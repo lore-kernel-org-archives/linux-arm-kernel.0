@@ -1,66 +1,148 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 9 Mar 2015 15:14:06 +0200
-Subject: [PATCH 0/6] dmaengine/dra7x: DMA router (crossbar support)
-In-Reply-To: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1424787683-19151-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <54FD9C9E.8000405@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Mar 2015 14:26:11 +0100
+Subject: [PATCH v2 5/6] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <1425479753-18349-6-git-send-email-alex.bennee@linaro.org>
+References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+ <1425479753-18349-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150309132611.GB20559@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/24/2015 04:21 PM, Peter Ujfalusi wrote:
-> Hi,
+On Wed, Mar 04, 2015 at 02:35:52PM +0000, Alex Benn?e wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> The series adds support for DMA router type of devices. They are used in SoCs
-> which has more peripherals with DMA request lines than the DMA controller can
-> handle.
-> The router itself is not part of the DMA controller and it's operation should be
-> transparent (as it is in the HW) for the SW stack.
+> The current code was negatively indexing the cpu state array and not
+> synchronizing banked spsr register state with the current mode's spsr
+> state, causing occasional failures with migration.
 > 
-> This series takes into accound the comments Sricharan received for his version
-> of the crossbar driver:
-> https://lkml.org/lkml/2014/3/7/199
+> Some munging is done to take care of the aarch64 mapping and also to
+> ensure the most current value of the spsr is updated to the banked
+> registers (relevant for KVM<->TCG migration).
 > 
-> This implementation is not tied to any DMA driver so it is possible to use the
-> framework by other vendors, also ACPI version of binding can be easy enough to
-> be added.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > 
-> The omap-dma part of changes are based on the dma property name change series:
-> https://lkml.org/lkml/2015/2/20/182
-> 
-> but the code has fallback so it is working w/o the changes in that series.
-
-Gentle ping on this series before I send the V2 with the comments from Russell
-and Paul addressed.
-
-Kind Regards,
-P?ter
-
-> 
-> Regards,
-> Peter
 > ---
-> Peter Ujfalusi (6):
->   dmaengine: of_dma: Support for DMA routers
->   dmaengine: Add driver for TI DMA crossbar on DRA7x
->   dmaengine: omap-dma: Use defines for dma channels and request count
->   dmaengine: omap-dma: Take DMA request number from DT if it is
->     available
->   dmaengine: omap-dma: Remove mapping between virtual channels and
->     requests
->   ARM: DTS: dra7x: Integrate sDMA crossbar
+> v2 (ajb)
+>   - minor tweaks and clarifications
+> v3
+>   - Use the correct bank index function for setting/getting env->spsr
+>   - only deal with spsrs in elevated exception levels
 > 
->  Documentation/devicetree/bindings/dma/dma.txt |  27 ++++
->  arch/arm/boot/dts/dra7.dtsi                   |  57 ++++----
->  drivers/dma/Kconfig                           |   4 +
->  drivers/dma/Makefile                          |   1 +
->  drivers/dma/dmaengine.c                       |   7 +
->  drivers/dma/of-dma.c                          |  92 +++++++++++++
->  drivers/dma/omap-dma.c                        |  24 +++-
->  drivers/dma/ti-dma-crossbar.c                 | 191 ++++++++++++++++++++++++++
->  include/linux/dmaengine.h                     |  17 +++
->  include/linux/of_dma.h                        |  21 +++
->  10 files changed, 413 insertions(+), 28 deletions(-)
->  create mode 100644 drivers/dma/ti-dma-crossbar.c
+> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> index c60e989..45e5c3f 100644
+> --- a/target-arm/kvm64.c
+> +++ b/target-arm/kvm64.c
+> @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>      uint64_t val;
+>      int i;
+>      int ret;
+> +    unsigned int el;
+>  
+>      ARMCPU *cpu = ARM_CPU(cs);
+>      CPUARMState *env = &cpu->env;
+> @@ -206,9 +207,27 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          return ret;
+>      }
+>  
+> +    /* Saved Program State Registers
+> +     *
+> +     * Before we restore from the banked_spsr[] array we need to
+> +     * ensure that any modifications to env->spsr are correctly
+> +     * reflected and map aarch64 exception levels if required.
+> +     */
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            /* KVM only maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 ATM */
+
+not sure about the 'for aarch64' comment; I would say that it's for
+aarch32 support.  Also, you can drop the ATM, since this is user space
+ABI that we don't change easily.
+
+
+don't you need to do env->banked_spsr[0] = env->spsr first?
+
+> +            env->banked_spsr[1] = env->banked_spsr[0];
+
+
+> +        } else {
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> +            env->banked_spsr[i] = env->spsr;
+
+so here we don't need to worry about banked_spsr[1] = banked_spsr[0]
+because banked_spsr[0] is meaningless for 32-bit state and we only sync
+banked_spsr[1] and up to KVM, correct?  I think this is what may deserve
+a comment.
+
+> +        }
+> +    }
+> +
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+>          ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+> @@ -253,6 +272,7 @@ int kvm_arch_get_registers(CPUState *cs)
+>      struct kvm_one_reg reg;
+>      uint64_t val;
+>      uint32_t fpr;
+> +    unsigned int el;
+>      int i;
+>      int ret;
+>  
+> @@ -325,15 +345,35 @@ int kvm_arch_get_registers(CPUState *cs)
+>          return ret;
+>      }
+>  
+> +    /* Fetch the SPSR registers
+> +     *
+> +     * KVM has an array of state indexed for all the possible aarch32
+> +     * privilage levels. Although not all are valid at all points
+
+privilege
+
+> +     * there are some transitions possible which can access old state
+> +     * so it is worth keeping them all.
+> +     */
+
+dubious comment overall
+
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+>          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+>          }
+>      }
+>  
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            /* KVM maps KVM_SPSR_SVC to KVM_SPSR_EL1 for aarch64 */
+
+same as above
+
+> +            env->banked_spsr[0] = env->banked_spsr[1];
+> +            i = aarch64_banked_spsr_index(el);
+> +        } else {
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+
+same potential place for comment as above.
+
+> +        }
+> +        env->spsr = env->banked_spsr[i];
+> +    }
+> +
+>      /* Advanced SIMD and FP registers */
+>      for (i = 0; i < 32; i++) {
+>          reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
+> -- 
+> 2.3.1
 > 
