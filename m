@@ -1,59 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 09 Mar 2015 15:40:29 -0700
-Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
-In-Reply-To: <20150309215803.GD7525@pengutronix.de>
-References: <20150221085620.GV19388@pengutronix.de>
- <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150306185730.11109.45998@quantum> <20150306192813.GG10717@pengutronix.de>
- <54FA02B7.8090703@codeaurora.org> <1425895136.3152.22.camel@pengutronix.de>
- <54FDEEFE.1060803@codeaurora.org> <20150309210735.14952.91257@quantum>
- <20150309215803.GD7525@pengutronix.de>
-Message-ID: <54FE215D.7090804@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Mar 2015 15:49:30 -0700
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <1425915402-10012-3-git-send-email-eliad@wizery.com>
+ <9217056.Z3urqp19oZ@wuerfel>
+ <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
+Message-ID: <20150309224929.GL5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/15 14:58, Uwe Kleine-K?nig wrote:
->
-> If you see
->
-> 	round_rate(110) = 108
->
-> it would be fortunate to know if you get 108 because the next available
-> greater rate is > 112 or because the implementation rounds down always
-> (which would mean that 111 is possible, too). For the "easy" consumers
-> this probably doesn't matter much, but if you do things that affects
-> a considerable part of the clock tree, you really want to know more
-> about the behaviour of round_rate to effectively work with its results.
->
-> So yes, please let us pick ceiling for round_rate (i.e. a fixed policy
-> for all clks) and then it should even be possible to make
-> clk_set_rate_range a generic function that doesn't need the min and max
-> members in the clk struct and the respective parameters to
-> determine_rate.
->
-> What should a clock that can only provide 100 Hz return on
->
-> 	clk_round_rate(clk, 60);
->
-> ? 0? -ESOMETHING (for SOMETHING = ...?)?
->
+* Eliad Peller <eliad@wizery.com> [150309 14:03]:
+> On Mon, Mar 9, 2015 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 09 March 2015 17:36:42 Eliad Peller wrote:
+> >> --- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+> >> +++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+> >> @@ -64,4 +64,13 @@
+> >>         vmmc-supply = <&lbep5clwmc_wlen>;
+> >>         bus-width = <4>;
+> >>         non-removable;
+> >> +
+> >> +       #address-cells = <1>;
+> >> +       #size-cells = <0>;
+> >> +       wlcore: wlcore at 2 {
+> >> +               compatible = "ti,wl1835";
+> >> +               reg = <2>;
+> >> +               interrupt-parent = <&gpio5>;
+> >> +               interrupts = <8 IRQ_TYPE_NONE>;
+> >> +       };
+> >>
+> >
+> > Why IRQ_TYPE_NONE?
+> >
+> i simply mirrored the current board file (which only sets the irq number).
+> 
+> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+> > if that's enough to clean out the platform_data handling from the wlcore
+> > driver, it's good enough as a start.
+> not sure i'm following - can you elaborate?
+> 
+> i'll summarize the way i see it. please correct me if i'm wrong.
+> 
+> both wl18xx and wl12xx use the platform data to get the irq number.
+> wl12xx (only) also needs some additional clock definitions to be
+> passed. there's currently some issue with specifying some the of clock
+> sources, so i preferred starting only with (the simpler) wl18xx
+> bindings.
+> 
+> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+> data (i.e. irq) can be passed by the new DT bindings.
+> however, for platforms with wl12xx, we still need to pass the clock
+> definitions (along with the irq), so we have to keep
+> legacy_init_wl12xx for the time being (and that's also why we have to
+> currently keep the platform_data handling in the wlcore driver)
+> 
+> do you have something else in mind?
 
-Do you have any real world use cases, or is this just all theoretical?
-At least in Philipp's panel case we can discuss how to make an API that
-works properly. These other examples are either completely theoretical
-or taken out of context and so it's unclear how they matter in practice.
+I think what Arnd is saying is we've now removed all the wl12xx using
+legacy platforms, so all of them can boot with just data from dts.
 
-Ideally I'd like an API to exist that doesn't require going back and
-forth with the framework (i.e. it's "atomic" and doesn't require calling
-clk_round_rate() in a loop) and that allows consumers to properly
-express what they want. Right now we have a way to say min/max and a
-typical rate is in the works. If we need to declare some sort of clock
-provider rounding policy then we've failed to provide an API that
-properly expresses all the requirements that the consumer has. It
-probably means we're missing some key parameter that consumers know but
-we don't accept. Maybe some more concrete examples will help clarify
-what this is.
+Regards,
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
