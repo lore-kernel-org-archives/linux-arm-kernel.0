@@ -1,60 +1,49 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 9 Mar 2015 15:59:48 +0000
-Subject: [PATCH v2 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <1425491994-23913-11-git-send-email-andre.przywara@arm.com>
-References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
- <1425491994-23913-11-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150309155935.GA3984@e103592.cambridge.arm.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Mon, 09 Mar 2015 12:58:54 -0300
+Subject: [PATCH] MTD: cfi: reduce stack size
+In-Reply-To: <2161999.Fy9EjgoTPm@wuerfel>
+References: <2161999.Fy9EjgoTPm@wuerfel>
+Message-ID: <54FDC33E.2060004@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 05:59:54PM +0000, Andre Przywara wrote:
-> The ARM Server Base System Architecture[1] document describes a
-> generic UART which is a subset of the PL011 UART.
-> It lacks DMA support, baud rate control and modem status line
-> control, among other things.
-> The idea is to move the UART initialization and setup into the
-> firmware (which does this job today already) and let the kernel just
-> use the UART for sending and receiving characters.
+On 03/09/2015 10:58 AM, Arnd Bergmann wrote:
+> The cfi_staa_write_buffers function uses a large amount of ernel stack
+
+Typo: "ernel"
+
+> whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
+> warning on ARM allmodconfig builds:
 > 
-> We use the recent refactoring to build a new struct uart_ops
-> variable which points to some new functions avoiding access to the
-> missing registers. We reuse as much existing PL011 code as possible.
+> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+> drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 > 
-> In contrast to the PL011 the SBSA UART does not define any AMBA or
-> PrimeCell relations, so we go with a pretty generic probe function
-> which only uses platform device functions.
-> A DT binding is provided, but other systems can easily attach to it,
-> too (hint, hint!).
+> It turns out that this is largely a result of a suboptimal implementation
+> of map_word_andequal(). Replacing this function with a straightforward
+> one reduces the stack size in this function by exactly 200 bytes,
+> shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
+> and makes the warning go away.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+> index 5f487d776411..2d2457bee50c 100644
+> --- a/include/linux/mtd/map.h
+> +++ b/include/linux/mtd/map.h
+> @@ -314,7 +314,15 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
+>  	return r;
+>  }
+>  
+> -#define map_word_andequal(m, a, b, z) map_word_equal(m, z, map_word_and(m, a, b))
+> +static inline int map_word_andequal(struct map_info *map, map_word val1, map_word val2, map_word val3)
+> +{
+> +	int i;
+> +	for (i=0; i<map_words(map); i++) {
 
-[...]
+Nit:
 
-> +MODULE_DEVICE_TABLE(of, sbsa_uart_match);
-> +
-> +static struct platform_driver arm_sbsa_uart_platform_driver = {
-> +	.probe		= sbsa_uart_probe,
-> +	.remove		= sbsa_uart_remove,
-> +	.driver	= {
-> +		.name	= "sbsa-uart",
-> +		.of_match_table = of_match_ptr(sbsa_uart_match),
-> +	},
-> +};
-> +
-> +module_platform_driver(arm_sbsa_uart_platform_driver);
+for (i = 0; i < map_words(map); i++)
 
-Hmmm, this seems to break with CONFIG_MODULE -- it tries to create its
-own module_{init,exit} that just register/unregister the platform
-driver.
-
-Instead, I think the existing init/exit functions need to register/
-unregister both drivers.
-
-Module initialisation shouldn't fail unless neither registration
-succeeds (?) -- if only one succeeds we can carry on, but it's worth
-a printk.  Or can the failure of either registration just be fatal?
-
-Cheers
----Dave
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
