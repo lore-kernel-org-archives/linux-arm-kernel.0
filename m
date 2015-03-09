@@ -1,45 +1,44 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 10 Mar 2015 02:00:44 +0900
-Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1425912389.4871.19.camel@mtksdaap41>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <CAAFQd5AhTe=d9tXN8kaRah_GiZYYxG0cD0up=cbHkSfbBnXmvQ@mail.gmail.com>
- <1425912389.4871.19.camel@mtksdaap41>
-Message-ID: <CAAFQd5DpXxyoNiTGC4YYnpXeKo43XXrC+my6KWOV1pGq1jw6Aw@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 9 Mar 2015 18:01:51 +0100
+Subject: [PATCH 14/14] MAINTAINERS: Add entry for STM32 MCUs
+In-Reply-To: <CACRpkdaYVyH-y19yHYp2noq6VhDVJYQfqkevDtLr-7y8gVwdXw@mail.gmail.com>
+References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1423763164-5606-15-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdaM0BwMcq77MO=0-dVaqwobD5Pt+11j7ZZ4c3yKM=AkeA@mail.gmail.com>
+ <CALszF6Bz978KA1DAxcKtmA55X=vJWEcVDa9fLOF=uNatYS+b+Q@mail.gmail.com>
+ <CACRpkdaYVyH-y19yHYp2noq6VhDVJYQfqkevDtLr-7y8gVwdXw@mail.gmail.com>
+Message-ID: <CALszF6B1k9tAhhhwMJ9y3J9JdPabdeK4600FBw0o21YL4kSoAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 9, 2015 at 11:46 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> On Mon, 2015-03-09 at 20:11 +0900, Tomasz Figa wrote:
-> <...>
->> > +/*
->> > + * pimudev is a global var for dma_alloc_coherent.
->> > + * It is not accepatable, we will delete it if "domain_alloc" is enabled
->> > + */
->> > +static struct device *pimudev;
+2015-03-09 17:47 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Mar 6, 2015 at 10:55 AM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+>> 2015-03-06 10:03 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+>>> On Thu, Feb 12, 2015 at 6:46 PM, Maxime Coquelin
+>>> <mcoquelin.stm32@gmail.com> wrote:
+>>>
+>>>> Add a MAINTAINER entry covering all STM32 machine and drivers files.
+>>>>
+>>>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>>
+>>> (...)
+>>>> +F:     drivers/clocksource/arm_system_timer.c
+>>>
+>>> Is that all? And that is not even a STM32 specific driver.
 >>
->> This is indeed not acceptable. Could you replace dma_alloc_coherent()
->> with something that doesn't require device pointer, e.g.
->> alloc_pages()? (Although that would require you to handle cache
->> maintenance in the driver, due to cached memory allocated.) I need to
->> think about a better solution for this.
+>> For the ARM System Timer, I'm fine to add a new entry.
+>> Or remove the line, and let the maintain-ship to clocksource maintainers.
+>>
+>> All the STM32 files are covered by this line:
+>> +N:     stm32
 >
-> Hi,
+> Aha you're right, news2me, I'm old and stupid :/
+
+This is new to me too. :)
+
+Maxime
+
 >
-> For 2nd level page table, we use cached memory now. Currently we are
-> using __dma_flush_range to flush the cache, which is also unacceptable.
->
-> For proper cache management, we'll need to use dma_map_single or
-> dma_sync_*, which still need a deivce*.
-
-Looking at how already mainlined drivers do this, they either use
-dmac_flush_range()
-(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iommu/msm_iommu.c?id=refs/tags/v4.0-rc3#n80)
-or directly __cpuc_flush_dcache_area() and outer_flush_range()
-(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iommu/rockchip-iommu.c?id=refs/tags/v4.0-rc3#n93).
-
-Joerg, what's your opinion on this?
-
-Best regards,
-Tomasz
+> Thanks,
+> Linus Walleij
