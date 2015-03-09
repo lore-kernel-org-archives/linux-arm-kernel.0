@@ -1,40 +1,18 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon,  9 Mar 2015 09:16:46 -0600
-Subject: [PATCH v15 11/11] ARM: qcom: Update defconfig
-In-Reply-To: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
-References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1425914206-22295-12-git-send-email-lina.iyer@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 9 Mar 2015 08:27:58 -0700
+Subject: [v5, 1/9] mfd: dt-bindings: Provide human readable defines for
+ LPC mode choosing
+In-Reply-To: <1425492398-27340-2-git-send-email-lee.jones@linaro.org>
+References: <1425492398-27340-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150309152758.GA7497@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Enable QCOM_PM
-* Enable ARM_CPUIDLE
+On Wed, Mar 04, 2015 at 06:06:30PM +0000, Lee Jones wrote:
+> ST's Low Power Controller can currently operate in two supported modes;
+> Watchdog and Real Time Clock.  These defines will aid engineers to easily
+> identify the selected mode.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- arch/arm/configs/qcom_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da33..33a5339 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -30,6 +30,7 @@ CONFIG_CLEANCACHE=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_IDLE=y
-+CONFIG_ARM_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-@@ -135,6 +136,7 @@ CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
- CONFIG_QCOM_GSBI=y
-+CONFIG_QCOM_PM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_IPQ_GCC_806X=y
--- 
-2.1.0
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
