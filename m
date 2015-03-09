@@ -1,64 +1,36 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 9 Mar 2015 17:51:40 +0100
-Subject: [PATCH v2 16/18] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <CACRpkdaW-OMgGfw8+ngia8AsmzRpW8z7922=dPpRGjgv79-gqw@mail.gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-17-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdaW-OMgGfw8+ngia8AsmzRpW8z7922=dPpRGjgv79-gqw@mail.gmail.com>
-Message-ID: <CALszF6DW4_2AmVgG3EBNqKTaP=cf-ZimZCR7_Cynqz5Uczs2+g@mail.gmail.com>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Mon, 9 Mar 2015 22:22:17 +0530
+Subject: [PATCH] pinctrl: exynos: Remove eint_gpio_init call-back for
+ exynos7 alive pinctrl block
+In-Reply-To: <CA+Ln22HGH3r6UEYtCPU7Y4a0-b4FKnx8d0VcA3a1-m1VD5Jm=w@mail.gmail.com>
+References: <1425226876-5122-1-git-send-email-a.kesavan@samsung.com>
+ <CA+Ln22HGH3r6UEYtCPU7Y4a0-b4FKnx8d0VcA3a1-m1VD5Jm=w@mail.gmail.com>
+Message-ID: <CAM4voandpVQqVtHgZdTViEzNtBj=XWJ7A7yY5oGqgqg4btxzCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-09 15:39 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Feb 20, 2015 at 7:01 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->
->> The STMicrolectornics's STM32F419 MCU has the following main features:
->>  - Cortex-M4 core running up to @180MHz
->>  - 2MB internal flash, 256KBytes internal RAM
->>  - FMC controller to connect SDRAM, NOR and NAND memories
->>  - SD/MMC/SDIO support
->>  - Ethernet controller
->>  - USB OTFG FS & HS controllers
->>  - I2C, SPI, CAN busses support
->>  - Several 16 & 32 bits general purpose timers
->>  - Serial Audio interface
->>  - LCD controller
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> (...)
->> +       soc {
->> +               usart1: usart at 40011000 {
->> +                       status = "okay";
->> +               };
->> +
->> +               leds {
->> +                       compatible = "gpio-leds";
->> +                       red {
->> +                               #gpio-cells = <2>;
->> +                               label = "Front Panel LED";
->> +                               gpios = <&gpiog 14 0>;
->> +                               linux,default-trigger = "heartbeat";
->> +                       };
->> +                       green {
->> +                               #gpio-cells = <2>;
->> +                               gpios = <&gpiog 13 0>;
->> +                               default-state = "off";
->> +                       };
->> +               };
->> +       };
->
-> The LEDs are mounted on the board not the SoC, right?
->
-> So move them outside of the soc node, to the top level
-> of the DTS file.
+Hi Tomasz,
 
-Yes, you are right.
-Andreas already made the same remark, and the top-level move is
-already here in the upcoming v3.
-
-Thanks,
-Maxime
+On Mon, Mar 9, 2015 at 3:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Abhilash, Linus,
 >
-> Yours,
-> Linus Walleij
+> 2015-03-02 1:21 GMT+09:00 Abhilash Kesavan <a.kesavan@samsung.com>:
+>> The alive pin controller on exynos7 does not support external gpio
+>> interrupts. Hence, remove the eint_gpio_init call-back for it. This
+>> fixes the following error message seen during exynos7 boot-up:
+>> "samsung-pinctrl 10580000.pinctrl: irq number not available"
+>
+> As long as "external gpio interrupts" refer to non-wake-up-capable
+> GPIO interrupts I'm fine with this patch.
+
+Yes, that was the intention. Thanks for the review.
+
+Regards,
+Abhilash
+>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+>
+> Thanks Linus for pinging and sorry for delay.
+>
+> Best regards,
+> Tomasz
