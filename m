@@ -1,43 +1,30 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 9 Mar 2015 11:51:49 +0800
-Subject: [PATCH v2.0 6/6] pm: at91: remove unused void (*at91_pm_standby)(void)
-In-Reply-To: <1425872857-7772-1-git-send-email-wenyou.yang@atmel.com>
-References: <1425872857-7772-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1425873109-8025-1-git-send-email-wenyou.yang@atmel.com>
+Date: Mon, 9 Mar 2015 11:53:07 +0800
+Subject: [PATCH v2.0 0/2] ARM: at91: Add pm support for sama5d3 and sama5d4
+Message-ID: <1425873187-8096-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the standby mode use the same sram function as the suspend to memory
-mode, void (*at91_pm_standby)(void) doesn't need, remove it.
+Hi,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/pm.c |    5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+The patch series purpose is to add pm support for sama5d3 and sama5d4.
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index a008e9c..9fb868d 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -42,7 +42,6 @@ static struct {
- 	int memctrl;
- } at91_pm_data;
- 
--static void (*at91_pm_standby)(void);
- void __iomem *at91_ramc_base[2];
- 
- static int at91_pm_valid_state(suspend_state_t state)
-@@ -207,10 +206,8 @@ static struct platform_device at91_cpuidle_device = {
- 
- static void at91_pm_set_standby(void (*at91_standby)(void))
- {
--	if (at91_standby) {
-+	if (at91_standby)
- 		at91_cpuidle_device.dev.platform_data = at91_standby;
--		at91_pm_standby = at91_standby;
--	}
- }
- 
- static const struct of_device_id ramc_ids[] __initconst = {
+It is based on the branch, at91-4.0-fixes
+git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+	+ [PATCH] ARM: AT91: pm improvement for 4.1
+
+Change log for v2.0:
+ - remove the patch already stacked. 
+ - rebase.
+
+Wenyou Yang (2):
+  pm: at91: pm_suspend: add the WFI instruction support for ARMv7
+  pm: at91: flush data cache and clean, invalidate and disable the L2
+    cache
+
+ arch/arm/mach-at91/pm.c         |    6 ++++++
+ arch/arm/mach-at91/pm_suspend.S |   20 +++++++++++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+
 -- 
 1.7.9.5
