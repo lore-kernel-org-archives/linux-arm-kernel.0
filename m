@@ -1,100 +1,117 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon,  9 Mar 2015 09:16:36 -0600
-Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
+Date: Mon,  9 Mar 2015 09:16:38 -0600
+Subject: [PATCH v15 03/11] ARM: cpuidle: qcom: Add documentation for qcom
+ cpuidle states.
 In-Reply-To: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
 References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1425914206-22295-4-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Add documentation for cpuidle states of QCOM cpus. In addition to
+arm-idle-state compatible string, the ARM idle state definition must
+define one of the following compatible strings -
+	"qcom,idle-state-stby",
+	"qcom,idle-state-ret",
+	"qcom,idle-state-spc",
+	"qcom,idle-state-pc",
 
-Some architectures have some cpus which does not support idle states.
+The compatibles helps the SPM platform driver to use the correct idle
+function when the index to the idle state is passed to the platform
+driver.
 
-Let the underlying low level code to return -ENOSYS when it is not
-possible to set an idle state.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-[Minor clean ups and fixes of the per-cpu variable]
 ---
- drivers/cpuidle/cpuidle-arm.c | 34 +++++++++++++++++++++++++++++++++-
- 1 file changed, 33 insertions(+), 1 deletion(-)
+ .../bindings/arm/msm/qcom,idle-state.txt           | 81 ++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 1c94b88..f7cdb73 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -17,11 +17,14 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/slab.h>
- 
- #include <asm/cpuidle.h>
- 
- #include "dt_idle_states.h"
- 
-+static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+new file mode 100644
+index 0000000..ae1b07f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+@@ -0,0 +1,81 @@
++QCOM Idle States for cpuidle driver
 +
- /*
-  * arm_enter_idle_state - Programs CPU to enter the specified state
-  *
-@@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
- static int __init arm_idle_init(void)
- {
- 	int cpu, ret;
-+	struct cpuidle_device *dev;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
- 
- 	/*
-@@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
- 	if (ret <= 0)
- 		return ret ? : -ENODEV;
- 
++ARM provides idle-state node to define the cpuidle states, as defined in [1].
++cpuidle-qcom is the cpuidle driver for Qualcomm SoCs and uses these idle
++states. Idle states have different enter/exit latency and residency values.
++The idle states supported by the QCOM SoC are defined as -
 +
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("Failed to register cpuidle driver\n");
-+		return ret;
-+	}
++    * Standby
++    * Retention
++    * Standalone Power Collapse (Standalone PC or SPC)
++    * Power Collapse (PC)
 +
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
++Standby: Standby does a little more in addition to architectural clock gating.
++When the WFI instruction is executed the ARM core would gate its internal
++clocks. In addition to gating the clocks, QCOM cpus use this instruction as a
++trigger to execute the SPM state machine. The SPM state machine waits for the
++interrupt to trigger the core back in to active. This triggers the cache
++hierarchy to enter standby states, when all cpus are idle. An interrupt brings
++the SPM state machine out of its wait, the next step is to ensure that the
++cache hierarchy is also out of standby, and then the cpu is allowed to resume
++execution.
 +
- 		ret = arm_cpuidle_init(cpu);
-+		/*
-+		 * This cpu does not support any idle states
-+		 */
-+		if (ret == -ENOSYS)
-+			continue;
++Retention: Retention is a low power state where the core is clock gated and
++the memory and the registers associated with the core are retained. The
++voltage may be reduced to the minimum value needed to keep the processor
++registers active. The SPM should be configured to execute the retention
++sequence and would wait for interrupt, before restoring the cpu to execution
++state. Retention may have a slightly higher latency than Standby.
 +
- 		if (ret) {
- 			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
- 			return ret;
- 		}
++Standalone PC: A cpu can power down and warmboot if there is a sufficient time
++between the time it enters idle and the next known wake up. SPC mode is used
++to indicate a core entering a power down state without consulting any other
++cpu or the system resources. This helps save power only on that core.  The SPM
++sequence for this idle state is programmed to power down the supply to the
++core, wait for the interrupt, restore power to the core, and ensure the
++system state including cache hierarchy is ready before allowing core to
++resume. Applying power and resetting the core causes the core to warmboot
++back into Elevation Level (EL) which trampolines the control back to the
++kernel. Entering a power down state for the cpu, needs to be done by trapping
++into a EL. Failing to do so, would result in a crash enforced by the warm boot
++code in the EL for the SoC. On SoCs with write-back L1 cache, the cache has to
++be flushed in s/w, before powering down the core.
 +
-+		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+		if (!dev)
-+			return -ENOMEM;
++Power Collapse: This state is similar to the SPC mode, but distinguishes
++itself in that the cpu acknowledges and permits the SoC to enter deeper sleep
++modes. In a hierarchical power domain SoC, this means L2 and other caches can
++be flushed, system bus, clocks - lowered, and SoC main XO clock gated and
++voltages reduced, provided all cpus enter this state.  Since the span of low
++power modes possible at this state is vast, the exit latency and the residency
++of this low power mode would be considered high even though at a cpu level,
++this essentially is cpu power down. The SPM in this state also may handshake
++with the Resource power manager processor in the SoC to indicate a complete
++application processor subsystem shut down.
 +
-+		dev->cpu = cpu;
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("Failed to register cpuidle device for CPU %d\n",
-+			       cpu);
-+			return ret;
-+		}
++The idle-state for QCOM SoCs are distinguished by the compatible property of
++the idle-states device node.
++The devicetree representation of the idle state should be -
 +
-+		per_cpu(cpuidle_arm_dev, cpu) = dev;
- 	}
- 
--	return cpuidle_register(drv, NULL);
-+	return 0;
- }
- device_initcall(arm_idle_init);
++Required properties:
++
++- compatible: Must be one of -
++			"qcom,idle-state-stby",
++			"qcom,idle-state-ret",
++			"qcom,idle-state-spc",
++			"qcom,idle-state-pc",
++		and "arm,idle-state".
++
++Other required and optional properties are specified in [1].
++
++Example:
++
++	idle-states {
++		CPU_SPC: spc {
++			compatible = "qcom,idle-state-spc", "arm,idle-state";
++			entry-latency-us = <150>;
++			exit-latency-us = <200>;
++			min-residency-us = <2000>;
++		};
++	};
++
++[1]. Documentation/devicetree/bindings/arm/idle-states.txt
 -- 
 2.1.0
