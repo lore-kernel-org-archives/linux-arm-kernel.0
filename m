@@ -1,182 +1,492 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 9 Mar 2015 11:49:46 +0800
-Subject: [PATCH v2.0 3/6] pm: at91: standby mode uses same sram function as
- suspend to memory mode
+Date: Mon, 9 Mar 2015 11:50:29 +0800
+Subject: [PATCH v2.0 4/6] pm: at91: rename file name: pm_slowclock.S
+ -->pm_suspend.S
 In-Reply-To: <1425872857-7772-1-git-send-email-wenyou.yang@atmel.com>
 References: <1425872857-7772-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1425872986-7905-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1425873029-7957-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To simply the PM code, the suspend to standby mode uses same sram function
-as the suspend to memory mode, running in the internal SRAM, instead of the
-respective code for each mode.
-
-For the suspend to standby mode, the master clock doesn't switch to the slow
-clock, and PLLA and the main oscillator doesn't turn off as well.
+Because the sram function is used for both suspend to memory and the suspend
+to standby mode, renaming is more elegant.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c           |   85 +++++++++++++++++--------------------
- arch/arm/mach-at91/pm.h           |   10 +++++
- arch/arm/mach-at91/pm_slowclock.S |   25 ++++++++++-
- 3 files changed, 73 insertions(+), 47 deletions(-)
+ arch/arm/mach-at91/Makefile       |    2 +-
+ arch/arm/mach-at91/pm_slowclock.S |  353 -------------------------------------
+ arch/arm/mach-at91/pm_suspend.S   |  353 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 354 insertions(+), 354 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
+ create mode 100644 arch/arm/mach-at91/pm_suspend.S
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 7cb3a33..3fc5e12 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -128,62 +128,55 @@ extern void at91_slow_clock(void __iomem *pmc, void __iomem *ramc0,
- 			    void __iomem *ramc1, int memctrl);
- extern u32 at91_slow_clock_sz;
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 103c256..7df8c854 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -13,7 +13,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
  
-+static void at91_pm_suspend(suspend_state_t state)
-+{
-+	unsigned int pm_data = at91_pm_data.memctrl;
-+
-+	pm_data |= (state == PM_SUSPEND_MEM) ?
-+				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
-+
-+	slow_clock(at91_pmc_base, at91_ramc_base[0],
-+			at91_ramc_base[1], pm_data);
-+}
-+
- static int at91_pm_enter(suspend_state_t state)
- {
- 	at91_pinctrl_gpio_suspend();
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= pm_slowclock.o
++obj-$(CONFIG_PM)		+= pm_suspend.o
  
- 	switch (state) {
-+	/*
-+	 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
-+	 * drivers must suspend more deeply, the master clock switches
-+	 * to the clk32k and turns off the main oscillator
-+	 */
-+	case PM_SUSPEND_MEM:
- 		/*
--		 * Suspend-to-RAM is like STANDBY plus slow clock mode, so
--		 * drivers must suspend more deeply:  only the master clock
--		 * controller may be using the main oscillator.
-+		 * Ensure that clocks are in a valid state.
- 		 */
--		case PM_SUSPEND_MEM:
--			/*
--			 * Ensure that clocks are in a valid state.
--			 */
--			if (!at91_pm_verify_clocks())
--				goto error;
--
--			/*
--			 * Enter slow clock mode by switching over to clk32k and
--			 * turning off the main oscillator; reverse on wakeup.
--			 */
--			if (slow_clock) {
--				slow_clock(at91_pmc_base, at91_ramc_base[0],
--					   at91_ramc_base[1],
--					   at91_pm_data.memctrl);
--				break;
--			} else {
--				pr_info("AT91: PM - no slow clock mode enabled ...\n");
--				/* FALLTHROUGH leaving master clock alone */
--			}
-+		if (!at91_pm_verify_clocks())
-+			goto error;
- 
--		/*
--		 * STANDBY mode has *all* drivers suspended; ignores irqs not
--		 * marked as 'wakeup' event sources; and reduces DRAM power.
--		 * But otherwise it's identical to PM_SUSPEND_ON:  cpu idle, and
--		 * nothing fancy done with main or cpu clocks.
--		 */
--		case PM_SUSPEND_STANDBY:
--			/*
--			 * NOTE: the Wait-for-Interrupt instruction needs to be
--			 * in icache so no SDRAM accesses are needed until the
--			 * wakeup IRQ occurs and self-refresh is terminated.
--			 * For ARM 926 based chips, this requirement is weaker
--			 * as at91sam9 can access a RAM in self-refresh mode.
--			 */
--			if (at91_pm_standby)
--				at91_pm_standby();
--			break;
-+		at91_pm_suspend(state);
- 
--		case PM_SUSPEND_ON:
--			cpu_do_idle();
--			break;
-+		break;
- 
--		default:
--			pr_debug("AT91: PM - bogus suspend state %d\n", state);
--			goto error;
-+	/*
-+	 * STANDBY mode has *all* drivers suspended; ignores irqs not
-+	 * marked as 'wakeup' event sources; and reduces DRAM power.
-+	 * But otherwise it's identical to PM_SUSPEND_ON: cpu idle, and
-+	 * nothing fancy done with main or cpu clocks.
-+	 */
-+	case PM_SUSPEND_STANDBY:
-+		at91_pm_suspend(state);
-+		break;
-+
-+	case PM_SUSPEND_ON:
-+		cpu_do_idle();
-+		break;
-+
-+	default:
-+		pr_debug("AT91: PM - bogus suspend state %d\n", state);
-+		goto error;
- 	}
- 
- error:
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index 86a9d0b..dcacfa1 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -15,6 +15,14 @@
- 
- #include <mach/at91_ramc.h>
- 
-+#define	AT91_PM_MEMTYPE_MASK	0x0f
-+
-+#define	AT91_PM_MODE_OFFSET	4
-+#define	AT91_PM_MODE_MASK	0x01
-+#define	AT91_PM_MODE(x)		(((x) & AT91_PM_MODE_MASK) << AT91_PM_MODE_OFFSET)
-+
-+#define	AT91_PM_SLOW_CLOCK	0x01
-+
- /*
-  * The AT91RM9200 goes into self-refresh mode with this command, and will
-  * terminate self-refresh automatically on the next SDRAM access.
-@@ -25,6 +33,7 @@
-  * still in self-refresh is "not recommended", but seems to work.
-  */
- 
-+#ifndef __ASSEMBLY__
- static inline void at91rm9200_standby(void)
- {
- 	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
-@@ -106,3 +115,4 @@ static inline void at91sam9_sdram_standby(void)
- }
- 
- #endif
-+#endif
+ ifeq ($(CONFIG_PM_DEBUG),y)
+ CFLAGS_pm.o += -DDEBUG
 diff --git a/arch/arm/mach-at91/pm_slowclock.S b/arch/arm/mach-at91/pm_slowclock.S
-index 517e344..b0939c8 100644
+deleted file mode 100644
+index b0939c8..0000000
 --- a/arch/arm/mach-at91/pm_slowclock.S
-+++ b/arch/arm/mach-at91/pm_slowclock.S
-@@ -15,6 +15,7 @@
- #include <linux/clk/at91_pmc.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
++++ /dev/null
+@@ -1,353 +0,0 @@
+-/*
+- * arch/arm/mach-at91/pm_slow_clock.S
+- *
+- *  Copyright (C) 2006 Savin Zlobec
+- *
+- * AT91SAM9 support:
+- *  Copyright (C) 2007 Anti Sullin <anti.sullin@artecdesign.ee
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-#include <linux/linkage.h>
+-#include <linux/clk/at91_pmc.h>
+-#include <mach/hardware.h>
+-#include <mach/at91_ramc.h>
+-#include "pm.h"
+-
+-#define	SRAMC_SELF_FRESH_ACTIVE		0x01
+-#define	SRAMC_SELF_FRESH_EXIT		0x00
+-
+-pmc	.req	r0
+-tmp1	.req	r4
+-tmp2	.req	r5
+-
+-/*
+- * Wait until master clock is ready (after switching master clock source)
+- */
+-	.macro wait_mckrdy
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_MCKRDY
+-	beq	1b
+-	.endm
+-
+-/*
+- * Wait until master oscillator has stabilized.
+- */
+-	.macro wait_moscrdy
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_MOSCS
+-	beq	1b
+-	.endm
+-
+-/*
+- * Wait until PLLA has locked.
+- */
+-	.macro wait_pllalock
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_LOCKA
+-	beq	1b
+-	.endm
+-
+-/*
+- * Wait until PLLB has locked.
+- */
+-	.macro wait_pllblock
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_LOCKB
+-	beq	1b
+-	.endm
+-
+-	.text
+-
+-/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
+- *			void __iomem *ramc1, int memctrl)
+- */
+-ENTRY(at91_slow_clock)
+-	/* Save registers on stack */
+-	stmfd	sp!, {r4 - r12, lr}
+-
+-	/*
+-	 * Register usage:
+-	 *  R0 = Base address of AT91_PMC
+-	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
+-	 *  R2 = Base address of second RAM Controller or 0 if not present
+-	 *  R3 = Memory controller
+-	 *  R4 = temporary register
+-	 *  R5 = temporary register
+-	 */
+-
+-	/* Drain write buffer */
+-	mov	tmp1, #0
+-	mcr	p15, 0, tmp1, c7, c10, 4
+-
+-	str	r0, .pmc_base
+-	str	r1, .sramc_base
+-	str	r2, .sramc1_base
+-
+-	and	r0, r3, #AT91_PM_MEMTYPE_MASK
+-	str	r0, .memtype
+-
+-	lsr	r0, r3, #AT91_PM_MODE_OFFSET
+-	and	r0, r0, #AT91_PM_MODE_MASK
+-	str	r0, .pm_mode
+-
+-	/* Active the self-refresh mode */
+-	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	bl	at91_sramc_self_refresh
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_disable_main_clock
+-
+-	ldr	pmc, .pmc_base
+-
+-	/* Save Master clock setting */
+-	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
+-	str	tmp1, .saved_mckr
+-
+-	/*
+-	 * Set the Master clock source to slow clock
+-	 */
+-	bic	tmp1, tmp1, #AT91_PMC_CSS
+-	str	tmp1, [pmc, #AT91_PMC_MCKR]
+-
+-	wait_mckrdy
+-
+-	/* Save PLLA setting and disable it */
+-	ldr	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-	str	tmp1, .saved_pllar
+-
+-	mov	tmp1, #AT91_PMC_PLLCOUNT
+-	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+-	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-
+-	/* Save PLLB setting and disable it */
+-	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
+-	str	tmp1, .saved_pllbr
+-
+-	mov	tmp1, #AT91_PMC_PLLCOUNT
+-	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
+-
+-	/* Turn off the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-skip_disable_main_clock:
+-	ldr	pmc, .pmc_base
+-
+-	/* Wait for interrupt */
+-	mcr	p15, 0, tmp1, c7, c0, 4
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_enable_main_clock
+-
+-	ldr	pmc, .pmc_base
+-
+-	/* Turn on the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-	wait_moscrdy
+-
+-	/* Restore PLLB setting */
+-	ldr	tmp1, .saved_pllbr
+-	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
+-
+-	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
+-	bne	1f
+-	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
+-	beq	2f
+-1:
+-	wait_pllblock
+-2:
+-
+-	/* Restore PLLA setting */
+-	ldr	tmp1, .saved_pllar
+-	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-
+-	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
+-	bne	3f
+-	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
+-	beq	4f
+-3:
+-	wait_pllalock
+-4:
+-
+-	/*
+-	 * Restore master clock setting
+-	 */
+-	ldr	tmp1, .saved_mckr
+-	str	tmp1, [pmc, #AT91_PMC_MCKR]
+-
+-	wait_mckrdy
+-
+-skip_enable_main_clock:
+-	/* Exit the self-refresh mode */
+-	mov	r0, #SRAMC_SELF_FRESH_EXIT
+-	bl	at91_sramc_self_refresh
+-
+-	/* Restore registers, and return */
+-	ldmfd	sp!, {r4 - r12, pc}
+-ENDPROC(at91_slow_clock)
+-
+-/*
+- * void at91_sramc_self_refresh(unsigned int is_active)
+- *
+- * @input param:
+- *	@r0: 1 - active self-refresh mode
+- *	     0 - exit self-refresh mode
+- * register usage:
+- * 	@r1: memory type
+- *	@r2: base address of the sram controller
+- */
+-
+-ENTRY(at91_sramc_self_refresh)
+-	ldr	r1, .memtype
+-	ldr	r2, .sramc_base
+-
+-	cmp	r1, #AT91_MEMCTRL_MC
+-	bne	ddrc_sf
+-
+-	/*
+-	 * at91rm9200 Memory controller
+-	 */
+-
+-	 /*
+-	  * For exiting the self-refresh mode, do nothing,
+-	  * automatically exit the self-refresh mode.
+-	  */
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	exit_sramc_sf
+-
+-	/* Active SDRAM self-refresh mode */
+-	mov	r3, #1
+-	str	r3, [r2, #AT91RM9200_SDRAMC_SRR]
+-	b	exit_sramc_sf
+-
+-ddrc_sf:
+-	cmp	r1, #AT91_MEMCTRL_DDRSDR
+-	bne	sdramc_sf
+-
+-	/*
+-	 * DDR Memory controller
+-	 */
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	ddrc_exit_sf
+-
+-	/* LPDDR1 --> force DDR2 mode during self-refresh */
+-	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
+-	str	r3, .saved_sam9_mdr
+-	bic	r3, r3, #~AT91_DDRSDRC_MD
+-	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+-	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
+-	biceq	r3, r3, #AT91_DDRSDRC_MD
+-	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
+-	streq	r3, [r2, #AT91_DDRSDRC_MDR]
+-
+-	/* Active DDRC self-refresh mode */
+-	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
+-	str	r3, .saved_sam9_lpr
+-	bic	r3, r3, #AT91_DDRSDRC_LPCB
+-	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	/* If using the 2nd ddr controller */
+-	ldr	r2, .sramc1_base
+-	cmp	r2, #0
+-	beq	no_2nd_ddrc
+-
+-	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
+-	str	r3, .saved_sam9_mdr1
+-	bic	r3, r3, #~AT91_DDRSDRC_MD
+-	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+-	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
+-	biceq	r3, r3, #AT91_DDRSDRC_MD
+-	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
+-	streq	r3, [r2, #AT91_DDRSDRC_MDR]
+-
+-	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
+-	str	r3, .saved_sam9_lpr1
+-	bic	r3, r3, #AT91_DDRSDRC_LPCB
+-	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+-
+-	/* Active DDRC self-refresh mode */
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-no_2nd_ddrc:
+-	b	exit_sramc_sf
+-
+-ddrc_exit_sf:
+-	/* Restore MDR in case of LPDDR1 */
+-	ldr	r3, .saved_sam9_mdr
+-	str	r3, [r2, #AT91_DDRSDRC_MDR]
+-	/* Restore LPR on AT91 with DDRAM */
+-	ldr	r3, .saved_sam9_lpr
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	/* If using the 2nd ddr controller */
+-	ldr	r2, .sramc1_base
+-	cmp	r2, #0
+-	ldrne	r3, .saved_sam9_mdr1
+-	strne	r3, [r2, #AT91_DDRSDRC_MDR]
+-	ldrne	r3, .saved_sam9_lpr1
+-	strne	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	b	exit_sramc_sf
+-
+-	/*
+-	 * SDRAMC Memory controller
+-	 */
+-sdramc_sf:
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	sdramc_exit_sf
+-
+-	/* Active SDRAMC self-refresh mode */
+-	ldr	r3, [r2, #AT91_SDRAMC_LPR]
+-	str	r3, .saved_sam9_lpr
+-
+-	bic	r3, r3, #AT91_SDRAMC_LPCB
+-	orr	r3, r3, #AT91_SDRAMC_LPCB_SELF_REFRESH
+-	str	r3, [r2, #AT91_SDRAMC_LPR]
+-
+-sdramc_exit_sf:
+-	ldr	r3, .saved_sam9_lpr
+-	str	r3, [r2, #AT91_SDRAMC_LPR]
+-
+-exit_sramc_sf:
+-	mov	pc, lr
+-ENDPROC(at91_sramc_self_refresh)
+-
+-.pmc_base:
+-	.word 0
+-.sramc_base:
+-	.word 0
+-.sramc1_base:
+-	.word 0
+-.memtype:
+-	.word 0
+-.pm_mode:
+-	.word 0
+-.saved_mckr:
+-	.word 0
+-.saved_pllar:
+-	.word 0
+-.saved_pllbr:
+-	.word 0
+-.saved_sam9_lpr:
+-	.word 0
+-.saved_sam9_lpr1:
+-	.word 0
+-.saved_sam9_mdr:
+-	.word 0
+-.saved_sam9_mdr1:
+-	.word 0
+-
+-ENTRY(at91_slow_clock_sz)
+-	.word .-at91_slow_clock
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+new file mode 100644
+index 0000000..a2bd1dc
+--- /dev/null
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -0,0 +1,353 @@
++/*
++ * arch/arm/mach-at91/pm_suspend.S
++ *
++ *  Copyright (C) 2006 Savin Zlobec
++ *
++ * AT91SAM9 support:
++ *  Copyright (C) 2007 Anti Sullin <anti.sullin@artecdesign.ee
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/linkage.h>
++#include <linux/clk/at91_pmc.h>
++#include <mach/hardware.h>
++#include <mach/at91_ramc.h>
 +#include "pm.h"
- 
- #define	SRAMC_SELF_FRESH_ACTIVE		0x01
- #define	SRAMC_SELF_FRESH_EXIT		0x00
-@@ -85,12 +86,22 @@ ENTRY(at91_slow_clock)
- 	str	r0, .pmc_base
- 	str	r1, .sramc_base
- 	str	r2, .sramc1_base
--	str	r3, .memtype
++
++#define	SRAMC_SELF_FRESH_ACTIVE		0x01
++#define	SRAMC_SELF_FRESH_EXIT		0x00
++
++pmc	.req	r0
++tmp1	.req	r4
++tmp2	.req	r5
++
++/*
++ * Wait until master clock is ready (after switching master clock source)
++ */
++	.macro wait_mckrdy
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
++	tst	tmp1, #AT91_PMC_MCKRDY
++	beq	1b
++	.endm
++
++/*
++ * Wait until master oscillator has stabilized.
++ */
++	.macro wait_moscrdy
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
++	tst	tmp1, #AT91_PMC_MOSCS
++	beq	1b
++	.endm
++
++/*
++ * Wait until PLLA has locked.
++ */
++	.macro wait_pllalock
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
++	tst	tmp1, #AT91_PMC_LOCKA
++	beq	1b
++	.endm
++
++/*
++ * Wait until PLLB has locked.
++ */
++	.macro wait_pllblock
++1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
++	tst	tmp1, #AT91_PMC_LOCKB
++	beq	1b
++	.endm
++
++	.text
++
++/* void at91_slow_clock(void __iomem *pmc, void __iomem *sdramc,
++ *			void __iomem *ramc1, int memctrl)
++ */
++ENTRY(at91_slow_clock)
++	/* Save registers on stack */
++	stmfd	sp!, {r4 - r12, lr}
++
++	/*
++	 * Register usage:
++	 *  R0 = Base address of AT91_PMC
++	 *  R1 = Base address of RAM Controller (SDRAM, DDRSDR, or AT91_SYS)
++	 *  R2 = Base address of second RAM Controller or 0 if not present
++	 *  R3 = Memory controller
++	 *  R4 = temporary register
++	 *  R5 = temporary register
++	 */
++
++	/* Drain write buffer */
++	mov	tmp1, #0
++	mcr	p15, 0, tmp1, c7, c10, 4
++
++	str	r0, .pmc_base
++	str	r1, .sramc_base
++	str	r2, .sramc1_base
 +
 +	and	r0, r3, #AT91_PM_MEMTYPE_MASK
 +	str	r0, .memtype
@@ -184,53 +494,263 @@ index 517e344..b0939c8 100644
 +	lsr	r0, r3, #AT91_PM_MODE_OFFSET
 +	and	r0, r0, #AT91_PM_MODE_MASK
 +	str	r0, .pm_mode
- 
- 	/* Active the self-refresh mode */
- 	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
- 	bl	at91_sramc_self_refresh
- 
++
++	/* Active the self-refresh mode */
++	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
++	bl	at91_sramc_self_refresh
++
 +	ldr	r0, .pm_mode
 +	tst	r0, #AT91_PM_SLOW_CLOCK
 +	beq	skip_disable_main_clock
 +
- 	ldr	pmc, .pmc_base
- 
- 	/* Save Master clock setting */
-@@ -126,9 +137,18 @@ ENTRY(at91_slow_clock)
- 	orr	tmp1, tmp1, #AT91_PMC_KEY
- 	str	tmp1, [pmc, #AT91_CKGR_MOR]
- 
++	ldr	pmc, .pmc_base
++
++	/* Save Master clock setting */
++	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
++	str	tmp1, .saved_mckr
++
++	/*
++	 * Set the Master clock source to slow clock
++	 */
++	bic	tmp1, tmp1, #AT91_PMC_CSS
++	str	tmp1, [pmc, #AT91_PMC_MCKR]
++
++	wait_mckrdy
++
++	/* Save PLLA setting and disable it */
++	ldr	tmp1, [pmc, #AT91_CKGR_PLLAR]
++	str	tmp1, .saved_pllar
++
++	mov	tmp1, #AT91_PMC_PLLCOUNT
++	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
++	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
++
++	/* Save PLLB setting and disable it */
++	ldr	tmp1, [pmc, #AT91_CKGR_PLLBR]
++	str	tmp1, .saved_pllbr
++
++	mov	tmp1, #AT91_PMC_PLLCOUNT
++	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
++
++	/* Turn off the main oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
 +skip_disable_main_clock:
 +	ldr	pmc, .pmc_base
 +
- 	/* Wait for interrupt */
- 	mcr	p15, 0, tmp1, c7, c0, 4
- 
++	/* Wait for interrupt */
++	mcr	p15, 0, tmp1, c7, c0, 4
++
 +	ldr	r0, .pm_mode
 +	tst	r0, #AT91_PM_SLOW_CLOCK
 +	beq	skip_enable_main_clock
 +
 +	ldr	pmc, .pmc_base
 +
- 	/* Turn on the main oscillator */
- 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
- 	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
-@@ -169,6 +189,7 @@ ENTRY(at91_slow_clock)
- 
- 	wait_mckrdy
- 
++	/* Turn on the main oscillator */
++	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
++	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
++	orr	tmp1, tmp1, #AT91_PMC_KEY
++	str	tmp1, [pmc, #AT91_CKGR_MOR]
++
++	wait_moscrdy
++
++	/* Restore PLLB setting */
++	ldr	tmp1, .saved_pllbr
++	str	tmp1, [pmc, #AT91_CKGR_PLLBR]
++
++	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
++	bne	1f
++	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
++	beq	2f
++1:
++	wait_pllblock
++2:
++
++	/* Restore PLLA setting */
++	ldr	tmp1, .saved_pllar
++	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
++
++	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
++	bne	3f
++	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
++	beq	4f
++3:
++	wait_pllalock
++4:
++
++	/*
++	 * Restore master clock setting
++	 */
++	ldr	tmp1, .saved_mckr
++	str	tmp1, [pmc, #AT91_PMC_MCKR]
++
++	wait_mckrdy
++
 +skip_enable_main_clock:
- 	/* Exit the self-refresh mode */
- 	mov	r0, #SRAMC_SELF_FRESH_EXIT
- 	bl	at91_sramc_self_refresh
-@@ -311,6 +332,8 @@ ENDPROC(at91_sramc_self_refresh)
- 	.word 0
- .memtype:
- 	.word 0
++	/* Exit the self-refresh mode */
++	mov	r0, #SRAMC_SELF_FRESH_EXIT
++	bl	at91_sramc_self_refresh
++
++	/* Restore registers, and return */
++	ldmfd	sp!, {r4 - r12, pc}
++ENDPROC(at91_slow_clock)
++
++/*
++ * void at91_sramc_self_refresh(unsigned int is_active)
++ *
++ * @input param:
++ *	@r0: 1 - active self-refresh mode
++ *	     0 - exit self-refresh mode
++ * register usage:
++ * 	@r1: memory type
++ *	@r2: base address of the sram controller
++ */
++
++ENTRY(at91_sramc_self_refresh)
++	ldr	r1, .memtype
++	ldr	r2, .sramc_base
++
++	cmp	r1, #AT91_MEMCTRL_MC
++	bne	ddrc_sf
++
++	/*
++	 * at91rm9200 Memory controller
++	 */
++
++	 /*
++	  * For exiting the self-refresh mode, do nothing,
++	  * automatically exit the self-refresh mode.
++	  */
++	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
++	beq	exit_sramc_sf
++
++	/* Active SDRAM self-refresh mode */
++	mov	r3, #1
++	str	r3, [r2, #AT91RM9200_SDRAMC_SRR]
++	b	exit_sramc_sf
++
++ddrc_sf:
++	cmp	r1, #AT91_MEMCTRL_DDRSDR
++	bne	sdramc_sf
++
++	/*
++	 * DDR Memory controller
++	 */
++	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
++	beq	ddrc_exit_sf
++
++	/* LPDDR1 --> force DDR2 mode during self-refresh */
++	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
++	str	r3, .saved_sam9_mdr
++	bic	r3, r3, #~AT91_DDRSDRC_MD
++	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
++	biceq	r3, r3, #AT91_DDRSDRC_MD
++	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
++	streq	r3, [r2, #AT91_DDRSDRC_MDR]
++
++	/* Active DDRC self-refresh mode */
++	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
++	str	r3, .saved_sam9_lpr
++	bic	r3, r3, #AT91_DDRSDRC_LPCB
++	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
++	str	r3, [r2, #AT91_DDRSDRC_LPR]
++
++	/* If using the 2nd ddr controller */
++	ldr	r2, .sramc1_base
++	cmp	r2, #0
++	beq	no_2nd_ddrc
++
++	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
++	str	r3, .saved_sam9_mdr1
++	bic	r3, r3, #~AT91_DDRSDRC_MD
++	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
++	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
++	biceq	r3, r3, #AT91_DDRSDRC_MD
++	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
++	streq	r3, [r2, #AT91_DDRSDRC_MDR]
++
++	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
++	str	r3, .saved_sam9_lpr1
++	bic	r3, r3, #AT91_DDRSDRC_LPCB
++	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
++
++	/* Active DDRC self-refresh mode */
++	str	r3, [r2, #AT91_DDRSDRC_LPR]
++no_2nd_ddrc:
++	b	exit_sramc_sf
++
++ddrc_exit_sf:
++	/* Restore MDR in case of LPDDR1 */
++	ldr	r3, .saved_sam9_mdr
++	str	r3, [r2, #AT91_DDRSDRC_MDR]
++	/* Restore LPR on AT91 with DDRAM */
++	ldr	r3, .saved_sam9_lpr
++	str	r3, [r2, #AT91_DDRSDRC_LPR]
++
++	/* If using the 2nd ddr controller */
++	ldr	r2, .sramc1_base
++	cmp	r2, #0
++	ldrne	r3, .saved_sam9_mdr1
++	strne	r3, [r2, #AT91_DDRSDRC_MDR]
++	ldrne	r3, .saved_sam9_lpr1
++	strne	r3, [r2, #AT91_DDRSDRC_LPR]
++
++	b	exit_sramc_sf
++
++	/*
++	 * SDRAMC Memory controller
++	 */
++sdramc_sf:
++	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
++	beq	sdramc_exit_sf
++
++	/* Active SDRAMC self-refresh mode */
++	ldr	r3, [r2, #AT91_SDRAMC_LPR]
++	str	r3, .saved_sam9_lpr
++
++	bic	r3, r3, #AT91_SDRAMC_LPCB
++	orr	r3, r3, #AT91_SDRAMC_LPCB_SELF_REFRESH
++	str	r3, [r2, #AT91_SDRAMC_LPR]
++
++sdramc_exit_sf:
++	ldr	r3, .saved_sam9_lpr
++	str	r3, [r2, #AT91_SDRAMC_LPR]
++
++exit_sramc_sf:
++	mov	pc, lr
++ENDPROC(at91_sramc_self_refresh)
++
++.pmc_base:
++	.word 0
++.sramc_base:
++	.word 0
++.sramc1_base:
++	.word 0
++.memtype:
++	.word 0
 +.pm_mode:
 +	.word 0
- .saved_mckr:
- 	.word 0
- .saved_pllar:
++.saved_mckr:
++	.word 0
++.saved_pllar:
++	.word 0
++.saved_pllbr:
++	.word 0
++.saved_sam9_lpr:
++	.word 0
++.saved_sam9_lpr1:
++	.word 0
++.saved_sam9_mdr:
++	.word 0
++.saved_sam9_mdr1:
++	.word 0
++
++ENTRY(at91_slow_clock_sz)
++	.word .-at91_slow_clock
 -- 
 1.7.9.5
