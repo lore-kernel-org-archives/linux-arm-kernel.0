@@ -1,83 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 9 Mar 2015 16:51:13 +0100
-Subject: [PATCH] ARM: at91/dt: fix USB high-speed clock to select UTMI
-Message-ID: <1425916273-393-1-git-send-email-nicolas.ferre@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 15:57:12 +0000
+Subject: [PATCH v5] drivers/tty: amba: defer probing DMA availability
+ until hw_init
+In-Reply-To: <54F5DC08.1040807@linaro.org>
+References: <1424969811-11197-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1424969811-11197-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <54F5DC08.1040807@linaro.org>
+Message-ID: <20150309155711.GS8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UTMI clock must be selected by any high-speed USB IP. The logic behind it
-needs this particular clock.
-So, correct the clock in the device tree files affected.
+On Tue, Mar 03, 2015 at 11:06:32AM -0500, Jorge Ramirez-Ortiz wrote:
+> On 02/26/2015 11:56 AM, Jorge Ramirez-Ortiz wrote:
+> > -	chan = dma_request_slave_channel(dev, "tx");
+> > +	uap->dma_probed = true;
+> > +
+> > +	chan = dma_request_slave_channel_reason(uap_dev, "tx");
+> > +	if (IS_ERR(chan)) {
+> > +		if (PTR_ERR(chan) == -EPROBE_DEFER) {
+> > +			dev_info(uap_dev, "DMA driver not ready\n");
 
-Reported-by: Bo Shen <voice.shen@atmel.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++--
- arch/arm/boot/dts/sama5d3.dtsi     | 2 +-
- arch/arm/boot/dts/sama5d4.dtsi     | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+I still object to this.
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 56fa94bf6776..72be4be57767 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1325,7 +1325,7 @@
- 			reg = <0x00800000 0x100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
- 			//TODO
--			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-+			clocks = <&utmi>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
- 			clock-names = "usb_clk", "ehci_clk", "hclk", "uhpck";
- 			status = "disabled";
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index a2ad79b0878c..76043e95b958 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -1062,7 +1062,7 @@
- 				reg = <0x00500000 0x80000
- 				       0xf803c000 0x400>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
--				clocks = <&usb>, <&udphs_clk>;
-+				clocks = <&utmi>, <&udphs_clk>;
- 				clock-names = "hclk", "pclk";
- 				status = "disabled";
- 
-@@ -1182,7 +1182,7 @@
- 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
- 			reg = <0x00700000 0x100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
--			clocks = <&usb>, <&uhphs_clk>, <&uhpck>;
-+			clocks = <&utmi>, <&uhphs_clk>, <&uhpck>;
- 			clock-names = "usb_clk", "ehci_clk", "uhpck";
- 			status = "disabled";
- 		};
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 7ec28dab308a..29c08215d93a 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -1426,7 +1426,7 @@
- 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
- 			reg = <0x00700000 0x100000>;
- 			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
--			clocks = <&usb>, <&uhphs_clk>, <&uhpck>;
-+			clocks = <&utmi>, <&uhphs_clk>, <&uhpck>;
- 			clock-names = "usb_clk", "ehci_clk", "uhpck";
- 			status = "disabled";
- 		};
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index d050decd3ca0..3b23b88ca6a2 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -266,7 +266,7 @@
- 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
- 			reg = <0x00600000 0x100000>;
- 			interrupts = <46 IRQ_TYPE_LEVEL_HIGH 2>;
--			clocks = <&usb>, <&uhphs_clk>, <&uhpck>;
-+			clocks = <&utmi>, <&uhphs_clk>, <&uhpck>;
- 			clock-names = "usb_clk", "ehci_clk", "uhpck";
- 			status = "disabled";
- 		};
+It _can't_ be right that we plaster the kernel console with these
+messages when the is a DMA possible, but the DMA driver is a module
+which hasn't been loaded yet.
+
+You probably don't realise it, but init daemons tend to open the
+console, write their message, and then close it again.  What your
+message above means is that each time an init daemon does that, we
+get a "DMA driver not ready" message.
+
+IMHO, that is unacceptable.
+
 -- 
-2.1.3
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
