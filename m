@@ -1,486 +1,195 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  9 Mar 2015 20:18:56 +0100
-Subject: [PATCH] crypto/arm: add support for GHASH using ARMv8 Crypto
- Extensions
-Message-ID: <1425928736-14469-1-git-send-email-ard.biesheuvel@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 9 Mar 2015 20:29:42 +0100
+Subject: [PATCH v2 1/5] arm: KVM: export vcpi->pause state via MP_STATE
+ ioctls
+In-Reply-To: <87pp8ib04y.fsf@linaro.org>
+References: <1425302944-6276-1-git-send-email-alex.bennee@linaro.org>
+ <1425302944-6276-2-git-send-email-alex.bennee@linaro.org>
+ <20150309135055.GC20559@cbox> <87pp8ib04y.fsf@linaro.org>
+Message-ID: <20150309192942.GF20559@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements the GHASH hash algorithm (as used by the GCM AEAD
-chaining mode) using the AArch32 version of the 64x64 to 128 bit
-polynomial multiplication instruction (vmull.p64) that is part of
-the ARMv8 Crypto Extensions.
+On Mon, Mar 09, 2015 at 04:34:21PM +0000, Alex Benn?e wrote:
+> 
+> Christoffer Dall <christoffer.dall@linaro.org> writes:
+> 
+> > Hi Alex,
+> >
+> > The subject of this change has a typo, and I also think it's not about
+> > exposing the pause state (that's just an internal name/concept), but
+> > about exposing the PSCI state, or simply the VCPU power state.
+> 
+> arm: KVM: export VCPU power state via MP_STATE ioctl?
+> 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/Kconfig         |   9 ++
- arch/arm/crypto/Makefile        |   2 +
- arch/arm/crypto/ghash-ce-core.S |  93 ++++++++++++
- arch/arm/crypto/ghash-ce-glue.c | 318 ++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 422 insertions(+)
- create mode 100644 arch/arm/crypto/ghash-ce-core.S
- create mode 100644 arch/arm/crypto/ghash-ce-glue.c
+arm/arm64: KVM: 
 
-diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index 63588bdf3b5d..5dc8a9e79744 100644
---- a/arch/arm/crypto/Kconfig
-+++ b/arch/arm/crypto/Kconfig
-@@ -110,4 +110,13 @@ config CRYPTO_AES_ARM_CE
- 	  Use an implementation of AES in CBC, CTR and XTS modes that uses
- 	  ARMv8 Crypto Extensions
- 
-+config CRYPTO_GHASH_ARM_CE
-+	tristate "PMULL-accelerated GHASH using ARMv8 Crypto Extensions"
-+	depends on KERNEL_MODE_NEON
-+	select CRYPTO_HASH
-+	help
-+	  Use an implementation of GHASH (used by the GCM AEAD chaining mode)
-+	  that uses the 64x64 to 128 bit polynomial multiplication (vmull.p64)
-+	  that is part of the ARMv8 Crypto Extensions
-+
- endif
-diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index 2514c420e8d3..9a273bd7dffd 100644
---- a/arch/arm/crypto/Makefile
-+++ b/arch/arm/crypto/Makefile
-@@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
- obj-$(CONFIG_CRYPTO_SHA512_ARM_NEON) += sha512-arm-neon.o
- obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
- obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
-+obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
- 
- aes-arm-y	:= aes-armv4.o aes_glue.o
- aes-arm-bs-y	:= aesbs-core.o aesbs-glue.o
-@@ -19,6 +20,7 @@ sha512-arm-neon-y := sha512-armv7-neon.o sha512_neon_glue.o
- sha1-arm-ce-y	:= sha1-ce-core.o sha1-ce-glue.o
- sha2-arm-ce-y	:= sha2-ce-core.o sha2-ce-glue.o
- aes-arm-ce-y	:= aes-ce-core.o aes-ce-glue.o
-+ghash-arm-ce-y	:= ghash-ce-core.o ghash-ce-glue.o
- 
- quiet_cmd_perl = PERL    $@
-       cmd_perl = $(PERL) $(<) > $(@)
-diff --git a/arch/arm/crypto/ghash-ce-core.S b/arch/arm/crypto/ghash-ce-core.S
-new file mode 100644
-index 000000000000..53bee60ff94b
---- /dev/null
-+++ b/arch/arm/crypto/ghash-ce-core.S
-@@ -0,0 +1,93 @@
-+/*
-+ * Accelerated GHASH implementation with ARMv8 vmull.p64 instructions.
-+ *
-+ * Copyright (C) 2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+	SHASH		.req	q0
-+	SHASH2		.req	q1
-+	T1		.req	q2
-+	T2		.req	q3
-+	MASK		.req	q4
-+	XL		.req	q5
-+	XM		.req	q6
-+	XH		.req	q7
-+	IN1		.req	q7
-+
-+	SHASH_L		.req	d0
-+	SHASH_H		.req	d1
-+	SHASH2_L	.req	d2
-+	T1_L		.req	d4
-+	MASK_L		.req	d8
-+	XL_L		.req	d10
-+	XL_H		.req	d11
-+	XM_L		.req	d12
-+	XM_H		.req	d13
-+	XH_L		.req	d14
-+
-+	.text
-+	.fpu		crypto-neon-fp-armv8
-+
-+	/*
-+	 * void pmull_ghash_update(int blocks, u64 dg[], const char *src,
-+	 *			   struct ghash_key const *k, const char *head)
-+	 */
-+ENTRY(pmull_ghash_update)
-+	vld1.8		{SHASH}, [r3]
-+	vld1.8		{XL}, [r1]
-+	vmov.i8		MASK, #0xe1
-+	vext.8		SHASH2, SHASH, SHASH, #8
-+	vshl.u64	MASK, MASK, #57
-+	veor		SHASH2, SHASH2, SHASH
-+
-+	/* do the head block first, if supplied */
-+	ldr		ip, [sp]
-+	teq		ip, #0
-+	beq		0f
-+	vld1.8		{T1}, [ip]
-+	teq		r0, #0
-+	b		1f
-+
-+0:	vld1.8		{T1}, [r2]!
-+	subs		r0, r0, #1
-+
-+1:	/* multiply XL by SHASH in GF(2^128) */
-+	vrev64.8	T1, T1
-+
-+	vext.8		T2, XL, XL, #8
-+	vext.8		IN1, T1, T1, #8
-+	veor		T1, T1, T2
-+	veor		XL, XL, IN1
-+
-+	vmull.p64	XH, SHASH_H, XL_H		@ a1 * b1
-+	veor		T1, T1, XL
-+	vmull.p64	XL, SHASH_L, XL_L		@ a0 * b0
-+	vmull.p64	XM, SHASH2_L, T1_L		@ (a1 + a0)(b1 + b0)
-+
-+	vext.8		T1, XL, XH, #8
-+	veor		T2, XL, XH
-+	veor		XM, XM, T1
-+	veor		XM, XM, T2
-+	vmull.p64	T2, XL_L, MASK_L
-+
-+	vmov		XH_L, XM_H
-+	vmov		XM_H, XL_L
-+
-+	veor		XL, XM, T2
-+	vext.8		T2, XL, XL, #8
-+	vmull.p64	XL, XL_L, MASK_L
-+	veor		T2, T2, XH
-+	veor		XL, XL, T2
-+
-+	bne		0b
-+
-+	vst1.8		{XL}, [r1]
-+	bx		lr
-+ENDPROC(pmull_ghash_update)
-diff --git a/arch/arm/crypto/ghash-ce-glue.c b/arch/arm/crypto/ghash-ce-glue.c
-new file mode 100644
-index 000000000000..8c959d128065
---- /dev/null
-+++ b/arch/arm/crypto/ghash-ce-glue.c
-@@ -0,0 +1,318 @@
-+/*
-+ * Accelerated GHASH implementation with ARMv8 vmull.p64 instructions.
-+ *
-+ * Copyright (C) 2015 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+#include <asm/unaligned.h>
-+#include <crypto/cryptd.h>
-+#include <crypto/internal/hash.h>
-+#include <crypto/gf128mul.h>
-+#include <linux/crypto.h>
-+#include <linux/module.h>
-+
-+MODULE_DESCRIPTION("GHASH secure hash using ARMv8 Crypto Extensions");
-+MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
-+MODULE_LICENSE("GPL v2");
-+
-+#define GHASH_BLOCK_SIZE	16
-+#define GHASH_DIGEST_SIZE	16
-+
-+struct ghash_key {
-+	u64	a;
-+	u64	b;
-+};
-+
-+struct ghash_desc_ctx {
-+	u64 digest[GHASH_DIGEST_SIZE/sizeof(u64)];
-+	u8 buf[GHASH_BLOCK_SIZE];
-+	u32 count;
-+};
-+
-+struct ghash_async_ctx {
-+	struct cryptd_ahash *cryptd_tfm;
-+};
-+
-+asmlinkage void pmull_ghash_update(int blocks, u64 dg[], const char *src,
-+				   struct ghash_key const *k, const char *head);
-+
-+static int ghash_init(struct shash_desc *desc)
-+{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+
-+	*ctx = (struct ghash_desc_ctx){};
-+	return 0;
-+}
-+
-+static int ghash_update(struct shash_desc *desc, const u8 *src,
-+			unsigned int len)
-+{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+	unsigned int partial = ctx->count % GHASH_BLOCK_SIZE;
-+
-+	ctx->count += len;
-+
-+	if ((partial + len) >= GHASH_BLOCK_SIZE) {
-+		struct ghash_key *key = crypto_shash_ctx(desc->tfm);
-+		int blocks;
-+
-+		if (partial) {
-+			int p = GHASH_BLOCK_SIZE - partial;
-+
-+			memcpy(ctx->buf + partial, src, p);
-+			src += p;
-+			len -= p;
-+		}
-+
-+		blocks = len / GHASH_BLOCK_SIZE;
-+		len %= GHASH_BLOCK_SIZE;
-+
-+		kernel_neon_begin();
-+		pmull_ghash_update(blocks, ctx->digest, src, key,
-+				   partial ? ctx->buf : NULL);
-+		kernel_neon_end();
-+		src += blocks * GHASH_BLOCK_SIZE;
-+		partial = 0;
-+	}
-+	if (len)
-+		memcpy(ctx->buf + partial, src, len);
-+	return 0;
-+}
-+
-+static int ghash_final(struct shash_desc *desc, u8 *dst)
-+{
-+	struct ghash_desc_ctx *ctx = shash_desc_ctx(desc);
-+	unsigned int partial = ctx->count % GHASH_BLOCK_SIZE;
-+
-+	if (partial) {
-+		struct ghash_key *key = crypto_shash_ctx(desc->tfm);
-+
-+		memset(ctx->buf + partial, 0, GHASH_BLOCK_SIZE - partial);
-+		kernel_neon_begin();
-+		pmull_ghash_update(1, ctx->digest, ctx->buf, key, NULL);
-+		kernel_neon_end();
-+	}
-+	put_unaligned_be64(ctx->digest[1], dst);
-+	put_unaligned_be64(ctx->digest[0], dst + 8);
-+
-+	*ctx = (struct ghash_desc_ctx){};
-+	return 0;
-+}
-+
-+static int ghash_setkey(struct crypto_shash *tfm,
-+			const u8 *inkey, unsigned int keylen)
-+{
-+	struct ghash_key *key = crypto_shash_ctx(tfm);
-+	u64 a, b;
-+
-+	if (keylen != GHASH_BLOCK_SIZE) {
-+		crypto_shash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
-+		return -EINVAL;
-+	}
-+
-+	/* perform multiplication by 'x' in GF(2^128) */
-+	b = get_unaligned_be64(inkey);
-+	a = get_unaligned_be64(inkey + 8);
-+
-+	key->a = (a << 1) | (b >> 63);
-+	key->b = (b << 1) | (a >> 63);
-+
-+	if (b >> 63)
-+		key->b ^= 0xc200000000000000UL;
-+
-+	return 0;
-+}
-+
-+static struct shash_alg ghash_alg = {
-+	.digestsize		= GHASH_DIGEST_SIZE,
-+	.init			= ghash_init,
-+	.update			= ghash_update,
-+	.final			= ghash_final,
-+	.setkey			= ghash_setkey,
-+	.descsize		= sizeof(struct ghash_desc_ctx),
-+	.base			= {
-+		.cra_name	= "ghash",
-+		.cra_driver_name = "__driver-ghash-ce",
-+		.cra_priority	= 0,
-+		.cra_flags	= CRYPTO_ALG_TYPE_SHASH,
-+		.cra_blocksize	= GHASH_BLOCK_SIZE,
-+		.cra_ctxsize	= sizeof(struct ghash_key),
-+		.cra_module	= THIS_MODULE,
-+	},
-+};
-+
-+static int ghash_async_init(struct ahash_request *req)
-+{
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct ghash_async_ctx *ctx = crypto_ahash_ctx(tfm);
-+	struct ahash_request *cryptd_req = ahash_request_ctx(req);
-+	struct cryptd_ahash *cryptd_tfm = ctx->cryptd_tfm;
-+
-+	if (!may_use_simd()) {
-+		memcpy(cryptd_req, req, sizeof(*req));
-+		ahash_request_set_tfm(cryptd_req, &cryptd_tfm->base);
-+		return crypto_ahash_init(cryptd_req);
-+	} else {
-+		struct shash_desc *desc = cryptd_shash_desc(cryptd_req);
-+		struct crypto_shash *child = cryptd_ahash_child(cryptd_tfm);
-+
-+		desc->tfm = child;
-+		desc->flags = req->base.flags;
-+		return crypto_shash_init(desc);
-+	}
-+}
-+
-+static int ghash_async_update(struct ahash_request *req)
-+{
-+	struct ahash_request *cryptd_req = ahash_request_ctx(req);
-+
-+	if (!may_use_simd()) {
-+		struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+		struct ghash_async_ctx *ctx = crypto_ahash_ctx(tfm);
-+		struct cryptd_ahash *cryptd_tfm = ctx->cryptd_tfm;
-+
-+		memcpy(cryptd_req, req, sizeof(*req));
-+		ahash_request_set_tfm(cryptd_req, &cryptd_tfm->base);
-+		return crypto_ahash_update(cryptd_req);
-+	} else {
-+		struct shash_desc *desc = cryptd_shash_desc(cryptd_req);
-+		return shash_ahash_update(req, desc);
-+	}
-+}
-+
-+static int ghash_async_final(struct ahash_request *req)
-+{
-+	struct ahash_request *cryptd_req = ahash_request_ctx(req);
-+
-+	if (!may_use_simd()) {
-+		struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+		struct ghash_async_ctx *ctx = crypto_ahash_ctx(tfm);
-+		struct cryptd_ahash *cryptd_tfm = ctx->cryptd_tfm;
-+
-+		memcpy(cryptd_req, req, sizeof(*req));
-+		ahash_request_set_tfm(cryptd_req, &cryptd_tfm->base);
-+		return crypto_ahash_final(cryptd_req);
-+	} else {
-+		struct shash_desc *desc = cryptd_shash_desc(cryptd_req);
-+		return crypto_shash_final(desc, req->result);
-+	}
-+}
-+
-+static int ghash_async_digest(struct ahash_request *req)
-+{
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct ghash_async_ctx *ctx = crypto_ahash_ctx(tfm);
-+	struct ahash_request *cryptd_req = ahash_request_ctx(req);
-+	struct cryptd_ahash *cryptd_tfm = ctx->cryptd_tfm;
-+
-+	if (!may_use_simd()) {
-+		memcpy(cryptd_req, req, sizeof(*req));
-+		ahash_request_set_tfm(cryptd_req, &cryptd_tfm->base);
-+		return crypto_ahash_digest(cryptd_req);
-+	} else {
-+		struct shash_desc *desc = cryptd_shash_desc(cryptd_req);
-+		struct crypto_shash *child = cryptd_ahash_child(cryptd_tfm);
-+
-+		desc->tfm = child;
-+		desc->flags = req->base.flags;
-+		return shash_ahash_digest(req, desc);
-+	}
-+}
-+
-+static int ghash_async_setkey(struct crypto_ahash *tfm, const u8 *key,
-+			      unsigned int keylen)
-+{
-+	struct ghash_async_ctx *ctx = crypto_ahash_ctx(tfm);
-+	struct crypto_ahash *child = &ctx->cryptd_tfm->base;
-+	int err;
-+
-+	crypto_ahash_clear_flags(child, CRYPTO_TFM_REQ_MASK);
-+	crypto_ahash_set_flags(child, crypto_ahash_get_flags(tfm)
-+			       & CRYPTO_TFM_REQ_MASK);
-+	err = crypto_ahash_setkey(child, key, keylen);
-+	crypto_ahash_set_flags(tfm, crypto_ahash_get_flags(child)
-+			       & CRYPTO_TFM_RES_MASK);
-+
-+	return err;
-+}
-+
-+static int ghash_async_init_tfm(struct crypto_tfm *tfm)
-+{
-+	struct cryptd_ahash *cryptd_tfm;
-+	struct ghash_async_ctx *ctx = crypto_tfm_ctx(tfm);
-+
-+	cryptd_tfm = cryptd_alloc_ahash("__driver-ghash-ce", 0, 0);
-+	if (IS_ERR(cryptd_tfm))
-+		return PTR_ERR(cryptd_tfm);
-+	ctx->cryptd_tfm = cryptd_tfm;
-+	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
-+				 sizeof(struct ahash_request) +
-+				 crypto_ahash_reqsize(&cryptd_tfm->base));
-+
-+	return 0;
-+}
-+
-+static void ghash_async_exit_tfm(struct crypto_tfm *tfm)
-+{
-+	struct ghash_async_ctx *ctx = crypto_tfm_ctx(tfm);
-+
-+	cryptd_free_ahash(ctx->cryptd_tfm);
-+}
-+
-+static struct ahash_alg ghash_async_alg = {
-+	.init			= ghash_async_init,
-+	.update			= ghash_async_update,
-+	.final			= ghash_async_final,
-+	.setkey			= ghash_async_setkey,
-+	.digest			= ghash_async_digest,
-+	.halg.digestsize	= GHASH_DIGEST_SIZE,
-+	.halg.base		= {
-+		.cra_name	= "ghash",
-+		.cra_driver_name = "ghash-ce",
-+		.cra_priority	= 300,
-+		.cra_flags	= CRYPTO_ALG_TYPE_AHASH | CRYPTO_ALG_ASYNC,
-+		.cra_blocksize	= GHASH_BLOCK_SIZE,
-+		.cra_type	= &crypto_ahash_type,
-+		.cra_ctxsize	= sizeof(struct ghash_async_ctx),
-+		.cra_module	= THIS_MODULE,
-+		.cra_init	= ghash_async_init_tfm,
-+		.cra_exit	= ghash_async_exit_tfm,
-+	},
-+};
-+
-+static int __init ghash_ce_mod_init(void)
-+{
-+	int err;
-+
-+	if (!(elf_hwcap2 & HWCAP2_PMULL))
-+		return -ENODEV;
-+
-+	err = crypto_register_shash(&ghash_alg);
-+	if (err)
-+		return err;
-+	err = crypto_register_ahash(&ghash_async_alg);
-+	if (err)
-+		goto err_shash;
-+
-+	return 0;
-+
-+err_shash:
-+	crypto_unregister_shash(&ghash_alg);
-+	return err;
-+}
-+
-+static void __exit ghash_ce_mod_exit(void)
-+{
-+	crypto_unregister_ahash(&ghash_async_alg);
-+	crypto_unregister_shash(&ghash_alg);
-+}
-+
-+module_init(ghash_ce_mod_init);
-+module_exit(ghash_ce_mod_exit);
--- 
-1.8.3.2
+otherwise looks good to me ;)
+
+
+> >
+> > On Mon, Mar 02, 2015 at 01:29:00PM +0000, Alex Benn?e wrote:
+> >> To cleanly restore an SMP VM we need to ensure that the current pause
+> >> state of each vcpu is correctly recorded. Things could get confused if
+> >> the CPU starts running after migration restore completes when it was
+> >> paused before it state was captured.
+> >> 
+> >> We use the existing KVM_GET/SET_MP_STATE ioctl to do this. The arm/arm64
+> >> interface is a lot simpler as the only valid states are
+> >> KVM_MP_STATE_RUNNABLE and KVM_MP_STATE_HALTED.
+> >> 
+> >> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> >> 
+> >> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> >> index b112efc..602156f 100644
+> >> --- a/Documentation/virtual/kvm/api.txt
+> >> +++ b/Documentation/virtual/kvm/api.txt
+> >> @@ -997,7 +997,7 @@ for vm-wide capabilities.
+> >>  4.38 KVM_GET_MP_STATE
+> >>  
+> >>  Capability: KVM_CAP_MP_STATE
+> >> -Architectures: x86, s390
+> >> +Architectures: x86, s390, arm, arm64
+> >>  Type: vcpu ioctl
+> >>  Parameters: struct kvm_mp_state (out)
+> >>  Returns: 0 on success; -1 on error
+> >> @@ -1027,15 +1027,21 @@ Possible values are:
+> >>   - KVM_MP_STATE_LOAD:            the vcpu is in a special load/startup state
+> >>                                   [s390]
+> >>  
+> >> -On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+> >> -in-kernel irqchip, the multiprocessing state must be maintained by userspace on
+> >> +For x86:
+> >> +
+> >> +This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
+> >> +irqchip, the multiprocessing state must be maintained by userspace on
+> >
+> > Nit: I would not taint the git log with this change but instead just
+> > introduce a paragraph below starting with "On arm/arm64, " and you would
+> > get the same effect.
+> >
+> >>  these architectures.
+> >>  
+> >> +For arm/arm64:
+> >> +
+> >> +The only states that are valid are KVM_MP_STATE_HALTED and
+> >> +KVM_MP_STATE_RUNNABLE which reflect if the vcpu is paused or not.
+> >
+> > As suggested on the QEMU series, HALTED is probably not the right thing
+> > to use.
+> 
+> KVM_MP_STATE_STOPPED is currently only used for s390 but seems to fit.
+> I'm wary of adding yet another define.
+> 
+
+sounds fine, as long as it doesn't have some inherently different
+meaning with s390.
+
+> >
+> >>  
+> >>  4.39 KVM_SET_MP_STATE
+> >>  
+> >>  Capability: KVM_CAP_MP_STATE
+> >> -Architectures: x86, s390
+> >> +Architectures: x86, s390, arm, arm64
+> >>  Type: vcpu ioctl
+> >>  Parameters: struct kvm_mp_state (in)
+> >>  Returns: 0 on success; -1 on error
+> >> @@ -1043,10 +1049,16 @@ Returns: 0 on success; -1 on error
+> >>  Sets the vcpu's current "multiprocessing state"; see KVM_GET_MP_STATE for
+> >>  arguments.
+> >>  
+> >> -On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+> >> -in-kernel irqchip, the multiprocessing state must be maintained by userspace on
+> >> +For x86:
+> >> +
+> >> +This ioctl is only useful after KVM_CREATE_IRQCHIP.  Without an in-kernel
+> >> +irqchip, the multiprocessing state must be maintained by userspace on
+> >>  these architectures.
+> >>  
+> >> +For arm/arm64:
+> >> +
+> >> +The only states that are valid are KVM_MP_STATE_HALTED and
+> >> +KVM_MP_STATE_RUNNABLE which reflect if the vcpu should be paused or not.
+> >
+> > same as above
+> >
+> >>  
+> >>  4.40 KVM_SET_IDENTITY_MAP_ADDR
+> >>  
+> >> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> >> index 5560f74..8531536 100644
+> >> --- a/arch/arm/kvm/arm.c
+> >> +++ b/arch/arm/kvm/arm.c
+> >> @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+> >>  	case KVM_CAP_ARM_PSCI:
+> >>  	case KVM_CAP_ARM_PSCI_0_2:
+> >>  	case KVM_CAP_READONLY_MEM:
+> >> +	case KVM_CAP_MP_STATE:
+> >>  		r = 1;
+> >>  		break;
+> >>  	case KVM_CAP_COALESCED_MMIO:
+> >> @@ -313,13 +314,29 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+> >>  int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+> >>  				    struct kvm_mp_state *mp_state)
+> >>  {
+> >> -	return -EINVAL;
+> >> +	if (vcpu->arch.pause)
+> >> +		mp_state->mp_state = KVM_MP_STATE_HALTED;
+> >> +	else
+> >> +		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
+> >> +
+> >> +	return 0;
+> >>  }
+> >>  
+> >>  int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+> >>  				    struct kvm_mp_state *mp_state)
+> >>  {
+> >> -	return -EINVAL;
+> >> +	switch (mp_state->mp_state) {
+> >> +	case KVM_MP_STATE_RUNNABLE:
+> >> +		vcpu->arch.pause = false;
+> >> +		break;
+> >> +	case KVM_MP_STATE_HALTED:
+> >> +		vcpu->arch.pause = true;
+> >> +		break;
+> >> +	default:
+> >> +		return -EINVAL;
+> >> +	}
+> >> +
+> >> +	return 0;
+> >>  }
+> >>  
+> >>  /**
+> >
+> > Are we capturing the vcpu features in some way or do we expect userspace
+> > to migrate these on its own?  The reason I'm asking, is if you create
+> > multiple VCPUs, where all the non-primary VCPUs are started in power off
+> > mode, and then you boot your guest which powers on all VCPUs, and then
+> > you restart your guest (with PSCI RESET), the system will not power on
+> > all the non-primary VCPUs but hold them in power-off.
+> >
+> > We need to make sure this behavior is preserved for a reboot across a
+> > migration.  Is it?
+> 
+> Isn't that behaviour orthogonal to the migration case?
+> 
+> - Boot
+> - Power on secondary CPUs
+> - Power off one secondary CPU
+> - Migrate to file (cpu_powered reflects state of each CPU)
+> 
+> - Start fresh QEMU
+> - Restore from file (cpu_powered -> vcpu->paused via ioctl)
+> - Run (we continue with the same power state pre-migrate)
+> 
+> - PSCI RESET
+> - Does what it does, power all secondaries down?
+> - Kernel boots, turns them on?
+> 
+Hmmm. As long as QEMU always inits all VCPUs in the exact same way
+(including the KVM_ARM_VCPU_POWER_OFF feature bit) I guess it works and
+that's probably a reasonable requirement for migration.
+
+-Christoffer
