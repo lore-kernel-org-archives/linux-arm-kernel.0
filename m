@@ -1,58 +1,146 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Mon, 9 Mar 2015 23:03:30 +0200
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <9217056.Z3urqp19oZ@wuerfel>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-3-git-send-email-eliad@wizery.com>
- <9217056.Z3urqp19oZ@wuerfel>
-Message-ID: <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 09 Mar 2015 14:07:35 -0700
+Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
+In-Reply-To: <54FDEEFE.1060803@codeaurora.org>
+References: <20150221085620.GV19388@pengutronix.de>
+ <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150306185730.11109.45998@quantum>
+ <20150306192813.GG10717@pengutronix.de> <54FA02B7.8090703@codeaurora.org>
+ <1425895136.3152.22.camel@pengutronix.de> <54FDEEFE.1060803@codeaurora.org>
+Message-ID: <20150309210735.14952.91257@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 9, 2015 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 09 March 2015 17:36:42 Eliad Peller wrote:
->> --- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
->> @@ -64,4 +64,13 @@
->>         vmmc-supply = <&lbep5clwmc_wlen>;
->>         bus-width = <4>;
->>         non-removable;
->> +
->> +       #address-cells = <1>;
->> +       #size-cells = <0>;
->> +       wlcore: wlcore at 2 {
->> +               compatible = "ti,wl1835";
->> +               reg = <2>;
->> +               interrupt-parent = <&gpio5>;
->> +               interrupts = <8 IRQ_TYPE_NONE>;
->> +       };
->>
->
-> Why IRQ_TYPE_NONE?
->
-i simply mirrored the current board file (which only sets the irq number).
+Quoting Stephen Boyd (2015-03-09 12:05:34)
+> On 03/09/15 02:58, Philipp Zabel wrote:
+> > Am Freitag, den 06.03.2015, 11:40 -0800 schrieb Stephen Boyd:
+> >> On 03/06/15 11:28, Uwe Kleine-K?nig wrote:
+> >>> Hello Mike,
+> >>>
+> >>> On Fri, Mar 06, 2015 at 10:57:30AM -0800, Mike Turquette wrote:
+> >>>> Quoting Uwe Kleine-K?nig (2015-02-21 02:40:22)
+> >>>>> Hello,
+> >>>>>
+> >>>>> TLDR: only apply patch 1 and rip of CLK_DIVIDER_ROUND_CLOSEST.
+> >>>>>
+> >>>>> I stared at clk-divider.c for some time now given Sascha's failing test
+> >>>>> case. I found a fix for the failure (which happens to be what Sascha
+> >>>>> suspected).
+> >>>>>
+> >>>>> The other two patches fix problems only present when handling dividers
+> >>>>> that have CLK_DIVIDER_ROUND_CLOSEST set. Note that these are still
+> >>>>> heavily broken however. So having a 4bit-divider and a parent clk of
+> >>>>> 10000 (as in Sascha's test case) requesting
+> >>>>>
+> >>>>>         clk_set_rate(clk, 666)
+> >>>>>
+> >>>>> sets the rate to 625 (div=15) instead of 667 (div=16). The reason is the
+> >>>>> choice of parent_rate in clk_divider_bestdiv's loop is wrong for
+> >>>>> CLK_DIVIDER_ROUND_CLOSEST (with and without patch 1). A fix here is
+> >>>>> non-trivial and for sure more than one rate must be tested here. This is
+> >>>>> complicated by the fact that clk_round_rate might return a value bigger
+> >>>>> than the requested rate which convinces me (once more) that it's a bad
+> >>>>> idea to allow that. Even if this was fixed for .round_rate,
+> >>>>> clk_divider_set_rate is still broken because it also uses
+> >>>>>
+> >>>>>         div = DIV_ROUND_UP(parent_rate, rate);
+> >>>>>
+> >>>>> to calculate the (pretended) best divider to get near rate.
+> >>>>>
+> >>>>> Note this makes at least two reasons to remove support for
+> >>>>> CLK_DIVIDER_ROUND_CLOSEST!
+> >>>>>
+> >>>>> Instead I'd favour creating a function
+> >>>>>
+> >>>>>         clk_round_rate_nearest
+> >>>>>
+> >>>>> as was suggested some time ago by Soren Brinkmann and me[1] that doesn't
+> >>>> Uwe,
+> >>>>
+> >>>> Thanks for the fixes. I'm thinking of taking all three for 4.0. I also
+> >>>> agree on clk_round_rate_nearest (along with a _ceil and _floor version
+> >>>> as well). That's something we can do for 4.1 probably.
+> >>> I'd say that we make round_rate the _floor version. I guess in most
+> >>> cases that already does the right thing. Also I think 4.1 is very
+> >>> ambitious, so my suggestion for 4.1 is:
+> >>>
+> >>>  - add a WARN_ON_ONCE to clk_round_rate catching calls that return a
+> >>>    value bigger than requested.
+> >>>  - implement clk_round_rate_nearest using clk_round_rate and the
+> >>>    assumption that it returns a value that is <= the requested rate.
+> >>>    I think without that there are too many special cases to handle and
+> >>>    probably not even a reliable way to determine the nearest rate.
+> >>>  - while we're at it tightening the requirements for clk_round_rate
+> >>>    let's also specify the expected rounding. I'd vote for the
+> >>>    mathematical rounding, that is
+> >>>
+> >>>     clk_round_rate(someclk, 333)
+> >>>
+> >>>    explicitly is allowed to return a rate bigger than 333 as long as it
+> >>>    is less than 333.5.
+> >>>
+> >>> At one point while developing patch 1 I had the dividers fixed for the
+> >>> rounding issue. I think I still have that patch somewhere so can post it
+> >>> as RFC.
+> >>>
+> >> Why do we need clk_round_rate_nearest? We have rate constraints now so
+> >> drivers should be moving towards requesting a rate that's within a
+> >> tolerance they can accept if they even care to enforce anything like
+> >> that. Eventually clk_round_rate() returning a value smaller or larger
+> >> than what it's called with won't matter as long as what the
+> >> implementation does fits within the constraints that consumers specify.
+> >> It may even be possible to remove clk_round_rate() as a consumer API.
+> > If I have to provide a panel pixel clock I usually want to get a rate as
+> > close as possible to the specified typical rate, but within the
+> > specified limits.
+> >
+> > Assume a panel with 70 MHz ideal pixel clock and a valid range of 60 MHz
+> > to 80 MHz. If the clock supply supports two frequencies within that
+> > range, 60 MHz and 72 MHz, I'd prefer 72 MHz to be chosen over 60 Mhz.
+> >
+> >
+> 
+> Hm.. Maybe we should tweak the arguments to clk_set_range() to have a
+> "typical" rate? So instead of the current API:
+> 
+>   int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned
+> long max)
+> 
+> we should have
+> 
+>  int clk_set_rate_range(struct clk *clk, unsigned long min, unsigned
+> long typical, unsigned long max)
+> 
+> with the semantics that we'll set the rate within the min,max
+> constraints and try to get the rate as close to the typical rate as
+> possible? That would match quite a few datasheets out there that specify
+> these triplets.
 
-> I was expecting you to remove all calls to legacy_init_wl12xx from this file,
-> including the ones for wl12xx aside from the wl18xx ones you removed, but
-> if that's enough to clean out the platform_data handling from the wlcore
-> driver, it's good enough as a start.
-not sure i'm following - can you elaborate?
+This suffers from the same problem that round_rate has today, which is
+the question of rounding policy. When you say that we want to get as
+close as possible, how do we decide between equivalent values? We need
+to make a default policy, document it and stick to it. E.g:
 
-i'll summarize the way i see it. please correct me if i'm wrong.
+clk_set_rate_range(clk, 100, 110, 120);
 
-both wl18xx and wl12xx use the platform data to get the irq number.
-wl12xx (only) also needs some additional clock definitions to be
-passed. there's currently some issue with specifying some the of clock
-sources, so i preferred starting only with (the simpler) wl18xx
-bindings.
+Let's say that round_rate gives us possible values of 108 and 112, both
+of which are two Hz away from the typical value of 110Hz. One is not
+closer than the other. Which do we choose? Let's figure out a sane
+default to the question and document it very loudly in the code.
 
-for platforms with wl18xx, we can remove the pdata-quirk, as all the
-data (i.e. irq) can be passed by the new DT bindings.
-however, for platforms with wl12xx, we still need to pass the clock
-definitions (along with the irq), so we have to keep
-legacy_init_wl12xx for the time being (and that's also why we have to
-currently keep the platform_data handling in the wlcore driver)
+For the sake of consistency I think we should choose the slower value
+since this is what a normal clk_round_rate should do stay within spec.
+Obviously either rate (108 or 112) would be in spec, since they are
+within the min/max range. But if a normal call to clk_round_rate should
+choose a ceiling value by default (which I think it should) then
+probably the range stuff should as well, just to keep us from confusing
+ourselves.
 
-do you have something else in mind?
+Regards,
+Mike
 
-Eliad.
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
