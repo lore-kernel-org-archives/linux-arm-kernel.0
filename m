@@ -1,74 +1,50 @@
 From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Mon,  9 Mar 2015 18:03:44 +0000
-Subject: [PATCH 1/2] of: fix handling of '/' in options for
- of_find_node_by_path()
+Date: Mon,  9 Mar 2015 18:03:45 +0000
+Subject: [PATCH 2/2] of: unittest: Add options string testcase variants
 In-Reply-To: <1425924225-22748-1-git-send-email-leif.lindholm@linaro.org>
 References: <1425924225-22748-1-git-send-email-leif.lindholm@linaro.org>
-Message-ID: <1425924225-22748-2-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <1425924225-22748-3-git-send-email-leif.lindholm@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure proper handling of paths with appended options (after ':'),
-where those options may contain a '/'.
+From: Peter Hurley <peter@hurleysoftware.com>
 
-Fixes: 7914a7c5651a ("of: support passing console options with stdout-path")
-Reported-by: Peter Hurley <peter@hurleysoftware.com>
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Add testcase variants with '/' in the options string to test for
+scan beyond end path name terminated by ':'.
+
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
 ---
- drivers/of/base.c | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
+ drivers/of/unittest.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 0a8aeb8..8b904e5 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -714,16 +714,17 @@ static struct device_node *__of_find_node_by_path(struct device_node *parent,
- 						const char *path)
- {
- 	struct device_node *child;
--	int len = strchrnul(path, '/') - path;
--	int term;
-+	int len;
-+	const char *end;
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index 0cf9a23..b2d7547 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -92,6 +92,11 @@ static void __init of_selftest_find_node_by_name(void)
+ 		 "option path test failed\n");
+ 	of_node_put(np);
  
-+	end = strchr(path, ':');
-+	if (!end)
-+		end = strchrnul(path, '/');
++	np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
++	selftest(np && !strcmp("test/option", options),
++		 "option path test, subcase #1 failed\n");
++	of_node_put(np);
 +
-+	len = end - path;
- 	if (!len)
- 		return NULL;
+ 	np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
+ 	selftest(np, "NULL option path test failed\n");
+ 	of_node_put(np);
+@@ -102,6 +107,12 @@ static void __init of_selftest_find_node_by_name(void)
+ 		 "option alias path test failed\n");
+ 	of_node_put(np);
  
--	term = strchrnul(path, ':') - path;
--	if (term < len)
--		len = term;
--
- 	__for_each_child_of_node(parent, child) {
- 		const char *name = strrchr(child->full_name, '/');
- 		if (WARN(!name, "malformed device_node %s\n", child->full_name))
-@@ -768,8 +769,12 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
- 
- 	/* The path could begin with an alias */
- 	if (*path != '/') {
--		char *p = strchrnul(path, '/');
--		int len = separator ? separator - path : p - path;
-+		int len;
-+		const char *p = separator;
++	np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
++				       &options);
++	selftest(np && !strcmp("test/alias/option", options),
++		 "option alias path test, subcase #1 failed\n");
++	of_node_put(np);
 +
-+		if (!p)
-+			p = strchrnul(path, '/');
-+		len = p - path;
- 
- 		/* of_aliases must not be NULL */
- 		if (!of_aliases)
-@@ -794,6 +799,8 @@ struct device_node *of_find_node_opts_by_path(const char *path, const char **opt
- 		path++; /* Increment past '/' delimiter */
- 		np = __of_find_node_by_path(np, path);
- 		path = strchrnul(path, '/');
-+		if (separator && separator < path)
-+			break;
- 	}
- 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
- 	return np;
+ 	np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
+ 	selftest(np, "NULL option alias path test failed\n");
+ 	of_node_put(np);
 -- 
 2.1.4
