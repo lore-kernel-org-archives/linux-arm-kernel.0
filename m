@@ -1,36 +1,28 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon,  9 Mar 2015 12:36:12 +0800
-Subject: [PATCH v2 0/3] Improve eye-diagram & single-ended test for rk3288 hdmi
-Message-ID: <1425875772-21252-1-git-send-email-ykk@rock-chips.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 9 Mar 2015 06:37:23 +0100
+Subject: [PATCH] Mediatek PMIC wrapper support
+In-Reply-To: <1424606567-29708-1-git-send-email-s.hauer@pengutronix.de>
+References: <1424606567-29708-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150309053723.GA31436@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Matthias,
 
-RK3288 hdmi eye-diagram test would fail when pixel clock is 148.5MHz,
-and single-ended test would failed when display mode is 74.25MHz.
+On Sun, Feb 22, 2015 at 01:02:45PM +0100, Sascha Hauer wrote:
+> This series adds support for the PMIC wrapper found on MT8135 and
+> MT8173 SoCs. This has been sent several times already as part of
+> different series, this time broken out as a series only containing
+> the wrapper code. No further compile time dependencies.
+> 
+> Matthias, I assume you can take this one through your tree, right?
 
-To fix such problems, we make those patch set:
-- Fix some code style, leave space for next patches.
-- For hdmi eye-diagram test, we turn on the Transmitter Trailer-B and
-  improve slopeboost to 10%-20% decrease.
-- For hdmi single-ended test, we set CKLVL to 18 and & TXLVL to 19 when
-  pixel clock is 74.25MHz, keep CKLVL & TXLVL to 13 when pixel clock is
-  148.5MHz.
+Are you ok with these patches? Can you take them through your tree?
 
-Changes in v2:
-- set slopeboost back to 10%-20%, then rasing/falling time would pass.
-- For pixel clock less than 74.25MHz, set txlvl to 19 and set cklvl to 18.
-
-Yakir Yang (3):
-  drm: bridge/dw_hdmi: fixed codec style
-  drm: bridge/dw_hdmi_rockchip: improve hdmi eye-diagram test
-  drm: bridge/dw_hdmi: improve hdmi single-end test
-
- drivers/gpu/drm/bridge/dw_hdmi.c            | 20 ++++++++++----------
- drivers/gpu/drm/imx/dw_hdmi-imx.c           | 12 ++++++------
- drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c | 14 +++++++-------
- include/drm/bridge/dw_hdmi.h                |  5 +++--
- 4 files changed, 26 insertions(+), 25 deletions(-)
+Sascha
 
 -- 
-2.1.2
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
