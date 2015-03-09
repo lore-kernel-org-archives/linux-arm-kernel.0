@@ -1,37 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 17:47:40 +0100
-Subject: [PATCH 14/14] MAINTAINERS: Add entry for STM32 MCUs
-In-Reply-To: <CALszF6Bz978KA1DAxcKtmA55X=vJWEcVDa9fLOF=uNatYS+b+Q@mail.gmail.com>
-References: <1423763164-5606-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1423763164-5606-15-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdaM0BwMcq77MO=0-dVaqwobD5Pt+11j7ZZ4c3yKM=AkeA@mail.gmail.com>
- <CALszF6Bz978KA1DAxcKtmA55X=vJWEcVDa9fLOF=uNatYS+b+Q@mail.gmail.com>
-Message-ID: <CACRpkdaYVyH-y19yHYp2noq6VhDVJYQfqkevDtLr-7y8gVwdXw@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Mon, 9 Mar 2015 17:51:40 +0100
+Subject: [PATCH v2 16/18] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <CACRpkdaW-OMgGfw8+ngia8AsmzRpW8z7922=dPpRGjgv79-gqw@mail.gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-17-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdaW-OMgGfw8+ngia8AsmzRpW8z7922=dPpRGjgv79-gqw@mail.gmail.com>
+Message-ID: <CALszF6DW4_2AmVgG3EBNqKTaP=cf-ZimZCR7_Cynqz5Uczs2+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 6, 2015 at 10:55 AM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
-> 2015-03-06 10:03 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, Feb 12, 2015 at 6:46 PM, Maxime Coquelin
->> <mcoquelin.stm32@gmail.com> wrote:
->>
->>> Add a MAINTAINER entry covering all STM32 machine and drivers files.
->>>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->> (...)
->>> +F:     drivers/clocksource/arm_system_timer.c
->>
->> Is that all? And that is not even a STM32 specific driver.
+2015-03-09 15:39 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Feb 20, 2015 at 7:01 PM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
 >
-> For the ARM System Timer, I'm fine to add a new entry.
-> Or remove the line, and let the maintain-ship to clocksource maintainers.
+>> The STMicrolectornics's STM32F419 MCU has the following main features:
+>>  - Cortex-M4 core running up to @180MHz
+>>  - 2MB internal flash, 256KBytes internal RAM
+>>  - FMC controller to connect SDRAM, NOR and NAND memories
+>>  - SD/MMC/SDIO support
+>>  - Ethernet controller
+>>  - USB OTFG FS & HS controllers
+>>  - I2C, SPI, CAN busses support
+>>  - Several 16 & 32 bits general purpose timers
+>>  - Serial Audio interface
+>>  - LCD controller
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> (...)
+>> +       soc {
+>> +               usart1: usart at 40011000 {
+>> +                       status = "okay";
+>> +               };
+>> +
+>> +               leds {
+>> +                       compatible = "gpio-leds";
+>> +                       red {
+>> +                               #gpio-cells = <2>;
+>> +                               label = "Front Panel LED";
+>> +                               gpios = <&gpiog 14 0>;
+>> +                               linux,default-trigger = "heartbeat";
+>> +                       };
+>> +                       green {
+>> +                               #gpio-cells = <2>;
+>> +                               gpios = <&gpiog 13 0>;
+>> +                               default-state = "off";
+>> +                       };
+>> +               };
+>> +       };
 >
-> All the STM32 files are covered by this line:
-> +N:     stm32
+> The LEDs are mounted on the board not the SoC, right?
+>
+> So move them outside of the soc node, to the top level
+> of the DTS file.
 
-Aha you're right, news2me, I'm old and stupid :/
+Yes, you are right.
+Andreas already made the same remark, and the top-level move is
+already here in the upcoming v3.
 
 Thanks,
-Linus Walleij
+Maxime
+>
+> Yours,
+> Linus Walleij
