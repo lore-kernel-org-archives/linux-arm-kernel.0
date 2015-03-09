@@ -1,66 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Mar 2015 17:37:36 +0000
-Subject: [PATCH 3/8] ARM: make xscale iwmmxt code multiplatform aware
-In-Reply-To: <356997090.ZkRbrlLqgW@wuerfel>
-References: <1425043775-3106827-1-git-send-email-arnd@arndb.de>
- <1425043775-3106827-4-git-send-email-arnd@arndb.de>
- <87pp8ozwb1.fsf@free.fr> <356997090.ZkRbrlLqgW@wuerfel>
-Message-ID: <20150309173736.GB8656@n2100.arm.linux.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon,  9 Mar 2015 10:38:36 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.1 #1
+Message-ID: <1425922716-4213-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 03:38:29PM +0100, Arnd Bergmann wrote:
-> On Wednesday 04 March 2015 15:12:02 Robert Jarzmik wrote:
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > 
-> > I'm not sure I understand this patch fully, so take with caution my comment.
-> > If I'm not mistaken, the former behavior was for pxa3xx:
-> >  - cpu_is_xscale() -> false
-> >  - cpu_is_xsc3() -> true
-> >  => this implied PMD_BIT4 was set
-> > 
-> > With your patch :
-> >  - cpu_is_xscale() -> true
-> >  - cpu_is_xsc3() -> true
-> >  => this implied PMD_BIT4 is not set
-> > 
-> > I like the new meaning for cpu_is_*(), but is the change of PMD_BIT4 the goal of
-> > this patch (the piece in [1]) ?
-> 
-> > > -     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
-> > > +     if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ &&
-> > > +         !cpu_is_xscale() && !cpu_is_xsc3())
-> > >               prot |= PMD_BIT4;
-> > >  
-> > >       pgd += pgd_index(addr);
-> 
-> I tried to not change the behavior here, and I think you missed this part:
-> 
-> -#if !defined(CONFIG_CPU_XSCALE) && !defined(CONFIG_CPU_XSC3)
-> +#if !defined(CONFIG_CPU_XSCALE)
->  #define        cpu_is_xscale() 0
->  #else
-> -#define        cpu_is_xscale() 1
->  ...
-> 
-> This means that previously, cpu_is_xscale() returned true for pxa3xx,
-> while now it returns false, and I added the "&& !cpu_is_xsc3()" to
-> keep the logic the same as before.
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-Please don't do stuff like this.  It's really easy for it to be buggy.
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-Before your change, cpu_is_xscale() returns true for _any_ Xscale CPU,
-whether it's v1, v2 or v3.  After your change, it only returns true for
-v1 and v2 CPUs.  So now the macro is mis-named, and is misleading.
+are available in the git repository at:
 
-Either rename the macro, or keep the existing behaviour, or do something
-smarter like:
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.1/devicetree
 
-#define cpu_is_xscale() (cpu_is_xsc1_2() || cpu_is_xsc3())
+for you to fetch changes up to 7875b470c9d80dff2d58ae9692adb3a2b5814a89:
 
-defining cpu_is_xsc1_2() to be your new version of cpu_is_xscale().
+  ARM: BCM5301X: Fix default state of power LEDs on Netgear R6250 (2015-03-06 22:26:48 -0800)
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+----------------------------------------------------------------
+This pull request contains the following Broadcom SoCs Device Tree changes:
+
+- Jonathan adds support for the Broadcom Cygnus BCM958305K board
+
+- Rafal adds support for Netgear R8000 and fixes the default for power LEDs
+  on Netgear R6250
+
+----------------------------------------------------------------
+Jonathan Richardson (1):
+      ARM: dts: Enable Broadcom Cygnus BCM958305K
+
+Rafa? Mi?ecki (2):
+      ARM: BCM5301X: Add DT for Netgear R8000
+      ARM: BCM5301X: Fix default state of power LEDs on Netgear R6250
+
+ arch/arm/boot/dts/Makefile                  |  6 ++-
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts |  4 +-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 77 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm958305k.dts            | 53 ++++++++++++++++++++
+ 4 files changed, 136 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+ create mode 100644 arch/arm/boot/dts/bcm958305k.dts
