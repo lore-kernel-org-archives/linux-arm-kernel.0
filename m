@@ -1,50 +1,45 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Mon, 9 Mar 2015 18:00:13 +0100
-Subject: [PATCH v2 04/18] clocksource: Add ARM System timer driver
-In-Reply-To: <CACRpkdYnj0vTBVEEDp4isznRZ+KQuC2h+VViZr=Pt8VtEOWP-A@mail.gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-5-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdYnj0vTBVEEDp4isznRZ+KQuC2h+VViZr=Pt8VtEOWP-A@mail.gmail.com>
-Message-ID: <CALszF6B1NV4193+az0Aep+C5R+=kn0a2HyyzU1HtfD_HnWCnRw@mail.gmail.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 10 Mar 2015 02:00:44 +0900
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1425912389.4871.19.camel@mtksdaap41>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+ <CAAFQd5AhTe=d9tXN8kaRah_GiZYYxG0cD0up=cbHkSfbBnXmvQ@mail.gmail.com>
+ <1425912389.4871.19.camel@mtksdaap41>
+Message-ID: <CAAFQd5DpXxyoNiTGC4YYnpXeKo43XXrC+my6KWOV1pGq1jw6Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-09 16:50 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Feb 20, 2015 at 7:01 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->
->> This patch adds clocksource support for ARMv7-M's System timer,
->> also known as SysTick.
+On Mon, Mar 9, 2015 at 11:46 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> On Mon, 2015-03-09 at 20:11 +0900, Tomasz Figa wrote:
+> <...>
+>> > +/*
+>> > + * pimudev is a global var for dma_alloc_coherent.
+>> > + * It is not accepatable, we will delete it if "domain_alloc" is enabled
+>> > + */
+>> > +static struct device *pimudev;
 >>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> (...)
->> +       /* If no clock found, try to get clock-frequency property */
->> +       if (!rate) {
->> +               ret = of_property_read_u32(np, "clock-frequency", &rate);
->> +               if (ret)
->> +                       goto out_unmap;
->> +       }
+>> This is indeed not acceptable. Could you replace dma_alloc_coherent()
+>> with something that doesn't require device pointer, e.g.
+>> alloc_pages()? (Although that would require you to handle cache
+>> maintenance in the driver, due to cached memory allocated.) I need to
+>> think about a better solution for this.
 >
-> If this driver is only used for this one system, and if on this one system
-> the clk subsystem will provide the clock rate, then there is no need
-> to include this hackaround property.
+> Hi,
 >
-> Alternatively there is no point including reading the frequency from
-> the clk subsystem for this one system.
+> For 2nd level page table, we use cached memory now. Currently we are
+> using __dma_flush_range to flush the cache, which is also unacceptable.
 >
-> So which one is it?
+> For proper cache management, we'll need to use dma_map_single or
+> dma_sync_*, which still need a deivce*.
 
-In the first version, the "clock-frequency" property handling was not here.
-Rob Herring advised me to add its support, as it could be used by
-simple systems not selecting CCF.
+Looking at how already mainlined drivers do this, they either use
+dmac_flush_range()
+(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iommu/msm_iommu.c?id=refs/tags/v4.0-rc3#n80)
+or directly __cpuc_flush_dcache_area() and outer_flush_range()
+(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/iommu/rockchip-iommu.c?id=refs/tags/v4.0-rc3#n93).
 
-So, I don't have the name of a system where it could be useful, but I
-think Rob's request make sense.
-
-Note that I tested using the clock-frequency property before sending.
+Joerg, what's your opinion on this?
 
 Best regards,
-Maxime
->
-> Yours,
-> Linus Walleij
+Tomasz
