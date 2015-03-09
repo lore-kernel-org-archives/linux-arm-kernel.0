@@ -1,36 +1,88 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon,  9 Mar 2015 09:16:39 -0600
-Subject: [RFC PATCH v15 04/11] ARM: cpuidle: Register cpuidle_ops for QCOM cpus
+Date: Mon,  9 Mar 2015 09:16:40 -0600
+Subject: [PATCH v15 05/11] ARM: dts: qcom: Add power-controller device node
+ for 8074 Krait CPUs
 In-Reply-To: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
 References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1425914206-22295-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register cpuidle ops for Krait Processor Sub-System.
-Supports v1 and v2 versions of KPSS.
+Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
+regulate the power to the cpu and aide the core in entering idle states.
+Reference the SAW instance and associate the instance with the CPU core.
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/cpuidle_ops.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/cpuidle_ops.h b/arch/arm/include/asm/cpuidle_ops.h
-index be0a612..40cb262 100644
---- a/arch/arm/include/asm/cpuidle_ops.h
-+++ b/arch/arm/include/asm/cpuidle_ops.h
-@@ -1,3 +1,8 @@
- /*
-  * List of cpuidle operations
-  */
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index e265ec1..5a41f44 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -21,6 +21,7 @@
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc0>;
++			qcom,saw = <&saw0>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -30,6 +31,7 @@
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc1>;
++			qcom,saw = <&saw1>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -39,6 +41,7 @@
+ 			reg = <2>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc2>;
++			qcom,saw = <&saw2>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -48,6 +51,7 @@
+ 			reg = <3>;
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc3>;
++			qcom,saw = <&saw3>;
+ 		};
+ 
+ 		L2: l2-cache {
+@@ -144,7 +148,27 @@
+ 			};
+ 		};
+ 
+-		saw_l2: regulator at f9012000 {
++		saw0: power-controller at f9089000 {
++			compatible = "qcom,msm8974-saw2-v2.1-cpu";
++			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
++		};
 +
-+#if IS_ENABLED(CONFIG_QCOM_PM)
-+CPUIDLE_OPS(qcom_kpss_v1)
-+CPUIDLE_OPS(qcom_kpss_v2)
-+#endif
++		saw1: power-controller at f9099000 {
++			compatible = "qcom,msm8974-saw2-v2.1-cpu";
++			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw2: power-controller at f90a9000 {
++			compatible = "qcom,msm8974-saw2-v2.1-cpu";
++			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw3: power-controller at f90b9000 {
++			compatible = "qcom,msm8974-saw2-v2.1-cpu";
++			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw_l2: power-controller at f9012000 {
+ 			compatible = "qcom,saw2";
+ 			reg = <0xf9012000 0x1000>;
+ 			regulator;
 -- 
 2.1.0
