@@ -1,29 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Mar 2015 16:23:28 +0000
-Subject: [PATCH] mfd: mt6397: Use set_irq_flags only on ARM
-In-Reply-To: <20150304075907.GN7865@pengutronix.de>
-References: <1425453869-18482-1-git-send-email-s.hauer@pengutronix.de>
- <20150304075907.GN7865@pengutronix.de>
-Message-ID: <20150309162328.GX8656@n2100.arm.linux.org.uk>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 09 Mar 2015 16:25:58 +0000
+Subject: [PATCH 5/6] target-arm/kvm64: fix save/restore of SPSR regs
+In-Reply-To: <CAFEAcA_DqHx-sDMuhSr0-uQL20-uJzXXpBvr6YLUWmzMN2mL4w@mail.gmail.com>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-7-git-send-email-alex.bennee@linaro.org>
+ <20150302172212.GB10137@lvm> <874mq27222.fsf@linaro.org>
+ <20150309125650.GA20559@cbox>
+ <CAFEAcA_DqHx-sDMuhSr0-uQL20-uJzXXpBvr6YLUWmzMN2mL4w@mail.gmail.com>
+Message-ID: <87r3syb0ix.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 08:59:07AM +0100, Uwe Kleine-K?nig wrote:
-> While this is what everyone does, I wonder why ARM is special here.
-> Has this only historic reasons and needs refurbishment?
 
-We have platforms where we need to ensure that certain interrupts can't
-be requested.
+Peter Maydell <peter.maydell@linaro.org> writes:
 
-Unfortunately, that was never properly dealt with when genirq came
-along, and we're pretty much stuck with this situation: going through
-and working out what the restrictions were is a much bigger problem
-than it was when genirq first happened.  I don't see how we could
-sanely fix this now.
+> On 9 March 2015 at 21:56, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>> this function, however, is not used only when migration, but should
+>> generally cover the case where you want to synchronize QEMU's state into
+>> KVM's state, right?  So while it may not be harmful in currently
+>> supported use cases, is there ever a situation where (is_a64(env) && el
+>> == 0) and env->spsr != banked_spsr[el], and where env->spsr is
+>> out-of-date?
+>
+> If EL == 0 then you can't access any SPSR, so env->spsr is by
+> definition out of date.
 
-What we should probably at least do is work out a way that we can kill
-that ifdef, so we don't have the same hack appearing in many drivers.
+Indeed and in v2 the whole thing is wrapped in if (el > 0)
+
+>
+> -- PMM
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Alex Benn?e
