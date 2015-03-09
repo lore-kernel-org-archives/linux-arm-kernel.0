@@ -1,26 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Mar 2015 17:23:37 +0000
-Subject: [PATCH] ARM: at91: sama5d4: Properly configure L2CC
-In-Reply-To: <1425468563-14300-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425468563-14300-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150309172337.GA8656@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Mar 2015 18:37:07 +0100
+Subject: [PATCH v5 2/5] dt-bindings: Add pinctrl bindings for
+ mt65xx/mt81xx.
+In-Reply-To: <CABuKBeL0y4OrLCtyV_n0eVsncpo7vT0ZentGC-ZW9YzBYDa1Qw@mail.gmail.com>
+References: <1421818097-9281-1-git-send-email-hongzhou.yang@mediatek.com>
+ <1421818097-9281-3-git-send-email-hongzhou.yang@mediatek.com>
+ <CACRpkdYASTGTiiAF6EA=OCqYepdStf4UO9_qWGg6ACyd8=CaHw@mail.gmail.com>
+ <CABuKBeL0y4OrLCtyV_n0eVsncpo7vT0ZentGC-ZW9YzBYDa1Qw@mail.gmail.com>
+Message-ID: <CACRpkdZq-UA2K8dLjcVR1-ttxdHJRVZHPfjEigKZtMHY+wQ5YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 12:29:23PM +0100, Alexandre Belloni wrote:
-> As the bootloader may not properly configure the L2CC, enforce its configuration
-> in the kernel.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Sun, Mar 8, 2015 at 9:16 AM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> Hi Linus,
+>
+> 2015-02-10 9:01 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Wed, Jan 21, 2015 at 1:28 PM, Hongzhou Yang
+>> <hongzhou.yang@mediatek.com> wrote:
+>>
+>>> From: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>>>
+>>> Add devicetree bindings for Mediatek SoC pinctrl driver.
+>>>
+>>> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>>
+>> OK applied this patch for v3.21 now, relying on Sascha's ACK.
+>
+> I can see the the pinctrl driver parts in your tree repository [0],
+> but not in linux-next.
+> Do think of merging them in the next merge window?
 
-And I assume you never bothered to read the kernel messages which result
-from this?  I guess this means I need to ensure that the kernel freezes
-if you do this kind of thing so you can't ignore the complaints from
-the L2C code.
+Oops too stressed just forgot to merge them into my devel
+branch.
 
-It would be much better if you configured the L2C in the boot loader/
-board firmware rather than trying to have the kernel do it.
+Merged now. Will push from devel to for-next when the
+zeroday builders say it all compiles.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Yours,
+Linus Walleij
