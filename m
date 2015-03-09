@@ -1,46 +1,41 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Mar 2015 00:23:22 +0100
-Subject: [PATCH 3/3] ARM: dts: rockchip: add hdmi analog power supplies to
- rk3288 boards
-In-Reply-To: <1429128.MSqYm0qZ9p@phil>
-References: <1429128.MSqYm0qZ9p@phil>
-Message-ID: <1671480.kThS89MFxf@phil>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Tue, 10 Mar 2015 10:31:01 +1100
+Subject: [linux-sunxi] [PATCH 09/15] ARM: dts: sun4i: Add USB Dual Role
+ Controller
+In-Reply-To: <1425933628-9672-10-git-send-email-hdegoede@redhat.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <1425933628-9672-10-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGRGNgVsf05rtLC2+yOPrbrPV-ceQzPC=ZX1zX+hfNxdC7OX-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the recently added hdmi power supplies to evb and firefly boards.
+Hi Hans,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-evb.dtsi     | 2 ++
- arch/arm/boot/dts/rk3288-firefly.dtsi | 2 ++
- 2 files changed, 4 insertions(+)
+On Tue, Mar 10, 2015 at 7:40 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Add a node for the otg/drc usb controller to sun4i-a10.dtsi.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  arch/arm/boot/dts/sun4i-a10.dtsi | 12 ++++++++++++
+>  drivers/usb/musb/Kconfig         |  1 +
+>  2 files changed, 13 insertions(+)
+>
+> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+> index 8180a3a..fab8e9a 100644
+> --- a/drivers/usb/musb/Kconfig
+> +++ b/drivers/usb/musb/Kconfig
+> @@ -65,6 +65,7 @@ comment "Platform Glue Layer"
+>  config USB_MUSB_SUNXI
+>         tristate "Allwinner (sunxi)"
+>         depends on ARCH_SUNXI
+> +       depends on NOP_USB_XCEIV
 
-diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-index 5e895a5..edd45a0 100644
---- a/arch/arm/boot/dts/rk3288-evb.dtsi
-+++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-@@ -118,6 +118,8 @@
- };
- 
- &hdmi {
-+	avdd1v0-supply = <&vdd10_lcd>;
-+	avdd1v8-supply = <&vcc18_lcd>;
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index e6f873a..09fcded 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -180,6 +180,8 @@
- };
- 
- &hdmi {
-+	avdd1v0-supply = <&vdd10_lcd>;
-+	avdd1v8-supply = <&vcc18_lcd>;
- 	ddc-i2c-bus = <&i2c5>;
- 	status = "okay";
- };
+Shouldn't this be in a different patch?
+
+Thanks,
+
 -- 
-2.1.4
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
