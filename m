@@ -1,51 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  9 Mar 2015 18:27:49 +0000
-Subject: [PATCH][RESEND] ARM: vexpress: update CONFIG_USB_ISP1760 option
-Message-ID: <1425925669-8561-1-git-send-email-sudeep.holla@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 9 Mar 2015 19:33:15 +0100
+Subject: [PATCH] ARM: at91: sama5d4: Properly configure L2CC
+In-Reply-To: <20150309172337.GA8656@n2100.arm.linux.org.uk>
+References: <1425468563-14300-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150309172337.GA8656@n2100.arm.linux.org.uk>
+Message-ID: <20150309183315.GA9188@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
-to drivers/usb/isp1760/") moved the isp1760 driver and changed the
-Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
-directly anymore. This results in driver being not compiled in when
-using vexpress_defconfig and the USB is non-functional.
+On 09/03/2015 at 17:23:37 +0000, Russell King - ARM Linux wrote :
+> On Wed, Mar 04, 2015 at 12:29:23PM +0100, Alexandre Belloni wrote:
+> > As the bootloader may not properly configure the L2CC, enforce its configuration
+> > in the kernel.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> And I assume you never bothered to read the kernel messages which result
+> from this?  I guess this means I need to ensure that the kernel freezes
+> if you do this kind of thing so you can't ignore the complaints from
+> the L2C code.
+> 
+> It would be much better if you configured the L2C in the boot loader/
+> board firmware rather than trying to have the kernel do it.
+> 
 
-This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
-get back USB functional on vexpress platforms.
+As I understand, there is no proper way to enable prefetch from the
+kernel so if it is not done by the bootloader or firmware (and it is
+not), then we are out of luck.
 
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reported-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/configs/vexpress_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Or is there something done right on berlin and exynos that I'm not doing
+here?
 
-Hi Olof/Arnd,
 
-I had sent this fix a while ago[1], looks like it's lost somewhere in
-my mails. So I am resending it again.
-
-Regards,
-Sudeep
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325427.html
-
-diff --git a/arch/arm/configs/vexpress_defconfig b/arch/arm/configs/vexpress_defconfig
-index f489fdaa19b8..37fe607a4ede 100644
---- a/arch/arm/configs/vexpress_defconfig
-+++ b/arch/arm/configs/vexpress_defconfig
-@@ -118,8 +118,8 @@ CONFIG_HID_ZEROPLUS=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_MON=y
--CONFIG_USB_ISP1760_HCD=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_ISP1760=y
- CONFIG_MMC=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
