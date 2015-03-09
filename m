@@ -1,20 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Mar 2015 18:13:39 +0100
-Subject: [PATCH v2 00/10] ARM: berlin: refactor chip and system controllers
-In-Reply-To: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <CACRpkdZnb1z2RGMRkCJQ=arOmQrkjrLjvK2eDRdm0jYNEM4h9g@mail.gmail.com>
+From: davem@redhat.com (David Miller)
+Date: Mon, 09 Mar 2015 13:14:04 -0400 (EDT)
+Subject: [PATCH] net: smc91x: improve neponset hack
+In-Reply-To: <20150309123447.GL8656@n2100.arm.linux.org.uk>
+References: <5754481.gFE9BvLjh0@wuerfel>
+ <20150309122012.GJ8656@n2100.arm.linux.org.uk>
+ <20150309123447.GL8656@n2100.arm.linux.org.uk>
+Message-ID: <20150309.131404.2077303491934820826.davem@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 6, 2015 at 4:05 PM, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Date: Mon, 9 Mar 2015 12:34:47 +0000
 
-> This series aims to handle these two nodes correctly, by using the newly
-> available simple-mfd compatible, to register all the sub-devices.
+> On Mon, Mar 09, 2015 at 12:20:12PM +0000, Russell King - ARM Linux wrote:
+>> On Fri, Feb 20, 2015 at 04:47:06PM +0100, Arnd Bergmann wrote:
+>> > On Thursday 19 February 2015 00:35:49 Russell King - ARM Linux wrote:
+>> > > On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
+>> > > > The smc91x driver tries to support multiple platforms at compile
+>> > > > time, but they are mutually exclusive at runtime, and not clearly
+>> > > > defined.
+>> > > 
+>> > > I'd prefer to rework this to fix that properly.  From what I remember,
+>> > > the whole SA11x0 stuff in this driver was a mess.
+>> > 
+>> > I guess that's reasonable. I've looked through the driver and it seems we
+>> > did most of the multiplatform work but left a few things alone that should
+>> > have been converted a long time ago.
+>> > 
+>> > Can you check if the approach below makes sense to you?
+>> 
+>> I don't know who's carrying what patches, but this is still broken.
+>> 
+>> arch/arm/mach-sa1100/neponset.c: In function 'neponset_probe':
+>> arch/arm/mach-sa1100/neponset.c:271:12: error: 'smc91c_platdata' undeclared (first use in this function)
+>> drivers/net/ethernet/smsc/smc91x.c: In function 'smc_drv_probe':
+>> drivers/net/ethernet/smsc/smc91x.c:2363:2: error: implicit declaration of function 'machine_has_neponset' [-Werror=implicit-function-declaration]
+>> 
+>> This is from building Linus' tree as of Saturday plus arm-soc.
+>> 
+>> Let's revert all this crap and start again, this time testing it better?
+> 
+> I'm also getting:
 
-Hm let's see if that series makes it to ARM SoC then, thanks for
-supporting that design pattern!
+I have the fix in my tree still and is pending to be sent to Linus.
 
-Yours,
-Linus Walleij
+Please be patient.
