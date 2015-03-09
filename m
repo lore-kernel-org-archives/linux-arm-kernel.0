@@ -1,94 +1,140 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Mon, 09 Mar 2015 08:44:18 +0100
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
- <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
- <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
-Message-ID: <20150309084418.227b3e16@amdc2363>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 9 Mar 2015 07:44:51 +0000
+Subject: [PATCH 2/3] mfd: sun6i-prcm: Add support for PRCM found on
+ Allwinner A80 SoC
+In-Reply-To: <1425349320-2754-3-git-send-email-wens@csie.org>
+References: <1425349320-2754-1-git-send-email-wens@csie.org>
+ <1425349320-2754-3-git-send-email-wens@csie.org>
+Message-ID: <20150309074451.GH3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+On Tue, 03 Mar 2015, Chen-Yu Tsai wrote:
 
-> On Fri, Mar 06, 2015 at 07:16:53PM +0900, Kukjin Kim wrote:
-> > Arnd Bergmann wrote:
-> > > 
-> > + Eduardo
-> > 
-> > Hi Arnd,
-> > 
-> > > On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> > > > Please pull Samsung tmu and hdmi regression fixes for v4.0 and
-> > > > I know this is quite big for fixes but I couldn't handle this
-> > > > series for previous merge window because of dependency with
-> > > > driver side...sorry for that and please pull so that we could
-> > > > support them in v4.0 on exynos platforms.
-> > > 
-> > > What kind of dependency do you have there? It really should not be
-> > > necessary to wait for driver changes, unless you do an
-> > > incompatible DT binding change, which you should avoid.
-> > > 
-> > For TMU patches, I've asked Eduardo to provide topic branch for
-> > 'include/dt-bindings/thermal/thermal_exynos.h' has been added via
-> > thermal tree because if I can't apply the patch in Samsung tree for
-> > arm-soc, kernel build breakage will be happened. But I couldn't get
-> > Eduardo's topic branch.
+> This patch adds support for the PRCM on the A80 SoC. There is little
+> to no document for this at the moment. Only register offsets are
+> available. However with some testing, the clock and reset controls
+> seem to be the similar to the ones on the A31.
 > 
+> One thing that needs verifying is whether the apbs divider is the same
+> as the A31 or the A23. The lowest divider is different between those
+> 2 implementations.
 > 
-> Specifically, the developer, while migrating the driver to support DT
-> and OF thermal, decided to create a header with constants. The header
-> is used by DT files and the driver code. The header was the
-> dependency.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../devicetree/bindings/mfd/sun6i-prcm.txt         |  3 +-
+>  drivers/mfd/sun6i-prcm.c                           | 58 ++++++++++++++++++++++
+>  2 files changed, 60 insertions(+), 1 deletion(-)
 
-Just my 2 cents :-).
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-The above situation is the justification for adding the whole patch set
-to one repository when all ACKs are collected for it.
-
-> 
-> 
-> BR,
-> 
-> Eduardo Valentin
-> 
-> > 
-> > http://www.spinics.net/lists/linux-samsung-soc/msg41877.html
-> > 
-> > 
-> > For HDMI patches, I thought the DT changes have a dependency with
-> > "drm/exynos: add support for 'hdmi' clock" so waited for its
-> > applying then in drm tree. But I couldn't send it to arm-soc after
-> > that...
-> > 
-> > http://www.spinics.net/lists/linux-samsung-soc/msg42173.html
-> > 
-> > 
-> > I asked about the situation (late DT changes?) when I sent a
-> > pull-request, then I couldn't get a access my kernel.org because of
-> > biz. trip to China :(
-> > 
-> > http://www.spinics.net/lists/linux-samsung-soc/msg42235.html
-> > 
-> > 
-> > > I've pulled it into fixes, but won't forward it until I hear a
-> > > good explanation.
-> > > 
-> > As you know, basically I tried to make a clear branch for
-> > pull-request but in that case, I couldn't find a solution. Sorry
-> > for the inconvenience.
-> > 
-> > I hope v4.0 can support them properly.
-> > 
-> > Thanks,
-> > Kukjin
-> > 
-
-
+> diff --git a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> index 03c5a551da55..c100abfcb2a4 100644
+> --- a/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> +++ b/Documentation/devicetree/bindings/mfd/sun6i-prcm.txt
+> @@ -4,7 +4,8 @@ PRCM is an MFD device exposing several Power Management related devices
+>  (like clks and reset controllers).
+>  
+>  Required properties:
+> - - compatible: "allwinner,sun6i-a31-prcm" or "allwinner,sun8i-a23-prcm"
+> + - compatible: "allwinner,sun6i-a31-prcm", "allwinner,sun8i-a23-prcm",
+> +	       "allwinner,sun9i-a80-prcm"
+>   - reg: The PRCM registers range
+>  
+>  The prcm node may contain several subdevices definitions:
+> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+> index 191173166d65..d067c77fb512 100644
+> --- a/drivers/mfd/sun6i-prcm.c
+> +++ b/drivers/mfd/sun6i-prcm.c
+> @@ -33,6 +33,22 @@ static const struct resource sun6i_a31_apb0_clk_res[] = {
+>  	},
+>  };
+>  
+> +static const struct resource sun9i_a80_cpus_clk_res[] = {
+> +	{
+> +		.start = 0x10,
+> +		.end = 0x13,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static const struct resource sun9i_a80_apbs_clk_res[] = {
+> +	{
+> +		.start = 0x1c,
+> +		.end = 0x1f,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+>  static const struct resource sun6i_a31_apb0_gates_clk_res[] = {
+>  	{
+>  		.start = 0x28,
+> @@ -111,6 +127,39 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+>  	},
+>  };
+>  
+> +static const struct mfd_cell sun9i_a80_prcm_subdevs[] = {
+> +	{
+> +		.name = "sun6i-a31-ar100-clk",
+> +		.of_compatible = "allwinner,sun6i-a31-ar100-clk",
+> +		.num_resources = ARRAY_SIZE(sun9i_a80_cpus_clk_res),
+> +		.resources = sun9i_a80_cpus_clk_res,
+> +	},
+> +	{
+> +		.name = "sun8i-a23-apb0-clk",
+> +		.of_compatible = "allwinner,sun8i-a23-apb0-clk",
+> +		.num_resources = ARRAY_SIZE(sun9i_a80_apbs_clk_res),
+> +		.resources = sun9i_a80_apbs_clk_res,
+> +	},
+> +	{
+> +		.name = "sun6i-a31-apb0-gates-clk",
+> +		.of_compatible = "allwinner,sun9i-a80-apbs-gates-clk",
+> +		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_gates_clk_res),
+> +		.resources = sun6i_a31_apb0_gates_clk_res,
+> +	},
+> +	{
+> +		.name = "sun6i-a31-ir-clk",
+> +		.of_compatible = "allwinner,sun4i-a10-mod0-clk",
+> +		.num_resources = ARRAY_SIZE(sun6i_a31_ir_clk_res),
+> +		.resources = sun6i_a31_ir_clk_res,
+> +	},
+> +	{
+> +		.name = "sun6i-a31-apb0-clock-reset",
+> +		.of_compatible = "allwinner,sun6i-a31-clock-reset",
+> +		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
+> +		.resources = sun6i_a31_apb0_rstc_res,
+> +	},
+> +};
+> +
+>  static const struct prcm_data sun6i_a31_prcm_data = {
+>  	.nsubdevs = ARRAY_SIZE(sun6i_a31_prcm_subdevs),
+>  	.subdevs = sun6i_a31_prcm_subdevs,
+> @@ -121,6 +170,11 @@ static const struct prcm_data sun8i_a23_prcm_data = {
+>  	.subdevs = sun8i_a23_prcm_subdevs,
+>  };
+>  
+> +static const struct prcm_data sun9i_a80_prcm_data = {
+> +	.nsubdevs = ARRAY_SIZE(sun9i_a80_prcm_subdevs),
+> +	.subdevs = sun9i_a80_prcm_subdevs,
+> +};
+> +
+>  static const struct of_device_id sun6i_prcm_dt_ids[] = {
+>  	{
+>  		.compatible = "allwinner,sun6i-a31-prcm",
+> @@ -130,6 +184,10 @@ static const struct of_device_id sun6i_prcm_dt_ids[] = {
+>  		.compatible = "allwinner,sun8i-a23-prcm",
+>  		.data = &sun8i_a23_prcm_data,
+>  	},
+> +	{
+> +		.compatible = "allwinner,sun9i-a80-prcm",
+> +		.data = &sun9i_a80_prcm_data,
+> +	},
+>  	{ /* sentinel */ },
+>  };
+>  
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
