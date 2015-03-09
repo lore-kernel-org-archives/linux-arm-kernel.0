@@ -1,33 +1,67 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Mon, 9 Mar 2015 10:42:03 -0700
-Subject: [PATCH v4 08/10] s390: redefine randomize_et_dyn for
- ELF_ET_DYN_BASE
-In-Reply-To: <1425503454-7531-9-git-send-email-keescook@chromium.org>
-References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
- <1425503454-7531-9-git-send-email-keescook@chromium.org>
-Message-ID: <20150309104203.7767babc@mschwide>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 17:59:04 +0000
+Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
+In-Reply-To: <54F83B0C.9020606@arm.com>
+References: <cover.1423226542.git.robin.murphy@arm.com>
+ <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>
+ <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>
+ <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
+ <1425353927.4555.10.camel@mhfsdcap03> <54F5A5FE.3040506@arm.com>
+ <54F7A121.3050103@codeaurora.org> <54F83B0C.9020606@arm.com>
+Message-ID: <20150309175904.GC8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  4 Mar 2015 13:10:52 -0800
-Kees Cook <keescook@chromium.org> wrote:
-
-> In preparation for moving ET_DYN randomization into the ELF loader (which
-> requires a static ELF_ET_DYN_BASE), this redefines s390's existing ET_DYN
-> randomization in a call to arch_mmap_rnd(). This refactoring results in
-> the same ET_DYN randomization on s390.
+On Thu, Mar 05, 2015 at 11:16:28AM +0000, Robin Murphy wrote:
+> Hi Laura,
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/s390/include/asm/elf.h |  8 +++++---
->  arch/s390/mm/mmap.c         | 11 ++---------
->  2 files changed, 7 insertions(+), 12 deletions(-)
+> On 05/03/15 00:19, Laura Abbott wrote:
+> [...]
+> >>Consider that the IOMMU's page table walker is a DMA master in its own
+> >right, and that is the device you're mapping the page tables for.
+> >Therefore your IOMMU driver needs to have access to the struct device
+> >of the IOMMU itself to use for the page-table-related mappings. Also,
+> >be sure to set the IOMMU's DMA mask correctly to prevent SWIOTLB bounce
+> >buffers being created in the process (which as I've found generally ends
+> >in disaster).
+> >>
+> >>>          And normally, we always need do cache maintenance only for some
+> >>>bytes in the pagetable but not whole a page. Then is there a easy way to
+> >>>do the cache maintenance?
+> >>
+> >>For a noncoherent device, dma_map_single() will end up calling
+> >__dma_map_area() with the page offset and size of the original request, so
+> >the updated part gets flushed by VA, and the rest of the page isn't touched
+> >if it doesn't need to be. On the other hand if the page tables were
+> >allocated with dma_alloc_coherent() in the first place, then just calling
+> >dma_sync_single_for_device() for the updated region should suffice.
 
-Patch series including this patch works fine
-Acked-by: Martin Schwidefsky <schwidefsky@de.ibm.com>
+That's wrong.  dma_sync_single_*() is not permitted to be called on
+coherently allocated memory.  Where coherent memory needs to be remapped,
+dma_sync_single_*() will panic the kernel.
+
+If it's in coherent memory, all you should need is the appropriate
+memory barrier to ensure that the DMA agent can see the writes.
+
+> >Where exactly would you call the dma_unmap? It seems a bit strange to
+> >be repeatedly calling dma_map and never calling dma_unmap. I don't see it
+> >explicitly forbidden in the docs anywhere to do this but it seems like
+> >it would be violating the implicit handoff of dma_map/dma_unmap.
+> 
+> I think ideally you'd call dma_map_page when you first create the page
+> table, dma_sync_single_for_device on any update, and dma_unmap_page when you
+> tear it down, and you'd also use the appropriate DMA addresses everywhere
+> instead of physical addresses.
+
+No.
+
+dma_map_page()			ownership changes CPU->DMA
+dma_sync_single_for_cpu()	ownership changes DMA->CPU
+dma_sync_single_for_device()	ownership changes CPU->DMA
+dma_unmap_page()		ownership changes DMA->CPU
+
+It's invalid to miss out the pairing that give those ownership changes.
 
 -- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
