@@ -1,78 +1,63 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  9 Mar 2015 21:40:15 +0100
-Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update the iscr
- register
+Date: Mon,  9 Mar 2015 21:40:18 +0100
+Subject: [PATCH 05/15] musb: Do not use musb_read[b|w] / _write[b|w] wrappers
+ in generic fifo functions
 In-Reply-To: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
 References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1425933628-9672-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <1425933628-9672-6-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add sun4i_usb_phy_update_iscr() helper function to allow the otg driver to
-update the sun4i usb phy0 Interface Status and Control Register.
+The generic fifo functions already use non wrapped accesses in various
+cases through the iowrite#_rep functions, and all platforms which override
+the default musb_read[b|w] / _write[b|w] functions also provide their own
+fifo access functions, so we can safely drop the unnecessary indirection
+from the fifo access functions.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c       | 13 +++++++++++++
- include/linux/phy/phy-sun4i-usb.h | 26 ++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
- create mode 100644 include/linux/phy/phy-sun4i-usb.h
+ drivers/usb/musb/musb_core.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index a2b08f3c..4742d5a 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -79,6 +79,19 @@ struct sun4i_usb_phy_data {
- #define to_sun4i_usb_phy_data(phy) \
- 	container_of((phy), struct sun4i_usb_phy_data, phys[(phy)->index])
- 
-+void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
-+{
-+	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
-+	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-+	u32 iscr;
-+
-+	iscr = readl(data->base + REG_ISCR);
-+	iscr &= ~clr;
-+	iscr |= set;
-+	writel(iscr, data->base + REG_ISCR);
-+}
-+EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
-+
- static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- 				int len)
- {
-diff --git a/include/linux/phy/phy-sun4i-usb.h b/include/linux/phy/phy-sun4i-usb.h
-new file mode 100644
-index 0000000..f69e784
---- /dev/null
-+++ b/include/linux/phy/phy-sun4i-usb.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Allwinner sun4i USB phy header
-+ *
-+ * Copyright (C) 2015 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#ifndef __PHY_SUN4I_USB_H
-+#define __PHY_SUN4I_USB_H
-+
-+#include <linux/phy/phy.h>
-+
-+/**
-+ * sun4i_usb_phy_update_iscr() - Update sun4i usb phy0 Interface Status and
-+ * Control bits
-+ * @phy: Reference to sun4i usb phy0
-+ * @clr: bits to clear in the ISCR register
-+ * @set: bits to set in the ISCR register
-+ */
-+void sun4i_usb_phy_update_iscr(struct phy *phy, u32 clr, u32 set);
-+
-+#endif
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index b71d310..47c1a0a 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -313,7 +313,7 @@ static void musb_default_write_fifo(struct musb_hw_ep *hw_ep, u16 len,
+ 				index += len & ~0x03;
+ 			}
+ 			if (len & 0x02) {
+-				musb_writew(fifo, 0, *(u16 *)&src[index]);
++				__raw_writew(*(u16 *)&src[index], fifo);
+ 				index += 2;
+ 			}
+ 		} else {
+@@ -323,7 +323,7 @@ static void musb_default_write_fifo(struct musb_hw_ep *hw_ep, u16 len,
+ 			}
+ 		}
+ 		if (len & 0x01)
+-			musb_writeb(fifo, 0, src[index]);
++			__raw_writeb(src[index], fifo);
+ 	} else  {
+ 		/* byte aligned */
+ 		iowrite8_rep(fifo, src, len);
+@@ -355,7 +355,7 @@ static void musb_default_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
+ 				index = len & ~0x03;
+ 			}
+ 			if (len & 0x02) {
+-				*(u16 *)&dst[index] = musb_readw(fifo, 0);
++				*(u16 *)&dst[index] = __raw_readw(fifo);
+ 				index += 2;
+ 			}
+ 		} else {
+@@ -365,7 +365,7 @@ static void musb_default_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
+ 			}
+ 		}
+ 		if (len & 0x01)
+-			dst[index] = musb_readb(fifo, 0);
++			dst[index] = __raw_readb(fifo);
+ 	} else  {
+ 		/* byte aligned */
+ 		ioread8_rep(fifo, dst, len);
 -- 
 2.3.1
