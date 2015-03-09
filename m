@@ -1,58 +1,46 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 9 Mar 2015 11:53:46 +0800
-Subject: [PATCH v2.0 1/2] pm: at91: pm_suspend: add the WFI instruction
- support for ARMv7
+Date: Mon, 9 Mar 2015 11:54:26 +0800
+Subject: [PATCH v2.0 2/2] pm: at91: flush data cache and clean,
+ invalidate and disable the L2 cache
 In-Reply-To: <1425873187-8096-1-git-send-email-wenyou.yang@atmel.com>
 References: <1425873187-8096-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1425873226-8158-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1425873266-8192-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the WFI instruction to make the cpu to the idle state.
-In the meanwhile, disable the processor's clock.
+Flush data cache, and clean, invalidate and disable the L2 cache before going to suspend.
+Restore the L2 cache configuration and re-enable the L2 cache after waking up.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
- arch/arm/mach-at91/pm_suspend.S |   20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm/mach-at91/pm.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index 0c520c3..95c3404 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -60,6 +60,24 @@ tmp2	.req	r5
- 	beq	1b
- 	.endm
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 9fb868d..ac947cd 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -30,6 +30,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/mach/irq.h>
+ #include <asm/fncpy.h>
++#include <asm/cacheflush.h>
  
-+/*
-+ * Put the processor to enter the idle state
-+ */
-+	.macro at91_cpu_idle
-+
-+#if defined(CONFIG_CPU_V7)
-+	mov	tmp1, #AT91_PMC_PCK
-+	str	tmp1, [pmc, #AT91_PMC_SCDR]
-+
-+	dsb
-+
-+	wfi		@ Wait For Interrupt
-+#else
-+	mcr	p15, 0, tmp1, c7, c0, 4
-+#endif
-+
-+	.endm
-+
- 	.text
+ #include <mach/cpu.h>
+ #include <mach/hardware.h>
+@@ -133,8 +134,13 @@ static void at91_pm_suspend(suspend_state_t state)
+ 	pm_data |= (state == PM_SUSPEND_MEM) ?
+ 				AT91_PM_MODE(AT91_PM_SLOW_CLOCK) : 0;
  
- /*
-@@ -137,7 +155,7 @@ skip_disable_main_clock:
- 	ldr	pmc, .pmc_base
++	flush_cache_all();
++	outer_disable();
++
+ 	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
+ 				at91_ramc_base[1], pm_data);
++
++	outer_resume();
+ }
  
- 	/* Wait for interrupt */
--	mcr	p15, 0, tmp1, c7, c0, 4
-+	at91_cpu_idle
- 
- 	ldr	r0, .pm_mode
- 	tst	r0, #AT91_PM_SLOW_CLOCK
+ static int at91_pm_enter(suspend_state_t state)
 -- 
 1.7.9.5
