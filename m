@@ -1,27 +1,33 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 9 Mar 2015 19:24:29 +0900
-Subject: [PATCH] pinctrl: exynos: Remove eint_gpio_init call-back for
- exynos7 alive pinctrl block
-In-Reply-To: <1425226876-5122-1-git-send-email-a.kesavan@samsung.com>
-References: <1425226876-5122-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <CA+Ln22HGH3r6UEYtCPU7Y4a0-b4FKnx8d0VcA3a1-m1VD5Jm=w@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon,  9 Mar 2015 10:27:08 +0000
+Subject: [PATCH 4/6] arm: add support for memtest
+In-Reply-To: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1425896830-19705-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Abhilash, Linus,
+Add support for memtest command line option.
 
-2015-03-02 1:21 GMT+09:00 Abhilash Kesavan <a.kesavan@samsung.com>:
-> The alive pin controller on exynos7 does not support external gpio
-> interrupts. Hence, remove the eint_gpio_init call-back for it. This
-> fixes the following error message seen during exynos7 boot-up:
-> "samsung-pinctrl 10580000.pinctrl: irq number not available"
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/init.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-As long as "external gpio interrupts" refer to non-wake-up-capable
-GPIO interrupts I'm fine with this patch.
-
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-
-Thanks Linus for pinging and sorry for delay.
-
-Best regards,
-Tomasz
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 1609b02..3d0e9ae 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -335,6 +335,9 @@ void __init bootmem_init(void)
+ 
+ 	find_limits(&min, &max_low, &max_high);
+ 
++	early_memtest((phys_addr_t)min << PAGE_SHIFT,
++		      (phys_addr_t)max_low << PAGE_SHIFT);
++
+ 	/*
+ 	 * Sparsemem tries to allocate bootmem in memory_present(),
+ 	 * so must be done after the fixed reservations
+-- 
+1.7.9.5
