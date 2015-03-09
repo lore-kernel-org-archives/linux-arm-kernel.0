@@ -1,86 +1,87 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Mon, 9 Mar 2015 17:28:06 +0800
-Subject: [PATCH 1/3] ARM: imx6qdl-sabreauto.dtsi: add max7310 support
+Date: Mon, 9 Mar 2015 17:28:07 +0800
+Subject: [PATCH 2/3] ARM: imx6qdl-sabreauto.dtsi: enable USB support
 In-Reply-To: <1425893288-1517-1-git-send-email-peter.chen@freescale.com>
 References: <1425893288-1517-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1425893288-1517-2-git-send-email-peter.chen@freescale.com>
+Message-ID: <1425893288-1517-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-max7310 is an i2c interface gpio expander
+Add USBOTG and USB host 1 support
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 43 ++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 44 ++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index 009abd6..51acfec 100644
+index 51acfec..33f228c 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -28,6 +28,13 @@
- 		};
+@@ -35,6 +35,32 @@
+ 		#reset-cells = <0>;
  	};
  
-+	max7310_reset: max7310-reset {
-+		compatible = "gpio-reset";
-+		reset-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-+		reset-delay-us = <1>;
-+		#reset-cells = <0>;
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_usb_h1_vbus: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&max7310_b 7 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
++
++		reg_usb_otg_vbus: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&max7310_c 1 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++		};
 +	};
 +
  	sound-spdif {
  		compatible = "fsl,imx-audio-spdif",
  			   "fsl,imx-sabreauto-spdif";
-@@ -182,6 +189,35 @@
- 	};
- };
- 
-+&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	pinctrl-assert-gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+
-+	max7310_a: gpio at 30 {
-+		compatible = "maxim,max7310";
-+		reg = <0x30>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		resets = <&max7310_reset>;
-+	};
-+
-+	max7310_b: gpio at 32 {
-+		compatible = "maxim,max7310";
-+		reg = <0x32>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+	max7310_c: gpio at 34 {
-+		compatible = "maxim,max7310";
-+		reg = <0x34>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
-@@ -265,6 +301,13 @@
+@@ -327,6 +353,12 @@
  			>;
  		};
  
-+		pinctrl_i2c3: i2c3grp {
++		pinctrl_usbotg: usbotggrp {
 +			fsl,pins = <
-+				MX6QDL_PAD_GPIO_3__I2C3_SCL  0x4001b8b1
-+				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
++				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
 +			>;
 +		};
 +
- 		pinctrl_pwm3: pwm1grp {
+ 		pinctrl_usdhc3: usdhc3grp {
  			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+ 				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
+@@ -471,6 +503,18 @@
+ 	status = "okay";
+ };
+ 
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
 -- 
 1.9.1
