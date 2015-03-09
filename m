@@ -1,121 +1,52 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 9 Mar 2015 15:40:06 -0600
-Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <20150309212926.GB17839@qualcomm.com>
-References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
- <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
- <20150309212926.GB17839@qualcomm.com>
-Message-ID: <20150309214006.GA3727@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 22:44:58 +0100
+Subject: [PATCH 00/15] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <2227491.z0aBeXi5ZG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09 2015 at 15:29 -0600, Andy Gross wrote:
->On Mon, Mar 09, 2015 at 09:16:36AM -0600, Lina Iyer wrote:
->> From: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->> Some architectures have some cpus which does not support idle states.
->>
->> Let the underlying low level code to return -ENOSYS when it is not
->> possible to set an idle state.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> [Minor clean ups and fixes of the per-cpu variable]
->> ---
->>  drivers/cpuidle/cpuidle-arm.c | 34 +++++++++++++++++++++++++++++++++-
->>  1 file changed, 33 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> index 1c94b88..f7cdb73 100644
->> --- a/drivers/cpuidle/cpuidle-arm.c
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->> @@ -17,11 +17,14 @@
->>  #include <linux/kernel.h>
->>  #include <linux/module.h>
->>  #include <linux/of.h>
->> +#include <linux/slab.h>
->>
->>  #include <asm/cpuidle.h>
->>
->>  #include "dt_idle_states.h"
->>
->> +static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
->> +
->>  /*
->>   * arm_enter_idle_state - Programs CPU to enter the specified state
->>   *
->> @@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
->>  static int __init arm_idle_init(void)
->>  {
->>  	int cpu, ret;
->> +	struct cpuidle_device *dev;
->>  	struct cpuidle_driver *drv = &arm_idle_driver;
->>
->>  	/*
->> @@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
->>  	if (ret <= 0)
->>  		return ret ? : -ENODEV;
->>
->> +
->> +	ret = cpuidle_register_driver(drv);
->> +	if (ret) {
->> +		pr_err("Failed to register cpuidle driver\n");
->> +		return ret;
->> +	}
->> +
->>  	/*
->>  	 * Call arch CPU operations in order to initialize
->>  	 * idle states suspend back-end specific data
->>  	 */
->>  	for_each_possible_cpu(cpu) {
->> +
->>  		ret = arm_cpuidle_init(cpu);
->> +		/*
->> +		 * This cpu does not support any idle states
->> +		 */
->> +		if (ret == -ENOSYS)
->> +			continue;
->> +
->>  		if (ret) {
->>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
->>  			return ret;
->>  		}
->> +
->> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->
->devm_kzalloc?  Otherwise, failures could lead to lost memory.
->
-I dont have a local device to work with for allocation. May be I can get
-the cpu device node and the device therefore for allocation. Thoughts?
+On Monday 09 March 2015 21:40:13 Hans de Goede wrote:
+> Hi All,
+> 
+> This patch set has been a while in the making, so I'm very happy to present
+> the end result here, and I hope everyone likes it.
 
->> +		if (!dev)
->> +			return -ENOMEM;
->> +
->> +		dev->cpu = cpu;
->> +		ret = cpuidle_register_device(dev);
->> +		if (ret) {
->> +			pr_err("Failed to register cpuidle device for CPU %d\n",
->> +			       cpu);
->> +			return ret;
->> +		}
->> +
->> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
->>  	}
->>
->> -	return cpuidle_register(drv, NULL);
->> +	return 0;
->>  }
->>  device_initcall(arm_idle_init);
->> --
->> 2.1.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->-- 
->Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+Awesome work!
+
+> Before talking about merging this there are 2 things which I would like to
+> point out:
+> 
+> a) The musb controller in the sunxi SoCs uses some SRAM which needs to be
+> mapped to the musb controller by poking some bits in the SRAM controller,
+> just like the EMAC patches which were send a while back I've chosen to use
+> syscon for this, actually 2 of the patches in this set come directly from the
+> SRAM mapping patchset for the EMAC.
+> 
+> I know that Maxime is not 100% in favor of using syscon:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320221.html
+> 
+> But I disagree with his arguments for writing a special driver for the SRAM
+> controller:
+> 1) syscon was specifically designed for global system control registers like
+> this and is fine to use as long as there are no conflicts where 1 bit is of
+> interest to multiple drivers, and there is no such conflict here
+> 2) Maxime's other arguments seem to boil down to it would be nice / prettier
+> to have a specific driver for this, without really proving a hard need for
+> such a driver. But writing such a driver is going to be a lot of work, and
+> we've a ton of other work to do, and as said there is no real need for a
+> separate driver, syscon works fine for this.
+> 3) I actually believe that having a specific driver for this is a bad idea,
+> because that means inventing a whole new cross driver API for this, and
+> getting those right is, hard, a lot of work, and even then one is still likely
+> to get it wrong. We can avoid all this by going with the proven syscon solution.
+> 
+> Maxime, can we please have your ack for moving forward with this using syscon?
+> (see above for my arguments why)
+
+I'd like to understand here why we can't use the existing SRAM DT binding
+instead of the syscon binding.
+
+	Arnd
