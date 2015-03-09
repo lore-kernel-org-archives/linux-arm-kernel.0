@@ -1,99 +1,153 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 Mar 2015 00:34:16 +0100
-Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
-In-Reply-To: <54FE215D.7090804@codeaurora.org>
-References: <20150221085620.GV19388@pengutronix.de>
- <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150306185730.11109.45998@quantum>
- <20150306192813.GG10717@pengutronix.de>
- <54FA02B7.8090703@codeaurora.org>
- <1425895136.3152.22.camel@pengutronix.de>
- <54FDEEFE.1060803@codeaurora.org>
- <20150309210735.14952.91257@quantum>
- <20150309215803.GD7525@pengutronix.de>
- <54FE215D.7090804@codeaurora.org>
-Message-ID: <20150309233416.GF7525@pengutronix.de>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 9 Mar 2015 16:45:58 -0700
+Subject: [PATCH v3 2/3] pci: iproc: Add Broadcom iProc PCIe support
+In-Reply-To: <2314573.X8TfIpVCUq@wuerfel>
+References: <1425603699-13416-1-git-send-email-rjui@broadcom.com>
+ <CAE_wzQ_Rq5u83UXOYRLShxuCzcgxA0BSPFZT4RmvDj8nfTSGcg@mail.gmail.com>
+ <54F9EB42.3010804@broadcom.com> <2314573.X8TfIpVCUq@wuerfel>
+Message-ID: <54FE30B6.3070400@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stephen,
+Hi Arnd,
 
-On Mon, Mar 09, 2015 at 03:40:29PM -0700, Stephen Boyd wrote:
-> On 03/09/15 14:58, Uwe Kleine-K?nig wrote:
-> > If you see
-> >
-> > 	round_rate(110) = 108
-> >
-> > it would be fortunate to know if you get 108 because the next available
-> > greater rate is > 112 or because the implementation rounds down always
-> > (which would mean that 111 is possible, too). For the "easy" consumers
-> > this probably doesn't matter much, but if you do things that affects
-> > a considerable part of the clock tree, you really want to know more
-> > about the behaviour of round_rate to effectively work with its results.
-> >
-> > So yes, please let us pick ceiling for round_rate (i.e. a fixed policy
-> > for all clks) and then it should even be possible to make
-> > clk_set_rate_range a generic function that doesn't need the min and max
-> > members in the clk struct and the respective parameters to
-> > determine_rate.
-> >
-> > What should a clock that can only provide 100 Hz return on
-> >
-> > 	clk_round_rate(clk, 60);
-> >
-> > ? 0? -ESOMETHING (for SOMETHING = ...?)?
-> >
+On 3/9/2015 5:35 AM, Arnd Bergmann wrote:
+> On Friday 06 March 2015 10:00:34 Ray Jui wrote:
+>>>
+>>
+>> Although I have not tested it, but to my best knowledge there shouldn't
+>> be any technical issue by making the PCIe iProc driver a loadable module
+>> and installing the module later after the kernel finishes booting.
+>>
+>> But I wonder why I haven't seen any PCIe host driver being allowed to be
+>> compiled as module? Maybe there's no obvious benefit of doing that.
+>> People typically opt to load slave devices as module but tend to keep
+>> the bus or host devices compiled in.
+>>
+>> And to allow a PCI host driver to be compiled as module, some PCI
+>> functions need to have their symbols exported:
+>>
+>> ERROR: "pci_common_swizzle" [drivers/pci/host/pcie-iproc.ko] undefined!
+>> ERROR: "pci_fixup_irqs" [drivers/pci/host/pcie-iproc.ko] undefined!
+>> ERROR: "pci_assign_unassigned_bus_resources"
+>> [drivers/pci/host/pcie-iproc.ko] undefined!
+>> ERROR: "pci_remove_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+>> ERROR: "pci_stop_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+>> ERROR: "pci_create_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+>>
+>> Maybe Bjorn can help to shed some light here? Should I go ahead and
+>> export_symbol these PCI functions and make the iProc PCI driver "tristate"?
 > 
-> Do you have any real world use cases, or is this just all theoretical?
-The question about clk_round_rate(fixed_clk_100hz, 60) is an
-implementation detail that we must handle after agreeing that
-clk_round_rate should always round down. I faced that when I tried to
-implement this rounding requirement for dividers.
+> My best guess is that no loadable driver ever tried to use these and
+> we should indeed just export them.
 
-> At least in Philipp's panel case we can discuss how to make an API that
-> works properly. These other examples are either completely theoretical
-> or taken out of context and so it's unclear how they matter in practice.
-We can stick to Philipp's panel case if you want. Philipp wants to find
-a rate between 100 Hz and 120 Hz and likes 110 Hz most. And the lower
-abs(1 / 110 - 1 / r) the better. Let's assume the clk is provided by a
-fixed clk with 10000 Hz that goes through two 4bit-dividers. (So no,
-that's not a real world use case, but I imagine that something like that
-can occur and should definitely be possible to handle.) Something
-similar happens if you have for example an i2c bus device that has a
-built-in divider. For the lowest consumer the situation is easy most of
-the time: It wants a certain frequency to update a panel, or it wants at
-most 100 kHz on the i2c bus. But already for the divider one step up
-the clk tree it's not that easy any more.
+True. I can export those symbols.
 
-> Ideally I'd like an API to exist that doesn't require going back and
-> forth with the framework (i.e. it's "atomic" and doesn't require calling
-> clk_round_rate() in a loop) and that allows consumers to properly
-Why is calling "clk_round_rate() in a loop" bad? In some situations you
-won't be able to do something different.
+> 
+> The call to pci_assign_unassigned_bus_resources could be avoided by using
+> pci_rescan_bus(), which would simplify the driver a little, but for
+> some reason, nothing else uses that, so I'm not sure about it.
+> 
+> The pci_remove_root_bus/pci_stop_root_bus calls are rarely used anywhere
+> else. Are they functional to the point where you could unload a pci
+> host driver that is a loadable module? If so, that would be
+> wonderful.
 
-> express what they want. Right now we have a way to say min/max and a
-> typical rate is in the works. If we need to declare some sort of clock
-> provider rounding policy then we've failed to provide an API that
-> properly expresses all the requirements that the consumer has. It
-I think you don't want a way to express: "I want a frequency that I
-can divide down to 110 Hz with a divider picked from [1 ... 16].".
-And even if we somehow manage to create something like that in a sane
-way, I think the only reliable and maintainable way to get there is to
-not ask all clock types to implement this functionality.
-That is, I want the complexity at a single place in the framework and
-only ask easy things from the clk type implementors. A .round_rate
-callback is easy for most clk types. .determine_rate a bit less and it
-already promotes boilerplate because each implementation has to check
-for min_rate and max_rate. And .determine_rate as it is today doesn't
-even support the typical value yet.
+It is quite wonderful, :)
 
-> probably means we're missing some key parameter that consumers know but
-> we don't accept. Maybe some more concrete examples will help clarify
-> what this is.
+I added driver remove function support and tested it out. I'm able to
+install/remove/install the iProc PCIe platform driver as a kernel
+loadable module. pci_remove_root_bus/pci_stop_root_bus works fine. See
+logs below.
 
-Best regards
-Uwe
+-bash-3.2# insmod pcie-iproc-pltfm.ko
+[   54.058546] PCI host bridge /pcie at 18012000 ranges:
+[   54.064584]    IO 0x28000000..0x2800ffff -> 0x00000000
+[   54.071003]   MEM 0x20000000..0x23ffffff -> 0x20000000
+[   54.330194] iproc-pcie 18012000.pcie: PCI host bridge to bus 0000:00
+[   54.338138] pci_bus 0000:00: root bus resource [bus 00-ff]
+[   54.344983] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[   54.352683] pci_bus 0000:00: root bus resource [mem
+0x20000000-0x23ffffff]
+[   54.361254] iproc-pcie 18012000.pcie: link: UP
+[   54.367086] PCI: bus0: Fast back to back transfers disabled
+[   54.374046] pci 0000:00:00.0: bridge configuration invalid ([bus
+00-00]), reconfiguring
+[   54.400237] PCI: bus1: Fast back to back transfers disabled
+[   54.407274] pci 0000:00:00.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
+[   54.415766] pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
+[   54.424241] pci 0000:01:00.0: BAR 6: assigned [mem
+0x20080000-0x200bffff pref]
+[   54.433245] pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
+[   54.441710] pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
+[   54.450173] pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
+[   54.457979] pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
+[   54.466217] pci 0000:00:00.0: PCI bridge to [bus 01]
+[   54.472404] pci 0000:00:00.0:   bridge window [mem 0x20000000-0x200fffff]
+[   54.480945] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+[   54.488767] e1000e 0000:01:00.0: enabling device (0140 -> 0142)
+[   54.496315] e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec)
+set to dynamic conservative mode
+[   54.507958] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
+to initialize MSI-X interrupts.  Falling back to MSI interru.
+[   54.522913] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
+to initialize MSI interrupts.  Falling back to legacy interr.
+[   54.643486] e1000e 0000:01:00.0 eth0: registered PHC clock
+[   54.650379] e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
+68:05:ca:28:19:e8
+[   54.660254] e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network
+Connection
+[   54.668834] e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: E46981-008
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+
+-bash-3.2# rmmod pcie-iproc-pltfm
+[   66.465834] e1000e 0000:01:00.0 eth0: removed PHC
+
+
+-bash-3.2# insmod pcie-iproc-pltfm.ko
+[   71.043195] PCI host bridge /pcie at 18012000 ranges:
+[   71.049235]    IO 0x28000000..0x2800ffff -> 0x00000000
+[   71.055652]   MEM 0x20000000..0x23ffffff -> 0x20000000
+[   71.315192] iproc-pcie 18012000.pcie: PCI host bridge to bus 0000:00
+[   71.323135] pci_bus 0000:00: root bus resource [bus 00-ff]
+[   71.329979] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[   71.337679] pci_bus 0000:00: root bus resource [mem
+0x20000000-0x23ffffff]
+[   71.346249] iproc-pcie 18012000.pcie: link: UP
+[   71.352072] PCI: bus0: Fast back to back transfers disabled
+[   71.375261] PCI: bus1: Fast back to back transfers disabled
+[   71.382291] pci 0000:00:00.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
+[   71.390782] pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
+[   71.399258] pci 0000:01:00.0: BAR 6: assigned [mem
+0x20080000-0x200bffff pref]
+[   71.408263] pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
+[   71.416728] pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
+[   71.425190] pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
+[   71.432996] pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
+[   71.441235] pci 0000:00:00.0: PCI bridge to [bus 01]
+[   71.447422] pci 0000:00:00.0:   bridge window [mem 0x20000000-0x200fffff]
+[   71.456125] pcieport 0000:00:00.0: Signaling PME through PCIe PME
+interrupt
+[   71.464812] pci 0000:01:00.0: Signaling PME through PCIe PME interrupt
+[   71.473411] e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec)
+set to dynamic conservative mode
+[   71.485069] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
+to initialize MSI-X interrupts.  Falling back to MSI interru.
+[   71.500025] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
+to initialize MSI interrupts.  Falling back to legacy interr.
+[   71.624549] e1000e 0000:01:00.0 eth0: registered PHC clock
+[   71.631444] e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
+68:05:ca:28:19:e8
+[   71.641314] e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network
+Connection
+[   71.649894] e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: E46981-008
+
+> 
+> 	Arnd
+> 
+
+I'll submit patch series v4 with loadable module support.
+
+Thanks,
+
+Ray
