@@ -1,29 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  9 Mar 2015 11:05:14 +0200
-Subject: [PATCH] ARM: digicolor: add the machine directory to Makefile
-Message-ID: <286ee8cf58a31417f28f22e071023ad29d161df8.1425891914.git.baruch@tkos.co.il>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 9 Mar 2015 11:08:22 +0200
+Subject: [PATCH 11/24] ARM: OMAP2+: clock: remove support for legacy
+ mpurate command line param
+In-Reply-To: <20150306162516.GN13520@atomide.com>
+References: <1425644939-3232-1-git-send-email-t-kristo@ti.com>
+ <1425644939-3232-12-git-send-email-t-kristo@ti.com>
+ <20150306153254.GK13520@atomide.com> <54F9D160.7010708@ti.com>
+ <20150306162516.GN13520@atomide.com>
+Message-ID: <54FD6306.4050109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the digicolor specific DT_MACHINE_START entry visible.
+On 03/06/2015 06:25 PM, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [150306 08:10]:
+>> On 03/06/2015 05:32 PM, Tony Lindgren wrote:
+>>> * Tero Kristo <t-kristo@ti.com> [150306 04:29]:
+>>>> The legacy support is wrong and dangerous, as it doesn't take any
+>>>> OPPs into account and does not scale voltages. Switching mpurate should
+>>>> be handled through cpufreq.
+>>>
+>>> Hmm I wonder if some systems actually rely on the mpurate cmdline
+>>> parameter. If this cannot be fixed properly, you should at least
+>>> print an error here.
+>>
+>> Yea, I was kind of worried about this comment. We have also an option of
+>> doing this through clock driver, but I was hesitant of doing this either.
+>> Isn't having a global kernel option like this frowned upon anyway? I believe
+>> this piece of init code gets executed on every board on multiarch kernel.
+>
+> Well the option has been there probably for 10 years already so we
+> can't just drop it like that. Chances are it's unused though, so I
+> suggest you just print out a warning for it.
+>
+> It's called from omap_arch_initcall which checks for soc_is_omap()
+> so that's not an issue. But when moving the code, you naturally
+> need to check the moved code initcall usage.
 
-Fixes: df8d742e929 (ARM: initial support for Conexant Digicolor CX92755 SoC)
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+This patch is not really needed for the set itself btw, it can just be 
+dropped if you feel it actually is used by someone. Reverting it from 
+the set just causes a minor merge conflict and you can't remove two of 
+the otherwise empty clock files.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 7f99cd652203..eb7bb511f853 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -150,6 +150,7 @@ machine-$(CONFIG_ARCH_BERLIN)		+= berlin
- machine-$(CONFIG_ARCH_CLPS711X)		+= clps711x
- machine-$(CONFIG_ARCH_CNS3XXX)		+= cns3xxx
- machine-$(CONFIG_ARCH_DAVINCI)		+= davinci
-+machine-$(CONFIG_ARCH_DIGICOLOR)	+= digicolor
- machine-$(CONFIG_ARCH_DOVE)		+= dove
- machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
- machine-$(CONFIG_ARCH_EFM32)		+= efm32
--- 
-2.1.4
+You could also just move the code over to clock.c maybe, merge these and 
+do a soc type check to reach the same behaviour.
+
+-Tero
