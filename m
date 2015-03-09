@@ -1,47 +1,33 @@
 From: tyler.baker@linaro.org (tyler.baker at linaro.org)
-Date: Mon,  9 Mar 2015 13:19:56 -0700
-Subject: [PATCH v2 0/2] ARM: dts: add dts files for Cubieboard4
-Message-ID: <1425932398-7194-1-git-send-email-tyler.baker@linaro.org>
+Date: Mon,  9 Mar 2015 13:19:58 -0700
+Subject: [PATCH v2 2/2] ARM: dts: add vendor prefix for cubietech
+In-Reply-To: <1425932398-7194-1-git-send-email-tyler.baker@linaro.org>
+References: <1425932398-7194-1-git-send-email-tyler.baker@linaro.org>
+Message-ID: <1425932398-7194-3-git-send-email-tyler.baker@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tyler Baker <tyler.baker@linaro.org>
 
-This series adds basic support for the Cubietech Cubieboard4.
+Add a cubietech vendor prefix, as it is missing. The cubietruck, cubieboard2,
+and cubieboard all already reference this prefix.
 
-The Cubietech Cubieboard4 is a A80 based development board with 2GB DDR3, 8GB
-eMMC, Micro SD, HDMI, VGA, 3.5mm audio jack. One USB OTG port and four USB 2.0
-ports.
+Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-The sun9i-a80-optimus device tree[1] has been used to boot this board for some
-time now, as the two platforms are very similar. But there are differences, so 
-it deserves it's own device tree. I've tested this series on a 
-Cubieboard4[2][3] and can confirm UART, eMMC, and MMC are working properly.
-
-This patch series is based on arm-soc v4.0-rc2.
-
-Changes v1 -> v2:
-* Use more descriptive notation for stdout-path
-
-Changes v0 -> v1:
-* Corrected typo. a80-cubietruck -> a80-cubieboard4.
-* Removed bootargs node.
-* Added stdout-path for uart0.
-* Removed unneeded newline.
-
-[1] http://kernelci.org/boot/sun9i-a80-cubieboard4/ 
-[2] http://lava.kernelci.org/scheduler/job/47969/log_file#L_13_308
-[3] http://lava.kernelci.org/scheduler/job/47969/log_file#L_17_11
-
-Tyler Baker (2):
-  ARM: dts: add cubietech cubieboard4
-  ARM: dts: add vendor prefix for cubietech
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 100 +++++++++++++++++++++
- 3 files changed, 103 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index aeb5bb5..58364cf 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -45,6 +45,7 @@ cnxt	Conexant Systems, Inc.
+ cortina	Cortina Systems, Inc.
+ cosmic	Cosmic Circuits
+ crystalfontz	Crystalfontz America, Inc.
++cubietech	Cubietech, Ltd.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
+ davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
 -- 
 2.1.0
