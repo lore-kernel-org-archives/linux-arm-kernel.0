@@ -1,52 +1,65 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon,  9 Mar 2015 21:06:53 +0100
-Subject: [PATCH 0/4] ARM: shmobile: koelsch / lager regulator updates
-Message-ID: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 09 Mar 2015 20:09:49 +0000
+Subject: [RFC PATCH v2 2/3] arm64: add IOMMU dma_ops
+In-Reply-To: <20150309175904.GC8656@n2100.arm.linux.org.uk>
+References: <cover.1423226542.git.robin.murphy@arm.com>
+ <058e038009ac708a40197c80e07410914c2a162e.1423226542.git.robin.murphy@arm.com>
+ <1423543151.18280.2.camel@mtksdaap41> <54D9F486.10501@arm.com>
+ <1423901011.27922.7.camel@mhfsdcap03> <54E24D50.408@arm.com>
+ <1425353927.4555.10.camel@mhfsdcap03> <54F5A5FE.3040506@arm.com>
+ <54F7A121.3050103@codeaurora.org> <54F83B0C.9020606@arm.com>
+ <20150309175904.GC8656@n2100.arm.linux.org.uk>
+Message-ID: <54FDFE0D.8030807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Hi Russell,
 
-This patch series contains two DTS updates each for r8a7791/koelsch and
-r8a7790/lager:
-  - add the missing interrupt for the da9210 regulators,
-  - add device nodes for the da9063 pmics.
+On 09/03/15 17:59, Russell King - ARM Linux wrote:
+[...]
+>>>> For a noncoherent device, dma_map_single() will end up calling
+>>> __dma_map_area() with the page offset and size of the original request, so
+>>> the updated part gets flushed by VA, and the rest of the page isn't touched
+>>> if it doesn't need to be. On the other hand if the page tables were
+>>> allocated with dma_alloc_coherent() in the first place, then just calling
+>>> dma_sync_single_for_device() for the updated region should suffice.
+>
+> That's wrong.  dma_sync_single_*() is not permitted to be called on
+> coherently allocated memory.  Where coherent memory needs to be remapped,
+> dma_sync_single_*() will panic the kernel.
+>
+> If it's in coherent memory, all you should need is the appropriate
+> memory barrier to ensure that the DMA agent can see the writes.
 
-The da9063 pmic allows the system to be restarted when the watchdog
-timer times out ("cat > dev/watchdog0", and wait 8 s), or when a system
-restart is requested ("reboot").
+You're quite right, that's the whole point of *coherent* allocations 
+after all. I got my syncs and barriers muddled there.
 
-This series depends on "[PATCH] ARM: shmobile: R-Car Gen2: Add
-da9063/da9210 regulator quirk".
+>>> Where exactly would you call the dma_unmap? It seems a bit strange to
+>>> be repeatedly calling dma_map and never calling dma_unmap. I don't see it
+>>> explicitly forbidden in the docs anywhere to do this but it seems like
+>>> it would be violating the implicit handoff of dma_map/dma_unmap.
+>>
+>> I think ideally you'd call dma_map_page when you first create the page
+>> table, dma_sync_single_for_device on any update, and dma_unmap_page when you
+>> tear it down, and you'd also use the appropriate DMA addresses everywhere
+>> instead of physical addresses.
+>
+> No.
+>
+> dma_map_page()			ownership changes CPU->DMA
+> dma_sync_single_for_cpu()	ownership changes DMA->CPU
+> dma_sync_single_for_device()	ownership changes CPU->DMA
+> dma_unmap_page()		ownership changes DMA->CPU
+>
+> It's invalid to miss out the pairing that give those ownership changes.
 
-An earlier version of patch [2/4] has been posted before as "[PATCH 3/4]
-ARM: shmobile: koelsch: Add DA9063 PMIC device node for system
-restart", but it caused havoc without the quirk.
+Thanks for the clarification - the wording in DMA-API.txt rather implies 
+that in the DMA_TO_DEVICE case you only have to sync the updated data 
+/after/ writing it. For the sake of purely getting pages flushed, would 
+it be more reasonable then to call dma_map_single() followed immediately 
+by dma_unmap_single_attrs() with DMA_ATTR_SKIP_CPU_SYNC? Since we know 
+the IOMMU can never write back to memory  (ones that can are a different 
+issue) it would be nice to be able to skip the extra invalidations 
+somehow, without too heinously abusing the API.
 
-This has been tested on r8a7791/koelsch.
-
-Thanks!
-
-Geert Uytterhoeven (4):
-  ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
-  ARM: shmobile: koelsch: Add da9063 PMIC device node for system restart
-  ARM: shmobile: lager dts: Add da9210 regulator interrupt
-  ARM: shmobile: lager: Add da9063 PMIC device node for system restart
-
- arch/arm/boot/dts/r8a7790-lager.dts   | 18 ++++++++++++++++++
- arch/arm/boot/dts/r8a7791-koelsch.dts | 18 ++++++++++++++++++
- 2 files changed, 36 insertions(+)
-
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Robin.
