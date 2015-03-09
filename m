@@ -1,47 +1,35 @@
-From: davem@redhat.com (David Miller)
-Date: Mon, 09 Mar 2015 13:14:04 -0400 (EDT)
-Subject: [PATCH] net: smc91x: improve neponset hack
-In-Reply-To: <20150309123447.GL8656@n2100.arm.linux.org.uk>
-References: <5754481.gFE9BvLjh0@wuerfel>
- <20150309122012.GJ8656@n2100.arm.linux.org.uk>
- <20150309123447.GL8656@n2100.arm.linux.org.uk>
-Message-ID: <20150309.131404.2077303491934820826.davem@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 17:15:39 +0000
+Subject: [BUG] ARM: socfpga: L2 cache init
+In-Reply-To: <54F750E6.5030703@opensource.altera.com>
+References: <20150209213017.GC7994@pengutronix.de>
+ <54DD2BB3.3090507@opensource.altera.com>
+ <20150213080106.GD7994@pengutronix.de>
+ <CADhT+wfbZb+u7a-aCi71rh9xFMuphOvqiyEgEYpmmTQtujLcVg@mail.gmail.com>
+ <20150217222817.GS8656@n2100.arm.linux.org.uk>
+ <CADhT+wcpWcfca6JWLAfpQm_yPHOpTRRbCpiikUEs0ha1NHq3TQ@mail.gmail.com>
+ <20150225092657.GU8656@n2100.arm.linux.org.uk>
+ <CADhT+wcyim0Yeq6Wcy6UFAmv+GPjWtVO3hQQ_7uX1bMskADSJQ@mail.gmail.com>
+ <20150304102342.GA14613@pengutronix.de>
+ <54F750E6.5030703@opensource.altera.com>
+Message-ID: <20150309171539.GZ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Date: Mon, 9 Mar 2015 12:34:47 +0000
-
-> On Mon, Mar 09, 2015 at 12:20:12PM +0000, Russell King - ARM Linux wrote:
->> On Fri, Feb 20, 2015 at 04:47:06PM +0100, Arnd Bergmann wrote:
->> > On Thursday 19 February 2015 00:35:49 Russell King - ARM Linux wrote:
->> > > On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
->> > > > The smc91x driver tries to support multiple platforms at compile
->> > > > time, but they are mutually exclusive at runtime, and not clearly
->> > > > defined.
->> > > 
->> > > I'd prefer to rework this to fix that properly.  From what I remember,
->> > > the whole SA11x0 stuff in this driver was a mess.
->> > 
->> > I guess that's reasonable. I've looked through the driver and it seems we
->> > did most of the multiplatform work but left a few things alone that should
->> > have been converted a long time ago.
->> > 
->> > Can you check if the approach below makes sense to you?
->> 
->> I don't know who's carrying what patches, but this is still broken.
->> 
->> arch/arm/mach-sa1100/neponset.c: In function 'neponset_probe':
->> arch/arm/mach-sa1100/neponset.c:271:12: error: 'smc91c_platdata' undeclared (first use in this function)
->> drivers/net/ethernet/smsc/smc91x.c: In function 'smc_drv_probe':
->> drivers/net/ethernet/smsc/smc91x.c:2363:2: error: implicit declaration of function 'machine_has_neponset' [-Werror=implicit-function-declaration]
->> 
->> This is from building Linus' tree as of Saturday plus arm-soc.
->> 
->> Let's revert all this crap and start again, this time testing it better?
+On Wed, Mar 04, 2015 at 12:37:26PM -0600, Dinh Nguyen wrote:
+> On 03/04/2015 04:23 AM, Steffen Trumtrar wrote:
+> > Looks good for me, too:
+> > 
+> > Tested-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > 
 > 
-> I'm also getting:
+> Steffen, thanks for testing.
+> 
+> Russell, if you don't mind, I'll take this patch through my tree as I
+> have a couple of other fixes for 4.0-rc as well.
 
-I have the fix in my tree still and is pending to be sent to Linus.
+That's fine, especially as I've been recovering post-op.
 
-Please be patient.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
