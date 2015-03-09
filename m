@@ -1,133 +1,126 @@
-From: sowmini.varadhan@oracle.com (Sowmini Varadhan)
-Date: Mon, 09 Mar 2015 10:19:41 -0400
-Subject: [PATCH] rds: avoid potential stack overflow
-In-Reply-To: <17806664.ym3oszzFIH@wuerfel>
-References: <17806664.ym3oszzFIH@wuerfel>
-Message-ID: <54FDABFD.2020502@oracle.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 9 Mar 2015 15:26:02 +0100
+Subject: [RFC/RFT PATCH 0/3] arm64: KVM: work around incoherency with
+ uncached guest mappings
+In-Reply-To: <54FA174D.4030807@samsung.com>
+References: <54F73ACF.1090605@redhat.com>
+ <20150304172855.GA28951@e104818-lin.cambridge.arm.com>
+ <54F82C06.2000701@redhat.com>
+ <20150305110415.GA7712@e104818-lin.cambridge.arm.com>
+ <CAFEAcA98j_EsP4Hy20tQCKdnP3=NuvS3Ona37peBjan8aWLSEA@mail.gmail.com>
+ <20150305120348.GD7712@e104818-lin.cambridge.arm.com>
+ <54F84B7F.5010007@redhat.com>
+ <20150305145831.GA11447@e104818-lin.cambridge.arm.com>
+ <54F895C8.2070306@redhat.com> <54FA174D.4030807@samsung.com>
+Message-ID: <20150309142601.GA4171@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2015 08:06 AM, Arnd Bergmann wrote:
-> The rds_iw_add_conn function stores a large 'struct rds_sock'
+On Fri, Mar 06, 2015 at 01:08:29PM -0800, Mario Smarduch wrote:
+> On 03/05/2015 09:43 AM, Paolo Bonzini wrote:
+> > 
+> > 
+> > On 05/03/2015 15:58, Catalin Marinas wrote:
+> >>> It would especially suck if the user has a cluster with different
+> >>> machines, some of them coherent and others non-coherent, and then has to
+> >>> debug why the same configuration works on some machines and not on others.
+> >>
+> >> That's a problem indeed, especially with guest migration. But I don't
+> >> think we have any sane solution here for the bus master DMA.
+> > 
+> > I do not oppose doing cache management in QEMU for bus master DMA
+> > (though if the solution you outlined below works it would be great).
+> > 
+> >> ARM can override them as well but only making them stricter. Otherwise,
+> >> on a weakly ordered architecture, it's not always safe (let's say the
+> >> guest thinks it accesses Strongly Ordered memory and avoids barriers for
+> >> flag updates but the host "upgrades" it to Cacheable which breaks the
+> >> memory order).
+> > 
+> > The same can happen on x86 though, even if it's rarer.  You still need a
+> > barrier between stores and loads.
+> > 
+> >> If we want the host to enforce guest memory mapping attributes via stage
+> >> 2, we could do it the other way around: get the guests to always assume
+> >> full cache coherency, generating Normal Cacheable mappings, but use the
+> >> stage 2 attributes restriction in the host to make such mappings
+> >> non-cacheable when needed (it works this way on ARM but not in the other
+> >> direction to relax the attributes).
+> > 
+> > That sounds like a plan for device assignment.  But it still would not
+> > solve the problem of the MMIO framebuffer, right?
+> > 
+> >>> The problem arises with MMIO areas that the guest can reasonably expect
+> >>> to be uncacheable, but that are optimized by the host so that they end
+> >>> up backed by cacheable RAM.  It's perfectly reasonable that the same
+> >>> device needs cacheable mapping with one userspace, and works with
+> >>> uncacheable mapping with another userspace that doesn't optimize the
+> >>> MMIO area to RAM.
+> >>
+> >> Unless the guest allocates the framebuffer itself (e.g.
+> >> dma_alloc_coherent), we can't control the cacheability via
+> >> "dma-coherent" properties as it refers to bus master DMA.
+> > 
+> > Okay, it's good to rule that out.  One less thing to think about. :)
+> > Same for _DSD.
+> > 
+> >> So for MMIO with the buffer allocated by the host (Qemu), the only
+> >> solution I see on ARM is for the host to ensure coherency, either via
+> >> explicit cache maintenance (new KVM API) or by changing the memory
+> >> attributes used by Qemu to access such virtual MMIO.
+> >>
+> >> Basically Qemu is acting as a bus master when reading the framebuffer it
+> >> allocated but the guest considers it a slave access and we don't have a
+> >> way to tell the guest that such accesses should be cacheable, nor can we
+> >> upgrade them via architecture features.
+> > 
+> > Yes, that's a way to put it.
+> > 
+> >>> In practice, the VGA framebuffer has an optimization that uses dirty
+> >>> page tracking, so we could piggyback on the ioctls that return which
+> >>> pages are dirty.  It turns out that piggybacking on those ioctls also
+> >>> should fix the case of migrating a guest while the MMU is disabled.
+> >>
+> >> Yes, Qemu would need to invalidate the cache before reading a dirty
+> >> framebuffer page.
+> >>
+> >> As I said above, an API that allows non-cacheable mappings for the VGA
+> >> framebuffer in Qemu would also solve the problem. I'm not sure what KVM
+> >> provides here (or whether we can add such API).
+> > 
+> > Nothing for now; other architectures simply do not have the issue.
+> > 
+> > As long as it's just VGA, we can quirk it.  There's just a couple
+> > vendor/device IDs to catch, and the guest can then use a cacheable mapping.
+> > 
+> > For a more generic solution, the API would be madvise(MADV_DONTCACHE).
+> > It would be easy for QEMU to use it, but I am not too optimistic about
+> > convincing the mm folks about it.  We can try.
 
-I think you might have a typo here- did you mean
-rds_iw_update_cm_id above (which is the function that has
-a 'struct rds_sock rs' on the stack)?
+I forgot to list this one in my summary of approaches[*]. This is a
+nice, clean approach. Avoids getting cache maintenance into everything.
+However, besides the difficulty to get it past mm people, it reduces
+performance for any userspace-userspace uses/sharing of the memory.
+userspace-guest requires cache maintenance, but nothing else. Maybe
+that's not an important concern for the few emulated devices that need
+it though.
 
-The rest of the change looks fine to me.
+> 
+> Interested to see the outcome.
+> 
+> I was thinking of a very basic memory driver that can provide
+> an uncached memslot to QEMU - in mmap() file operation
+> apply pgprot_uncached to allocated pages, lock them, flush TLB
+> call remap_pfn_range().
 
---Sowmini
+I guess this is the same as the madvise approach, but with a driver.
+KVM could take this approach itself when memslots are added/updated
+with the INCOHERENT flag. Maybe worth some experimental patches to
+find out?
 
-> object on the stack in order to pass a pair of addresses. This
-> happens to just fit withint the 1024 byte stack size warning
-> limit on x86, but just exceed that limit on ARM, which gives
-> us this warning:
->
-> net/rds/iw_rdma.c:200:1: warning: the frame size of 1056 bytes is larger than 1024 bytes [-Wframe-larger-than=]
->
-> The warning is correct in principle, though unlikely to be
-> related to a serious problem.
->
-> As the use of this large variable is basically bogus, we can
-> rearrange the code to not do that. Instead of passing an
-> rds socket into rds_iw_get_device, we now just pass the two
-> addresses that we have available in rds_iw_update_cm_id, and
-> we change rds_iw_get_mr accordingly, to create two address
-> structures on the stack there.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> diff --git a/net/rds/iw_rdma.c b/net/rds/iw_rdma.c
-> index a817705ce2d0..dba8d0864f18 100644
-> --- a/net/rds/iw_rdma.c
-> +++ b/net/rds/iw_rdma.c
-> @@ -88,7 +88,9 @@ static unsigned int rds_iw_unmap_fastreg_list(struct rds_iw_mr_pool *pool,
->   			int *unpinned);
->   static void rds_iw_destroy_fastreg(struct rds_iw_mr_pool *pool, struct rds_iw_mr *ibmr);
->
-> -static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwdev, struct rdma_cm_id **cm_id)
-> +static int rds_iw_get_device(struct sockaddr_in *src, struct sockaddr_in *dst,
-> +			     struct rds_iw_device **rds_iwdev,
-> +			     struct rdma_cm_id **cm_id)
->   {
->   	struct rds_iw_device *iwdev;
->   	struct rds_iw_cm_id *i_cm_id;
-> @@ -112,15 +114,15 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
->   				src_addr->sin_port,
->   				dst_addr->sin_addr.s_addr,
->   				dst_addr->sin_port,
-> -				rs->rs_bound_addr,
-> -				rs->rs_bound_port,
-> -				rs->rs_conn_addr,
-> -				rs->rs_conn_port);
-> +				src->sin_addr.s_addr,
-> +				src->sin_port,
-> +				dst->sin_addr.s_addr,
-> +				dst->sin_port);
->   #ifdef WORKING_TUPLE_DETECTION
-> -			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr &&
-> -			    src_addr->sin_port == rs->rs_bound_port &&
-> -			    dst_addr->sin_addr.s_addr == rs->rs_conn_addr &&
-> -			    dst_addr->sin_port == rs->rs_conn_port) {
-> +			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr &&
-> +			    src_addr->sin_port == src->sin_port &&
-> +			    dst_addr->sin_addr.s_addr == dst->sin_addr.s_addr &&
-> +			    dst_addr->sin_port == dst->sin_port) {
->   #else
->   			/* FIXME - needs to compare the local and remote
->   			 * ipaddr/port tuple, but the ipaddr is the only
-> @@ -128,7 +130,7 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
->   			 * zero'ed.  It doesn't appear to be properly populated
->   			 * during connection setup...
->   			 */
-> -			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr) {
-> +			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr) {
->   #endif
->   				spin_unlock_irq(&iwdev->spinlock);
->   				*rds_iwdev = iwdev;
-> @@ -180,19 +182,13 @@ int rds_iw_update_cm_id(struct rds_iw_device *rds_iwdev, struct rdma_cm_id *cm_i
->   {
->   	struct sockaddr_in *src_addr, *dst_addr;
->   	struct rds_iw_device *rds_iwdev_old;
-> -	struct rds_sock rs;
->   	struct rdma_cm_id *pcm_id;
->   	int rc;
->
->   	src_addr = (struct sockaddr_in *)&cm_id->route.addr.src_addr;
->   	dst_addr = (struct sockaddr_in *)&cm_id->route.addr.dst_addr;
->
-> -	rs.rs_bound_addr = src_addr->sin_addr.s_addr;
-> -	rs.rs_bound_port = src_addr->sin_port;
-> -	rs.rs_conn_addr = dst_addr->sin_addr.s_addr;
-> -	rs.rs_conn_port = dst_addr->sin_port;
-> -
-> -	rc = rds_iw_get_device(&rs, &rds_iwdev_old, &pcm_id);
-> +	rc = rds_iw_get_device(src_addr, dst_addr, &rds_iwdev_old, &pcm_id);
->   	if (rc)
->   		rds_iw_remove_cm_id(rds_iwdev, cm_id);
->
-> @@ -598,9 +594,17 @@ void *rds_iw_get_mr(struct scatterlist *sg, unsigned long nents,
->   	struct rds_iw_device *rds_iwdev;
->   	struct rds_iw_mr *ibmr = NULL;
->   	struct rdma_cm_id *cm_id;
-> +	struct sockaddr_in src = {
-> +		.sin_addr.s_addr = rs->rs_bound_addr,
-> +		.sin_port = rs->rs_bound_port,
-> +	};
-> +	struct sockaddr_in dst = {
-> +		.sin_addr.s_addr = rs->rs_conn_addr,
-> +		.sin_port = rs->rs_conn_port,
-> +	};
->   	int ret;
->
-> -	ret = rds_iw_get_device(rs, &rds_iwdev, &cm_id);
-> +	ret = rds_iw_get_device(&src, &dst, &rds_iwdev, &cm_id);
->   	if (ret || !cm_id) {
->   		ret = -ENODEV;
->   		goto out;
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe netdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+I'm still thinking about experimenting with the ARM private syscalls
+next though.
+
+drew
+
+[*] http://lists.gnu.org/archive/html/qemu-devel/2015-03/msg01254.html
