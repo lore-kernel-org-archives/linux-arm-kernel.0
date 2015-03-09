@@ -1,55 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 Mar 2015 12:34:47 +0000
-Subject: [PATCH] net: smc91x: improve neponset hack
-In-Reply-To: <20150309122012.GJ8656@n2100.arm.linux.org.uk>
-References: <5763365.j5Nvv4LgM3@wuerfel>
- <20150219003549.GY8656@n2100.arm.linux.org.uk>
- <5754481.gFE9BvLjh0@wuerfel>
- <20150309122012.GJ8656@n2100.arm.linux.org.uk>
-Message-ID: <20150309123447.GL8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Mar 2015 13:35:24 +0100
+Subject: [PATCH v3 2/3] pci: iproc: Add Broadcom iProc PCIe support
+In-Reply-To: <54F9EB42.3010804@broadcom.com>
+References: <1425603699-13416-1-git-send-email-rjui@broadcom.com>
+ <CAE_wzQ_Rq5u83UXOYRLShxuCzcgxA0BSPFZT4RmvDj8nfTSGcg@mail.gmail.com>
+ <54F9EB42.3010804@broadcom.com>
+Message-ID: <2314573.X8TfIpVCUq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 12:20:12PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Feb 20, 2015 at 04:47:06PM +0100, Arnd Bergmann wrote:
-> > On Thursday 19 February 2015 00:35:49 Russell King - ARM Linux wrote:
-> > > On Wed, Feb 18, 2015 at 08:47:30PM +0100, Arnd Bergmann wrote:
-> > > > The smc91x driver tries to support multiple platforms at compile
-> > > > time, but they are mutually exclusive at runtime, and not clearly
-> > > > defined.
-> > > 
-> > > I'd prefer to rework this to fix that properly.  From what I remember,
-> > > the whole SA11x0 stuff in this driver was a mess.
+On Friday 06 March 2015 10:00:34 Ray Jui wrote:
 > > 
-> > I guess that's reasonable. I've looked through the driver and it seems we
-> > did most of the multiplatform work but left a few things alone that should
-> > have been converted a long time ago.
-> > 
-> > Can you check if the approach below makes sense to you?
 > 
-> I don't know who's carrying what patches, but this is still broken.
+> Although I have not tested it, but to my best knowledge there shouldn't
+> be any technical issue by making the PCIe iProc driver a loadable module
+> and installing the module later after the kernel finishes booting.
 > 
-> arch/arm/mach-sa1100/neponset.c: In function 'neponset_probe':
-> arch/arm/mach-sa1100/neponset.c:271:12: error: 'smc91c_platdata' undeclared (first use in this function)
-> drivers/net/ethernet/smsc/smc91x.c: In function 'smc_drv_probe':
-> drivers/net/ethernet/smsc/smc91x.c:2363:2: error: implicit declaration of function 'machine_has_neponset' [-Werror=implicit-function-declaration]
+> But I wonder why I haven't seen any PCIe host driver being allowed to be
+> compiled as module? Maybe there's no obvious benefit of doing that.
+> People typically opt to load slave devices as module but tend to keep
+> the bus or host devices compiled in.
 > 
-> This is from building Linus' tree as of Saturday plus arm-soc.
+> And to allow a PCI host driver to be compiled as module, some PCI
+> functions need to have their symbols exported:
 > 
-> Let's revert all this crap and start again, this time testing it better?
+> ERROR: "pci_common_swizzle" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "pci_fixup_irqs" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "pci_assign_unassigned_bus_resources"
+> [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "pci_remove_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "pci_stop_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+> ERROR: "pci_create_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
+> 
+> Maybe Bjorn can help to shed some light here? Should I go ahead and
+> export_symbol these PCI functions and make the iProc PCI driver "tristate"?
 
-I'm also getting:
+My best guess is that no loadable driver ever tried to use these and
+we should indeed just export them.
 
-arch/arm/mach-pxa/idp.c:84:15: error: variable 'smc91x_platdata' has initializer but incomplete type
-arch/arm/mach-pxa/idp.c:85:2: error: unknown field 'flags' specified in initializer
-arch/arm/mach-pxa/idp.c:85:11: error: 'SMC91X_USE_32BIT' undeclared here (not in a function)
-arch/arm/mach-pxa/idp.c:85:30: error: 'SMC91X_USE_DMA' undeclared here (not in a function)
-arch/arm/mach-pxa/idp.c:85:47: error: 'SMC91X_NOWAIT' undeclared here (not in a function)
-arch/arm/mach-pxa/idp.c:85:2: warning: excess elements in struct initializer [enabled by default]
-arch/arm/mach-pxa/idp.c:85:2: warning: (near initialization for 'smc91x_platdata') [enabled by default]
-arch/arm/mach-pxa/lpd270.c:198:30: error: expected '}' before ';' token
+The call to pci_assign_unassigned_bus_resources could be avoided by using
+pci_rescan_bus(), which would simplify the driver a little, but for
+some reason, nothing else uses that, so I'm not sure about it.
 
+The pci_remove_root_bus/pci_stop_root_bus calls are rarely used anywhere
+else. Are they functional to the point where you could unload a pci
+host driver that is a loadable module? If so, that would be
+wonderful.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
