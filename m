@@ -1,156 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 9 Mar 2015 19:10:17 +0000 (UTC)
-Subject: OMAP baseline test results for v4.0-rc3
-Message-ID: <alpine.DEB.2.02.1503091845400.11763@utopia.booyaka.com>
+From: jorge.ramirez-ortiz@linaro.org (Jorge Ramirez-Ortiz)
+Date: Mon, 09 Mar 2015 15:12:39 -0400
+Subject: [PATCH v5] drivers/tty: amba: defer probing DMA availability
+ until hw_init
+In-Reply-To: <20150309155711.GS8656@n2100.arm.linux.org.uk>
+References: <1424969811-11197-1-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <1424969811-11197-2-git-send-email-jorge.ramirez-ortiz@linaro.org>
+ <54F5DC08.1040807@linaro.org> <20150309155711.GS8656@n2100.arm.linux.org.uk>
+Message-ID: <54FDF0A7.20009@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/09/2015 11:57 AM, Russell King - ARM Linux wrote:
+> On Tue, Mar 03, 2015 at 11:06:32AM -0500, Jorge Ramirez-Ortiz wrote:
+>> On 02/26/2015 11:56 AM, Jorge Ramirez-Ortiz wrote:
+>>> -	chan = dma_request_slave_channel(dev, "tx");
+>>> +	uap->dma_probed = true;
+>>> +
+>>> +	chan = dma_request_slave_channel_reason(uap_dev, "tx");
+>>> +	if (IS_ERR(chan)) {
+>>> +		if (PTR_ERR(chan) == -EPROBE_DEFER) {
+>>> +			dev_info(uap_dev, "DMA driver not ready\n");
+> I still object to this.
 
-Here are some basic OMAP test results for Linux v4.0-rc3.
-Logs and other details at:
+it was an oversight, not intentional. my fault.
 
-    http://www.pwsan.com/omap/testlogs/test_v4.0-rc3/20150308193049/
+>
+> It _can't_ be right that we plaster the kernel console with these
+> messages when the is a DMA possible, but the DMA driver is a module
+> which hasn't been loaded yet.
+>
+> You probably don't realise it, but init daemons tend to open the
+> console, write their message, and then close it again.  What your
+> message above means is that each time an init daemon does that, we
+> get a "DMA driver not ready" message.
 
+I initially - before your first remarks- did think about the init daemons and
+balancing the value I saw in having the message in (for product developers) I
+thought it was worth having it.
 
-Test summary
-------------
+What I didnt know relates to your second point about modules:
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+- That for as long as the device tree declares a DMA name that matches the one
+that the UART requests in its DT settings, attempting to request a channel on it
+before said DMA driver has been registered would be returning EPROBE_DEFER (same
+thing for ACPI).
 
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-som,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
+- And yes, as the situation described above could go on for ever (maybe the
+driver was blacklisted) the clutter in the log would be unacceptable.
 
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+[I had only looked at defer driver probing from the perspective of its internal
+lists (deferred_probe_ending/active_list) and did not have the overall picture
+in mind. So I missed this point]
 
-Build warnings from toolchain: uImage:
-    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+>
+> IMHO, that is unacceptable.
+>
 
-Build warnings from toolchain: uImage+dtb:
-    (none)
-
-Build warnings from toolchain: zImage:
-    FAIL (15/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap4430_sdp_oldconfig, multi_v7_defconfig
-
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 2/17): 5912osk, 3517evm
-    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  5430es2sbct54, 2420n800
-
-Kernel warnings during boot to userspace:
-    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip retention via dynamic idle:
-    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
-		  5430es2uevm, 5430es2sbct54
-    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
-
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-PM: chip off via dynamic idle:
-    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730es12beaglexm
-
-Kernel warnings during PM test:
-    FAIL ( 2/17): 4430es2panda, 4460varsomom
-
-Obsolete Kconfig symbols:
-    FAIL ( 2/20): omap1_defconfig, multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.0-rc2 (13a7a6ac0a11197edcd0f756a035f472b42cdf8b)):
-   text     data      bss    total  kernel
-  +1521      +24      +64    +1609  omap1_defconfig
-  +1489      +16      +64    +1569  omap1_defconfig_1510innovator_only
-  +1521      +24      +64    +1609  omap1_defconfig_5912osk_only
-  +7910      -80      +64    +7894  multi_v7_defconfig
-  +1650       -8      +64    +1706  omap2plus_defconfig
-  +1546       -8      +64    +1602  omap2plus_defconfig_2430sdp_only
-  +1642      +32      +64    +1738  omap2plus_defconfig_am33xx_only
-  +1642      +24      +64    +1730  omap2plus_defconfig_am43xx_only
-  +1650       -8      +64    +1706  omap2plus_defconfig_cpupm
-  +1578       -8      +64    +1634  omap2plus_defconfig_dra7xx_only
-    +43       -8      +64      +99  omap2plus_defconfig_n800_multi_omap2xxx
-    +43        0      +64     +107  omap2plus_defconfig_n800_only_a
-   +845      +24      +64     +933  omap2plus_defconfig_no_pm
-  +1586       -8      +64    +1642  omap2plus_defconfig_omap2_4_only
-  +1654       -8      +64    +1710  omap2plus_defconfig_omap3_4_only
-  +1642       -8      +64    +1698  omap2plus_defconfig_omap5_only
-    -40        0     +128      +88  rmk_omap3430_ldp_allnoconfig
-   +938       -8      +64     +994  rmk_omap3430_ldp_oldconfig
-    -40        0     +128      +88  rmk_omap4430_sdp_allnoconfig
-   +938      +16      +64    +1018  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.0-rc2 (13a7a6ac0a11197edcd0f756a035f472b42cdf8b))
-  avail  rsrvd   high  freed  board          kconfig
-      .      .      .    -4k  3530es31beagle omap2plus_defconfig
-      .      .      .    -4k  3530es3beagle  omap2plus_defconfig
-      .      .      .    -4k  3730beaglexm   omap2plus_defconfig
-      .      .      .    -4k  3730es12beaglexmomap2plus_defconfig
-      .      .      .    -4k  37xxevm        omap2plus_defconfig
-      .      .      .    -4k  4430es2panda   omap2plus_defconfig
-      .      .      .    -4k  4460pandaes    omap2plus_defconfig
-      .      .      .    -4k  4460varsomom   omap2plus_defconfig
-      .      .      .    -4k  5430es2sbct54  omap2plus_defconfig
-      .      .      .    -4k  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .     4k  am335xbone     omap2plus_defconfig_am33xx_only
-      .      .      .    -4k  am335xbonelt   omap2plus_defconfig
+agree.
