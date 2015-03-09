@@ -1,52 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 9 Mar 2015 15:53:43 +0100
-Subject: [PATCH 4/7] ARM: dts: sun5i: Add new Auxtek-t004 board
-In-Reply-To: <54FC9FD2.6010309@redhat.com>
-References: <1425754884-7875-1-git-send-email-hdegoede@redhat.com>
- <1425754884-7875-4-git-send-email-hdegoede@redhat.com>
- <20150308172157.GE5085@lukather> <54FC9FD2.6010309@redhat.com>
-Message-ID: <20150309145343.GU5085@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Mar 2015 15:29:09 +0100
+Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+In-Reply-To: <20150303102550.GA32624@x1>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+ <20150303102550.GA32624@x1>
+Message-ID: <CACRpkdaFz35PAnUv50J4hA8LA9WUUB97_Qmbb-3iAMjuaB4iUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 08, 2015 at 08:15:30PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 08-03-15 18:21, Maxime Ripard wrote:
-> >On Sat, Mar 07, 2015 at 08:01:21PM +0100, Hans de Goede wrote:
-> >>The auxtek-t004:
-> >>http://www.fasttech.com/products/1110/10004200/1318603-auxtek-t004-allwinner-a10s-single-core-android-ics
-> >>
-> >>Is an Allwinner A10s based hdmi tv stick with with 512M RAM, 4G nand flash,
-> >>toc9002 (bcm43362) sdio wifi, 1 USB host ports using an USB-A receptacle and
-> >>a 2 micro-usb receptacles, one for power and one for USB OTG.
-> >>
-> >>The sdio wifi appears to not have an oob irq hooked up, so we rely on sdio-irq
-> >>support for it.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>
-> >>foo
-> >
-> >I'm not sure what that foo was about :)
-> 
-> Heh, that was the commit message of a fixup commit which I apparently
-> added with a s (squash) rather then a f (fix) when doing a rebase -i leaving
-> the foo in the combined commit msg. So now if you ever see a "foo" in a commit
-> msg from me again you know where it comes from :)
+On Tue, Mar 3, 2015 at 11:25 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 03 Mar 2015, Linus Walleij wrote:
 
-Noted :)
+>> +Multi-Function Devices (MFD)
+>> +
+>> +These devices comprise a nexus for heterogeneous hardware blocks
+>
+> I don't think you meant 'comprise' here.  Perhaps 'represent' might
+> fit better?
 
-Maxime
+I meant "comprise", even looked up the same word in a Swedish-English
+dictionary. I mean those devices really are such heterogeneous things,
+not just modeled like such in Linux.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150309/e731aa6d/attachment.sig>
+>> +spawning multiple child devices.
+>
+> Spawning devices is something software will do.  Think less about what
+> the actions the OS will take order to handle these IPs and more about
+> what they are physically.  I would prefer the description mentions
+> that these chips are single pieces of silicon which contain >1 devices
+> with non-unique/varying functionality.
+
+OK.
+
+>> +A typical MFD can be:
+>> +
+>> +- A mixed signal ASIC on an external bus, sometimes a PMIC (power management
+>> +  integrated circuit) that is manufactured in a lower technology node (rough
+>
+> Please capitalise the expanded PMIC abbreviation.
+
+OK.
+
+>> +  silicon) that handles analog drivers for things like audio amplifiers, LED
+>> +  drivers, level shifters, PHY (physical interfaces to things like USB or
+>> +  ethernet), regulators etc.
+>> +
+>> +- A range of memory registers containing "miscellaneous system registers" also
+>> +  known as a system controller "syscon" or any other memory range containing a
+>> +  mix of unrelated registers.
+>
+> s/registers/{hardware|devices}/
+
+OK.
+
+>> +Optional properties:
+>> +
+>> +- compatible : "simple-mfd" - this signifies that the operating system should
+>> +  spawn child devices for all the subnodes of the MFD device akin to how
+>
+> This is pretty Linux specific IMHO.  Other OSes might not spawn
+> seperate devices to handle MFD type h/w.  The idea is fine, but please
+> generify a little.
+
+OK.
+
+>> +foo at 1000 {
+>
+> Should be 10000.
+
+OK.
+
+>> +             compatible = "syscon", "simple-mfd";
+>
+> Please address your tabbing issues.
+
+OK.
+
+Yours,
+Linus Walleij
