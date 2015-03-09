@@ -1,79 +1,71 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:01 +0800
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
+Date: Mon, 9 Mar 2015 10:34:10 +0800
+Subject: [PATCH v6 13/30] PCI: Introduce new scan function
+ pci_scan_host_bridge()
 In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425868467-9667-14-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Introduce new scan function pci_scan_host_bridge() to
+support host bridge drivers that need to provide platform
+own pci_host_bridge_ops.
 
-Use pci_scan_root_bus() instead of deprecated function
-pci_scan_bus_parented().
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-CC: xen-devel at lists.xenproject.org
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/xen-pcifront.c |   12 +++++++++---
- 1 files changed, 9 insertions(+), 3 deletions(-)
+ drivers/pci/probe.c |   22 ++++++++++++++++++++++
+ include/linux/pci.h |    4 ++++
+ 2 files changed, 26 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-index b1ffebe..9e7c28b 100644
---- a/drivers/pci/xen-pcifront.c
-+++ b/drivers/pci/xen-pcifront.c
-@@ -21,6 +21,7 @@
- #include <linux/bitops.h>
- #include <linux/time.h>
- #include <xen/platform_pci.h>
-+#include "pci.h"
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 59d9be3..99f17e3 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2064,6 +2064,28 @@ static struct pci_bus *__pci_scan_root_bus(
+ 	return b;
+ }
  
- #include <asm/xen/swiotlb-xen.h>
- #define INVALID_GRANT_REF (0)
-@@ -446,6 +447,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
- 				 unsigned int domain, unsigned int bus)
++struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
++		u32 db, struct pci_ops *ops, void *sysdata,
++		struct list_head *resources,
++		struct pci_host_bridge_ops *phb_ops)
++{
++	struct pci_host_bridge *host;
++	struct pci_bus *bus;
++
++	host = pci_create_host_bridge(parent, db, resources,
++			sysdata, phb_ops);
++	if (!host)
++		return NULL;
++
++	bus = __pci_scan_root_bus(host, ops);
++	if (!bus)
++		pci_free_host_bridge(host);
++
++	return host;
++}
++EXPORT_SYMBOL(pci_scan_host_bridge);
++
++
+ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
+ 		struct pci_ops *ops, void *sysdata, struct list_head *resources)
  {
- 	struct pci_bus *b;
-+	LIST_HEAD(resources);
- 	struct pcifront_sd *sd = NULL;
- 	struct pci_bus_entry *bus_entry = NULL;
- 	int err = 0;
-@@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
- 		err = -ENOMEM;
- 		goto err_out;
- 	}
-+	pci_add_resource(&resources, &ioport_resource);
-+	pci_add_resource(&resources, &iomem_resource);
-+	pci_add_resource(&resources, &busn_resource);
- 	pcifront_init_sd(sd, domain, bus, pdev);
- 
- 	pci_lock_rescan_remove();
- 
--	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
--				  &pcifront_bus_ops, sd);
-+	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
-+				  &pcifront_bus_ops, sd, &resources);
- 	if (!b) {
- 		dev_err(&pdev->xdev->dev,
- 			"Error creating PCI Frontend Bus!\n");
- 		err = -ENOMEM;
- 		pci_unlock_rescan_remove();
-+		pci_free_resource_list(&resources);
- 		goto err_out;
- 	}
- 
-@@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
- 
- 	list_add(&bus_entry->list, &pdev->root_buses);
- 
--	/* pci_scan_bus_parented skips devices which do not have a have
-+	/* pci_scan_root_bus skips devices which do not have a
- 	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
- 	err = pcifront_scan_bus(pdev, domain, bus, b);
- 
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index e9922b1..28eafb5 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -790,6 +790,10 @@ void pci_bus_release_busn_res(struct pci_bus *b);
+ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 dombus,
+ 					     struct pci_ops *ops, void *sysdata,
+ 					     struct list_head *resources);
++struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
++		u32 dombus, struct pci_ops *ops, void *sysdata,
++		struct list_head *resources,
++		struct pci_host_bridge_ops *phb_ops);
+ struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
+ 				int busnr);
+ void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
 -- 
 1.7.1
