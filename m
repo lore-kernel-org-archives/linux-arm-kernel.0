@@ -1,153 +1,81 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 9 Mar 2015 16:45:58 -0700
-Subject: [PATCH v3 2/3] pci: iproc: Add Broadcom iProc PCIe support
-In-Reply-To: <2314573.X8TfIpVCUq@wuerfel>
-References: <1425603699-13416-1-git-send-email-rjui@broadcom.com>
- <CAE_wzQ_Rq5u83UXOYRLShxuCzcgxA0BSPFZT4RmvDj8nfTSGcg@mail.gmail.com>
- <54F9EB42.3010804@broadcom.com> <2314573.X8TfIpVCUq@wuerfel>
-Message-ID: <54FE30B6.3070400@broadcom.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 9 Mar 2015 18:59:06 -0500
+Subject: [PATCH v2 2/2] ARM: dts: am33xx: Move wkup_m3 node to soc node
+ and add ranges
+In-Reply-To: <20150305165727.GE13520@atomide.com>
+References: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
+ <1425528742-3087-3-git-send-email-d-gerlach@ti.com>
+ <20150305154039.GD13520@atomide.com> <54F88849.1090708@ti.com>
+ <20150305165727.GE13520@atomide.com>
+Message-ID: <54FE33CA.4090709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Tony,
 
-On 3/9/2015 5:35 AM, Arnd Bergmann wrote:
-> On Friday 06 March 2015 10:00:34 Ray Jui wrote:
+On 03/05/2015 10:57 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [150305 08:47]:
+>> On 03/05/2015 09:40 AM, Tony Lindgren wrote:
+>>> * Dave Gerlach <d-gerlach@ti.com> [150304 20:14]:
+>> Dave,
+>>
+>> Looks like the commit message disappeared during your patch preparation.
+>>
+>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/am33xx.dtsi | 21 +++++++++++++--------
+>>>>  1 file changed, 13 insertions(+), 8 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>>> index acd3705..086415c 100644
+>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>>> @@ -77,10 +77,23 @@
+>>>>  	 */
+>>>>  	soc {
+>>>>  		compatible = "ti,omap-infra";
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <1>;
+>>>> +		ranges = <0x0     0x44d00000 0x4000>,
+>>>> +			 <0x80000 0x44d80000 0x2000>;
+>>>> +
 >>>
->>
->> Although I have not tested it, but to my best knowledge there shouldn't
->> be any technical issue by making the PCIe iProc driver a loadable module
->> and installing the module later after the kernel finishes booting.
->>
->> But I wonder why I haven't seen any PCIe host driver being allowed to be
->> compiled as module? Maybe there's no obvious benefit of doing that.
->> People typically opt to load slave devices as module but tend to keep
->> the bus or host devices compiled in.
->>
->> And to allow a PCI host driver to be compiled as module, some PCI
->> functions need to have their symbols exported:
->>
->> ERROR: "pci_common_swizzle" [drivers/pci/host/pcie-iproc.ko] undefined!
->> ERROR: "pci_fixup_irqs" [drivers/pci/host/pcie-iproc.ko] undefined!
->> ERROR: "pci_assign_unassigned_bus_resources"
->> [drivers/pci/host/pcie-iproc.ko] undefined!
->> ERROR: "pci_remove_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
->> ERROR: "pci_stop_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
->> ERROR: "pci_create_root_bus" [drivers/pci/host/pcie-iproc.ko] undefined!
->>
->> Maybe Bjorn can help to shed some light here? Should I go ahead and
->> export_symbol these PCI functions and make the iProc PCI driver "tristate"?
-> 
-> My best guess is that no loadable driver ever tried to use these and
-> we should indeed just export them.
+>>> I think putting the ranges here will cause issues for adding
+>>> ranges for anything else.
+>>>
+>>> How about do something like this instead (untested):
+>>>
+>>> ocp {
+>>> 	l4_wkup: l4_wkup at 44c00000 {
+>>> 		compatible = "am335-l4-wkup", "simple-bus";
+>>> 		ranges = <0 0x44c00000 0x3fffff>;
+>>>
+>>> 		wkup_m3: wkup_m3 at 44d00000 {
+>>> 			compatible = "ti,am3353-wkup-m3";
+>>> 			reg = <0x1000000     0x4000>,	/* M3 UMEM */
+>>> 			      <0x180000	     0x2000>;	/* M3 DMEM */
+>>> 			ti,hwmods = "wkup_m3";
+>>> 			ti,pm-firmware = "am335x-pm-firmware.elf";
+>>> 		};
+>>>
+>>> 		...
+>>> 	};
+>>> };
+>>>
+>>> That way we can start moving also the other l4_wkup components there
+>>> eventuallly without having to redo the ranges again for wkup_m3.
+>>>
+>>> You can also look at how the scm_conf was done for dm816x.dtsi for an
+>>> example, and the recent large set of patches posted by Tero.
 
-True. I can export those symbols.
+I have taken a look at both the above. The L4_WKUP range includes the
+PRCM, Control Module, as well as a few peripherals like DMTimer0, UART0
+etc. What all do we want to move here eventually? Depending on that, we
+may have to use 2 address cells like in Tero's PRCM cleanup series
+rather than the single cell translation used by you in dm816x.dtsi so
+that we can retain the relative addresses w.r.t the existing node bases
+in the derivative child nodes.
 
-> 
-> The call to pci_assign_unassigned_bus_resources could be avoided by using
-> pci_rescan_bus(), which would simplify the driver a little, but for
-> some reason, nothing else uses that, so I'm not sure about it.
-> 
-> The pci_remove_root_bus/pci_stop_root_bus calls are rarely used anywhere
-> else. Are they functional to the point where you could unload a pci
-> host driver that is a loadable module? If so, that would be
-> wonderful.
-
-It is quite wonderful, :)
-
-I added driver remove function support and tested it out. I'm able to
-install/remove/install the iProc PCIe platform driver as a kernel
-loadable module. pci_remove_root_bus/pci_stop_root_bus works fine. See
-logs below.
-
--bash-3.2# insmod pcie-iproc-pltfm.ko
-[   54.058546] PCI host bridge /pcie at 18012000 ranges:
-[   54.064584]    IO 0x28000000..0x2800ffff -> 0x00000000
-[   54.071003]   MEM 0x20000000..0x23ffffff -> 0x20000000
-[   54.330194] iproc-pcie 18012000.pcie: PCI host bridge to bus 0000:00
-[   54.338138] pci_bus 0000:00: root bus resource [bus 00-ff]
-[   54.344983] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-[   54.352683] pci_bus 0000:00: root bus resource [mem
-0x20000000-0x23ffffff]
-[   54.361254] iproc-pcie 18012000.pcie: link: UP
-[   54.367086] PCI: bus0: Fast back to back transfers disabled
-[   54.374046] pci 0000:00:00.0: bridge configuration invalid ([bus
-00-00]), reconfiguring
-[   54.400237] PCI: bus1: Fast back to back transfers disabled
-[   54.407274] pci 0000:00:00.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
-[   54.415766] pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
-[   54.424241] pci 0000:01:00.0: BAR 6: assigned [mem
-0x20080000-0x200bffff pref]
-[   54.433245] pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
-[   54.441710] pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
-[   54.450173] pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
-[   54.457979] pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
-[   54.466217] pci 0000:00:00.0: PCI bridge to [bus 01]
-[   54.472404] pci 0000:00:00.0:   bridge window [mem 0x20000000-0x200fffff]
-[   54.480945] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
-[   54.488767] e1000e 0000:01:00.0: enabling device (0140 -> 0142)
-[   54.496315] e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec)
-set to dynamic conservative mode
-[   54.507958] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
-to initialize MSI-X interrupts.  Falling back to MSI interru.
-[   54.522913] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
-to initialize MSI interrupts.  Falling back to legacy interr.
-[   54.643486] e1000e 0000:01:00.0 eth0: registered PHC clock
-[   54.650379] e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
-68:05:ca:28:19:e8
-[   54.660254] e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network
-Connection
-[   54.668834] e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: E46981-008
-
-
--bash-3.2# rmmod pcie-iproc-pltfm
-[   66.465834] e1000e 0000:01:00.0 eth0: removed PHC
-
-
--bash-3.2# insmod pcie-iproc-pltfm.ko
-[   71.043195] PCI host bridge /pcie at 18012000 ranges:
-[   71.049235]    IO 0x28000000..0x2800ffff -> 0x00000000
-[   71.055652]   MEM 0x20000000..0x23ffffff -> 0x20000000
-[   71.315192] iproc-pcie 18012000.pcie: PCI host bridge to bus 0000:00
-[   71.323135] pci_bus 0000:00: root bus resource [bus 00-ff]
-[   71.329979] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-[   71.337679] pci_bus 0000:00: root bus resource [mem
-0x20000000-0x23ffffff]
-[   71.346249] iproc-pcie 18012000.pcie: link: UP
-[   71.352072] PCI: bus0: Fast back to back transfers disabled
-[   71.375261] PCI: bus1: Fast back to back transfers disabled
-[   71.382291] pci 0000:00:00.0: BAR 8: assigned [mem 0x20000000-0x200fffff]
-[   71.390782] pci 0000:01:00.0: BAR 1: assigned [mem 0x20000000-0x2007ffff]
-[   71.399258] pci 0000:01:00.0: BAR 6: assigned [mem
-0x20080000-0x200bffff pref]
-[   71.408263] pci 0000:01:00.0: BAR 0: assigned [mem 0x200c0000-0x200dffff]
-[   71.416728] pci 0000:01:00.0: BAR 3: assigned [mem 0x200e0000-0x200e3fff]
-[   71.425190] pci 0000:01:00.0: BAR 2: no space for [io  size 0x0020]
-[   71.432996] pci 0000:01:00.0: BAR 2: failed to assign [io  size 0x0020]
-[   71.441235] pci 0000:00:00.0: PCI bridge to [bus 01]
-[   71.447422] pci 0000:00:00.0:   bridge window [mem 0x20000000-0x200fffff]
-[   71.456125] pcieport 0000:00:00.0: Signaling PME through PCIe PME
-interrupt
-[   71.464812] pci 0000:01:00.0: Signaling PME through PCIe PME interrupt
-[   71.473411] e1000e 0000:01:00.0: Interrupt Throttling Rate (ints/sec)
-set to dynamic conservative mode
-[   71.485069] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
-to initialize MSI-X interrupts.  Falling back to MSI interru.
-[   71.500025] e1000e 0000:01:00.0 0000:01:00.0 (uninitialized): Failed
-to initialize MSI interrupts.  Falling back to legacy interr.
-[   71.624549] e1000e 0000:01:00.0 eth0: registered PHC clock
-[   71.631444] e1000e 0000:01:00.0 eth0: (PCI Express:2.5GT/s:Width x1)
-68:05:ca:28:19:e8
-[   71.641314] e1000e 0000:01:00.0 eth0: Intel(R) PRO/1000 Network
-Connection
-[   71.649894] e1000e 0000:01:00.0 eth0: MAC: 3, PHY: 8, PBA No: E46981-008
-
-> 
-> 	Arnd
-> 
-
-I'll submit patch series v4 with loadable module support.
-
-Thanks,
-
-Ray
+regards
+Suman
