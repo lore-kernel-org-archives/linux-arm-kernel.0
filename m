@@ -1,82 +1,64 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon,  9 Mar 2015 10:37:50 +0100
-Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature reporting
-Message-ID: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 9 Mar 2015 10:41:08 +0100
+Subject: [PATCH 0/3] Add DT support for netxbig LEDs
+In-Reply-To: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
+References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150309094107.GL1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit titled:
-"touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
-contains a math error, the offset it uses is in degrees, but the actual code
-applies the offset before multiplying by stepsize :|
+On Mon, Feb 23, 2015 at 04:04:18PM +0100, Simon Guinot wrote:
+> Hello,
+> 
+> This patch series adds DT support for the LEDs found on the Kirkwood-based
+> LaCie boards 2Big and 5Big Network v2.
+> 
+> Simon
+> 
+> Simon Guinot (3):
+>   leds: netxbig: add device tree binding
+>   ARM: Kirkwood: add LED DT entries for netxbig boards
+>   ARM: mvebu: remove static LED setup for netxbig boards
 
-Given that this is rather backwards (every math course ever thought applies
-the multiplication before the offset for linear functions), this commit
-fixes things by changing the code applying the offset to do the logical
-thing, adjusting the offset for the other models accordingly.
+Hi Brian,
 
-This has been tested on an A10, A13, A20 and A31 to make sure everything really
-is correct now.
+Please, consider merging the first patch of this serie.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Note if possible this commit should be squashed into the original
-"touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
-commit as a fixup.
----
- drivers/input/touchscreen/sun4i-ts.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Thanks in advance.
 
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index 66ccd5a..178d2ef 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -193,7 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
- 	if (ts->temp_data == -1)
- 		return -EAGAIN;
- 
--	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
-+	*temp = ts->temp_data * ts->temp_step - ts->temp_offset;
- 
- 	return 0;
- }
-@@ -255,17 +255,17 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 	ts->ignore_fifo_data = true;
- 	ts->temp_data = -1;
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
--		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
--		ts->temp_offset = 1626;
-+		/* Allwinner SDK has temperature (C) = (value / 6) - 271 */
-+		ts->temp_offset = 271000;
- 		ts->temp_step = 167;
- 	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
- 		/*
- 		 * The A10 temperature sensor has quite a wide spread, these
- 		 * parameters are based on the averaging of the calibration
- 		 * results of 4 completely different boards, with a spread of
--		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
-+		 * temp_step from 0.096 - 0.170 and temp_offset from 176 - 331.
- 		 */
--		ts->temp_offset = 2570;
-+		ts->temp_offset = 257000;
- 		ts->temp_step = 133;
- 	} else {
- 		/*
-@@ -273,13 +273,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 		 * the temperature. The formula used here is from the AXP209,
- 		 * which is designed by X-Powers, an affiliate of Allwinner:
- 		 *
--		 *     temperature = -144.7 + (value * 0.1)
-+		 *     temperature (C) = (value * 0.1) - 144.7
- 		 *
- 		 * Allwinner does not have any documentation whatsoever for
- 		 * this hardware. Moreover, it is claimed that the sensor
- 		 * is inaccurate and cannot work properly.
- 		 */
--		ts->temp_offset = 1447;
-+		ts->temp_offset = 144700;
- 		ts->temp_step = 100;
- 	}
- 
--- 
-2.3.1
+Simon
+
+> 
+>  .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+>  .../devicetree/bindings/leds/leds-netxbig.txt      |  90 ++++++++
+>  arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
+>  arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
+>  arch/arm/mach-mvebu/Kconfig                        |   7 -
+>  arch/arm/mach-mvebu/Makefile                       |   1 -
+>  arch/arm/mach-mvebu/board.h                        |  21 --
+>  arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+>  arch/arm/mach-mvebu/netxbig.c                      | 191 ----------------
+>  drivers/leds/leds-netxbig.c                        | 244 +++++++++++++++++++--
+>  include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+>  11 files changed, 493 insertions(+), 245 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+>  create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+>  delete mode 100644 arch/arm/mach-mvebu/board.h
+>  delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+>  create mode 100644 include/dt-bindings/leds/leds-netxbig.h
+> 
+> -- 
+> 2.1.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150309/49836f37/attachment.sig>
