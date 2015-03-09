@@ -1,45 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 9 Mar 2015 11:06:00 -0700
-Subject: [PATCH v3 0/10] split ET_DYN ASLR from mmap ASLR
-In-Reply-To: <20150309161912.GW8656@n2100.arm.linux.org.uk>
-References: <1425435025-30284-1-git-send-email-keescook@chromium.org>
- <20150309161912.GW8656@n2100.arm.linux.org.uk>
-Message-ID: <CAGXu5jK=bEQDao+QZN7AZuVi0FB_+AsT4LAPodVZg3VTK=Pi-A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Mar 2015 18:06:45 +0000
+Subject: [PATCH v2] ARM: advertise availability of v8 Crypto instructions
+In-Reply-To: <1425556302-3370-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425556302-3370-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150309180645.GD8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 9, 2015 at 9:19 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 03, 2015 at 06:10:15PM -0800, Kees Cook wrote:
->> To address the "offset2lib" ASLR weakness[1], this separates ET_DYN
->> ASLR from mmap ASLR, as already done on s390. The architectures
->> that are already randomizing mmap (arm, arm64, mips, powerpc, s390,
->> and x86), have their various forms of arch_mmap_rnd() made available
->> via the new CONFIG_ARCH_HAS_ELF_RANDOMIZE. For these architectures,
->> arch_randomize_brk() is collapsed as well.
->>
->> This is an alternative to the solutions in:
->> https://lkml.org/lkml/2015/2/23/442
->>
->> I've been able to test x86 and arm, and the buildbot (so far) seems
->> happy with building the rest.
->
-> Hmm, do you want to wrap my acks up to your previous one into this set?
-> What about my tested-by?
->
-> I'd rather not waste time testing this version if my previous test is
-> still valid (or if there's yet another version of this patch set which
-> is later than this set.)
->
-> Unless I hear anything, I'll assume that it's broadly the same as the
-> previous patch set and requires no action.
+On Thu, Mar 05, 2015 at 12:51:42PM +0100, Ard Biesheuvel wrote:
+> @@ -393,6 +393,20 @@ static void __init cpuid_init_hwcaps(void)
+>  	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+>  	if (vmsa >= 5)
+>  		elf_hwcap |= HWCAP_LPAE;
+> +
+> +	/* check for supported v8 Crypto instructions */
+> +	isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
+> +
+> +	switch ((isar5 >> 4) & 0xf) {
+> +	case 2:	elf_hwcap2 |= HWCAP2_PMULL;	/* pmull implies aes */
+> +	case 1:	elf_hwcap2 |= HWCAP2_AES;
+> +	}
+> +	if (((isar5 >> 8) & 0xf) == 1)
+> +		elf_hwcap2 |= HWCAP2_SHA1;
+> +	if (((isar5 >> 12) & 0xf) == 1)
+> +		elf_hwcap2 |= HWCAP2_SHA2;
+> +	if (((isar5 >> 16) & 0xf) == 1)
+> +		elf_hwcap2 |= HWCAP2_CRC32;
 
-Yeah, it's broadly the same. I tweaked a few minor things, so I'm
-comfortable retaining the acks and tested-bys. Thank you for the
-reviews and tests!
+Reading through the ARMv7 ARM, the ISAR registers seem to work in a way
+that "feature >= N" is sufficient to test for something (in other words,
+the feature revision bits build on previous instructions added by older
+revisions of that feature.)
 
--Kees
+Hence why PMULL implies AES - that follows the same pattern.  So, I wonder
+if those == should all be >=, and there should be a "default:" before
+"case 2:" with the zero case handled separately.
 
 -- 
-Kees Cook
-Chrome OS Security
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
