@@ -1,70 +1,79 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 9 Mar 2015 10:34:15 +0800
-Subject: [PATCH v6 18/30] PCI: Remove weak pcibios_root_bridge_prepare()
+Date: Mon, 9 Mar 2015 10:34:01 +0800
+Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
 In-Reply-To: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1425868467-9667-19-git-send-email-wangyijing@huawei.com>
+Message-ID: <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now no one use weak pcibios_root_bridge_prepare(),
-we could remove it.
+From: Arnd Bergmann <arnd@arndb.de>
 
+Use pci_scan_root_bus() instead of deprecated function
+pci_scan_bus_parented().
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: xen-devel at lists.xenproject.org
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/probe.c |   16 +---------------
- include/linux/pci.h |    2 --
- 2 files changed, 1 insertions(+), 17 deletions(-)
+ drivers/pci/xen-pcifront.c |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 99f17e3..1080eff 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1845,18 +1845,6 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
- }
- EXPORT_SYMBOL_GPL(pci_scan_child_bus);
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index b1ffebe..9e7c28b 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -21,6 +21,7 @@
+ #include <linux/bitops.h>
+ #include <linux/time.h>
+ #include <xen/platform_pci.h>
++#include "pci.h"
  
--/**
-- * pcibios_root_bridge_prepare - Platform-specific host bridge setup.
-- * @bridge: Host bridge to set up.
-- *
-- * Default empty implementation.  Replace with an architecture-specific setup
-- * routine, if necessary.
-- */
--int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	return 0;
--}
--
- void __weak pcibios_add_bus(struct pci_bus *bus)
+ #include <asm/xen/swiotlb-xen.h>
+ #define INVALID_GRANT_REF (0)
+@@ -446,6 +447,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 				 unsigned int domain, unsigned int bus)
  {
- }
-@@ -1889,11 +1877,9 @@ static struct pci_bus *__pci_create_root_bus(
+ 	struct pci_bus *b;
++	LIST_HEAD(resources);
+ 	struct pcifront_sd *sd = NULL;
+ 	struct pci_bus_entry *bus_entry = NULL;
+ 	int err = 0;
+@@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 		err = -ENOMEM;
+ 		goto err_out;
+ 	}
++	pci_add_resource(&resources, &ioport_resource);
++	pci_add_resource(&resources, &iomem_resource);
++	pci_add_resource(&resources, &busn_resource);
+ 	pcifront_init_sd(sd, domain, bus, pdev);
  
- 	bridge->bus = b;
- 	b->bridge = get_device(&bridge->dev);
-+
- 	if (bridge->ops && bridge->ops->set_root_bus_speed)
- 		bridge->ops->set_root_bus_speed(bridge);
--	error = pcibios_root_bridge_prepare(bridge);
--	if (error)
--		goto err_out;
+ 	pci_lock_rescan_remove();
  
- 	device_enable_async_suspend(b->bridge);
- 	pci_set_bus_of_node(b);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 28eafb5..cfaf217 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -424,8 +424,6 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
- 		     void (*release_fn)(struct pci_host_bridge *),
- 		     void *release_data);
+-	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+-				  &pcifront_bus_ops, sd);
++	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
++				  &pcifront_bus_ops, sd, &resources);
+ 	if (!b) {
+ 		dev_err(&pdev->xdev->dev,
+ 			"Error creating PCI Frontend Bus!\n");
+ 		err = -ENOMEM;
+ 		pci_unlock_rescan_remove();
++		pci_free_resource_list(&resources);
+ 		goto err_out;
+ 	}
  
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
--
- /*
-  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
-  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
+@@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+ 
+ 	list_add(&bus_entry->list, &pdev->root_buses);
+ 
+-	/* pci_scan_bus_parented skips devices which do not have a have
++	/* pci_scan_root_bus skips devices which do not have a
+ 	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+ 	err = pcifront_scan_bus(pdev, domain, bus, b);
+ 
 -- 
 1.7.1
