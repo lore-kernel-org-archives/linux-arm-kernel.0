@@ -1,60 +1,32 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Mar 2015 11:27:59 +0100
-Subject: [PATCH] iio: ak8975: fix AK09911 dependencies
-In-Reply-To: <7968545.0Cq9DcaG85@wuerfel>
-References: <7968545.0Cq9DcaG85@wuerfel>
-Message-ID: <CAMuHMdU9x_OUReNMdZx+urZE3FDx2qz1m6gDRVp8qJ0r_QF5tA@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon,  9 Mar 2015 10:27:10 +0000
+Subject: [PATCH 6/6] Documentation: update arch list in the 'memtest' entry
+In-Reply-To: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1425896830-19705-7-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Since arm64/arm support memtest command line option update the "memtest"
+entry.
 
-On Wed, Jan 28, 2015 at 2:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> ak8975 depends on I2C and GPIOLIB, so any symbols that selects
-> ak8975 must have the same dependency, or we get build errors:
->
-> drivers/iio/magnetometer/ak8975.c: In function 'ak8975_who_i_am':
-> drivers/iio/magnetometer/ak8975.c:393:2: error: implicit declaration of function 'i2c_smbus_read_i2c_block_data' [-Werror=implicit-function-declaration]
->   ret = i2c_smbus_read_i2c_block_data(client, AK09912_REG_WIA1,
->   ^
-> drivers/iio/magnetometer/ak8975.c: In function 'ak8975_set_mode':
-> drivers/iio/magnetometer/ak8975.c:431:2: error: implicit declaration of function 'i2c_smbus_write_byte_data' [-Werror=implicit-function-declaration]
->   ret = i2c_smbus_write_byte_data(data->client,
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 57e73a423b1e85 ("iio: ak8975: add ak09911 and ak09912 support")
-> ---
-> I found this recent regression doing ARM randconfig builds, please apply
->
-> diff --git a/drivers/iio/magnetometer/Kconfig b/drivers/iio/magnetometer/Kconfig
-> index 4c7a4c52dd06..a5d6de72c523 100644
-> --- a/drivers/iio/magnetometer/Kconfig
-> +++ b/drivers/iio/magnetometer/Kconfig
-> @@ -18,6 +18,8 @@ config AK8975
->
->  config AK09911
->         tristate "Asahi Kasei AK09911 3-axis Compass"
-> +       depends on I2C
-> +       depends on GPIOLIB
->         select AK8975
->         help
->           Deprecated: AK09911 is now supported by AK8975 driver.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ Documentation/kernel-parameters.txt |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I just saw the AK8975/AK09911 config options disappear for a v4.0-rc3 m68k
-allmodconfig kernel. Apparently it built fine with !GPIOLIB before, as many
-gpiolib (consumer) functions have dummies for the !GPIOLIB case.
-
-So I think the GPIOLIB dependency can be relaxed to "GPIOLIB || COMPILE_TEST".
-The same may be true for many other GPIOLIB consumer drivers.
-Will look into it and send patches...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index bfcb1a6..ea11c98 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -1988,7 +1988,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			seconds.  Use this parameter to check at some
+ 			other rate.  0 disables periodic checking.
+ 
+-	memtest=	[KNL,X86] Enable memtest
++	memtest=	[KNL,X86,ARM] Enable memtest
+ 			Format: <integer>
+ 			default : 0 <disable>
+ 			Specifies the number of memtest passes to be
+-- 
+1.7.9.5
