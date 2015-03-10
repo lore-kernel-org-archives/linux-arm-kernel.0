@@ -1,55 +1,46 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Mar 2015 19:59:12 +0800
-Subject: [PATCH v5 01/12] ARM: dts: sun6i: add p2wi controller node to dtsi
+Date: Tue, 10 Mar 2015 19:59:15 +0800
+Subject: [PATCH v5 04/12] mfd: axp20x: update DT bindings with AXP22x
+ compatibles
 In-Reply-To: <1425988764-23618-1-git-send-email-wens@csie.org>
 References: <1425988764-23618-1-git-send-email-wens@csie.org>
-Message-ID: <1425988764-23618-2-git-send-email-wens@csie.org>
+Message-ID: <1425988764-23618-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Add AXP221 to the list of supported devices.
 
-The p2wi controller has only one possible pinmux setting. Use it by
-default in the dtsi, instead of having to set it in each board's dts.
+Also replace any mention of AXP20x in the document with a
+generic "PMIC".
 
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-[wens at csie.org: reformat commit title; rename p2wi pins and use as default]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index fa2f403ccf28..92abea20b946 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -973,6 +973,27 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
-+
-+			p2wi_pins: p2wi {
-+				allwinner,pins = "PL0", "PL1";
-+				allwinner,function = "s_p2wi";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+		};
-+
-+		p2wi: i2c at 01f03400 {
-+			compatible = "allwinner,sun6i-a31-p2wi";
-+			reg = <0x01f03400 0x400>;
-+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&apb0_gates 3>;
-+			clock-frequency = <100000>;
-+			resets = <&apb0_rst 3>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&p2wi_pins>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 98685f291a72..3914a3f91ff6 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -1,15 +1,16 @@
+-AXP202/AXP209 device tree bindings
++AXP family PMIC device tree bindings
+ 
+ The axp20x family current members :
+ axp202 (X-Powers)
+ axp209 (X-Powers)
++axp221 (X-Powers)
+ 
+ Required properties:
+-- compatible: "x-powers,axp202" or "x-powers,axp209"
++- compatible: "x-powers,axp202", "x-powers,axp209", "x-powers,axp221"
+ - reg: The I2C slave address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+-- interrupt-controller: axp20x has its own internal IRQs
++- interrupt-controller: The PMIC has its own internal IRQs
+ - #interrupt-cells: Should be set to 1
+ 
+ Optional properties:
 -- 
 2.1.4
