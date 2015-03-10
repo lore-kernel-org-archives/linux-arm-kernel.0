@@ -1,102 +1,32 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 10 Mar 2015 15:56:51 -0500
-Subject: [PATCH v5 1/4] PCI: Export symbols of PCI functions
-In-Reply-To: <1425947886-23705-2-git-send-email-rjui@broadcom.com>
-References: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
- <1425947886-23705-2-git-send-email-rjui@broadcom.com>
-Message-ID: <20150310205651.GA32204@google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 22:00:14 +0100
+Subject: [PATCH v3] mtd: cfi: reduce stack size
+In-Reply-To: <20150310194126.GC4124@norris-Latitude-E6410>
+References: <2266200.3mx7btcFe5@wuerfel>
+ <20150310194126.GC4124@norris-Latitude-E6410>
+Message-ID: <201503102200.16344.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 05:38:03PM -0700, Ray Jui wrote:
-> Export symbols of the following PCI functions so they can be referenced
-> by a PCI driver compiled as a kernel loadable module:
+On Tuesday 10 March 2015, Brian Norris wrote:
+> On Tue, Mar 10, 2015 at 05:48:37PM +0100, Arnd Bergmann wrote:
+> > The cfi_staa_write_buffers function uses a large amount of kernel stack
+> > whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
+> > warning on ARM allmodconfig builds:
+> > 
+> > drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+> > drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+> > 
+> > It turns out that this is largely a result of a suboptimal implementation
+> > of map_word_andequal(). Replacing this function with a straightforward
+> > one reduces the stack size in this function by exactly 200 bytes,
+> > shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
+> > and makes the warning go away.
 > 
-> pci_common_swizzle
-> pci_create_root_bus
-> pci_stop_root_bus
-> pci_remove_root_bus
-> pci_assign_unassigned_bus_resources
-> pci_fixup_irqs
-
-Have you tested your driver as a loadable module?
-
-If it works to load/unload/reload/etc., I'm OK with exporting these
-symbols.  I would prefer EXPORT_SYMBOL_GPL, though, because these don't
-constitute a very coherent interface right now, and they will likely be
-reworked.  For example, see Yijing Wang's work to sort out the
-pci_bus_add_devices() / resource assignment mess.
-
-Bjorn
-
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> ---
->  drivers/pci/pci.c       |    1 +
->  drivers/pci/probe.c     |    1 +
->  drivers/pci/remove.c    |    2 ++
->  drivers/pci/setup-bus.c |    1 +
->  drivers/pci/setup-irq.c |    1 +
->  5 files changed, 6 insertions(+)
+> Patch looks OK to me, and those results are nice.
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 81f06e8..fb4a3da 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -2492,6 +2492,7 @@ u8 pci_common_swizzle(struct pci_dev *dev, u8 *pinp)
->  	*pinp = pin;
->  	return PCI_SLOT(dev->devfn);
->  }
-> +EXPORT_SYMBOL(pci_common_swizzle);
->  
->  /**
->   *	pci_release_region - Release a PCI bar
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8d2f400..eb24ef9 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1993,6 +1993,7 @@ err_out:
->  	kfree(b);
->  	return NULL;
->  }
-> +EXPORT_SYMBOL(pci_create_root_bus);
->  
->  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
->  {
-> diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
-> index 8bd76c9..c523159 100644
-> --- a/drivers/pci/remove.c
-> +++ b/drivers/pci/remove.c
-> @@ -139,6 +139,7 @@ void pci_stop_root_bus(struct pci_bus *bus)
->  	/* stop the host bridge */
->  	device_release_driver(&host_bridge->dev);
->  }
-> +EXPORT_SYMBOL(pci_stop_root_bus);
->  
->  void pci_remove_root_bus(struct pci_bus *bus)
->  {
-> @@ -158,3 +159,4 @@ void pci_remove_root_bus(struct pci_bus *bus)
->  	/* remove the host bridge */
->  	device_unregister(&host_bridge->dev);
->  }
-> +EXPORT_SYMBOL(pci_remove_root_bus);
-> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-> index e3e17f3..932c9e5 100644
-> --- a/drivers/pci/setup-bus.c
-> +++ b/drivers/pci/setup-bus.c
-> @@ -1750,3 +1750,4 @@ void pci_assign_unassigned_bus_resources(struct pci_bus *bus)
->  	__pci_bus_assign_resources(bus, &add_list, NULL);
->  	BUG_ON(!list_empty(&add_list));
->  }
-> +EXPORT_SYMBOL(pci_assign_unassigned_bus_resources);
-> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
-> index 4e2d595..9d2bbb6 100644
-> --- a/drivers/pci/setup-irq.c
-> +++ b/drivers/pci/setup-irq.c
-> @@ -65,3 +65,4 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
->  	for_each_pci_dev(dev)
->  		pdev_fixup_irq(dev, swizzle, map_irq);
->  }
-> +EXPORT_SYMBOL(pci_fixup_irqs);
-> -- 
-> 1.7.9.5
-> 
+> Did you (or anyone else) do any testing?
+
+No runtime tests, I only built them, sorry.
+
+	Arnd
