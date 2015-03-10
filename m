@@ -1,50 +1,73 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Tue, 10 Mar 2015 20:51:58 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF2B45.8060407@hurleysoftware.com>
-References: <54FF21BE.2040506@list.ru> <54FF2B45.8060407@hurleysoftware.com>
-Message-ID: <54FF2F3E.7050503@list.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Mar 2015 10:55:47 -0700
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <F5017A7F-0EA2-41B3-A9DD-6123CCFD36FA@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjpOx4SxY7j8jnoEwLG+mhPKB2st8qCb-hduHLOVw=RcQ@mail.gmail.com>
+ <F9B276F7-61EF-4406-AB46-97D7F1ECEEFE@codeaurora.org>
+ <89746055.qtEO3GZJmR@wuerfel>
+ <F5017A7F-0EA2-41B3-A9DD-6123CCFD36FA@codeaurora.org>
+Message-ID: <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-10.03.2015 20:35, Peter Hurley ?????:
-> On 03/10/2015 12:54 PM, Stas Sergeev wrote:
->> Hello, the patch below is needed for a successful boot on armada-xp.
->>
->>
->> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
->> This fixes the following crash at boot:
->>
->>  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
->>  Internal error: : 808 [#1] SMP ARM
->>
->>  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
->>  Hardware name: Marvell Armada 370/XP (Device Tree)
->>  task: ed41e800 ti: ed43e000 task.ti: ed43e000
->>  PC is at _set_bit+0x28/0x50
->>  LR is at n_tty_set_termios+0x328/0x358
->>  pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
->>  sp : ed43fd00  ip : 00000000  fp : 00000000
->>  r10: 00000002  r9 : 00000000  r8 : ec930200
->>  r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
->>  r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
->>  Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
->>  Control: 10c5387d  Table: 0000406a  DAC: 00000015
->>  Process swapper/0 (pid: 1, stack limit = 0xed43e220)
->>
->> The offending instruction in _set_bit() is "strex r0, r2, [r1]"
->> For some reason the exclusive access instructions do not like the
->> vmalloc() space... While there may be another fix to make them
->> fine about vmalloc() space, it still looks like a good idea to
->> use kmalloc() for allocating a small (sub-page) struct.
-> NAK.
+On Tue, Mar 10, 2015 at 10:13 AM, Kumar Gala <galak@codeaurora.org> wrote:
 >
-> struct n_tty_data is order 2, not sub-page.
-OK, you are right, sorry. 8844 bytes.
-Is this really a target for vmalloc() though? I thought kmalloc()
-is preferable even for that size.
+> On Mar 9, 2015, at 7:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> On Friday 06 March 2015 14:37:52 Kumar Gala wrote:
+>>> On Mar 6, 2015, at 1:15 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>
+>>>> On Fri, Mar 6, 2015 at 8:08 AM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>>>
+>>>>> On Mar 5, 2015, at 7:59 PM, Olof Johansson <olof@lixom.net> wrote:
+>>>>>
+>>>>>> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>>>>>>>
+>>>>>>> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>>>>>>>
+>>>>>>>> Kumar Gala <galak@codeaurora.org> writes:
+>>>>>>>>
+>>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>>>>>>> utilized and passed to the kernel.
+>>>>>>>>>
+>>>>>>>>> Cc: <devicetree@vger.kernel.org>
+>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>>>>>
+>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
+>>>>>>>>
+>>>>>>>> Kevin
+>>>>>>>
+>>>>>>> yes
+>>>>>>
+>>>>>> That's a bummer.
+>>>>>>
+>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
+>>>>>> one devicetree, and it'll be used, right?
+>>>>>
+>>>>> We can provide only one, we still need the IDs in the DT.
+>>>>
+>>>> How are the DTS provided? Concatenated with the kernel, or in a
+>>>> wrapped data format? Or in a separate partition from the kernel?
+>>>
+>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+>>
+>> Then you should be able to create a tool that can write this concatenated
+>> format and insert these properties from a table that matches the boot
+>> loader, right?
+>>
+>>       Arnd
+>
+> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
 
-> The abort means something else is wrong; that's what needs
-> tracking down and fixing.
-Yeah, I even mentioned that in a commit log.
+To insert platform-local properties that mean nothing outside of the
+firmware packaging of the device trees, which is the case here?
+
+I think the idea of having the installer script inserting them is
+quite reasonable in this case.
+
+
+-Olof
