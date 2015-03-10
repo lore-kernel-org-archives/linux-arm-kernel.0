@@ -1,52 +1,75 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Mar 2015 09:27:13 +0100
-Subject: [PATCH v6 09/22] mfd: ab8500: Use power_supply_*() API for accessing
- function attrs
+Date: Tue, 10 Mar 2015 09:27:07 +0100
+Subject: [PATCH v6 03/22] power_supply: Add driver private data
 In-Reply-To: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425976046-20973-10-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425976046-20973-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
+Allow drivers to store private data inside power_supply structure for
+later usage in power supply operations.
+
+Usage of driver private data is necessary to access driver's state
+container object from power supply calls (like get_property()) if struct
+'power_supply' is a stored there as a pointer, for example:
+
+struct some_driver_info {
+	struct i2c_client       *client;
+	struct power_supply     *power_supply;
+	...
+}
+
+In such case one cannot use container_of() and must store pointer to
+state container as private data.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/mfd/ab8500-sysctrl.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/power/power_supply_core.c | 6 ++++++
+ include/linux/power_supply.h      | 4 ++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index cfff0b643f1b..d4a4b24be7c6 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -49,7 +49,8 @@ static void ab8500_power_off(void)
- 		if (!psy)
- 			continue;
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index 44c810456212..1c0978f961ea 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -674,6 +674,12 @@ void power_supply_unregister(struct power_supply *psy)
+ }
+ EXPORT_SYMBOL_GPL(power_supply_unregister);
  
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &val);
-+		ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE,
-+				&val);
++void *power_supply_get_drvdata(struct power_supply *psy)
++{
++	return psy->drv_data;
++}
++EXPORT_SYMBOL_GPL(power_supply_get_drvdata);
++
+ static int __init power_supply_class_init(void)
+ {
+ 	power_supply_class = class_create(THIS_MODULE, "power_supply");
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index f606d6b4bd56..e30d85c0158d 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -209,6 +209,9 @@ struct power_supply {
+ 	/* For APM emulation, think legacy userspace. */
+ 	int use_for_apm;
  
- 		if (!ret && val.intval) {
- 			charger_present = true;
-@@ -63,8 +64,8 @@ static void ab8500_power_off(void)
- 	/* Check if battery is known */
- 	psy = power_supply_get_by_name("ab8500_btemp");
- 	if (psy) {
--		ret = psy->get_property(psy, POWER_SUPPLY_PROP_TECHNOLOGY,
--					&val);
-+		ret = power_supply_get_property(psy,
-+				POWER_SUPPLY_PROP_TECHNOLOGY, &val);
- 		if (!ret && val.intval != POWER_SUPPLY_TECHNOLOGY_UNKNOWN) {
- 			printk(KERN_INFO
- 			       "Charger \"%s\" is connected with known battery."
++	/* Driver private data */
++	void *drv_data;
++
+ 	/* private */
+ 	struct device *dev;
+ 	struct work_struct changed_work;
+@@ -285,6 +288,7 @@ extern int devm_power_supply_register_no_ws(struct device *parent,
+ extern void power_supply_unregister(struct power_supply *psy);
+ extern int power_supply_powers(struct power_supply *psy, struct device *dev);
+ 
++extern void *power_supply_get_drvdata(struct power_supply *psy);
+ /* For APM emulation, think legacy userspace. */
+ extern struct class *power_supply_class;
+ 
 -- 
 1.9.1
