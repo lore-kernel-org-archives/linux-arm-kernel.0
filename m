@@ -1,51 +1,79 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Mar 2015 10:57:33 +0900
-Subject: [PATCH v6 7/9] arm64: dts: exynos: Add I2S dt node for Exynos5433 SoC
+Date: Tue, 10 Mar 2015 10:57:28 +0900
+Subject: [PATCH v6 2/9] arm64: dts: exynos: Add MSHC dt node for Exynos5433
 In-Reply-To: <1425952655-21654-1-git-send-email-cw00.choi@samsung.com>
 References: <1425952655-21654-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1425952655-21654-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1425952655-21654-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Inha Song <ideal.song@samsung.com>
+From: Jaehoon Chung <jh80.chung@samsung.com>
 
-This patch adds I2S device tree node for Exynos5433 SoC.
-In Exynos5433 SoC, I2S0 is used for audio interface.
+This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos5433
+SoC. MSHC is an interface between the system the SD/MMC card.
 
-Signed-off-by: Inha Song <ideal.song@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 38 ++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 23d9018..fea4e32 100644
+index 7c3488a..5807f71 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -475,6 +475,23 @@
+@@ -655,6 +655,44 @@
  			status = "disabled";
  		};
  
-+		i2s0: i2s0 at 11440000 {
-+			compatible = "samsung,exynos7-i2s";
-+			reg = <0x11440000 0x100>;
-+			dmas = <&adma 0 &adma 2>;
-+			dma-names = "tx", "rx";
-+			interrupts = <0 70 0>;
++		mshc_0: mshc at 15540000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 225 0>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			clocks = <&cmu_aud CLK_PCLK_AUD_I2S>,
-+				 <&cmu_aud CLK_SCLK_AUD_I2S>,
-+				 <&cmu_aud CLK_SCLK_I2S_BCLK>;
-+			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2s0_bus>;
++			reg = <0x15540000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC0>,
++				 <&cmu_fsys CLK_SCLK_MMC0>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
 +			status = "disabled";
 +		};
 +
- 		pinctrl_alive: pinctrl at 10580000 {
- 			compatible = "samsung,exynos5433-pinctrl";
- 			reg = <0x10580000 0x1000>;
++		mshc_1: mshc at 15550000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 226 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15550000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC1>,
++				 <&cmu_fsys CLK_SCLK_MMC1>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
++		mshc_2: mshc at 15560000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 227 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15560000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC2>,
++				 <&cmu_fsys CLK_SCLK_MMC2>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	timer {
 -- 
 1.8.5.5
