@@ -1,83 +1,31 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 10 Mar 2015 16:23:09 +0100
-Subject: [PATCH 12/15] ARM: dts: sun4i: Enable USB DRC on Chuwi V7 CW0825
-In-Reply-To: <20150310150741.GW5085@lukather>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <1425933628-9672-13-git-send-email-hdegoede@redhat.com>
- <20150310150741.GW5085@lukather>
-Message-ID: <54FF0C5D.3090706@redhat.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 10 Mar 2015 16:24:47 +0100
+Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints
+ and find ports by id
+In-Reply-To: <1425369592.3146.14.camel@pengutronix.de>
+References: <1425369592.3146.14.camel@pengutronix.de>
+Message-ID: <1426001087.3141.46.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Grant, Rob,
 
-On 03/10/2015 04:07 PM, Maxime Ripard wrote:
-> Hi Hans,
+Am Dienstag, den 03.03.2015, 08:59 +0100 schrieb Philipp Zabel:
+> Hi Grant, Rob,
+> 
+> this series has been around for quite some time now, basically unchanged
+> except for adding fixes for new users of the API that keep appearing
+> over time in different subsystems.
+> 
+> It would be really helpful to get this merged for v4.0. Could you still
+> make this happen?
 >
-> On Mon, Mar 09, 2015 at 09:40:25PM +0100, Hans de Goede wrote:
->> Enable the otg/drc usb controller on the Chuwi V7 CW0825 tablet.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 31 +++++++++++++++++++++++++
->>   1 file changed, 31 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
->> index 97fca89..034396c 100644
->> --- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
->> +++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
->> @@ -111,6 +111,26 @@
->>   	status = "okay";
->>   };
->>
->> +&pio {
->> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
->> +		allwinner,pins = "PH4";
->> +		allwinner,function = "gpio_in";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
->> +	};
->> +
->> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
->> +		allwinner,pins = "PH5";
->> +		allwinner,function = "gpio_in";
->> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
->> +	};
->> +};
->> +
->> +&reg_usb0_vbus {
->> +	status = "okay";
->> +};
->> +
->>   &reg_usb2_vbus {
->>   	status = "okay";
->>   };
->> @@ -121,7 +141,18 @@
->>   	status = "okay";
->>   };
->>
->> +&usb_otg {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&usb0_id_detect_pin
->> +		     &usb0_vbus_detect_pin>;
->> +	id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
->> +	vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
->> +	dr_mode = "otg";
->
-> Is there a reason to not put that in the DTSI?
+> Alternatively, could I please get your ack to allow this tag to be
+> merged into the other subsystem trees for v4.1 so that patches that
+> depend on it don't have to wait for yet another merge window?
 
-This is not in the dtsi because it is board specific.
+The question still stands. It would be great to hear from you and maybe
+get this change in at least in time for v4.1.
 
-> All the users seem to be wiring it as OTG.
-
-Sofar I've only enabled the otg on a handful of boards,
-the otg on the Mele-M9 for example is connected to a usb->sata
-bridge and as such should be brought up in host only mode.
-
-And on the wobo-i5 (which I still need to create a dts file for)
-the otg is connected to an usb wifi module.
-
-Regards,
-
-Hans
+best regards
+Philipp
