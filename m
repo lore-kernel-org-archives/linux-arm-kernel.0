@@ -1,31 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 10:24:13 +0000
-Subject: [PATCH] ARM: l2c: enforce use of cache-level property
-In-Reply-To: <CACRpkdaFvQ9mqnNRrj0j1YAeLQ3xUeUokQv-81AL6gxDeU+iWQ@mail.gmail.com>
-References: <1425408941-9897-1-git-send-email-f.fainelli@gmail.com>
- <CACRpkdaFvQ9mqnNRrj0j1YAeLQ3xUeUokQv-81AL6gxDeU+iWQ@mail.gmail.com>
-Message-ID: <20150310102413.GJ8656@n2100.arm.linux.org.uk>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 10 Mar 2015 16:04:45 +0530
+Subject: [PATCH 0/3] clockevents: Manage device's state separately for core
+In-Reply-To: <cover.1425037853.git.viresh.kumar@linaro.org>
+References: <cover.1425037853.git.viresh.kumar@linaro.org>
+Message-ID: <CAKohpok+bfVVm-6fW5+tJCOKQA+dY=8zHykdyJEcUNbgGQyrcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 03:42:14PM +0100, Linus Walleij wrote:
-> On Tue, Mar 3, 2015 at 7:55 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 
-> > Make sure that we can read the "cache-level" property from the L2 cache
-> > controller node, and ensure its value is 2.
-> >
-> > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> (...)
-> > +       if (of_property_read_u32(np, "cache-level", &cache_level))
-> > +               pr_err("L2C: device tree omits to specify cache-level\n");
-> > +
-> 
-> Is that really an error? Does ePAPR specify that this must always be
-> present or what?
+On 27 February 2015 at 17:21, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> Hi Thomas/Ingo,
+>
+> This is in response to the suggestions Ingo gave [1] on the shortcomings of
+> clockevents core's state machine.
+>
+> This first separates out the RESUME functionality from other states as its a
+> special case. Then it defines a new enum to map possible states of a clockevent
+> device.
+>
+> Ideally it should only be available for the core, but as bL switcher is using it
+> today, it is exposed in clockchips.h. That dependency will go away after
+> applying the Thomas's work (Sent out be Peter) and then we can move this enum to
+> somewhere in kernel/time/.
+>
+> The last patch moves the legacy check to the legacy code.
+>
+> Please see if this meets your expectation or if you have some suggestions on it.
+>
+> Rebased of tip/master as there were some dependencies:
+> 575daeea39a3 Merge branch 'tools/kvm'
+>
+> This along with migration of few clockevents drivers is pushed here:
+> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git clkevt/manage-state
+>
+> --
+> Viresh
+>
+> [1] https://lkml.org/lkml/2015/2/20/107
+>
+> Viresh Kumar (3):
+>   clockevents: Handle tick device's resume separately
+>   clockevents: Manage device's state separately for the core
+>   clockevents: Don't validate dev->mode against CLOCK_EVT_MODE_UNUSED
+>     for new interface
 
-See table 3-9.  It appears to be a required property.
+Ingo,
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Gentle reminder ping...
