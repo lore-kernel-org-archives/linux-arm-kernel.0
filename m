@@ -1,55 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 10 Mar 2015 16:30:40 -0500
-Subject: [PATCH v2 05/18] reset: Add reset_controller_of_init() function
-In-Reply-To: <6773745.i9mx5zmPP4@wuerfel>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <8729383.kvUZDm4dQz@wuerfel>
- <CALszF6BkTOLR+VNkRKfvEBG5ZyaYL+9fZ4EAPVu5b_imCvEQoQ@mail.gmail.com>
- <6773745.i9mx5zmPP4@wuerfel>
-Message-ID: <CAL_Jsq+_ridpAaUwpqo91xB6Ea1ctCWfYTYUrcZ=gB_0FiBD4g@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Mar 2015 22:33:17 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <1592385.fqRVVyPSPE@vostro.rjw.lan>
+References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1615214.0rkGfM1gZL@vostro.rjw.lan>
+ <20150309075546.GY3989@piout.net>
+ <1592385.fqRVVyPSPE@vostro.rjw.lan>
+Message-ID: <20150310213317.GK9188@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 3:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 10 March 2015 16:28:44 Maxime Coquelin wrote:
->> 2015-03-10 16:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
->> > On Friday 20 February 2015 19:01:04 Maxime Coquelin wrote:
->> >> Some platforms need to initialize the reset controller before the timers.
->> >>
->> >> This patch introduces a reset_controller_of_init() function that can be
->> >> called before the timers intialization.
->> >>
->> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> >>
->> >
->> > Not sure about this. It seems like the cleanest approach if we get
->> > a lot of these, but then again it is probably very rare, and I'd
->> > like to avoid adding such infrastructure if it's just for one
->> > SoC. Could we add a hack in the machine initialization instead?
->>
->> Sun6i also need to initialize the reset controller early. Today, they
->> hack the machine initialization.
->> With two SoCs having the same need, what should we do?
->
-> Good question, I'd like to hear some other opinions on this first.
+Hi,
 
-2 is still far from the common case.
+On 09/03/2015 at 15:30:01 +0100, Rafael J. Wysocki wrote :
+> > > > Actaully, your platform should just refuse to enter suspend-to-RAM
+> > > > when hw watchdog is enabled.
+> > > 
+> > > Quite likely, depending on how exactly the suspend is implemented.
+> > >
+> > 
+> > We've had absolutely zero complain on that. It is quite clear in the
+> > datasheet that failing to refresh the watchdog once started will lead to
+> > a reset and that it is impossible to stop.
+> > It is actually quite convenient to also ensure that you can actually
+> > wake up from suspend because that can obviously go wrong.
+> 
+> I gather then that the suspend implementation is such that touching the
+> watchdog periodically while suspended is not a problem.
+> 
+> Again, can you please tell me how suspend is implemented on at91?
+> 
 
->> > I think ideally this would be done in the boot loader before we
->> > even start Linux, but I don't know if that's possible for you.
->>
->> From what I understand, the only constraint is to perform it after the
->> clock is enabled.
->> So this should be possible to do it in the bootloader, but it means
->> also adding timers clocks ungating in the bootloader.
->
-> Ungating the timer clock input seems like a reasonable thing to
-> do for the bootloader, I think a lot of platforms rely on this
-> elsewhere (but enough of them don't, which is why we have the
-> early clk init).
+It actually depends on the architecture (at91rm9200, at91sam9 or sama5)
+but basically, the clocks are switched off in almost all the peripheral
+drivers then the ram self refresh activated, the master clock is
+switched off using code running from SRAM and the core is then waiting
+for interrupt.
 
-+1
 
-If the bootloader is u-boot, then you need a timer anyway.
-
-Rob
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
