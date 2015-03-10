@@ -1,93 +1,47 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 9 Mar 2015 17:38:06 -0700
-Subject: [PATCH v5 4/4] ARM: dts: enable PCIe support for Cygnus
-In-Reply-To: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
-References: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1425947886-23705-5-git-send-email-rjui@broadcom.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 10 Mar 2015 09:42:09 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.1
+Message-ID: <cover.1425947508.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCIe device nodes in bcm-cygnus.dtsi but keep them disabled there.
-Only enable them for bcm958300k where PCIe interfaces are populated
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbraden@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi |   42 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm958300k.dts  |    8 +++++++
- 2 files changed, 50 insertions(+)
+Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index ff5fb6a..ee0c6e4 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -90,6 +90,48 @@
- 		status = "disabled";
- 	};
- 
-+	pcie0: pcie at 18012000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18012000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <0>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000
-+			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>;
-+
-+		status = "disabled";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18013000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <1>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000
-+			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>;
-+
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at 18020000 {
- 		compatible = "snps,dw-apb-uart";
- 		reg = <0x18020000 0x100>;
-diff --git a/arch/arm/boot/dts/bcm958300k.dts b/arch/arm/boot/dts/bcm958300k.dts
-index f1bb36f..c9eb856 100644
---- a/arch/arm/boot/dts/bcm958300k.dts
-+++ b/arch/arm/boot/dts/bcm958300k.dts
-@@ -47,6 +47,14 @@
- 		bootargs = "console=ttyS0,115200";
- 	};
- 
-+	pcie0: pcie at 18012000 {
-+		status = "okay";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		status = "okay";
-+	};
-+
- 	uart3: serial at 18023000 {
- 		status = "okay";
- 	};
--- 
-1.7.9.5
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-cleanup-for-v4.1,
+which you have already pulled.
+
+
+The following changes since commit fd9454ab51fa92f43ae5b7a71c42f2ee8417c2a2:
+
+  ARM: shmobile: r8a7779: Remove redundant cpu_disable implementation (2015-02-24 07:12:16 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanup2-for-v4.1
+
+for you to fetch changes up to 82fbf29f26733dd38bd2ab17db04e0aa46ef3857:
+
+  ARM: shmobile: r8a7740: Remove restart callback (2015-03-01 10:59:16 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Cleanup for v4.1
+
+* Remove restart callback from r8a7740 SoC
+* Remove unecessary check on always set CONFIG_COMMON_CLK from
+  shared R-Car Gen2 SoC code
+* Remove stray closing parenthesis in SCIF debug description
+  for R-Car Gen2 SoCa
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      ARM: shmobile: Remove stray closing parenthesis in debug description
+      ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
+      ARM: shmobile: r8a7740: Remove restart callback
+
+ arch/arm/Kconfig.debug                   | 2 +-
+ arch/arm/mach-shmobile/setup-r8a7740.c   | 8 --------
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
+ 3 files changed, 1 insertion(+), 13 deletions(-)
