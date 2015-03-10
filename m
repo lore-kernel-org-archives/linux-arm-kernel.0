@@ -1,114 +1,89 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Mar 2015 17:31:22 +0000
-Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
-In-Reply-To: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 10 Mar 2015 13:35:01 -0400
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <54FF21BE.2040506@list.ru>
+References: <54FF21BE.2040506@list.ru>
+Message-ID: <54FF2B45.8060407@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is being profiled through PMU events and it enters suspend
-or idle states, the PMU registers content can be lost, which means that
-counters that were relied upon on power down entry are reset on power
-up to values that are incosistent with the profile session.
+On 03/10/2015 12:54 PM, Stas Sergeev wrote:
+> Hello, the patch below is needed for a successful boot on armada-xp.
+> 
+> 
+> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
+> This fixes the following crash at boot:
+> 
+>  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
+>  Internal error: : 808 [#1] SMP ARM
+> 
+>  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
+>  Hardware name: Marvell Armada 370/XP (Device Tree)
+>  task: ed41e800 ti: ed43e000 task.ti: ed43e000
+>  PC is at _set_bit+0x28/0x50
+>  LR is at n_tty_set_termios+0x328/0x358
+>  pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
+>  sp : ed43fd00  ip : 00000000  fp : 00000000
+>  r10: 00000002  r9 : 00000000  r8 : ec930200
+>  r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
+>  r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
+>  Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+>  Control: 10c5387d  Table: 0000406a  DAC: 00000015
+>  Process swapper/0 (pid: 1, stack limit = 0xed43e220)
+> 
+> The offending instruction in _set_bit() is "strex r0, r2, [r1]"
+> For some reason the exclusive access instructions do not like the
+> vmalloc() space... While there may be another fix to make them
+> fine about vmalloc() space, it still looks like a good idea to
+> use kmalloc() for allocating a small (sub-page) struct.
 
-This patch adds a CPU PM notifier to arm64 perf code, that detects
-on entry if events are being monitored, and if so, it returns
-failure to the CPU PM notification chain, causing the suspend
-thread or the idle thread to abort power down, therefore preventing
-registers content loss.
+NAK.
 
-By triggering CPU PM notification failure this patch prevents
-suspending a system if the suspend thread is being profiled and
-it also prevents entering idle deep states on cores that have profile
-events in use, somehow limiting power management capabilities when
-there are active perf sessions.
+struct n_tty_data is order 2, not sub-page.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm64/kernel/perf_event.c | 50 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+The abort means something else is wrong; that's what needs
+tracking down and fixing.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 83f21d8..4809fca 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/bitmap.h>
- #include <linux/cpu.h>
-+#include <linux/cpu_pm.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
-@@ -1316,6 +1317,53 @@ static struct pmu_hw_events *armpmu_get_cpu_events(void)
- 	return this_cpu_ptr(&cpu_hw_events);
- }
- 
-+#ifdef CONFIG_CPU_PM
-+static int cpu_pm_pmu_notifier(struct notifier_block *self,
-+			       unsigned long cmd, void *v)
-+{
-+	switch (cmd) {
-+	case CPU_PM_ENTER: {
-+		/*
-+		 * Check events in use and fail if events are being monitored.
-+		 * On failure, system suspend and idle entry will consequently
-+		 * abort power down operations, preventing CPU reset on power
-+		 * down, that would cause PMU registers reset in turn.
-+		 * The obvious drawback is that we can't enter idle
-+		 * states if a cpu is being profiled, and we can't
-+		 * profile the suspend thread (ie profiling it has the side
-+		 * effect of disabling system suspend), but that's the price
-+		 * to pay to keep the PMU registers powered up.
-+		 */
-+		struct pmu_hw_events *hw_events = cpu_pmu->get_hw_events();
-+		int enabled = bitmap_weight(hw_events->used_mask,
-+					    cpu_pmu->num_events);
-+		return enabled ? NOTIFY_BAD : NOTIFY_OK;
-+	}
-+	case CPU_PM_EXIT:
-+		if (cpu_pmu->reset)
-+			cpu_pmu->reset(NULL);
-+		return NOTIFY_OK;
-+	case CPU_PM_ENTER_FAILED:
-+	default:
-+		break;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block cpu_pm_pmu_notifier_block = {
-+	.notifier_call = cpu_pm_pmu_notifier,
-+};
-+
-+static void cpu_pm_pmu_init(void)
-+{
-+	cpu_pm_register_notifier(&cpu_pm_pmu_notifier_block);
-+}
-+
-+#else
-+static inline void cpu_pm_pmu_init(void) { }
-+#endif /* CONFIG_CPU_PM */
-+
- /*
-  * PMU hardware loses all context when a CPU goes offline.
-  * When a CPU is hotplugged back in, since some hardware registers are
-@@ -1352,6 +1400,8 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
- 	armpmu->get_hw_events = armpmu_get_cpu_events;
- 
- 	register_cpu_notifier(&cpu_pmu_notifier_block);
-+
-+	cpu_pm_pmu_init();
- }
- 
- static int __init init_hw_perf_events(void)
--- 
-2.2.1
+AFAIK this is not happening on any other ARM platform.
+
+Regards,
+Peter Hurley
+
+> Signed-off-by: Stas Sergeev <stsp@users.sourceforge.net>
+> ---
+>  drivers/tty/n_tty.c |    5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/n_tty.c b/drivers/tty/n_tty.c
+> index cf6e0f2..e03622e 100644
+> --- a/drivers/tty/n_tty.c
+> +++ b/drivers/tty/n_tty.c
+> @@ -50,7 +50,6 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/module.h>
+>  #include <linux/ratelimit.h>
+> -#include <linux/vmalloc.h>
+>  
+>  
+>  /* number of characters left in xmit buffer before select has we have
+> room */
+> @@ -1892,7 +1891,7 @@ static void n_tty_close(struct tty_struct *tty)
+>      if (tty->link)
+>          n_tty_packet_mode_flush(tty);
+>  
+> -    vfree(ldata);
+> +    kfree(ldata);
+>      tty->disc_data = NULL;
+>  }
+>  
+> @@ -1911,7 +1910,7 @@ static int n_tty_open(struct tty_struct *tty)
+>      struct n_tty_data *ldata;
+>  
+>      /* Currently a malloc failure here can panic */
+> -    ldata = vmalloc(sizeof(*ldata));
+> +    ldata = kmalloc(sizeof(*ldata), GFP_KERNEL);
+>      if (!ldata)
+>          goto err;
+>  
+> 
