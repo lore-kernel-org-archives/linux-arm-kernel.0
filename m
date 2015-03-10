@@ -1,47 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 21:19:55 +0100
-Subject: [PATCH v2 05/18] reset: Add reset_controller_of_init() function
-In-Reply-To: <CALszF6BkTOLR+VNkRKfvEBG5ZyaYL+9fZ4EAPVu5b_imCvEQoQ@mail.gmail.com>
+Date: Tue, 10 Mar 2015 21:21:33 +0100
+Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
+In-Reply-To: <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
 References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <8729383.kvUZDm4dQz@wuerfel>
- <CALszF6BkTOLR+VNkRKfvEBG5ZyaYL+9fZ4EAPVu5b_imCvEQoQ@mail.gmail.com>
-Message-ID: <6773745.i9mx5zmPP4@wuerfel>
+ <2383270.cAJPOxrkvo@wuerfel>
+ <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
+Message-ID: <2455342.zT71E5iyaL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 March 2015 16:28:44 Maxime Coquelin wrote:
-> 2015-03-10 16:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Friday 20 February 2015 19:01:04 Maxime Coquelin wrote:
-> >> Some platforms need to initialize the reset controller before the timers.
-> >>
-> >> This patch introduces a reset_controller_of_init() function that can be
-> >> called before the timers intialization.
-> >>
-> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On Tuesday 10 March 2015 16:44:24 Maxime Coquelin wrote:
+> 2015-03-10 16:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
+> >> +/* AHB1 */
+> >> +#define GPIOA_RESET    0
+> >> +#define GPIOB_RESET    1
+> >> +#define GPIOC_RESET    2
+> >> +#define GPIOD_RESET    3
+> >> +#define GPIOE_RESET    4
+> >> +#define GPIOF_RESET    5
+> >> +#define GPIOG_RESET    6
+> >> +#define GPIOH_RESET    7
+> >> +#define GPIOI_RESET    8
+> >> +#define GPIOJ_RESET    9
+> >> +#define GPIOK_RESET    10
 > >>
 > >
-> > Not sure about this. It seems like the cleanest approach if we get
-> > a lot of these, but then again it is probably very rare, and I'd
-> > like to avoid adding such infrastructure if it's just for one
-> > SoC. Could we add a hack in the machine initialization instead?
+> > As these are just the hardware numbers, it's better to not make them
+> > part of the binding at all. Instead, just document in the binding that
+> > one is supposed to pass the hardware number as the argument.
 > 
-> Sun6i also need to initialize the reset controller early. Today, they
-> hack the machine initialization.
-> With two SoCs having the same need, what should we do?
-
-Good question, I'd like to hear some other opinions on this first.
-
-> > I think ideally this would be done in the boot loader before we
-> > even start Linux, but I don't know if that's possible for you.
+> The reset controller is part of the RCC (Reset & Clock Controller) IP.
+> In this version, I only provided the reset registers to the reset
+> controller driver, but as per Andreas F?rber remark, I should avec a
+> single DT node for both the resets and clocks.
 > 
-> From what I understand, the only constraint is to perform it after the
-> clock is enabled.
-> So this should be possible to do it in the bootloader, but it means
-> also adding timers clocks ungating in the bootloader.
+> In the next version I am preparing, the defines doesn't look as
+> trivial as in this version, GPIOA_RESET being 128 for instance.
+> 
+> Is it fine for you if I keep the defines part of the binding?
+> 
+> 
 
-Ungating the timer clock input seems like a reasonable thing to
-do for the bootloader, I think a lot of platforms rely on this
-elsewhere (but enough of them don't, which is why we have the
-early clk init).
+It's always better to avoid these files entirely, as they are
+a frequent source of merge dependencies, and they make it less
+obvious what's going on than having binary values in the dtb
+that make sense.
 
 	Arnd
