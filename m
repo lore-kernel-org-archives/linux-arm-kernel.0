@@ -1,79 +1,102 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 10 Mar 2015 09:57:07 +0800
-Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
-In-Reply-To: <20150309162809.GY8656@n2100.arm.linux.org.uk>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
- <20150309162809.GY8656@n2100.arm.linux.org.uk>
-Message-ID: <CALx668Ue7Q2Xj=f+TN3bpybL6+8bmTVTFOgOy3ouurb7jMJS9g@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 10 Mar 2015 10:57:26 +0900
+Subject: [PATCH v6 0/9] arm64: Add the support for new Exynos5433 SoC
+Message-ID: <1425952655-21654-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 March 2015 at 00:28, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 04, 2015 at 04:49:15PM +0800, pi-cheng.chen wrote:
->> +static int cpu_opp_table_get_freq_index(unsigned int freq)
->> +{
->> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
->> +     int i;
->> +
->> +     for (i = 0; opp_tbl[i].freq != 0; i++) {
->> +             if (opp_tbl[i].freq >= freq)
->> +                     return i;
->> +     }
->> +
->> +     return -1;
->
-> My "return -1" detector fired on this...
->
->> +static int cpu_opp_table_get_volt_index(unsigned int volt)
->> +{
->> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
->> +     int i;
->> +
->> +     for (i = 0; opp_tbl[i].vproc != -1; i++)
->> +             if (opp_tbl[i].vproc >= volt)
->> +                     return i;
->> +
->> +     return -1;
->
-> And this.
->
->> +static int mtk_cpufreq_notify(struct notifier_block *nb,
->> +                           unsigned long action, void *data)
->> +{
->> +     struct cpufreq_freqs *freqs = data;
->> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
->> +     int old_vproc, new_vproc, old_index, new_index;
->> +
->> +     if (!cpumask_test_cpu(freqs->cpu, &dvfs_info->cpus))
->> +             return NOTIFY_DONE;
->> +
->> +     old_vproc = regulator_get_voltage(dvfs_info->proc_reg);
->> +     old_index = cpu_opp_table_get_volt_index(old_vproc);
->> +     new_index = cpu_opp_table_get_freq_index(freqs->new * 1000);
->> +     new_vproc = opp_tbl[new_index].vproc;
->
-> Let's say that cpu_opp_table_get_freq_index() returns -1.  We then
-> do no error checking on this, and access the memory immediately
-> preceding opp_tbl[0].
->
-> Since we'll be loading garbage from opp_tbl[-1], this probably means
-> that mtk_cpufreq_voltage_trace() will go wrong.  Your method of using
-> the vproc values to work out which direction we should walk between
-> old_index...new_index means that we could end up walking through
-> almost the whole UINT_MAX range to wrap around to the new index.
->
-> Yet again, "return -1" proves to be a sure sign of a bug.
+This patchset adds new 64-bit Exynos5433 Samsung SoC which contains quad
+Cortex-A57 and quad Cortex-A53. It is desigend with the 20nm low power process.
 
-Hi Russell,
+Depends on:
+- This patch-set has the dependency on following four patch-set.
+The Exynos5433 clock controller patch-set[1][2] was merged by Michael Turquette.
+and Exynos5433's pinctrl patch[3] was merged by Linus Walleij. Exynos5433's TMU
+patch[4] will be refactoring without feature update.
 
-Thanks for your reviewing. I'll fix it in next version.
+[1] [PATCH v5 00/13] clk: samsung: Add the support for exynos5433 clocks
+- https://lkml.org/lkml/2015/2/2/368
+[2] [PATCH v3 0/9] clk: samsung: Add clocks for remaining domains of Exynos5433
+- https://lkml.org/lkml/2015/2/2/784
+[3] [PATCH v4] pinctrl: exynos: Add support for Exynos5433
+- https://lkml.org/lkml/2015/2/23/728
+[4] [PATCH 0/3] thermal: exynos: Add support for Exynos5433 TMU
+- https://lkml.org/lkml/2015/2/26/234
 
-Best Regards,
-Pi-Cheng
+Changelog:
 
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+Changes from v5:
+(https://lkml.org/lkml/2015/3/5/27)
+- Move 'timer' dt node under root node by Mark Rutland's comment
+
+Changes from v4:
+(https://lkml.org/lkml/2015/2/24/2)
+- Rebased it on Linux 4.0-rc2
+- Remove CONFIG_ARCH_EXYNOS5433 configuration by Arnd Bergmann's comment
+- Move 'aliases' dt node from SoC dtsi to board dts file by Arnd Bergmann's comment
+- Add Exynos5433 TMU patches which got the Lukasz Majewski's reviewed message
+
+Changes from v3:
+(https://lkml.org/lkml/2015/2/12/65)
+- Rebased it on Linux 4.0-rc1.
+- Remove ARM_GIC and ARM_AMBA dependency because CONFIG_ARM64 already included them.
+
+Changes from v2:
+(https://lkml.org/lkml/2014/12/2/134)
+: Fix the range of GICC memory map (0x1000 -> 0x2000)
+: Fix address space of 'range' property under 'soc' node
+: Add ADMA / I2S dt node for sound playback/capture
+- Select ARM_AMBA/ARM_GIC/HAVE_S3C_RTC for Exynos5433 in arch/arm64/Kconfig
+- Send separate patch-set for Exynos5433 clock controller[1][2] and pinctrl[3]
+
+Changes from v1:
+(https://lkml.org/lkml/2014/11/27/92)
+- Merge two patches (patch2, patch3) to solve incomplete description
+- Exynos5433 Clock driver
+ : Fix wrong register and code clean by using space instead of tab
+ : Add CLK_IGNORE_UNUSED flag to pclk_sysreg_* clock for accessing system control register
+ : Remove duplicate definition on the patch for CMU_BUS{0|1|2} domain
+- Exynos5433 SoC DTS
+ : Remove un-supported properties of arch_timer
+ : Remove 'clock-frequency' property from 'cpus' dt node
+ : Fix interrupt type from edge rising triggering to level high triggering
+   because Cortex-A53/A57 use level triggering.
+ : Fix defult address-size/size-celss from 1 to 2 because Exynos5433 is 64-bit SoC
+ : Modify 'fin_pll' dt node to remove un-needed and ugly code
+ : Move 'chipid' dt node under 'soc'
+ : Use lowercase on all case in exynos5433.dtsi
+ : Add PSCI dt node for secondary cpu boot
+ : Add 'samsung,exynos5433' compatible to MCT dt node
+- Divide pinctrl patch from this patchset
+- Add new following patches:
+  : clocksource: exynos_mct: Add the support for Exynos 64bit SoC
+  : arm64: Enable Exynos5433 SoC in the defconfig
+
+Chanwoo Choi (6):
+  arm64: dts: exynos: Add dts files for 64-bit Exynos5433 SoC
+  arm64: dts: exynos: Add SPI/PDMA dt node for Exynos5433
+  arm64: dts: exynos: Add PMU dt node for Exynos5433
+  arm64: dts: exynos: Add RTC and ADC dt node for Exynos5433 SoC
+  arm64: dts: exynos: Add TMU sensor dt node for Exynos5433 SoC
+  arm64: dts: exynos: Add thermal-zones dt node for Exynos5433 SoC
+
+Inha Song (2):
+  arm64: dts: exynos: Add ADMA dt node for Exynos5433 SoC
+  arm64: dts: exynos: Add I2S dt node for Exynos5433 SoC
+
+Jaehoon Chung (1):
+  arm64: dts: exynos: Add MSHC dt node for Exynos5433
+
+ .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
+ arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  22 +
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 231 +++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 931 +++++++++++++++++++++
+ 5 files changed, 1883 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+
+-- 
+1.8.5.5
