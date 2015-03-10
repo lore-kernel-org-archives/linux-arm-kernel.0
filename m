@@ -1,48 +1,81 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 10 Mar 2015 08:43:22 +0100
-Subject: [PATCH 05/15] musb: Do not use musb_read[b|w] / _write[b|w]
- wrappers in generic fifo functions
-In-Reply-To: <4821047.1nqnop93Xh@wuerfel>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <1425933628-9672-6-git-send-email-hdegoede@redhat.com>
- <4821047.1nqnop93Xh@wuerfel>
-Message-ID: <54FEA09A.6040401@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 10 Mar 2015 08:54:48 +0100
+Subject: [PATCH v3] ARM: advertise availability of v8 Crypto instructions
+Message-ID: <1425974088-15591-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When running the 32-bit ARM kernel on ARMv8 capable bare metal (e.g.,
+32-bit Android userland and kernel on a Cortex-A53), or as a KVM guest
+on a 64-bit host, we should advertise the availability of the Crypto
+instructions, so that userland libraries such as OpenSSL may use them.
+(Support for the v8 Crypto instructions in the 32-bit build was added
+to OpenSSL more than six months ago)
 
-On 09-03-15 22:50, Arnd Bergmann wrote:
-> On Monday 09 March 2015 21:40:18 Hans de Goede wrote:
->> The generic fifo functions already use non wrapped accesses in various
->> cases through the iowrite#_rep functions, and all platforms which override
->> the default musb_read[b|w] / _write[b|w] functions also provide their own
->> fifo access functions, so we can safely drop the unnecessary indirection
->> from the fifo access functions.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>
->
-> The patch looks reasonably, but the description seem misleading.
-> I believe the real reason why it's ok to use __raw_writew for the
-> FIFO is that a FIFO by definition is using CPU endian access for
-> copying byte streams from memory, which is unlike any other MMIO
-> register that requires fixed-endian accessors.
+This adds the ID feature bit detection, and sets elf_hwcap2 accordingly.
 
-I'm not sure that that is the case here, this fifo allows reading
-4 bytes at a time using 32 bit word access, so endianness may come
-into play. This patch is safe however since all existing users of
-the generic fifo_read / write helpers which this patch touches, are
-also using the generic musb_read[b|w] / _write[b|w] functions which
-are just __raw_foo wrappers, so there is no functional change, which
-is what the commit message tries to say.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3:
+- reuse logic from arm64 kernel: the feature blocks are signed quantities
+  that represent incremental functionality for non-negative values.
+v2:
+- drop redundant architecture check -> accessing ID_ISAR5 should be safe
+  even on v7-M, and even if we don't expect to find crypto features there
 
-Note that sunxi needs this function because of the register address
-translation the sunxi_musb_readb / writeb wrappers are doing which
-does not know how to deal with fifo data, and besides that it should
-make the generic read / write fifo helpers somewhat faster by removing
-an indirect function call.
+ arch/arm/kernel/setup.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-Regards,
-
-Hans
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e55408e96559..fe07efca2f12 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -375,7 +375,7 @@ void __init early_print(const char *str, ...)
+ 
+ static void __init cpuid_init_hwcaps(void)
+ {
+-	unsigned int divide_instrs, vmsa;
++	unsigned int divide_instrs, vmsa, features, block;
+ 
+ 	if (cpu_architecture() < CPU_ARCH_ARMv7)
+ 		return;
+@@ -393,6 +393,37 @@ static void __init cpuid_init_hwcaps(void)
+ 	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+ 	if (vmsa >= 5)
+ 		elf_hwcap |= HWCAP_LPAE;
++
++	/*
++	 * ID_ISAR5 contains 4-bit wide signed feature blocks.
++	 * The blocks we test below represent incremental functionality
++	 * for non-negative values. Negative values are reserved.
++	 */
++	features = read_cpuid_ext(ID_ISAR5);
++	block = (features >> 4) & 0xf;
++	if (!(block & 0x8)) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap2 |= HWCAP2_PMULL;
++		case 1:
++			elf_hwcap2 |= HWCAP2_AES;
++		case 0:
++			break;
++		}
++	}
++
++	block = (features >> 8) & 0xf;
++	if (block && !(block & 0x8))
++		elf_hwcap2 |= HWCAP2_SHA1;
++
++	block = (features >> 12) & 0xf;
++	if (block && !(block & 0x8))
++		elf_hwcap2 |= HWCAP2_SHA2;
++
++	block = (features >> 16) & 0xf;
++	if (block && !(block & 0x8))
++		elf_hwcap2 |= HWCAP2_CRC32;
+ }
+ 
+ static void __init elf_hwcap_fixup(void)
+-- 
+1.8.3.2
