@@ -1,72 +1,178 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Mar 2015 19:59:24 +0800
-Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the onboard
- WiFi module
+Date: Tue, 10 Mar 2015 19:59:18 +0800
+Subject: [PATCH v5 07/12] regulator: axp20x: add support for AXP22X regulators
 In-Reply-To: <1425988764-23618-1-git-send-email-wens@csie.org>
 References: <1425988764-23618-1-git-send-email-wens@csie.org>
-Message-ID: <1425988764-23618-14-git-send-email-wens@csie.org>
+Message-ID: <1425988764-23618-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
-WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
-The IC also takes a power enable signal via GPIO. This is supported
-with the new power sequencing bindings.
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-The WiFi module supports out-of-band interrupt signaling via GPIO,
-but this is buggy and not enabled yet.
+Add AXP22X regulator definitions and variant id associations.
+This introduces a new "switch" type output for one of the regulators.
+It is a switchable secondary output of one regulator, with the same
+voltage level as the primary output.
 
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+[wens at csie.org: Moved variant choosing to multi family support patch]
+[wens at csie.org: Add dc-dc work frequency range]
+[wens at csie.org: Add "switch" type output regulator DC1SW]
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/regulator/axp20x-regulator.c | 96 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index d13c88c6509a..25a3ef49bb71 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -61,6 +61,11 @@
- 	chosen {
- 		bootargs = "earlyprintk console=ttyS0,115200";
- 	};
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 50ae0b5f2c0c..646829132b59 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -27,8 +27,12 @@
+ #define AXP20X_IO_ENABLED		0x03
+ #define AXP20X_IO_DISABLED		0x07
+ 
++#define AXP22X_IO_ENABLED		0x04
++#define AXP22X_IO_DISABLED		0x03
 +
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
-+	};
+ #define AXP20X_WORKMODE_DCDC2_MASK	BIT(2)
+ #define AXP20X_WORKMODE_DCDC3_MASK	BIT(1)
++#define AXP22X_WORKMODE_DCDCX_MASK(x)	BIT(x)
+ 
+ #define AXP20X_FREQ_DCDC_MASK		0x0f
+ 
+@@ -74,6 +78,26 @@
+ 		.ops		= &axp20x_ops,					\
+ 	}
+ 
++#define AXP_DESC_SW(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
++		    _vmask, _ereg, _emask) 					\
++	[_family##_##_id] = {							\
++		.name		= #_id,						\
++		.supply_name	= (_supply),					\
++		.of_match	= of_match_ptr(_match),				\
++		.regulators_node = of_match_ptr("regulators"),			\
++		.type		= REGULATOR_VOLTAGE,				\
++		.id		= _family##_##_id,				\
++		.n_voltages	= (((_max) - (_min)) / (_step) + 1),		\
++		.owner		= THIS_MODULE,					\
++		.min_uV		= (_min) * 1000,				\
++		.uV_step	= (_step) * 1000,				\
++		.vsel_reg	= (_vreg),					\
++		.vsel_mask	= (_vmask),					\
++		.enable_reg	= (_ereg),					\
++		.enable_mask	= (_emask),					\
++		.ops		= &axp20x_ops_sw,				\
++	}
++
+ #define AXP_DESC_FIXED(_family, _id, _match, _supply, _volt)			\
+ 	[_family##_##_id] = {							\
+ 		.name		= #_id,						\
+@@ -135,6 +159,14 @@ static struct regulator_ops axp20x_ops = {
+ 	.is_enabled		= regulator_is_enabled_regmap,
  };
  
- &ehci0 {
-@@ -127,6 +132,16 @@
- 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- };
- 
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_hummingbird>;
-+	vmmc-supply = <&vcc_wifi>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
++static struct regulator_ops axp20x_ops_sw = {
++	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
++	.list_voltage		= regulator_list_voltage_linear,
++	.enable			= regulator_enable_regmap,
++	.disable		= regulator_disable_regmap,
++	.is_enabled		= regulator_is_enabled_regmap,
 +};
 +
- &ohci0 {
- 	status = "okay";
- };
-@@ -138,6 +153,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	wifi_reset_pin_hummingbird: wifi_reset_pin at 0 {
-+		allwinner,pins = "PG10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
+ static const struct regulator_desc axp20x_regulators[] = {
+ 	AXP_DESC(AXP20X, DCDC2, "dcdc2", "vin2", 700, 2275, 25,
+ 		 AXP20X_DCDC2_V_OUT, 0x3f, AXP20X_PWR_OUT_CTRL, 0x10),
+@@ -152,6 +184,52 @@ static const struct regulator_desc axp20x_regulators[] = {
+ 		    AXP20X_IO_ENABLED, AXP20X_IO_DISABLED),
  };
  
- &p2wi {
++static const struct regulator_desc axp22x_regulators[] = {
++	AXP_DESC(AXP22X, DCDC1, "dcdc1", "vin1", 1600, 3400, 100,
++		 AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(1)),
++	AXP_DESC(AXP22X, DCDC2, "dcdc2", "vin2", 600, 1540, 20,
++		 AXP22X_DCDC2_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(2)),
++	AXP_DESC(AXP22X, DCDC3, "dcdc3", "vin3", 600, 1860, 20,
++		 AXP22X_DCDC3_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(3)),
++	AXP_DESC(AXP22X, DCDC4, "dcdc4", "vin4", 600, 1540, 20,
++		 AXP22X_DCDC4_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(3)),
++	AXP_DESC(AXP22X, DCDC5, "dcdc5", "vin5", 1000, 2550, 50,
++		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(4)),
++	/* secondary switchable output of DCDC1 */
++	AXP_DESC_SW(AXP22X, DC1SW, "dc1sw", "dcdc1", 1600, 3400, 100,
++		    AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(7)),
++	/* LDO regulator internally chained to DCDC5 */
++	AXP_DESC(AXP22X, DC5LDO, "dc5ldo", "dcdc5", 700, 1400, 100,
++		 AXP22X_DC5LDO_V_OUT, 0x7, AXP22X_PWR_OUT_CTRL1, BIT(0)),
++	AXP_DESC(AXP22X, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(6)),
++	AXP_DESC(AXP22X, ALDO2, "aldo2", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(7)),
++	AXP_DESC(AXP22X, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL3, BIT(7)),
++	AXP_DESC(AXP22X, DLDO1, "dldo1", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(3)),
++	AXP_DESC(AXP22X, DLDO2, "dldo2", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(4)),
++	AXP_DESC(AXP22X, DLDO3, "dldo3", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(5)),
++	AXP_DESC(AXP22X, DLDO4, "dldo4", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO4_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(6)),
++	AXP_DESC(AXP22X, ELDO1, "eldo1", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(0)),
++	AXP_DESC(AXP22X, ELDO2, "eldo2", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
++	AXP_DESC(AXP22X, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
++	AXP_DESC_IO(AXP22X, LDO_IO0, "ldo_io0", "ips", 1800, 3300, 100,
++		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_IO(AXP22X, LDO_IO1, "ldo_io1", "ips", 1800, 3300, 100,
++		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
++};
++
+ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ {
+ 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+@@ -165,6 +243,12 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ 		def = 1500;
+ 		step = 75;
+ 		break;
++	case AXP221_ID:
++		min = 1800;
++		max = 4050;
++		def = 3000;
++		step = 150;
++		break;
+ 	default:
+ 		dev_err(&pdev->dev,
+ 			"Setting DCDC frequency for unsupported AXP variant\n");
+@@ -237,6 +321,14 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
+ 		workmode <<= ffs(mask) - 1;
+ 		break;
+ 
++	case AXP221_ID:
++		if (id < AXP22X_DCDC1 || id > AXP22X_DCDC5)
++			return -EINVAL;
++
++		mask = AXP22X_WORKMODE_DCDCX_MASK(id - AXP22X_DCDC1);
++		workmode <<= id - AXP22X_DCDC1;
++		break;
++
+ 	default:
+ 		/* should not happen */
+ 		WARN_ON(1);
+@@ -265,6 +357,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		regulators = axp20x_regulators;
+ 		nregulators = AXP20X_REG_ID_MAX;
+ 		break;
++	case AXP221_ID:
++		regulators = axp22x_regulators;
++		nregulators = AXP22X_REG_ID_MAX;
++		break;
+ 	default:
+ 		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+ 			axp20x->variant);
 -- 
 2.1.4
