@@ -1,81 +1,21 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Mar 2015 16:07:41 +0100
-Subject: [PATCH 12/15] ARM: dts: sun4i: Enable USB DRC on Chuwi V7 CW0825
-In-Reply-To: <1425933628-9672-13-git-send-email-hdegoede@redhat.com>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <1425933628-9672-13-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150310150741.GW5085@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 16:08:59 +0100
+Subject: [PATCH v2 12/18] dt-bindings: Document the STM32 USART bindings
+In-Reply-To: <1424455277-29983-13-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1424455277-29983-13-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <38153432.AWA0ogMaoK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Mon, Mar 09, 2015 at 09:40:25PM +0100, Hans de Goede wrote:
-> Enable the otg/drc usb controller on the Chuwi V7 CW0825 tablet.
+On Friday 20 February 2015 19:01:11 Maxime Coquelin wrote:
+> +
+> +Example:
+> +usart1: usart at 40011000 {
+> +       compatible = "st,stm32-usart";
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 31 +++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-> index 97fca89..034396c 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-> @@ -111,6 +111,26 @@
->  	status = "okay";
->  };
->  
-> +&pio {
-> +	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-> +		allwinner,pins = "PH4";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-> +	};
-> +
-> +	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-> +		allwinner,pins = "PH5";
-> +		allwinner,function = "gpio_in";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-> +	};
-> +};
-> +
-> +&reg_usb0_vbus {
-> +	status = "okay";
-> +};
-> +
->  &reg_usb2_vbus {
->  	status = "okay";
->  };
-> @@ -121,7 +141,18 @@
->  	status = "okay";
->  };
->  
-> +&usb_otg {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&usb0_id_detect_pin
-> +		     &usb0_vbus_detect_pin>;
-> +	id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-> +	vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-> +	dr_mode = "otg";
 
-Is there a reason to not put that in the DTSI?
+Please use generic node names everywhere. The standard name for a serial
+port is "serial".
 
-All the users seem to be wiring it as OTG.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/4a8c827c/attachment.sig>
+	Arnd
