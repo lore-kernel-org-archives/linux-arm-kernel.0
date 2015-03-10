@@ -1,40 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 11:05:38 +0000
-Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
- DMA_BIT_MASK(64)); to fail?
-In-Reply-To: <54FA2084.8050803@linaro.org>
-References: <54F8A68B.3080709@linaro.org>
- <20150305201753.GG29584@n2100.arm.linux.org.uk>
- <54FA2084.8050803@linaro.org>
-Message-ID: <20150310110538.GK29584@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 10 Mar 2015 12:16:07 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <20150303135847.GH4911@lukather>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+ <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
+ <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
+ <20150303135847.GH4911@lukather>
+Message-ID: <54FED277.4040000@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 06, 2015 at 11:47:48PM +0200, Grygorii.Strashko at linaro.org wrote:
-> Hi Russell,
-> 
-> On 03/05/2015 10:17 PM, Russell King - ARM Linux wrote:
-> > On Thu, Mar 05, 2015 at 08:55:07PM +0200, Grygorii.Strashko at linaro.org wrote:
-> >> The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
-> >> dma-mapping.c --> __dma_supported()
-> >> 	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
-> >> 	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
-> >> 	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
-> > 
-> > Hmm, I think this may make more sense to be "< max_pfn - 1" here, as
-> > that would be better suited to our intention.
-> > 
-> > The result of dma_to_pfn(dev, ~0) is the maximum PFN which we could
-> > address via DMA, but we're comparing it with the maximum PFN in the
-> > system plus 1 - so we need to subtract one from it.
-> 
-> Ok. I'll try it.
+Hi,
 
-Any news on this - I think it is a real off-by-one bug which we should
-fix in any case.
+On 03-03-15 14:58, Maxime Ripard wrote:
+> On Tue, Mar 03, 2015 at 02:20:31PM +0100, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 03-03-15 09:22, Maxime Ripard wrote:
+>>> On Tue, Mar 03, 2015 at 08:55:36AM +0100, Hans de Goede wrote:
+>>>>>> +/ {
+>>>>>> +	model = "Mele I7 Quad top set box";
+>>>>>> +	compatible = "mele,i7", "allwinner,sun6i-a31";
+>>>>>> +
+>>>>>> +	chosen {
+>>>>>> +		bootargs = "earlyprintk console=ttyS0,115200";
+>>>>>
+>>>>> Using earlyprintk by default is a bad idea if the kernel is configured
+>>>>> with DEBUG_LL support for another SoC.
+>>>>
+>>>> While on this subject, u-boot now sets the chosen/stdout-path property
+>>>> up by default, which means that the kernel will do the right thing by
+>>>> default. So we we really do not need any bootargs= in our dts files.
+>>>
+>>> I just tested that this weekend, and it turned out that the kernel
+>>> couldn't use it so far (ie, no output until init takes over and setup
+>>> a TTY on ttyS0).
+>>>
+>>> Was it working for you?
+>>
+>> Yes, note that the kernel only honors the stdout-path property if
+>> there is no console= argument present if there is a console= argument
+>> present on the kernel cmdline then that will overrule the stdout-path
+>> property
+>
+> Yeah, I removed the bootargs entirely.
+>
+>> Which board did you test with, and what u-boot and kernel version ?
+>
+> I tested it on my A31 hummingbird, with allwinner's u-boot, but with
+> /chosen/stdout-path hardcoded to "serial0:115200n8", with a 4.0-rc1
+> kernel.
 
-Thanks.
+I'm not sure if stdout-path supports aliases this is what u-boot is using,
+and which works fine (with 4.0-rc1 kernel): "/soc at 01c00000/serial at 01c28000:115200"
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> But it might very well just be me. We just tested it on a Marvell
+> board (that uses the same serial driver) this morning and it was fine,
+> so I don't think it's really worth worrying about this :)
+>
+>>>> Currently we've a random mix where we do have bootargs in some, but
+>>>> not in most sunxi dts files. I believe we should simply remove it
+>>>> everywhere...
+>>>
+>>> We used to set them in SoCs that are not supported by U-boot yet, and
+>>> where the bootloader won't come and patch the DT (A31, A23, A80).
+>>
+>> Ah, so that is (was) the logic, following that logic we should probably
+>> remove bootargs= from at least the a23 and a31 boards (basically
+>> from all boards but a80).
+>
+> I'm not so sure about the A31, since most boards won't even boot by
+> default on the SD card
+
+True.
+
+ > and we have no way to replace U-Boot in NAND
+> so far (afaik). But replacing them by stdout-path is a very good
+> solution too.
+
+You mean putting stdout-path in the dts, I'm not sure if I like that,
+to me both bootargs and stdout-path are something which should be
+left to the bootloader to set. But I understand that when not
+using upstream u-boot that may be an issue.
+
+Regards,
+
+Hans
