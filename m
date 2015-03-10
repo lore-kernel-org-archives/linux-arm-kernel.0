@@ -1,48 +1,89 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 10 Mar 2015 16:04:45 +0530
-Subject: [PATCH 0/3] clockevents: Manage device's state separately for core
-In-Reply-To: <cover.1425037853.git.viresh.kumar@linaro.org>
-References: <cover.1425037853.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpok+bfVVm-6fW5+tJCOKQA+dY=8zHykdyJEcUNbgGQyrcQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Mar 2015 10:37:34 +0000
+Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <20150310103734.GK8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 17:21, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Hi Thomas/Ingo,
->
-> This is in response to the suggestions Ingo gave [1] on the shortcomings of
-> clockevents core's state machine.
->
-> This first separates out the RESUME functionality from other states as its a
-> special case. Then it defines a new enum to map possible states of a clockevent
-> device.
->
-> Ideally it should only be available for the core, but as bL switcher is using it
-> today, it is exposed in clockchips.h. That dependency will go away after
-> applying the Thomas's work (Sent out be Peter) and then we can move this enum to
-> somewhere in kernel/time/.
->
-> The last patch moves the legacy check to the legacy code.
->
-> Please see if this meets your expectation or if you have some suggestions on it.
->
-> Rebased of tip/master as there were some dependencies:
-> 575daeea39a3 Merge branch 'tools/kvm'
->
-> This along with migration of few clockevents drivers is pushed here:
-> git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git clkevt/manage-state
->
-> --
-> Viresh
->
-> [1] https://lkml.org/lkml/2015/2/20/107
->
-> Viresh Kumar (3):
->   clockevents: Handle tick device's resume separately
->   clockevents: Manage device's state separately for the core
->   clockevents: Don't validate dev->mode against CLOCK_EVT_MODE_UNUSED
->     for new interface
+On Mon, Mar 09, 2015 at 09:16:36AM -0600, Lina Iyer wrote:
+> @@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
+>  	if (ret <= 0)
+>  		return ret ? : -ENODEV;
+>  
+> +
 
-Ingo,
+A bit better formatting would be nice - you don't need the extra blank
+line here.
 
-Gentle reminder ping...
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		pr_err("Failed to register cpuidle driver\n");
+> +		return ret;
+> +	}
+> +
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+>  	 */
+>  	for_each_possible_cpu(cpu) {
+> +
+
+This blank line is not necessary either.
+
+>  		ret = arm_cpuidle_init(cpu);
+
+However, a blank line here would be a good thing.
+
+> +		/*
+> +		 * This cpu does not support any idle states
+> +		 */
+
+Also, formatting this as /* This cpu does not support any idle states */ is
+acceptable too, and doesn't waste as many lines.
+
+> +		if (ret == -ENOSYS)
+> +			continue;
+> +
+>  		if (ret) {
+>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+>  			return ret;
+>  		}
+> +
+> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> +		if (!dev)
+> +			return -ENOMEM;
+> +
+> +		dev->cpu = cpu;
+> +		ret = cpuidle_register_device(dev);
+> +		if (ret) {
+> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> +			       cpu);
+> +			return ret;
+
+It looks like we leak the 'dev' allocation here.
+
+Also, other error paths, it looks like we leave the previously registered
+cpuidle devices in place.  That may be acceptable if the intention is to
+initialise as many CPUs as possible - but we then miss the
+cpuidle_register() call below, which seems to make the registered devices
+useless.  It's a little inconsistent.
+
+Also, it's useful to report why something fails - printing the error code
+can help debugging if it isn't already printed elsewhere.
+
+> +		}
+> +
+> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
+>  	}
+>  
+> -	return cpuidle_register(drv, NULL);
+> +	return 0;
+>  }
+>  device_initcall(arm_idle_init);
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
