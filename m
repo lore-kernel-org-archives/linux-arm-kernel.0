@@ -1,10 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Mar 2015 09:44:47 +0900
-Subject: [PATCH 10/15] ARM: shmobile: koelsch: Add DU external pixel clocks to
- DT
+Date: Tue, 10 Mar 2015 09:44:48 +0900
+Subject: [PATCH 11/15] ARM: shmobile: lager: Add DU external pixel clocks to DT
 In-Reply-To: <cover.1425947992.git.horms+renesas@verge.net.au>
 References: <cover.1425947992.git.horms+renesas@verge.net.au>
-Message-ID: <cd21cb46e14aae3a5d4f044c07f2c1f9d89fcd1a.1425947992.git.horms+renesas@verge.net.au>
+Message-ID: <26c00ab4aae2d29b6c724a9c23d5f6cba2b20e41.1425947992.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,14 +15,14 @@ inputs.
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 624bb2c..75fa985 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -269,6 +269,18 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 631b3f5..329bb99 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -233,6 +233,18 @@
  			};
  		};
  	};
@@ -42,15 +41,17 @@ index 624bb2c..75fa985 100644
  };
  
  &du {
-@@ -276,6 +288,13 @@
+@@ -240,6 +252,15 @@
  	pinctrl-names = "default";
  	status = "okay";
  
-+	clocks = <&mstp7_clks R8A7791_CLK_DU0>,
-+		 <&mstp7_clks R8A7791_CLK_DU1>,
-+		 <&mstp7_clks R8A7791_CLK_LVDS0>,
++	clocks = <&mstp7_clks R8A7790_CLK_DU0>,
++		 <&mstp7_clks R8A7790_CLK_DU1>,
++		 <&mstp7_clks R8A7790_CLK_DU2>,
++		 <&mstp7_clks R8A7790_CLK_LVDS0>,
++		 <&mstp7_clks R8A7790_CLK_LVDS1>,
 +		 <&x13_clk>, <&x2_clk>;
-+	clock-names = "du.0", "du.1", "lvds.0",
++	clock-names = "du.0", "du.1", "du.2", "lvds.0", "lvds.1",
 +		      "dclkin.0", "dclkin.1";
 +
  	ports {
