@@ -1,28 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 16:00:44 +0100
-Subject: [PATCH v2 05/18] reset: Add reset_controller_of_init() function
-In-Reply-To: <1424455277-29983-6-git-send-email-mcoquelin.stm32@gmail.com>
+Date: Tue, 10 Mar 2015 16:02:14 +0100
+Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
+In-Reply-To: <1424455277-29983-8-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-6-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <8729383.kvUZDm4dQz@wuerfel>
+ <1424455277-29983-8-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <2383270.cAJPOxrkvo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 February 2015 19:01:04 Maxime Coquelin wrote:
-> Some platforms need to initialize the reset controller before the timers.
-> 
-> This patch introduces a reset_controller_of_init() function that can be
-> called before the timers intialization.
-> 
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
+> +/* AHB1 */
+> +#define GPIOA_RESET    0
+> +#define GPIOB_RESET    1
+> +#define GPIOC_RESET    2
+> +#define GPIOD_RESET    3
+> +#define GPIOE_RESET    4
+> +#define GPIOF_RESET    5
+> +#define GPIOG_RESET    6
+> +#define GPIOH_RESET    7
+> +#define GPIOI_RESET    8
+> +#define GPIOJ_RESET    9
+> +#define GPIOK_RESET    10
 > 
 
-Not sure about this. It seems like the cleanest approach if we get
-a lot of these, but then again it is probably very rare, and I'd
-like to avoid adding such infrastructure if it's just for one
-SoC. Could we add a hack in the machine initialization instead?
-
-I think ideally this would be done in the boot loader before we
-even start Linux, but I don't know if that's possible for you.
+As these are just the hardware numbers, it's better to not make them
+part of the binding at all. Instead, just document in the binding that
+one is supposed to pass the hardware number as the argument.
 
 	Arnd
