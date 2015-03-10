@@ -1,36 +1,111 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 10 Mar 2015 22:42:54 +0100
-Subject: [PATCH] clk: provide clk_is_match() dummy for non-common clk
-In-Reply-To: <8682755.oK0Ae34OOP@wuerfel>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
- <20150225172757.421.43718@quantum> <8682755.oK0Ae34OOP@wuerfel>
-Message-ID: <CAMuHMdWvaO-qEohYX=DNybR1=1d4me=FHO8Rj-eEn2OgAKaPgg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Mar 2015 22:45:29 +0100
+Subject: [PATCH v2 1/2] drm/bridge: dw-hdmi: support optional supply regulators
+Message-ID: <2265807.RXHBN9kUi4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 8, 2015 at 10:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> ARM randconfig build tests found a new error for configurations
-> with COMMON_CLK disabled but HAS_CLK selected by the platform:
->
-> ERROR: "clk_is_match" [sound/soc/fsl/snd-soc-fsl-spdif.ko] undefined!
->
-> This moves the declaration around, so this case is covered
-> by the existing static inline helper function.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: c69e182e51d89 ("clk: introduce clk_is_match")
+At least the Rockchip variant of the dw_hdmi can have controllable power supplies
+providing 1.0 and 1.8V. Therefore add the possibility for the generic bridge
+driver to enable supplies provided by the hw-specific drivers.
 
-FYI, this also happens for sh/allmodconfig
-http://kisskb.ellerman.id.au/kisskb/buildresult/12379884/
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes since v1:
+- follow suggestion from Russell King to keep regulator handling local
+  to the rockchip implementation for the time being and only generalize
+  when a real second implementation needs regulator handling
 
-Gr{oetje,eeting}s,
+ .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32 +++++++++++++++++++++-
+ 2 files changed, 36 insertions(+), 1 deletion(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+index a905c14..bb74640 100644
+--- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
++++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+@@ -22,6 +22,11 @@ Optional properties
+ - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+ - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
+ 
++Optional supplies:
++rockchip,rk3288-dw-hdmi handles two optional power supplies:
++- avdd1v0-supply: 1.0V power supply
++- avdd1v8-supply: 1.8V power supply
++
+ Example:
+ 	hdmi: hdmi at 0120000 {
+ 		compatible = "fsl,imx6q-hdmi";
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index d236faa..647a240 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -11,6 +11,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
+ #include <drm/drm_of.h>
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+@@ -28,6 +29,9 @@ struct rockchip_hdmi {
+ 	struct device *dev;
+ 	struct regmap *regmap;
+ 	struct drm_encoder encoder;
++	struct regulator_bulk_data supplies[2];
++	int nsupplies;
++	bool supplies_enabled;
+ };
+ 
+ #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+@@ -179,6 +183,12 @@ static struct drm_encoder_funcs dw_hdmi_rockchip_encoder_funcs = {
+ 
+ static void dw_hdmi_rockchip_encoder_disable(struct drm_encoder *encoder)
+ {
++	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
++
++	if (hdmi->nsupplies > 0 && hdmi->supplies_enabled) {
++		regulator_bulk_disable(hdmi->nsupplies, hdmi->supplies);
++		hdmi->supplies_enabled = false;
++	}
+ }
+ 
+ static bool
+@@ -199,7 +209,16 @@ static void dw_hdmi_rockchip_encoder_commit(struct drm_encoder *encoder)
+ {
+ 	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
+ 	u32 val;
+-	int mux;
++	int mux, ret;
++
++	if (hdmi->nsupplies > 0 && !hdmi->supplies_enabled) {
++		ret = regulator_bulk_enable(hdmi->nsupplies, hdmi->supplies);
++		if (ret) {
++			dev_err(hdmi->dev, "could not enable hdmi analog supplies\n");
++			return;
++		}
++		hdmi->supplies_enabled = true;
++	}
+ 
+ 	mux = rockchip_drm_encoder_get_mux_id(hdmi->dev->of_node, encoder);
+ 	if (mux)
+@@ -275,6 +294,17 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
+ 	if (!iores)
+ 		return -ENXIO;
+ 
++	hdmi->supplies[0].supply = "avdd1v0";
++	hdmi->supplies[1].supply = "avdd1v8";
++	hdmi->nsupplies = 2;
++
++	ret = devm_regulator_bulk_get(hdmi->dev,
++				      hdmi->nsupplies, hdmi->supplies);
++	if (ret == -EPROBE_DEFER)
++		return ret;
++	if (ret)
++		hdmi->nsupplies = 0;
++
+ 	platform_set_drvdata(pdev, hdmi);
+ 
+ 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+-- 
+2.1.4
