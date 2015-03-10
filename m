@@ -1,108 +1,75 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 18:54:38 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF3865.8080301@list.ru>
-References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru>
- <20150310173807.GU8656@n2100.arm.linux.org.uk>
- <54FF3865.8080301@list.ru>
-Message-ID: <20150310185438.GW8656@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 10 Mar 2015 14:05:57 -0500
+Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
+ find ports by id
+In-Reply-To: <20150310154253.GO8656@n2100.arm.linux.org.uk>
+References: <1425369592.3146.14.camel@pengutronix.de>
+ <1426001087.3141.46.camel@pengutronix.de>
+ <20150310154253.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 09:31:01PM +0300, Stas Sergeev wrote:
-> 10.03.2015 20:38, Russell King - ARM Linux ?????:
-> > On Tue, Mar 10, 2015 at 08:27:34PM +0300, Stas Sergeev wrote:
-> >> Please also find the same crash here:
-> >> http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/003872.html
-> > Hmm, looks like from the exynos5420-arndale-octa failure in that, we
-> > don't dump the page table entries.  We should do.  Sorry about my
-> > previous mail.
-> >
-> > If you can reproduce this, please do so with this patch so that we
-> > can get the page table entries associated with the problem.  Thanks.
-> >
-> >  arch/arm/mm/fault.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> > index a982dc3190df..6333d9c17875 100644
-> > --- a/arch/arm/mm/fault.c
-> > +++ b/arch/arm/mm/fault.c
-> > @@ -552,6 +552,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-> >  
-> >  	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
-> >  		inf->name, fsr, addr);
-> > +	show_pte(current->mm, addr);
-> >  
-> >  	info.si_signo = inf->sig;
-> >  	info.si_errno = 0;
-> >
-> >
+On Tue, Mar 10, 2015 at 10:42 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Mar 10, 2015 at 04:24:47PM +0100, Philipp Zabel wrote:
+>> Hi Grant, Rob,
+>>
+>> Am Dienstag, den 03.03.2015, 08:59 +0100 schrieb Philipp Zabel:
+>> > Hi Grant, Rob,
+>> >
+>> > this series has been around for quite some time now, basically unchanged
+>> > except for adding fixes for new users of the API that keep appearing
+>> > over time in different subsystems.
+>> >
+>> > It would be really helpful to get this merged for v4.0. Could you still
+>> > make this happen?
+>> >
+>> > Alternatively, could I please get your ack to allow this tag to be
+>> > merged into the other subsystem trees for v4.1 so that patches that
+>> > depend on it don't have to wait for yet another merge window?
+>>
+>> The question still stands. It would be great to hear from you and maybe
+>> get this change in at least in time for v4.1.
+>
+> Let's look at the history.
+>
+> 10-03-2015: This reminder
+> 03-03-2015: Pull request (ignored from what can be seen)
+> 01-03-2015: Request from Laurent about what's happening
+> 27-02-2015: Reminder
+> 23-02-2015: Re-base (and version 8) due to conflicts
+> 11-02-2015: Reminder
+> 22-01-2015: Pull request
+> 23-12-2014: Version 7
+>
+> During that time, there's not been one peep from Rob or Grant on this.
 
-Thanks.
+I've only been copied on this latest pull request and a version from
+March of last year which Grant nak'ed. This series did not go to
+devicetree list either.
 
-> [    5.383283] Unhandled fault: external abort on non-linefetch (0x808)
-> at 0xf00d3018
-> [    5.390871] pgd = c0004000
-> [    5.393583] [f00d3018] *pgd=2d404811, *pte=efc1e65f, *ppte=efc1e45f
+I'll take a look at the series. If there is an explanation of how
+Grant's nak was addressed that would speed up my review. I'm not
+applying for v4.0 though.
 
-This is interesting.
+Rob
 
-So, the L1 page table entry is:
-	PMD_TYPE_TABLE
-	PMD_BIT4
-	PMD_DOMAIN(0)
-	Pointing at physical address 0x2f404800
-
-L2 page table entry:
-	PTE_EXT_XN
-	PTE_BUFFERABLE
-	PTE_CACHEABLE
-	PTE_EXT_AP_UNO_SRW
-	PTE_EXT_TEX(1)
-	PTE_EXT_SHARED
-	Physical address 0xefc1e000
-
-That corresponds with L_PTE_MT_WRITEALLOC, so that's a memory type mapping
-with cacheable, write-back, write-allocate attributes.
-
-The thing which has me wondering though is the difference in physical
-addresses - that looks /very/ wrong - unless you have close to 4GB of
-memory.
-
-Let's see whether we can get some debug from vmalloc to work out what's
-going on - can you also apply the patch below.
-
-Also, if you could include details about how much memory your platform
-has, and where it's located, that would be useful - passing memblock=debug
-should allow us to see what's going on at the memblock level.
-
-Also, the full kernel boot log would be useful to see.
-
-Thanks.
-
-(Patch isn't tested.)
-
- mm/vmalloc.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/mm/vmalloc.c b/mm/vmalloc.c
-index 35b25e1340ca..3379bcd6d280 100644
---- a/mm/vmalloc.c
-+++ b/mm/vmalloc.c
-@@ -129,6 +129,8 @@ static int vmap_pte_range(pmd_t *pmd, unsigned long addr,
- 			return -EBUSY;
- 		if (WARN_ON(!page))
- 			return -ENOMEM;
-+printk("vmalloc: mapping page %p (0x%08lx000) at 0x%08lx\n",
-+	page, page_to_pfn(page), addr);
- 		set_pte_at(&init_mm, addr, pte, mk_pte(page, prot));
- 		(*nr)++;
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> At what point has there been enough pestering that it's sufficient to
+> bypass an apparently uninterested maintainer, who can't be bothered to
+> say yes or no to a set of patches?
+>
+> For such a key subsystem in the kernel, this is bad.  If Grant isn't
+> interested in performing a maintainer role, I'd be willing to pick up
+> that function (which'll be ironic, because that's the kind of thing
+> that Linaro's been doing to me over the last few years... picking
+> stuff off my plate without any discussion or agreement with me first,
+> leaving me with almost nothing to do.  No, I'm not pissed at that...
+> not much.)
+>
+> I guess if you were to submit patches to Andrew, Andrew may take them
+> in this circumstance and eventually send them on to Linus.  Andrew?
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
