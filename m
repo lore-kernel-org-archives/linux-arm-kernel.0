@@ -1,61 +1,41 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 10 Mar 2015 22:20:03 +0100
-Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
-In-Reply-To: <2455342.zT71E5iyaL@wuerfel>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <2383270.cAJPOxrkvo@wuerfel>
- <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
- <2455342.zT71E5iyaL@wuerfel>
-Message-ID: <CALszF6DENRS2L8mHD_iPsPwbAZndbHoB10oHaJ8-E4ajhog=8w@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 10 Mar 2015 22:21:22 +0100
+Subject: [PATCH] udc: gadget: atmel_usba_udc: depend on COMMON_CLK_AT91
+In-Reply-To: <20150310205312.GD18456@saruman.tx.rr.com>
+References: <1425368567-5333-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150303092620.63e1861d@bbrezillon>
+ <20150303094138.GC3892@piout.net>
+ <20150310205312.GD18456@saruman.tx.rr.com>
+Message-ID: <20150310212122.GJ9188@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-10 21:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 10 March 2015 16:44:24 Maxime Coquelin wrote:
->> 2015-03-10 16:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
->> > On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
->> >> +/* AHB1 */
->> >> +#define GPIOA_RESET    0
->> >> +#define GPIOB_RESET    1
->> >> +#define GPIOC_RESET    2
->> >> +#define GPIOD_RESET    3
->> >> +#define GPIOE_RESET    4
->> >> +#define GPIOF_RESET    5
->> >> +#define GPIOG_RESET    6
->> >> +#define GPIOH_RESET    7
->> >> +#define GPIOI_RESET    8
->> >> +#define GPIOJ_RESET    9
->> >> +#define GPIOK_RESET    10
->> >>
->> >
->> > As these are just the hardware numbers, it's better to not make them
->> > part of the binding at all. Instead, just document in the binding that
->> > one is supposed to pass the hardware number as the argument.
->>
->> The reset controller is part of the RCC (Reset & Clock Controller) IP.
->> In this version, I only provided the reset registers to the reset
->> controller driver, but as per Andreas F?rber remark, I should avec a
->> single DT node for both the resets and clocks.
->>
->> In the next version I am preparing, the defines doesn't look as
->> trivial as in this version, GPIOA_RESET being 128 for instance.
->>
->> Is it fine for you if I keep the defines part of the binding?
->>
->>
->
-> It's always better to avoid these files entirely, as they are
-> a frequent source of merge dependencies, and they make it less
-> obvious what's going on than having binary values in the dtb
-> that make sense.
+On 10/03/2015 at 15:53:12 -0500, Felipe Balbi wrote :
+> On Tue, Mar 03, 2015 at 10:41:38AM +0100, Alexandre Belloni wrote:
+> > On 03/03/2015 at 09:26:20 +0100, Boris Brezillon wrote :
+> > > >  config USB_ATMEL_USBA
+> > > >  	tristate "Atmel USBA"
+> > > > -	depends on AVR32 || ARCH_AT91
+> > > > +	depends on AVR32 || ARCH_AT91 && COMMON_CLK_AT91
+> > > 
+> > > I guess you should add parenthesis to make it clearer ?
+> > > 
+> > > 	depends on AVR32 || (ARCH_AT91 && COMMON_CLK_AT91)
+> > > 
+> > > And I wonder why you need that. I though this option was selected by all
+> > > at91 platforms ?
+> > > 
+> > 
+> > That is currently the case but maybe, one day, one of the AT91 platform
+> > will not use the same clock driver.
+> 
+> then, maybe, one day, you send this patch.
 
-I agree it is always painful to have to have to manage these merge dependencies.
-What I will do, if Philipp agrees, is to list all the values in the
-binding documentation.
+Yeah, let's drop it for now but I have the feeling that this will
+break (I actually broke it when switching at91 to multiplatform).
 
-Doing that, the user of a reset won't have to do the calculation, and
-no more merge dependencies.
 
-Maxime
->
->         Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
