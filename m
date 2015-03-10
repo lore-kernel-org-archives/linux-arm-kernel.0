@@ -1,56 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 09:50:44 +0100
-Subject: [PATCH 05/15] musb: Do not use musb_read[b|w] / _write[b|w]
- wrappers in generic fifo functions
-In-Reply-To: <54FEA09A.6040401@redhat.com>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <4821047.1nqnop93Xh@wuerfel> <54FEA09A.6040401@redhat.com>
-Message-ID: <11429972.krcjty7oKd@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 10 Mar 2015 09:47:43 +0100
+Subject: [PATCH v2 0/5] ARM: crypto: ARMv8 Crypto Extensions
+Message-ID: <1425977268-27835-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 March 2015 08:43:22 Hans de Goede wrote:
-> On 09-03-15 22:50, Arnd Bergmann wrote:
-> > On Monday 09 March 2015 21:40:18 Hans de Goede wrote:
-> >> The generic fifo functions already use non wrapped accesses in various
-> >> cases through the iowrite#_rep functions, and all platforms which override
-> >> the default musb_read[b|w] / _write[b|w] functions also provide their own
-> >> fifo access functions, so we can safely drop the unnecessary indirection
-> >> from the fifo access functions.
-> >>
-> >> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>
-> >
-> > The patch looks reasonably, but the description seem misleading.
-> > I believe the real reason why it's ok to use __raw_writew for the
-> > FIFO is that a FIFO by definition is using CPU endian access for
-> > copying byte streams from memory, which is unlike any other MMIO
-> > register that requires fixed-endian accessors.
-> 
-> I'm not sure that that is the case here, this fifo allows reading
-> 4 bytes at a time using 32 bit word access, so endianness may come
-> into play. This patch is safe however since all existing users of
-> the generic fifo_read / write helpers which this patch touches, are
-> also using the generic musb_read[b|w] / _write[b|w] functions which
-> are just __raw_foo wrappers, so there is no functional change, which
-> is what the commit message tries to say.
+This is v2 of the ARM crypto series I sent out yesterday, erroneously without
+a cover letter.
 
-This probably means that the generic musb helpers are not safe to use
-on big-endian ARM systems (but may work on MIPS). The only one currently
-not using the generic helpers is blackfin, which is fixed to little
-endian.
- 
-> Note that sunxi needs this function because of the register address
-> translation the sunxi_musb_readb / writeb wrappers are doing which
-> does not know how to deal with fifo data, and besides that it should
-> make the generic read / write fifo helpers somewhat faster by removing
-> an indirect function call.
+Patch #1 moves all the ARM specific crypto options to arch/arm/crypto/Kconfig.
 
-Your sunxi_musb_readw/writew functions however also are endian-safe
-and seem to get this part right, unlike all other platforms that use
-the generic __raw_*() accessors. With this patch applied, it should
-actually work fine, and it would work on other platforms as well
-if we change all __raw_*() calls outside of musb_default_write_fifo()
-and musb_default_read_fifo() to use *_relaxed() instead.
+Patches #2 - #5 implement SHA1, SHA-224/256, AES-ECB/CBC/CTR/XTS and GHASH,
+respectively.
 
-	Arnd
+Changes since v1:
+- fixes for BE (currently still untested)
+- added alignment hints where appropriate (e,g., [rX, :128])
+- various minor tweaks
+
+There are all tested on LE using the respective tcrypt tests.
+
+Ard Biesheuvel (5):
+  crypto/arm: move ARM specific Kconfig definitions to a dedicated file
+  crypto/arm: add support for SHA1 using ARMv8 Crypto Instructions
+  crypto/arm: add support for SHA-224/256 using ARMv8 Crypto Extensions
+  crypto/arm: AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions
+  crypto/arm: add support for GHASH using ARMv8 Crypto Extensions
+
+ arch/arm/Kconfig                |   3 +
+ arch/arm/crypto/Kconfig         | 123 ++++++++++
+ arch/arm/crypto/Makefile        |   8 +
+ arch/arm/crypto/aes-ce-core.S   | 518 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/crypto/aes-ce-glue.c   | 520 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/crypto/ghash-ce-core.S |  94 ++++++++
+ arch/arm/crypto/ghash-ce-glue.c | 318 ++++++++++++++++++++++++
+ arch/arm/crypto/sha1-ce-core.S  | 134 +++++++++++
+ arch/arm/crypto/sha1-ce-glue.c  | 150 ++++++++++++
+ arch/arm/crypto/sha2-ce-core.S  | 134 +++++++++++
+ arch/arm/crypto/sha2-ce-glue.c  | 203 ++++++++++++++++
+ crypto/Kconfig                  |  75 ------
+ 12 files changed, 2205 insertions(+), 75 deletions(-)
+ create mode 100644 arch/arm/crypto/Kconfig
+ create mode 100644 arch/arm/crypto/aes-ce-core.S
+ create mode 100644 arch/arm/crypto/aes-ce-glue.c
+ create mode 100644 arch/arm/crypto/ghash-ce-core.S
+ create mode 100644 arch/arm/crypto/ghash-ce-glue.c
+ create mode 100644 arch/arm/crypto/sha1-ce-core.S
+ create mode 100644 arch/arm/crypto/sha1-ce-glue.c
+ create mode 100644 arch/arm/crypto/sha2-ce-core.S
+ create mode 100644 arch/arm/crypto/sha2-ce-glue.c
+
+-- 
+1.8.3.2
