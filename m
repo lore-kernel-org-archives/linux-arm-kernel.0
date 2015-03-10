@@ -1,154 +1,93 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 10 Mar 2015 12:59:16 -0500
-Subject: [PATCH 1/4] ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt
- property
-In-Reply-To: <54FF2BA5.6070001@ti.com>
-References: <1425561211-31003-1-git-send-email-d-gerlach@ti.com>
- <1425561211-31003-2-git-send-email-d-gerlach@ti.com>
- <alpine.DEB.2.02.1503051815590.5613@utopia.booyaka.com>
- <20150305184952.GF13520@atomide.com> <54F8B2C7.7060202@ti.com>
- <20150305201713.GH13520@atomide.com> <20150306004157.GI13520@atomide.com>
- <54F9E3BF.5010407@ti.com> <20150306174548.GW13520@atomide.com>
- <54FF2BA5.6070001@ti.com>
-Message-ID: <54FF30F4.10107@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 10 Mar 2015 19:05:07 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP
+ SOCs
+In-Reply-To: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+Message-ID: <20150310190507.64b3c153@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grygorii,
-On 03/10/2015 12:36 PM, Grygorii Strashko wrote:
-> Hi Dave,
-> 
-> On 03/06/2015 07:45 PM, Tony Lindgren wrote:
->> * Dave Gerlach <d-gerlach@ti.com> [150306 09:28]:
->>> On 03/05/2015 06:41 PM, Tony Lindgren wrote:
->>>> * Tony Lindgren <tony@atomide.com> [150305 12:24]:
->>>>> * Dave Gerlach <d-gerlach@ti.com> [150305 11:53]:
->>>>>> On 03/05/2015 12:49 PM, Tony Lindgren wrote:
->>>>>>> * Paul Walmsley <paul@pwsan.com> [150305 10:16]:
->>>>>>>> On Thu, 5 Mar 2015, Dave Gerlach wrote:
->>>>>>>>
->>>>>>>>> Introduce a dt property, ti,no-init, that prevents hwmod initialization.
->>>>>>>>> Even if a dt node is marked as disabled, hwmod still at least enables
->>>>>>>>> the hwmod and programs the sysconfig before attempting to idle it at
->>>>>>>>> boot. If an IP has been disabled by the hardware configuration on a
->>>>>>>>> platform, this will cause a hang due to writing to inactive registers.
->>>>>>>>> This property prevents that from happening by marking the hwmod as
->>>>>>>>> _HWMOD_STATE_DISABLED during init.
->>>>>>>>
->>>>>>>> I'm kind of wondering if hwmod should even touch a device if it's marked
->>>>>>>> as disabled in the DT.  Tony, what do you think?
->>>>>>>
->>>>>>> Well nothing happens if a device is status = "disabled". No dev entry
->>>>>>> gets created for it at all and hwmod won't have any data for the device
->>>>>>> populated. The only way hwmod code could see that device if the device
->>>>>>> gets it's data from the legacy omap_hwmod_*_data.c instead of DT.
->>>>>>>
->>>>>>
->>>>>> We still need this for the sysconfig programming, correct? hwmod programs that
->>>>>> regardless of dt status and then idles the IP,
->>>>>
->>>>> Well hwmod does not even know about the IP IO addresses if it's marked
->>>>> with status = "disabled".. Which IP are you having problems with?
->>>>>
->>>>>> which is why I needed the ti,no-init for the epos evm. It isn't just a
->>>>>> matter of we shouldnt write to it because we don't want to use it; we
->>>>>> can't write to it because the module is held off so it causes an
->>>>>> external abort if we do.
->>>>>
->>>>> Well hard to say not knowing which module this is.. Pretty much all
->>>>> the modules have drivers and the driver just does pm_runtime_get()
->>>>> on it?
->>>>
->>>> Heh OK this thread is about the RTC driver, so I assume that's the
->>>> problem :) So if you set the rtc to status = "disabled" how can the
->>>> hwmod code do anything as AFAIK it won't even get the rtc IO address?
->>>>
->>>> Or am I missing something here?
->>>
->>> Perhaps I am mistaken, but from what I understand, all hwmods have _init and
->>> _setup called on them, and all hwmods read the IO address regardless of DT
->>> status at this point with _init_mpu_rt_base. In _setup, _setup_reset gets called
->>> which calls _enable for the hwmod, and this calls both _enable_sysc and
->>> _update_sysc_cache which touch the sysconfig register of the IP.
->>
->> Oh OK, I think you're right. I was thinking of omap_device_build_from_dt(),
->> sorry. Looks like the hwmod IO address data does get populated even
->> for status = "disabled" although the dev entry won't get created and
->> omap_device_build_from_dt() never gets called.
->>
->>> Normally this is fine regardless of whether or not we are using an IP because
->>> the module will wake up for a moment, have it's sysc programmed, and then be put
->>> back to sleep later, potentially never to be woken again if we bind no driver
->>> for it, which is fine for 99% of cases. In the case of am43x epos evm, you can
->>> take the same piece of silicon that will boot happily on the gp evm with the rtc
->>> hwmod in place and it will hang during boot on the epos evm because the board
->>> uses a pin to hold the RTC IP in reset. There is no way to detect this in
->>> software, the module can be turned on as normal using the clk_ctrl, but if you
->>> touch any of the IP registers you get an abort.
->>
->> OK sounds like some dts property is needed to signal this.
-> 
-> As I understand, there is device "RTC" and this device has status 'disabled',
-> so there is reasonable question why do we need to touch it at all?
-> The HWMOD is some kind of SoC description, which was needed before DT.
-> Now with DT in place it seems unreasonable to touch any IP block which:
-> - are not defined in DT
-> - has status 'disabled'.
-> in above cases the u-boot has to dial with IP block if it's invisible for Kernel.
-> 
-> The HWMOD framework intended to reset and put in some predefined states IPs which are
-> visible for the Kernel, so then proper driver can start working with IP or IP will be
-> kept in some low-power state if there is no driver.
+Hello Daniel,
 
-Currently we still need this hwmod behavior as not all IPs are in an ideal state
-for PM by default. Not sure if you saw my last email in this thread but I gave
-an example for USB hwmod:
+I know you suggested a more rigorous method of determining the exit
+latency and target residency times, but would it be nonetheless
+possible to apply this patch, which clearly improves performance a lot,
+and actually makes the code match the values used in the vendor kernel?
 
-If no USB driver is bound even just letting omap_device idle it using the USB_
-CLKCTRL in the PRCM will not work properly, because the USB on am33xx expects
-it's SYSCONFIG STANDBY_MODE to be software supervised, the default state
-(SMART_STANDBY) does not let the IP go into standby so the IP gets stuck in a
-partially off state but does not actually shut down as expected.
+I also think this patch should be marked for stable, it fixes values
+introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
+should therefore be backported all the way to v3.16.
 
-So we need to be able to touch the dt nodes even if they are marked as disabled
-because we need to get the IO address to have access to the SYSCONFIG register.
-I am not trying to introduce any major new changes to omap_hwmod layer, I am
-just trying to allow it to work in more situations.
+Thanks a lot,
 
-This flag would only exist to PREVENT any hwmod action from happening in certain
-cases where we cannot even touch the IP for whatever reason (in the first case
-that this patch intends to be used for, the RTC IP on am43x-epos-evm which is
-disabled by the board configuration).
+Thomas
 
-Regards,
-Dave
-
+On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
+> Originally, the thresholds used in the cpuidle driver for Armada SOCs
+> were temporarily chosen, leaving room for improvements.
 > 
-> Such kind of changes really confused :(, because when I'm looking on DT and see - status='disabled'
-> I suppose that such IP will not be touched by Kernel. But it's NOT really 'disabled'.
-> It's kinda 'partially disabled' or 'not present' or 'unused' ..
-> (if someone will decide to continue with such approach - it could be more
-> useful to define new value for 'status' parameter :P).
-> Also, just imaging that OMAP kernel is used with Xen as DomU and how hard will
-> it be to find and cut off all such tricks :( 
+> This commit updates the thresholds for the Armada XP SOCs with values
+> that positively impact performances:
 > 
-> Did I miss something?
->
->>   
->>> So we need to prevent this from happening but of course we can't selectively
->>> choose when the rtc hwmod gets added based on which board we are using so it
->>> seemed a DT flag was appropriate to indicate that we do not want to init the rtc
->>> IP at all only on this board.
->>>
->>> Without this flag in place but with the rtc hwmod added, the am43x-epos-evm
->>> fails booting with an imprecise abort.
->>
->> OK thanks for explaining it. I'm fine with this patch, Paul may have
->> other issues. The other option would be to use status = "disabled" to
->> not touch the device at all like Paul suggested. I wonder if that's
->> going to break PM on some devices though..
->>
+>                                 without patch  with patch   vendor kernel
+>  - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
+>  - ioping tmpfs (iops)          ~163k          ~206k        ~179k
+>  - ioping tmpfs (mib/s)         ~636           ~805         ~699
 > 
-> Regards,
-> -grygorii
+> The idle power consumption is negatively impacted (proportionally less
+> than the performance gain), and we are still performing better than
+> the vendor kernel here:
 > 
+>                                 without patch   with patch  vendor kernel
+>  - power consumption idle (W)   ~2.4            ~3.2        ~4.4
+>  - power consumption busy (W)   ~8.6            ~8.3        ~8.6
+> 
+> There is still room for improvement regarding the value of these
+> thresholds, they were chosen to mimic the vendor kernel.
+> 
+> This patch only impacts Armada XP SOCs and was tested on Online Labs
+> C1 boards. A similar approach can be taken to improve the performances
+> of the Armada 370 and Armada 38x SOCs.
+> 
+> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
+> for the discussions and tips around this topic.
+> 
+> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
+> ---
+>  drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> index 38e6861..3716a1f 100644
+> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
+>  	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>  	.states[1]		= {
+>  		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 10,
+> +		.exit_latency		= 100,
+>  		.power_usage		= 50,
+> -		.target_residency	= 100,
+> +		.target_residency	= 1000,
+>  		.name			= "MV CPU IDLE",
+>  		.desc			= "CPU power down",
+>  	},
+>  	.states[2]		= {
+>  		.enter			= mvebu_v7_enter_idle,
+> -		.exit_latency		= 100,
+> +		.exit_latency		= 1000,
+>  		.power_usage		= 5,
+> -		.target_residency	= 1000,
+> +		.target_residency	= 10000,
+>  		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
+>  		.name			= "MV CPU DEEP IDLE",
+>  		.desc			= "CPU and L2 Fabric power down",
+
+
+
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
