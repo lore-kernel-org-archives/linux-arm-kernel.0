@@ -1,69 +1,39 @@
-From: fabrice.gasnier@st.com (Fabrice GASNIER)
-Date: Tue, 10 Mar 2015 09:59:01 +0100
-Subject: [PATCH v2] ARM: l2c: Fix prefetch settings dt parsing
-Message-ID: <1425977941-31278-1-git-send-email-fabrice.gasnier@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 10:02:15 +0100
+Subject: [PATCH] ARM: at91: force CPU selection
+In-Reply-To: <1425970798-14015-1-git-send-email-computersforpeace@gmail.com>
+References: <1425970798-14015-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <2216832.iXiqHye8YX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow prefetch settings overriding by device tree, in case
-l2x0_cache_size_of_parse() returns value, prefetch tuning
-properties are silently ignored. E.g. arm,double-linefill* and
-arm,prefetch*.
-This happens for example, when "cache-size" or "cache-sets"
-properties haven't been filled in l2c dt node.
+On Monday 09 March 2015 23:59:58 Brian Norris wrote:
+> @@ -114,6 +114,12 @@ config SOC_AT91SAM9
+>             AT91SAM9XE
+>  endif # SOC_SAM_V4_V5
+>  
+> +config MACH_AT91_AUTO
+> +       def_bool y
+> +       depends on !SOC_AT91SAM9 && !SOC_SAMA5D4
+> +       select SOC_SAMA5D3 if SOC_SAM_V7
+> +       select SOC_AT91RM9200 if SOC_SAM_V4_V5
+> +
+>  comment "AT91 Feature Selections"
+>  
+>  config AT91_SLOW_CLOCK
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
----
-V2: fix typo in commit message
-s/prefect/prefetch/ and s/of tree/device tree/
----
- arch/arm/mm/cache-l2x0.c | 33 ++++++++++++++++-----------------
- 1 file changed, 16 insertions(+), 17 deletions(-)
+Hi Brian,
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c6c7696..8f15f70 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1131,23 +1131,22 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	}
- 
- 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_512K);
--	if (ret)
--		return;
--
--	switch (assoc) {
--	case 16:
--		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
--		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		break;
--	case 8:
--		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		break;
--	default:
--		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
--		       assoc);
--		break;
-+	if (!ret) {
-+		switch (assoc) {
-+		case 16:
-+			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
-+			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			break;
-+		case 8:
-+			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			break;
-+		default:
-+			pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
-+			       assoc);
-+			break;
-+		}
- 	}
- 
- 	prefetch = l2x0_saved_regs.prefetch_ctrl;
--- 
-1.9.1
+I actually added a bunch of these in other places, but have stopped
+doing so because Russell didn't like them, and I tend to follow
+his argument now that it's actually pretty confusing.
+
+In case of at91, we can do better now, once we have multiplatform
+enabled, and we can simply remove the SOC_SAM_V7 and SOC_SAM_V4_V5
+symbols entirely (if Alexandre's patch doesn't already do that).
+
+With multiplatform enabled, you no longer have to select a particular
+SoC, because we always get the default selection and the kernel
+will build without any one of them being enabled.
+
+	Arnd
