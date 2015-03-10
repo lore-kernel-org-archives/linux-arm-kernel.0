@@ -1,225 +1,86 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 10 Mar 2015 15:18:54 +0000
-Subject: [PATCH 4/5] arm-cci: Split the code for PMU vs driver support
-In-Reply-To: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
-References: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1426000735-14375-5-git-send-email-suzuki.poulose@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Mar 2015 16:22:33 +0100
+Subject: [PATCH 1/2] dt-bindings: ARM: Mediatek: document binding for the PMIC
+ wrapper
+In-Reply-To: <1426000954-7647-1-git-send-email-s.hauer@pengutronix.de>
+References: <1426000954-7647-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1426000954-7647-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+This adds documentation for the PMIC wrapper unit found on Mediatek
+SoCs. Currently support are the MT8135 and MT8173 SoCs, but the PMIC
+wrapper can also be found on MT6xxx and possibly other SoCs.
 
-This patch separates the PMU driver code from the low level
-CCI driver code and enables the PMU driver for ARM64.
-
-Introduces config options for both.
-
- ARM_CCI400_PORT_CTRL	- controls the low level driver code for
-			  CCI400 ports.
- ARM_CCI400_PMU 	- controls the PMU driver code
- ARM_CCI400_COMMON 	- Common defintions for CCI400
-
-This patch also changes:
- ARM_CCI - common code for probing the CCI devices. This can be
-   used for adding support for newer CCI versions(e.g, CCI-500).
-
-Changes since V2:
-  - Make ARM_CCI400_PMU default y (Suggested-by: Sudeep Holla)
-Changes since V1 (Suggestions-by: Nicolas Pitre):
-  - Renames
-	CONFIG_ARM_CCI400_MCPM => CONFIG_ARM_CCI400_PORT_CTRL
-	CCI400_MCPM_PORTS_DATA => CCI400_PORTS_DATA
-  - Select ARM_CCI400_COMMON for ARM_CCI400_PORT_CTRL
-  - Better documentation in the git commit log about the ARM_CCI config.
-
-Cc: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-exynos/Kconfig   |    2 +-
- arch/arm/mach-vexpress/Kconfig |    4 ++--
- drivers/bus/Kconfig            |   28 ++++++++++++++++++++++++----
- drivers/bus/arm-cci.c          |   24 ++++++++++++++++++++----
- include/linux/arm-cci.h        |    7 ++++++-
- 5 files changed, 53 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/soc/mediatek/pwrap.txt     | 58 ++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 603820e..81064cd 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -123,7 +123,7 @@ config SOC_EXYNOS5800
- config EXYNOS5420_MCPM
- 	bool "Exynos5420 Multi-Cluster PM support"
- 	depends on MCPM && SOC_EXYNOS5420
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	select ARM_CPU_SUSPEND
- 	help
- 	  This is needed to provide CPU and cluster power management
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 3c2509b..daa7ab6 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -53,7 +53,7 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
- config ARCH_VEXPRESS_DCSCB
- 	bool "Dual Cluster System Control Block (DCSCB) support"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	help
- 	  Support for the Dual Cluster System Configuration Block (DCSCB).
- 	  This is needed to provide CPU and cluster power management
-@@ -71,7 +71,7 @@ config ARCH_VEXPRESS_SPC
- config ARCH_VEXPRESS_TC2_PM
- 	bool "Versatile Express TC2 power management"
- 	depends on MCPM
--	select ARM_CCI
-+	select ARM_CCI400_PORT_CTRL
- 	select ARCH_VEXPRESS_SPC
- 	select ARM_CPU_SUSPEND
- 	help
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index b99729e..79e297b 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -43,12 +43,32 @@ config OMAP_INTERCONNECT
- 	help
- 	  Driver to enable OMAP interconnect error handling driver.
- 
--config ARM_CCI
--	bool "ARM CCI driver support"
-+config ARM_CCI400_PORT_CTRL
-+	bool
- 	depends on ARM && OF && CPU_V7
-+	select ARM_CCI400_COMMON
-+	help
-+	  Low level power management driver for CCI400 cache coherent
-+	  interconnect for ARM platforms.
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+new file mode 100644
+index 0000000..ddeb5b6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+@@ -0,0 +1,58 @@
++MediaTek PMIC Wrapper Driver
 +
-+config ARM_CCI400_PMU
-+	bool "ARM CCI400 PMU support"
-+	default y
-+	depends on ARM || ARM64
-+	depends on HW_PERF_EVENTS
-+	select ARM_CCI400_COMMON
- 	help
--	  Driver supporting the CCI cache coherent interconnect for ARM
--	  platforms.
-+	  Support for PMU events monitoring on the ARM CCI cache coherent
-+	  interconnect.
++This document describes the binding for the MediaTek PMIC wrapper.
 +
-+	  If unsure, say Y
++On MediaTek SoCs the PMIC is connected via SPI. The SPI master interface
++is not directly visible to the CPU, but only through the PMIC wrapper
++inside the SoC. The communication between the SoC and the PMIC can
++optionally be encrypted. Also a non standard Dual IO SPI mode can be
++used to increase speed.
 +
-+config ARM_CCI400_COMMON
-+	bool
-+	select ARM_CCI
++IP Pairing
 +
-+config ARM_CCI
-+	bool
- 
- config ARM_CCN
- 	bool "ARM CCN driver support"
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 70dff09..581190d 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -32,6 +32,7 @@
- static void __iomem *cci_ctrl_base;
- static unsigned long cci_ctrl_phys;
- 
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- struct cci_nb_ports {
- 	unsigned int nb_ace;
- 	unsigned int nb_ace_lite;
-@@ -42,12 +43,19 @@ static const struct cci_nb_ports cci400_ports = {
- 	.nb_ace_lite = 3
- };
- 
-+#define CCI400_PORTS_DATA	(&cci400_ports)
-+#else
-+#define CCI400_PORTS_DATA	(NULL)
-+#endif
++on MT8135 the pins of some SoC internal peripherals can be on the PMIC.
++The signals of these pins are routed over the SPI bus using the pwrap
++bridge. In the binding description below the properties needed for bridging
++are marked with "IP Pairing". These are optional on SoCs which do not support
++IP Pairing
 +
- static const struct of_device_id arm_cci_matches[] = {
--	{.compatible = "arm,cci-400", .data = &cci400_ports },
-+#ifdef CONFIG_ARM_CCI400_COMMON
-+	{.compatible = "arm,cci-400", .data = CCI400_PORTS_DATA },
-+#endif
- 	{},
- };
- 
--#ifdef CONFIG_HW_PERF_EVENTS
-+#ifdef CONFIG_ARM_CCI400_PMU
- 
- #define DRIVER_NAME		"CCI-400"
- #define DRIVER_NAME_PMU		DRIVER_NAME " PMU"
-@@ -1013,14 +1021,16 @@ static int __init cci_platform_init(void)
- 	return platform_driver_register(&cci_platform_driver);
- }
- 
--#else /* !CONFIG_HW_PERF_EVENTS */
-+#else /* !CONFIG_ARM_CCI400_PMU */
- 
- static int __init cci_platform_init(void)
- {
- 	return 0;
- }
- 
--#endif /* CONFIG_HW_PERF_EVENTS */
-+#endif /* CONFIG_ARM_CCI400_PMU */
++Required properties in pwrap device node.
++- compatible:
++	"mediatek,mt8135-pwrap" for MT8135 SoCs
++	"mediatek,mt8173-pwrap" for MT8173 SoCs
++- interrupts: IRQ for pwrap in SOC
++- reg-names: Must include the following entries:
++  "pwrap": Main registers base
++  "pwrap-bridge": bridge base (IP Pairing)
++- reg: Must contain an entry for each entry in reg-names.
++- reset-names: Must include the following entries:
++  "pwrap"
++  "pwrap-bridge" (IP Pairing)
++- resets: Must contain an entry for each entry in reset-names.
++- clock-names: Must include the following entries:
++  "spi": SPI bus clock
++  "wrap": Main module clock
++- clocks: Must contain an entry for each entry in clock-names.
 +
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- 
- #define CCI_PORT_CTRL		0x0
- #define CCI_CTRL_STATUS		0xc
-@@ -1451,6 +1461,12 @@ static int cci_probe_ports(struct device_node *np)
- 
- 	return 0;
- }
-+#else /* !CONFIG_ARM_CCI400_PORT_CTRL */
-+static inline int cci_probe_ports(struct device_node *np)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_ARM_CCI400_PORT_CTRL */
- 
- static int cci_probe(void)
- {
-diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
-index aede5c7..521ec1f 100644
---- a/include/linux/arm-cci.h
-+++ b/include/linux/arm-cci.h
-@@ -30,12 +30,16 @@ struct device_node;
- 
- #ifdef CONFIG_ARM_CCI
- extern bool cci_probed(void);
-+#else
-+static inline bool cci_probed(void) { return false; }
-+#endif
++Optional properities:
++- pmic: Mediatek PMIC MFD is the child device of pwrap
++  See the following for child node definitions:
++  Documentation/devicetree/bindings/mfd/mt6397.txt
 +
-+#ifdef CONFIG_ARM_CCI400_PORT_CTRL
- extern int cci_ace_get_port(struct device_node *dn);
- extern int cci_disable_port_by_cpu(u64 mpidr);
- extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
- extern int __cci_control_port_by_index(u32 port, bool enable);
- #else
--static inline bool cci_probed(void) { return false; }
- static inline int cci_ace_get_port(struct device_node *dn)
- {
- 	return -ENODEV;
-@@ -51,6 +55,7 @@ static inline int __cci_control_port_by_index(u32 port, bool enable)
- 	return -ENODEV;
- }
- #endif
++Example:
++	pwrap: pwrap at 1000f000 {
++		compatible = "mediatek,mt8135-pwrap";
++		reg = <0 0x1000f000 0 0x1000>,
++			<0 0x11017000 0 0x1000>;
++		reg-names = "pwrap", "pwrap-bridge";
++		interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
++		resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
++				<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
++		reset-names = "pwrap", "pwrap-bridge";
++		clocks = <&clk26m>, <&clk26m>;
++		clock-names = "spi", "wrap";
 +
- #define cci_disable_port_by_device(dev) \
- 	__cci_control_port_by_device(dev, false)
- #define cci_enable_port_by_device(dev) \
++		pmic {
++			compatible = "mediatek,mt6397";
++		};
++	};
 -- 
-1.7.9.5
+2.1.4
