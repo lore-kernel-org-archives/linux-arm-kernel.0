@@ -1,72 +1,21 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 10 Mar 2015 19:36:00 +0800
-Subject: [PATCH v9 05/21] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
-In-Reply-To: <20150310111931.GU4278@bivouac.eciton.net>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-6-git-send-email-hanjun.guo@linaro.org>
- <20150305185117.GA17415@e102568-lin.cambridge.arm.com>
- <54FEA4CC.8090000@linaro.org> <20150310111931.GU4278@bivouac.eciton.net>
-Message-ID: <54FED720.8080401@linaro.org>
+From: ijc@hellion.org.uk (Ian Campbell)
+Date: Tue, 10 Mar 2015 11:40:46 +0000
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <54FED277.4040000@redhat.com>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+ <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
+ <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
+ <20150303135847.GH4911@lukather> <54FED277.4040000@redhat.com>
+Message-ID: <1425987646.21353.96.camel@hellion.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?03?10? 19:19, Leif Lindholm wrote:
-> On Tue, Mar 10, 2015 at 04:01:16PM +0800, Hanjun Guo wrote:
->>>> index 0000000..f052e7a
->>>> --- /dev/null
->>>> +++ b/arch/arm64/kernel/acpi.c
->>>> @@ -0,0 +1,101 @@
->>>> +/*
->>>> + *  ARM64 Specific Low-Level ACPI Boot Support
->>>> + *
->>>> + *  Copyright (C) 2013-2014, Linaro Ltd.
->>>> + *	Author: Al Stone <al.stone@linaro.org>
->>>> + *	Author: Graeme Gregory <graeme.gregory@linaro.org>
->>>> + *	Author: Hanjun Guo <hanjun.guo@linaro.org>
->>>> + *	Author: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>> + *	Author: Naresh Bhat <naresh.bhat@linaro.org>
->>>> + *
->>>> + *  This program is free software; you can redistribute it and/or modify
->>>> + *  it under the terms of the GNU General Public License version 2 as
->>>> + *  published by the Free Software Foundation.
->>>> + */
->>>> +
->>>> +#define pr_fmt(fmt) "ACPI: " fmt
->>>> +
->>>> +#include <linux/acpi.h>
->>>> +#include <linux/bootmem.h>
->>>> +#include <linux/cpumask.h>
->>>> +#include <linux/init.h>
->>>> +#include <linux/irq.h>
->>>> +#include <linux/irqdomain.h>
->>>> +#include <linux/memblock.h>
->>>> +#include <linux/smp.h>
->>>> +
->>>> +int acpi_noirq;			/* skip ACPI IRQ initialization */
->>>> +int acpi_disabled;
->>>> +EXPORT_SYMBOL(acpi_disabled);
->>>> +
->>>> +int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
->>>> +EXPORT_SYMBOL(acpi_pci_disabled);
->>>> +
->>>> +/*
->>>> + * __acpi_map_table() will be called before page_init(), so early_ioremap()
->>>> + * or early_memremap() should be called here to for ACPI table mapping.
->>>> + */
->>>> +char *__init __acpi_map_table(unsigned long phys, unsigned long size)
->>>> +{
->>>> +	if (!phys || !size)
->>>
->>> Is there a reason to rule out physical address 0x0 ?
->>
->> No particular reasons, unless some arch/firmware limits, I'm
->> not sure if we need this check (x86 needs it), I'm CC Leif
->> to confirm.
->
-> Nothing in UEFI explicitly bans using physical address 0 for anything,
-> and nothing in the architecture reserves it. So I don't think this
-> check is necessary.
+On Tue, 2015-03-10 at 12:16 +0100, Hans de Goede wrote:
 
-Thanks for the confirmation, will remove the !phys check.
+> I'm not sure if stdout-path supports aliases
 
-Hanjun
+I thought it did but ePAPR section 3.5 says "A string that specifies the
+full path to the node" which suggests not, and AFAICT the code doesn't
+try to handle alias.
+
+Ian.
