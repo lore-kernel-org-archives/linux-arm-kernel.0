@@ -1,34 +1,27 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Tue, 10 Mar 2015 22:27:26 +0100
-Subject: [PATCH v4 5/6] power: twl4030_madc_battery: Add of_twl4030_madc_match
- to MODULE_DEVICE_TABLE
+Date: Tue, 10 Mar 2015 22:27:27 +0100
+Subject: [PATCH v4 6/6] power: twl4030_madc_battery: Add missing MODULE_ALIAS
 In-Reply-To: <1426022847-30912-1-git-send-email-marek@goldelico.com>
 References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
-Message-ID: <1426022847-30912-6-git-send-email-marek@goldelico.com>
+Message-ID: <1426022847-30912-7-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When twl_4030_madc_battery is build as module, MODULE_DEVICE_TABLE allow
-the module to be auto-loaded since the module will match the devices
-instantiated from device tree.
+Without MODULE_ALIAS twl4030_madc_battery won't get loaded automatically.
 
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- drivers/power/twl4030_madc_battery.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/power/twl4030_madc_battery.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/power/twl4030_madc_battery.c b/drivers/power/twl4030_madc_battery.c
-index 4bcb4a9..3e0005d 100644
+index 3e0005d..d0753f1 100644
 --- a/drivers/power/twl4030_madc_battery.c
 +++ b/drivers/power/twl4030_madc_battery.c
-@@ -252,6 +252,8 @@ static const struct of_device_id of_twl4030_madc_match[] = {
- 	{},
- };
- 
-+MODULE_DEVICE_TABLE(of, of_twl4030_madc_match);
-+
- #else
- static struct twl4030_madc_bat_platform_data *
- 	twl4030_madc_dt_probe(struct platform_device *pdev)
+@@ -355,3 +355,4 @@ module_platform_driver(twl4030_madc_battery_driver);
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Lukas M?rdian <lukas@goldelico.com>");
+ MODULE_DESCRIPTION("twl4030_madc battery driver");
++MODULE_ALIAS("platform:twl4030_madc_battery");
 -- 
 1.9.1
