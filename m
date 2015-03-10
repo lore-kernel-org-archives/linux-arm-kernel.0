@@ -1,65 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 10 Mar 2015 14:16:46 +0000
-Subject: [PATCH v9 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
- if ACPI is enabled on ARM64
-In-Reply-To: <54FEE227.4000808@linaro.org>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-19-git-send-email-hanjun.guo@linaro.org>
- <20150306174715.GA26888@e102568-lin.cambridge.arm.com>
- <54FEE227.4000808@linaro.org>
-Message-ID: <20150310141645.GA25123@red-moon>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 10 Mar 2015 16:31:33 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <2223973.a64rBcZvaA@wuerfel>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <20150309224929.GL5264@atomide.com>
+ <CAB3XZEdS+mK1MiB7OWiehFGRBnUzJ84s3rFrCy3-YFYhL-BNWw@mail.gmail.com>
+ <2223973.a64rBcZvaA@wuerfel>
+Message-ID: <CAB3XZEftjwUGS_Kj2dCxYY1m82C+a1_=akbnG3_hLETCr+Dddg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 12:23:03PM +0000, Hanjun Guo wrote:
-> On 2015?03?07? 01:47, Lorenzo Pieralisi wrote:
-> > On Wed, Feb 25, 2015 at 08:39:58AM +0000, Hanjun Guo wrote:
-> >> From: Al Stone <al.stone@linaro.org>
-> >>
-> >> ACPI reduced hardware mode is disabled by default, but ARM64
-> >> can only run properly in ACPI hardware reduced mode, so select
-> >> ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
-> >
-> > Agreed. This will remove unneeded acpica code. I think though,
-> > you should also check the FADT flag HW_REDUCED_ACPI at boot to
-> > make sure that the tables are HW reduced compliant. I am flagging
-> 
-> Agreed, I will add that check on top of this patch set. We explicitly
-> stated that we are using hardware reduced mode on ARM64 in the doc, so, 
-> how about print some warning message and go on with the boot if we
-> got the wrong flag HW_REDUCED_ACPI at boot?
+On Tue, Mar 10, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 10 March 2015 13:00:19 Eliad Peller wrote:
+>> On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+>> >> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+>> >> > if that's enough to clean out the platform_data handling from the wlcore
+>> >> > driver, it's good enough as a start.
+>> >> not sure i'm following - can you elaborate?
+>> >>
+>> >> i'll summarize the way i see it. please correct me if i'm wrong.
+>> >>
+>> >> both wl18xx and wl12xx use the platform data to get the irq number.
+>> >> wl12xx (only) also needs some additional clock definitions to be
+>> >> passed. there's currently some issue with specifying some the of clock
+>> >> sources, so i preferred starting only with (the simpler) wl18xx
+>> >> bindings.
+>> >>
+>> >> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+>> >> data (i.e. irq) can be passed by the new DT bindings.
+>> >> however, for platforms with wl12xx, we still need to pass the clock
+>> >> definitions (along with the irq), so we have to keep
+>> >> legacy_init_wl12xx for the time being (and that's also why we have to
+>> >> currently keep the platform_data handling in the wlcore driver)
+>> >>
+>> >> do you have something else in mind?
+>> >
+>> > I think what Arnd is saying is we've now removed all the wl12xx using
+>> > legacy platforms, so all of them can boot with just data from dts.
+>
+> Right, that was my idea.
+>
+>> I don't think that's the case (unless i'm missing something).
+>> e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
+>> initializes wl12xx device.
+>
+> This one is just like the igep0030, as Tony was saying: the board
+> boots from device tree already, so now that we have a binding for
+> it, we can remove the wl12xx_set_platform_data() for it.
+>
+i think the wl12xx_set_platform_data() name created some confusion -
+it is used to pass platform data for both wl12xx and wl18xx devices.
+(this confusion is all around the wlcore driver as well, due to the
+code evolution)
 
-Why would be boot if the ACPI tables are not HW_REDUCED_ACPI compliant ?
+the binding i added is for wl18xx only (there is no wl12xx binding yet).
+the remaining boards, AFAICT, have wl12xx (rather than wl18xx) cards.
+so i don't see how we can remove these wl12xx_set_platform_data()
+calls before we have wl12xx bindings in-place as well.
 
-To look for trouble :) ? arm64 does not support any other ACPI model,
-the missing flag should disable ACPI IMO on arm64.
+> Unfortunately, there is still one machine that uses a board file
+> in combination with this wl12xx: da850-evm calls
+> wl12xx_set_platform_data() from a legacy board file without DT.
+>
+ditto.
 
-You could add a check in this patch same place where you check
-the FADT version and be done with this.
-
-Thank you !
-Lorenzo
-
-> > this up because I noticed code in core code (not guarded by
-> > ifdef) that checks:
-> >
-> > acpi_gbl_reduced_hardware
-> >
-> > and if it is not set it goes on instantiating fixed HW devices.
-> >
-> > drivers/acpi/scan.c:2567
-> >
-> > It is just a heads up, I think it is harmless, but one thing is
-> > removing acpica code on ACPI HW reduced only, the other is to make
-> > sure the kernel does not try to use ACPI HW features that acpica
-> > can't support.
-> 
-> I agree, need some cleanups for the ACPICA code I think, and this
-> was raised about 1 and half years ago and Intel folks need more
-> consideration on that [1].
-> 
-> [1]: http://comments.gmane.org/gmane.linux.acpi.devel/63844
-> 
-> Thanks
-> Hanjun
-> 
+Eliad.
