@@ -1,43 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 17:38:08 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF2986.6020503@list.ru>
-References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru>
-Message-ID: <20150310173807.GU8656@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Mar 2015 17:40:19 +0000
+Subject: some question about Set bit 22 in the PL310 (cache controller)
+ AuxCtlr register
+In-Reply-To: <20150310163411.GR8656@n2100.arm.linux.org.uk>
+References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
+ <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
+ <20150310163411.GR8656@n2100.arm.linux.org.uk>
+Message-ID: <20150310174018.GE13687@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 08:27:34PM +0300, Stas Sergeev wrote:
-> Please also find the same crash here:
-> http://lists.linaro.org/pipermail/kernel-build-reports/2014-June/003872.html
+On Tue, Mar 10, 2015 at 04:34:12PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Mar 10, 2015 at 04:31:34PM +0000, Catalin Marinas wrote:
+> > It's not entirely safe either. I guess the assumption is that CMA
+> > allocates from highmem which is not mapped in the kernel linear mapping.
+> > However, to be able to flush the caches for such highmem pages, they
+> > need to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a
+> > small window between dmac_flush_range() and kunmap_atomic() where
+> > speculative cache line fills can still happen.
+> 
+> That really ought to be fixed.
 
-Hmm, looks like from the exynos5420-arndale-octa failure in that, we
-don't dump the page table entries.  We should do.  Sorry about my
-previous mail.
+For non-CMA DMA allocations, the solution is to set some memory aside
+which is not mapped (IIRC you tried this long time ago).
 
-If you can reproduce this, please do so with this patch so that we
-can get the page table entries associated with the problem.  Thanks.
+As for CMA, do we have a guarantee that memory only comes from highmem?
+If yes (or we can enforce this somehow), we need something like
+kmap_atomic_prot() implemented for flushing such pages.
 
- arch/arm/mm/fault.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index a982dc3190df..6333d9c17875 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -552,6 +552,7 @@ do_DataAbort(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- 
- 	pr_alert("Unhandled fault: %s (0x%03x) at 0x%08lx\n",
- 		inf->name, fsr, addr);
-+	show_pte(current->mm, addr);
- 
- 	info.si_signo = inf->sig;
- 	info.si_errno = 0;
-
+But I still think it's easier if we just set bit 22 for PL310 ;). When
+this bit is cleared, the system is no longer compliant with the
+statements on mismatched memory attributes.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Catalin
