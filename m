@@ -1,47 +1,16 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 10 Mar 2015 14:02:37 -0700
-Subject: [PATCH v5 1/4] PCI: Export symbols of PCI functions
-In-Reply-To: <20150310205651.GA32204@google.com>
-References: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
- <1425947886-23705-2-git-send-email-rjui@broadcom.com>
- <20150310205651.GA32204@google.com>
-Message-ID: <54FF5BED.9090302@broadcom.com>
+From: info@seopage.biz (Olivia)
+Date: Wed, 11 Mar 2015 02:23:27 +0530
+Subject: Web Listing
+Message-ID: <n3bXa6usKLd7dC2n7jNVifVkA9IHnBmH2zq45feL4VQG@seopage.biz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
 
-On 3/10/2015 1:56 PM, Bjorn Helgaas wrote:
-> On Mon, Mar 09, 2015 at 05:38:03PM -0700, Ray Jui wrote:
->> Export symbols of the following PCI functions so they can be referenced
->> by a PCI driver compiled as a kernel loadable module:
->>
->> pci_common_swizzle
->> pci_create_root_bus
->> pci_stop_root_bus
->> pci_remove_root_bus
->> pci_assign_unassigned_bus_resources
->> pci_fixup_irqs
-> 
-> Have you tested your driver as a loadable module?
-> 
-> If it works to load/unload/reload/etc., I'm OK with exporting these
-> symbols.  I would prefer EXPORT_SYMBOL_GPL, though, because these don't
-> constitute a very coherent interface right now, and they will likely be
-> reworked.  For example, see Yijing Wang's work to sort out the
-> pci_bus_add_devices() / resource assignment mess.
-> 
-> Bjorn
 
-Yes, I tested the driver with load/unload/reload on Cygnus. Console logs
-are included in my reply to Arnd's email from another email thread.
+Hi, 
+My name is Olivia and I am an Online Strategist.
+I've been tracking the success of your website while doing some research on your industry-I'm impressed with your company, but there are some real opportunities for growth that you currently are missing. Are you interested in several proven strategies to use content and social media to drive relevant traffic to your site? In 20 minutes I can show you how to fuel your brand and generate more revenue from search engines and social networks. This is a $500 value free of charge. I'd like to follow up about this with a quick phone call. Can I call you this week to discuss your campaign?
 
-I'll wait for more feedback from you on the iProc PCIe driver itself.
-But if you have reviewed them and think they are okay then I can go
-ahead and submit v6 with changes to use EXPORT_SYMBOL_GPL.
-
-Let me know.
-
-Thanks,
-
-Ray
+Thank you
+Best regards,
+Olivia
