@@ -1,118 +1,28 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Tue, 10 Mar 2015 18:37:49 +0200
-Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
- DMA_BIT_MASK(64)); to fail?
-In-Reply-To: <20150310110538.GK29584@n2100.arm.linux.org.uk>
-References: <54F8A68B.3080709@linaro.org>
- <20150305201753.GG29584@n2100.arm.linux.org.uk> <54FA2084.8050803@linaro.org>
- <20150310110538.GK29584@n2100.arm.linux.org.uk>
-Message-ID: <54FF1DDD.6060707@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 10 Mar 2015 09:38:51 -0700
+Subject: [PATCH v6 7/8] ARM: dts: enable GPIO for Broadcom Cygnus
+In-Reply-To: <CACRpkdbx9h5t5QRLusnXqx31zD9W89dyvGDH4y6osK_6PeoChA@mail.gmail.com>
+References: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
+ <1425933902-20652-8-git-send-email-rjui@broadcom.com>
+ <CACRpkdbx9h5t5QRLusnXqx31zD9W89dyvGDH4y6osK_6PeoChA@mail.gmail.com>
+Message-ID: <CAGVrzcZN0zUUb_zyrvijm3XBHAO+NqvrMpdptbn0oVyaShWqdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On 03/10/2015 01:05 PM, Russell King - ARM Linux wrote:
-> On Fri, Mar 06, 2015 at 11:47:48PM +0200, Grygorii.Strashko at linaro.org wrote:
->> On 03/05/2015 10:17 PM, Russell King - ARM Linux wrote:
->>> On Thu, Mar 05, 2015 at 08:55:07PM +0200, Grygorii.Strashko at linaro.org wrote:
->>>> The dma_coerce_mask_and_coherent() will fail in case 'Example 3' and succeed in cases 1,2.
->>>> dma-mapping.c --> __dma_supported()
->>>> 	if (sizeof(mask) != sizeof(dma_addr_t) && <== true for all OMAP4+
->>>> 	    mask > (dma_addr_t)~0 &&		<== true for DMA_BIT_MASK(64)
->>>> 	    dma_to_pfn(dev, ~0) < max_pfn) {  <== true only for Example 3
->>>
->>> Hmm, I think this may make more sense to be "< max_pfn - 1" here, as
->>> that would be better suited to our intention.
->>>
->>> The result of dma_to_pfn(dev, ~0) is the maximum PFN which we could
->>> address via DMA, but we're comparing it with the maximum PFN in the
->>> system plus 1 - so we need to subtract one from it.
+2015-03-10 3:21 GMT-07:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Mon, Mar 9, 2015 at 9:45 PM, Ray Jui <rjui@broadcom.com> wrote:
+>
+>> This enables all 3 GPIO controllers including the ASIU GPIO, the
+>> chipcommonG GPIO, and the ALWAYS-ON GPIO, for Broadcom Cygnus SoC
 >>
->> Ok. I'll try it.
-> 
-> Any news on this - I think it is a real off-by-one bug which we should
-> fix in any case.
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> Tested-by: Dmitry Torokhov <dtor@chromium.org>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Pls take this through ARM SoC.
 
-Sorry for delay, there was a day-off on my side.
-
-As per my test results - with above change 
- dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends will succeed always.
-
-
-=========== Test results:
-
-==== Test case 1:
-Input data:
-- RAM: start = 0x80000000 size = 0x80000000
-- CONFIG_ARM_LPAE=n and sizeof(phys_addr_t) = 4
-
-a) NO changes:
- memory registered within memblock as:
-   memory.cnt  = 0x1
-   memory[0x0]     [0x00000080000000-0x000000fffffffe], 0x7fffffff bytes flags: 0x0
-
- max_pfn   = 0xFFFFF
- max_mapnr = 0x7FFFF
-
- dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)); -- succeeded
-
-b) with change in __dma_supported():
-        if (sizeof(mask) != sizeof(dma_addr_t) &&
-            mask > (dma_addr_t)~0 &&
--           dma_to_pfn(dev, ~0) < max_pfn) {
-+           dma_to_pfn(dev, ~0) < (max_pfn - 1)) {
-                if (warn) {
-
- memory registered within memblock as:
-   memory.cnt  = 0x1
-   memory[0x0]     [0x00000080000000-0x000000fffffffe], 0x7fffffff bytes flags: 0x0
-
- max_pfn   = 0xFFFFF
- max_mapnr = 0x7FFFF
-
- dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)); -- succeeded
-
-
-==== Test case 2:
-Input data:
-- RAM: start = 0x80000000 size = 0x80000000
-- CONFIG_ARM_LPAE=y and sizeof(phys_addr_t) = 8
-
-a) NO changes:
- memory registered within memblock as:
-   memory.cnt  = 0x1
-   memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
-
- max_pfn   = 0x100000
- max_mapnr = 0x80000
-
- dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)); -- failed
-[    5.468470] asoc-simple-card sound at 0: Coherent DMA mask 0xffffffffffffffff is larger than dma_addr_t allows
-[    5.478706] asoc-simple-card sound at 0: Driver did not use or check the return value from dma_set_coherent_mask()?
-[    5.496620] davinci-mcasp 48468000.mcasp: ASoC: pcm constructor failed: -5
-[    5.503844] asoc-simple-card sound@0: ASoC: can't create pcm davinci-mcasp.0-tlv320aic3x-hifi :-5
-
-
-b) with change in __dma_supported():
-        if (sizeof(mask) != sizeof(dma_addr_t) &&
-            mask > (dma_addr_t)~0 &&
--           dma_to_pfn(dev, ~0) < max_pfn) {
-+           dma_to_pfn(dev, ~0) < (max_pfn - 1)) {
-                if (warn) {
-
- memory registered within memblock as:
-   memory.cnt  = 0x1
-   memory[0x0]     [0x00000080000000-0x000000ffffffff], 0x80000000 bytes flags: 0x0
-
- max_pfn   = 0x100000
- max_mapnr = 0x80000
-
- dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)); -- succeeded
-
-regards,
--grygorii
-
--- 
-regards,
--grygorii
+Applied to devicetree/next.
+--
+Florian
