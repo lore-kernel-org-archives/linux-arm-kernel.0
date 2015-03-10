@@ -1,49 +1,24 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 10 Mar 2015 08:48:10 -0700
-Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command errors
-Message-ID: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 16:48:31 +0100
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <20150310142805.GN5264@atomide.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <2223973.a64rBcZvaA@wuerfel> <20150310142805.GN5264@atomide.com>
+Message-ID: <2300824.dcEMS7aYJa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_mmc driver enables HLE errors as part of DW_MCI_ERROR_FLAGS but
-nothing in the interrupt handler actually handles them and ACKs them.
-That means that if we ever get an HLE error we'll just keep getting
-interrupts and we'll wedge things.
+On Tuesday 10 March 2015 07:28:05 Tony Lindgren wrote:
+> 
+> Oops I forgot about the omap3-sbc-t3730, so yes we have to keep the
+> platform data a little bit longer. But nothing stopping us moving
+> all the other ones to use a proper device tree based configuration.
+> 
 
-We really don't expect HLE errors but if we ever get them we shouldn't
-silently ignore them.
+For all I can tell, the t3730 board file does not support wl12xx
+at the moment, only the dts file does.
 
-Note that I have seen HLE errors while constantly ejecting and
-inserting cards (ejecting while inserting, etc).
+If we do what Sekhar suggested and drop wl12xx support from
+the DA850 EVM board file, we can fix all wlcore users.
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Note that this works together with the patch I sent up yesterday (the
-CMD 11 timer).  I would have sent the two together except that I had
-local printouts (and ACKing of HLE) and didn't realize that this was
-also required for a full solution.
-
- drivers/mmc/host/dw_mmc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 47dfd0e..294edc9c 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -44,11 +44,11 @@
- /* Common flag combinations */
- #define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | \
- 				 SDMMC_INT_HTO | SDMMC_INT_SBE  | \
--				 SDMMC_INT_EBE)
-+				 SDMMC_INT_EBE | SDMMC_INT_HLE)
- #define DW_MCI_CMD_ERROR_FLAGS	(SDMMC_INT_RTO | SDMMC_INT_RCRC | \
--				 SDMMC_INT_RESP_ERR)
-+				 SDMMC_INT_RESP_ERR | SDMMC_INT_HLE)
- #define DW_MCI_ERROR_FLAGS	(DW_MCI_DATA_ERROR_FLAGS | \
--				 DW_MCI_CMD_ERROR_FLAGS  | SDMMC_INT_HLE)
-+				 DW_MCI_CMD_ERROR_FLAGS)
- #define DW_MCI_SEND_STATUS	1
- #define DW_MCI_RECV_STATUS	2
- #define DW_MCI_DMA_THRESHOLD	16
--- 
-2.2.0.rc0.207.ga3a616c
+	Arnd
