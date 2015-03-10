@@ -1,99 +1,65 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Tue, 10 Mar 2015 19:46:23 +0530
-Subject: [PATCH] dma: Add Xilinx ZDMA device tree Binding Documentation
-Message-ID: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 Mar 2015 14:16:46 +0000
+Subject: [PATCH v9 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
+ if ACPI is enabled on ARM64
+In-Reply-To: <54FEE227.4000808@linaro.org>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
+ <1424853601-6675-19-git-send-email-hanjun.guo@linaro.org>
+ <20150306174715.GA26888@e102568-lin.cambridge.arm.com>
+ <54FEE227.4000808@linaro.org>
+Message-ID: <20150310141645.GA25123@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device-tree binding documentation for Xilinx ZDMA Engine
+On Tue, Mar 10, 2015 at 12:23:03PM +0000, Hanjun Guo wrote:
+> On 2015?03?07? 01:47, Lorenzo Pieralisi wrote:
+> > On Wed, Feb 25, 2015 at 08:39:58AM +0000, Hanjun Guo wrote:
+> >> From: Al Stone <al.stone@linaro.org>
+> >>
+> >> ACPI reduced hardware mode is disabled by default, but ARM64
+> >> can only run properly in ACPI hardware reduced mode, so select
+> >> ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
+> >
+> > Agreed. This will remove unneeded acpica code. I think though,
+> > you should also check the FADT flag HW_REDUCED_ACPI at boot to
+> > make sure that the tables are HW reduced compliant. I am flagging
+> 
+> Agreed, I will add that check on top of this patch set. We explicitly
+> stated that we are using hardware reduced mode on ARM64 in the doc, so, 
+> how about print some warning message and go on with the boot if we
+> got the wrong flag HW_REDUCED_ACPI at boot?
 
-Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
----
- .../devicetree/bindings/dma/xilinx/zdma.txt        |   76 ++++++++++++++++++++
- 1 files changed, 76 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zdma.txt
+Why would be boot if the ACPI tables are not HW_REDUCED_ACPI compliant ?
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/zdma.txt b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
-new file mode 100644
-index 0000000..399a3bc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
-@@ -0,0 +1,76 @@
-+Xilinx ZDMA engine, it does support memory to memory transfers,
-+memory to device and device to memory transfers. It also has flow
-+control and rate control support for slave/peripheral dma access.
-+
-+Xilinx ZynqMP has two instances of general purpose DMA(ZDMA).
-+one is located in FPD(full power domain) and other is located in
-+LPD(low power domain).
-+
-+ZDMA instance located in FPD is referred as FPDMA and instance located
-+in LPD is referred as LPDMA.
-+
-+FPDMA is configured with 8 DMA channels and AXI bus width is 128 byte.
-+LPDMA is configured with 8 DMA channels and AXI bus width is 64 byte.
-+
-+Each channel in a instance has its own address space and interrupt line
-+but shares common reference and APB clock. So, each channel will be treated
-+as a standalone dma device.
-+Since its a general purpose dma controller, it has a rich set of configurable
-+options with respect to data and descriptor attributes.
-+
-+Required properties:
-+- compatible: Should be "xlnx,fpdma-1.0" or "xlnx,lpdma-1.0"
-+- reg: Memory map for dma module access.
-+- interrupt-parent: Interrupt controller the interrupt is routed through
-+- interrupts: Should contain DMA channel interrupt.
-+- xlnx,id: Channel Id
-+
-+Optional properties:
-+- xlnx,include-sg: Indicates the controller to operate in simple or scatter
-+		   gather dma mode
-+- xlnx,ratectrl: Scheduling interval in terms of clock cycles for
-+		 source AXI transaction
-+- xlnx,overfetch: Tells whether the channel is allowed to over fetch the data
-+- xlnx,src-issue: Number of AXI outstanding transactions on source side
-+- xlnx,desc-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			descriptor read are marked Non-coherent
-+- xlnx,src-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			source descriptor payload are marked Non-coherent
-+- xlnx,dst-axi-cohrnt: Tells whether the AXI transactions generated for the
-+			dst descriptor payload are marked Non-coherent
-+- xlnx,desc-axi-qos: AXI QOS bits to be used for descriptor fetch
-+- xlnx,src-axi-qos: AXI QOS bits to be used for data read
-+- xlnx,dst-axi-qos: Axi QOS bits to be used for data write
-+- xlnx,desc-axi-cache: AXI cache bits to be used for descriptor fetch
-+- xlnx,desc-axi-cache: AXI cache bits to be used for data read
-+- xlnx,desc-axi-cache: AXI cache bits to be used for data write
-+- xlnx,src-burst-len: AXI length for data read. Support only power of 2 values
-+		      i.e 1,2,4,8 and 16.
-+- xlnx,dst-burst-len: AXI length for data write. Support only power of 2 values
-+		      i.e 1,2,4,8 and 16.
-+
-+Example:
-+++++++++
-+fpdma0: dma at fd500000 {
-+	compatible = "xlnx,fpdma-1.0";
-+	reg = <0x0 0xfd500000 0x1000>;
-+	interrupt-parent = <&gic>;
-+	interrupts = <0 117 4>;
-+	xlnx,include-sg;
-+	xlnx,overfetch;
-+	xlnx,ratectrl = <0>;
-+	xlnx,src-issue = <16>;
-+	xlnx,id = <0>;
-+	xlnx,desc-axi-cohrnt;
-+	xlnx,src-axi-cohrnt;
-+	xlnx,dst-axi-cohrnt;
-+	xlnx,desc-axi-qos = <0>;
-+	xlnx,desc-axi-cache = <0>;
-+	xlnx,src-axi-qos = <0>;
-+	xlnx,src-axi-cache = <2>;
-+	xlnx,dst-axi-qos = <0>;
-+	xlnx,dst-axi-cache = <2>;
-+	xlnx,src-burst-len = <4>;
-+	xlnx,dst-burst-len = <4>;
-+};
-+
--- 
-1.7.4
+To look for trouble :) ? arm64 does not support any other ACPI model,
+the missing flag should disable ACPI IMO on arm64.
+
+You could add a check in this patch same place where you check
+the FADT version and be done with this.
+
+Thank you !
+Lorenzo
+
+> > this up because I noticed code in core code (not guarded by
+> > ifdef) that checks:
+> >
+> > acpi_gbl_reduced_hardware
+> >
+> > and if it is not set it goes on instantiating fixed HW devices.
+> >
+> > drivers/acpi/scan.c:2567
+> >
+> > It is just a heads up, I think it is harmless, but one thing is
+> > removing acpica code on ACPI HW reduced only, the other is to make
+> > sure the kernel does not try to use ACPI HW features that acpica
+> > can't support.
+> 
+> I agree, need some cleanups for the ACPICA code I think, and this
+> was raised about 1 and half years ago and Intel folks need more
+> consideration on that [1].
+> 
+> [1]: http://comments.gmane.org/gmane.linux.acpi.devel/63844
+> 
+> Thanks
+> Hanjun
+> 
