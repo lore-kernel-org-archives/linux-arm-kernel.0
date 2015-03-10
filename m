@@ -1,46 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 17:48:10 +0000
-Subject: some question about Set bit 22 in the PL310 (cache controller)
- AuxCtlr register
-In-Reply-To: <20150310174018.GE13687@e104818-lin.cambridge.arm.com>
-References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
- <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
- <20150310163411.GR8656@n2100.arm.linux.org.uk>
- <20150310174018.GE13687@e104818-lin.cambridge.arm.com>
-Message-ID: <20150310174809.GV8656@n2100.arm.linux.org.uk>
+From: stsp@list.ru (Stas Sergeev)
+Date: Tue, 10 Mar 2015 20:51:58 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <54FF2B45.8060407@hurleysoftware.com>
+References: <54FF21BE.2040506@list.ru> <54FF2B45.8060407@hurleysoftware.com>
+Message-ID: <54FF2F3E.7050503@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 05:40:19PM +0000, Catalin Marinas wrote:
-> On Tue, Mar 10, 2015 at 04:34:12PM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Mar 10, 2015 at 04:31:34PM +0000, Catalin Marinas wrote:
-> > > It's not entirely safe either. I guess the assumption is that CMA
-> > > allocates from highmem which is not mapped in the kernel linear mapping.
-> > > However, to be able to flush the caches for such highmem pages, they
-> > > need to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a
-> > > small window between dmac_flush_range() and kunmap_atomic() where
-> > > speculative cache line fills can still happen.
-> > 
-> > That really ought to be fixed.
-> 
-> For non-CMA DMA allocations, the solution is to set some memory aside
-> which is not mapped (IIRC you tried this long time ago).
-> 
-> As for CMA, do we have a guarantee that memory only comes from highmem?
-> If yes (or we can enforce this somehow), we need something like
-> kmap_atomic_prot() implemented for flushing such pages.
+10.03.2015 20:35, Peter Hurley ?????:
+> On 03/10/2015 12:54 PM, Stas Sergeev wrote:
+>> Hello, the patch below is needed for a successful boot on armada-xp.
+>>
+>>
+>> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
+>> This fixes the following crash at boot:
+>>
+>>  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
+>>  Internal error: : 808 [#1] SMP ARM
+>>
+>>  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
+>>  Hardware name: Marvell Armada 370/XP (Device Tree)
+>>  task: ed41e800 ti: ed43e000 task.ti: ed43e000
+>>  PC is at _set_bit+0x28/0x50
+>>  LR is at n_tty_set_termios+0x328/0x358
+>>  pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
+>>  sp : ed43fd00  ip : 00000000  fp : 00000000
+>>  r10: 00000002  r9 : 00000000  r8 : ec930200
+>>  r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
+>>  r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
+>>  Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+>>  Control: 10c5387d  Table: 0000406a  DAC: 00000015
+>>  Process swapper/0 (pid: 1, stack limit = 0xed43e220)
+>>
+>> The offending instruction in _set_bit() is "strex r0, r2, [r1]"
+>> For some reason the exclusive access instructions do not like the
+>> vmalloc() space... While there may be another fix to make them
+>> fine about vmalloc() space, it still looks like a good idea to
+>> use kmalloc() for allocating a small (sub-page) struct.
+> NAK.
+>
+> struct n_tty_data is order 2, not sub-page.
+OK, you are right, sorry. 8844 bytes.
+Is this really a target for vmalloc() though? I thought kmalloc()
+is preferable even for that size.
 
-For CMA, if it comes from lowmem, CMA changes the memory attributes to
-make it non-cacheable, rather than using a separate mapping of the same
-page.  That eliminates the aliasing mapping problem, and was done to
-explicitly avoid this scenario.
-
-However, the CMA changes on ARM were never properly reviewed before they
-went in.  Like a lot of things today, they bypassed my tree for no good
-reason (and a lot of DMA API stuff continues to do so.)  So it's not
-surprising that the quality of core ARM code has been getting half-
-thoughtout fixes like this...
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> The abort means something else is wrong; that's what needs
+> tracking down and fixing.
+Yeah, I even mentioned that in a commit log.
