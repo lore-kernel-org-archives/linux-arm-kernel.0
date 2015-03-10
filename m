@@ -1,89 +1,89 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 9 Mar 2015 17:38:04 -0700
-Subject: [PATCH v5 2/4] pci: iProc: define iProc PCIe platform bus binding
+Date: Mon, 9 Mar 2015 17:38:03 -0700
+Subject: [PATCH v5 1/4] PCI: Export symbols of PCI functions
 In-Reply-To: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
 References: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1425947886-23705-3-git-send-email-rjui@broadcom.com>
+Message-ID: <1425947886-23705-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Broadcom iProc PCIe platform interface device tree binding
+Export symbols of the following PCI functions so they can be referenced
+by a PCI driver compiled as a kernel loadable module:
+
+pci_common_swizzle
+pci_create_root_bus
+pci_stop_root_bus
+pci_remove_root_bus
+pci_assign_unassigned_bus_resources
+pci_fixup_irqs
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbraden@broadcom.com>
 ---
- .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |   63 ++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+ drivers/pci/pci.c       |    1 +
+ drivers/pci/probe.c     |    1 +
+ drivers/pci/remove.c    |    2 ++
+ drivers/pci/setup-bus.c |    1 +
+ drivers/pci/setup-irq.c |    1 +
+ 5 files changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-new file mode 100644
-index 0000000..f7ce50e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-@@ -0,0 +1,63 @@
-+* Broadcom iProc PCIe controller with the platform bus interface
-+
-+Required properties:
-+- compatible: Must be "brcm,iproc-pcie"
-+- reg: base address and length of the PCIe controller I/O register space
-+- #interrupt-cells: set to <1>
-+- interrupt-map-mask and interrupt-map, standard PCI properties to define the
-+  mapping of the PCIe interface to interrupt numbers
-+- linux,pci-domain: PCI domain ID. Should be unique for each host controller
-+- bus-range: PCI bus numbers covered
-+- #address-cells: set to <3>
-+- #size-cells: set to <2>
-+- device_type: set to "pci"
-+- ranges: ranges for the PCI memory and I/O regions
-+
-+Optional properties:
-+- phys: phandle of the PCIe PHY device
-+- phy-names: must be "pcie-phy"
-+
-+Example:
-+	pcie0: pcie at 18012000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18012000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <0>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000
-+			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>;
-+
-+		phys = <&phy 0 5>;
-+		phy-names = "pcie-phy";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18013000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <1>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000
-+			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>;
-+
-+		phys = <&phy 1 6>;
-+		phy-names = "pcie-phy";
-+	};
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 81f06e8..fb4a3da 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -2492,6 +2492,7 @@ u8 pci_common_swizzle(struct pci_dev *dev, u8 *pinp)
+ 	*pinp = pin;
+ 	return PCI_SLOT(dev->devfn);
+ }
++EXPORT_SYMBOL(pci_common_swizzle);
+ 
+ /**
+  *	pci_release_region - Release a PCI bar
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 8d2f400..eb24ef9 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1993,6 +1993,7 @@ err_out:
+ 	kfree(b);
+ 	return NULL;
+ }
++EXPORT_SYMBOL(pci_create_root_bus);
+ 
+ int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+ {
+diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
+index 8bd76c9..c523159 100644
+--- a/drivers/pci/remove.c
++++ b/drivers/pci/remove.c
+@@ -139,6 +139,7 @@ void pci_stop_root_bus(struct pci_bus *bus)
+ 	/* stop the host bridge */
+ 	device_release_driver(&host_bridge->dev);
+ }
++EXPORT_SYMBOL(pci_stop_root_bus);
+ 
+ void pci_remove_root_bus(struct pci_bus *bus)
+ {
+@@ -158,3 +159,4 @@ void pci_remove_root_bus(struct pci_bus *bus)
+ 	/* remove the host bridge */
+ 	device_unregister(&host_bridge->dev);
+ }
++EXPORT_SYMBOL(pci_remove_root_bus);
+diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+index e3e17f3..932c9e5 100644
+--- a/drivers/pci/setup-bus.c
++++ b/drivers/pci/setup-bus.c
+@@ -1750,3 +1750,4 @@ void pci_assign_unassigned_bus_resources(struct pci_bus *bus)
+ 	__pci_bus_assign_resources(bus, &add_list, NULL);
+ 	BUG_ON(!list_empty(&add_list));
+ }
++EXPORT_SYMBOL(pci_assign_unassigned_bus_resources);
+diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+index 4e2d595..9d2bbb6 100644
+--- a/drivers/pci/setup-irq.c
++++ b/drivers/pci/setup-irq.c
+@@ -65,3 +65,4 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+ 	for_each_pci_dev(dev)
+ 		pdev_fixup_irq(dev, swizzle, map_irq);
+ }
++EXPORT_SYMBOL(pci_fixup_irqs);
 -- 
 1.7.9.5
