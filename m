@@ -1,29 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 10 Mar 2015 10:28:26 -0600
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <54FF1BAA.3060409@wwwdotorg.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Mar 2015 16:31:34 +0000
+Subject: some question about Set bit 22 in the PL310 (cache controller)
+ AuxCtlr register
+In-Reply-To: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
+References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
+Message-ID: <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/2015 06:21 AM, Sebastian Hesselbarth wrote:
-> I2C mux pinctrl driver currently determines the number of sub-busses by
-> counting available pinctrl-names. Unfortunately, this requires each
-> incarnation of the devicetree node with different available sub-busses
-> to be rewritten.
->
-> This patch reworks i2c-mux-pinctrl driver to count the number of
-> available sub-nodes instead. The rework should be compatible to the old
-> way of probing for sub-busses and additionally allows to disable unused
-> sub-busses with standard DT property status = "disabled".
->
-> This also amends the corresponding devicetree binding documentation to
-> reflect the new functionality to disable unused sub-nodes. While at it,
-> also fix two references to binding documentation files that miss an "i2c-"
-> prefix.
+On Sun, Mar 08, 2015 at 08:31:45PM +0800, vichy wrote:
+> Recently we bumped into the same issue like below path:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/245908.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-November/031810.html
+> 
+> We have some question about this patch:
+> a. Under what circumstances, there will be memory returned by
+> dma_alloc_coherent and friends mapped as normal, cacheable mappings?
 
-The DT binding changes at least,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+dma_alloc_coherent() allocating from ZONE_DMA (or ZONE_NORMAL) which is
+already mapped in the kernel linear mapping as Normal Cacheable.
+
+> b. why "with CMA enabled, it should be safe not to set this bit."
+
+It's not entirely safe either. I guess the assumption is that CMA
+allocates from highmem which is not mapped in the kernel linear mapping.
+However, to be able to flush the caches for such highmem pages, they
+need to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a
+small window between dmac_flush_range() and kunmap_atomic() where
+speculative cache line fills can still happen.
+
+Bit 22 in PL310 AuxCtlr must be set for most (all) uses of the coherent
+DMA API in Linux.
+
+-- 
+Catalin
