@@ -1,278 +1,213 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Mar 2015 19:06:59 +0000
-Subject: [PATCH v2 1/3] arm64: KVM: Fix stage-2 PGD allocation to have
- per-page refcounting
-In-Reply-To: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
-References: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426014421-5579-2-git-send-email-marc.zyngier@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 10 Mar 2015 14:20:51 -0500
+Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
+ IODelay configuration
+In-Reply-To: <54FF38F3.2030703@ti.com>
+References: <1425427237-11511-1-git-send-email-nm@ti.com>
+ <1425427237-11511-2-git-send-email-nm@ti.com>
+ <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
+ <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
+ <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
+Message-ID: <54FF4413.90001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're using __get_free_pages with to allocate the guest's stage-2
-PGD. The standard behaviour of this function is to return a set of
-pages where only the head page has a valid refcount.
+On 03/10/2015 01:33 PM, Nishanth Menon wrote:
+> On 03/10/2015 12:31 PM, Tony Lindgren wrote:
+>> * Nishanth Menon <nm@ti.com> [150310 10:25]:
+>>> On 03/10/2015 10:33 AM, Tony Lindgren wrote:
+>>>> * Linus Walleij <linus.walleij@linaro.org> [150310 03:39]:
+>>>>> On Wed, Mar 4, 2015 at 1:00 AM, Nishanth Menon <nm@ti.com> wrote:
+>>>>>
+>>>>>> +Configuration definition follows similar model as the pinctrl-single:
+>>>>>> +The groups of pin configuration are defined under "pinctrl-single,pins"
+>>>>>> +
+>>>>>> +&dra7_iodelay_core {
+>>>>>> +       mmc2_iodelay_3v3_conf: mmc2_iodelay_3v3_conf {
+>>>>>> +               pinctrl-single,pins = <
+>>>>>> +                       0x18c (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A19_IN */
+>>>>>> +                       0x1a4 (A_DELAY(265) | G_DELAY(360))     /* CFG_GPMC_A20_IN */
+>>>>>> +                       0x1b0 (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A21_IN */
+>>>>>> +                       0x1bc (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A22_IN */
+>>>>>> +                       0x1c8 (A_DELAY(287) | G_DELAY(420))     /* CFG_GPMC_A23_IN */
+>>>>>> +                       0x1d4 (A_DELAY(144) | G_DELAY(240))     /* CFG_GPMC_A24_IN */
+>>>>>> +                       0x1e0 (A_DELAY(0) | G_DELAY(0))         /* CFG_GPMC_A25_IN */
+>>>>>> +                       0x1ec (A_DELAY(120) | G_DELAY(0))       /* CFG_GPMC_A26_IN */
+>>>>>> +                       0x1f8 (A_DELAY(120) | G_DELAY(180))     /* CFG_GPMC_A27_IN */
+>>>>>> +                       0x360 (A_DELAY(0) | G_DELAY(0))         /* CFG_GPMC_CS1_IN */
+>>>>>> +               >;
+>>>>>> +       };
+>>>>>> +};
+>>>>>
+>>>>> But wait.
+>>>>>
+>>>>> The promise when we merged pinctrl-single was that this driver was to be used
+>>>>> when the system had a one-register-per-pin layout and it was easy to do device
+>>>>> trees based on that.
+>>>>>
+>>>>> We were very reluctant to accept that even though we didn't even have the
+>>>>> generic pin control bindings in place, the argument being that the driver
+>>>>> should know the detailed register layout, it should not be described in the
+>>>>> device tree. We eventually caved in and accepted it as an exception.
+>>>>
+>>>> Hey let's get few things straight here. There's nothing stopping the
+>>>> driver from knowing a detailed register layout with the pinctrl-single
+>>>> binding. This can be very easily done based on the compatible flag and
+>>>> match data as needed and check the values provided.
+>>>>
+>>>> And let's also recap the reasons for the pinctrl-single binding. The
+>>>> the main reason for the pinctrl-single binding is to avoid mapping
+>>>> individual register bits to device tree compatible string properties.
+>>>>
+>>>> Imagine doing that for hundreds of similar registers. Believe me, I tried
+>>>> using device tree properties initially and it just sucked big time. For
+>>>> larger amounts of dts data, it's best to stick to numeric values and
+>>>> phandles in the device tree data and rely on the preprocessor for
+>>>> getting the values right.
+>>>>
+>>>> Finally, we don't want to build databases into the kernel drivers for
+>>>> every SoC. We certainly have plenty fo those already.
+>>>>  
+>>>>> Since this pin controller is not using pinctrl-single it does not enjoy that
+>>>>> privilege and you need to explain why this pin controller cannot use the
+>>>>> generic bindings like so many other pin controllers have since started
+>>>>> to do. ("It is in the same SoC" is not an acceptable argument.)
+>>>>>
+>>>>> What is wrong with this:
+>>>>> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>>>>
+>>>> Nishanth, care to explain your reasons for using pinctrl-single binding
+>>>> here vs the generic binding? Is the amount of string parsing with the
+>>>> data an issue here?
+>>>
+>>> Wrong option chosen, I suppose :( - alright, lets discuss the alternative.
+>>
+>> Heh well now we know :) 
+>>   
+>>>>> We can add generic delay bindings to the list, it even seems like
+>>>>> a good idea to do so, as it is likely something that will come up in
+>>>>> other hardware and will be needed for ACPI etc going forward.
+>>>>
+>>>> We certainly need to make setting delays (with values) generic, no
+>>>> doubt about that.
+>>>>
+>>>> If the large amount of data is not an issue here, we could maybe set
+>>>> each iodelay register as a separate device? Then the binding could
+>>>> be just along the interrupts-extended type binding:
+>>>>
+>>>> foo = <&bar 0x18c A_DELAY(0) G_DELAY(120)>;
+>>>>
+>>>> Where the 0x18c is the instance offset of the register within the
+>>>> ti,dra7-iodelay compatible controller.
+>>>
+>>> if mmc2_pins_default point at pins for mmc pin configuration for
+>>> control_core (pinctrl-single), are you proposing the following?
+>>>
+>>>  mmc2_pins_default: mmc2_pins_default {
+>>>          pinctrl-single,pins = <
+>>>                  0x9c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a23.mmc2_clk */
+>>>                  0xb0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_cs1.mmc2_cmd */
+>>>                  0xa0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a24.mmc2_dat0 */
+>>>                  0xa4 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a25.mmc2_dat1 */
+>>>                  0xa8 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a26.mmc2_dat2 */
+>>>                  0xac (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a27.mmc2_dat3 */
+>>>                  0x8c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a19.mmc2_dat4 */
+>>>                  0x90 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a20.mmc2_dat5 */
+>>>                  0x94 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a21.mmc2_dat6 */
+>>>                  0x98 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
+>>> gpmc_a22.mmc2_dat7 */
+>>>          >;
+>>>  };
+>>
+>> Yeah so existing pinctrl-single binding above, with additional iodelay
+>> binding below..
+>>  
+>>> &mmc2 {
+>>> ...
+>>>  pinctrl-1 =
+>>>  	&mmc2_pins_default,	/* points to mmc control core pins */
+>>>  	<&iodelay 0x18c A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A19_IN */
+>>>  	<&iodelay 0x1a4 A_DELAY(265) | G_DELAY(360)>,     /* CFG_GPMC_A20_IN */
+>>>  	<&iodelay 0x1b0 A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A21_IN */
+>>>  	<&iodelay 0x1bc A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A22_IN */
+>>>  	<&iodelay 0x1c8 A_DELAY(287) | G_DELAY(420)>,     /* CFG_GPMC_A23_IN */
+>>>  	<&iodelay 0x1d4 A_DELAY(144) | G_DELAY(240)>,     /* CFG_GPMC_A24_IN */
+>>>  	<&iodelay 0x1e0 A_DELAY(0) | G_DELAY(0)>,         /* CFG_GPMC_A25_IN */
+>>>  	<&iodelay 0x1ec A_DELAY(120) | G_DELAY(0)>,       /* CFG_GPMC_A26_IN */
+>>>  	<&iodelay 0x1f8 A_DELAY(120) | G_DELAY(180)>,     /* CFG_GPMC_A27_IN */
+>>>  	<&iodelay 0x360 A_DELAY(0) | G_DELAY(0)>;         /* CFG_GPMC_CS1_IN */
+>>>
+>>> I have to check if we are capable of parsing that. but if that is the
+>>> approach chosen, I suppose we might be able to figure something, I
+>>> suppose..
+>>
+>> Yes except I'd make use of some kind of #pinctrl-cells here just like
+>> interrupt controller has #interrupt-cells. Then you can have the values
+>> seprate and the controller knows what to do with them based on the
+>> compatible flag and #pinctrl-cells.
+> 
+> Something like the following I suppose, where pinctrl-cells is optional?
+> 
+> dra7_pmx_core: pinmux at 4a003400 {
+>         compatible = "ti,dra7-padconf", "pinctrl-single";
+>         reg = <0x4a003400 0x0464>;
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+>         #interrupt-cells = <1>;
+>         interrupt-controller;
+>         pinctrl-single,register-width = <32>;
+>         pinctrl-single,function-mask = <0x3fffffff>;
+> };
+> 
+> dra7_iodelay_core: padconf at 4844a000 {
+>         compatible = "ti,dra7-iodelay";
+>         reg = <0x4844a000 0x0d1c>;
+>         #address-cells = <1>;
+>         #size-cells = <0>;
+> 	#pinctrl-cells = <2>;
+> };
+> 
+> Linus,
+> 
+> I hope you are ok with the above?
+> 
 
-This behaviour gets us into trouble when we're trying to increment
-the refcount on a non-head page:
+a and g delays are in pico seconds parsed by iodelay driver, so,
+revising proposal (and dropping the macros) to something as follows:
 
-page:ffff7c00cfb693c0 count:0 mapcount:0 mapping:          (null) index:0x0
-flags: 0x4000000000000000()
-page dumped because: VM_BUG_ON_PAGE((*({ __attribute__((unused)) typeof((&page->_count)->counter) __var = ( typeof((&page->_count)->counter)) 0; (volatile typeof((&page->_count)->counter) *)&((&page->_count)->counter); })) <= 0)
-BUG: failure@include/linux/mm.h:548/get_page()!
-Kernel panic - not syncing: BUG!
-CPU: 1 PID: 1695 Comm: kvm-vcpu-0 Not tainted 4.0.0-rc1+ #3825
-Hardware name: APM X-Gene Mustang board (DT)
-Call trace:
-[<ffff80000008a09c>] dump_backtrace+0x0/0x13c
-[<ffff80000008a1e8>] show_stack+0x10/0x1c
-[<ffff800000691da8>] dump_stack+0x74/0x94
-[<ffff800000690d78>] panic+0x100/0x240
-[<ffff8000000a0bc4>] stage2_get_pmd+0x17c/0x2bc
-[<ffff8000000a1dc4>] kvm_handle_guest_abort+0x4b4/0x6b0
-[<ffff8000000a420c>] handle_exit+0x58/0x180
-[<ffff80000009e7a4>] kvm_arch_vcpu_ioctl_run+0x114/0x45c
-[<ffff800000099df4>] kvm_vcpu_ioctl+0x2e0/0x754
-[<ffff8000001c0a18>] do_vfs_ioctl+0x424/0x5c8
-[<ffff8000001c0bfc>] SyS_ioctl+0x40/0x78
-CPU0: stopping
 
-A possible approach for this is to split the compound page using
-split_page() at allocation time, and change the teardown path to
-free one page at a time.
+ pinctrl-1 =
+ 	&mmc2_pins_default,	/* points to mmc control core pins */
+ 	<&iodelay IODELAY_OFFSET(0x18c) 0 120>,       /* CFG_GPMC_A19_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1a4) 265 360>,     /* CFG_GPMC_A20_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1b0) 0 120>,       /* CFG_GPMC_A21_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1bc) 0 120>,       /* CFG_GPMC_A22_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1c8) 287 420>,     /* CFG_GPMC_A23_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1d4) 144 240>,     /* CFG_GPMC_A24_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1e0) 0 0>,         /* CFG_GPMC_A25_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1ec) 120 0>,       /* CFG_GPMC_A26_IN */
+ 	<&iodelay IODELAY_OFFSET(0x1f8) 120 180>,     /* CFG_GPMC_A27_IN */
+ 	<&iodelay IODELAY_OFFSET(0x360) 0 0>;         /* CFG_GPMC_CS1_IN */
 
-While we're at it, the PGD allocation code is reworked to reduce
-duplication.
+it might just need us to define the right parse path etc.. but should
+let us scale with other phandle implementations as well.
 
-This has been tested on an X-Gene platform with a 4kB/48bit-VA host
-kernel, and kvmtool hacked to place memory in the second page of
-the hardware PGD (PUD for the host kernel). Also regression-tested
-on a Cubietruck (Cortex-A7).
+offsets are computed by a macro IODELAY_OFFSET() -> just throwing in
+an example set of values for illustration here.. but just to get the idea.
 
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_mmu.h   |  9 ++---
- arch/arm/kvm/mmu.c               | 77 +++++++++++++++++++++++++++++++---------
- arch/arm64/include/asm/kvm_mmu.h | 46 +++---------------------
- 3 files changed, 66 insertions(+), 66 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index 0187606..ff56f91 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -162,18 +162,13 @@ static inline bool kvm_page_empty(void *ptr)
- 
- #define KVM_PREALLOC_LEVEL	0
- 
--static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
--{
--	return 0;
--}
--
--static inline void kvm_free_hwpgd(struct kvm *kvm) { }
--
- static inline void *kvm_get_hwpgd(struct kvm *kvm)
- {
- 	return kvm->arch.pgd;
- }
- 
-+static inline unsigned int kvm_get_hwpgd_order(void) { return S2_PGD_ORDER; }
-+
- struct kvm;
- 
- #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 69c2b4c..0a5457c 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -634,6 +634,31 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
- }
- 
-+/* Free the HW pgd, one page at a time */
-+static void kvm_free_hwpgd(unsigned long hwpgd)
-+{
-+	int i;
-+
-+	for (i = 0; i < (1 << kvm_get_hwpgd_order()); i += PAGE_SIZE)
-+		free_page(hwpgd + i);
-+}
-+
-+/* Allocate the HW PGD, making sure that each page gets its own refcount */
-+static int kvm_alloc_hwpgd(unsigned long *hwpgdp)
-+{
-+	unsigned long hwpgd;
-+	unsigned int order = kvm_get_hwpgd_order();
-+
-+	hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
-+	if (!hwpgd)
-+		return -ENOMEM;
-+
-+	split_page(virt_to_page((void *)hwpgd), order);
-+
-+	*hwpgdp = hwpgd;
-+	return 0;
-+}
-+
- /**
-  * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
-  * @kvm:	The KVM struct pointer for the VM.
-@@ -649,13 +674,30 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- {
- 	int ret;
- 	pgd_t *pgd;
-+	unsigned long hwpgd;
- 
- 	if (kvm->arch.pgd != NULL) {
- 		kvm_err("kvm_arch already initialized?\n");
- 		return -EINVAL;
- 	}
- 
-+	ret = kvm_alloc_hwpgd(&hwpgd);
-+	if (ret)
-+		return ret;
-+
-+	/* When the kernel uses more levels of page tables than the
-+	 * guest, we allocate a fake PGD and pre-populate it to point
-+	 * to the next-level page table, which will be the real
-+	 * initial page table pointed to by the VTTBR.
-+	 *
-+	 * When KVM_PREALLOC_LEVEL==2, we allocate a single page for
-+	 * the PMD and the kernel will use folded pud.
-+	 * When KVM_PREALLOC_LEVEL==1, we allocate 2 consecutive PUD
-+	 * pages.
-+	 */
- 	if (KVM_PREALLOC_LEVEL > 0) {
-+		int i;
-+
- 		/*
- 		 * Allocate fake pgd for the page table manipulation macros to
- 		 * work.  This is not used by the hardware and we have no
-@@ -663,30 +705,32 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 		 */
- 		pgd = (pgd_t *)kmalloc(PTRS_PER_S2_PGD * sizeof(pgd_t),
- 				       GFP_KERNEL | __GFP_ZERO);
-+
-+		if (!pgd) {
-+			kvm_free_hwpgd(hwpgd);
-+			return -ENOMEM;
-+		}
-+
-+		/* Plug the HW PGD into the fake one. */
-+		for (i = 0; i < PTRS_PER_S2_PGD; i++) {
-+			if (KVM_PREALLOC_LEVEL == 1)
-+				pgd_populate(NULL, pgd + i,
-+					     (pud_t *)hwpgd + i * PTRS_PER_PUD);
-+			else if (KVM_PREALLOC_LEVEL == 2)
-+				pud_populate(NULL, pud_offset(pgd, 0) + i,
-+					     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
-+		}
- 	} else {
- 		/*
- 		 * Allocate actual first-level Stage-2 page table used by the
- 		 * hardware for Stage-2 page table walks.
- 		 */
--		pgd = (pgd_t *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, S2_PGD_ORDER);
-+		pgd = (pgd_t *)hwpgd;
- 	}
- 
--	if (!pgd)
--		return -ENOMEM;
--
--	ret = kvm_prealloc_hwpgd(kvm, pgd);
--	if (ret)
--		goto out_err;
--
- 	kvm_clean_pgd(pgd);
- 	kvm->arch.pgd = pgd;
- 	return 0;
--out_err:
--	if (KVM_PREALLOC_LEVEL > 0)
--		kfree(pgd);
--	else
--		free_pages((unsigned long)pgd, S2_PGD_ORDER);
--	return ret;
- }
- 
- /**
-@@ -787,11 +831,10 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
- 		return;
- 
- 	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
--	kvm_free_hwpgd(kvm);
-+	kvm_free_hwpgd((unsigned long)kvm_get_hwpgd(kvm));
- 	if (KVM_PREALLOC_LEVEL > 0)
- 		kfree(kvm->arch.pgd);
--	else
--		free_pages((unsigned long)kvm->arch.pgd, S2_PGD_ORDER);
-+
- 	kvm->arch.pgd = NULL;
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index ab1313f..8354152 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -173,43 +173,6 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
- #define KVM_PREALLOC_LEVEL	(0)
- #endif
- 
--/**
-- * kvm_prealloc_hwpgd - allocate inital table for VTTBR
-- * @kvm:	The KVM struct pointer for the VM.
-- * @pgd:	The kernel pseudo pgd
-- *
-- * When the kernel uses more levels of page tables than the guest, we allocate
-- * a fake PGD and pre-populate it to point to the next-level page table, which
-- * will be the real initial page table pointed to by the VTTBR.
-- *
-- * When KVM_PREALLOC_LEVEL==2, we allocate a single page for the PMD and
-- * the kernel will use folded pud.  When KVM_PREALLOC_LEVEL==1, we
-- * allocate 2 consecutive PUD pages.
-- */
--static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
--{
--	unsigned int i;
--	unsigned long hwpgd;
--
--	if (KVM_PREALLOC_LEVEL == 0)
--		return 0;
--
--	hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, PTRS_PER_S2_PGD_SHIFT);
--	if (!hwpgd)
--		return -ENOMEM;
--
--	for (i = 0; i < PTRS_PER_S2_PGD; i++) {
--		if (KVM_PREALLOC_LEVEL == 1)
--			pgd_populate(NULL, pgd + i,
--				     (pud_t *)hwpgd + i * PTRS_PER_PUD);
--		else if (KVM_PREALLOC_LEVEL == 2)
--			pud_populate(NULL, pud_offset(pgd, 0) + i,
--				     (pmd_t *)hwpgd + i * PTRS_PER_PMD);
--	}
--
--	return 0;
--}
--
- static inline void *kvm_get_hwpgd(struct kvm *kvm)
- {
- 	pgd_t *pgd = kvm->arch.pgd;
-@@ -226,12 +189,11 @@ static inline void *kvm_get_hwpgd(struct kvm *kvm)
- 	return pmd_offset(pud, 0);
- }
- 
--static inline void kvm_free_hwpgd(struct kvm *kvm)
-+static inline unsigned int kvm_get_hwpgd_order(void)
- {
--	if (KVM_PREALLOC_LEVEL > 0) {
--		unsigned long hwpgd = (unsigned long)kvm_get_hwpgd(kvm);
--		free_pages(hwpgd, PTRS_PER_S2_PGD_SHIFT);
--	}
-+	if (KVM_PREALLOC_LEVEL > 0)
-+		return PTRS_PER_S2_PGD_SHIFT;
-+	return S2_PGD_ORDER;
- }
- 
- static inline bool kvm_page_empty(void *ptr)
+Will be nice to have some comments before I go down this path. Thanks
+for helping review this to a reasonable direction.
+
 -- 
-2.1.4
+Regards,
+Nishanth Menon
