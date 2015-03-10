@@ -1,89 +1,85 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 10 Mar 2015 13:35:01 -0400
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF21BE.2040506@list.ru>
-References: <54FF21BE.2040506@list.ru>
-Message-ID: <54FF2B45.8060407@hurleysoftware.com>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Tue, 10 Mar 2015 19:35:41 +0200
+Subject: ARM: OMPA4+: is it expected dma_coerce_mask_and_coherent(dev,
+ DMA_BIT_MASK(64)); to fail?
+In-Reply-To: <2886917.pqK9QloHOD@wuerfel>
+References: <54F8A68B.3080709@linaro.org> <2886917.pqK9QloHOD@wuerfel>
+Message-ID: <54FF2B6D.1030005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 12:54 PM, Stas Sergeev wrote:
-> Hello, the patch below is needed for a successful boot on armada-xp.
-> 
-> 
-> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
-> This fixes the following crash at boot:
-> 
->  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
->  Internal error: : 808 [#1] SMP ARM
-> 
->  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
->  Hardware name: Marvell Armada 370/XP (Device Tree)
->  task: ed41e800 ti: ed43e000 task.ti: ed43e000
->  PC is at _set_bit+0x28/0x50
->  LR is at n_tty_set_termios+0x328/0x358
->  pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
->  sp : ed43fd00  ip : 00000000  fp : 00000000
->  r10: 00000002  r9 : 00000000  r8 : ec930200
->  r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
->  r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
->  Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
->  Control: 10c5387d  Table: 0000406a  DAC: 00000015
->  Process swapper/0 (pid: 1, stack limit = 0xed43e220)
-> 
-> The offending instruction in _set_bit() is "strex r0, r2, [r1]"
-> For some reason the exclusive access instructions do not like the
-> vmalloc() space... While there may be another fix to make them
-> fine about vmalloc() space, it still looks like a good idea to
-> use kmalloc() for allocating a small (sub-page) struct.
+Hi Arnd,
 
-NAK.
-
-struct n_tty_data is order 2, not sub-page.
-
-The abort means something else is wrong; that's what needs
-tracking down and fixing.
-
-AFAIK this is not happening on any other ARM platform.
-
-Regards,
-Peter Hurley
-
-> Signed-off-by: Stas Sergeev <stsp@users.sourceforge.net>
-> ---
->  drivers/tty/n_tty.c |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+On 03/09/2015 11:33 PM, Arnd Bergmann wrote:
+> On Thursday 05 March 2015 20:55:07 Grygorii.Strashko at linaro.org wrote:
+>> Hi All,
+>>
+>> Now I can see very interesting behavior related to dma_coerce_mask_and_coherent()
+>> and friends which I'd like to explain and clarify.
+>>
+>> Below is set of questions I have (why - I explained below):
+>> - Is expected dma_coerce_mask_and_coherent(DMA_BIT_MASK(64)) and friends to fail on 32 bits HW?
 > 
-> diff --git a/drivers/tty/n_tty.c b/drivers/tty/n_tty.c
-> index cf6e0f2..e03622e 100644
-> --- a/drivers/tty/n_tty.c
-> +++ b/drivers/tty/n_tty.c
-> @@ -50,7 +50,6 @@
->  #include <linux/uaccess.h>
->  #include <linux/module.h>
->  #include <linux/ratelimit.h>
-> -#include <linux/vmalloc.h>
->  
->  
->  /* number of characters left in xmit buffer before select has we have
-> room */
-> @@ -1892,7 +1891,7 @@ static void n_tty_close(struct tty_struct *tty)
->      if (tty->link)
->          n_tty_packet_mode_flush(tty);
->  
-> -    vfree(ldata);
-> +    kfree(ldata);
->      tty->disc_data = NULL;
->  }
->  
-> @@ -1911,7 +1910,7 @@ static int n_tty_open(struct tty_struct *tty)
->      struct n_tty_data *ldata;
->  
->      /* Currently a malloc failure here can panic */
-> -    ldata = vmalloc(sizeof(*ldata));
-> +    ldata = kmalloc(sizeof(*ldata), GFP_KERNEL);
->      if (!ldata)
->          goto err;
->  
+> No. dma_coerce_mask_and_coherent() is meant to ignore the actual mask. It's
+> usually considered a bug to use this function for that reason.
 > 
+>> - What is expected value for max_pfn: max_phys_pfn or max_phys_pfn + 1?
+>>
+>> - What is expected value for struct memblock_region->size: mem_range_size or mem_range_size - 1?
+>>
+>> - What is expected value to be returned by memblock_end_of_DRAM():
+>>    @base + @size(max_phys_addr + 1) or @base + @size - 1(max_phys_addr)?
+>>
+>>
+>> I'm working with BeaglBoard-X15 (AM572x/DRA7xx) board and have following code in OMAP ASOC driver
+>> which is failed SOMETIMES during the boot with error -EIO.
+>> === to omap-pcm.c:
+>> omap_pcm_new() {
+>> ...
+>> 	ret = dma_coerce_mask_and_coherent(card->dev, DMA_BIT_MASK(64));
+>> ^^ failed sometimes
+>> 	if (ret)
+>> 		return ret;
+>> }
+> 
+> The code should be fixed to use dma_set_mask_and_coherent(), which is expected to
+> fail if the bus is incapable of addressing all RAM within the mask.
+> 
+>> I'd be very appreciated for any comments/clarification on questions I've listed at the
+>> beginning of my e-mail - there are no patches from my side as I'd like to understand
+>> expected behavior of the kernel first (especially taking into account that any
+>> memblock changes might affect on at least half of arches).
+> 
+> Is the device you have actually 64-bit capable?
+> 
+> Is the bus it is connected to 64-bit wide?
+
+As I mentioned before - The device was fixed by switching to use 32 bit mask
+"The issue with omap-pcm was simply fixed by using DMA_BIT_MASK(32), ".
+
+> 
+> Does the dma-ranges property of the parent bus reflect the correct address width?
+
+dma-ranges is not used and all devices are created with default mask DMA_BIT_MASK(32);
+
+
+My goal was to clarify above questions (first of all), because on my HW I can see
+different values of  max_pfn, max_mapnr and memblock configuration depending on 
+CONFIG_ARM_LPAE=n|y and when RAM is defined as: start = 0x80000000 size = 0x80000000.
+(and also between kernels 3.14 and LKML).
+
+Looks like such RAM configuration is a corner case, which is not always handled as expected
+(and how is it expected to be handled?).
+For example:
+before commit ARM: 8025/1: Get rid of meminfo
+- registered RAM  start = 0x80000000 size = 0x80000000 will be adjusted by arm_add_memory()
+and final RAM configuration will be start = 0x80000000 size = 0x7FFFF000
+after this commit:
+- code will try to register start = 0x80000000 size = 0x80000000, but memblock will
+adjust it to start = 0x80000000 size = 0x7fffffff.
+
+
+
+-- 
+regards,
+-grygorii
