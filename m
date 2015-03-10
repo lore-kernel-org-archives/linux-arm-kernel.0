@@ -1,82 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 15:11:14 +0100
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CAB3XZEdS+mK1MiB7OWiehFGRBnUzJ84s3rFrCy3-YFYhL-BNWw@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <20150309224929.GL5264@atomide.com>
- <CAB3XZEdS+mK1MiB7OWiehFGRBnUzJ84s3rFrCy3-YFYhL-BNWw@mail.gmail.com>
-Message-ID: <2223973.a64rBcZvaA@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Mar 2015 14:15:11 +0000
+Subject: [PATCH] video: treat signal like timeout as failure
+In-Reply-To: <20150310125116.GA26020@opentech.at>
+References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
+ <54FEE70D.3010307@ti.com> <20150310125116.GA26020@opentech.at>
+Message-ID: <20150310141511.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 March 2015 13:00:19 Eliad Peller wrote:
-> On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Eliad Peller <eliad@wizery.com> [150309 14:03]:
-> >> On Mon, Mar 9, 2015 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > On Monday 09 March 2015 17:36:42 Eliad Peller wrote:
-> >> >> --- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-> >> >> +++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-> >> >> @@ -64,4 +64,13 @@
-> >> >>         vmmc-supply = <&lbep5clwmc_wlen>;
-> >> >>         bus-width = <4>;
-> >> >>         non-removable;
-> >> >> +
-> >> >> +       #address-cells = <1>;
-> >> >> +       #size-cells = <0>;
-> >> >> +       wlcore: wlcore at 2 {
-> >> >> +               compatible = "ti,wl1835";
-> >> >> +               reg = <2>;
-> >> >> +               interrupt-parent = <&gpio5>;
-> >> >> +               interrupts = <8 IRQ_TYPE_NONE>;
-> >> >> +       };
-> >> >>
-> >> >
-> >> > Why IRQ_TYPE_NONE?
-> >> >
-> >> i simply mirrored the current board file (which only sets the irq number).
-> >>
-> >> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
-> >> > including the ones for wl12xx aside from the wl18xx ones you removed, but
-> >> > if that's enough to clean out the platform_data handling from the wlcore
-> >> > driver, it's good enough as a start.
-> >> not sure i'm following - can you elaborate?
-> >>
-> >> i'll summarize the way i see it. please correct me if i'm wrong.
-> >>
-> >> both wl18xx and wl12xx use the platform data to get the irq number.
-> >> wl12xx (only) also needs some additional clock definitions to be
-> >> passed. there's currently some issue with specifying some the of clock
-> >> sources, so i preferred starting only with (the simpler) wl18xx
-> >> bindings.
-> >>
-> >> for platforms with wl18xx, we can remove the pdata-quirk, as all the
-> >> data (i.e. irq) can be passed by the new DT bindings.
-> >> however, for platforms with wl12xx, we still need to pass the clock
-> >> definitions (along with the irq), so we have to keep
-> >> legacy_init_wl12xx for the time being (and that's also why we have to
-> >> currently keep the platform_data handling in the wlcore driver)
-> >>
-> >> do you have something else in mind?
+On Tue, Mar 10, 2015 at 01:51:16PM +0100, Nicholas Mc Guire wrote:
+> On Tue, 10 Mar 2015, Tomi Valkeinen wrote:
+> 
+> > On 20/01/15 07:23, Nicholas Mc Guire wrote:
+> > > if(!wait_for_completion_interruptible_timeout(...))
+> > > only handles the timeout case - this patch adds handling the
+> > > signal case the same as timeout and cleans up.
+> > > 
+> > > Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
+> > > ---
+> > > 
+> > > Only the timeout case was being handled, return of 0 in 
+> > > wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
+> > > was treated just like the case of successful completion, which is most 
+> > > likely not reasonable.
+> > > 
+> > > Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
+> > > are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
+> > > 
+> > > This patch simply treats the signal case the same way as the timeout case,
+> > > by releasing locks and returning 0 - which might not be the right thing to
+> > > do - this needs a review by someone knowing the details of this driver.
+> > 
+> > While I agree that this patch is a bit better than the current state,
+> > the code still looks wrong as Russell said.
+> > 
+> > I can merge this, but I'd rather have someone from Samsung look at the
+> > code and change it to use wait_for_completion_killable_timeout() if
+> > that's what this code is really supposed to use.
 > >
-> > I think what Arnd is saying is we've now removed all the wl12xx using
-> > legacy platforms, so all of them can boot with just data from dts.
+> If someone that knows the details takes care of it
+> that is of course the best solution. If someone Samsung is 
+> going to look into it then it is probably best to completly
+> drop this speculative patch so that this does not lead
+> to more confusion than it does good.
 
-Right, that was my idea.
+IMHO, just change it to wait_for_completion_killable_timeout() - that's
+a much better change than the change you're proposing.
 
-> I don't think that's the case (unless i'm missing something).
-> e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
-> initializes wl12xx device.
+If we think about it...  The current code uses this:
 
-This one is just like the igep0030, as Tony was saying: the board
-boots from device tree already, so now that we have a binding for
-it, we can remove the wl12xx_set_platform_data() for it.
+                if (!wait_for_completion_interruptible_timeout(&dsim_wr_comp,
+                                                        MIPI_FIFO_TIMEOUT)) {
+                        dev_warn(dsim->dev, "command write timeout.\n");
+                        mutex_unlock(&dsim->lock);
+                        return -EAGAIN;
+                }
 
-Unfortunately, there is still one machine that uses a board file
-in combination with this wl12xx: da850-evm calls
-wl12xx_set_platform_data() from a legacy board file without DT.
+which has the effect of treating a signal as "success", and doesn't return
+an error.  So, if the calling application receives (eg) a SIGPIPE or a
+SIGALRM, we proceed as if we received the FIFO empty interrupt and doesn't
+cause an error.
 
-We have DT support for this file as well, but if I remember correctly,
-it is somewhat incomplete and we don't want to remove the file
-yet. Adding Sekhar and Kevin to Cc here for confirmation.
+Your change results in:
 
-	Arnd
+                timeout = wait_for_completion_interruptible_timeout(
+                                        &dsim_wr_comp, MIPI_FIFO_TIMEOUT);
+                if (timeout <= 0) {
+                        dev_warn(dsim->dev,
+                                "command write timed-out/interrupted.\n");
+                        mutex_unlock(&dsim->lock);
+                        return -EAGAIN;
+                }
+
+which now means that this call returns -EAGAIN when a signal is raised.
+
+Now, further auditing of this exynos crap (and I really do mean crap)
+shows that this function is assigned to a method called "cmd_write".
+Grepping for that shows that *no caller ever checks the return value*!
+
+So, really, there's a bug here in that we should _never_ complete on a
+signal, and we most *definitely can not* error out on a signal either.
+The *only* sane change to this code without author/maintainer input is
+to change this to wait_for_completion_killable_timeout() - so that
+signals do not cause either premature completion nor premature failure
+of the wait.
+
+The proper fix is absolutely huge: all call paths need to be augmented
+with code to detect this function failing, and back out whatever changes
+they've made, and restoring the previous state (if they can) and
+propagate the error all the way back to userland, so that syscall
+restarting can work correctly.  _Only then_ is it safe to use a call
+which causes an interruptible sleep.
+
+Personally, I'd be happier seeing this moved into drivers/staging and
+eventually deleted from the kernel unless someone is willing to review
+the driver and fix some of these glaring problems.  I wouldn't be
+surprised if there was _loads_ of this kind of crap there.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
