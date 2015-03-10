@@ -1,47 +1,28 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 10 Mar 2015 16:28:44 +0100
-Subject: [PATCH v2 05/18] reset: Add reset_controller_of_init() function
-In-Reply-To: <8729383.kvUZDm4dQz@wuerfel>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-6-git-send-email-mcoquelin.stm32@gmail.com>
- <8729383.kvUZDm4dQz@wuerfel>
-Message-ID: <CALszF6BkTOLR+VNkRKfvEBG5ZyaYL+9fZ4EAPVu5b_imCvEQoQ@mail.gmail.com>
+From: valentinrothberg@gmail.com (Valentin Rothberg)
+Date: Tue, 10 Mar 2015 16:32:29 +0100
+Subject: ARCH_EXYNOS5433 missing in Kconfig
+Message-ID: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-10 16:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 20 February 2015 19:01:04 Maxime Coquelin wrote:
->> Some platforms need to initialize the reset controller before the timers.
->>
->> This patch introduces a reset_controller_of_init() function that can be
->> called before the timers intialization.
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->
-> Not sure about this. It seems like the cleanest approach if we get
-> a lot of these, but then again it is probably very rare, and I'd
-> like to avoid adding such infrastructure if it's just for one
-> SoC. Could we add a hack in the machine initialization instead?
+Hi Chanwoo,
 
-Sun6i also need to initialize the reset controller early. Today, they
-hack the machine initialization.
-With two SoCs having the same need, what should we do?
+your commit 96bd6224f07b ("clk: samsung: exynos5433: Add clocks using
+common clock framework") is included in today's linux-next tree (i.e.,
+next-20150310).
 
-That said, I'm fine with either way. If reset_controller_of_init gets
-accepted, I will send the patch for sun6i.
+This patch conditionally compiles clk-exynos5433.c depending on the
+Kconfig option ARCH_EXYNOS5433.  However, this option is not defined
+in Kconfig, so that the driver cannot be compiled at the current
+state:
 
->
-> I think ideally this would be done in the boot loader before we
-> even start Linux, but I don't know if that's possible for you.
++obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
 
->From what I understand, the only constraint is to perform it after the
-clock is enabled.
-So this should be possible to do it in the bootloader, but it means
-also adding timers clocks ungating in the bootloader.
+Is there a patch queued somewhere that adds this Kconfig symbol?  I
+detected the issue by running undertaker-checkpatch from the
+Undertaker tool suite (undertaker.cs.fau.de).  There is also a tool in
+the git tree that can detect such issues (i.e.,
+scripts/checkkconfigsymbols.py).
 
-Br,
-Maxime
-
->
->         Arnd
+Kind regards,
+ Valentin
