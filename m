@@ -1,55 +1,253 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 15:26:22 +0000
-Subject: [PATCH] video: treat signal like timeout as failure
-In-Reply-To: <54FF05FC.5030704@ti.com>
-References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
- <54FEE70D.3010307@ti.com> <20150310125116.GA26020@opentech.at>
- <20150310141511.GL8656@n2100.arm.linux.org.uk>
- <20150310143928.GA19501@opentech.at>
- <20150310144640.GM8656@n2100.arm.linux.org.uk>
- <54FF05FC.5030704@ti.com>
-Message-ID: <20150310152622.GN8656@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 10 Mar 2015 16:27:09 +0100
+Subject: [PATCH v2 1/2] ARM: dts: sunxi: Add address- and size-cells
+ properties to the mmc ctrl nodes
+In-Reply-To: <1426001230-15906-1-git-send-email-hdegoede@redhat.com>
+References: <1426001230-15906-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1426001230-15906-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 04:55:56PM +0200, Tomi Valkeinen wrote:
-> On 10/03/15 16:46, Russell King - ARM Linux wrote:
-> 
-> > In which case, let me propose that the exynos fbdev driver needs to be
-> > moved to drivers/staging, and stay there until this stuff gets fixed.
-> > drivers/staging is supposed to be for stuff which isn't up to the mark,
-> > and which is potentially unstable.  And that's what this driver exactly
-> > is.
-> 
-> There is drivers/gpu/drm/exynos/ which is getting a lot of updates. So...
-> 
-> I'd propose removing the exynos fbdev driver if the exynos drm driver
-> offers the same functionality. I don't know if that's the case. Does the
-> drm driver support all the devices the fbdev supports?
-> 
-> Also, I'm not sure if and how we can remove drivers. If exynos fbdev
-> driver is dropped, that would perhaps break boards that have exynos
-> fbdev in their .dts file. And if the drm driver doesn't offer the exact
-> same /dev/fbX interface, it would break the userspace.
-> 
-> So I don't know if that's possible. But that's what I'd like to do,
-> eventually, for all the fbdev drivers. Implement drm driver, remove the
-> fbdev one.
+Sometimes we need to specify non-probably information for sdio devices in the
+devicetree, this is done through child nodes addressed by the reg property,
+whereby the reg property refers to the sdio function number, see;
+Documentation/devicetree/bindings/mmc/mmc.txt
 
-That's why I suggested moving it to drivers/staging - it's a hint that
-the driver needs a serious amount of work, and when built as a module,
-it also provides users with the hint that the module they're loading is
-of questionable quality (which is definitely the case here.)
+This commit adds the necessary address- and size-cells properties to the mmc
+controller nodes in the dtsi files, so that dts files needing such a child
+node do not need to specify these themselves.
 
-Others have done that kind of thing before - we've had drivers which
-have fallen by the way side, and at some point the decision has been
-made to move them to drivers/staging, and if nothing happens to fix
-them up (showing that no one cares about them), they've eventually
-been dropped.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+ arch/arm/boot/dts/sun5i.dtsi     | 6 ++++++
+ arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ arch/arm/boot/dts/sun8i-a23.dtsi | 6 ++++++
+ arch/arm/boot/dts/sun9i-a80.dtsi | 8 ++++++++
+ 6 files changed, 44 insertions(+)
 
-Of course, us talking about this might be enough to spur some effort
-to get the thing properly fixed. :)
-
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index e550415..48f96cd 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -527,6 +527,8 @@
+ 				      "sample";
+ 			interrupts = <32>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -542,6 +544,8 @@
+ 				      "sample";
+ 			interrupts = <33>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -557,6 +561,8 @@
+ 				      "sample";
+ 			interrupts = <34>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc3: mmc at 01c12000 {
+@@ -572,6 +578,8 @@
+ 				      "sample";
+ 			interrupts = <35>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		usb_otg: usb at 01c13000 {
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index cf730d4..ca15d35 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -352,6 +352,8 @@
+ 				      "sample";
+ 			interrupts = <32>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -367,6 +369,8 @@
+ 				      "sample";
+ 			interrupts = <33>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -382,6 +386,8 @@
+ 				      "sample";
+ 			interrupts = <34>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		usb_otg: usb at 01c13000 {
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index fa2f403..96563d3 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -402,6 +402,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -419,6 +421,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -436,6 +440,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc3: mmc at 01c12000 {
+@@ -453,6 +459,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		usbphy: phy at 01c19400 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 1d0b9ac..9ddefcd 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -606,6 +606,8 @@
+ 				      "sample";
+ 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -621,6 +623,8 @@
+ 				      "sample";
+ 			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -636,6 +640,8 @@
+ 				      "sample";
+ 			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc3: mmc at 01c12000 {
+@@ -651,6 +657,8 @@
+ 				      "sample";
+ 			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		usb_otg: usb at 01c13000 {
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 382ebd1..85e7b2b 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -286,6 +286,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -303,6 +305,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -320,6 +324,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		pio: pinctrl at 01c20800 {
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index 2f7f82c..abe7bbf 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -447,6 +447,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc1: mmc at 01c10000 {
+@@ -459,6 +461,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc2: mmc at 01c11000 {
+@@ -471,6 +475,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc3: mmc at 01c12000 {
+@@ -483,6 +489,8 @@
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		mmc_config_clk: clk at 01c13000 {
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.3.1
