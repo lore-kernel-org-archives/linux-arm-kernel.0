@@ -1,57 +1,69 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Mar 2015 10:31:03 +0900
-Subject: [PATCH v5 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <54F99B1A.3080600@samsung.com>
-References: <1425533911-14800-1-git-send-email-cw00.choi@samsung.com>
- <1425533911-14800-2-git-send-email-cw00.choi@samsung.com>
- <20150305122459.GC14093@leverpostej>
- <CAGTfZH3Bf1ueFO25NXFbN+Mvb9TcGbErbSp=a+vQ0=A+E07mQA@mail.gmail.com>
- <20150305170450.GG14093@leverpostej>
- <CAGTfZH3nkCvnuu+fC1Gv5DrRQXEg6Y19tQnh+phj6c_jAFpbvg@mail.gmail.com>
- <20150305185407.GK14093@leverpostej> <54F9140B.3060109@samsung.com>
- <20150306114021.GF8700@leverpostej> <54F99B1A.3080600@samsung.com>
-Message-ID: <54FE4957.7050904@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Mar 2015 09:46:24 +0800
+Subject: [PATCH 00/15] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <2227491.z0aBeXi5ZG@wuerfel>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <2227491.z0aBeXi5ZG@wuerfel>
+Message-ID: <CAGb2v67GkL9Mdr98Chf6MhMff7CO8OGgfF2kaB3Xcnz=SkMG3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Arnd,
 
-On 03/06/2015 09:18 PM, Chanwoo Choi wrote:
-> Hi,
-> 
-> On 03/06/2015 08:40 PM, Mark Rutland wrote:
-
-[snip]
-
+On Tue, Mar 10, 2015 at 5:44 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 09 March 2015 21:40:13 Hans de Goede wrote:
+>> Hi All,
 >>
->>>>>>>> I take it CPUs boot at EL2?
->>>>>>
->>>>>> Do the CPUs boot at EL1 or EL2?
->>>>>
->>>>> Unfortunately, I cannot check the secure firmware for Exynos5433 SoC.
->>>>> I think that a few SoC provider probably would know it.
->>>>
->>>> I guess I asked the wrong question.
->>>>
->>>> Do CPUs enter the kernel at EL2 or at EL1?
->>>
->>> Could you give me a tip how to check the kernel at EL2 or EL1?
+>> This patch set has been a while in the making, so I'm very happy to present
+>> the end result here, and I hope everyone likes it.
+>
+> Awesome work!
+>
+>> Before talking about merging this there are 2 things which I would like to
+>> point out:
 >>
->> Hmm... I thought we logged this but it looks like we don't.
+>> a) The musb controller in the sunxi SoCs uses some SRAM which needs to be
+>> mapped to the musb controller by poking some bits in the SRAM controller,
+>> just like the EMAC patches which were send a while back I've chosen to use
+>> syscon for this, actually 2 of the patches in this set come directly from the
+>> SRAM mapping patchset for the EMAC.
 >>
->> You could hack in a check of is_hyp_mode_available() and
->> is_hyp_mode_mismatched(). That will tell you if EL2/hyp is available,
->> and whether all CPUs enter at the same mode (mandatory per the boot
->> protocol).
-> 
-> OK, I'll try it.
+>> I know that Maxime is not 100% in favor of using syscon:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320221.html
+>>
+>> But I disagree with his arguments for writing a special driver for the SRAM
+>> controller:
+>> 1) syscon was specifically designed for global system control registers like
+>> this and is fine to use as long as there are no conflicts where 1 bit is of
+>> interest to multiple drivers, and there is no such conflict here
+>> 2) Maxime's other arguments seem to boil down to it would be nice / prettier
+>> to have a specific driver for this, without really proving a hard need for
+>> such a driver. But writing such a driver is going to be a lot of work, and
+>> we've a ton of other work to do, and as said there is no real need for a
+>> separate driver, syscon works fine for this.
+>> 3) I actually believe that having a specific driver for this is a bad idea,
+>> because that means inventing a whole new cross driver API for this, and
+>> getting those right is, hard, a lot of work, and even then one is still likely
+>> to get it wrong. We can avoid all this by going with the proven syscon solution.
+>>
+>> Maxime, can we please have your ack for moving forward with this using syscon?
+>> (see above for my arguments why)
+>
+> I'd like to understand here why we can't use the existing SRAM DT binding
+> instead of the syscon binding.
 
-I check the return value of is_hyp_mode_available() to catch whether EL1 or EL2. 
+I believe you are talking about "mmio-sram"?
 
-The is_hyp_mode_available() returns 'false' during kernel booting.
-- __boot_cpu_mode[0]: 0xe11 (BOOT_CPU_MODE_EL1)
-- __boot_cpu_mode[1]: 0x0
+The syscon here represents a switch, to toggle whether a block of SRAM is
+mapped into the CPU memory space, or to a specific devices private address
+space. It is not the actual SRAM.
 
-Best Regards,
-Chanwoo Choi
+The SRAM DT binding is orthogonal to this, if not irrelevant when the block
+is mapped privately, as it is no longer visible from the DT's PoV.
+
+Coincidentally, on the A23 this is no longer needed. The SRAM for the FIFO
+is wholly owned by MUSB and not available to the CPU.
+
+
+ChenYu
