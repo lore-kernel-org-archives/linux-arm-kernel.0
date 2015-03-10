@@ -1,23 +1,27 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Mar 2015 13:02:09 -0700
-Subject: [PATCH] ARM: at91: force CPU selection
-In-Reply-To: <2216832.iXiqHye8YX@wuerfel>
-References: <1425970798-14015-1-git-send-email-computersforpeace@gmail.com>
- <2216832.iXiqHye8YX@wuerfel>
-Message-ID: <20150310200209.GE4124@norris-Latitude-E6410>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 10 Mar 2015 20:04:56 +0000
+Subject: [PATCH v5 07/12] regulator: axp20x: add support for AXP22X
+ regulators
+In-Reply-To: <1425988764-23618-8-git-send-email-wens@csie.org>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-8-git-send-email-wens@csie.org>
+Message-ID: <20150310200456.GH28806@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 10:02:15AM +0100, Arnd Bergmann wrote:
-> I actually added a bunch of these in other places, but have stopped
-> doing so because Russell didn't like them, and I tend to follow
-> his argument now that it's actually pretty confusing.
+On Tue, Mar 10, 2015 at 07:59:18PM +0800, Chen-Yu Tsai wrote:
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> 
+> Add AXP22X regulator definitions and variant id associations.
+> This introduces a new "switch" type output for one of the regulators.
+> It is a switchable secondary output of one regulator, with the same
+> voltage level as the primary output.
 
-I'm not a big fan of my patch, but it did at least solve the problem.
-Thanks for the info, and I'm happy to drop my patch. At least I've fixed
-my compile-test setups to avoid bad combinations, now.
-
-To be clear, multiplatform support is in progress, but not merged yet,
-right?
-
-Brian
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/beff3bf1/attachment.sig>
