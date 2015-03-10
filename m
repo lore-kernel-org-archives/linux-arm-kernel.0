@@ -1,59 +1,48 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Mar 2015 09:27:10 +0100
-Subject: [PATCH v6 06/22] power_supply: sysfs: Use power_supply_*() API for
- accessing function attrs
+Date: Tue, 10 Mar 2015 09:27:05 +0100
+Subject: [PATCH v6 01/22] compal-laptop: Fix leaking hwmon device
 In-Reply-To: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425976046-20973-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425976046-20973-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
- - set_property -> power_supply_set_property
- - property_is_writeable -> power_supply_property_is_writeable
+The commit c2be45f09bb0 ("compal-laptop: Use
+devm_hwmon_device_register_with_groups") wanted to change the
+registering of hwmon device to resource-managed version. It mostly did
+it except the main thing - it forgot to use devm-like function so the
+hwmon device leaked after device removal or probe failure.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Reviewed-by: Sebastian Reichel <sre@kernel.org>
+Fixes: c2be45f09bb0 ("compal-laptop: Use devm_hwmon_device_register_with_groups")
+Cc: <stable@vger.kernel.org>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
+Acked-by: Darren Hart <dvhart@linux.intel.com>
+
 ---
- drivers/power/power_supply_sysfs.c | 6 +++---
+Changes since previous submission:
+1. Add Darren's ack.
+   http://lkml.iu.edu/hypermail/linux/kernel/1503.0/01895.html
+---
+ drivers/platform/x86/compal-laptop.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/power/power_supply_sysfs.c b/drivers/power/power_supply_sysfs.c
-index 62653f50a524..f817aab80813 100644
---- a/drivers/power/power_supply_sysfs.c
-+++ b/drivers/power/power_supply_sysfs.c
-@@ -76,7 +76,7 @@ static ssize_t power_supply_show_property(struct device *dev,
- 	if (off == POWER_SUPPLY_PROP_TYPE) {
- 		value.intval = psy->type;
- 	} else {
--		ret = psy->get_property(psy, off, &value);
-+		ret = power_supply_get_property(psy, off, &value);
+diff --git a/drivers/platform/x86/compal-laptop.c b/drivers/platform/x86/compal-laptop.c
+index 15c0fab2bfa1..eb9885e7fb0e 100644
+--- a/drivers/platform/x86/compal-laptop.c
++++ b/drivers/platform/x86/compal-laptop.c
+@@ -1026,9 +1026,9 @@ static int compal_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
  
- 		if (ret < 0) {
- 			if (ret == -ENODATA)
-@@ -125,7 +125,7 @@ static ssize_t power_supply_store_property(struct device *dev,
- 
- 	value.intval = long_val;
- 
--	ret = psy->set_property(psy, off, &value);
-+	ret = power_supply_set_property(psy, off, &value);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -223,7 +223,7 @@ static umode_t power_supply_attr_is_visible(struct kobject *kobj,
- 
- 		if (property == attrno) {
- 			if (psy->property_is_writeable &&
--			    psy->property_is_writeable(psy, property) > 0)
-+			    power_supply_property_is_writeable(psy, property) > 0)
- 				mode |= S_IWUSR;
- 
- 			return mode;
+-	hwmon_dev = hwmon_device_register_with_groups(&pdev->dev,
+-						      "compal", data,
+-						      compal_hwmon_groups);
++	hwmon_dev = devm_hwmon_device_register_with_groups(&pdev->dev,
++							   "compal", data,
++							   compal_hwmon_groups);
+ 	if (IS_ERR(hwmon_dev)) {
+ 		err = PTR_ERR(hwmon_dev);
+ 		goto remove;
 -- 
 1.9.1
