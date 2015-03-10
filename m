@@ -1,37 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 17:29:35 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF21BE.2040506@list.ru>
-References: <54FF21BE.2040506@list.ru>
-Message-ID: <20150310172935.GT8656@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 10 Mar 2015 17:31:21 +0000
+Subject: [RFC PATCH 1/2] arm64: kernel: perf: add cpu hotplug notifier
+Message-ID: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 07:54:22PM +0300, Stas Sergeev wrote:
-> Hello, the patch below is needed for a successful boot on armada-xp.
-> 
-> 
-> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
-> This fixes the following crash at boot:
-> 
->  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
->  Internal error: : 808 [#1] SMP ARM
-> 
->  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
->  Hardware name: Marvell Armada 370/XP (Device Tree)
->  task: ed41e800 ti: ed43e000 task.ti: ed43e000
+When a CPU is taken offline, its PMU registers content is lost
+and needs to be reset on power up, since for most of the PMU registers
+content is UNKNOWN upon CPU reset. This patch implements a cpu hotplug
+notifier and hooks the reset call in the respective notifier callback
+function.
 
-Oh ffs, stop trimming down the dumps.  Knowing what the page table entries
-were would have been useful to see whether this is an appropriate fix.
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-We dump information from the kernel for a reason.  That reason is not so
-people can cut random bits that they don't think is relevant from it.
-
-NAK until we see the full dump.
-
-Thanks.
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 25a5308..83f21d8 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -21,6 +21,7 @@
+ #define pr_fmt(fmt) "hw perfevents: " fmt
+ 
+ #include <linux/bitmap.h>
++#include <linux/cpu.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+@@ -1315,6 +1316,30 @@ static struct pmu_hw_events *armpmu_get_cpu_events(void)
+ 	return this_cpu_ptr(&cpu_hw_events);
+ }
+ 
++/*
++ * PMU hardware loses all context when a CPU goes offline.
++ * When a CPU is hotplugged back in, since some hardware registers are
++ * UNKNOWN at reset, the PMU must be explicitly reset to avoid reading
++ * junk values out of them.
++ */
++static int cpu_pmu_notifier(struct notifier_block *b, unsigned long action,
++			    void *hcpu)
++{
++	if ((action & ~CPU_TASKS_FROZEN) != CPU_STARTING)
++		return NOTIFY_DONE;
++
++	if (cpu_pmu->reset)
++		cpu_pmu->reset(NULL);
++	else
++		return NOTIFY_DONE;
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block cpu_pmu_notifier_block = {
++	.notifier_call = cpu_pmu_notifier,
++};
++
+ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
+ {
+ 	int cpu;
+@@ -1325,6 +1350,8 @@ static void __init cpu_pmu_init(struct arm_pmu *armpmu)
+ 		raw_spin_lock_init(&events->pmu_lock);
+ 	}
+ 	armpmu->get_hw_events = armpmu_get_cpu_events;
++
++	register_cpu_notifier(&cpu_pmu_notifier_block);
+ }
+ 
+ static int __init init_hw_perf_events(void)
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.2.1
