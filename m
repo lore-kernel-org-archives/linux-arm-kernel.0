@@ -1,40 +1,58 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Mar 2015 19:59:16 +0800
-Subject: [PATCH v5 05/12] ARM: dts: sun6i: hummingbird: Add AXP221 PMIC device
- node
+Date: Tue, 10 Mar 2015 19:59:19 +0800
+Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information to DT
+ bindings
 In-Reply-To: <1425988764-23618-1-git-send-email-wens@csie.org>
 References: <1425988764-23618-1-git-send-email-wens@csie.org>
-Message-ID: <1425988764-23618-6-git-send-email-wens@csie.org>
+Message-ID: <1425988764-23618-9-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hummingbird A31 has an AXP221 PMIC hooked up to the
-P2WI controller.
+Add the list of regulators for AXP22x to the DT bindings.
+This includes the names and supply names.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 533bedc5dd95..486ffc69ac96 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -142,6 +142,15 @@
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 3914a3f91ff6..0fc2f1f35cef 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -49,6 +49,33 @@ LDO3		: LDO		: ldo3in-supply
+ LDO4		: LDO		: ldo24in-supply	: shared supply
+ LDO5		: LDO		: ldo5in-supply
  
- &p2wi {
- 	status = "okay";
 +
-+	axp221: pmic at 68 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x68>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+	};
- };
++AXP221 regulators, type, and corresponding input supply names:
++
++Regulator	  Type		  Supply Name		  Notes
++---------	  ----		  -----------		  -----
++DCDC1		: DC-DC buck	: vin1-supply
++DCDC2		: DC-DC buck	: vin2-supply
++DCDC3		: DC-DC	buck	: vin3-supply
++DCDC4		: DC-DC	buck	: vin4-supply
++DCDC5		: DC-DC	buck	: vin5-supply
++DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
++DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
++ALDO1		: LDO		: aldoin-supply		: shared supply
++ALDO2		: LDO		: aldoin-supply		: shared supply
++ALDO3		: LDO		: aldoin-supply		: shared supply
++DLDO1		: LDO		: dldoin-supply		: shared supply
++DLDO2		: LDO		: dldoin-supply		: shared supply
++DLDO3		: LDO		: dldoin-supply		: shared supply
++DLDO4		: LDO		: dldoin-supply		: shared supply
++ELDO1		: LDO		: eldoin-supply		: shared supply
++ELDO2		: LDO		: eldoin-supply		: shared supply
++ELDO3		: LDO		: eldoin-supply		: shared supply
++LDO_IO0		: LDO		: ips-supply		: GPIO 0
++LDO_IO1		: LDO		: ips-supply		: GPIO 1
++RTC_LDO		: LDO		: ips-supply		: always on
++
++
+ Example:
  
- &reg_usb1_vbus {
+ axp209: pmic at 34 {
 -- 
 2.1.4
