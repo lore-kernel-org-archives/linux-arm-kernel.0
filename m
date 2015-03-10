@@ -1,64 +1,148 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 10 Mar 2015 11:51:03 +0100
-Subject: [PATCH 0/5] arm64: update/clarify/relax Image and FDT placement
- rules
-In-Reply-To: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8Ghwr5DRjehr780=8NUpnCYciZSMNxUzFdo1VoOy1Dng@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 10 Mar 2015 16:23:36 +0530
+Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update
+ the iscr register
+In-Reply-To: <54FEC3DD.10108@redhat.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <4772280.xE1WBZVd8Z@wuerfel> <54FEA59B.7020400@redhat.com>
+ <2515825.598CypcWU3@wuerfel> <54FEC3DD.10108@redhat.com>
+Message-ID: <54FECD30.6080106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2015 at 12:03, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This series came about after Mark Rutland brought up the fact that the current
-> FDT placement logic used by the EFI stub is flawed. But actually, it turned out
-> that the documentation for both the Image and FDT placement was incorrect as
-> well, or confusing at the very least.
+Hi,
+
+On Tuesday 10 March 2015 03:43 PM, Hans de Goede wrote:
+> Hi,
 >
-> So this series does two things:
-> - It relaxes the FDT placement requirements, and updates the documentation and
->   EFI stub FDT placement logic accordingly.
-> - It clarifies the Image placement requirements in the documentation, and brings
->   the EFI stub Image placement logic in line with it
->
+> On 10-03-15 09:57, Arnd Bergmann wrote:
+>> On Tuesday 10 March 2015 09:04:43 Hans de Goede wrote:
+>>> Hi,
+>>>
+>>> On 09-03-15 22:47, Arnd Bergmann wrote:
+>>>> On Monday 09 March 2015 21:40:15 Hans de Goede wrote:
+>>>>> +void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
+>>>>> +{
+>>>>> +       struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>>>> +       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>>>> +       u32 iscr;
+>>>>> +
+>>>>> +       iscr = readl(data->base + REG_ISCR);
+>>>>> +       iscr &= ~clr;
+>>>>> +       iscr |= set;
+>>>>> +       writel(iscr, data->base + REG_ISCR);
+>>>>> +}
+>>>>> +EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
+>>>>> +
+>>>>>
+>>>>
+>>>> I would generally consider this a bad design. What is the purpose of
+>>>> calling sun4i_usb_phy_update_iscr()
 
-Anyone care to comment on these patches?
+right. That would bind the PHY driver and the controller driver and would
+start creating problems when a different PHY is connected with the
+controller.
+>>>
+>>> There are 2 different use cases for this one is to enable the dataline
+>>> pull-ups at driver init and disable them at driver exit, this could /
+>>> should probably be moved to the phy_init / phy_exit code for the usb0 phy
+>>> removing the need to do this from within the sunxi musb glue.
+>>>
+>>> The second use-case is more tricky, for some reasons Allwinner has decided
+>>> to not use the dedicated id-detect and vusb-sense pins of the phy they are
+>>> using (these pins are not routed to the outside).
+>>>
+>>> Instead id-detect and vusb-sense are done through any $random gpio pins
+>>> (including non irq capable pins on some designs requiring polling).
 
-Patch #4 is arguably a bug fix, although it is unlikely that the base
-of visible (to EL2) DRAM would be so close to a 512 MB boundary that
-the Image would end up astride it.
+The polling can still be done in PHY driver and can use the extcon framework
+to report the status to controller driver no?
+>>>
+>>> But the musb-core still needs to know the status of the id and vbus pins,
 
-However, the FDT placement issue is more likely to cause trouble: if
-EL3 takes a couple of megs from the bottom of DRAM to give to the
-secure world (in which case it is perfectly legal for it not to turn
-up in the UEFI memory map at all), the current FDT placement logic
-will prefer an offset which sits in the next 512 MB block, putting the
-FDT out of reach for the initial page tables.
+musb-core or the musb-glue (musb/sunxi.c in this case)?
+>>> and gets this from the usb0-phy iscr register, which reflects the status of
+>>> the not connected dedicated pins of the phy. The reason this can still
+>>> work at all is because the iscr register allows the user to override
+>>> whatever the not connected phy pins are seeing and forcing a value to
+>>> report to the musb core as id and vbus status.
+>>>
+>>> This is done by these 2 functions in the musb sunxi glue:
+>>>
+>>> static void sunxi_musb_force_id(struct musb *musb, u32 val)
+>>> {
+>>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>>>
+>>>           if (val)
+>>>                   val = SUNXI_ISCR_FORCE_ID_HIGH;
+>>>           else
+>>>                   val = SUNXI_ISCR_FORCE_ID_LOW;
+>>>
+>>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_ID_MASK, val);
 
-If we prefer not to use the fixmap region for the FDT,  the latter
-issue should be addressed in a different way.
+What will writing to this register lead to? call to sunxi_musb_id_vbus_det_irq
+interrupt handler?
+>>> }
+>>>
+>>> static void sunxi_musb_force_vbus(struct musb *musb, u32 val)
+>>> {
+>>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>>>
+>>>           if (val)
+>>>                   val = SUNXI_ISCR_FORCE_VBUS_HIGH;
+>>>           else
+>>>                   val = SUNXI_ISCR_FORCE_VBUS_LOW;
+>>>
+>>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_VBUS_MASK,
+>>> val);
+>>> }
+>>>
+>>> I will happily admit that these 2 functions are a better API between the
+>>> sunxi musb
+>>> glue and the sunxi usb phy driver. I started with the minimal
+>>> sun4i_usb_phy_update_iscr
+>>> approach as I wanted to keep the API as small as possible, but having 2
+>>> functions like
+>>> the one above, which actually reflect what is happening would indeed be better.
+>>
+>> Ok, that would definitely improve things.
+>>
+>>> Note that the polling of the pins cannot (easily) be moved into the phy
+>>> driver for various
+>>> reasons:
+>>>
+>>> 1) It depends on dr_mode, the otg may be used in host only mode in which
+>>> case there are no
+>>> pins at all.
+>>> 2) the musb set_vbus callback needs access to the pins
+>>> 3) When id changes some musb core state changes are necessary.
+>>>
+>>> I'll respin the patch set to do things this way as soon as we've agreement on
+>>> your second point.
+>>>
+>>>   > and why can't there be a high-level
+>>>> PHY API for this?
+>>>
+>>> The current generic phy API seems to not have any bus specific methods, I
+>>> know that
+>>> in the long run people want to get rid of struct usb_phy, so maybe we should
+>>> consider
+>>> adding bus specific methods to the generic phy API for things like otg.
+>>>
+>>> If we decide to add bus specific methods, then the question becomes if having
+>>>
+>>> int phy_usb_set_id_detect(struct phy *phy, bool val);
+>>> int phy_usb_set_vbus_detect(struct phy *phy, bool val);
+>>>
+>>> Functions in the generic phy API is a good idea, or if this is too sunxi
+>>> specific,
+>>> I'm fine with doing this either way. If we want to go the generic phy route
+>>> I'll split this in 2 patches, one adding these 2 generic functions &
+>>> phy-ops, and
+>>> 1 doing the sunxi implementation.
 
-Regards,
-Ard.
+Please don't do that. We don't want to be bloating phy framework with platform
+specific hooks.
 
-> Ard Biesheuvel (5):
->   of/fdt: allow FDT virtual address outside of linear direct mapping
->   arm64: use fixmap region for permanent FDT mapping
->   arm64: Documentation: clarify Image placement in physical RAM
->   arm64/efi: ensure that Image does not cross a 512 MB boundary
->   arm64/efi: adapt to relaxed FDT placement requirements
->
->  Documentation/arm64/booting.txt         | 12 +++----
->  arch/arm64/include/asm/efi.h            |  9 +++--
->  arch/arm64/include/asm/fixmap.h         |  9 +++++
->  arch/arm64/kernel/Makefile              |  1 +
->  arch/arm64/kernel/efi-stub.c            | 38 ++++++++++++++++----
->  arch/arm64/kernel/head.S                | 38 +-------------------
->  arch/arm64/kernel/setup.c               | 62 +++++++++++++++++++++++++++++----
->  drivers/firmware/efi/libstub/arm-stub.c |  2 +-
->  drivers/firmware/efi/libstub/fdt.c      |  7 ++--
->  drivers/of/fdt.c                        | 14 +++++++-
->  10 files changed, 125 insertions(+), 67 deletions(-)
->
-> --
-> 1.8.3.2
->
+Cheers
+Kishon
