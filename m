@@ -1,42 +1,53 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 10 Mar 2015 17:01:26 -0700
-Subject: [PATCH] dma: Add Xilinx ZDMA device tree Binding Documentation
-In-Reply-To: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
-References: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
-Message-ID: <BN1BFFO11FD01214F9392FD94A0D30D9E28C190@BN1BFFO11FD012.protection.gbl>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 10 Mar 2015 16:59:12 -0700
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+ <20150305074207.GC11010@pengutronix.de>
+ <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+Message-ID: <20150310235912.14952.99786@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-10 at 07:46PM +0530, Punnaiah Choudary Kalluri wrote:
-> Device-tree binding documentation for Xilinx ZDMA Engine
+Quoting Viresh Kumar (2015-03-05 00:59:50)
+> On 5 March 2015 at 13:12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > We have clk_set_parent for changing the parent and clk_set_rate to
+> > change the rate. Use the former for changing the parent and the latter
+> > for changing the rate. What you are interested in is changing the
+> > parent, so use clk_set_parent for this and not abuse a side effect
+> > of clk_set_rate.
 > 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> ---
->  .../devicetree/bindings/dma/xilinx/zdma.txt        |   76 ++++++++++++++++++++
->  1 files changed, 76 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zdma.txt
+> clk_set_rate() for CPUs clock is responsible to change clock rate
+> of the CPU. Whether it plays with PLLs or muxes, its not that relevant.
+
+Agreed.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zdma.txt b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
-> new file mode 100644
-> index 0000000..399a3bc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
-> @@ -0,0 +1,76 @@
-> +Xilinx ZDMA engine, it does support memory to memory transfers,
-> +memory to device and device to memory transfers. It also has flow
-> +control and rate control support for slave/peripheral dma access.
-> +
-> +Xilinx ZynqMP has two instances of general purpose DMA(ZDMA).
-> +one is located in FPD(full power domain) and other is located in
-> +LPD(low power domain).
-> +
-> +ZDMA instance located in FPD is referred as FPDMA and instance located
-> +in LPD is referred as LPDMA.
-> +
-> +FPDMA is configured with 8 DMA channels and AXI bus width is 128 byte.
-> +LPDMA is configured with 8 DMA channels and AXI bus width is 64 byte.
+> > My suggestion is to take another approach. Implement clk_set_rate for
+> > these muxes and in the set_rate hook:
+> >
+> > - switch mux to intermediate PLL parent
+> > - call clk_set_rate() for the real parent PLL
+> > - switch mux back to real parent PLL
+> >
+> > This way the things happening behind the scenes are completely transparent
+> > to the cpufreq driver and you can use cpufreq-dt as is without changes.
+> 
+> CPUFreq wants to change to intermediate frequency by itself against
+> some magic change behind the scene. The major requirement for that
+> comes from the fact that we want to send PRE/POST freq notifiers on
+> which loops-per-jiffie depends.
 
-All these implementation details are good background information, but
-shouldn't be part of the binding.
+I assume you are saying that you want to update loops-per-jiffie while
+at an intermediate frequency. Why? This operation should not take very
+long.
 
-	S?ren
+Imagine a (hypothetical?) processor that changes frequency in many small
+steps until it converges to the target rate. Would you want to update
+lpj for every step?
+
+Regards,
+Mike
