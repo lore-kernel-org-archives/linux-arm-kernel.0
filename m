@@ -1,47 +1,70 @@
-From: der.herr@hofr.at (Nicholas Mc Guire)
-Date: Tue, 10 Mar 2015 13:51:16 +0100
-Subject: [PATCH] video: treat signal like timeout as failure
-In-Reply-To: <54FEE70D.3010307@ti.com>
-References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
- <54FEE70D.3010307@ti.com>
-Message-ID: <20150310125116.GA26020@opentech.at>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 10 Mar 2015 13:53:51 +0100
+Subject: [PATCH 1/3] arm/pmu: Reject groups spanning multiple hardware PMUs
+In-Reply-To: <20150310120521.GD28168@leverpostej>
+References: <1425905192-10509-1-git-send-email-suzuki.poulose@arm.com>
+ <1425905192-10509-2-git-send-email-suzuki.poulose@arm.com>
+ <20150310112723.GY2896@worktop.programming.kicks-ass.net>
+ <20150310120521.GD28168@leverpostej>
+Message-ID: <20150310125351.GD2896@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Mar 2015, Tomi Valkeinen wrote:
-
-> On 20/01/15 07:23, Nicholas Mc Guire wrote:
-> > if(!wait_for_completion_interruptible_timeout(...))
-> > only handles the timeout case - this patch adds handling the
-> > signal case the same as timeout and cleans up.
+On Tue, Mar 10, 2015 at 12:05:21PM +0000, Mark Rutland wrote:
+> On Tue, Mar 10, 2015 at 11:27:23AM +0000, Peter Zijlstra wrote:
+> > On Mon, Mar 09, 2015 at 12:46:30PM +0000, Suzuki K. Poulose wrote:
+> > > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> > > 
+> > > Don't allow grouping hardware events from different PMUs
+> > >  (eg. CCI + CPU).
 > > 
-> > Signed-off-by: Nicholas Mc Guire <der.herr@hofr.at>
-> > ---
-> > 
-> > Only the timeout case was being handled, return of 0 in 
-> > wait_for_completion_interruptible_timeout, the signal case (-ERESTARTSYS)
-> > was treated just like the case of successful completion, which is most 
-> > likely not reasonable.
-> > 
-> > Note that exynos_mipi_dsi_wr_data/exynos_mipi_dsi_rd_data return values
-> > are not checked at the call sites in s6e8ax0.c (cmd_read/cmd_write)!
-> > 
-> > This patch simply treats the signal case the same way as the timeout case,
-> > by releasing locks and returning 0 - which might not be the right thing to
-> > do - this needs a review by someone knowing the details of this driver.
+> > Uhm, how does this work? If we have multiple hardware PMUs we'll stop
+> > scheduling events after the first failed event schedule. This can leave
+> > one of the PMUs severely under utilized.
 > 
-> While I agree that this patch is a bit better than the current state,
-> the code still looks wrong as Russell said.
-> 
-> I can merge this, but I'd rather have someone from Samsung look at the
-> code and change it to use wait_for_completion_killable_timeout() if
-> that's what this code is really supposed to use.
->
-If someone that knows the details takes care of it
-that is of course the best solution. If someone Samsung is 
-going to look into it then it is probably best to completly
-drop this speculative patch so that this does not lead
-to more confusion than it does good.
+> The problem is here group validation at pmu::event_init() time, not
+> scheduling.
 
-thx!
-hofrat
+Maybe make that a little more explicit.
+
+> We don't allow grouping across disparate HW PMUs because we can't
+> provide group semantics anyway. Scheduling is not a problem in this case
+> (unlike the big.LITTLE case I have a patch for [1]).
+
+Right, I remember that; I was wondering if this was related.
+
+> We have a CPU PMU and an "uncore" CCI PMU. You can't create task-bound
+> events for the CCI, but you can create CPU-bound events for the CCI on
+> the nominal CPU the CCI is monitored from.
+
+Indeed, ok.
+
+> The context check you added in c3c87e770458aa00 "perf: Tighten (and fix)
+> the grouping condition" implicitly rejects groups that have CPU and CCI
+> events (each event::ctx will be the relevant pmu::pmu_cpu_context and
+> will differ), and this is sane -- you can't provide group semantics
+> across disparate HW PMUs.
+
+Agreed.
+
+> Unfortunately that happens after we've done the
+> event->pmu->event_init(event) dance on each event, and in our event_init
+> function we try to verify the group is sane. In our verification we
+> ignore SW events, but assume that all !SW events are for the CPU PMU.
+> If you add a CPU event to a CCI group, that's not the case, and we use
+> container_of on an unsuitable object, derefence garbage, invoke the
+> eschaton and so on.
+
+Indeed, on x86 we explicitly ignore everything not an x86_pmu event.
+
+> It would be nicer if we could prevent this in the core so we're not
+> reliant on every PMU driver doing the same verification. My initial
+> thought was that seemed like unnecessary duplication of the ctx checking
+> above, but if we're going to end up shoving it into several drivers
+> anyway perhaps it's the lesser evil.
+
+Again, agreed, that would be better and less error prone. But I'm not
+entirely sure how to go about doing it :/ I'll have to go think about
+that; and conferences are not the best place for that.
+
+Suggestions on that are welcome of course ;)
