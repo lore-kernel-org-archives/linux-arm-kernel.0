@@ -1,76 +1,62 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 10 Mar 2015 14:57:47 -0500
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <10886228.vUHyKm1ubP@wuerfel>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
- <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
- <10886228.vUHyKm1ubP@wuerfel>
-Message-ID: <7DA73171-01A5-4158-9A69-015B62D2D7E8@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Mar 2015 12:58:32 -0700
+Subject: [PATCH] mtd: clean up whitespace in linux/mtd/map.h
+In-Reply-To: <1426012416.18060.22.camel@perches.com>
+References: <2266200.3mx7btcFe5@wuerfel> <2220416.D2kDyFWh1C@wuerfel>
+ <1426012416.18060.22.camel@perches.com>
+Message-ID: <20150310195832.GD4124@norris-Latitude-E6410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 10, 2015, at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Tuesday 10 March 2015 13:10:08 Kumar Gala wrote:
->>>>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->>>>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
->>>>>>>>>>>> utilized and passed to the kernel.
->>>>>>>>>>>> 
->>>>>>>>>>>> Cc: <devicetree@vger.kernel.org>
->>>>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->>>>>>>>>>> 
->>>>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
->>>>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
->>>>>>>>>>> 
->>>>>>>>>>> Kevin
->>>>>>>>>> 
->>>>>>>>>> yes
->>>>>>>>> 
->>>>>>>>> That's a bummer.
->>>>>>>>> 
->>>>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
->>>>>>>>> one devicetree, and it'll be used, right?
->>>>>>>> 
->>>>>>>> We can provide only one, we still need the IDs in the DT.
->>>>>>> 
->>>>>>> How are the DTS provided? Concatenated with the kernel, or in a
->>>>>>> wrapped data format? Or in a separate partition from the kernel?
->>>>>> 
->>>>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
->>>>> 
->>>>> Then you should be able to create a tool that can write this concatenated
->>>>> format and insert these properties from a table that matches the boot
->>>>> loader, right?
->>>>> 
->>>>>     Arnd
->>>> 
->>>> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
->>> 
->>> To insert platform-local properties that mean nothing outside of the
->>> firmware packaging of the device trees, which is the case here?
->>> 
->>> I think the idea of having the installer script inserting them is
->>> quite reasonable in this case.
->>> 
->>> 
->>> -Olof
->> 
->> These values are static, so not sure what the point of having the installer script do that?
->> 
+On Tue, Mar 10, 2015 at 11:33:36AM -0700, Joe Perches wrote:
+> On Tue, 2015-03-10 at 17:51 +0100, Arnd Bergmann wrote:
+> > As the only comments I got for the "mtd: cfi: reduce stack size"
+> > patch were about whitespace changes, it appears necessary to fix
+> > up the rest of the file as well, which contains the exact same
+> > mistakes.
 > 
-> It combines two hacks to work around a nonstandard boot loader.
-> Once the bootloader is fixed, you can stop using that script.
+> trivia:
 > 
-> 	Arnd
+> > diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+> []
+> > @@ -77,7 +77,7 @@
+> >  /* ensure we never evaluate anything shorted than an unsigned long
+> >   * to zero, and ensure we'll never miss the end of an comparison (bjd) */
+> >  
+> > -#define map_calc_words(map) ((map_bankwidth(map) + (sizeof(unsigned long)-1))/ sizeof(unsigned long))
+> > +#define map_calc_words(map) ((map_bankwidth(map) + (sizeof(unsigned long)-1)) / sizeof(unsigned long))
+> 
+> DIV_ROUND_UP?
+>  
+> >  #ifdef CONFIG_MTD_MAP_BANK_WIDTH_8
+> >  # ifdef map_bankwidth
+> > @@ -181,7 +181,7 @@ static inline int map_bankwidth_supported(int w)
+> >  	}
+> >  }
+> >  
+> > -#define MAX_MAP_LONGS ( ((MAX_MAP_BANKWIDTH*8) + BITS_PER_LONG - 1) / BITS_PER_LONG )
+> > +#define MAX_MAP_LONGS (((MAX_MAP_BANKWIDTH * 8) + BITS_PER_LONG - 1) / BITS_PER_LONG)
+> 
+> BITS_TO_LONGS?
 
-I feel as if I?m missing something here.  If we just have the properties in the .dts files I don?t need to change anything ever, no script, no worries about working with old or new boot loaders, etc.
+It seems the $subject patch is really not that necessary, as it was just
+inspired by similarly trivial comments. But I thought CodingStyle
+was supposed to mostly be a guide for new code, not a charter to "fix
+up" old code like drivers/mtd/{chips,maps}.
 
-- k
+So I would have been happy with ignoring the whitespace comments on the
+v1 stack usage patch (esp. since it *did* match the existing style), and
+avoiding the ensuing comments about helper macros. IMO, it's pretty
+silly when a simple patch to fix a real issue turns into an extended
+search for other trivial issues.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I'll probably take both of Arnd's patches as they stand, but any more
+trivial requests to stable code like this should come in the form of
+real patches, not respins of Arnd's patch.
+
+Disclaimer: I'm probably just as guilty of adding trivial tangential
+comments/requests that distract from the original issue. So I'm partly
+speaking to myself here.
+
+Happy coding,
+Brian
