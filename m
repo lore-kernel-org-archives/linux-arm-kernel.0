@@ -1,159 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 17:51:55 +0100
-Subject: [PATCH] mtd: clean up whitespace in linux/mtd/map.h
-In-Reply-To: <2266200.3mx7btcFe5@wuerfel>
-References: <2266200.3mx7btcFe5@wuerfel>
-Message-ID: <2220416.D2kDyFWh1C@wuerfel>
+From: stsp@list.ru (Stas Sergeev)
+Date: Tue, 10 Mar 2015 19:54:22 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+Message-ID: <54FF21BE.2040506@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the only comments I got for the "mtd: cfi: reduce stack size"
-patch were about whitespace changes, it appears necessary to fix
-up the rest of the file as well, which contains the exact same
-mistakes.
+Hello, the patch below is needed for a successful boot on armada-xp.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+-=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
+This fixes the following crash at boot:
+
+ Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
+ Internal error: : 808 [#1] SMP ARM
+
+ CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
+ Hardware name: Marvell Armada 370/XP (Device Tree)
+ task: ed41e800 ti: ed43e000 task.ti: ed43e000
+ PC is at _set_bit+0x28/0x50
+ LR is at n_tty_set_termios+0x328/0x358
+ pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
+ sp : ed43fd00  ip : 00000000  fp : 00000000
+ r10: 00000002  r9 : 00000000  r8 : ec930200
+ r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
+ r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
+ Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+ Control: 10c5387d  Table: 0000406a  DAC: 00000015
+ Process swapper/0 (pid: 1, stack limit = 0xed43e220)
+
+The offending instruction in _set_bit() is "strex r0, r2, [r1]"
+For some reason the exclusive access instructions do not like the
+vmalloc() space... While there may be another fix to make them
+fine about vmalloc() space, it still looks like a good idea to
+use kmalloc() for allocating a small (sub-page) struct.
+
+Signed-off-by: Stas Sergeev <stsp@users.sourceforge.net>
 ---
-The two patches can be applied in either order, or this one dropped
-entirely, I don't care as long as the other patch can get merged,
-or get some constructive feedback.
+ drivers/tty/n_tty.c |    5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 5f487d776411..47c59991491b 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -77,7 +77,7 @@
- /* ensure we never evaluate anything shorted than an unsigned long
-  * to zero, and ensure we'll never miss the end of an comparison (bjd) */
+diff --git a/drivers/tty/n_tty.c b/drivers/tty/n_tty.c
+index cf6e0f2..e03622e 100644
+--- a/drivers/tty/n_tty.c
++++ b/drivers/tty/n_tty.c
+@@ -50,7 +50,6 @@
+ #include <linux/uaccess.h>
+ #include <linux/module.h>
+ #include <linux/ratelimit.h>
+-#include <linux/vmalloc.h>
  
--#define map_calc_words(map) ((map_bankwidth(map) + (sizeof(unsigned long)-1))/ sizeof(unsigned long))
-+#define map_calc_words(map) ((map_bankwidth(map) + (sizeof(unsigned long)-1)) / sizeof(unsigned long))
  
- #ifdef CONFIG_MTD_MAP_BANK_WIDTH_8
- # ifdef map_bankwidth
-@@ -181,7 +181,7 @@ static inline int map_bankwidth_supported(int w)
- 	}
+ /* number of characters left in xmit buffer before select has we have
+room */
+@@ -1892,7 +1891,7 @@ static void n_tty_close(struct tty_struct *tty)
+     if (tty->link)
+         n_tty_packet_mode_flush(tty);
+ 
+-    vfree(ldata);
++    kfree(ldata);
+     tty->disc_data = NULL;
  }
  
--#define MAX_MAP_LONGS ( ((MAX_MAP_BANKWIDTH*8) + BITS_PER_LONG - 1) / BITS_PER_LONG )
-+#define MAX_MAP_LONGS (((MAX_MAP_BANKWIDTH * 8) + BITS_PER_LONG - 1) / BITS_PER_LONG)
+@@ -1911,7 +1910,7 @@ static int n_tty_open(struct tty_struct *tty)
+     struct n_tty_data *ldata;
  
- typedef union {
- 	unsigned long x[MAX_MAP_LONGS];
-@@ -264,20 +264,22 @@ void unregister_mtd_chip_driver(struct mtd_chip_driver *);
- struct mtd_info *do_map_probe(const char *name, struct map_info *map);
- void map_destroy(struct mtd_info *mtd);
+     /* Currently a malloc failure here can panic */
+-    ldata = vmalloc(sizeof(*ldata));
++    ldata = kmalloc(sizeof(*ldata), GFP_KERNEL);
+     if (!ldata)
+         goto err;
  
--#define ENABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(map, 1); } while(0)
--#define DISABLE_VPP(map) do { if(map->set_vpp) map->set_vpp(map, 0); } while(0)
-+#define ENABLE_VPP(map) do { if (map->set_vpp) map->set_vpp(map, 1); } while (0)
-+#define DISABLE_VPP(map) do { if (map->set_vpp) map->set_vpp(map, 0); } while (0)
- 
- #define INVALIDATE_CACHED_RANGE(map, from, size) \
--	do { if(map->inval_cache) map->inval_cache(map, from, size); } while(0)
-+	do { if (map->inval_cache) map->inval_cache(map, from, size); } while (0)
- 
- 
- static inline int map_word_equal(struct map_info *map, map_word val1, map_word val2)
- {
- 	int i;
--	for (i=0; i<map_words(map); i++) {
-+
-+	for (i = 0; i < map_words(map); i++) {
- 		if (val1.x[i] != val2.x[i])
- 			return 0;
- 	}
-+
- 	return 1;
- }
- 
-@@ -286,9 +288,9 @@ static inline map_word map_word_and(struct map_info *map, map_word val1, map_wor
- 	map_word r;
- 	int i;
- 
--	for (i=0; i<map_words(map); i++) {
-+	for (i = 0; i < map_words(map); i++)
- 		r.x[i] = val1.x[i] & val2.x[i];
--	}
-+
- 	return r;
- }
- 
-@@ -297,9 +299,9 @@ static inline map_word map_word_clr(struct map_info *map, map_word val1, map_wor
- 	map_word r;
- 	int i;
- 
--	for (i=0; i<map_words(map); i++) {
-+	for (i = 0; i < map_words(map); i++)
- 		r.x[i] = val1.x[i] & ~val2.x[i];
--	}
-+
- 	return r;
- }
- 
-@@ -308,9 +310,9 @@ static inline map_word map_word_or(struct map_info *map, map_word val1, map_word
- 	map_word r;
- 	int i;
- 
--	for (i=0; i<map_words(map); i++) {
-+	for (i = 0; i < map_words(map); i++)
- 		r.x[i] = val1.x[i] | val2.x[i];
--	}
-+
- 	return r;
- }
- 
-@@ -320,10 +322,11 @@ static inline int map_word_bitsset(struct map_info *map, map_word val1, map_word
- {
- 	int i;
- 
--	for (i=0; i<map_words(map); i++) {
-+	for (i = 0; i < map_words(map); i++) {
- 		if (val1.x[i] & val2.x[i])
- 			return 1;
- 	}
-+
- 	return 0;
- }
- 
-@@ -355,14 +358,16 @@ static inline map_word map_word_load_partial(struct map_info *map, map_word orig
- 
- 	if (map_bankwidth_is_large(map)) {
- 		char *dest = (char *)&orig;
-+
- 		memcpy(dest+start, buf, len);
- 	} else {
--		for (i=start; i < start+len; i++) {
-+		for (i = start; i < start+len; i++) {
- 			int bitpos;
-+
- #ifdef __LITTLE_ENDIAN
--			bitpos = i*8;
-+			bitpos = i * 8;
- #else /* __BIG_ENDIAN */
--			bitpos = (map_bankwidth(map)-1-i)*8;
-+			bitpos = (map_bankwidth(map) - 1 - i) * 8;
- #endif
- 			orig.x[0] &= ~(0xff << bitpos);
- 			orig.x[0] |= (unsigned long)buf[i-start] << bitpos;
-@@ -384,9 +389,10 @@ static inline map_word map_word_ff(struct map_info *map)
- 
- 	if (map_bankwidth(map) < MAP_FF_LIMIT) {
- 		int bw = 8 * map_bankwidth(map);
-+
- 		r.x[0] = (1UL << bw) - 1;
- 	} else {
--		for (i=0; i<map_words(map); i++)
-+		for (i = 0; i < map_words(map); i++)
- 			r.x[i] = ~0UL;
- 	}
- 	return r;
-@@ -407,7 +413,7 @@ static inline map_word inline_map_read(struct map_info *map, unsigned long ofs)
- 		r.x[0] = __raw_readq(map->virt + ofs);
- #endif
- 	else if (map_bankwidth_is_large(map))
--		memcpy_fromio(r.x, map->virt+ofs, map->bankwidth);
-+		memcpy_fromio(r.x, map->virt + ofs, map->bankwidth);
- 	else
- 		BUG();
- 
+-- 
+1.7.9.5
