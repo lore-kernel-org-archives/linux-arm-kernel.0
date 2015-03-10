@@ -1,91 +1,109 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Mar 2015 09:27:12 +0100
-Subject: [PATCH v6 08/22] power_supply: ab8500: Use power_supply_*() API for
- accessing function attrs
+Date: Tue, 10 Mar 2015 09:27:18 +0100
+Subject: [PATCH v6 14/22] power_supply: Add power_supply_put for decrementing
+ device reference counter
 In-Reply-To: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425976046-20973-9-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425976046-20973-15-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace direct calls to power supply function attributes with wrappers.
-Wrappers provide safe access in case of unregistering the power
-supply (e.g. by removing the driver). Replace:
- - get_property -> power_supply_get_property
+The power_supply_get_by_phandle() and power_supply_get_by_name() use
+function class_find_device() for obtaining the reference to power
+supply. Each use of class_find_device() increases the power supply's
+device reference counter.
+
+However the reference counter was not decreased by users of this API.
+Thus final device_unregister() call from power_supply_unregister() could
+not release the device and clean up its resources. This lead to memory
+leak if at least once power_supply_get_by_*() was called between
+registering and unregistering the power supply.
+
+Add and document new API power_supply_put() for decrementing the
+reference counter.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
 Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
 ---
- drivers/power/ab8500_btemp.c    | 2 +-
- drivers/power/ab8500_charger.c  | 2 +-
- drivers/power/ab8500_fg.c       | 2 +-
- drivers/power/abx500_chargalg.c | 4 ++--
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/power/power_supply_core.c | 38 ++++++++++++++++++++++++++++++++++++++
+ include/linux/power_supply.h      |  1 +
+ 2 files changed, 39 insertions(+)
 
-diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
-index d5683f503a4e..4d18464d6400 100644
---- a/drivers/power/ab8500_btemp.c
-+++ b/drivers/power/ab8500_btemp.c
-@@ -938,7 +938,7 @@ static int ab8500_btemp_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
+diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
+index e51405b176c8..b4ec14683b7f 100644
+--- a/drivers/power/power_supply_core.c
++++ b/drivers/power/power_supply_core.c
+@@ -336,6 +336,17 @@ static int power_supply_match_device_by_name(struct device *dev, const void *dat
+ 	return strcmp(psy->desc->name, name) == 0;
+ }
  
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
++/**
++ * power_supply_get_by_name() - Search for a power supply and returns its ref
++ * @name: Power supply name to fetch
++ *
++ * If power supply was found, it increases reference count for the
++ * internal power supply's device. The user should power_supply_put()
++ * after usage.
++ *
++ * Return: On success returns a reference to a power supply with
++ * matching name equals to @name, a NULL otherwise.
++ */
+ struct power_supply *power_supply_get_by_name(const char *name)
+ {
+ 	struct device *dev = class_find_device(power_supply_class, NULL, name,
+@@ -345,12 +356,39 @@ struct power_supply *power_supply_get_by_name(const char *name)
+ }
+ EXPORT_SYMBOL_GPL(power_supply_get_by_name);
  
- 		switch (prop) {
-diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
-index cee9b9e46825..f9eb7fff1d65 100644
---- a/drivers/power/ab8500_charger.c
-+++ b/drivers/power/ab8500_charger.c
-@@ -1957,7 +1957,7 @@ static int ab8500_charger_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
++/**
++ * power_supply_put() - Drop reference obtained with power_supply_get_by_name
++ * @psy: Reference to put
++ *
++ * The reference to power supply should be put before unregistering
++ * the power supply.
++ */
++void power_supply_put(struct power_supply *psy)
++{
++	might_sleep();
++
++	put_device(&psy->dev);
++}
++EXPORT_SYMBOL_GPL(power_supply_put);
++
+ #ifdef CONFIG_OF
+ static int power_supply_match_device_node(struct device *dev, const void *data)
+ {
+ 	return dev->parent && dev->parent->of_node == data;
+ }
  
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 
- 		switch (prop) {
-diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
-index 73bdb4dc4142..7a2e3ac44cf3 100644
---- a/drivers/power/ab8500_fg.c
-+++ b/drivers/power/ab8500_fg.c
-@@ -2200,7 +2200,7 @@ static int ab8500_fg_get_ext_psy_data(struct device *dev, void *data)
- 		enum power_supply_property prop;
- 		prop = ext->properties[j];
- 
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 
- 		switch (prop) {
-diff --git a/drivers/power/abx500_chargalg.c b/drivers/power/abx500_chargalg.c
-index 0da4415cbc10..ac6f4a22f846 100644
---- a/drivers/power/abx500_chargalg.c
-+++ b/drivers/power/abx500_chargalg.c
-@@ -1001,7 +1001,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
- 	 * property because of handling that sysfs entry on its own, this is
- 	 * the place to get the battery capacity.
- 	 */
--	if (!ext->get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
-+	if (!power_supply_get_property(ext, POWER_SUPPLY_PROP_CAPACITY, &ret)) {
- 		di->batt_data.percent = ret.intval;
- 		capacity_updated = true;
- 	}
-@@ -1019,7 +1019,7 @@ static int abx500_chargalg_get_ext_psy_data(struct device *dev, void *data)
- 			ext->type == POWER_SUPPLY_TYPE_USB)
- 			di->usb_chg = psy_to_ux500_charger(ext);
- 
--		if (ext->get_property(ext, prop, &ret))
-+		if (power_supply_get_property(ext, prop, &ret))
- 			continue;
- 		switch (prop) {
- 		case POWER_SUPPLY_PROP_PRESENT:
++/**
++ * power_supply_get_by_phandle() - Search for a power supply and returns its ref
++ * @np: Pointer to device node holding phandle property
++ * @phandle_name: Name of property holding a power supply name
++ *
++ * If power supply was found, it increases reference count for the
++ * internal power supply's device. The user should power_supply_put()
++ * after usage.
++ *
++ * Return: On success returns a reference to a power supply with
++ * matching name equals to value under @property, NULL or ERR_PTR otherwise.
++ */
+ struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 							const char *property)
+ {
+diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
+index ea15eb68f609..75a1dd8dc56e 100644
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -282,6 +282,7 @@ extern struct atomic_notifier_head power_supply_notifier;
+ extern int power_supply_reg_notifier(struct notifier_block *nb);
+ extern void power_supply_unreg_notifier(struct notifier_block *nb);
+ extern struct power_supply *power_supply_get_by_name(const char *name);
++extern void power_supply_put(struct power_supply *psy);
+ #ifdef CONFIG_OF
+ extern struct power_supply *power_supply_get_by_phandle(struct device_node *np,
+ 							const char *property);
 -- 
 1.9.1
