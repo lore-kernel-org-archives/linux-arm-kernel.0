@@ -1,148 +1,69 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 10 Mar 2015 16:23:36 +0530
-Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update
- the iscr register
-In-Reply-To: <54FEC3DD.10108@redhat.com>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <4772280.xE1WBZVd8Z@wuerfel> <54FEA59B.7020400@redhat.com>
- <2515825.598CypcWU3@wuerfel> <54FEC3DD.10108@redhat.com>
-Message-ID: <54FECD30.6080106@ti.com>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 10 Mar 2015 13:00:19 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <20150309224929.GL5264@atomide.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <1425915402-10012-3-git-send-email-eliad@wizery.com>
+ <9217056.Z3urqp19oZ@wuerfel>
+ <CAB3XZEc_sjpA8kgfYCsO8FjGEc6O0xhE9aKO3VtgVbd+Meaakg@mail.gmail.com>
+ <20150309224929.GL5264@atomide.com>
+Message-ID: <CAB3XZEdS+mK1MiB7OWiehFGRBnUzJ84s3rFrCy3-YFYhL-BNWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tuesday 10 March 2015 03:43 PM, Hans de Goede wrote:
-> Hi,
+On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Eliad Peller <eliad@wizery.com> [150309 14:03]:
+>> On Mon, Mar 9, 2015 at 9:50 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Monday 09 March 2015 17:36:42 Eliad Peller wrote:
+>> >> --- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+>> >> +++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
+>> >> @@ -64,4 +64,13 @@
+>> >>         vmmc-supply = <&lbep5clwmc_wlen>;
+>> >>         bus-width = <4>;
+>> >>         non-removable;
+>> >> +
+>> >> +       #address-cells = <1>;
+>> >> +       #size-cells = <0>;
+>> >> +       wlcore: wlcore at 2 {
+>> >> +               compatible = "ti,wl1835";
+>> >> +               reg = <2>;
+>> >> +               interrupt-parent = <&gpio5>;
+>> >> +               interrupts = <8 IRQ_TYPE_NONE>;
+>> >> +       };
+>> >>
+>> >
+>> > Why IRQ_TYPE_NONE?
+>> >
+>> i simply mirrored the current board file (which only sets the irq number).
+>>
+>> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+>> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+>> > if that's enough to clean out the platform_data handling from the wlcore
+>> > driver, it's good enough as a start.
+>> not sure i'm following - can you elaborate?
+>>
+>> i'll summarize the way i see it. please correct me if i'm wrong.
+>>
+>> both wl18xx and wl12xx use the platform data to get the irq number.
+>> wl12xx (only) also needs some additional clock definitions to be
+>> passed. there's currently some issue with specifying some the of clock
+>> sources, so i preferred starting only with (the simpler) wl18xx
+>> bindings.
+>>
+>> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+>> data (i.e. irq) can be passed by the new DT bindings.
+>> however, for platforms with wl12xx, we still need to pass the clock
+>> definitions (along with the irq), so we have to keep
+>> legacy_init_wl12xx for the time being (and that's also why we have to
+>> currently keep the platform_data handling in the wlcore driver)
+>>
+>> do you have something else in mind?
 >
-> On 10-03-15 09:57, Arnd Bergmann wrote:
->> On Tuesday 10 March 2015 09:04:43 Hans de Goede wrote:
->>> Hi,
->>>
->>> On 09-03-15 22:47, Arnd Bergmann wrote:
->>>> On Monday 09 March 2015 21:40:15 Hans de Goede wrote:
->>>>> +void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
->>>>> +{
->>>>> +       struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
->>>>> +       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
->>>>> +       u32 iscr;
->>>>> +
->>>>> +       iscr = readl(data->base + REG_ISCR);
->>>>> +       iscr &= ~clr;
->>>>> +       iscr |= set;
->>>>> +       writel(iscr, data->base + REG_ISCR);
->>>>> +}
->>>>> +EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
->>>>> +
->>>>>
->>>>
->>>> I would generally consider this a bad design. What is the purpose of
->>>> calling sun4i_usb_phy_update_iscr()
+> I think what Arnd is saying is we've now removed all the wl12xx using
+> legacy platforms, so all of them can boot with just data from dts.
+>
+I don't think that's the case (unless i'm missing something).
+e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
+initializes wl12xx device.
 
-right. That would bind the PHY driver and the controller driver and would
-start creating problems when a different PHY is connected with the
-controller.
->>>
->>> There are 2 different use cases for this one is to enable the dataline
->>> pull-ups at driver init and disable them at driver exit, this could /
->>> should probably be moved to the phy_init / phy_exit code for the usb0 phy
->>> removing the need to do this from within the sunxi musb glue.
->>>
->>> The second use-case is more tricky, for some reasons Allwinner has decided
->>> to not use the dedicated id-detect and vusb-sense pins of the phy they are
->>> using (these pins are not routed to the outside).
->>>
->>> Instead id-detect and vusb-sense are done through any $random gpio pins
->>> (including non irq capable pins on some designs requiring polling).
-
-The polling can still be done in PHY driver and can use the extcon framework
-to report the status to controller driver no?
->>>
->>> But the musb-core still needs to know the status of the id and vbus pins,
-
-musb-core or the musb-glue (musb/sunxi.c in this case)?
->>> and gets this from the usb0-phy iscr register, which reflects the status of
->>> the not connected dedicated pins of the phy. The reason this can still
->>> work at all is because the iscr register allows the user to override
->>> whatever the not connected phy pins are seeing and forcing a value to
->>> report to the musb core as id and vbus status.
->>>
->>> This is done by these 2 functions in the musb sunxi glue:
->>>
->>> static void sunxi_musb_force_id(struct musb *musb, u32 val)
->>> {
->>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
->>>
->>>           if (val)
->>>                   val = SUNXI_ISCR_FORCE_ID_HIGH;
->>>           else
->>>                   val = SUNXI_ISCR_FORCE_ID_LOW;
->>>
->>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_ID_MASK, val);
-
-What will writing to this register lead to? call to sunxi_musb_id_vbus_det_irq
-interrupt handler?
->>> }
->>>
->>> static void sunxi_musb_force_vbus(struct musb *musb, u32 val)
->>> {
->>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
->>>
->>>           if (val)
->>>                   val = SUNXI_ISCR_FORCE_VBUS_HIGH;
->>>           else
->>>                   val = SUNXI_ISCR_FORCE_VBUS_LOW;
->>>
->>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_VBUS_MASK,
->>> val);
->>> }
->>>
->>> I will happily admit that these 2 functions are a better API between the
->>> sunxi musb
->>> glue and the sunxi usb phy driver. I started with the minimal
->>> sun4i_usb_phy_update_iscr
->>> approach as I wanted to keep the API as small as possible, but having 2
->>> functions like
->>> the one above, which actually reflect what is happening would indeed be better.
->>
->> Ok, that would definitely improve things.
->>
->>> Note that the polling of the pins cannot (easily) be moved into the phy
->>> driver for various
->>> reasons:
->>>
->>> 1) It depends on dr_mode, the otg may be used in host only mode in which
->>> case there are no
->>> pins at all.
->>> 2) the musb set_vbus callback needs access to the pins
->>> 3) When id changes some musb core state changes are necessary.
->>>
->>> I'll respin the patch set to do things this way as soon as we've agreement on
->>> your second point.
->>>
->>>   > and why can't there be a high-level
->>>> PHY API for this?
->>>
->>> The current generic phy API seems to not have any bus specific methods, I
->>> know that
->>> in the long run people want to get rid of struct usb_phy, so maybe we should
->>> consider
->>> adding bus specific methods to the generic phy API for things like otg.
->>>
->>> If we decide to add bus specific methods, then the question becomes if having
->>>
->>> int phy_usb_set_id_detect(struct phy *phy, bool val);
->>> int phy_usb_set_vbus_detect(struct phy *phy, bool val);
->>>
->>> Functions in the generic phy API is a good idea, or if this is too sunxi
->>> specific,
->>> I'm fine with doing this either way. If we want to go the generic phy route
->>> I'll split this in 2 patches, one adding these 2 generic functions &
->>> phy-ops, and
->>> 1 doing the sunxi implementation.
-
-Please don't do that. We don't want to be bloating phy framework with platform
-specific hooks.
-
-Cheers
-Kishon
+Eliad.
