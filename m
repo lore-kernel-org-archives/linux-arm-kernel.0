@@ -1,54 +1,74 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 10 Mar 2015 10:42:09 +0100
-Subject: [PATCH] ARM: at91: force CPU selection
-In-Reply-To: <2216832.iXiqHye8YX@wuerfel>
-References: <1425970798-14015-1-git-send-email-computersforpeace@gmail.com>
- <2216832.iXiqHye8YX@wuerfel>
-Message-ID: <20150310094209.GD9188@piout.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Mar 2015 10:43:37 +0100
+Subject: [PATCH 2/3] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <1425979013.3141.17.camel@pengutronix.de>
+References: <1429128.MSqYm0qZ9p@phil> <2297963.iMSNqyfSUx@phil>
+ <1425979013.3141.17.camel@pengutronix.de>
+Message-ID: <79223422.KFbmI1BzE4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2015 at 10:02:15 +0100, Arnd Bergmann wrote :
-> On Monday 09 March 2015 23:59:58 Brian Norris wrote:
-> > @@ -114,6 +114,12 @@ config SOC_AT91SAM9
-> >             AT91SAM9XE
-> >  endif # SOC_SAM_V4_V5
-> >  
-> > +config MACH_AT91_AUTO
-> > +       def_bool y
-> > +       depends on !SOC_AT91SAM9 && !SOC_SAMA5D4
-> > +       select SOC_SAMA5D3 if SOC_SAM_V7
-> > +       select SOC_AT91RM9200 if SOC_SAM_V4_V5
+Hi Philipp,
+
+Am Dienstag, 10. M?rz 2015, 10:16:53 schrieb Philipp Zabel:
+
+[cut the obvious stuff I need to fix]
+
+> Am Dienstag, den 10.03.2015, 00:22 +0100 schrieb Heiko Stuebner:
+> > @@ -879,6 +883,12 @@ static int dw_hdmi_phy_init(struct dw_hdmi *hdmi)
+> > 
+> >  	int i, ret;
+> >  	bool cscon = false;
+> > 
+> > +	if (hdmi->nsupplies > 0) {
+> > +		ret = regulator_bulk_enable(hdmi->nsupplies, hdmi->supplies);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
 > > +
-> >  comment "AT91 Feature Selections"
+> 
+> Are these really supplies to the PHY or is this just a convenient place
+> to enable them? Looking at the i.MX6 docs, I suppose yes.
+
+According to the TRM, the supplies are "DC supply voltage for Analog part of 
+HDMI", so I'd think phy supplies.
+
+> 
+> >  	/*check csc whether needed activated in HDMI mode */
+> >  	cscon = (is_color_space_conversion(hdmi) &&
+> >  	
+> >  			!hdmi->hdmi_data.video_mode.mdvi);
+> > 
+> > @@ -1105,6 +1115,9 @@ static void dw_hdmi_phy_disable(struct dw_hdmi
+> > *hdmi)
+> > 
+> >  	dw_hdmi_phy_enable_tmds(hdmi, 0);
+> >  	dw_hdmi_phy_enable_power(hdmi, 0);
+> > 
+> > +	if (hdmi->nsupplies > 0)
+> > +		regulator_bulk_disable(hdmi->nsupplies, hdmi->supplies);
+> > +
+> > 
+> >  	hdmi->phy_enabled = false;
 > >  
-> >  config AT91_SLOW_CLOCK
+> >  }
+> > 
+> > @@ -1549,7 +1562,8 @@ static int dw_hdmi_register(struct drm_device *drm,
+> > struct dw_hdmi *hdmi)> 
+> >  int dw_hdmi_bind(struct device *dev, struct device *master,
+> >  
+> >  		 void *data, struct drm_encoder *encoder,
+> >  		 struct resource *iores, int irq,
+> > 
+> > -		 const struct dw_hdmi_plat_data *plat_data)
+> > +		 const struct dw_hdmi_plat_data *plat_data,
+> > +		 struct regulator_bulk_data *supplies, int nsupplies)
 > 
-> Hi Brian,
-> 
-> I actually added a bunch of these in other places, but have stopped
-> doing so because Russell didn't like them, and I tend to follow
-> his argument now that it's actually pretty confusing.
-> 
-> In case of at91, we can do better now, once we have multiplatform
-> enabled, and we can simply remove the SOC_SAM_V7 and SOC_SAM_V4_V5
-> symbols entirely (if Alexandre's patch doesn't already do that).
-> 
+> I'm not sure I like this function sprouting so many parameters. Is there
+> a good reason not to add this to struct dw_hdmi_plat_data?
 
-I didn't remove it to keep the sub menus SOC_SAM_V7 -> SOC_SAMA5D4 and
-SOC_SAMA5D3, SOC_SAM_V4_V5 -> SOC_AT91SAM9 and SOC_AT91RM9200. But I can
-also expose SOC_AT91RM9200, SOC_AT91SAM9, SOC_SAMA5D3 and SOC_SAMA5D4
-instead of SOC_SAM_V7 and SOC_SAM_V4_V5 and remove them.
+Nope, moving this to platdata sound sensible and I'll give this a try :-)
 
-> With multiplatform enabled, you no longer have to select a particular
-> SoC, because we always get the default selection and the kernel
-> will build without any one of them being enabled.
-> 
 
-Indeed, with multiplatform, the kernel will compile without any of those
-being selected.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Heiko
