@@ -1,274 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 10 Mar 2015 14:39:18 +0100
-Subject: [PATCH] ARM: Kirkwood: add DT description for nas2big
-In-Reply-To: <20150310131612.GA6052@lunn.ch>
-References: <1425243100-318-1-git-send-email-simon.guinot@sequanux.org>
- <54F57EBB.7040009@free-electrons.com> <20150309094531.GM1509@kw.sim.vm.gnt>
- <20150310131612.GA6052@lunn.ch>
-Message-ID: <54FEF406.3020205@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 14:43:59 +0100
+Subject: [PATCH 05/15] musb: Do not use musb_read[b|w] / _write[b|w]
+ wrappers in generic fifo functions
+In-Reply-To: <54FEB1D4.3080700@redhat.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <11429972.krcjty7oKd@wuerfel> <54FEB1D4.3080700@redhat.com>
+Message-ID: <3191852.oa4fdTnq6y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/2015 14:16, Andrew Lunn wrote:
-> On Mon, Mar 09, 2015 at 10:45:32AM +0100, Simon Guinot wrote:
->> On Tue, Mar 03, 2015 at 10:28:27AM +0100, Gregory CLEMENT wrote:
->>> Hi Simon,
->>>
->>> On 01/03/2015 21:51, Simon Guinot wrote:
->>>> This patch adds the DT description for the LaCie "2Big NAS" (nas2big).
->>>> This NAS is an hardware upgrade of the 2Big Network v2.
->>>>
->>>> Chipset and device list:
->>>>
->>>> - CPU Marvell 88F6282 1600Mhz
->>>> - SDRAM memory, 256MB DDR3 (2x128MB x8) 533Mhz
->>>> - 1 Ethernet Gigabit port (PHY Marvell 88E1518)
->>>> - Flash memory, NAND 256MB TSOP48
->>>> - I2C EEPROM, 512 bytes (AT24 type)
->>>> - PCIe SATA controller JMicron JMB360 (eSATA)
->>>> - I2C fan controller GMT G762 (with a separate alarm GPIO)
->>>> - 1 USB2 host port
->>>> - 1 push button
->>>> - 1 power switch
->>>> - 2 SATA LEDs (bi-color, blue and red)
->>>> - 1 power LED (bi-color, blue and red)
->>>> - CPLD for LEDs and start-up management (Altera Max EMP3064)
->>>
->>>
->>> This dts looks fine for me, however I would like to have an Acked-by
->>> from Andrew or Jason before applying it as kikwood is not my area of
->>> expertise.
->>
->> Hi Jason and Andrew,
->>
->> What do you think about this DTS file ?
+On Tuesday 10 March 2015 09:56:52 Hans de Goede wrote:
+> On 10-03-15 09:50, Arnd Bergmann wrote:
+> > On Tuesday 10 March 2015 08:43:22 Hans de Goede wrote:
+> >> On 09-03-15 22:50, Arnd Bergmann wrote:
+> >>> On Monday 09 March 2015 21:40:18 Hans de Goede wrote:
+> >>>> The generic fifo functions already use non wrapped accesses in various
+> >>>> cases through the iowrite#_rep functions, and all platforms which override
+> >>>> the default musb_read[b|w] / _write[b|w] functions also provide their own
+> >>>> fifo access functions, so we can safely drop the unnecessary indirection
+> >>>> from the fifo access functions.
+> >>>>
+> >>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>>>
+> >>>
+> >>> The patch looks reasonably, but the description seem misleading.
+> >>> I believe the real reason why it's ok to use __raw_writew for the
+> >>> FIFO is that a FIFO by definition is using CPU endian access for
+> >>> copying byte streams from memory, which is unlike any other MMIO
+> >>> register that requires fixed-endian accessors.
+> >>
+> >> I'm not sure that that is the case here, this fifo allows reading
+> >> 4 bytes at a time using 32 bit word access, so endianness may come
+> >> into play. This patch is safe however since all existing users of
+> >> the generic fifo_read / write helpers which this patch touches, are
+> >> also using the generic musb_read[b|w] / _write[b|w] functions which
+> >> are just __raw_foo wrappers, so there is no functional change, which
+> >> is what the commit message tries to say.
+> >
+> > This probably means that the generic musb helpers are not safe to use
+> > on big-endian ARM systems (but may work on MIPS). The only one currently
+> > not using the generic helpers is blackfin, which is fixed to little
+> > endian.
+> >
+> >> Note that sunxi needs this function because of the register address
+> >> translation the sunxi_musb_readb / writeb wrappers are doing which
+> >> does not know how to deal with fifo data, and besides that it should
+> >> make the generic read / write fifo helpers somewhat faster by removing
+> >> an indirect function call.
+> >
+> > Your sunxi_musb_readw/writew functions however also are endian-safe
+> > and seem to get this part right, unlike all other platforms that use
+> > the generic __raw_*() accessors. With this patch applied, it should
+> > actually work fine, and it would work on other platforms as well
+> > if we change all __raw_*() calls outside of musb_default_write_fifo()
+> > and musb_default_read_fifo() to use *_relaxed() instead.
 > 
-> Hi Simon
-> 
-> Sorry for taking so long. I've been travelling for the last few weeks.
-> 
-> I just took a look at the patch. Nothing jumps out at me as being
-> wrong or needing changes.
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> 
+> I think that that change falls outside of the scope of this patchset.
 
-applied on mvebu/dt with Andrew Acked-by
+Yes, sorry for not being clear about that.
 
-Thanks,
+> I agree that it would be probably a good idea to get rid of the
+> __raw_foo usage in musb, which is why I've used the non __raw
+> versions in the sunxi glue, but as said I believe this falls outside
+> of the scope of this patchset. All my preparation patches for adding
+> sunxi support carefully do not make any functional changes, as I
+> do not want to cause regressions on hardware which I cannot test.
 
-Gregory
+Right.
 
-
-> 	  Andrew
-> 
->>
->> Thanks,
->>
->> Simon
->>
->>>>
->>>> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
->>>> ---
->>>>  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
->>>>  arch/arm/boot/dts/Makefile                         |   1 +
->>>>  arch/arm/boot/dts/kirkwood-nas2big.dts             | 144 +++++++++++++++++++++
->>>>  3 files changed, 146 insertions(+)
->>>>  create mode 100644 arch/arm/boot/dts/kirkwood-nas2big.dts
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
->>>> index 925ecbf6e7b7..4f40ff3fee4b 100644
->>>> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
->>>> @@ -42,6 +42,7 @@ board. Currently known boards are:
->>>>  "lacie,cloudbox"
->>>>  "lacie,inetspace_v2"
->>>>  "lacie,laplug"
->>>> +"lacie,nas2big"
->>>>  "lacie,netspace_lite_v2"
->>>>  "lacie,netspace_max_v2"
->>>>  "lacie,netspace_mini_v2"
->>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->>>> index a1c776b8dcec..920fd9dd7a35 100644
->>>> --- a/arch/arm/boot/dts/Makefile
->>>> +++ b/arch/arm/boot/dts/Makefile
->>>> @@ -165,6 +165,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->>>>  	kirkwood-lsxhl.dtb \
->>>>  	kirkwood-mplcec4.dtb \
->>>>  	kirkwood-mv88f6281gtw-ge.dtb \
->>>> +	kirkwood-nas2big.dtb \
->>>>  	kirkwood-net2big.dtb \
->>>>  	kirkwood-net5big.dtb \
->>>>  	kirkwood-netgear_readynas_duo_v2.dtb \
->>>> diff --git a/arch/arm/boot/dts/kirkwood-nas2big.dts b/arch/arm/boot/dts/kirkwood-nas2big.dts
->>>> new file mode 100644
->>>> index 000000000000..d459c94fd1d4
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/kirkwood-nas2big.dts
->>>> @@ -0,0 +1,144 @@
->>>> +/*
->>>> + * Device Tree file for LaCie 2Big NAS
->>>> + *
->>>> + * Copyright (C) 2015 Seagate
->>>> + *
->>>> + * Author: Simon Guinot <simon.guinot@sequanux.org>
->>>> + *
->>>> + * This file is licensed under the terms of the GNU General Public
->>>> + * License version 2.  This program is licensed "as is" without any
->>>> + * warranty of any kind, whether express or implied.
->>>> +*/
->>>> +
->>>> +/dts-v1/;
->>>> +
->>>> +#include <dt-bindings/leds/leds-netxbig.h>
->>>> +#include "kirkwood-netxbig.dtsi"
->>>> +
->>>> +/ {
->>>> +	model = "LaCie 2Big NAS";
->>>> +	compatible = "lacie,nas2big", "lacie,netxbig", "marvell,kirkwood-88f6282", "marvell,kirkwood";
->>>> +
->>>> +	memory {
->>>> +		device_type = "memory";
->>>> +		reg = <0x00000000 0x10000000>;
->>>> +	};
->>>> +
->>>> +	chosen {
->>>> +		bootargs = "console=ttyS0,115200n8";
->>>> +		stdout-path = &uart0;
->>>> +	};
->>>> +
->>>> +	mbus {
->>>> +		pcie-controller {
->>>> +			status = "okay";
->>>> +
->>>> +			pcie at 1,0 {
->>>> +				status = "okay";
->>>> +			};
->>>> +		};
->>>> +	};
->>>> +
->>>> +	ocp at f1000000 {
->>>> +		rtc at 10300 {
->>>> +			/* The on-chip RTC is not powered (no supercap). */
->>>> +			status = "disabled";
->>>> +		};
->>>> +		spi at 10600 {
->>>> +			/*
->>>> +			 * A NAND flash is used instead of an SPI flash for
->>>> +			 * the other netxbig-compatible boards.
->>>> +			 */
->>>> +			status = "disabled";
->>>> +		};
->>>> +	};
->>>> +
->>>> +	fan {
->>>> +		/*
->>>> +		 * An I2C fan controller (GMT G762) is used but alarm is
->>>> +		 * wired to a separate GPIO.
->>>> +		 */
->>>> +		compatible = "gpio-fan";
->>>> +		alarm-gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
->>>> +	};
->>>> +
->>>> +	regulators: regulators {
->>>> +		status = "okay";
->>>> +		compatible = "simple-bus";
->>>> +		#address-cells = <1>;
->>>> +		#size-cells = <0>;
->>>> +		pinctrl-names = "default";
->>>> +
->>>> +		regulator at 2 {
->>>> +			compatible = "regulator-fixed";
->>>> +			reg = <2>;
->>>> +			regulator-name = "hdd1power";
->>>> +			regulator-min-microvolt = <5000000>;
->>>> +			regulator-max-microvolt = <5000000>;
->>>> +			enable-active-high;
->>>> +			regulator-always-on;
->>>> +			regulator-boot-on;
->>>> +			gpio = <&gpio0 17 GPIO_ACTIVE_HIGH>;
->>>> +		};
->>>> +		clocks {
->>>> +			g762_clk: g762-oscillator {
->>>> +				compatible = "fixed-clock";
->>>> +				#clock-cells = <0>;
->>>> +				clock-frequency = <32768>;
->>>> +			};
->>>> +		};
->>>> +	};
->>>> +};
->>>> +
->>>> +&mdio {
->>>> +	status = "okay";
->>>> +
->>>> +	ethphy0: ethernet-phy at 0 {
->>>> +		reg = <0>;
->>>> +	};
->>>> +};
->>>> +
->>>> +&i2c0 {
->>>> +	status = "okay";
->>>> +
->>>> +	/*
->>>> +	 * An external I2C RTC (Dallas DS1337S+) is used. This allows
->>>> +	 * to power-up the board on an RTC alarm. The external RTC can
->>>> +	 * be kept powered, even when the SoC is off.
->>>> +	 */
->>>> +	rtc at 68 {
->>>> +		compatible = "dallas,ds1307";
->>>> +		reg = <0x68>;
->>>> +		interrupts = <43>;
->>>> +	};
->>>> +	g762 at 3e {
->>>> +		compatible = "gmt,g762";
->>>> +		reg = <0x3e>;
->>>> +		clocks = <&g762_clk>;
->>>> +	};
->>>> +};
->>>> +
->>>> +&nand {
->>>> +	chip-delay = <50>;
->>>> +	status = "okay";
->>>> +
->>>> +	partition at 0 {
->>>> +		label = "U-Boot";
->>>> +		reg = <0x0 0x100000>;
->>>> +	};
->>>> +
->>>> +	partition at 100000 {
->>>> +		label = "uImage";
->>>> +		reg = <0x100000 0x1000000>;
->>>> +	};
->>>> +
->>>> +	partition at 1100000 {
->>>> +		label = "root";
->>>> +		reg = <0x1100000 0x8000000>;
->>>> +	};
->>>> +
->>>> +	partition at 9100000 {
->>>> +		label = "unused";
->>>> +		reg = <0x9100000 0x6f00000>;
->>>> +	};
->>>> +};
->>>>
->>>
->>>
->>> -- 
->>> Gregory Clement, Free Electrons
->>> Kernel, drivers, real-time and embedded Linux
->>> development, consulting, training and support.
->>> http://free-electrons.com
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
