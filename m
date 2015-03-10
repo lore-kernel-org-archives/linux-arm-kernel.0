@@ -1,54 +1,51 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 10 Mar 2015 10:57:31 +0900
-Subject: [PATCH v6 5/9] arm64: dts: exynos: Add RTC and ADC dt node for
- Exynos5433 SoC
+Date: Tue, 10 Mar 2015 10:57:33 +0900
+Subject: [PATCH v6 7/9] arm64: dts: exynos: Add I2S dt node for Exynos5433 SoC
 In-Reply-To: <1425952655-21654-1-git-send-email-cw00.choi@samsung.com>
 References: <1425952655-21654-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1425952655-21654-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1425952655-21654-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds RTC (Real Time Clock) dt node for Exynos5433 SoC and adds
-ADC dt node for Exynos5433 SoC. The c1b501564c98a94b4(iio: adc: exynos_adc:
-Add support for exynos7) commit supports the ADC for Exynos7. Exynos5433's ADC
-IP is the same with Exynos7's ADC IP. Exynos5433 has a little different from
-ADCv2 on ADC_CON2 register. Exynos5433 don't contain OSEL/ESEL /HIGHF of ADC_CON2.
+From: Inha Song <ideal.song@samsung.com>
 
-Cc: Kukjin Kim <kgene@kernel.org>
+This patch adds I2S device tree node for Exynos5433 SoC.
+In Exynos5433 SoC, I2S0 is used for audio interface.
+
+Signed-off-by: Inha Song <ideal.song@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index fa27bb8..99aa51e 100644
+index 23d9018..fea4e32 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -815,6 +815,24 @@
- 			clock-names = "clkout16";
- 			clocks = <&xxti>;
+@@ -475,6 +475,23 @@
+ 			status = "disabled";
  		};
-+
-+		rtc: rtc at 10590000 {
-+			compatible = "samsung,exynos3250-rtc";
-+			reg = <0x10590000 0x100>;
-+			interrupts = <0 385 0>, <0 386 0>;
-+			status = "disabled";
-+		};
-+
-+		adc: adc at 14d10000 {
-+			compatible = "samsung,exynos7-adc";
-+			reg = <0x14d10000 0x100>;
-+			interrupts = <0 438 0>;
-+			clock-names = "adc";
-+			clocks = <&cmu_peric CLK_PCLK_ADCIF>;
-+			#io-channel-cells = <1>;
-+			io-channel-ranges;
-+			status = "disabled";
-+		};
- 	};
  
- 	timer {
++		i2s0: i2s0 at 11440000 {
++			compatible = "samsung,exynos7-i2s";
++			reg = <0x11440000 0x100>;
++			dmas = <&adma 0 &adma 2>;
++			dma-names = "tx", "rx";
++			interrupts = <0 70 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&cmu_aud CLK_PCLK_AUD_I2S>,
++				 <&cmu_aud CLK_SCLK_AUD_I2S>,
++				 <&cmu_aud CLK_SCLK_I2S_BCLK>;
++			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2s0_bus>;
++			status = "disabled";
++		};
++
+ 		pinctrl_alive: pinctrl at 10580000 {
+ 			compatible = "samsung,exynos5433-pinctrl";
+ 			reg = <0x10580000 0x1000>;
 -- 
 1.8.5.5
