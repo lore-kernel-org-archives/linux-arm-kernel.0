@@ -1,42 +1,79 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon,  9 Mar 2015 23:59:58 -0700
-Subject: [PATCH] ARM: at91: force CPU selection
-Message-ID: <1425970798-14015-1-git-send-email-computersforpeace@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 10 Mar 2015 02:21:40 +0200
+Subject: Bug in i2c-core?
+In-Reply-To: <20150308082617.GA1904@katana>
+References: <54F0507F.6030804@armadeus.com> <20150304082237.GA2955@katana>
+ <20150308082617.GA1904@katana>
+Message-ID: <6018658.iFTJCkgHeH@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mach-at91 build does not force the user to make a CPU selection.
-This can yield a build failure when SOC_SAM_V7 is used, but neither
-SOC_SAMA5D4 nor SOC_SAMA5D3 are defined:
+Hi Wolfram,
 
-    arch/arm/include/asm/glue-pf.h:54:2: error: #error Unknown prefetch abort handler type
-     #error Unknown prefetch abort handler type
-      ^
-    make[2]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+On Sunday 08 March 2015 09:26:17 Wolfram Sang wrote:
+> On Wed, Mar 04, 2015 at 09:22:37AM +0100, Wolfram Sang wrote:
+> >>>> I am writing an I2C touchscreen driver for an i.MX6 based board. I
+> >>>> compiled it as a module and when I unload it, I get the following
+> >>>> warning:
+> >>>> 
+> >>>> # modprobe sx8654
+> >>>> [   46.261494] input: SX8654 I2C Touchscreen as
+> >>>> /devices/soc0/soc/2100000.aips-bus/21a0000.i2c/i2c-0/0-0048/input/in
+> >>>> put1
+> >>>> # rmmod sx8654
+> >>>> [   76.435223] ------------[ cut here ]------------
+> >>>> [   76.439909] WARNING: CPU: 0 PID: 134 at fs/proc/generic.c:552
+> >>>> remove_proc_entry+0x148/0x164()
+> >>>> [   76.448582] remove_proc_entry: removing non-empty directory
+> >>>> 'irq/208', leaking at least 'sx8654'
+> >>> 
+> >>> ...
+> >>> 
+> >>>> When I revert commit e4df3a0 (i2c: core: Dispose OF IRQ mapping at
+> >>>> client removal time) I don't get the warning.
+> >>>> 
+> >>>> Is this a bug in the i2c-core or am I doing something wrong in my
+> >>>> driver?
+> >>> 
+> >>> Yes, this commit breaks all drivers using devm* for IRQ management on
+> >>> OF-based systemsi because devm* cleanup happens in device code, after
+> >>> bus's remove() method returns. I'd recommend reverting and finding a
+> >>> better way (making cleanup a custom devm action as well?).
+> >> 
+> >> Ouch, my bad.
+> >> 
+> >> Wolfram, any opinion ? The original patch fixes a real bug, so we
+> >> shouldn't just revert it.
+> > 
+> > Looking at it some more: What bug does it fix? Anything you experienced?
 
-The forced default selection is completely arbitrary.
+Good question, and I have to confess that I don't really remember :-/
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
- arch/arm/mach-at91/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+> > I wonder if we really need e4df3a0 because I can't see where
+> > platform_get_irq, the major user of of_irq_get, disposes the mapping.
+> > irq_create_of_mapping() will return an already assigned mapping if
+> > called twice.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c74a44324e5b..afbf03e96746 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -114,6 +114,12 @@ config SOC_AT91SAM9
- 	    AT91SAM9XE
- endif # SOC_SAM_V4_V5
- 
-+config MACH_AT91_AUTO
-+	def_bool y
-+	depends on !SOC_AT91SAM9 && !SOC_SAMA5D4
-+	select SOC_SAMA5D3 if SOC_SAM_V7
-+	select SOC_AT91RM9200 if SOC_SAM_V4_V5
-+
- comment "AT91 Feature Selections"
- 
- config AT91_SLOW_CLOCK
+I've reached the same conclusion after reading the code. I was concerned about 
+resource leakage, but that doesn't seem to be an issue.
+
+> > I don't know yet, though, if mappings are static or if a mapping can be
+> > routed to another irq controller over some time because theoretically they
+> > can be dynamically added/removed.
+> > 
+> > Adding Rob to CC as he wrote of_irq_get and put it into
+> > platform_get_irq. Rob, we use of_irq_get() in the I2C core and the
+> > question is now if we need to dispose the mapping and if so what would
+> > be a good place for it so managed devices will not have their mappings
+> > removed before the managed irq is removed.
+> 
+> Ping. Just so you know: Without further information, I will revert the
+> patch in question around rc4/rc5. I'd still like to know if the
+> non-disposing of the mapping in platform_get_irq() is intentional.
+
+I'll defer that to Rob. I'm fine with the revert at the moment.
+
 -- 
-2.3.2
+Regards,
+
+Laurent Pinchart
