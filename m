@@ -1,65 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 16:08:26 +0100
-Subject: [PATCH v2 11/18] pinctrl: Add pinctrl driver for STM32 MCUs
-In-Reply-To: <1424455277-29983-12-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1424455277-29983-12-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <2464742.YZIRrHto62@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 10 Mar 2015 15:09:23 +0000
+Subject: [PATCH 1/3] arm/pmu: Reject groups spanning multiple hardware PMUs
+In-Reply-To: <54FEFA23.7050307@arm.com>
+References: <1425905192-10509-1-git-send-email-suzuki.poulose@arm.com>
+ <1425905192-10509-2-git-send-email-suzuki.poulose@arm.com>
+ <20150310112723.GY2896@worktop.programming.kicks-ass.net>
+ <20150310120521.GD28168@leverpostej>
+ <20150310125351.GD2896@worktop.programming.kicks-ass.net>
+ <20150310130041.GC11574@worktop.ger.corp.intel.com>
+ <54FEFA23.7050307@arm.com>
+Message-ID: <20150310150923.GA31849@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 February 2015 19:01:10 Maxime Coquelin wrote:
-> --- /dev/null
-> +++ b/include/dt-bindings/pinctrl/pinctrl-stm32.h
-> @@ -0,0 +1,43 @@
-> +#ifndef _DT_BINDINGS_PINCTRL_STM32_H
-> +#define _DT_BINDINGS_PINCTRL_STM32_H
-> +
-> +/* Modes */
-> +#define IN             0
-> +#define OUT            1
-> +#define ALT            2
-> +#define ANALOG         3
+> I think we could still solve this problem by deferring the 'context'
+> validation to the core. The PMUs could validate the group, within its
+> context. i.e, if it can accommodate its events as a group, during 
+> event_init.  The problem we face now, is encountering an event from a 
+> different PMU, which we could leave it to the core as we do already.
 
-I think it's better to prefix all the names with a
-string to identify what they are for, otherwise these
-are way too generic.
+Good point: we're not reliant on other drivers because the core will
+still check the context. We only hope that those other drivers don't
+make similar mistakes and corrupt things.
 
-> +/* Alternate functions */
-> +#define ALT0           ((0 << 2) | ALT)
-> +#define ALT1           ((1 << 2) | ALT)
-> +#define ALT2           ((2 << 2) | ALT)
-> +#define ALT3           ((3 << 2) | ALT)
-> +#define ALT4           ((4 << 2) | ALT)
-> +#define ALT5           ((5 << 2) | ALT)
-> +#define ALT6           ((6 << 2) | ALT)
-> +#define ALT7           ((7 << 2) | ALT)
-> +#define ALT8           ((8 << 2) | ALT)
-> +#define ALT9           ((9 << 2) | ALT)
-> +#define ALT10          ((10 << 2) | ALT)
-> +#define ALT11          ((11 << 2) | ALT)
-> +#define ALT12          ((12 << 2) | ALT)
-> +#define ALT13          ((13 << 2) | ALT)
-> +#define ALT14          ((14 << 2) | ALT)
-> +#define ALT15          ((15 << 2) | ALT)
+[...]
 
-You can have a single macro for these like
+>   static int
+> -validate_event(struct pmu_hw_events *hw_events,
+> -	       struct perf_event *event)
+> +validate_event(struct pmu *pmu, struct pmu_hw_events *hw_events,
+> +			       struct perf_event *event)
+>   {
+> -	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+> +	struct arm_pmu *armpmu;
+> 
+>   	if (is_software_event(event))
+>   		return 1;
+> 
+> +	/*
+> +	 * We are only worried if we can accommodate the events
+> +	 * from this pmu in this group.
+> +	 */
+> +	if (event->pmu != pmu)
+> +		return 1;
 
-#define STM32_PIN_ALT(x) ((x << 2) | ALT)
+It's better to explicitly reject this case. We know it's non-sensical
+and there's no point wasting any time on it. That will also make
+big.LITTLE support a bit nicer, whenever I get that under control -- big
+and LITTLE events could live in the same task context (so the core won't
+reject grouping them) but mustn't be in the same group (so we have to
+reject grouping in the backend).
 
-> +/* Pull-Up/Down */
-> +#define NO_PULL                0
-> +#define PULL_UP                1
-> +#define PULL_DOWN      2
-> +
-> +/* Type */
-> +#define PUSH_PULL      (0 << 2)
-> +#define OPEN_DRAIN     (1 << 2)
-> +
+I'd still prefer the group validation being triggered explicitly by the
+core code, so that it's logically separate from initialising the event
+in isolation, but that's looking like a much bigger job, and I don't
+trust myself to correctly update every PMU driver for v4.0.
 
-These should probably not be stm32 specific at all, they sound
-rather generic, so maybe put the definitions into a common file.
+For the moment let's clean up the commit message for the original patch.
+I'll add splitting group validation to my TODO list; there seems to be a
+slot free around 2035...
 
-
-
-	Arnd
+Thanks,
+Mark.
