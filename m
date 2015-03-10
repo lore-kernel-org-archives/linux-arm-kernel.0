@@ -1,27 +1,21 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Tue, 10 Mar 2015 17:11:51 +0000
-Subject: some question about Set bit 22 in the PL310 (cache controller)
- AuxCtlr register
-In-Reply-To: <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
-References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
- <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
-Message-ID: <3a3ada21b71c4e798951b482e56dd631@HQMAIL108.nvidia.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 10 Mar 2015 18:12:13 +0100
+Subject: [PATCH 0/3] clockevents: Manage device's state separately for core
+In-Reply-To: <20150310130541.GA26185@gmail.com>
+References: <cover.1425037853.git.viresh.kumar@linaro.org>
+ <CAKohpok+bfVVm-6fW5+tJCOKQA+dY=8zHykdyJEcUNbgGQyrcQ@mail.gmail.com>
+ <20150310130541.GA26185@gmail.com>
+Message-ID: <20150310171213.GH2896@worktop.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > b. why "with CMA enabled, it should be safe not to set this bit."
-> 
-> It's not entirely safe either. I guess the assumption is that CMA allocates from
-> highmem which is not mapped in the kernel linear mapping.
-> However, to be able to flush the caches for such highmem pages, they need
-> to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a small
-> window between dmac_flush_range() and kunmap_atomic() where
-> speculative cache line fills can still happen.
+On Tue, Mar 10, 2015 at 02:05:41PM +0100, Ingo Molnar wrote:
+> Yeah, so I'd like PeterZ to ACK/NAK this approach before I move 
+> forward with the patches - but he's on the road right now, so it
+> will take a week I suspect.
 
-Even Low mem CMA pages has similar race window as highmem CMA pages. 
-__free_from_contiguous() in dma-mapping.c maps the CMA Low Mem pages as
- Cached using __dma_remap().
-During the subsequent allocation of same CMA low mem pages, the window exist between
-__dma_clear_buffer() and __dma_remap() in __alloc_from_contiguous().
+I stared at it between sessions today and it looks ok, so
 
---Krishna Reddy
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+
+Thanks!
