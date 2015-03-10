@@ -1,46 +1,97 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 10 Mar 2015 16:55:56 +0200
-Subject: [PATCH] video: treat signal like timeout as failure
-In-Reply-To: <20150310144640.GM8656@n2100.arm.linux.org.uk>
-References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
- <54FEE70D.3010307@ti.com> <20150310125116.GA26020@opentech.at>
- <20150310141511.GL8656@n2100.arm.linux.org.uk>
- <20150310143928.GA19501@opentech.at>
- <20150310144640.GM8656@n2100.arm.linux.org.uk>
-Message-ID: <54FF05FC.5030704@ti.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 10 Mar 2015 08:57:10 -0600
+Subject: [RFC PATCH v15 01/11] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <20150310103734.GK8656@n2100.arm.linux.org.uk>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-2-git-send-email-lina.iyer@linaro.org>
+ <20150310103734.GK8656@n2100.arm.linux.org.uk>
+Message-ID: <20150310145710.GB3727@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/03/15 16:46, Russell King - ARM Linux wrote:
+On Tue, Mar 10 2015 at 04:37 -0600, Russell King - ARM Linux wrote:
+>On Mon, Mar 09, 2015 at 09:16:36AM -0600, Lina Iyer wrote:
+>> @@ -105,18 +109,46 @@ static int __init arm_idle_init(void)
+>>  	if (ret <= 0)
+>>  		return ret ? : -ENODEV;
+>>
+>> +
+>
+>A bit better formatting would be nice - you don't need the extra blank
+>line here.
+>
+>> +	ret = cpuidle_register_driver(drv);
+>> +	if (ret) {
+>> +		pr_err("Failed to register cpuidle driver\n");
+>> +		return ret;
+>> +	}
+>> +
+>>  	/*
+>>  	 * Call arch CPU operations in order to initialize
+>>  	 * idle states suspend back-end specific data
+>>  	 */
+>>  	for_each_possible_cpu(cpu) {
+>> +
+>
+>This blank line is not necessary either.
+>
+>>  		ret = arm_cpuidle_init(cpu);
+>
+>However, a blank line here would be a good thing.
+>
+Sure.
+>> +		/*
+>> +		 * This cpu does not support any idle states
+>> +		 */
+>
+>Also, formatting this as /* This cpu does not support any idle states */ is
+>acceptable too, and doesn't waste as many lines.
+>
+Will fix.
+>> +		if (ret == -ENOSYS)
+>> +			continue;
+>> +
+>>  		if (ret) {
+>>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+>>  			return ret;
+>>  		}
+>> +
+>> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>> +		if (!dev)
+>> +			return -ENOMEM;
+>> +
+>> +		dev->cpu = cpu;
+>> +		ret = cpuidle_register_device(dev);
+>> +		if (ret) {
+>> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+>> +			       cpu);
+>> +			return ret;
+>
+>It looks like we leak the 'dev' allocation here.
+>
 
-> In which case, let me propose that the exynos fbdev driver needs to be
-> moved to drivers/staging, and stay there until this stuff gets fixed.
-> drivers/staging is supposed to be for stuff which isn't up to the mark,
-> and which is potentially unstable.  And that's what this driver exactly
-> is.
+True, I will amend that.
 
-There is drivers/gpu/drm/exynos/ which is getting a lot of updates. So...
-
-I'd propose removing the exynos fbdev driver if the exynos drm driver
-offers the same functionality. I don't know if that's the case. Does the
-drm driver support all the devices the fbdev supports?
-
-Also, I'm not sure if and how we can remove drivers. If exynos fbdev
-driver is dropped, that would perhaps break boards that have exynos
-fbdev in their .dts file. And if the drm driver doesn't offer the exact
-same /dev/fbX interface, it would break the userspace.
-
-So I don't know if that's possible. But that's what I'd like to do,
-eventually, for all the fbdev drivers. Implement drm driver, remove the
-fbdev one.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/d88fe89e/attachment.sig>
+>Also, other error paths, it looks like we leave the previously registered
+>cpuidle devices in place.  That may be acceptable if the intention is to
+>initialise as many CPUs as possible - but we then miss the
+>cpuidle_register() call below, which seems to make the registered devices
+>useless.  It's a little inconsistent.
+>
+>Also, it's useful to report why something fails - printing the error code
+>can help debugging if it isn't already printed elsewhere.
+>
+Fair point.
+>> +		}
+>> +
+>> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
+>>  	}
+>>
+>> -	return cpuidle_register(drv, NULL);
+>> +	return 0;
+>>  }
+>>  device_initcall(arm_idle_init);
+>
+>-- 
+>FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+>according to speedtest.net.
