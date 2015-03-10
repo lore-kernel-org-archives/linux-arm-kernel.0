@@ -1,71 +1,128 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 10 Mar 2015 09:56:52 +0100
-Subject: [PATCH 05/15] musb: Do not use musb_read[b|w] / _write[b|w]
- wrappers in generic fifo functions
-In-Reply-To: <11429972.krcjty7oKd@wuerfel>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 09:57:46 +0100
+Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update the
+ iscr register
+In-Reply-To: <54FEA59B.7020400@redhat.com>
 References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <4821047.1nqnop93Xh@wuerfel> <54FEA09A.6040401@redhat.com>
- <11429972.krcjty7oKd@wuerfel>
-Message-ID: <54FEB1D4.3080700@redhat.com>
+ <4772280.xE1WBZVd8Z@wuerfel> <54FEA59B.7020400@redhat.com>
+Message-ID: <2515825.598CypcWU3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tuesday 10 March 2015 09:04:43 Hans de Goede wrote:
+> Hi,
+> 
+> On 09-03-15 22:47, Arnd Bergmann wrote:
+> > On Monday 09 March 2015 21:40:15 Hans de Goede wrote:
+> >> +void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
+> >> +{
+> >> +       struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+> >> +       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> >> +       u32 iscr;
+> >> +
+> >> +       iscr = readl(data->base + REG_ISCR);
+> >> +       iscr &= ~clr;
+> >> +       iscr |= set;
+> >> +       writel(iscr, data->base + REG_ISCR);
+> >> +}
+> >> +EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
+> >> +
+> >>
+> >
+> > I would generally consider this a bad design. What is the purpose of
+> > calling sun4i_usb_phy_update_iscr()
+> 
+> There are 2 different use cases for this one is to enable the dataline
+> pull-ups at driver init and disable them at driver exit, this could /
+> should probably be moved to the phy_init / phy_exit code for the usb0 phy
+> removing the need to do this from within the sunxi musb glue.
+> 
+> The second use-case is more tricky, for some reasons Allwinner has decided
+> to not use the dedicated id-detect and vusb-sense pins of the phy they are
+> using (these pins are not routed to the outside).
+> 
+> Instead id-detect and vusb-sense are done through any $random gpio pins
+> (including non irq capable pins on some designs requiring polling).
+> 
+> But the musb-core still needs to know the status of the id and vbus pins,
+> and gets this from the usb0-phy iscr register, which reflects the status of
+> the not connected dedicated pins of the phy. The reason this can still
+> work at all is because the iscr register allows the user to override
+> whatever the not connected phy pins are seeing and forcing a value to
+> report to the musb core as id and vbus status.
+> 
+> This is done by these 2 functions in the musb sunxi glue:
+> 
+> static void sunxi_musb_force_id(struct musb *musb, u32 val)
+> {
+>          struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+> 
+>          if (val)
+>                  val = SUNXI_ISCR_FORCE_ID_HIGH;
+>          else
+>                  val = SUNXI_ISCR_FORCE_ID_LOW;
+> 
+>          sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_ID_MASK, val);
+> }
+> 
+> static void sunxi_musb_force_vbus(struct musb *musb, u32 val)
+> {
+>          struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+> 
+>          if (val)
+>                  val = SUNXI_ISCR_FORCE_VBUS_HIGH;
+>          else
+>                  val = SUNXI_ISCR_FORCE_VBUS_LOW;
+> 
+>          sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_VBUS_MASK, val);
+> }
+> 
+> I will happily admit that these 2 functions are a better API between the sunxi musb
+> glue and the sunxi usb phy driver. I started with the minimal sun4i_usb_phy_update_iscr
+> approach as I wanted to keep the API as small as possible, but having 2 functions like
+> the one above, which actually reflect what is happening would indeed be better.
 
-On 10-03-15 09:50, Arnd Bergmann wrote:
-> On Tuesday 10 March 2015 08:43:22 Hans de Goede wrote:
->> On 09-03-15 22:50, Arnd Bergmann wrote:
->>> On Monday 09 March 2015 21:40:18 Hans de Goede wrote:
->>>> The generic fifo functions already use non wrapped accesses in various
->>>> cases through the iowrite#_rep functions, and all platforms which override
->>>> the default musb_read[b|w] / _write[b|w] functions also provide their own
->>>> fifo access functions, so we can safely drop the unnecessary indirection
->>>> from the fifo access functions.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>>
->>>
->>> The patch looks reasonably, but the description seem misleading.
->>> I believe the real reason why it's ok to use __raw_writew for the
->>> FIFO is that a FIFO by definition is using CPU endian access for
->>> copying byte streams from memory, which is unlike any other MMIO
->>> register that requires fixed-endian accessors.
->>
->> I'm not sure that that is the case here, this fifo allows reading
->> 4 bytes at a time using 32 bit word access, so endianness may come
->> into play. This patch is safe however since all existing users of
->> the generic fifo_read / write helpers which this patch touches, are
->> also using the generic musb_read[b|w] / _write[b|w] functions which
->> are just __raw_foo wrappers, so there is no functional change, which
->> is what the commit message tries to say.
->
-> This probably means that the generic musb helpers are not safe to use
-> on big-endian ARM systems (but may work on MIPS). The only one currently
-> not using the generic helpers is blackfin, which is fixed to little
-> endian.
->
->> Note that sunxi needs this function because of the register address
->> translation the sunxi_musb_readb / writeb wrappers are doing which
->> does not know how to deal with fifo data, and besides that it should
->> make the generic read / write fifo helpers somewhat faster by removing
->> an indirect function call.
->
-> Your sunxi_musb_readw/writew functions however also are endian-safe
-> and seem to get this part right, unlike all other platforms that use
-> the generic __raw_*() accessors. With this patch applied, it should
-> actually work fine, and it would work on other platforms as well
-> if we change all __raw_*() calls outside of musb_default_write_fifo()
-> and musb_default_read_fifo() to use *_relaxed() instead.
+Ok, that would definitely improve things.
 
-I think that that change falls outside of the scope of this patchset.
+> Note that the polling of the pins cannot (easily) be moved into the phy driver for various
+> reasons:
+> 
+> 1) It depends on dr_mode, the otg may be used in host only mode in which case there are no
+> pins at all.
+> 2) the musb set_vbus callback needs access to the pins
+> 3) When id changes some musb core state changes are necessary.
+> 
+> I'll respin the patch set to do things this way as soon as we've agreement on
+> your second point.
+> 
+>  > and why can't there be a high-level
+> > PHY API for this?
+> 
+> The current generic phy API seems to not have any bus specific methods, I know that
+> in the long run people want to get rid of struct usb_phy, so maybe we should consider
+> adding bus specific methods to the generic phy API for things like otg.
+> 
+> If we decide to add bus specific methods, then the question becomes if having
+> 
+> int phy_usb_set_id_detect(struct phy *phy, bool val);
+> int phy_usb_set_vbus_detect(struct phy *phy, bool val);
+> 
+> Functions in the generic phy API is a good idea, or if this is too sunxi specific,
+> I'm fine with doing this either way. If we want to go the generic phy route
+> I'll split this in 2 patches, one adding these 2 generic functions & phy-ops, and
+> 1 doing the sunxi implementation.
+> 
+> If people believe this is too sunxi specific (I believe it is, but as said I'm
+> fine with doing this either way). I'll respin this patch to remove the too
+> generic sun4i_usb_phy_update_iscr function, and instead add these 2:
+> 
+> void sun4i_usb_phy_set_id_detect(struct phy *phy, bool val);
+> void sun4i_usb_phy_set_vbus_detect(struct phy *phy, bool val);
 
-I agree that it would be probably a good idea to get rid of the
-__raw_foo usage in musb, which is why I've used the non __raw
-versions in the sunxi glue, but as said I believe this falls outside
-of the scope of this patchset. All my preparation patches for adding
-sunxi support carefully do not make any functional changes, as I
-do not want to cause regressions on hardware which I cannot test.
+Thanks for your detailed explanations. I think this is something for
+Kishon to decide, based on where he wants to take the phy API in the
+long run. I'm fine with it either way, and it seems easy enough to
+change between those two interfaces if we make up our minds about it
+later.
 
-Regards,
-
-Hans
+	Arnd
