@@ -1,123 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Mar 2015 09:27:24 +0100
-Subject: [PATCH v6 20/22] power_supply: bq2415x_charger: Decrement the power
- supply's device reference counter
-In-Reply-To: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425976046-20973-21-git-send-email-k.kozlowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Mar 2015 09:31:53 +0100
+Subject: [PATCH 00/15] musb: Add support for the Allwinner sunxi musb
+ controller
+In-Reply-To: <CAGb2v67GkL9Mdr98Chf6MhMff7CO8OGgfF2kaB3Xcnz=SkMG3w@mail.gmail.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <2227491.z0aBeXi5ZG@wuerfel>
+ <CAGb2v67GkL9Mdr98Chf6MhMff7CO8OGgfF2kaB3Xcnz=SkMG3w@mail.gmail.com>
+Message-ID: <7198432.YfztEdzB1p@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use power_supply_put() to decrement the power supply's device reference
-counter (increased by power_supply_get_by_name() or
-power_supply_get_by_phandle()).
+On Tuesday 10 March 2015 09:46:24 Chen-Yu Tsai wrote:
+> I believe you are talking about "mmio-sram"?
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Reviewed-by: Sebastian Reichel <sre@kernel.org>
----
- drivers/power/bq2415x_charger.c | 31 ++++++++++++++++++-------------
- 1 file changed, 18 insertions(+), 13 deletions(-)
+Yes.
+ 
+> The syscon here represents a switch, to toggle whether a block of SRAM is
+> mapped into the CPU memory space, or to a specific devices private address
+> space. It is not the actual SRAM.
+> 
+> The SRAM DT binding is orthogonal to this, if not irrelevant when the block
+> is mapped privately, as it is no longer visible from the DT's PoV.
 
-diff --git a/drivers/power/bq2415x_charger.c b/drivers/power/bq2415x_charger.c
-index c745d278815d..6c534dcbc19c 100644
---- a/drivers/power/bq2415x_charger.c
-+++ b/drivers/power/bq2415x_charger.c
-@@ -1594,27 +1594,27 @@ static int bq2415x_probe(struct i2c_client *client,
- 		ret = of_property_read_u32(np, "ti,current-limit",
- 				&bq->init_data.current_limit);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,weak-battery-voltage",
- 				&bq->init_data.weak_battery_voltage);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,battery-regulation-voltage",
- 				&bq->init_data.battery_regulation_voltage);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,charge-current",
- 				&bq->init_data.charge_current);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,termination-current",
- 				&bq->init_data.termination_current);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 		ret = of_property_read_u32(np, "ti,resistor-sense",
- 				&bq->init_data.resistor_sense);
- 		if (ret)
--			goto error_2;
-+			goto error_3;
- 	} else {
- 		memcpy(&bq->init_data, pdata, sizeof(bq->init_data));
- 	}
-@@ -1624,19 +1624,19 @@ static int bq2415x_probe(struct i2c_client *client,
- 	ret = bq2415x_power_supply_init(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to register power supply: %d\n", ret);
--		goto error_2;
-+		goto error_3;
- 	}
- 
- 	ret = bq2415x_sysfs_init(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to create sysfs entries: %d\n", ret);
--		goto error_3;
-+		goto error_4;
- 	}
- 
- 	ret = bq2415x_set_defaults(bq);
- 	if (ret) {
- 		dev_err(bq->dev, "failed to set default values: %d\n", ret);
--		goto error_4;
-+		goto error_5;
- 	}
- 
- 	if (bq->notify_psy) {
-@@ -1644,7 +1644,7 @@ static int bq2415x_probe(struct i2c_client *client,
- 		ret = power_supply_reg_notifier(&bq->nb);
- 		if (ret) {
- 			dev_err(bq->dev, "failed to reg notifier: %d\n", ret);
--			goto error_5;
-+			goto error_6;
- 		}
- 
- 		/* Query for initial reported_mode and set it */
-@@ -1664,11 +1664,14 @@ static int bq2415x_probe(struct i2c_client *client,
- 	dev_info(bq->dev, "driver registered\n");
- 	return 0;
- 
-+error_6:
- error_5:
--error_4:
- 	bq2415x_sysfs_exit(bq);
--error_3:
-+error_4:
- 	bq2415x_power_supply_exit(bq);
-+error_3:
-+	if (bq->notify_psy)
-+		power_supply_put(bq->notify_psy);
- error_2:
- 	kfree(name);
- error_1:
-@@ -1685,8 +1688,10 @@ static int bq2415x_remove(struct i2c_client *client)
- {
- 	struct bq2415x_device *bq = i2c_get_clientdata(client);
- 
--	if (bq->notify_psy)
-+	if (bq->notify_psy) {
- 		power_supply_unreg_notifier(&bq->nb);
-+		power_supply_put(bq->notify_psy);
-+	}
- 
- 	bq2415x_sysfs_exit(bq);
- 	bq2415x_power_supply_exit(bq);
--- 
-1.9.1
+Ok, got it. I missed this part when reading the introduction. syscon seems
+fine to me then.
+
+	Arnd
