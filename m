@@ -1,135 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Mar 2015 19:52:30 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
- XP SOCs
-In-Reply-To: <CDBC2CF7-30C4-4B1C-8F85-DE72C37856A7@free-electrons.com>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
- <20150310190507.64b3c153@free-electrons.com> <54FF3967.1090602@linaro.org>
- <CDBC2CF7-30C4-4B1C-8F85-DE72C37856A7@free-electrons.com>
-Message-ID: <54FF3D6E.9080802@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 10 Mar 2015 19:52:53 +0100
+Subject: [PATCH v4 0/4] ARM: extend VA range of ID map for core kernel and KVM
+Message-ID: <1426013577-32081-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 07:47 PM, Gregory CLEMENT wrote:
-> Le 10 mars 2015 19:35:19 GMT+01:00, Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
->> On 03/10/2015 07:05 PM, Thomas Petazzoni wrote:
->>> Hello Daniel,
->>>
->>> I know you suggested a more rigorous method of determining the exit
->>> latency and target residency times, but would it be nonetheless
->>> possible to apply this patch, which clearly improves performance a
->> lot,
->>> and actually makes the code match the values used in the vendor
->> kernel?
->>>
->>> I also think this patch should be marked for stable, it fixes values
->>> introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
->>> should therefore be backported all the way to v3.16.
->>
->> I don't have a problem to apply this patch. But I would like to have
->> confirmation from one of the Armada maintainers the tradeoff is
->> accepted
->> (less energy saving for more performance).
->
-> Hi Daniel,
->
-> I already gave my acked- by for this patch, so for me this tradeoff
-> is acceptable.
+These are the VA range patches presented as a coherent set. The bounce page
+and 'HYP init code too big' error are probably not prerequisites anymore now
+that I switched from merging the HYP runtime map with the HYP id map rather
+than the kernel ID map, but I would strongly prefer to keep it as a single
+series. (There is an unlikely scenario where the kernel Image could be inside
+VA_BITS but the bounce page outside VA_BITS, but this is currently broken
+anyway.)
 
-Ah, Indeed.
+Changes since previous version:
+- move ARM HYP idmap to a separate output section __hyp_idmap_rodata instead
+  of .rodata to address Russell's concern that the linker may handle this poorly
+- fix the linker script ASSERTs on the HYP page size and alignment: both would
+  incorrectly reject a 0 size HYP idmap (i.e., when !CONFIG_KVM) if the start
+  and end symbols were both aligned to a page
+- update the VA range patches to use the new adr_l/ldr_l/str_l macros that are
+  introduced in the arm64/head.S cleanup series
 
-Thanks.
+Ard Biesheuvel (3):
+  arm64: mm: increase VA range of identity map
+  ARM, arm64: kvm: get rid of the bounce page
+  arm64: KVM: use ID map with increased VA range if required
 
-   -- Daniel
+Arnd Bergmann (1):
+  ARM: KVM: avoid "HYP init code too big" error
 
->>
->>> On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
->>>> Originally, the thresholds used in the cpuidle driver for Armada
->> SOCs
->>>> were temporarily chosen, leaving room for improvements.
->>>>
->>>> This commit updates the thresholds for the Armada XP SOCs with
->> values
->>>> that positively impact performances:
->>>>
->>>>                                   without patch  with patch   vendor
->> kernel
->>>>    - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
->>>>    - ioping tmpfs (iops)          ~163k          ~206k        ~179k
->>>>    - ioping tmpfs (mib/s)         ~636           ~805         ~699
->>>>
->>>> The idle power consumption is negatively impacted (proportionally
->> less
->>>> than the performance gain), and we are still performing better than
->>>> the vendor kernel here:
->>>>
->>>>                                   without patch   with patch  vendor
->> kernel
->>>>    - power consumption idle (W)   ~2.4            ~3.2        ~4.4
->>>>    - power consumption busy (W)   ~8.6            ~8.3        ~8.6
->>>>
->>>> There is still room for improvement regarding the value of these
->>>> thresholds, they were chosen to mimic the vendor kernel.
->>>>
->>>> This patch only impacts Armada XP SOCs and was tested on Online Labs
->>>> C1 boards. A similar approach can be taken to improve the
->> performances
->>>> of the Armada 370 and Armada 38x SOCs.
->>>>
->>>> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
->>>> for the discussions and tips around this topic.
->>>>
->>>> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
->>>> ---
->>>>    drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
->>>>    1 file changed, 4 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c
->> b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> index 38e6861..3716a1f 100644
->>>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>>> @@ -50,17 +50,17 @@ static struct cpuidle_driver
->> armadaxp_idle_driver = {
->>>>    	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->>>>    	.states[1]		= {
->>>>    		.enter			= mvebu_v7_enter_idle,
->>>> -		.exit_latency		= 10,
->>>> +		.exit_latency		= 100,
->>>>    		.power_usage		= 50,
->>>> -		.target_residency	= 100,
->>>> +		.target_residency	= 1000,
->>>>    		.name			= "MV CPU IDLE",
->>>>    		.desc			= "CPU power down",
->>>>    	},
->>>>    	.states[2]		= {
->>>>    		.enter			= mvebu_v7_enter_idle,
->>>> -		.exit_latency		= 100,
->>>> +		.exit_latency		= 1000,
->>>>    		.power_usage		= 5,
->>>> -		.target_residency	= 1000,
->>>> +		.target_residency	= 10000,
->>>>    		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
->>>>    		.name			= "MV CPU DEEP IDLE",
->>>>    		.desc			= "CPU and L2 Fabric power down",
->>>
->>>
->>>
->>
->>
->> --
->> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
->>
->> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
->> <http://twitter.com/#!/linaroorg> Twitter |
->> <http://www.linaro.org/linaro-blog/> Blog
->
->
-
+ arch/arm/include/asm/kvm_mmu.h         | 10 +++++
+ arch/arm/kernel/vmlinux.lds.S          | 34 ++++++++++++++---
+ arch/arm/kvm/init.S                    |  3 ++
+ arch/arm/kvm/mmu.c                     | 69 +++++++++++++++-------------------
+ arch/arm64/include/asm/kvm_mmu.h       | 33 ++++++++++++++++
+ arch/arm64/include/asm/mmu_context.h   | 43 +++++++++++++++++++++
+ arch/arm64/include/asm/page.h          |  6 ++-
+ arch/arm64/include/asm/pgtable-hwdef.h |  7 +++-
+ arch/arm64/kernel/head.S               | 37 ++++++++++++++++++
+ arch/arm64/kernel/smp.c                |  1 +
+ arch/arm64/kernel/vmlinux.lds.S        | 17 ++++++---
+ arch/arm64/kvm/hyp-init.S              | 25 ++++++++++++
+ arch/arm64/mm/mmu.c                    |  7 +++-
+ arch/arm64/mm/proc-macros.S            | 10 +++++
+ arch/arm64/mm/proc.S                   |  3 ++
+ 15 files changed, 251 insertions(+), 54 deletions(-)
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.8.3.2
