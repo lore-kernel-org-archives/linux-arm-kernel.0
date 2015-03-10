@@ -1,28 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 09:31:53 +0100
-Subject: [PATCH 00/15] musb: Add support for the Allwinner sunxi musb
- controller
-In-Reply-To: <CAGb2v67GkL9Mdr98Chf6MhMff7CO8OGgfF2kaB3Xcnz=SkMG3w@mail.gmail.com>
-References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
- <2227491.z0aBeXi5ZG@wuerfel>
- <CAGb2v67GkL9Mdr98Chf6MhMff7CO8OGgfF2kaB3Xcnz=SkMG3w@mail.gmail.com>
-Message-ID: <7198432.YfztEdzB1p@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 10 Mar 2015 09:34:23 +0100
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <CACRpkdazTt+_9m-iWEee2gJy4MQ+QNo3Rb2JY9hVSSXK2-dJRw@mail.gmail.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CACRpkdazTt+_9m-iWEee2gJy4MQ+QNo3Rb2JY9hVSSXK2-dJRw@mail.gmail.com>
+Message-ID: <54FEAC8F.1040206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 March 2015 09:46:24 Chen-Yu Tsai wrote:
-> I believe you are talking about "mmio-sram"?
-
-Yes.
- 
-> The syscon here represents a switch, to toggle whether a block of SRAM is
-> mapped into the CPU memory space, or to a specific devices private address
-> space. It is not the actual SRAM.
+Le 09/03/2015 17:14, Linus Walleij a ?crit :
+> On Sun, Feb 8, 2015 at 7:23 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
 > 
-> The SRAM DT binding is orthogonal to this, if not irrelevant when the block
-> is mapped privately, as it is no longer visible from the DT's PoV.
+>> The gpiochip_lock_as_irq call can fail and return an error, while the
+>> irq_startup is not expected to fail (returns an unsigned int which is not
+>> checked by irq core code).
+>>
+>> irq_request/release_resources functions have been created to address this
+>> problem.
+>>
+>> Move gpiochip_lock/unlock_as_irq calls into
+>> irq_request/release_resources functions to prevent using a gpio as an irq
+>> if the gpiochip_lock_as_irq call failed.
+>>
+>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> Patch applied with all the ACKs.
 
-Ok, got it. I missed this part when reading the introduction. syscon seems
-fine to me then.
+Hi Linus,
 
-	Arnd
+As suggested earlier, do you think it can be scheduled for the 4.0-rc
+phase as a "fix"?
+
+Bye,
+
+
+
+> Happy new year J-C!
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+
+
+-- 
+Nicolas Ferre
