@@ -1,35 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Mar 2015 22:27:12 +0100
-Subject: [PATCH v5 01/12] ARM: dts: sun6i: add p2wi controller node to dtsi
-In-Reply-To: <1425988764-23618-2-git-send-email-wens@csie.org>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-2-git-send-email-wens@csie.org>
-Message-ID: <20150310212712.GC5085@lukather>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 10 Mar 2015 16:30:40 -0500
+Subject: [PATCH v2 05/18] reset: Add reset_controller_of_init() function
+In-Reply-To: <6773745.i9mx5zmPP4@wuerfel>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <8729383.kvUZDm4dQz@wuerfel>
+ <CALszF6BkTOLR+VNkRKfvEBG5ZyaYL+9fZ4EAPVu5b_imCvEQoQ@mail.gmail.com>
+ <6773745.i9mx5zmPP4@wuerfel>
+Message-ID: <CAL_Jsq+_ridpAaUwpqo91xB6Ea1ctCWfYTYUrcZ=gB_0FiBD4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 07:59:12PM +0800, Chen-Yu Tsai wrote:
-> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> 
-> The p2wi controller has only one possible pinmux setting. Use it by
-> default in the dtsi, instead of having to set it in each board's dts.
-> 
-> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
-> [wens at csie.org: reformat commit title; rename p2wi pins and use as default]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, Mar 10, 2015 at 3:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 10 March 2015 16:28:44 Maxime Coquelin wrote:
+>> 2015-03-10 16:00 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Friday 20 February 2015 19:01:04 Maxime Coquelin wrote:
+>> >> Some platforms need to initialize the reset controller before the timers.
+>> >>
+>> >> This patch introduces a reset_controller_of_init() function that can be
+>> >> called before the timers intialization.
+>> >>
+>> >> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> >>
+>> >
+>> > Not sure about this. It seems like the cleanest approach if we get
+>> > a lot of these, but then again it is probably very rare, and I'd
+>> > like to avoid adding such infrastructure if it's just for one
+>> > SoC. Could we add a hack in the machine initialization instead?
+>>
+>> Sun6i also need to initialize the reset controller early. Today, they
+>> hack the machine initialization.
+>> With two SoCs having the same need, what should we do?
+>
+> Good question, I'd like to hear some other opinions on this first.
 
-Applied, thanks!
+2 is still far from the common case.
 
-Maxime
+>> > I think ideally this would be done in the boot loader before we
+>> > even start Linux, but I don't know if that's possible for you.
+>>
+>> From what I understand, the only constraint is to perform it after the
+>> clock is enabled.
+>> So this should be possible to do it in the bootloader, but it means
+>> also adding timers clocks ungating in the bootloader.
+>
+> Ungating the timer clock input seems like a reasonable thing to
+> do for the bootloader, I think a lot of platforms rely on this
+> elsewhere (but enough of them don't, which is why we have the
+> early clk init).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/c527473a/attachment.sig>
++1
+
+If the bootloader is u-boot, then you need a timer anyway.
+
+Rob
