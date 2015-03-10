@@ -1,117 +1,79 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 10 Mar 2015 09:53:19 +0800
-Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <20150305074207.GC11010@pengutronix.de>
-References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
- <20150304112109.GB11010@pengutronix.de>
- <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
- <20150305074207.GC11010@pengutronix.de>
-Message-ID: <CALx668V4KJBmpSg3PKfXuzJsMHWgY=RCh8L=TzTC7-fEUh5HBw@mail.gmail.com>
+Date: Tue, 10 Mar 2015 09:57:07 +0800
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <20150309162809.GY8656@n2100.arm.linux.org.uk>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+ <20150309162809.GY8656@n2100.arm.linux.org.uk>
+Message-ID: <CALx668Ue7Q2Xj=f+TN3bpybL6+8bmTVTFOgOy3ouurb7jMJS9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 March 2015 at 15:42, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On 10 March 2015 at 00:28, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Mar 04, 2015 at 04:49:15PM +0800, pi-cheng.chen wrote:
+>> +static int cpu_opp_table_get_freq_index(unsigned int freq)
+>> +{
+>> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
+>> +     int i;
+>> +
+>> +     for (i = 0; opp_tbl[i].freq != 0; i++) {
+>> +             if (opp_tbl[i].freq >= freq)
+>> +                     return i;
+>> +     }
+>> +
+>> +     return -1;
 >
-> +Cc Viresh Kumar
+> My "return -1" detector fired on this...
 >
-> Viresh, this is the patch for the underlying clocks for the Mediatek
-> cpufreq driver.
+>> +static int cpu_opp_table_get_volt_index(unsigned int volt)
+>> +{
+>> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
+>> +     int i;
+>> +
+>> +     for (i = 0; opp_tbl[i].vproc != -1; i++)
+>> +             if (opp_tbl[i].vproc >= volt)
+>> +                     return i;
+>> +
+>> +     return -1;
 >
-> On Thu, Mar 05, 2015 at 10:43:21AM +0800, Pi-Cheng Chen wrote:
->> Hi Sascha,
->>
->> On 4 March 2015 at 19:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Wed, Mar 04, 2015 at 06:49:11PM +0800, pi-cheng.chen wrote:
->> >> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
->> >> for intermediate clock source switching. This patch is based on Mediatek
->> >> clock driver patches[1].
->> >>
->> >> [1] http://thread.gmane.org/gmane.linux.kernel/1892436
->> >>
->> >> Signed-off-by: pi-cheng.chen <pi-cheng.chen@linaro.org>
->> >> ---
->> >> +static long clk_cpumux_determine_rate(struct clk_hw *hw, unsigned long rate,
->> >> +                                   unsigned long min_rate,
->> >> +                                   unsigned long max_rate,
->> >> +                                   unsigned long *best_parent_rate,
->> >> +                                   struct clk_hw **best_parent_p)
->> >> +{
->> >> +     struct clk *clk = hw->clk, *parent;
->> >> +     unsigned long parent_rate;
->> >> +     int i;
->> >> +
->> >> +     for (i = MAINPLL_INDEX; i >= ARMPLL_INDEX; i--) {
->> >> +             parent = clk_get_parent_by_index(clk, i);
->> >> +             if (!parent)
->> >> +                     return 0;
->> >> +
->> >> +             if (i == MAINPLL_INDEX) {
->> >> +                     parent_rate = __clk_get_rate(parent);
->> >> +                     if (parent_rate == rate)
->> >> +                             break;
->> >> +             }
->> >> +
->> >> +             parent_rate = __clk_round_rate(parent, rate);
->> >> +     }
->> >> +
->> >> +     *best_parent_rate = parent_rate;
->> >> +     *best_parent_p = __clk_get_hw(parent);
->> >> +     return parent_rate;
->> >> +}
->> >
->> > Why this determine_rate hook? If you want to switch the clock to some
->> > intermediate parent I would assume you do this explicitly by setting the
->> > parent and not implicitly by setting a rate.
->> >
->>
->> I use determine_rate hook here because I am using generic cpufreq-dt
->> driver and I want to make clock switching transparent to cpufreq-dt.
->> I.e. when I am trying to switch the clock from ARMPLL to MAINPLL, I
->> call clk_set_rate() with the rate of MAINPLL, and determine_rate will
->> select MAINPLL as the new parent.
+> And this.
 >
-> We have clk_set_parent for changing the parent and clk_set_rate to
-> change the rate. Use the former for changing the parent and the latter
-> for changing the rate. What you are interested in is changing the
-> parent, so use clk_set_parent for this and not abuse a side effect
-> of clk_set_rate.
+>> +static int mtk_cpufreq_notify(struct notifier_block *nb,
+>> +                           unsigned long action, void *data)
+>> +{
+>> +     struct cpufreq_freqs *freqs = data;
+>> +     struct cpu_opp_table *opp_tbl = dvfs_info->opp_tbl;
+>> +     int old_vproc, new_vproc, old_index, new_index;
+>> +
+>> +     if (!cpumask_test_cpu(freqs->cpu, &dvfs_info->cpus))
+>> +             return NOTIFY_DONE;
+>> +
+>> +     old_vproc = regulator_get_voltage(dvfs_info->proc_reg);
+>> +     old_index = cpu_opp_table_get_volt_index(old_vproc);
+>> +     new_index = cpu_opp_table_get_freq_index(freqs->new * 1000);
+>> +     new_vproc = opp_tbl[new_index].vproc;
 >
-> My suggestion is to take another approach. Implement clk_set_rate for
-> these muxes and in the set_rate hook:
+> Let's say that cpu_opp_table_get_freq_index() returns -1.  We then
+> do no error checking on this, and access the memory immediately
+> preceding opp_tbl[0].
 >
-> - switch mux to intermediate PLL parent
-> - call clk_set_rate() for the real parent PLL
-> - switch mux back to real parent PLL
+> Since we'll be loading garbage from opp_tbl[-1], this probably means
+> that mtk_cpufreq_voltage_trace() will go wrong.  Your method of using
+> the vproc values to work out which direction we should walk between
+> old_index...new_index means that we could end up walking through
+> almost the whole UINT_MAX range to wrap around to the new index.
+>
+> Yet again, "return -1" proves to be a sure sign of a bug.
 
-Hi Sascha,
+Hi Russell,
 
-Thanks for your suggestion. I've tried to take this approach, but there's some
-issues here.
-
-Calling clk_set_rate() inside the set_rate callback of cpumux will cause
-an infinite recursive calling in the clock framework:
-mux.set_rate() -> pll.set_rate() -> mux.set_rate -> ...
-
-I've also tries to update pll register settings in the set_rate()
-callback of cpumux,
-but the PLL clock information will not be correctly updated in this case.
-
-How do you think to create a new "CPU PLL" type of clock and do underlying
-mux switching in the set_rate callback of "CPU PLL"?
+Thanks for your reviewing. I'll fix it in next version.
 
 Best Regards,
 Pi-Cheng
 
 >
-> This way the things happening behind the scenes are completely transparent
-> to the cpufreq driver and you can use cpufreq-dt as is without changes.
->
-> Sascha
->
->
 > --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
