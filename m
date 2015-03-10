@@ -1,75 +1,102 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Tue, 10 Mar 2015 19:54:22 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-Message-ID: <54FF21BE.2040506@list.ru>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 10 Mar 2015 19:01:39 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <20150310161801.GR5264@atomide.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <2223973.a64rBcZvaA@wuerfel>
+ <CAB3XZEftjwUGS_Kj2dCxYY1m82C+a1_=akbnG3_hLETCr+Dddg@mail.gmail.com>
+ <5683860.JYkc24rKim@wuerfel>
+ <CAB3XZEfEQnb7qsxuAAr6pUehm1nw6Eu4ZsV1+E477yF5K1hczA@mail.gmail.com>
+ <20150310161801.GR5264@atomide.com>
+Message-ID: <CAB3XZEdK2O7tSSTchvRQtaefzCECjjQ-biQmOBHGdzJaBknSFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, the patch below is needed for a successful boot on armada-xp.
+On Tue, Mar 10, 2015 at 6:18 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Eliad Peller <eliad@wizery.com> [150310 09:11]:
+>> On Tue, Mar 10, 2015 at 5:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 10 March 2015 16:31:33 Eliad Peller wrote:
+>> >> On Tue, Mar 10, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > On Tuesday 10 March 2015 13:00:19 Eliad Peller wrote:
+>> >> >> On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >> >> >> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+>> >> >> >> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+>> >> >> >> > if that's enough to clean out the platform_data handling from the wlcore
+>> >> >> >> > driver, it's good enough as a start.
+>> >> >> >> not sure i'm following - can you elaborate?
+>> >> >> >>
+>> >> >> >> i'll summarize the way i see it. please correct me if i'm wrong.
+>> >> >> >>
+>> >> >> >> both wl18xx and wl12xx use the platform data to get the irq number.
+>> >> >> >> wl12xx (only) also needs some additional clock definitions to be
+>> >> >> >> passed. there's currently some issue with specifying some the of clock
+>> >> >> >> sources, so i preferred starting only with (the simpler) wl18xx
+>> >> >> >> bindings.
+>> >> >> >>
+>> >> >> >> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+>> >> >> >> data (i.e. irq) can be passed by the new DT bindings.
+>> >> >> >> however, for platforms with wl12xx, we still need to pass the clock
+>> >> >> >> definitions (along with the irq), so we have to keep
+>> >> >> >> legacy_init_wl12xx for the time being (and that's also why we have to
+>> >> >> >> currently keep the platform_data handling in the wlcore driver)
+>> >> >> >>
+>> >> >> >> do you have something else in mind?
+>> >> >> >
+>> >> >> > I think what Arnd is saying is we've now removed all the wl12xx using
+>> >> >> > legacy platforms, so all of them can boot with just data from dts.
+>> >> >
+>> >> > Right, that was my idea.
+>> >> >
+>> >> >> I don't think that's the case (unless i'm missing something).
+>> >> >> e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
+>> >> >> initializes wl12xx device.
+>> >> >
+>> >> > This one is just like the igep0030, as Tony was saying: the board
+>> >> > boots from device tree already, so now that we have a binding for
+>> >> > it, we can remove the wl12xx_set_platform_data() for it.
+>> >> >
+>> >> i think the wl12xx_set_platform_data() name created some confusion -
+>> >> it is used to pass platform data for both wl12xx and wl18xx devices.
+>> >> (this confusion is all around the wlcore driver as well, due to the
+>> >> code evolution)
+>> >>
+>> >> the binding i added is for wl18xx only (there is no wl12xx binding yet).
+>> >> the remaining boards, AFAICT, have wl12xx (rather than wl18xx) cards.
+>> >> so i don't see how we can remove these wl12xx_set_platform_data()
+>> >> calls before we have wl12xx bindings in-place as well.
+>> >
+>> > What is missing for that binding then? I keep getting confused here,
+>> > but I thought that they share the implementation that looks at the
+>> > platform data.
+>> >
+>> they both get the same wl12xx_platform_data struct, but only wl12xx
+>> cares about the clocks-related fields.
+>> the bindings i added parses only the irq.
+>>
+>> (Luca tried previously to upstream wl12xx DT support along with the
+>> required clock DT changes, but got some rejections, mainly wrt. clock
+>> stuff.
+>> e.g. http://thread.gmane.org/gmane.linux.kernel/1520752
+>> that's why i preferred starting with "easier" wl18xx bindings only)
+>
+> I believe we did not have clock bindings back then, now it's simple
+> to get the clock. If it's some internal clock to the wl12xx, then
+> that's a different story, it should be just hidden behind a compatible
+> flag then.
+>
+i'm really not familiar with the common clock framework, but there
+still doesn't seem to be a way to determine whether a clock is XTAL or
+not (which is what Luca's patch was about). should we use compatible
+flag in such case? i'm not sure it sounds right.
 
+anyway, i'd really prefer, if possible, starting with the wl18xx
+bindings, and defer the wl12xx complications to later on.
+(i also need to find some wl12xx card in order to actually test the
+patches once i'll have them...)
 
--=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
-This fixes the following crash at boot:
+we do have to make sure these wl18xx bindings are future-compatible
+with the wl12xx ones, but i think the current bindings are pretty much
+standard (and are actually a subset of the bindings needed by wl12xx),
+so it should be fine.
 
- Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
- Internal error: : 808 [#1] SMP ARM
-
- CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
- Hardware name: Marvell Armada 370/XP (Device Tree)
- task: ed41e800 ti: ed43e000 task.ti: ed43e000
- PC is at _set_bit+0x28/0x50
- LR is at n_tty_set_termios+0x328/0x358
- pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
- sp : ed43fd00  ip : 00000000  fp : 00000000
- r10: 00000002  r9 : 00000000  r8 : ec930200
- r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
- r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
- Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
- Control: 10c5387d  Table: 0000406a  DAC: 00000015
- Process swapper/0 (pid: 1, stack limit = 0xed43e220)
-
-The offending instruction in _set_bit() is "strex r0, r2, [r1]"
-For some reason the exclusive access instructions do not like the
-vmalloc() space... While there may be another fix to make them
-fine about vmalloc() space, it still looks like a good idea to
-use kmalloc() for allocating a small (sub-page) struct.
-
-Signed-off-by: Stas Sergeev <stsp@users.sourceforge.net>
----
- drivers/tty/n_tty.c |    5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/tty/n_tty.c b/drivers/tty/n_tty.c
-index cf6e0f2..e03622e 100644
---- a/drivers/tty/n_tty.c
-+++ b/drivers/tty/n_tty.c
-@@ -50,7 +50,6 @@
- #include <linux/uaccess.h>
- #include <linux/module.h>
- #include <linux/ratelimit.h>
--#include <linux/vmalloc.h>
- 
- 
- /* number of characters left in xmit buffer before select has we have
-room */
-@@ -1892,7 +1891,7 @@ static void n_tty_close(struct tty_struct *tty)
-     if (tty->link)
-         n_tty_packet_mode_flush(tty);
- 
--    vfree(ldata);
-+    kfree(ldata);
-     tty->disc_data = NULL;
- }
- 
-@@ -1911,7 +1910,7 @@ static int n_tty_open(struct tty_struct *tty)
-     struct n_tty_data *ldata;
- 
-     /* Currently a malloc failure here can panic */
--    ldata = vmalloc(sizeof(*ldata));
-+    ldata = kmalloc(sizeof(*ldata), GFP_KERNEL);
-     if (!ldata)
-         goto err;
- 
--- 
-1.7.9.5
+Eliad.
