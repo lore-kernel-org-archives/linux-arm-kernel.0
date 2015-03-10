@@ -1,39 +1,108 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 10 Mar 2015 19:06:58 +0000
-Subject: [PATCH v2 0/3] arm64: KVM: High memory guest fixes
-Message-ID: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 10 Mar 2015 19:07:00 +0000
+Subject: [PATCH v2 2/3] arm64: KVM: Do not use pgd_index to index stage-2 pgd
+In-Reply-To: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
+References: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426014421-5579-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been playing with a hacked-up kvmtool that places the memory much
-higher than usual, in an effort to emulate what some arm64 platforms
-do (typically AMD Seattle).
+The kernel's pgd_index macro is designed to index a normal, page
+sized array. KVM is a bit diffferent, as we can use concatenated
+pages to have a bigger address space (for example 40bit IPA with
+4kB pages gives us an 8kB PGD.
 
-Unexpectedly (hey, what could possibly go wrong...), I've discovered a
-couple of mm related issues, ranging from the host exploding to the
-guest being stuck on a page fault. Additionally, I noticed a minor
-documentation issue.
+In the above case, the use of pgd_index will always return an index
+inside the first 4kB, which makes a guest that has memory above
+0x8000000000 rather unhappy, as it spins forever in a page fault,
+whist the host happilly corrupts the lower pgd.
 
-With these fixes in, I'm able to run a guest that has its memory
-located just under the 40bit limit.
+The obvious fix is to get our own kvm_pgd_index that does the right
+thing(tm).
 
-* From v1 [1]:
-- Reworked patch #1 to use split_page() instead. This leads to much
-  refactoring, but is slightly nicer (more common code).
-- Dropped Mark's Tested-by (too many changes)
+Tested on X-Gene with a hacked kvmtool that put memory at a stupidly
+high address.
 
-[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013672.html
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   | 3 ++-
+ arch/arm/kvm/mmu.c               | 8 ++++----
+ arch/arm64/include/asm/kvm_mmu.h | 2 ++
+ 3 files changed, 8 insertions(+), 5 deletions(-)
 
-Marc Zyngier (3):
-  arm64: KVM: Fix stage-2 PGD allocation to have per-page refcounting
-  arm64: KVM: Do not use pgd_index to index stage-2 pgd
-  arm64: KVM: Fix outdated comment about VTCR_EL2.PS
-
- arch/arm/include/asm/kvm_mmu.h   | 12 ++----
- arch/arm/kvm/mmu.c               | 85 ++++++++++++++++++++++++++++++----------
- arch/arm64/include/asm/kvm_arm.h |  5 ++-
- arch/arm64/include/asm/kvm_mmu.h | 48 +++--------------------
- 4 files changed, 77 insertions(+), 73 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index ff56f91..9486a7a 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -149,13 +149,14 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	(__boundary - 1 < (end) - 1)? __boundary: (end);		\
+ })
+ 
++#define kvm_pgd_index(addr)			pgd_index(addr)
++
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
+ 	return page_count(ptr_page) == 1;
+ }
+ 
+-
+ #define kvm_pte_table_empty(kvm, ptep) kvm_page_empty(ptep)
+ #define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
+ #define kvm_pud_table_empty(kvm, pudp) (0)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 0a5457c..f99543d 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -290,7 +290,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+ 	phys_addr_t addr = start, end = start + size;
+ 	phys_addr_t next;
+ 
+-	pgd = pgdp + pgd_index(addr);
++	pgd = pgdp + kvm_pgd_index(addr);
+ 	do {
+ 		next = kvm_pgd_addr_end(addr, end);
+ 		if (!pgd_none(*pgd))
+@@ -355,7 +355,7 @@ static void stage2_flush_memslot(struct kvm *kvm,
+ 	phys_addr_t next;
+ 	pgd_t *pgd;
+ 
+-	pgd = kvm->arch.pgd + pgd_index(addr);
++	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+ 	do {
+ 		next = kvm_pgd_addr_end(addr, end);
+ 		stage2_flush_puds(kvm, pgd, addr, next);
+@@ -844,7 +844,7 @@ static pud_t *stage2_get_pud(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+ 
+-	pgd = kvm->arch.pgd + pgd_index(addr);
++	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+ 	if (WARN_ON(pgd_none(*pgd))) {
+ 		if (!cache)
+ 			return NULL;
+@@ -1134,7 +1134,7 @@ static void stage2_wp_range(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
+ 	pgd_t *pgd;
+ 	phys_addr_t next;
+ 
+-	pgd = kvm->arch.pgd + pgd_index(addr);
++	pgd = kvm->arch.pgd + kvm_pgd_index(addr);
+ 	do {
+ 		/*
+ 		 * Release kvm_mmu_lock periodically if the memory region is
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 8354152..d8f809f 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -160,6 +160,8 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ #define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
+ #define S2_PGD_ORDER		get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+ 
++#define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
++
+ /*
+  * If we are concatenating first level stage-2 page tables, we would have less
+  * than or equal to 16 pointers in the fake PGD, because that's what the
 -- 
 2.1.4
