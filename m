@@ -1,77 +1,46 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 10 Mar 2015 18:01:36 -0400
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <10886228.vUHyKm1ubP@wuerfel>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
- <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
- <10886228.vUHyKm1ubP@wuerfel>
-Message-ID: <CAF6AEGvquV=RMv87CAP4C8JHXjjMk4Xbn1oD4pYcq0YaSFLL+A@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 10 Mar 2015 23:31:52 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150310213317.GK9188@piout.net>
+References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1592385.fqRVVyPSPE@vostro.rjw.lan> <20150310213317.GK9188@piout.net>
+Message-ID: <1901056.Mqyykpv3e9@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 3:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 10 March 2015 13:10:08 Kumar Gala wrote:
->> >>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->> >>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
->> >>>>>>>>>> utilized and passed to the kernel.
->> >>>>>>>>>>
->> >>>>>>>>>> Cc: <devicetree@vger.kernel.org>
->> >>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> >>>>>>>>>
->> >>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
->> >>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
->> >>>>>>>>>
->> >>>>>>>>> Kevin
->> >>>>>>>>
->> >>>>>>>> yes
->> >>>>>>>
->> >>>>>>> That's a bummer.
->> >>>>>>>
->> >>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
->> >>>>>>> one devicetree, and it'll be used, right?
->> >>>>>>
->> >>>>>> We can provide only one, we still need the IDs in the DT.
->> >>>>>
->> >>>>> How are the DTS provided? Concatenated with the kernel, or in a
->> >>>>> wrapped data format? Or in a separate partition from the kernel?
->> >>>>
->> >>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
->> >>>
->> >>> Then you should be able to create a tool that can write this concatenated
->> >>> format and insert these properties from a table that matches the boot
->> >>> loader, right?
->> >>>
->> >>>      Arnd
->> >>
->> >> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
->> >
->> > To insert platform-local properties that mean nothing outside of the
->> > firmware packaging of the device trees, which is the case here?
->> >
->> > I think the idea of having the installer script inserting them is
->> > quite reasonable in this case.
->> >
->> >
->> > -Olof
->>
->> These values are static, so not sure what the point of having the installer script do that?
->>
->
-> It combines two hacks to work around a nonstandard boot loader.
-> Once the bootloader is fixed, you can stop using that script.
->
+On Tuesday, March 10, 2015 10:33:17 PM Alexandre Belloni wrote:
+> Hi,
+> 
+> On 09/03/2015 at 15:30:01 +0100, Rafael J. Wysocki wrote :
+> > > > > Actaully, your platform should just refuse to enter suspend-to-RAM
+> > > > > when hw watchdog is enabled.
+> > > > 
+> > > > Quite likely, depending on how exactly the suspend is implemented.
+> > > >
+> > > 
+> > > We've had absolutely zero complain on that. It is quite clear in the
+> > > datasheet that failing to refresh the watchdog once started will lead to
+> > > a reset and that it is impossible to stop.
+> > > It is actually quite convenient to also ensure that you can actually
+> > > wake up from suspend because that can obviously go wrong.
+> > 
+> > I gather then that the suspend implementation is such that touching the
+> > watchdog periodically while suspended is not a problem.
+> > 
+> > Again, can you please tell me how suspend is implemented on at91?
+> > 
+> 
+> It actually depends on the architecture (at91rm9200, at91sam9 or sama5)
+> but basically, the clocks are switched off in almost all the peripheral
+> drivers then the ram self refresh activated, the master clock is
+> switched off using code running from SRAM and the core is then waiting
+> for interrupt.
 
-still sounds like an extra hurdle for distro's..  can't you just add
-the extra entry in the dts files w/ a comment about workaround for
-bootloader (and then possibly *not* document the property)?
+OK, so it looks like enable_irq_wake() doesn't actually affect the hardware
+on those platforms, is that correct?
 
-BR,
--R
 
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
