@@ -1,129 +1,67 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Tue, 10 Mar 2015 22:27:23 +0100
-Subject: [PATCH v4 2/6] power: twl4030_madc_battery: Add device tree support
+Date: Tue, 10 Mar 2015 22:27:24 +0100
+Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
 In-Reply-To: <1426022847-30912-1-git-send-email-marek@goldelico.com>
 References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
-Message-ID: <1426022847-30912-3-git-send-email-marek@goldelico.com>
+Message-ID: <1426022847-30912-4-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Belisko <marek@goldelico.com>
 ---
- drivers/power/twl4030_madc_battery.c | 81 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+ .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
 
-diff --git a/drivers/power/twl4030_madc_battery.c b/drivers/power/twl4030_madc_battery.c
-index 6af28b5..4bcb4a9 100644
---- a/drivers/power/twl4030_madc_battery.c
-+++ b/drivers/power/twl4030_madc_battery.c
-@@ -20,6 +20,7 @@
- #include <linux/i2c/twl4030-madc.h>
- #include <linux/power/twl4030_madc_battery.h>
- #include <linux/iio/consumer.h>
-+#include <linux/of.h>
- 
- struct twl4030_madc_battery {
- 	struct power_supply psy;
-@@ -183,6 +184,82 @@ static int twl4030_cmp(const void *a, const void *b)
- 		((struct twl4030_madc_bat_calibration *)a)->voltage;
- }
- 
-+#ifdef CONFIG_OF
-+static struct twl4030_madc_bat_platform_data *
-+	twl4030_madc_dt_probe(struct platform_device *pdev)
-+{
-+	struct twl4030_madc_bat_platform_data *pdata;
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+	int i, proplen;
+diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+new file mode 100644
+index 0000000..d3dd9d8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+@@ -0,0 +1,43 @@
++twl4030_madc_battery
 +
-+	pdata = devm_kzalloc(&pdev->dev,
-+			sizeof(struct twl4030_madc_bat_platform_data),
-+			GFP_KERNEL);
-+	if (!pdata)
-+		return ERR_PTR(-ENOMEM);
++Required properties:
++ - compatible : "ti,twl4030-madc-battery"
++ - capacity-uah : battery capacity in uAh
++ - ti,volt-to-capacity-charging-map : list of voltage(mV):level(%) values
++	for charging calibration (see example)
++ - ti,volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
++	for discharging calibration (see example)
++ - io-channels: Should contain IIO channel specifiers
++	for each element in io-channel-names.
++- io-channel-names: Should contain the following values:
++ * "temp" - The ADC channel for temperature reading
++ * "ichg" - The ADC channel for battery charging status
++ * "vbat" - The ADC channel to measure the battery voltage
 +
-+	ret = of_property_read_u32(np, "capacity-uah", &pdata->capacity);
-+	if (ret != 0)
-+		return ERR_PTR(-EINVAL);
++Example:
++	madc-battery {
++		compatible = "ti,twl4030-madc-battery";
++		capacity-uah = <1200000>;
++		ti,volt-to-capacity-charging-map = <4200 100>,
++					        <4100 75>,
++					        <4000 55>,
++					        <3900 25>,
++					        <3800 5>,
++					        <3700 2>,
++					        <3600 1>,
++					        <3300 0>;
 +
-+	/* parse and prepare charging data */
-+	proplen = of_property_count_u32_elems(np, "ti,volt-to-capacity-charging-map");
-+	if (proplen < 0) {
-+		dev_warn(&pdev->dev, "No 'ti,volt-to-capacity-charging-map' property found\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	pdata->charging = devm_kzalloc(&pdev->dev,
-+		sizeof(struct twl4030_madc_bat_calibration) * (proplen / 2),
-+		GFP_KERNEL);
-+
-+	for (i = 0; i < proplen / 2; i++) {
-+		of_property_read_u32_index(np, "ti,volt-to-capacity-charging-map",
-+					   i * 2,
-+					   (u32 *)&pdata->charging[i].voltage);
-+		of_property_read_u32_index(np, "ti,volt-to-capacity-charging-map",
-+					  i * 2 + 1,
-+					  (u32 *)&pdata->charging[i].level);
-+	}
-+
-+	/* parse and prepare discharging data */
-+	proplen = of_property_count_u32_elems(np,
-+			"ti,volt-to-capacity-discharging-map");
-+	if (proplen < 0) {
-+		dev_warn(&pdev->dev, "No 'ti,volt-to-capacity-discharging-map' property found\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	pdata->discharging = devm_kzalloc(&pdev->dev,
-+		sizeof(struct twl4030_madc_bat_calibration) * (proplen / 2),
-+		GFP_KERNEL);
-+
-+	for (i = 0; i < proplen / 2; i++) {
-+		of_property_read_u32_index(np, "ti,volt-to-capacity-discharging-map",
-+					   i * 2,
-+					   (u32 *)&pdata->discharging[i].voltage);
-+		of_property_read_u32_index(np, "ti,volt-to-capacity-discharging-map",
-+					   i * 2 + 1,
-+					   (u32 *)&pdata->discharging[i].level);
-+	}
-+
-+	return pdata;
-+}
-+
-+static const struct of_device_id of_twl4030_madc_match[] = {
-+	{ .compatible = "ti,twl4030-madc-battery", },
-+	{},
-+};
-+
-+#else
-+static struct twl4030_madc_bat_platform_data *
-+	twl4030_madc_dt_probe(struct platform_device *pdev)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+#endif
-+
- static int twl4030_madc_battery_probe(struct platform_device *pdev)
- {
- 	struct twl4030_madc_battery *twl4030_madc_bat;
-@@ -194,6 +271,9 @@ static int twl4030_madc_battery_probe(struct platform_device *pdev)
- 	if (!twl4030_madc_bat)
- 		return -ENOMEM;
- 
-+	if (!pdata)
-+		pdata = twl4030_madc_dt_probe(pdev);
-+
- 	twl4030_madc_bat->psy.name = "twl4030_battery";
- 	twl4030_madc_bat->psy.type = POWER_SUPPLY_TYPE_BATTERY;
- 	twl4030_madc_bat->psy.properties = twl4030_madc_bat_props;
-@@ -263,6 +343,7 @@ static int twl4030_madc_battery_remove(struct platform_device *pdev)
- static struct platform_driver twl4030_madc_battery_driver = {
- 	.driver = {
- 		.name = "twl4030_madc_battery",
-+		.of_match_table = of_match_ptr(of_twl4030_madc_match),
- 	},
- 	.probe  = twl4030_madc_battery_probe,
- 	.remove = twl4030_madc_battery_remove,
++		ti,volt-to-capacity-discharging-map = <4200 100>
++						   <4100 95>,
++						   <4000 70>,
++						   <3800 50>,
++						   <3700 10>,
++						   <3600 5>,
++						   <3300 0>;
++		io-channels = <&twl_madc 1>,
++	                      <&twl_madc 10>,
++			      <&twl_madc 12>;
++		io-channel-names = "temp",
++		                   "ichg",
++		                   "vbat";
++	};
 -- 
 1.9.1
