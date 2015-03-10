@@ -1,48 +1,108 @@
-From: robert.smigielski@timesys.com (Robert Smigielski)
-Date: Tue, 10 Mar 2015 09:45:42 -0400
-Subject: [PATCH] ARM: dts: imx: imx6q uart2 pin mux correction
-Message-ID: <CAPvN=VTSMxtjs6QQ=VFPCDgJ3LJ2xfC+Ryh-rXU4-xnqk+i67w@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 10 Mar 2015 14:55:20 +0100
+Subject: [RFC V2 03/12] i2c: at91: make use of the new infrastructure for
+ quirks
+In-Reply-To: <20150308082845.GB1904@katana>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+ <1424880126-15047-4-git-send-email-wsa@the-dreams.de>
+ <20150308082845.GB1904@katana>
+Message-ID: <20150310135520.GY9132@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch contains a correction to the file imx6q-pinfunc.h for the
-definition of the UART2 GPIO pin mux setting.
+Hi Wolfram,
 
-Issue found when testing UART2 configured as the console in Linux
-GPIO_7 is a transmit pin not a transmit and receive pin
-GPIO_8 is a receive pin not a transmit and receive pin
+You can add my 
 
-Verified the correction with Freescale in posting to the Freescale
-forum https://community.freescale.com/thread/343349
+Acked-by and Tested-By: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-commit c383bbb4d17037435305858f488db7ae17dc1c85
-Author: robert.smigielski <robert.smigielski@timesys.com>
-Date:   Fri Mar 6 11:53:20 2015 -0500
+Tested on sama5d3, some problems with at24 eeprom on sama5d4 but it
+doesn't come from the i2c quirks patch series.
 
-    UART2 Tx and Rx values corrected based on IMX6Q datasheet
+Regards
 
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h
-b/arch/arm/boot/dts/imx6q-pinfunc.h
-index c68c21d..4d4cc49 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -696,8 +696,7 @@
- #define MX6QDL_PAD_GPIO_7__ECSPI5_RDY               0x240 0x610 0x000 0x1 0x0
- #define MX6QDL_PAD_GPIO_7__EPIT1_OUT                0x240 0x610 0x000 0x2 0x0
- #define MX6QDL_PAD_GPIO_7__FLEXCAN1_TX              0x240 0x610 0x000 0x3 0x0
--#define MX6QDL_PAD_GPIO_7__UART2_TX_DATA            0x240 0x610 0x000 0x4 0x0
--#define MX6QDL_PAD_GPIO_7__UART2_RX_DATA            0x240 0x610 0x928 0x4 0x2
-+#define MX6QDL_PAD_GPIO_7__UART2_TX_DATA            0x240 0x610 0x928 0x4 0x2
- #define MX6QDL_PAD_GPIO_7__GPIO1_IO07               0x240 0x610 0x000 0x5 0x0
- #define MX6QDL_PAD_GPIO_7__SPDIF_LOCK               0x240 0x610 0x000 0x6 0x0
- #define MX6QDL_PAD_GPIO_7__USB_OTG_HOST_MODE        0x240 0x610 0x000 0x7 0x0
-@@ -706,7 +705,6 @@
- #define MX6QDL_PAD_GPIO_8__EPIT2_OUT                0x244 0x614 0x000 0x2 0x0
- #define MX6QDL_PAD_GPIO_8__FLEXCAN1_RX              0x244 0x614 0x7e4 0x3 0x1
- #define MX6QDL_PAD_GPIO_8__UART2_RX_DATA            0x244 0x614 0x928 0x4 0x3
--#define MX6QDL_PAD_GPIO_8__UART2_TX_DATA            0x244 0x614 0x000 0x4 0x0
- #define MX6QDL_PAD_GPIO_8__GPIO1_IO08               0x244 0x614 0x000 0x5 0x0
- #define MX6QDL_PAD_GPIO_8__SPDIF_SR_CLK             0x244 0x614 0x000 0x6 0x0
- #define MX6QDL_PAD_GPIO_8__USB_OTG_PWR_CTL_WAKE     0x244 0x614 0x000 0x7 0x0
+Ludovic
 
-Robert Smigielski
+On Sun, Mar 08, 2015 at 09:28:45AM +0100, Wolfram Sang wrote:
+> On Wed, Feb 25, 2015 at 05:01:54PM +0100, Wolfram Sang wrote:
+> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > 
+> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> 
+> Hi Ludovic,
+> 
+> if you have a few minutes, could you please test this series? I'd like to
+> include it in 4.1. and because at91 is using the quirk infrastructure in
+> a more complex way, it is a really good test candidate.
+> 
+> Thanks,
+> 
+>    Wolfram
+> 
+> > ---
+> >  drivers/i2c/busses/i2c-at91.c | 32 +++++++++++---------------------
+> >  1 file changed, 11 insertions(+), 21 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+> > index 636fd2efad8850..b3a70e8fc653c5 100644
+> > --- a/drivers/i2c/busses/i2c-at91.c
+> > +++ b/drivers/i2c/busses/i2c-at91.c
+> > @@ -487,30 +487,10 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
+> >  	if (ret < 0)
+> >  		goto out;
+> >  
+> > -	/*
+> > -	 * The hardware can handle at most two messages concatenated by a
+> > -	 * repeated start via it's internal address feature.
+> > -	 */
+> > -	if (num > 2) {
+> > -		dev_err(dev->dev,
+> > -			"cannot handle more than two concatenated messages.\n");
+> > -		ret = 0;
+> > -		goto out;
+> > -	} else if (num == 2) {
+> > +	if (num == 2) {
+> >  		int internal_address = 0;
+> >  		int i;
+> >  
+> > -		if (msg->flags & I2C_M_RD) {
+> > -			dev_err(dev->dev, "first transfer must be write.\n");
+> > -			ret = -EINVAL;
+> > -			goto out;
+> > -		}
+> > -		if (msg->len > 3) {
+> > -			dev_err(dev->dev, "first message size must be <= 3.\n");
+> > -			ret = -EINVAL;
+> > -			goto out;
+> > -		}
+> > -
+> >  		/* 1st msg is put into the internal address, start with 2nd */
+> >  		m_start = &msg[1];
+> >  		for (i = 0; i < msg->len; ++i) {
+> > @@ -540,6 +520,15 @@ out:
+> >  	return ret;
+> >  }
+> >  
+> > +/*
+> > + * The hardware can handle at most two messages concatenated by a
+> > + * repeated start via it's internal address feature.
+> > + */
+> > +static struct i2c_adapter_quirks at91_twi_quirks = {
+> > +	.flags = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | I2C_AQ_COMB_SAME_ADDR,
+> > +	.max_comb_1st_msg_len = 3,
+> > +};
+> > +
+> >  static u32 at91_twi_func(struct i2c_adapter *adapter)
+> >  {
+> >  	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL
+> > @@ -777,6 +766,7 @@ static int at91_twi_probe(struct platform_device *pdev)
+> >  	dev->adapter.owner = THIS_MODULE;
+> >  	dev->adapter.class = I2C_CLASS_DEPRECATED;
+> >  	dev->adapter.algo = &at91_twi_algorithm;
+> > +	dev->adapter.quirks = &at91_twi_quirks;
+> >  	dev->adapter.dev.parent = dev->dev;
+> >  	dev->adapter.nr = pdev->id;
+> >  	dev->adapter.timeout = AT91_I2C_TIMEOUT;
+> > -- 
+> > 2.1.4
+> > 
