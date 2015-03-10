@@ -1,127 +1,135 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 10 Mar 2015 19:47:34 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP
- SOCs
-In-Reply-To: <54FF3967.1090602@linaro.org>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
- <20150310190507.64b3c153@free-electrons.com> <54FF3967.1090602@linaro.org>
-Message-ID: <CDBC2CF7-30C4-4B1C-8F85-DE72C37856A7@free-electrons.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 10 Mar 2015 12:51:09 -0600
+Subject: [RFC PATCH v15 02/11] ARM: qcom: Add Subsystem Power Manager
+ (SPM) driver
+In-Reply-To: <0D04D613-5916-448E-92F3-27C3D25AFE51@codeaurora.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-3-git-send-email-lina.iyer@linaro.org>
+ <0D04D613-5916-448E-92F3-27C3D25AFE51@codeaurora.org>
+Message-ID: <20150310185109.GC3727@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10 mars 2015 19:35:19 GMT+01:00, Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
->On 03/10/2015 07:05 PM, Thomas Petazzoni wrote:
->> Hello Daniel,
->>
->> I know you suggested a more rigorous method of determining the exit
->> latency and target residency times, but would it be nonetheless
->> possible to apply this patch, which clearly improves performance a
->lot,
->> and actually makes the code match the values used in the vendor
->kernel?
->>
->> I also think this patch should be marked for stable, it fixes values
->> introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
->> should therefore be backported all the way to v3.16.
+On Tue, Mar 10 2015 at 11:26 -0600, Kumar Gala wrote:
 >
->I don't have a problem to apply this patch. But I would like to have 
->confirmation from one of the Armada maintainers the tradeoff is
->accepted 
->(less energy saving for more performance).
-
-Hi Daniel,
-
-I already gave my acked- by for this patch, so for me this tradeoff
-is acceptable.
-
-Gr?gory
-
+>On Mar 9, 2015, at 10:16 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
 >
->
->> On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
->>> Originally, the thresholds used in the cpuidle driver for Armada
->SOCs
->>> were temporarily chosen, leaving room for improvements.
->>>
->>> This commit updates the thresholds for the Armada XP SOCs with
->values
->>> that positively impact performances:
->>>
->>>                                  without patch  with patch   vendor
->kernel
->>>   - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
->>>   - ioping tmpfs (iops)          ~163k          ~206k        ~179k
->>>   - ioping tmpfs (mib/s)         ~636           ~805         ~699
->>>
->>> The idle power consumption is negatively impacted (proportionally
->less
->>> than the performance gain), and we are still performing better than
->>> the vendor kernel here:
->>>
->>>                                  without patch   with patch  vendor
->kernel
->>>   - power consumption idle (W)   ~2.4            ~3.2        ~4.4
->>>   - power consumption busy (W)   ~8.6            ~8.3        ~8.6
->>>
->>> There is still room for improvement regarding the value of these
->>> thresholds, they were chosen to mimic the vendor kernel.
->>>
->>> This patch only impacts Armada XP SOCs and was tested on Online Labs
->>> C1 boards. A similar approach can be taken to improve the
->performances
->>> of the Armada 370 and Armada 38x SOCs.
->>>
->>> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
->>> for the discussions and tips around this topic.
->>>
->>> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
->>> ---
->>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
->>>   1 file changed, 4 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c
->b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>> index 38e6861..3716a1f 100644
->>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
->>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
->>> @@ -50,17 +50,17 @@ static struct cpuidle_driver
->armadaxp_idle_driver = {
->>>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->>>   	.states[1]		= {
->>>   		.enter			= mvebu_v7_enter_idle,
->>> -		.exit_latency		= 10,
->>> +		.exit_latency		= 100,
->>>   		.power_usage		= 50,
->>> -		.target_residency	= 100,
->>> +		.target_residency	= 1000,
->>>   		.name			= "MV CPU IDLE",
->>>   		.desc			= "CPU power down",
->>>   	},
->>>   	.states[2]		= {
->>>   		.enter			= mvebu_v7_enter_idle,
->>> -		.exit_latency		= 100,
->>> +		.exit_latency		= 1000,
->>>   		.power_usage		= 5,
->>> -		.target_residency	= 1000,
->>> +		.target_residency	= 10000,
->>>   		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
->>>   		.name			= "MV CPU DEEP IDLE",
->>>   		.desc			= "CPU and L2 Fabric power down",
+>> SPM is a hardware block that controls the peripheral logic surrounding
+>> the application cores (cpu/l$). When the core executes WFI instruction,
+>> the SPM takes over the putting the core in low power state as
+>> configured. The wake up for the SPM is an interrupt at the GIC, which
+>> then completes the rest of low power mode sequence and brings the core
+>> out of low power mode.
 >>
+>> The SPM has a set of control registers that configure the SPMs
+>> individually based on the type of the core and the runtime conditions.
+>> SPM is a finite state machine block to which a sequence is provided and
+>> it interprets the bytes and executes them in sequence. Each low power
+>> mode that the core can enter into is provided to the SPM as a sequence.
 >>
+>> Configure the SPM to set the core (cpu or L2) into its low power mode,
+>> the index of the first command in the sequence is set in the SPM_CTL
+>> register. When the core executes ARM wfi instruction, it triggers the
+>> SPM state machine to start executing from that index. The SPM state
+>> machine waits until the interrupt occurs and starts executing the rest
+>> of the sequence until it hits the end of the sequence. The end of the
+>> sequence jumps the core out of its low power mode.
+>>
+>> Add support for an idle driver to set up the SPM to place the core in
+>> Standby or Standalone power collapse mode when the core is idle.
+>>
+>> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
+>> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
+>> Original tree available at -
+>> git://codeaurora.org/quic/la/kernel/msm-3.10.git
+>>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 +-
+>> drivers/soc/qcom/Kconfig                           |   7 +
+>> drivers/soc/qcom/Makefile                          |   1 +
+>> drivers/soc/qcom/spm.c                             | 422 +++++++++++++++++++++
+>> 4 files changed, 455 insertions(+), 6 deletions(-)
+>> create mode 100644 drivers/soc/qcom/spm.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> index 1505fb8..690c3c0 100644
+>> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> @@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
+>>
+>> The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
+>> Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
+>> -micro-controller that transitions a piece of hardware (like a processor or
+>> +power-controller that transitions a piece of hardware (like a processor or
+>> subsystem) into and out of low power modes via a direct connection to
+>> the PMIC. It can also be wired up to interact with other processors in the
+>> system, notifying them when a low power state is entered or exited.
+>>
+>> +Multiple revisions of the SAW hardware are supported using these Device Nodes.
+>> +SAW2 revisions differ in the register offset and configuration data. Also, the
+>> +same revision of the SAW in different SoCs may have different configuration
+>> +data due the the differences in hardware capabilities. Hence the SoC name, the
+>> +version of the SAW hardware in that SoC and the distinction between cpu (big
+>> +or Little) or cache, may be needed to uniquely identify the SAW register
+>> +configuration and initialization data. The compatible string is used to
+>> +indicate this parameter.
+>> +
+>> PROPERTIES
+>>
+>> - compatible:
+>> @@ -14,10 +23,13 @@ PROPERTIES
+>> 	Value type: <string>
+>> 	Definition: shall contain "qcom,saw2". A more specific value should be
+>> 		    one of:
+>> -			 "qcom,saw2-v1"
+>> -			 "qcom,saw2-v1.1"
+>> -			 "qcom,saw2-v2"
+>> -			 "qcom,saw2-v2.1"
+>> +			"qcom,saw2-v1"
+>> +			"qcom,saw2-v1.1"
+>> +			"qcom,saw2-v2"
+>> +			"qcom,saw2-v2.1"
+>> +			"qcom,apq8064-saw2-v1.1-cpu"
+>> +			"qcom,msm8974-saw2-v2.1-cpu"
+>> +			"qcom,apq8084-saw2-v2.1-cpu?
 >>
 >
+>We don?t seem to use the "qcom,saw2-v1*? variants so should we just drop them?
+
+Sure. Will fix in the next.
+>
+>
+>> - reg:
+>> 	Usage: required
+>> @@ -26,10 +38,17 @@ PROPERTIES
+>> 		    the register region. An optional second element specifies
+>> 		    the base address and size of the alias register region.
+>>
+>> +- regulator:
+>> +	Usage: optional
+>> +	Value type: boolean
+>> +	Definition: Indicates that this SPM device acts as a regulator device
+>> +			device for the core (CPU or Cache) the SPM is attached
+>> +			to.
+>>
+>> Example:
+>>
+>> -	regulator at 2099000 {
+>> +	power-controller at 2099000 {
+>> 		compatible = "qcom,saw2";
+>> 		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+>> +		regulator;
+>> 	};
+>
+>- k
 >
 >-- 
-><http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>Qualcomm Innovation Center, Inc.
+>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>a Linux Foundation Collaborative Project
 >
->Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-><http://twitter.com/#!/linaroorg> Twitter |
-><http://www.linaro.org/linaro-blog/> Blog
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
