@@ -1,92 +1,146 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 10:11:17 +0000
-Subject: [PATCH v2] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <CAKv+Gu8yDK_U_J-yeA4QRypNT=TKjxNtkyiKnJaogacDt5_jrw@mail.gmail.com>
-References: <1425556302-3370-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150309180645.GD8656@n2100.arm.linux.org.uk>
- <CAKv+Gu8yDK_U_J-yeA4QRypNT=TKjxNtkyiKnJaogacDt5_jrw@mail.gmail.com>
-Message-ID: <20150310101117.GH8656@n2100.arm.linux.org.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 10 Mar 2015 11:13:49 +0100
+Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update
+ the iscr register
+In-Reply-To: <2515825.598CypcWU3@wuerfel>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <4772280.xE1WBZVd8Z@wuerfel> <54FEA59B.7020400@redhat.com>
+ <2515825.598CypcWU3@wuerfel>
+Message-ID: <54FEC3DD.10108@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 07:12:46PM +0100, Ard Biesheuvel wrote:
-> On 9 March 2015 at 19:06, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Thu, Mar 05, 2015 at 12:51:42PM +0100, Ard Biesheuvel wrote:
-> >> @@ -393,6 +393,20 @@ static void __init cpuid_init_hwcaps(void)
-> >>       vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> >>       if (vmsa >= 5)
-> >>               elf_hwcap |= HWCAP_LPAE;
-> >> +
-> >> +     /* check for supported v8 Crypto instructions */
-> >> +     isar5 = read_cpuid_ext(CPUID_EXT_ISAR5);
-> >> +
-> >> +     switch ((isar5 >> 4) & 0xf) {
-> >> +     case 2: elf_hwcap2 |= HWCAP2_PMULL;     /* pmull implies aes */
-> >> +     case 1: elf_hwcap2 |= HWCAP2_AES;
-> >> +     }
-> >> +     if (((isar5 >> 8) & 0xf) == 1)
-> >> +             elf_hwcap2 |= HWCAP2_SHA1;
-> >> +     if (((isar5 >> 12) & 0xf) == 1)
-> >> +             elf_hwcap2 |= HWCAP2_SHA2;
-> >> +     if (((isar5 >> 16) & 0xf) == 1)
-> >> +             elf_hwcap2 |= HWCAP2_CRC32;
-> >
-> > Reading through the ARMv7 ARM, the ISAR registers seem to work in a way
-> > that "feature >= N" is sufficient to test for something (in other words,
-> > the feature revision bits build on previous instructions added by older
-> > revisions of that feature.)
-> >
-> 
-> There was quite some discussion about that when we implemented this
-> for arm64. Perhaps Steve wants to elaborate on the details, because I
-> don't remember them exactly.
-> 
-> > Hence why PMULL implies AES - that follows the same pattern.  So, I wonder
-> > if those == should all be >=, and there should be a "default:" before
-> > "case 2:" with the zero case handled separately.
-> >
-> 
-> Quoting from my version of the ARM ARM (DDI0487A_d):
-> 
-> AES, bits [7:4]
-> Indicates whether AES instructions are implemented in AArch32.
-> 0000 No AES instructions implemented.
-> 0001 AESE, AESD, AESMC, and AESIMC implemented.
-> 0010 As for 0001 , plus PMULL/PMULL2 instructions operating on 64-bit
-> data quantities.
-> All other values are reserved.
-> 
-> Even though they are obviously not bitfields, 'reserved' to me
-> suggests that it is still incorrect to assume both PMULL and AES
-> capability for values not listed yet > 0b0010.
-> The same applies to the other blocks: all other values are reserved.
+Hi,
 
-The use of "reserved" in this manner isn't actually detailed in the
-glossary, which makes it a little hard to work out exactly what is
-meant here (that's a documentation bug).
+On 10-03-15 09:57, Arnd Bergmann wrote:
+> On Tuesday 10 March 2015 09:04:43 Hans de Goede wrote:
+>> Hi,
+>>
+>> On 09-03-15 22:47, Arnd Bergmann wrote:
+>>> On Monday 09 March 2015 21:40:15 Hans de Goede wrote:
+>>>> +void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
+>>>> +{
+>>>> +       struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>>> +       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>>> +       u32 iscr;
+>>>> +
+>>>> +       iscr = readl(data->base + REG_ISCR);
+>>>> +       iscr &= ~clr;
+>>>> +       iscr |= set;
+>>>> +       writel(iscr, data->base + REG_ISCR);
+>>>> +}
+>>>> +EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
+>>>> +
+>>>>
+>>>
+>>> I would generally consider this a bad design. What is the purpose of
+>>> calling sun4i_usb_phy_update_iscr()
+>>
+>> There are 2 different use cases for this one is to enable the dataline
+>> pull-ups at driver init and disable them at driver exit, this could /
+>> should probably be moved to the phy_init / phy_exit code for the usb0 phy
+>> removing the need to do this from within the sunxi musb glue.
+>>
+>> The second use-case is more tricky, for some reasons Allwinner has decided
+>> to not use the dedicated id-detect and vusb-sense pins of the phy they are
+>> using (these pins are not routed to the outside).
+>>
+>> Instead id-detect and vusb-sense are done through any $random gpio pins
+>> (including non irq capable pins on some designs requiring polling).
+>>
+>> But the musb-core still needs to know the status of the id and vbus pins,
+>> and gets this from the usb0-phy iscr register, which reflects the status of
+>> the not connected dedicated pins of the phy. The reason this can still
+>> work at all is because the iscr register allows the user to override
+>> whatever the not connected phy pins are seeing and forcing a value to
+>> report to the musb core as id and vbus status.
+>>
+>> This is done by these 2 functions in the musb sunxi glue:
+>>
+>> static void sunxi_musb_force_id(struct musb *musb, u32 val)
+>> {
+>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>>
+>>           if (val)
+>>                   val = SUNXI_ISCR_FORCE_ID_HIGH;
+>>           else
+>>                   val = SUNXI_ISCR_FORCE_ID_LOW;
+>>
+>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_ID_MASK, val);
+>> }
+>>
+>> static void sunxi_musb_force_vbus(struct musb *musb, u32 val)
+>> {
+>>           struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+>>
+>>           if (val)
+>>                   val = SUNXI_ISCR_FORCE_VBUS_HIGH;
+>>           else
+>>                   val = SUNXI_ISCR_FORCE_VBUS_LOW;
+>>
+>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_VBUS_MASK, val);
+>> }
+>>
+>> I will happily admit that these 2 functions are a better API between the sunxi musb
+>> glue and the sunxi usb phy driver. I started with the minimal sun4i_usb_phy_update_iscr
+>> approach as I wanted to keep the API as small as possible, but having 2 functions like
+>> the one above, which actually reflect what is happening would indeed be better.
+>
+> Ok, that would definitely improve things.
+>
+>> Note that the polling of the pins cannot (easily) be moved into the phy driver for various
+>> reasons:
+>>
+>> 1) It depends on dr_mode, the otg may be used in host only mode in which case there are no
+>> pins at all.
+>> 2) the musb set_vbus callback needs access to the pins
+>> 3) When id changes some musb core state changes are necessary.
+>>
+>> I'll respin the patch set to do things this way as soon as we've agreement on
+>> your second point.
+>>
+>>   > and why can't there be a high-level
+>>> PHY API for this?
+>>
+>> The current generic phy API seems to not have any bus specific methods, I know that
+>> in the long run people want to get rid of struct usb_phy, so maybe we should consider
+>> adding bus specific methods to the generic phy API for things like otg.
+>>
+>> If we decide to add bus specific methods, then the question becomes if having
+>>
+>> int phy_usb_set_id_detect(struct phy *phy, bool val);
+>> int phy_usb_set_vbus_detect(struct phy *phy, bool val);
+>>
+>> Functions in the generic phy API is a good idea, or if this is too sunxi specific,
+>> I'm fine with doing this either way. If we want to go the generic phy route
+>> I'll split this in 2 patches, one adding these 2 generic functions & phy-ops, and
+>> 1 doing the sunxi implementation.
+>>
+>> If people believe this is too sunxi specific (I believe it is, but as said I'm
+>> fine with doing this either way). I'll respin this patch to remove the too
+>> generic sun4i_usb_phy_update_iscr function, and instead add these 2:
+>>
+>> void sun4i_usb_phy_set_id_detect(struct phy *phy, bool val);
+>> void sun4i_usb_phy_set_vbus_detect(struct phy *phy, bool val);
+>
+> Thanks for your detailed explanations. I think this is something for
+> Kishon to decide, based on where he wants to take the phy API in the
+> long run. I'm fine with it either way, and it seems easy enough to
+> change between those two interfaces if we make up our minds about it
+> later.
 
-Is it "ARM Ltd reserves the right to add further values which augment
-the previous values" or is it "ARM Ltd reserve the right to add
-further values with completely different behaviours."
+Ok, so I've fixed things in my personal tree to use 2 sun4i private functions for
+now:
 
-Really, the ARM ARM needs to be improved in this area.  It needs to
-contain a clear statement about how the bitfields are intended to work.
-The purpose of the CPUID stuff is to allow software to adapt to the
-features of the CPU, but without a clearly defined behaviour for the
-"unknown values", moving a piece of software to a newer CPU which
-implements a superset of the features of a previous CPU will lead it
-to fail (because the CPUID fields could now be in the reserved ranges)
-if strict tests were applied for exact field values.
+void sun4i_usb_phy_set_id_detect(struct phy *phy, bool val);
+void sun4i_usb_phy_set_vbus_detect(struct phy *phy, bool val);
 
-I'm not talking about moving a piece of binary software: I'm talking
-there more about the maintanence burden of having to go through the
-entire program checking for any references to CPUID fields, and checking
-and updating every single one.
+You can find this change here:
+https://github.com/jwrdegoede/linux-sunxi/commits/sunxi-wip
 
-The current CPUID situation is which encourages exact precise tests is,
-IMHO, not well thought out.
+I'll wait a bit to see if there are more review comments and then
+I'll send a v2 of the set.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Hans
