@@ -1,162 +1,52 @@
 From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 10 Mar 2015 12:35:14 +0100
-Subject: [PATCH v3 3/9] x86,
- pci: Reorder logic of pci_mmconfig_insert() function
+Date: Tue, 10 Mar 2015 12:35:16 +0100
+Subject: [PATCH v3 5/9] pci, acpi,
+ mcfg: Provide generic implementation of MCFG code initialization.
 In-Reply-To: <1425987320-15020-1-git-send-email-tomasz.nowicki@linaro.org>
 References: <1425987320-15020-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <1425987320-15020-4-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <1425987320-15020-6-git-send-email-tomasz.nowicki@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is the first step for MMCONFIG refactoring process.
-
-Code that uses pci_mmcfg_lock will be moved to common file and become
-accessible for all architectures. pci_mmconfig_insert() cannot be moved
-so easily since it is mixing generic mmconfig code with x86 specific logic
-inside of mutual exclusive block guarded by pci_mmcfg_lock.
-
-To get rid of that constraint, we reorder actions as follow:
-1. mmconfig entry allocation can be done first, no need to lock
-2. insertion to iomem_resource has its own lock, no need to wrap it into mutex
-3. insertion to mmconfig list can be done as the final step in separate
-function (candidate for further refactoring)
+Those two functions are required by ACPI subsystem to make PCI config
+space accessible. Generic code assume to do nothing for early init call but
+late init call does as follow:
+- parse MCFG table and add regions to ECAM resource list
+- map regions
+- add regions to iomem_resource
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- arch/x86/pci/mmconfig-shared.c | 100 ++++++++++++++++++++++-------------------
- 1 file changed, 54 insertions(+), 46 deletions(-)
+ drivers/acpi/mcfg.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index 8b3bc4f..685cd4c 100644
---- a/arch/x86/pci/mmconfig-shared.c
-+++ b/arch/x86/pci/mmconfig-shared.c
-@@ -834,6 +834,39 @@ static int __init pci_mmcfg_late_insert_resources(void)
-  */
- late_initcall(pci_mmcfg_late_insert_resources);
+diff --git a/drivers/acpi/mcfg.c b/drivers/acpi/mcfg.c
+index a2e2326..1e646fc 100644
+--- a/drivers/acpi/mcfg.c
++++ b/drivers/acpi/mcfg.c
+@@ -79,3 +79,23 @@ int __init acpi_parse_mcfg(struct acpi_table_header *header)
  
-+static int pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
+ 	return 0;
+ }
++
++void __init __weak pci_mmcfg_early_init(void)
 +{
-+	struct pci_mmcfg_region *cfg_conflict;
-+	int err = 0;
 +
-+	mutex_lock(&pci_mmcfg_lock);
-+	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
-+	if (cfg_conflict) {
-+		if (cfg_conflict->end_bus < cfg->end_bus)
-+			pr_info(FW_INFO "MMCONFIG for "
-+				"domain %04x [bus %02x-%02x] "
-+				"only partially covers this bridge\n",
-+				cfg_conflict->segment, cfg_conflict->start_bus,
-+				cfg_conflict->end_bus);
-+		err = -EEXIST;
-+		goto out;
-+	}
-+
-+	if (pci_mmcfg_arch_map(cfg)) {
-+		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
-+		err = -ENOMEM;
-+		goto out;
-+	} else {
-+		list_add_sorted(cfg);
-+		pr_info("MMCONFIG at %pR (base %#lx)\n",
-+			&cfg->res, (unsigned long)cfg->address);
-+
-+	}
-+out:
-+	mutex_unlock(&pci_mmcfg_lock);
-+	return err;
 +}
 +
- /* Add MMCFG information for host bridges */
- int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 			phys_addr_t addr)
-@@ -845,66 +878,41 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 	if (!(pci_probe & PCI_PROBE_MMCONF) || pci_mmcfg_arch_init_failed)
- 		return -ENODEV;
- 
--	if (start > end)
-+	if (start > end || !addr)
- 		return -EINVAL;
- 
--	mutex_lock(&pci_mmcfg_lock);
--	cfg = pci_mmconfig_lookup(seg, start);
--	if (cfg) {
--		if (cfg->end_bus < end)
--			dev_info(dev, FW_INFO
--				 "MMCONFIG for "
--				 "domain %04x [bus %02x-%02x] "
--				 "only partially covers this bridge\n",
--				  cfg->segment, cfg->start_bus, cfg->end_bus);
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EEXIST;
--	}
--
--	if (!addr) {
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EINVAL;
--	}
--
- 	rc = -EBUSY;
- 	cfg = pci_mmconfig_alloc(seg, start, end, addr);
- 	if (cfg == NULL) {
- 		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
--		rc = -ENOMEM;
-+		return -ENOMEM;
- 	} else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
- 		dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
- 			 &cfg->res);
--	} else {
--		/* Insert resource if it's not in boot stage */
--		if (pci_mmcfg_running_state)
--			tmp = insert_resource_conflict(&iomem_resource,
--						       &cfg->res);
--
--		if (tmp) {
--			dev_warn(dev,
--				 "MMCONFIG %pR conflicts with "
--				 "%s %pR\n",
--				 &cfg->res, tmp->name, tmp);
--		} else if (pci_mmcfg_arch_map(cfg)) {
--			dev_warn(dev, "fail to map MMCONFIG %pR.\n",
--				 &cfg->res);
--		} else {
--			list_add_sorted(cfg);
--			dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
--				 &cfg->res, (unsigned long)addr);
--			cfg = NULL;
--			rc = 0;
--		}
-+		goto error;
- 	}
- 
--	if (cfg) {
--		if (cfg->res.parent)
--			release_resource(&cfg->res);
--		kfree(cfg);
-+	/* Insert resource if it's not in boot stage */
-+	if (pci_mmcfg_running_state)
-+		tmp = insert_resource_conflict(&iomem_resource, &cfg->res);
++void __init __weak pci_mmcfg_late_init(void)
++{
++	struct pci_mmcfg_region *cfg;
 +
-+	if (tmp) {
-+		dev_warn(dev,
-+			 "MMCONFIG %pR conflicts with %s %pR\n",
-+			 &cfg->res, tmp->name, tmp);
-+		goto error;
- 	}
- 
--	mutex_unlock(&pci_mmcfg_lock);
-+	rc = pci_mmconfig_inject(cfg);
-+	if (rc)
-+		goto error;
++	acpi_table_parse(ACPI_SIG_MCFG, acpi_parse_mcfg);
 +
-+	return 0;
- 
-+error:
-+	if (cfg->res.parent)
-+		release_resource(&cfg->res);
-+	kfree(cfg);
- 	return rc;
- }
- 
++	if (list_empty(&pci_mmcfg_list))
++		return;
++	if (!pci_mmcfg_arch_init())
++		free_all_mmcfg();
++
++	list_for_each_entry(cfg, &pci_mmcfg_list, list)
++		insert_resource(&iomem_resource, &cfg->res);
++}
 -- 
 1.9.1
