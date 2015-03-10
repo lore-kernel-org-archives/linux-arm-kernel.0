@@ -1,93 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 10 Mar 2015 09:09:20 -0700
-Subject: [PATCH v2 2/2] ARM: dts: am33xx: Move wkup_m3 node to soc node
- and add ranges
-In-Reply-To: <54FE33CA.4090709@ti.com>
-References: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
- <1425528742-3087-3-git-send-email-d-gerlach@ti.com>
- <20150305154039.GD13520@atomide.com> <54F88849.1090708@ti.com>
- <20150305165727.GE13520@atomide.com> <54FE33CA.4090709@ti.com>
-Message-ID: <20150310160919.GQ5264@atomide.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Mar 2015 16:21:09 +0000
+Subject: [PATCHv3 0/5] arm-cci400: PMU monitoring support on ARM64
+In-Reply-To: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
+References: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <54FF19F5.1020309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150309 16:59]:
-> On 03/05/2015 10:57 AM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [150305 08:47]:
-> >> On 03/05/2015 09:40 AM, Tony Lindgren wrote:
-> >>> * Dave Gerlach <d-gerlach@ti.com> [150304 20:14]:
-> >> Dave,
-> >>
-> >> Looks like the commit message disappeared during your patch preparation.
-> >>
-> >>>> Signed-off-by: Suman Anna <s-anna@ti.com>
-> >>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/am33xx.dtsi | 21 +++++++++++++--------
-> >>>>  1 file changed, 13 insertions(+), 8 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> >>>> index acd3705..086415c 100644
-> >>>> --- a/arch/arm/boot/dts/am33xx.dtsi
-> >>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> >>>> @@ -77,10 +77,23 @@
-> >>>>  	 */
-> >>>>  	soc {
-> >>>>  		compatible = "ti,omap-infra";
-> >>>> +		#address-cells = <1>;
-> >>>> +		#size-cells = <1>;
-> >>>> +		ranges = <0x0     0x44d00000 0x4000>,
-> >>>> +			 <0x80000 0x44d80000 0x2000>;
-> >>>> +
-> >>>
-> >>> I think putting the ranges here will cause issues for adding
-> >>> ranges for anything else.
-> >>>
-> >>> How about do something like this instead (untested):
-> >>>
-> >>> ocp {
-> >>> 	l4_wkup: l4_wkup at 44c00000 {
-> >>> 		compatible = "am335-l4-wkup", "simple-bus";
-> >>> 		ranges = <0 0x44c00000 0x3fffff>;
-> >>>
-> >>> 		wkup_m3: wkup_m3 at 44d00000 {
-> >>> 			compatible = "ti,am3353-wkup-m3";
-> >>> 			reg = <0x1000000     0x4000>,	/* M3 UMEM */
-> >>> 			      <0x180000	     0x2000>;	/* M3 DMEM */
-> >>> 			ti,hwmods = "wkup_m3";
-> >>> 			ti,pm-firmware = "am335x-pm-firmware.elf";
-> >>> 		};
-> >>>
-> >>> 		...
-> >>> 	};
-> >>> };
-> >>>
-> >>> That way we can start moving also the other l4_wkup components there
-> >>> eventuallly without having to redo the ranges again for wkup_m3.
-> >>>
-> >>> You can also look at how the scm_conf was done for dm816x.dtsi for an
-> >>> example, and the recent large set of patches posted by Tero.
-> 
-> I have taken a look at both the above. The L4_WKUP range includes the
-> PRCM, Control Module, as well as a few peripherals like DMTimer0, UART0
-> etc. What all do we want to move here eventually?
 
-Well eventually all the children of L4_WKUP, but that can be done
-slowly as some of the drivers have weird hacks and may not work
-properly if moved around.
 
-For example, anything with reg entries for something like SCM area will
-break as that's not going to be in the L4_WKUP area ny longer :p And
-that's actually good as it will protect us from spaghetti code
-automatically later on for new code.
+On 10/03/15 15:18, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+>
+> This series enables the PMU monitoring support for CCI400 on ARM64.
+> The existing CCI400 driver code is a mix of PMU driver and the MCPM
+> driver code. The MCPM driver is only used on ARM(32) and contains
+> arm32 assembly and hence can't be built on ARM64. This patch splits
+> the code to
+>
+>   - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
+>   - ARM_CCI400_PMU driver
+>
+> Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
+> the revision of the chipset, is a secure operation. Hence, it prevents
+> us from running this on non-secure platforms. The issue is overcome by
+> explicitly mentioning the revision number of the CCI PMU in the device tree
+> binding. The device-tree binding has been updated with the new bindings.
+>
+> i.e,	arm-cci-400-pmu,r0 => revision 0
+> 	arm-cci-400-pmu,r1 => revision 1
+> 	arm-cci-400-pmu => (old) DEPRECATED
+>
+> The old binding has been DEPRECATED and must be used only on ARM32
+> system with secure access. We don't have a reliable dynamic way to detect
+> if the system is running secure. This series tries to use the best safe
+> method by relying on the availability of MCPM(as it was prior to the series).
+> It is upto the MCPM platform driver to decide, if the system is secure before
+> it goes ahead and registers its drivers and pokes the CCI. This series doesn't
+> address/solve the problem of MCPM. I will be happy to use a better approach,
+> if there is any.
+>
+> Tested on (non-secure)TC2 and A53x2.
+>
 
-> Depending on that, we may have to use 2 address cells like in Tero's
-> PRCM cleanup series rather than the single cell translation used by
-> you in dm816x.dtsi so that we can retain the relative addresses
-> w.r.t the existing node bases in the derivative child nodes.
-
-Hmm OK, care to paste a dts snippet example for that?
+For the series,
+Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+(Tested on secure TC2 using MCPM)
 
 Regards,
-
-Tony
+Sudeep
