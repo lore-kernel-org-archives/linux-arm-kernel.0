@@ -1,55 +1,93 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Mar 2015 09:44:51 +0900
-Subject: [PATCH 14/15] ARM: shmobile: ape6evm dts: Enable pull-up for GPIO
- switches
-In-Reply-To: <cover.1425947992.git.horms+renesas@verge.net.au>
-References: <cover.1425947992.git.horms+renesas@verge.net.au>
-Message-ID: <a104662052b5863663d11895667f0f8a755cd826.1425947992.git.horms+renesas@verge.net.au>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Mon, 09 Mar 2015 19:00:34 -0600
+Subject: [PATCH v4 1/4] PCI: Export symbols of PCI functions
+In-Reply-To: <1425946878-13169-2-git-send-email-rjui@broadcom.com>
+References: <1425946878-13169-1-git-send-email-rjui@broadcom.com>
+ <1425946878-13169-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1425949234.25026.24.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Mon, 2015-03-09 at 17:21 -0700, Ray Jui wrote:
+> Export symbols of the following PCI functions so they can be referenced
+> by a PCI driver compiled as a kernel loadable module:
+> 
+> pci_common_swizzle
+> pci_create_root_bus
+> pci_stop_root_bus
+> pci_remove_root_bus
+> pci_assign_unassigned_bus_resources
+> pci_fixup_irqs
+> 
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> ---
+>  drivers/pci/pci.c       |    1 +
+>  drivers/pci/probe.c     |    1 +
+>  drivers/pci/remove.c    |    2 ++
+>  drivers/pci/setup-bus.c |    1 +
+>  drivers/pci/setup-irq.c |    1 +
+>  5 files changed, 6 insertions(+)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 81f06e8..fb4a3da 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -2492,6 +2492,7 @@ u8 pci_common_swizzle(struct pci_dev *dev, u8 *pinp)
+>  	*pinp = pin;
+>  	return PCI_SLOT(dev->devfn);
+>  }
+> +EXPORT_SYMBOL(pci_common_swizzle);
+>  
+>  /**
+>   *	pci_release_region - Release a PCI bar
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8d2f400..eb24ef9 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1993,6 +1993,7 @@ err_out:
+>  	kfree(b);
+>  	return NULL;
+>  }
+> +EXPORT_SYMBOL(pci_create_root_bus);
+>  
+>  int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int bus_max)
+>  {
+> diff --git a/drivers/pci/remove.c b/drivers/pci/remove.c
+> index 8bd76c9..c523159 100644
+> --- a/drivers/pci/remove.c
+> +++ b/drivers/pci/remove.c
+> @@ -139,6 +139,7 @@ void pci_stop_root_bus(struct pci_bus *bus)
+>  	/* stop the host bridge */
+>  	device_release_driver(&host_bridge->dev);
+>  }
+> +EXPORT_SYMBOL(pci_stop_root_bus);
+>  
+>  void pci_remove_root_bus(struct pci_bus *bus)
+>  {
+> @@ -158,3 +159,4 @@ void pci_remove_root_bus(struct pci_bus *bus)
+>  	/* remove the host bridge */
+>  	device_unregister(&host_bridge->dev);
+>  }
+> +EXPORT_SYMBOL(pci_remove_root_bus);
+> diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
+> index e3e17f3..932c9e5 100644
+> --- a/drivers/pci/setup-bus.c
+> +++ b/drivers/pci/setup-bus.c
+> @@ -1750,3 +1750,4 @@ void pci_assign_unassigned_bus_resources(struct pci_bus *bus)
+>  	__pci_bus_assign_resources(bus, &add_list, NULL);
+>  	BUG_ON(!list_empty(&add_list));
+>  }
+> +EXPORT_SYMBOL(pci_assign_unassigned_bus_resources);
+> diff --git a/drivers/pci/setup-irq.c b/drivers/pci/setup-irq.c
+> index 4e2d595..9d2bbb6 100644
+> --- a/drivers/pci/setup-irq.c
+> +++ b/drivers/pci/setup-irq.c
+> @@ -65,3 +65,4 @@ void pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+>  	for_each_pci_dev(dev)
+>  		pdev_fixup_irq(dev, swizzle, map_irq);
+>  }
+> +EXPORT_SYMBOL(pci_fixup_irqs);
 
-The switches on r8a73a4/ape6evm do not have pull-up registers.  The
-schematics say: "Need to use APE6 internal PullUp", hence enable pull-up
-using pinctrl.
 
-Without this, the switches don't really work, as the GPIO inputs are
-more likely to pick up ghost signals through capacitive coupling than
-actual keypresses.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a73a4-ape6evm.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-index e8f3f38..9734dd7 100644
---- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-+++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-@@ -123,6 +123,9 @@
- 	keyboard {
- 		compatible = "gpio-keys";
- 
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&keyboard_pins>;
-+
- 		zero-key {
- 			gpios = <&pfc 324 GPIO_ACTIVE_LOW>;
- 			linux,code = <KEY_0>;
-@@ -208,6 +211,12 @@
- 		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
- 		renesas,function = "sdhi1";
- 	};
-+
-+	keyboard_pins: keyboard {
-+		renesas,pins = "PORT324", "PORT325", "PORT326", "PORT327",
-+			       "PORT328", "PORT329";
-+		bias-pull-up;
-+	};
- };
- 
- &mmcif0 {
--- 
-2.1.4
+Why not EXPORT_SYMBOL_GPL for all of these?  Some of these seem fairly
+close to PCI core functionality for arbitrarily licensed modules.
