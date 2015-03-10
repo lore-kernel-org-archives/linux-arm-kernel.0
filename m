@@ -1,68 +1,77 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 10 Mar 2015 16:47:27 -0500
-Subject: [PATCH 1/5] of/fdt: allow FDT virtual address outside of linear
- direct mapping
-In-Reply-To: <1425380630-3684-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
- <1425380630-3684-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAL_JsqL=hgQWM93tgp3cCWU290-fbj37LtvqLWFo+vPFVYws3A@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Tue, 10 Mar 2015 18:01:36 -0400
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <10886228.vUHyKm1ubP@wuerfel>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
+ <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
+ <10886228.vUHyKm1ubP@wuerfel>
+Message-ID: <CAF6AEGvquV=RMv87CAP4C8JHXjjMk4Xbn1oD4pYcq0YaSFLL+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 3, 2015 at 5:03 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> The early FDT code reserves the physical region that contains the
-> FDT, and uses __pa() to calculate the FDT's physical address.
-> However, if the FDT is mapped outside of the linear direct mapping,
-> __pa() cannot be used.
+On Tue, Mar 10, 2015 at 3:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 10 March 2015 13:10:08 Kumar Gala wrote:
+>> >>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>> >>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>> >>>>>>>>>> utilized and passed to the kernel.
+>> >>>>>>>>>>
+>> >>>>>>>>>> Cc: <devicetree@vger.kernel.org>
+>> >>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>> >>>>>>>>>
+>> >>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>> >>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
+>> >>>>>>>>>
+>> >>>>>>>>> Kevin
+>> >>>>>>>>
+>> >>>>>>>> yes
+>> >>>>>>>
+>> >>>>>>> That's a bummer.
+>> >>>>>>>
+>> >>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
+>> >>>>>>> one devicetree, and it'll be used, right?
+>> >>>>>>
+>> >>>>>> We can provide only one, we still need the IDs in the DT.
+>> >>>>>
+>> >>>>> How are the DTS provided? Concatenated with the kernel, or in a
+>> >>>>> wrapped data format? Or in a separate partition from the kernel?
+>> >>>>
+>> >>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+>> >>>
+>> >>> Then you should be able to create a tool that can write this concatenated
+>> >>> format and insert these properties from a table that matches the boot
+>> >>> loader, right?
+>> >>>
+>> >>>      Arnd
+>> >>
+>> >> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
+>> >
+>> > To insert platform-local properties that mean nothing outside of the
+>> > firmware packaging of the device trees, which is the case here?
+>> >
+>> > I think the idea of having the installer script inserting them is
+>> > quite reasonable in this case.
+>> >
+>> >
+>> > -Olof
+>>
+>> These values are static, so not sure what the point of having the installer script do that?
+>>
 >
-> So create a __weak default wrapper called fdt_virt_to_phys() around
-> __pa(), and use that instead. This allows architectures to drop in
-> their own virt/phys mapping for the FDT blob.
+> It combines two hacks to work around a nonstandard boot loader.
+> Once the bootloader is fixed, you can stop using that script.
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->
-> I am aware that __weak functions are generally frowned upon, but in this
-> case, I wonder if it is worth the trouble to add arch specific header files
-> so we can include them here.
->
->  drivers/of/fdt.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 3a896c9aeb74..b10ce880000b 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -547,6 +547,18 @@ static int __init __fdt_scan_reserved_mem(unsigned long node, const char *uname,
->  }
->
->  /**
-> + * fdt_virt_to_phys - translate a virtual address inside the FDT image
-> + *                    to its corresponding physical address
-> + *
-> + * This needs to be overridden by the architecture if the virtual mapping
-> + * of the FDT is separate from the linear direct mapping of system RAM
-> + */
-> +phys_addr_t __weak __init fdt_virt_to_phys(void *virt)
-> +{
-> +       return __pa(virt);
-> +}
-> +
-> +/**
->   * early_init_fdt_scan_reserved_mem() - create reserved memory regions
->   *
->   * This function grabs memory from early allocator for device exclusive use
-> @@ -562,7 +574,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
->                 return;
->
->         /* Reserve the dtb region */
-> -       early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
-> +       early_init_dt_reserve_memory_arch(fdt_virt_to_phys(initial_boot_params),
 
-This is already a weak function call, so I'd rather change
-early_init_dt_reserve_memory_arch to take the virt address and do the
-conversion inside it. Or we could just pass both addresses from the
-arch code to the core code.
+still sounds like an extra hurdle for distro's..  can't you just add
+the extra entry in the dts files w/ a comment about workaround for
+bootloader (and then possibly *not* document the property)?
 
-Rob
+BR,
+-R
+
+>         Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
