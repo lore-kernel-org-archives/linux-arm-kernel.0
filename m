@@ -1,140 +1,66 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 11 Mar 2015 10:12:13 +1100
-Subject: [RFC V2 04/12] i2c: opal: make use of the new infrastructure
- for quirks
-In-Reply-To: <54FF2631.9050006@linux.vnet.ibm.com>
-References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
- <1424880126-15047-5-git-send-email-wsa@the-dreams.de>
- <54FF2631.9050006@linux.vnet.ibm.com>
-Message-ID: <1426029133.17565.9.camel@kernel.crashing.org>
+From: joshc@ni.com (Josh Cartwright)
+Date: Tue, 10 Mar 2015 18:57:51 -0500
+Subject: [PATCH] dma: Add Xilinx ZDMA device tree Binding Documentation
+In-Reply-To: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
+References: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
+Message-ID: <20150310235751.GC27583@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-10 at 22:43 +0530, Neelesh Gupta wrote:
-> I tested the i2c opal driver after updating the patch as below.
-> Basically I think we can also support write-then-{read/write}
-> for the number of messages = 2.
-> Ben, any issues if we support both write plus read/write in the
-> opal driver ?
-
-Nope, in fact it's a good idea, I found myself having to expoes such
-an interface to some userspace tool of ours.
-
-However...
-
-> diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
-> index 16f90b1..85412ba 100644
-> --- a/drivers/i2c/busses/i2c-opal.c
-> +++ b/drivers/i2c/busses/i2c-opal.c
-> @@ -104,18 +104,8 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
->   		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
->   		break;
->   	case 2:
-> -		/* For two messages, we basically support only simple
-> -		 * smbus transactions of a write plus a read. We might
-> -		 * want to allow also two writes but we'd have to bounce
-> -		 * the data into a single buffer.
-> -		 */
-> -		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
-> -			return -EOPNOTSUPP;
-
-Don't we still want to enforce that the first message is a write ?
-Somebody may not be looking at the quirks...
-
-> -		if (msgs[0].len > 4)
-> -			return -EOPNOTSUPP;
-
-And that the len is supported...
-
-> -		if (msgs[0].addr != msgs[1].addr)
-> -			return -EOPNOTSUPP;
-
-Same...
-
-Ie, the quirk indicates to the callers what we support, but we should
-still check that we aren't called with something that doesn't match.
-
-> -		req.type = OPAL_I2C_SM_READ;
-> +		req.type = (msgs[1].flags & I2C_M_RD) ?
-> +			OPAL_I2C_SM_READ : OPAL_I2C_SM_WRITE;
->   		req.addr = cpu_to_be16(msgs[0].addr);
->   		req.subaddr_sz = msgs[0].len;
->   		for (i = 0; i < msgs[0].len; i++)
-> @@ -210,6 +200,11 @@ static const struct i2c_algorithm i2c_opal_algo = {
->   	.functionality	= i2c_opal_func,
->   };
+On Tue, Mar 10, 2015 at 07:46:23PM +0530, Punnaiah Choudary Kalluri wrote:
+> Device-tree binding documentation for Xilinx ZDMA Engine
 > 
-> +static struct i2c_adapter_quirks i2c_opal_quirks = {
-> +	.flags = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | I2C_AQ_COMB_SAME_ADDR,
-> +	.max_comb_1st_msg_len = 4,
-> +};
+> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+> ---
+
+Hey Punnaiah-
+
+Was this intended to be sent out with a driver?
+
+>  .../devicetree/bindings/dma/xilinx/zdma.txt        |   76 ++++++++++++++++++++
+>  1 files changed, 76 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zdma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zdma.txt b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
+> new file mode 100644
+> index 0000000..399a3bc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
+> @@ -0,0 +1,76 @@
+> +Xilinx ZDMA engine, it does support memory to memory transfers,
+> +memory to device and device to memory transfers. It also has flow
+> +control and rate control support for slave/peripheral dma access.
 > +
->   static int i2c_opal_probe(struct platform_device *pdev)
->   {
->   	struct i2c_adapter	*adapter;
-> @@ -232,6 +227,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
-> 
->   	adapter->algo = &i2c_opal_algo;
->   	adapter->algo_data = (void *)(unsigned long)opal_id;
-> +	adapter->quirks = &i2c_opal_quirks;
->   	adapter->dev.parent = &pdev->dev;
->   	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
->   	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
-> 
-> 
-> 
-> On 02/25/2015 09:31 PM, Wolfram Sang wrote:
-> > From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >
-> > Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > ---
-> >   drivers/i2c/busses/i2c-opal.c | 22 +++++++++++-----------
-> >   1 file changed, 11 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
-> > index 16f90b1a750894..b2788ecad5b3cb 100644
-> > --- a/drivers/i2c/busses/i2c-opal.c
-> > +++ b/drivers/i2c/busses/i2c-opal.c
-> > @@ -104,17 +104,6 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> >   		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
-> >   		break;
-> >   	case 2:
-> > -		/* For two messages, we basically support only simple
-> > -		 * smbus transactions of a write plus a read. We might
-> > -		 * want to allow also two writes but we'd have to bounce
-> > -		 * the data into a single buffer.
-> > -		 */
-> > -		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
-> > -			return -EOPNOTSUPP;
-> > -		if (msgs[0].len > 4)
-> > -			return -EOPNOTSUPP;
-> > -		if (msgs[0].addr != msgs[1].addr)
-> > -			return -EOPNOTSUPP;
-> >   		req.type = OPAL_I2C_SM_READ;
-> >   		req.addr = cpu_to_be16(msgs[0].addr);
-> >   		req.subaddr_sz = msgs[0].len;
-> > @@ -210,6 +199,16 @@ static const struct i2c_algorithm i2c_opal_algo = {
-> >   	.functionality	= i2c_opal_func,
-> >   };
-> >   
-> > +/* For two messages, we basically support only simple
-> > + * smbus transactions of a write plus a read. We might
-> > + * want to allow also two writes but we'd have to bounce
-> > + * the data into a single buffer.
-> > + */
-> > +static struct i2c_adapter_quirks i2c_opal_quirks = {
-> > +	.flags = I2C_AQ_COMB_WRITE_THEN_READ,
-> > +	.max_comb_1st_msg_len = 4,
-> > +};
-> > +
-> >   static int i2c_opal_probe(struct platform_device *pdev)
-> >   {
-> >   	struct i2c_adapter	*adapter;
-> > @@ -232,6 +231,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
-> >   
-> >   	adapter->algo = &i2c_opal_algo;
-> >   	adapter->algo_data = (void *)(unsigned long)opal_id;
-> > +	adapter->quirks = &i2c_opal_quirks;
-> >   	adapter->dev.parent = &pdev->dev;
-> >   	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
-> >   	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
+> +Xilinx ZynqMP has two instances of general purpose DMA(ZDMA).
+> +one is located in FPD(full power domain) and other is located in
+> +LPD(low power domain).
+> +
+> +ZDMA instance located in FPD is referred as FPDMA and instance located
+> +in LPD is referred as LPDMA.
+> +
+> +FPDMA is configured with 8 DMA channels and AXI bus width is 128 byte.
+> +LPDMA is configured with 8 DMA channels and AXI bus width is 64 byte.
+> +
+> +Each channel in a instance has its own address space and interrupt line
+                   ^an
+
+> +but shares common reference and APB clock. So, each channel will be treated
+> +as a standalone dma device.
+
+Does your example below then describe only a single channel?  Or, should
+I expect to see sub-nodes representing each of the dma channels?
+
+> +Since its a general purpose dma controller, it has a rich set of configurable
+> +options with respect to data and descriptor attributes.
+> +
+> +Required properties:
+> +- compatible: Should be "xlnx,fpdma-1.0" or "xlnx,lpdma-1.0"
+> +- reg: Memory map for dma module access.
+> +- interrupt-parent: Interrupt controller the interrupt is routed through
+> +- interrupts: Should contain DMA channel interrupt.
+> +- xlnx,id: Channel Id
+
+I would have expected, as a dma controller, to see a #dma-cells here,
+and a tie-in to the existing Documentation/devicetree/bindings/dma/dma.txt documentation.
+
+  Josh
