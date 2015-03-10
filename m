@@ -1,75 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 10 Mar 2015 14:05:57 -0500
-Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
- find ports by id
-In-Reply-To: <20150310154253.GO8656@n2100.arm.linux.org.uk>
-References: <1425369592.3146.14.camel@pengutronix.de>
- <1426001087.3141.46.camel@pengutronix.de>
- <20150310154253.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 10 Mar 2015 19:06:58 +0000
+Subject: [PATCH v2 0/3] arm64: KVM: High memory guest fixes
+Message-ID: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 10:42 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 10, 2015 at 04:24:47PM +0100, Philipp Zabel wrote:
->> Hi Grant, Rob,
->>
->> Am Dienstag, den 03.03.2015, 08:59 +0100 schrieb Philipp Zabel:
->> > Hi Grant, Rob,
->> >
->> > this series has been around for quite some time now, basically unchanged
->> > except for adding fixes for new users of the API that keep appearing
->> > over time in different subsystems.
->> >
->> > It would be really helpful to get this merged for v4.0. Could you still
->> > make this happen?
->> >
->> > Alternatively, could I please get your ack to allow this tag to be
->> > merged into the other subsystem trees for v4.1 so that patches that
->> > depend on it don't have to wait for yet another merge window?
->>
->> The question still stands. It would be great to hear from you and maybe
->> get this change in at least in time for v4.1.
->
-> Let's look at the history.
->
-> 10-03-2015: This reminder
-> 03-03-2015: Pull request (ignored from what can be seen)
-> 01-03-2015: Request from Laurent about what's happening
-> 27-02-2015: Reminder
-> 23-02-2015: Re-base (and version 8) due to conflicts
-> 11-02-2015: Reminder
-> 22-01-2015: Pull request
-> 23-12-2014: Version 7
->
-> During that time, there's not been one peep from Rob or Grant on this.
+I've been playing with a hacked-up kvmtool that places the memory much
+higher than usual, in an effort to emulate what some arm64 platforms
+do (typically AMD Seattle).
 
-I've only been copied on this latest pull request and a version from
-March of last year which Grant nak'ed. This series did not go to
-devicetree list either.
+Unexpectedly (hey, what could possibly go wrong...), I've discovered a
+couple of mm related issues, ranging from the host exploding to the
+guest being stuck on a page fault. Additionally, I noticed a minor
+documentation issue.
 
-I'll take a look at the series. If there is an explanation of how
-Grant's nak was addressed that would speed up my review. I'm not
-applying for v4.0 though.
+With these fixes in, I'm able to run a guest that has its memory
+located just under the 40bit limit.
 
-Rob
+* From v1 [1]:
+- Reworked patch #1 to use split_page() instead. This leads to much
+  refactoring, but is slightly nicer (more common code).
+- Dropped Mark's Tested-by (too many changes)
 
-> At what point has there been enough pestering that it's sufficient to
-> bypass an apparently uninterested maintainer, who can't be bothered to
-> say yes or no to a set of patches?
->
-> For such a key subsystem in the kernel, this is bad.  If Grant isn't
-> interested in performing a maintainer role, I'd be willing to pick up
-> that function (which'll be ironic, because that's the kind of thing
-> that Linaro's been doing to me over the last few years... picking
-> stuff off my plate without any discussion or agreement with me first,
-> leaving me with almost nothing to do.  No, I'm not pissed at that...
-> not much.)
->
-> I guess if you were to submit patches to Andrew, Andrew may take them
-> in this circumstance and eventually send them on to Linus.  Andrew?
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2015-February/013672.html
+
+Marc Zyngier (3):
+  arm64: KVM: Fix stage-2 PGD allocation to have per-page refcounting
+  arm64: KVM: Do not use pgd_index to index stage-2 pgd
+  arm64: KVM: Fix outdated comment about VTCR_EL2.PS
+
+ arch/arm/include/asm/kvm_mmu.h   | 12 ++----
+ arch/arm/kvm/mmu.c               | 85 ++++++++++++++++++++++++++++++----------
+ arch/arm64/include/asm/kvm_arm.h |  5 ++-
+ arch/arm64/include/asm/kvm_mmu.h | 48 +++--------------------
+ 4 files changed, 77 insertions(+), 73 deletions(-)
+
+-- 
+2.1.4
