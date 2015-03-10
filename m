@@ -1,74 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Mar 2015 10:43:37 +0100
-Subject: [PATCH 2/3] drm/bridge: dw-hdmi: support optional supply
- regulators
-In-Reply-To: <1425979013.3141.17.camel@pengutronix.de>
-References: <1429128.MSqYm0qZ9p@phil> <2297963.iMSNqyfSUx@phil>
- <1425979013.3141.17.camel@pengutronix.de>
-Message-ID: <79223422.KFbmI1BzE4@phil>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 10 Mar 2015 09:52:32 +0000
+Subject: [PATCH v2] drivers/base: cacheinfo: validate device node for
+ all the caches
+In-Reply-To: <1424709159-13152-1-git-send-email-sudeep.holla@arm.com>
+References: <1424095816-4414-1-git-send-email-sudeep.holla@arm.com>
+ <1424709159-13152-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <54FEBEE0.2030703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Greg,
 
-Am Dienstag, 10. M?rz 2015, 10:16:53 schrieb Philipp Zabel:
+On 23/02/15 16:32, Sudeep Holla wrote:
+> On architectures that depend on DT for obtaining cache hierarcy, we need
+> to validate the device node for all the cache indices, failing to do so
+> might result in wrong information being exposed to the userspace.
+>
+> This is quite possible on initial/incomplete versions of the device
+> trees. In such cases, it's better to bail out if all the required device
+> nodes are not present.
+>
+> This patch adds checks for the validation of device node for all the
+> caches and doesn't initialise the cacheinfo if there's any error.
+>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>   drivers/base/cacheinfo.c | 13 +++++++++++--
+>   1 file changed, 11 insertions(+), 2 deletions(-)
+>
+> v1->v2:
+>   - Updated log information as suggested by Mark
+>   - Added Mark's ACK
+>
+> Hi Greg,
+>
+> Can you please pick this fix for the next rc ?
+>
+> Without this there's possibility that erroneous information is exposed
+> to userspace on architecture depending on DT especially if DT lacks
+> cache hierarchy information.
+>
 
-[cut the obvious stuff I need to fix]
+There are many arm64 DT without cache hierarchy which exposes wrong
+cacheinfo to the user space. It would be good to get this included
+as bug fix for 4.0
 
-> Am Dienstag, den 10.03.2015, 00:22 +0100 schrieb Heiko Stuebner:
-> > @@ -879,6 +883,12 @@ static int dw_hdmi_phy_init(struct dw_hdmi *hdmi)
-> > 
-> >  	int i, ret;
-> >  	bool cscon = false;
-> > 
-> > +	if (hdmi->nsupplies > 0) {
-> > +		ret = regulator_bulk_enable(hdmi->nsupplies, hdmi->supplies);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> 
-> Are these really supplies to the PHY or is this just a convenient place
-> to enable them? Looking at the i.MX6 docs, I suppose yes.
-
-According to the TRM, the supplies are "DC supply voltage for Analog part of 
-HDMI", so I'd think phy supplies.
-
-> 
-> >  	/*check csc whether needed activated in HDMI mode */
-> >  	cscon = (is_color_space_conversion(hdmi) &&
-> >  	
-> >  			!hdmi->hdmi_data.video_mode.mdvi);
-> > 
-> > @@ -1105,6 +1115,9 @@ static void dw_hdmi_phy_disable(struct dw_hdmi
-> > *hdmi)
-> > 
-> >  	dw_hdmi_phy_enable_tmds(hdmi, 0);
-> >  	dw_hdmi_phy_enable_power(hdmi, 0);
-> > 
-> > +	if (hdmi->nsupplies > 0)
-> > +		regulator_bulk_disable(hdmi->nsupplies, hdmi->supplies);
-> > +
-> > 
-> >  	hdmi->phy_enabled = false;
-> >  
-> >  }
-> > 
-> > @@ -1549,7 +1562,8 @@ static int dw_hdmi_register(struct drm_device *drm,
-> > struct dw_hdmi *hdmi)> 
-> >  int dw_hdmi_bind(struct device *dev, struct device *master,
-> >  
-> >  		 void *data, struct drm_encoder *encoder,
-> >  		 struct resource *iores, int irq,
-> > 
-> > -		 const struct dw_hdmi_plat_data *plat_data)
-> > +		 const struct dw_hdmi_plat_data *plat_data,
-> > +		 struct regulator_bulk_data *supplies, int nsupplies)
-> 
-> I'm not sure I like this function sprouting so many parameters. Is there
-> a good reason not to add this to struct dw_hdmi_plat_data?
-
-Nope, moving this to platdata sound sensible and I'll give this a try :-)
-
-
-Heiko
+Regards,
+Sudeep
