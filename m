@@ -1,47 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Mar 2015 09:42:09 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.1
-Message-ID: <cover.1425947508.git.horms+renesas@verge.net.au>
+Date: Tue, 10 Mar 2015 09:43:02 +0900
+Subject: [PATCH 1/3] ARM: shmobile: Remove stray closing parenthesis in debug
+ description
+In-Reply-To: <cover.1425947508.git.horms+renesas@verge.net.au>
+References: <cover.1425947508.git.horms+renesas@verge.net.au>
+Message-ID: <6b9d3306b335c9643ee9d09e67be50d6f7e90b42.1425947508.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
+Remove the stray closing parenthesis in the config description for the
+DEBUG_RCAR_GEN2_SCIF0 option.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-soc-cleanup-for-v4.1,
-which you have already pulled.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/Kconfig.debug | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-The following changes since commit fd9454ab51fa92f43ae5b7a71c42f2ee8417c2a2:
-
-  ARM: shmobile: r8a7779: Remove redundant cpu_disable implementation (2015-02-24 07:12:16 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanup2-for-v4.1
-
-for you to fetch changes up to 82fbf29f26733dd38bd2ab17db04e0aa46ef3857:
-
-  ARM: shmobile: r8a7740: Remove restart callback (2015-03-01 10:59:16 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Cleanup for v4.1
-
-* Remove restart callback from r8a7740 SoC
-* Remove unecessary check on always set CONFIG_COMMON_CLK from
-  shared R-Car Gen2 SoC code
-* Remove stray closing parenthesis in SCIF debug description
-  for R-Car Gen2 SoCa
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: Remove stray closing parenthesis in debug description
-      ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
-      ARM: shmobile: r8a7740: Remove restart callback
-
- arch/arm/Kconfig.debug                   | 2 +-
- arch/arm/mach-shmobile/setup-r8a7740.c   | 8 --------
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
- 3 files changed, 1 insertion(+), 13 deletions(-)
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 1ca8dc7..3809ac9 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -806,7 +806,7 @@ choice
+ 		  via SCIF2 on Renesas R-Car H1 (R8A7779).
+ 
+ 	config DEBUG_RCAR_GEN2_SCIF0
+-		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793)"
++		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793"
+ 		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793
+ 		help
+ 		  Say Y here if you want kernel low-level debugging support
+-- 
+2.1.4
