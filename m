@@ -1,75 +1,76 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 10 Mar 2015 09:27:07 +0100
-Subject: [PATCH v6 03/22] power_supply: Add driver private data
+Date: Tue, 10 Mar 2015 09:27:11 +0100
+Subject: [PATCH v6 07/22] power_supply: 88pm860x_charger: Use power_supply_*()
+ API for accessing function attrs
 In-Reply-To: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
 References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1425976046-20973-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1425976046-20973-8-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow drivers to store private data inside power_supply structure for
-later usage in power supply operations.
-
-Usage of driver private data is necessary to access driver's state
-container object from power supply calls (like get_property()) if struct
-'power_supply' is a stored there as a pointer, for example:
-
-struct some_driver_info {
-	struct i2c_client       *client;
-	struct power_supply     *power_supply;
-	...
-}
-
-In such case one cannot use container_of() and must store pointer to
-state container as private data.
+Replace direct calls to power supply function attributes with wrappers.
+Wrappers provide safe access in case of unregistering the power
+supply (e.g. by removing the driver). Replace:
+ - get_property -> power_supply_get_property
+ - set_property -> power_supply_set_property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Reviewed-by: Sebastian Reichel <sre@kernel.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- drivers/power/power_supply_core.c | 6 ++++++
- include/linux/power_supply.h      | 4 ++++
- 2 files changed, 10 insertions(+)
+ drivers/power/88pm860x_charger.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/power/power_supply_core.c b/drivers/power/power_supply_core.c
-index 44c810456212..1c0978f961ea 100644
---- a/drivers/power/power_supply_core.c
-+++ b/drivers/power/power_supply_core.c
-@@ -674,6 +674,12 @@ void power_supply_unregister(struct power_supply *psy)
- }
- EXPORT_SYMBOL_GPL(power_supply_unregister);
+diff --git a/drivers/power/88pm860x_charger.c b/drivers/power/88pm860x_charger.c
+index ac352a6c03ea..98e31419d9cf 100644
+--- a/drivers/power/88pm860x_charger.c
++++ b/drivers/power/88pm860x_charger.c
+@@ -296,12 +296,13 @@ static int set_charging_fsm(struct pm860x_charger_info *info)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		return -EINVAL;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&data);
+ 	if (ret)
+ 		return ret;
+ 	vbatt = data.intval / 1000;
  
-+void *power_supply_get_drvdata(struct power_supply *psy)
-+{
-+	return psy->drv_data;
-+}
-+EXPORT_SYMBOL_GPL(power_supply_get_drvdata);
-+
- static int __init power_supply_class_init(void)
- {
- 	power_supply_class = class_create(THIS_MODULE, "power_supply");
-diff --git a/include/linux/power_supply.h b/include/linux/power_supply.h
-index f606d6b4bd56..e30d85c0158d 100644
---- a/include/linux/power_supply.h
-+++ b/include/linux/power_supply.h
-@@ -209,6 +209,9 @@ struct power_supply {
- 	/* For APM emulation, think legacy userspace. */
- 	int use_for_apm;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &data);
+ 	if (ret)
+ 		return ret;
  
-+	/* Driver private data */
-+	void *drv_data;
-+
- 	/* private */
- 	struct device *dev;
- 	struct work_struct changed_work;
-@@ -285,6 +288,7 @@ extern int devm_power_supply_register_no_ws(struct device *parent,
- extern void power_supply_unregister(struct power_supply *psy);
- extern int power_supply_powers(struct power_supply *psy, struct device *dev);
+@@ -430,7 +431,7 @@ static irqreturn_t pm860x_temp_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_TEMP, &temp);
+ 	if (ret)
+ 		goto out;
+ 	value = temp.intval / 10;
+@@ -485,7 +486,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	psy = power_supply_get_by_name(pm860x_supplied_to[0]);
+ 	if (!psy)
+ 		goto out;
+-	ret = psy->get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
++	ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_VOLTAGE_NOW,
++			&val);
+ 	if (ret)
+ 		goto out;
+ 	vbatt = val.intval / 1000;
+@@ -500,7 +502,8 @@ static irqreturn_t pm860x_done_handler(int irq, void *data)
+ 	if (ret < 0)
+ 		goto out;
+ 	if (vbatt > CHARGE_THRESHOLD && ret & STATUS2_CHG)
+-		psy->set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL, &val);
++		power_supply_set_property(psy, POWER_SUPPLY_PROP_CHARGE_FULL,
++				&val);
  
-+extern void *power_supply_get_drvdata(struct power_supply *psy);
- /* For APM emulation, think legacy userspace. */
- extern struct class *power_supply_class;
- 
+ out:
+ 	mutex_unlock(&info->lock);
 -- 
 1.9.1
