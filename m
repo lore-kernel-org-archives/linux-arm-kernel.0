@@ -1,100 +1,108 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 10 Mar 2015 19:35:19 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
- XP SOCs
-In-Reply-To: <20150310190507.64b3c153@free-electrons.com>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
- <20150310190507.64b3c153@free-electrons.com>
-Message-ID: <54FF3967.1090602@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 10 Mar 2015 19:44:49 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
+In-Reply-To: <54FED277.4040000@redhat.com>
+References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
+ <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
+ <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
+ <20150303135847.GH4911@lukather> <54FED277.4040000@redhat.com>
+Message-ID: <20150310184449.GZ5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 07:05 PM, Thomas Petazzoni wrote:
-> Hello Daniel,
->
-> I know you suggested a more rigorous method of determining the exit
-> latency and target residency times, but would it be nonetheless
-> possible to apply this patch, which clearly improves performance a lot,
-> and actually makes the code match the values used in the vendor kernel?
->
-> I also think this patch should be marked for stable, it fixes values
-> introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
-> should therefore be backported all the way to v3.16.
+On Tue, Mar 10, 2015 at 12:16:07PM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 03-03-15 14:58, Maxime Ripard wrote:
+> >On Tue, Mar 03, 2015 at 02:20:31PM +0100, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 03-03-15 09:22, Maxime Ripard wrote:
+> >>>On Tue, Mar 03, 2015 at 08:55:36AM +0100, Hans de Goede wrote:
+> >>>>>>+/ {
+> >>>>>>+	model = "Mele I7 Quad top set box";
+> >>>>>>+	compatible = "mele,i7", "allwinner,sun6i-a31";
+> >>>>>>+
+> >>>>>>+	chosen {
+> >>>>>>+		bootargs = "earlyprintk console=ttyS0,115200";
+> >>>>>
+> >>>>>Using earlyprintk by default is a bad idea if the kernel is configured
+> >>>>>with DEBUG_LL support for another SoC.
+> >>>>
+> >>>>While on this subject, u-boot now sets the chosen/stdout-path property
+> >>>>up by default, which means that the kernel will do the right thing by
+> >>>>default. So we we really do not need any bootargs= in our dts files.
+> >>>
+> >>>I just tested that this weekend, and it turned out that the kernel
+> >>>couldn't use it so far (ie, no output until init takes over and setup
+> >>>a TTY on ttyS0).
+> >>>
+> >>>Was it working for you?
+> >>
+> >>Yes, note that the kernel only honors the stdout-path property if
+> >>there is no console= argument present if there is a console= argument
+> >>present on the kernel cmdline then that will overrule the stdout-path
+> >>property
+> >
+> >Yeah, I removed the bootargs entirely.
+> >
+> >>Which board did you test with, and what u-boot and kernel version ?
+> >
+> >I tested it on my A31 hummingbird, with allwinner's u-boot, but with
+> >/chosen/stdout-path hardcoded to "serial0:115200n8", with a 4.0-rc1
+> >kernel.
+> 
+> I'm not sure if stdout-path supports aliases this is what u-boot is using,
+> and which works fine (with 4.0-rc1 kernel): "/soc at 01c00000/serial at 01c28000:115200"
 
-I don't have a problem to apply this patch. But I would like to have 
-confirmation from one of the Armada maintainers the tradeoff is accepted 
-(less energy saving for more performance).
+I gave that another try, and it worked like a charm, so it really
+looks like an instance of PEBKAC.
 
+> >But it might very well just be me. We just tested it on a Marvell
+> >board (that uses the same serial driver) this morning and it was fine,
+> >so I don't think it's really worth worrying about this :)
+> >
+> >>>>Currently we've a random mix where we do have bootargs in some, but
+> >>>>not in most sunxi dts files. I believe we should simply remove it
+> >>>>everywhere...
+> >>>
+> >>>We used to set them in SoCs that are not supported by U-boot yet, and
+> >>>where the bootloader won't come and patch the DT (A31, A23, A80).
+> >>
+> >>Ah, so that is (was) the logic, following that logic we should probably
+> >>remove bootargs= from at least the a23 and a31 boards (basically
+> >>from all boards but a80).
+> >
+> >I'm not so sure about the A31, since most boards won't even boot by
+> >default on the SD card
+> 
+> True.
+> 
+> > and we have no way to replace U-Boot in NAND
+> >so far (afaik). But replacing them by stdout-path is a very good
+> >solution too.
+> 
+> You mean putting stdout-path in the dts, I'm not sure if I like that,
+> to me both bootargs and stdout-path are something which should be
+> left to the bootloader to set. But I understand that when not
+> using upstream u-boot that may be an issue.
 
-> On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
->> Originally, the thresholds used in the cpuidle driver for Armada SOCs
->> were temporarily chosen, leaving room for improvements.
->>
->> This commit updates the thresholds for the Armada XP SOCs with values
->> that positively impact performances:
->>
->>                                  without patch  with patch   vendor kernel
->>   - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
->>   - ioping tmpfs (iops)          ~163k          ~206k        ~179k
->>   - ioping tmpfs (mib/s)         ~636           ~805         ~699
->>
->> The idle power consumption is negatively impacted (proportionally less
->> than the performance gain), and we are still performing better than
->> the vendor kernel here:
->>
->>                                  without patch   with patch  vendor kernel
->>   - power consumption idle (W)   ~2.4            ~3.2        ~4.4
->>   - power consumption busy (W)   ~8.6            ~8.3        ~8.6
->>
->> There is still room for improvement regarding the value of these
->> thresholds, they were chosen to mimic the vendor kernel.
->>
->> This patch only impacts Armada XP SOCs and was tested on Online Labs
->> C1 boards. A similar approach can be taken to improve the performances
->> of the Armada 370 and Armada 38x SOCs.
->>
->> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
->> for the discussions and tips around this topic.
->>
->> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
->> ---
->>   drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
->>   1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
->> index 38e6861..3716a1f 100644
->> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
->> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
->> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
->>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->>   	.states[1]		= {
->>   		.enter			= mvebu_v7_enter_idle,
->> -		.exit_latency		= 10,
->> +		.exit_latency		= 100,
->>   		.power_usage		= 50,
->> -		.target_residency	= 100,
->> +		.target_residency	= 1000,
->>   		.name			= "MV CPU IDLE",
->>   		.desc			= "CPU power down",
->>   	},
->>   	.states[2]		= {
->>   		.enter			= mvebu_v7_enter_idle,
->> -		.exit_latency		= 100,
->> +		.exit_latency		= 1000,
->>   		.power_usage		= 5,
->> -		.target_residency	= 1000,
->> +		.target_residency	= 10000,
->>   		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
->>   		.name			= "MV CPU DEEP IDLE",
->>   		.desc			= "CPU and L2 Fabric power down",
->
->
->
+I know that some other platforms ask for stdout-path when they review
+it, because iirc, barebox uses it to know on which console to output
+its log and export its shell, which is also a valid interpretation of
+that property, and, contrary to bootargs, doesn't really imply that
+the bootloader should update it.
 
+Maxime
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/3ebd6a9a/attachment-0001.sig>
