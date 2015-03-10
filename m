@@ -1,71 +1,229 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 10 Mar 2015 14:12:14 +0530
-Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
- <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
- <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
- <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
-Message-ID: <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 10 Mar 2015 09:47:44 +0100
+Subject: [PATCH v2 1/5] crypto/arm: move ARM specific Kconfig definitions to a
+ dedicated file
+In-Reply-To: <1425977268-27835-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425977268-27835-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1425977268-27835-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping?
+This moves all Kconfig symbols defined in crypto/Kconfig that depend
+on CONFIG_ARM to a dedicated Kconfig file in arch/arm/crypto, which is
+where the code that implements those features resides as well.
 
-On Tue, Feb 24, 2015 at 2:22 PM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Hi Arnd,
->
-> On Fri, Jan 23, 2015 at 6:07 PM, Ganapatrao Kulkarni
-> <gpkulkarni@gmail.com> wrote:
->> Hi Arnd,
->>
->> On Thu, Jan 22, 2015 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
->>>>
->>>> This seems wrong still: The clusters and cores do not have unique
->>>> numbers. I believe the code will not work correctly, and it won't
->>>> be compliant with the binding from patch 2.
->>>>
->>>> I think the right way here would be to use
->>>>
->>>>         arm,associativity = <0 2 47>;
->>>>
->>>> for cpu at 20f, and
->>>>
->>>>         arm,associativity = <1 3 48>;
->>>>
->>>> for cpu at 10000. Your previous version used the numbers from
->>>> the reg property, which should be fine as well if that helps:
->>>>
->>>>
->>>>         arm,associativity = <0x0 0x200 0x20f>;
->>>>
->>>>         arm,associativity = <0x10000 0x10000 0x10000>;
->>>>
->>>> which should have the same effect as above, as long as the code
->>>> can handle the numbers not being consecutive.
->>>>
->>>>
->>>
->>> Upon further consideration, I think your patch is correct after
->>> all, but let me check again on PowerPC machines.
->> i have removed, board id which was in previous patch, to keep the
->> associativity aligned to mpidr, ie. socket,cluster id and core id.
->> both previous and current mappings holds good for our design.
->> our topology is 2 sockets(aff2=0and 1) , each having 3
->> clusters(aff1=0to2)and each cluster having 16 cores(aff0:0to15)
->> in associativity property, for our case, only first id(socket id) is
->> mapped to numa, others are mentioned only to describe the topology.
->>>
->>>         Arnd
-> any further comments, how we go about these patches?
-> please suggest.
->
->> thanks
->> Ganapat
->
-> thanks
-> Ganapat
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/Kconfig        |  3 ++
+ arch/arm/crypto/Kconfig | 85 +++++++++++++++++++++++++++++++++++++++++++++++++
+ crypto/Kconfig          | 75 -------------------------------------------
+ 3 files changed, 88 insertions(+), 75 deletions(-)
+ create mode 100644 arch/arm/crypto/Kconfig
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a2bc9b..e60da5ab8aec 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2167,6 +2167,9 @@ source "arch/arm/Kconfig.debug"
+ source "security/Kconfig"
+ 
+ source "crypto/Kconfig"
++if CRYPTO
++source "arch/arm/crypto/Kconfig"
++endif
+ 
+ source "lib/Kconfig"
+ 
+diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+new file mode 100644
+index 000000000000..66fe82857e99
+--- /dev/null
++++ b/arch/arm/crypto/Kconfig
+@@ -0,0 +1,85 @@
++
++menuconfig ARM_CRYPTO
++	bool "ARM Accelerated Cryptographic Algorithms"
++	depends on ARM
++	help
++	  Say Y here to choose from a selection of cryptographic algorithms
++	  implemented using ARM specific CPU features or instructions.
++
++if ARM_CRYPTO
++
++config CRYPTO_SHA1_ARM
++	tristate "SHA1 digest algorithm (ARM-asm)"
++	select CRYPTO_SHA1
++	select CRYPTO_HASH
++	help
++	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
++	  using optimized ARM assembler.
++
++config CRYPTO_SHA1_ARM_NEON
++	tristate "SHA1 digest algorithm (ARM NEON)"
++	depends on KERNEL_MODE_NEON
++	select CRYPTO_SHA1_ARM
++	select CRYPTO_SHA1
++	select CRYPTO_HASH
++	help
++	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
++	  using optimized ARM NEON assembly, when NEON instructions are
++	  available.
++
++config CRYPTO_SHA512_ARM_NEON
++	tristate "SHA384 and SHA512 digest algorithm (ARM NEON)"
++	depends on KERNEL_MODE_NEON
++	select CRYPTO_SHA512
++	select CRYPTO_HASH
++	help
++	  SHA-512 secure hash standard (DFIPS 180-2) implemented
++	  using ARM NEON instructions, when available.
++
++	  This version of SHA implements a 512 bit hash with 256 bits of
++	  security against collision attacks.
++
++	  This code also includes SHA-384, a 384 bit hash with 192 bits
++	  of security against collision attacks.
++
++config CRYPTO_AES_ARM
++	tristate "AES cipher algorithms (ARM-asm)"
++	depends on ARM
++	select CRYPTO_ALGAPI
++	select CRYPTO_AES
++	help
++	  Use optimized AES assembler routines for ARM platforms.
++
++	  AES cipher algorithms (FIPS-197). AES uses the Rijndael
++	  algorithm.
++
++	  Rijndael appears to be consistently a very good performer in
++	  both hardware and software across a wide range of computing
++	  environments regardless of its use in feedback or non-feedback
++	  modes. Its key setup time is excellent, and its key agility is
++	  good. Rijndael's very low memory requirements make it very well
++	  suited for restricted-space environments, in which it also
++	  demonstrates excellent performance. Rijndael's operations are
++	  among the easiest to defend against power and timing attacks.
++
++	  The AES specifies three key sizes: 128, 192 and 256 bits
++
++	  See <http://csrc.nist.gov/encryption/aes/> for more information.
++
++config CRYPTO_AES_ARM_BS
++	tristate "Bit sliced AES using NEON instructions"
++	depends on KERNEL_MODE_NEON
++	select CRYPTO_ALGAPI
++	select CRYPTO_AES_ARM
++	select CRYPTO_ABLK_HELPER
++	help
++	  Use a faster and more secure NEON based implementation of AES in CBC,
++	  CTR and XTS modes
++
++	  Bit sliced AES gives around 45% speedup on Cortex-A15 for CTR mode
++	  and for XTS mode encryption, CBC and XTS mode decryption speedup is
++	  around 25%. (CBC encryption speed is not affected by this driver.)
++	  This implementation does not rely on any lookup tables so it is
++	  believed to be invulnerable to cache timing attacks.
++
++endif
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 50f4da44a304..c50900b467c8 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -555,26 +555,6 @@ config CRYPTO_SHA1_SPARC64
+ 	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
+ 	  using sparc64 crypto instructions, when available.
+ 
+-config CRYPTO_SHA1_ARM
+-	tristate "SHA1 digest algorithm (ARM-asm)"
+-	depends on ARM
+-	select CRYPTO_SHA1
+-	select CRYPTO_HASH
+-	help
+-	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
+-	  using optimized ARM assembler.
+-
+-config CRYPTO_SHA1_ARM_NEON
+-	tristate "SHA1 digest algorithm (ARM NEON)"
+-	depends on ARM && KERNEL_MODE_NEON
+-	select CRYPTO_SHA1_ARM
+-	select CRYPTO_SHA1
+-	select CRYPTO_HASH
+-	help
+-	  SHA-1 secure hash standard (FIPS 180-1/DFIPS 180-2) implemented
+-	  using optimized ARM NEON assembly, when NEON instructions are
+-	  available.
+-
+ config CRYPTO_SHA1_PPC
+ 	tristate "SHA1 digest algorithm (powerpc)"
+ 	depends on PPC
+@@ -640,21 +620,6 @@ config CRYPTO_SHA512_SPARC64
+ 	  SHA-512 secure hash standard (DFIPS 180-2) implemented
+ 	  using sparc64 crypto instructions, when available.
+ 
+-config CRYPTO_SHA512_ARM_NEON
+-	tristate "SHA384 and SHA512 digest algorithm (ARM NEON)"
+-	depends on ARM && KERNEL_MODE_NEON
+-	select CRYPTO_SHA512
+-	select CRYPTO_HASH
+-	help
+-	  SHA-512 secure hash standard (DFIPS 180-2) implemented
+-	  using ARM NEON instructions, when available.
+-
+-	  This version of SHA implements a 512 bit hash with 256 bits of
+-	  security against collision attacks.
+-
+-	  This code also includes SHA-384, a 384 bit hash with 192 bits
+-	  of security against collision attacks.
+-
+ config CRYPTO_TGR192
+ 	tristate "Tiger digest algorithms"
+ 	select CRYPTO_HASH
+@@ -817,46 +782,6 @@ config CRYPTO_AES_SPARC64
+ 	  for some popular block cipher mode is supported too, including
+ 	  ECB and CBC.
+ 
+-config CRYPTO_AES_ARM
+-	tristate "AES cipher algorithms (ARM-asm)"
+-	depends on ARM
+-	select CRYPTO_ALGAPI
+-	select CRYPTO_AES
+-	help
+-	  Use optimized AES assembler routines for ARM platforms.
+-
+-	  AES cipher algorithms (FIPS-197). AES uses the Rijndael
+-	  algorithm.
+-
+-	  Rijndael appears to be consistently a very good performer in
+-	  both hardware and software across a wide range of computing
+-	  environments regardless of its use in feedback or non-feedback
+-	  modes. Its key setup time is excellent, and its key agility is
+-	  good. Rijndael's very low memory requirements make it very well
+-	  suited for restricted-space environments, in which it also
+-	  demonstrates excellent performance. Rijndael's operations are
+-	  among the easiest to defend against power and timing attacks.
+-
+-	  The AES specifies three key sizes: 128, 192 and 256 bits
+-
+-	  See <http://csrc.nist.gov/encryption/aes/> for more information.
+-
+-config CRYPTO_AES_ARM_BS
+-	tristate "Bit sliced AES using NEON instructions"
+-	depends on ARM && KERNEL_MODE_NEON
+-	select CRYPTO_ALGAPI
+-	select CRYPTO_AES_ARM
+-	select CRYPTO_ABLK_HELPER
+-	help
+-	  Use a faster and more secure NEON based implementation of AES in CBC,
+-	  CTR and XTS modes
+-
+-	  Bit sliced AES gives around 45% speedup on Cortex-A15 for CTR mode
+-	  and for XTS mode encryption, CBC and XTS mode decryption speedup is
+-	  around 25%. (CBC encryption speed is not affected by this driver.)
+-	  This implementation does not rely on any lookup tables so it is
+-	  believed to be invulnerable to cache timing attacks.
+-
+ config CRYPTO_ANUBIS
+ 	tristate "Anubis cipher algorithm"
+ 	select CRYPTO_ALGAPI
+-- 
+1.8.3.2
