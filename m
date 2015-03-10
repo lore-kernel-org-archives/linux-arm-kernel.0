@@ -1,93 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 10 Mar 2015 19:05:07 +0100
-Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP
- SOCs
-In-Reply-To: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
-References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
-Message-ID: <20150310190507.64b3c153@free-electrons.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 10 Mar 2015 13:10:08 -0500
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjpOx4SxY7j8jnoEwLG+mhPKB2st8qCb-hduHLOVw=RcQ@mail.gmail.com>
+ <F9B276F7-61EF-4406-AB46-97D7F1ECEEFE@codeaurora.org>
+ <89746055.qtEO3GZJmR@wuerfel>
+ <F5017A7F-0EA2-41B3-A9DD-6123CCFD36FA@codeaurora.org>
+ <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
+Message-ID: <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel,
+>>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>>>>>>>> utilized and passed to the kernel.
+>>>>>>>>>> 
+>>>>>>>>>> Cc: <devicetree@vger.kernel.org>
+>>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>>>>>> 
+>>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
+>>>>>>>>> 
+>>>>>>>>> Kevin
+>>>>>>>> 
+>>>>>>>> yes
+>>>>>>> 
+>>>>>>> That's a bummer.
+>>>>>>> 
+>>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
+>>>>>>> one devicetree, and it'll be used, right?
+>>>>>> 
+>>>>>> We can provide only one, we still need the IDs in the DT.
+>>>>> 
+>>>>> How are the DTS provided? Concatenated with the kernel, or in a
+>>>>> wrapped data format? Or in a separate partition from the kernel?
+>>>> 
+>>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+>>> 
+>>> Then you should be able to create a tool that can write this concatenated
+>>> format and insert these properties from a table that matches the boot
+>>> loader, right?
+>>> 
+>>>      Arnd
+>> 
+>> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
+> 
+> To insert platform-local properties that mean nothing outside of the
+> firmware packaging of the device trees, which is the case here?
+> 
+> I think the idea of having the installer script inserting them is
+> quite reasonable in this case.
+> 
+> 
+> -Olof
 
-I know you suggested a more rigorous method of determining the exit
-latency and target residency times, but would it be nonetheless
-possible to apply this patch, which clearly improves performance a lot,
-and actually makes the code match the values used in the vendor kernel?
+These values are static, so not sure what the point of having the installer script do that?
 
-I also think this patch should be marked for stable, it fixes values
-introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
-should therefore be backported all the way to v3.16.
-
-Thanks a lot,
-
-Thomas
-
-On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
-> Originally, the thresholds used in the cpuidle driver for Armada SOCs
-> were temporarily chosen, leaving room for improvements.
-> 
-> This commit updates the thresholds for the Armada XP SOCs with values
-> that positively impact performances:
-> 
->                                 without patch  with patch   vendor kernel
->  - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
->  - ioping tmpfs (iops)          ~163k          ~206k        ~179k
->  - ioping tmpfs (mib/s)         ~636           ~805         ~699
-> 
-> The idle power consumption is negatively impacted (proportionally less
-> than the performance gain), and we are still performing better than
-> the vendor kernel here:
-> 
->                                 without patch   with patch  vendor kernel
->  - power consumption idle (W)   ~2.4            ~3.2        ~4.4
->  - power consumption busy (W)   ~8.6            ~8.3        ~8.6
-> 
-> There is still room for improvement regarding the value of these
-> thresholds, they were chosen to mimic the vendor kernel.
-> 
-> This patch only impacts Armada XP SOCs and was tested on Online Labs
-> C1 boards. A similar approach can be taken to improve the performances
-> of the Armada 370 and Armada 38x SOCs.
-> 
-> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
-> for the discussions and tips around this topic.
-> 
-> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
-> ---
->  drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> index 38e6861..3716a1f 100644
-> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
-> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
-> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
->  	.states[0]		= ARM_CPUIDLE_WFI_STATE,
->  	.states[1]		= {
->  		.enter			= mvebu_v7_enter_idle,
-> -		.exit_latency		= 10,
-> +		.exit_latency		= 100,
->  		.power_usage		= 50,
-> -		.target_residency	= 100,
-> +		.target_residency	= 1000,
->  		.name			= "MV CPU IDLE",
->  		.desc			= "CPU power down",
->  	},
->  	.states[2]		= {
->  		.enter			= mvebu_v7_enter_idle,
-> -		.exit_latency		= 100,
-> +		.exit_latency		= 1000,
->  		.power_usage		= 5,
-> -		.target_residency	= 1000,
-> +		.target_residency	= 10000,
->  		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
->  		.name			= "MV CPU DEEP IDLE",
->  		.desc			= "CPU and L2 Fabric power down",
-
-
+- k
 
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
