@@ -1,41 +1,37 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 10 Mar 2015 10:57:13 +0100
-Subject: [PATCH v2 03/10] reset: berlin: convert to a platform driver
-In-Reply-To: <1425896186.3152.25.camel@pengutronix.de>
-References: <1425654328-26298-1-git-send-email-antoine.tenart@free-electrons.com>
- <1425654328-26298-4-git-send-email-antoine.tenart@free-electrons.com>
- <1425896186.3152.25.camel@pengutronix.de>
-Message-ID: <20150310095713.GD23469@kwain>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Mar 2015 09:58:18 +0000
+Subject: [PATCH 0/3] add power-supply support to dw_hdmi
+In-Reply-To: <1429128.MSqYm0qZ9p@phil>
+References: <1429128.MSqYm0qZ9p@phil>
+Message-ID: <20150310095818.GG8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On Mon, Mar 09, 2015 at 11:16:26AM +0100, Philipp Zabel wrote:
+On Tue, Mar 10, 2015 at 12:21:21AM +0100, Heiko Stuebner wrote:
+> At least the Rockchip variant of the dw_hdmi should control its supplying
+> regulators. A cursory glance at the imx manual didn't any equivalent there,
+> so I'm not sure if there are similar controllable regulators present.
 > 
-> Am Freitag, den 06.03.2015, 16:05 +0100 schrieb Antoine Tenart:
-> > The Berlin reset controller was introduced without being a platform
-> > driver because of a needed DT rework: the node describing the reset
-> > controller also describes the pinctrl and clk controllers...
-> > 
-> > The DT issue being solved thanks to the addition of the Berlin
-> > controller mfd driver, it is now possible to convert the Berlin reset
-> > driver to a plaftorm driver.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> Patch1 is only a small fix to keep {devm_}regulator_bulk_get quiet in
+> the deferring case and could go directly to the regulator tree, if ok.
 > 
-> Looks good to me. Do you want to merge this together with the rest of
-> the series, or should I queue the reset patch?
+> Patch3 is the addition of the supplies to the rk3288 boards and I would
+> take it into my dts branch if patch2 gets deemed acceptable.
 
-I think we better wait for the simple-mfd patch to make it to ARM SoC
-first.
+I have a problem with this approach.
 
-Once this is done, you can queue the reset patch (unless Sebastian wants
-to take it alongside the series).
+Rather than trying to shove everything into the generic part of the driver,
+what we should be doing is ensuring that the generic part stays generic,
+and the specific implementation details end up in the appropriate place.
 
-Antoine
+As Rockchip needs these external regulators, they should be in that part
+of the driver, and controlled appropriately from the encoder callbacks.
+The encoder has sufficient callbacks to be able to turn on/off regulators
+both before and after the bridge has been disabled/enabled.
+
+When we see more implementations with regulators, then we can think about
+moving it into the core dw_hdmi driver code.
 
 -- 
-Antoine T?nart, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
