@@ -1,48 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Mar 2015 15:52:29 +0100
-Subject: [PATCH v2 3/3] ARM: mx25: Remove platform code support files
-In-Reply-To: <CAOMZO5BC-pebQfbFhKBJAXto=6f6osHRW4V0kwvLJqzFuQVUqQ@mail.gmail.com>
-References: <1425662758-4675-1-git-send-email-festevam@gmail.com>
- <21909740.nfZYRJLb3G@wuerfel>
- <CAOMZO5BC-pebQfbFhKBJAXto=6f6osHRW4V0kwvLJqzFuQVUqQ@mail.gmail.com>
-Message-ID: <7138524.8fPsXzMqGK@wuerfel>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 10 Mar 2015 16:55:56 +0200
+Subject: [PATCH] video: treat signal like timeout as failure
+In-Reply-To: <20150310144640.GM8656@n2100.arm.linux.org.uk>
+References: <1421731430-13207-1-git-send-email-der.herr@hofr.at>
+ <54FEE70D.3010307@ti.com> <20150310125116.GA26020@opentech.at>
+ <20150310141511.GL8656@n2100.arm.linux.org.uk>
+ <20150310143928.GA19501@opentech.at>
+ <20150310144640.GM8656@n2100.arm.linux.org.uk>
+Message-ID: <54FF05FC.5030704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 March 2015 22:51:53 Fabio Estevam wrote:
-> Hi Arnd,
-> 
-> On Mon, Mar 9, 2015 at 6:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Very nice, good to see some progress on the old machines!
-> >
-> > If you find the time, could you summarize your plans for the remaining
-> > i.MX SoCs that have board files (imx21, imx27, imx31, imx35)? Do you plan
-> > to continue with those, one by one?
-> 
-> After this series gets applied I will submit another one removing the
-> remaining mx25 leftovers pieces.
-> 
-> mx27 can be the next one to be converted to dt-only (still need to get
-> ov2640 camera, mc13783 audio and LCD to work in imx27-pdk.dts though).
-> 
-> mx35 should also be simple to convert to dt-only.
-> 
-> mx31 still lacks pinctrl.
-> 
-> I don't have access to imx1/imx21 hardware.
-> 
-> Hopefully someday we can get imx to be dt-only.
-> 
+On 10/03/15 16:46, Russell King - ARM Linux wrote:
 
-Ok, thanks a lot for the update.
+> In which case, let me propose that the exynos fbdev driver needs to be
+> moved to drivers/staging, and stay there until this stuff gets fixed.
+> drivers/staging is supposed to be for stuff which isn't up to the mark,
+> and which is potentially unstable.  And that's what this driver exactly
+> is.
 
-For imx21, we only support the original development board and no real
-products, which means the platform code is not very valuable and we could
-drop that if everything else is done.
+There is drivers/gpu/drm/exynos/ which is getting a lot of updates. So...
 
-For imx1, Alexander Shiyan has already submitted a series to remove
-the board files. I don't know remember if there were remaining objections
-to that, but it does seem reasonable.
+I'd propose removing the exynos fbdev driver if the exynos drm driver
+offers the same functionality. I don't know if that's the case. Does the
+drm driver support all the devices the fbdev supports?
 
-	Arnd
+Also, I'm not sure if and how we can remove drivers. If exynos fbdev
+driver is dropped, that would perhaps break boards that have exynos
+fbdev in their .dts file. And if the drm driver doesn't offer the exact
+same /dev/fbX interface, it would break the userspace.
+
+So I don't know if that's possible. But that's what I'd like to do,
+eventually, for all the fbdev drivers. Implement drm driver, remove the
+fbdev one.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/d88fe89e/attachment.sig>
