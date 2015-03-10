@@ -1,94 +1,78 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 10 Mar 2015 12:09:44 -0400 (EDT)
-Subject: [PATCHv3 0/5] arm-cci400: PMU monitoring support on ARM64
-In-Reply-To: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
-References: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <alpine.LFD.2.11.1503101205400.25484@knanqh.ubzr>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 10 Mar 2015 18:11:02 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <5683860.JYkc24rKim@wuerfel>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <2223973.a64rBcZvaA@wuerfel>
+ <CAB3XZEftjwUGS_Kj2dCxYY1m82C+a1_=akbnG3_hLETCr+Dddg@mail.gmail.com>
+ <5683860.JYkc24rKim@wuerfel>
+Message-ID: <CAB3XZEfEQnb7qsxuAAr6pUehm1nw6Eu4ZsV1+E477yF5K1hczA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Mar 2015, Suzuki K. Poulose wrote:
+On Tue, Mar 10, 2015 at 5:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 10 March 2015 16:31:33 Eliad Peller wrote:
+>> On Tue, Mar 10, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 10 March 2015 13:00:19 Eliad Peller wrote:
+>> >> On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >> >> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+>> >> >> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+>> >> >> > if that's enough to clean out the platform_data handling from the wlcore
+>> >> >> > driver, it's good enough as a start.
+>> >> >> not sure i'm following - can you elaborate?
+>> >> >>
+>> >> >> i'll summarize the way i see it. please correct me if i'm wrong.
+>> >> >>
+>> >> >> both wl18xx and wl12xx use the platform data to get the irq number.
+>> >> >> wl12xx (only) also needs some additional clock definitions to be
+>> >> >> passed. there's currently some issue with specifying some the of clock
+>> >> >> sources, so i preferred starting only with (the simpler) wl18xx
+>> >> >> bindings.
+>> >> >>
+>> >> >> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+>> >> >> data (i.e. irq) can be passed by the new DT bindings.
+>> >> >> however, for platforms with wl12xx, we still need to pass the clock
+>> >> >> definitions (along with the irq), so we have to keep
+>> >> >> legacy_init_wl12xx for the time being (and that's also why we have to
+>> >> >> currently keep the platform_data handling in the wlcore driver)
+>> >> >>
+>> >> >> do you have something else in mind?
+>> >> >
+>> >> > I think what Arnd is saying is we've now removed all the wl12xx using
+>> >> > legacy platforms, so all of them can boot with just data from dts.
+>> >
+>> > Right, that was my idea.
+>> >
+>> >> I don't think that's the case (unless i'm missing something).
+>> >> e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
+>> >> initializes wl12xx device.
+>> >
+>> > This one is just like the igep0030, as Tony was saying: the board
+>> > boots from device tree already, so now that we have a binding for
+>> > it, we can remove the wl12xx_set_platform_data() for it.
+>> >
+>> i think the wl12xx_set_platform_data() name created some confusion -
+>> it is used to pass platform data for both wl12xx and wl18xx devices.
+>> (this confusion is all around the wlcore driver as well, due to the
+>> code evolution)
+>>
+>> the binding i added is for wl18xx only (there is no wl12xx binding yet).
+>> the remaining boards, AFAICT, have wl12xx (rather than wl18xx) cards.
+>> so i don't see how we can remove these wl12xx_set_platform_data()
+>> calls before we have wl12xx bindings in-place as well.
+>
+> What is missing for that binding then? I keep getting confused here,
+> but I thought that they share the implementation that looks at the
+> platform data.
+>
+they both get the same wl12xx_platform_data struct, but only wl12xx
+cares about the clocks-related fields.
+the bindings i added parses only the irq.
 
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-> 
-> This series enables the PMU monitoring support for CCI400 on ARM64.
-> The existing CCI400 driver code is a mix of PMU driver and the MCPM
-> driver code. The MCPM driver is only used on ARM(32) and contains
-> arm32 assembly and hence can't be built on ARM64. This patch splits
-> the code to
-> 
->  - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
->  - ARM_CCI400_PMU driver
-> 
-> Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
-> the revision of the chipset, is a secure operation. Hence, it prevents
-> us from running this on non-secure platforms. The issue is overcome by
-> explicitly mentioning the revision number of the CCI PMU in the device tree
-> binding. The device-tree binding has been updated with the new bindings.
-> 
-> i.e,	arm-cci-400-pmu,r0 => revision 0
-> 	arm-cci-400-pmu,r1 => revision 1
-> 	arm-cci-400-pmu => (old) DEPRECATED
-> 
-> The old binding has been DEPRECATED and must be used only on ARM32
-> system with secure access. We don't have a reliable dynamic way to detect
-> if the system is running secure. This series tries to use the best safe
-> method by relying on the availability of MCPM(as it was prior to the series).
-> It is upto the MCPM platform driver to decide, if the system is secure before
-> it goes ahead and registers its drivers and pokes the CCI. This series doesn't
-> address/solve the problem of MCPM. I will be happy to use a better approach,
-> if there is any.
-> 
-> Tested on (non-secure)TC2 and A53x2.
+(Luca tried previously to upstream wl12xx DT support along with the
+required clock DT changes, but got some rejections, mainly wrt. clock
+stuff.
+e.g. http://thread.gmane.org/gmane.linux.kernel/1520752
+that's why i preferred starting with "easier" wl18xx bindings only)
 
-Would be nice if you could also test it on secure TC2 making sure MCPM 
-is still functional.
-
-For patches 1, 3 and 4, you may add:
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Patches 2 and 5 are purely PMU stuff and out of my area of expertise.
-
-
-> Changes sinve V2
-> 
->  - Include suggestions from Sudeep Holla.
->  - Cleanup event validation checks.
-> 
-> Changes since V1 (Suggestions from Nicolas Pitre):
-> 
->  - Split Patch 2 to separate the 'PMU' abstraction(now Patch 2/5)
->    from the introduction of a new device-tree binding(now Patch 3/5)
->  - Rename
-> 	ARM_CCI400_MCPM => ARM_CCI400_PORT_CTRL
-> 	CCI400_MCPM_PORTS_DATA => CCI400_PORTS_DATA
->  - Select ARM_CCI400_COMMON for ARM_CCI400_PORT_CTRL
->  - Better documentation in the git commit log about the ARM_CCI config.
->  - Move the 'pr_info' to its apporpriate patch.
-> 
-> 
-> Suzuki K. Poulose (5):
->   arm-cci: Rearrange code for splitting PMU vs driver code
->   arm-cci: Abstract the CCI400 PMU speicific definitions
->   arm-cci: Get rid of secure transactions for PMU driver
->   arm-cci: Split the code for PMU vs driver support
->   arm-cci: Fix CCI PMU event validation
-> 
->  Documentation/devicetree/bindings/arm/cci.txt |    7 +-
->  arch/arm/include/asm/arm-cci.h                |   42 +++
->  arch/arm/mach-exynos/Kconfig                  |    2 +-
->  arch/arm/mach-vexpress/Kconfig                |    4 +-
->  arch/arm64/include/asm/arm-cci.h              |   27 ++
->  drivers/bus/Kconfig                           |   28 +-
->  drivers/bus/arm-cci.c                         |  496 ++++++++++++++-----------
->  include/linux/arm-cci.h                       |    9 +-
->  8 files changed, 384 insertions(+), 231 deletions(-)
->  create mode 100644 arch/arm/include/asm/arm-cci.h
->  create mode 100644 arch/arm64/include/asm/arm-cci.h
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> 
+Eliad.
