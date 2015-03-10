@@ -1,36 +1,111 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Mar 2015 17:40:19 +0000
-Subject: some question about Set bit 22 in the PL310 (cache controller)
- AuxCtlr register
-In-Reply-To: <20150310163411.GR8656@n2100.arm.linux.org.uk>
-References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
- <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
- <20150310163411.GR8656@n2100.arm.linux.org.uk>
-Message-ID: <20150310174018.GE13687@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 10 Mar 2015 10:35:50 -0700
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CAB3XZEdK2O7tSSTchvRQtaefzCECjjQ-biQmOBHGdzJaBknSFQ@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <2223973.a64rBcZvaA@wuerfel>
+ <CAB3XZEftjwUGS_Kj2dCxYY1m82C+a1_=akbnG3_hLETCr+Dddg@mail.gmail.com>
+ <5683860.JYkc24rKim@wuerfel>
+ <CAB3XZEfEQnb7qsxuAAr6pUehm1nw6Eu4ZsV1+E477yF5K1hczA@mail.gmail.com>
+ <20150310161801.GR5264@atomide.com>
+ <CAB3XZEdK2O7tSSTchvRQtaefzCECjjQ-biQmOBHGdzJaBknSFQ@mail.gmail.com>
+Message-ID: <20150310173550.GT5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 04:34:12PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 10, 2015 at 04:31:34PM +0000, Catalin Marinas wrote:
-> > It's not entirely safe either. I guess the assumption is that CMA
-> > allocates from highmem which is not mapped in the kernel linear mapping.
-> > However, to be able to flush the caches for such highmem pages, they
-> > need to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a
-> > small window between dmac_flush_range() and kunmap_atomic() where
-> > speculative cache line fills can still happen.
+* Eliad Peller <eliad@wizery.com> [150310 10:01]:
+> On Tue, Mar 10, 2015 at 6:18 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Eliad Peller <eliad@wizery.com> [150310 09:11]:
+> >> On Tue, Mar 10, 2015 at 5:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Tuesday 10 March 2015 16:31:33 Eliad Peller wrote:
+> >> >> On Tue, Mar 10, 2015 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> >> > On Tuesday 10 March 2015 13:00:19 Eliad Peller wrote:
+> >> >> >> On Tue, Mar 10, 2015 at 12:49 AM, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> >> >> > I was expecting you to remove all calls to legacy_init_wl12xx from this file,
+> >> >> >> >> > including the ones for wl12xx aside from the wl18xx ones you removed, but
+> >> >> >> >> > if that's enough to clean out the platform_data handling from the wlcore
+> >> >> >> >> > driver, it's good enough as a start.
+> >> >> >> >> not sure i'm following - can you elaborate?
+> >> >> >> >>
+> >> >> >> >> i'll summarize the way i see it. please correct me if i'm wrong.
+> >> >> >> >>
+> >> >> >> >> both wl18xx and wl12xx use the platform data to get the irq number.
+> >> >> >> >> wl12xx (only) also needs some additional clock definitions to be
+> >> >> >> >> passed. there's currently some issue with specifying some the of clock
+> >> >> >> >> sources, so i preferred starting only with (the simpler) wl18xx
+> >> >> >> >> bindings.
+> >> >> >> >>
+> >> >> >> >> for platforms with wl18xx, we can remove the pdata-quirk, as all the
+> >> >> >> >> data (i.e. irq) can be passed by the new DT bindings.
+> >> >> >> >> however, for platforms with wl12xx, we still need to pass the clock
+> >> >> >> >> definitions (along with the irq), so we have to keep
+> >> >> >> >> legacy_init_wl12xx for the time being (and that's also why we have to
+> >> >> >> >> currently keep the platform_data handling in the wlcore driver)
+> >> >> >> >>
+> >> >> >> >> do you have something else in mind?
+> >> >> >> >
+> >> >> >> > I think what Arnd is saying is we've now removed all the wl12xx using
+> >> >> >> > legacy platforms, so all of them can boot with just data from dts.
+> >> >> >
+> >> >> > Right, that was my idea.
+> >> >> >
+> >> >> >> I don't think that's the case (unless i'm missing something).
+> >> >> >> e.g. there's still pdata-quirk for "compulab,omap3-sbc-t3730" which
+> >> >> >> initializes wl12xx device.
+> >> >> >
+> >> >> > This one is just like the igep0030, as Tony was saying: the board
+> >> >> > boots from device tree already, so now that we have a binding for
+> >> >> > it, we can remove the wl12xx_set_platform_data() for it.
+> >> >> >
+> >> >> i think the wl12xx_set_platform_data() name created some confusion -
+> >> >> it is used to pass platform data for both wl12xx and wl18xx devices.
+> >> >> (this confusion is all around the wlcore driver as well, due to the
+> >> >> code evolution)
+> >> >>
+> >> >> the binding i added is for wl18xx only (there is no wl12xx binding yet).
+> >> >> the remaining boards, AFAICT, have wl12xx (rather than wl18xx) cards.
+> >> >> so i don't see how we can remove these wl12xx_set_platform_data()
+> >> >> calls before we have wl12xx bindings in-place as well.
+> >> >
+> >> > What is missing for that binding then? I keep getting confused here,
+> >> > but I thought that they share the implementation that looks at the
+> >> > platform data.
+> >> >
+> >> they both get the same wl12xx_platform_data struct, but only wl12xx
+> >> cares about the clocks-related fields.
+> >> the bindings i added parses only the irq.
+> >>
+> >> (Luca tried previously to upstream wl12xx DT support along with the
+> >> required clock DT changes, but got some rejections, mainly wrt. clock
+> >> stuff.
+> >> e.g. http://thread.gmane.org/gmane.linux.kernel/1520752
+> >> that's why i preferred starting with "easier" wl18xx bindings only)
+> >
+> > I believe we did not have clock bindings back then, now it's simple
+> > to get the clock. If it's some internal clock to the wl12xx, then
+> > that's a different story, it should be just hidden behind a compatible
+> > flag then.
+> >
+> i'm really not familiar with the common clock framework, but there
+> still doesn't seem to be a way to determine whether a clock is XTAL or
+> not (which is what Luca's patch was about). should we use compatible
+> flag in such case? i'm not sure it sounds right.
 > 
-> That really ought to be fixed.
+> anyway, i'd really prefer, if possible, starting with the wl18xx
+> bindings, and defer the wl12xx complications to later on.
+> (i also need to find some wl12xx card in order to actually test the
+> patches once i'll have them...)
+> 
+> we do have to make sure these wl18xx bindings are future-compatible
+> with the wl12xx ones, but i think the current bindings are pretty much
+> standard (and are actually a subset of the bindings needed by wl12xx),
+> so it should be fine.
 
-For non-CMA DMA allocations, the solution is to set some memory aside
-which is not mapped (IIRC you tried this long time ago).
+Well how about add just the parsing of the clock and assume it's always
+WL12XX_REFCLOCK_38 for now as that's the only thing we're currently
+using. Then we can add a property or compatible value if using something
+else as needed.
 
-As for CMA, do we have a guarantee that memory only comes from highmem?
-If yes (or we can enforce this somehow), we need something like
-kmap_atomic_prot() implemented for flushing such pages.
+Regards,
 
-But I still think it's easier if we just set bit 22 for PL310 ;). When
-this bit is cleared, the system is no longer compliant with the
-statements on mismatched memory attributes.
-
--- 
-Catalin
+Tony
