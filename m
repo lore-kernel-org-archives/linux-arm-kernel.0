@@ -1,21 +1,55 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Tue, 10 Mar 2015 11:40:46 +0000
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun6i: dt: Add new Mele I7 device
-In-Reply-To: <54FED277.4040000@redhat.com>
-References: <1425131285-8640-1-git-send-email-codekipper@gmail.com>
- <20150303071635.GC4713@lukather> <54F568F8.1040104@redhat.com>
- <20150303082209.GE4713@lukather> <54F5B51F.6030609@redhat.com>
- <20150303135847.GH4911@lukather> <54FED277.4040000@redhat.com>
-Message-ID: <1425987646.21353.96.camel@hellion.org.uk>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 10 Mar 2015 19:59:12 +0800
+Subject: [PATCH v5 01/12] ARM: dts: sun6i: add p2wi controller node to dtsi
+In-Reply-To: <1425988764-23618-1-git-send-email-wens@csie.org>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+Message-ID: <1425988764-23618-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-10 at 12:16 +0100, Hans de Goede wrote:
+From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 
-> I'm not sure if stdout-path supports aliases
+The p2wi controller has only one possible pinmux setting. Use it by
+default in the dtsi, instead of having to set it in each board's dts.
 
-I thought it did but ePAPR section 3.5 says "A string that specifies the
-full path to the node" which suggests not, and AFAICT the code doesn't
-try to handle alias.
+Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+[wens at csie.org: reformat commit title; rename p2wi pins and use as default]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Ian.
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index fa2f403ccf28..92abea20b946 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -973,6 +973,27 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
++
++			p2wi_pins: p2wi {
++				allwinner,pins = "PL0", "PL1";
++				allwinner,function = "s_p2wi";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++		};
++
++		p2wi: i2c at 01f03400 {
++			compatible = "allwinner,sun6i-a31-p2wi";
++			reg = <0x01f03400 0x400>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&apb0_gates 3>;
++			clock-frequency = <100000>;
++			resets = <&apb0_rst 3>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&p2wi_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 	};
+ };
+-- 
+2.1.4
