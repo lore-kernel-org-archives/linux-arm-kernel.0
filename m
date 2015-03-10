@@ -1,36 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Mar 2015 09:43:02 +0900
-Subject: [PATCH 1/3] ARM: shmobile: Remove stray closing parenthesis in debug
- description
+Date: Tue, 10 Mar 2015 09:43:03 +0900
+Subject: [PATCH 2/3] ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
 In-Reply-To: <cover.1425947508.git.horms+renesas@verge.net.au>
 References: <cover.1425947508.git.horms+renesas@verge.net.au>
-Message-ID: <6b9d3306b335c9643ee9d09e67be50d6f7e90b42.1425947508.git.horms+renesas@verge.net.au>
+Message-ID: <c77e9e7327218244d181a297f0742cf15d370fd1.1425947508.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Remove the stray closing parenthesis in the config description for the
-DEBUG_RCAR_GEN2_SCIF0 option.
+Since commit e042681894b62d60 ("ARM: shmobile: r8a7790: Remove legacy
+code"), all R-Car Gen2 SoCs are supported by multiplatform kernels only.
+As CONFIG_COMMON_CLK is always set for multiplatform kernels, we can
+remove related #ifdefs in code specific to R-Car Gen2 SoCs.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Kconfig.debug | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 1ca8dc7..3809ac9 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -806,7 +806,7 @@ choice
- 		  via SCIF2 on Renesas R-Car H1 (R8A7779).
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index d1fa625..51464cc 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -50,9 +50,7 @@ u32 rcar_gen2_read_mode_pins(void)
  
- 	config DEBUG_RCAR_GEN2_SCIF0
--		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793)"
-+		bool "Kernel low-level debugging messages via SCIF0 on R8A7790/R8A7791/R8A7793"
- 		depends on ARCH_R8A7790 || ARCH_R8A7791 || ARCH_R8A7793
- 		help
- 		  Say Y here if you want kernel low-level debugging support
+ void __init rcar_gen2_timer_init(void)
+ {
+-#if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
+ 	u32 mode = rcar_gen2_read_mode_pins();
+-#endif
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 	void __iomem *base;
+ 	int extal_mhz = 0;
+@@ -128,9 +126,7 @@ void __init rcar_gen2_timer_init(void)
+ 	iounmap(base);
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+-#ifdef CONFIG_COMMON_CLK
+ 	rcar_gen2_clocks_init(mode);
+-#endif
+ #ifdef CONFIG_ARCH_SHMOBILE_MULTI
+ 	clocksource_of_init();
+ #endif
 -- 
 2.1.4
