@@ -1,51 +1,23 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 10 Mar 2015 20:23:03 +0800
-Subject: [PATCH v9 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
- if ACPI is enabled on ARM64
-In-Reply-To: <20150306174715.GA26888@e102568-lin.cambridge.arm.com>
-References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>
- <1424853601-6675-19-git-send-email-hanjun.guo@linaro.org>
- <20150306174715.GA26888@e102568-lin.cambridge.arm.com>
-Message-ID: <54FEE227.4000808@linaro.org>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Tue, 10 Mar 2015 09:24:18 -0300
+Subject: [PATCH] ARM: dts: imx6sl-warp: Pass 'bus-width' property
+In-Reply-To: <1425954802-14206-1-git-send-email-festevam@gmail.com>
+References: <1425954802-14206-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAP9ODKoB7r3E8N291t9ms97pLmC_SREidFrvwWMi6TKf6TeBwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?03?07? 01:47, Lorenzo Pieralisi wrote:
-> On Wed, Feb 25, 2015 at 08:39:58AM +0000, Hanjun Guo wrote:
->> From: Al Stone <al.stone@linaro.org>
->>
->> ACPI reduced hardware mode is disabled by default, but ARM64
->> can only run properly in ACPI hardware reduced mode, so select
->> ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
+On Mon, Mar 9, 2015 at 11:33 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 >
-> Agreed. This will remove unneeded acpica code. I think though,
-> you should also check the FADT flag HW_REDUCED_ACPI at boot to
-> make sure that the tables are HW reduced compliant. I am flagging
-
-Agreed, I will add that check on top of this patch set. We explicitly
-stated that we are using hardware reduced mode on ARM64 in the doc, so, 
-how about print some warning message and go on with the boot if we
-got the wrong flag HW_REDUCED_ACPI at boot?
-
-> this up because I noticed code in core code (not guarded by
-> ifdef) that checks:
+> USDHC2 port uses all the 8 data signals, so pass the 'bus-width' property
+> accordingly.
 >
-> acpi_gbl_reduced_hardware
->
-> and if it is not set it goes on instantiating fixed HW devices.
->
-> drivers/acpi/scan.c:2567
->
-> It is just a heads up, I think it is harmless, but one thing is
-> removing acpica code on ACPI HW reduced only, the other is to make
-> sure the kernel does not try to use ACPI HW features that acpica
-> can't support.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-I agree, need some cleanups for the ACPICA code I think, and this
-was raised about 1 and half years ago and Intel folks need more
-consideration on that [1].
+Acked-by: Otavio Salvador <otavio@ossystems.com.br>
 
-[1]: http://comments.gmane.org/gmane.linux.acpi.devel/63844
-
-Thanks
-Hanjun
+-- 
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
