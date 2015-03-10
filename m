@@ -1,147 +1,130 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 10 Mar 2015 12:25:09 -0500
-Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
- IODelay configuration
-In-Reply-To: <20150310153321.GO5264@atomide.com>
-References: <1425427237-11511-1-git-send-email-nm@ti.com>
- <1425427237-11511-2-git-send-email-nm@ti.com>
- <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
- <20150310153321.GO5264@atomide.com>
-Message-ID: <54FF28F5.4040707@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 10 Mar 2015 12:26:16 -0500
+Subject: [RFC PATCH v15 02/11] ARM: qcom: Add Subsystem Power Manager
+ (SPM) driver
+In-Reply-To: <1425914206-22295-3-git-send-email-lina.iyer@linaro.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <0D04D613-5916-448E-92F3-27C3D25AFE51@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 10:33 AM, Tony Lindgren wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [150310 03:39]:
->> On Wed, Mar 4, 2015 at 1:00 AM, Nishanth Menon <nm@ti.com> wrote:
->>
->>> +Configuration definition follows similar model as the pinctrl-single:
->>> +The groups of pin configuration are defined under "pinctrl-single,pins"
->>> +
->>> +&dra7_iodelay_core {
->>> +       mmc2_iodelay_3v3_conf: mmc2_iodelay_3v3_conf {
->>> +               pinctrl-single,pins = <
->>> +                       0x18c (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A19_IN */
->>> +                       0x1a4 (A_DELAY(265) | G_DELAY(360))     /* CFG_GPMC_A20_IN */
->>> +                       0x1b0 (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A21_IN */
->>> +                       0x1bc (A_DELAY(0) | G_DELAY(120))       /* CFG_GPMC_A22_IN */
->>> +                       0x1c8 (A_DELAY(287) | G_DELAY(420))     /* CFG_GPMC_A23_IN */
->>> +                       0x1d4 (A_DELAY(144) | G_DELAY(240))     /* CFG_GPMC_A24_IN */
->>> +                       0x1e0 (A_DELAY(0) | G_DELAY(0))         /* CFG_GPMC_A25_IN */
->>> +                       0x1ec (A_DELAY(120) | G_DELAY(0))       /* CFG_GPMC_A26_IN */
->>> +                       0x1f8 (A_DELAY(120) | G_DELAY(180))     /* CFG_GPMC_A27_IN */
->>> +                       0x360 (A_DELAY(0) | G_DELAY(0))         /* CFG_GPMC_CS1_IN */
->>> +               >;
->>> +       };
->>> +};
->>
->> But wait.
->>
->> The promise when we merged pinctrl-single was that this driver was to be used
->> when the system had a one-register-per-pin layout and it was easy to do device
->> trees based on that.
->>
->> We were very reluctant to accept that even though we didn't even have the
->> generic pin control bindings in place, the argument being that the driver
->> should know the detailed register layout, it should not be described in the
->> device tree. We eventually caved in and accepted it as an exception.
-> 
-> Hey let's get few things straight here. There's nothing stopping the
-> driver from knowing a detailed register layout with the pinctrl-single
-> binding. This can be very easily done based on the compatible flag and
-> match data as needed and check the values provided.
-> 
-> And let's also recap the reasons for the pinctrl-single binding. The
-> the main reason for the pinctrl-single binding is to avoid mapping
-> individual register bits to device tree compatible string properties.
-> 
-> Imagine doing that for hundreds of similar registers. Believe me, I tried
-> using device tree properties initially and it just sucked big time. For
-> larger amounts of dts data, it's best to stick to numeric values and
-> phandles in the device tree data and rely on the preprocessor for
-> getting the values right.
-> 
-> Finally, we don't want to build databases into the kernel drivers for
-> every SoC. We certainly have plenty fo those already.
->  
->> Since this pin controller is not using pinctrl-single it does not enjoy that
->> privilege and you need to explain why this pin controller cannot use the
->> generic bindings like so many other pin controllers have since started
->> to do. ("It is in the same SoC" is not an acceptable argument.)
->>
->> What is wrong with this:
->> Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> 
-> Nishanth, care to explain your reasons for using pinctrl-single binding
-> here vs the generic binding? Is the amount of string parsing with the
-> data an issue here?
 
-Wrong option chosen, I suppose :( - alright, lets discuss the alternative.
+On Mar 9, 2015, at 10:16 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
->  
->> We can add generic delay bindings to the list, it even seems like
->> a good idea to do so, as it is likely something that will come up in
->> other hardware and will be needed for ACPI etc going forward.
+> SPM is a hardware block that controls the peripheral logic surrounding
+> the application cores (cpu/l$). When the core executes WFI instruction,
+> the SPM takes over the putting the core in low power state as
+> configured. The wake up for the SPM is an interrupt at the GIC, which
+> then completes the rest of low power mode sequence and brings the core
+> out of low power mode.
 > 
-> We certainly need to make setting delays (with values) generic, no
-> doubt about that.
+> The SPM has a set of control registers that configure the SPMs
+> individually based on the type of the core and the runtime conditions.
+> SPM is a finite state machine block to which a sequence is provided and
+> it interprets the bytes and executes them in sequence. Each low power
+> mode that the core can enter into is provided to the SPM as a sequence.
 > 
-> If the large amount of data is not an issue here, we could maybe set
-> each iodelay register as a separate device? Then the binding could
-> be just along the interrupts-extended type binding:
+> Configure the SPM to set the core (cpu or L2) into its low power mode,
+> the index of the first command in the sequence is set in the SPM_CTL
+> register. When the core executes ARM wfi instruction, it triggers the
+> SPM state machine to start executing from that index. The SPM state
+> machine waits until the interrupt occurs and starts executing the rest
+> of the sequence until it hits the end of the sequence. The end of the
+> sequence jumps the core out of its low power mode.
 > 
-> foo = <&bar 0x18c A_DELAY(0) G_DELAY(120)>;
+> Add support for an idle driver to set up the SPM to place the core in
+> Standby or Standalone power collapse mode when the core is idle.
 > 
-> Where the 0x18c is the instance offset of the register within the
-> ti,dra7-iodelay compatible controller.
+> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
+> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
+> Original tree available at -
+> git://codeaurora.org/quic/la/kernel/msm-3.10.git
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  31 +-
+> drivers/soc/qcom/Kconfig                           |   7 +
+> drivers/soc/qcom/Makefile                          |   1 +
+> drivers/soc/qcom/spm.c                             | 422 +++++++++++++++++++++
+> 4 files changed, 455 insertions(+), 6 deletions(-)
+> create mode 100644 drivers/soc/qcom/spm.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> index 1505fb8..690c3c0 100644
+> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+> @@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
+> 
+> The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
+> Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
+> -micro-controller that transitions a piece of hardware (like a processor or
+> +power-controller that transitions a piece of hardware (like a processor or
+> subsystem) into and out of low power modes via a direct connection to
+> the PMIC. It can also be wired up to interact with other processors in the
+> system, notifying them when a low power state is entered or exited.
+> 
+> +Multiple revisions of the SAW hardware are supported using these Device Nodes.
+> +SAW2 revisions differ in the register offset and configuration data. Also, the
+> +same revision of the SAW in different SoCs may have different configuration
+> +data due the the differences in hardware capabilities. Hence the SoC name, the
+> +version of the SAW hardware in that SoC and the distinction between cpu (big
+> +or Little) or cache, may be needed to uniquely identify the SAW register
+> +configuration and initialization data. The compatible string is used to
+> +indicate this parameter.
+> +
+> PROPERTIES
+> 
+> - compatible:
+> @@ -14,10 +23,13 @@ PROPERTIES
+> 	Value type: <string>
+> 	Definition: shall contain "qcom,saw2". A more specific value should be
+> 		    one of:
+> -			 "qcom,saw2-v1"
+> -			 "qcom,saw2-v1.1"
+> -			 "qcom,saw2-v2"
+> -			 "qcom,saw2-v2.1"
+> +			"qcom,saw2-v1"
+> +			"qcom,saw2-v1.1"
+> +			"qcom,saw2-v2"
+> +			"qcom,saw2-v2.1"
+> +			"qcom,apq8064-saw2-v1.1-cpu"
+> +			"qcom,msm8974-saw2-v2.1-cpu"
+> +			"qcom,apq8084-saw2-v2.1-cpu?
+> 
 
-if mmc2_pins_default point at pins for mmc pin configuration for
-control_core (pinctrl-single), are you proposing the following?
+We don?t seem to use the "qcom,saw2-v1*? variants so should we just drop them?
 
- mmc2_pins_default: mmc2_pins_default {
-         pinctrl-single,pins = <
-                 0x9c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a23.mmc2_clk */
-                 0xb0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_cs1.mmc2_cmd */
-                 0xa0 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a24.mmc2_dat0 */
-                 0xa4 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a25.mmc2_dat1 */
-                 0xa8 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a26.mmc2_dat2 */
-                 0xac (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a27.mmc2_dat3 */
-                 0x8c (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a19.mmc2_dat4 */
-                 0x90 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a20.mmc2_dat5 */
-                 0x94 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a21.mmc2_dat6 */
-                 0x98 (PIN_INPUT_PULLUP | MANUAL_MODE | MUX_MODE1) /*
-gpmc_a22.mmc2_dat7 */
-         >;
- };
 
-&mmc2 {
-...
- pinctrl-1 =
- 	&mmc2_pins_default,	/* points to mmc control core pins */
- 	<&iodelay 0x18c A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A19_IN */
- 	<&iodelay 0x1a4 A_DELAY(265) | G_DELAY(360)>,     /* CFG_GPMC_A20_IN */
- 	<&iodelay 0x1b0 A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A21_IN */
- 	<&iodelay 0x1bc A_DELAY(0) | G_DELAY(120)>,       /* CFG_GPMC_A22_IN */
- 	<&iodelay 0x1c8 A_DELAY(287) | G_DELAY(420)>,     /* CFG_GPMC_A23_IN */
- 	<&iodelay 0x1d4 A_DELAY(144) | G_DELAY(240)>,     /* CFG_GPMC_A24_IN */
- 	<&iodelay 0x1e0 A_DELAY(0) | G_DELAY(0)>,         /* CFG_GPMC_A25_IN */
- 	<&iodelay 0x1ec A_DELAY(120) | G_DELAY(0)>,       /* CFG_GPMC_A26_IN */
- 	<&iodelay 0x1f8 A_DELAY(120) | G_DELAY(180)>,     /* CFG_GPMC_A27_IN */
- 	<&iodelay 0x360 A_DELAY(0) | G_DELAY(0)>;         /* CFG_GPMC_CS1_IN */
+> - reg:
+> 	Usage: required
+> @@ -26,10 +38,17 @@ PROPERTIES
+> 		    the register region. An optional second element specifies
+> 		    the base address and size of the alias register region.
+> 
+> +- regulator:
+> +	Usage: optional
+> +	Value type: boolean
+> +	Definition: Indicates that this SPM device acts as a regulator device
+> +			device for the core (CPU or Cache) the SPM is attached
+> +			to.
+> 
+> Example:
+> 
+> -	regulator at 2099000 {
+> +	power-controller at 2099000 {
+> 		compatible = "qcom,saw2";
+> 		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+> +		regulator;
+> 	};
 
-I have to check if we are capable of parsing that. but if that is the
-approach chosen, I suppose we might be able to figure something, I
-suppose..
+- k
 
 -- 
-Regards,
-Nishanth Menon
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
