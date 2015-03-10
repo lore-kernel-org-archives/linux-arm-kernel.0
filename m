@@ -1,27 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 10 Mar 2015 22:26:03 +0100
-Subject: [PATCH v2 1/2] ARM: dts: add cubietech cubieboard4
-In-Reply-To: <1425932398-7194-2-git-send-email-tyler.baker@linaro.org>
-References: <1425932398-7194-1-git-send-email-tyler.baker@linaro.org>
- <1425932398-7194-2-git-send-email-tyler.baker@linaro.org>
-Message-ID: <20150310212603.GB5085@lukather>
+Date: Tue, 10 Mar 2015 22:28:43 +0100
+Subject: [PATCH v5 05/12] ARM: dts: sun6i: hummingbird: Add AXP221 PMIC
+ device node
+In-Reply-To: <1425988764-23618-6-git-send-email-wens@csie.org>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-6-git-send-email-wens@csie.org>
+Message-ID: <20150310212843.GE5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 01:19:57PM -0700, tyler.baker at linaro.org wrote:
-> From: Tyler Baker <tyler.baker@linaro.org>
+On Tue, Mar 10, 2015 at 07:59:16PM +0800, Chen-Yu Tsai wrote:
+> The Hummingbird A31 has an AXP221 PMIC hooked up to the
+> P2WI controller.
 > 
-> Add a Cubietech Cubieboard4 device tree and instruct make to build it. This
-> device tree has been derived from the sun9i-a80-optimus.dts as they are very
-> similar in design[1]. Notably, I2C3 is not used on Cubieboard4 and the LED/PWM
-> definitions will need to be updated in the future.
-> 
-> [1] http://dl.cubieboard.org/model/cc-a80/Hardware/CC-A80-HW-V1.1.pdf
-> 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Applied, thanks!
-
 Maxime
 
 -- 
@@ -34,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/59cd9e6d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/e032cd45/attachment.sig>
