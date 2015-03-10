@@ -1,69 +1,127 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 10 Mar 2015 12:13:46 -0500
-Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
- msm-id and qcom, board-id
-In-Reply-To: <89746055.qtEO3GZJmR@wuerfel>
-References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
- <CAOesGMjpOx4SxY7j8jnoEwLG+mhPKB2st8qCb-hduHLOVw=RcQ@mail.gmail.com>
- <F9B276F7-61EF-4406-AB46-97D7F1ECEEFE@codeaurora.org>
- <89746055.qtEO3GZJmR@wuerfel>
-Message-ID: <F5017A7F-0EA2-41B3-A9DD-6123CCFD36FA@codeaurora.org>
+From: neelegup@linux.vnet.ibm.com (Neelesh Gupta)
+Date: Tue, 10 Mar 2015 22:43:21 +0530
+Subject: [RFC V2 04/12] i2c: opal: make use of the new infrastructure
+ for quirks
+In-Reply-To: <1424880126-15047-5-git-send-email-wsa@the-dreams.de>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+ <1424880126-15047-5-git-send-email-wsa@the-dreams.de>
+Message-ID: <54FF2631.9050006@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I tested the i2c opal driver after updating the patch as below.
+Basically I think we can also support write-then-{read/write}
+for the number of messages = 2.
+Ben, any issues if we support both write plus read/write in the
+opal driver ?
 
-On Mar 9, 2015, at 7:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+Regards,
+Neelesh
 
-> On Friday 06 March 2015 14:37:52 Kumar Gala wrote:
->> On Mar 6, 2015, at 1:15 PM, Olof Johansson <olof@lixom.net> wrote:
->> 
->>> On Fri, Mar 6, 2015 at 8:08 AM, Kumar Gala <galak@codeaurora.org> wrote:
->>>> 
->>>> On Mar 5, 2015, at 7:59 PM, Olof Johansson <olof@lixom.net> wrote:
->>>> 
->>>>> On Thu, Mar 5, 2015 at 12:23 PM, Kumar Gala <galak@codeaurora.org> wrote:
->>>>>> 
->>>>>> On Mar 5, 2015, at 1:42 PM, Kevin Hilman <khilman@kernel.org> wrote:
->>>>>> 
->>>>>>> Kumar Gala <galak@codeaurora.org> writes:
->>>>>>> 
->>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
->>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
->>>>>>>> utilized and passed to the kernel.
->>>>>>>> 
->>>>>>>> Cc: <devicetree@vger.kernel.org>
->>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->>>>>>> 
->>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
->>>>>>> plus multiple DTBs and figure out which DTB to pass?
->>>>>>> 
->>>>>>> Kevin
->>>>>> 
->>>>>> yes
->>>>> 
->>>>> That's a bummer.
->>>>> 
->>>>> Luckily, the solution for upstream is still quite simple: Provide only
->>>>> one devicetree, and it'll be used, right?
->>>> 
->>>> We can provide only one, we still need the IDs in the DT.
->>> 
->>> How are the DTS provided? Concatenated with the kernel, or in a
->>> wrapped data format? Or in a separate partition from the kernel?
->> 
->> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
-> 
-> Then you should be able to create a tool that can write this concatenated
-> format and insert these properties from a table that matches the boot
-> loader, right?
-> 
-> 	Arnd
 
-Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
+  drivers/i2c/busses/i2c-opal.c |   20 ++++++++------------
+  1 file changed, 8 insertions(+), 12 deletions(-)
 
-- k
+diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
+index 16f90b1..85412ba 100644
+--- a/drivers/i2c/busses/i2c-opal.c
++++ b/drivers/i2c/busses/i2c-opal.c
+@@ -104,18 +104,8 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+  		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
+  		break;
+  	case 2:
+-		/* For two messages, we basically support only simple
+-		 * smbus transactions of a write plus a read. We might
+-		 * want to allow also two writes but we'd have to bounce
+-		 * the data into a single buffer.
+-		 */
+-		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
+-			return -EOPNOTSUPP;
+-		if (msgs[0].len > 4)
+-			return -EOPNOTSUPP;
+-		if (msgs[0].addr != msgs[1].addr)
+-			return -EOPNOTSUPP;
+-		req.type = OPAL_I2C_SM_READ;
++		req.type = (msgs[1].flags & I2C_M_RD) ?
++			OPAL_I2C_SM_READ : OPAL_I2C_SM_WRITE;
+  		req.addr = cpu_to_be16(msgs[0].addr);
+  		req.subaddr_sz = msgs[0].len;
+  		for (i = 0; i < msgs[0].len; i++)
+@@ -210,6 +200,11 @@ static const struct i2c_algorithm i2c_opal_algo = {
+  	.functionality	= i2c_opal_func,
+  };
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
++static struct i2c_adapter_quirks i2c_opal_quirks = {
++	.flags = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | I2C_AQ_COMB_SAME_ADDR,
++	.max_comb_1st_msg_len = 4,
++};
++
+  static int i2c_opal_probe(struct platform_device *pdev)
+  {
+  	struct i2c_adapter	*adapter;
+@@ -232,6 +227,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
+
+  	adapter->algo = &i2c_opal_algo;
+  	adapter->algo_data = (void *)(unsigned long)opal_id;
++	adapter->quirks = &i2c_opal_quirks;
+  	adapter->dev.parent = &pdev->dev;
+  	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
+  	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
+
+
+
+On 02/25/2015 09:31 PM, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>
+> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> ---
+>   drivers/i2c/busses/i2c-opal.c | 22 +++++++++++-----------
+>   1 file changed, 11 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
+> index 16f90b1a750894..b2788ecad5b3cb 100644
+> --- a/drivers/i2c/busses/i2c-opal.c
+> +++ b/drivers/i2c/busses/i2c-opal.c
+> @@ -104,17 +104,6 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>   		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
+>   		break;
+>   	case 2:
+> -		/* For two messages, we basically support only simple
+> -		 * smbus transactions of a write plus a read. We might
+> -		 * want to allow also two writes but we'd have to bounce
+> -		 * the data into a single buffer.
+> -		 */
+> -		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
+> -			return -EOPNOTSUPP;
+> -		if (msgs[0].len > 4)
+> -			return -EOPNOTSUPP;
+> -		if (msgs[0].addr != msgs[1].addr)
+> -			return -EOPNOTSUPP;
+>   		req.type = OPAL_I2C_SM_READ;
+>   		req.addr = cpu_to_be16(msgs[0].addr);
+>   		req.subaddr_sz = msgs[0].len;
+> @@ -210,6 +199,16 @@ static const struct i2c_algorithm i2c_opal_algo = {
+>   	.functionality	= i2c_opal_func,
+>   };
+>   
+> +/* For two messages, we basically support only simple
+> + * smbus transactions of a write plus a read. We might
+> + * want to allow also two writes but we'd have to bounce
+> + * the data into a single buffer.
+> + */
+> +static struct i2c_adapter_quirks i2c_opal_quirks = {
+> +	.flags = I2C_AQ_COMB_WRITE_THEN_READ,
+> +	.max_comb_1st_msg_len = 4,
+> +};
+> +
+>   static int i2c_opal_probe(struct platform_device *pdev)
+>   {
+>   	struct i2c_adapter	*adapter;
+> @@ -232,6 +231,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
+>   
+>   	adapter->algo = &i2c_opal_algo;
+>   	adapter->algo_data = (void *)(unsigned long)opal_id;
+> +	adapter->quirks = &i2c_opal_quirks;
+>   	adapter->dev.parent = &pdev->dev;
+>   	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
+>   	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
