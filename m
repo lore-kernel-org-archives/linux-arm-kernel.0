@@ -1,56 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 10 Mar 2015 12:05:21 +0000
-Subject: [PATCH 1/3] arm/pmu: Reject groups spanning multiple hardware PMUs
-In-Reply-To: <20150310112723.GY2896@worktop.programming.kicks-ass.net>
-References: <1425905192-10509-1-git-send-email-suzuki.poulose@arm.com>
- <1425905192-10509-2-git-send-email-suzuki.poulose@arm.com>
- <20150310112723.GY2896@worktop.programming.kicks-ass.net>
-Message-ID: <20150310120521.GD28168@leverpostej>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 Mar 2015 13:07:43 +0100
+Subject: [PATCH 1/2] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT8173 SoCs
+In-Reply-To: <1425986519.28516.59.camel@mtksdaap41>
+References: <1424606567-29708-1-git-send-email-s.hauer@pengutronix.de>
+ <1424606567-29708-2-git-send-email-s.hauer@pengutronix.de>
+ <CABuKBe+goUnNUtK1+-VGNq9w-NUgQOA5d5h_0Yx9VwuXr6-A6g@mail.gmail.com>
+ <20150309103835.GB31289@pengutronix.de>
+ <1425986519.28516.59.camel@mtksdaap41>
+Message-ID: <20150310120743.GG24885@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 11:27:23AM +0000, Peter Zijlstra wrote:
-> On Mon, Mar 09, 2015 at 12:46:30PM +0000, Suzuki K. Poulose wrote:
-> > From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+On Tue, Mar 10, 2015 at 07:21:59PM +0800, fan.chen wrote:
+> On Mon, 2015-03-09 at 11:38 +0100, Sascha Hauer wrote:
+> > > > +
+> > > > +       switch (ck_mhz) {
+> > > > +       case 18:
+> > > > +               if (pwrap_is_mt8135(wrp))
+> > > > +                       pwrap_writel(wrp, 0xc, PWRAP_CSHEXT);
+> > > 
+> > > If the pmic-wrapper is unique to every SoC, we should think of
+> > > providing a different way to distinguish between the implementations.
+> > > Otherwise we will bloat up the code with SoC specific conditionals.
 > > 
-> > Don't allow grouping hardware events from different PMUs
-> >  (eg. CCI + CPU).
-> 
-> Uhm, how does this work? If we have multiple hardware PMUs we'll stop
-> scheduling events after the first failed event schedule. This can leave
-> one of the PMUs severely under utilized.
+> > I am happy to replace this with pwrap_is_v2() or even with additional
+> > function hooks in struct pmic_wrapper_type once it's clear how other
+> > pmic wrapper are different. Without this knowledge it's hard to predict
+> > what the right weapon is to abstract between SoC differences.
+> > 
+> > Sascha
+> > 
+> Per function similarity, the pmic-wrapper of a new soc usually comes
+> from an existing soc and have some modifications on it. (it does not
+> have exactly the same version shared between SoCs so far)
 
-The problem is here group validation at pmu::event_init() time, not
-scheduling.
+So you don't have some internal versioning scheme, right? In that case the
+SoC name is the best we can use as a version.
 
-We don't allow grouping across disparate HW PMUs because we can't
-provide group semantics anyway. Scheduling is not a problem in this case
-(unlike the big.LITTLE case I have a patch for [1]).
+> In this case, MT8173's pmic wrapper is derived from MT8135 and they
+> share much common implementation.
+> For other SOCs like 6582/6592, they would have different init flows, but
+> the pwrap-read/write part has very similar protocol. 
+> The driver is originally intended for MT8135/MT8173 since they share quite common init flow.
 
-We have a CPU PMU and an "uncore" CCI PMU. You can't create task-bound
-events for the CCI, but you can create CPU-bound events for the CCI on
-the nominal CPU the CCI is monitored from.
+Originally there were two drivers for both SoCs, it was me who merged
+them.
 
-The context check you added in c3c87e770458aa00 "perf: Tighten (and fix)
-the grouping condition" implicitly rejects groups that have CPU and CCI
-events (each event::ctx will be the relevant pmu::pmu_cpu_context and
-will differ), and this is sane -- you can't provide group semantics
-across disparate HW PMUs.
+> For other SOCs, they won't fit in current MT8135/MT173 init flow.
+> Should we move pmic-wrapper init part to a chip-specific file and leave
+> only common part (pmic read/write protocol) for all SoC here? ex:
 
-Unfortunately that happens after we've done the
-event->pmu->event_init(event) dance on each event, and in our event_init
-function we try to verify the group is sane. In our verification we
-ignore SW events, but assume that all !SW events are for the CPU PMU.
-If you add a CPU event to a CCI group, that's not the case, and we use
-container_of on an unsuitable object, derefence garbage, invoke the
-eschaton and so on.
+Putting these into separate files doesn't change much. If this becomes
+necessary because otherwise the driver grows too big it can always be
+done. For now I have created an abstraction which fits for two SoC
+derivates. If more derivates come then the abstraction has to grow with
+the situation. Yes, we don't want to end up with stuff like
+if (is_mt8173() || is_mt8135() || (is_mt6xxx() && !is_mt6533())).
+Everytime another is_mtxy() is added we have to look if it's still the
+right thing to be do or if function pointers in SoC specific data
+structs are better, or maybe a completely other approach.
 
-It would be nicer if we could prevent this in the core so we're not
-reliant on every PMU driver doing the same verification. My initial
-thought was that seemed like unnecessary duplication of the ctx checking
-above, but if we're going to end up shoving it into several drivers
-anyway perhaps it's the lesser evil.
+Sascha
 
-Mark.
-
-[1] https://lkml.org/lkml/2015/2/5/520
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
