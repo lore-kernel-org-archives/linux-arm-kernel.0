@@ -1,57 +1,127 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 10 Mar 2015 14:45:55 -0400
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <54FF2F3E.7050503@list.ru>
-References: <54FF21BE.2040506@list.ru> <54FF2B45.8060407@hurleysoftware.com>
- <54FF2F3E.7050503@list.ru>
-Message-ID: <54FF3BE3.308@hurleysoftware.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 10 Mar 2015 19:47:34 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada XP
+ SOCs
+In-Reply-To: <54FF3967.1090602@linaro.org>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+ <20150310190507.64b3c153@free-electrons.com> <54FF3967.1090602@linaro.org>
+Message-ID: <CDBC2CF7-30C4-4B1C-8F85-DE72C37856A7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/10/2015 01:51 PM, Stas Sergeev wrote:
-> 10.03.2015 20:35, Peter Hurley ?????:
->> On 03/10/2015 12:54 PM, Stas Sergeev wrote:
->>> Hello, the patch below is needed for a successful boot on armada-xp.
->>>
->>>
->>> -=-=-=-=-=-=-=-=-=# Don't remove this line #=-=-=-=-=-=-=-=-=-
->>> This fixes the following crash at boot:
->>>
->>>  Unhandled fault: external abort on non-linefetch (0x808) at 0xf00ca018
->>>  Internal error: : 808 [#1] SMP ARM
->>>
->>>  CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc1 #3
->>>  Hardware name: Marvell Armada 370/XP (Device Tree)
->>>  task: ed41e800 ti: ed43e000 task.ti: ed43e000
->>>  PC is at _set_bit+0x28/0x50
->>>  LR is at n_tty_set_termios+0x328/0x358
->>>  pc : [<c01bc858>]    lr : [<c0207314>]    psr: 40000113
->>>  sp : ed43fd00  ip : 00000000  fp : 00000000
->>>  r10: 00000002  r9 : 00000000  r8 : ec930200
->>>  r7 : 00000000  r6 : f00ca018  r5 : f00ca000  r4 : ed69cc00
->>>  r3 : 00002000  r2 : 00002000  r1 : f00ca018  r0 : 00000000
->>>  Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
->>>  Control: 10c5387d  Table: 0000406a  DAC: 00000015
->>>  Process swapper/0 (pid: 1, stack limit = 0xed43e220)
->>>
->>> The offending instruction in _set_bit() is "strex r0, r2, [r1]"
->>> For some reason the exclusive access instructions do not like the
->>> vmalloc() space... While there may be another fix to make them
->>> fine about vmalloc() space, it still looks like a good idea to
->>> use kmalloc() for allocating a small (sub-page) struct.
->> NAK.
+Le 10 mars 2015 19:35:19 GMT+01:00, Daniel Lezcano <daniel.lezcano@linaro.org> a ?crit :
+>On 03/10/2015 07:05 PM, Thomas Petazzoni wrote:
+>> Hello Daniel,
 >>
->> struct n_tty_data is order 2, not sub-page.
-> OK, you are right, sorry. 8844 bytes.
-> Is this really a target for vmalloc() though? I thought kmalloc()
-> is preferable even for that size.
+>> I know you suggested a more rigorous method of determining the exit
+>> latency and target residency times, but would it be nonetheless
+>> possible to apply this patch, which clearly improves performance a
+>lot,
+>> and actually makes the code match the values used in the vendor
+>kernel?
+>>
+>> I also think this patch should be marked for stable, it fixes values
+>> introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
+>> should therefore be backported all the way to v3.16.
+>
+>I don't have a problem to apply this patch. But I would like to have 
+>confirmation from one of the Armada maintainers the tradeoff is
+>accepted 
+>(less energy saving for more performance).
 
-It doubles as a selftest for arch page table setup :)
+Hi Daniel,
 
-I considered only using vmalloc() as a fallback, but problems
-like this make me *less* interested in doing that. At least this
-way the problem is unambiguous.
+I already gave my acked- by for this patch, so for me this tradeoff
+is acceptable.
 
-Regards,
-Peter Hurley
+Gr?gory
+
+>
+>
+>> On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
+>>> Originally, the thresholds used in the cpuidle driver for Armada
+>SOCs
+>>> were temporarily chosen, leaving room for improvements.
+>>>
+>>> This commit updates the thresholds for the Armada XP SOCs with
+>values
+>>> that positively impact performances:
+>>>
+>>>                                  without patch  with patch   vendor
+>kernel
+>>>   - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
+>>>   - ioping tmpfs (iops)          ~163k          ~206k        ~179k
+>>>   - ioping tmpfs (mib/s)         ~636           ~805         ~699
+>>>
+>>> The idle power consumption is negatively impacted (proportionally
+>less
+>>> than the performance gain), and we are still performing better than
+>>> the vendor kernel here:
+>>>
+>>>                                  without patch   with patch  vendor
+>kernel
+>>>   - power consumption idle (W)   ~2.4            ~3.2        ~4.4
+>>>   - power consumption busy (W)   ~8.6            ~8.3        ~8.6
+>>>
+>>> There is still room for improvement regarding the value of these
+>>> thresholds, they were chosen to mimic the vendor kernel.
+>>>
+>>> This patch only impacts Armada XP SOCs and was tested on Online Labs
+>>> C1 boards. A similar approach can be taken to improve the
+>performances
+>>> of the Armada 370 and Armada 38x SOCs.
+>>>
+>>> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
+>>> for the discussions and tips around this topic.
+>>>
+>>> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
+>>> ---
+>>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
+>>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> index 38e6861..3716a1f 100644
+>>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>>> @@ -50,17 +50,17 @@ static struct cpuidle_driver
+>armadaxp_idle_driver = {
+>>>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>>>   	.states[1]		= {
+>>>   		.enter			= mvebu_v7_enter_idle,
+>>> -		.exit_latency		= 10,
+>>> +		.exit_latency		= 100,
+>>>   		.power_usage		= 50,
+>>> -		.target_residency	= 100,
+>>> +		.target_residency	= 1000,
+>>>   		.name			= "MV CPU IDLE",
+>>>   		.desc			= "CPU power down",
+>>>   	},
+>>>   	.states[2]		= {
+>>>   		.enter			= mvebu_v7_enter_idle,
+>>> -		.exit_latency		= 100,
+>>> +		.exit_latency		= 1000,
+>>>   		.power_usage		= 5,
+>>> -		.target_residency	= 1000,
+>>> +		.target_residency	= 10000,
+>>>   		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
+>>>   		.name			= "MV CPU DEEP IDLE",
+>>>   		.desc			= "CPU and L2 Fabric power down",
+>>
+>>
+>>
+>
+>
+>-- 
+><http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter |
+><http://www.linaro.org/linaro-blog/> Blog
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
