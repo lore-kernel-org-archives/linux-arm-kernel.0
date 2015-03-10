@@ -1,29 +1,61 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Mar 2015 16:13:24 -0500
-Subject: [PATCHv7 3/4] USB: gadget: atmel_usba_udc: Start clocks on
- rising edge of the Vbus signal, stop clocks on falling edge of the Vbus
- signal
-In-Reply-To: <1423763647-11687-4-git-send-email-sylvain.rochet@finsecur.com>
-References: <1423763647-11687-1-git-send-email-sylvain.rochet@finsecur.com>
- <1423763647-11687-4-git-send-email-sylvain.rochet@finsecur.com>
-Message-ID: <20150310211324.GE25666@saruman.tx.rr.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 10 Mar 2015 22:20:03 +0100
+Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
+In-Reply-To: <2455342.zT71E5iyaL@wuerfel>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2383270.cAJPOxrkvo@wuerfel>
+ <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
+ <2455342.zT71E5iyaL@wuerfel>
+Message-ID: <CALszF6DENRS2L8mHD_iPsPwbAZndbHoB10oHaJ8-E4ajhog=8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2015-03-10 21:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 10 March 2015 16:44:24 Maxime Coquelin wrote:
+>> 2015-03-10 16:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
+>> >> +/* AHB1 */
+>> >> +#define GPIOA_RESET    0
+>> >> +#define GPIOB_RESET    1
+>> >> +#define GPIOC_RESET    2
+>> >> +#define GPIOD_RESET    3
+>> >> +#define GPIOE_RESET    4
+>> >> +#define GPIOF_RESET    5
+>> >> +#define GPIOG_RESET    6
+>> >> +#define GPIOH_RESET    7
+>> >> +#define GPIOI_RESET    8
+>> >> +#define GPIOJ_RESET    9
+>> >> +#define GPIOK_RESET    10
+>> >>
+>> >
+>> > As these are just the hardware numbers, it's better to not make them
+>> > part of the binding at all. Instead, just document in the binding that
+>> > one is supposed to pass the hardware number as the argument.
+>>
+>> The reset controller is part of the RCC (Reset & Clock Controller) IP.
+>> In this version, I only provided the reset registers to the reset
+>> controller driver, but as per Andreas F?rber remark, I should avec a
+>> single DT node for both the resets and clocks.
+>>
+>> In the next version I am preparing, the defines doesn't look as
+>> trivial as in this version, GPIOA_RESET being 128 for instance.
+>>
+>> Is it fine for you if I keep the defines part of the binding?
+>>
+>>
+>
+> It's always better to avoid these files entirely, as they are
+> a frequent source of merge dependencies, and they make it less
+> obvious what's going on than having binary values in the dtb
+> that make sense.
 
-this one became:
+I agree it is always painful to have to have to manage these merge dependencies.
+What I will do, if Philipp agrees, is to list all the values in the
+binding documentation.
 
-"usb: gadget: atmel_usba_udc: condition clocks to vbus state"
+Doing that, the user of a reset won't have to do the calculation, and
+no more merge dependencies.
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150310/ad04e4fc/attachment.sig>
+Maxime
+>
+>         Arnd
