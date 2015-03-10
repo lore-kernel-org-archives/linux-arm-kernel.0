@@ -1,58 +1,94 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 10 Mar 2015 19:59:19 +0800
-Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information to DT
- bindings
+Date: Tue, 10 Mar 2015 19:59:21 +0800
+Subject: [PATCH v5 10/12] ARM: dts: sun6i: hummingbird: Add AXP221 regulator
+ nodes
 In-Reply-To: <1425988764-23618-1-git-send-email-wens@csie.org>
 References: <1425988764-23618-1-git-send-email-wens@csie.org>
-Message-ID: <1425988764-23618-9-git-send-email-wens@csie.org>
+Message-ID: <1425988764-23618-11-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the list of regulators for AXP22x to the DT bindings.
-This includes the names and supply names.
+This patch adds the AXP221 regulators. Only the ones directly used
+on the board are added.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 56 ++++++++++++++++++++++++++++-
+ 1 file changed, 55 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 3914a3f91ff6..0fc2f1f35cef 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -49,6 +49,33 @@ LDO3		: LDO		: ldo3in-supply
- LDO4		: LDO		: ldo24in-supply	: shared supply
- LDO5		: LDO		: ldo5in-supply
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 486ffc69ac96..d13c88c6509a 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -115,7 +115,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&vcc_3v0>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
+ 	cd-inverted;
+@@ -150,6 +150,60 @@
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
++		dcdc1-supply = <&vcc_3v0>;
++		dcdc5-supply = <&vcc_dram>;
++
++		regulators {
++			x-powers,dcdc-freq = <3000>;
++
++			vcc_3v0: dcdc1 {
++				regulator-always-on;
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-name = "vcc-3v0";
++			};
++
++			vdd_cpu: dcdc2 {
++				regulator-always-on;
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1320000>;
++				regulator-name = "vdd-cpu";
++			};
++
++			vdd_gpu: dcdc3 {
++				regulator-always-on;
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1320000>;
++				regulator-name = "vdd-gpu";
++			};
++
++			vdd_sys_dll: dcdc4 {
++				regulator-always-on;
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-name = "vdd-sys-dll";
++			};
++
++			vcc_dram: dcdc5 {
++				regulator-always-on;
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-name = "vcc-dram";
++			};
++
++			vcc_wifi: aldo1 {
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-name = "vcc_wifi";
++			};
++
++			avcc: aldo3 {
++				regulator-always-on;
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-name = "avcc";
++			};
++		};
+ 	};
+ };
  
-+
-+AXP221 regulators, type, and corresponding input supply names:
-+
-+Regulator	  Type		  Supply Name		  Notes
-+---------	  ----		  -----------		  -----
-+DCDC1		: DC-DC buck	: vin1-supply
-+DCDC2		: DC-DC buck	: vin2-supply
-+DCDC3		: DC-DC	buck	: vin3-supply
-+DCDC4		: DC-DC	buck	: vin4-supply
-+DCDC5		: DC-DC	buck	: vin5-supply
-+DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
-+DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
-+ALDO1		: LDO		: aldoin-supply		: shared supply
-+ALDO2		: LDO		: aldoin-supply		: shared supply
-+ALDO3		: LDO		: aldoin-supply		: shared supply
-+DLDO1		: LDO		: dldoin-supply		: shared supply
-+DLDO2		: LDO		: dldoin-supply		: shared supply
-+DLDO3		: LDO		: dldoin-supply		: shared supply
-+DLDO4		: LDO		: dldoin-supply		: shared supply
-+ELDO1		: LDO		: eldoin-supply		: shared supply
-+ELDO2		: LDO		: eldoin-supply		: shared supply
-+ELDO3		: LDO		: eldoin-supply		: shared supply
-+LDO_IO0		: LDO		: ips-supply		: GPIO 0
-+LDO_IO1		: LDO		: ips-supply		: GPIO 1
-+RTC_LDO		: LDO		: ips-supply		: always on
-+
-+
- Example:
- 
- axp209: pmic at 34 {
 -- 
 2.1.4
