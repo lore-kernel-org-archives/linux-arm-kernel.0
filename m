@@ -1,135 +1,76 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 10 Mar 2015 14:55:30 -0500
-Subject: [PATCH v2 2/2] ARM: dts: am33xx: Move wkup_m3 node to soc node
- and add ranges
-In-Reply-To: <20150310160919.GQ5264@atomide.com>
-References: <1425528742-3087-1-git-send-email-d-gerlach@ti.com>
- <1425528742-3087-3-git-send-email-d-gerlach@ti.com>
- <20150305154039.GD13520@atomide.com> <54F88849.1090708@ti.com>
- <20150305165727.GE13520@atomide.com> <54FE33CA.4090709@ti.com>
- <20150310160919.GQ5264@atomide.com>
-Message-ID: <54FF4C32.5070106@ti.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Tue, 10 Mar 2015 14:57:47 -0500
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <10886228.vUHyKm1ubP@wuerfel>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
+ <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
+ <10886228.vUHyKm1ubP@wuerfel>
+Message-ID: <7DA73171-01A5-4158-9A69-015B62D2D7E8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 03/10/2015 11:09 AM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [150309 16:59]:
->> On 03/05/2015 10:57 AM, Tony Lindgren wrote:
->>> * Suman Anna <s-anna@ti.com> [150305 08:47]:
->>>> On 03/05/2015 09:40 AM, Tony Lindgren wrote:
->>>>> * Dave Gerlach <d-gerlach@ti.com> [150304 20:14]:
->>>> Dave,
->>>>
->>>> Looks like the commit message disappeared during your patch preparation.
->>>>
->>>>>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>>>> ---
->>>>>>  arch/arm/boot/dts/am33xx.dtsi | 21 +++++++++++++--------
->>>>>>  1 file changed, 13 insertions(+), 8 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>>>>> index acd3705..086415c 100644
->>>>>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>>>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>>>>> @@ -77,10 +77,23 @@
->>>>>>  	 */
->>>>>>  	soc {
->>>>>>  		compatible = "ti,omap-infra";
->>>>>> +		#address-cells = <1>;
->>>>>> +		#size-cells = <1>;
->>>>>> +		ranges = <0x0     0x44d00000 0x4000>,
->>>>>> +			 <0x80000 0x44d80000 0x2000>;
->>>>>> +
->>>>>
->>>>> I think putting the ranges here will cause issues for adding
->>>>> ranges for anything else.
->>>>>
->>>>> How about do something like this instead (untested):
->>>>>
->>>>> ocp {
->>>>> 	l4_wkup: l4_wkup at 44c00000 {
->>>>> 		compatible = "am335-l4-wkup", "simple-bus";
->>>>> 		ranges = <0 0x44c00000 0x3fffff>;
->>>>>
->>>>> 		wkup_m3: wkup_m3 at 44d00000 {
->>>>> 			compatible = "ti,am3353-wkup-m3";
->>>>> 			reg = <0x1000000     0x4000>,	/* M3 UMEM */
->>>>> 			      <0x180000	     0x2000>;	/* M3 DMEM */
->>>>> 			ti,hwmods = "wkup_m3";
->>>>> 			ti,pm-firmware = "am335x-pm-firmware.elf";
->>>>> 		};
->>>>>
->>>>> 		...
->>>>> 	};
->>>>> };
->>>>>
->>>>> That way we can start moving also the other l4_wkup components there
->>>>> eventuallly without having to redo the ranges again for wkup_m3.
->>>>>
->>>>> You can also look at how the scm_conf was done for dm816x.dtsi for an
->>>>> example, and the recent large set of patches posted by Tero.
->>
->> I have taken a look at both the above. The L4_WKUP range includes the
->> PRCM, Control Module, as well as a few peripherals like DMTimer0, UART0
->> etc. What all do we want to move here eventually?
-> 
-> Well eventually all the children of L4_WKUP, but that can be done
-> slowly as some of the drivers have weird hacks and may not work
-> properly if moved around.
-> 
-> For example, anything with reg entries for something like SCM area will
-> break as that's not going to be in the L4_WKUP area ny longer :p And
-> that's actually good as it will protect us from spaghetti code
-> automatically later on for new code.
-> 
->> Depending on that, we may have to use 2 address cells like in Tero's
->> PRCM cleanup series rather than the single cell translation used by
->> you in dm816x.dtsi so that we can retain the relative addresses
->> w.r.t the existing node bases in the derivative child nodes.
-> 
-> Hmm OK, care to paste a dts snippet example for that?
 
-Suman and I have been looking at this together, so I can comment here. An
-implementation like this is what Suman is referring to:
+On Mar 10, 2015, at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-+               l4_wkup: l4_wkup at 44c00000 {
-+                       compatible = "am335-l4-wkup", "simple-bus";
-+                       #address-cells = <2>;
-+                       #size-cells = <1>;
-+                       ranges = <0 0           0x44c00000 0x100000>,
-+                                <1 0x0         0x44d00000 0x4000>,
-+                                <2 0x80000     0x44d80000 0x2000>;
-+
-+                       wkup_m3: wkup_m3 at 1,0 {
-+                               compatible = "ti,am3353-wkup-m3";
-+                               reg = <1 0x0     0x4000>,       /* M3 UMEM */
-+                                     <2 0x80000 0x2000>;       /* M3 DMEM */
-+
-+                               ti,hwmods = "wkup_m3";
-+                               ti,pm-firmware = "am335x-pm-firmware.elf";
-+                       };
-+               };
-+
-
-The of_* layer automatically translates everything so the pdata-quirks can still
-match based on wkup_m3 at 44d00000. The existing wkup_m3_rproc driver works almost
-entirely as is with this, all cpu addresses are read and mapped correctly but
-the driver no longer will read the actual device addresses correctly which we
-need for understanding where to load the firmware sections.
-
-These device addresses are being read directly using of_get_address, which reads
-the first value in the reg entries which is 1 and 2 now for UMEM and DMEM. We
-would need some sort of change there also to get the proper 0x0 and 0x80000
-device address values. Just advancing the pointer returned by of_get_address
-does the trick but this doesn't seem like the cleanest solution.
-
-Regards,
-Dave
-
+> On Tuesday 10 March 2015 13:10:08 Kumar Gala wrote:
+>>>>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>>>>>>>>>> utilized and passed to the kernel.
+>>>>>>>>>>>> 
+>>>>>>>>>>>> Cc: <devicetree@vger.kernel.org>
+>>>>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>>>>>>>> 
+>>>>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>>>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
+>>>>>>>>>>> 
+>>>>>>>>>>> Kevin
+>>>>>>>>>> 
+>>>>>>>>>> yes
+>>>>>>>>> 
+>>>>>>>>> That's a bummer.
+>>>>>>>>> 
+>>>>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
+>>>>>>>>> one devicetree, and it'll be used, right?
+>>>>>>>> 
+>>>>>>>> We can provide only one, we still need the IDs in the DT.
+>>>>>>> 
+>>>>>>> How are the DTS provided? Concatenated with the kernel, or in a
+>>>>>>> wrapped data format? Or in a separate partition from the kernel?
+>>>>>> 
+>>>>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+>>>>> 
+>>>>> Then you should be able to create a tool that can write this concatenated
+>>>>> format and insert these properties from a table that matches the boot
+>>>>> loader, right?
+>>>>> 
+>>>>>     Arnd
+>>>> 
+>>>> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
+>>> 
+>>> To insert platform-local properties that mean nothing outside of the
+>>> firmware packaging of the device trees, which is the case here?
+>>> 
+>>> I think the idea of having the installer script inserting them is
+>>> quite reasonable in this case.
+>>> 
+>>> 
+>>> -Olof
+>> 
+>> These values are static, so not sure what the point of having the installer script do that?
+>> 
 > 
-> Regards,
+> It combines two hacks to work around a nonstandard boot loader.
+> Once the bootloader is fixed, you can stop using that script.
 > 
-> Tony
-> 
+> 	Arnd
+
+I feel as if I?m missing something here.  If we just have the properties in the .dts files I don?t need to change anything ever, no script, no worries about working with old or new boot loaders, etc.
+
+- k
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
