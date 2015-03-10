@@ -1,31 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon,  9 Mar 2015 23:33:22 -0300
-Subject: [PATCH] ARM: dts: imx6sl-warp: Pass 'bus-width' property
-Message-ID: <1425954802-14206-1-git-send-email-festevam@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 10 Mar 2015 10:35:58 +0800
+Subject: [PATCH v9 01/21] ACPI / table: Use pr_debug() instead of pr_info()
+ for MADT table scanning
+In-Reply-To: <1425673876.12017.50.camel@perches.com>
+References: <1424853601-6675-1-git-send-email-hanjun.guo@linaro.org>	
+ <1424853601-6675-2-git-send-email-hanjun.guo@linaro.org>	
+ <20150306201718.9363CC40AA9@trevor.secretlab.ca>
+ <1425673876.12017.50.camel@perches.com>
+Message-ID: <54FE588E.4030406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 2015?03?07? 04:31, Joe Perches wrote:
+> On Fri, 2015-03-06 at 20:17 +0000, Grant Likely wrote:
+>> On Wed, 25 Feb 2015 16:39:41 +0800 Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>>> This patch just use pr_debug() instead of pr_info() for ioapic/iosapic,
+>>> local apic/x2apic/sapic structures when scanning the MADT table to remove
+>>> those verbose information, but leave other structures unchanged.
+> []
+>> One nitpick below, but don't respin over this, and don't do a fixup.
+> []
+>>> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> []
+>>> @@ -61,9 +63,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+>>>   		{
+>>>   			struct acpi_madt_local_apic *p =
+>>>   			    (struct acpi_madt_local_apic *)header;
+>>> -			pr_info("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>>> -				p->processor_id, p->id,
+>>> -				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+>>> +			pr_debug("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
+>>> +				 p->processor_id, p->id,
+>>> +				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
+>>
+>> The whitespace changes makes each 1 line change into 3 line changes. In
+>> these situations, I would chose to leave the whitespace alone to keep
+>> the diffstat as small as possible. It makes it less likely to conflict
+>> with other patches and easier to find context.
+>
+> I think it's mostly better to use a consistent indentation style
+> regardless of the number in whitespace changes surrounding the change.
 
-USDHC2 port uses all the 8 data signals, so pass the 'bus-width' property
-accordingly.
+I think both would be fine. Since this patch only touches acpi core
+code and ACPI maintainer Rafael already acked it, I will keep it as
+it is.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sl-warp.dts | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx6sl-warp.dts b/arch/arm/boot/dts/imx6sl-warp.dts
-index 904efc4..8adc843 100644
---- a/arch/arm/boot/dts/imx6sl-warp.dts
-+++ b/arch/arm/boot/dts/imx6sl-warp.dts
-@@ -122,6 +122,7 @@
- 	pinctrl-0 = <&pinctrl_usdhc2>;
- 	pinctrl-1 = <&pinctrl_usdhc2_100mhz>;
- 	pinctrl-2 = <&pinctrl_usdhc2_200mhz>;
-+	bus-width = <8>;
- 	non-removable;
- 	status = "okay";
- };
--- 
-1.9.1
+Thanks
+Hanjun
