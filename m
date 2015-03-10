@@ -1,24 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Mar 2015 16:34:12 +0000
-Subject: some question about Set bit 22 in the PL310 (cache controller)
- AuxCtlr register
-In-Reply-To: <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
-References: <CAOVJa8Euj-VC-r0uQdyxqRtU7v23t3UW=wWTbrTCz_6gSp4x6g@mail.gmail.com>
- <20150310163133.GC13687@e104818-lin.cambridge.arm.com>
-Message-ID: <20150310163411.GR8656@n2100.arm.linux.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 10 Mar 2015 09:35:13 -0700
+Subject: [PATCH v6 4/8] ARM: dts: enable IOMUX for Broadcom Cygnus
+In-Reply-To: <CACRpkdase0H-fH4f_0FOXj6O79C=S4frjk-evsE+6EOSVN4MuA@mail.gmail.com>
+References: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
+ <1425933902-20652-5-git-send-email-rjui@broadcom.com>
+ <CACRpkdase0H-fH4f_0FOXj6O79C=S4frjk-evsE+6EOSVN4MuA@mail.gmail.com>
+Message-ID: <CAGVrzcY+49cDoQEuC6PxOfnt0gEfGwCDNEPfbzgp+BG2Ow+q+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 04:31:34PM +0000, Catalin Marinas wrote:
-> It's not entirely safe either. I guess the assumption is that CMA
-> allocates from highmem which is not mapped in the kernel linear mapping.
-> However, to be able to flush the caches for such highmem pages, they
-> need to be mapped (kmap_atomic() in __dma_clear_buffer()) but there is a
-> small window between dmac_flush_range() and kunmap_atomic() where
-> speculative cache line fills can still happen.
+2015-03-10 3:14 GMT-07:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Mon, Mar 9, 2015 at 9:44 PM, Ray Jui <rjui@broadcom.com> wrote:
+>
+>> This enables the IOMUX support for Broadcom Cygnus SoC
+>>
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>> Tested-by: Dmitry Torokhov <dtor@chromium.org>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Pls take this through some BRCM ARM SoC tree.
 
-That really ought to be fixed.
-
+Applied to devicetree/next.
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Florian
