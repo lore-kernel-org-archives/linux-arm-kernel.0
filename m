@@ -1,29 +1,53 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Wed, 11 Mar 2015 16:06:01 +0100
-Subject: [PATCH 2/2] ARM: dts: imx28-apf28dev: add wakeup function to user
- button
-In-Reply-To: <1426086361-32933-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1426086361-32933-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <1426086361-32933-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 11 Mar 2015 16:13:05 +0100
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <550058BE.3060406@list.ru>
+References: <54FF21BE.2040506@list.ru> <550038C9.7010807@free-electrons.com>
+ <20150311131433.GC8656@n2100.arm.linux.org.uk> <550058BE.3060406@list.ru>
+Message-ID: <55005B81.9020103@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx28-apf28dev.dts | 1 +
- 1 file changed, 1 insertion(+)
+On 11/03/2015 16:01, Stas Sergeev wrote:
+> 11.03.2015 16:14, Russell King - ARM Linux ?????:
+>> On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
+>>> Hi Stas,
+>>>
+>>> On 10/03/2015 17:54, Stas Sergeev wrote:
+>>>> Hello, the patch below is needed for a successful boot on armada-xp.
+>>>>
+>>> I am really surprised by this patch because I used the Armada XP based
+>>> board in a daily base and I never saw this issue.
+>> Can you provide some details about your board - does it have 8GB of
+>> memory, ranging from 0-0xf0000000, and 4G-8G ?
+> I wonder about this 256Mb memory hole.
 
-diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-index 1e72b0d..7ac4f1a 100644
---- a/arch/arm/boot/dts/imx28-apf28dev.dts
-+++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-@@ -225,6 +225,7 @@
- 			label = "User button";
- 			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x100>;
-+			gpio-key,wakeup;
- 		};
- 	};
- };
+This is where the SoC registers are.
+
+> There is only one dimm for whole 8Gb.
+> It seems 0xf000000-0xffffffff is used for PCI though:
+> ---
+> 
+> 0xf3000000-0xf303ffff 64bit]
+> [  119.290027] pci 0000:00:00.0: BAR 2: set to [mem
+> 0xf3000000-0xf303ffff 64bit] (PCI address [0xf3000000-0xf303ffff])
+> [  119.300509] pci 0000:00:00.0: BAR 0: assigned [mem
+> 0xf3040000-0xf305ffff 64bit]
+> [  119.307883] pci 0000:00:00.0: BAR 0: set to [mem
+> 0xf3040000-0xf305ffff 64bit] (PCI address [0xf3040000-0xf305ffff])
+> [  119.318367] pci 0000:00:00.0: BAR 6: assigned [mem
+> 0xf3060000-0xf306ffff pref]
+> 
+> ---
+> 
+> Does this mean that the 256Mb of physical memory is
+> completely unaccessable on this board?
+> 
+
+
 -- 
-2.0.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
