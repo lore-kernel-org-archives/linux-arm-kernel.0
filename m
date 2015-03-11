@@ -1,141 +1,60 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:43:46 +0000
-Subject: [PATCH v6 4/7] irqchip: GIC: get rid of routable domain
+Date: Wed, 11 Mar 2015 15:43:48 +0000
+Subject: [PATCH v6 6/7] DT: omap4/5: add binding for the wake-up generator
 In-Reply-To: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
 References: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426088629-15377-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088629-15377-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only user of the so called "routable domain" functionality
-now being fixed, let's clean up the GIC.
+Add a binding for the OMAP4/5 wake-up generator, which acts as
+an interrupt controller feeding into the GIC.
 
 Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c       | 59 ++++-------------------------------------
- include/linux/irqchip/arm-gic.h |  6 -----
- 2 files changed, 5 insertions(+), 60 deletions(-)
+ .../interrupt-controller/ti,omap4-wugen-mpu        | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 4634cf7..e3ca6da 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -798,15 +798,12 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
- 				    handle_fasteoi_irq, NULL, NULL);
- 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--
--		gic_routable_irq_domain_ops->map(d, irq, hw);
- 	}
- 	return 0;
- }
- 
- static void gic_irq_domain_unmap(struct irq_domain *d, unsigned int irq)
- {
--	gic_routable_irq_domain_ops->unmap(d, irq);
- }
- 
- static int gic_irq_domain_xlate(struct irq_domain *d,
-@@ -825,16 +822,8 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
- 	*out_hwirq = intspec[1] + 16;
- 
- 	/* For SPIs, we need to add 16 more to get the GIC irq ID number */
--	if (!intspec[0]) {
--		ret = gic_routable_irq_domain_ops->xlate(d, controller,
--							 intspec,
--							 intsize,
--							 out_hwirq,
--							 out_type);
--
--		if (IS_ERR_VALUE(ret))
--			return ret;
--	}
-+	if (!intspec[0])
-+		*out_hwirq += 16;
- 
- 	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
- 
-@@ -891,37 +880,6 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.xlate = gic_irq_domain_xlate,
- };
- 
--/* Default functions for routable irq domain */
--static int gic_routable_irq_domain_map(struct irq_domain *d, unsigned int irq,
--			      irq_hw_number_t hw)
--{
--	return 0;
--}
--
--static void gic_routable_irq_domain_unmap(struct irq_domain *d,
--					  unsigned int irq)
--{
--}
--
--static int gic_routable_irq_domain_xlate(struct irq_domain *d,
--				struct device_node *controller,
--				const u32 *intspec, unsigned int intsize,
--				unsigned long *out_hwirq,
--				unsigned int *out_type)
--{
--	*out_hwirq += 16;
--	return 0;
--}
--
--static const struct irq_domain_ops gic_default_routable_irq_domain_ops = {
--	.map = gic_routable_irq_domain_map,
--	.unmap = gic_routable_irq_domain_unmap,
--	.xlate = gic_routable_irq_domain_xlate,
--};
--
--const struct irq_domain_ops *gic_routable_irq_domain_ops =
--					&gic_default_routable_irq_domain_ops;
--
- void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
- 			   u32 percpu_offset, struct device_node *node)
-@@ -929,7 +887,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	irq_hw_number_t hwirq_base;
- 	struct gic_chip_data *gic;
- 	int gic_irqs, irq_base, i;
--	int nr_routable_irqs;
- 
- 	BUG_ON(gic_nr >= MAX_GIC_NR);
- 
-@@ -985,15 +942,9 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	gic->gic_irqs = gic_irqs;
- 
- 	if (node) {		/* DT case */
--		const struct irq_domain_ops *ops = &gic_irq_domain_hierarchy_ops;
--
--		if (!of_property_read_u32(node, "arm,routable-irqs",
--					  &nr_routable_irqs)) {
--			ops = &gic_irq_domain_ops;
--			gic_irqs = nr_routable_irqs;
--		}
--
--		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
-+		gic->domain = irq_domain_add_linear(node, gic_irqs,
-+						    &gic_irq_domain_hierarchy_ops,
-+						    gic);
- 	} else {		/* Non-DT case */
- 		/*
- 		 * For primary GICs, skip over SGIs.
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 71d706d..3978c5b 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -115,11 +115,5 @@ int gic_get_cpu_id(unsigned int cpu);
- void gic_migrate_target(unsigned int new_cpu_id);
- unsigned long gic_get_sgir_physaddr(void);
- 
--extern const struct irq_domain_ops *gic_routable_irq_domain_ops;
--static inline void __init register_routable_domain_ops
--					(const struct irq_domain_ops *ops)
--{
--	gic_routable_irq_domain_ops = ops;
--}
- #endif /* __ASSEMBLY */
- #endif
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+new file mode 100644
+index 0000000..43effa0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+@@ -0,0 +1,33 @@
++TI OMAP4 Wake-up Generator
++
++All TI OMAP4/5 (and their derivatives) an interrupt controller that
++routes interrupts to the GIC, and also serves as a wakeup source. It
++is also referred to as "WUGEN-MPU", hence the name of the binding.
++
++Reguired properties:
++
++- compatible : should contain at least "ti,omap4-wugen-mpu" or
++  "ti,omap5-wugen-mpu"
++- reg : Specifies base physical address and size of the registers.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++  interrupt source. The value must be 3.
++- interrupt-parent : a phandle to the GIC these interrupts are routed
++  to.
++
++Notes:
++
++- Because this HW ultimately routes interrupts to the GIC, the
++  interrupt specifier must be that of the GIC.
++- Only SPIs can use the WUGEN as an interrupt parent. SGIs and PPIs
++  are explicitly forbiden.
++
++Example:
++
++       wakeupgen: interrupt-controller at 48281000 {
++               compatible = "ti,omap5-wugen-mpu", "ti,omap4-wugen-mpu";
++               interrupt-controller;
++               #interrupt-cells = <3>;
++               reg = <0x48281000 0x1000>;
++               interrupt-parent = <&gic>;
++       };
 -- 
 2.1.4
