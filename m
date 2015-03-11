@@ -1,21 +1,22 @@
-From: sowmini.varadhan@oracle.com (Sowmini Varadhan)
-Date: Wed, 11 Mar 2015 17:50:38 -0400
-Subject: [PATCH v2] rds: avoid potential stack overflow
-In-Reply-To: <4321699.nNdBmxDHpu@wuerfel>
-References: <4321699.nNdBmxDHpu@wuerfel>
-Message-ID: <20150311215038.GA13663@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Mar 2015 22:52:04 +0100
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.1 #1
+In-Reply-To: <1425922716-4213-1-git-send-email-f.fainelli@gmail.com>
+References: <1425922716-4213-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <3531615.l693vyIoTB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (03/11/15 22:46), Arnd Bergmann wrote:
+On Monday 09 March 2015 10:38:36 Florian Fainelli wrote:
+> This pull request contains the following Broadcom SoCs Device Tree changes:
 > 
-> The rds_iw_update_cm_id function stores a large 'struct rds_sock' object
-> on the stack in order to pass a pair of addresses. This happens to just
-> fit withint the 1024 byte stack size warning limit on x86, but just
-> exceed that limit on ARM, which gives us this warning:
-  :
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> - Jonathan adds support for the Broadcom Cygnus BCM958305K board
+> 
+> - Rafal adds support for Netgear R8000 and fixes the default for power LEDs
+>   on Netgear R6250
+> 
+> 
 
-Acked-by: Sowmini Varadhan <sowmini.varadhan@oracle.com>
+Pulled into next/dt, thanks!
 
---Sowmini
+	Arnd
