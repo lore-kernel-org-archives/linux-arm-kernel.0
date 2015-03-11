@@ -1,112 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 22:46:59 +0100
-Subject: [PATCH v2] rds: avoid potential stack overflow
-Message-ID: <4321699.nNdBmxDHpu@wuerfel>
+Date: Wed, 11 Mar 2015 22:47:30 +0100
+Subject: [PATCH 1/2] phy: usbphy: Add dt documentation for Broadcom Cygnus
+ USB PHY driver
+In-Reply-To: <5500B5B6.50609@broadcom.com>
+References: <1424200821-16368-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <2079271.sEacVGN4vm@wuerfel> <5500B5B6.50609@broadcom.com>
+Message-ID: <3142298.YeoA7WAayD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rds_iw_update_cm_id function stores a large 'struct rds_sock' object
-on the stack in order to pass a pair of addresses. This happens to just
-fit withint the 1024 byte stack size warning limit on x86, but just
-exceed that limit on ARM, which gives us this warning:
+On Wednesday 11 March 2015 14:37:58 Arun Ramamurthy wrote:
+> On 15-03-10 01:27 PM, Arnd Bergmann wrote:
+> > On Wednesday 25 February 2015 16:24:06 Arun Ramamurthy wrote:
+> >>>>> Should I run this by Alan Stern?
+> >>>>
+> >>>> I've added him to Cc here. He clearly didn't know the background about
+> >>>> the DT binding change, and should not need to, but he may have an opinion
+> >>>> on what names we should use.
+> >>>>
+> >>>
+> >> Arnd, should I re patch the ehci-platform driver to avoid phy-names
+> >> entirely? Alan, if not do you have an opinion on what the usb phy names
+> >> should be? The current patch uses "usbp" + port number such as "usbp0" ,
+> >> "usbp1" etc
+> >
+> > I think avoiding the phy names would be best here, but it requires a
+> > kernel API change first, because we do not have a way to get a phy
+> > by index as we do for other subsystems (e.g. clocks or gpios).
+> >
+> Arnd , there is an existing api _of_phy_get that gets a phy by index. 
+> However it is not exported and is called from of_phy_get which is in 
+> turn called from devm_of_phy_get.
+> 
+> My plan is to create a new function maybe devm_of_phy_get_by_index that 
+> calls _of_phy_get directly? What are your thoughts?
 
-net/rds/iw_rdma.c:200:1: warning: the frame size of 1056 bytes is larger than 1024 bytes [-Wframe-larger-than=]
+Sounds good to me.
 
-As the use of this large variable is basically bogus, we can rearrange
-the code to not do that. Instead of passing an rds socket into
-rds_iw_get_device, we now just pass the two addresses that we have
-available in rds_iw_update_cm_id, and we change rds_iw_get_mr accordingly,
-to create two address structures on the stack there.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: fix incorrect commit message
-
-diff --git a/net/rds/iw_rdma.c b/net/rds/iw_rdma.c
-index a817705ce2d0..dba8d0864f18 100644
---- a/net/rds/iw_rdma.c
-+++ b/net/rds/iw_rdma.c
-@@ -88,7 +88,9 @@ static unsigned int rds_iw_unmap_fastreg_list(struct rds_iw_mr_pool *pool,
- 			int *unpinned);
- static void rds_iw_destroy_fastreg(struct rds_iw_mr_pool *pool, struct rds_iw_mr *ibmr);
- 
--static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwdev, struct rdma_cm_id **cm_id)
-+static int rds_iw_get_device(struct sockaddr_in *src, struct sockaddr_in *dst,
-+			     struct rds_iw_device **rds_iwdev,
-+			     struct rdma_cm_id **cm_id)
- {
- 	struct rds_iw_device *iwdev;
- 	struct rds_iw_cm_id *i_cm_id;
-@@ -112,15 +114,15 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
- 				src_addr->sin_port,
- 				dst_addr->sin_addr.s_addr,
- 				dst_addr->sin_port,
--				rs->rs_bound_addr,
--				rs->rs_bound_port,
--				rs->rs_conn_addr,
--				rs->rs_conn_port);
-+				src->sin_addr.s_addr,
-+				src->sin_port,
-+				dst->sin_addr.s_addr,
-+				dst->sin_port);
- #ifdef WORKING_TUPLE_DETECTION
--			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr &&
--			    src_addr->sin_port == rs->rs_bound_port &&
--			    dst_addr->sin_addr.s_addr == rs->rs_conn_addr &&
--			    dst_addr->sin_port == rs->rs_conn_port) {
-+			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr &&
-+			    src_addr->sin_port == src->sin_port &&
-+			    dst_addr->sin_addr.s_addr == dst->sin_addr.s_addr &&
-+			    dst_addr->sin_port == dst->sin_port) {
- #else
- 			/* FIXME - needs to compare the local and remote
- 			 * ipaddr/port tuple, but the ipaddr is the only
-@@ -128,7 +130,7 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
- 			 * zero'ed.  It doesn't appear to be properly populated
- 			 * during connection setup...
- 			 */
--			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr) {
-+			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr) {
- #endif
- 				spin_unlock_irq(&iwdev->spinlock);
- 				*rds_iwdev = iwdev;
-@@ -180,19 +182,13 @@ int rds_iw_update_cm_id(struct rds_iw_device *rds_iwdev, struct rdma_cm_id *cm_i
- {
- 	struct sockaddr_in *src_addr, *dst_addr;
- 	struct rds_iw_device *rds_iwdev_old;
--	struct rds_sock rs;
- 	struct rdma_cm_id *pcm_id;
- 	int rc;
- 
- 	src_addr = (struct sockaddr_in *)&cm_id->route.addr.src_addr;
- 	dst_addr = (struct sockaddr_in *)&cm_id->route.addr.dst_addr;
- 
--	rs.rs_bound_addr = src_addr->sin_addr.s_addr;
--	rs.rs_bound_port = src_addr->sin_port;
--	rs.rs_conn_addr = dst_addr->sin_addr.s_addr;
--	rs.rs_conn_port = dst_addr->sin_port;
--
--	rc = rds_iw_get_device(&rs, &rds_iwdev_old, &pcm_id);
-+	rc = rds_iw_get_device(src_addr, dst_addr, &rds_iwdev_old, &pcm_id);
- 	if (rc)
- 		rds_iw_remove_cm_id(rds_iwdev, cm_id);
- 
-@@ -598,9 +594,17 @@ void *rds_iw_get_mr(struct scatterlist *sg, unsigned long nents,
- 	struct rds_iw_device *rds_iwdev;
- 	struct rds_iw_mr *ibmr = NULL;
- 	struct rdma_cm_id *cm_id;
-+	struct sockaddr_in src = {
-+		.sin_addr.s_addr = rs->rs_bound_addr,
-+		.sin_port = rs->rs_bound_port,
-+	};
-+	struct sockaddr_in dst = {
-+		.sin_addr.s_addr = rs->rs_conn_addr,
-+		.sin_port = rs->rs_conn_port,
-+	};
- 	int ret;
- 
--	ret = rds_iw_get_device(rs, &rds_iwdev, &cm_id);
-+	ret = rds_iw_get_device(&src, &dst, &rds_iwdev, &cm_id);
- 	if (ret || !cm_id) {
- 		ret = -ENODEV;
- 		goto out;
+	Arnd
