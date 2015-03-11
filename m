@@ -1,14 +1,28 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Wed, 11 Mar 2015 22:23:56 +0100
-Subject: [PATCH] ARM: BCM5301X: Implement SMP support
-In-Reply-To: <1424385148-15026-1-git-send-email-zajec5@gmail.com>
-References: <1423600375-18665-1-git-send-email-zajec5@gmail.com>
- <1424385148-15026-1-git-send-email-zajec5@gmail.com>
-Message-ID: <CACna6ryPmTeBQg4bZ8cZrd43KLs5pe3EOcFCZr0Xq_yQfj1XqQ@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 11 Mar 2015 14:31:06 -0700
+Subject: [PATCH 1/2] ARM: rockchip: decrease the wait time for resume
+In-Reply-To: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+References: <1423487543-10593-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=VAnqGDin26nnVHa+hsida5zgZKpQR-VNYj-9z0HhO=SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2015 at 23:32, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Hi,
 
-So does it look good enough to send it in pull request? :)
+On Mon, Feb 9, 2015 at 5:12 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+> The delay time for wait the 24MHz OSC stabilization is 750ms, and the
+> delay time for wait the external PMU stabilization is 750ms too, let's
+> decrease them to 30ms.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+>
+>  arch/arm/mach-rockchip/pm.c | 3 +++
+>  arch/arm/mach-rockchip/pm.h | 4 ++++
+>  2 files changed, 7 insertions(+)
+
+I have done a lot of testing and as far as I'm aware this patch is
+safe and right.
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Tested-by: Doug Anderson <dianders@chromium.org>
