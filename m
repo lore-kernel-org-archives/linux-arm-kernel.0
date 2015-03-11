@@ -1,129 +1,225 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Mar 2015 11:21:28 -0300
-Subject: [PATCH v2 1/7] ARM: mx25: Remove mx25_clocks_init()
-Message-ID: <1426083694-6624-1-git-send-email-festevam@gmail.com>
+Date: Wed, 11 Mar 2015 11:21:29 -0300
+Subject: [PATCH v2 2/7] ARM: mx25: Remove mm-imx25.c
+In-Reply-To: <1426083694-6624-1-git-send-email-festevam@gmail.com>
+References: <1426083694-6624-1-git-send-email-festevam@gmail.com>
+Message-ID: <1426083694-6624-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-mx25_clocks_init() is only used to register the clocks for non-dt platforms.
-
-As mx25 has been converted to a dt-only platform, we can safely remove it.
+Move the functionality from mm-imx25.c into arch/arm/mach-imx/mach-imx25.c as
+done by other i.MX SoCs.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
 - None
 
- arch/arm/mach-imx/clk-imx25.c | 75 -------------------------------------------
- arch/arm/mach-imx/common.h    |  1 -
- 2 files changed, 76 deletions(-)
+ arch/arm/mach-imx/Makefile     |  2 +-
+ arch/arm/mach-imx/common.h     |  4 --
+ arch/arm/mach-imx/mach-imx25.c | 41 ++++++++++++++++++-
+ arch/arm/mach-imx/mm-imx25.c   | 89 ------------------------------------------
+ 4 files changed, 41 insertions(+), 95 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/mm-imx25.c
 
-diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
-index 59c0c85..9c2633a 100644
---- a/arch/arm/mach-imx/clk-imx25.c
-+++ b/arch/arm/mach-imx/clk-imx25.c
-@@ -30,7 +30,6 @@
- #include "clk.h"
- #include "common.h"
- #include "hardware.h"
--#include "mx25.h"
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 86c6470..3244cf1 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -3,7 +3,7 @@ obj-y := time.o cpu.o system.o irq-common.o
+ obj-$(CONFIG_SOC_IMX1) += clk-imx1.o mm-imx1.o
+ obj-$(CONFIG_SOC_IMX21) += clk-imx21.o mm-imx21.o
  
- #define CCM_MPCTL	0x00
- #define CCM_UPCTL	0x04
-@@ -239,80 +238,6 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
- 	return 0;
- }
+-obj-$(CONFIG_SOC_IMX25) += clk-imx25.o mm-imx25.o cpu-imx25.o mach-imx25.o
++obj-$(CONFIG_SOC_IMX25) += clk-imx25.o cpu-imx25.o mach-imx25.o
  
--int __init mx25_clocks_init(void)
--{
--	void __iomem *ccm;
--
--	ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
--
--	__mx25_clocks_init(24000000, ccm);
--
--	clk_register_clkdev(clk[gpt1_ipg], "ipg", "imx-gpt.0");
--	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
--	/* i.mx25 has the i.mx21 type uart */
--	clk_register_clkdev(clk[uart1_ipg], "ipg", "imx21-uart.0");
--	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.0");
--	clk_register_clkdev(clk[uart2_ipg], "ipg", "imx21-uart.1");
--	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.1");
--	clk_register_clkdev(clk[uart3_ipg], "ipg", "imx21-uart.2");
--	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.2");
--	clk_register_clkdev(clk[uart4_ipg], "ipg", "imx21-uart.3");
--	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.3");
--	clk_register_clkdev(clk[uart5_ipg], "ipg", "imx21-uart.4");
--	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.4");
--	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.0");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.0");
--	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
--	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.1");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.1");
--	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.1");
--	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
--	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
--	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
--	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx27");
--	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
--	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
--	/* i.mx25 has the i.mx35 type cspi */
--	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
--	clk_register_clkdev(clk[cspi2_ipg], NULL, "imx35-cspi.1");
--	clk_register_clkdev(clk[cspi3_ipg], NULL, "imx35-cspi.2");
--	clk_register_clkdev(clk[kpp_ipg], NULL, "imx-keypad");
--	clk_register_clkdev(clk[tsc_ipg], NULL, "mx25-adc");
--	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.0");
--	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.1");
--	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.2");
--	clk_register_clkdev(clk[fec_ipg], "ipg", "imx25-fec.0");
--	clk_register_clkdev(clk[fec_ahb], "ahb", "imx25-fec.0");
--	clk_register_clkdev(clk[dryice_ipg], NULL, "imxdi_rtc.0");
--	clk_register_clkdev(clk[lcdc_ipg_per], "per", "imx21-fb.0");
--	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx21-fb.0");
--	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx21-fb.0");
--	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
--	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
--	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.1");
--	clk_register_clkdev(clk[esdhc1_ipg_per], "per", "sdhci-esdhc-imx25.0");
--	clk_register_clkdev(clk[esdhc1_ipg], "ipg", "sdhci-esdhc-imx25.0");
--	clk_register_clkdev(clk[esdhc1_ahb], "ahb", "sdhci-esdhc-imx25.0");
--	clk_register_clkdev(clk[esdhc2_ipg_per], "per", "sdhci-esdhc-imx25.1");
--	clk_register_clkdev(clk[esdhc2_ipg], "ipg", "sdhci-esdhc-imx25.1");
--	clk_register_clkdev(clk[esdhc2_ahb], "ahb", "sdhci-esdhc-imx25.1");
--	clk_register_clkdev(clk[csi_ipg_per], "per", "imx25-camera.0");
--	clk_register_clkdev(clk[csi_ipg], "ipg", "imx25-camera.0");
--	clk_register_clkdev(clk[csi_ahb], "ahb", "imx25-camera.0");
--	clk_register_clkdev(clk[dummy], "audmux", NULL);
--	clk_register_clkdev(clk[can1_ipg], NULL, "flexcan.0");
--	clk_register_clkdev(clk[can2_ipg], NULL, "flexcan.1");
--	/* i.mx25 has the i.mx35 type sdma */
--	clk_register_clkdev(clk[sdma_ipg], "ipg", "imx35-sdma");
--	clk_register_clkdev(clk[sdma_ahb], "ahb", "imx35-sdma");
--	clk_register_clkdev(clk[iim_ipg], "iim", NULL);
--
--	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), MX25_INT_GPT1);
--
--	return 0;
--}
--
- static void __init mx25_clocks_init_dt(struct device_node *np)
- {
- 	struct device_node *refnp;
+ obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
+ obj-$(CONFIG_SOC_IMX27) += clk-imx27.o mm-imx27.o ehci-imx27.o
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 1028b6c..a12b52d 100644
+index a12b52d..771ecfe 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -51,7 +51,6 @@ void epit_timer_init(void __iomem *base, int irq);
- void mxc_timer_init(void __iomem *, int);
- int mx1_clocks_init(unsigned long fref);
- int mx21_clocks_init(unsigned long lref, unsigned long fref);
--int mx25_clocks_init(void);
- int mx27_clocks_init(unsigned long fref);
- int mx31_clocks_init(unsigned long fref);
- int mx35_clocks_init(void);
+@@ -23,13 +23,11 @@ struct of_device_id;
+ 
+ void mx1_map_io(void);
+ void mx21_map_io(void);
+-void mx25_map_io(void);
+ void mx27_map_io(void);
+ void mx31_map_io(void);
+ void mx35_map_io(void);
+ void imx1_init_early(void);
+ void imx21_init_early(void);
+-void imx25_init_early(void);
+ void imx27_init_early(void);
+ void imx31_init_early(void);
+ void imx35_init_early(void);
+@@ -37,13 +35,11 @@ void mxc_init_irq(void __iomem *);
+ void tzic_init_irq(void);
+ void mx1_init_irq(void);
+ void mx21_init_irq(void);
+-void mx25_init_irq(void);
+ void mx27_init_irq(void);
+ void mx31_init_irq(void);
+ void mx35_init_irq(void);
+ void imx1_soc_init(void);
+ void imx21_soc_init(void);
+-void imx25_soc_init(void);
+ void imx27_soc_init(void);
+ void imx31_soc_init(void);
+ void imx35_soc_init(void);
+diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
+index 25defbd..7cad96d 100644
+--- a/arch/arm/mach-imx/mach-imx25.c
++++ b/arch/arm/mach-imx/mach-imx25.c
+@@ -10,12 +10,51 @@
+  */
+ 
+ #include <linux/irq.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <asm/mach/time.h>
++
+ #include "common.h"
+-#include "mx25.h"
++#include "hardware.h"
++
++/*
++ * This table defines static virtual address mappings for I/O regions.
++ * These are the mappings common across all MX25 boards.
++ */
++static struct map_desc mx25_io_desc[] __initdata = {
++	imx_map_entry(MX25, AVIC, MT_DEVICE_NONSHARED),
++	imx_map_entry(MX25, AIPS1, MT_DEVICE_NONSHARED),
++	imx_map_entry(MX25, AIPS2, MT_DEVICE_NONSHARED),
++};
++
++/*
++ * This function initializes the memory map. It is called during the
++ * system startup to create static physical to virtual memory mappings
++ * for the IO modules.
++ */
++void static __init mx25_map_io(void)
++{
++	iotable_init(mx25_io_desc, ARRAY_SIZE(mx25_io_desc));
++}
++
++void static __init imx25_init_early(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX25);
++}
++
++void static __init mx25_init_irq(void)
++{
++	struct device_node *np;
++	static void __iomem *avic_base;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,avic");
++	avic_base = of_iomap(np, 0);
++	WARN_ON(!avic_base);
++	mxc_init_irq(avic_base);
++}
+ 
+ static const char * const imx25_dt_board_compat[] __initconst = {
+ 	"fsl,imx25",
+diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
+deleted file mode 100644
+index 5211f62..0000000
+--- a/arch/arm/mach-imx/mm-imx25.c
++++ /dev/null
+@@ -1,89 +0,0 @@
+-/*
+- *  Copyright (C) 1999,2000 Arm Limited
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *  Copyright (C) 2002 Shane Nay (shane at minirl.com)
+- *  Copyright 2005-2007 Freescale Semiconductor, Inc. All Rights Reserved.
+- *    - add MX31 specific definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/mm.h>
+-#include <linux/init.h>
+-#include <linux/err.h>
+-#include <linux/pinctrl/machine.h>
+-
+-#include <asm/pgtable.h>
+-#include <asm/mach/map.h>
+-
+-#include "common.h"
+-#include "devices/devices-common.h"
+-#include "hardware.h"
+-#include "iomux-v3.h"
+-#include "mx25.h"
+-
+-/*
+- * This table defines static virtual address mappings for I/O regions.
+- * These are the mappings common across all MX25 boards.
+- */
+-static struct map_desc mx25_io_desc[] __initdata = {
+-	imx_map_entry(MX25, AVIC, MT_DEVICE_NONSHARED),
+-	imx_map_entry(MX25, AIPS1, MT_DEVICE_NONSHARED),
+-	imx_map_entry(MX25, AIPS2, MT_DEVICE_NONSHARED),
+-};
+-
+-/*
+- * This function initializes the memory map. It is called during the
+- * system startup to create static physical to virtual memory mappings
+- * for the IO modules.
+- */
+-void __init mx25_map_io(void)
+-{
+-	iotable_init(mx25_io_desc, ARRAY_SIZE(mx25_io_desc));
+-}
+-
+-void __init imx25_init_early(void)
+-{
+-	mxc_set_cpu_type(MXC_CPU_MX25);
+-	mxc_iomux_v3_init(MX25_IO_ADDRESS(MX25_IOMUXC_BASE_ADDR));
+-}
+-
+-void __init mx25_init_irq(void)
+-{
+-	mxc_init_irq(MX25_IO_ADDRESS(MX25_AVIC_BASE_ADDR));
+-}
+-
+-static struct sdma_platform_data imx25_sdma_pdata __initdata = {
+-	.fw_name = "sdma-imx25.bin",
+-};
+-
+-static const struct resource imx25_audmux_res[] __initconst = {
+-	DEFINE_RES_MEM(MX25_AUDMUX_BASE_ADDR, SZ_16K),
+-};
+-
+-void __init imx25_soc_init(void)
+-{
+-	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
+-	mxc_device_init();
+-
+-	/* i.mx25 has the i.mx35 type gpio */
+-	mxc_register_gpio("imx35-gpio", 0, MX25_GPIO1_BASE_ADDR, SZ_16K, MX25_INT_GPIO1, 0);
+-	mxc_register_gpio("imx35-gpio", 1, MX25_GPIO2_BASE_ADDR, SZ_16K, MX25_INT_GPIO2, 0);
+-	mxc_register_gpio("imx35-gpio", 2, MX25_GPIO3_BASE_ADDR, SZ_16K, MX25_INT_GPIO3, 0);
+-	mxc_register_gpio("imx35-gpio", 3, MX25_GPIO4_BASE_ADDR, SZ_16K, MX25_INT_GPIO4, 0);
+-
+-	pinctrl_provide_dummies();
+-	/* i.mx25 has the i.mx35 type sdma */
+-	imx_add_imx_sdma("imx35-sdma", MX25_SDMA_BASE_ADDR, MX25_INT_SDMA, &imx25_sdma_pdata);
+-	/* i.mx25 has the i.mx31 type audmux */
+-	platform_device_register_simple("imx31-audmux", 0, imx25_audmux_res,
+-					ARRAY_SIZE(imx25_audmux_res));
+-}
 -- 
 1.9.1
