@@ -1,19 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 22:57:35 +0100
-Subject: [PATCH v3] ARM64: Add new Xilinx ZynqMP SoC
-In-Reply-To: <8dea13bec5470b0b18c586ce62c1fea467f9f647.1425890447.git.michal.simek@xilinx.com>
-References: <8dea13bec5470b0b18c586ce62c1fea467f9f647.1425890447.git.michal.simek@xilinx.com>
-Message-ID: <2718184.YlPDsYmc4D@wuerfel>
+Date: Wed, 11 Mar 2015 23:01:44 +0100
+Subject: [PATCH v8 0/2] Add Spreadtrum Sharkl64 Platform support
+In-Reply-To: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <5111739.CpgUXH2iat@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 March 2015 09:41:04 Michal Simek wrote:
-> Initial version of device tree for Xilinx ZynqMP SoC.
+On Wednesday 11 March 2015 02:27:08 Chunyan Zhang wrote:
+> This patchset adds Spreadtrum's Sharkl64 support in arm64 device tree.
 > 
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Changes from v7:
+>         - Added Mark Rutland's Acked-by
+>         - Rebased v4.0-rc1
 > 
 
-Pulled into next/arm64, thanks!
+Applied both to next/arm64.
+
+I had some trouble applying the patches because of broken end-of-line
+markers and had to edit the patch manually. Please check what went
+wrong there so you can avoid the problem in the future. Thanks!
 
 	Arnd
