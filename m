@@ -1,41 +1,91 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Wed, 11 Mar 2015 20:26:53 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <20150311175227.499612af@free-electrons.com>
-References: <54FF21BE.2040506@list.ru>
- <20150311175227.499612af@free-electrons.com>
-Message-ID: <55007ADD.6080505@list.ru>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Mar 2015 17:31:15 +0000
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <CAL85gmCuB4LfNp+6B8cL9+emFqWPM6W9gevTzibyaAzL+7jVdg@mail.gmail.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>	<550056FD.8060804@arm.com>
+ <CAL85gmCuB4LfNp+6B8cL9+emFqWPM6W9gevTzibyaAzL+7jVdg@mail.gmail.com>
+Message-ID: <55007BE3.30300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-11.03.2015 19:52, Thomas Petazzoni ?????:
-> Dear Stas Sergeev,
-> No, this is not the right fix. The right fix is to upgrade your
-> bootloader to a non-buggy one.
->
-> Basically, the problem is that the memory information passed by the
-> bootloader to the kernel is not consistent with the MBus base address
-> which is the limit between RAM (below the MBus base address) and I/O
-> registers (above the MBus base address).
->
-> The bootloader tells the kernel that the RAM up to 0xf0000000 is
-> usable, but sets the MBus base address to 0xe0000000. So whenever the
-> kernel accesses 0xe0000000 -> 0xf0000000, it crashes, because you're
-> not hitting RAM but MBus windows (and there are most likely no MBus
-> window mapped in this space).
->
-> Since kmalloc() relies on the identity mapping, it happens to mainly
-> use pages at the beginning of the physical memory, which are OK. But
-> vmalloc() happens to start using pages at the end of the physical
-> memory (which are not part of the identity mapping), so that's why
-> you're seeing this on the first access to a vmalloc()ed area.
->
-> This problem has already been reported to Marvell and they have fixed
-> it in their U-Boot. Please upgrade your bootloader, since there is not
-> much the kernel can do about this: the bootloader is simply lying to
-> the kernel about the amount of memory that is accessible.
-Hello Thomas, thanks for that info!
+On 11/03/15 17:19, Feng Kan wrote:
+> On Wed, Mar 11, 2015 at 7:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 27/01/15 07:03, Pranavkumar Sawargaonkar wrote:
+>>> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+>>> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+>>> size due to size alignment checking in vgic driver for VCPU Control and
+>>> VCPU register.
+>>>
+>>> This patch corrects the sizes to be inline with the hardware spec.
+>>
+>> This patch may be correct, but it is useless. The firmware on my APM
+>> system (some version of u-boot) repaints the DT at boot time, negating
+>> the effect of this patch.
+> We have updated u-boot to reflect this change. I can supply you with a updated
+> image if you wish.
 
-Is there a quick way to test that?
-I used memmap=0x20000000$0xe0000000 but nothing changed...
+That would be useful, thanks.
+
+But more importantly, why bother upstreaming your DT into the kernel
+tree if your firmware is going to overwrite whatever we provide?
+
+Either the firmware let the user provide its own DT (and doesn't touch
+it other than to change the CPU enable method, insert a /memreserve/ or
+similar things), or the firmware always provide its own DT, and doesn't
+let the user provide its own. Corrupting the user DT is a disaster, as
+we just found.
+
+Thanks,
+
+	M.
+
+>>
+>> Another system I can remove from my 64k-capable list.
+>>
+>>         M.
+>>
+>>> CC: linux-arm-kernel at lists.infradead.org
+>>> CC: kvmarm at lists.cs.columbia.edu
+>>> CC: arnd at arndb.de
+>>> CC: marc.zyngier at arm.com
+>>> CC: christoffer.dall at linaro.org
+>>> CC: jcm at redhat.com
+>>> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
+>>> Signed-off-by: Tushar Jagad <tjagad@apm.com>
+>>> Signed-off-by: Feng Kan <fkan@apm.com>
+>>> ---
+>>>  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
+>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>>> index f1ad9c2..65f0e6d 100644
+>>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>>> @@ -81,10 +81,10 @@
+>>>               compatible = "arm,cortex-a15-gic";
+>>>               #interrupt-cells = <3>;
+>>>               interrupt-controller;
+>>> -             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
+>>> -                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
+>>> -                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
+>>> -                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
+>>> +             reg = <0x0 0x78010000 0x0 0x10000>,     /* GIC Dist */
+>>> +                   <0x0 0x78020000 0x0 0x20000>,     /* GIC CPU */
+>>> +                   <0x0 0x78040000 0x0 0x10000>,     /* GIC VCPU Control */
+>>> +                   <0x0 0x78060000 0x0 0x20000>;     /* GIC VCPU */
+>>>               interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>>>       };
+>>>
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>
+>>
+>> --
+>> Jazz is not dead. It just smells funny...
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
