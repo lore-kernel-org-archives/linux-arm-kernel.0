@@ -1,92 +1,31 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 17:32:11 -0500
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150311223211.GB1082@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 11 Mar 2015 15:36:58 -0700
+Subject: [PATCH v2 01/11] clk: convert clock mux to accept regmap
+In-Reply-To: <1425654784-27354-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1425654784-27354-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1425654784-27354-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <5500C38A.5070506@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:01AM +0800, Yijing Wang wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> 
-> Use pci_scan_root_bus() instead of deprecated function
-> pci_scan_bus_parented().
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: xen-devel at lists.xenproject.org
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/xen-pcifront.c |   12 +++++++++---
->  1 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-> index b1ffebe..9e7c28b 100644
-> --- a/drivers/pci/xen-pcifront.c
-> +++ b/drivers/pci/xen-pcifront.c
-> @@ -21,6 +21,7 @@
->  #include <linux/bitops.h>
->  #include <linux/time.h>
->  #include <xen/platform_pci.h>
-> +#include "pci.h"
->  
->  #include <asm/xen/swiotlb-xen.h>
->  #define INVALID_GRANT_REF (0)
-> @@ -446,6 +447,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->  				 unsigned int domain, unsigned int bus)
->  {
->  	struct pci_bus *b;
-> +	LIST_HEAD(resources);
->  	struct pcifront_sd *sd = NULL;
->  	struct pci_bus_entry *bus_entry = NULL;
->  	int err = 0;
-> @@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->  		err = -ENOMEM;
->  		goto err_out;
->  	}
-> +	pci_add_resource(&resources, &ioport_resource);
-> +	pci_add_resource(&resources, &iomem_resource);
-> +	pci_add_resource(&resources, &busn_resource);
+On 03/06/15 07:12, Antoine Tenart wrote:
+> Rework the clk_mux helpers to either use an iomem base address or a
+> regmap.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+>
 
-Since I don't want to export busn_resource, you might have to allocate your
-own struct resource for it here.  And, of course, figure out the details of
-which PCI domain you're in and whether you need to share one struct
-resource across several host bridges in the same domain.
+Last time we tried this Mike was opposed. The union is a nice trick but
+I'm not sure it will help much.
 
->  	pcifront_init_sd(sd, domain, bus, pdev);
->  
->  	pci_lock_rescan_remove();
->  
-> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
-> -				  &pcifront_bus_ops, sd);
-> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
-> +				  &pcifront_bus_ops, sd, &resources);
->  	if (!b) {
->  		dev_err(&pdev->xdev->dev,
->  			"Error creating PCI Frontend Bus!\n");
->  		err = -ENOMEM;
->  		pci_unlock_rescan_remove();
-> +		pci_free_resource_list(&resources);
->  		goto err_out;
->  	}
->  
-> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->  
->  	list_add(&bus_entry->list, &pdev->root_buses);
->  
-> -	/* pci_scan_bus_parented skips devices which do not have a have
-> +	/* pci_scan_root_bus skips devices which do not have a
->  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
->  	err = pcifront_scan_bus(pdev, domain, bus, b);
->  
-> -- 
-> 1.7.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Perhaps you'd be interested in using the bits of the mux code that you
+need by using this patch[1]? It makes it so you can use the mux and
+associated flags as functions called from somewhere else. Building a
+regmap mux on top of that should be fairly straightforward.
+
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/284935.html
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
