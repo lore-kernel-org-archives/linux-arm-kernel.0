@@ -1,70 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 11 Mar 2015 12:17:01 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150311093848.2b23a027@bbrezillon>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>	<20150307103939.GA17964@amd>	<20150307110645.GW3989@piout.net>	<2616799.fRG1k0Q6sR@vostro.rjw.lan>
- <20150311093848.2b23a027@bbrezillon>
-Message-ID: <5500242D.3080605@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 11 Mar 2015 12:17:55 +0100
+Subject: [PATCH] clk: provide clk_is_match() dummy for non-common clk
+In-Reply-To: <20150311102208.GX8656@n2100.arm.linux.org.uk>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum> <8682755.oK0Ae34OOP@wuerfel>
+ <20150311102208.GX8656@n2100.arm.linux.org.uk>
+Message-ID: <20150311111755.GI952@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/03/2015 09:38, Boris Brezillon a ?crit :
-> On Sun, 08 Mar 2015 02:11:45 +0100
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
+Hey Russell,
+
+On Wed, Mar 11, 2015 at 10:22:09AM +0000, Russell King - ARM Linux wrote:
+> On Sun, Mar 08, 2015 at 10:05:29PM +0100, Arnd Bergmann wrote:
+> > ARM randconfig build tests found a new error for configurations
+> > with COMMON_CLK disabled but HAS_CLK selected by the platform:
+> > 
+> > ERROR: "clk_is_match" [sound/soc/fsl/snd-soc-fsl-spdif.ko] undefined!
+> > 
+> > This moves the declaration around, so this case is covered
+> > by the existing static inline helper function.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: c69e182e51d89 ("clk: introduce clk_is_match")
+> > ----
+> > BTW, we have a preexisting problem in clk_get_parent,
+> > clk_round_rate and clk_set_parent, which I've worked around in
+> > my randconfig builds so far. Should we do that the same way?
 > 
->> On Saturday, March 07, 2015 12:06:45 PM Alexandre Belloni wrote:
->>> On 07/03/2015 at 11:39:39 +0100, Pavel Machek wrote :
->>>>> The Atmel watchdog can't be stopped once it's started. This is actually 
->>>>> very useful so we can reset if suspend or resume failed, the only 
->>>>> drawback is that you have to wake up from time to time (e.g. by using 
->>>>> the RTC/RTT) to clear the watchdog and then go back to sleep ASAP.
->>>>
->>>> Yeah. So you do "echo mem > /sys/power/state", and few seconds/minutes
->>>> after watchdog kills the system. But you did not ask for dead system,
->>>> you asked for suspend.
->>>>
->>>> And while that behaviour is useful for you, I don't think it is
->>>> exactly useful behaviour, nor it is the behaviour user would expect.
->>>>
->>>
->>> I think you misunderstood, that is exactly the expected behaviour. This
->>> is hardware defined. Once the watchdog is started, nobody can stop it.
->>> Trying to change the mode register will result in a reset of the SoC.
->>>
->>> It is documented in the datasheet and any user wanting another behaviour
->>> is out of luck.
->>>
->>> So basically, when using a watchdog, you have to wake up every 15-16s to
->>> restart it.
->>
->> So question is if we need a separate interrupt handler for that, expecially
->> since it is shared with the PIT timer anyway.
->>
->> Seems to me that the simplest way out of this conundrum would be to simply
->> make the timer's interrupt handler kick the watchdog every once a while and
->> get rid of the separate watchdog interrupt handler entirely.
-> 
-> The watchdog interrupt handler is not here to ping the watchdog, it's
-> here to reset the platform if the watchdog hasn't been refreshed
-> appropriately.
-> 
-> IOW, it's a software watchdog using at91 WDT capabilities to determine
-> when it should reboot the system.
-> IIRC, we need this on some at91 platforms to fix a HW bug (maybe
-> Nicolas can confirm this).
+> NAK, as Uwe points out, you didn't address my comment.
+You commented on the patch that is c69e182e51d8 ("clk: introduce
+clk_is_match") now in next. Arnd just moved this around.
 
-Yes, the HW bug that we address in these functions:
-at91sam9260_restart() and at91sam9g45_restart().
+Best regards
+Uwe
 
-We have this issue because of NAND flash lines shared with DDR that are
-driven during product reboot on old products (Cf. these functions
-comments). This bug would kick-in when doing "software reset"/"watchdog
-reset"/"push button reset". Only the "software reset" is handled by the
-functions above.
-
-So, yes, this "software watchdog" is there for this purpose IIRC.
-
-Bye,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
