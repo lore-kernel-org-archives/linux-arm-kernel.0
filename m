@@ -1,33 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Mar 2015 13:24:56 +0000
-Subject: [PATCH 4/7] ARM: mx25: Retrieve IIM base from dt
-In-Reply-To: <1426077835-31081-4-git-send-email-festevam@gmail.com>
-References: <1426077835-31081-1-git-send-email-festevam@gmail.com>
- <1426077835-31081-4-git-send-email-festevam@gmail.com>
-Message-ID: <20150311132456.GD8656@n2100.arm.linux.org.uk>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 11 Mar 2015 14:21:29 +0100
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <2353601.si5uCETVn2@wuerfel>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <6286151.8rcX893TN6@wuerfel>
+ <CABxcv=mPVxW=BqL2PUL=AtS74kcqMG1yxC1WqMpxGiNOqGAnyQ@mail.gmail.com>
+ <2353601.si5uCETVn2@wuerfel>
+Message-ID: <CABxcv==yx3dy-beEF9cf1mKo1vjCh_LU6iLuvn1z-SKz9xG0qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 09:43:52AM -0300, Fabio Estevam wrote:
-> +	void __iomem *iim_base;
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-iim");
-> +	iim_base = of_iomap(np, 0);
-> +	WARN_ON(!iim_base);
-> +	rev = readl(iim_base + MXC_IIMSREV);
-> +	iounmap(iim_base);
+On Wed, Mar 11, 2015 at 2:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 March 2015 14:07:11 Javier Martinez Canillas wrote:
+>>
+>> Right now it seems that all boards in mainline with a WiLink6 part are
+>> using internal clocks. So as a first step I think that adding an
+>> optional refclock-frequency and tcxoclock-frequency properties should
+>> be enough.
+>>
+>> It would be good if the driver supports getting the refclock and
+>> tcxoclock from an external provider in case a board gets these from
+>> external clocks but that can be done as a followup if there are boards
+>> in the future using that design.
+>>
+>> But please bear in mind that I'm not familiar with the clock handling
+>> in WiLink6 since the WiLink8 part used in the IGEP boards does not
+>> need these clocks and I only looked at Luciano's previous patches and
+>> the WiLink today driver today. So it would be good if Eliad can double
+>> check my assumptions to see if those are correct.
+>
+> Sounds good. I'd also be fine with not implementing the case for
+> external clocks in the code until we need (and can test) it, but
+> I think it should be specified in the binding from the start.
+>
 
-Is there much point to that WARN_ON()?  Are you avoiding the political
-BUG_ON(!iim_base) ? :)
+Agreed.
 
-Since a NULL pointer there will lead to a NULL pointer dereference, it's
-silly to use WARN_ON() there - we'll get a backtrace etc from the WARN_ON
-followed immediately by an oops dump due to the readl(), crashing the
-kernel.
-
-Better to just use BUG_ON() and only get one set of diagnostics.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Javier
