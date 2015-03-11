@@ -1,65 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 14:53:49 +0000
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
-Message-ID: <550056FD.8060804@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 Mar 2015 16:00:48 +0100
+Subject: [GIT PULL] at91: fixes for 4.0 #3
+Message-ID: <1426086048-25681-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/15 07:03, Pranavkumar Sawargaonkar wrote:
-> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
-> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
-> size due to size alignment checking in vgic driver for VCPU Control and
-> VCPU register.
-> 
-> This patch corrects the sizes to be inline with the hardware spec.
+Arnd, Olof, Kevin,
 
-This patch may be correct, but it is useless. The firmware on my APM
-system (some version of u-boot) repaints the DT at boot time, negating
-the effect of this patch.
+Some fixes for 4.0. Most of them are for USB and some issues that we hit with
+the clocks. The cleanup of the cpu_is_at91xxxx() macros for multi-platform led
+to rework some USB compatibility strings to handle particularities of some SoCs.
+A compilation error in case of thumb2 kernel build is also solved.
 
-Another system I can remove from my 64k-capable list.
+Thanks, best regards,
 
-	M.
+The following changes since commit 5957457a2d96e4c9b2fecd40f29cdb3bb841d75e:
 
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: kvmarm at lists.cs.columbia.edu
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: christoffer.dall at linaro.org
-> CC: jcm at redhat.com
-> Signed-off-by: Pranavkumar Sawargaonkar <psawargaonkar@apm.com>
-> Signed-off-by: Tushar Jagad <tjagad@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  arch/arm64/boot/dts/apm/apm-storm.dtsi |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index f1ad9c2..65f0e6d 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -81,10 +81,10 @@
->  		compatible = "arm,cortex-a15-gic";
->  		#interrupt-cells = <3>;
->  		interrupt-controller;
-> -		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-> -		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-> -		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-> -		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-> +		reg = <0x0 0x78010000 0x0 0x10000>,	/* GIC Dist */
-> +		      <0x0 0x78020000 0x0 0x20000>,	/* GIC CPU */
-> +		      <0x0 0x78040000 0x0 0x10000>,	/* GIC VCPU Control */
-> +		      <0x0 0x78060000 0x0 0x20000>;	/* GIC VCPU */
->  		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
->  	};
-> 
-> --
-> 1.7.9.5
-> 
-> 
+  ARM: at91/pm: MOR register KEY was missing (2015-03-05 11:43:02 +0100)
 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes3
+
+for you to fetch changes up to e7b848d731cdf681e06138a2ae4380220a6baac8:
+
+  ARM: at91: pm_slowclock: fix the compilation error (2015-03-11 15:49:47 +0100)
+
+----------------------------------------------------------------
+Third fixes batch for AT91 on 4.0:
+- clock fixes for USB
+- compatible string changes for handling USB IP differences
+  (+ needed AHB matrix syscon)
+- fix of a compilation error in PM code
+
+----------------------------------------------------------------
+Boris Brezillon (3):
+      ARM: at91/dt: at91sam9261: fix clocks and clock-names in udc definition
+      ARM: at91/dt: declare matrix node as a syscon device
+      ARM: at91/dt: fix at91 udc compatible strings
+
+Nicolas Ferre (1):
+      ARM: at91/dt: fix USB high-speed clock to select UTMI
+
+Wenyou Yang (1):
+      ARM: at91: pm_slowclock: fix the compilation error
+
+ arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
+ arch/arm/boot/dts/at91sam9261.dtsi | 9 +++++----
+ arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++--
+ arch/arm/boot/dts/sama5d3.dtsi     | 2 +-
+ arch/arm/boot/dts/sama5d4.dtsi     | 2 +-
+ arch/arm/mach-at91/pm_slowclock.S  | 2 ++
+ 8 files changed, 14 insertions(+), 11 deletions(-)
 
 -- 
-Jazz is not dead. It just smells funny...
+Nicolas Ferre
