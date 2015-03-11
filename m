@@ -1,32 +1,60 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Wed, 11 Mar 2015 10:50:04 +0100
-Subject: [PATCHv7 2/4] USB: gadget: atmel_usba_udc: Request an auto
- disabled Vbus signal IRQ instead of an auto enabled IRQ request followed by
- IRQ disable
-In-Reply-To: <20150310211214.GD25666@saruman.tx.rr.com>
-References: <1423763647-11687-1-git-send-email-sylvain.rochet@finsecur.com>
- <1423763647-11687-3-git-send-email-sylvain.rochet@finsecur.com>
- <20150310211214.GD25666@saruman.tx.rr.com>
-Message-ID: <20150311095004.GA1487@gradator.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Mar 2015 10:51:21 +0100
+Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
+In-Reply-To: <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <1425915402-10012-2-git-send-email-eliad@wizery.com>
+ <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
+Message-ID: <2121942.zIG9BfPsTV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Felipe,
+On Wednesday 11 March 2015 01:34:19 Javier Martinez Canillas wrote:
+> > +
+> > +static struct wl12xx_platform_data *
+> > +wlcore_get_platform_data(struct device *dev)
+> > +{
+> > +       struct wl12xx_platform_data *pdata;
+> > +
+> > +       /* first, look for DT data */
+> 
+> I thought it was the opposite, that platform data should over-rule DT.
+> That way you can still use the data filled in
+> arch/arm/mach-omap2/pdata-quirks.c even after the driver supports your
+> new DT binding.
 
-On Tue, Mar 10, 2015 at 04:12:14PM -0500, Felipe Balbi wrote:
-> Hi,
-> 
-> (dropping patch, my only context is subject line)
-> 
-> "USB: gadget: atmel_usba_udc: Request an auto disabled Vbus signal IRQ
-> instead of an auto enabled IRQ request followed by IRQ disable"
-> 
-> Holy crap, that's a pretty long patch *short* description. I'm trimming
-> it to:
-> 
-> "usb: gadget: atmel_usba_udc: Request an auto disabled Vbus signal IRQ"
+No, the pdata-quirks stuff for this driver must die, it was a hack
+that only exists because we previously could not attach data to an
+sdio function.
 
-I agree, lesson learned!, thanks for the heads up :)
+> > +       pdata = wlcore_probe_of(dev);
+> > +       if (pdata)
+> > +               return pdata;
+> > +
+> > +       /* if not found - fallback to static platform data */
+> > +       pdata = wl12xx_get_platform_data();
+> > +       if (!IS_ERR(pdata))
+> > +               return kmemdup(pdata, sizeof(*pdata), GFP_KERNEL);
+> > +
+> > +       dev_err(dev, "No platform data set\n");
+> > +       return NULL;
+> > +}
+> > +
+> > +static void wlcore_del_platform_data(struct wl12xx_platform_data *pdata)
+> > +{
+> > +       kfree(pdata);
+> > +}
+> > +
+> 
+> This function seems to be an unnecessary, why not just call kfree() directly?
+> 
+> Or better, maybe the resource-managed devm_*() functions can be used
+> so the data doesn't have to be explicitly freed?
 
-Cheers,
-Sylvain
+As I said earlier, I think it would be best not to dynamically allocate anything
+here at all. As Eliad explained, the data is used by two different drivers:
+wl12xx and wl18xx, and only the latter is converted for now, but after the
+conversion, it should not need the platform data structure any more, only
+the irq number that gets passed in from DT.
+
+	Arnd
