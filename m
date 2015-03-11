@@ -1,84 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Mar 2015 10:19:22 -0500
-Subject: [PATCH v4 2/9] x86, pci: Abstract PCI config accessors and use
- AMD Fam10h workaround exclusively.
-In-Reply-To: <1426083169-8698-3-git-send-email-tomasz.nowicki@linaro.org>
-References: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
- <1426083169-8698-3-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <CAL_Jsq+AtQAkzfGL0Gk8O7_r-H8wXWF2Rw=0oN6saj9oa3s-CA@mail.gmail.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Wed, 11 Mar 2015 18:22:42 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <55005B81.9020103@free-electrons.com>
+References: <54FF21BE.2040506@list.ru> <550038C9.7010807@free-electrons.com>
+ <20150311131433.GC8656@n2100.arm.linux.org.uk> <550058BE.3060406@list.ru>
+ <55005B81.9020103@free-electrons.com>
+Message-ID: <55005DC2.1060300@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 9:12 AM, Tomasz Nowicki
-<tomasz.nowicki@linaro.org> wrote:
-> From now on, readb()/writeb()/etc. generic calls are used as default
-> approach. Special MMIO accessors are registered for AMD Fam10h CPUs only.
->
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
->  arch/x86/include/asm/pci_x86.h |   8 +++
->  arch/x86/pci/mmconfig-shared.c | 114 +++++++++++++++++++++++++++++++++++++++++
->  arch/x86/pci/mmconfig_32.c     |  24 +--------
->  arch/x86/pci/mmconfig_64.c     |  24 +--------
->  arch/x86/pci/numachip.c        |  24 +--------
->  5 files changed, 128 insertions(+), 66 deletions(-)
->
-> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
-> index d024f4d..c57c225 100644
-> --- a/arch/x86/include/asm/pci_x86.h
-> +++ b/arch/x86/include/asm/pci_x86.h
-> @@ -137,6 +137,11 @@ struct pci_mmcfg_region {
->         char name[PCI_MMCFG_RESOURCE_NAME_LEN];
->  };
->
-> +struct pci_mmcfg_mmio_ops {
-> +       u32 (*read)(int len, void __iomem *addr);
-> +       void (*write)(int len, void __iomem *addr, u32 value);
+11.03.2015 18:13, Gregory CLEMENT ?????:
+> On 11/03/2015 16:01, Stas Sergeev wrote:
+>> 11.03.2015 16:14, Russell King - ARM Linux ?????:
+>>> On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
+>>>> Hi Stas,
+>>>>
+>>>> On 10/03/2015 17:54, Stas Sergeev wrote:
+>>>>> Hello, the patch below is needed for a successful boot on armada-xp.
+>>>>>
+>>>> I am really surprised by this patch because I used the Armada XP based
+>>>> board in a daily base and I never saw this issue.
+>>> Can you provide some details about your board - does it have 8GB of
+>>> memory, ranging from 0-0xf0000000, and 4G-8G ?
+>> I wonder about this 256Mb memory hole.
+> This is where the SoC registers are.
+OK but it seems I am loosing this region of _physical_ memory:
+---
 
-We already have nearly the same struct with pci_ops...
+[    0.000000]  memory size = 0x1f0000000
+[    0.000000]  memory.cnt  = 0x2
+[    0.000000]  memory[0x0]     [0x00000000000000-0x000000efffffff],
+0xf0000000 bytes
+[    0.000000]  memory[0x1]     [0x00000100000000-0x000001ffffffff],
+0x100000000 bytes
 
-> +};
-> +
->  extern int __init pci_mmcfg_arch_init(void);
->  extern void __init pci_mmcfg_arch_free(void);
->  extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
-> @@ -145,6 +150,9 @@ extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
->                                phys_addr_t addr);
->  extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
->  extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
-> +extern u32 pci_mmio_read(int len, void __iomem *addr);
-> +extern void pci_mmio_write(int len, void __iomem *addr, u32 value);
-> +extern void pci_mmconfig_register_mmio(struct pci_mmcfg_mmio_ops *ops);
->
->  extern struct list_head pci_mmcfg_list;
->
-> diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-> index dd30b7e..8b3bc4f 100644
-> --- a/arch/x86/pci/mmconfig-shared.c
-> +++ b/arch/x86/pci/mmconfig-shared.c
-> @@ -31,6 +31,118 @@ static DEFINE_MUTEX(pci_mmcfg_lock);
->
->  LIST_HEAD(pci_mmcfg_list);
->
-> +static u32
-> +pci_mmconfig_generic_read(int len, void __iomem *addr)
-> +{
-> +       u32 data = 0;
-> +
-> +       switch (len) {
-> +       case 1:
-> +               data = readb(addr);
-> +               break;
-> +       case 2:
-> +               data = readw(addr);
-> +               break;
-> +       case 4:
-> +               data = readl(addr);
-> +               break;
-> +       }
+---
 
-This same function logic already exists with pci_generic_config_read.
-I think you need to move the differentiation between AMD and generic
-ECAM to pci_ops.
-
-Rob
+As you can see, memory size is 0x1f0000000 instead of 0x20000000.
+Why 256Mb are lost?
