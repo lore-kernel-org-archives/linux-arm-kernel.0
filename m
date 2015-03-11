@@ -1,124 +1,56 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Mar 2015 01:34:19 +0100
-Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
-In-Reply-To: <1425915402-10012-2-git-send-email-eliad@wizery.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-2-git-send-email-eliad@wizery.com>
-Message-ID: <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 11 Mar 2015 02:03:08 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <20150310223305.GN9188@piout.net>
+References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1901056.Mqyykpv3e9@vostro.rjw.lan> <20150310223305.GN9188@piout.net>
+Message-ID: <2194398.CCV6AEYQ7u@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eliad,
+On Tuesday, March 10, 2015 11:33:05 PM Alexandre Belloni wrote:
+> On 10/03/2015 at 23:31:52 +0100, Rafael J. Wysocki wrote :
+> > On Tuesday, March 10, 2015 10:33:17 PM Alexandre Belloni wrote:
+> > > Hi,
+> > > 
+> > > On 09/03/2015 at 15:30:01 +0100, Rafael J. Wysocki wrote :
+> > > > > > > Actaully, your platform should just refuse to enter suspend-to-RAM
+> > > > > > > when hw watchdog is enabled.
+> > > > > > 
+> > > > > > Quite likely, depending on how exactly the suspend is implemented.
+> > > > > >
+> > > > > 
+> > > > > We've had absolutely zero complain on that. It is quite clear in the
+> > > > > datasheet that failing to refresh the watchdog once started will lead to
+> > > > > a reset and that it is impossible to stop.
+> > > > > It is actually quite convenient to also ensure that you can actually
+> > > > > wake up from suspend because that can obviously go wrong.
+> > > > 
+> > > > I gather then that the suspend implementation is such that touching the
+> > > > watchdog periodically while suspended is not a problem.
+> > > > 
+> > > > Again, can you please tell me how suspend is implemented on at91?
+> > > > 
+> > > 
+> > > It actually depends on the architecture (at91rm9200, at91sam9 or sama5)
+> > > but basically, the clocks are switched off in almost all the peripheral
+> > > drivers then the ram self refresh activated, the master clock is
+> > > switched off using code running from SRAM and the core is then waiting
+> > > for interrupt.
+> > 
+> > OK, so it looks like enable_irq_wake() doesn't actually affect the hardware
+> > on those platforms, is that correct?
+> > 
+> 
+> I didn't exactly look in details but apart from the wakeup from gpio
+> handling (keeping the pio controller clocked in the case one of its gpio
+> has wakeup enabled), I don't think it does much more. It uses
+> irq_gc_set_wake().
 
-On Mon, Mar 9, 2015 at 4:36 PM, Eliad Peller <eliad@wizery.com> wrote:
-> When running with device-tree, we no longer have a board file
-> that can set up the platform data for wlcore.
-> Allow this data to be passed from DT.
->
-> For now, parse only the irq used. Other (optional) properties
-> can be added later on.
->
-> Signed-off-by: Ido Yariv <ido@wizery.com>
-> Signed-off-by: Eliad Peller <eliad@wizery.com>
-> ---
+Well, that only modifies gc->wake_active, so no hardware interactions.
 
-I see this is a v5 but I don't know what was changed from prior
-revisions. It would be good if the patches had a versions history.
 
->  drivers/net/wireless/ti/wlcore/sdio.c | 80 ++++++++++++++++++++++++++++++++---
->  1 file changed, 74 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
-> index d3dd7bf..ee556ac 100644
-> --- a/drivers/net/wireless/ti/wlcore/sdio.c
-> +++ b/drivers/net/wireless/ti/wlcore/sdio.c
-> @@ -34,6 +34,8 @@
->  #include <linux/wl12xx.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/printk.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
->
->  #include "wlcore.h"
->  #include "wl12xx_80211.h"
-> @@ -214,6 +216,69 @@ static struct wl1271_if_operations sdio_ops = {
->         .set_block_size = wl1271_sdio_set_block_size,
->  };
->
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id wlcore_sdio_of_match_table[] = {
-> +       { .compatible = "ti,wl1801" },
-> +       { .compatible = "ti,wl1805" },
-> +       { .compatible = "ti,wl1807" },
-> +       { .compatible = "ti,wl1831" },
-> +       { .compatible = "ti,wl1835" },
-> +       { .compatible = "ti,wl1837" },
-> +       { }
-> +};
-> +
-> +static struct wl12xx_platform_data *wlcore_probe_of(struct device *dev)
-> +{
-> +       struct device_node *np = dev->of_node;
-> +       struct wl12xx_platform_data *pdata;
-> +
-> +       if (!np || !of_match_node(wlcore_sdio_of_match_table, np))
-> +               return NULL;
-> +
-> +       pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-> +       if (!pdata)
-> +               return NULL;
-> +
-> +       pdata->irq = irq_of_parse_and_map(np, 0);
-> +       if (!pdata->irq) {
-> +               dev_err(dev, "No irq in platform data\n");
-> +               kfree(pdata);
-> +               return NULL;
-> +       }
-> +
-> +       return pdata;
-> +}
-> +#else
-> +static struct wl12xx_platform_data *wlcore_probe_of(struct device *dev)
-> +{
-> +       return NULL;
-> +}
-> +#endif
-> +
-> +static struct wl12xx_platform_data *
-> +wlcore_get_platform_data(struct device *dev)
-> +{
-> +       struct wl12xx_platform_data *pdata;
-> +
-> +       /* first, look for DT data */
-
-I thought it was the opposite, that platform data should over-rule DT.
-That way you can still use the data filled in
-arch/arm/mach-omap2/pdata-quirks.c even after the driver supports your
-new DT binding.
-
-> +       pdata = wlcore_probe_of(dev);
-> +       if (pdata)
-> +               return pdata;
-> +
-> +       /* if not found - fallback to static platform data */
-> +       pdata = wl12xx_get_platform_data();
-> +       if (!IS_ERR(pdata))
-> +               return kmemdup(pdata, sizeof(*pdata), GFP_KERNEL);
-> +
-> +       dev_err(dev, "No platform data set\n");
-> +       return NULL;
-> +}
-> +
-> +static void wlcore_del_platform_data(struct wl12xx_platform_data *pdata)
-> +{
-> +       kfree(pdata);
-> +}
-> +
-
-This function seems to be an unnecessary, why not just call kfree() directly?
-
-Or better, maybe the resource-managed devm_*() functions can be used
-so the data doesn't have to be explicitly freed?
-
-Best regards,
-Javier
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
