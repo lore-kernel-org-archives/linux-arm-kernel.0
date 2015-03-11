@@ -1,52 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 18:17:29 +0000
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <CAL85gmDVfop1_roHyLTRzFY3BahzTWs7nwbpmZD7emFKcFHyLg@mail.gmail.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>	<550056FD.8060804@arm.com>	<CAL85gmCuB4LfNp+6B8cL9+emFqWPM6W9gevTzibyaAzL+7jVdg@mail.gmail.com>	<55007BE3.30300@arm.com>
- <CAL85gmDVfop1_roHyLTRzFY3BahzTWs7nwbpmZD7emFKcFHyLg@mail.gmail.com>
-Message-ID: <550086B9.4010001@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 11 Mar 2015 19:33:43 +0100
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid
+ crash on armada-xp
+In-Reply-To: <55008483.8050603@list.ru>
+References: <54FF21BE.2040506@list.ru>
+ <20150311175227.499612af@free-electrons.com>
+ <55007ADD.6080505@list.ru>
+ <20150311174618.GE8656@n2100.arm.linux.org.uk>
+ <55008483.8050603@list.ru>
+Message-ID: <20150311193343.0317e3e1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/15 17:57, Feng Kan wrote:
-> On Wed, Mar 11, 2015 at 10:31 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 11/03/15 17:19, Feng Kan wrote:
->>> On Wed, Mar 11, 2015 at 7:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 27/01/15 07:03, Pranavkumar Sawargaonkar wrote:
->>>>> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
->>>>> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
->>>>> size due to size alignment checking in vgic driver for VCPU Control and
->>>>> VCPU register.
->>>>>
->>>>> This patch corrects the sizes to be inline with the hardware spec.
->>>>
->>>> This patch may be correct, but it is useless. The firmware on my APM
->>>> system (some version of u-boot) repaints the DT at boot time, negating
->>>> the effect of this patch.
->>> We have updated u-boot to reflect this change. I can supply you with a updated
->>> image if you wish.
->>
->> That would be useful, thanks.
->>
->> But more importantly, why bother upstreaming your DT into the kernel
->> tree if your firmware is going to overwrite whatever we provide?
-> We did tried to submit a version upstream but was rejected.
-> 
->>
->> Either the firmware let the user provide its own DT (and doesn't touch
->> it other than to change the CPU enable method, insert a /memreserve/ or
->> similar things), or the firmware always provide its own DT, and doesn't
->> let the user provide its own. Corrupting the user DT is a disaster, as
->> we just found.
-> Yes, the intent of the change is listed in the link below. It is not a
-> justification by any means,
-> just the effects of things appearing in layers.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288574.html
+Dear Stas Sergeev,
 
-Yeah. This is as wrong as it can possibly be. Oh well...
+On Wed, 11 Mar 2015 21:08:03 +0300, Stas Sergeev wrote:
 
-Thanks,
+> mem=0xc0000000 seems to work!
+> 0xd0000000 or 0xe0000000 do not.
+> OK, so 3Gb instead of 8... but at least it boots! :)
 
-	M.
+What is the value of the register 0xf1020254 ?
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
