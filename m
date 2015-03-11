@@ -1,81 +1,37 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Mar 2015 09:34:28 +0100
-Subject: [PATCH] soc/tegra: move soc_device_register call out of arch/arm
-In-Reply-To: <1425868301-22767-1-git-send-email-josephl@nvidia.com>
-References: <1425868301-22767-1-git-send-email-josephl@nvidia.com>
-Message-ID: <20150311083424.GA19391@ulmo.nvidia.com>
+Date: Wed, 11 Mar 2015 09:38:47 +0100
+Subject: [PATCH 1/2] iommu: move pgsize_bitmap from struct iommu_ops to
+ struct iommu_domain
+In-Reply-To: <1425641688-26438-2-git-send-email-will.deacon@arm.com>
+References: <1425641688-26438-1-git-send-email-will.deacon@arm.com>
+ <1425641688-26438-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20150311083846.GB19391@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:31:41AM +0800, Joseph Lo wrote:
-> Expending the usage for both Tegra & Tegra64 SoCs.
+On Fri, Mar 06, 2015 at 11:34:47AM +0000, Will Deacon wrote:
+> struct iommu_ops contains function pointers for IOMMU driver callbacks
+> in order to implement the core IOMMU API. Amongst these pointers is
+> an unsigned long pgsize_bitmap field, which is problematic because the
+> set of supported page sizes is not necessarily the same across all
+> instances of a given IOMMU type in the system. Furthermore, the set of
+> supported page sizes may be restricted following domain initialisation
+> when a particular page table format is chosen for the domain.
 > 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> This patch moves the field from iommu_ops into the iommu_domain and
+> updates all users accordingly.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/mach-tegra/tegra.c | 31 +------------------------------
->  drivers/soc/tegra/common.c  | 33 +++++++++++++++++++++++++++++++++
->  2 files changed, 34 insertions(+), 30 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
-> index 914341bcef25..95df6a97b956 100644
-> --- a/arch/arm/mach-tegra/tegra.c
-> +++ b/arch/arm/mach-tegra/tegra.c
-> @@ -87,36 +87,7 @@ static void __init tegra_dt_init_irq(void)
->  
->  static void __init tegra_dt_init(void)
->  {
-> -	struct soc_device_attribute *soc_dev_attr;
-> -	struct soc_device *soc_dev;
-> -	struct device *parent = NULL;
-> -
-> -	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> -	if (!soc_dev_attr)
-> -		goto out;
-> -
-> -	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
-> -	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d",
-> -					   tegra_sku_info.revision);
-> -	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%u", tegra_get_chip_id());
-> -
-> -	soc_dev = soc_device_register(soc_dev_attr);
-> -	if (IS_ERR(soc_dev)) {
-> -		kfree(soc_dev_attr->family);
-> -		kfree(soc_dev_attr->revision);
-> -		kfree(soc_dev_attr->soc_id);
-> -		kfree(soc_dev_attr);
-> -		goto out;
-> -	}
-> -
-> -	parent = soc_device_to_device(soc_dev);
-> -
-> -	/*
-> -	 * Finished with the static registrations now; fill in the missing
-> -	 * devices
-> -	 */
-> -out:
-> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+[...]
+>  drivers/iommu/tegra-gart.c      |  2 +-
+>  drivers/iommu/tegra-smmu.c      |  3 +--
 
-One of the reasons for adding the soc_device in the first place was so
-that it would be possible to use it as the parent for all devices that
-are instantiated from device tree. You remove that here, and break the
-ABI in the process. Arguably no userspace should be relying on the exact
-path in sysfs, but I'd still like to keep the top-level parent.
-
-Which reminds me of a discussion a while back about introducing a top-
-level driver for the SoC. I'm not sure if anything came of that.
-
-Stephen, do you know if there was a conclusion on that discussion? As
-far as I remember this sparked around the time when we moved drivers to
-drivers/soc and started splitting things up into initcalls. I'm thinking
-that if nothing like that was created yet, perhaps soc_device and
-soc_bus_type would be good candidates to implement this on top of.
-
-Thierry
+Acked-by: Thierry Reding <treding@nvidia.com>
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/2a5fc161/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/55d9df1f/attachment.sig>
