@@ -1,34 +1,118 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Wed, 11 Mar 2015 13:50:47 +0200
-Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
-In-Reply-To: <2121942.zIG9BfPsTV@wuerfel>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-2-git-send-email-eliad@wizery.com>
- <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
- <2121942.zIG9BfPsTV@wuerfel>
-Message-ID: <CAB3XZEcUC5H5b3rpFWQ_NG7fAT22x-MO9HajpD15WG6G=s7=NQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Mar 2015 11:50:28 +0000
+Subject: [PATCH 4/5] arm64/efi: ensure that Image does not cross a 512 MB
+ boundary
+In-Reply-To: <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150311115028.GD4114@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 11:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > +static void wlcore_del_platform_data(struct wl12xx_platform_data *pdata)
->> > +{
->> > +       kfree(pdata);
->> > +}
->> > +
->>
->> This function seems to be an unnecessary, why not just call kfree() directly?
->>
->> Or better, maybe the resource-managed devm_*() functions can be used
->> so the data doesn't have to be explicitly freed?
->
-> As I said earlier, I think it would be best not to dynamically allocate anything
-> here at all. As Eliad explained, the data is used by two different drivers:
-> wl12xx and wl18xx, and only the latter is converted for now, but after the
-> conversion, it should not need the platform data structure any more, only
-> the irq number that gets passed in from DT.
->
-sure, i'll try taking care of it (probably with additional patch after
-the conversion)
+Hi Ard,
 
-Eliad.
+On Tue, Mar 03, 2015 at 11:03:49AM +0000, Ard Biesheuvel wrote:
+> Update the Image placement logic used by the stub to make absolutely
+> sure that Image is placed in such a way that the early init code will
+
+Minor grammatical nits:
+
+s/that Image/that the Image/
+
+s/in such a way that/such that/
+
+> always be able to map it. This means the entire static memory footprint
+> of Image should be inside the same naturally aligned 512 MB region.
+
+s/Image/the Image/
+
+> 
+> First of all, the preferred offset of dram_base + TEXT_OFFSET is only
+> suitable if it doesn't result in the Image crossing a 512 MB
+> alignment boundary, which could be the case if dram_base itself
+> is close to the end of a naturally aligned 512 MB region.
+> 
+> Also, when moving the kernel Image, we need to verify that the new
+> destination region does not cross a 512 MB alignment boundary either.
+> If that is the case, we retry the allocation with the alignment
+> chosen such that the resulting region will always be suitable.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi-stub.c | 38 ++++++++++++++++++++++++++++++++------
+>  1 file changed, 32 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> index f5374065ad53..5f8175979be8 100644
+> --- a/arch/arm64/kernel/efi-stub.c
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -22,14 +22,40 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
+>  					efi_loaded_image_t *image)
+>  {
+>  	efi_status_t status;
+> -	unsigned long kernel_size, kernel_memsize = 0;
+> +	unsigned long kernel_size, kernel_memsize;
+> +	unsigned long preferred_offset;
+>  
+> -	/* Relocate the image, if required. */
+>  	kernel_size = _edata - _text;
+> -	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+> -		kernel_memsize = kernel_size + (_end - _edata);
+> -		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+> -				       SZ_2M, reserve_addr);
+> +	kernel_memsize = kernel_size + (_end - _edata);
+> +
+> +	/*
+> +	 * The kernel Image should be located as close as possible to the base
+> +	 * of system RAM, but must not cross a 512 MB alignment boundary.
+
+It might be better to say "but its static memory footprint must not
+cross a 512MB boundary" or something to that effect, to avoid any
+ambiguity regarding the Image binary vs the runtime memory footprint
+thereof.
+
+> +	 */
+> +	preferred_offset = dram_base + TEXT_OFFSET;
+> +	if ((preferred_offset & (SZ_512M - 1)) + kernel_memsize > SZ_512M)
+> +		preferred_offset = round_up(dram_base, SZ_512M) + TEXT_OFFSET;
+> +
+> +	if (*image_addr != preferred_offset) {
+> +		unsigned long alloc_size = kernel_memsize + TEXT_OFFSET;
+
+This could be const.
+
+> +		unsigned long alloc_align = SZ_2M;
+> +
+> +again:
+> +		status = efi_low_alloc(sys_table, alloc_size, alloc_align,
+> +				       reserve_addr);
+> +
+> +		/*
+> +		 * Check whether the new allocation crosses a 512 MB alignment
+> +		 * boundary. If so, retry with the alignment set to a power of
+> +		 * two upper bound of the allocation size. That is guaranteed
+> +		 * to produce a suitable allocation, but may waste more memory.
+> +		 */
+> +		if (status == EFI_SUCCESS &&
+> +		    ((*reserve_addr & (SZ_512M - 1)) + alloc_size) > SZ_512M) {
+> +			efi_free(sys_table, alloc_size, *reserve_addr);
+> +			alloc_align = roundup_pow_of_two(alloc_size);
+> +			goto again;
+> +		}
+
+If you move this check after the status != EFI_SUCCESS check below then
+you don't need to check status == EFI_SUCCESS, which would make the
+condition a little more legible.
+
+Other than those comments this looks sane to me.
+
+Thanks,
+Mark.
+
+>  		if (status != EFI_SUCCESS) {
+>  			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+>  			return status;
+> -- 
+> 1.8.3.2
+> 
+> 
