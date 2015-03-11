@@ -1,82 +1,73 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 11 Mar 2015 06:24:16 -0500
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141208101026.GD27367@arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <20141204182049.GB7749@arm.com> <54833BAF.1030405@suse.de>
- <20141208101026.GD27367@arm.com>
-Message-ID: <550025E0.7030008@suse.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 11 Mar 2015 12:34:03 +0100
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <3439869.6umCuOq6SV@wuerfel>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <20150310173550.GT5264@atomide.com>
+ <CABxcv=ndnNj4MhoXeW=GHXT4aEWQYHdbu-Mg4R2Zhf9CJTrJCA@mail.gmail.com>
+ <3439869.6umCuOq6SV@wuerfel>
+Message-ID: <CABxcv=nE_Qd7do+dRyp=fw3wYmWFb+0eEjXYOtdjqE55Cp0zmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Arnd,
 
-
-On 08.12.14 04:10, Will Deacon wrote:
-> On Sat, Dec 06, 2014 at 05:23:59PM +0000, Alexander Graf wrote:
->> On 04.12.14 19:20, Will Deacon wrote:
->>> On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
->>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
->>>> have everything 64k aligned. Armv7 binaries built with this binutils version
->>>> run successfully on an arm64 system.
->>>>
->>>> Since effectively there is now the chance to run armv7 code on arm64 even
->>>> with 64k page size, it doesn't make sense to block people from enabling
->>>> CONFIG_COMPAT on those configurations.
->>>
->>> Is there a distro available that is built with a recent enough binutils for
->>> this? I'd really like to run our regression tests to check that page-size
->>> assumptions don't exist for things like shm.
+On Wed, Mar 11, 2015 at 10:53 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 11 March 2015 02:00:59 Javier Martinez Canillas wrote:
 >>
->> So how much of a distro do you need? I could probably assemble a simple
->> very minimalistic rootfs with only bash if that helps.
-> 
-> I'd like to run LTP, so I'd probably need slightly more than that but I
-> certainly don't need the whole world.
+>> What do you mean by parsing here? IIUC there isn't a clock driver for
+>> these clocks and are setup directly in the
+>> drivers/net/wireless/ti/wl12xx/main.c driver.
+>>
+>> So you can't make the WLAN chip dev node a consumer of these clocks by
+>> adding a phandle to a clock provider and clock specifiers since there
+>> isn't a provider to be referenced in the DT. Or did I misunderstand?
+>
+> As I understand it, the clock signal is provided by an external oscillator,
 
-So after recompiling all of the distribution with newer binutils we now
-have an openSUSE Factory tree that has 64k aligned 32bit binaries.
+According to [0], it seems the chip can be connected to both external
+oscillators or internal clocks provided by the chip itself.
 
-Unfortunately however, the 32bit glibc has a bogus mmap() implementation
-that hard codes 4k page size.
+> which we can easily model in DT, and then you call clk_get_rate on that.
+>
 
-With the patch below applied to glibc, I can successfully run 32bit user
-space on Seattle with 64k PAGE_SIZE though. So I guess we'll need to fix
-up glibc next.
+Right, my point wast that this can be done only if the external
+oscillator have a proper clock driver / provider which I don't think
+is the case here. Most of this stuff predates the common clock
+framework.
 
-Do you know of anyone who's fluent enough in 32bit ARM assembly to
-convert the hard coded assumptions in there to instead use a variable
-that takes the actual host page size into account?
+Or at least Luciano Coelho had a patch on his series to make the
+wilink driver a clock provider itself by registering the refclock and
+tcxoclock clocks [0].
 
+Luciano also had patches for:
 
-Alex
+* Adding the clock provider dev node in the DTS [1]
+* Have a table to map the clock rate with the FW configuration values [2]
+* Getting the clock from DT and the rate as you said to configure the
+firmware accordingly [3]
 
+I think that patch [0] should not be needed since for external clocks,
+the IP providing the clocks should have its own clock driver and for
+internal clocks, a property should be used instead as you said.
 
-Index: glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap.S
-===================================================================
---- glibc-2.21.orig/sysdeps/unix/sysv/linux/arm/mmap.S
-+++ glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap.S
-@@ -36,7 +36,7 @@ ENTRY (__mmap)
- 	/* convert offset to pages */
- 	movs	ip, r5, lsl #20
- 	bne	.Linval
--	mov	r5, r5, lsr #12
-+	mov	r5, r5, lsr #16
+> If there is no external clock provider for this chip and the clocks
+> are provided by the device itself, then all we need is a clock-frequency
+> property in the device node.
+>
 
- 	/* do the syscall */
- 	DO_CALL (mmap2, 0)
-Index: glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap64.S
-===================================================================
---- glibc-2.21.orig/sysdeps/unix/sysv/linux/arm/mmap64.S
-+++ glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap64.S
-@@ -43,9 +43,9 @@ ENTRY (__mmap64)
- 	cfi_rel_offset (r4, 0)
- 	cfi_remember_state
- 	movs	r4, ip, lsl $20		@ check that offset is page-aligned
--	mov	ip, ip, lsr $12
-+	mov	ip, ip, lsr $16
- 	it	eq
--	movseq	r4, r5, lsr $12		@ check for overflow
-+	movseq	r4, r5, lsr $16		@ check for overflow
- 	bne	.Linval
- 	ldr	r4, [sp, $8]		@ load fd
- 	orr	r5, ip, r5, lsl $20	@ compose page offset
+Agreed, IIUC Luciano wanted to expose the internal clocks by
+registering in the common clock framework but if those clocks are not
+really accessible from outside the wlan chip, then I also think that a
+device node property should be used instead.
+
+>         Arnd
+> --
+
+Best regards,
+Javier
+
+[0]: https://lists.ozlabs.org/pipermail/devicetree-discuss/2013-July/037139.html
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/187794.html
+[2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181594.html
+[3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2013-July/181591.html
