@@ -1,29 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 11 Mar 2015 19:33:43 +0100
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid
- crash on armada-xp
-In-Reply-To: <55008483.8050603@list.ru>
-References: <54FF21BE.2040506@list.ru>
- <20150311175227.499612af@free-electrons.com>
- <55007ADD.6080505@list.ru>
- <20150311174618.GE8656@n2100.arm.linux.org.uk>
- <55008483.8050603@list.ru>
-Message-ID: <20150311193343.0317e3e1@free-electrons.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Wed, 11 Mar 2015 21:38:53 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <20150311191118.1edb2ed8@free-electrons.com>
+References: <54FF21BE.2040506@list.ru>	<20150311175227.499612af@free-electrons.com>	<55007ADD.6080505@list.ru>	<20150311174618.GE8656@n2100.arm.linux.org.uk>	<550081E2.5030807@list.ru>
+ <20150311191118.1edb2ed8@free-electrons.com>
+Message-ID: <55008BBD.5010800@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stas Sergeev,
+11.03.2015 21:11, Thomas Petazzoni ?????:
+> Dear Stas Sergeev,
+>
+> On Wed, 11 Mar 2015 20:56:50 +0300, Stas Sergeev wrote:
+>
+>> It doesn't look like it works as intended.
+>> Got the crash below.
+>> Please note the mappings beyond 0xe0000000, so I wonder if
+>> the option worked as expected?
+> Are you sure you're not confusing virtual addresses and physical
+> addresses?
+OK, so I changed Russel's printk to the following way:
 
-On Wed, 11 Mar 2015 21:08:03 +0300, Stas Sergeev wrote:
++printk("vmalloc: mapping page %p (0x%08lx000) at 0x%08lx 0x%08zx\n",
++    page, page_to_pfn(page), addr, __pa(addr));
 
-> mem=0xc0000000 seems to work!
-> 0xd0000000 or 0xe0000000 do not.
-> OK, so 3Gb instead of 8... but at least it boots! :)
+(added __pa(addr)) and now I hope I am seeing the physical
+addresses at the last column:
 
-What is the value of the register 0xf1020254 ?
+[   19.023836] vmalloc: mapping page ef7f1fa0 (0x000bfc7d000) at
+0xf04a3000 0x304a3000
+[   19.031515] vmalloc: mapping page ef7f3360 (0x000bfd1b000) at
+0xf04a4000 0x304a4000
+[   19.039221] vmalloc: mapping page ef7f18e0 (0x000bfc47000) at
+0xf04a5000 0x304a5000
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+and they do not exceed mem= option.
+Not sure though if this was the right thing to do though. :)
+
+Anyway, with mem=0xc000000 it seems to boot, so many
+thanks to everyone!
+
+I'll check the value of the register 0xf1020254 tomorrow and will post back.
