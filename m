@@ -1,136 +1,84 @@
 From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 11 Mar 2015 15:51:19 -0500
-Subject: [PATCH v3 3/4] devicetree: bindings: Document qcom, msm-id and qcom,
- board-id
-In-Reply-To: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
-References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1426107080-29079-3-git-send-email-galak@codeaurora.org>
+Date: Wed, 11 Mar 2015 15:51:17 -0500
+Subject: [PATCH v3 1/4] arm64: qcom: Add support for Qualcomm MSM8916 SoC
+Message-ID: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
-on Qualcomm MSM platforms to determine which device tree should be
-utilized and passed to the kernel.
+From: Abhimanyu Kapur <abhimany@codeaurora.org>
 
-Cc: <devicetree@vger.kernel.org>
+Add support for Qualcomm MSM8916 SoC in arm64 Kconfig and defconfig.
+Enable MSM8916 clock, pin control, and MSM serial driver utilized by
+MSM8916 and Qualcomm SoCs in general.
+
 Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Abhimanyu Kapur <abhimany@codeaurora.org>
 ---
- Documentation/devicetree/bindings/arm/msm/ids.txt | 65 +++++++++++++++++++++++
- include/dt-bindings/arm/qcom-ids.h                | 33 ++++++++++++
- 2 files changed, 98 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/msm/ids.txt
- create mode 100644 include/dt-bindings/arm/qcom-ids.h
+v3:
+* Dropped ARCH_REQUIRE_GPIOLIB, COMMON_CLK_QCOM, and SOC_BUS
+* Updated defconfig related to dropping various Kconfig options
 
-diff --git a/Documentation/devicetree/bindings/arm/msm/ids.txt b/Documentation/devicetree/bindings/arm/msm/ids.txt
-new file mode 100644
-index 0000000..9ee8428
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/msm/ids.txt
-@@ -0,0 +1,65 @@
-+* MSM-ID
+v2:
+* Dropped CONFIG_ARCH_QCOM_MSM8916, just use CONFIG_ARCH_QCOM
+* Updated defconfig related to dropping CONFIG_ARCH_QCOM_MSM8916
+
+ arch/arm64/Kconfig           | 6 ++++++
+ arch/arm64/configs/defconfig | 6 ++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..610965dd 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -177,6 +177,12 @@ config ARCH_MEDIATEK
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx ARMv8 SoCs
+ 
++config ARCH_QCOM
++	bool "Qualcomm Platforms"
++	select PINCTRL
++	help
++	  This enables support for the ARMv8 based Qualcomm chipsets.
 +
-+The qcom,msm-id entry specifies the MSM chipset and hardware revision.  It can
-+optionally be an array of these to indicate multiple hardware that use the same
-+device tree.  It is expected that the bootloader will use this information at
-+boot-up to decide which device tree to use when given multiple device trees,
-+some of which may not be compatible with the actual hardware.  It is the
-+bootloader's responsibility to pass the correct device tree to the kernel.
-+
-+PROPERTIES
-+
-+- qcom,msm-id:
-+	Usage: required
-+	Value type: <prop-encoded-array> (<chipset_id, rev_id> [, <c2, r2> ..])
-+	Definition:
-+		The "chipset_id" consists of three fields as below:
-+
-+		bits 0-15  = The unique MSM chipset id.
-+		bits 16-31 = Reserved.  Should be 0
-+
-+		chipset_id is an exact match value
-+
-+		The "rev_id" is a chipset specific 32-bit id that represents
-+		the version of the chipset.
-+
-+		The rev_id is a best match id.  The bootloader will look for
-+		the closest possible patch.
-+
-+* BOARD-ID
-+
-+The qcom,board-id entry specifies the board type and revision information.  It
-+can optionally be an array of these to indicate multiple boards that use the
-+same device tree.  It is expected that the bootloader will use this information
-+at boot-up to decide which device tree to use when given multiple device trees,
-+some of which may not be compatible with the actual hardware.  It is the
-+bootloader's responsibility to pass the correct device tree to the kernel.
-+
-+PROPERTIES
-+
-+- qcom,board-id:
-+	Usage: required
-+	Value type: <prop-encoded-array> (<board_id, subtype_id> [, <b2, s2> ..])
-+	Definition:
-+		The "board_id" consists of three fields as below:
-+
-+		bits 31-24 = Unusued.
-+		bits 23-16 = Platform Version Major
-+		bits 15-8  = Platfrom Version Minor
-+		bits 7-0   = Platform Type
-+
-+		Platform Type field is an exact match value.  The Platform
-+		Major/Minor field is a best match.  The bootloader will look
-+		for the closest possible match.
-+
-+		The "subtype_id" is unique to a Platform Type/Chipset ID.  For
-+		a given Platform Type, there will typically only be a single
-+		board and the subtype_id will be 0.  However in some cases board
-+		variants may need to be distinquished by different subtype_id
-+		values.
-+
-+		subtype_id is an exact match value.
-+
-+EXAMPLE:
-+	qcom,board-id = <15 2>;
-+	qcom,msm-id = <0x1007e 0>;
-diff --git a/include/dt-bindings/arm/qcom-ids.h b/include/dt-bindings/arm/qcom-ids.h
-new file mode 100644
-index 0000000..a18f34e
---- /dev/null
-+++ b/include/dt-bindings/arm/qcom-ids.h
-@@ -0,0 +1,33 @@
-+/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __DT_BINDINGS_QCOM_IDS_H
-+#define __DT_BINDINGS_QCOM_IDS_H
-+
-+/* qcom,msm-id */
-+#define QCOM_ID_MSM8916		206
-+#define QCOM_ID_APQ8016		247
-+#define QCOM_ID_MSM8216		248
-+#define QCOM_ID_MSM8116		249
-+#define QCOM_ID_MSM8616		250
-+
-+/* qcom,board-id */
-+#define QCOM_BRD_ID(a, major, minor) \
-+	(((major & 0xff) << 16) | ((minor & 0xff) << 8) | QCOM_BRD_ID_##a)
-+
-+#define QCOM_BRD_ID_MTP		8
-+#define QCOM_BRD_ID_DRAGONBRD	10
-+#define QCOM_BRD_ID_SBC		24
-+
-+#define QCOM_BRD_SUBTYPE_DEFAULT		0
-+#define QCOM_BRD_SUBTYPE_MTP8916_SMB1360	1
-+
-+#endif
+ config ARCH_SEATTLE
+ 	bool "AMD Seattle SoC Family"
+ 	help
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index be1f12a..d54a1f6 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -33,6 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_QCOM=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_XGENE=y
+@@ -93,11 +94,14 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_MSM=y
++CONFIG_SERIAL_MSM_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_VIRTIO_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
++CONFIG_PINCTRL_MSM8916=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_XGENE=y
+ # CONFIG_HWMON is not set
+@@ -127,6 +131,8 @@ CONFIG_RTC_DRV_EFI=y
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_VIRTIO_BALLOON=y
+ CONFIG_VIRTIO_MMIO=y
++CONFIG_COMMON_CLK_QCOM=y
++CONFIG_MSM_GCC_8916=y
+ # CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_PHY_XGENE=y
+ CONFIG_EXT2_FS=y
 -- 
 Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
