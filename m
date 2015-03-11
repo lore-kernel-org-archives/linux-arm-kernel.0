@@ -1,107 +1,95 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Mar 2015 20:39:32 +0800
-Subject: [PATCH v10 06/21] ACPI / sleep: Introduce CONFIG_ACPI_GENERIC_SLEEP
+Date: Wed, 11 Mar 2015 20:39:33 +0800
+Subject: [PATCH v10 07/21] ARM64 / ACPI: Introduce PCI stub functions for ACPI
 In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1426077587-1561-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1426077587-1561-8-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+CONFIG_ACPI depends CONFIG_PCI on x86 and ia64, in ARM64 server
+world we will have PCIe in most cases, but some of them may not,
+make CONFIG_ACPI depend CONFIG_PCI on ARM64 will satisfy both.
 
-ACPI 5.1 does not currently support S states for ARM64 hardware but
-ACPI code will call acpi_target_system_state() and acpi_sleep_init()
-for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
-and select it for x86 and ia64 only to make sleep functions available,
-and also introduce stub function to allow other drivers to function
-until S states are defined for ARM64.
+With that case, we need some arch dependent PCI functions to
+access the config space before the PCI root bridge is created, and
+pci_acpi_scan_root() to create the PCI root bus. So introduce
+some stub function here to make ACPI core compile and revisit
+them later when implemented on ARM64.
 
-It will be no functional change for x86 and IA64.
-
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+CC: Liviu Dudau <Liviu.Dudau@arm.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Tested-by: Yijing Wang <wangyijing@huawei.com>
+Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+Tested-by: Jon Masters <jcm@redhat.com>
+Tested-by: Timur Tabi <timur@codeaurora.org>
+Tested-by: Robert Richter <rrichter@cavium.com>
 Acked-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/ia64/Kconfig       | 1 +
- arch/x86/Kconfig        | 1 +
- drivers/acpi/Kconfig    | 4 ++++
- drivers/acpi/Makefile   | 2 +-
- drivers/acpi/internal.h | 4 ++++
- 5 files changed, 11 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/pci.h |  6 ++++++
+ arch/arm64/kernel/pci.c      | 25 +++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 074e52b..e8728d7 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -10,6 +10,7 @@ config IA64
- 	select ARCH_MIGHT_HAVE_PC_SERIO
- 	select PCI if (!IA64_HP_SIM)
- 	select ACPI if (!IA64_HP_SIM)
-+	select ACPI_GENERIC_SLEEP if ACPI
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select HAVE_UNSTABLE_SCHED_CLOCK
- 	select HAVE_IDE
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index b7d31ca..9804431 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -22,6 +22,7 @@ config X86_64
- ### Arch settings
- config X86
- 	def_bool y
-+	select ACPI_GENERIC_SLEEP if ACPI
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
- 	select ARCH_HAS_FAST_MULTIPLIER
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index e6c3ddd..a7b9120 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
- config ARCH_MIGHT_HAVE_ACPI_PDC
- 	bool
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index 872ba93..b008a72 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -27,6 +27,12 @@
+ extern int isa_dma_bridge_buggy;
  
-+config ACPI_GENERIC_SLEEP
-+	bool
+ #ifdef CONFIG_PCI
++static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
++{
++	/* no legacy IRQ on arm64 */
++	return -ENODEV;
++}
 +
- config ACPI_SLEEP
- 	bool
- 	depends on SUSPEND || HIBERNATION
-+	depends on ACPI_GENERIC_SLEEP
- 	default y
+ static inline int pci_proc_domain(struct pci_bus *bus)
+ {
+ 	return 1;
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 6f93c24..4095379 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -10,6 +10,7 @@
+  *
+  */
  
- config ACPI_PROCFS_POWER
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 623b117..2397822 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -23,7 +23,7 @@ acpi-y				+= nvs.o
++#include <linux/acpi.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+@@ -46,3 +47,27 @@ int pcibios_add_device(struct pci_dev *dev)
  
- # Power management related files
- acpi-y				+= wakeup.o
--acpi-y				+= sleep.o
-+acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
- acpi-y				+= device_pm.o
- acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
- 
-diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-index 56b321a..b5eef4c 100644
---- a/drivers/acpi/internal.h
-+++ b/drivers/acpi/internal.h
-@@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
- /*--------------------------------------------------------------------------
-                                   Suspend/Resume
-   -------------------------------------------------------------------------- */
-+#ifdef CONFIG_ACPI_GENERIC_SLEEP
- extern int acpi_sleep_init(void);
-+#else
-+static inline int acpi_sleep_init(void) { return -ENOSYS; }
+ 	return 0;
+ }
++
++/*
++ * raw_pci_read/write - Platform-specific PCI config space access.
++ */
++int raw_pci_read(unsigned int domain, unsigned int bus,
++		  unsigned int devfn, int reg, int len, u32 *val)
++{
++	return -ENXIO;
++}
++
++int raw_pci_write(unsigned int domain, unsigned int bus,
++		unsigned int devfn, int reg, int len, u32 val)
++{
++	return -ENXIO;
++}
++
++#ifdef CONFIG_ACPI
++/* Root bridge scanning */
++struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
++{
++	/* TODO: Should be revisited when implementing PCI on ACPI */
++	return NULL;
++}
 +#endif
- 
- #ifdef CONFIG_ACPI_SLEEP
- int acpi_sleep_proc_init(void);
 -- 
 1.9.1
