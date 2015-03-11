@@ -1,77 +1,48 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Mar 2015 11:18:46 +0100
-Subject: [PATCH 2/2] ARM: l2c: Maintain CPU endianness for early resume
- function
-In-Reply-To: <1421757420-20983-1-git-send-email-digetx@gmail.com>
-References: <1421757420-20983-1-git-send-email-digetx@gmail.com>
-Message-ID: <20150311101845.GL19577@ulmo.nvidia.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 11 Mar 2015 11:20:11 +0100
+Subject: [PATCH 2/5] arm64: use fixmap region for permanent FDT mapping
+In-Reply-To: <20150311095055.GB21430@leverpostej>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425380630-3684-3-git-send-email-ard.biesheuvel@linaro.org>
+ <CAL_JsqLdFS_nGuLTxrEZPCQv8MtW0s5jQ9Od1qj41yoqX40ONQ@mail.gmail.com>
+ <CAKv+Gu8xrb0QqeFCfbqOb2sxFPyT8cVaq_RkhiD5jrr8L0zYzA@mail.gmail.com>
+ <20150311095055.GB21430@leverpostej>
+Message-ID: <CAKv+Gu-=_LGYLPcDw3od04x5MneDXHN8goUg=zdmv-hBaj_H-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 20, 2015 at 03:36:55PM +0300, Dmitry Osipenko wrote:
-> In big endian CPU mode l2x0_saved_regs structure stores registers values in BE
-> format. In order to maintain BE CPU mode, these values and immediate constants
-> must be converted back to LE format before writing them to cache controller.
-> 
-> Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
-> ---
->  arch/arm/mm/l2c-l2x0-resume.S | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+On 11 March 2015 at 10:50, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> +       /*
+>> >> +        * Reserve 2 MB of virtual space for the FDT at the top of the fixmap
+>> >> +        * region. Keep this at the top so it remains 2 MB aligned.
+>> >> +        */
+>> >
+>> > We should not fix a location restriction by creating a size
+>> > restriction. You could embed firmware images within a DTB (which I
+>> > think PPC does).
+>> >
+>>
+>> The size restriction existed on arm64 before this patch, so I didn't
+>> think twice about it.
+>> So what would be a reasonable upper bound? We could go up to ~256 MB
+>> without much trouble, but I guess that's a bit excessive, no?
+>
+> Given the existing code had the same 2MB restriction (documented in
+> booting.txt), I think retaining that limitation for now is fine unless
+> we have some reasonable example of a DTB approaching or exceeding 2MB.
+>
+> As far as I am aware, on arm64 we're not currently embeddeding FW images
+> in the DTB passed to the kernel, and I'm not sure why we would.
+> Anything that's critical to the system and requires FW should be
+> initialised prior to the kernel, and if we need FW to drive a particular
+> device I'd expect we'd store that in the filesystem (or perhaps
+> initrd/initramfs).
+>
 
-Hi Russell,
+I agree with Mark's observation that 2 MB seems reasonable at the
+moment, but on the other hand, the code only requires minor tweaking
+to make the limit configurable simply by changing the FIX_FDT_SIZE
+define, so I don't mind changing that.
 
-Did you get a chance yet to review this patch? It's a dependency for
-enabling big-endian support on Tegra. As such, I wonder if you would be
-willing to ack it, so that I can take it through the Tegra tree along
-with the rest of the patches.
-
-If you prefer to take it through the ARM tree, that's fine, too. In that
-case would you be able to provide a stable branch that I can merge into
-the Tegra tree to resolve the dependency?
-
-Thanks,
-Thierry
-
-> diff --git a/arch/arm/mm/l2c-l2x0-resume.S b/arch/arm/mm/l2c-l2x0-resume.S
-> index fda415e..9f99c7e 100644
-> --- a/arch/arm/mm/l2c-l2x0-resume.S
-> +++ b/arch/arm/mm/l2c-l2x0-resume.S
-> @@ -30,6 +30,15 @@ ENTRY(l2c310_early_resume)
->  	teq	r1, #0
->  	reteq	lr
->  
-> +	@ Reverse for big endian kernel
-> +ARM_BE8(rev	r2, r2)
-> +ARM_BE8(rev	r3, r3)
-> +ARM_BE8(rev	r4, r4)
-> +ARM_BE8(rev	r5, r5)
-> +ARM_BE8(rev	r6, r6)
-> +ARM_BE8(rev	r7, r7)
-> +ARM_BE8(rev	r8, r8)
-> +
->  	@ The prefetch and power control registers are revision dependent
->  	@ and can be written whether or not the L2 cache is enabled
->  	ldr	r0, [r1, #L2X0_CACHE_ID]
-> @@ -51,6 +60,7 @@ ENTRY(l2c310_early_resume)
->  
->  	str	r2, [r1, #L2X0_AUX_CTRL]
->  	mov	r9, #L2X0_CTRL_EN
-> +ARM_BE8(rev	r9, r9)
->  	str	r9, [r1, #L2X0_CTRL]
->  	ret	lr
->  ENDPROC(l2c310_early_resume)
-> -- 
-> 2.2.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/3b95639a/attachment.sig>
+-- 
+Ard.
