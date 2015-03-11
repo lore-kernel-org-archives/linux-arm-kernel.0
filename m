@@ -1,56 +1,238 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 11 Mar 2015 02:03:08 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <20150310223305.GN9188@piout.net>
-References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
- <1901056.Mqyykpv3e9@vostro.rjw.lan> <20150310223305.GN9188@piout.net>
-Message-ID: <2194398.CCV6AEYQ7u@vostro.rjw.lan>
+From: fkan@apm.com (Feng Kan)
+Date: Tue, 10 Mar 2015 17:47:32 -0700
+Subject: [PATCH V2] arm64: dts: add APM Merlin Board device tree
+Message-ID: <1426034852-18080-1-git-send-email-fkan@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 10, 2015 11:33:05 PM Alexandre Belloni wrote:
-> On 10/03/2015 at 23:31:52 +0100, Rafael J. Wysocki wrote :
-> > On Tuesday, March 10, 2015 10:33:17 PM Alexandre Belloni wrote:
-> > > Hi,
-> > > 
-> > > On 09/03/2015 at 15:30:01 +0100, Rafael J. Wysocki wrote :
-> > > > > > > Actaully, your platform should just refuse to enter suspend-to-RAM
-> > > > > > > when hw watchdog is enabled.
-> > > > > > 
-> > > > > > Quite likely, depending on how exactly the suspend is implemented.
-> > > > > >
-> > > > > 
-> > > > > We've had absolutely zero complain on that. It is quite clear in the
-> > > > > datasheet that failing to refresh the watchdog once started will lead to
-> > > > > a reset and that it is impossible to stop.
-> > > > > It is actually quite convenient to also ensure that you can actually
-> > > > > wake up from suspend because that can obviously go wrong.
-> > > > 
-> > > > I gather then that the suspend implementation is such that touching the
-> > > > watchdog periodically while suspended is not a problem.
-> > > > 
-> > > > Again, can you please tell me how suspend is implemented on at91?
-> > > > 
-> > > 
-> > > It actually depends on the architecture (at91rm9200, at91sam9 or sama5)
-> > > but basically, the clocks are switched off in almost all the peripheral
-> > > drivers then the ram self refresh activated, the master clock is
-> > > switched off using code running from SRAM and the core is then waiting
-> > > for interrupt.
-> > 
-> > OK, so it looks like enable_irq_wake() doesn't actually affect the hardware
-> > on those platforms, is that correct?
-> > 
-> 
-> I didn't exactly look in details but apart from the wakeup from gpio
-> handling (keeping the pio controller clocked in the case one of its gpio
-> has wakeup enabled), I don't think it does much more. It uses
-> irq_gc_set_wake().
+This patch adds the support for APM Merlin board. The Merlin board
+is based on the APM X-Gene Shadowcat SoC. This DTS enables PMU,
+SATA and Serial.
 
-Well, that only modifies gc->wake_active, so no hardware interactions.
+Signed-off-by: Feng Kan <fkan@apm.com>
+---
+  V2 Change:
+	- Add dma-range definition
 
+  V1 Change:
+	- add memreserve for spintable.
+        - remove clkfreq attribute
+	- update spin location, although it is done by bootloader.
+	- remove msi reg entry
+	- add chosen for stdout path 
+ arch/arm64/boot/dts/apm/apm-merlin.dts     |  41 ++++++++
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 155 +++++++++++++++++++++++++++++
+ 2 files changed, 196 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/apm/apm-merlin.dts
+ create mode 100644 arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
 
+diff --git a/arch/arm64/boot/dts/apm/apm-merlin.dts b/arch/arm64/boot/dts/apm/apm-merlin.dts
+new file mode 100644
+index 0000000..3feefbd
+--- /dev/null
++++ b/arch/arm64/boot/dts/apm/apm-merlin.dts
+@@ -0,0 +1,41 @@
++/*
++ * dts file for AppliedMicro (APM) Merlin Board
++ *
++ * Copyright (C) 2015, Applied Micro Circuits Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++/dts-v1/;
++
++/include/ "apm-shadowcat.dtsi"
++
++/ {
++	model = "APM X-Gene Merlin board";
++	compatible = "apm,merlin", "apm,xgene-shadowcat";
++
++	chosen {
++		linux,stdout-path = &serial0;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = < 0x1 0x00000000 0x0 0x80000000 >;
++	};
++};
++
++&serial0 {
++	status = "ok";
++};
++&sata1 {
++	status = "ok";
++};
++&sata2 {
++	status = "ok";
++};
++&sata3 {
++	status = "ok";
++};
+diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+new file mode 100644
+index 0000000..d9e193d
+--- /dev/null
++++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+@@ -0,0 +1,155 @@
++/*
++ * dts file for AppliedMicro (APM) X-Gene Shadowcat SOC
++ *
++ * Copyright (C) 2015, Applied Micro Circuits Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++/memreserve/ 0x4000000000 0x00010000;
++
++/ {
++	compatible = "apm,xgene-shadowcat";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 000 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x000>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 001 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x001>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 100 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x100>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 101 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x101>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 200 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x200>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 201 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x201>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 300 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x300>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++		cpu at 301 {
++			device_type = "cpu";
++			compatible = "apm,strega", "arm,armv8";
++			reg = <0x0 0x301>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0x40 0x0000fff8>;
++		};
++	};
++
++	gic: interrupt-controller at 78090000 {
++		compatible = "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		interrupt-controller;
++		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
++		reg = <0x0 0x78090000 0x0 0x10000>,	/* GIC Dist */
++		      <0x0 0x780A0000 0x0 0x20000>,	/* GIC CPU */
++		      <0x0 0x780C0000 0x0 0x10000>,	/* GIC VCPU Control */
++		      <0x0 0x780E0000 0x0 0x20000>;	/* GIC VCPU */
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <1 12 0xff04>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <1 0 0xff04>,	/* Secure Phys IRQ */
++			     <1 13 0xff04>,	/* Non-secure Phys IRQ */
++			     <1 14 0xff04>,	/* Virt IRQ */
++			     <1 15 0xff04>;	/* Hyp IRQ */
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		dma-ranges = <0x0 0x0 0x0 0x0 0x100 0x0>;
++
++		serial0: serial at 10600000 {
++			device_type = "serial";
++			compatible = "ns16550";
++			reg = <0 0x10600000 0x0 0x1000>;
++			reg-shift = <2>;
++			clock-frequency = <10000000>;
++			interrupt-parent = <&gic>;
++			interrupts = <0x0 0x4c 0x4>;
++		};
++
++		sata1: sata at 1a000000 {
++			compatible = "apm,xgene-ahci";
++			reg = <0x0 0x1a000000 0x0 0x1000>,
++			      <0x0 0x1f200000 0x0 0x1000>,
++			      <0x0 0x1f20d000 0x0 0x1000>,
++			      <0x0 0x1f20e000 0x0 0x1000>;
++			interrupts = <0x0 0x5a 0x4>;
++			dma-coherent;
++		};
++
++		sata2: sata at 1a200000 {
++			compatible = "apm,xgene-ahci";
++			reg = <0x0 0x1a200000 0x0 0x1000>,
++			      <0x0 0x1f210000 0x0 0x1000>,
++			      <0x0 0x1f21d000 0x0 0x1000>,
++			      <0x0 0x1f21e000 0x0 0x1000>;
++			interrupts = <0x0 0x5b 0x4>;
++			dma-coherent;
++		};
++
++		sata3: sata at 1a400000 {
++			compatible = "apm,xgene-ahci";
++			reg = <0x0 0x1a400000 0x0 0x1000>,
++			      <0x0 0x1f220000 0x0 0x1000>,
++			      <0x0 0x1f22d000 0x0 0x1000>,
++			      <0x0 0x1f22e000 0x0 0x1000>;
++			interrupts = <0x0 0x5c 0x4>;
++			dma-coherent;
++		};
++	};
++};
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.9.1
