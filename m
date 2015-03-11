@@ -1,47 +1,152 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Mar 2015 11:05:47 +0100
-Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
-In-Reply-To: <2121942.zIG9BfPsTV@wuerfel>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-2-git-send-email-eliad@wizery.com>
- <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
- <2121942.zIG9BfPsTV@wuerfel>
-Message-ID: <CABxcv=nn9-1a-3809Y1JgC5ExkwHqQmCXRT3tX=h7Z6C7c+m2A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 11 Mar 2015 11:07:43 +0100
+Subject: [PATCH v8 00/18] Tegra124 CL-DVFS / DFLL clocksource + cpufreq
+In-Reply-To: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
+References: <1425213881-5262-1-git-send-email-mikko.perttunen@kapsi.fi>
+Message-ID: <20150311100741.GK19577@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hi Mike,
 
-On Wed, Mar 11, 2015 at 10:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 11 March 2015 01:34:19 Javier Martinez Canillas wrote:
->> > +
->> > +static struct wl12xx_platform_data *
->> > +wlcore_get_platform_data(struct device *dev)
->> > +{
->> > +       struct wl12xx_platform_data *pdata;
->> > +
->> > +       /* first, look for DT data */
->>
->> I thought it was the opposite, that platform data should over-rule DT.
->> That way you can still use the data filled in
->> arch/arm/mach-omap2/pdata-quirks.c even after the driver supports your
->> new DT binding.
->
-> No, the pdata-quirks stuff for this driver must die, it was a hack
-> that only exists because we previously could not attach data to an
-> sdio function.
->
+Have you had a chance to look at these changes to the Tegra clock
+driver? If you're fine with it, I'd like to take these patches through
+the Tegra tree because the rest of the series depends on them. I can
+provide a stable branch in case we need to base other Tegra clock
+changes on top of this.
 
-Ok sorry, I misunderstood and thought that the output from the
-discussion in patch 3/3 was that the pdata could not still be removed
-due not having a way to configure the clocks for wl12xx.
+Thierry
 
-I totally agree with removing the pdata on this driver, in fact I
-would go an just remove all the remaining OMAP2+ board files and
-pdata-quirks completely. Most OMAP2+ boards have been converted to DT
-years ago and if someone really cares about mainline support for these
-boards, they can add a DTS and DT bindings for the drivers that still
-needed like this one.
-
-Best regards,
-Javier
+On Sun, Mar 01, 2015 at 02:44:23PM +0200, Mikko Perttunen wrote:
+> Hi, this is v8 of the Tegra124 cpufreq series. Aside rebasing on latest -next,
+> the following changes have been done:
+> 
+> clk: tegra: Add binding for the Tegra124 DFLL clocksource
+> - Changed dfll@ -> clock@
+> - Changed compatibility string to "nvidia,tegra124-dfll"
+> - Clarified how the vdd-cpu-supply property is used
+> - Marked nvidia,cg-scale as optional since it is a boolean property
+> - Expanded the 'FS mode' term to 'full speed mode'
+> - Added dvco reset control
+> 
+> ARM: tegra: Add the DFLL to Tegra124 device tree
+> - Changed dfll@ -> clock@
+> - Added dvco reset control
+> 
+> ARM: tegra: Enable the DFLL on the Jetson TK1
+> - Changed dfll@ -> clock@
+> 
+> clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
+> - Added
+> 
+> clk: tegra: Introduce ability for SoC-specific reset control callbacks
+> - Added
+> 
+> clk: tegra: Add DFLL DVCO reset control for Tegra124
+> - Changed to use SoC-specific reset control callback
+> 
+> clk: tegra: Add Tegra124 DFLL clocksource platform driver
+> - Don't set DVCO reset handlers
+> 
+> clk: tegra: Add library for the DFLL clock source (open-loop mode)
+> - Use reset control instead of function pointers
+> 
+> also added acks from v7.
+> 
+> The series is available in a git repository at
+>   git://github.com/cyndis/linux.git cldvfs-v8
+> 
+> Tested by me on Jetson-TK1 (rev. D).
+> 
+> Original cover letter:
+> 
+> This series implements the DFLL/CL-DVFS clock source for the fast CPU
+> cluster on Tegra124, and a cpufreq driver that uses the DFLL for
+> clocking the CPU. Most of this is based on Paul Walmsley's public patch
+> set from December 2013, which is available at
+> http://comments.gmane.org/gmane.linux.ports.tegra/15273
+> 
+> The DFLL clock hardware is a voltage-controlled oscillator plus
+> control logic that compares the generated output clock with a
+> 51 MHz reference clock, and can make decisions to either lower
+> or raise the DFLL voltage to keep the output rate close to the
+> software-requested rate. The voltage changes are done by
+> communicating with an off-chip PMIC via either I2C or PWM.
+> As the DFLL oscillator is powered via the CPU rail, using
+> the DFLL as the CPU clocksource also gives us dynamic CPU
+> voltage scaling.
+> 
+> This series has been tested on the Jetson TK1 (Rev C). Porting this to
+> the Venice2 should be simple, though do note that it does not have
+> active cooling.
+> 
+> Thanks,
+> Tuomas
+> 
+> Mikko Perttunen (3):
+>   clk: tegra: Introduce ability for SoC-specific reset control callbacks
+>   clk: tegra: Initialize PLL_X before CCLK_G to ensure it has a parent
+>   ARM: tegra: Add CPU regulator to the Jetson TK1 device tree
+> 
+> Paul Walmsley (1):
+>   clk: tegra: Add DFLL DVCO reset control for Tegra124
+> 
+> Tuomas Tynkkynen (14):
+>   clk: tegra: Add binding for the Tegra124 DFLL clocksource
+>   clk: tegra: Add library for the DFLL clock source (open-loop mode)
+>   clk: tegra: Add closed loop support for the DFLL
+>   clk: tegra: Add functions for parsing CVB tables
+>   clk: tegra: Add Tegra124 DFLL clocksource platform driver
+>   clk: tegra: Save/restore CCLKG_BURST_POLICY on suspend
+>   clk: tegra: Add the DFLL as a possible parent of the cclk_g clock
+>   ARM: tegra: Add the DFLL to Tegra124 device tree
+>   ARM: tegra: Enable the DFLL on the Jetson TK1
+>   cpufreq: tegra124: Add device tree bindings
+>   cpufreq: tegra: Rename tegra-cpufreq to tegra20-cpufreq
+>   cpufreq: Add cpufreq driver for Tegra124
+>   ARM: tegra: Add entries for cpufreq on Tegra124
+>   ARM: tegra: enable Tegra124 cpufreq driver by default
+> 
+>  .../bindings/clock/nvidia,tegra124-dfll.txt        |   79 +
+>  .../bindings/cpufreq/tegra124-cpufreq.txt          |   44 +
+>  arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   15 +-
+>  arch/arm/boot/dts/tegra124.dtsi                    |   34 +
+>  arch/arm/configs/tegra_defconfig                   |    1 +
+>  arch/arm/mach-tegra/Kconfig                        |    1 +
+>  drivers/clk/tegra/Makefile                         |    3 +
+>  drivers/clk/tegra/clk-dfll.c                       | 1755 ++++++++++++++++++++
+>  drivers/clk/tegra/clk-dfll.h                       |   54 +
+>  drivers/clk/tegra/clk-tegra-super-gen4.c           |   50 +-
+>  drivers/clk/tegra/clk-tegra124-dfll-fcpu.c         |  163 ++
+>  drivers/clk/tegra/clk-tegra124.c                   |   82 +
+>  drivers/clk/tegra/clk.c                            |   36 +-
+>  drivers/clk/tegra/clk.h                            |    3 +
+>  drivers/clk/tegra/cvb.c                            |  133 ++
+>  drivers/clk/tegra/cvb.h                            |   67 +
+>  drivers/cpufreq/Kconfig.arm                        |   13 +-
+>  drivers/cpufreq/Makefile                           |    3 +-
+>  drivers/cpufreq/tegra124-cpufreq.c                 |  217 +++
+>  .../cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} |    0
+>  include/dt-bindings/reset/tegra124-car.h           |   11 +
+>  21 files changed, 2730 insertions(+), 34 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/nvidia,tegra124-dfll.txt
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/tegra124-cpufreq.txt
+>  create mode 100644 drivers/clk/tegra/clk-dfll.c
+>  create mode 100644 drivers/clk/tegra/clk-dfll.h
+>  create mode 100644 drivers/clk/tegra/clk-tegra124-dfll-fcpu.c
+>  create mode 100644 drivers/clk/tegra/cvb.c
+>  create mode 100644 drivers/clk/tegra/cvb.h
+>  create mode 100644 drivers/cpufreq/tegra124-cpufreq.c
+>  rename drivers/cpufreq/{tegra-cpufreq.c => tegra20-cpufreq.c} (100%)
+>  create mode 100644 include/dt-bindings/reset/tegra124-car.h
+> 
+> --
+> 2.3.0
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/eebe9464/attachment.sig>
