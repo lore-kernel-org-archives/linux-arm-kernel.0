@@ -1,21 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 15:37:34 +0100
-Subject: [PATCH][RESEND] ARM: vexpress: update CONFIG_USB_ISP1760 option
-In-Reply-To: <1425925669-8561-1-git-send-email-sudeep.holla@arm.com>
-References: <1425925669-8561-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <2270067.EVeXEFvz96@wuerfel>
+Date: Wed, 11 Mar 2015 15:38:45 +0100
+Subject: [GIT PULL] ARM: imx: fixes for 4.0
+In-Reply-To: <20150311045505.GB20455@dragon>
+References: <20150311045505.GB20455@dragon>
+Message-ID: <12511152.LJ89QvYOkK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 March 2015 18:27:49 Sudeep Holla wrote:
-> Commit 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
-> to drivers/usb/isp1760/") moved the isp1760 driver and changed the
-> Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
-> directly anymore. This results in driver being not compiled in when
-> using vexpress_defconfig and the USB is non-functional.
+On Wednesday 11 March 2015 12:55:07 Shawn Guo wrote:
+> The i.MX fixes for 4.0:
 > 
-> This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
-> get back USB functional on vexpress platforms.
+> It includes a couple of i.MX6 dts fixes, which set an input supply to
+> vbus regulator.  Without the fixes, the voltage of vbus is incorrect
+> after system boots up.
+> 
 > 
 
 Pulled into fixes, thanks!
