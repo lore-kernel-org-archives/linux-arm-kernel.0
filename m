@@ -1,54 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Mar 2015 17:00:15 +0100
-Subject: [PATCH v2 0/5] arm64: update/clarify/relax Image and FDT placement
- rules
-Message-ID: <1426089620-9459-1-git-send-email-ard.biesheuvel@linaro.org>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Wed, 11 Mar 2015 17:06:47 +0100 (CET)
+Subject: [PATCH v6 04/22] power_supply: Move run-time configuration to
+ separate structure
+In-Reply-To: <1425976046-20973-5-git-send-email-k.kozlowski@samsung.com>
+References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
+ <1425976046-20973-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <alpine.LRH.2.00.1503111706310.13021@twin.jikos.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series came about after Mark Rutland brought up the fact that the current
-FDT placement logic used by the EFI stub is flawed. But actually, it turned out
-that the documentation for both the Image and FDT placement was incorrect as
-well, or confusing at the very least.
+On Tue, 10 Mar 2015, Krzysztof Kozlowski wrote:
 
-So this series does two things:
-- It relaxes the FDT placement requirements, and updates the documentation and
-  EFI stub FDT placement logic accordingly.
-- It clarifies the Image placement requirements in the documentation, and brings
-  the EFI stub Image placement logic in line with it
+> Add new structure 'power_supply_config' for holding run-time
+> initialization data like of_node, supplies and private driver data.
+> 
+> The power_supply_register() function is changed so all power supply
+> drivers need updating.
+> 
+> When registering the power supply this new 'power_supply_config' should be
+> used instead of directly initializing 'struct power_supply'. This allows
+> changing the ownership of power_supply structure from driver to the
+> power supply core in next patches.
+> 
+> When a driver does not use of_node or supplies then it should use NULL
+> as config. If driver uses of_node or supplies then it should allocate
+> config on stack and initialize it with proper values.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> 
+> [for the nvec part]
+> Reviewed-by: Marc Dietrich <marvin24@gmx.de>
+> 
+> [for drivers/platform/x86/compal-laptop.c]
+> Reviewed-by: Darren Hart <dvhart@linux.intel.com>
 
-Changes since v1:
-- patch #1: split off reservation of the FDT binary itself from the memreserve
-  processing, since the former assumes the FDT is accessed via the linear
-  mapping, which we are about to change
-- patch #2: mention the older, stricter FDT placement rules in booting.txt,
-  get rid of early_print,
-  use correct format specifier for phys_addr_t,
-  use R/O mapping for FDT,
-- patches #3 .. #5: add R-b, minor style and grammar tweaks 
-  
-Ard Biesheuvel (5):
-  of/fdt: split off FDT self reservation from memreserve processing
-  arm64: use fixmap region for permanent FDT mapping
-  arm64: Documentation: clarify Image placement in physical RAM
-  arm64/efi: ensure that Image does not cross a 512 MB boundary
-  arm64/efi: adapt to relaxed FDT placement requirements
+Reviewed-by: Jiri Kosina <jkosina@suse.cz>
 
- Documentation/arm64/booting.txt         | 15 ++++---
- arch/arm/mm/init.c                      |  1 +
- arch/arm64/include/asm/efi.h            |  8 ++--
- arch/arm64/include/asm/fixmap.h         |  9 +++++
- arch/arm64/kernel/Makefile              |  1 +
- arch/arm64/kernel/efi-stub.c            | 41 +++++++++++++++----
- arch/arm64/kernel/head.S                | 38 +----------------
- arch/arm64/kernel/setup.c               | 72 ++++++++++++++++++++++++---------
- arch/powerpc/kernel/prom.c              |  1 +
- drivers/firmware/efi/libstub/arm-stub.c |  5 +--
- drivers/firmware/efi/libstub/efistub.h  |  1 -
- drivers/firmware/efi/libstub/fdt.c      | 10 ++---
- drivers/of/fdt.c                        | 19 ++++++---
- include/linux/of_fdt.h                  |  2 +
- 14 files changed, 131 insertions(+), 92 deletions(-)
+for changes in drivers/hid/*
 
 -- 
-1.8.3.2
+Jiri Kosina
+SUSE Labs
