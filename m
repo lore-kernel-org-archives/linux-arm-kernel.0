@@ -1,79 +1,150 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 11 Mar 2015 10:10:05 +0900
-Subject: ARCH_EXYNOS5433 missing in Kconfig
-In-Reply-To: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
-References: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
-Message-ID: <54FF95ED.1040003@samsung.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 11 Mar 2015 09:11:49 +0800
+Subject: [PATCH v5 3/4] pci: iproc: Add Broadcom iProc PCIe support
+In-Reply-To: <20150310214010.GB32204@google.com>
+References: <1425947886-23705-1-git-send-email-rjui@broadcom.com>
+ <1425947886-23705-4-git-send-email-rjui@broadcom.com>
+ <20150310214010.GB32204@google.com>
+Message-ID: <54FF9655.7080604@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Valentin,
-
-I sent the Exynos5433 clock patch and then separately I'm sending the
-Exynos5433 devicetree patch-set[1].
-[1] [PATCH v6 0/9] arm64: Add the support for new Exynos5433 SoC
-- https://lkml.org/lkml/2015/3/9/1036
-
-But, according to Arnd bergmann's comment[2], latest Exynos5433 dt patch-set[1]
-removed the CONFIG_ARCH_EXYNOS5433.
-[2] https://lkml.org/lkml/2015/2/24/85
-
-
-So, I have plan to send following patch.
-
----
-    clk: samsung: Use CONFIG_ARCH_EXYNOS instead of Exynos-specific configuration
-
-    This patch removes the CONFIG_ARCH_EXYNOS{5433|7} and then use only the
-    CONFIG_ARCH_EXYNOS for ARM-64bit Exynos SoC.
-
-    Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-    Cc: Tomasz Figa <tomasz.figa@gmail.com>
-    Cc: Arnd Bergmann <arnd@arndb.de>
-    Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/clk/samsung/Makefile | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 17e9af7..561719d 100644
---- a/drivers/clk/samsung/Makefile
-+++ b/drivers/clk/samsung/Makefile
-@@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)        += clk-exynos5250.o
- obj-$(CONFIG_SOC_EXYNOS5260)   += clk-exynos5260.o
- obj-$(CONFIG_SOC_EXYNOS5410)   += clk-exynos5410.o
- obj-$(CONFIG_SOC_EXYNOS5420)   += clk-exynos5420.o
--obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
-+obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos5433.o
- obj-$(CONFIG_SOC_EXYNOS5440)   += clk-exynos5440.o
- obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-audss.o
- obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-clkout.o
-
-
-Regards,
-Chanwoo Choi
-
-
-On 03/11/2015 12:32 AM, Valentin Rothberg wrote:
-> Hi Chanwoo,
+...
+>> +	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+>> +				  &pcie->sysdata, pcie->resources);
+>> +	if (!bus) {
+>> +		dev_err(pcie->dev, "unable to create PCI root bus\n");
+>> +		ret = -ENOMEM;
+>> +		goto err_power_off_phy;
+>> +	}
+>> +	pcie->root_bus = bus;
+>> +
+>> +	ret = iproc_pcie_check_link(pcie, bus);
+>> +	if (ret) {
+>> +		dev_err(pcie->dev, "no PCIe EP device detected\n");
+>> +		goto err_rm_root_bus;
+>> +	}
+>> +
+>> +	iproc_pcie_enable(pcie);
+>> +
+>> +	pci_scan_child_bus(bus);
+>> +	pci_assign_unassigned_bus_resources(bus);
+>> +	pci_bus_add_devices(bus);
+>> +
+>> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
 > 
-> your commit 96bd6224f07b ("clk: samsung: exynos5433: Add clocks using
-> common clock framework") is included in today's linux-next tree (i.e.,
-> next-20150310).
+> I think the IRQ fixup should be before pci_bus_add_devices().  CC'd Yijing,
+> who's been fixing similar issues.
 > 
-> This patch conditionally compiles clk-exynos5433.c depending on the
-> Kconfig option ARCH_EXYNOS5433.  However, this option is not defined
-> in Kconfig, so that the driver cannot be compiled at the current
-> state:
+> pci_bus_add_devices() is the point where drivers can claim these devices,
+> and we don't want to change things after a driver claims the device.
+
+Yes, we should call pci_bus_add_devices() at last, after all resources(mem/io/irq) are
+configured properly. Otherwise, this code could not be run normally in non system boot up path.
+
+Thanks!
+Yijing.
+
+
 > 
-> +obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
+>> +
+>> +	return 0;
+>> +
+>> +err_rm_root_bus:
+>> +	pci_stop_root_bus(bus);
+>> +	pci_remove_root_bus(bus);
+>> +
+>> +err_power_off_phy:
+>> +	if (pcie->phy)
+>> +		phy_power_off(pcie->phy);
+>> +err_exit_phy:
+>> +	if (pcie->phy)
+>> +		phy_exit(pcie->phy);
+>> +
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL(iproc_pcie_setup);
+>> +
+>> +int iproc_pcie_remove(struct iproc_pcie *pcie)
+>> +{
+>> +	pci_stop_root_bus(pcie->root_bus);
+>> +	pci_remove_root_bus(pcie->root_bus);
+>> +
+>> +	if (pcie->phy) {
+>> +		phy_power_off(pcie->phy);
+>> +		phy_exit(pcie->phy);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL(iproc_pcie_remove);
 > 
-> Is there a patch queued somewhere that adds this Kconfig symbol?  I
-> detected the issue by running undertaker-checkpatch from the
-> Undertaker tool suite (undertaker.cs.fau.de).  There is also a tool in
-> the git tree that can detect such issues (i.e.,
-> scripts/checkkconfigsymbols.py).
+> These exports wouldn't be needed if this were all squashed into one file.
 > 
-> Kind regards,
->  Valentin
+>> +
+>> +MODULE_AUTHOR("Ray Jui <rjui@broadcom.com>");
+>> +MODULE_DESCRIPTION("Broadcom iPROC PCIe common driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+>> new file mode 100644
+>> index 0000000..569bc04
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-iproc.h
+>> @@ -0,0 +1,42 @@
+>> +/*
+>> + * Copyright (C) 2014-2015 Broadcom Corporation
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#ifndef _PCIE_IPROC_H
+>> +#define _PCIE_IPROC_H
+>> +
+>> +#define IPROC_PCIE_MAX_NUM_IRQS 6
+>> +
+>> +/**
+>> + * iProc PCIe device
+>> + * @dev: pointer to device data structure
+>> + * @base: PCIe host controller I/O register base
+>> + * @resources: linked list of all PCI resources
+>> + * @sysdata: Per PCI controller data
+>> + * @root_bus: pointer to root bus
+>> + * @phy: optional PHY device that controls the Serdes
+>> + * @irqs: interrupt IDs
+>> + */
+>> +struct iproc_pcie {
+>> +	struct device *dev;
+>> +	void __iomem *base;
+>> +	struct list_head *resources;
+>> +	struct pci_sys_data sysdata;
+>> +	struct pci_bus *root_bus;
+>> +	struct phy *phy;
+>> +	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
+>> +};
+>> +
+>> +extern int iproc_pcie_setup(struct iproc_pcie *pcie);
+>> +extern int iproc_pcie_remove(struct iproc_pcie *pcie);
 > 
+> Hopefully you can squash this all into one file, but if you can't, my
+> preference is to omit "extern" on function declarations.
+> 
+>> +
+>> +#endif /* _PCIE_IPROC_H */
+>> -- 
+>> 1.7.9.5
+>>
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
