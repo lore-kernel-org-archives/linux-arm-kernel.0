@@ -1,57 +1,35 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 11 Mar 2015 18:56:22 +0900
-Subject: [PATCH v2] ARM: EXYNOS: Use platform device name as power domain
- name
-In-Reply-To: <1426067672-21589-1-git-send-email-k.kozlowski@samsung.com>
-References: <1426067672-21589-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55001146.3040304@samsung.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 11 Mar 2015 10:57:00 +0100
+Subject: [PATCH 1/2] ARM: imx6qdl-sabresd: set swbst_reg as vbus's parent
+ reg
+In-Reply-To: <20150311012424.GW20455@dragon>
+References: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
+ <20150311012424.GW20455@dragon>
+Message-ID: <20150311095700.GA8172@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2015 06:54 PM, Krzysztof Kozlowski wrote:
-> The power domain nodes in DTS may be very generic (e.g. "power-domain"
-> for Exynos 5420) making it very hard to debug:
+On Wed, Mar 11, 2015 at 09:24:25AM +0800, Shawn Guo wrote:
+> On Fri, Mar 06, 2015 at 04:04:20PM +0800, Peter Chen wrote:
+> > USB vbus 5V is from PMIC SWBST, so set swbst_reg as vbus's
+> > parent reg, it fixed a bug that the voltage of vbus is incorrect
+> > due to swbst_reg is disabled after boots up.
+> > 
+> > Cc: stable <stable@vger.kernel.org>
 > 
-> $ cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
->     domain                      status         slaves
-> power-domain                    on
+> It's more idiomatic to put the line in this way:
 > 
-> Use platform device name instead so the names will be a little more user
-> friendly:
->     domain                      status         slaves
-> 100440e0.power-domain           on
+> Cc: stable at vger.kernel.org
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
-> 
-> Notes:
->     Changes since v1:
->     1. Add Javier's reviewed-by.
-> 
->  arch/arm/mach-exynos/pm_domains.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-> index 37266a826437..84e1d9f4d76c 100644
-> --- a/arch/arm/mach-exynos/pm_domains.c
-> +++ b/arch/arm/mach-exynos/pm_domains.c
-> @@ -125,7 +125,7 @@ static __init int exynos4_pm_init_power_domain(void)
->  			return -ENOMEM;
->  		}
->  
-> -		pd->pd.name = kstrdup(np->name, GFP_KERNEL);
-> +		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
->  		pd->name = pd->pd.name;
->  		pd->base = of_iomap(np, 0);
->  		pd->pd.power_off = exynos_pd_power_off;
-> 
+> Changed it and applied both patches.
 
-Looks good to me. This patch is very useful for debug.
+It really doesn't matter, my scripts try to pick up any variation of the
+stable@ markings in a signed-off-by: area, as there is a huge number of
+different ways people try to mark this, including using invalid email
+addresses, and typos.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+So no need to be pedantic about this, I can handle it just fine.
 
-Thanks,
-Chanwoo Choi
+thanks,
+
+greg k-h
