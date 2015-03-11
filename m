@@ -1,43 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 11 Mar 2015 12:00:56 +0100
-Subject: [PATCH] pwm: atmel-hlcdc: add errata handling for sama5d4
-In-Reply-To: <54E7603A.5010309@atmel.com>
-References: <1424447898-2791-1-git-send-email-nicolas.ferre@atmel.com>
- <20150220170613.424edbb5@bbrezillon> <54E7603A.5010309@atmel.com>
-Message-ID: <20150311110055.GE22149@ulmo.nvidia.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 11 Mar 2015 16:33:49 +0530
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <20150311105307.GW28806@sirena.org.uk>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
+ <CALx668VypyWbVuph0ir0SRt4kqASvYzwBuyc_r5tFeoHi+HieA@mail.gmail.com>
+ <CAKohpomxXTP6NdPoSmB=eq2sFqqgskS5vYtDNAT6a0VL5K6dCg@mail.gmail.com>
+ <CALx668VFRdeWcK_gKhJrJehnaH5uDpA0m2OfHLqPVUq8oocXaw@mail.gmail.com>
+ <CAKohpokT7fSniPGX2BfM61AtMoMCxEP8WDtbZ34bozUXscEWyg@mail.gmail.com>
+ <20150311105307.GW28806@sirena.org.uk>
+Message-ID: <CAKohpom4riOhzc3hK8B2tiSwGx0zG96C7QNeQB0yZaPMd_OpLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 05:26:34PM +0100, Nicolas Ferre wrote:
-> Le 20/02/2015 17:06, Boris Brezillon a ?crit :
-> > Hi Nicolas,
-> > 
-> > On Fri, 20 Feb 2015 16:58:18 +0100
-> > Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > 
-> >> sama5d4 SoC also has an errata on the HLCDC PWM. It is the same as the sama5d3
-> >> that is forbidding the use of div1 prescaler.
-> >>
-> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > 
-> > The "atmel,sama5d4-hlcdc" compatible string is not yet documented in
-> > the atmel-hlcdc MFD driver binding, but this shouldn't hurt, so
-> 
-> Yes, I'll document it when I'm submitting your patches that add the
-> compatibility strings to the drivers/mfd/atmel-hlcdc.c. (with
-> atmel,at91sam9x5-hlcdc as well).
-> 
-> > Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On 11 March 2015 at 16:23, Mark Brown <broonie@kernel.org> wrote:
+> On Tue, Mar 10, 2015 at 08:20:43AM +0530, Viresh Kumar wrote:
+>
+> Please don't send upstream e-mail to my work account, I use this address
+> pretty consistently for upstream.  Upstream mail to my work account
+> frequently ends up unread.
 
-I'll take your word on it that this will be documented, so I've applied
-this.
+Sorry about that, I did exactly opposite of this earlier :(
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/e60785fe/attachment.sig>
+>> On 6 March 2015 at 11:19, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+>> > On 5 March 2015 at 17:55, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>
+>> > About putting
+>> > those stuff into regulator driver, I think you mean creating a
+>> > "virtual regulator
+>> > device" and put all the voltage controlling complex into the driver, right?
+>> > Maybe it's a good idea in this case, but I am sure if this kind of
+>> > virtual regulator is acceptable.
+>
+>> @Mark: Is this allowed to create virtual regulator for a CPU ?
+>
+> I don't really know what the above means or what problem it's supposed
+> to solve.
+
+On mediatek platform, they need to configure two regulators in order to change
+DVFS state of the big cluster. The generic cpufreq-dt driver and earlier OPP
+bindings have support for a single regulator only and so what Pi-cheng tried
+to do is,
+- Configure one of the regulators using cpufreq-dt
+- And other one using cpufreq frequency change notifiers
+
+This looks awkward..
+
+What I suggested was to create another virtual regulator for CPU which will
+eventually configure both the regulators. And so the question that such
+virtual regulators are allowed or not.
