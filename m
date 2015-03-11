@@ -1,95 +1,157 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Mar 2015 20:39:33 +0800
-Subject: [PATCH v10 07/21] ARM64 / ACPI: Introduce PCI stub functions for ACPI
+Date: Wed, 11 Mar 2015 20:39:34 +0800
+Subject: [PATCH v10 08/21] ARM64 / ACPI: Introduce early_param "acpi=" to
+ enable/disable ACPI
 In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1426077587-1561-8-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1426077587-1561-9-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ACPI depends CONFIG_PCI on x86 and ia64, in ARM64 server
-world we will have PCIe in most cases, but some of them may not,
-make CONFIG_ACPI depend CONFIG_PCI on ARM64 will satisfy both.
+From: Al Stone <al.stone@linaro.org>
 
-With that case, we need some arch dependent PCI functions to
-access the config space before the PCI root bridge is created, and
-pci_acpi_scan_root() to create the PCI root bus. So introduce
-some stub function here to make ACPI core compile and revisit
-them later when implemented on ARM64.
+This implements the following policy to decide whether ACPI should
+be used to boot the system:
+- acpi=off: ACPI will not be used to boot the system, even if there is
+  no alternative available (e.g., device tree is empty)
+- acpi=force: only ACPI will be used to boot the system; if that fails,
+  there will be no fallback to alternative methods (such as device tree)
+- otherwise, ACPI will be used as a fallback if the device tree turns out
+  to lack a platform description; the heuristic to decide this is whether
+  /chosen is the only node present at depth 1
 
-CC: Liviu Dudau <Liviu.Dudau@arm.com>
 CC: Catalin Marinas <catalin.marinas@arm.com>
 CC: Will Deacon <will.deacon@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Jon Masters <jcm@redhat.com>
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+Acked-by: Olof Johansson <olof@lixom.net>
+Acked-by: Grant Likely <grant.likely@linaro.org>
 Tested-by: Timur Tabi <timur@codeaurora.org>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/pci.h |  6 ++++++
- arch/arm64/kernel/pci.c      | 25 +++++++++++++++++++++++++
- 2 files changed, 31 insertions(+)
+ Documentation/kernel-parameters.txt |  3 ++-
+ arch/arm64/include/asm/acpi.h       |  7 +++++
+ arch/arm64/kernel/acpi.c            | 52 +++++++++++++++++++++++++++++++++----
+ 3 files changed, 56 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index 872ba93..b008a72 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -27,6 +27,12 @@
- extern int isa_dma_bridge_buggy;
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index bfcb1a6..d6c35a7 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+ bytes respectively. Such letter suffixes can also be entirely omitted.
  
- #ifdef CONFIG_PCI
-+static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
-+{
-+	/* no legacy IRQ on arm64 */
-+	return -ENODEV;
-+}
-+
- static inline int pci_proc_domain(struct pci_bus *bus)
- {
- 	return 1;
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 6f93c24..4095379 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -10,6 +10,7 @@
-  *
-  */
  
-+#include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
-@@ -46,3 +47,27 @@ int pcibios_add_device(struct pci_dev *dev)
+-	acpi=		[HW,ACPI,X86]
++	acpi=		[HW,ACPI,X86,ARM64]
+ 			Advanced Configuration and Power Interface
+ 			Format: { force | off | strict | noirq | rsdt }
+ 			force -- enable ACPI if default was off
+@@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 				strictly ACPI specification compliant.
+ 			rsdt -- prefer RSDT over (default) XSDT
+ 			copy_dsdt -- copy DSDT to memory
++			For ARM64, ONLY "acpi=off" or "acpi=force" are available
  
- 	return 0;
+ 			See also Documentation/power/runtime_pm.txt, pci=noacpi
+ 
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 40e0924..c5a9b97 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -39,6 +39,13 @@ static inline void disable_acpi(void)
+ 	acpi_noirq = 1;
  }
-+
-+/*
-+ * raw_pci_read/write - Platform-specific PCI config space access.
-+ */
-+int raw_pci_read(unsigned int domain, unsigned int bus,
-+		  unsigned int devfn, int reg, int len, u32 *val)
+ 
++static inline void enable_acpi(void)
 +{
-+	return -ENXIO;
++	acpi_disabled = 0;
++	acpi_pci_disabled = 0;
++	acpi_noirq = 0;
 +}
 +
-+int raw_pci_write(unsigned int domain, unsigned int bus,
-+		unsigned int devfn, int reg, int len, u32 val)
+ /*
+  * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+  * with this check the ACPI core will not override the CPU index
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 7abac24..2269e30 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -22,15 +22,49 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/memblock.h>
++#include <linux/of_fdt.h>
+ #include <linux/smp.h>
+ 
+-int acpi_noirq;			/* skip ACPI IRQ initialization */
+-int acpi_disabled;
++int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
++int acpi_disabled = 1;
+ EXPORT_SYMBOL(acpi_disabled);
+ 
+-int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
++int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
++static bool param_acpi_off __initdata;
++static bool param_acpi_force __initdata;
++
++static int __init parse_acpi(char *arg)
 +{
-+	return -ENXIO;
++	if (!arg)
++		return -EINVAL;
++
++	/* "acpi=off" disables both ACPI table parsing and interpreter */
++	if (strcmp(arg, "off") == 0)
++		param_acpi_off = true;
++	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
++		param_acpi_force = true;
++	else
++		return -EINVAL;	/* Core will print when we return error */
++
++	return 0;
++}
++early_param("acpi", parse_acpi);
++
++static int __init dt_scan_depth1_nodes(unsigned long node,
++				       const char *uname, int depth,
++				       void *data)
++{
++	/*
++	 * Return 1 as soon as we encounter a node at depth 1 that is
++	 * not the /chosen node.
++	 */
++	if (depth == 1 && (strcmp(uname, "chosen") != 0))
++		return 1;
++	return 0;
 +}
 +
-+#ifdef CONFIG_ACPI
-+/* Root bridge scanning */
-+struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
-+{
-+	/* TODO: Should be revisited when implementing PCI on ACPI */
-+	return NULL;
-+}
-+#endif
+ /*
+  * __acpi_map_table() will be called before page_init(), so early_ioremap()
+  * or early_memremap() should be called here to for ACPI table mapping.
+@@ -83,10 +117,18 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+  */
+ void __init acpi_boot_table_init(void)
+ {
+-	/* If acpi_disabled, bail out */
+-	if (acpi_disabled)
++	/*
++	 * Enable ACPI instead of device tree unless
++	 * - ACPI has been disabled explicitly (acpi=off), or
++	 * - the device tree is not empty (it has more than just a /chosen node)
++	 *   and ACPI has not been force enabled (acpi=force)
++	 */
++	if (param_acpi_off ||
++	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+ 		return;
+ 
++	enable_acpi();
++
+ 	/* Initialize the ACPI boot-time table parser. */
+ 	if (acpi_table_init()) {
+ 		disable_acpi();
 -- 
 1.9.1
