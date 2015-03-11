@@ -1,34 +1,25 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Mar 2015 11:20:01 -0300
-Subject: [PATCH 4/7] ARM: mx25: Retrieve IIM base from dt
-In-Reply-To: <20150311132456.GD8656@n2100.arm.linux.org.uk>
-References: <1426077835-31081-1-git-send-email-festevam@gmail.com>
- <1426077835-31081-4-git-send-email-festevam@gmail.com>
- <20150311132456.GD8656@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5AqFYVKvWJuRUJJO-3H+krdQrzW+MhArx6wu776g5SGKg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Mar 2015 15:20:24 +0100
+Subject: [PATCH] KVM: arm/arm64: prefer IS_ENABLED to a static variable
+In-Reply-To: <1425554766-4119-1-git-send-email-pbonzini@redhat.com>
+References: <1425554766-4119-1-git-send-email-pbonzini@redhat.com>
+Message-ID: <20150311142024.GA23478@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 10:24 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Mar 11, 2015 at 09:43:52AM -0300, Fabio Estevam wrote:
->> +     void __iomem *iim_base;
->> +     struct device_node *np;
->> +
->> +     np = of_find_compatible_node(NULL, NULL, "fsl,imx25-iim");
->> +     iim_base = of_iomap(np, 0);
->> +     WARN_ON(!iim_base);
->> +     rev = readl(iim_base + MXC_IIMSREV);
->> +     iounmap(iim_base);
->
-> Is there much point to that WARN_ON()?  Are you avoiding the political
-> BUG_ON(!iim_base) ? :)
->
-> Since a NULL pointer there will lead to a NULL pointer dereference, it's
-> silly to use WARN_ON() there - we'll get a backtrace etc from the WARN_ON
-> followed immediately by an oops dump due to the readl(), crashing the
-> kernel.
->
-> Better to just use BUG_ON() and only get one set of diagnostics.
+On Thu, Mar 05, 2015 at 12:26:06PM +0100, Paolo Bonzini wrote:
+> IS_ENABLED gives compile-time checking and keeps the code clearer.
+> 
+> The one exception is inside kvm_vm_ioctl_check_extension, where
+> the established idiom is to wrap the case labels with an #ifdef.
+> 
+> Signed-off-by: Paolo Bonzini <pbonzini@redhat.com>
 
-Thanks, will do it in v2.
+Thanks, I've applied this to my queue with a follow-up to remove config
+options all together just like we have it on arm64.
+
+I'll send out that patch based on yours and I've applied Eric's IRQFD
+series on top of that.
+
+Best,
+-Christoffer
