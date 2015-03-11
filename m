@@ -1,50 +1,98 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Mar 2015 09:43:52 -0300
-Subject: [PATCH 4/7] ARM: mx25: Retrieve IIM base from dt
+Date: Wed, 11 Mar 2015 09:43:54 -0300
+Subject: [PATCH 6/7] ARM: mx25: Remove imxdi_rtc platform code
 In-Reply-To: <1426077835-31081-1-git-send-email-festevam@gmail.com>
 References: <1426077835-31081-1-git-send-email-festevam@gmail.com>
-Message-ID: <1426077835-31081-4-git-send-email-festevam@gmail.com>
+Message-ID: <1426077835-31081-6-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-We should use dt to retrieve the IIM base address.
+platform-imxdi_rtc.c can is only used by mx25, so it can safely go away now that
+mx25 has been converted to dt.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-imx/cpu-imx25.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-imx/devices/Kconfig              |  3 --
+ arch/arm/mach-imx/devices/Makefile             |  1 -
+ arch/arm/mach-imx/devices/platform-imxdi_rtc.c | 42 --------------------------
+ 3 files changed, 46 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/devices/platform-imxdi_rtc.c
 
-diff --git a/arch/arm/mach-imx/cpu-imx25.c b/arch/arm/mach-imx/cpu-imx25.c
-index 96ec64b..0d2d860 100644
---- a/arch/arm/mach-imx/cpu-imx25.c
-+++ b/arch/arm/mach-imx/cpu-imx25.c
-@@ -11,6 +11,8 @@
-  */
- #include <linux/module.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
+diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
+index 1d2cc18..3a55298 100644
+--- a/arch/arm/mach-imx/devices/Kconfig
++++ b/arch/arm/mach-imx/devices/Kconfig
+@@ -21,9 +21,6 @@ config IMX_HAVE_PLATFORM_IMX27_CODA
+ config IMX_HAVE_PLATFORM_IMX2_WDT
+ 	bool
  
- #include "iim.h"
- #include "hardware.h"
-@@ -20,8 +22,15 @@ static int mx25_cpu_rev = -1;
- static int mx25_read_cpu_rev(void)
- {
- 	u32 rev;
-+	void __iomem *iim_base;
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-iim");
-+	iim_base = of_iomap(np, 0);
-+	WARN_ON(!iim_base);
-+	rev = readl(iim_base + MXC_IIMSREV);
-+	iounmap(iim_base);
+-config IMX_HAVE_PLATFORM_IMXDI_RTC
+-	bool
+-
+ config IMX_HAVE_PLATFORM_IMX_FB
+ 	bool
  
--	rev = __raw_readl(MX25_IO_ADDRESS(MX25_IIM_BASE_ADDR + MXC_IIMSREV));
- 	switch (rev) {
- 	case 0x00:
- 		return IMX_CHIP_REVISION_1_0;
+diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
+index 8fdb12b..e5cf587 100644
+--- a/arch/arm/mach-imx/devices/Makefile
++++ b/arch/arm/mach-imx/devices/Makefile
+@@ -8,7 +8,6 @@ obj-y += platform-gpio-mxc.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX27_CODA) += platform-imx27-coda.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
+-obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
+ obj-y += platform-imx-dma.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_FB) += platform-imx-fb.o
+ obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
+diff --git a/arch/arm/mach-imx/devices/platform-imxdi_rtc.c b/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
+deleted file mode 100644
+index 5bb490d..0000000
+--- a/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
++++ /dev/null
+@@ -1,42 +0,0 @@
+-/*
+- * Copyright (C) 2010 Pengutronix
+- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+- *
+- * This program is free software; you can redistribute it and/or modify it under
+- * the terms of the GNU General Public License version 2 as published by the
+- * Free Software Foundation.
+- */
+-#include <asm/sizes.h>
+-
+-#include "../hardware.h"
+-#include "devices-common.h"
+-
+-#define imx_imxdi_rtc_data_entry_single(soc)				\
+-	{								\
+-		.iobase = soc ## _DRYICE_BASE_ADDR,			\
+-		.irq = soc ## _INT_DRYICE,				\
+-	}
+-
+-#ifdef CONFIG_SOC_IMX25
+-const struct imx_imxdi_rtc_data imx25_imxdi_rtc_data __initconst =
+-	imx_imxdi_rtc_data_entry_single(MX25);
+-#endif /* ifdef CONFIG_SOC_IMX25 */
+-
+-struct platform_device *__init imx_add_imxdi_rtc(
+-		const struct imx_imxdi_rtc_data *data)
+-{
+-	struct resource res[] = {
+-		{
+-			.start = data->iobase,
+-			.end = data->iobase + SZ_16K - 1,
+-			.flags = IORESOURCE_MEM,
+-		}, {
+-			.start = data->irq,
+-			.end = data->irq,
+-			.flags = IORESOURCE_IRQ,
+-		},
+-	};
+-
+-	return imx_add_platform_device("imxdi_rtc", 0,
+-			res, ARRAY_SIZE(res), NULL, 0);
+-}
 -- 
 1.9.1
