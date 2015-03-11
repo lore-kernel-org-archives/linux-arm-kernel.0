@@ -1,47 +1,84 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 11 Mar 2015 17:54:52 +0100
-Subject: [PATCH v9 5/5] KVM: arm/arm64: add irqfd support
-In-Reply-To: <20150311142418.GB14799@cbox>
-References: <1425464076-20558-1-git-send-email-eric.auger@linaro.org>
- <1425464076-20558-6-git-send-email-eric.auger@linaro.org>
- <54F8359A.4020405@arm.com> <54F83DAE.2060607@redhat.com>
- <20150311142418.GB14799@cbox>
-Message-ID: <5500735C.4070903@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 11 Mar 2015 18:00:28 +0100
+Subject: [PATCH v3 2/9] ARM: at91: remove unused at91_ioremap_matrix and header
+In-Reply-To: <1426093235-11759-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426093235-11759-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426093235-11759-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2015 03:24 PM, Christoffer Dall wrote:
-> On Thu, Mar 05, 2015 at 12:27:42PM +0100, Paolo Bonzini wrote:
->>
->>
->> On 05/03/2015 11:53, Marc Zyngier wrote:
->>>> +#ifdef CONFIG_HAVE_KVM_IRQFD
->>>> +	case KVM_CAP_IRQFD:
->>>> +		r = vgic_present;
->>>> +		break;
->>>> +#endif
->>>
->>> Nitpick: we have "select HAVE_KVM_IRQFD", so we can lose the #ifdef-ery.
->>
->> Alternatively, I've just posted a patch to move the KVM_CAP_IRQFD case
->> to common code.
->>
->> vgic_present probably should be replaced by
->> IS_ENABLED(CONFIG_KVM_ARM_VGIC).  I've sent a patch for this.
->>
-> I have applied all of this together with my kill-the-vgic-config-option
-> patch here:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git queue
-> 
-> Take a look please.
+at91_ioremap_matrix and the at91_matrix.h header are not used anymore, remove
+them.
 
-Hi Christoffer,
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/generic.h                  |  4 ----
+ arch/arm/mach-at91/include/mach/at91_matrix.h | 23 -----------------------
+ arch/arm/mach-at91/setup.c                    | 10 ----------
+ 3 files changed, 37 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
 
-This looks good to me. Thanks for the integration.
-
-- Eric
-> 
-> Thanks,
-> -Christoffer
-> 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 583369ffc284..2b396c4e1fc1 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -25,10 +25,6 @@ extern void at91rm9200_timer_init(void);
+ extern void at91rm9200_idle(void);
+ extern void at91sam9_idle(void);
+ 
+-/* Matrix */
+-extern void at91_ioremap_matrix(u32 base_addr);
+-
+-
+ #ifdef CONFIG_PM
+ extern void __init at91rm9200_pm_init(void);
+ extern void __init at91sam9260_pm_init(void);
+diff --git a/arch/arm/mach-at91/include/mach/at91_matrix.h b/arch/arm/mach-at91/include/mach/at91_matrix.h
+deleted file mode 100644
+index f8996c954131..000000000000
+--- a/arch/arm/mach-at91/include/mach/at91_matrix.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * Under GPLv2
+- */
+-
+-#ifndef __MACH_AT91_MATRIX_H__
+-#define __MACH_AT91_MATRIX_H__
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_matrix_base;
+-
+-#define at91_matrix_read(field) \
+-	__raw_readl(at91_matrix_base + field)
+-
+-#define at91_matrix_write(field, value) \
+-	__raw_writel(value, at91_matrix_base + field)
+-
+-#else
+-.extern at91_matrix_base
+-#endif
+-
+-#endif /* __MACH_AT91_MATRIX_H__ */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 4e58bc90ed21..ef778f33c488 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -318,13 +318,3 @@ void __init at91_alt_map_io(void)
+ 		pr_info("AT91: Detected soc subtype: %s\n",
+ 			at91_get_soc_subtype(&at91_soc_initdata));
+ }
+-
+-void __iomem *at91_matrix_base;
+-EXPORT_SYMBOL_GPL(at91_matrix_base);
+-
+-void __init at91_ioremap_matrix(u32 base_addr)
+-{
+-	at91_matrix_base = ioremap(base_addr, 512);
+-	if (!at91_matrix_base)
+-		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+-}
+-- 
+2.1.0
