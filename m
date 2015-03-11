@@ -1,78 +1,131 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Mar 2015 15:15:16 -0700
-Subject: [PATCH v4 3/4] mmc: dw_mmc: Use mmc_regulator_set_vqmmc in
- start_signal_voltage_switch
+Date: Wed, 11 Mar 2015 15:15:15 -0700
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
 In-Reply-To: <1426112117-18220-1-git-send-email-dianders@chromium.org>
 References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
-Message-ID: <1426112117-18220-3-git-send-email-dianders@chromium.org>
+Message-ID: <1426112117-18220-2-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We've introduced a new helper in the MMC core:
-mmc_regulator_set_vqmmc().  Let's use this in dw_mmc.  Using this new
-helper has some advantages:
+This adds logic to the MMC core to set VQMMC.  This is expected to be
+called by MMC drivers like dw_mmc as part of (or instead of) their
+start_signal_voltage_switch() callback.
 
-1. We get the mmc_regulator_set_vqmmc() behavior of trying to match
-   VQMMC and VMMC when the signal voltage is 3.3V.  This ensures max
-   compatibility.
+A few notes:
 
-2. We get rid of a few more warnings when probing unsupported
-   voltages.
+* When setting the signal voltage to 3.3V we do our best to make VQMMC
+  and VMMC match.  It's been reported that this makes some old cards
+  happy since they were tested back in the day before UHS when VQMMC
+  and VMMC were provided by the same regulator.  A nice side effect of
+  this is that we don't end up on the hairy edge of VQMMC (2.7V),
+  which some EEs claim is a little too close to the minimum for
+  comfort.
 
-3. We get rid of some non-dw_mmc specific code in dw_mmc.
+* When setting the signal voltage to 1.8V or 1.2V we aim for that
+  specific voltage instead of picking the lowest one in the range.
+
+* We very purposely don't print errors in mmc_regulator_set_vqmmc().
+  There are cases where the MMC core will try several different
+  voltages and we don't want to pollute the logs.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 Reviewed-by: Andrew Bresticker <abrestic@chromium.org>
 ---
 Changes in v4: None
-Changes in v3:
-- Continue to check for errors if VQMMC is not an error as per Andrew.
+Changes in v3: None
+Changes in v2:
+- Now use existing regulator_set_voltage_tol() function.
 
-Changes in v2: None
+ drivers/mmc/core/core.c  | 51 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/mmc/host.h |  7 +++++++
+ 2 files changed, 58 insertions(+)
 
- drivers/mmc/host/dw_mmc.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index e2811cf..615d1d9 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1214,7 +1214,6 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	struct dw_mci *host = slot->host;
- 	u32 uhs;
- 	u32 v18 = SDMMC_UHS_18V << slot->id;
--	int min_uv, max_uv;
- 	int ret;
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 23f10f7..1d3b84e 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1394,6 +1394,57 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ }
+ EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
  
- 	/*
-@@ -1223,22 +1222,18 @@ static int dw_mci_switch_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
- 	 * does no harm but you need to set the regulator directly.  Try both.
- 	 */
- 	uhs = mci_readl(host, UHS_REG);
--	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
--		min_uv = 2700000;
--		max_uv = 3600000;
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
- 		uhs &= ~v18;
--	} else {
--		min_uv = 1700000;
--		max_uv = 1950000;
-+	else
- 		uhs |= v18;
--	}
++static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
++						  int new_uV, int tol_uV)
++{
++	/*
++	 * Check if supported first to avoid errors since we may try several
++	 * signal levels during power up and don't want to show errors.
++	 */
++	if (!regulator_is_supported_voltage_tol(regulator, new_uV, tol_uV))
++		return -EINVAL;
 +
- 	if (!IS_ERR(mmc->supply.vqmmc)) {
--		ret = regulator_set_voltage(mmc->supply.vqmmc, min_uv, max_uv);
-+		ret = mmc_regulator_set_vqmmc(mmc, ios);
++	return regulator_set_voltage_tol(regulator, new_uV, tol_uV);
++}
++
++/**
++ * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
++ *
++ * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
++ * That will match the behavior of old boards where VQMMC and VMMC were supplied
++ * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
++ * SD card spec also define VQMMC in terms of VMMC.
++ *
++ * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
++ * requested voltage.  This is definitely a good idea for UHS where there's a
++ * separate regulator on the card that's trying to make 1.8V and it's best if
++ * we match.
++ *
++ * This function is expected to be used by a controller's
++ * start_signal_voltage_switch() function.
++ */
++int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	/* If no vqmmc supply then we can't change the voltage */
++	if (IS_ERR(mmc->supply.vqmmc))
++		return -EINVAL;
++
++	switch (ios->signal_voltage) {
++	case MMC_SIGNAL_VOLTAGE_120:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			1200000, 100000);
++	case MMC_SIGNAL_VOLTAGE_180:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			1800000, 100000);
++	case MMC_SIGNAL_VOLTAGE_330:
++		return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
++			regulator_get_voltage(mmc->supply.vmmc), 300000);
++	default:
++		return -EINVAL;
++	}
++}
++EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
++
+ #endif /* CONFIG_REGULATOR */
  
- 		if (ret) {
- 			dev_dbg(&mmc->class_dev,
--					 "Regulator set error %d: %d - %d\n",
--					 ret, min_uv, max_uv);
-+					 "Regulator set error %d - %s V\n",
-+					 ret, uhs & v18 ? "1.8" : "3.3");
- 			return ret;
- 		}
- 	}
+ int mmc_regulator_get_supply(struct mmc_host *mmc)
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 0c8cbe5..edd7d59 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -416,6 +416,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
+ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ 			struct regulator *supply,
+ 			unsigned short vdd_bit);
++int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
+ #else
+ static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
+ {
+@@ -428,6 +429,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
+ {
+ 	return 0;
+ }
++
++static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
++					  struct mmc_ios *ios)
++{
++	return -EINVAL;
++}
+ #endif
+ 
+ int mmc_regulator_get_supply(struct mmc_host *mmc);
 -- 
 2.2.0.rc0.207.ga3a616c
