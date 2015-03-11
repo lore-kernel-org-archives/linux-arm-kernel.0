@@ -1,82 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Mar 2015 08:24:15 -0700
-Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <1426022847-30912-4-git-send-email-marek@goldelico.com>
-References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
- <1426022847-30912-4-git-send-email-marek@goldelico.com>
-Message-ID: <20150311152414.GX5264@atomide.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Wed, 11 Mar 2015 08:33:04 -0700
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <7DA73171-01A5-4158-9A69-015B62D2D7E8@codeaurora.org>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <CAOesGMjJXyjNH-Lm66mZXq0X=52DyRtdmpvQ4sFEr0cMAp3b-w@mail.gmail.com>
+ <3A588B25-66ED-4BB5-8C8F-D050D8A2F9F3@codeaurora.org>
+ <10886228.vUHyKm1ubP@wuerfel>
+ <7DA73171-01A5-4158-9A69-015B62D2D7E8@codeaurora.org>
+Message-ID: <CAJAp7OiVwvPjRbrBxw7Dndvk4Apwz_bx=CzSqeqd3JzYhmB7Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 10, 2015 at 12:57 PM, Kumar Gala <galak@codeaurora.org> wrote:
+>
+> On Mar 10, 2015, at 2:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+>> On Tuesday 10 March 2015 13:10:08 Kumar Gala wrote:
+>>>>>>>>>>>> The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+>>>>>>>>>>>>> on Qualcomm MSM platforms to determine which device tree should be
+>>>>>>>>>>>>> utilized and passed to the kernel.
+>>>>>>>>>>>>>
+>>>>>>>>>>>>> Cc: <devicetree@vger.kernel.org>
+>>>>>>>>>>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>>>>>>>>>>>
+>>>>>>>>>>>> Is this the special magic that allows qcom bootloaders to take a kernel
+>>>>>>>>>>>> plus multiple DTBs and figure out which DTB to pass?
+>>>>>>>>>>>>
+>>>>>>>>>>>> Kevin
+>>>>>>>>>>>
+>>>>>>>>>>> yes
+>>>>>>>>>>
+>>>>>>>>>> That's a bummer.
+>>>>>>>>>>
+>>>>>>>>>> Luckily, the solution for upstream is still quite simple: Provide only
+>>>>>>>>>> one devicetree, and it'll be used, right?
+>>>>>>>>>
+>>>>>>>>> We can provide only one, we still need the IDs in the DT.
+>>>>>>>>
+>>>>>>>> How are the DTS provided? Concatenated with the kernel, or in a
+>>>>>>>> wrapped data format? Or in a separate partition from the kernel?
+>>>>>>>
+>>>>>>> Its a wrapped data format that is than concatenated with the kernel if I remember correctly.
+>>>>>>
+>>>>>> Then you should be able to create a tool that can write this concatenated
+>>>>>> format and insert these properties from a table that matches the boot
+>>>>>> loader, right?
+>>>>>>
+>>>>>>     Arnd
+>>>>>
+>>>>> Are you suggesting the tool insert the properties in the DT?  I?m not sure I understand what the point of doing that would be.
+>>>>
+>>>> To insert platform-local properties that mean nothing outside of the
+>>>> firmware packaging of the device trees, which is the case here?
+>>>>
+>>>> I think the idea of having the installer script inserting them is
+>>>> quite reasonable in this case.
+>>>>
+>>>>
+>>>> -Olof
+>>>
+>>> These values are static, so not sure what the point of having the installer script do that?
+>>>
+>>
+>> It combines two hacks to work around a nonstandard boot loader.
+>> Once the bootloader is fixed, you can stop using that script.
+>>
+>>       Arnd
+>
+> I feel as if I?m missing something here.  If we just have the properties in the .dts files I don?t need to change anything ever, no script, no worries about working with old or new boot loaders, etc.
+>
 
-* Marek Belisko <marek@goldelico.com> [150310 14:28]:
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> ---
->  .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> new file mode 100644
-> index 0000000..d3dd9d8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> @@ -0,0 +1,43 @@
-> +twl4030_madc_battery
-> +
-> +Required properties:
-> + - compatible : "ti,twl4030-madc-battery"
-> + - capacity-uah : battery capacity in uAh
-> + - ti,volt-to-capacity-charging-map : list of voltage(mV):level(%) values
-> +	for charging calibration (see example)
-> + - ti,volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
-> +	for discharging calibration (see example)
-> + - io-channels: Should contain IIO channel specifiers
-> +	for each element in io-channel-names.
-> +- io-channel-names: Should contain the following values:
-> + * "temp" - The ADC channel for temperature reading
-> + * "ichg" - The ADC channel for battery charging status
-> + * "vbat" - The ADC channel to measure the battery voltage
-> +
-> +Example:
-> +	madc-battery {
-> +		compatible = "ti,twl4030-madc-battery";
-> +		capacity-uah = <1200000>;
-> +		ti,volt-to-capacity-charging-map = <4200 100>,
-> +					        <4100 75>,
-> +					        <4000 55>,
-> +					        <3900 25>,
-> +					        <3800 5>,
-> +					        <3700 2>,
-> +					        <3600 1>,
-> +					        <3300 0>;
-> +
-> +		ti,volt-to-capacity-discharging-map = <4200 100>
-> +						   <4100 95>,
-> +						   <4000 70>,
-> +						   <3800 50>,
-> +						   <3700 10>,
-> +						   <3600 5>,
-> +						   <3300 0>;
-> +		io-channels = <&twl_madc 1>,
-> +	                      <&twl_madc 10>,
-> +			      <&twl_madc 12>;
-> +		io-channel-names = "temp",
-> +		                   "ichg",
-> +		                   "vbat";
-> +	};
+But are these values actually used by the boot loader?
 
-Rather than just making platform_data into device tree properties..
-
-Can't you hide the these custom properties behind the compatible flag?
-
-You can initialize that data in the driver based on the compatible
-flag and the match data.
-
-This makes sense if you can group things to similar configurations.
+As far as I could see in 8974 the dtbTool provided by Qualcomm
+extracts the values from the list of dtbs and use them to create the
+table-of-content in the QCDT blob. The boot loader then looks in this
+TOC to pick the right dtb to use.
 
 Regards,
-
-Tony
+Bjorn
