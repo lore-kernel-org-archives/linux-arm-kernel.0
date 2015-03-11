@@ -1,63 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:44:51 +0000
-Subject: [PATCH v6 0/2] irqchip: Move Exynos PM to use stacked domains
-Message-ID: <1426088693-15724-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 11 Mar 2015 15:45:35 +0000
+Subject: [PATCH v6 2/4] ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
+In-Reply-To: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088737-15817-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is extracted from [4], which is trying to remove all
-traces of gic_arch_extn from the tree. As some maintainers are more
-responsive than others (understatement of the year...), I've decided
-to split it per sub-arch, and get it moving, at least partially.
+shmobile only uses gic_arch_extn.irq_set_wake to prevent the GIC
+from returning -ENXIO when receiving a wake-up configuration request.
 
-This series addresses Exynos by converting its PM support to a stacked
-domain on top of the standard GIC.
+It is a lot simpler to tell the irq layer that we don't need any
+configuration by using the IRQCHIP_SKIP_SET_WAKE, thanks to the
+new gic_set_irqchip_flags function.
 
-Based on 4.0-rc1.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-shmobile/intc-sh73a0.c   | 7 +------
+ arch/arm/mach-shmobile/setup-r8a7779.c | 7 +------
+ 2 files changed, 2 insertions(+), 12 deletions(-)
 
-* From v5: [5]
-- Added a big fat warning when an old DT is detected (as requested by Jason)
-- Added support for Exynos3250
-- Allow interrupt affinity to be changed
-
-* From v4: [4]
-- Extracted from the full series
-- Rebased on 4.0-rc1
-
-* From v3 [3]:
-- Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
-- Fixed more iMX6 DTs (Stephan)
-- Fixed Exynos4/5 DTs
-
-* From v2 [2]:
-- Addressed numerous comments from Thierry
-- Merged bug fixes from Nishanth
-- Merged bug fix from Stefan
-
-* From v1 [1]:
-- Rebased on 3.19-rc3
-- Fixed a number of additional platforms
-- Added crossbar conversion to stacked domains
-- Merged bug fixes from Nishanth
-
-[5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325368.html
-[4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
-[3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
-[2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
-
-Marc Zyngier (2):
-  ARM: exynos4/5: convert pmu wakeup to stacked domains
-  DT: exynos: update PMU binding
-
- .../devicetree/bindings/arm/samsung/pmu.txt        |  17 +++
- arch/arm/boot/dts/exynos3250.dtsi                  |   6 +-
- arch/arm/boot/dts/exynos4.dtsi                     |   4 +
- arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
- arch/arm/boot/dts/exynos5420.dtsi                  |   4 +
- arch/arm/mach-exynos/exynos.c                      |  15 +--
- arch/arm/mach-exynos/suspend.c                     | 139 ++++++++++++++++++---
- 7 files changed, 164 insertions(+), 25 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index 9e36180..fd63ae6 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -252,11 +252,6 @@ static irqreturn_t sh73a0_intcs_demux(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int sh73a0_set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return 0; /* always allow wakeup */
+-}
+-
+ #define PINTER0_PHYS 0xe69000a0
+ #define PINTER1_PHYS 0xe69000a4
+ #define PINTER0_VIRT IOMEM(0xe69000a0)
+@@ -318,8 +313,8 @@ void __init sh73a0_init_irq(void)
+ 	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+-	gic_arch_extn.irq_set_wake = sh73a0_set_wake;
+ 
+ 	register_intc_controller(&intcs_desc);
+ 	register_intc_controller(&intc_pint0_desc);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 27dceaf9..c03e562 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -713,18 +713,13 @@ void __init r8a7779_init_late(void)
+ }
+ 
+ #ifdef CONFIG_USE_OF
+-static int r8a7779_set_wake(struct irq_data *data, unsigned int on)
+-{
+-	return 0; /* always allow wakeup */
+-}
+-
+ void __init r8a7779_init_irq_dt(void)
+ {
+ #ifdef CONFIG_ARCH_SHMOBILE_LEGACY
+ 	void __iomem *gic_dist_base = ioremap_nocache(0xf0001000, 0x1000);
+ 	void __iomem *gic_cpu_base = ioremap_nocache(0xf0000100, 0x1000);
+ #endif
+-	gic_arch_extn.irq_set_wake = r8a7779_set_wake;
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 
+ #ifdef CONFIG_ARCH_SHMOBILE_LEGACY
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
 -- 
 2.1.4
