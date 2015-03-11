@@ -1,71 +1,141 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:43:45 +0000
-Subject: [PATCH v6 3/7] DT: update ti,irq-crossbar binding
+Date: Wed, 11 Mar 2015 15:43:46 +0000
+Subject: [PATCH v6 4/7] irqchip: GIC: get rid of routable domain
 In-Reply-To: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
 References: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426088629-15377-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088629-15377-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it look like a real interrupt controller.
+The only user of the so called "routable domain" functionality
+now being fixed, let's clean up the GIC.
 
 Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../devicetree/bindings/arm/omap/crossbar.txt          | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+ drivers/irqchip/irq-gic.c       | 59 ++++-------------------------------------
+ include/linux/irqchip/arm-gic.h |  6 -----
+ 2 files changed, 5 insertions(+), 60 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/crossbar.txt b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-index 4139db3..a9b28d7 100644
---- a/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/crossbar.txt
-@@ -9,7 +9,9 @@ inputs.
- Required properties:
- - compatible : Should be "ti,irq-crossbar"
- - reg: Base address and the size of the crossbar registers.
--- ti,max-irqs: Total number of irqs available at the interrupt controller.
-+- interrupt-controller: indicates that this block is an interrupt controller.
-+- interrupt-parent: the interrupt controller this block is connected to.
-+- ti,max-irqs: Total number of irqs available at the parent interrupt controller.
- - ti,max-crossbar-sources: Maximum number of crossbar sources that can be routed.
- - ti,reg-size: Size of a individual register in bytes. Every individual
- 	    register is assumed to be of same size. Valid sizes are 1, 2, 4.
-@@ -27,13 +29,13 @@ Optional properties:
-   when the interrupt controller irq is unused (when not provided, default is 0)
- 
- Examples:
--		crossbar_mpu: @4a020000 {
-+		crossbar_mpu: crossbar at 4a002a48 {
- 			compatible = "ti,irq-crossbar";
- 			reg = <0x4a002a48 0x130>;
- 			ti,max-irqs = <160>;
- 			ti,max-crossbar-sources = <400>;
- 			ti,reg-size = <2>;
--			ti,irqs-reserved = <0 1 2 3 5 6 131 132 139 140>;
-+			ti,irqs-reserved = <0 1 2 3 5 6 131 132>;
- 			ti,irqs-skip = <10 133 139 140>;
- 		};
- 
-@@ -44,10 +46,6 @@ Documentation/devicetree/bindings/arm/gic.txt for further details.
- 
- An interrupt consumer on an SoC using crossbar will use:
- 	interrupts = <GIC_SPI request_number interrupt_level>
--When the request number is between 0 to that described by
--"ti,max-crossbar-sources", it is assumed to be a crossbar mapping. If the
--request_number is greater than "ti,max-crossbar-sources", then it is mapped as a
--quirky hardware mapping direct to GIC.
- 
- Example:
- 	device_x at 0x4a023000 {
-@@ -55,9 +53,3 @@ Example:
- 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 		...
- 	};
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 4634cf7..e3ca6da 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -798,15 +798,12 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+ 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 -
--	device_y at 0x4a033000 {
--		/* Direct mapped GIC SPI 1 used */
--		interrupts = <GIC_SPI DIRECT_IRQ(1) IRQ_TYPE_LEVEL_HIGH>;
--		...
--	};
+-		gic_routable_irq_domain_ops->map(d, irq, hw);
+ 	}
+ 	return 0;
+ }
+ 
+ static void gic_irq_domain_unmap(struct irq_domain *d, unsigned int irq)
+ {
+-	gic_routable_irq_domain_ops->unmap(d, irq);
+ }
+ 
+ static int gic_irq_domain_xlate(struct irq_domain *d,
+@@ -825,16 +822,8 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+ 	*out_hwirq = intspec[1] + 16;
+ 
+ 	/* For SPIs, we need to add 16 more to get the GIC irq ID number */
+-	if (!intspec[0]) {
+-		ret = gic_routable_irq_domain_ops->xlate(d, controller,
+-							 intspec,
+-							 intsize,
+-							 out_hwirq,
+-							 out_type);
+-
+-		if (IS_ERR_VALUE(ret))
+-			return ret;
+-	}
++	if (!intspec[0])
++		*out_hwirq += 16;
+ 
+ 	*out_type = intspec[2] & IRQ_TYPE_SENSE_MASK;
+ 
+@@ -891,37 +880,6 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.xlate = gic_irq_domain_xlate,
+ };
+ 
+-/* Default functions for routable irq domain */
+-static int gic_routable_irq_domain_map(struct irq_domain *d, unsigned int irq,
+-			      irq_hw_number_t hw)
+-{
+-	return 0;
+-}
+-
+-static void gic_routable_irq_domain_unmap(struct irq_domain *d,
+-					  unsigned int irq)
+-{
+-}
+-
+-static int gic_routable_irq_domain_xlate(struct irq_domain *d,
+-				struct device_node *controller,
+-				const u32 *intspec, unsigned int intsize,
+-				unsigned long *out_hwirq,
+-				unsigned int *out_type)
+-{
+-	*out_hwirq += 16;
+-	return 0;
+-}
+-
+-static const struct irq_domain_ops gic_default_routable_irq_domain_ops = {
+-	.map = gic_routable_irq_domain_map,
+-	.unmap = gic_routable_irq_domain_unmap,
+-	.xlate = gic_routable_irq_domain_xlate,
+-};
+-
+-const struct irq_domain_ops *gic_routable_irq_domain_ops =
+-					&gic_default_routable_irq_domain_ops;
+-
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+ 			   u32 percpu_offset, struct device_node *node)
+@@ -929,7 +887,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	irq_hw_number_t hwirq_base;
+ 	struct gic_chip_data *gic;
+ 	int gic_irqs, irq_base, i;
+-	int nr_routable_irqs;
+ 
+ 	BUG_ON(gic_nr >= MAX_GIC_NR);
+ 
+@@ -985,15 +942,9 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	gic->gic_irqs = gic_irqs;
+ 
+ 	if (node) {		/* DT case */
+-		const struct irq_domain_ops *ops = &gic_irq_domain_hierarchy_ops;
+-
+-		if (!of_property_read_u32(node, "arm,routable-irqs",
+-					  &nr_routable_irqs)) {
+-			ops = &gic_irq_domain_ops;
+-			gic_irqs = nr_routable_irqs;
+-		}
+-
+-		gic->domain = irq_domain_add_linear(node, gic_irqs, ops, gic);
++		gic->domain = irq_domain_add_linear(node, gic_irqs,
++						    &gic_irq_domain_hierarchy_ops,
++						    gic);
+ 	} else {		/* Non-DT case */
+ 		/*
+ 		 * For primary GICs, skip over SGIs.
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 71d706d..3978c5b 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -115,11 +115,5 @@ int gic_get_cpu_id(unsigned int cpu);
+ void gic_migrate_target(unsigned int new_cpu_id);
+ unsigned long gic_get_sgir_physaddr(void);
+ 
+-extern const struct irq_domain_ops *gic_routable_irq_domain_ops;
+-static inline void __init register_routable_domain_ops
+-					(const struct irq_domain_ops *ops)
+-{
+-	gic_routable_irq_domain_ops = ops;
+-}
+ #endif /* __ASSEMBLY */
+ #endif
 -- 
 2.1.4
