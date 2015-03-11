@@ -1,92 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Mar 2015 12:26:22 -0700
-Subject: [PATCHv3 34/35] ARM: dts: dra7: add system control module node
-In-Reply-To: <550092CA.9030008@ti.com>
-References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
- <1424891085-10392-35-git-send-email-t-kristo@ti.com>
- <20150311171708.GB5264@atomide.com> <550092CA.9030008@ti.com>
-Message-ID: <20150311192621.GE5264@atomide.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 11 Mar 2015 20:36:54 +0100
+Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <20150311174316.GD5264@atomide.com>
+References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
+ <1426022847-30912-4-git-send-email-marek@goldelico.com>
+ <20150311152414.GX5264@atomide.com>
+ <844740CD-C95B-4411-A2C8-4906F58DBEE8@goldelico.com>
+ <20150311164442.GA5264@atomide.com>
+ <F7BA143D-5CF9-42E3-AFA8-B83B149EF77E@goldelico.com>
+ <20150311174316.GD5264@atomide.com>
+Message-ID: <20150311193654.GA3126@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150311 12:09]:
-> On 03/11/2015 07:17 PM, Tony Lindgren wrote:
-> >Hi Tero,
-> >
-> >* Tero Kristo <t-kristo@ti.com> [150225 11:09]:
-> >>Add node for system control module, and move all the existing system
-> >>control IO space users under this new node as its children. A new node
-> >>for scm_conf area is also added.
-> >...
-> >
-> >>--- a/arch/arm/boot/dts/dra7.dtsi
-> >>+++ b/arch/arm/boot/dts/dra7.dtsi
-> >>@@ -203,26 +203,47 @@
-> >>  			};
-> >>  		};
-> >>
-> >>+		scm: scm at 4a002000 {
-> >>+			compatible = "ti,dra7-ctrl", "simple-bus";
-> >>+			reg = <0x4a002000 0x1400>,
-> >>+			      <0x4a003400 0x600>,
-> >>+			      <0x4ae0c000 0x600>;
-> >>+			#address-cells = <2>;
-> >>+			#size-cells = <1>;
-> >>+			ranges = <0 0 0x4a002000 0x1400>,
-> >>+				 <1 0 0x4a003400 0x600>,
-> >>+				 <2 0 0x4ae0c000 0x600>;
-> >>+
-> >>+			scm_conf: tisyscon at 0,0 {
-> >>+				compatible = "syscon";
-> >>+				reg = <0 0x0 0x1400>;
-> >>+				#address-cells = <1>;
-> >>+				#size-cells = <1>;
-> >>+			};
-> >>+
-> >>+			dra7_pmx_core: pinmux at 1,0 {
-> >>+				compatible = "ti,dra7-padconf",
-> >>+					     "pinctrl-single";
-> >>+				reg = <1 0x0 0x0464>;
-> >>+				#address-cells = <1>;
-> >>+				#size-cells = <0>;
-> >>+				#interrupt-cells = <1>;
-> >>+				interrupt-controller;
-> >>+				pinctrl-single,register-width = <32>;
-> >>+				pinctrl-single,function-mask = <0x3fffffff>;
-> >>+			};
-> >>+		};
-> >
-> >Wouldn't it make more sense to have separate device_scm, core_scm and
-> >wkup_scm instead of stuffing multiple ranges here?
-> >
-> >Or are there other reasons for the multiple ranges?
+Hi,
+
+On Wed, Mar 11, 2015 at 10:43:17AM -0700, Tony Lindgren wrote:
+> No no, "capacity-uah" is what we should use, but you need an ack from
+> the battery and device tree people that this is OK. Let's not add
+> "ti,capacity-uah? as that can obviously be a generic property.
+
+I'm okay with capacity-uah.
+
+> > [...]
 > 
-> Yea that was the alternative I was thinking about, I ended up with this for
-> some reason. I think personally I liked having them all under the same SCM
-> part, because they are nicely grouped then, and well, its the same system
-> control part in the chip. We can split it up easily of course. Should we
-> have a higher level scm part and then have core_scm and wkup_scm under this
-> followed by the sub-functions, or just drop the top level scm part
-> completely?
-
-Well I'd model it after the hardware so we can have one or more scm driver
-instances managing the clock for those blocks. If we squash them together,
-we won't have a chance to pass interrupts and clocks device tree property
-to the right driver instance. And for example 5432 TRM has them as separate
-devices in "Figure 18-1. Control Module Overview".
-
-I don't think we need the top level scm to group them under, these are all
-connected seprately to the interconnect, right?
- 
-> This same question applies to omap4 + omap5 also. In some part for omap3
-> also, as it also has pmx_core + pmx_wkup separately, even if they are part
-> of the same register space.
+> Oh if they are battery spicific, then ideally we'd have generic batery
+> voltage to capacity maps property rather than a custom ti specific
+> property.
 > 
-> Anyway, just a political decision from your side, I am fine either way. :)
+> To avoid extra hassles later on, maybe you could submit a generic
+> binding patch only documenting it to the battery people and the device
+> tree people? That will make it easier to maintain this driver in the
+> long run.
 
-OK thanks for confirming that, to me it makes sense to set them up as
-separate instances then.
+Actually the proper way would be to differentiate between the
+battery and the measurement chip / adc and that should be
+implemented in the long run. The kernel's power supply framework
+is not yet ready for it, though.
 
-Regards,
+Example DT:
 
-Tony
+battery {
+    battery-specific-data;
+};
+
+fuel-gauge {
+    measures = <&battery>;
+};
+
+charger {
+    charges = <&battery>;
+};
+
+Since infrastructure for generic bindings is missing, I think its
+best to have the vendor properties for now and map this to generic
+properties, once they have been specified.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/ba72c6cc/attachment.sig>
