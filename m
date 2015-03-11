@@ -1,117 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 Mar 2015 10:37:29 -0500
-Subject: [PATCH v4 7/9] x86, pci, ecam: mmconfig_64.c becomes default
- implementation for ECAM driver.
-In-Reply-To: <1426083169-8698-8-git-send-email-tomasz.nowicki@linaro.org>
-References: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
- <1426083169-8698-8-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <CAL_JsqJfvOcQ9sSuKfq3YCWubL9QctEDU0CR2mjBze2ZyB+nVg@mail.gmail.com>
+From: greg.bellows@linaro.org (Greg Bellows)
+Date: Wed, 11 Mar 2015 10:39:47 -0500
+Subject: [Qemu-devel] [PATCH 6/6] target-arm/cpu.h: document why env->spsr
+ exists
+In-Reply-To: <1424880159-29348-8-git-send-email-alex.bennee@linaro.org>
+References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
+ <1424880159-29348-8-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAOgzsHWzroog_K3DAXtS=UzP_s9488LT=Q54FykN3yuC+xOvqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 9:12 AM, Tomasz Nowicki
-<tomasz.nowicki@linaro.org> wrote:
-> Architectures which want to take advantage of ECAM generic goodness
-
-This is not necessarily an architecture decision. It is likely per host.
-
-> should select CONFIG_PCI_ECAM_GENERIC. Otherwise, like x86 32bits machines,
-> are obligated to provide own low-level ECAM calls.
+On Wed, Feb 25, 2015 at 10:02 AM, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> I was getting very confused about the duplication of state. Perhaps we
+> should just get rid of env->spsr and use helpers that understand the
+> banking?
 >
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> ---
-
-[...]
-
-> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
-> index c588234..796b6e7 100644
-> --- a/drivers/pci/ecam.c
-> +++ b/drivers/pci/ecam.c
-> @@ -23,6 +23,119 @@ static DEFINE_MUTEX(pci_mmcfg_lock);
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 >
->  LIST_HEAD(pci_mmcfg_list);
+> diff --git a/target-arm/cpu.h b/target-arm/cpu.h
+> index 11845a6..d7fd13f 100644
+> --- a/target-arm/cpu.h
+> +++ b/target-arm/cpu.h
+> @@ -155,6 +155,11 @@ typedef struct CPUARMState {
+>         This contains all the other bits.  Use cpsr_{read,write} to access
+>         the whole CPSR.  */
+>      uint32_t uncached_cpsr;
+> +    /* The spsr is a alias for spsr_elN where N is the current
+
+"an alias"
+
+> +     * exception level. It is provided for here so the TCG msr/mrs
+
+remove "for here"
+
+> +     * implementation can access one register. Care needs to be taken
+> +     * to ensure the banked_spsr[] is also updated.
+> +     */
+>      uint32_t spsr;
 >
-> +#ifdef CONFIG_GENERIC_PCI_ECAM
-> +static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus,
-> +                                 unsigned int devfn)
-> +{
-> +       struct pci_mmcfg_region *cfg = pci_mmconfig_lookup(seg, bus);
-> +
-> +       if (cfg && cfg->virt)
-> +               return cfg->virt + (PCI_MMCFG_BUS_OFFSET(bus) | (devfn << 12));
-> +       return NULL;
-> +}
-> +
-> +int pci_mmcfg_read(unsigned int seg, unsigned int bus,
-> +                         unsigned int devfn, int reg, int len, u32 *value)
-> +{
-> +       char __iomem *addr;
-> +
-> +       /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-> +       if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095))) {
-> +err:           *value = -1;
-> +               return -EINVAL;
-> +       }
-> +
-> +       rcu_read_lock();
+>      /* Banked registers.  */
+> --
+> 2.3.0
+>
+>
 
-What is the purpose of the rcu lock other than the old implementation had it?
+Otherwise...
 
-> +       addr = pci_dev_base(seg, bus, devfn);
-
-The .map_bus op provides the same function if you restructure to use
-the generic accessors.
-
-> +       if (!addr) {
-> +               rcu_read_unlock();
-> +               goto err;
-> +       }
-> +
-> +       *value = pci_mmio_read(len, addr + reg);
-> +       rcu_read_unlock();
-> +
-> +       return 0;
-> +}
-> +
-> +int pci_mmcfg_write(unsigned int seg, unsigned int bus,
-> +                          unsigned int devfn, int reg, int len, u32 value)
-> +{
-> +       char __iomem *addr;
-> +
-> +       /* Why do we have this when nobody checks it. How about a BUG()!? -AK */
-> +       if (unlikely((bus > 255) || (devfn > 255) || (reg > 4095)))
-> +               return -EINVAL;
-> +
-> +       rcu_read_lock();
-> +       addr = pci_dev_base(seg, bus, devfn);
-> +       if (!addr) {
-> +               rcu_read_unlock();
-> +               return -EINVAL;
-> +       }
-> +
-> +       pci_mmio_write(len, addr + reg, value);
-> +       rcu_read_unlock();
-> +
-> +       return 0;
-> +}
-> +
-> +static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
-> +{
-> +       void __iomem *addr;
-> +       u64 start, size;
-> +       int num_buses;
-> +
-> +       start = cfg->address + PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
-> +       num_buses = cfg->end_bus - cfg->start_bus + 1;
-> +       size = PCI_MMCFG_BUS_OFFSET(num_buses);
-> +       addr = ioremap_nocache(start, size);
-> +       if (addr)
-> +               addr -= PCI_MMCFG_BUS_OFFSET(cfg->start_bus);
-> +       return addr;
-> +}
-> +
-> +int __init pci_mmcfg_arch_init(void)
-
-Where would this be called for the case of the generic host and using DT?
-
-Rob
+Reviewed-by: Greg Bellows <greg.bellows@linaro.org>
