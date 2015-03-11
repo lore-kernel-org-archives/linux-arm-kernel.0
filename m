@@ -1,48 +1,182 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 11 Mar 2015 17:08:08 +0800
-Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the onboard
- WiFi module
-In-Reply-To: <20150311085225.GK5085@lukather>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-14-git-send-email-wens@csie.org>
- <20150310213218.GH5085@lukather>
- <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
- <20150311085225.GK5085@lukather>
-Message-ID: <CAGb2v64qQVDyG69Oe_R9m_GCY4kqW13dG+soh+MeaJ4W1Xb5kQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 11 Mar 2015 14:43:45 +0530
+Subject: [PATCH 02/15] phy-sun4i-usb: Add a helper function to update
+ the iscr register
+In-Reply-To: <54FECF9F.7020606@redhat.com>
+References: <1425933628-9672-1-git-send-email-hdegoede@redhat.com>
+ <4772280.xE1WBZVd8Z@wuerfel> <54FEA59B.7020400@redhat.com>
+ <2515825.598CypcWU3@wuerfel> <54FEC3DD.10108@redhat.com>
+ <54FECD30.6080106@ti.com> <54FECF9F.7020606@redhat.com>
+Message-ID: <55000749.9040606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 4:52 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Mar 11, 2015 at 11:11:49AM +0800, Chen-Yu Tsai wrote:
->> On Wed, Mar 11, 2015 at 5:32 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Tue, Mar 10, 2015 at 07:59:24PM +0800, Chen-Yu Tsai wrote:
->> >> The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
->> >> WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
->> >> The IC also takes a power enable signal via GPIO. This is supported
->> >> with the new power sequencing bindings.
->> >>
->> >> The WiFi module supports out-of-band interrupt signaling via GPIO,
->> >> but this is buggy and not enabled yet.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >
->> > There's two almost identical patches 12/12. Which one am I suppose to
->> > apply?
+Hi,
+
+On Tuesday 10 March 2015 04:33 PM, Hans de Goede wrote:
+> Hi,
+>
+> On 10-03-15 11:53, Kishon Vijay Abraham I wrote:
+>> Hi,
 >>
->> This one is the right one. I forgot to clear the patches after changing
->> the description. The "buggy" part in the description is probably not
->> needed. Hans explained that the SD resets have nothing to do with
->> interrupt handling.
+>> On Tuesday 10 March 2015 03:43 PM, Hans de Goede wrote:
+>>> Hi,
+>>>
+>>> On 10-03-15 09:57, Arnd Bergmann wrote:
+>>>> On Tuesday 10 March 2015 09:04:43 Hans de Goede wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 09-03-15 22:47, Arnd Bergmann wrote:
+>>>>>> On Monday 09 March 2015 21:40:15 Hans de Goede wrote:
+>>>>>>> +void sun4i_usb_phy_update_iscr(struct phy *_phy, u32 clr, u32 set)
+>>>>>>> +{
+>>>>>>> +       struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+>>>>>>> +       struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+>>>>>>> +       u32 iscr;
+>>>>>>> +
+>>>>>>> +       iscr = readl(data->base + REG_ISCR);
+>>>>>>> +       iscr &= ~clr;
+>>>>>>> +       iscr |= set;
+>>>>>>> +       writel(iscr, data->base + REG_ISCR);
+>>>>>>> +}
+>>>>>>> +EXPORT_SYMBOL(sun4i_usb_phy_update_iscr);
+>>>>>>> +
+>>>>>>>
+>>>>>>
+>>>>>> I would generally consider this a bad design. What is the purpose of
+>>>>>> calling sun4i_usb_phy_update_iscr()
+>>
+>> right. That would bind the PHY driver and the controller driver and would
+>> start creating problems when a different PHY is connected with the
+>> controller.
+>>>>>
+>>>>> There are 2 different use cases for this one is to enable the dataline
+>>>>> pull-ups at driver init and disable them at driver exit, this could /
+>>>>> should probably be moved to the phy_init / phy_exit code for the usb0 phy
+>>>>> removing the need to do this from within the sunxi musb glue.
+>>>>>
+>>>>> The second use-case is more tricky, for some reasons Allwinner has decided
+>>>>> to not use the dedicated id-detect and vusb-sense pins of the phy they are
+>>>>> using (these pins are not routed to the outside).
+>>>>>
+>>>>> Instead id-detect and vusb-sense are done through any $random gpio pins
+>>>>> (including non irq capable pins on some designs requiring polling).
+>>
+>> The polling can still be done in PHY driver and can use the extcon framework
+>> to report the status to controller driver no?
 >
-> Just to be clear, you want the last sentence to be:
+> Technically the polling can be moved to the phy driver yes, but it is not easy,
+> e.g. we only need to poll when we're in otg mode rather then host-only
+> or peripheral-only mode, and the mode gets set by the musb driver not phy
+> the phy driver. The sunxi musb implementation uses an integrated phy, so it
+> is just much easier and more logical to have all control / polling happening
+> from a single module rather then from 2 different modules.
 >
-> The WiFi module supports out-of-band interrupt signaling via GPIO, but
-> this is not enabled yet.
+>>>>>
+>>>>> But the musb-core still needs to know the status of the id and vbus pins,
+>>
+>> musb-core or the musb-glue (musb/sunxi.c in this case)?
+>>>>> and gets this from the usb0-phy iscr register, which reflects the status of
+>>>>> the not connected dedicated pins of the phy. The reason this can still
+>>>>> work at all is because the iscr register allows the user to override
+>>>>> whatever the not connected phy pins are seeing and forcing a value to
+>>>>> report to the musb core as id and vbus status.
+>>>>>
+>>>>> This is done by these 2 functions in the musb sunxi glue:
+>>>>>
+>>>>> static void sunxi_musb_force_id(struct musb *musb, u32 val)
+>>>>> {
+>>>>>           struct sunxi_glue *glue =
+>>>>> dev_get_drvdata(musb->controller->parent);
+>>>>>
+>>>>>           if (val)
+>>>>>                   val = SUNXI_ISCR_FORCE_ID_HIGH;
+>>>>>           else
+>>>>>                   val = SUNXI_ISCR_FORCE_ID_LOW;
+>>>>>
+>>>>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_ID_MASK,
+>>>>> val);
+>>
+>> What will writing to this register lead to? call to sunxi_musb_id_vbus_det_irq
+>> interrupt handler?
 >
-> Right?
+> No this changes the vbus and id status as seen by the musb core, and the musb
+> responds to this, by e.g. starting a session, or when vbus does not get high
+> after a session request by reporting a vbus-error interrupt.
+>
+> The sunxi_musb_id_vbus_det_irq handler gets triggered by edges on the gpio
+> pins which are used to monitor the id and vbus status.
+>
+>
+>>>>> }
+>>>>>
+>>>>> static void sunxi_musb_force_vbus(struct musb *musb, u32 val)
+>>>>> {
+>>>>>           struct sunxi_glue *glue =
+>>>>> dev_get_drvdata(musb->controller->parent);
+>>>>>
+>>>>>           if (val)
+>>>>>                   val = SUNXI_ISCR_FORCE_VBUS_HIGH;
+>>>>>           else
+>>>>>                   val = SUNXI_ISCR_FORCE_VBUS_LOW;
+>>>>>
+>>>>>           sun4i_usb_phy_update_iscr(glue->phy, SUNXI_ISCR_FORCE_VBUS_MASK,
+>>>>> val);
+>>>>> }
+>>>>>
+>>>>> I will happily admit that these 2 functions are a better API between the
+>>>>> sunxi musb
+>>>>> glue and the sunxi usb phy driver. I started with the minimal
+>>>>> sun4i_usb_phy_update_iscr
+>>>>> approach as I wanted to keep the API as small as possible, but having 2
+>>>>> functions like
+>>>>> the one above, which actually reflect what is happening would indeed be
+>>>>> better.
+>>>>
+>>>> Ok, that would definitely improve things.
+>>>>
+>>>>> Note that the polling of the pins cannot (easily) be moved into the phy
+>>>>> driver for various
+>>>>> reasons:
+>>>>>
+>>>>> 1) It depends on dr_mode, the otg may be used in host only mode in which
+>>>>> case there are no
+>>>>> pins at all.
+>>>>> 2) the musb set_vbus callback needs access to the pins
+>>>>> 3) When id changes some musb core state changes are necessary.
+>>>>>
+>>>>> I'll respin the patch set to do things this way as soon as we've agreement on
+>>>>> your second point.
+>>>>>
+>>>>>   > and why can't there be a high-level
+>>>>>> PHY API for this?
+>>>>>
+>>>>> The current generic phy API seems to not have any bus specific methods, I
+>>>>> know that
+>>>>> in the long run people want to get rid of struct usb_phy, so maybe we should
+>>>>> consider
+>>>>> adding bus specific methods to the generic phy API for things like otg.
+>>>>>
+>>>>> If we decide to add bus specific methods, then the question becomes if having
+>>>>>
+>>>>> int phy_usb_set_id_detect(struct phy *phy, bool val);
+>>>>> int phy_usb_set_vbus_detect(struct phy *phy, bool val);
+>>>>>
+>>>>> Functions in the generic phy API is a good idea, or if this is too sunxi
+>>>>> specific,
+>>>>> I'm fine with doing this either way. If we want to go the generic phy route
+>>>>> I'll split this in 2 patches, one adding these 2 generic functions &
+>>>>> phy-ops, and
+>>>>> 1 doing the sunxi implementation.
+>>
+>> Please don't do that. We don't want to be bloating phy framework with platform
+>> specific hooks.
+>
+> Right, that was my feeling too. I believe that using sunxi specific phy functions
+> here is best given that we're dealing with an otg controller + phy both if which
 
-That's right. Thanks.
+Using platform specific PHY functions dissolves the very purpose of creating
+the PHY framework. We have to find a better way.
 
-ChenYu
+Thanks
+Kishon
