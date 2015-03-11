@@ -1,55 +1,150 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 11 Mar 2015 04:05:39 +0000
-Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System Control
- Module (MSCM)
-In-Reply-To: <20150311004812.GU20455@dragon>
-References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
- <1425249689-32354-4-git-send-email-stefan@agner.ch>
- <20150311004812.GU20455@dragon>
-Message-ID: <20150311040539.GD21998@io.lakedaemon.net>
+From: neelegup@linux.vnet.ibm.com (Neelesh Gupta)
+Date: Wed, 11 Mar 2015 09:56:20 +0530
+Subject: [RFC V2 04/12] i2c: opal: make use of the new infrastructure
+ for quirks
+In-Reply-To: <1426029133.17565.9.camel@kernel.crashing.org>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+ <1424880126-15047-5-git-send-email-wsa@the-dreams.de>
+ <54FF2631.9050006@linux.vnet.ibm.com>
+ <1426029133.17565.9.camel@kernel.crashing.org>
+Message-ID: <54FFC3EC.7020708@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 08:48:15AM +0800, Shawn Guo wrote:
-> On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
-> > Add the Miscellaneous System Control Module (MSCM) to the base
-> > device tree for Vybrid SoC's. This module contains registers
-> > to get information of the individual and current (accessing)
-> > CPU. In a second block, there is an interrupt router, which
-> > handles the routing of the interrupts between the two CPU cores
-> > on VF6xx variants of the SoC. However, also on single core
-> > variants the interrupt router needs to be configured in order
-> > to receive interrupts on the CPU's interrupt controller. Almost
-> > all peripheral interrupts are routed through the router, hence
-> > the MSCM module is the default interrupt parent for this SoC.
-> > 
-> > In a earlier commit the interrupt nodes were moved out of the
-> > peripheral nodes and specified in the CPU specific vf500.dtsi
-> > device tree. This allowed to use the base device tree vfxxx.dtsi
-> > also for a Cortex-M4 specific device tree, which uses different
-> > interrupt nodes due to the NVIC interrupt controller. However,
-> > since the interrupt parent for peripherals is the MSCM module
-> > independently which CPU the device tree is used for, we can move
-> > the interrupt nodes into the base device tree vfxxx.dtsi again.
-> > Depending on which CPU this base device tree will be used with,
-> > the correct parent interrupt controller has to be assigned to
-> > the MSCM-IR node (GIC or NVIC). The driver takes care of the
-> > parent interrupt controller specific needs (interrupt-cells).
-> > 
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Stefan,
-> 
-> I guess this patch has a run-time dependency on the first two in the
-> series, right?  Or put it another way, if I apply this single patch on
-> my branch, the dtb and kernel built from the same branch do not work
-> together, right?  If so, we will need to either wait for the first two
-> hit mainline or pull Jason's irqchip/vybrid branch into my tree as
-> prerequisite (irqchip/vybrid needs to be stable).
 
-No problem, I'll only add patches on top of this if needed.  no rebasing.
+On 03/11/2015 04:42 AM, Benjamin Herrenschmidt wrote:
+> On Tue, 2015-03-10 at 22:43 +0530, Neelesh Gupta wrote:
+>> I tested the i2c opal driver after updating the patch as below.
+>> Basically I think we can also support write-then-{read/write}
+>> for the number of messages = 2.
+>> Ben, any issues if we support both write plus read/write in the
+>> opal driver ?
+> Nope, in fact it's a good idea, I found myself having to expoes such
+> an interface to some userspace tool of ours.
+>
+> However...
+>
+>> diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
+>> index 16f90b1..85412ba 100644
+>> --- a/drivers/i2c/busses/i2c-opal.c
+>> +++ b/drivers/i2c/busses/i2c-opal.c
+>> @@ -104,18 +104,8 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>>    		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
+>>    		break;
+>>    	case 2:
+>> -		/* For two messages, we basically support only simple
+>> -		 * smbus transactions of a write plus a read. We might
+>> -		 * want to allow also two writes but we'd have to bounce
+>> -		 * the data into a single buffer.
+>> -		 */
+>> -		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
+>> -			return -EOPNOTSUPP;
+> Don't we still want to enforce that the first message is a write ?
+> Somebody may not be looking at the quirks...
+>
+>> -		if (msgs[0].len > 4)
+>> -			return -EOPNOTSUPP;
+> And that the len is supported...
+>
+>> -		if (msgs[0].addr != msgs[1].addr)
+>> -			return -EOPNOTSUPP;
+> Same...
+>
+> Ie, the quirk indicates to the callers what we support, but we should
+> still check that we aren't called with something that doesn't match.
 
-thx,
+Quirk *also* return error to the user if any of the conditions mismatch with
+what we have indicated through the quriks structure...
 
-Jason.
+I think we can't land up here by-passing the check for quirks so above 
+checks
+are duplicated here..
+
+Neelesh.
+
+>
+>> -		req.type = OPAL_I2C_SM_READ;
+>> +		req.type = (msgs[1].flags & I2C_M_RD) ?
+>> +			OPAL_I2C_SM_READ : OPAL_I2C_SM_WRITE;
+>>    		req.addr = cpu_to_be16(msgs[0].addr);
+>>    		req.subaddr_sz = msgs[0].len;
+>>    		for (i = 0; i < msgs[0].len; i++)
+>> @@ -210,6 +200,11 @@ static const struct i2c_algorithm i2c_opal_algo = {
+>>    	.functionality	= i2c_opal_func,
+>>    };
+>>
+>> +static struct i2c_adapter_quirks i2c_opal_quirks = {
+>> +	.flags = I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | I2C_AQ_COMB_SAME_ADDR,
+>> +	.max_comb_1st_msg_len = 4,
+>> +};
+>> +
+>>    static int i2c_opal_probe(struct platform_device *pdev)
+>>    {
+>>    	struct i2c_adapter	*adapter;
+>> @@ -232,6 +227,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
+>>
+>>    	adapter->algo = &i2c_opal_algo;
+>>    	adapter->algo_data = (void *)(unsigned long)opal_id;
+>> +	adapter->quirks = &i2c_opal_quirks;
+>>    	adapter->dev.parent = &pdev->dev;
+>>    	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
+>>    	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
+>>
+>>
+>>
+>> On 02/25/2015 09:31 PM, Wolfram Sang wrote:
+>>> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>>>
+>>> Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>>> ---
+>>>    drivers/i2c/busses/i2c-opal.c | 22 +++++++++++-----------
+>>>    1 file changed, 11 insertions(+), 11 deletions(-)
+>>>
+>>> diff --git a/drivers/i2c/busses/i2c-opal.c b/drivers/i2c/busses/i2c-opal.c
+>>> index 16f90b1a750894..b2788ecad5b3cb 100644
+>>> --- a/drivers/i2c/busses/i2c-opal.c
+>>> +++ b/drivers/i2c/busses/i2c-opal.c
+>>> @@ -104,17 +104,6 @@ static int i2c_opal_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+>>>    		req.buffer_ra = cpu_to_be64(__pa(msgs[0].buf));
+>>>    		break;
+>>>    	case 2:
+>>> -		/* For two messages, we basically support only simple
+>>> -		 * smbus transactions of a write plus a read. We might
+>>> -		 * want to allow also two writes but we'd have to bounce
+>>> -		 * the data into a single buffer.
+>>> -		 */
+>>> -		if ((msgs[0].flags & I2C_M_RD) || !(msgs[1].flags & I2C_M_RD))
+>>> -			return -EOPNOTSUPP;
+>>> -		if (msgs[0].len > 4)
+>>> -			return -EOPNOTSUPP;
+>>> -		if (msgs[0].addr != msgs[1].addr)
+>>> -			return -EOPNOTSUPP;
+>>>    		req.type = OPAL_I2C_SM_READ;
+>>>    		req.addr = cpu_to_be16(msgs[0].addr);
+>>>    		req.subaddr_sz = msgs[0].len;
+>>> @@ -210,6 +199,16 @@ static const struct i2c_algorithm i2c_opal_algo = {
+>>>    	.functionality	= i2c_opal_func,
+>>>    };
+>>>    
+>>> +/* For two messages, we basically support only simple
+>>> + * smbus transactions of a write plus a read. We might
+>>> + * want to allow also two writes but we'd have to bounce
+>>> + * the data into a single buffer.
+>>> + */
+>>> +static struct i2c_adapter_quirks i2c_opal_quirks = {
+>>> +	.flags = I2C_AQ_COMB_WRITE_THEN_READ,
+>>> +	.max_comb_1st_msg_len = 4,
+>>> +};
+>>> +
+>>>    static int i2c_opal_probe(struct platform_device *pdev)
+>>>    {
+>>>    	struct i2c_adapter	*adapter;
+>>> @@ -232,6 +231,7 @@ static int i2c_opal_probe(struct platform_device *pdev)
+>>>    
+>>>    	adapter->algo = &i2c_opal_algo;
+>>>    	adapter->algo_data = (void *)(unsigned long)opal_id;
+>>> +	adapter->quirks = &i2c_opal_quirks;
+>>>    	adapter->dev.parent = &pdev->dev;
+>>>    	adapter->dev.of_node = of_node_get(pdev->dev.of_node);
+>>>    	pname = of_get_property(pdev->dev.of_node, "ibm,port-name", NULL);
+>
