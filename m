@@ -1,53 +1,51 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 11 Mar 2015 11:40:16 +0000
-Subject: [PATCHv3 0/5] arm-cci400: PMU monitoring support on ARM64
-In-Reply-To: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
- (Suzuki K. Poulose's message of "Tue, 10 Mar 2015 15:18:50 +0000")
-References: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <9hhsidbyd7j.fsf@e105922-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Mar 2015 12:29:05 +0000
+Subject: [PATCH] clk: provide clk_is_match() dummy for non-common clk
+In-Reply-To: <20150311111755.GI952@pengutronix.de>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum> <8682755.oK0Ae34OOP@wuerfel>
+ <20150311102208.GX8656@n2100.arm.linux.org.uk>
+ <20150311111755.GI952@pengutronix.de>
+Message-ID: <20150311122905.GY8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Suzuki K. Poulose" <suzuki.poulose@arm.com> writes:
+On Wed, Mar 11, 2015 at 12:17:55PM +0100, Uwe Kleine-K?nig wrote:
+> Hey Russell,
+> 
+> On Wed, Mar 11, 2015 at 10:22:09AM +0000, Russell King - ARM Linux wrote:
+> > On Sun, Mar 08, 2015 at 10:05:29PM +0100, Arnd Bergmann wrote:
+> > > ARM randconfig build tests found a new error for configurations
+> > > with COMMON_CLK disabled but HAS_CLK selected by the platform:
+> > > 
+> > > ERROR: "clk_is_match" [sound/soc/fsl/snd-soc-fsl-spdif.ko] undefined!
+> > > 
+> > > This moves the declaration around, so this case is covered
+> > > by the existing static inline helper function.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > > Fixes: c69e182e51d89 ("clk: introduce clk_is_match")
+> > > ----
+> > > BTW, we have a preexisting problem in clk_get_parent,
+> > > clk_round_rate and clk_set_parent, which I've worked around in
+> > > my randconfig builds so far. Should we do that the same way?
+> > 
+> > NAK, as Uwe points out, you didn't address my comment.
+> You commented on the patch that is c69e182e51d8 ("clk: introduce
+> clk_is_match") now in next. Arnd just moved this around.
 
-> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
->
-> This series enables the PMU monitoring support for CCI400 on ARM64.
-> The existing CCI400 driver code is a mix of PMU driver and the MCPM
-> driver code. The MCPM driver is only used on ARM(32) and contains
-> arm32 assembly and hence can't be built on ARM64. This patch splits
-> the code to
->
->  - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
->  - ARM_CCI400_PMU driver
->
-> Accessing the Peripheral ID2 register(PID2) on CCI-400, to detect
-> the revision of the chipset, is a secure operation. Hence, it prevents
-> us from running this on non-secure platforms. The issue is overcome by
-> explicitly mentioning the revision number of the CCI PMU in the device tree
-> binding. The device-tree binding has been updated with the new bindings.
->
-> i.e,	arm-cci-400-pmu,r0 => revision 0
-> 	arm-cci-400-pmu,r1 => revision 1
-> 	arm-cci-400-pmu => (old) DEPRECATED
->
-> The old binding has been DEPRECATED and must be used only on ARM32
-> system with secure access. We don't have a reliable dynamic way to detect
-> if the system is running secure. This series tries to use the best safe
-> method by relying on the availability of MCPM(as it was prior to the series).
-> It is upto the MCPM platform driver to decide, if the system is secure before
-> it goes ahead and registers its drivers and pokes the CCI. This series doesn't
-> address/solve the problem of MCPM. I will be happy to use a better approach,
-> if there is any.
->
-> Tested on (non-secure)TC2 and A53x2.
->
+*Sigh*
 
-For the series,
+Mike - please remove this commit until proper kernel patch process is
+honoured.  We'll have some order here, and mutual respect of fellow
+kernel developers, rather than people selectively ignoring people.
+Yes, I realise that it fixes a bug, but it's utterly disgusting that
+comments on a patch are ignored and it's just picked up irrespective
+of comments being addressed.
 
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
+If you don't like that, bloody well do a better job.
 
-Cheers,
-Punit
-
-[...]
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
