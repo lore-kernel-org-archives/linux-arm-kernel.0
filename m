@@ -1,51 +1,134 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Mar 2015 08:11:38 -0700
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CAB3XZEfi49qMsB7A3p4Y7r9emzSbeyUGVy4-njzey1UnJU0qzA@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <6286151.8rcX893TN6@wuerfel>
- <CABxcv=mPVxW=BqL2PUL=AtS74kcqMG1yxC1WqMpxGiNOqGAnyQ@mail.gmail.com>
- <2353601.si5uCETVn2@wuerfel>
- <CABxcv==yx3dy-beEF9cf1mKo1vjCh_LU6iLuvn1z-SKz9xG0qA@mail.gmail.com>
- <CAB3XZEfi49qMsB7A3p4Y7r9emzSbeyUGVy4-njzey1UnJU0qzA@mail.gmail.com>
-Message-ID: <20150311151138.GU5264@atomide.com>
+From: greg.bellows@linaro.org (Greg Bellows)
+Date: Wed, 11 Mar 2015 10:17:47 -0500
+Subject: [Qemu-devel] [PATCH v2 4/6] target-arm: kvm64 sync FP register
+ state
+In-Reply-To: <1425479753-18349-5-git-send-email-alex.bennee@linaro.org>
+References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+ <1425479753-18349-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAOgzsHUdDtj4SntgXShurAzd1725_z+80eLm20HnxzZZcg1mHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eliad Peller <eliad@wizery.com> [150311 06:39]:
-> On Wed, Mar 11, 2015 at 3:21 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
-> > On Wed, Mar 11, 2015 at 2:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Wednesday 11 March 2015 14:07:11 Javier Martinez Canillas wrote:
-> >>>
-> >>> Right now it seems that all boards in mainline with a WiLink6 part are
-> >>> using internal clocks. So as a first step I think that adding an
-> >>> optional refclock-frequency and tcxoclock-frequency properties should
-> >>> be enough.
-> >>>
-> >>> It would be good if the driver supports getting the refclock and
-> >>> tcxoclock from an external provider in case a board gets these from
-> >>> external clocks but that can be done as a followup if there are boards
-> >>> in the future using that design.
-> >>>
-> >>> But please bear in mind that I'm not familiar with the clock handling
-> >>> in WiLink6 since the WiLink8 part used in the IGEP boards does not
-> >>> need these clocks and I only looked at Luciano's previous patches and
-> >>> the WiLink today driver today. So it would be good if Eliad can double
-> >>> check my assumptions to see if those are correct.
-> >>
-> sounds right. that's what i know as well.
-> 
-> >> Sounds good. I'd also be fine with not implementing the case for
-> >> external clocks in the code until we need (and can test) it, but
-> >> I think it should be specified in the binding from the start.
-> >>
-> > Agreed.
-> >
-> great. so i'll implement the internal clocks case only.
+On Wed, Mar 4, 2015 at 8:35 AM, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> For migration to work we need to sync all of the register state. This is
+> especially noticeable when GCC starts using FP registers as spill
+> registers even with integer programs.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> index 8cf3a62..c60e989 100644
+> --- a/target-arm/kvm64.c
+> +++ b/target-arm/kvm64.c
+> @@ -126,9 +126,17 @@ bool kvm_arm_reg_syncs_via_cpreg_list(uint64_t regidx)
+>  #define AARCH64_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
+>                   KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+>
+> +/* The linux headers don't define a 128 bit wide SIMD macro for us */
+> +#define AARCH64_SIMD_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U128 | \
+> +                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+> +
+> +#define AARCH64_SIMD_CTRL_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U32 | \
+> +                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+> +
+>  int kvm_arch_put_registers(CPUState *cs, int level)
+>  {
+>      struct kvm_one_reg reg;
+> +    uint32_t fpr;
+>      uint64_t val;
+>      int i;
+>      int ret;
+> @@ -207,13 +215,36 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          }
+>      }
+>
+> +    /* Advanced SIMD and FP registers */
+> +    for (i = 0; i < 32; i++) {
+> +        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
+> +        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
+> +        ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+> +        if (ret) {
+> +            return ret;
+> +        }
+> +        reg.id++;
 
-OK great sounds good to me also.
+What does this increment do?  It appears that it just gets thrown away
+on the next iteration of the loop unless ioctl(SET) return something,
+but maybe I am missing something.
 
-Regards,
-
-Tony
+> +    }
+> +
+> +    reg.addr = (uintptr_t)(&fpr);
+> +    fpr = vfp_get_fpsr(env);
+> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
+> +    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+> +    if (ret) {
+> +        return ret;
+> +    }
+> +
+> +    fpr = vfp_get_fpcr(env);
+> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
+> +    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+> +    if (ret) {
+> +        return ret;
+> +    }
+> +
+>      if (!write_list_to_kvmstate(cpu)) {
+>          return EINVAL;
+>      }
+>
+> -    /* TODO:
+> -     * FP state
+> -     */
+>      return ret;
+>  }
+>
+> @@ -221,6 +252,7 @@ int kvm_arch_get_registers(CPUState *cs)
+>  {
+>      struct kvm_one_reg reg;
+>      uint64_t val;
+> +    uint32_t fpr;
+>      int i;
+>      int ret;
+>
+> @@ -302,9 +334,36 @@ int kvm_arch_get_registers(CPUState *cs)
+>          }
+>      }
+>
+> +    /* Advanced SIMD and FP registers */
+> +    for (i = 0; i < 32; i++) {
+> +        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
+> +        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
+> +        ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+> +        if (ret) {
+> +            return ret;
+> +        }
+> +        reg.id++;
+> +    }
+> +
+> +    reg.addr = (uintptr_t)(&fpr);
+> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
+> +    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+> +    if (ret) {
+> +        return ret;
+> +    }
+> +    vfp_set_fpsr(env, fpr);
+> +
+> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
+> +    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+> +    if (ret) {
+> +        return ret;
+> +    }
+> +    vfp_set_fpcr(env, fpr);
+> +
+>      if (!write_kvmstate_to_list(cpu)) {
+>          return EINVAL;
+>      }
+> +
+>      /* Note that it's OK to have registers which aren't in CPUState,
+>       * so we can ignore a failure return here.
+>       */
+> --
+> 2.3.1
+>
+>
