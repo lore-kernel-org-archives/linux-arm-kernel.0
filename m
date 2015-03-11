@@ -1,29 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 Mar 2015 13:14:33 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <550038C9.7010807@free-electrons.com>
-References: <54FF21BE.2040506@list.ru>
- <550038C9.7010807@free-electrons.com>
-Message-ID: <20150311131433.GC8656@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Mar 2015 14:17:42 +0100
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CABxcv=mPVxW=BqL2PUL=AtS74kcqMG1yxC1WqMpxGiNOqGAnyQ@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <6286151.8rcX893TN6@wuerfel>
+ <CABxcv=mPVxW=BqL2PUL=AtS74kcqMG1yxC1WqMpxGiNOqGAnyQ@mail.gmail.com>
+Message-ID: <2353601.si5uCETVn2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
-> Hi Stas,
+On Wednesday 11 March 2015 14:07:11 Javier Martinez Canillas wrote:
 > 
-> On 10/03/2015 17:54, Stas Sergeev wrote:
-> > Hello, the patch below is needed for a successful boot on armada-xp.
-> > 
+> Right now it seems that all boards in mainline with a WiLink6 part are
+> using internal clocks. So as a first step I think that adding an
+> optional refclock-frequency and tcxoclock-frequency properties should
+> be enough.
 > 
-> I am really surprised by this patch because I used the Armada XP based
-> board in a daily base and I never saw this issue.
+> It would be good if the driver supports getting the refclock and
+> tcxoclock from an external provider in case a board gets these from
+> external clocks but that can be done as a followup if there are boards
+> in the future using that design.
+> 
+> But please bear in mind that I'm not familiar with the clock handling
+> in WiLink6 since the WiLink8 part used in the IGEP boards does not
+> need these clocks and I only looked at Luciano's previous patches and
+> the WiLink today driver today. So it would be good if Eliad can double
+> check my assumptions to see if those are correct.
 
-Can you provide some details about your board - does it have 8GB of
-memory, ranging from 0-0xf0000000, and 4G-8G ?
+Sounds good. I'd also be fine with not implementing the case for
+external clocks in the code until we need (and can test) it, but
+I think it should be specified in the binding from the start.
 
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
