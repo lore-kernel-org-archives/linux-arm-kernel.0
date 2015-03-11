@@ -1,76 +1,82 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 11 Mar 2015 11:19:08 +0000
-Subject: [PATCH v2 0/5] GICv3: add 32bit compatibility
-In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <550024AC.2070901@arm.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 11 Mar 2015 06:24:16 -0500
+Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
+In-Reply-To: <20141208101026.GD27367@arm.com>
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <20141204182049.GB7749@arm.com> <54833BAF.1030405@suse.de>
+ <20141208101026.GD27367@arm.com>
+Message-ID: <550025E0.7030008@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/15 18:20, Jean-Philippe Brucker wrote:
-> This series adds 32bit compatibility to Marc's GICv3 driver. Only SGIs,
-> PPIs and SPIs support is present, no ITS.
-> 
-> It is now based on Linux 4.0-rc1, which contains Andre's GICv3 emulation
-> series for KVM [1]. With this support along with the kvmtool patches
-> mentioned in [1], it is possible to run ARM guests that use GICv3.
-> 
-> Changes since v1 [2]:
-> * rebased on 4.0-rc1
-> * fix the mistakes pointed out by Russell and Vladimir
-> * add a patch to select ARM_GIC_V3 under ARCH_VIRT, as suggested by Marc
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316230.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310124.htm
-> 
 
-Hi Jean,
 
-In case CONFIG_KVM_ARM_VGIC=y there is build error:
+On 08.12.14 04:10, Will Deacon wrote:
+> On Sat, Dec 06, 2014 at 05:23:59PM +0000, Alexander Graf wrote:
+>> On 04.12.14 19:20, Will Deacon wrote:
+>>> On Thu, Dec 04, 2014 at 03:46:33PM +0000, Alexander Graf wrote:
+>>>> With binutils 2.25 the default alignment for 32bit arm sections changed to
+>>>> have everything 64k aligned. Armv7 binaries built with this binutils version
+>>>> run successfully on an arm64 system.
+>>>>
+>>>> Since effectively there is now the chance to run armv7 code on arm64 even
+>>>> with 64k page size, it doesn't make sense to block people from enabling
+>>>> CONFIG_COMPAT on those configurations.
+>>>
+>>> Is there a distro available that is built with a recent enough binutils for
+>>> this? I'd really like to run our regression tests to check that page-size
+>>> assumptions don't exist for things like shm.
+>>
+>> So how much of a distro do you need? I could probably assemble a simple
+>> very minimalistic rootfs with only bash if that helps.
+> 
+> I'd like to run LTP, so I'd probably need slightly more than that but I
+> certainly don't need the whole world.
 
-  CC      arch/arm/kvm/../../../virt/kvm/arm/vgic.o
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c: In function 'kvm_vgic_addr':
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c:1703:7: error:
-'KVM_VGIC_V3_ADDR_TYPE_DIST' undeclared (first use in this function)
-   case KVM_VGIC_V3_ADDR_TYPE_DIST:
-        ^
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c:1703:7: note: each undeclared
-identifier is reported only once for each function it appears in
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c:1706:16: error:
-'KVM_VGIC_V3_DIST_SIZE' undeclared (first use in this function)
-    block_size = KVM_VGIC_V3_DIST_SIZE;
-                 ^
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c:1709:7: error:
-'KVM_VGIC_V3_ADDR_TYPE_REDIST' undeclared (first use in this function)
-   case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-        ^
- arch/arm/kvm/../../../virt/kvm/arm/vgic.c:1712:16: error:
-'KVM_VGIC_V3_REDIST_SIZE' undeclared (first use in this function)
-    block_size = KVM_VGIC_V3_REDIST_SIZE;
-                 ^
- make[1]: *** [arch/arm/kvm/../../../virt/kvm/arm/vgic.o] Error 1
- make: *** [arch/arm/kvm] Error 2
+So after recompiling all of the distribution with newer binutils we now
+have an openSUSE Factory tree that has 64k aligned 32bit binaries.
 
-Thanks
-Vladimir
+Unfortunately however, the 32bit glibc has a bogus mmap() implementation
+that hard codes 4k page size.
 
-> Cheers,
-> Jean
-> 
-> 
-> Jean-Philippe Brucker (5):
->   arm64: GICv3: refactor the AArch64 specific parts
->   arm64: GICv3: change unsigned types for AArch32 compatibility
->   arm64: GICv3: Specialize readq and writeq accesses
->   ARM: add 32bit support to GICv3
->   ARM: virt: select ARM_GIC_V3
-> 
->  arch/arm/Kconfig                    |   1 +
->  arch/arm/include/asm/arch_gicv3.h   | 182 ++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/arch_gicv3.h | 141 ++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v3.c        |  69 ++++----------
->  include/linux/irqchip/arm-gic-v3.h  | 115 ++++++-----------------
->  5 files changed, 369 insertions(+), 139 deletions(-)
->  create mode 100644 arch/arm/include/asm/arch_gicv3.h
->  create mode 100644 arch/arm64/include/asm/arch_gicv3.h
-> 
+With the patch below applied to glibc, I can successfully run 32bit user
+space on Seattle with 64k PAGE_SIZE though. So I guess we'll need to fix
+up glibc next.
+
+Do you know of anyone who's fluent enough in 32bit ARM assembly to
+convert the hard coded assumptions in there to instead use a variable
+that takes the actual host page size into account?
+
+
+Alex
+
+
+Index: glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap.S
+===================================================================
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/arm/mmap.S
++++ glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap.S
+@@ -36,7 +36,7 @@ ENTRY (__mmap)
+ 	/* convert offset to pages */
+ 	movs	ip, r5, lsl #20
+ 	bne	.Linval
+-	mov	r5, r5, lsr #12
++	mov	r5, r5, lsr #16
+
+ 	/* do the syscall */
+ 	DO_CALL (mmap2, 0)
+Index: glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap64.S
+===================================================================
+--- glibc-2.21.orig/sysdeps/unix/sysv/linux/arm/mmap64.S
++++ glibc-2.21/sysdeps/unix/sysv/linux/arm/mmap64.S
+@@ -43,9 +43,9 @@ ENTRY (__mmap64)
+ 	cfi_rel_offset (r4, 0)
+ 	cfi_remember_state
+ 	movs	r4, ip, lsl $20		@ check that offset is page-aligned
+-	mov	ip, ip, lsr $12
++	mov	ip, ip, lsr $16
+ 	it	eq
+-	movseq	r4, r5, lsr $12		@ check for overflow
++	movseq	r4, r5, lsr $16		@ check for overflow
+ 	bne	.Linval
+ 	ldr	r4, [sp, $8]		@ load fd
+ 	orr	r5, ip, r5, lsl $20	@ compose page offset
