@@ -1,60 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 10:51:21 +0100
-Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
-In-Reply-To: <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-2-git-send-email-eliad@wizery.com>
- <CABxcv=mygdT2Q+ByVKPx4+o_Oj9KSy=zVX9ng9yN25ivkfSn1A@mail.gmail.com>
-Message-ID: <2121942.zIG9BfPsTV@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Mar 2015 09:50:55 +0000
+Subject: [PATCH 2/5] arm64: use fixmap region for permanent FDT mapping
+In-Reply-To: <CAKv+Gu8xrb0QqeFCfbqOb2sxFPyT8cVaq_RkhiD5jrr8L0zYzA@mail.gmail.com>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425380630-3684-3-git-send-email-ard.biesheuvel@linaro.org>
+ <CAL_JsqLdFS_nGuLTxrEZPCQv8MtW0s5jQ9Od1qj41yoqX40ONQ@mail.gmail.com>
+ <CAKv+Gu8xrb0QqeFCfbqOb2sxFPyT8cVaq_RkhiD5jrr8L0zYzA@mail.gmail.com>
+Message-ID: <20150311095055.GB21430@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 01:34:19 Javier Martinez Canillas wrote:
-> > +
-> > +static struct wl12xx_platform_data *
-> > +wlcore_get_platform_data(struct device *dev)
-> > +{
-> > +       struct wl12xx_platform_data *pdata;
-> > +
-> > +       /* first, look for DT data */
+> >> +       /*
+> >> +        * Reserve 2 MB of virtual space for the FDT at the top of the fixmap
+> >> +        * region. Keep this at the top so it remains 2 MB aligned.
+> >> +        */
+> >
+> > We should not fix a location restriction by creating a size
+> > restriction. You could embed firmware images within a DTB (which I
+> > think PPC does).
+> >
 > 
-> I thought it was the opposite, that platform data should over-rule DT.
-> That way you can still use the data filled in
-> arch/arm/mach-omap2/pdata-quirks.c even after the driver supports your
-> new DT binding.
+> The size restriction existed on arm64 before this patch, so I didn't
+> think twice about it.
+> So what would be a reasonable upper bound? We could go up to ~256 MB
+> without much trouble, but I guess that's a bit excessive, no?
 
-No, the pdata-quirks stuff for this driver must die, it was a hack
-that only exists because we previously could not attach data to an
-sdio function.
+Given the existing code had the same 2MB restriction (documented in
+booting.txt), I think retaining that limitation for now is fine unless
+we have some reasonable example of a DTB approaching or exceeding 2MB.
 
-> > +       pdata = wlcore_probe_of(dev);
-> > +       if (pdata)
-> > +               return pdata;
-> > +
-> > +       /* if not found - fallback to static platform data */
-> > +       pdata = wl12xx_get_platform_data();
-> > +       if (!IS_ERR(pdata))
-> > +               return kmemdup(pdata, sizeof(*pdata), GFP_KERNEL);
-> > +
-> > +       dev_err(dev, "No platform data set\n");
-> > +       return NULL;
-> > +}
-> > +
-> > +static void wlcore_del_platform_data(struct wl12xx_platform_data *pdata)
-> > +{
-> > +       kfree(pdata);
-> > +}
-> > +
-> 
-> This function seems to be an unnecessary, why not just call kfree() directly?
-> 
-> Or better, maybe the resource-managed devm_*() functions can be used
-> so the data doesn't have to be explicitly freed?
+As far as I am aware, on arm64 we're not currently embeddeding FW images
+in the DTB passed to the kernel, and I'm not sure why we would.
+Anything that's critical to the system and requires FW should be
+initialised prior to the kernel, and if we need FW to drive a particular
+device I'd expect we'd store that in the filesystem (or perhaps
+initrd/initramfs).
 
-As I said earlier, I think it would be best not to dynamically allocate anything
-here at all. As Eliad explained, the data is used by two different drivers:
-wl12xx and wl18xx, and only the latter is converted for now, but after the
-conversion, it should not need the platform data structure any more, only
-the irq number that gets passed in from DT.
-
-	Arnd
+Mark.
