@@ -1,118 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Mar 2015 11:50:28 +0000
-Subject: [PATCH 4/5] arm64/efi: ensure that Image does not cross a 512 MB
- boundary
-In-Reply-To: <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
- <1425380630-3684-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150311115028.GD4114@leverpostej>
+From: eliad@wizery.com (Eliad Peller)
+Date: Wed, 11 Mar 2015 13:54:52 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CABxcv=kL3Hw43VVxAsZ=DnY4Z+5431PO2YehcK2zTkFGBG0cNA@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <1425915402-10012-3-git-send-email-eliad@wizery.com>
+ <CABxcv=kL3Hw43VVxAsZ=DnY4Z+5431PO2YehcK2zTkFGBG0cNA@mail.gmail.com>
+Message-ID: <CAB3XZEfrqVkq+wCByZfT2kqSEQP6xJS2enQMJQv8DZf9Sj2VKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+hi Javier,
 
-On Tue, Mar 03, 2015 at 11:03:49AM +0000, Ard Biesheuvel wrote:
-> Update the Image placement logic used by the stub to make absolutely
-> sure that Image is placed in such a way that the early init code will
+On Wed, Mar 11, 2015 at 2:28 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Eliad,
+>
+> On Mon, Mar 9, 2015 at 4:36 PM, Eliad Peller <eliad@wizery.com> wrote:
+>> Add wl18xx (wilink8) bindings to omap3-igep0030-rev-g and
+>> omap3-igep0020-rev-f dts files, instead of defining the
+>> platform data through the pdata-quirks.
+>>
+>> The patch was compile-tested only.
+>>
+>
+> You should look at MAINTAINERS or use ./scripts/get_maintainer.pl to
+> know who should be cc'ed. Specially for this kind of patches where you
+> are not able to test on the actual platform. Added Enric to cc as well
+> since he also maintains the IGEP boards an has access to the hw too.
+>
+right. sorry about that.
+i assumed adding the relevant mailing lists should be enough, but i
+guess i should have added the relevant maintainers as well.
 
-Minor grammatical nits:
+>>  arch/arm/boot/dts/omap3-igep0020-rev-f.dts | 9 +++++++++
+>>  arch/arm/boot/dts/omap3-igep0030-rev-g.dts | 9 +++++++++
+>>  arch/arm/mach-omap2/pdata-quirks.c         | 2 --
+>>  3 files changed, 18 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
+>> index cc8bd0c..8e5b44e 100644
+>> --- a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
+>> +++ b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
+>> @@ -42,4 +42,13 @@
+>>         vmmc-supply = <&lbep5clwmc_wlen>;
+>>         bus-width = <4>;
+>>         non-removable;
+>> +
+>> +       #address-cells = <1>;
+>> +       #size-cells = <0>;
+>> +       wlcore: wlcore at 2 {
+>> +               compatible = "ti,wl1835";
+>> +               reg = <2>;
+>> +               interrupt-parent = <&gpio6>;
+>> +               interrupts = <17 IRQ_TYPE_NONE>;
+>
+> As Arnd said, it seems this should be IRQ_TYPE_LEVEL_HIGH to match
+> what the platform code is currently doing.
+>
+will be fixed.
 
-s/that Image/that the Image/
-
-s/in such a way that/such that/
-
-> always be able to map it. This means the entire static memory footprint
-> of Image should be inside the same naturally aligned 512 MB region.
-
-s/Image/the Image/
-
-> 
-> First of all, the preferred offset of dram_base + TEXT_OFFSET is only
-> suitable if it doesn't result in the Image crossing a 512 MB
-> alignment boundary, which could be the case if dram_base itself
-> is close to the end of a naturally aligned 512 MB region.
-> 
-> Also, when moving the kernel Image, we need to verify that the new
-> destination region does not cross a 512 MB alignment boundary either.
-> If that is the case, we retry the allocation with the alignment
-> chosen such that the resulting region will always be suitable.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-stub.c | 38 ++++++++++++++++++++++++++++++++------
->  1 file changed, 32 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index f5374065ad53..5f8175979be8 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -22,14 +22,40 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
->  					efi_loaded_image_t *image)
->  {
->  	efi_status_t status;
-> -	unsigned long kernel_size, kernel_memsize = 0;
-> +	unsigned long kernel_size, kernel_memsize;
-> +	unsigned long preferred_offset;
->  
-> -	/* Relocate the image, if required. */
->  	kernel_size = _edata - _text;
-> -	if (*image_addr != (dram_base + TEXT_OFFSET)) {
-> -		kernel_memsize = kernel_size + (_end - _edata);
-> -		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-> -				       SZ_2M, reserve_addr);
-> +	kernel_memsize = kernel_size + (_end - _edata);
-> +
-> +	/*
-> +	 * The kernel Image should be located as close as possible to the base
-> +	 * of system RAM, but must not cross a 512 MB alignment boundary.
-
-It might be better to say "but its static memory footprint must not
-cross a 512MB boundary" or something to that effect, to avoid any
-ambiguity regarding the Image binary vs the runtime memory footprint
-thereof.
-
-> +	 */
-> +	preferred_offset = dram_base + TEXT_OFFSET;
-> +	if ((preferred_offset & (SZ_512M - 1)) + kernel_memsize > SZ_512M)
-> +		preferred_offset = round_up(dram_base, SZ_512M) + TEXT_OFFSET;
-> +
-> +	if (*image_addr != preferred_offset) {
-> +		unsigned long alloc_size = kernel_memsize + TEXT_OFFSET;
-
-This could be const.
-
-> +		unsigned long alloc_align = SZ_2M;
-> +
-> +again:
-> +		status = efi_low_alloc(sys_table, alloc_size, alloc_align,
-> +				       reserve_addr);
-> +
-> +		/*
-> +		 * Check whether the new allocation crosses a 512 MB alignment
-> +		 * boundary. If so, retry with the alignment set to a power of
-> +		 * two upper bound of the allocation size. That is guaranteed
-> +		 * to produce a suitable allocation, but may waste more memory.
-> +		 */
-> +		if (status == EFI_SUCCESS &&
-> +		    ((*reserve_addr & (SZ_512M - 1)) + alloc_size) > SZ_512M) {
-> +			efi_free(sys_table, alloc_size, *reserve_addr);
-> +			alloc_align = roundup_pow_of_two(alloc_size);
-> +			goto again;
-> +		}
-
-If you move this check after the status != EFI_SUCCESS check below then
-you don't need to check status == EFI_SUCCESS, which would make the
-condition a little more legible.
-
-Other than those comments this looks sane to me.
-
-Thanks,
-Mark.
-
->  		if (status != EFI_SUCCESS) {
->  			pr_efi_err(sys_table, "Failed to relocate kernel\n");
->  			return status;
-> -- 
-> 1.8.3.2
-> 
-> 
+thanks,
+Eliad.
