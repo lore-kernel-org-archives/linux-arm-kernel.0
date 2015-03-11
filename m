@@ -1,58 +1,67 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 11 Mar 2015 15:15:14 -0700
-Subject: [PATCH v4 1/4] mmc: dw_mmc: Don't try to enable the CD until we're
- sure we're not deferring
-Message-ID: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 11 Mar 2015 17:28:35 -0500
+Subject: [PATCH v6 03/30] PCI: Export busn_resource to drivers/pci
+In-Reply-To: <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150311222835.GA1082@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If dw_mci_init_slot() returns that we got a probe deferral then it may
-leave slot->mmc as NULL.  That will cause dw_mci_enable_cd() to crash
-when it calls mmc_gpio_get_cd().
+On Mon, Mar 09, 2015 at 10:34:00AM +0800, Yijing Wang wrote:
+> Export out busn_resource. Xen pcifront module need it.
+> 
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> ---
+>  drivers/pci/pci.h   |    2 ++
+>  drivers/pci/probe.c |    3 ++-
+>  2 files changed, 4 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+> index 4091f82..eeacab9 100644
+> --- a/drivers/pci/pci.h
+> +++ b/drivers/pci/pci.h
+> @@ -10,6 +10,8 @@ bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+>  
+>  /* Functions internal to the PCI core code */
+>  
+> +extern struct resource busn_resource;
+> +
+>  int pci_create_sysfs_dev_files(struct pci_dev *pdev);
+>  void pci_remove_sysfs_dev_files(struct pci_dev *pdev);
+>  #if !defined(CONFIG_DMI) && !defined(CONFIG_ACPI)
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8ef0375..b97ea81 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -17,12 +17,13 @@
+>  #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
+>  #define CARDBUS_RESERVE_BUSNR	3
+>  
+> -static struct resource busn_resource = {
+> +struct resource busn_resource = {
+>  	.name	= "PCI busn",
+>  	.start	= 0,
+>  	.end	= 255,
+>  	.flags	= IORESOURCE_BUS,
+>  };
+> +EXPORT_SYMBOL(busn_resource);
 
-Fix this by moving the call of dw_mci_enable_cd() until we're sure
-that we're good.  Note that if we have more than one slot and one
-defers (but the others don't) things won't work so well.  ...but
-that's not a new thing and everyone has already agreed that multislot
-support ought to be removed from dw_mmc eventually anyway since it is
-unused, untested, and you can see several bugs like this by inspecting
-the code.
+I don't think this is a good idea.  We support multiple PCI domains, and
+each domain has its own 0-255 bus number range.  This busn_resource is
+only for domain 0 and probably should be handled in arch code instead of
+the PCI core.
 
-Fixes: bcafaf5470f0 ("mmc: dw_mmc: Only enable CD after setup and only if needed")
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v4:
-- Defer vs. card detect fix patch new for v4.
+Right now, I think it's possible to call pci_scan_bus_parented() or
+pci_scan_bus() several times for buses in different domains, and they would
+all share the same busn_resource, which would cause corruption.
 
-Changes in v3: None
-Changes in v2: None
+So it's already broken, but I don't want to make it harder to fix by
+exporting this stuff.
 
- drivers/mmc/host/dw_mmc.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 47dfd0e..e2811cf 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2863,9 +2863,6 @@ int dw_mci_probe(struct dw_mci *host)
- 			init_slots++;
- 	}
- 
--	/* Now that slots are all setup, we can enable card detect */
--	dw_mci_enable_cd(host);
--
- 	if (init_slots) {
- 		dev_info(host->dev, "%d slots initialized\n", init_slots);
- 	} else {
-@@ -2874,6 +2871,9 @@ int dw_mci_probe(struct dw_mci *host)
- 		goto err_dmaunmap;
- 	}
- 
-+	/* Now that slots are all setup, we can enable card detect */
-+	dw_mci_enable_cd(host);
-+
- 	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
- 		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
- 
--- 
-2.2.0.rc0.207.ga3a616c
+>  
+>  /* Ugh.  Need to stop exporting this to modules. */
+>  LIST_HEAD(pci_root_buses);
+> -- 
+> 1.7.1
+> 
