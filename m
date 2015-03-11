@@ -1,324 +1,255 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Mar 2015 20:39:38 +0800
-Subject: [PATCH v10 12/21] ARM64 / ACPI: Parse MADT for SMP initialization
+Date: Wed, 11 Mar 2015 20:39:39 +0800
+Subject: [PATCH v10 13/21] ACPI / processor: Introduce phys_cpuid_t for CPU
+ hardware ID
 In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1426077587-1561-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1426077587-1561-14-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MADT contains the information for MPIDR which is essential for
-SMP initialization, parse the GIC cpu interface structures to
-get the MPIDR value and map it to cpu_logical_map(), and add
-enabled cpu with valid MPIDR into cpu_possible_map.
+CPU hardware ID (phys_id) is defined as u32 in structure acpi_processor,
+but phys_id is used as int in acpi processor driver, so it will lead to
+some inconsistence for the drivers.
 
-ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and
-Parking protocol, but the Parking protocol is only specified for
-ARMv7 now, so make PSCI as the only way for the SMP boot protocol
-before some updates for the ACPI spec or the Parking protocol spec.
+Furthermore, to cater for ACPI arch ports that implement 64 bits CPU
+ids a generic CPU physical id type is required.
 
-Parking protocol patches for SMP boot will be sent to upstream when
-the new version of Parking protocol is ready.
+So introduce typedef u32 phys_cpuid_t for x86 and ia64, and introduce
+a macro CPU_PHYS_ID_INVALID as (u32)(-1), use phys_cpuid_t when phys_id
+defined in acpi processor driver, and replace CPU_PHYS_ID_INVALID as -1
+for phys_id, this will solve the inconsistence in acpi processor driver,
+and will prepare for the ACPI on ARM64 for the 64 bit CPU hardware ID
+in the following patch.
 
-CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Jon Masters <jcm@redhat.com>
-Tested-by: Timur Tabi <timur@codeaurora.org>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Olof Johansson <olof@lixom.net>
+CC: Rafael J Wysocki <rjw@rjwysocki.net>
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+[hj: reworked cpu physid map return codes]
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- arch/arm64/include/asm/acpi.h    |   2 +
- arch/arm64/include/asm/cpu_ops.h |   1 +
- arch/arm64/include/asm/smp.h     |   5 +-
- arch/arm64/kernel/acpi.c         | 149 ++++++++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/cpu_ops.c      |   2 +-
- arch/arm64/kernel/setup.c        |   7 +-
- arch/arm64/kernel/smp.c          |   2 +-
- 7 files changed, 160 insertions(+), 8 deletions(-)
+ arch/ia64/kernel/acpi.c       |  2 +-
+ arch/x86/kernel/acpi/boot.c   |  2 +-
+ drivers/acpi/acpi_processor.c |  7 ++++---
+ drivers/acpi/processor_core.c | 30 +++++++++++++++---------------
+ include/acpi/processor.h      |  6 +++---
+ include/linux/acpi.h          |  7 ++++++-
+ 6 files changed, 30 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 9ea650c..9719921 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -71,10 +71,12 @@ static inline bool acpi_has_cpu_in_madt(void)
+diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
+index 2c44989..067ef44 100644
+--- a/arch/ia64/kernel/acpi.c
++++ b/arch/ia64/kernel/acpi.c
+@@ -887,7 +887,7 @@ static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
  }
  
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
-+void __init acpi_init_cpus(void);
- 
- #else
- static inline bool acpi_psci_present(void) { return false; }
- static inline bool acpi_psci_use_hvc(void) { return false; }
-+static inline void acpi_init_cpus(void) { }
- #endif /* CONFIG_ACPI */
- 
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
-index da301ee..5a31d67 100644
---- a/arch/arm64/include/asm/cpu_ops.h
-+++ b/arch/arm64/include/asm/cpu_ops.h
-@@ -66,5 +66,6 @@ struct cpu_operations {
- extern const struct cpu_operations *cpu_ops[NR_CPUS];
- int __init cpu_read_ops(struct device_node *dn, int cpu);
- void __init cpu_read_bootcpu_ops(void);
-+const struct cpu_operations *cpu_get_ops(const char *name);
- 
- #endif /* ifndef __ASM_CPU_OPS_H */
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 780f82c..bf22650 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -39,9 +39,10 @@ extern void show_ipi_list(struct seq_file *p, int prec);
- extern void handle_IPI(int ipinr, struct pt_regs *regs);
- 
- /*
-- * Setup the set of possible CPUs (via set_cpu_possible)
-+ * Discover the set of possible CPUs and determine their
-+ * SMP operations.
-  */
--extern void smp_init_cpus(void);
-+extern void of_smp_init_cpus(void);
- 
- /*
-  * Provide a function to raise an IPI cross call on CPUs in callmap.
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 2269e30..c9203c0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -25,6 +25,10 @@
- #include <linux/of_fdt.h>
- #include <linux/smp.h>
- 
-+#include <asm/cputype.h>
-+#include <asm/cpu_ops.h>
-+#include <asm/smp_plat.h>
-+
- int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
- int acpi_disabled = 1;
- EXPORT_SYMBOL(acpi_disabled);
-@@ -32,6 +36,12 @@ EXPORT_SYMBOL(acpi_disabled);
- int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
- EXPORT_SYMBOL(acpi_pci_disabled);
- 
-+/* Processors with enabled flag and sane MPIDR */
-+static int enabled_cpus;
-+
-+/* Boot CPU is valid or not in MADT */
-+static bool bootcpu_valid  __initdata;
-+
- static bool param_acpi_off __initdata;
- static bool param_acpi_force __initdata;
- 
-@@ -85,6 +95,129 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
- 	early_memunmap(map, size);
+ /* wrapper to silence section mismatch warning */
+-int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
++int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
+ {
+ 	return _acpi_map_lsapic(handle, physid, pcpu);
+ }
+diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+index 3d525c6..e4f8582 100644
+--- a/arch/x86/kernel/acpi/boot.c
++++ b/arch/x86/kernel/acpi/boot.c
+@@ -757,7 +757,7 @@ static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
  }
  
-+/**
-+ * acpi_map_gic_cpu_interface - generates a logical cpu number
-+ * and map to MPIDR represented by GICC structure
-+ * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
-+ * @enabled: this cpu is enabled or not
-+ *
-+ * Returns the logical cpu number which maps to MPIDR
-+ */
-+static int __init acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
-+{
-+	int i;
-+
-+	if (mpidr == INVALID_HWID) {
-+		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
-+		return -EINVAL;
-+	}
-+
-+	total_cpus++;
-+	if (!enabled)
-+		return -EINVAL;
-+
-+	if (enabled_cpus >=  NR_CPUS) {
-+		pr_warn("NR_CPUS limit of %d reached, Processor %d/0x%llx ignored.\n",
-+			NR_CPUS, total_cpus, mpidr);
-+		return -EINVAL;
-+	}
-+
-+	/* Check if GICC structure of boot CPU is available in the MADT */
-+	if (cpu_logical_map(0) == mpidr) {
-+		if (bootcpu_valid) {
-+			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
-+			       mpidr);
-+			return -EINVAL;
-+		}
-+
-+		bootcpu_valid = true;
-+	}
-+
-+	/*
-+	 * Duplicate MPIDRs are a recipe for disaster. Scan
-+	 * all initialized entries and check for
-+	 * duplicates. If any is found just ignore the CPU.
-+	 */
-+	for (i = 1; i < enabled_cpus; i++) {
-+		if (cpu_logical_map(i) == mpidr) {
-+			pr_err("Firmware bug, duplicate CPU MPIDR: 0x%llx in MADT\n",
-+			       mpidr);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	if (!acpi_psci_present())
-+		return -EOPNOTSUPP;
-+
-+	cpu_ops[enabled_cpus] = cpu_get_ops("psci");
-+	/* CPU 0 was already initialized */
-+	if (enabled_cpus) {
-+		if (!cpu_ops[enabled_cpus])
-+			return -EINVAL;
-+
-+		if (cpu_ops[enabled_cpus]->cpu_init(NULL, enabled_cpus))
-+			return -EOPNOTSUPP;
-+
-+		/* map the logical cpu id to cpu MPIDR */
-+		cpu_logical_map(enabled_cpus) = mpidr;
-+	}
-+
-+	enabled_cpus++;
-+	return enabled_cpus;
-+}
-+
-+static int __init
-+acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-+				const unsigned long end)
-+{
-+	struct acpi_madt_generic_interrupt *processor;
-+
-+	processor = (struct acpi_madt_generic_interrupt *)header;
-+
-+	if (BAD_MADT_ENTRY(processor, end))
-+		return -EINVAL;
-+
-+	acpi_table_print_madt_entry(header);
-+
-+	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
-+		processor->flags & ACPI_MADT_ENABLED);
-+
-+	return 0;
-+}
-+
-+/* Parse GIC cpu interface entries in MADT for SMP init */
-+void __init acpi_init_cpus(void)
-+{
-+	int count, i;
-+
-+	/*
-+	 * do a partial walk of MADT to determine how many CPUs
-+	 * we have including disabled CPUs, and get information
-+	 * we need for SMP init
-+	 */
-+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-+			acpi_parse_gic_cpu_interface, 0);
-+
-+	if (!count) {
-+		pr_err("No GIC CPU interface entries present\n");
-+		return;
-+	} else if (count < 0) {
-+		pr_err("Error parsing GIC CPU interface entry\n");
-+		return;
-+	}
-+
-+	if (!bootcpu_valid) {
-+		pr_err("MADT missing boot CPU MPIDR, not enabling secondaries\n");
-+		return;
-+	}
-+
-+	for (i = 0; i < enabled_cpus; i++)
-+		set_cpu_possible(i, true);
-+
-+	/* Make boot-up look pretty */
-+	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
-+}
-+
- static int __init acpi_parse_fadt(struct acpi_table_header *table)
+ /* wrapper to silence section mismatch warning */
+-int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
++int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
  {
- 	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-@@ -96,8 +229,20 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
- 	 * boot protocol configuration data, or we will disable ACPI.
- 	 */
- 	if (table->revision > 5 ||
--	    (table->revision == 5 && fadt->minor_revision >= 1))
--		return 0;
-+	    (table->revision == 5 && fadt->minor_revision >= 1)) {
-+		/*
-+		 * ACPI 5.1 only has two explicit methods to boot up SMP,
-+		 * PSCI and Parking protocol, but the Parking protocol is
-+		 * only specified for ARMv7 now, so make PSCI as the only
-+		 * way for the SMP boot protocol before some updates for
-+		 * the Parking protocol spec.
-+		 */
-+		if (acpi_psci_present())
-+			return 0;
-+
-+		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
-+		return -EOPNOTSUPP;
-+	}
+ 	return _acpi_map_lsapic(handle, physid, pcpu);
+ }
+diff --git a/drivers/acpi/acpi_processor.c b/drivers/acpi/acpi_processor.c
+index 1020b1b..58f335c 100644
+--- a/drivers/acpi/acpi_processor.c
++++ b/drivers/acpi/acpi_processor.c
+@@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
+ 	acpi_status status;
+ 	int ret;
  
- 	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
- 		table->revision, fadt->minor_revision);
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index cce9524..fb8ff9b 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -35,7 +35,7 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
- 	NULL,
- };
+-	if (pr->phys_id == -1)
++	if (pr->phys_id == PHYS_CPUID_INVALID)
+ 		return -ENODEV;
  
--static const struct cpu_operations * __init cpu_get_ops(const char *name)
-+const struct cpu_operations * __init cpu_get_ops(const char *name)
- {
- 	const struct cpu_operations **ops = supported_cpu_ops;
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 97fa7f3..b278311 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -393,13 +393,16 @@ void __init setup_arch(char **cmdline_p)
- 	if (acpi_disabled) {
- 		unflatten_device_tree();
- 		psci_dt_init();
-+		cpu_read_bootcpu_ops();
-+#ifdef CONFIG_SMP
-+		of_smp_init_cpus();
-+#endif
- 	} else {
- 		psci_acpi_init();
-+		acpi_init_cpus();
+ 	status = acpi_evaluate_integer(pr->handle, "_STA", NULL, &sta);
+@@ -215,7 +215,8 @@ static int acpi_processor_get_info(struct acpi_device *device)
+ 	union acpi_object object = { 0 };
+ 	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
+ 	struct acpi_processor *pr = acpi_driver_data(device);
+-	int phys_id, cpu_index, device_declaration = 0;
++	phys_cpuid_t phys_id;
++	int cpu_index, device_declaration = 0;
+ 	acpi_status status = AE_OK;
+ 	static int cpu0_initialized;
+ 	unsigned long long value;
+@@ -263,7 +264,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
  	}
  
--	cpu_read_bootcpu_ops();
+ 	phys_id = acpi_get_phys_id(pr->handle, device_declaration, pr->acpi_id);
+-	if (phys_id < 0)
++	if (phys_id == PHYS_CPUID_INVALID)
+ 		acpi_handle_debug(pr->handle, "failed to get CPU physical ID.\n");
+ 	pr->phys_id = phys_id;
+ 
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 7962651..51cc299 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -32,7 +32,7 @@ static struct acpi_table_madt *get_madt_table(void)
+ }
+ 
+ static int map_lapic_id(struct acpi_subtable_header *entry,
+-		 u32 acpi_id, int *apic_id)
++		 u32 acpi_id, phys_cpuid_t *apic_id)
+ {
+ 	struct acpi_madt_local_apic *lapic =
+ 		container_of(entry, struct acpi_madt_local_apic, header);
+@@ -48,7 +48,7 @@ static int map_lapic_id(struct acpi_subtable_header *entry,
+ }
+ 
+ static int map_x2apic_id(struct acpi_subtable_header *entry,
+-			 int device_declaration, u32 acpi_id, int *apic_id)
++		int device_declaration, u32 acpi_id, phys_cpuid_t *apic_id)
+ {
+ 	struct acpi_madt_local_x2apic *apic =
+ 		container_of(entry, struct acpi_madt_local_x2apic, header);
+@@ -65,7 +65,7 @@ static int map_x2apic_id(struct acpi_subtable_header *entry,
+ }
+ 
+ static int map_lsapic_id(struct acpi_subtable_header *entry,
+-		int device_declaration, u32 acpi_id, int *apic_id)
++		int device_declaration, u32 acpi_id, phys_cpuid_t *apic_id)
+ {
+ 	struct acpi_madt_local_sapic *lsapic =
+ 		container_of(entry, struct acpi_madt_local_sapic, header);
+@@ -83,10 +83,10 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+ 	return 0;
+ }
+ 
+-static int map_madt_entry(int type, u32 acpi_id)
++static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+ {
+ 	unsigned long madt_end, entry;
+-	int phys_id = -1;	/* CPU hardware ID */
++	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
+ 	struct acpi_table_madt *madt;
+ 
+ 	madt = get_madt_table();
+@@ -117,12 +117,12 @@ static int map_madt_entry(int type, u32 acpi_id)
+ 	return phys_id;
+ }
+ 
+-static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
++static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
+ {
+ 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+ 	union acpi_object *obj;
+ 	struct acpi_subtable_header *header;
+-	int phys_id = -1;
++	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;
+ 
+ 	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
+ 		goto exit;
+@@ -149,27 +149,27 @@ exit:
+ 	return phys_id;
+ }
+ 
+-int acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
++phys_cpuid_t acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
+ {
+-	int phys_id;
++	phys_cpuid_t phys_id;
+ 
+ 	phys_id = map_mat_entry(handle, type, acpi_id);
+-	if (phys_id == -1)
++	if (phys_id == PHYS_CPUID_INVALID)
+ 		phys_id = map_madt_entry(type, acpi_id);
+ 
+ 	return phys_id;
+ }
+ 
+-int acpi_map_cpuid(int phys_id, u32 acpi_id)
++int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id)
+ {
  #ifdef CONFIG_SMP
--	smp_init_cpus();
- 	smp_build_mpidr_hash();
+ 	int i;
  #endif
  
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 328b8ce..52998b7 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -322,7 +322,7 @@ void __init smp_prepare_boot_cpu(void)
-  * cpu logical map array containing MPIDR values related to logical
-  * cpus. Assumes that cpu_logical_map(0) has already been initialized.
-  */
--void __init smp_init_cpus(void)
-+void __init of_smp_init_cpus(void)
+-	if (phys_id == -1) {
++	if (phys_id == PHYS_CPUID_INVALID) {
+ 		/*
+ 		 * On UP processor, there is no _MAT or MADT table.
+-		 * So above phys_id is always set to -1.
++		 * So above phys_id is always set to PHYS_CPUID_INVALID.
+ 		 *
+ 		 * BIOS may define multiple CPU handles even for UP processor.
+ 		 * For example,
+@@ -190,7 +190,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
+ 		if (nr_cpu_ids <= 1 && acpi_id == 0)
+ 			return acpi_id;
+ 		else
+-			return phys_id;
++			return -1;
+ 	}
+ 
+ #ifdef CONFIG_SMP
+@@ -208,7 +208,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
+ 
+ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
  {
- 	struct device_node *dn = NULL;
- 	unsigned int i, cpu = 1;
+-	int phys_id;
++	phys_cpuid_t phys_id;
+ 
+ 	phys_id = acpi_get_phys_id(handle, type, acpi_id);
+ 
+diff --git a/include/acpi/processor.h b/include/acpi/processor.h
+index b95dc32..4188a4d 100644
+--- a/include/acpi/processor.h
++++ b/include/acpi/processor.h
+@@ -196,7 +196,7 @@ struct acpi_processor_flags {
+ struct acpi_processor {
+ 	acpi_handle handle;
+ 	u32 acpi_id;
+-	u32 phys_id;	/* CPU hardware ID such as APIC ID for x86 */
++	phys_cpuid_t phys_id;	/* CPU hardware ID such as APIC ID for x86 */
+ 	u32 id;		/* CPU logical ID allocated by OS */
+ 	u32 pblk;
+ 	int performance_platform_limit;
+@@ -310,8 +310,8 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
+ #endif				/* CONFIG_CPU_FREQ */
+ 
+ /* in processor_core.c */
+-int acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
+-int acpi_map_cpuid(int phys_id, u32 acpi_id);
++phys_cpuid_t acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
++int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id);
+ int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
+ 
+ /* in processor_pdc.c */
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 24c7aa8..6ec33c5 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -146,9 +146,14 @@ void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
+ int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
+ void acpi_numa_arch_fixup(void);
+ 
++#ifndef PHYS_CPUID_INVALID
++typedef u32 phys_cpuid_t;
++#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
++#endif
++
+ #ifdef CONFIG_ACPI_HOTPLUG_CPU
+ /* Arch dependent functions for cpu hotplug support */
+-int acpi_map_cpu(acpi_handle handle, int physid, int *pcpu);
++int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu);
+ int acpi_unmap_cpu(int cpu);
+ #endif /* CONFIG_ACPI_HOTPLUG_CPU */
+ 
 -- 
 1.9.1
