@@ -1,44 +1,69 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 11 Mar 2015 08:08:41 -0500
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <5396604.TRferrWZgF@wuerfel>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <20141208101026.GD27367@arm.com> <550025E0.7030008@suse.de>
- <5396604.TRferrWZgF@wuerfel>
-Message-ID: <C0CF99B1-8706-4D9B-87E0-13A7C6C619D6@suse.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 11 Mar 2015 14:08:28 +0100
+Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
+In-Reply-To: <CALszF6DENRS2L8mHD_iPsPwbAZndbHoB10oHaJ8-E4ajhog=8w@mail.gmail.com>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2383270.cAJPOxrkvo@wuerfel>
+ <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
+ <2455342.zT71E5iyaL@wuerfel>
+ <CALszF6DENRS2L8mHD_iPsPwbAZndbHoB10oHaJ8-E4ajhog=8w@mail.gmail.com>
+Message-ID: <1426079308.3101.57.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-> Am 11.03.2015 um 07:47 schrieb Arnd Bergmann <arnd@arndb.de>:
+Am Dienstag, den 10.03.2015, 22:20 +0100 schrieb Maxime Coquelin:
+> 2015-03-10 21:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Tuesday 10 March 2015 16:44:24 Maxime Coquelin wrote:
+> >> 2015-03-10 16:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+> >> > On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
+> >> >> +/* AHB1 */
+> >> >> +#define GPIOA_RESET    0
+> >> >> +#define GPIOB_RESET    1
+> >> >> +#define GPIOC_RESET    2
+> >> >> +#define GPIOD_RESET    3
+> >> >> +#define GPIOE_RESET    4
+> >> >> +#define GPIOF_RESET    5
+> >> >> +#define GPIOG_RESET    6
+> >> >> +#define GPIOH_RESET    7
+> >> >> +#define GPIOI_RESET    8
+> >> >> +#define GPIOJ_RESET    9
+> >> >> +#define GPIOK_RESET    10
+> >> >>
+> >> >
+> >> > As these are just the hardware numbers, it's better to not make them
+> >> > part of the binding at all. Instead, just document in the binding that
+> >> > one is supposed to pass the hardware number as the argument.
+> >>
+> >> The reset controller is part of the RCC (Reset & Clock Controller) IP.
+> >> In this version, I only provided the reset registers to the reset
+> >> controller driver, but as per Andreas F?rber remark, I should avec a
+> >> single DT node for both the resets and clocks.
+> >>
+> >> In the next version I am preparing, the defines doesn't look as
+> >> trivial as in this version, GPIOA_RESET being 128 for instance.
+> >>
+> >> Is it fine for you if I keep the defines part of the binding?
+> >>
+> >>
+> >
+> > It's always better to avoid these files entirely, as they are
+> > a frequent source of merge dependencies, and they make it less
+> > obvious what's going on than having binary values in the dtb
+> > that make sense.
 > 
->> On Wednesday 11 March 2015 06:24:16 Alexander Graf wrote:
->> So after recompiling all of the distribution with newer binutils we now
->> have an openSUSE Factory tree that has 64k aligned 32bit binaries.
->> 
->> Unfortunately however, the 32bit glibc has a bogus mmap() implementation
->> that hard codes 4k page size.
->> 
->> With the patch below applied to glibc, I can successfully run 32bit user
->> space on Seattle with 64k PAGE_SIZE though. So I guess we'll need to fix
->> up glibc next.
->> 
->> Do you know of anyone who's fluent enough in 32bit ARM assembly to
->> convert the hard coded assumptions in there to instead use a variable
->> that takes the actual host page size into account?
+> I agree it is always painful to have to have to manage these merge dependencies.
+> What I will do, if Philipp agrees, is to list all the values in the
+> binding documentation.
 > 
-> I believe this is a kernel bug, and the kernel API for 32-bit emulation
-> should always take the pgoff argument in 4KB units instead of PAGE_SIZE
-> units, see the implementation of sys_mmap2 in
-> arch/powerpc/kernel/sys_ppc32.c.
-> 
-> All user space programs that call mmap2 still need to make sure that
-> their arguments are PAGE_SIZE aligned, but the libc need not care
-> about this here.
+> Doing that, the user of a reset won't have to do the calculation, and
+> no more merge dependencies.
 
-Awesome, that makes my life a lot easier. Let me cook up a patch that fixes the compat mmap call later today :).
+I'd prefer to have #defines for the reset bits if they are named in the
+documentation and use the names in the dts. But if you want to reference
+reset bits by number in the device tree instead, I won't insist.
 
+Consider using two cells in the phandle for register and bit offset
+instead of a single number that arbitrarily starts at 128.
 
-Alex
+regards
+Philipp
