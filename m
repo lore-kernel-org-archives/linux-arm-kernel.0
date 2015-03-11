@@ -1,66 +1,77 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 11 Mar 2015 19:06:57 +0000
-Subject: [PATCH v2 4/5] ARM: add 32bit support to GICv3
-In-Reply-To: <550056B2.90505@arm.com>
-References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
- <1425320432-6325-5-git-send-email-jean-philippe.brucker@arm.com>
- <550056B2.90505@arm.com>
-Message-ID: <20150311190657.GA2271@e106794-lin.cambridge.arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 11 Mar 2015 21:08:58 +0200
+Subject: [PATCHv3 34/35] ARM: dts: dra7: add system control module node
+In-Reply-To: <20150311171708.GB5264@atomide.com>
+References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
+ <1424891085-10392-35-git-send-email-t-kristo@ti.com>
+ <20150311171708.GB5264@atomide.com>
+Message-ID: <550092CA.9030008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 02:52:34PM +0000, Vladimir Murzin wrote:
-> Hi Jean,
-> 
-> On 02/03/15 18:20, Jean-Philippe Brucker wrote:
-> > Implement the system and memory-mapped register accesses in
-> > asm/arch_gicv3.h for 32bit architectures.
-> > 
-> > This patch is a straightforward translation of the arm64 header. 64bit
-> > accesses are done in two times and don't need atomicity: TYPER is
-> > read-only, and the upper-word of IROUTER is always zero on 32bit
-> > architectures.
-> > 
-> > Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> > ---
-> >  arch/arm/include/asm/arch_gicv3.h | 182 ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 182 insertions(+)
-> >  create mode 100644 arch/arm/include/asm/arch_gicv3.h
-> > 
-> > diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-> > new file mode 100644
-> > index 0000000..c2c3603
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/arch_gicv3.h
-> > @@ -0,0 +1,182 @@
+On 03/11/2015 07:17 PM, Tony Lindgren wrote:
+> Hi Tero,
+>
+> * Tero Kristo <t-kristo@ti.com> [150225 11:09]:
+>> Add node for system control module, and move all the existing system
+>> control IO space users under this new node as its children. A new node
+>> for scm_conf area is also added.
+> ...
+>
+>> --- a/arch/arm/boot/dts/dra7.dtsi
+>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>> @@ -203,26 +203,47 @@
+>>   			};
+>>   		};
+>>
+>> +		scm: scm at 4a002000 {
+>> +			compatible = "ti,dra7-ctrl", "simple-bus";
+>> +			reg = <0x4a002000 0x1400>,
+>> +			      <0x4a003400 0x600>,
+>> +			      <0x4ae0c000 0x600>;
+>> +			#address-cells = <2>;
+>> +			#size-cells = <1>;
+>> +			ranges = <0 0 0x4a002000 0x1400>,
+>> +				 <1 0 0x4a003400 0x600>,
+>> +				 <2 0 0x4ae0c000 0x600>;
+>> +
+>> +			scm_conf: tisyscon at 0,0 {
+>> +				compatible = "syscon";
+>> +				reg = <0 0x0 0x1400>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <1>;
+>> +			};
+>> +
+>> +			dra7_pmx_core: pinmux at 1,0 {
+>> +				compatible = "ti,dra7-padconf",
+>> +					     "pinctrl-single";
+>> +				reg = <1 0x0 0x0464>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +				#interrupt-cells = <1>;
+>> +				interrupt-controller;
+>> +				pinctrl-single,register-width = <32>;
+>> +				pinctrl-single,function-mask = <0x3fffffff>;
+>> +			};
+>> +		};
+>
+> Wouldn't it make more sense to have separate device_scm, core_scm and
+> wkup_scm instead of stuffing multiple ranges here?
+ >
+> Or are there other reasons for the multiple ranges?
 
-[...]
+Yea that was the alternative I was thinking about, I ended up with this 
+for some reason. I think personally I liked having them all under the 
+same SCM part, because they are nicely grouped then, and well, its the 
+same system control part in the chip. We can split it up easily of 
+course. Should we have a higher level scm part and then have core_scm 
+and wkup_scm under this followed by the sub-functions, or just drop the 
+top level scm part completely?
 
-> > +static inline void gic_write_sre(u32 val)
-> > +{
-> > +	asm volatile("mcr " __stringify(ICC_SRE) : : "r" (val));
-> > +	isb();
-> > +}
-> > +
-> > +/*
-> > + * Even in 32bit systems that use LPAE, there is no guarantee that the I/O
-> > + * interface provides true 64bit atomic accesses, so using strd/ldrd doesn't
-> > + * make much sense.
-> > + * Moreover, 64bit I/O emulation is extremely difficult to implement on
-> > + * AArch32, since the syndrome register doesn't provide any information for
-> > + * them.
-> > + * Consequently, the following IO helpers use 32bit accesses.
-> > + *
-> > + * There are only two registers that need 64bit accesses in this driver:
-> > + * - GICD_IROUTERn, contain the affinity values associated to each interrupt.
-> > + *   The upper-word (aff3) will always be 0, so there is no need for a lock.
-> > + * - GICR_TYPER is an ID register and doesn't need atomicity.
-> > + */
-> > +static void gic_write_irouter(u64 val, volatile void __iomem *addr)
-> 
-> Any reason not to be inlined like other functions do?
-> 
-No, it should be inlined. Good catch!
+This same question applies to omap4 + omap5 also. In some part for omap3 
+also, as it also has pmx_core + pmx_wkup separately, even if they are 
+part of the same register space.
 
-Thanks,
-Jean
+Anyway, just a political decision from your side, I am fine either way. :)
+
+-Tero
