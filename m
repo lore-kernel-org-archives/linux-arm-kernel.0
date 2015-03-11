@@ -1,36 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 15:34:30 +0100
-Subject: [GIT PULL] at91: fixes for 4.0 #2
-In-Reply-To: <1425553155-30407-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1425553155-30407-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <3359075.L2gzEY5Xgg@wuerfel>
+Date: Wed, 11 Mar 2015 15:37:34 +0100
+Subject: [PATCH][RESEND] ARM: vexpress: update CONFIG_USB_ISP1760 option
+In-Reply-To: <1425925669-8561-1-git-send-email-sudeep.holla@arm.com>
+References: <1425925669-8561-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <2270067.EVeXEFvz96@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 March 2015 11:59:15 Nicolas Ferre wrote:
-> Another batch of fixes that I have now, so it doesn't make sense to hold them
-> more.
+On Monday 09 March 2015 18:27:49 Sudeep Holla wrote:
+> Commit 7ef077a8ad35 ("usb: isp1760: Move driver from drivers/usb/host/
+> to drivers/usb/isp1760/") moved the isp1760 driver and changed the
+> Kconfig option. This makes CONFIG_USB_ISP1760_HCD not selectable
+> directly anymore. This results in driver being not compiled in when
+> using vexpress_defconfig and the USB is non-functional.
 > 
-> Thanks, best regards,
-> 
-> The following changes since commit 2141102e045e622cac176891cb66c5bf08e439f5:
-> 
->   ARM: at91/dt: keep watchdog running in idle mode (2015-03-04 11:20:52 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes2
-> 
-> for you to fetch changes up to 5957457a2d96e4c9b2fecd40f29cdb3bb841d75e:
-> 
->   ARM: at91/pm: MOR register KEY was missing (2015-03-05 11:43:02 +0100)
-> 
-> ----------------------------------------------------------------
-> Second fixes batch for AT91 on 4.0:
-> - little fix for !MMU debug: may also help for randconfig
-> - fix of 2 errors in LCD clock definitions
-> - in PM code, not writing the key leads to not execute the action
-> 
+> This patch updates the CONFIG_USB_ISP1760_HCD to CONFIG_USB_ISP1760 to
+> get back USB functional on vexpress platforms.
 > 
 
 Pulled into fixes, thanks!
