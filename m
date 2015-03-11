@@ -1,67 +1,112 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 21:31:42 +0100
-Subject: [PATCHv1] rtc: bcm-iproc: Add support for Broadcom iproc rtc
-In-Reply-To: <55009ED6.4050205@broadcom.com>
-References: <1418757750-3628-1-git-send-email-arun.ramamurthy@broadcom.com>
- <2216310.NqXA88JvvL@wuerfel> <55009ED6.4050205@broadcom.com>
-Message-ID: <3192051.z32dL5alyl@wuerfel>
+Date: Wed, 11 Mar 2015 22:46:59 +0100
+Subject: [PATCH v2] rds: avoid potential stack overflow
+Message-ID: <4321699.nNdBmxDHpu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 13:00:22 Arun Ramamurthy wrote:
-> 
-> Arnd, this is the device tree entry that I would end up with and I plan 
-> to use syscon_regmap_lookup_by_phandle in the rtc driver. Does this look 
-> acceptable?
-> 
-> rtc: iproc_rtc at 0x03026000 {
->                 compatible = "brcm,iproc-rtc";
->                 reg =   <0x03026000 0xC>,
->                 iso_cell_syscon = <&crmu_iso_cell_control>;
->                 bbl_auth_syscon = <&crmu_bbl_auth>
->                 status = "okay";
-> 
-> crmu_iso_cell_control:crmu at 0x0301C02C {
->                 compatible = "syscon";
->                 reg = <0x0301C038 0x8>
-> }
-> 
-> crmu_bbl_auth:crmu at 0x03024C74 {
->                 compatible = "syscon";
->                 reg = <0x03024C74 0x8>;
-> }
+The rds_iw_update_cm_id function stores a large 'struct rds_sock' object
+on the stack in order to pass a pair of addresses. This happens to just
+fit withint the 1024 byte stack size warning limit on x86, but just
+exceed that limit on ARM, which gives us this warning:
 
-This doesn't look right, sorry:
+net/rds/iw_rdma.c:200:1: warning: the frame size of 1056 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 
-A syscon device is defined as a collection of registers that
-have no logical grouping within them but that can be seen
-as a single device. What you have here instead are two syscon
-nodes that each have only a single 8-byte register.
+As the use of this large variable is basically bogus, we can rearrange
+the code to not do that. Instead of passing an rds socket into
+rds_iw_get_device, we now just pass the two addresses that we have
+available in rds_iw_update_cm_id, and we change rds_iw_get_mr accordingly,
+to create two address structures on the stack there.
 
-What are the other registers surrounding those? I would expect
-something like
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: fix incorrect commit message
 
-	crmu0: syscon at 03010000 {
-                 compatible = "syscon";
-                 reg = <0x03010000 0x10000>;
-	};
-
-and then use an offset into the syscon from the rtc node, like
-
-	iproc_rtc: rtc at 03026000 {
-		compatible = "brcm,iproc-rtc";
-		reg = <0x03026000 0x1000>;
-		iso_cell_syscon = <&crmu0 0xc038>;
-		bbl_auth_syscon = <&crmu1 0x4c74>;
-	};
-
-Note also that you got most of the naming wrong:
-
-- node names should be generic strings like "rtc", "syscon", "pci" etc.
-  The specific strings are defined in ePAPR.
-- unit addresses should match the first 'reg' property and
-  not start with '0x'.
-- it seems strange that the rtc has only 12 bytes of registers,
-  though that may actually be correct.
-
-	Arnd
+diff --git a/net/rds/iw_rdma.c b/net/rds/iw_rdma.c
+index a817705ce2d0..dba8d0864f18 100644
+--- a/net/rds/iw_rdma.c
++++ b/net/rds/iw_rdma.c
+@@ -88,7 +88,9 @@ static unsigned int rds_iw_unmap_fastreg_list(struct rds_iw_mr_pool *pool,
+ 			int *unpinned);
+ static void rds_iw_destroy_fastreg(struct rds_iw_mr_pool *pool, struct rds_iw_mr *ibmr);
+ 
+-static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwdev, struct rdma_cm_id **cm_id)
++static int rds_iw_get_device(struct sockaddr_in *src, struct sockaddr_in *dst,
++			     struct rds_iw_device **rds_iwdev,
++			     struct rdma_cm_id **cm_id)
+ {
+ 	struct rds_iw_device *iwdev;
+ 	struct rds_iw_cm_id *i_cm_id;
+@@ -112,15 +114,15 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
+ 				src_addr->sin_port,
+ 				dst_addr->sin_addr.s_addr,
+ 				dst_addr->sin_port,
+-				rs->rs_bound_addr,
+-				rs->rs_bound_port,
+-				rs->rs_conn_addr,
+-				rs->rs_conn_port);
++				src->sin_addr.s_addr,
++				src->sin_port,
++				dst->sin_addr.s_addr,
++				dst->sin_port);
+ #ifdef WORKING_TUPLE_DETECTION
+-			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr &&
+-			    src_addr->sin_port == rs->rs_bound_port &&
+-			    dst_addr->sin_addr.s_addr == rs->rs_conn_addr &&
+-			    dst_addr->sin_port == rs->rs_conn_port) {
++			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr &&
++			    src_addr->sin_port == src->sin_port &&
++			    dst_addr->sin_addr.s_addr == dst->sin_addr.s_addr &&
++			    dst_addr->sin_port == dst->sin_port) {
+ #else
+ 			/* FIXME - needs to compare the local and remote
+ 			 * ipaddr/port tuple, but the ipaddr is the only
+@@ -128,7 +130,7 @@ static int rds_iw_get_device(struct rds_sock *rs, struct rds_iw_device **rds_iwd
+ 			 * zero'ed.  It doesn't appear to be properly populated
+ 			 * during connection setup...
+ 			 */
+-			if (src_addr->sin_addr.s_addr == rs->rs_bound_addr) {
++			if (src_addr->sin_addr.s_addr == src->sin_addr.s_addr) {
+ #endif
+ 				spin_unlock_irq(&iwdev->spinlock);
+ 				*rds_iwdev = iwdev;
+@@ -180,19 +182,13 @@ int rds_iw_update_cm_id(struct rds_iw_device *rds_iwdev, struct rdma_cm_id *cm_i
+ {
+ 	struct sockaddr_in *src_addr, *dst_addr;
+ 	struct rds_iw_device *rds_iwdev_old;
+-	struct rds_sock rs;
+ 	struct rdma_cm_id *pcm_id;
+ 	int rc;
+ 
+ 	src_addr = (struct sockaddr_in *)&cm_id->route.addr.src_addr;
+ 	dst_addr = (struct sockaddr_in *)&cm_id->route.addr.dst_addr;
+ 
+-	rs.rs_bound_addr = src_addr->sin_addr.s_addr;
+-	rs.rs_bound_port = src_addr->sin_port;
+-	rs.rs_conn_addr = dst_addr->sin_addr.s_addr;
+-	rs.rs_conn_port = dst_addr->sin_port;
+-
+-	rc = rds_iw_get_device(&rs, &rds_iwdev_old, &pcm_id);
++	rc = rds_iw_get_device(src_addr, dst_addr, &rds_iwdev_old, &pcm_id);
+ 	if (rc)
+ 		rds_iw_remove_cm_id(rds_iwdev, cm_id);
+ 
+@@ -598,9 +594,17 @@ void *rds_iw_get_mr(struct scatterlist *sg, unsigned long nents,
+ 	struct rds_iw_device *rds_iwdev;
+ 	struct rds_iw_mr *ibmr = NULL;
+ 	struct rdma_cm_id *cm_id;
++	struct sockaddr_in src = {
++		.sin_addr.s_addr = rs->rs_bound_addr,
++		.sin_port = rs->rs_bound_port,
++	};
++	struct sockaddr_in dst = {
++		.sin_addr.s_addr = rs->rs_conn_addr,
++		.sin_port = rs->rs_conn_port,
++	};
+ 	int ret;
+ 
+-	ret = rds_iw_get_device(rs, &rds_iwdev, &cm_id);
++	ret = rds_iw_get_device(&src, &dst, &rds_iwdev, &cm_id);
+ 	if (ret || !cm_id) {
+ 		ret = -ENODEV;
+ 		goto out;
