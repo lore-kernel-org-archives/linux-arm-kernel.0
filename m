@@ -1,26 +1,46 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 11 Mar 2015 13:11:35 -0500
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <mvmtwxrcy81.fsf@hawking.suse.de>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>	<C0CF99B1-8706-4D9B-87E0-13A7C6C619D6@suse.de>	<mvmegovejx0.fsf@hawking.suse.de>
- <2583329.jVX0TanYzO@wuerfel>	<mvma8zjeixd.fsf@hawking.suse.de>
- <550062D6.3000101@suse.de> <mvmtwxrcy81.fsf@hawking.suse.de>
-Message-ID: <55008557.3000200@suse.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 11 Mar 2015 11:16:15 -0700
+Subject: [RFC PATCH v15 04/11] ARM: cpuidle: Register cpuidle_ops for
+ QCOM cpus
+In-Reply-To: <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <5500866F.6080704@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/09/15 08:16, Lina Iyer wrote:
+> Register cpuidle ops for Krait Processor Sub-System.
+> Supports v1 and v2 versions of KPSS.
+>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  arch/arm/include/asm/cpuidle_ops.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/cpuidle_ops.h b/arch/arm/include/asm/cpuidle_ops.h
+> index be0a612..40cb262 100644
+> --- a/arch/arm/include/asm/cpuidle_ops.h
+> +++ b/arch/arm/include/asm/cpuidle_ops.h
+> @@ -1,3 +1,8 @@
+>  /*
+>   * List of cpuidle operations
+>   */
+> +
+> +#if IS_ENABLED(CONFIG_QCOM_PM)
+
+Why not #ifdef CONFIG_QCOM_PM? I thought IS_ENABLED was for C code where
+you want to put it in an if () statement.
+
+> +CPUIDLE_OPS(qcom_kpss_v1)
+> +CPUIDLE_OPS(qcom_kpss_v2)
+> +#endif
 
 
-On 11.03.15 11:09, Andreas Schwab wrote:
-> Alexander Graf <agraf@suse.de> writes:
-> 
->> Andreas, would you like to send this upstream as a proper top-level
->> patch or would you prefer if I do a patch set with the 2 patches (enable
->> CONFIG_COMPAT on 64k PAGE_SIZE and your patch)?
-> 
-> They only make sense in combination, so go for the patch set.
-
-Ok, can you please give me a signed-off-by line for your patch then? :)
-
-
-Alex
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
