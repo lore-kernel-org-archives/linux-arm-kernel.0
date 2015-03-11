@@ -1,39 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 11 Mar 2015 09:02:17 -0700
-Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
-In-Reply-To: <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
- (Lorenzo Pieralisi's message of "Tue, 10 Mar 2015 17:31:22 +0000")
-References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <7hh9try12u.fsf@deeprootsystems.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 11 Mar 2015 09:05:20 -0700
+Subject: [PATCH -next] pinctrl: mediatek: Fix include directive
+Message-ID: <1426089920-24818-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+Fix the following build failure:
 
-> When a CPU is being profiled through PMU events and it enters suspend
-> or idle states, the PMU registers content can be lost, which means that
-> counters that were relied upon on power down entry are reset on power
-> up to values that are incosistent with the profile session.
->
-> This patch adds a CPU PM notifier to arm64 perf code, that detects
-> on entry if events are being monitored, and if so, it returns
-> failure to the CPU PM notification chain, causing the suspend
-> thread or the idle thread to abort power down, therefore preventing
-> registers content loss.
->
-> By triggering CPU PM notification failure this patch prevents
-> suspending a system if the suspend thread is being profiled and
-> it also prevents entering idle deep states on cores that have profile
-> events in use, somehow limiting power management capabilities when
-> there are active perf sessions.
+In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
+drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error:
+	pinctrl-mtk-common.h: No such file or directory
 
-I guess that's one choice.  Couldn't you also stop the PMU and
-save/restore it's context in the notifiers? so that you wouldn't affect
-PM capabilities?
+seen when building arm:multi_v7_defconfig.
 
-That would imply that you lose the ability to profile after a certain
-point in suspend/idle, but maybe that's a better trade off than having
-profiling disable certain PM features?
+Fixes: 94097d89c145 ("pinctrl: mediatek: Add Pinctrl/GPIO driver for mt8135.")
+Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+ drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Kevin
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+index 5019cef..e17aedb 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+@@ -16,7 +16,7 @@
+ #define __PINCTRL_MTK_MT8135_H
+ 
+ #include <linux/pinctrl/pinctrl.h>
+-#include <pinctrl-mtk-common.h>
++#include "pinctrl-mtk-common.h"
+ 
+ static const struct mtk_desc_pin mtk_pins_mt8135[] = {
+ 	MTK_PIN(
+-- 
+2.1.0
