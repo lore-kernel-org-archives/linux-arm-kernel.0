@@ -1,24 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 23:01:44 +0100
-Subject: [PATCH v8 0/2] Add Spreadtrum Sharkl64 Platform support
-In-Reply-To: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <5111739.CpgUXH2iat@wuerfel>
+Date: Wed, 11 Mar 2015 23:03:03 +0100
+Subject: [GIT PULL] ARM: mvebu: cleanup changes for v4.1
+In-Reply-To: <54FDF7A4.4030401@free-electrons.com>
+References: <54FDF7A4.4030401@free-electrons.com>
+Message-ID: <2173871.t6V8DfOsuY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 02:27:08 Chunyan Zhang wrote:
-> This patchset adds Spreadtrum's Sharkl64 support in arm64 device tree.
+On Monday 09 March 2015 20:42:28 Gregory CLEMENT wrote:
+> Hi,
 > 
-> Changes from v7:
->         - Added Mark Rutland's Acked-by
->         - Rebased v4.0-rc1
+> Here is the first pull request for cleanup for mvebu for v4.1
+> 
+> Gregory
+> 
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.1
+> 
+> for you to fetch changes up to bc2d7a58b9a48e4c1f35fadb30223ca87c59d50f:
+> 
+>   ARM: mvebu: add __initconst specifiers on DT_MACHINE_START dt_compat tables (2015-03-04 14:56:21 +0100)
+> 
+> ----------------------------------------------------------------
+> mvebu clean-up changes for v4.1 (part #1)
+> 
+> - Constify the dt_compat table in DT_MACHINE_START
 > 
 
-Applied both to next/arm64.
-
-I had some trouble applying the patches because of broken end-of-line
-markers and had to edit the patch manually. Please check what went
-wrong there so you can avoid the problem in the future. Thanks!
+Pulled into next/cleanup, thanks!
 
 	Arnd
