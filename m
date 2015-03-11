@@ -1,53 +1,51 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 11 Mar 2015 16:13:05 +0100
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <550058BE.3060406@list.ru>
-References: <54FF21BE.2040506@list.ru> <550038C9.7010807@free-electrons.com>
- <20150311131433.GC8656@n2100.arm.linux.org.uk> <550058BE.3060406@list.ru>
-Message-ID: <55005B81.9020103@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Mar 2015 08:11:38 -0700
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CAB3XZEfi49qMsB7A3p4Y7r9emzSbeyUGVy4-njzey1UnJU0qzA@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <6286151.8rcX893TN6@wuerfel>
+ <CABxcv=mPVxW=BqL2PUL=AtS74kcqMG1yxC1WqMpxGiNOqGAnyQ@mail.gmail.com>
+ <2353601.si5uCETVn2@wuerfel>
+ <CABxcv==yx3dy-beEF9cf1mKo1vjCh_LU6iLuvn1z-SKz9xG0qA@mail.gmail.com>
+ <CAB3XZEfi49qMsB7A3p4Y7r9emzSbeyUGVy4-njzey1UnJU0qzA@mail.gmail.com>
+Message-ID: <20150311151138.GU5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 16:01, Stas Sergeev wrote:
-> 11.03.2015 16:14, Russell King - ARM Linux ?????:
->> On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
->>> Hi Stas,
->>>
->>> On 10/03/2015 17:54, Stas Sergeev wrote:
->>>> Hello, the patch below is needed for a successful boot on armada-xp.
->>>>
->>> I am really surprised by this patch because I used the Armada XP based
->>> board in a daily base and I never saw this issue.
->> Can you provide some details about your board - does it have 8GB of
->> memory, ranging from 0-0xf0000000, and 4G-8G ?
-> I wonder about this 256Mb memory hole.
-
-This is where the SoC registers are.
-
-> There is only one dimm for whole 8Gb.
-> It seems 0xf000000-0xffffffff is used for PCI though:
-> ---
+* Eliad Peller <eliad@wizery.com> [150311 06:39]:
+> On Wed, Mar 11, 2015 at 3:21 PM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+> > On Wed, Mar 11, 2015 at 2:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Wednesday 11 March 2015 14:07:11 Javier Martinez Canillas wrote:
+> >>>
+> >>> Right now it seems that all boards in mainline with a WiLink6 part are
+> >>> using internal clocks. So as a first step I think that adding an
+> >>> optional refclock-frequency and tcxoclock-frequency properties should
+> >>> be enough.
+> >>>
+> >>> It would be good if the driver supports getting the refclock and
+> >>> tcxoclock from an external provider in case a board gets these from
+> >>> external clocks but that can be done as a followup if there are boards
+> >>> in the future using that design.
+> >>>
+> >>> But please bear in mind that I'm not familiar with the clock handling
+> >>> in WiLink6 since the WiLink8 part used in the IGEP boards does not
+> >>> need these clocks and I only looked at Luciano's previous patches and
+> >>> the WiLink today driver today. So it would be good if Eliad can double
+> >>> check my assumptions to see if those are correct.
+> >>
+> sounds right. that's what i know as well.
 > 
-> 0xf3000000-0xf303ffff 64bit]
-> [  119.290027] pci 0000:00:00.0: BAR 2: set to [mem
-> 0xf3000000-0xf303ffff 64bit] (PCI address [0xf3000000-0xf303ffff])
-> [  119.300509] pci 0000:00:00.0: BAR 0: assigned [mem
-> 0xf3040000-0xf305ffff 64bit]
-> [  119.307883] pci 0000:00:00.0: BAR 0: set to [mem
-> 0xf3040000-0xf305ffff 64bit] (PCI address [0xf3040000-0xf305ffff])
-> [  119.318367] pci 0000:00:00.0: BAR 6: assigned [mem
-> 0xf3060000-0xf306ffff pref]
-> 
-> ---
-> 
-> Does this mean that the 256Mb of physical memory is
-> completely unaccessable on this board?
-> 
+> >> Sounds good. I'd also be fine with not implementing the case for
+> >> external clocks in the code until we need (and can test) it, but
+> >> I think it should be specified in the binding from the start.
+> >>
+> > Agreed.
+> >
+> great. so i'll implement the internal clocks case only.
 
+OK great sounds good to me also.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+
+Tony
