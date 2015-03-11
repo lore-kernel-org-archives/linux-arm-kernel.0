@@ -1,53 +1,95 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 10 Mar 2015 16:59:12 -0700
+Date: Tue, 10 Mar 2015 17:13:28 -0700
 Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
  control
-In-Reply-To: <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+In-Reply-To: <CAKohpo=90YH3TLfnMro0AQOM6_uMB_SPS9Q3j6Myz4RqqBdVHg@mail.gmail.com>
 References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
  <20150304112109.GB11010@pengutronix.de>
  <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
  <20150305074207.GC11010@pengutronix.de>
  <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
-Message-ID: <20150310235912.14952.99786@quantum>
+ <20150305091948.GH11010@pengutronix.de>
+ <CALx668X2m0hMVQumGQmhhrKnv4h1hiYp20Q4FcKuECK3mhoJiA@mail.gmail.com>
+ <20150305105104.GJ11010@pengutronix.de>
+ <CAKohpo=90YH3TLfnMro0AQOM6_uMB_SPS9Q3j6Myz4RqqBdVHg@mail.gmail.com>
+Message-ID: <20150311001328.14952.56422@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Viresh Kumar (2015-03-05 00:59:50)
-> On 5 March 2015 at 13:12, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > We have clk_set_parent for changing the parent and clk_set_rate to
-> > change the rate. Use the former for changing the parent and the latter
-> > for changing the rate. What you are interested in is changing the
-> > parent, so use clk_set_parent for this and not abuse a side effect
-> > of clk_set_rate.
+Quoting Viresh Kumar (2015-03-05 03:02:06)
+> On 5 March 2015 at 16:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Given the variance of different SoCs I don't think it makes sense
+> > to try to handle all these cases. Instead the cpufreq-dt driver
+> > should just call clk_set_rate() on the CPU clock with the desired
+> > target frequency. Everything else should be handled in the clock
+> > driver which has intimate knowledge about the SoC anyway.
 > 
-> clk_set_rate() for CPUs clock is responsible to change clock rate
-> of the CPU. Whether it plays with PLLs or muxes, its not that relevant.
-
-Agreed.
-
+> I agree..
 > 
-> > My suggestion is to take another approach. Implement clk_set_rate for
-> > these muxes and in the set_rate hook:
-> >
-> > - switch mux to intermediate PLL parent
-> > - call clk_set_rate() for the real parent PLL
-> > - switch mux back to real parent PLL
-> >
-> > This way the things happening behind the scenes are completely transparent
-> > to the cpufreq driver and you can use cpufreq-dt as is without changes.
+> @Russell: I wanted to ask you this since sometime..
 > 
-> CPUFreq wants to change to intermediate frequency by itself against
-> some magic change behind the scene. The major requirement for that
-> comes from the fact that we want to send PRE/POST freq notifiers on
-> which loops-per-jiffie depends.
+> On CPU-freq changes we fire PRE/POST notifiers and they are
+> used for updating loops_per_jiffies which then controls delays.
+> 
+> Now, it is fine to do that for normal frequencies, but what should be
+> the approach for intermediate frequencies ?
+> 
+> Intermediate freqs: On some platforms changing PLL's straight away
+> isn't considered safe and so we switch parent to another stable clock,
+> change PLL rate and switch back.
+> 
+> The *wild* thought I earlier had was to fire these notifiers for even these
+> intermediate frequencies, otherwise some of the delays will end before
+> they should have and that *might* cause other problems.
+> 
+> I wanted to know what do you (and other champs) think about this..
+> 
+> Thanks in advance for your advice.
 
-I assume you are saying that you want to update loops-per-jiffie while
-at an intermediate frequency. Why? This operation should not take very
-long.
+Sorry, I am not who you asked for advice but I will chime in anyways ;-)
 
-Imagine a (hypothetical?) processor that changes frequency in many small
-steps until it converges to the target rate. Would you want to update
-lpj for every step?
+I really hate this intermediate frequency stuff in cpufreq. As we
+discussed over lunch in Hong Kong, it does not scale. What if there two
+intermediate frequencies? What if a processor steps frequency up in 5KHz
+increments (albeit very quickly) until it converges to the target rate?
+
+Or what if we have more complex levels of intermediate frequencies?
+Stealing Sascha's excellent ascii art:
+
+            ---
+CPU_PLL ---|   |
+           |   |
+           |   |----- CPU
+           |   |
+IM_PLL ----|   |
+            ---
+
+Where the sequence is as follows:
+
+1) set IM_PLL to a new freq
+2) reparent CPU to IM_PLL
+3) configure CPU_PLL
+4) reparent CPU to CPU_PLL
+5) restore IM_PLL to original frequency
+
+Steps #1 and #5 are new in this example.
+
+I don't see how the concept of an intermediate frequency in the cpufreq
+core could ever scale gracefully to handle corner cases. They may be
+hypothetical now but I'd rather see us dodge this mistake.
+
+Furthermore any intermediate-frequency property in a Devicetree binding
+would suffer the same fate. Trying to neatly encode some weird sequence
+into this generic thing will get very ugly very fast.
+
+For proof please look at clk-divider.c, clk-gate.c, clk-mux.c or
+clk-composite.c and you'll see the result of the slow accumulation of
+lots and lots of hardware corner cases onto generic code. If I had known
+then what I know now I would not have created those generic clock types
+and I would have tried for an abstraction layer between generic stuff
+(e.g. find the best divider) and the real hardware stuff (write to the
+register). Instead I kept all of it together and now things are super
+ugly.
 
 Regards,
 Mike
