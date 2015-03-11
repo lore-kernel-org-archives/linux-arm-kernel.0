@@ -1,54 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:45:34 +0000
-Subject: [PATCH v6 1/4] irqchip: gic: add an entry point to set up irqchip
- flags
+Date: Wed, 11 Mar 2015 15:45:36 +0000
+Subject: [PATCH v6 3/4] ARM: ux500: switch from gic_arch_extn to
+ gic_set_irqchip_flags
 In-Reply-To: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
 References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426088737-15817-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088737-15817-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A common use of gic_arch_extn is to set up additional flags
-to the GIC irqchip. It looks like a benign enough hack that
-doesn't really require the users of that feature to be converted
-to stacked domains.
+Instead of directly touching gic_arch_extn, which is about to
+be removed, use gic_set_irqchip_flags instead.
 
-Add a gic_set_irqchip_flags() function that platform code can
-call instead of using the dreaded gic_arch_extn.
-
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c       | 5 +++++
- include/linux/irqchip/arm-gic.h | 1 +
- 2 files changed, 6 insertions(+)
+ arch/arm/mach-ux500/cpu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index e3ca6da..6004d84 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -880,6 +880,11 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.xlate = gic_irq_domain_xlate,
- };
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index dbb2970..6ced0f6 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -52,7 +52,7 @@ void ux500_restart(enum reboot_mode mode, const char *cmd)
+ */
+ void __init ux500_init_irq(void)
+ {
+-	gic_arch_extn.flags = IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND;
++	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
+ 	irqchip_init();
  
-+void gic_set_irqchip_flags(unsigned long flags)
-+{
-+	gic_chip.flags |= flags;
-+}
-+
- void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
- 			   u32 percpu_offset, struct device_node *node)
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 3978c5b..36ec4ae 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -97,6 +97,7 @@ struct device_node;
- 
- extern struct irq_chip gic_arch_extn;
- 
-+void gic_set_irqchip_flags(unsigned long flags);
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
- 		    u32 offset, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ 	/*
 -- 
 2.1.4
