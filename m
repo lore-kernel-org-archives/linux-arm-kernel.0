@@ -1,41 +1,82 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Wed, 11 Mar 2015 18:22:42 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <55005B81.9020103@free-electrons.com>
-References: <54FF21BE.2040506@list.ru> <550038C9.7010807@free-electrons.com>
- <20150311131433.GC8656@n2100.arm.linux.org.uk> <550058BE.3060406@list.ru>
- <55005B81.9020103@free-electrons.com>
-Message-ID: <55005DC2.1060300@list.ru>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Mar 2015 08:24:15 -0700
+Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <1426022847-30912-4-git-send-email-marek@goldelico.com>
+References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
+ <1426022847-30912-4-git-send-email-marek@goldelico.com>
+Message-ID: <20150311152414.GX5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-11.03.2015 18:13, Gregory CLEMENT ?????:
-> On 11/03/2015 16:01, Stas Sergeev wrote:
->> 11.03.2015 16:14, Russell King - ARM Linux ?????:
->>> On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
->>>> Hi Stas,
->>>>
->>>> On 10/03/2015 17:54, Stas Sergeev wrote:
->>>>> Hello, the patch below is needed for a successful boot on armada-xp.
->>>>>
->>>> I am really surprised by this patch because I used the Armada XP based
->>>> board in a daily base and I never saw this issue.
->>> Can you provide some details about your board - does it have 8GB of
->>> memory, ranging from 0-0xf0000000, and 4G-8G ?
->> I wonder about this 256Mb memory hole.
-> This is where the SoC registers are.
-OK but it seems I am loosing this region of _physical_ memory:
----
+Hi,
 
-[    0.000000]  memory size = 0x1f0000000
-[    0.000000]  memory.cnt  = 0x2
-[    0.000000]  memory[0x0]     [0x00000000000000-0x000000efffffff],
-0xf0000000 bytes
-[    0.000000]  memory[0x1]     [0x00000100000000-0x000001ffffffff],
-0x100000000 bytes
+* Marek Belisko <marek@goldelico.com> [150310 14:28]:
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> new file mode 100644
+> index 0000000..d3dd9d8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> @@ -0,0 +1,43 @@
+> +twl4030_madc_battery
+> +
+> +Required properties:
+> + - compatible : "ti,twl4030-madc-battery"
+> + - capacity-uah : battery capacity in uAh
+> + - ti,volt-to-capacity-charging-map : list of voltage(mV):level(%) values
+> +	for charging calibration (see example)
+> + - ti,volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
+> +	for discharging calibration (see example)
+> + - io-channels: Should contain IIO channel specifiers
+> +	for each element in io-channel-names.
+> +- io-channel-names: Should contain the following values:
+> + * "temp" - The ADC channel for temperature reading
+> + * "ichg" - The ADC channel for battery charging status
+> + * "vbat" - The ADC channel to measure the battery voltage
+> +
+> +Example:
+> +	madc-battery {
+> +		compatible = "ti,twl4030-madc-battery";
+> +		capacity-uah = <1200000>;
+> +		ti,volt-to-capacity-charging-map = <4200 100>,
+> +					        <4100 75>,
+> +					        <4000 55>,
+> +					        <3900 25>,
+> +					        <3800 5>,
+> +					        <3700 2>,
+> +					        <3600 1>,
+> +					        <3300 0>;
+> +
+> +		ti,volt-to-capacity-discharging-map = <4200 100>
+> +						   <4100 95>,
+> +						   <4000 70>,
+> +						   <3800 50>,
+> +						   <3700 10>,
+> +						   <3600 5>,
+> +						   <3300 0>;
+> +		io-channels = <&twl_madc 1>,
+> +	                      <&twl_madc 10>,
+> +			      <&twl_madc 12>;
+> +		io-channel-names = "temp",
+> +		                   "ichg",
+> +		                   "vbat";
+> +	};
 
----
+Rather than just making platform_data into device tree properties..
 
-As you can see, memory size is 0x1f0000000 instead of 0x20000000.
-Why 256Mb are lost?
+Can't you hide the these custom properties behind the compatible flag?
+
+You can initialize that data in the driver based on the compatible
+flag and the match data.
+
+This makes sense if you can group things to similar configurations.
+
+Regards,
+
+Tony
