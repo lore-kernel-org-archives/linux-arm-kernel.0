@@ -1,50 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 11 Mar 2015 12:58:42 +0000
-Subject: [PATCH v2 0/5] GICv3: add 32bit compatibility
-In-Reply-To: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-References: <1425320432-6325-1-git-send-email-jean-philippe.brucker@arm.com>
-Message-ID: <20150311125842.GF21998@io.lakedaemon.net>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 11 Mar 2015 13:00:43 +0000
+Subject: [PATCH 0/2] of: fix handling of '/' in path options
+In-Reply-To: <CAL_JsqK=cODtAgt5jRQ-ASPBVatUztjOwDcZ6vzOh9bDKMdSBA@mail.gmail.com>
+References: <1425924225-22748-1-git-send-email-leif.lindholm@linaro.org>
+ <CAL_JsqK=cODtAgt5jRQ-ASPBVatUztjOwDcZ6vzOh9bDKMdSBA@mail.gmail.com>
+Message-ID: <20150311130043.GW4278@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Philippe,
+On Wed, Mar 11, 2015 at 07:49:33AM -0500, Rob Herring wrote:
+> On Mon, Mar 9, 2015 at 1:03 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > Commit 7914a7c5651a ("of: support passing console options with
+> > stdout-path") neglected to deal with '/'s appearing past the ':'
+> > terminator.
+> >
+> > This mini-series fixes this oversight and adds the tests to prove it.
+> >
+> > Leif Lindholm (1):
+> >   of: fix handling of '/' in options for of_find_node_by_path()
+> >
+> > Peter Hurley (1):
+> >   of: unittest: Add options string testcase variants
+> 
+> Are there changes from the previous versions? I've already pulled those in.
 
-On Mon, Mar 02, 2015 at 06:20:27PM +0000, Jean-Philippe Brucker wrote:
-> This series adds 32bit compatibility to Marc's GICv3 driver. Only SGIs,
-> PPIs and SPIs support is present, no ITS.
-> 
-> It is now based on Linux 4.0-rc1, which contains Andre's GICv3 emulation
-> series for KVM [1]. With this support along with the kvmtool patches
-> mentioned in [1], it is possible to run ARM guests that use GICv3.
-> 
-> Changes since v1 [2]:
-> * rebased on 4.0-rc1
-> * fix the mistakes pointed out by Russell and Vladimir
-> * add a patch to select ARM_GIC_V3 under ARCH_VIRT, as suggested by Marc
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/316230.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-December/310124.htm
-> 
-> Cheers,
-> Jean
-> 
-> 
-> Jean-Philippe Brucker (5):
->   arm64: GICv3: refactor the AArch64 specific parts
->   arm64: GICv3: change unsigned types for AArch32 compatibility
->   arm64: GICv3: Specialize readq and writeq accesses
->   ARM: add 32bit support to GICv3
->   ARM: virt: select ARM_GIC_V3
-> 
->  arch/arm/Kconfig                    |   1 +
->  arch/arm/include/asm/arch_gicv3.h   | 182 ++++++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/arch_gicv3.h | 141 ++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-v3.c        |  69 ++++----------
->  include/linux/irqchip/arm-gic-v3.h  | 115 ++++++-----------------
+No, just sent together as a series since I didn't realise you had.
 
-Please include the irqchip maintainers (myself and Thomas) on future revisions
-of this series.
-
-thx,
-
-Jason.
+/
+    Leif
