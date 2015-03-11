@@ -1,62 +1,129 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 Mar 2015 15:20:37 +0100
-Subject: [GIT PULL] Exynos fixes for v4.0
-Message-ID: <1426083637.24734.14.camel@AMDC1943>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 11 Mar 2015 11:21:28 -0300
+Subject: [PATCH v2 1/7] ARM: mx25: Remove mx25_clocks_init()
+Message-ID: <1426083694-6624-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-This groups important fixes for this v4.0-rc cycle. I hope you will find
-useful such grouping them in a pull request.
+mx25_clocks_init() is only used to register the clocks for non-dt platforms.
 
-1. Fix second suspend to RAM on Trats2 board. This has shown up
-   after enabling L2 cache but actually the "use delayed reset
-   assertion" is to be blamed.
-2. Fix power domain issues with disp1 domain and HDMI (some of them)
-   on Odroid XU3:
-   - disp1 power domain can be turned off,
-   - no more "imprecise external abort" faults.
-3. Proper fix for build breakage of cpuidle on !SMP. This allows using
-   Exynos cpuidle driver on UP.
+As mx25 has been converted to a dt-only platform, we can safely remove it.
 
-Best regards,
-Krzysztof
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- None
 
-----------------------------------------------------------------
+ arch/arm/mach-imx/clk-imx25.c | 75 -------------------------------------------
+ arch/arm/mach-imx/common.h    |  1 -
+ 2 files changed, 76 deletions(-)
 
-The following changes since commit 2d2c9a8d0a4f90e298315d2f4a282d8bd5d45e5c:
-
-  ARM: dts: add display power domain for exynos5250 (2015-02-27 05:29:32 +0900)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.0-rc1-exynos-fixes
-
-for you to fetch changes up to c1b57bce36a69f3972a1db433d3c8b34e0541e63:
-
-  ARM: EXYNOS: cpuidle: Fix build breakage on !SMP (2015-03-11 13:02:08 +0100)
-
-----------------------------------------------------------------
-Andrzej Hajda (4):
-      arm/exynos: add asynchronous bridge clock bindings
-      arm/exynos/pm_domains: add support for async-bridge clocks
-      ARM: dts: exynos5420: add async-bridge clocks to disp1 power domain
-      ARM: dts: exynos5420: add async-bridge clocks to gsc power domain
-
-Bartlomiej Zolnierkiewicz (1):
-      ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
-
-Krzysztof Kozlowski (1):
-      ARM: EXYNOS: Fix failed second suspend on Exynos4
-
- .../bindings/arm/exynos/power_domain.txt           |  3 ++
- arch/arm/boot/dts/exynos5420.dtsi                  |  8 +++--
- arch/arm/mach-exynos/common.h                      |  2 ++
- arch/arm/mach-exynos/exynos.c                      | 29 +++++++++++++++-
- arch/arm/mach-exynos/platsmp.c                     | 39 ++--------------------
- arch/arm/mach-exynos/pm.c                          |  2 ++
- arch/arm/mach-exynos/pm_domains.c                  | 27 ++++++++++++---
- arch/arm/mach-exynos/suspend.c                     |  3 ++
- drivers/cpuidle/cpuidle-exynos.c                   |  3 +-
- 9 files changed, 71 insertions(+), 45 deletions(-)
+diff --git a/arch/arm/mach-imx/clk-imx25.c b/arch/arm/mach-imx/clk-imx25.c
+index 59c0c85..9c2633a 100644
+--- a/arch/arm/mach-imx/clk-imx25.c
++++ b/arch/arm/mach-imx/clk-imx25.c
+@@ -30,7 +30,6 @@
+ #include "clk.h"
+ #include "common.h"
+ #include "hardware.h"
+-#include "mx25.h"
+ 
+ #define CCM_MPCTL	0x00
+ #define CCM_UPCTL	0x04
+@@ -239,80 +238,6 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
+ 	return 0;
+ }
+ 
+-int __init mx25_clocks_init(void)
+-{
+-	void __iomem *ccm;
+-
+-	ccm = ioremap(MX25_CRM_BASE_ADDR, SZ_16K);
+-
+-	__mx25_clocks_init(24000000, ccm);
+-
+-	clk_register_clkdev(clk[gpt1_ipg], "ipg", "imx-gpt.0");
+-	clk_register_clkdev(clk[gpt_ipg_per], "per", "imx-gpt.0");
+-	/* i.mx25 has the i.mx21 type uart */
+-	clk_register_clkdev(clk[uart1_ipg], "ipg", "imx21-uart.0");
+-	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.0");
+-	clk_register_clkdev(clk[uart2_ipg], "ipg", "imx21-uart.1");
+-	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.1");
+-	clk_register_clkdev(clk[uart3_ipg], "ipg", "imx21-uart.2");
+-	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.2");
+-	clk_register_clkdev(clk[uart4_ipg], "ipg", "imx21-uart.3");
+-	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.3");
+-	clk_register_clkdev(clk[uart5_ipg], "ipg", "imx21-uart.4");
+-	clk_register_clkdev(clk[uart_ipg_per], "per", "imx21-uart.4");
+-	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.0");
+-	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.0");
+-	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
+-	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.1");
+-	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.1");
+-	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.1");
+-	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.2");
+-	clk_register_clkdev(clk[usbotg_ahb], "ahb", "mxc-ehci.2");
+-	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
+-	clk_register_clkdev(clk[ipg], "ipg", "imx-udc-mx27");
+-	clk_register_clkdev(clk[usbotg_ahb], "ahb", "imx-udc-mx27");
+-	clk_register_clkdev(clk[usb_div], "per", "imx-udc-mx27");
+-	clk_register_clkdev(clk[nfc_ipg_per], NULL, "imx25-nand.0");
+-	/* i.mx25 has the i.mx35 type cspi */
+-	clk_register_clkdev(clk[cspi1_ipg], NULL, "imx35-cspi.0");
+-	clk_register_clkdev(clk[cspi2_ipg], NULL, "imx35-cspi.1");
+-	clk_register_clkdev(clk[cspi3_ipg], NULL, "imx35-cspi.2");
+-	clk_register_clkdev(clk[kpp_ipg], NULL, "imx-keypad");
+-	clk_register_clkdev(clk[tsc_ipg], NULL, "mx25-adc");
+-	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.0");
+-	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.1");
+-	clk_register_clkdev(clk[i2c_ipg_per], NULL, "imx21-i2c.2");
+-	clk_register_clkdev(clk[fec_ipg], "ipg", "imx25-fec.0");
+-	clk_register_clkdev(clk[fec_ahb], "ahb", "imx25-fec.0");
+-	clk_register_clkdev(clk[dryice_ipg], NULL, "imxdi_rtc.0");
+-	clk_register_clkdev(clk[lcdc_ipg_per], "per", "imx21-fb.0");
+-	clk_register_clkdev(clk[lcdc_ipg], "ipg", "imx21-fb.0");
+-	clk_register_clkdev(clk[lcdc_ahb], "ahb", "imx21-fb.0");
+-	clk_register_clkdev(clk[wdt_ipg], NULL, "imx2-wdt.0");
+-	clk_register_clkdev(clk[ssi1_ipg], NULL, "imx-ssi.0");
+-	clk_register_clkdev(clk[ssi2_ipg], NULL, "imx-ssi.1");
+-	clk_register_clkdev(clk[esdhc1_ipg_per], "per", "sdhci-esdhc-imx25.0");
+-	clk_register_clkdev(clk[esdhc1_ipg], "ipg", "sdhci-esdhc-imx25.0");
+-	clk_register_clkdev(clk[esdhc1_ahb], "ahb", "sdhci-esdhc-imx25.0");
+-	clk_register_clkdev(clk[esdhc2_ipg_per], "per", "sdhci-esdhc-imx25.1");
+-	clk_register_clkdev(clk[esdhc2_ipg], "ipg", "sdhci-esdhc-imx25.1");
+-	clk_register_clkdev(clk[esdhc2_ahb], "ahb", "sdhci-esdhc-imx25.1");
+-	clk_register_clkdev(clk[csi_ipg_per], "per", "imx25-camera.0");
+-	clk_register_clkdev(clk[csi_ipg], "ipg", "imx25-camera.0");
+-	clk_register_clkdev(clk[csi_ahb], "ahb", "imx25-camera.0");
+-	clk_register_clkdev(clk[dummy], "audmux", NULL);
+-	clk_register_clkdev(clk[can1_ipg], NULL, "flexcan.0");
+-	clk_register_clkdev(clk[can2_ipg], NULL, "flexcan.1");
+-	/* i.mx25 has the i.mx35 type sdma */
+-	clk_register_clkdev(clk[sdma_ipg], "ipg", "imx35-sdma");
+-	clk_register_clkdev(clk[sdma_ahb], "ahb", "imx35-sdma");
+-	clk_register_clkdev(clk[iim_ipg], "iim", NULL);
+-
+-	mxc_timer_init(MX25_IO_ADDRESS(MX25_GPT1_BASE_ADDR), MX25_INT_GPT1);
+-
+-	return 0;
+-}
+-
+ static void __init mx25_clocks_init_dt(struct device_node *np)
+ {
+ 	struct device_node *refnp;
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 1028b6c..a12b52d 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -51,7 +51,6 @@ void epit_timer_init(void __iomem *base, int irq);
+ void mxc_timer_init(void __iomem *, int);
+ int mx1_clocks_init(unsigned long fref);
+ int mx21_clocks_init(unsigned long lref, unsigned long fref);
+-int mx25_clocks_init(void);
+ int mx27_clocks_init(unsigned long fref);
+ int mx31_clocks_init(unsigned long fref);
+ int mx35_clocks_init(void);
+-- 
+1.9.1
