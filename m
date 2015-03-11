@@ -1,38 +1,26 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 11 Mar 2015 16:01:47 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC r8a7778 CCF and Multiplatform
- Updates for v4.1
-In-Reply-To: <2398647.6T9U8oT0zu@wuerfel>
-References: <cover.1425518337.git.horms+renesas@verge.net.au>
- <2398647.6T9U8oT0zu@wuerfel>
-Message-ID: <CAMuHMdXR06gQVvi5+h1kyDWsTwqGdtHchD20-Ln1tGOFEn8Tag@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 11 Mar 2015 15:07:21 +0000
+Subject: [PATCH] arm/arm64: KVM: Kill CONFIG_KVM_ARM_{VGIC,TIMER}
+In-Reply-To: <1426083780-27588-1-git-send-email-christoffer.dall@linaro.org>
+References: <1426083780-27588-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <55005A29.9060202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 11/03/15 14:23, Christoffer Dall wrote:
+> We can definitely decide at run-time whether to use the GIC and timers
+> or not, and the extra code and data structures that we allocate space
+> for is really negligable with this config option, so I don't think it's
+> worth the extra complexity of always having to define stub static
+> inlines.  The !CONFIG_KVM_ARM_VGIC/TIMER case is pretty much an untested
+> code path anyway, so we're better off just getting rid of it.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-On Wed, Mar 11, 2015 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 05 March 2015 10:58:14 Simon Horman wrote:
->> Renesas ARM Based SoC r8a7778 CCF and Multiplatform Updates for v4.1
->>
->> * Add CCF and them multiplatform support to r8a7778 SoC and its
->>   bockw board.
->
-> I don't see Mike Turquette on Cc for the CCF driver here, or in the
-> Reviewed-by/Acked-by list for the relevant patches.
->
-> Has he given his ok for the patches to be merged through arm-soc?
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I think you overlooked Mike's ack:
-https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?id=6232c51cb370919b116e0aea38d12aa33aae2fa9
+Thanks for putting this together.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
