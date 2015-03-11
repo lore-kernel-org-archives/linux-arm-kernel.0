@@ -1,45 +1,48 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 11 Mar 2015 11:03:41 +0100
-Subject: [PATCH] ARM: Kirkwood: remove leds-netxbig.h include from nas2big DTS
-Message-ID: <1426068221-29025-1-git-send-email-simon.guinot@sequanux.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Mar 2015 10:04:21 +0000
+Subject: [PATCH 3/5] arm64: Documentation: clarify Image placement in
+ physical RAM
+In-Reply-To: <1425380630-3684-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425380630-3684-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150311100421.GA4114@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following build error introduced by the patch
-a9e58557e998 ("ARM: Kirkwood: add DT description for nas2big"):
+On Tue, Mar 03, 2015 at 11:03:48AM +0000, Ard Biesheuvel wrote:
+> The early init code maps the kernel image using statically
+> allocated page tables. This means that we can only allow
+> Image to be placed such that we can map its entire static
+> footprint using a single table entry at all but the lowest
+> level. So update the documentation to reflect that the Image
+> should not cross a 512 MB boundary, which ensures the above
+> on both 4k and 64k pages kernels.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  Documentation/arm64/booting.txt | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+> index bdc35fc97ac8..49f17b1632f1 100644
+> --- a/Documentation/arm64/booting.txt
+> +++ b/Documentation/arm64/booting.txt
+> @@ -112,8 +112,9 @@ The Image must be placed text_offset bytes from a 2MB aligned base
+>  address near the start of usable system RAM and called there. Memory
+>  below that base address is currently unusable by Linux, and therefore it
+>  is strongly recommended that this location is the start of system RAM.
+> -At least image_size bytes from the start of the image must be free for
+> -use by the kernel.
+> +The physical memory region consisting of image_size bytes counting from
+> +the start of the image must be free for use by the kernel, and must not
+> +cross a 512 MB physical alignment boundary.
 
-  DTC     arch/arm/boot/dts/kirkwood-nas2big.dtb
-/home/simon/workspace/lacie-nas.org/src/linux-lacie.git/arch/arm/boot/dts/kirkwood-nas2big.dts:16:
-fatal error: dt-bindings/leds/leds-netxbig.h: No such file or directory
-compilation terminated.
-scripts/Makefile.lib:292: recipe for target
-'arch/arm/boot/dts/kirkwood-nas2big.dtb' failed
+This is correct.
 
-Since the leds-netxbig DT binding is not merged yet, the
-dt-bindings/leds/leds-netxbig.h header can't be used. Moreover there is
-no point in including leds-netxbig.h from the nas2big DTS anyway: since
-the LEDs characteristics are shared between all the netxbig boards, the
-LED node will be added in the kirkwood-netxbig DTSI file.
+I had a go at rewording this so as to move all the address restrictions
+together, but I couldn't make it any clearer than the wording above. So
+FWIW:
 
-This patch fixes the build error by removing the useless leds-netxbig.h
-include.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- arch/arm/boot/dts/kirkwood-nas2big.dts | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-nas2big.dts b/arch/arm/boot/dts/kirkwood-nas2big.dts
-index d459c94fd1d4..7427ec50b829 100644
---- a/arch/arm/boot/dts/kirkwood-nas2big.dts
-+++ b/arch/arm/boot/dts/kirkwood-nas2big.dts
-@@ -12,7 +12,6 @@
- 
- /dts-v1/;
- 
--#include <dt-bindings/leds/leds-netxbig.h>
- #include "kirkwood-netxbig.dtsi"
- 
- / {
--- 
-2.1.1
+Mark.
