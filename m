@@ -1,41 +1,53 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Mar 2015 02:19:25 +0100
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CABxcv=kL3Hw43VVxAsZ=DnY4Z+5431PO2YehcK2zTkFGBG0cNA@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-3-git-send-email-eliad@wizery.com>
- <CABxcv=kL3Hw43VVxAsZ=DnY4Z+5431PO2YehcK2zTkFGBG0cNA@mail.gmail.com>
-Message-ID: <CABxcv=kUwU2KVw5jYryh62v5us2-CiJFMnYN2nyWLRMWnEkU3w@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 11 Mar 2015 09:24:25 +0800
+Subject: [PATCH 1/2] ARM: imx6qdl-sabresd: set swbst_reg as vbus's parent
+ reg
+In-Reply-To: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
+References: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20150311012424.GW20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eliad,
+On Fri, Mar 06, 2015 at 04:04:20PM +0800, Peter Chen wrote:
+> USB vbus 5V is from PMIC SWBST, so set swbst_reg as vbus's
+> parent reg, it fixed a bug that the voltage of vbus is incorrect
+> due to swbst_reg is disabled after boots up.
+> 
+> Cc: stable <stable@vger.kernel.org>
 
-On Wed, Mar 11, 2015 at 1:28 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> On Mon, Mar 9, 2015 at 4:36 PM, Eliad Peller <eliad@wizery.com> wrote:
->> --- a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
->> +++ b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
->> @@ -42,4 +42,13 @@
->>         vmmc-supply = <&lbep5clwmc_wlen>;
+It's more idiomatic to put the line in this way:
 
-Something I forgot to mention is that this vmmc-supply is a DT hack
-since the WLAN SDIO chip needs a WL_EN signal to be asserted as a part
-of the chip power sequencing.
+Cc: stable at vger.kernel.org
 
-But there wasn't a DT binding to describe that so most boards use the
-same hack which is to define a fake fixed-regulator with an enable
-GPIO just to toggle that pin.
+Changed it and applied both patches.
 
-But now the MMC subsystem has support for power sequence providers and
-the pwrseq-simple driver
-(Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt) has
-support for reset GPIOs so you may want to change that as well.
+Shawn
 
-In fact, the pwrseq-simple also has support for an external clock (and
-can be extended to support more than one) so if the clocks are not
-internal to the wl12xx, maybe these should be defined in the
-pwrseq-simple dev node assuming that there is a clock driver for them.
-
-Best regards,
-Javier
+> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index f1cd214..a626e6d 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -35,6 +35,7 @@
+>  			regulator-max-microvolt = <5000000>;
+>  			gpio = <&gpio3 22 0>;
+>  			enable-active-high;
+> +			vin-supply = <&swbst_reg>;
+>  		};
+>  
+>  		reg_usb_h1_vbus: regulator at 1 {
+> @@ -45,6 +46,7 @@
+>  			regulator-max-microvolt = <5000000>;
+>  			gpio = <&gpio1 29 0>;
+>  			enable-active-high;
+> +			vin-supply = <&swbst_reg>;
+>  		};
+>  
+>  		reg_audio: regulator at 2 {
+> -- 
+> 1.9.1
+> 
