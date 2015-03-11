@@ -1,61 +1,37 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 11 Mar 2015 09:38:48 +0100
-Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
- IRQF_NO_SUSPEND
-In-Reply-To: <2616799.fRG1k0Q6sR@vostro.rjw.lan>
-References: <1425287898-15093-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150307103939.GA17964@amd> <20150307110645.GW3989@piout.net>
- <2616799.fRG1k0Q6sR@vostro.rjw.lan>
-Message-ID: <20150311093848.2b23a027@bbrezillon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 11 Mar 2015 09:43:49 +0100
+Subject: [PATCH 2/2] iommu: of: enforce const-ness of struct iommu_ops
+In-Reply-To: <1425641688-26438-3-git-send-email-will.deacon@arm.com>
+References: <1425641688-26438-1-git-send-email-will.deacon@arm.com>
+ <1425641688-26438-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20150311084347.GC19391@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 08 Mar 2015 02:11:45 +0100
-"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-
-> On Saturday, March 07, 2015 12:06:45 PM Alexandre Belloni wrote:
-> > On 07/03/2015 at 11:39:39 +0100, Pavel Machek wrote :
-> > > > The Atmel watchdog can't be stopped once it's started. This is actually 
-> > > > very useful so we can reset if suspend or resume failed, the only 
-> > > > drawback is that you have to wake up from time to time (e.g. by using 
-> > > > the RTC/RTT) to clear the watchdog and then go back to sleep ASAP.
-> > > 
-> > > Yeah. So you do "echo mem > /sys/power/state", and few seconds/minutes
-> > > after watchdog kills the system. But you did not ask for dead system,
-> > > you asked for suspend.
-> > > 
-> > > And while that behaviour is useful for you, I don't think it is
-> > > exactly useful behaviour, nor it is the behaviour user would expect.
-> > > 
-> > 
-> > I think you misunderstood, that is exactly the expected behaviour. This
-> > is hardware defined. Once the watchdog is started, nobody can stop it.
-> > Trying to change the mode register will result in a reset of the SoC.
-> > 
-> > It is documented in the datasheet and any user wanting another behaviour
-> > is out of luck.
-> > 
-> > So basically, when using a watchdog, you have to wake up every 15-16s to
-> > restart it.
+On Fri, Mar 06, 2015 at 11:34:48AM +0000, Will Deacon wrote:
+> From: Robin Murphy <Robin.Murphy@arm.com>
 > 
-> So question is if we need a separate interrupt handler for that, expecially
-> since it is shared with the PIT timer anyway.
+> With the pgsize_bitmap removed, there is no compelling reason for
+> the remaining callbacks in struct iommu_ops to be mutable, so enforce
+> const-ness throughout the core code.
 > 
-> Seems to me that the simplest way out of this conundrum would be to simply
-> make the timer's interrupt handler kick the watchdog every once a while and
-> get rid of the separate watchdog interrupt handler entirely.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/dma-mapping.h   |  2 +-
+>  arch/arm/mm/dma-mapping.c            |  6 +++---
+>  arch/arm64/include/asm/dma-mapping.h |  3 ++-
+>  drivers/iommu/of_iommu.c             | 12 ++++++------
+>  drivers/of/platform.c                |  2 +-
+>  include/linux/dma-mapping.h          |  2 +-
+>  include/linux/of_iommu.h             |  8 ++++----
+>  7 files changed, 18 insertions(+), 17 deletions(-)
 
-The watchdog interrupt handler is not here to ping the watchdog, it's
-here to reset the platform if the watchdog hasn't been refreshed
-appropriately.
-
-IOW, it's a software watchdog using at91 WDT capabilities to determine
-when it should reboot the system.
-IIRC, we need this on some at91 platforms to fix a HW bug (maybe
-Nicolas can confirm this).
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/35ce187e/attachment.sig>
