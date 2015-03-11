@@ -1,55 +1,76 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Wed, 11 Mar 2015 08:21:01 +0530
-Subject: [PATCH] dma: Add Xilinx ZDMA device tree Binding Documentation
-In-Reply-To: <BN1BFFO11FD01214F9392FD94A0D30D9E28C190@BN1BFFO11FD012.protection.gbl>
-References: <BN1AFFO11FD032F933FA09686353911532C8180@BN1AFFO11FD032.protection.gbl>
- <BN1BFFO11FD01214F9392FD94A0D30D9E28C190@BN1BFFO11FD012.protection.gbl>
-Message-ID: <CAGnW=BZpDjoX0tHncmzsMapppi9LKXe9SjCe7M4G3-js0Jm2JQ@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 11 Mar 2015 11:16:31 +0800
+Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
+In-Reply-To: <20150310094142.GD24885@pengutronix.de>
+References: <1425888603-25800-1-git-send-email-s.hauer@pengutronix.de>
+ <1425888603-25800-3-git-send-email-s.hauer@pengutronix.de>
+ <7h61a94zy0.fsf@deeprootsystems.com>
+ <20150310094142.GD24885@pengutronix.de>
+Message-ID: <1426043791.24243.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 5:31 AM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Tue, 2015-03-10 at 07:46PM +0530, Punnaiah Choudary Kalluri wrote:
->> Device-tree binding documentation for Xilinx ZDMA Engine
->>
->> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
->> ---
->>  .../devicetree/bindings/dma/xilinx/zdma.txt        |   76 ++++++++++++++++++++
->>  1 files changed, 76 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zdma.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zdma.txt b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
->> new file mode 100644
->> index 0000000..399a3bc
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/xilinx/zdma.txt
->> @@ -0,0 +1,76 @@
->> +Xilinx ZDMA engine, it does support memory to memory transfers,
->> +memory to device and device to memory transfers. It also has flow
->> +control and rate control support for slave/peripheral dma access.
->> +
->> +Xilinx ZynqMP has two instances of general purpose DMA(ZDMA).
->> +one is located in FPD(full power domain) and other is located in
->> +LPD(low power domain).
->> +
->> +ZDMA instance located in FPD is referred as FPDMA and instance located
->> +in LPD is referred as LPDMA.
->> +
->> +FPDMA is configured with 8 DMA channels and AXI bus width is 128 byte.
->> +LPDMA is configured with 8 DMA channels and AXI bus width is 64 byte.
->
-> All these implementation details are good background information, but
-> shouldn't be part of the binding.
+Hi,
 
-Ok. i will remove then.
+On Tue, 2015-03-10 at 10:41 +0100, Sascha Hauer wrote:
+> On Mon, Mar 09, 2015 at 02:35:03PM -0700, Kevin Hilman wrote:
+> > Sascha Hauer <s.hauer@pengutronix.de> writes:
+> > 
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > A bit of a changelog here would be useful describing this driver, that
+> > it's only covering part of the device (e.g. power controller) with more
+> > to come, dependency on the syscon driver, etc.
+> > 
+> > > +/*
+> > > + * The Infracfg unit has bus protection bits. We enable the bus protection
+> > > + * for disabled power domains so that the system does not hang when some unit
+> > > + * accesses the bus while in power down.
+> > > + */
+> > 
+> > Hmm, why don't you want to know if some device is accessing another
+> > device which is in a domain that is powered down?   Seems like this is a
+> > good way to hide real bugs.
+> 
+> How I understand it the system just hangs on erroneous accesses without
+> these protection bits enabled, so enabling them at least makes sure we
+> can output something.
+> I must admit though that my understanding of these bits is quite limited
+> and the only user of this driver I have available here (audio) doesn't
+> make use of these protection bits, so I can't test here.
+> 
+> James, could you shed some light on this issue?
 
-Thanks.
-Punnaiah
->
->         S?ren
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+I asked our designer about the bus protection feature, here is his
+response:
+
+"
+It's for unexpected signal glitch in Power switch process.
+
+During Power switch process, we have clock switch, reset, isolation
+enable/disable and  power switch involved where the transition of
+asynchronous reset and  isolation is the most critical one,  which have
+risk to introduce a unexpected short period signal transition from
+MTCMOS?s interface to other alive HW . 
+"
+
+That means it protects unexpected bus accessing from HW, not from SW. So
+it will not hide bugs from wrong SW access.
+
+
+Best regards,
+
+James
+
+************* Email Confidentiality Notice ********************
+The information contained in this e-mail message (including any 
+attachments) may be confidential, proprietary, privileged, or otherwise
+exempt from disclosure under applicable laws. It is intended to be 
+conveyed only to the designated recipient(s). Any use, dissemination, 
+distribution, printing, retaining or copying of this e-mail (including its 
+attachments) by unintended recipient(s) is strictly prohibited and may 
+be unlawful. If you are not an intended recipient of this e-mail, or believe 
+that you have received this e-mail in error, please notify the sender 
+immediately (by replying to this e-mail), delete any and all copies of 
+this e-mail (including any attachments) from your system, and do not
+disclose the content of this e-mail to any other person. Thank you!
