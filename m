@@ -1,35 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 11 Mar 2015 11:11:49 +0800
-Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the onboard
- WiFi module
-In-Reply-To: <20150310213218.GH5085@lukather>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-14-git-send-email-wens@csie.org>
- <20150310213218.GH5085@lukather>
-Message-ID: <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 11 Mar 2015 04:05:39 +0000
+Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System Control
+ Module (MSCM)
+In-Reply-To: <20150311004812.GU20455@dragon>
+References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+ <1425249689-32354-4-git-send-email-stefan@agner.ch>
+ <20150311004812.GU20455@dragon>
+Message-ID: <20150311040539.GD21998@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 5:32 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Mar 10, 2015 at 07:59:24PM +0800, Chen-Yu Tsai wrote:
->> The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
->> WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
->> The IC also takes a power enable signal via GPIO. This is supported
->> with the new power sequencing bindings.
->>
->> The WiFi module supports out-of-band interrupt signaling via GPIO,
->> but this is buggy and not enabled yet.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> There's two almost identical patches 12/12. Which one am I suppose to
-> apply?
+On Wed, Mar 11, 2015 at 08:48:15AM +0800, Shawn Guo wrote:
+> On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
+> > Add the Miscellaneous System Control Module (MSCM) to the base
+> > device tree for Vybrid SoC's. This module contains registers
+> > to get information of the individual and current (accessing)
+> > CPU. In a second block, there is an interrupt router, which
+> > handles the routing of the interrupts between the two CPU cores
+> > on VF6xx variants of the SoC. However, also on single core
+> > variants the interrupt router needs to be configured in order
+> > to receive interrupts on the CPU's interrupt controller. Almost
+> > all peripheral interrupts are routed through the router, hence
+> > the MSCM module is the default interrupt parent for this SoC.
+> > 
+> > In a earlier commit the interrupt nodes were moved out of the
+> > peripheral nodes and specified in the CPU specific vf500.dtsi
+> > device tree. This allowed to use the base device tree vfxxx.dtsi
+> > also for a Cortex-M4 specific device tree, which uses different
+> > interrupt nodes due to the NVIC interrupt controller. However,
+> > since the interrupt parent for peripherals is the MSCM module
+> > independently which CPU the device tree is used for, we can move
+> > the interrupt nodes into the base device tree vfxxx.dtsi again.
+> > Depending on which CPU this base device tree will be used with,
+> > the correct parent interrupt controller has to be assigned to
+> > the MSCM-IR node (GIC or NVIC). The driver takes care of the
+> > parent interrupt controller specific needs (interrupt-cells).
+> > 
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> Stefan,
+> 
+> I guess this patch has a run-time dependency on the first two in the
+> series, right?  Or put it another way, if I apply this single patch on
+> my branch, the dtb and kernel built from the same branch do not work
+> together, right?  If so, we will need to either wait for the first two
+> hit mainline or pull Jason's irqchip/vybrid branch into my tree as
+> prerequisite (irqchip/vybrid needs to be stable).
 
-This one is the right one. I forgot to clear the patches after changing
-the description. The "buggy" part in the description is probably not
-needed. Hans explained that the SD resets have nothing to do with
-interrupt handling.
+No problem, I'll only add patches on top of this if needed.  no rebasing.
 
+thx,
 
-ChenYu
+Jason.
