@@ -1,198 +1,359 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 11 Mar 2015 18:00:33 +0100
-Subject: [PATCH v3 7/9] ARM: at91: at91sam9: use SoC detection infrastructure
+Date: Wed, 11 Mar 2015 18:00:35 +0100
+Subject: [PATCH v3 9/9] ARM: at91: remove old setup
 In-Reply-To: <1426093235-11759-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426093235-11759-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426093235-11759-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426093235-11759-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the soc detection infrastructure for at91sam9 initialization.
+The old setup is not used anymore, remove it
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/at91sam9.c | 86 ++++++++++++++++++++++++++++++++-----------
- arch/arm/mach-at91/soc.h      | 30 +++++++++++++++
- 2 files changed, 94 insertions(+), 22 deletions(-)
+ arch/arm/mach-at91/Makefile |   2 +-
+ arch/arm/mach-at91/setup.c  | 320 --------------------------------------------
+ 2 files changed, 1 insertion(+), 321 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/setup.c
 
-diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
-index 56e3ba73ec40..6aa0a5461be9 100644
---- a/arch/arm/mach-at91/at91sam9.c
-+++ b/arch/arm/mach-at91/at91sam9.c
-@@ -7,29 +7,78 @@
-  * Licensed under GPLv2 or later.
-  */
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 44a5c1a92b39..50c0b526dcd8 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel.
+ #
  
--#include <linux/types.h>
--#include <linux/init.h>
+-obj-y		:= setup.o soc.o
++obj-y		:= soc.o
+ 
+ obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+ 
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+deleted file mode 100644
+index ef778f33c488..000000000000
+--- a/arch/arm/mach-at91/setup.c
++++ /dev/null
+@@ -1,320 +0,0 @@
+-/*
+- * Copyright (C) 2007 Atmel Corporation.
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * Under GPLv2
+- */
+-
+-#define pr_fmt(fmt)	"AT91: " fmt
+-
 -#include <linux/module.h>
--#include <linux/gpio.h>
- #include <linux/of.h>
--#include <linux/of_irq.h>
- #include <linux/of_platform.h>
--#include <linux/clk-provider.h>
- 
+-#include <linux/io.h>
+-#include <linux/mm.h>
+-#include <linux/pm.h>
+-#include <linux/of_address.h>
+-#include <linux/pinctrl/machine.h>
+-#include <linux/clk/at91_pmc.h>
+-
 -#include <asm/system_misc.h>
--#include <asm/setup.h>
--#include <asm/irq.h>
- #include <asm/mach/arch.h>
 -#include <asm/mach/map.h>
--#include <asm/mach/irq.h>
-+#include <asm/system_misc.h>
- 
- #include "generic.h"
-+#include "soc.h"
- 
--static void __init at91sam9_dt_device_init(void)
-+static const struct at91_soc at91sam9_socs[] = {
-+	AT91_SOC(AT91SAM9260_CIDR_MATCH, 0, "at91sam9260", NULL),
-+	AT91_SOC(AT91SAM9261_CIDR_MATCH, 0, "at91sam9261", NULL),
-+	AT91_SOC(AT91SAM9263_CIDR_MATCH, 0, "at91sam9263", NULL),
-+	AT91_SOC(AT91SAM9G20_CIDR_MATCH, 0, "at91sam9g20", NULL),
-+	AT91_SOC(AT91SAM9RL64_CIDR_MATCH, 0, "at91sam9rl64", NULL),
-+	AT91_SOC(AT91SAM9G45_CIDR_MATCH, AT91SAM9M11_EXID_MATCH,
-+		 "at91sam9g45", "at91sam9m11"),
-+	AT91_SOC(AT91SAM9G45_CIDR_MATCH, AT91SAM9M10_EXID_MATCH,
-+		 "at91sam9g45", "at91sam9m10"),
-+	AT91_SOC(AT91SAM9G45_CIDR_MATCH, AT91SAM9G46_EXID_MATCH,
-+		 "at91sam9g45", "at91sam9g46"),
-+	AT91_SOC(AT91SAM9G45_CIDR_MATCH, AT91SAM9G45_EXID_MATCH,
-+		 "at91sam9g45", "at91sam9g45"),
-+	AT91_SOC(AT91SAM9X5_CIDR_MATCH, AT91SAM9G15_EXID_MATCH,
-+		 "at91sam9x5", "at91sam9g15"),
-+	AT91_SOC(AT91SAM9X5_CIDR_MATCH, AT91SAM9G35_EXID_MATCH,
-+		 "at91sam9x5", "at91sam9g35"),
-+	AT91_SOC(AT91SAM9X5_CIDR_MATCH, AT91SAM9X35_EXID_MATCH,
-+		 "at91sam9x5", "at91sam9x35"),
-+	AT91_SOC(AT91SAM9X5_CIDR_MATCH, AT91SAM9G25_EXID_MATCH,
-+		 "at91sam9x5", "at91sam9g25"),
-+	AT91_SOC(AT91SAM9X5_CIDR_MATCH, AT91SAM9X25_EXID_MATCH,
-+		 "at91sam9x5", "at91sam9x25"),
-+	AT91_SOC(AT91SAM9N12_CIDR_MATCH, AT91SAM9CN12_EXID_MATCH,
-+		 "at91sam9n12", "at91sam9cn12"),
-+	AT91_SOC(AT91SAM9N12_CIDR_MATCH, AT91SAM9N12_EXID_MATCH,
-+		 "at91sam9n12", "at91sam9n12"),
-+	AT91_SOC(AT91SAM9N12_CIDR_MATCH, AT91SAM9CN11_EXID_MATCH,
-+		 "at91sam9n12", "at91sam9cn11"),
-+	{ /* sentinel */ },
-+};
-+
-+static const struct at91_soc at91sam9xe_socs[] = {
-+	AT91_SOC(AT91SAM9XE128_CIDR_MATCH, 0, "at91sam9xe", "at91sam9xe128"),
-+	AT91_SOC(AT91SAM9XE256_CIDR_MATCH, 0, "at91sam9xe", "at91sam9xe256"),
-+	AT91_SOC(AT91SAM9XE512_CIDR_MATCH, 0, "at91sam9xe", "at91sam9xe512"),
-+	{ /* sentinel */ },
-+};
-+
-+static const struct at91_soc_family at91sam9_families[] = {
-+	AT91_SOC_FAMILY(ARCH_ID_AT91SAM9, "AT91SAM9", at91sam9_socs),
-+	AT91_SOC_FAMILY(ARCH_ID_AT91SAM9XE, "AT91SAM9XE", at91sam9xe_socs),
-+	{ /* sentinel */ },
-+};
-+
-+static void __init at91sam9_common_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	struct soc_device *soc;
-+	struct device *soc_dev = NULL;
-+
-+	soc = at91_soc_init(at91sam9_families);
-+	if (soc != NULL)
-+		soc_dev = soc_device_to_device(soc);
-+
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
- 
- 	arm_pm_idle = at91sam9_idle;
-+}
-+
-+static void __init at91sam9_dt_device_init(void)
-+{
-+	at91sam9_common_init();
- 	at91sam9260_pm_init();
- }
- 
-@@ -40,16 +89,13 @@ static const char *at91_dt_board_compat[] __initconst = {
- 
- DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM9")
- 	/* Maintainer: Atmel */
--	.map_io		= at91_map_io,
- 	.init_machine	= at91sam9_dt_device_init,
- 	.dt_compat	= at91_dt_board_compat,
- MACHINE_END
- 
- static void __init at91sam9g45_dt_device_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 -
--	arm_pm_idle = at91sam9_idle;
-+	at91sam9_common_init();
- 	at91sam9g45_pm_init();
- }
- 
-@@ -60,16 +106,13 @@ static const char *at91sam9g45_board_compat[] __initconst = {
- 
- DT_MACHINE_START(at91sam9g45_dt, "Atmel AT91SAM9G45")
- 	/* Maintainer: Atmel */
--	.map_io		= at91_map_io,
- 	.init_machine	= at91sam9g45_dt_device_init,
- 	.dt_compat	= at91sam9g45_board_compat,
- MACHINE_END
- 
- static void __init at91sam9x5_dt_device_init(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-#include <mach/hardware.h>
+-#include <mach/cpu.h>
+-#include <mach/at91_dbgu.h>
 -
--	arm_pm_idle = at91sam9_idle;
-+	at91sam9_common_init();
- 	at91sam9x5_pm_init();
- }
- 
-@@ -81,7 +124,6 @@ static const char *at91sam9x5_board_compat[] __initconst = {
- 
- DT_MACHINE_START(at91sam9x5_dt, "Atmel AT91SAM9")
- 	/* Maintainer: Atmel */
--	.map_io		= at91_map_io,
- 	.init_machine	= at91sam9x5_dt_device_init,
- 	.dt_compat	= at91sam9x5_board_compat,
- MACHINE_END
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-index b330fcfe18a3..4ed7e0bd7a62 100644
---- a/arch/arm/mach-at91/soc.h
-+++ b/arch/arm/mach-at91/soc.h
-@@ -48,4 +48,34 @@ at91_soc_init(const struct at91_soc_family *families);
- #define ARCH_ID_AT91RM9200		0x92
- #define AT91RM9200_CIDR_MATCH		0x09290780
- 
-+#define ARCH_ID_AT91SAM9		0x19
-+#define AT91SAM9260_CIDR_MATCH		0x019803a0
-+#define AT91SAM9261_CIDR_MATCH		0x019703a0
-+#define AT91SAM9263_CIDR_MATCH		0x019607a0
-+#define AT91SAM9G20_CIDR_MATCH		0x019905a0
-+#define AT91SAM9RL64_CIDR_MATCH		0x019b03a0
-+#define AT91SAM9G45_CIDR_MATCH		0x019b05a0
-+#define AT91SAM9X5_CIDR_MATCH		0x019a05a0
-+#define AT91SAM9N12_CIDR_MATCH		0x019a07a0
-+
-+#define AT91SAM9M11_EXID_MATCH		0x00000001
-+#define AT91SAM9M10_EXID_MATCH		0x00000002
-+#define AT91SAM9G46_EXID_MATCH		0x00000003
-+#define AT91SAM9G45_EXID_MATCH		0x00000004
-+
-+#define AT91SAM9G15_EXID_MATCH		0x00000000
-+#define AT91SAM9G35_EXID_MATCH		0x00000001
-+#define AT91SAM9X35_EXID_MATCH		0x00000002
-+#define AT91SAM9G25_EXID_MATCH		0x00000003
-+#define AT91SAM9X25_EXID_MATCH		0x00000004
-+
-+#define AT91SAM9CN12_EXID_MATCH		0x00000005
-+#define AT91SAM9N12_EXID_MATCH		0x00000006
-+#define AT91SAM9CN11_EXID_MATCH		0x00000009
-+
-+#define ARCH_ID_AT91SAM9XE		0x29
-+#define AT91SAM9XE128_CIDR_MATCH	0x329973a0
-+#define AT91SAM9XE256_CIDR_MATCH	0x329a93a0
-+#define AT91SAM9XE512_CIDR_MATCH	0x329aa3a0
-+
- #endif /* __AT91_SOC_H */
+-#include "generic.h"
+-#include "pm.h"
+-
+-struct at91_socinfo at91_soc_initdata;
+-EXPORT_SYMBOL(at91_soc_initdata);
+-
+-static struct map_desc at91_io_desc __initdata __maybe_unused = {
+-	.virtual	= (unsigned long)AT91_VA_BASE_SYS,
+-	.pfn		= __phys_to_pfn(AT91_BASE_SYS),
+-	.length		= SZ_16K,
+-	.type		= MT_DEVICE,
+-};
+-
+-static struct map_desc at91_alt_io_desc __initdata __maybe_unused = {
+-	.virtual	= (unsigned long)AT91_ALT_VA_BASE_SYS,
+-	.pfn		= __phys_to_pfn(AT91_ALT_BASE_SYS),
+-	.length		= 24 * SZ_1K,
+-	.type		= MT_DEVICE,
+-};
+-
+-static void __init soc_detect(u32 dbgu_base)
+-{
+-	u32 cidr, socid;
+-
+-	cidr = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
+-	socid = cidr & ~AT91_CIDR_VERSION;
+-
+-	switch (socid) {
+-	case ARCH_ID_AT91RM9200:
+-		at91_soc_initdata.type = AT91_SOC_RM9200;
+-		if (at91_soc_initdata.subtype == AT91_SOC_SUBTYPE_UNKNOWN)
+-			at91_soc_initdata.subtype = AT91_SOC_RM9200_BGA;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9260:
+-		at91_soc_initdata.type = AT91_SOC_SAM9260;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9261:
+-		at91_soc_initdata.type = AT91_SOC_SAM9261;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9263:
+-		at91_soc_initdata.type = AT91_SOC_SAM9263;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9G20:
+-		at91_soc_initdata.type = AT91_SOC_SAM9G20;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9G45:
+-		at91_soc_initdata.type = AT91_SOC_SAM9G45;
+-		if (cidr == ARCH_ID_AT91SAM9G45ES)
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G45ES;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9RL64:
+-		at91_soc_initdata.type = AT91_SOC_SAM9RL;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9X5:
+-		at91_soc_initdata.type = AT91_SOC_SAM9X5;
+-		break;
+-
+-	case ARCH_ID_AT91SAM9N12:
+-		at91_soc_initdata.type = AT91_SOC_SAM9N12;
+-		break;
+-
+-	case ARCH_ID_SAMA5:
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+-		}
+-		break;
+-	}
+-
+-	/* at91sam9g10 */
+-	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+-		at91_soc_initdata.type = AT91_SOC_SAM9G10;
+-		at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_NONE;
+-	}
+-	/* at91sam9xe */
+-	else if ((cidr & AT91_CIDR_ARCH) == ARCH_FAMILY_AT91SAM9XE) {
+-		at91_soc_initdata.type = AT91_SOC_SAM9260;
+-		at91_soc_initdata.subtype = AT91_SOC_SAM9XE;
+-	}
+-
+-	if (!at91_soc_is_detected())
+-		return;
+-
+-	at91_soc_initdata.cidr = cidr;
+-
+-	/* sub version of soc */
+-	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAM9G45) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_AT91SAM9M10:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9M10;
+-			break;
+-		case ARCH_EXID_AT91SAM9G46:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G46;
+-			break;
+-		case ARCH_EXID_AT91SAM9M11:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9M11;
+-			break;
+-		}
+-	}
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAM9X5) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_AT91SAM9G15:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G15;
+-			break;
+-		case ARCH_EXID_AT91SAM9G35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G35;
+-			break;
+-		case ARCH_EXID_AT91SAM9X35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9X35;
+-			break;
+-		case ARCH_EXID_AT91SAM9G25:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9G25;
+-			break;
+-		case ARCH_EXID_AT91SAM9X25:
+-			at91_soc_initdata.subtype = AT91_SOC_SAM9X25;
+-			break;
+-		}
+-	}
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAMA5D3) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_SAMA5D31:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D31;
+-			break;
+-		case ARCH_EXID_SAMA5D33:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D33;
+-			break;
+-		case ARCH_EXID_SAMA5D34:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D34;
+-			break;
+-		case ARCH_EXID_SAMA5D35:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D35;
+-			break;
+-		case ARCH_EXID_SAMA5D36:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D36;
+-			break;
+-		}
+-	}
+-}
+-
+-static void __init alt_soc_detect(u32 dbgu_base)
+-{
+-	u32 cidr, socid;
+-
+-	/* SoC ID */
+-	cidr = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
+-	socid = cidr & ~AT91_CIDR_VERSION;
+-
+-	switch (socid) {
+-	case ARCH_ID_SAMA5:
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+-		} else if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D4) {
+-			at91_soc_initdata.type = AT91_SOC_SAMA5D4;
+-		}
+-		break;
+-	}
+-
+-	if (!at91_soc_is_detected())
+-		return;
+-
+-	at91_soc_initdata.cidr = cidr;
+-
+-	/* sub version of soc */
+-	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+-
+-	if (at91_soc_initdata.type == AT91_SOC_SAMA5D4) {
+-		switch (at91_soc_initdata.exid) {
+-		case ARCH_EXID_SAMA5D41:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D41;
+-			break;
+-		case ARCH_EXID_SAMA5D42:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D42;
+-			break;
+-		case ARCH_EXID_SAMA5D43:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D43;
+-			break;
+-		case ARCH_EXID_SAMA5D44:
+-			at91_soc_initdata.subtype = AT91_SOC_SAMA5D44;
+-			break;
+-		}
+-	}
+-}
+-
+-static const char *soc_name[] = {
+-	[AT91_SOC_RM9200]	= "at91rm9200",
+-	[AT91_SOC_SAM9260]	= "at91sam9260",
+-	[AT91_SOC_SAM9261]	= "at91sam9261",
+-	[AT91_SOC_SAM9263]	= "at91sam9263",
+-	[AT91_SOC_SAM9G10]	= "at91sam9g10",
+-	[AT91_SOC_SAM9G20]	= "at91sam9g20",
+-	[AT91_SOC_SAM9G45]	= "at91sam9g45",
+-	[AT91_SOC_SAM9RL]	= "at91sam9rl",
+-	[AT91_SOC_SAM9X5]	= "at91sam9x5",
+-	[AT91_SOC_SAM9N12]	= "at91sam9n12",
+-	[AT91_SOC_SAMA5D3]	= "sama5d3",
+-	[AT91_SOC_SAMA5D4]	= "sama5d4",
+-	[AT91_SOC_UNKNOWN]	= "Unknown",
+-};
+-
+-const char *at91_get_soc_type(struct at91_socinfo *c)
+-{
+-	return soc_name[c->type];
+-}
+-EXPORT_SYMBOL(at91_get_soc_type);
+-
+-static const char *soc_subtype_name[] = {
+-	[AT91_SOC_RM9200_BGA]	= "at91rm9200 BGA",
+-	[AT91_SOC_RM9200_PQFP]	= "at91rm9200 PQFP",
+-	[AT91_SOC_SAM9XE]	= "at91sam9xe",
+-	[AT91_SOC_SAM9G45ES]	= "at91sam9g45es",
+-	[AT91_SOC_SAM9M10]	= "at91sam9m10",
+-	[AT91_SOC_SAM9G46]	= "at91sam9g46",
+-	[AT91_SOC_SAM9M11]	= "at91sam9m11",
+-	[AT91_SOC_SAM9G15]	= "at91sam9g15",
+-	[AT91_SOC_SAM9G35]	= "at91sam9g35",
+-	[AT91_SOC_SAM9X35]	= "at91sam9x35",
+-	[AT91_SOC_SAM9G25]	= "at91sam9g25",
+-	[AT91_SOC_SAM9X25]	= "at91sam9x25",
+-	[AT91_SOC_SAMA5D31]	= "sama5d31",
+-	[AT91_SOC_SAMA5D33]	= "sama5d33",
+-	[AT91_SOC_SAMA5D34]	= "sama5d34",
+-	[AT91_SOC_SAMA5D35]	= "sama5d35",
+-	[AT91_SOC_SAMA5D36]	= "sama5d36",
+-	[AT91_SOC_SAMA5D41]	= "sama5d41",
+-	[AT91_SOC_SAMA5D42]	= "sama5d42",
+-	[AT91_SOC_SAMA5D43]	= "sama5d43",
+-	[AT91_SOC_SAMA5D44]	= "sama5d44",
+-	[AT91_SOC_SUBTYPE_NONE]	= "None",
+-	[AT91_SOC_SUBTYPE_UNKNOWN] = "Unknown",
+-};
+-
+-const char *at91_get_soc_subtype(struct at91_socinfo *c)
+-{
+-	return soc_subtype_name[c->subtype];
+-}
+-EXPORT_SYMBOL(at91_get_soc_subtype);
+-
+-void __init at91_map_io(void)
+-{
+-	/* Map peripherals */
+-	iotable_init(&at91_io_desc, 1);
+-
+-	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
+-	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
+-
+-	soc_detect(AT91_BASE_DBGU0);
+-	if (!at91_soc_is_detected())
+-		soc_detect(AT91_BASE_DBGU1);
+-
+-	if (!at91_soc_is_detected())
+-		panic(pr_fmt("Impossible to detect the SOC type"));
+-
+-	pr_info("Detected soc type: %s\n",
+-		at91_get_soc_type(&at91_soc_initdata));
+-	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("Detected soc subtype: %s\n",
+-			at91_get_soc_subtype(&at91_soc_initdata));
+-}
+-
+-void __init at91_alt_map_io(void)
+-{
+-	/* Map peripherals */
+-	iotable_init(&at91_alt_io_desc, 1);
+-
+-	at91_soc_initdata.type = AT91_SOC_UNKNOWN;
+-	at91_soc_initdata.subtype = AT91_SOC_SUBTYPE_UNKNOWN;
+-
+-	alt_soc_detect(AT91_BASE_DBGU2);
+-	if (!at91_soc_is_detected())
+-		panic("AT91: Impossible to detect the SOC type");
+-
+-	pr_info("AT91: Detected soc type: %s\n",
+-		at91_get_soc_type(&at91_soc_initdata));
+-	if (at91_soc_initdata.subtype != AT91_SOC_SUBTYPE_NONE)
+-		pr_info("AT91: Detected soc subtype: %s\n",
+-			at91_get_soc_subtype(&at91_soc_initdata));
+-}
 -- 
 2.1.0
