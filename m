@@ -1,36 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 Mar 2015 10:06:01 +0100
-Subject: [PATCH v9 0/5] i.MX6 PU power domain support
-In-Reply-To: <20150311011236.GV20455@dragon>
-References: <1424713215-3357-1-git-send-email-p.zabel@pengutronix.de>
- <20150311011236.GV20455@dragon>
-Message-ID: <1426064761.3101.37.camel@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 11 Mar 2015 17:08:08 +0800
+Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the onboard
+ WiFi module
+In-Reply-To: <20150311085225.GK5085@lukather>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-14-git-send-email-wens@csie.org>
+ <20150310213218.GH5085@lukather>
+ <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
+ <20150311085225.GK5085@lukather>
+Message-ID: <CAGb2v64qQVDyG69Oe_R9m_GCY4kqW13dG+soh+MeaJ4W1Xb5kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Mar 11, 2015 at 4:52 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Mar 11, 2015 at 11:11:49AM +0800, Chen-Yu Tsai wrote:
+>> On Wed, Mar 11, 2015 at 5:32 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > On Tue, Mar 10, 2015 at 07:59:24PM +0800, Chen-Yu Tsai wrote:
+>> >> The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
+>> >> WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
+>> >> The IC also takes a power enable signal via GPIO. This is supported
+>> >> with the new power sequencing bindings.
+>> >>
+>> >> The WiFi module supports out-of-band interrupt signaling via GPIO,
+>> >> but this is buggy and not enabled yet.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >
+>> > There's two almost identical patches 12/12. Which one am I suppose to
+>> > apply?
+>>
+>> This one is the right one. I forgot to clear the patches after changing
+>> the description. The "buggy" part in the description is probably not
+>> needed. Hans explained that the SD resets have nothing to do with
+>> interrupt handling.
+>
+> Just to be clear, you want the last sentence to be:
+>
+> The WiFi module supports out-of-band interrupt signaling via GPIO, but
+> this is not enabled yet.
+>
+> Right?
 
-Am Mittwoch, den 11.03.2015, 09:12 +0800 schrieb Shawn Guo:
-> On Mon, Feb 23, 2015 at 06:40:10PM +0100, Philipp Zabel wrote:
-> > Philipp Zabel (6):
-> >   Documentation: Add device tree bindings for Freescale i.MX GPC
-> >   ARM: imx6: gpc: Add PU power domain for GPU/VPU
-> >   ARM: dts: imx6qdl: Add power-domain information to gpc node
-> >   ARM: dts: imx6sl: Add power-domain information to gpc node
-> >   ARM: dts: imx6qdl: Allow disabling the PU regulator, add a enable ramp
-> >     delay
-> 
-> Applied above 5.
-> 
-> >   ARM: imx6: gpc: Allow PU regulator bypass
-> 
-> I only received 5 patches in the series.
+That's right. Thanks.
 
-Thank you, this shouldn't have appeared in the list at all.
-
-Allowing regulator bypass isn't part of the series because I still
-didn't manage to get rid of race conditions when enabling bypass on the
-regulator used in two places (gpc and imx6q-cpufreq).
-
-regards
-Philipp
+ChenYu
