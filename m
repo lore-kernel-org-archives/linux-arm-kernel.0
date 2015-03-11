@@ -1,193 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 Mar 2015 11:20:06 +0100
-Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
-Message-ID: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Mar 2015 10:22:09 +0000
+Subject: [PATCH] clk: provide clk_is_match() dummy for non-common clk
+In-Reply-To: <8682755.oK0Ae34OOP@wuerfel>
+References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
+ <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
+ <20150225172757.421.43718@quantum> <8682755.oK0Ae34OOP@wuerfel>
+Message-ID: <20150311102208.GX8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-controller") the second suspend to RAM failed. First suspend worked fine
-but the next one hang just after powering down of secondary CPUs (system
-consumed energy as it would be running but was not responsive).
+On Sun, Mar 08, 2015 at 10:05:29PM +0100, Arnd Bergmann wrote:
+> ARM randconfig build tests found a new error for configurations
+> with COMMON_CLK disabled but HAS_CLK selected by the platform:
+> 
+> ERROR: "clk_is_match" [sound/soc/fsl/snd-soc-fsl-spdif.ko] undefined!
+> 
+> This moves the declaration around, so this case is covered
+> by the existing static inline helper function.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: c69e182e51d89 ("clk: introduce clk_is_match")
+> ----
+> BTW, we have a preexisting problem in clk_get_parent,
+> clk_round_rate and clk_set_parent, which I've worked around in
+> my randconfig builds so far. Should we do that the same way?
 
-The issue was caused by enabling delayed reset assertion for CPU0 just
-after issuing power down of cores. This was introduced for Exynos4 in
-13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+NAK, as Uwe points out, you didn't address my comment.
 
-The whole behavior is not well documented but after checking with vendor
-code this should be done like this (on Exynos4):
-1. Enable delayed reset assertion when system is running (for all CPUs).
-2. Disable delayed reset assertion before suspending the system.
-   This can be done after powering off secondary CPUs.
-3. Re-enable the delayed reset assertion when system is resumed.
-
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-Cc: <stable@vger.kernel.org>
-Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
----
-
-Notes:
-    Changes since v1:
-    1. Add Bartlomiej's and Chanwoo's tested-by.
-
- arch/arm/mach-exynos/common.h  |  2 ++
- arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
- arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
- arch/arm/mach-exynos/suspend.c |  3 +++
- 4 files changed, 34 insertions(+), 37 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index f70eca7ee705..0ef8d4b47102 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -153,6 +153,8 @@ extern void exynos_enter_aftr(void);
- 
- extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
- 
-+extern void exynos_set_delayed_reset_assertion(bool enable);
-+
- extern void s5p_init_cpu(void __iomem *cpuid_addr);
- extern unsigned int samsung_rev(void);
- extern void __iomem *cpu_boot_reg_base(void);
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 9e9dfdfad9d7..1081ff1f03c6 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -166,6 +166,33 @@ static void __init exynos_init_io(void)
- 	exynos_map_io();
- }
- 
-+/*
-+ * Set or clear the USE_DELAYED_RESET_ASSERTION option. Used by smp code
-+ * and suspend.
-+ *
-+ * This is necessary only on Exynos4 SoCs. When system is running
-+ * USE_DELAYED_RESET_ASSERTION should be set so the ARM CLK clock down
-+ * feature could properly detect global idle state when secondary CPU is
-+ * powered down.
-+ *
-+ * However this should not be set when such system is going into suspend.
-+ */
-+void exynos_set_delayed_reset_assertion(bool enable)
-+{
-+	if (soc_is_exynos4()) {
-+		unsigned int tmp, core_id;
-+
-+		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
-+			tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
-+			if (enable)
-+				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
-+			else
-+				tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
-+			pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
-+		}
-+	}
-+}
-+
- static const struct of_device_id exynos_dt_pmu_match[] = {
- 	{ .compatible = "samsung,exynos3250-pmu" },
- 	{ .compatible = "samsung,exynos4210-pmu" },
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index d2e9f12d12f1..d45e8cd23925 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,30 +34,6 @@
- 
- extern void exynos4_secondary_startup(void);
- 
--/*
-- * Set or clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
-- * during hot-(un)plugging CPUx.
-- *
-- * The feature can be cleared safely during first boot of secondary CPU.
-- *
-- * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION during powering
-- * down a CPU so the CPU idle clock down feature could properly detect global
-- * idle state when CPUx is off.
-- */
--static void exynos_set_delayed_reset_assertion(u32 core_id, bool enable)
--{
--	if (soc_is_exynos4()) {
--		unsigned int tmp;
--
--		tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
--		if (enable)
--			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
--		else
--			tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
--		pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
--	}
--}
--
- #ifdef CONFIG_HOTPLUG_CPU
- static inline void cpu_leave_lowpower(u32 core_id)
- {
-@@ -73,8 +49,6 @@ static inline void cpu_leave_lowpower(u32 core_id)
- 	  : "=&r" (v)
- 	  : "Ir" (CR_C), "Ir" (0x40)
- 	  : "cc");
--
--	 exynos_set_delayed_reset_assertion(core_id, false);
- }
- 
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-@@ -87,14 +61,6 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		/* Turn the CPU off on next WFI instruction. */
- 		exynos_cpu_power_down(core_id);
- 
--		/*
--		 * Exynos4 SoCs require setting
--		 * USE_DELAYED_RESET_ASSERTION so the CPU idle
--		 * clock down feature could properly detect
--		 * global idle state when CPUx is off.
--		 */
--		exynos_set_delayed_reset_assertion(core_id, true);
--
- 		wfi();
- 
- 		if (pen_release == core_id) {
-@@ -354,9 +320,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 		udelay(10);
- 	}
- 
--	/* No harm if this is called during first boot of secondary CPU */
--	exynos_set_delayed_reset_assertion(core_id, false);
--
- 	/*
- 	 * now the secondary core is starting up let it run its
- 	 * calibrations, then wait for it to finish
-@@ -403,6 +366,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- 
- 	exynos_sysram_init();
- 
-+	exynos_set_delayed_reset_assertion(true);
-+
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
- 		scu_enable(scu_base_addr());
- 
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index 318d127df147..582ef2df960d 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -235,6 +235,8 @@ static void exynos_pm_enter_sleep_mode(void)
- 
- static void exynos_pm_prepare(void)
- {
-+	exynos_set_delayed_reset_assertion(false);
-+
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
-@@ -383,6 +385,7 @@ early_wakeup:
- 
- 	/* Clear SLEEP mode set in INFORM1 */
- 	pmu_raw_writel(0x0, S5P_INFORM1);
-+	exynos_set_delayed_reset_assertion(true);
- }
- 
- static void exynos3250_pm_resume(void)
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
