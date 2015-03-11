@@ -1,67 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 14:13:59 +0100
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CAB3XZEfnZbZqH95suJ9n39aZRr8kxPdj2HZuWKMvQtYmXe3QEQ@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <CABxcv=nE_Qd7do+dRyp=fw3wYmWFb+0eEjXYOtdjqE55Cp0zmQ@mail.gmail.com>
- <CAB3XZEfnZbZqH95suJ9n39aZRr8kxPdj2HZuWKMvQtYmXe3QEQ@mail.gmail.com>
-Message-ID: <2233058.m8xh0sUU5j@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Mar 2015 13:14:33 +0000
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <550038C9.7010807@free-electrons.com>
+References: <54FF21BE.2040506@list.ru>
+ <550038C9.7010807@free-electrons.com>
+Message-ID: <20150311131433.GC8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 14:12:54 Eliad Peller wrote:
-> On Wed, Mar 11, 2015 at 1:34 PM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
-> > I think that patch [0] should not be needed since for external clocks,
-> > the IP providing the clocks should have its own clock driver and for
-> > internal clocks, a property should be used instead as you said.
-> >
-> >> If there is no external clock provider for this chip and the clocks
-> >> are provided by the device itself, then all we need is a clock-frequency
-> >> property in the device node.
-> >>
-> >
-> > Agreed, IIUC Luciano wanted to expose the internal clocks by
-> > registering in the common clock framework but if those clocks are not
-> > really accessible from outside the wlan chip, then I also think that a
-> > device node property should be used instead.
-> >
-> how should i describe multiple clock-frequency properties (there are 2
-> relevant clocks) in this case?
+On Wed, Mar 11, 2015 at 01:44:57PM +0100, Gregory CLEMENT wrote:
+> Hi Stas,
 > 
-> does something like the following makes sense?
+> On 10/03/2015 17:54, Stas Sergeev wrote:
+> > Hello, the patch below is needed for a successful boot on armada-xp.
+> > 
 > 
-> wlcore: wlcore at 2 {
->     ...
->     refclock: refclock {
->         compatible = "fixed-clock";
->         #clock-cells = <0>;
->         clock-frequency = <38400000>;
->     };
-> }
+> I am really surprised by this patch because I used the Armada XP based
+> board in a daily base and I never saw this issue.
 
-I would put that clock node on the top level of the DT, as you are
-describing an external clock input here, but other than that, it looks
-good.
+Can you provide some details about your board - does it have 8GB of
+memory, ranging from 0-0xf0000000, and 4G-8G ?
 
-I would do the binding in a way that mandates either a "clocks"
-reference to an external clock provider in case of a XTAL or
-a "clock-frequency" property. In the first case, you can use
-the "clock-names" property to identify the "ref" and "txco"
-clock inputs, in the second case we could either decide
-to have a single property with two cells, or have named
-properties like
+Thanks.
 
-	wlcore at 2 {
-		interrupts = < ... >;
-		tcxo-clock-frequency = <38400000>;
-		ref-clock-frequency = <19200000>;
-	}
-
-I don't know which combinations are possible here. I did notice
-that most of the references in the board hacks use '0' as the
-tcxo clock value, which happens to be the same as
-WL12XX_TCXOCLOCK_19_2, but could also meant that no tcxo clock
-is used.
-
-	Arnd 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
