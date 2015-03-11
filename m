@@ -1,34 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 21:16:15 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC r8a7778 CCF and Multiplatform
- Updates for v4.1
-In-Reply-To: <CAMuHMdXR06gQVvi5+h1kyDWsTwqGdtHchD20-Ln1tGOFEn8Tag@mail.gmail.com>
-References: <cover.1425518337.git.horms+renesas@verge.net.au>
- <2398647.6T9U8oT0zu@wuerfel>
- <CAMuHMdXR06gQVvi5+h1kyDWsTwqGdtHchD20-Ln1tGOFEn8Tag@mail.gmail.com>
-Message-ID: <42571376.W8osvFWALn@wuerfel>
+Date: Wed, 11 Mar 2015 21:20:31 +0100
+Subject: [PATCH v2 1/3] devicetree: bindings: Document qcom,
+ msm-id and qcom, board-id
+In-Reply-To: <CAJAp7OiVwvPjRbrBxw7Dndvk4Apwz_bx=CzSqeqd3JzYhmB7Kw@mail.gmail.com>
+References: <1425503602-24916-1-git-send-email-galak@codeaurora.org>
+ <7DA73171-01A5-4158-9A69-015B62D2D7E8@codeaurora.org>
+ <CAJAp7OiVwvPjRbrBxw7Dndvk4Apwz_bx=CzSqeqd3JzYhmB7Kw@mail.gmail.com>
+Message-ID: <2155628.BceQuZbXC8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 16:01:47 Geert Uytterhoeven wrote:
+On Wednesday 11 March 2015 08:33:04 Bjorn Andersson wrote:
 > 
-> On Wed, Mar 11, 2015 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 05 March 2015 10:58:14 Simon Horman wrote:
-> >> Renesas ARM Based SoC r8a7778 CCF and Multiplatform Updates for v4.1
-> >>
-> >> * Add CCF and them multiplatform support to r8a7778 SoC and its
-> >>   bockw board.
-> >
-> > I don't see Mike Turquette on Cc for the CCF driver here, or in the
-> > Reviewed-by/Acked-by list for the relevant patches.
-> >
-> > Has he given his ok for the patches to be merged through arm-soc?
+> But are these values actually used by the boot loader?
 > 
-> I think you overlooked Mike's ack:
-> https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?id=6232c51cb370919b116e0aea38d12aa33aae2fa9
+> As far as I could see in 8974 the dtbTool provided by Qualcomm
+> extracts the values from the list of dtbs and use them to create the
+> table-of-content in the QCDT blob. The boot loader then looks in this
+> TOC to pick the right dtb to use.
+> 
 
-I clearly did, yes.
-
-Sorry for my mistake, pulled into next/multiplatform now.
+I guess if I understand this right, we just need to fix that dtbTool
+then to look at the top-level compatible property and/or machine
+name instead?
 
 	Arnd
