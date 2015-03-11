@@ -1,19 +1,26 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Mar 2015 20:39:43 +0800
-Subject: [PATCH v10 17/21] clocksource / arch_timer: Parse GTDT to initialize
- arch timer
+Date: Wed, 11 Mar 2015 20:39:44 +0800
+Subject: [PATCH v10 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if
+ ACPI is enabled on ARM64
 In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1426077587-1561-18-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1426077587-1561-19-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the information presented by GTDT (Generic Timer Description Table)
-to initialize the arch timer (not memory-mapped).
+From: Al Stone <al.stone@linaro.org>
 
-CC: Daniel Lezcano <daniel.lezcano@linaro.org>
-CC: Thomas Gleixner <tglx@linutronix.de>
-Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+ACPI reduced hardware mode is disabled by default, but ARM64
+can only run properly in ACPI hardware reduced mode, so select
+ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
+
+If the firmware is not using hardware reduced ACPI mode, we
+will disable ACPI to avoid nightmare such as accessing some
+registers which are not available on ARM64.
+
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
 Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 Tested-by: Yijing Wang <wangyijing@huawei.com>
 Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
@@ -21,225 +28,50 @@ Tested-by: Jon Masters <jcm@redhat.com>
 Tested-by: Timur Tabi <timur@codeaurora.org>
 Tested-by: Robert Richter <rrichter@cavium.com>
 Acked-by: Robert Richter <rrichter@cavium.com>
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/kernel/time.c             |   7 ++
- drivers/clocksource/arm_arch_timer.c | 132 ++++++++++++++++++++++++++++-------
- include/linux/clocksource.h          |   6 ++
- 3 files changed, 118 insertions(+), 27 deletions(-)
+ arch/arm64/Kconfig       | 1 +
+ arch/arm64/kernel/acpi.c | 8 +++++++-
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 1a7125c..42f9195 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -35,6 +35,7 @@
- #include <linux/delay.h>
- #include <linux/clocksource.h>
- #include <linux/clk-provider.h>
-+#include <linux/acpi.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -72,6 +73,12 @@ void __init time_init(void)
- 
- 	tick_setup_hrtimer_broadcast();
- 
-+	/*
-+	 * Since ACPI or FDT will only one be available in the system,
-+	 * we can use acpi_generic_timer_init() here safely
-+	 */
-+	acpi_generic_timer_init();
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..d00ab9a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1,5 +1,6 @@
+ config ARM64
+ 	def_bool y
++	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+ 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 6468f88..5819ef7 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -303,6 +303,11 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+ 	 */
+ 	if (table->revision > 5 ||
+ 	    (table->revision == 5 && fadt->minor_revision >= 1)) {
++		if (!acpi_gbl_reduced_hardware) {
++			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
++			goto disable_acpi;
++		}
 +
- 	arch_timer_rate = arch_timer_get_rate();
- 	if (!arch_timer_rate)
- 		panic("Unable to initialise architected timer.\n");
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index a3025e7..ea62fc7 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -22,6 +22,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/sched_clock.h>
-+#include <linux/acpi.h>
+ 		/*
+ 		 * ACPI 5.1 only has two explicit methods to boot up SMP,
+ 		 * PSCI and Parking protocol, but the Parking protocol is
+@@ -319,8 +324,9 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
  
- #include <asm/arch_timer.h>
- #include <asm/virt.h>
-@@ -371,8 +372,12 @@ arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
- 	if (arch_timer_rate)
- 		return;
+ 	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+ 		table->revision, fadt->minor_revision);
+-	disable_acpi();
  
--	/* Try to determine the frequency from the device tree or CNTFRQ */
--	if (of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
-+	/*
-+	 * Try to determine the frequency from the device tree or CNTFRQ,
-+	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
-+	 */
-+	if (!acpi_disabled ||
-+	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
- 		if (cntbase)
- 			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
- 		else
-@@ -691,28 +696,8 @@ static void __init arch_timer_common_init(void)
- 	arch_timer_arch_init();
++disable_acpi:
++	disable_acpi();
+ 	return -EINVAL;
  }
  
--static void __init arch_timer_init(struct device_node *np)
-+static void __init arch_timer_init(void)
- {
--	int i;
--
--	if (arch_timers_present & ARCH_CP15_TIMER) {
--		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
--		return;
--	}
--
--	arch_timers_present |= ARCH_CP15_TIMER;
--	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
--		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
--	arch_timer_detect_rate(NULL, np);
--
--	/*
--	 * If we cannot rely on firmware initializing the timer registers then
--	 * we should use the physical timers instead.
--	 */
--	if (IS_ENABLED(CONFIG_ARM) &&
--	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
--			arch_timer_use_virtual = false;
--
- 	/*
- 	 * If HYP mode is available, we know that the physical timer
- 	 * has been configured to be accessible from PL1. Use it, so
-@@ -731,13 +716,39 @@ static void __init arch_timer_init(struct device_node *np)
- 		}
- 	}
- 
--	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
--
- 	arch_timer_register();
- 	arch_timer_common_init();
- }
--CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_init);
--CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_init);
-+
-+static void __init arch_timer_of_init(struct device_node *np)
-+{
-+	int i;
-+
-+	if (arch_timers_present & ARCH_CP15_TIMER) {
-+		pr_warn("arch_timer: multiple nodes in dt, skipping\n");
-+		return;
-+	}
-+
-+	arch_timers_present |= ARCH_CP15_TIMER;
-+	for (i = PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++)
-+		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
-+
-+	arch_timer_detect_rate(NULL, np);
-+
-+	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
-+
-+	/*
-+	 * If we cannot rely on firmware initializing the timer registers then
-+	 * we should use the physical timers instead.
-+	 */
-+	if (IS_ENABLED(CONFIG_ARM) &&
-+	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
-+			arch_timer_use_virtual = false;
-+
-+	arch_timer_init();
-+}
-+CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
-+CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
- 
- static void __init arch_timer_mem_init(struct device_node *np)
- {
-@@ -804,3 +815,70 @@ static void __init arch_timer_mem_init(struct device_node *np)
- }
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_init);
-+
-+#ifdef CONFIG_ACPI
-+static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
-+{
-+	int trigger, polarity;
-+
-+	if (!interrupt)
-+		return 0;
-+
-+	trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
-+			: ACPI_LEVEL_SENSITIVE;
-+
-+	polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
-+			: ACPI_ACTIVE_HIGH;
-+
-+	return acpi_register_gsi(NULL, interrupt, trigger, polarity);
-+}
-+
-+/* Initialize per-processor generic timer */
-+static int __init arch_timer_acpi_init(struct acpi_table_header *table)
-+{
-+	struct acpi_table_gtdt *gtdt;
-+
-+	if (arch_timers_present & ARCH_CP15_TIMER) {
-+		pr_warn("arch_timer: already initialized, skipping\n");
-+		return -EINVAL;
-+	}
-+
-+	gtdt = container_of(table, struct acpi_table_gtdt, header);
-+
-+	arch_timers_present |= ARCH_CP15_TIMER;
-+
-+	arch_timer_ppi[PHYS_SECURE_PPI] =
-+		map_generic_timer_interrupt(gtdt->secure_el1_interrupt,
-+		gtdt->secure_el1_flags);
-+
-+	arch_timer_ppi[PHYS_NONSECURE_PPI] =
-+		map_generic_timer_interrupt(gtdt->non_secure_el1_interrupt,
-+		gtdt->non_secure_el1_flags);
-+
-+	arch_timer_ppi[VIRT_PPI] =
-+		map_generic_timer_interrupt(gtdt->virtual_timer_interrupt,
-+		gtdt->virtual_timer_flags);
-+
-+	arch_timer_ppi[HYP_PPI] =
-+		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
-+		gtdt->non_secure_el2_flags);
-+
-+	/* Get the frequency from CNTFRQ */
-+	arch_timer_detect_rate(NULL, NULL);
-+
-+	/* Always-on capability */
-+	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-+
-+	arch_timer_init();
-+	return 0;
-+}
-+
-+/* Initialize all the generic timers presented in GTDT */
-+void __init acpi_generic_timer_init(void)
-+{
-+	if (acpi_disabled)
-+		return;
-+
-+	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
-+}
-+#endif
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 9c78d15..2b2e1f8 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -244,4 +244,10 @@ extern void clocksource_of_init(void);
- static inline void clocksource_of_init(void) {}
- #endif
- 
-+#ifdef CONFIG_ACPI
-+void acpi_generic_timer_init(void);
-+#else
-+static inline void acpi_generic_timer_init(void) { }
-+#endif
-+
- #endif /* _LINUX_CLOCKSOURCE_H */
 -- 
 1.9.1
