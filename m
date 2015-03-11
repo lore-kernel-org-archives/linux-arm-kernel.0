@@ -1,625 +1,269 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Wed, 11 Mar 2015 17:24:42 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <20150311124730.GZ8656@n2100.arm.linux.org.uk>
-References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru> <20150310173807.GU8656@n2100.arm.linux.org.uk>
- <55003569.1010200@list.ru> <20150311124730.GZ8656@n2100.arm.linux.org.uk>
-Message-ID: <5500502A.5060905@list.ru>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 11 Mar 2015 15:25:05 +0100
+Subject: [PATCH v2 1/3] arm64: KVM: Fix stage-2 PGD allocation to have
+ per-page refcounting
+In-Reply-To: <20150311140333.GA7911@hawk.usersys.redhat.com>
+References: <1426014421-5579-1-git-send-email-marc.zyngier@arm.com>
+ <1426014421-5579-2-git-send-email-marc.zyngier@arm.com>
+ <20150311121635.GA12888@cbox> <55003F5F.6050706@arm.com>
+ <CAMJs5B_rXikZiLdWgwxdXYHcsyzo_Hm1T1Rm9Gkw12HPUvJ84A@mail.gmail.com>
+ <20150311140333.GA7911@hawk.usersys.redhat.com>
+Message-ID: <CAMJs5B-c5aKmBUV614k-JUQGsf3fL8ub8q8GbGMDAGhfvb9j=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-11.03.2015 15:47, Russell King - ARM Linux ?????:
->> [    6.857113] vmalloc: mapping page ef7f12c0 (0x000efc16000) at 0xf00d4000
->> [    6.863845] vmalloc: mapping page ef7f12a0 (0x000efc15000) at 0xf00d5000
->> [    6.870567] Unhandled fault: external abort on non-linefetch (0x808)
->> at 0xf00d3018
-> Yet it causes this.  I wonder if there's a conflict between DRAM and
-> some other devices causing this, or maybe a stale TLB entry.
+On Wed, Mar 11, 2015 at 3:03 PM, Andrew Jones <drjones@redhat.com> wrote:
+> On Wed, Mar 11, 2015 at 02:20:56PM +0100, Christoffer Dall wrote:
+>> On Wed, Mar 11, 2015 at 2:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> > Hi Christoffer,
+>> >
+>> > On 11/03/15 12:16, Christoffer Dall wrote:
+>> >> Hi Marc,
+>> >>
+>> >> On Tue, Mar 10, 2015 at 07:06:59PM +0000, Marc Zyngier wrote:
+>> >>> We're using __get_free_pages with to allocate the guest's stage-2
+>> >>> PGD. The standard behaviour of this function is to return a set of
+>> >>> pages where only the head page has a valid refcount.
+>> >>>
+>> >>> This behaviour gets us into trouble when we're trying to increment
+>> >>> the refcount on a non-head page:
+>> >>>
+>> >>> page:ffff7c00cfb693c0 count:0 mapcount:0 mapping:          (null) index:0x0
+>> >>> flags: 0x4000000000000000()
+>> >>> page dumped because: VM_BUG_ON_PAGE((*({ __attribute__((unused)) typeof((&page->_count)->counter) __var = ( typeof((&page->_count)->counter)) 0; (volatile typeof((&page->_count)->counter) *)&((&page->_count)->counter); })) <= 0)
+>> >>> BUG: failure at include/linux/mm.h:548/get_page()!
+>> >>> Kernel panic - not syncing: BUG!
+>> >>> CPU: 1 PID: 1695 Comm: kvm-vcpu-0 Not tainted 4.0.0-rc1+ #3825
+>> >>> Hardware name: APM X-Gene Mustang board (DT)
+>> >>> Call trace:
+>> >>> [<ffff80000008a09c>] dump_backtrace+0x0/0x13c
+>> >>> [<ffff80000008a1e8>] show_stack+0x10/0x1c
+>> >>> [<ffff800000691da8>] dump_stack+0x74/0x94
+>> >>> [<ffff800000690d78>] panic+0x100/0x240
+>> >>> [<ffff8000000a0bc4>] stage2_get_pmd+0x17c/0x2bc
+>> >>> [<ffff8000000a1dc4>] kvm_handle_guest_abort+0x4b4/0x6b0
+>> >>> [<ffff8000000a420c>] handle_exit+0x58/0x180
+>> >>> [<ffff80000009e7a4>] kvm_arch_vcpu_ioctl_run+0x114/0x45c
+>> >>> [<ffff800000099df4>] kvm_vcpu_ioctl+0x2e0/0x754
+>> >>> [<ffff8000001c0a18>] do_vfs_ioctl+0x424/0x5c8
+>> >>> [<ffff8000001c0bfc>] SyS_ioctl+0x40/0x78
+>> >>> CPU0: stopping
+>> >>>
+>> >>> A possible approach for this is to split the compound page using
+>> >>> split_page() at allocation time, and change the teardown path to
+>> >>> free one page at a time.
+>> >>>
+>> >>> While we're at it, the PGD allocation code is reworked to reduce
+>> >>> duplication.
+>> >>>
+>> >>> This has been tested on an X-Gene platform with a 4kB/48bit-VA host
+>> >>> kernel, and kvmtool hacked to place memory in the second page of
+>> >>> the hardware PGD (PUD for the host kernel). Also regression-tested
+>> >>> on a Cubietruck (Cortex-A7).
+>> >>>
+>> >>> Reported-by: Mark Rutland <mark.rutland@arm.com>
+>> >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> >>> ---
+>> >>>  arch/arm/include/asm/kvm_mmu.h   |  9 ++---
+>> >>>  arch/arm/kvm/mmu.c               | 77 +++++++++++++++++++++++++++++++---------
+>> >>>  arch/arm64/include/asm/kvm_mmu.h | 46 +++---------------------
+>> >>>  3 files changed, 66 insertions(+), 66 deletions(-)
+>> >>>
+>> >>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> >>> index 0187606..ff56f91 100644
+>> >>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> >>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> >>> @@ -162,18 +162,13 @@ static inline bool kvm_page_empty(void *ptr)
+>> >>>
+>> >>>  #define KVM_PREALLOC_LEVEL  0
+>> >>>
+>> >>> -static inline int kvm_prealloc_hwpgd(struct kvm *kvm, pgd_t *pgd)
+>> >>> -{
+>> >>> -    return 0;
+>> >>> -}
+>> >>> -
+>> >>> -static inline void kvm_free_hwpgd(struct kvm *kvm) { }
+>> >>> -
+>> >>>  static inline void *kvm_get_hwpgd(struct kvm *kvm)
+>> >>>  {
+>> >>>      return kvm->arch.pgd;
+>> >>>  }
+>> >>>
+>> >>> +static inline unsigned int kvm_get_hwpgd_order(void) { return S2_PGD_ORDER; }
+>> >>> +
+>> >>>  struct kvm;
+>> >>>
+>> >>>  #define kvm_flush_dcache_to_poc(a,l)        __cpuc_flush_dcache_area((a), (l))
+>> >>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> >>> index 69c2b4c..0a5457c 100644
+>> >>> --- a/arch/arm/kvm/mmu.c
+>> >>> +++ b/arch/arm/kvm/mmu.c
+>> >>> @@ -634,6 +634,31 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+>> >>>                                   __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+>> >>>  }
+>> >>>
+>> >>> +/* Free the HW pgd, one page at a time */
+>> >>> +static void kvm_free_hwpgd(unsigned long hwpgd)
+>> >>> +{
+>> >>> +    int i;
+>> >>> +
+>> >>> +    for (i = 0; i < (1 << kvm_get_hwpgd_order()); i += PAGE_SIZE)
+>> >>> +            free_page(hwpgd + i);
+>> >>> +}
+>> >>> +
+>> >>> +/* Allocate the HW PGD, making sure that each page gets its own refcount */
+>> >>> +static int kvm_alloc_hwpgd(unsigned long *hwpgdp)
+>> >>
+>> >> I think this can be simplified somewhat by just returning an unsigned
+>> >> long that can be 0 in the error case which will make the caller look
+>> >> a little nicer too.
+>> >
+>> > Sure.
+>> >
+>> >>> +{
+>> >>> +    unsigned long hwpgd;
+>> >>> +    unsigned int order = kvm_get_hwpgd_order();
+>> >>> +
+>> >>> +    hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>> >>> +    if (!hwpgd)
+>> >>> +            return -ENOMEM;
+>> >>> +
+>> >>> +    split_page(virt_to_page((void *)hwpgd), order);
+>> >>
+>> >> nit: alloc_pages_exact() and free_pages_exact() seem to do this for us,
+>> >> is it worth using those instead?
+>> >
+>> > Ah, I didn't know about these.
+>> >
+>> >> It would look something like this on top of your changes:
+>> >>
+>> >>
+>> >>  arch/arm/include/asm/kvm_mmu.h   |  5 ++++-
+>> >>  arch/arm/kvm/mmu.c               | 32 ++++++++++----------------------
+>> >>  arch/arm64/include/asm/kvm_mmu.h |  6 +++---
+>> >>  3 files changed, 17 insertions(+), 26 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> >> index fc05ba8..4cf48c3 100644
+>> >> --- a/arch/arm/include/asm/kvm_mmu.h
+>> >> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> >> @@ -168,7 +168,10 @@ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+>> >>       return kvm->arch.pgd;
+>> >>  }
+>> >>
+>> >> -static inline unsigned int kvm_get_hwpgd_order(void) { return S2_PGD_ORDER; }
+>> >> +static inline unsigned int kvm_get_hwpgd_size(void)
+>> >> +{
+>> >> +     return PTRS_PER_S2_PGD * sizeof(pgd_t);
+>> >> +}
+>> >>
+>> >>  struct kvm;
+>> >>
+>> >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> >> index 8e91bea3..5656d79 100644
+>> >> --- a/arch/arm/kvm/mmu.c
+>> >> +++ b/arch/arm/kvm/mmu.c
+>> >> @@ -633,28 +633,17 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+>> >>  }
+>> >>
+>> >>  /* Free the HW pgd, one page at a time */
+>> >> -static void kvm_free_hwpgd(unsigned long hwpgd)
+>> >> +static void kvm_free_hwpgd(void *hwpgd)
+>> >>  {
+>> >> -     int i;
+>> >> -
+>> >> -     for (i = 0; i < (1 << kvm_get_hwpgd_order()); i += PAGE_SIZE)
+>> >> -             free_page(hwpgd + i);
+>> >> +     free_pages_exact(hwpgd, kvm_get_hwpgd_size());
+>> >>  }
+>> >>
+>> >>  /* Allocate the HW PGD, making sure that each page gets its own refcount */
+>> >> -static int kvm_alloc_hwpgd(unsigned long *hwpgdp)
+>> >> +static void *kvm_alloc_hwpgd(void)
+>> >>  {
+>> >> -     unsigned long hwpgd;
+>> >> -     unsigned int order = kvm_get_hwpgd_order();
+>> >> -
+>> >> -     hwpgd = __get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
+>> >> -     if (!hwpgd)
+>> >> -             return -ENOMEM;
+>> >> -
+>> >> -     split_page(virt_to_page((void *)hwpgd), order);
+>> >> +     unsigned int size = kvm_get_hwpgd_size();
+>> >>
+>> >> -     *hwpgdp = hwpgd;
+>> >> -     return 0;
+>> >> +     return alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+>> >>  }
+>> >>
+>> >>  /**
+>> >> @@ -670,18 +659,17 @@ static int kvm_alloc_hwpgd(unsigned long *hwpgdp)
+>> >>   */
+>> >>  int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>> >>  {
+>> >> -     int ret;
+>> >>       pgd_t *pgd;
+>> >> -     unsigned long hwpgd;
+>> >> +     void *hwpgd;
+>> >>
+>> >>       if (kvm->arch.pgd != NULL) {
+>> >>               kvm_err("kvm_arch already initialized?\n");
+>> >>               return -EINVAL;
+>> >>       }
+>> >>
+>> >> -     ret = kvm_alloc_hwpgd(&hwpgd);
+>> >> -     if (ret)
+>> >> -             return ret;
+>> >> +     hwpgd = kvm_alloc_hwpgd();
+>> >> +     if (!hwpgd)
+>> >> +             return -ENOMEM;
+>> >>
+>> >>       /* When the kernel uses more levels of page tables than the
+>> >>        * guest, we allocate a fake PGD and pre-populate it to point
+>> >> @@ -829,7 +817,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>> >>               return;
+>> >>
+>> >>       unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+>> >> -     kvm_free_hwpgd((unsigned long)kvm_get_hwpgd(kvm));
+>> >> +     kvm_free_hwpgd(kvm_get_hwpgd(kvm));
+>> >>       if (KVM_PREALLOC_LEVEL > 0)
+>> >>               kfree(kvm->arch.pgd);
+>> >>
+>> >> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> >> index 3668110..bbfb600 100644
+>> >> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> >> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> >> @@ -189,11 +189,11 @@ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+>> >>       return pmd_offset(pud, 0);
+>> >>  }
+>> >>
+>> >> -static inline unsigned int kvm_get_hwpgd_order(void)
+>> >> +static inline unsigned int kvm_get_hwpgd_size(void)
+>> >>  {
+>> >>       if (KVM_PREALLOC_LEVEL > 0)
+>> >> -             return PTRS_PER_S2_PGD_SHIFT;
+>> >> -     return S2_PGD_ORDER;
+>> >> +             return PTRS_PER_S2_PGD * PAGE_SIZE;
+>> >> +     return PTRS_PER_S2_PGD * sizeof(pgd_t);
+>> >>  }
+>> >>
+>> >>  static inline bool kvm_page_empty(void *ptr)
+>> >
+>> > Looks good to me. I'll fold that into the patch, amend the commit
+>> > message and resend.
+>> >
+>>
+>> I've done that here:
+>> https://git.linaro.org/people/christoffer.dall/linux-kvm-arm.git/shortlog/refs/heads/pgd-fixes-alt
+>>
+>> (except for the commit message, which I can also adjust).
+>>
+>> I gave this a quick spin on Juno and TC2 (but couldn't test 64K pages
+>> because I don't have a platform for that handy this very second)...
 >
-> The thing which makes me consider a stale TLB entry is that the mapping
-> we're adding is for a WBWA cacheable mapping, which should cause line
-> fetches.  The abort which is being raised is for a non-linefetch, a
-> type of access which a WBWA cacheable mapping should never create.
+> Tested with 64K config. Works for me (test was just a guest boot)
 >
-> We can check whether it's a stale TLB entry - if you add a call to
-> flush_tlb_all() after the call to vmalloc() in n_tty_open().  You
-> may need to include <asm/tlbflush.h> to make that work - can you try
-> that please.
-Seems to be the same:
----
-[    6.872592] vmalloc: mapping page ef7f0800 (0x000efbc0000) at 0xf00d3000
-[    6.879309] vmalloc: mapping page ef7f0820 (0x000efbc1000) at 0xf00d4000
-[    6.886040] vmalloc: mapping page ef7f0840 (0x000efbc2000) at 0xf00d5000
-[    6.892762] flush_tlb_all() called here
-[    6.896611] Unhandled fault: external abort on non-linefetch (0x808)
-at 0xf00d3018
-[    6.903717]  sda: sda1 sda2 sda3
-[    6.907429] pgd = c0004000
-[    6.910141] [f00d3018] *pgd=2d404811, *pte=efbc065f, *ppte=efbc045f
-[    6.916461] Internal error: : 808 [#1] SMP ARM
----
+Thanks,
+applied.
 
-However, while testing, I've suddenly got another crash happened
-a bit earlier than the previous one used to happen: (OOM? How??)
----
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.0.0-rc2-00137-gb672c98-dirty
-(root at host-010-117) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) )
-#2 SMP 5
-[    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7),
-cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
-cache
-[    0.000000] Machine model: Marvell Armada XP Development Board
-DB-MV784MP-GP
-[    0.000000] Ignoring memory block 0x100000000 - 0x200000000
-[    0.000000] memblock_reserve: [0x00000000008280-0x00000000700203]
-flags 0x0 arm_memblock_init+0x20/0x18c
-[    0.000000] memblock_reserve: [0x00000001100040-0x0000000142fad3]
-flags 0x0 arm_memblock_init+0x100/0x18c
-[    0.000000] memblock_reserve: [0x00000000004000-0x00000000007fff]
-flags 0x0 arm_memblock_init+0x124/0x18c
-[    0.000000] memblock_reserve: [0x00000000000000-0x000000000027ff]
-flags 0x0 mvebu_scan_mem+0xa4/0xec
-[    0.000000] memblock_reserve: [0x00000000000000-0x000000000027ff]
-flags 0x0 mvebu_scan_mem+0xa4/0xec
-[    0.000000] memblock_reserve: [0x00000000a41168-0x00000000a45391]
-flags 0x0 early_init_fdt_scan_reserved_mem+0x30/0x88
-[    0.000000] MEMBLOCK configuration:
-[    0.000000]  memory size = 0xf0000000 reserved size = 0xa32442
-[    0.000000]  memory.cnt  = 0x1
-[    0.000000]  memory[0x0]     [0x00000000000000-0x000000efffffff],
-0xf0000000 bytes flags: 0x0
-[    0.000000]  reserved.cnt  = 0x5
-[    0.000000]  reserved[0x0]   [0x00000000000000-0x000000000027ff],
-0x2800 bytes flags: 0x0
-[    0.000000]  reserved[0x1]   [0x00000000004000-0x00000000007fff],
-0x4000 bytes flags: 0x0
-[    0.000000]  reserved[0x2]   [0x00000000008280-0x00000000700203],
-0x6f7f84 bytes flags: 0x0
-[    0.000000]  reserved[0x3]   [0x00000000a41168-0x00000000a45391],
-0x422a bytes flags: 0x0
-[    0.000000]  reserved[0x4]   [0x00000001100040-0x0000000142fad3],
-0x32fa94 bytes flags: 0x0
-[    0.000000] Memory policy: Data cache writealloc
-[    0.000000] memblock_reserve: [0x0000002f7fe000-0x0000002f7fffff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fd000-0x0000002f7fdfff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcfd8-0x0000002f7fcfff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fb000-0x0000002f7fbfff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fa000-0x0000002f7fafff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7f9000-0x0000002f7f9fff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 31457280 bytes
-align=0x0 nid=0 from=0x0 max_addr=0x0 alloc_node_mem_map.constprop.66+0x0
-[    0.000000] memblock_reserve: [0x0000002d9f9000-0x0000002f7f8fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 96 bytes align=0x0
-nid=0 from=0x0 max_addr=0x0 free_area_init_node+0x2fc/0x3cc
-[    0.000000] memblock_reserve: [0x0000002f7fcf40-0x0000002f7fcf9f]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 12288 bytes
-align=0x0 nid=0 from=0x0 max_addr=0x0 zone_wait_table_init+0x80/0xf0
-[    0.000000] memblock_reserve: [0x0000002d9f6000-0x0000002d9f8fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 388 bytes align=0x0
-nid=0 from=0x0 max_addr=0x0 free_area_init_node+0x2fc/0x3cc
-[    0.000000] memblock_reserve: [0x0000002f7fcd80-0x0000002f7fcf03]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 49152 bytes
-align=0x0 nid=0 from=0x0 max_addr=0x0 zone_wait_table_init+0x80/0xf0
-[    0.000000] memblock_reserve: [0x0000002d9ea000-0x0000002d9f5fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 28 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 setup_arch+0x4d4/0x8b0
-[    0.000000] memblock_reserve: [0x0000002f7fcd40-0x0000002f7fcd5b]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_reserve: [0x0000002d9defd8-0x0000002d9e9fff]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcfc0-0x0000002f7fcfd7]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcfa8-0x0000002f7fcfbf]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcf28-0x0000002f7fcf3f]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcf0c-0x0000002f7fcf24]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcd64-0x0000002f7fcd7c]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcd24-0x0000002f7fcd3c]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_reserve: [0x0000002f7fcd0c-0x0000002f7fcd23]
-flags 0x0 memblock_alloc_range_nid+0x30/0x44
-[    0.000000] memblock_virt_alloc_try_nid: 83 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 start_kernel+0xb4/0x3a8
-[    0.000000] memblock_reserve: [0x0000002f7fcc80-0x0000002f7fccd2]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 83 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 start_kernel+0xd8/0x3a8
-[    0.000000] memblock_reserve: [0x0000002f7fcc00-0x0000002f7fcc52]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 83 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 start_kernel+0xfc/0x3a8
-[    0.000000] memblock_reserve: [0x0000002f7fcb80-0x0000002f7fcbd2]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 4096 bytes align=0x0
-nid=-1 from=0x0 max_addr=0x0 pcpu_alloc_alloc_info+0x4c/0x8c
-[    0.000000] memblock_reserve: [0x0000002d9ddfc0-0x0000002d9defbf]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 4096 bytes align=0x0
-nid=-1 from=0x0 max_addr=0x0 pcpu_embed_first_chunk+0x4f0/0x788
-[    0.000000] memblock_reserve: [0x0000002d9dcfc0-0x0000002d9ddfbf]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 163840 bytes
-align=0x1000 nid=-1 from=0x3fffffff max_addr=0x0 pcpu_dfl_fc_alloc+0x28/0x0
-[    0.000000] memblock_reserve: [0x0000002d9b4000-0x0000002d9dbfff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] __memblock_free_early:
-[0x0000002d9be000-0x0000002d9bdfff] pcpu_embed_first_chunk+0x608/0x788
-[    0.000000] __memblock_free_early:
-[0x0000002d9c8000-0x0000002d9c7fff] pcpu_embed_first_chunk+0x608/0x788
-[    0.000000] __memblock_free_early:
-[0x0000002d9d2000-0x0000002d9d1fff] pcpu_embed_first_chunk+0x608/0x788
-[    0.000000] __memblock_free_early:
-[0x0000002d9dc000-0x0000002d9dbfff] pcpu_embed_first_chunk+0x608/0x788
-[    0.000000] PERCPU: Embedded 10 pages/cpu @ed9b4000 s11584 r8192
-d21184 u40960
-[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0xec/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fcd00-0x0000002f7fcd03]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 4 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x10c/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fcb40-0x0000002f7fcb43]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 16 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x12c/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fcb00-0x0000002f7fcb0f]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 16 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x14c/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fcac0-0x0000002f7fcacf]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 120 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x450/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fca40-0x0000002f7fcab7]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 68 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x498/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fc9c0-0x0000002f7fca03]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] memblock_virt_alloc_try_nid: 68 bytes align=0x0 nid=-1
-from=0x0 max_addr=0x0 pcpu_setup_first_chunk+0x5cc/0x740
-[    0.000000] memblock_reserve: [0x0000002f7fc940-0x0000002f7fc983]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] __memblock_free_early:
-[0x0000002d9ddfc0-0x0000002d9defbf] pcpu_embed_first_chunk+0x734/0x788
-[    0.000000] __memblock_free_early:
-[0x0000002d9dcfc0-0x0000002d9ddfbf] pcpu_embed_first_chunk+0x74c/0x788
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on. 
-Total pages: 981520
-[    0.000000] Kernel command line: console=ttyS0,115200
-earlyprintk=ttyS0 root=/dev/sda2 rw pm_disable memblock=debug
-[    0.000000] log_buf_len individual max cpu contribution: 4096 bytes
-[    0.000000] log_buf_len total cpu_extra contributions: 12288 bytes
-[    0.000000] log_buf_len min size: 16384 bytes
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 32768 bytes
-align=0x4 nid=-1 from=0x0 max_addr=0x0 setup_log_buf+0xf8/0x1d4
-[    0.000000] memblock_reserve: [0x0000002d9ac000-0x0000002d9b3fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] log_buf_len: 32768 bytes
-[    0.000000] early log buf free: 6144(37%)
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 16384 bytes
-align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x158/0x250
-[    0.000000] memblock_reserve: [0x0000002d9a8000-0x0000002d9abfff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 524288 bytes
-align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x158/0x250
-[    0.000000] memblock_reserve: [0x0000002d928000-0x0000002d9a7fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288
-bytes)
-[    0.000000] memblock_virt_alloc_try_nid_nopanic: 262144 bytes
-align=0x0 nid=-1 from=0x0 max_addr=0x0 alloc_large_system_hash+0x158/0x250
-[    0.000000] memblock_reserve: [0x0000002d8e8000-0x0000002d927fff]
-flags 0x0 memblock_virt_alloc_internal+0x104/0x154
-[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144
-bytes)
-[    0.000000] Memory: 3889876K/3932160K available (5068K kernel code,
-241K rwdata, 1380K rodata, 252K init, 190K bss, 42284K reserved, 0K )
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xf0000000 - 0xff000000   ( 240 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xef800000   ( 760 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc06543d0   (6449 kB)
-[    0.000000]       .init : 0xc0655000 - 0xc0694000   ( 252 kB)
-[    0.000000]       .data : 0xc0694000 - 0xc06d0740   ( 242 kB)
-[    0.000000]        .bss : 0xc06d0740 - 0xc0700204   ( 191 kB)
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000]  Additional per-CPU info printed with stalls.
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] Aurora cache controller enabled, 32 ways, 2048 kB
-[    0.000000] Aurora: CACHE_ID 0x00000100, AUX_CTRL 0x1a69ef12
-[    0.000006] sched_clock: 32 bits at 25MHz, resolution 40ns, wraps
-every 171798691800ns
-[    0.000244] Console: colour dummy device 80x30
-[    0.000259] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
-[    0.090071] pid_max: default: 32768 minimum: 301
-[    0.090141] Mount-cache hash table entries: 2048 (order: 1, 8192 bytes)
-[    0.090148] Mountpoint-cache hash table entries: 2048 (order: 1, 8192
-bytes)
-[    0.090395] CPU: Testing write buffer coherency: vmalloc: mapping
-page edfa13e0 (0x0002d41f000) at 0xf001e000
-[    0.090411] vmalloc: mapping page edfa13e0 (0x0002d41f000) at 0xf0020000
-[    0.090418] ok
-[    0.090521] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.090870] Setting up static identity map for 0x4cece8 - 0x4ced40
-[    0.091060] mvebu-soc-id: MVEBU SoC ID=0x7846, Rev=0x2
-[    0.091144] mvebu-pmsu: Initializing Power Management Service Unit
-[    0.091802] Booting CPU 1
-[    0.180067] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.180270] Booting CPU 2
-[    0.220066] CPU2: thread -1, cpu 2, socket 0, mpidr 80000002
-[    0.220262] Booting CPU 3
-[    0.260066] CPU3: thread -1, cpu 3, socket 0, mpidr 80000003
-[    0.260107] Brought up 4 CPUs
-[    0.260115] SMP: Total of 4 processors activated (6376.65 BogoMIPS).
-[    0.260119] CPU: All CPU(s) started in SVC mode.
-[    0.260386] devtmpfs: initialized
-[    0.260709] VFP support v0.3: implementor 56 architecture 2 part 20
-variant 9 rev 6
-[    0.260880] pinctrl core: initialized pinctrl subsystem
-[    0.262833] NET: Registered protocol family 16
-[    0.263006] vmalloc: mapping page edfa3800 (0x0002d540000) at 0xf002c000
-[    0.263011] vmalloc: mapping page edfa3820 (0x0002d541000) at 0xf002d000
-[    0.263016] vmalloc: mapping page edfa3840 (0x0002d542000) at 0xf002e000
-[    0.263020] vmalloc: mapping page edfa3860 (0x0002d543000) at 0xf002f000
-[    0.263024] vmalloc: mapping page edfa3880 (0x0002d544000) at 0xf0030000
-[    0.263028] vmalloc: mapping page edfa38a0 (0x0002d545000) at 0xf0031000
-[    0.263032] vmalloc: mapping page edfa38c0 (0x0002d546000) at 0xf0032000
-[    0.263036] vmalloc: mapping page edfa38e0 (0x0002d547000) at 0xf0033000
-[    0.263041] vmalloc: mapping page edfa3900 (0x0002d548000) at 0xf0034000
-[    0.263045] vmalloc: mapping page edfa3920 (0x0002d549000) at 0xf0035000
-[    0.263049] vmalloc: mapping page edfa3940 (0x0002d54a000) at 0xf0036000
-[    0.263053] vmalloc: mapping page edfa3960 (0x0002d54b000) at 0xf0037000
-[    0.263057] vmalloc: mapping page edfa3980 (0x0002d54c000) at 0xf0038000
-[    0.263061] vmalloc: mapping page edfa39a0 (0x0002d54d000) at 0xf0039000
-[    0.263065] vmalloc: mapping page edfa39c0 (0x0002d54e000) at 0xf003a000
-[    0.263070] vmalloc: mapping page edfa39e0 (0x0002d54f000) at 0xf003b000
-[    0.263074] vmalloc: mapping page edfa3a00 (0x0002d550000) at 0xf003c000
-[    0.263078] vmalloc: mapping page edfa3a20 (0x0002d551000) at 0xf003d000
-[    0.263082] vmalloc: mapping page edfa3a40 (0x0002d552000) at 0xf003e000
-[    0.263086] vmalloc: mapping page edfa3a60 (0x0002d553000) at 0xf003f000
-[    0.263090] vmalloc: mapping page edfa3a80 (0x0002d554000) at 0xf0040000
-[    0.263094] vmalloc: mapping page edfa3aa0 (0x0002d555000) at 0xf0041000
-[    0.263098] vmalloc: mapping page edfa3ac0 (0x0002d556000) at 0xf0042000
-[    0.263103] vmalloc: mapping page edfa3ae0 (0x0002d557000) at 0xf0043000
-[    0.263107] vmalloc: mapping page edfa3b00 (0x0002d558000) at 0xf0044000
-[    0.263111] vmalloc: mapping page edfa3b20 (0x0002d559000) at 0xf0045000
-[    0.263115] vmalloc: mapping page edfa3b40 (0x0002d55a000) at 0xf0046000
-[    0.263119] vmalloc: mapping page edfa3b60 (0x0002d55b000) at 0xf0047000
-[    0.263123] vmalloc: mapping page edfa3b80 (0x0002d55c000) at 0xf0048000
-[    0.263127] vmalloc: mapping page edfa3ba0 (0x0002d55d000) at 0xf0049000
-[    0.263131] vmalloc: mapping page edfa3bc0 (0x0002d55e000) at 0xf004a000
-[    0.263136] vmalloc: mapping page edfa3be0 (0x0002d55f000) at 0xf004b000
-[    0.263140] vmalloc: mapping page edfa3c00 (0x0002d560000) at 0xf004c000
-[    0.263144] vmalloc: mapping page edfa3c20 (0x0002d561000) at 0xf004d000
-[    0.263148] vmalloc: mapping page edfa3c40 (0x0002d562000) at 0xf004e000
-[    0.263152] vmalloc: mapping page edfa3c60 (0x0002d563000) at 0xf004f000
-[    0.263156] vmalloc: mapping page edfa3c80 (0x0002d564000) at 0xf0050000
-[    0.263160] vmalloc: mapping page edfa3ca0 (0x0002d565000) at 0xf0051000
-[    0.263164] vmalloc: mapping page edfa3cc0 (0x0002d566000) at 0xf0052000
-[    0.263169] vmalloc: mapping page edfa3ce0 (0x0002d567000) at 0xf0053000
-[    0.263173] vmalloc: mapping page edfa3d00 (0x0002d568000) at 0xf0054000
-[    0.263177] vmalloc: mapping page edfa3d20 (0x0002d569000) at 0xf0055000
-[    0.263181] vmalloc: mapping page edfa3d40 (0x0002d56a000) at 0xf0056000
-[    0.263185] vmalloc: mapping page edfa3d60 (0x0002d56b000) at 0xf0057000
-[    0.263189] vmalloc: mapping page edfa3d80 (0x0002d56c000) at 0xf0058000
-[    0.263193] vmalloc: mapping page edfa3da0 (0x0002d56d000) at 0xf0059000
-[    0.263197] vmalloc: mapping page edfa3dc0 (0x0002d56e000) at 0xf005a000
-[    0.263202] vmalloc: mapping page edfa3de0 (0x0002d56f000) at 0xf005b000
-[    0.263206] vmalloc: mapping page edfa3e00 (0x0002d570000) at 0xf005c000
-[    0.263210] vmalloc: mapping page edfa3e20 (0x0002d571000) at 0xf005d000
-[    0.263214] vmalloc: mapping page edfa3e40 (0x0002d572000) at 0xf005e000
-[    0.263218] vmalloc: mapping page edfa3e60 (0x0002d573000) at 0xf005f000
-[    0.263222] vmalloc: mapping page edfa3e80 (0x0002d574000) at 0xf0060000
-[    0.263226] vmalloc: mapping page edfa3ea0 (0x0002d575000) at 0xf0061000
-[    0.263230] vmalloc: mapping page edfa3ec0 (0x0002d576000) at 0xf0062000
-[    0.263235] vmalloc: mapping page edfa3ee0 (0x0002d577000) at 0xf0063000
-[    0.263239] vmalloc: mapping page edfa3f00 (0x0002d578000) at 0xf0064000
-[    0.263243] vmalloc: mapping page edfa3f20 (0x0002d579000) at 0xf0065000
-[    0.263247] vmalloc: mapping page edfa3f40 (0x0002d57a000) at 0xf0066000
-[    0.263251] vmalloc: mapping page edfa3f60 (0x0002d57b000) at 0xf0067000
-[    0.263255] vmalloc: mapping page edfa3f80 (0x0002d57c000) at 0xf0068000
-[    0.263259] vmalloc: mapping page edfa3fa0 (0x0002d57d000) at 0xf0069000
-[    0.263263] vmalloc: mapping page edfa3fc0 (0x0002d57e000) at 0xf006a000
-[    0.263267] vmalloc: mapping page edfa3fe0 (0x0002d57f000) at 0xf006b000
-[    0.263273] DMA: preallocated 256 KiB pool for atomic coherent
-allocations
-[    0.300043] cpuidle: using governor ladder
-[    0.350041] cpuidle: using governor menu
-[    0.390332] vmalloc: mapping page ef7f1000 (0x000efc00000) at 0xfedd8000
-[    0.390339] vmalloc: mapping page ef7f1020 (0x000efc01000) at 0xfedd9000
-[    0.390343] vmalloc: mapping page ef7f1040 (0x000efc02000) at 0xfedda000
-[    0.390348] vmalloc: mapping page ef7f1060 (0x000efc03000) at 0xfede2000
-[    0.390352] vmalloc: mapping page ef7f1080 (0x000efc04000) at 0xfede3000
-[    0.390356] vmalloc: mapping page ef7f10a0 (0x000efc05000) at 0xfede4000
-[    0.390361] vmalloc: mapping page ef7f10c0 (0x000efc06000) at 0xfedec000
-[    0.390365] vmalloc: mapping page ef7f10e0 (0x000efc07000) at 0xfeded000
-[    0.390369] vmalloc: mapping page ef7f1100 (0x000efc08000) at 0xfedee000
-[    0.390373] vmalloc: mapping page ef7f1120 (0x000efc09000) at 0xfedf6000
-[    0.390378] vmalloc: mapping page ef7f1140 (0x000efc0a000) at 0xfedf7000
-[    0.390382] vmalloc: mapping page ef7f1160 (0x000efc0b000) at 0xfedf8000
-[    0.390680] vgaarb: loaded
-[    0.390825] SCSI subsystem initialized
-[    0.391127] usbcore: registered new interface driver usbfs
-[    0.391170] usbcore: registered new interface driver hub
-[    0.391216] usbcore: registered new device driver usb
-[    0.391455] Advanced Linux Sound Architecture Driver Initialized.
-[    0.391774] Bluetooth: Core ver 2.20
-[    0.391801] NET: Registered protocol family 31
-[    0.391806] Bluetooth: HCI device and connection manager initialized
-[    0.391814] Bluetooth: HCI socket layer initialized
-[    0.391821] Bluetooth: L2CAP socket layer initialized
-[    0.391838] Bluetooth: SCO socket layer initialized
-[    0.392029] cfg80211: Calling CRDA to update world regulatory domain
-[    0.392158] Switched to clocksource armada_370_xp_clocksource
-[    0.398730] NET: Registered protocol family 2
-[    0.399051] TCP established hash table entries: 8192 (order: 3, 32768
-bytes)
-[    0.399090] TCP bind hash table entries: 8192 (order: 4, 65536 bytes)
-[    0.399142] TCP: Hash tables configured (established 8192 bind 8192)
-[    0.399175] TCP: reno registered
-[    0.399184] UDP hash table entries: 512 (order: 2, 16384 bytes)
-[    0.399204] UDP-Lite hash table entries: 512 (order: 2, 16384 bytes)
-[    0.399311] NET: Registered protocol family 1
-[    0.399473] RPC: Registered named UNIX socket transport module.
-[    0.399478] RPC: Registered udp transport module.
-[    0.399482] RPC: Registered tcp transport module.
-[    0.399486] RPC: Registered tcp NFSv4.1 backchannel transport module.
-[    0.399602] Unpacking initramfs...
-[    0.505641] Freeing initrd memory: 3264K (c1100000 - c1430000)
-[    0.506543] futex hash table entries: 1024 (order: 4, 65536 bytes)
-[    0.507145] vmalloc: mapping page ef7f0400 (0x000efba0000) at 0xfeddb000
-[    0.507155] vmalloc: mapping page ef7f03e0 (0x000efb9f000) at 0xfeddc000
-[    0.507160] vmalloc: mapping page ef7f03c0 (0x000efb9e000) at 0xfeddd000
-[    0.507165] vmalloc: mapping page ef7f03a0 (0x000efb9d000) at 0xfede5000
-[    0.507169] vmalloc: mapping page ef7f0380 (0x000efb9c000) at 0xfede6000
-[    0.507173] vmalloc: mapping page ef7f0360 (0x000efb9b000) at 0xfede7000
-[    0.507178] vmalloc: mapping page ef7f0340 (0x000efb9a000) at 0xfedef000
-[    0.507182] vmalloc: mapping page ef7f0320 (0x000efb99000) at 0xfedf0000
-[    0.507186] vmalloc: mapping page ef7f0300 (0x000efb98000) at 0xfedf1000
-[    0.507190] vmalloc: mapping page ef7f02e0 (0x000efb97000) at 0xfedf9000
-[    0.507195] vmalloc: mapping page ef7f02c0 (0x000efb96000) at 0xfedfa000
-[    0.507199] vmalloc: mapping page ef7f02a0 (0x000efb95000) at 0xfedfb000
-[    0.507586] bounce: pool size: 64 pages
-[    0.507628] Block layer SCSI generic (bsg) driver version 0.4 loaded
-(major 252)
-[    0.507640] io scheduler noop registered
-[    0.507648] io scheduler deadline registered
-[    0.507675] io scheduler cfq registered (default)
-[    0.508386] armada-xp-pinctrl f1018000.pin-ctrl: registered pinctrl
-driver
-[    0.508738] irq: Cannot allocate irq_descs @ IRQ45, assuming
-pre-allocated
-[    0.508954] irq: Cannot allocate irq_descs @ IRQ77, assuming
-pre-allocated
-[    0.509087] irq: Cannot allocate irq_descs @ IRQ109, assuming
-pre-allocated
-[    0.509436] mvebu-pcie soc:pcie-controller: PCI host bridge to bus
-0000:00
-[    0.509446] pci_bus 0000:00: root bus resource [io  0x1000-0xfffff]
-[    0.509453] pci_bus 0000:00: root bus resource [mem
-0xf8000000-0xffdfffff]
-[    0.509460] pci_bus 0000:00: root bus resource [bus 00-ff]
-[    0.509835] PCI: bus0: Fast back to back transfers disabled
-[    0.509844] pci 0000:00:01.0: bridge configuration invalid ([bus
-00-00]), reconfiguring
-[    0.509852] pci 0000:00:09.0: bridge configuration invalid ([bus
-00-00]), reconfiguring
-[    0.509859] pci 0000:00:0a.0: bridge configuration invalid ([bus
-00-00]), reconfiguring
-[    0.509941] PCI: bus1: Fast back to back transfers enabled
-[    0.510338] PCI: bus2: Fast back to back transfers disabled
-[    0.510426] PCI: bus3: Fast back to back transfers enabled
-[    0.510489] pci 0000:00:09.0: BAR 8: assigned [mem 0xf8000000-0xf80fffff]
-[    0.510497] pci 0000:00:01.0: PCI bridge to [bus 01]
-[    0.510509] pci 0000:02:00.0: BAR 2: assigned [mem
-0xf8000000-0xf803ffff 64bit]
-[    0.510527] pci 0000:02:00.0: BAR 0: assigned [mem
-0xf8040000-0xf805ffff 64bit]
-[    0.510543] pci 0000:02:00.0: BAR 6: assigned [mem
-0xf8060000-0xf806ffff pref]
-[    0.510549] pci 0000:00:09.0: PCI bridge to [bus 02]
-[    0.510556] pci 0000:00:09.0:   bridge window [mem 0xf8000000-0xf80fffff]
-[    0.510563] pci 0000:00:0a.0: PCI bridge to [bus 03]
-[    0.510671] mv_xor f1060900.xor: Marvell shared XOR driver
-[    0.542214] mv_xor f1060900.xor: Marvell XOR: ( xor cpy )
-[    0.582202] mv_xor f1060900.xor: Marvell XOR: ( xor cpy )
-[    0.582288] mv_xor f10f0900.xor: Marvell shared XOR driver
-[    0.622202] mv_xor f10f0900.xor: Marvell XOR: ( xor cpy )
-[    0.662201] mv_xor f10f0900.xor: Marvell XOR: ( xor cpy )
-[    0.696278] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
-[    0.697373] console [ttyS0] disabled
-[    0.717604] f1012000.serial: ttyS0 at MMIO 0xf1012000 (irq = 19,
-base_baud = 15625000) is a 16550A
-[    2.885177] console [ttyS0] enabled
-[    2.909702] f1012100.serial: ttyS1 at MMIO 0xf1012100 (irq = 20,
-base_baud = 15625000) is a 16550A
-[    2.940777] f1012200.serial: ttyS2 at MMIO 0xf1012200 (irq = 32,
-base_baud = 15625000) is a 16550A
-[    2.970730] f1012300.serial: ttyS3 at MMIO 0xf1012300 (irq = 33,
-base_baud = 15625000) is a 16550A
-[    2.980393] mvsas 0000:02:00.0: mvsas: driver version 0.8.16
-[    2.986095] pci 0000:00:09.0: enabling device (0140 -> 0142)
-[    2.992704] mvsas 0000:02:00.0: mvsas: PCI-E x4, Bandwidth Usage: 2.5
-Gbps
-[    6.282170] scsi host0: mvsas
-[    6.467033] ata1.00: ATA-8: ST320LT007-9ZV142, 0002SDM1, max UDMA/133
-[    6.473503] ata1.00: 625142448 sectors, multi 16: LBA48 NCQ (depth 31/32)
-[    6.483523] ata1.00: configured for UDMA/133
-[    6.502604] scsi 0:0:0:0: Direct-Access     ATA      ST320LT007-9ZV14
-SDM1 PQ: 0 ANSI: 5
-[    6.511657] sata_mv f10a0000.sata: slots 32 ports 2
-[    6.512263] sd 0:0:0:0: [sda] 625142448 512-byte logical blocks: (320
-GB/298 GiB)
-[    6.512268] sd 0:0:0:0: [sda] 4096-byte physical blocks
-[    6.512384] sd 0:0:0:0: [sda] Write Protect is off
-[    6.512442] sd 0:0:0:0: [sda] Write cache: enabled, read cache:
-enabled, doesn't support DPO or FUA
-[    6.522502] vmalloc: mapping page ef7f0420 (0x000efba1000) at 0xf009e000
-[    6.522505] vmalloc: mapping page ef7f0440 (0x000efba2000) at 0xf009f000
-[    6.522508] vmalloc: mapping page ef7f0460 (0x000efba3000) at 0xf00a0000
-[    6.522510] vmalloc: mapping page ef7f0480 (0x000efba4000) at 0xf00a1000
-[    6.522512] vmalloc: mapping page ef7f04a0 (0x000efba5000) at 0xf00a2000
-[    6.522514] vmalloc: mapping page ef7f04c0 (0x000efba6000) at 0xf00a3000
-[    6.522516] vmalloc: mapping page ef7f04e0 (0x000efba7000) at 0xf00a4000
-[    6.522519] vmalloc: mapping page ef7f0500 (0x000efba8000) at 0xf00a5000
-[    6.538641]  sda: sda1 sda2 sda3
-[    6.601155] scsi host1: sata_mv
-[    6.604557] scsi host2: sata_mv
-[    6.607849] ata2: SATA max UDMA/133 irq 30
-[    6.611958] ata3: SATA max UDMA/133 irq 30
-[    6.616502] pxa3xx-nand f10d0000.nand: This platform can't do DMA on
-this device
-[    6.624077] nand: second ID read did not match 00,28 against 00,20
-[    6.630272] nand: No NAND device found
-[    6.634044] pxa3xx-nand f10d0000.nand: failed to scan nand at cs 0
-[    6.646259] request_module: runaway loop modprobe binfmt-0000
-[    6.653829] m25p80 spi0.0: n25q128a13 (16384 Kbytes)
-[    6.664246] request_module: runaway loop modprobe binfmt-0000
-[    6.672883] libphy: orion_mdio_bus: probed
-[    6.678615] mvneta f1070000.ethernet eth0: Using device tree mac
-address 00:50:43:00:05:1e
-[    6.687691] mvneta f1074000.ethernet eth1: Using device tree mac
-address 00:50:43:00:05:1f
-[    6.696796] mvneta f1030000.ethernet eth2: Using device tree mac
-address 00:50:43:00:05:20
-[    6.705899] mvneta f1034000.ethernet eth3: Using device tree mac
-address 00:50:43:00:05:21
-[    6.714550] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
-[    6.721099] ehci-pci: EHCI PCI platform driver
-[    6.725609] ehci-orion: EHCI orion driver
-[    6.729725] orion-ehci f1050000.usb: EHCI Host Controller
-[    6.735168] orion-ehci f1050000.usb: new USB bus registered, assigned
-bus number 1
-[    6.742842] orion-ehci f1050000.usb: irq 26, io mem 0xf1050000
-[    6.762173] orion-ehci f1050000.usb: USB 2.0 started, EHCI 1.00
-[    6.768603] hub 1-0:1.0: USB hub found
-[    6.772402] hub 1-0:1.0: 1 port detected
-[    6.776609] orion-ehci f1051000.usb: EHCI Host Controller
-[    6.782034] orion-ehci f1051000.usb: new USB bus registered, assigned
-bus number 2
-[    6.789710] orion-ehci f1051000.usb: irq 27, io mem 0xf1051000
-[    6.812183] orion-ehci f1051000.usb: USB 2.0 started, EHCI 1.00
-[    6.818183] swapper/0 invoked oom-killer: gfp_mask=0x2040d0, order=0,
-oom_score_adj=0
-[    6.826058] CPU: 3 PID: 1 Comm: swapper/0 Not tainted
-4.0.0-rc2-00137-gb672c98-dirty #2
-[    6.834094] Hardware name: Marvell Armada 370/XP (Device Tree)
-[    6.839960] [<c0014ca4>] (unwind_backtrace) from [<c0010e34>]
-(show_stack+0x10/0x14)
-[    6.847743] [<c0010e34>] (show_stack) from [<c04c9d64>]
-(dump_stack+0x6c/0x88)
-[    6.855006] [<c04c9d64>] (dump_stack) from [<c04c8e18>]
-(dump_header.isra.12+0x90/0x1b0)
-[    6.863137] [<c04c8e18>] (dump_header.isra.12) from [<c007f3ec>]
-(__out_of_memory.isra.15+0x318/0x340)
-[    6.872482] [<c007f3ec>] (__out_of_memory.isra.15) from [<c007f5c4>]
-(out_of_memory+0x40/0x5c)
-[    6.881120] [<c007f5c4>] (out_of_memory) from [<c0082efc>]
-(__alloc_pages_nodemask+0x604/0x644)
-[    6.889857] [<c0082efc>] (__alloc_pages_nodemask) from [<c00b150c>]
-(cache_alloc_refill+0x350/0x580)
-[    6.899027] [<c00b150c>] (cache_alloc_refill) from [<c00b18d0>]
-(__kmalloc+0xac/0xe8)
-[    6.906895] [<c00b18d0>] (__kmalloc) from [<c02fff18>]
-(usb_hcd_submit_urb+0x1f8/0x850)
-[    6.914933] [<c02fff18>] (usb_hcd_submit_urb) from [<c03024ac>]
-(usb_start_wait_urb+0x44/0xbc)
-[    6.923576] [<c03024ac>] (usb_start_wait_urb) from [<c03026d4>]
-(usb_control_msg+0xa0/0xc4)
-[    6.931951] [<c03026d4>] (usb_control_msg) from [<c0302bf4>]
-(usb_get_descriptor+0x70/0xc4)
-[    6.940331] [<c0302bf4>] (usb_get_descriptor) from [<c0302d24>]
-(usb_get_device_descriptor+0x50/0x80)
-[    6.949592] [<c0302d24>] (usb_get_device_descriptor) from
-[<c02ff3f8>] (usb_add_hcd+0x37c/0x788)
-[    6.958410] [<c02ff3f8>] (usb_add_hcd) from [<c031a074>]
-(ehci_orion_drv_probe+0x2f4/0x480)
-[    6.966795] [<c031a074>] (ehci_orion_drv_probe) from [<c0231308>]
-(platform_drv_probe+0x48/0x98)
-[    6.975612] [<c0231308>] (platform_drv_probe) from [<c022fecc>]
-(driver_probe_device+0x114/0x234)
-[    6.982182] ata2: SATA link down (SStatus 0 SControl F300)
-[    6.990010] [<c022fecc>] (driver_probe_device) from [<c0230078>]
-(__driver_attach+0x8c/0x90)
-[    6.998477] [<c0230078>] (__driver_attach) from [<c022e880>]
-(bus_for_each_dev+0x54/0x88)
-[    7.006683] [<c022e880>] (bus_for_each_dev) from [<c022f6d0>]
-(bus_add_driver+0xd8/0x1cc)
-[    7.014889] [<c022f6d0>] (bus_add_driver) from [<c02306b8>]
-(driver_register+0x78/0xf4)
-[    7.022922] [<c02306b8>] (driver_register) from [<c0008a64>]
-(do_one_initcall+0x80/0x1d0)
-[    7.031127] [<c0008a64>] (do_one_initcall) from [<c0655d3c>]
-(kernel_init_freeable+0x108/0x1d4)
-[    7.039858] [<c0655d3c>] (kernel_init_freeable) from [<c04c68a8>]
-(kernel_init+0x8/0xe4)
-[    7.047978] [<c04c68a8>] (kernel_init) from [<c000e540>]
-(ret_from_fork+0x14/0x34)
-[    7.055570] Mem-info:
-[    7.057847] Normal per-cpu:
-[    7.060647] CPU    0: hi:  186, btch:  31 usd:  42
-[    7.065454] CPU    1: hi:  186, btch:  31 usd:  41
-[    7.070255] CPU    2: hi:  186, btch:  31 usd:  40
-[    7.075062] CPU    3: hi:  186, btch:  31 usd: 174
-[    7.079863] HighMem per-cpu:
-[    7.082754] CPU    0: hi:  186, btch:  31 usd:  19
-[    7.087556] CPU    1: hi:  186, btch:  31 usd:  31
-[    7.092363] CPU    2: hi:  186, btch:  31 usd:  62
-[    7.097165] CPU    3: hi:  186, btch:  31 usd:   2
-[    7.101972] active_anon:0 inactive_anon:0 isolated_anon:0
-[    7.101972]  active_file:222 inactive_file:1682 isolated_file:0
-[    7.101972]  unevictable:0 dirty:0 writeback:0 unstable:0
-[    7.101972]  free:787313 slab_reclaimable:104 slab_unreclaimable:182486
-[    7.101972]  mapped:0 shmem:0 pagetables:0 bounce:0
-[    7.101972]  free_cma:0
-[    7.132650] Normal free:3392kB min:3436kB low:4292kB high:5152kB
-active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unes
-[    7.172882] lowmem_reserve[]: 0 24640 24640
-[    7.177127] HighMem free:3145860kB min:512kB low:4176kB high:7840kB
-active_anon:0kB inactive_anon:0kB active_file:888kB inactive_file:67o
-[    7.217276] lowmem_reserve[]: 0 0 0
-[    7.220815] Normal: 2*4kB (UR) 17*8kB (UR) 0*16kB 0*32kB 0*64kB
-0*128kB 1*256kB (R) 0*512kB 1*1024kB (R) 1*2048kB (R) 0*4096kB = 3472kB
-[    7.233210] HighMem: 0*4kB 1*8kB (M) 0*16kB 0*32kB 0*64kB 0*128kB
-2*256kB (UM) 1*512kB (M) 1*1024kB (M) 1*2048kB (M) 767*4096kB (MR) = 3B
-[    7.246393] 1908 total pagecache pages
-[    7.250151] 0 pages in swap cache
-[    7.253479] Swap cache stats: add 0, delete 0, find 0/0
-[    7.258715] Free swap  = 0kB
-[    7.261601] Total swap = 0kB
-[    7.314368] 983040 pages of RAM
-[    7.317519] 788035 free pages
-[    7.320492] 9755 reserved pages
-[    7.323648] 182493 slab pages
-[    7.326621] 4 pages shared
-[    7.329333] 0 pages swap cached
-[    7.332183] ata3: SATA link down (SStatus 0 SControl F300)
-[    7.337980] [ pid ]   uid  tgid total_vm      rss nr_ptes nr_pmds
-swapents oom_score_adj name
-[    7.346544] Kernel panic - not syncing: Out of memory and no killable
-processes...
----
+-Christoffer
