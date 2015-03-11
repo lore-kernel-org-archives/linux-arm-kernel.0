@@ -1,108 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Mar 2015 17:00:20 +0100
-Subject: [PATCH v2 5/5] arm64/efi: adapt to relaxed FDT placement requirements
-In-Reply-To: <1426089620-9459-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426089620-9459-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426089620-9459-6-git-send-email-ard.biesheuvel@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 11 Mar 2015 09:02:17 -0700
+Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
+In-Reply-To: <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+ (Lorenzo Pieralisi's message of "Tue, 10 Mar 2015 17:31:22 +0000")
+References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <7hh9try12u.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the relaxed FDT placement requirements in place, we can change
-the allocation strategy used by the stub to put the FDT image higher
-up in memory. At the same time, reduce the minimal alignment to a
-power of 2 upper bound of the size: this way, we are still guaranteed
-not to cross a 2 MB boundary, but will potentially waste less memory.
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/efi.h            |  8 +++-----
- drivers/firmware/efi/libstub/arm-stub.c |  5 ++---
- drivers/firmware/efi/libstub/efistub.h  |  1 -
- drivers/firmware/efi/libstub/fdt.c      | 10 +++-------
- 4 files changed, 8 insertions(+), 16 deletions(-)
+> When a CPU is being profiled through PMU events and it enters suspend
+> or idle states, the PMU registers content can be lost, which means that
+> counters that were relied upon on power down entry are reset on power
+> up to values that are incosistent with the profile session.
+>
+> This patch adds a CPU PM notifier to arm64 perf code, that detects
+> on entry if events are being monitored, and if so, it returns
+> failure to the CPU PM notification chain, causing the suspend
+> thread or the idle thread to abort power down, therefore preventing
+> registers content loss.
+>
+> By triggering CPU PM notification failure this patch prevents
+> suspending a system if the suspend thread is being profiled and
+> it also prevents entering idle deep states on cores that have profile
+> events in use, somehow limiting power management capabilities when
+> there are active perf sessions.
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index ef572206f1c3..6f526fcc6b70 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -39,12 +39,10 @@ extern void efi_init(void);
- /* arch specific definitions used by the stub code */
- 
- /*
-- * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-- * start of kernel and may not cross a 2MiB boundary. We set alignment to
-- * 2MiB so we know it won't cross a 2MiB boundary.
-+ * AArch64 requires the DTB to be 8-byte aligned and not cross a 2MiB boundary.
-+ * So align to a power of 2 upper bound of the FDT size.
-  */
--#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
--#define MAX_FDT_OFFSET	SZ_512M
-+#define EFI_FDT_ALIGN(x)	roundup_pow_of_two(x)
- 
- #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
- 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index dcae482a9a17..f54c76a4fd32 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -269,9 +269,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 
- 	new_fdt_addr = fdt_addr;
- 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
--				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
--				initrd_addr, initrd_size, cmdline_ptr,
--				fdt_addr, fdt_size);
-+				&new_fdt_addr, initrd_addr, initrd_size,
-+				cmdline_ptr, fdt_addr, fdt_size);
- 
- 	/*
- 	 * If all went well, we need to return the FDT address to the
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 47437b16b186..c8e096094ea9 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -35,7 +35,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index 91da56c4fd54..48218e91cce1 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -165,10 +165,6 @@ fdt_set_fail:
- 	return EFI_LOAD_ERROR;
- }
- 
--#ifndef EFI_FDT_ALIGN
--#define EFI_FDT_ALIGN EFI_PAGE_SIZE
--#endif
--
- /*
-  * Allocate memory for a new FDT, then add EFI, commandline, and
-  * initrd related fields to the FDT.  This routine increases the
-@@ -186,7 +182,6 @@ fdt_set_fail:
- efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 					    void *handle,
- 					    unsigned long *new_fdt_addr,
--					    unsigned long max_addr,
- 					    u64 initrd_addr, u64 initrd_size,
- 					    char *cmdline_ptr,
- 					    unsigned long fdt_addr,
-@@ -223,8 +218,9 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
- 	 */
- 	new_fdt_size = fdt_size + EFI_PAGE_SIZE;
- 	while (1) {
--		status = efi_high_alloc(sys_table, new_fdt_size, EFI_FDT_ALIGN,
--					new_fdt_addr, max_addr);
-+		status = efi_high_alloc(sys_table, new_fdt_size,
-+					EFI_FDT_ALIGN(new_fdt_size),
-+					new_fdt_addr, ULONG_MAX);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Unable to allocate memory for new device tree.\n");
- 			goto fail;
--- 
-1.8.3.2
+I guess that's one choice.  Couldn't you also stop the PMU and
+save/restore it's context in the notifiers? so that you wouldn't affect
+PM capabilities?
+
+That would imply that you lose the ability to profile after a certain
+point in suspend/idle, but maybe that's a better trade off than having
+profiling disable certain PM features?
+
+Kevin
