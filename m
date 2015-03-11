@@ -1,39 +1,65 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Mar 2015 13:07:43 +0100
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <CAB3XZEdbVgOGH_uz4BX+8NXEu_vZzd=JF_1qvSPbyvvc0-O9iA@mail.gmail.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <1425915402-10012-3-git-send-email-eliad@wizery.com>
- <CABxcv=kL3Hw43VVxAsZ=DnY4Z+5431PO2YehcK2zTkFGBG0cNA@mail.gmail.com>
- <CABxcv=kUwU2KVw5jYryh62v5us2-CiJFMnYN2nyWLRMWnEkU3w@mail.gmail.com>
- <CAB3XZEdbVgOGH_uz4BX+8NXEu_vZzd=JF_1qvSPbyvvc0-O9iA@mail.gmail.com>
-Message-ID: <CABxcv=ntLn-Hv+J5fdjS6=R+8KYfm+1+4fXmMDQvw-kqFJD3-A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 11 Mar 2015 12:09:50 +0000
+Subject: [PATCH 5/5] arm64/efi: adapt to relaxed FDT placement requirements
+In-Reply-To: <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150311120950.GF4114@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eliad,
+On Tue, Mar 03, 2015 at 11:03:50AM +0000, Ard Biesheuvel wrote:
+> With the relaxed FDT placement requirements in place, we can change
+> the allocation strategy used by the stub to put the FDT image higher
+> up in memory. At the same time, reduce the minimal alignment to a
+> power of 2 upper bound of the size: this way, we are still guaranteed
+> not to cross a 2 MB boundary, but will potentially waste less memory
+> doing so.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/efi.h            | 9 ++++-----
+>  drivers/firmware/efi/libstub/arm-stub.c | 2 +-
+>  drivers/firmware/efi/libstub/fdt.c      | 7 ++-----
+>  3 files changed, 7 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index ef572206f1c3..68f7bb2ddad7 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -39,12 +39,11 @@ extern void efi_init(void);
+>  /* arch specific definitions used by the stub code */
+>  
+>  /*
+> - * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
+> - * start of kernel and may not cross a 2MiB boundary. We set alignment to
+> - * 2MiB so we know it won't cross a 2MiB boundary.
+> + * AArch64 requires the DTB to be 8-byte aligned and not cross a 2MiB boundary.
+> + * So align to a power of 2 upper bound of the FDT size.
+>   */
+> -#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+> -#define MAX_FDT_OFFSET	SZ_512M
+> +#define EFI_FDT_ALIGN(x)	roundup_pow_of_two(x)
+> +#define MAX_FDT_OFFSET		ULONG_MAX
+>  
+>  #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
+>  
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index dcae482a9a17..c58c21c22dbe 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -269,7 +269,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>  
+>  	new_fdt_addr = fdt_addr;
+>  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
+> +				&new_fdt_addr, MAX_FDT_OFFSET,
 
-On Wed, Mar 11, 2015 at 12:59 PM, Eliad Peller <eliad@wizery.com> wrote:
-> On Wed, Mar 11, 2015 at 3:19 AM, Javier Martinez Canillas
-> <javier@dowhile0.org> wrote:
->>
->> But there wasn't a DT binding to describe that so most boards use the
->> same hack which is to define a fake fixed-regulator with an enable
->> GPIO just to toggle that pin.
->>
->> But now the MMC subsystem has support for power sequence providers and
->> the pwrseq-simple driver
->> (Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt) has
->> support for reset GPIOs so you may want to change that as well.
->>
-> interesting. i wasn't aware of it.
-> but that's for a different time i guess :)
->
+Do we still need the max_addr parameter and MAX_FDT_OFFSET, or can we
+just have allocate_new_fdt_and_exit_boot assume it can allocate anywhere
+in the physical address space (or ULONG_MAX if we want to allocate below
+4GB whenever we get 32-bit EFI stub support).
 
-Indeed, I've on my TODO anyways so I can post a patch on top of your series :-)
+Otherwise this looks fine.
 
-> thanks,
-> Eliad.
-
-Best regards,
-Javier
+Mark.
