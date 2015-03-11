@@ -1,80 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 12 Mar 2015 00:30:14 +0100
-Subject: [PATCH v4 4/4] ARM: dts: Specify VMMC and VQMMC on rk3288-evb
-In-Reply-To: <1426112117-18220-4-git-send-email-dianders@chromium.org>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-4-git-send-email-dianders@chromium.org>
-Message-ID: <10565603.LCTpLmy44N@phil>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 12 Mar 2015 08:30:39 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.1
+In-Reply-To: <2060391.06thMe3uM7@wuerfel>
+References: <cover.1425947508.git.horms+renesas@verge.net.au>
+ <2060391.06thMe3uM7@wuerfel>
+Message-ID: <20150311233036.GA20057@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 11. M?rz 2015, 15:15:17 schrieb Doug Anderson:
-> Specifying these rails should eventually let us do UHS.
+On Wed, Mar 11, 2015 at 11:08:18PM +0100, Arnd Bergmann wrote:
+> On Tuesday 10 March 2015 09:42:09 Simon Horman wrote:
+> > Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
+> > 
+> > This pull request is based on the previous round of
+> > such requests, tagged as renesas-soc-cleanup-for-v4.1,
+> > which you have already pulled.
+> > 
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> I had grouped the renesas-soc-cleanup-for-v4.1 into next/multiplatform
+> rather than next/cleanup, and would like to keep the two separate
+> unless there is a good reason not to.
+> 
+> If you haven't already based other work on top of renesas-soc-cleanup2-for-v4.1
+> and there are no other conflicts, could you rebase it to -rc1?
 
-This one looks good to me and I'll take it into my dts branch.
-
-But due to the deferal issue fixed in patch1, I'll wait a bit for patch1 
-hopefully getting applied, so that we have a "clean" behaviour when everything 
-reaches linux-next.
-
-> ---
-> Changes in v4:
-> - Add vcc_sd regulator which is present on EVB 2.0 boards
-> 
-> Changes in v3: None
-> Changes in v2:
-> - Fix subject line
-> 
->  arch/arm/boot/dts/rk3288-evb.dtsi | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
-> b/arch/arm/boot/dts/rk3288-evb.dtsi index 5e895a5..6d4ae9f 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -103,6 +103,23 @@
->  		regulator-always-on;
->  		regulator-boot-on;
->  	};
-> +
-> +	/*
-> +	 * NOTE: vcc_sd isn't hooked up on v1.0 boards where power comes from
-> +	 * vcc_io directly.  Those boards won't be able to power cycle SD cards
-> +	 * but it shouldn't hurt to toggle this pin there anyway.
-> +	 */
-> +	vcc_sd: sdmmc-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sdmmc_pwr>;
-> +		regulator-name = "vcc_sd";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		startup-delay-us = <100000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
->  };
-> 
->  &emmc {
-> @@ -132,6 +149,8 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
->  	status = "okay";
-> +	vmmc-supply = <&vcc_sd>;
-> +	vqmmc-supply = <&vccio_sd>;
->  };
-> 
->  &i2c0 {
-> @@ -223,6 +242,10 @@
->  		sdmmc_cmd: sdmmc-cmd {
->  			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
->  		};
-> +
-> +		sdmmc_pwr: sdmmc-pwr {
-> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
->  	};
-> 
->  	usb {
+Sure, I think that should be clean on my side.
+I'll let you know if it turns out otherwise.
