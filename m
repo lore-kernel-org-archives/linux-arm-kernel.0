@@ -1,62 +1,53 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Mar 2015 11:21:30 -0300
-Subject: [PATCH v2 3/7] ARM: mx25: Remove static memory mapping
+Date: Wed, 11 Mar 2015 11:21:31 -0300
+Subject: [PATCH v2 4/7] ARM: mx25: Retrieve IIM base from dt
 In-Reply-To: <1426083694-6624-1-git-send-email-festevam@gmail.com>
 References: <1426083694-6624-1-git-send-email-festevam@gmail.com>
-Message-ID: <1426083694-6624-3-git-send-email-festevam@gmail.com>
+Message-ID: <1426083694-6624-4-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@freescale.com>
 
-We use dynamic memory mapping when using dt, so remove all the static mappings.
+We should use dt to retrieve the IIM base address.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
 Changes since v1:
-- None
+- Use BUG_ON as suggested by Russell
 
- arch/arm/mach-imx/mach-imx25.c | 21 ---------------------
- 1 file changed, 21 deletions(-)
+ arch/arm/mach-imx/cpu-imx25.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
-index 7cad96d..1a2c5de 100644
---- a/arch/arm/mach-imx/mach-imx25.c
-+++ b/arch/arm/mach-imx/mach-imx25.c
-@@ -20,26 +20,6 @@
- #include "common.h"
+diff --git a/arch/arm/mach-imx/cpu-imx25.c b/arch/arm/mach-imx/cpu-imx25.c
+index 96ec64b..0d2d860 100644
+--- a/arch/arm/mach-imx/cpu-imx25.c
++++ b/arch/arm/mach-imx/cpu-imx25.c
+@@ -11,6 +11,8 @@
+  */
+ #include <linux/module.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
+ 
+ #include "iim.h"
  #include "hardware.h"
- 
--/*
-- * This table defines static virtual address mappings for I/O regions.
-- * These are the mappings common across all MX25 boards.
-- */
--static struct map_desc mx25_io_desc[] __initdata = {
--	imx_map_entry(MX25, AVIC, MT_DEVICE_NONSHARED),
--	imx_map_entry(MX25, AIPS1, MT_DEVICE_NONSHARED),
--	imx_map_entry(MX25, AIPS2, MT_DEVICE_NONSHARED),
--};
--
--/*
-- * This function initializes the memory map. It is called during the
-- * system startup to create static physical to virtual memory mappings
-- * for the IO modules.
-- */
--void static __init mx25_map_io(void)
--{
--	iotable_init(mx25_io_desc, ARRAY_SIZE(mx25_io_desc));
--}
--
- void static __init imx25_init_early(void)
+@@ -20,8 +22,15 @@ static int mx25_cpu_rev = -1;
+ static int mx25_read_cpu_rev(void)
  {
- 	mxc_set_cpu_type(MXC_CPU_MX25);
-@@ -62,7 +42,6 @@ static const char * const imx25_dt_board_compat[] __initconst = {
- };
+ 	u32 rev;
++	void __iomem *iim_base;
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-iim");
++	iim_base = of_iomap(np, 0);
++	BUG_ON(!iim_base);
++	rev = readl(iim_base + MXC_IIMSREV);
++	iounmap(iim_base);
  
- DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
--	.map_io		= mx25_map_io,
- 	.init_early	= imx25_init_early,
- 	.init_irq	= mx25_init_irq,
- 	.dt_compat	= imx25_dt_board_compat,
+-	rev = __raw_readl(MX25_IO_ADDRESS(MX25_IIM_BASE_ADDR + MXC_IIMSREV));
+ 	switch (rev) {
+ 	case 0x00:
+ 		return IMX_CHIP_REVISION_1_0;
 -- 
 1.9.1
