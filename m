@@ -1,134 +1,84 @@
-From: greg.bellows@linaro.org (Greg Bellows)
-Date: Wed, 11 Mar 2015 10:17:47 -0500
-Subject: [Qemu-devel] [PATCH v2 4/6] target-arm: kvm64 sync FP register
- state
-In-Reply-To: <1425479753-18349-5-git-send-email-alex.bennee@linaro.org>
-References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
- <1425479753-18349-5-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAOgzsHUdDtj4SntgXShurAzd1725_z+80eLm20HnxzZZcg1mHQ@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 11 Mar 2015 10:19:22 -0500
+Subject: [PATCH v4 2/9] x86, pci: Abstract PCI config accessors and use
+ AMD Fam10h workaround exclusively.
+In-Reply-To: <1426083169-8698-3-git-send-email-tomasz.nowicki@linaro.org>
+References: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
+ <1426083169-8698-3-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <CAL_Jsq+AtQAkzfGL0Gk8O7_r-H8wXWF2Rw=0oN6saj9oa3s-CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 4, 2015 at 8:35 AM, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> For migration to work we need to sync all of the register state. This is
-> especially noticeable when GCC starts using FP registers as spill
-> registers even with integer programs.
+On Wed, Mar 11, 2015 at 9:12 AM, Tomasz Nowicki
+<tomasz.nowicki@linaro.org> wrote:
+> From now on, readb()/writeb()/etc. generic calls are used as default
+> approach. Special MMIO accessors are registered for AMD Fam10h CPUs only.
 >
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> ---
+>  arch/x86/include/asm/pci_x86.h |   8 +++
+>  arch/x86/pci/mmconfig-shared.c | 114 +++++++++++++++++++++++++++++++++++++++++
+>  arch/x86/pci/mmconfig_32.c     |  24 +--------
+>  arch/x86/pci/mmconfig_64.c     |  24 +--------
+>  arch/x86/pci/numachip.c        |  24 +--------
+>  5 files changed, 128 insertions(+), 66 deletions(-)
 >
-> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-> index 8cf3a62..c60e989 100644
-> --- a/target-arm/kvm64.c
-> +++ b/target-arm/kvm64.c
-> @@ -126,9 +126,17 @@ bool kvm_arm_reg_syncs_via_cpreg_list(uint64_t regidx)
->  #define AARCH64_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U64 | \
->                   KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+> diff --git a/arch/x86/include/asm/pci_x86.h b/arch/x86/include/asm/pci_x86.h
+> index d024f4d..c57c225 100644
+> --- a/arch/x86/include/asm/pci_x86.h
+> +++ b/arch/x86/include/asm/pci_x86.h
+> @@ -137,6 +137,11 @@ struct pci_mmcfg_region {
+>         char name[PCI_MMCFG_RESOURCE_NAME_LEN];
+>  };
 >
-> +/* The linux headers don't define a 128 bit wide SIMD macro for us */
-> +#define AARCH64_SIMD_CORE_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U128 | \
-> +                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
-> +
-> +#define AARCH64_SIMD_CTRL_REG(x)   (KVM_REG_ARM64 | KVM_REG_SIZE_U32 | \
-> +                 KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
-> +
->  int kvm_arch_put_registers(CPUState *cs, int level)
->  {
->      struct kvm_one_reg reg;
-> +    uint32_t fpr;
->      uint64_t val;
->      int i;
->      int ret;
-> @@ -207,13 +215,36 @@ int kvm_arch_put_registers(CPUState *cs, int level)
->          }
->      }
->
-> +    /* Advanced SIMD and FP registers */
-> +    for (i = 0; i < 32; i++) {
-> +        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
-> +        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
-> +        ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-> +        if (ret) {
-> +            return ret;
-> +        }
-> +        reg.id++;
+> +struct pci_mmcfg_mmio_ops {
+> +       u32 (*read)(int len, void __iomem *addr);
+> +       void (*write)(int len, void __iomem *addr, u32 value);
 
-What does this increment do?  It appears that it just gets thrown away
-on the next iteration of the loop unless ioctl(SET) return something,
-but maybe I am missing something.
+We already have nearly the same struct with pci_ops...
 
-> +    }
+> +};
 > +
-> +    reg.addr = (uintptr_t)(&fpr);
-> +    fpr = vfp_get_fpsr(env);
-> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
-> +    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-> +    if (ret) {
-> +        return ret;
-> +    }
-> +
-> +    fpr = vfp_get_fpcr(env);
-> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
-> +    ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-> +    if (ret) {
-> +        return ret;
-> +    }
-> +
->      if (!write_list_to_kvmstate(cpu)) {
->          return EINVAL;
->      }
+>  extern int __init pci_mmcfg_arch_init(void);
+>  extern void __init pci_mmcfg_arch_free(void);
+>  extern int pci_mmcfg_arch_map(struct pci_mmcfg_region *cfg);
+> @@ -145,6 +150,9 @@ extern int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
+>                                phys_addr_t addr);
+>  extern int pci_mmconfig_delete(u16 seg, u8 start, u8 end);
+>  extern struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
+> +extern u32 pci_mmio_read(int len, void __iomem *addr);
+> +extern void pci_mmio_write(int len, void __iomem *addr, u32 value);
+> +extern void pci_mmconfig_register_mmio(struct pci_mmcfg_mmio_ops *ops);
 >
-> -    /* TODO:
-> -     * FP state
-> -     */
->      return ret;
->  }
+>  extern struct list_head pci_mmcfg_list;
 >
-> @@ -221,6 +252,7 @@ int kvm_arch_get_registers(CPUState *cs)
->  {
->      struct kvm_one_reg reg;
->      uint64_t val;
-> +    uint32_t fpr;
->      int i;
->      int ret;
+> diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
+> index dd30b7e..8b3bc4f 100644
+> --- a/arch/x86/pci/mmconfig-shared.c
+> +++ b/arch/x86/pci/mmconfig-shared.c
+> @@ -31,6 +31,118 @@ static DEFINE_MUTEX(pci_mmcfg_lock);
 >
-> @@ -302,9 +334,36 @@ int kvm_arch_get_registers(CPUState *cs)
->          }
->      }
+>  LIST_HEAD(pci_mmcfg_list);
 >
-> +    /* Advanced SIMD and FP registers */
-> +    for (i = 0; i < 32; i++) {
-> +        reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
-> +        reg.addr = (uintptr_t)(&env->vfp.regs[i]);
-> +        ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-> +        if (ret) {
-> +            return ret;
-> +        }
-> +        reg.id++;
-> +    }
+> +static u32
+> +pci_mmconfig_generic_read(int len, void __iomem *addr)
+> +{
+> +       u32 data = 0;
 > +
-> +    reg.addr = (uintptr_t)(&fpr);
-> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpsr);
-> +    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-> +    if (ret) {
-> +        return ret;
-> +    }
-> +    vfp_set_fpsr(env, fpr);
-> +
-> +    reg.id = AARCH64_SIMD_CTRL_REG(fp_regs.fpcr);
-> +    ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-> +    if (ret) {
-> +        return ret;
-> +    }
-> +    vfp_set_fpcr(env, fpr);
-> +
->      if (!write_kvmstate_to_list(cpu)) {
->          return EINVAL;
->      }
-> +
->      /* Note that it's OK to have registers which aren't in CPUState,
->       * so we can ignore a failure return here.
->       */
-> --
-> 2.3.1
->
->
+> +       switch (len) {
+> +       case 1:
+> +               data = readb(addr);
+> +               break;
+> +       case 2:
+> +               data = readw(addr);
+> +               break;
+> +       case 4:
+> +               data = readl(addr);
+> +               break;
+> +       }
+
+This same function logic already exists with pci_generic_config_read.
+I think you need to move the differentiation between AMD and generic
+ECAM to pci_ops.
+
+Rob
