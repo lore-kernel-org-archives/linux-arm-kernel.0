@@ -1,48 +1,193 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 11 Mar 2015 11:20:11 +0100
-Subject: [PATCH 2/5] arm64: use fixmap region for permanent FDT mapping
-In-Reply-To: <20150311095055.GB21430@leverpostej>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
- <1425380630-3684-3-git-send-email-ard.biesheuvel@linaro.org>
- <CAL_JsqLdFS_nGuLTxrEZPCQv8MtW0s5jQ9Od1qj41yoqX40ONQ@mail.gmail.com>
- <CAKv+Gu8xrb0QqeFCfbqOb2sxFPyT8cVaq_RkhiD5jrr8L0zYzA@mail.gmail.com>
- <20150311095055.GB21430@leverpostej>
-Message-ID: <CAKv+Gu-=_LGYLPcDw3od04x5MneDXHN8goUg=zdmv-hBaj_H-g@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 Mar 2015 11:20:06 +0100
+Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
+Message-ID: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2015 at 10:50, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> +       /*
->> >> +        * Reserve 2 MB of virtual space for the FDT at the top of the fixmap
->> >> +        * region. Keep this at the top so it remains 2 MB aligned.
->> >> +        */
->> >
->> > We should not fix a location restriction by creating a size
->> > restriction. You could embed firmware images within a DTB (which I
->> > think PPC does).
->> >
->>
->> The size restriction existed on arm64 before this patch, so I didn't
->> think twice about it.
->> So what would be a reasonable upper bound? We could go up to ~256 MB
->> without much trouble, but I guess that's a bit excessive, no?
->
-> Given the existing code had the same 2MB restriction (documented in
-> booting.txt), I think retaining that limitation for now is fine unless
-> we have some reasonable example of a DTB approaching or exceeding 2MB.
->
-> As far as I am aware, on arm64 we're not currently embeddeding FW images
-> in the DTB passed to the kernel, and I'm not sure why we would.
-> Anything that's critical to the system and requires FW should be
-> initialised prior to the kernel, and if we need FW to drive a particular
-> device I'd expect we'd store that in the filesystem (or perhaps
-> initrd/initramfs).
->
+On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
+56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
+controller") the second suspend to RAM failed. First suspend worked fine
+but the next one hang just after powering down of secondary CPUs (system
+consumed energy as it would be running but was not responsive).
 
-I agree with Mark's observation that 2 MB seems reasonable at the
-moment, but on the other hand, the code only requires minor tweaking
-to make the limit configurable simply by changing the FIX_FDT_SIZE
-define, so I don't mind changing that.
+The issue was caused by enabling delayed reset assertion for CPU0 just
+after issuing power down of cores. This was introduced for Exynos4 in
+13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
 
+The whole behavior is not well documented but after checking with vendor
+code this should be done like this (on Exynos4):
+1. Enable delayed reset assertion when system is running (for all CPUs).
+2. Disable delayed reset assertion before suspending the system.
+   This can be done after powering off secondary CPUs.
+3. Re-enable the delayed reset assertion when system is resumed.
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
+Cc: <stable@vger.kernel.org>
+Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+
+Notes:
+    Changes since v1:
+    1. Add Bartlomiej's and Chanwoo's tested-by.
+
+ arch/arm/mach-exynos/common.h  |  2 ++
+ arch/arm/mach-exynos/exynos.c  | 27 +++++++++++++++++++++++++++
+ arch/arm/mach-exynos/platsmp.c | 39 ++-------------------------------------
+ arch/arm/mach-exynos/suspend.c |  3 +++
+ 4 files changed, 34 insertions(+), 37 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index f70eca7ee705..0ef8d4b47102 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -153,6 +153,8 @@ extern void exynos_enter_aftr(void);
+ 
+ extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
+ 
++extern void exynos_set_delayed_reset_assertion(bool enable);
++
+ extern void s5p_init_cpu(void __iomem *cpuid_addr);
+ extern unsigned int samsung_rev(void);
+ extern void __iomem *cpu_boot_reg_base(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 9e9dfdfad9d7..1081ff1f03c6 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -166,6 +166,33 @@ static void __init exynos_init_io(void)
+ 	exynos_map_io();
+ }
+ 
++/*
++ * Set or clear the USE_DELAYED_RESET_ASSERTION option. Used by smp code
++ * and suspend.
++ *
++ * This is necessary only on Exynos4 SoCs. When system is running
++ * USE_DELAYED_RESET_ASSERTION should be set so the ARM CLK clock down
++ * feature could properly detect global idle state when secondary CPU is
++ * powered down.
++ *
++ * However this should not be set when such system is going into suspend.
++ */
++void exynos_set_delayed_reset_assertion(bool enable)
++{
++	if (soc_is_exynos4()) {
++		unsigned int tmp, core_id;
++
++		for (core_id = 0; core_id < num_possible_cpus(); core_id++) {
++			tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
++			if (enable)
++				tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
++			else
++				tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
++			pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
++		}
++	}
++}
++
+ static const struct of_device_id exynos_dt_pmu_match[] = {
+ 	{ .compatible = "samsung,exynos3250-pmu" },
+ 	{ .compatible = "samsung,exynos4210-pmu" },
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index d2e9f12d12f1..d45e8cd23925 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -34,30 +34,6 @@
+ 
+ extern void exynos4_secondary_startup(void);
+ 
+-/*
+- * Set or clear the USE_DELAYED_RESET_ASSERTION option, set on Exynos4 SoCs
+- * during hot-(un)plugging CPUx.
+- *
+- * The feature can be cleared safely during first boot of secondary CPU.
+- *
+- * Exynos4 SoCs require setting USE_DELAYED_RESET_ASSERTION during powering
+- * down a CPU so the CPU idle clock down feature could properly detect global
+- * idle state when CPUx is off.
+- */
+-static void exynos_set_delayed_reset_assertion(u32 core_id, bool enable)
+-{
+-	if (soc_is_exynos4()) {
+-		unsigned int tmp;
+-
+-		tmp = pmu_raw_readl(EXYNOS_ARM_CORE_OPTION(core_id));
+-		if (enable)
+-			tmp |= S5P_USE_DELAYED_RESET_ASSERTION;
+-		else
+-			tmp &= ~(S5P_USE_DELAYED_RESET_ASSERTION);
+-		pmu_raw_writel(tmp, EXYNOS_ARM_CORE_OPTION(core_id));
+-	}
+-}
+-
+ #ifdef CONFIG_HOTPLUG_CPU
+ static inline void cpu_leave_lowpower(u32 core_id)
+ {
+@@ -73,8 +49,6 @@ static inline void cpu_leave_lowpower(u32 core_id)
+ 	  : "=&r" (v)
+ 	  : "Ir" (CR_C), "Ir" (0x40)
+ 	  : "cc");
+-
+-	 exynos_set_delayed_reset_assertion(core_id, false);
+ }
+ 
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+@@ -87,14 +61,6 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		/* Turn the CPU off on next WFI instruction. */
+ 		exynos_cpu_power_down(core_id);
+ 
+-		/*
+-		 * Exynos4 SoCs require setting
+-		 * USE_DELAYED_RESET_ASSERTION so the CPU idle
+-		 * clock down feature could properly detect
+-		 * global idle state when CPUx is off.
+-		 */
+-		exynos_set_delayed_reset_assertion(core_id, true);
+-
+ 		wfi();
+ 
+ 		if (pen_release == core_id) {
+@@ -354,9 +320,6 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		udelay(10);
+ 	}
+ 
+-	/* No harm if this is called during first boot of secondary CPU */
+-	exynos_set_delayed_reset_assertion(core_id, false);
+-
+ 	/*
+ 	 * now the secondary core is starting up let it run its
+ 	 * calibrations, then wait for it to finish
+@@ -403,6 +366,8 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	exynos_sysram_init();
+ 
++	exynos_set_delayed_reset_assertion(true);
++
+ 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+ 		scu_enable(scu_base_addr());
+ 
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 318d127df147..582ef2df960d 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -235,6 +235,8 @@ static void exynos_pm_enter_sleep_mode(void)
+ 
+ static void exynos_pm_prepare(void)
+ {
++	exynos_set_delayed_reset_assertion(false);
++
+ 	/* Set wake-up mask registers */
+ 	exynos_pm_set_wakeup_mask();
+ 
+@@ -383,6 +385,7 @@ early_wakeup:
+ 
+ 	/* Clear SLEEP mode set in INFORM1 */
+ 	pmu_raw_writel(0x0, S5P_INFORM1);
++	exynos_set_delayed_reset_assertion(true);
+ }
+ 
+ static void exynos3250_pm_resume(void)
 -- 
-Ard.
+1.9.1
