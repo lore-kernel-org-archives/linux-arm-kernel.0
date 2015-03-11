@@ -1,41 +1,53 @@
 From: Chunyan.Zhang@spreadtrum.com (=?gb2312?B?Q2h1bnlhbiBaaGFuZyAo1cW0utHeKQ==?=)
 Date: Wed, 11 Mar 2015 02:27:08 +0000
-Subject: [PATCH v8 0/2] Add Spreadtrum Sharkl64 Platform support
-Message-ID: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Subject: [PATCH v8 2/2] arm64: Add support for Spreadtrum's Sharkl64
+ Platform in Kconfig and defconfig
+In-Reply-To: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1426040790-19495-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1426040790-19495-3-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds Spreadtrum's Sharkl64 support in arm64 device tree.
+From: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
 
-Changes from v7:
-	- Added Mark Rutland's Acked-by
-	- Rebased v4.0-rc1
+Adds support for Spreadtrum's SoC Platform in the arm64 Kconfig and
+defconfig files.
 
-Changes from v6:
-	- Setted stdout-path with "serial1:115200n8"
+Signed-off-by: Zhizhou Zhang <zhizhou.zhang@spreadtrum.com>
+Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm64/Kconfig           | 5 +++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 6 insertions(+)
 
-Changes from v5:
-	- Added maintenance interrupt for gic
-	- Removed reg property from 'soc' and 'apb' nodes
-
-
-Zhizhou Zhang (2):
-  arm64: dts: Add support for Spreadtrum SC9836 SoC in dts and Makefile
-  arm64: Add support for Spreadtrum's Sharkl64 Platform in Kconfig and
-    defconfig
-
- arch/arm64/Kconfig                            |  5 ++
- arch/arm64/boot/dts/Makefile                  |  1 +
- arch/arm64/boot/dts/sprd/Makefile             |  5 ++
- arch/arm64/boot/dts/sprd/sc9836-openphone.dts | 49 ++++++++++++++++++
- arch/arm64/boot/dts/sprd/sc9836.dtsi          | 74 +++++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd/sharkl64.dtsi        | 65 +++++++++++++++++++++++
- arch/arm64/configs/defconfig                  |  1 +
- 7 files changed, 200 insertions(+)
- create mode 100644 arch/arm64/boot/dts/sprd/Makefile
- create mode 100644 arch/arm64/boot/dts/sprd/sc9836-openphone.dts
- create mode 100644 arch/arm64/boot/dts/sprd/sc9836.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd/sharkl64.dtsi
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..e582fe2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -208,6 +208,11 @@ config ARCH_TEGRA_132_SOC
+ 	  but contains an NVIDIA Denver CPU complex in place of
+ 	  Tegra124's "4+1" Cortex-A15 CPU complex.
+ 
++config ARCH_SPRD
++	bool "Spreadtrum SoC platform"
++	help
++	  Support for Spreadtrum ARM based SoCs
++
+ config ARCH_THUNDER
+ 	bool "Cavium Inc. Thunder SoC Family"
+ 	help
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index be1f12a..535307c 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -33,6 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_SPRD=y
+ CONFIG_ARCH_THUNDER=y
+ CONFIG_ARCH_VEXPRESS=y
+ CONFIG_ARCH_XGENE=y
 -- 
 1.9.1
