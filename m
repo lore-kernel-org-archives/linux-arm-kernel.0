@@ -1,63 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:45:33 +0000
-Subject: [PATCH v6 0/4] irqchip: move away from gic_arch_extn.irq_set_wake
-Message-ID: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 11 Mar 2015 15:45:34 +0000
+Subject: [PATCH v6 1/4] irqchip: gic: add an entry point to set up irqchip
+ flags
+In-Reply-To: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088737-15817-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is extracted from [4], which is trying to remove all
-traces of gic_arch_extn from the tree. As some maintainers are more
-responsive than others (understatement of the year...), I've decided
-to split it per sub-arch, and get it moving, at least partially.
+A common use of gic_arch_extn is to set up additional flags
+to the GIC irqchip. It looks like a benign enough hack that
+doesn't really require the users of that feature to be converted
+to stacked domains.
 
-This small set of patches slightly modifies some of the least
-offending platforms, by providing a much limited hook into the GIC
-driver.
+Add a gic_set_irqchip_flags() function that platform code can
+call instead of using the dreaded gic_arch_extn.
 
-Based on 4.0-rc1.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic.c       | 5 +++++
+ include/linux/irqchip/arm-gic.h | 1 +
+ 2 files changed, 6 insertions(+)
 
-* From v5: [5]
-- No change
-
-* From v4: [4]
-- Extracted from the full series
-- Rebased on 4.0-rc1
-
-* From v3 [3]:
-- Rebased on top of the patch working around hardcoded IRQ on OMAP4/5 [4]
-- Fixed more iMX6 DTs (Stephan)
-- Fixed Exynos4/5 DTs
-
-* From v2 [2]:
-- Addressed numerous comments from Thierry
-- Merged bug fixes from Nishanth
-- Merged bug fix from Stefan
-
-* From v1 [1]:
-- Rebased on 3.19-rc3
-- Fixed a number of additional platforms
-- Added crossbar conversion to stacked domains
-- Merged bug fixes from Nishanth
-
-[5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325190.html
-[4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
-[3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
-[2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
-[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
-
-Marc Zyngier (4):
-  irqchip: gic: add an entry point to set up irqchip flags
-  ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
-  ARM: ux500: switch from gic_arch_extn to gic_set_irqchip_flags
-  ARM: zynq: switch from gic_arch_extn to gic_set_irqchip_flags
-
- arch/arm/mach-shmobile/intc-sh73a0.c   | 7 +------
- arch/arm/mach-shmobile/setup-r8a7779.c | 7 +------
- arch/arm/mach-ux500/cpu.c              | 2 +-
- arch/arm/mach-zynq/common.c            | 2 +-
- drivers/irqchip/irq-gic.c              | 5 +++++
- include/linux/irqchip/arm-gic.h        | 1 +
- 6 files changed, 10 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index e3ca6da..6004d84 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -880,6 +880,11 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.xlate = gic_irq_domain_xlate,
+ };
+ 
++void gic_set_irqchip_flags(unsigned long flags)
++{
++	gic_chip.flags |= flags;
++}
++
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+ 			   u32 percpu_offset, struct device_node *node)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 3978c5b..36ec4ae 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -97,6 +97,7 @@ struct device_node;
+ 
+ extern struct irq_chip gic_arch_extn;
+ 
++void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
 -- 
 2.1.4
