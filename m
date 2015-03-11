@@ -1,48 +1,25 @@
-From: greg.bellows@linaro.org (Greg Bellows)
-Date: Wed, 11 Mar 2015 10:39:47 -0500
-Subject: [Qemu-devel] [PATCH 6/6] target-arm/cpu.h: document why env->spsr
- exists
-In-Reply-To: <1424880159-29348-8-git-send-email-alex.bennee@linaro.org>
-References: <1424880159-29348-1-git-send-email-alex.bennee@linaro.org>
- <1424880159-29348-8-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAOgzsHWzroog_K3DAXtS=UzP_s9488LT=Q54FykN3yuC+xOvqQ@mail.gmail.com>
+From: joshc@ni.com (Josh Cartwright)
+Date: Wed, 11 Mar 2015 10:41:50 -0500
+Subject: [PATCH v2] ARM: zynq: use restart_handler mechanism for slcr reset
+In-Reply-To: <1425049769-24929-1-git-send-email-joshc@ni.com>
+References: <1425049769-24929-1-git-send-email-joshc@ni.com>
+Message-ID: <20150311154150.GA3851@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 10:02 AM, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> I was getting very confused about the duplication of state. Perhaps we
-> should just get rid of env->spsr and use helpers that understand the
-> banking?
->
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> diff --git a/target-arm/cpu.h b/target-arm/cpu.h
-> index 11845a6..d7fd13f 100644
-> --- a/target-arm/cpu.h
-> +++ b/target-arm/cpu.h
-> @@ -155,6 +155,11 @@ typedef struct CPUARMState {
->         This contains all the other bits.  Use cpsr_{read,write} to access
->         the whole CPSR.  */
->      uint32_t uncached_cpsr;
-> +    /* The spsr is a alias for spsr_elN where N is the current
+On Fri, Feb 27, 2015 at 09:09:29AM -0600, Josh Cartwright wrote:
+> By making use of the restart_handler chain mechanism, the SLCR-based
+> reset mechanism can be prioritized amongst other mechanisms available on
+> a particular board.
 
-"an alias"
+Have either of you had a chance to look at this yet?  On our boards we
+have a chip external to the SoC that manages power sequencing (and a
+hodgepodge of other board-level things), and we would like it to be
+prioritized above the SLCR reset mechanism.
 
-> +     * exception level. It is provided for here so the TCG msr/mrs
+Previously we've just hacked up mach-zynq/common.c to not register a
+restart handler, and set arm_pm_restart ourselves, but that doesn't seem
+appropriate now that the restart chain exists.
 
-remove "for here"
-
-> +     * implementation can access one register. Care needs to be taken
-> +     * to ensure the banked_spsr[] is also updated.
-> +     */
->      uint32_t spsr;
->
->      /* Banked registers.  */
-> --
-> 2.3.0
->
->
-
-Otherwise...
-
-Reviewed-by: Greg Bellows <greg.bellows@linaro.org>
+Thanks,
+  Josh
