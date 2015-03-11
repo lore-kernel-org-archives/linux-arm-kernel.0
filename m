@@ -1,37 +1,54 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 11 Mar 2015 09:05:20 -0700
-Subject: [PATCH -next] pinctrl: mediatek: Fix include directive
-Message-ID: <1426089920-24818-1-git-send-email-linux@roeck-us.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 11 Mar 2015 17:00:15 +0100
+Subject: [PATCH v2 0/5] arm64: update/clarify/relax Image and FDT placement
+ rules
+Message-ID: <1426089620-9459-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following build failure:
+This series came about after Mark Rutland brought up the fact that the current
+FDT placement logic used by the EFI stub is flawed. But actually, it turned out
+that the documentation for both the Image and FDT placement was incorrect as
+well, or confusing at the very least.
 
-In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
-drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error:
-	pinctrl-mtk-common.h: No such file or directory
+So this series does two things:
+- It relaxes the FDT placement requirements, and updates the documentation and
+  EFI stub FDT placement logic accordingly.
+- It clarifies the Image placement requirements in the documentation, and brings
+  the EFI stub Image placement logic in line with it
 
-seen when building arm:multi_v7_defconfig.
+Changes since v1:
+- patch #1: split off reservation of the FDT binary itself from the memreserve
+  processing, since the former assumes the FDT is accessed via the linear
+  mapping, which we are about to change
+- patch #2: mention the older, stricter FDT placement rules in booting.txt,
+  get rid of early_print,
+  use correct format specifier for phys_addr_t,
+  use R/O mapping for FDT,
+- patches #3 .. #5: add R-b, minor style and grammar tweaks 
+  
+Ard Biesheuvel (5):
+  of/fdt: split off FDT self reservation from memreserve processing
+  arm64: use fixmap region for permanent FDT mapping
+  arm64: Documentation: clarify Image placement in physical RAM
+  arm64/efi: ensure that Image does not cross a 512 MB boundary
+  arm64/efi: adapt to relaxed FDT placement requirements
 
-Fixes: 94097d89c145 ("pinctrl: mediatek: Add Pinctrl/GPIO driver for mt8135.")
-Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/arm64/booting.txt         | 15 ++++---
+ arch/arm/mm/init.c                      |  1 +
+ arch/arm64/include/asm/efi.h            |  8 ++--
+ arch/arm64/include/asm/fixmap.h         |  9 +++++
+ arch/arm64/kernel/Makefile              |  1 +
+ arch/arm64/kernel/efi-stub.c            | 41 +++++++++++++++----
+ arch/arm64/kernel/head.S                | 38 +----------------
+ arch/arm64/kernel/setup.c               | 72 ++++++++++++++++++++++++---------
+ arch/powerpc/kernel/prom.c              |  1 +
+ drivers/firmware/efi/libstub/arm-stub.c |  5 +--
+ drivers/firmware/efi/libstub/efistub.h  |  1 -
+ drivers/firmware/efi/libstub/fdt.c      | 10 ++---
+ drivers/of/fdt.c                        | 19 ++++++---
+ include/linux/of_fdt.h                  |  2 +
+ 14 files changed, 131 insertions(+), 92 deletions(-)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-index 5019cef..e17aedb 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-@@ -16,7 +16,7 @@
- #define __PINCTRL_MTK_MT8135_H
- 
- #include <linux/pinctrl/pinctrl.h>
--#include <pinctrl-mtk-common.h>
-+#include "pinctrl-mtk-common.h"
- 
- static const struct mtk_desc_pin mtk_pins_mt8135[] = {
- 	MTK_PIN(
 -- 
-2.1.0
+1.8.3.2
