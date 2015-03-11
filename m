@@ -1,35 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 11 Mar 2015 10:57:00 +0100
-Subject: [PATCH 1/2] ARM: imx6qdl-sabresd: set swbst_reg as vbus's parent
- reg
-In-Reply-To: <20150311012424.GW20455@dragon>
-References: <1425629061-8995-1-git-send-email-peter.chen@freescale.com>
- <20150311012424.GW20455@dragon>
-Message-ID: <20150311095700.GA8172@kroah.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 11 Mar 2015 11:03:41 +0100
+Subject: [PATCH] ARM: Kirkwood: remove leds-netxbig.h include from nas2big DTS
+Message-ID: <1426068221-29025-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 09:24:25AM +0800, Shawn Guo wrote:
-> On Fri, Mar 06, 2015 at 04:04:20PM +0800, Peter Chen wrote:
-> > USB vbus 5V is from PMIC SWBST, so set swbst_reg as vbus's
-> > parent reg, it fixed a bug that the voltage of vbus is incorrect
-> > due to swbst_reg is disabled after boots up.
-> > 
-> > Cc: stable <stable@vger.kernel.org>
-> 
-> It's more idiomatic to put the line in this way:
-> 
-> Cc: stable at vger.kernel.org
-> 
-> Changed it and applied both patches.
+This patch fixes the following build error introduced by the patch
+a9e58557e998 ("ARM: Kirkwood: add DT description for nas2big"):
 
-It really doesn't matter, my scripts try to pick up any variation of the
-stable@ markings in a signed-off-by: area, as there is a huge number of
-different ways people try to mark this, including using invalid email
-addresses, and typos.
+  DTC     arch/arm/boot/dts/kirkwood-nas2big.dtb
+/home/simon/workspace/lacie-nas.org/src/linux-lacie.git/arch/arm/boot/dts/kirkwood-nas2big.dts:16:
+fatal error: dt-bindings/leds/leds-netxbig.h: No such file or directory
+compilation terminated.
+scripts/Makefile.lib:292: recipe for target
+'arch/arm/boot/dts/kirkwood-nas2big.dtb' failed
 
-So no need to be pedantic about this, I can handle it just fine.
+Since the leds-netxbig DT binding is not merged yet, the
+dt-bindings/leds/leds-netxbig.h header can't be used. Moreover there is
+no point in including leds-netxbig.h from the nas2big DTS anyway: since
+the LEDs characteristics are shared between all the netxbig boards, the
+LED node will be added in the kirkwood-netxbig DTSI file.
 
-thanks,
+This patch fixes the build error by removing the useless leds-netxbig.h
+include.
 
-greg k-h
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ arch/arm/boot/dts/kirkwood-nas2big.dts | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-nas2big.dts b/arch/arm/boot/dts/kirkwood-nas2big.dts
+index d459c94fd1d4..7427ec50b829 100644
+--- a/arch/arm/boot/dts/kirkwood-nas2big.dts
++++ b/arch/arm/boot/dts/kirkwood-nas2big.dts
+@@ -12,7 +12,6 @@
+ 
+ /dts-v1/;
+ 
+-#include <dt-bindings/leds/leds-netxbig.h>
+ #include "kirkwood-netxbig.dtsi"
+ 
+ / {
+-- 
+2.1.1
