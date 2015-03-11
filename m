@@ -1,43 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 Mar 2015 10:15:20 +0100
-Subject: [PATCH v6 6/8] pinctrl: cygnus: add gpio/pinconf driver
-In-Reply-To: <54FF306C.7020407@broadcom.com>
-References: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
- <1425933902-20652-7-git-send-email-rjui@broadcom.com>
- <CACRpkdZ1ErfikdF41aANTM-7LE6AExizHtCZTq1_TTxwYjeSQA@mail.gmail.com>
- <54FF306C.7020407@broadcom.com>
-Message-ID: <CACRpkdZbxTyYWpxWCmdN8a7p+MjcUo6UxEwfgStPWsNzf4NZ=g@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Wed, 11 Mar 2015 17:19:42 +0800
+Subject: [PATCH v2] mtd: atmel_nand: check NFC busy flag by HSMC_SR instead
+ of NFC cmd regs
+In-Reply-To: <54F6B2CE.9020604@atmel.com>
+References: <1421922090-8803-1-git-send-email-josh.wu@atmel.com>
+ <54F6B2CE.9020604@atmel.com>
+Message-ID: <550008AE.9050406@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 6:57 PM, Ray Jui <rjui@broadcom.com> wrote:
-> On 3/10/2015 3:20 AM, Linus Walleij wrote:
->> On Mon, Mar 9, 2015 at 9:45 PM, Ray Jui <rjui@broadcom.com> wrote:
->>
->>> This adds the initial support of the Broadcom Cygnus GPIO/PINCONF driver
->>> that supports all 3 GPIO controllers on Cygnus including the ASIU GPIO
->>> controller, the chipCommonG GPIO controller, and the always-on GPIO
->>> controller. Basic PINCONF configurations such as bias pull up/down, and
->>> drive strength are also supported in this driver.
->>>
->>> Pins from the ASIU GPIO controller can be individually muxed to GPIO
->>> function, through interaction with the Cygnus IOMUX controller
->>>
->>> Signed-off-by: Ray Jui <rjui@broadcom.com>
->>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->>> Tested-by: Dmitry Torokhov <dtor@chromium.org>
->>
->> Patch applied! But please look at this:
->>
->>> +#include <linux/gpio.h>
->>
->> Doesn't just #include <linux/gpio/driver.h> work?
->>
+Hi, Brain
+
+Sorry to be impatient, but is there any feedback for this patch?
+
+Best Regards,
+Josh Wu
+
+On 3/4/2015 3:22 PM, Josh Wu wrote:
+> Hi, Brain
 >
-> I think I need linux/gpio.h for gpiochip_add_pin_range and some related
-> APIs.
-
-OK you're right ... I need to fix this.
-
-Yours,
-Linus Walleij
+> Would you have any chance to take this patch as it's been a long time?
+>
+> Best Regards,
+> Josh Wu
+>
+> On 1/22/2015 6:21 PM, Josh Wu wrote:
+>> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>
+>> Currently the driver read NFC command registers to get NFC busy flag.
+>> Actually this flag also can be get by reading HSMC_SR register.
+>>
+>> Use the read NFC command registers need mapping a huge memory region.
+>> To save the mapped memory region, we change to check NFC busy flag by
+>> reading HSMC_SR register.
+>>
+>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>> Changes in v2:
+>> - Change me to signed-off-by.
+>> - modify the error log.
+>>
+>>   drivers/mtd/nand/atmel_nand.c     | 5 ++---
+>>   drivers/mtd/nand/atmel_nand_nfc.h | 1 +
+>>   2 files changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/mtd/nand/atmel_nand.c 
+>> b/drivers/mtd/nand/atmel_nand.c
+>> index d93c849..336cc2d 100644
+>> --- a/drivers/mtd/nand/atmel_nand.c
+>> +++ b/drivers/mtd/nand/atmel_nand.c
+>> @@ -1752,11 +1752,10 @@ static int nfc_send_command(struct 
+>> atmel_nand_host *host,
+>>           cmd, addr, cycle0);
+>>         timeout = jiffies + msecs_to_jiffies(NFC_TIME_OUT_MS);
+>> -    while (nfc_cmd_readl(NFCADDR_CMD_NFCBUSY, host->nfc->base_cmd_regs)
+>> -            & NFCADDR_CMD_NFCBUSY) {
+>> +    while (nfc_readl(host->nfc->hsmc_regs, SR) & NFC_SR_BUSY) {
+>>           if (time_after(jiffies, timeout)) {
+>>               dev_err(host->dev,
+>> -                "Time out to wait CMD_NFCBUSY ready!\n");
+>> +                "Time out to wait for NFC ready!\n");
+>>               return -ETIMEDOUT;
+>>           }
+>>       }
+>> diff --git a/drivers/mtd/nand/atmel_nand_nfc.h 
+>> b/drivers/mtd/nand/atmel_nand_nfc.h
+>> index 85b8ca6..4d5d262 100644
+>> --- a/drivers/mtd/nand/atmel_nand_nfc.h
+>> +++ b/drivers/mtd/nand/atmel_nand_nfc.h
+>> @@ -35,6 +35,7 @@
+>>   #define        NFC_CTRL_DISABLE    (1 << 1)
+>>     #define ATMEL_HSMC_NFC_SR    0x08        /* NFC Status Register */
+>> +#define        NFC_SR_BUSY        (1 << 8)
+>>   #define        NFC_SR_XFR_DONE        (1 << 16)
+>>   #define        NFC_SR_CMD_DONE        (1 << 17)
+>>   #define        NFC_SR_DTOE        (1 << 20)
+>
