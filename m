@@ -1,65 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 11 Mar 2015 12:09:50 +0000
-Subject: [PATCH 5/5] arm64/efi: adapt to relaxed FDT placement requirements
-In-Reply-To: <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425380630-3684-1-git-send-email-ard.biesheuvel@linaro.org>
- <1425380630-3684-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150311120950.GF4114@leverpostej>
+From: eliad@wizery.com (Eliad Peller)
+Date: Wed, 11 Mar 2015 14:12:54 +0200
+Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
+In-Reply-To: <CABxcv=nE_Qd7do+dRyp=fw3wYmWFb+0eEjXYOtdjqE55Cp0zmQ@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <20150310173550.GT5264@atomide.com>
+ <CABxcv=ndnNj4MhoXeW=GHXT4aEWQYHdbu-Mg4R2Zhf9CJTrJCA@mail.gmail.com>
+ <3439869.6umCuOq6SV@wuerfel>
+ <CABxcv=nE_Qd7do+dRyp=fw3wYmWFb+0eEjXYOtdjqE55Cp0zmQ@mail.gmail.com>
+Message-ID: <CAB3XZEfnZbZqH95suJ9n39aZRr8kxPdj2HZuWKMvQtYmXe3QEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 11:03:50AM +0000, Ard Biesheuvel wrote:
-> With the relaxed FDT placement requirements in place, we can change
-> the allocation strategy used by the stub to put the FDT image higher
-> up in memory. At the same time, reduce the minimal alignment to a
-> power of 2 upper bound of the size: this way, we are still guaranteed
-> not to cross a 2 MB boundary, but will potentially waste less memory
-> doing so.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/efi.h            | 9 ++++-----
->  drivers/firmware/efi/libstub/arm-stub.c | 2 +-
->  drivers/firmware/efi/libstub/fdt.c      | 7 ++-----
->  3 files changed, 7 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index ef572206f1c3..68f7bb2ddad7 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -39,12 +39,11 @@ extern void efi_init(void);
->  /* arch specific definitions used by the stub code */
->  
->  /*
-> - * AArch64 requires the DTB to be 8-byte aligned in the first 512MiB from
-> - * start of kernel and may not cross a 2MiB boundary. We set alignment to
-> - * 2MiB so we know it won't cross a 2MiB boundary.
-> + * AArch64 requires the DTB to be 8-byte aligned and not cross a 2MiB boundary.
-> + * So align to a power of 2 upper bound of the FDT size.
->   */
-> -#define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
-> -#define MAX_FDT_OFFSET	SZ_512M
-> +#define EFI_FDT_ALIGN(x)	roundup_pow_of_two(x)
-> +#define MAX_FDT_OFFSET		ULONG_MAX
->  
->  #define efi_call_early(f, ...) sys_table_arg->boottime->f(__VA_ARGS__)
->  
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index dcae482a9a17..c58c21c22dbe 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -269,7 +269,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  
->  	new_fdt_addr = fdt_addr;
->  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
-> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-> +				&new_fdt_addr, MAX_FDT_OFFSET,
+On Wed, Mar 11, 2015 at 1:34 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> I think that patch [0] should not be needed since for external clocks,
+> the IP providing the clocks should have its own clock driver and for
+> internal clocks, a property should be used instead as you said.
+>
+>> If there is no external clock provider for this chip and the clocks
+>> are provided by the device itself, then all we need is a clock-frequency
+>> property in the device node.
+>>
+>
+> Agreed, IIUC Luciano wanted to expose the internal clocks by
+> registering in the common clock framework but if those clocks are not
+> really accessible from outside the wlan chip, then I also think that a
+> device node property should be used instead.
+>
+how should i describe multiple clock-frequency properties (there are 2
+relevant clocks) in this case?
 
-Do we still need the max_addr parameter and MAX_FDT_OFFSET, or can we
-just have allocate_new_fdt_and_exit_boot assume it can allocate anywhere
-in the physical address space (or ULONG_MAX if we want to allocate below
-4GB whenever we get 32-bit EFI stub support).
+does something like the following makes sense?
 
-Otherwise this looks fine.
+wlcore: wlcore at 2 {
+    ...
+    refclock: refclock {
+        compatible = "fixed-clock";
+        #clock-cells = <0>;
+        clock-frequency = <38400000>;
+    };
+}
 
-Mark.
+Eliad.
