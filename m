@@ -1,67 +1,43 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 11 Mar 2015 15:43:02 +0000
-Subject: [PATCH v6 5/6] DT: tegra: add binding for the legacy interrupt
- controller
-In-Reply-To: <1426088583-15097-1-git-send-email-marc.zyngier@arm.com>
-References: <1426088583-15097-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426088583-15097-6-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 11 Mar 2015 15:43:47 +0000
+Subject: [PATCH v6 5/7] DT: arm,gic: kill arm,routable-irqs
+In-Reply-To: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
+References: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426088629-15377-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nobody will regret it.
+
+Acked-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- .../interrupt-controller/nvidia,tegra-ictlr.txt    | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
+ Documentation/devicetree/bindings/arm/gic.txt | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
-new file mode 100644
-index 0000000..1099fe0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
-@@ -0,0 +1,43 @@
-+NVIDIA Legacy Interrupt Controller
-+
-+All Tegra SoCs contain a legacy interrupt controller that routes
-+interrupts to the GIC, and also serves as a wakeup source. It is also
-+referred to as "ictlr", hence the name of the binding.
-+
-+The HW block exposes a number of interrupt controllers, each
-+implementing a set of 32 interrupts.
-+
-+Required properties:
-+
-+- compatible : should be: "nvidia,tegra<chip>-ictlr". The LIC on
-+  subsequent SoCs remained backwards-compatible with Tegra30, so on
-+  Tegra generations later than Tegra30 the compatible value should
-+  include "nvidia,tegra30-ictlr".	
-+- reg : Specifies base physical address and size of the registers.
-+  Each controller must be described separately (Tegra20 has 4 of them,
-+  whereas Tegra30 and later have 5"  
-+- interrupt-controller : Identifies the node as an interrupt controller.
-+- #interrupt-cells : Specifies the number of cells needed to encode an
-+  interrupt source. The value must be 3.
-+- interrupt-parent : a phandle to the GIC these interrupts are routed
-+  to.
-+
-+Notes:
-+
-+- Because this HW ultimately routes interrupts to the GIC, the
-+  interrupt specifier must be that of the GIC.
-+- Only SPIs can use the ictlr as an interrupt parent. SGIs and PPIs
-+  are explicitly forbidden.
-+
-+Example:
-+
-+	ictlr: interrupt-controller at 60004000 {
-+		compatible = "nvidia,tegra20-ictlr", "nvidia,tegra-ictlr";
-+		reg = <0x60004000 64>,
-+		      <0x60004100 64>,
-+		      <0x60004200 64>,
-+		      <0x60004300 64>;
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&intc>;
-+	};
+diff --git a/Documentation/devicetree/bindings/arm/gic.txt b/Documentation/devicetree/bindings/arm/gic.txt
+index c97484b..1e0d212 100644
+--- a/Documentation/devicetree/bindings/arm/gic.txt
++++ b/Documentation/devicetree/bindings/arm/gic.txt
+@@ -56,11 +56,6 @@ Optional
+   regions, used when the GIC doesn't have banked registers. The offset is
+   cpu-offset * cpu-nr.
+ 
+-- arm,routable-irqs : Total number of gic irq inputs which are not directly
+-		  connected from the peripherals, but are routed dynamically
+-		  by a crossbar/multiplexer preceding the GIC. The GIC irq
+-		  input line is assigned dynamically when the corresponding
+-		  peripheral's crossbar line is mapped.
+ Example:
+ 
+ 	intc: interrupt-controller at fff11000 {
+@@ -68,7 +63,6 @@ Example:
+ 		#interrupt-cells = <3>;
+ 		#address-cells = <1>;
+ 		interrupt-controller;
+-		arm,routable-irqs = <160>;
+ 		reg = <0xfff11000 0x1000>,
+ 		      <0xfff10100 0x100>;
+ 	};
 -- 
 2.1.4
