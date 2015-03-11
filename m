@@ -1,67 +1,92 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 17:28:35 -0500
-Subject: [PATCH v6 03/30] PCI: Export busn_resource to drivers/pci
-In-Reply-To: <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
+Date: Wed, 11 Mar 2015 17:32:11 -0500
+Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
+In-Reply-To: <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150311222835.GA1082@google.com>
+ <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150311223211.GB1082@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:00AM +0800, Yijing Wang wrote:
-> Export out busn_resource. Xen pcifront module need it.
+On Mon, Mar 09, 2015 at 10:34:01AM +0800, Yijing Wang wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 > 
+> Use pci_scan_root_bus() instead of deprecated function
+> pci_scan_bus_parented().
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: xen-devel at lists.xenproject.org
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 > ---
->  drivers/pci/pci.h   |    2 ++
->  drivers/pci/probe.c |    3 ++-
->  2 files changed, 4 insertions(+), 1 deletions(-)
+>  drivers/pci/xen-pcifront.c |   12 +++++++++---
+>  1 files changed, 9 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-> index 4091f82..eeacab9 100644
-> --- a/drivers/pci/pci.h
-> +++ b/drivers/pci/pci.h
-> @@ -10,6 +10,8 @@ bool pcie_cap_has_lnkctl(const struct pci_dev *dev);
+> diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+> index b1ffebe..9e7c28b 100644
+> --- a/drivers/pci/xen-pcifront.c
+> +++ b/drivers/pci/xen-pcifront.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/bitops.h>
+>  #include <linux/time.h>
+>  #include <xen/platform_pci.h>
+> +#include "pci.h"
 >  
->  /* Functions internal to the PCI core code */
+>  #include <asm/xen/swiotlb-xen.h>
+>  #define INVALID_GRANT_REF (0)
+> @@ -446,6 +447,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>  				 unsigned int domain, unsigned int bus)
+>  {
+>  	struct pci_bus *b;
+> +	LIST_HEAD(resources);
+>  	struct pcifront_sd *sd = NULL;
+>  	struct pci_bus_entry *bus_entry = NULL;
+>  	int err = 0;
+> @@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>  		err = -ENOMEM;
+>  		goto err_out;
+>  	}
+> +	pci_add_resource(&resources, &ioport_resource);
+> +	pci_add_resource(&resources, &iomem_resource);
+> +	pci_add_resource(&resources, &busn_resource);
+
+Since I don't want to export busn_resource, you might have to allocate your
+own struct resource for it here.  And, of course, figure out the details of
+which PCI domain you're in and whether you need to share one struct
+resource across several host bridges in the same domain.
+
+>  	pcifront_init_sd(sd, domain, bus, pdev);
 >  
-> +extern struct resource busn_resource;
-> +
->  int pci_create_sysfs_dev_files(struct pci_dev *pdev);
->  void pci_remove_sysfs_dev_files(struct pci_dev *pdev);
->  #if !defined(CONFIG_DMI) && !defined(CONFIG_ACPI)
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8ef0375..b97ea81 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -17,12 +17,13 @@
->  #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
->  #define CARDBUS_RESERVE_BUSNR	3
+>  	pci_lock_rescan_remove();
 >  
-> -static struct resource busn_resource = {
-> +struct resource busn_resource = {
->  	.name	= "PCI busn",
->  	.start	= 0,
->  	.end	= 255,
->  	.flags	= IORESOURCE_BUS,
->  };
-> +EXPORT_SYMBOL(busn_resource);
-
-I don't think this is a good idea.  We support multiple PCI domains, and
-each domain has its own 0-255 bus number range.  This busn_resource is
-only for domain 0 and probably should be handled in arch code instead of
-the PCI core.
-
-Right now, I think it's possible to call pci_scan_bus_parented() or
-pci_scan_bus() several times for buses in different domains, and they would
-all share the same busn_resource, which would cause corruption.
-
-So it's already broken, but I don't want to make it harder to fix by
-exporting this stuff.
-
+> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+> -				  &pcifront_bus_ops, sd);
+> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
+> +				  &pcifront_bus_ops, sd, &resources);
+>  	if (!b) {
+>  		dev_err(&pdev->xdev->dev,
+>  			"Error creating PCI Frontend Bus!\n");
+>  		err = -ENOMEM;
+>  		pci_unlock_rescan_remove();
+> +		pci_free_resource_list(&resources);
+>  		goto err_out;
+>  	}
 >  
->  /* Ugh.  Need to stop exporting this to modules. */
->  LIST_HEAD(pci_root_buses);
+> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+>  
+>  	list_add(&bus_entry->list, &pdev->root_buses);
+>  
+> -	/* pci_scan_bus_parented skips devices which do not have a have
+> +	/* pci_scan_root_bus skips devices which do not have a
+>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+>  	err = pcifront_scan_bus(pdev, domain, bus, b);
+>  
 > -- 
 > 1.7.1
 > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
