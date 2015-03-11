@@ -1,58 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 11 Mar 2015 11:29:25 +0100
-Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
-References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1426069765.30407.7.camel@AMDC1943>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Mar 2015 11:32:14 +0100
+Subject: [PATCH v5 2/3] wl18xx: add basic device-tree support
+In-Reply-To: <CABxcv=nn9-1a-3809Y1JgC5ExkwHqQmCXRT3tX=h7Z6C7c+m2A@mail.gmail.com>
+References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
+ <2121942.zIG9BfPsTV@wuerfel>
+ <CABxcv=nn9-1a-3809Y1JgC5ExkwHqQmCXRT3tX=h7Z6C7c+m2A@mail.gmail.com>
+Message-ID: <2158874.BdVTdz3Bds@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
-> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-> controller") the second suspend to RAM failed. First suspend worked fine
-> but the next one hang just after powering down of secondary CPUs (system
-> consumed energy as it would be running but was not responsive).
+On Wednesday 11 March 2015 11:05:47 Javier Martinez Canillas wrote:
 > 
-> The issue was caused by enabling delayed reset assertion for CPU0 just
-> after issuing power down of cores. This was introduced for Exynos4 in
-> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+> On Wed, Mar 11, 2015 at 10:51 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 11 March 2015 01:34:19 Javier Martinez Canillas wrote:
+> >> > +
+> >> > +static struct wl12xx_platform_data *
+> >> > +wlcore_get_platform_data(struct device *dev)
+> >> > +{
+> >> > +       struct wl12xx_platform_data *pdata;
+> >> > +
+> >> > +       /* first, look for DT data */
+> >>
+> >> I thought it was the opposite, that platform data should over-rule DT.
+> >> That way you can still use the data filled in
+> >> arch/arm/mach-omap2/pdata-quirks.c even after the driver supports your
+> >> new DT binding.
+> >
+> > No, the pdata-quirks stuff for this driver must die, it was a hack
+> > that only exists because we previously could not attach data to an
+> > sdio function.
+> >
 > 
-> The whole behavior is not well documented but after checking with vendor
-> code this should be done like this (on Exynos4):
-> 1. Enable delayed reset assertion when system is running (for all CPUs).
-> 2. Disable delayed reset assertion before suspending the system.
->    This can be done after powering off secondary CPUs.
-> 3. Re-enable the delayed reset assertion when system is resumed.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-> Cc: <stable@vger.kernel.org>
-> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Ok sorry, I misunderstood and thought that the output from the
+> discussion in patch 3/3 was that the pdata could not still be removed
+> due not having a way to configure the clocks for wl12xx.
 
-Dear Kukjin,
+I think that is still the case, but we should never have both pdata
+and DT, and if we ever did, I think the DT should take precedence
+so we can be sure that the pdata is not used and can be removed.
 
-This patch was first sent on 3rd of February. It could enter before
-opening 4.0 merge window. I did not receive any response from you in
-that time.
-
-So let me point next steps:
-1. The Exynos4412 suspend on 4.0 is broken and now this patch applies as
-a fix.
-2. I resent it on 18th of February.
-3. I received tested-by from Bartlomiej and Chanwoo.
-4. Bartlomiej pinged you on 3rd March.
-
-Still no response. If the patch does not look good then please share
-your comments. I'll fix it.
-If this patch looks good, why does it take so much time?
-
-
-Dear Arnd and Olof,
-
-Could you pick it up to your arm-soc?
-
-
-Best regards,
-Krzysztof
+	Arnd
