@@ -1,19 +1,21 @@
 From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 11 Mar 2015 12:10:23 +0100
-Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
-References: <1426002063-25713-1-git-send-email-s.hauer@pengutronix.de>
- <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1426072223.4244.93.camel@x220>
+Date: Wed, 11 Mar 2015 12:12:31 +0100
+Subject: [PATCH 2/2] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT8173 SoCs
+In-Reply-To: <1426000954-7647-3-git-send-email-s.hauer@pengutronix.de>
+References: <1426000954-7647-1-git-send-email-s.hauer@pengutronix.de>
+ <1426000954-7647-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1426072351.4244.95.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-10 at 16:41 +0100, Sascha Hauer wrote:
+On Tue, 2015-03-10 at 16:22 +0100, Sascha Hauer wrote:
 > --- /dev/null
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -0,0 +1,345 @@
+> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> @@ -0,0 +1,978 @@
 > +/*
-> + * Copyright (c) 2015 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
+> + * Copyright (c) 2014 MediaTek Inc.
+> + * Author: Flora Fu, MediaTek
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
