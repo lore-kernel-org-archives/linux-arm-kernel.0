@@ -1,108 +1,49 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 11 Mar 2015 20:39:27 +0800
-Subject: [PATCH v10 01/21] ACPI / table: Use pr_debug() instead of pr_info()
- for MADT table scanning
+Date: Wed, 11 Mar 2015 20:39:28 +0800
+Subject: [PATCH v10 02/21] ACPI: add arm64 to the platforms that use ioremap
 In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1426077587-1561-2-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1426077587-1561-3-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a normal 8 cpu sockets system, it will up to 240 cpu threads (Xeon E7
-v2 family for now), and we need 240 entries for local apic or local x2apic
-in MADT table, so it will be much verbose information printed with a slow
-uart console when system booted, this will be even worse with large system
-with 16/32 cpu sockets.
+From: Graeme Gregory <graeme.gregory@linaro.org>
 
-This patch just use pr_debug() instead of pr_info() for ioapic/iosapic,
-local apic/x2apic/sapic structures when scanning the MADT table to remove
-those verbose information, but leave other structures unchanged.
+Now with the base changes to the arm memory mapping it is safe
+to convert to using ioremap to map in the tables after
+acpi_gbl_permanent_mmap is set.
 
 CC: Rafael J Wysocki <rjw@rjwysocki.net>
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Acked-by: Olof Johansson <olof@lixom.net>
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Tested-by: Robert Richter <rrichter@cavium.com>
 Tested-by: Timur Tabi <timur@codeaurora.org>
+Acked-by: Robert Richter <rrichter@cavium.com>
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Reviewed-by: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Al Stone <al.stone@linaro.org>
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/acpi/tables.c | 30 ++++++++++++++++--------------
- 1 file changed, 16 insertions(+), 14 deletions(-)
+ drivers/acpi/osl.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-index 93b8152..f4e5b88 100644
---- a/drivers/acpi/tables.c
-+++ b/drivers/acpi/tables.c
-@@ -23,6 +23,8 @@
-  *
-  */
+diff --git a/drivers/acpi/osl.c b/drivers/acpi/osl.c
+index f9eeae8..39748bb 100644
+--- a/drivers/acpi/osl.c
++++ b/drivers/acpi/osl.c
+@@ -336,11 +336,11 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
+ 	return NULL;
+ }
  
-+/* Uncomment next line to get verbose printout */
-+/* #define DEBUG */
- #define pr_fmt(fmt) "ACPI: " fmt
+-#ifndef CONFIG_IA64
+-#define should_use_kmap(pfn)   page_is_ram(pfn)
+-#else
++#if defined(CONFIG_IA64) || defined(CONFIG_ARM64)
+ /* ioremap will take care of cache attributes */
+ #define should_use_kmap(pfn)   0
++#else
++#define should_use_kmap(pfn)   page_is_ram(pfn)
+ #endif
  
- #include <linux/init.h>
-@@ -61,9 +63,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		{
- 			struct acpi_madt_local_apic *p =
- 			    (struct acpi_madt_local_apic *)header;
--			pr_info("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
--				p->processor_id, p->id,
--				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-+			pr_debug("LAPIC (acpi_id[0x%02x] lapic_id[0x%02x] %s)\n",
-+				 p->processor_id, p->id,
-+				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
- 		}
- 		break;
- 
-@@ -71,9 +73,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		{
- 			struct acpi_madt_local_x2apic *p =
- 			    (struct acpi_madt_local_x2apic *)header;
--			pr_info("X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
--				p->local_apic_id, p->uid,
--				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-+			pr_debug("X2APIC (apic_id[0x%02x] uid[0x%02x] %s)\n",
-+				 p->local_apic_id, p->uid,
-+				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
- 		}
- 		break;
- 
-@@ -81,8 +83,8 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		{
- 			struct acpi_madt_io_apic *p =
- 			    (struct acpi_madt_io_apic *)header;
--			pr_info("IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
--				p->id, p->address, p->global_irq_base);
-+			pr_debug("IOAPIC (id[0x%02x] address[0x%08x] gsi_base[%d])\n",
-+				 p->id, p->address, p->global_irq_base);
- 		}
- 		break;
- 
-@@ -155,9 +157,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		{
- 			struct acpi_madt_io_sapic *p =
- 			    (struct acpi_madt_io_sapic *)header;
--			pr_info("IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
--				p->id, (void *)(unsigned long)p->address,
--				p->global_irq_base);
-+			pr_debug("IOSAPIC (id[0x%x] address[%p] gsi_base[%d])\n",
-+				 p->id, (void *)(unsigned long)p->address,
-+				 p->global_irq_base);
- 		}
- 		break;
- 
-@@ -165,9 +167,9 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 		{
- 			struct acpi_madt_local_sapic *p =
- 			    (struct acpi_madt_local_sapic *)header;
--			pr_info("LSAPIC (acpi_id[0x%02x] lsapic_id[0x%02x] lsapic_eid[0x%02x] %s)\n",
--				p->processor_id, p->id, p->eid,
--				(p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
-+			pr_debug("LSAPIC (acpi_id[0x%02x] lsapic_id[0x%02x] lsapic_eid[0x%02x] %s)\n",
-+				 p->processor_id, p->id, p->eid,
-+				 (p->lapic_flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
- 		}
- 		break;
- 
+ static void __iomem *acpi_map(acpi_physical_address pg_off, unsigned long pg_sz)
 -- 
 1.9.1
