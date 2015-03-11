@@ -1,185 +1,33 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 11 Mar 2015 15:23:30 +0200
-Subject: [PATCH v2 7/7] ARM: DTS: dra7x: Integrate sDMA crossbar
-In-Reply-To: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1426080210-841-8-git-send-email-peter.ujfalusi@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 Mar 2015 13:24:56 +0000
+Subject: [PATCH 4/7] ARM: mx25: Retrieve IIM base from dt
+In-Reply-To: <1426077835-31081-4-git-send-email-festevam@gmail.com>
+References: <1426077835-31081-1-git-send-email-festevam@gmail.com>
+ <1426077835-31081-4-git-send-email-festevam@gmail.com>
+Message-ID: <20150311132456.GD8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sDMA requests are routed through the DMA crossbar and without the
-crossbar only peripherals using DMA request 0-127 can be used.
+On Wed, Mar 11, 2015 at 09:43:52AM -0300, Fabio Estevam wrote:
+> +	void __iomem *iim_base;
+> +	struct device_node *np;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx25-iim");
+> +	iim_base = of_iomap(np, 0);
+> +	WARN_ON(!iim_base);
+> +	rev = readl(iim_base + MXC_IIMSREV);
+> +	iounmap(iim_base);
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 57 ++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 24 deletions(-)
+Is there much point to that WARN_ON()?  Are you avoiding the political
+BUG_ON(!iim_base) ? :)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 127608d79033..b6aca837e291 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -253,6 +253,15 @@
- 			dma-requests = <127>;
- 		};
- 
-+		sdma_xbar: dma-router at 4a002b78 {
-+			compatible = "ti,dra7-dma-crossbar";
-+			reg = <0x4a002b78 0xfc>;
-+			#dma-cells = <1>;
-+			dma-requests = <205>;
-+			ti,dma-safe-map = <0>;
-+			dma-device = <&sdma>;
-+		};
-+
- 		gpio1: gpio at 4ae10000 {
- 			compatible = "ti,omap4-gpio";
- 			reg = <0x4ae10000 0x200>;
-@@ -348,7 +357,7 @@
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 49>, <&sdma 50>;
-+			dmas = <&sdma_xbar 49>, <&sdma_xbar 50>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -359,7 +368,7 @@
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 51>, <&sdma 52>;
-+			dmas = <&sdma_xbar 51>, <&sdma_xbar 52>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -370,7 +379,7 @@
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 53>, <&sdma 54>;
-+			dmas = <&sdma_xbar 53>, <&sdma_xbar 54>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -381,7 +390,7 @@
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-                         status = "disabled";
--			dmas = <&sdma 55>, <&sdma 56>;
-+			dmas = <&sdma_xbar 55>, <&sdma_xbar 56>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -392,7 +401,7 @@
- 			ti,hwmods = "uart5";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 63>, <&sdma 64>;
-+			dmas = <&sdma_xbar 63>, <&sdma_xbar 64>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -403,7 +412,7 @@
- 			ti,hwmods = "uart6";
- 			clock-frequency = <48000000>;
- 			status = "disabled";
--			dmas = <&sdma 79>, <&sdma 80>;
-+			dmas = <&sdma_xbar 79>, <&sdma_xbar 80>;
- 			dma-names = "tx", "rx";
- 		};
- 
-@@ -819,7 +828,7 @@
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
--			dmas = <&sdma 61>, <&sdma 62>;
-+			dmas = <&sdma_xbar 61>, <&sdma_xbar 62>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 			pbias-supply = <&pbias_mmc_reg>;
-@@ -831,7 +840,7 @@
- 			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
--			dmas = <&sdma 47>, <&sdma 48>;
-+			dmas = <&sdma_xbar 47>, <&sdma_xbar 48>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -842,7 +851,7 @@
- 			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc3";
- 			ti,needs-special-reset;
--			dmas = <&sdma 77>, <&sdma 78>;
-+			dmas = <&sdma_xbar 77>, <&sdma_xbar 78>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -853,7 +862,7 @@
- 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc4";
- 			ti,needs-special-reset;
--			dmas = <&sdma 57>, <&sdma 58>;
-+			dmas = <&sdma_xbar 57>, <&sdma_xbar 58>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
- 		};
-@@ -998,14 +1007,14 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi1";
- 			ti,spi-num-cs = <4>;
--			dmas = <&sdma 35>,
--			       <&sdma 36>,
--			       <&sdma 37>,
--			       <&sdma 38>,
--			       <&sdma 39>,
--			       <&sdma 40>,
--			       <&sdma 41>,
--			       <&sdma 42>;
-+			dmas = <&sdma_xbar 35>,
-+			       <&sdma_xbar 36>,
-+			       <&sdma_xbar 37>,
-+			       <&sdma_xbar 38>,
-+			       <&sdma_xbar 39>,
-+			       <&sdma_xbar 40>,
-+			       <&sdma_xbar 41>,
-+			       <&sdma_xbar 42>;
- 			dma-names = "tx0", "rx0", "tx1", "rx1",
- 				    "tx2", "rx2", "tx3", "rx3";
- 			status = "disabled";
-@@ -1019,10 +1028,10 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi2";
- 			ti,spi-num-cs = <2>;
--			dmas = <&sdma 43>,
--			       <&sdma 44>,
--			       <&sdma 45>,
--			       <&sdma 46>;
-+			dmas = <&sdma_xbar 43>,
-+			       <&sdma_xbar 44>,
-+			       <&sdma_xbar 45>,
-+			       <&sdma_xbar 46>;
- 			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
-@@ -1035,7 +1044,7 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi3";
- 			ti,spi-num-cs = <2>;
--			dmas = <&sdma 15>, <&sdma 16>;
-+			dmas = <&sdma_xbar 15>, <&sdma_xbar 16>;
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
- 		};
-@@ -1048,7 +1057,7 @@
- 			#size-cells = <0>;
- 			ti,hwmods = "mcspi4";
- 			ti,spi-num-cs = <1>;
--			dmas = <&sdma 70>, <&sdma 71>;
-+			dmas = <&sdma_xbar 70>, <&sdma_xbar 71>;
- 			dma-names = "tx0", "rx0";
- 			status = "disabled";
- 		};
+Since a NULL pointer there will lead to a NULL pointer dereference, it's
+silly to use WARN_ON() there - we'll get a backtrace etc from the WARN_ON
+followed immediately by an oops dump due to the readl(), crashing the
+kernel.
+
+Better to just use BUG_ON() and only get one set of diagnostics.
+
 -- 
-2.3.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
