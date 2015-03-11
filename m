@@ -1,44 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 11 Mar 2015 09:51:21 +0100
-Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints
- and find ports by id
-In-Reply-To: <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
-References: <1425369592.3146.14.camel@pengutronix.de>
- <1426001087.3141.46.camel@pengutronix.de>
- <20150310154253.GO8656@n2100.arm.linux.org.uk>
- <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
-Message-ID: <1426063881.3101.33.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 11 Mar 2015 09:52:25 +0100
+Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the
+ onboard WiFi module
+In-Reply-To: <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-14-git-send-email-wens@csie.org>
+ <20150310213218.GH5085@lukather>
+ <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
+Message-ID: <20150311085225.GK5085@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Mar 11, 2015 at 11:11:49AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Mar 11, 2015 at 5:32 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Tue, Mar 10, 2015 at 07:59:24PM +0800, Chen-Yu Tsai wrote:
+> >> The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
+> >> WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
+> >> The IC also takes a power enable signal via GPIO. This is supported
+> >> with the new power sequencing bindings.
+> >>
+> >> The WiFi module supports out-of-band interrupt signaling via GPIO,
+> >> but this is buggy and not enabled yet.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> > There's two almost identical patches 12/12. Which one am I suppose to
+> > apply?
+> 
+> This one is the right one. I forgot to clear the patches after changing
+> the description. The "buggy" part in the description is probably not
+> needed. Hans explained that the SD resets have nothing to do with
+> interrupt handling.
 
-Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
-> I've only been copied on this latest pull request and a version from
-> March of last year which Grant nak'ed. This series did not go to
-> devicetree list either. I'll take a look at the series. 
+Just to be clear, you want the last sentence to be:
 
-My bad, I should have copied you, too. Thanks for having a look now.
+The WiFi module supports out-of-band interrupt signaling via GPIO, but
+this is not enabled yet.
 
-The nak'ed series (https://lkml.org/lkml/2014/3/20/664) indeed already
-included the "of: Add OF graph helper to get a specific port by id" and
-"of: Add OF graph helpers to iterate over ports" patches, but Grant's
-nak applied to the first patch, "of: Parse OF graph into graph
-structure", which I then dropped.
+Right?
 
-> If there is an explanation of how Grant's nak was addressed that would
-> speed up my review.
+Maxime
 
-See above. The other two patches have been uncontroversial. The
-of_graph_get_next_endpoint and for_each_endpoint_of_node patches
-fix an in-kernel API that was too easy to use incorrectly, and
-the of_graph_get_port_by_id patch I can't remember being
-commented on at all.
-
-> I'm not applying for v4.0 though.
-
-If you decide to apply them, please consider merging the tag and giving
-your ack for it to be merged into the other subsystem trees, too.
-
-regards
-Philipp
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/9748c958/attachment.sig>
