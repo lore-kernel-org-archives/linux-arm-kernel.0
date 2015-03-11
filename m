@@ -1,51 +1,31 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 11 Mar 2015 09:54:52 +0900
-Subject: [PATCH] ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator
- quirk
-In-Reply-To: <1425930640-4581-1-git-send-email-geert+renesas@glider.be>
-References: <1425930640-4581-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150311005451.GB11701@verge.net.au>
+Date: Wed, 11 Mar 2015 09:55:25 +0900
+Subject: [PATCH 0/4] ARM: shmobile: koelsch / lager regulator updates
+In-Reply-To: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
+References: <1425931617-5479-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20150311005524.GC11701@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 08:50:40PM +0100, Geert Uytterhoeven wrote:
-> The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
-> da9210 regulators.  Both regulators have their interrupt request lines
-> tied to the same interrupt pin (IRQ2) on the SoC.
+On Mon, Mar 09, 2015 at 09:06:53PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> After cold boot or da9063-induced restart, both the da9063 and da9210
-> seem to assert their interrupt request lines.  Hence as soon as one
-> driver requests this irq, it gets stuck in an interrupt storm, as it
-> only manages to deassert its own interrupt request line, and the other
-> driver hasn't installed an interrupt handler yet.
+> This patch series contains two DTS updates each for r8a7791/koelsch and
+> r8a7790/lager:
+>   - add the missing interrupt for the da9210 regulators,
+>   - add device nodes for the da9063 pmics.
 > 
-> To handle this, install a quirk that masks the interrupts in both the
-> da9063 and da9210.  This quirk has to run after the i2c master driver
-> has been initialized, but before the i2c slave drivers are initialized.
-> As it depends on i2c, select I2C if one of the affected platforms is
-> enabled in the kernel config.
+> The da9063 pmic allows the system to be restarted when the watchdog
+> timer times out ("cat > dev/watchdog0", and wait 8 s), or when a system
+> restart is requested ("reboot").
 > 
-> On koelsch, the following happens:
+> This series depends on "[PATCH] ARM: shmobile: R-Car Gen2: Add
+> da9063/da9210 regulator quirk".
 > 
->   - Cold boot or reboot using the da9063 restart handler:
+> An earlier version of patch [2/4] has been posted before as "[PATCH 3/4]
+> ARM: shmobile: koelsch: Add DA9063 PMIC device node for system
+> restart", but it caused havoc without the quirk.
 > 
-> 	IRQ2 is asserted, installing da9063/da9210 regulator quirk
-> 	...
-> 	i2c i2c-6: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
-> 	i2c 6-0058: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
-> 	i2c 6-0058: Detected da9063
-> 	i2c 6-0058: Masking da9063 interrupt sources
-> 	i2c 6-0068: regulator_quirk_notify: 1, IRQC_MONITOR = 0x3fb
-> 	i2c 6-0068: Detected da9210
-> 	i2c 6-0068: Masking da9210 interrupt sources
-> 	i2c 6-0068: IRQ2 is not asserted, removing quirk
-> 
->   - Warm boot (reset button):
-> 
-> 	rcar_gen2_regulator_quirk: IRQ2 is not asserted, not installing quirk
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Reviewed-by: Mark Brown <broonie@kernel.org>
+> This has been tested on r8a7791/koelsch.
 
-Thanks, I have queued this up for v4.1.
+Thanks, I have queued this up for v4.1 on top of the above mentioned patch.
