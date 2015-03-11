@@ -1,45 +1,79 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 11 Mar 2015 02:00:59 +0100
-Subject: [PATCH v5 3/3] ARM: dts: igep00x0: add wl18xx bindings
-In-Reply-To: <20150310173550.GT5264@atomide.com>
-References: <1425915402-10012-1-git-send-email-eliad@wizery.com>
- <2223973.a64rBcZvaA@wuerfel>
- <CAB3XZEftjwUGS_Kj2dCxYY1m82C+a1_=akbnG3_hLETCr+Dddg@mail.gmail.com>
- <5683860.JYkc24rKim@wuerfel>
- <CAB3XZEfEQnb7qsxuAAr6pUehm1nw6Eu4ZsV1+E477yF5K1hczA@mail.gmail.com>
- <20150310161801.GR5264@atomide.com>
- <CAB3XZEdK2O7tSSTchvRQtaefzCECjjQ-biQmOBHGdzJaBknSFQ@mail.gmail.com>
- <20150310173550.GT5264@atomide.com>
-Message-ID: <CABxcv=ndnNj4MhoXeW=GHXT4aEWQYHdbu-Mg4R2Zhf9CJTrJCA@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 11 Mar 2015 10:10:05 +0900
+Subject: ARCH_EXYNOS5433 missing in Kconfig
+In-Reply-To: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
+References: <CAD3Xx4Jf5ACBKe-KvGRD=myHKrJ+K_P0vBrtrmfgh+1zNM4hug@mail.gmail.com>
+Message-ID: <54FF95ED.1040003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+Hi Valentin,
 
-On Tue, Mar 10, 2015 at 6:35 PM, Tony Lindgren <tony@atomide.com> wrote:
->>
->> we do have to make sure these wl18xx bindings are future-compatible
->> with the wl12xx ones, but i think the current bindings are pretty much
->> standard (and are actually a subset of the bindings needed by wl12xx),
->> so it should be fine.
->
-> Well how about add just the parsing of the clock and assume it's always
-> WL12XX_REFCLOCK_38 for now as that's the only thing we're currently
-> using. Then we can add a property or compatible value if using something
-> else as needed.
->
+I sent the Exynos5433 clock patch and then separately I'm sending the
+Exynos5433 devicetree patch-set[1].
+[1] [PATCH v6 0/9] arm64: Add the support for new Exynos5433 SoC
+- https://lkml.org/lkml/2015/3/9/1036
 
-What do you mean by parsing here? IIUC there isn't a clock driver for
-these clocks and are setup directly in the
-drivers/net/wireless/ti/wl12xx/main.c driver.
+But, according to Arnd bergmann's comment[2], latest Exynos5433 dt patch-set[1]
+removed the CONFIG_ARCH_EXYNOS5433.
+[2] https://lkml.org/lkml/2015/2/24/85
 
-So you can't make the WLAN chip dev node a consumer of these clocks by
-adding a phandle to a clock provider and clock specifiers since there
-isn't a provider to be referenced in the DT. Or did I misunderstand?
 
-> Regards,
->
-> Tony
+So, I have plan to send following patch.
 
-Best regards,
-Javier
+---
+    clk: samsung: Use CONFIG_ARCH_EXYNOS instead of Exynos-specific configuration
+
+    This patch removes the CONFIG_ARCH_EXYNOS{5433|7} and then use only the
+    CONFIG_ARCH_EXYNOS for ARM-64bit Exynos SoC.
+
+    Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+    Cc: Tomasz Figa <tomasz.figa@gmail.com>
+    Cc: Arnd Bergmann <arnd@arndb.de>
+    Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/clk/samsung/Makefile | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index 17e9af7..561719d 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)        += clk-exynos5250.o
+ obj-$(CONFIG_SOC_EXYNOS5260)   += clk-exynos5260.o
+ obj-$(CONFIG_SOC_EXYNOS5410)   += clk-exynos5410.o
+ obj-$(CONFIG_SOC_EXYNOS5420)   += clk-exynos5420.o
+-obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
++obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos5433.o
+ obj-$(CONFIG_SOC_EXYNOS5440)   += clk-exynos5440.o
+ obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-audss.o
+ obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-clkout.o
+
+
+Regards,
+Chanwoo Choi
+
+
+On 03/11/2015 12:32 AM, Valentin Rothberg wrote:
+> Hi Chanwoo,
+> 
+> your commit 96bd6224f07b ("clk: samsung: exynos5433: Add clocks using
+> common clock framework") is included in today's linux-next tree (i.e.,
+> next-20150310).
+> 
+> This patch conditionally compiles clk-exynos5433.c depending on the
+> Kconfig option ARCH_EXYNOS5433.  However, this option is not defined
+> in Kconfig, so that the driver cannot be compiled at the current
+> state:
+> 
+> +obj-$(CONFIG_ARCH_EXYNOS5433)  += clk-exynos5433.o
+> 
+> Is there a patch queued somewhere that adds this Kconfig symbol?  I
+> detected the issue by running undertaker-checkpatch from the
+> Undertaker tool suite (undertaker.cs.fau.de).  There is also a tool in
+> the git tree that can detect such issues (i.e.,
+> scripts/checkkconfigsymbols.py).
+> 
+> Kind regards,
+>  Valentin
+> 
