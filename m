@@ -1,52 +1,76 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Mar 2015 16:33:49 +0530
-Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
-In-Reply-To: <20150311105307.GW28806@sirena.org.uk>
-References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
- <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
- <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
- <CALx668VypyWbVuph0ir0SRt4kqASvYzwBuyc_r5tFeoHi+HieA@mail.gmail.com>
- <CAKohpomxXTP6NdPoSmB=eq2sFqqgskS5vYtDNAT6a0VL5K6dCg@mail.gmail.com>
- <CALx668VFRdeWcK_gKhJrJehnaH5uDpA0m2OfHLqPVUq8oocXaw@mail.gmail.com>
- <CAKohpokT7fSniPGX2BfM61AtMoMCxEP8WDtbZ34bozUXscEWyg@mail.gmail.com>
- <20150311105307.GW28806@sirena.org.uk>
-Message-ID: <CAKohpom4riOhzc3hK8B2tiSwGx0zG96C7QNeQB0yZaPMd_OpLw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 Mar 2015 12:08:39 +0100
+Subject: [PATCH v4 1/3] ARM: EXYNOS: Add missing static to file-scope
+ declarations
+Message-ID: <1426072121-6822-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2015 at 16:23, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Mar 10, 2015 at 08:20:43AM +0530, Viresh Kumar wrote:
->
-> Please don't send upstream e-mail to my work account, I use this address
-> pretty consistently for upstream.  Upstream mail to my work account
-> frequently ends up unread.
+The 'pm_data', 'exynos_release_ret_regs', 'exynos3250_release_ret_regs'
+and 'exynos5420_release_ret_regs' are not exported nor used outside of
+suspend.c file. Make them static.
 
-Sorry about that, I did exactly opposite of this earlier :(
+This fixes following sparse warnings:
+arch/arm/mach-exynos/suspend.c:83:23: warning: symbol 'pm_data' was not declared. Should it be static?
+arch/arm/mach-exynos/suspend.c:106:14: warning: symbol 'exynos_release_ret_regs' was not declared. Should it be static?
+arch/arm/mach-exynos/suspend.c:117:14: warning: symbol 'exynos5420_release_ret_regs' was not declared. Should it be static?
 
->> On 6 March 2015 at 11:19, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
->> > On 5 March 2015 at 17:55, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->
->> > About putting
->> > those stuff into regulator driver, I think you mean creating a
->> > "virtual regulator
->> > device" and put all the voltage controlling complex into the driver, right?
->> > Maybe it's a good idea in this case, but I am sure if this kind of
->> > virtual regulator is acceptable.
->
->> @Mark: Is this allowed to create virtual regulator for a CPU ?
->
-> I don't really know what the above means or what problem it's supposed
-> to solve.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
 
-On mediatek platform, they need to configure two regulators in order to change
-DVFS state of the big cluster. The generic cpufreq-dt driver and earlier OPP
-bindings have support for a single regulator only and so what Pi-cheng tried
-to do is,
-- Configure one of the regulators using cpufreq-dt
-- And other one using cpufreq frequency change notifiers
+Notes:
+    Changes since v3:
+    1. Add Pankaj's reviewed-by.
+    
+    Changes since v2:
+    None
+    
+    Changes since v1:
+    1. Add static to 'exynos3250_release_ret_regs' (suggested by Kukjin).
 
-This looks awkward..
+ arch/arm/mach-exynos/suspend.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-What I suggested was to create another virtual regulator for CPU which will
-eventually configure both the regulators. And so the question that such
-virtual regulators are allowed or not.
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 318d127df147..2fefb7073083 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -75,7 +75,7 @@ struct exynos_pm_data {
+ 	int (*cpu_suspend)(unsigned long);
+ };
+ 
+-struct exynos_pm_data *pm_data;
++static struct exynos_pm_data *pm_data;
+ 
+ static int exynos5420_cpu_state;
+ static unsigned int exynos_pmu_spare3;
+@@ -104,7 +104,7 @@ static const struct exynos_wkup_irq exynos5250_wkup_irq[] = {
+ 	{ /* sentinel */ },
+ };
+ 
+-unsigned int exynos_release_ret_regs[] = {
++static unsigned int exynos_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -115,7 +115,7 @@ unsigned int exynos_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-unsigned int exynos3250_release_ret_regs[] = {
++static unsigned int exynos3250_release_ret_regs[] = {
+ 	S5P_PAD_RET_MAUDIO_OPTION,
+ 	S5P_PAD_RET_GPIO_OPTION,
+ 	S5P_PAD_RET_UART_OPTION,
+@@ -128,7 +128,7 @@ unsigned int exynos3250_release_ret_regs[] = {
+ 	REG_TABLE_END,
+ };
+ 
+-unsigned int exynos5420_release_ret_regs[] = {
++static unsigned int exynos5420_release_ret_regs[] = {
+ 	EXYNOS_PAD_RET_DRAM_OPTION,
+ 	EXYNOS_PAD_RET_MAUDIO_OPTION,
+ 	EXYNOS_PAD_RET_JTAG_OPTION,
+-- 
+1.9.1
