@@ -1,79 +1,80 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 11 Mar 2015 23:11:41 +0000
-Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
-In-Reply-To: <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
- <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
-Message-ID: <20150311231141.GG21998@io.lakedaemon.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 12 Mar 2015 00:30:14 +0100
+Subject: [PATCH v4 4/4] ARM: dts: Specify VMMC and VQMMC on rk3288-evb
+In-Reply-To: <1426112117-18220-4-git-send-email-dianders@chromium.org>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-4-git-send-email-dianders@chromium.org>
+Message-ID: <10565603.LCTpLmy44N@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Grant,
-
-On Wed, Mar 11, 2015 at 06:04:50PM +0000, Grant Likely wrote:
-> On 11 Mar 2015 12:42, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
-> >
-> > From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >
-> > ACPI kernel uses MADT table for proper GIC initialization. It needs to
-> > parse GIC related subtables, collect CPU interface and distributor
-> > addresses and call driver initialization function (which is hardware
-> > abstraction agnostic). In a similar way, FDT initialize GICv1/2.
-> >
-> > NOTE: This commit allow to initialize GICv1/2 basic functionality.
-> > While now simple GICv2 init call is used, any further GIC features
-> > require generic infrastructure for proper ACPI irqchip initialization.
-> > That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
-> > extension, GICv3/4 and its ITS are considered as next steps.
-> >
-> > CC: Jason Cooper <jason@lakedaemon.net>
-> > CC: Marc Zyngier <marc.zyngier@arm.com>
-> > CC: Thomas Gleixner <tglx@linutronix.de>
+Am Mittwoch, 11. M?rz 2015, 15:15:17 schrieb Doug Anderson:
+> Specifying these rails should eventually let us do UHS.
 > 
-> BTW, Thomas is taking a bit of a break, do he is unlikely to give an ack
-> here in a timely manner. I've not heard from Jason. Personally, I think we
-> can proceed without their ack if everything else is in order (heck, I used
-> to help with the irq subsystem, use me as an ack of you want). The patch is
-> low impact and only had effect for ARM ACPI builds.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-I'm not talking much, but I am tracking and collecting everything for irqchip.
-We do have some other changes in this driver this time around.  So it'd be nice
-if I could take this.
+This one looks good to me and I'll take it into my dts branch.
 
-I had reached out to Olof for his thoughts on this and he hasn't had enough
-cycles to look at it.  iirc, Marc reviewed a previous version and was happy with
-the changes.  My only question I had for Olof I'll put below:
+But due to the deferal issue fixed in patch1, I'll wait a bit for patch1 
+hopefully getting applied, so that we have a "clean" behaviour when everything 
+reaches linux-next.
 
-> > diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
-> > index 0fe2f71..afd1af3 100644
-> > --- a/drivers/irqchip/irqchip.c
-> > +++ b/drivers/irqchip/irqchip.c
-> > @@ -8,6 +8,7 @@
-> >   * warranty of any kind, whether express or implied.
-> >   */
-> >
-> > +#include <linux/acpi_irq.h>
-> >  #include <linux/init.h>
-> >  #include <linux/of_irq.h>
-> >  #include <linux/irqchip.h>
-> > @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
-> >  void __init irqchip_init(void)
-> >  {
-> >         of_irq_init(__irqchip_of_table);
-> > +
-> > +       acpi_irq_init();
-> >  }
-
-Is this in line with Olof's idea that providing a dtb would override ACPI?
-
-I have no strong opinion on the matter personally.  I haven't been able to
-follow the ACPI discussion as closely as I would have liked, what with the new
-job and all.
-
-Just let me know and I can pull it in with other GIC changes for this cycle.
-I'll do a topic branch in case other branches need to depend on this.
-
-thx,
-
-Jason.
+> ---
+> Changes in v4:
+> - Add vcc_sd regulator which is present on EVB 2.0 boards
+> 
+> Changes in v3: None
+> Changes in v2:
+> - Fix subject line
+> 
+>  arch/arm/boot/dts/rk3288-evb.dtsi | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi
+> b/arch/arm/boot/dts/rk3288-evb.dtsi index 5e895a5..6d4ae9f 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -103,6 +103,23 @@
+>  		regulator-always-on;
+>  		regulator-boot-on;
+>  	};
+> +
+> +	/*
+> +	 * NOTE: vcc_sd isn't hooked up on v1.0 boards where power comes from
+> +	 * vcc_io directly.  Those boards won't be able to power cycle SD cards
+> +	 * but it shouldn't hurt to toggle this pin there anyway.
+> +	 */
+> +	vcc_sd: sdmmc-regulator {
+> +		compatible = "regulator-fixed";
+> +		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdmmc_pwr>;
+> +		regulator-name = "vcc_sd";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		vin-supply = <&vcc_io>;
+> +	};
+>  };
+> 
+>  &emmc {
+> @@ -132,6 +149,8 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+>  	status = "okay";
+> +	vmmc-supply = <&vcc_sd>;
+> +	vqmmc-supply = <&vccio_sd>;
+>  };
+> 
+>  &i2c0 {
+> @@ -223,6 +242,10 @@
+>  		sdmmc_cmd: sdmmc-cmd {
+>  			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
+>  		};
+> +
+> +		sdmmc_pwr: sdmmc-pwr {
+> +			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+>  	};
+> 
+>  	usb {
