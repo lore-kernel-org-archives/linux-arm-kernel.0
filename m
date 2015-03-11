@@ -1,30 +1,76 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 11 Mar 2015 08:09:49 +0100
-Subject: [PATCH] clk: provide clk_is_match() dummy for non-common clk
-In-Reply-To: <8682755.oK0Ae34OOP@wuerfel>
-References: <1424876018-17852-1-git-send-email-shawn.guo@linaro.org>
- <1424876018-17852-2-git-send-email-shawn.guo@linaro.org>
- <20150225172757.421.43718@quantum> <8682755.oK0Ae34OOP@wuerfel>
-Message-ID: <20150311070949.GH952@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 11 Mar 2015 08:33:53 +0100
+Subject: [PATCH v2 5/6] watchdog: at91sam9: request the irq with
+ IRQF_NO_SUSPEND
+In-Reply-To: <2194398.CCV6AEYQ7u@vostro.rjw.lan>
+References: <1425287898-15093-6-git-send-email-boris.brezillon@free-electrons.com>
+ <1901056.Mqyykpv3e9@vostro.rjw.lan>
+ <20150310223305.GN9188@piout.net>
+ <2194398.CCV6AEYQ7u@vostro.rjw.lan>
+Message-ID: <20150311083353.577b8a30@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, 
+Rafael, Alexandre,
 
-On Sun, Mar 08, 2015 at 10:05:29PM +0100, Arnd Bergmann wrote:
-> +static inline bool clk_is_match(struct clk *p, struct clk *q)
-> +{
-> +	return p == q ? true : false;
-OK, this is only a move, but I wonder why Russell's comment that this is
-equivalent to the easier
+On Wed, 11 Mar 2015 02:03:08 +0100
+"Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 
-	return p == q;
+> On Tuesday, March 10, 2015 11:33:05 PM Alexandre Belloni wrote:
+> > On 10/03/2015 at 23:31:52 +0100, Rafael J. Wysocki wrote :
+> > > On Tuesday, March 10, 2015 10:33:17 PM Alexandre Belloni wrote:
+> > > > Hi,
+> > > > 
+> > > > On 09/03/2015 at 15:30:01 +0100, Rafael J. Wysocki wrote :
+> > > > > > > > Actaully, your platform should just refuse to enter suspend-to-RAM
+> > > > > > > > when hw watchdog is enabled.
+> > > > > > > 
+> > > > > > > Quite likely, depending on how exactly the suspend is implemented.
+> > > > > > >
+> > > > > > 
+> > > > > > We've had absolutely zero complain on that. It is quite clear in the
+> > > > > > datasheet that failing to refresh the watchdog once started will lead to
+> > > > > > a reset and that it is impossible to stop.
+> > > > > > It is actually quite convenient to also ensure that you can actually
+> > > > > > wake up from suspend because that can obviously go wrong.
+> > > > > 
+> > > > > I gather then that the suspend implementation is such that touching the
+> > > > > watchdog periodically while suspended is not a problem.
+> > > > > 
+> > > > > Again, can you please tell me how suspend is implemented on at91?
+> > > > > 
+> > > > 
+> > > > It actually depends on the architecture (at91rm9200, at91sam9 or sama5)
+> > > > but basically, the clocks are switched off in almost all the peripheral
+> > > > drivers then the ram self refresh activated, the master clock is
+> > > > switched off using code running from SRAM and the core is then waiting
+> > > > for interrupt.
+> > > 
+> > > OK, so it looks like enable_irq_wake() doesn't actually affect the hardware
+> > > on those platforms, is that correct?
+> > > 
+> > 
+> > I didn't exactly look in details but apart from the wakeup from gpio
+> > handling (keeping the pio controller clocked in the case one of its gpio
+> > has wakeup enabled), I don't think it does much more. It uses
+> > irq_gc_set_wake().
+> 
+> Well, that only modifies gc->wake_active, so no hardware interactions.
 
-wasn't addressed?!
+I'm not sure I understand the whole discussion, but calling
+enable_irq_wake() does affect suspend behavior on at91 platforms.
+Take a look at the suspend() implementation [1], it's making use of the
+wake_active field (modified by irq_gc_set_wake) when entering suspend
+in order to keep wakeup IRQ sources enabled. 
 
-Best regards
-Uwe
+Best Regards,
+
+Boris
+
+
+[1]http://lxr.free-electrons.com/source/drivers/irqchip/irq-atmel-aic.c#L106
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
