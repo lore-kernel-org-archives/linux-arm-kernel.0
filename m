@@ -1,35 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Mar 2015 13:47:36 +0100
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <550025E0.7030008@suse.de>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <20141208101026.GD27367@arm.com> <550025E0.7030008@suse.de>
-Message-ID: <5396604.TRferrWZgF@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 11 Mar 2015 13:48:34 +0100
+Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting
+ the PWM
+In-Reply-To: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <550039A2.9010307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 March 2015 06:24:16 Alexander Graf wrote:
-> So after recompiling all of the distribution with newer binutils we now
-> have an openSUSE Factory tree that has 64k aligned 32bit binaries.
+Le 19/02/2015 10:30, Nicolas Ferre a ?crit :
+> When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
+> flag is not handled properly. It can lead to the PWM not being found.
 > 
-> Unfortunately however, the 32bit glibc has a bogus mmap() implementation
-> that hard codes 4k page size.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Any comment on this patch?
+Can we see it included during next cycle (4.1)?
+
+(aka ping).
+
+Bye,
+
+
+> ---
+>  drivers/video/backlight/pwm_bl.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> With the patch below applied to glibc, I can successfully run 32bit user
-> space on Seattle with 64k PAGE_SIZE though. So I guess we'll need to fix
-> up glibc next.
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index 3a145a643e0d..6897f1c1bc73 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  
+>  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+>  	if (IS_ERR(pb->pwm)) {
+> +		ret = PTR_ERR(pb->pwm);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto err_alloc;
+> +
+>  		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+>  		pb->legacy = true;
+>  		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
 > 
-> Do you know of anyone who's fluent enough in 32bit ARM assembly to
-> convert the hard coded assumptions in there to instead use a variable
-> that takes the actual host page size into account?
 
-I believe this is a kernel bug, and the kernel API for 32-bit emulation
-should always take the pgoff argument in 4KB units instead of PAGE_SIZE
-units, see the implementation of sys_mmap2 in
-arch/powerpc/kernel/sys_ppc32.c.
 
-All user space programs that call mmap2 still need to make sure that
-their arguments are PAGE_SIZE aligned, but the libc need not care
-about this here.
-
-	Arnd
+-- 
+Nicolas Ferre
