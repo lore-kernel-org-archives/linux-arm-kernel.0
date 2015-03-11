@@ -1,162 +1,153 @@
 From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Wed, 11 Mar 2015 15:12:43 +0100
-Subject: [PATCH v4 3/9] x86,
- pci: Reorder logic of pci_mmconfig_insert() function
+Date: Wed, 11 Mar 2015 15:12:46 +0100
+Subject: [PATCH v4 6/9] x86, pci: mmconfig_{32,
+ 64}.c code refactoring - remove code duplication.
 In-Reply-To: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
 References: <1426083169-8698-1-git-send-email-tomasz.nowicki@linaro.org>
-Message-ID: <1426083169-8698-4-git-send-email-tomasz.nowicki@linaro.org>
+Message-ID: <1426083169-8698-7-git-send-email-tomasz.nowicki@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is the first step for MMCONFIG refactoring process.
+mmconfig_64.c version is going to be default implementation for arch
+agnostic low-level direct PCI config space accessors for ECAM dirver.
+However, now it initialize raw_pci_ext_ops pointer which is x86 specific
+code only. Moreover, mmconfig_32.c is doing the same thing at the same time.
 
-Code that uses pci_mmcfg_lock will be moved to common file and become
-accessible for all architectures. pci_mmconfig_insert() cannot be moved
-so easily since it is mixing generic mmconfig code with x86 specific logic
-inside of mutual exclusive block guarded by pci_mmcfg_lock.
-
-To get rid of that constraint, we reorder actions as follow:
-1. mmconfig entry allocation can be done first, no need to lock
-2. insertion to iomem_resource has its own lock, no need to wrap it into mutex
-3. insertion to mmconfig list can be done as the final step in separate
-function (candidate for further refactoring)
+Move it to mmconfig_shared.c so it becomes common for both and
+mmconfig_64.c turns out to be purely arch agnostic.
 
 Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- arch/x86/pci/mmconfig-shared.c | 100 ++++++++++++++++++++++-------------------
- 1 file changed, 54 insertions(+), 46 deletions(-)
+ arch/x86/pci/mmconfig-shared.c | 10 ++++++++--
+ arch/x86/pci/mmconfig_32.c     | 10 ++--------
+ arch/x86/pci/mmconfig_64.c     | 11 ++---------
+ include/linux/ecam.h           |  5 +++++
+ 4 files changed, 17 insertions(+), 19 deletions(-)
 
 diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index 8b3bc4f..685cd4c 100644
+index 5064302..6dfe614 100644
 --- a/arch/x86/pci/mmconfig-shared.c
 +++ b/arch/x86/pci/mmconfig-shared.c
-@@ -834,6 +834,39 @@ static int __init pci_mmcfg_late_insert_resources(void)
-  */
- late_initcall(pci_mmcfg_late_insert_resources);
+@@ -29,6 +29,11 @@
+ static bool pci_mmcfg_running_state;
+ static bool pci_mmcfg_arch_init_failed;
  
-+static int pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
-+{
-+	struct pci_mmcfg_region *cfg_conflict;
-+	int err = 0;
++const struct pci_raw_ops pci_mmcfg = {
++	.read =		pci_mmcfg_read,
++	.write =	pci_mmcfg_write,
++};
 +
-+	mutex_lock(&pci_mmcfg_lock);
-+	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
-+	if (cfg_conflict) {
-+		if (cfg_conflict->end_bus < cfg->end_bus)
-+			pr_info(FW_INFO "MMCONFIG for "
-+				"domain %04x [bus %02x-%02x] "
-+				"only partially covers this bridge\n",
-+				cfg_conflict->segment, cfg_conflict->start_bus,
-+				cfg_conflict->end_bus);
-+		err = -EEXIST;
-+		goto out;
-+	}
-+
-+	if (pci_mmcfg_arch_map(cfg)) {
-+		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
-+		err = -ENOMEM;
-+		goto out;
+ static u32
+ pci_mmconfig_amd_read(int len, void __iomem *addr)
+ {
+@@ -532,9 +537,10 @@ static void __init __pci_mmcfg_init(int early)
+ 		}
+ 	}
+ 
+-	if (pci_mmcfg_arch_init())
++	if (pci_mmcfg_arch_init()) {
++		raw_pci_ext_ops = &pci_mmcfg;
+ 		pci_probe = (pci_probe & ~PCI_PROBE_MASK) | PCI_PROBE_MMCONF;
+-	else {
 +	} else {
-+		list_add_sorted(cfg);
-+		pr_info("MMCONFIG at %pR (base %#lx)\n",
-+			&cfg->res, (unsigned long)cfg->address);
-+
-+	}
-+out:
-+	mutex_unlock(&pci_mmcfg_lock);
-+	return err;
-+}
-+
- /* Add MMCFG information for host bridges */
- int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 			phys_addr_t addr)
-@@ -845,66 +878,41 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 	if (!(pci_probe & PCI_PROBE_MMCONF) || pci_mmcfg_arch_init_failed)
- 		return -ENODEV;
- 
--	if (start > end)
-+	if (start > end || !addr)
- 		return -EINVAL;
- 
--	mutex_lock(&pci_mmcfg_lock);
--	cfg = pci_mmconfig_lookup(seg, start);
--	if (cfg) {
--		if (cfg->end_bus < end)
--			dev_info(dev, FW_INFO
--				 "MMCONFIG for "
--				 "domain %04x [bus %02x-%02x] "
--				 "only partially covers this bridge\n",
--				  cfg->segment, cfg->start_bus, cfg->end_bus);
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EEXIST;
--	}
--
--	if (!addr) {
--		mutex_unlock(&pci_mmcfg_lock);
--		return -EINVAL;
--	}
--
- 	rc = -EBUSY;
- 	cfg = pci_mmconfig_alloc(seg, start, end, addr);
- 	if (cfg == NULL) {
- 		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
--		rc = -ENOMEM;
-+		return -ENOMEM;
- 	} else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
- 		dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
- 			 &cfg->res);
--	} else {
--		/* Insert resource if it's not in boot stage */
--		if (pci_mmcfg_running_state)
--			tmp = insert_resource_conflict(&iomem_resource,
--						       &cfg->res);
--
--		if (tmp) {
--			dev_warn(dev,
--				 "MMCONFIG %pR conflicts with "
--				 "%s %pR\n",
--				 &cfg->res, tmp->name, tmp);
--		} else if (pci_mmcfg_arch_map(cfg)) {
--			dev_warn(dev, "fail to map MMCONFIG %pR.\n",
--				 &cfg->res);
--		} else {
--			list_add_sorted(cfg);
--			dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
--				 &cfg->res, (unsigned long)addr);
--			cfg = NULL;
--			rc = 0;
--		}
-+		goto error;
+ 		free_all_mmcfg();
+ 		pci_mmcfg_arch_init_failed = true;
  	}
- 
--	if (cfg) {
--		if (cfg->res.parent)
--			release_resource(&cfg->res);
--		kfree(cfg);
-+	/* Insert resource if it's not in boot stage */
-+	if (pci_mmcfg_running_state)
-+		tmp = insert_resource_conflict(&iomem_resource, &cfg->res);
-+
-+	if (tmp) {
-+		dev_warn(dev,
-+			 "MMCONFIG %pR conflicts with %s %pR\n",
-+			 &cfg->res, tmp->name, tmp);
-+		goto error;
+diff --git a/arch/x86/pci/mmconfig_32.c b/arch/x86/pci/mmconfig_32.c
+index 5cf6291..7a050cb 100644
+--- a/arch/x86/pci/mmconfig_32.c
++++ b/arch/x86/pci/mmconfig_32.c
+@@ -50,7 +50,7 @@ static void pci_exp_set_dev_base(unsigned int base, int bus, int devfn)
  	}
- 
--	mutex_unlock(&pci_mmcfg_lock);
-+	rc = pci_mmconfig_inject(cfg);
-+	if (rc)
-+		goto error;
-+
-+	return 0;
- 
-+error:
-+	if (cfg->res.parent)
-+		release_resource(&cfg->res);
-+	kfree(cfg);
- 	return rc;
  }
  
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
+ {
+ 	unsigned long flags;
+@@ -79,7 +79,7 @@ err:		*value = -1;
+ 	return 0;
+ }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	unsigned long flags;
+@@ -106,15 +106,9 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ int __init pci_mmcfg_arch_init(void)
+ {
+ 	printk(KERN_INFO "PCI: Using MMCONFIG for extended config space\n");
+-	raw_pci_ext_ops = &pci_mmcfg;
+ 	return 1;
+ }
+ 
+diff --git a/arch/x86/pci/mmconfig_64.c b/arch/x86/pci/mmconfig_64.c
+index b62ff18..fd857ea 100644
+--- a/arch/x86/pci/mmconfig_64.c
++++ b/arch/x86/pci/mmconfig_64.c
+@@ -25,7 +25,7 @@ static char __iomem *pci_dev_base(unsigned int seg, unsigned int bus, unsigned i
+ 	return NULL;
+ }
+ 
+-static int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
+ 			  unsigned int devfn, int reg, int len, u32 *value)
+ {
+ 	char __iomem *addr;
+@@ -49,7 +49,7 @@ err:		*value = -1;
+ 	return 0;
+ }
+ 
+-static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 			   unsigned int devfn, int reg, int len, u32 value)
+ {
+ 	char __iomem *addr;
+@@ -71,11 +71,6 @@ static int pci_mmcfg_write(unsigned int seg, unsigned int bus,
+ 	return 0;
+ }
+ 
+-const struct pci_raw_ops pci_mmcfg = {
+-	.read =		pci_mmcfg_read,
+-	.write =	pci_mmcfg_write,
+-};
+-
+ static void __iomem *mcfg_ioremap(struct pci_mmcfg_region *cfg)
+ {
+ 	void __iomem *addr;
+@@ -101,8 +96,6 @@ int __init pci_mmcfg_arch_init(void)
+ 			return 0;
+ 		}
+ 
+-	raw_pci_ext_ops = &pci_mmcfg;
+-
+ 	return 1;
+ }
+ 
+diff --git a/include/linux/ecam.h b/include/linux/ecam.h
+index 2387df5..fba5d6b 100644
+--- a/include/linux/ecam.h
++++ b/include/linux/ecam.h
+@@ -47,5 +47,10 @@ extern struct list_head pci_mmcfg_list;
+ 
+ #define PCI_MMCFG_BUS_OFFSET(bus)      ((bus) << 20)
+ 
++int pci_mmcfg_read(unsigned int seg, unsigned int bus,
++		   unsigned int devfn, int reg, int len, u32 *value);
++int pci_mmcfg_write(unsigned int seg, unsigned int bus,
++		    unsigned int devfn, int reg, int len, u32 value);
++
+ #endif  /* __KERNEL__ */
+ #endif  /* __ECAM_H */
 -- 
 1.9.1
