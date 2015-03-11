@@ -1,55 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Mar 2015 09:52:25 +0100
-Subject: [PATCH v5 12/12] ARM: dts: sun6i: hummingbird: Enable the
- onboard WiFi module
-In-Reply-To: <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-14-git-send-email-wens@csie.org>
- <20150310213218.GH5085@lukather>
- <CAGb2v66zJcBBpLZFjNyugjRzt8SppQ0VbFD+pMqVYdK4EKg-fQ@mail.gmail.com>
-Message-ID: <20150311085225.GK5085@lukather>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 11 Mar 2015 10:00:28 +0100
+Subject: [PATCH v2 0/2] Amlogic Meson8b pinctrl driver support
+Message-ID: <1426064430-5826-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 11:11:49AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Mar 11, 2015 at 5:32 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Mar 10, 2015 at 07:59:24PM +0800, Chen-Yu Tsai wrote:
-> >> The Hummingbird A31 has an AMPAK AP6210 WiFi+Bluetooth module. The
-> >> WiFi part is a BCM43362 IC connected to MMC1 in the A31 SoC via SDIO.
-> >> The IC also takes a power enable signal via GPIO. This is supported
-> >> with the new power sequencing bindings.
-> >>
-> >> The WiFi module supports out-of-band interrupt signaling via GPIO,
-> >> but this is buggy and not enabled yet.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >
-> > There's two almost identical patches 12/12. Which one am I suppose to
-> > apply?
-> 
-> This one is the right one. I forgot to clear the patches after changing
-> the description. The "buggy" part in the description is probably not
-> needed. Hans explained that the SD resets have nothing to do with
-> interrupt handling.
+From: Carlo Caione <carlo@endlessm.com>
 
-Just to be clear, you want the last sentence to be:
+Two patches to extend the pinctrl driver to support AmLogic Meson8b SoCs fixing
+the existing documentation.
 
-The WiFi module supports out-of-band interrupt signaling via GPIO, but
-this is not enabled yet.
+Changelog:
 
-Right?
+v2: * fix holes in GPIOs numbering
+v1: * initial version
 
-Maxime
+Carlo Caione (2):
+  pinctrl: Add support for Meson8b
+  documentation: Fix pinctrl docs for Meson8b
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |    2 +-
+ drivers/pinctrl/meson/Makefile                     |    2 +-
+ drivers/pinctrl/meson/pinctrl-meson.c              |    4 +
+ drivers/pinctrl/meson/pinctrl-meson.h              |    1 +
+ drivers/pinctrl/meson/pinctrl-meson8b.c            | 1013 ++++++++++++++++++++
+ include/dt-bindings/gpio/meson8b-gpio.h            |   31 +
+ 6 files changed, 1051 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson8b.c
+ create mode 100644 include/dt-bindings/gpio/meson8b-gpio.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150311/9748c958/attachment.sig>
+1.9.1
