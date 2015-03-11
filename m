@@ -1,306 +1,102 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Wed, 11 Mar 2015 15:51:18 -0500
-Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and evaluation
- board dts
-In-Reply-To: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
-References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
-Message-ID: <1426107080-29079-2-git-send-email-galak@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Mar 2015 14:00:07 -0700
+Subject: [PATCHv3 34/35] ARM: dts: dra7: add system control module node
+In-Reply-To: <55009E23.2020805@ti.com>
+References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
+ <1424891085-10392-35-git-send-email-t-kristo@ti.com>
+ <20150311171708.GB5264@atomide.com> <550092CA.9030008@ti.com>
+ <20150311192621.GE5264@atomide.com> <55009E23.2020805@ti.com>
+Message-ID: <20150311210007.GG5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial device tree support for Qualcomm MSM8916 SoC and MTP8916
-evaluation board.  At the current time we only boot up a single processor.
+* Tero Kristo <t-kristo@ti.com> [150311 12:57]:
+> On 03/11/2015 09:26 PM, Tony Lindgren wrote:
+> >* Tero Kristo <t-kristo@ti.com> [150311 12:09]:
+> >>On 03/11/2015 07:17 PM, Tony Lindgren wrote:
+> >>>Hi Tero,
+> >>>
+> >>>* Tero Kristo <t-kristo@ti.com> [150225 11:09]:
+> >>>>Add node for system control module, and move all the existing system
+> >>>>control IO space users under this new node as its children. A new node
+> >>>>for scm_conf area is also added.
+> >>>...
+> >>>
+> >>>>--- a/arch/arm/boot/dts/dra7.dtsi
+> >>>>+++ b/arch/arm/boot/dts/dra7.dtsi
+> >>>>@@ -203,26 +203,47 @@
+> >>>>  			};
+> >>>>  		};
+> >>>>
+> >>>>+		scm: scm at 4a002000 {
+> >>>>+			compatible = "ti,dra7-ctrl", "simple-bus";
+> >>>>+			reg = <0x4a002000 0x1400>,
+> >>>>+			      <0x4a003400 0x600>,
+> >>>>+			      <0x4ae0c000 0x600>;
+> >>>>+			#address-cells = <2>;
+> >>>>+			#size-cells = <1>;
+> >>>>+			ranges = <0 0 0x4a002000 0x1400>,
+> >>>>+				 <1 0 0x4a003400 0x600>,
+> >>>>+				 <2 0 0x4ae0c000 0x600>;
+> >>>>+
+> >>>>+			scm_conf: tisyscon at 0,0 {
+> >>>>+				compatible = "syscon";
+> >>>>+				reg = <0 0x0 0x1400>;
+> >>>>+				#address-cells = <1>;
+> >>>>+				#size-cells = <1>;
+> >>>>+			};
+> >>>>+
+> >>>>+			dra7_pmx_core: pinmux at 1,0 {
+> >>>>+				compatible = "ti,dra7-padconf",
+> >>>>+					     "pinctrl-single";
+> >>>>+				reg = <1 0x0 0x0464>;
+> >>>>+				#address-cells = <1>;
+> >>>>+				#size-cells = <0>;
+> >>>>+				#interrupt-cells = <1>;
+> >>>>+				interrupt-controller;
+> >>>>+				pinctrl-single,register-width = <32>;
+> >>>>+				pinctrl-single,function-mask = <0x3fffffff>;
+> >>>>+			};
+> >>>>+		};
+> >>>
+> >>>Wouldn't it make more sense to have separate device_scm, core_scm and
+> >>>wkup_scm instead of stuffing multiple ranges here?
+> >>>
+> >>>Or are there other reasons for the multiple ranges?
+> >>
+> >>Yea that was the alternative I was thinking about, I ended up with this for
+> >>some reason. I think personally I liked having them all under the same SCM
+> >>part, because they are nicely grouped then, and well, its the same system
+> >>control part in the chip. We can split it up easily of course. Should we
+> >>have a higher level scm part and then have core_scm and wkup_scm under this
+> >>followed by the sub-functions, or just drop the top level scm part
+> >>completely?
+> >
+> >Well I'd model it after the hardware so we can have one or more scm driver
+> >instances managing the clock for those blocks. If we squash them together,
+> >we won't have a chance to pass interrupts and clocks device tree property
+> >to the right driver instance. And for example 5432 TRM has them as separate
+> >devices in "Figure 18-1. Control Module Overview".
+> >
+> >I don't think we need the top level scm to group them under, these are all
+> >connected seprately to the interconnect, right?
+> 
+> Yea, can't really think of any real need for the top-level node.
+> 
+> >
+> >>This same question applies to omap4 + omap5 also. In some part for omap3
+> >>also, as it also has pmx_core + pmx_wkup separately, even if they are part
+> >>of the same register space.
+> >>
+> >>Anyway, just a political decision from your side, I am fine either way. :)
+> >
+> >OK thanks for confirming that, to me it makes sense to set them up as
+> >separate instances then.
+> 
+> All right, you got fair points there, I'll rework this for next revision of
+> the set. Had a quick look at OMAP3 TRM and it is also basically listing
+> these as separate instances also, so I'll change all OMAP3+.
 
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
----
-v3:
-* Removed qcom,msm-id and qcom,board-id
-* Added top level compat for "qcom,msm8916-mtp-smb1360"
+Oh OK.
 
-v2:
-* Updated to dropping CONFIG_ARCH_QCOM_MSM8916
-* Updated to use qcom-ids.h
- arch/arm64/boot/dts/Makefile              |   1 +
- arch/arm64/boot/dts/qcom/Makefile         |   5 +
- arch/arm64/boot/dts/qcom/msm8916-mtp.dts  |  21 ++++
- arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi |  24 ++++
- arch/arm64/boot/dts/qcom/msm8916.dtsi     | 184 ++++++++++++++++++++++++++++++
- 5 files changed, 235 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/Makefile
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dts
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/msm8916.dtsi
-
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index e0350ca..8517f15 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -5,5 +5,6 @@ dts-dirs += cavium
- dts-dirs += exynos
- dts-dirs += freescale
- dts-dirs += mediatek
-+dts-dirs += qcom
- 
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-new file mode 100644
-index 0000000..360ec4c
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-new file mode 100644
-index 0000000..784ad92
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-@@ -0,0 +1,21 @@
-+/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-+*
-+* This program is free software; you can redistribute it and/or modify
-+* it under the terms of the GNU General Public License version 2 and
-+* only version 2 as published by the Free Software Foundation.
-+*
-+* This program is distributed in the hope that it will be useful,
-+* but WITHOUT ANY WARRANTY; without even the implied warranty of
-+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+* GNU General Public License for more details.
-+*/
-+
-+/dts-v1/;
-+
-+#include "msm8916-mtp.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
-+	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
-+			"qcom,msm8916", "qcom,mtp";
-+};
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
-new file mode 100644
-index 0000000..4d2f073
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
-@@ -0,0 +1,24 @@
-+/* Copyright (c) 2014-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "msm8916.dtsi"
-+
-+/ {
-+	soc {
-+		serial at 78b0000 {
-+			status = "okay";
-+			pinctrl-names = "default", "sleep";
-+			pinctrl-0 = <&blsp1_uart2_default>;
-+			pinctrl-1 = <&blsp1_uart2_sleep>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-new file mode 100644
-index 0000000..957486f
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -0,0 +1,184 @@
-+/* Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/qcom,gcc-msm8916.h>
-+#include <dt-bindings/reset/qcom,gcc-msm8916.h>
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. MSM8916";
-+	compatible = "qcom,msm8916";
-+
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x1>;
-+		};
-+
-+		CPU2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x2>;
-+		};
-+
-+		CPU3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x3>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 4 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <19200000>;
-+	};
-+
-+	soc: soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0 0xffffffff>;
-+		compatible = "simple-bus";
-+
-+		pinctrl at 1000000 {
-+			compatible = "qcom,msm8916-pinctrl";
-+			reg = <0x1000000 0x300000>;
-+			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+
-+			blsp1_uart2_default: blsp1_uart2_default {
-+				pinmux {
-+					function = "blsp_uart2";
-+					pins = "gpio4", "gpio5";
-+				};
-+				pinconf {
-+					pins = "gpio4", "gpio5";
-+					drive-strength = <16>;
-+					bias-disable;
-+				};
-+			};
-+
-+			blsp1_uart2_sleep: blsp1_uart2_sleep {
-+				pinmux {
-+					function = "blsp_uart2";
-+					pins = "gpio4", "gpio5";
-+				};
-+				pinconf {
-+					pins = "gpio4", "gpio5";
-+					drive-strength = <2>;
-+					bias-pull-down;
-+				};
-+			};
-+		};
-+
-+		gcc: qcom,gcc at 1800000 {
-+			compatible = "qcom,gcc-msm8916";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0x1800000 0x80000>;
-+		};
-+
-+		blsp1_uart2: serial at 78b0000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78b0000 0x200>;
-+			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>, <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+			status = "disabled";
-+		};
-+
-+		intc: interrupt-controller at b000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x0b000000 0x1000>, <0x0b002000 0x1000>;
-+		};
-+
-+		timer at b020000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			compatible = "arm,armv7-timer-mem";
-+			reg = <0xb020000 0x1000>;
-+			clock-frequency = <19200000>;
-+
-+			frame at b021000 {
-+				frame-number = <0>;
-+				interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb021000 0x1000>,
-+				      <0xb022000 0x1000>;
-+			};
-+
-+			frame at b023000 {
-+				frame-number = <1>;
-+				interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb023000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at b024000 {
-+				frame-number = <2>;
-+				interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb024000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at b025000 {
-+				frame-number = <3>;
-+				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb025000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at b026000 {
-+				frame-number = <4>;
-+				interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb026000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at b027000 {
-+				frame-number = <5>;
-+				interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb027000 0x1000>;
-+				status = "disabled";
-+			};
-+
-+			frame at b028000 {
-+				frame-number = <6>;
-+				interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+				reg = <0xb028000 0x1000>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
