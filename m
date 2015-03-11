@@ -1,38 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 12 Mar 2015 08:39:22 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC r8a7778 CCF and Multiplatform
- Updates for v4.1
-In-Reply-To: <42571376.W8osvFWALn@wuerfel>
-References: <cover.1425518337.git.horms+renesas@verge.net.au>
- <2398647.6T9U8oT0zu@wuerfel>
- <CAMuHMdXR06gQVvi5+h1kyDWsTwqGdtHchD20-Ln1tGOFEn8Tag@mail.gmail.com>
- <42571376.W8osvFWALn@wuerfel>
-Message-ID: <20150311233922.GB20057@verge.net.au>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 11 Mar 2015 16:42:49 -0700
+Subject: [PATCH 0/6] mtd: teach mxc-nand about ONFI probing
+In-Reply-To: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150311234249.GE32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 09:16:15PM +0100, Arnd Bergmann wrote:
-> On Wednesday 11 March 2015 16:01:47 Geert Uytterhoeven wrote:
-> > 
-> > On Wed, Mar 11, 2015 at 3:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Thursday 05 March 2015 10:58:14 Simon Horman wrote:
-> > >> Renesas ARM Based SoC r8a7778 CCF and Multiplatform Updates for v4.1
-> > >>
-> > >> * Add CCF and them multiplatform support to r8a7778 SoC and its
-> > >>   bockw board.
-> > >
-> > > I don't see Mike Turquette on Cc for the CCF driver here, or in the
-> > > Reviewed-by/Acked-by list for the relevant patches.
-> > >
-> > > Has he given his ok for the patches to be merged through arm-soc?
-> > 
-> > I think you overlooked Mike's ack:
-> > https://git.kernel.org/cgit/linux/kernel/git/horms/renesas.git/commit/?id=6232c51cb370919b116e0aea38d12aa33aae2fa9
+On Tue, Feb 10, 2015 at 07:59:54PM +0100, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> I clearly did, yes.
+> this series implements support for ONFI probing in mxc-nand.
+> Before a PARAM command was just ignored and the following read_bytes
+> read whatever then happened to be available from the controller's RAM.
+> But actually this wasn't that bad because the driver already failed to
+> read the ONFI marker at offset 32 in response to the READID command and
+> so the PARAM command wasn't issued at all :-)
 > 
-> Sorry for my mistake, pulled into next/multiplatform now.
+> Patch 1 is a robustness fix. Patch 2 is necessary to not make the
+> controller stuck when the READPAGE command is issued before the flash
+> chip is identified. Patch 3 is needed to be able to read more than 6
+> bytes in the read_byte callback. Finally patch 4 fixes the driver to
+> allow reading out the READID ONFI marker and patch 5 implements support
+> for the PARAM command.
+> 
+> Patch 6 implements a WARN that triggers when the core requests an
+> unknown command from the driver. In the case of missing PARAM support it
+> wouldn't have triggered because READID at offset 0x20 failed, too, but
+> it might be worthwhile anyhow; I'm not sure though, so I marked it RFC.
+> Not sure the set of commands will grow in the near future ...
+> 
+> Best regards
+> Uwe
 
-Thanks!
+Looks OK to me. Pushed all to l2-mtd.git.
 
-One step closer to multiplatform support everywhere :)
+Brian
