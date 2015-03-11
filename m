@@ -1,101 +1,52 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Mar 2015 11:21:33 -0300
-Subject: [PATCH v2 6/7] ARM: mx25: Remove imxdi_rtc platform code
-In-Reply-To: <1426083694-6624-1-git-send-email-festevam@gmail.com>
-References: <1426083694-6624-1-git-send-email-festevam@gmail.com>
-Message-ID: <1426083694-6624-6-git-send-email-festevam@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 11 Mar 2015 15:21:58 +0100
+Subject: [GIT PULL] Exynos changes for v4.1
+Message-ID: <1426083718.24734.16.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Dear Kukjin,
 
-platform-imxdi_rtc.c can is only used by mx25, so it can safely go away now that
-mx25 has been converted to dt.
+This groups non-critical fixes and enhancements for Exynos suspend
+and power domain code for upcoming v4.1 release:
+1. Add 'const' and 'static' keywords where they are applicable.
+2. Remove unused field in struct 'exynos_pm_data'.
+3. Be more verbose about power domain name.
+4. Handle of_iomap() and of_find_device_by_node() failures.
+5. Enable cpuidle in exynos_defconfig.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- None
+All of these patches were sent previously to the LKML. I grouped
+them so they won't be forgotten. I hope you will find useful
+such grouping of pending patches in a pull request.
 
- arch/arm/mach-imx/devices/Kconfig              |  3 --
- arch/arm/mach-imx/devices/Makefile             |  1 -
- arch/arm/mach-imx/devices/platform-imxdi_rtc.c | 42 --------------------------
- 3 files changed, 46 deletions(-)
- delete mode 100644 arch/arm/mach-imx/devices/platform-imxdi_rtc.c
+Best regards,
+Krzysztof
 
-diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
-index 1d2cc18..3a55298 100644
---- a/arch/arm/mach-imx/devices/Kconfig
-+++ b/arch/arm/mach-imx/devices/Kconfig
-@@ -21,9 +21,6 @@ config IMX_HAVE_PLATFORM_IMX27_CODA
- config IMX_HAVE_PLATFORM_IMX2_WDT
- 	bool
- 
--config IMX_HAVE_PLATFORM_IMXDI_RTC
--	bool
--
- config IMX_HAVE_PLATFORM_IMX_FB
- 	bool
- 
-diff --git a/arch/arm/mach-imx/devices/Makefile b/arch/arm/mach-imx/devices/Makefile
-index 8fdb12b..e5cf587 100644
---- a/arch/arm/mach-imx/devices/Makefile
-+++ b/arch/arm/mach-imx/devices/Makefile
-@@ -8,7 +8,6 @@ obj-y += platform-gpio-mxc.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX21_HCD) += platform-imx21-hcd.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX27_CODA) += platform-imx27-coda.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX2_WDT) += platform-imx2-wdt.o
--obj-$(CONFIG_IMX_HAVE_PLATFORM_IMXDI_RTC) += platform-imxdi_rtc.o
- obj-y += platform-imx-dma.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_FB) += platform-imx-fb.o
- obj-$(CONFIG_IMX_HAVE_PLATFORM_IMX_I2C) += platform-imx-i2c.o
-diff --git a/arch/arm/mach-imx/devices/platform-imxdi_rtc.c b/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
-deleted file mode 100644
-index 5bb490d..0000000
---- a/arch/arm/mach-imx/devices/platform-imxdi_rtc.c
-+++ /dev/null
-@@ -1,42 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include <asm/sizes.h>
--
--#include "../hardware.h"
--#include "devices-common.h"
--
--#define imx_imxdi_rtc_data_entry_single(soc)				\
--	{								\
--		.iobase = soc ## _DRYICE_BASE_ADDR,			\
--		.irq = soc ## _INT_DRYICE,				\
--	}
--
--#ifdef CONFIG_SOC_IMX25
--const struct imx_imxdi_rtc_data imx25_imxdi_rtc_data __initconst =
--	imx_imxdi_rtc_data_entry_single(MX25);
--#endif /* ifdef CONFIG_SOC_IMX25 */
--
--struct platform_device *__init imx_add_imxdi_rtc(
--		const struct imx_imxdi_rtc_data *data)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + SZ_16K - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irq,
--			.end = data->irq,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return imx_add_platform_device("imxdi_rtc", 0,
--			res, ARRAY_SIZE(res), NULL, 0);
--}
--- 
-1.9.1
+----------------------------------------------------------------
+
+The following changes since commit c1b57bce36a69f3972a1db433d3c8b34e0541e63:
+
+  ARM: EXYNOS: cpuidle: Fix build breakage on !SMP (2015-03-11 13:02:08 +0100)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.0-rc1-exynos-next
+
+for you to fetch changes up to 150be89d6dddc61a7c01b2678e8872ac73ca68d3:
+
+  ARM: exynos_defconfig: Enable CPU idle (2015-03-11 13:45:26 +0100)
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (7):
+      ARM: EXYNOS: Add missing static to file-scope declarations
+      ARM: EXYNOS: Constify exynos_pm_data array
+      ARM: EXYNOS: Remove left over 'extra_save'
+      ARM: EXYNOS: Use platform device name as power domain name
+      ARM: EXYNOS: Handle of of_iomap() failure
+      ARM: EXYNOS: Handle of_find_device_by_node and kstrdup failures
+      ARM: exynos_defconfig: Enable CPU idle
+
+ arch/arm/configs/exynos_defconfig |  2 ++
+ arch/arm/mach-exynos/pm_domains.c | 21 ++++++++++++++++++++-
+ arch/arm/mach-exynos/suspend.c    | 22 ++++++----------------
+ 3 files changed, 28 insertions(+), 17 deletions(-)
