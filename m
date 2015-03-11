@@ -1,38 +1,31 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Mar 2015 16:42:49 -0700
-Subject: [PATCH 0/6] mtd: teach mxc-nand about ONFI probing
-In-Reply-To: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1423594800-24214-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150311234249.GE32500@ld-irv-0074>
+Date: Wed, 11 Mar 2015 16:49:45 -0700
+Subject: [PATCH v3] mtd: cfi: reduce stack size
+In-Reply-To: <2266200.3mx7btcFe5@wuerfel>
+References: <2266200.3mx7btcFe5@wuerfel>
+Message-ID: <20150311234945.GG32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 10, 2015 at 07:59:54PM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Tue, Mar 10, 2015 at 05:48:37PM +0100, Arnd Bergmann wrote:
+> The cfi_staa_write_buffers function uses a large amount of kernel stack
+> whenever CONFIG_MTD_MAP_BANK_WIDTH_32 is set, and that results in a
+> warning on ARM allmodconfig builds:
 > 
-> this series implements support for ONFI probing in mxc-nand.
-> Before a PARAM command was just ignored and the following read_bytes
-> read whatever then happened to be available from the controller's RAM.
-> But actually this wasn't that bad because the driver already failed to
-> read the ONFI marker at offset 32 in response to the READID command and
-> so the PARAM command wasn't issued at all :-)
+> drivers/mtd/chips/cfi_cmdset_0020.c: In function 'cfi_staa_write_buffers':
+> drivers/mtd/chips/cfi_cmdset_0020.c:651:1: warning: the frame size of 1208 bytes is larger than 1024 bytes [-Wframe-larger-than=]
 > 
-> Patch 1 is a robustness fix. Patch 2 is necessary to not make the
-> controller stuck when the READPAGE command is issued before the flash
-> chip is identified. Patch 3 is needed to be able to read more than 6
-> bytes in the read_byte callback. Finally patch 4 fixes the driver to
-> allow reading out the READID ONFI marker and patch 5 implements support
-> for the PARAM command.
+> It turns out that this is largely a result of a suboptimal implementation
+> of map_word_andequal(). Replacing this function with a straightforward
+> one reduces the stack size in this function by exactly 200 bytes,
+> shrinks the .text segment for this file from 27648 bytes to 26608 bytes,
+> and makes the warning go away.
 > 
-> Patch 6 implements a WARN that triggers when the core requests an
-> unknown command from the driver. In the case of missing PARAM support it
-> wouldn't have triggered because READID at offset 0x20 failed, too, but
-> it might be worthwhile anyhow; I'm not sure though, so I marked it RFC.
-> Not sure the set of commands will grow in the near future ...
-> 
-> Best regards
-> Uwe
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v3: more whitespace changes
+> v2: whitespace changes
 
-Looks OK to me. Pushed all to l2-mtd.git.
+Applied to l2-mtd.git. Thanks!
 
 Brian
