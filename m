@@ -1,39 +1,70 @@
-From: kwestfie@codeaurora.org (Kenneth Westfield)
-Date: Wed, 11 Mar 2015 20:42:34 -0700
-Subject: [PATCH v2] clk: qcom: Properly change rates for ahbix clock
-In-Reply-To: <1425685313-6005-1-git-send-email-sboyd@codeaurora.org>
-References: <1425685313-6005-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150312034234.GA22530@kwestfie-linux.qualcomm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 11 Mar 2015 22:43:05 -0500
+Subject: [PATCH v6 28/30] PCI: Export find_pci_host_bridge() and rename
+ to pci_find_host_bridge()
+In-Reply-To: <1425868467-9667-29-git-send-email-wangyijing@huawei.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-29-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150312034305.GJ10949@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 06, 2015 at 03:41:53PM -0800, Stephen Boyd wrote:
-> The ahbix clock can never be turned off in practice. To change the
-> rates we need to switch the mux off the M/N counter to an always on
-> source (XO), reprogram the M/N counter to get the rate we want and
-> finally switch back to the M/N counter. Add a new ops structure
-> for this type of clock so that we can set the rate properly.
-> 
-> Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
-> Cc: Kenneth Westfield <kwestfie@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Mon, Mar 09, 2015 at 10:34:25AM +0800, Yijing Wang wrote:
+> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 > ---
+>  drivers/pci/host-bridge.c |    6 +++---
+>  drivers/pci/pci.h         |    2 ++
+>  2 files changed, 5 insertions(+), 3 deletions(-)
 > 
-> Changes from v1:
->  * Handle the case where clock feeding M/N counter is off
+> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+> index bc1de59..51f0a82 100644
+> --- a/drivers/pci/host-bridge.c
+> +++ b/drivers/pci/host-bridge.c
+> @@ -103,7 +103,7 @@ static struct pci_bus *find_pci_root_bus(struct pci_bus *bus)
+>  	return bus;
+>  }
+>  
+> -static struct pci_host_bridge *find_pci_host_bridge(struct pci_bus *bus)
+> +struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus)
+>  {
+>  	struct pci_bus *root_bus = find_pci_root_bus(bus);
+>  
+> @@ -121,7 +121,7 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
+>  void pcibios_resource_to_bus(struct pci_bus *bus, struct pci_bus_region *region,
+>  			     struct resource *res)
+>  {
+> -	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> +	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+>  	struct resource_entry *window;
+>  	resource_size_t offset = 0;
+>  
+> @@ -146,7 +146,7 @@ static bool region_contains(struct pci_bus_region *region1,
+>  void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
+>  			     struct pci_bus_region *region)
+>  {
+> -	struct pci_host_bridge *bridge = find_pci_host_bridge(bus);
+> +	struct pci_host_bridge *bridge = pci_find_host_bridge(bus);
+>  	struct resource_entry *window;
+>  	resource_size_t offset = 0;
+>  
+> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+> index a1dc9f2..45252dd 100644
+> --- a/drivers/pci/pci.h
+> +++ b/drivers/pci/pci.h
+> @@ -328,4 +328,6 @@ struct pci_host_bridge *pci_create_host_bridge(
+>  		void *sysdata, struct pci_host_bridge_ops *ops);
+>  
+>  void pci_free_host_bridge(struct pci_host_bridge *host);
+> +struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
+
+This is only used in drivers/pci/host-bridge.c and in drivers/pci/pci.c for
+pci_domain_nr().  Can you drop this patch and put the generic
+pci_domain_nr() implementation (next patch) in host-bridge.c instead of in
+pci.c?
+
+> +
+>  #endif /* DRIVERS_PCI_H */
+> -- 
+> 1.7.1
 > 
->  drivers/clk/qcom/clk-rcg.c     | 62 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/qcom/clk-rcg.h     |  1 +
->  drivers/clk/qcom/lcc-ipq806x.c |  5 ++--
->  3 files changed, 65 insertions(+), 3 deletions(-)
-
-Verified I2S audio functionality on the Storm board; with and without
-firmware audio enabled.
-
-Tested-by: Kenneth Westfield <kwestfie@codeaurora.org>
-
--- 
-Kenneth Westfield
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, 
-a Linux Foundation Collaborative Project
