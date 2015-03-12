@@ -1,43 +1,153 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 12 Mar 2015 14:28:47 +0100
-Subject: [PATCH 5/6] ARM: at91: remove SoC headers
-In-Reply-To: <20150304171505.GH3989@piout.net>
-References: <1425480446-31711-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425480446-31711-6-git-send-email-alexandre.belloni@free-electrons.com>
- <8819576.zV70Ce3SCo@wuerfel> <20150304171505.GH3989@piout.net>
-Message-ID: <5501948F.9000509@atmel.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 12 Mar 2015 21:24:51 +0800
+Subject: [PATCH v6 21/30] PCI: Introduce pci_bus_child_max_busnr()
+In-Reply-To: <20150312033305.GH10949@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-22-git-send-email-wangyijing@huawei.com>
+ <20150312033305.GH10949@google.com>
+Message-ID: <550193A3.1020102@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/03/2015 18:15, Alexandre Belloni a ?crit :
-> On 04/03/2015 at 18:03:45 +0100, Arnd Bergmann wrote :
->> On Wednesday 04 March 2015 15:47:25 Alexandre Belloni wrote:
->>> @@ -21,6 +21,14 @@
->>>  #include "generic.h"
->>>  #include "soc.h"
->>>  
->>> +#define SAMA5D4_BASE_USART3    0xfc00c000 /* (USART3 non-secure) Base Address */
->>> +#define SAMA5D4_BASE_PMC       0xf0018000 /* (PMC) Base Address */
->>> +#define SAMA5D4_BASE_MPDDRC    0xf0010000 /* (MPDDRC) Base Address */
->>> +#define SAMA5D4_BASE_PIOD      0xfc068000 /* (PIOD) Base Address */
->>> +
->>> +/* Some other peripherals */
->>> +#define SAMA5D4_BASE_SYS2      SAMA5D4_BASE_PIOD
->>>
+On 2015/3/12 11:33, Bjorn Helgaas wrote:
+> On Mon, Mar 09, 2015 at 10:34:18AM +0800, Yijing Wang wrote:
+>> Sometimes, we need to know the highest reserved
+>> busnr for children bus. Because parent's
+>> bus->busn_res could have padding in it.
+>> This function return the max child busnr as
+>> pci_scan_child_bus().
+> 
+> I'm not convinced about this one.  The fact that it's only used by parisc
+> lba_pci.c and acpiphp makes me suspicious that either they're doing
+> something funny, or other drivers *should* be using it, too.
+
+Yes, what lba_pci.c do looks some strange, I did this patch just try to
+keep the original logic, but it seems to make code more complex, I would
+consider this again and try to find a better solution, thanks.
+
+> 
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+>> ---
+>>  drivers/pci/hotplug/acpiphp_glue.c |   29 +----------------------------
+>>  drivers/pci/pci.c                  |   27 +++++++++++++++++++++++++--
+>>  include/linux/pci.h                |    2 +-
+>>  3 files changed, 27 insertions(+), 31 deletions(-)
 >>
->> Why are these still needed? I would expect that the code using them
->> can be removed as well.
+>> diff --git a/drivers/pci/hotplug/acpiphp_glue.c b/drivers/pci/hotplug/acpiphp_glue.c
+>> index bcb90e4..84f2584 100644
+>> --- a/drivers/pci/hotplug/acpiphp_glue.c
+>> +++ b/drivers/pci/hotplug/acpiphp_glue.c
+>> @@ -397,33 +397,6 @@ static void cleanup_bridge(struct acpiphp_bridge *bridge)
+>>  	acpi_unlock_hp_context();
+>>  }
+>>  
+>> -/**
+>> - * acpiphp_max_busnr - return the highest reserved bus number under the given bus.
+>> - * @bus: bus to start search with
+>> - */
+>> -static unsigned char acpiphp_max_busnr(struct pci_bus *bus)
+>> -{
+>> -	struct pci_bus *tmp;
+>> -	unsigned char max, n;
+>> -
+>> -	/*
+>> -	 * pci_bus_max_busnr will return the highest
+>> -	 * reserved busnr for all these children.
+>> -	 * that is equivalent to the bus->subordinate
+>> -	 * value.  We don't want to use the parent's
+>> -	 * bus->subordinate value because it could have
+>> -	 * padding in it.
+>> -	 */
+>> -	max = bus->busn_res.start;
+>> -
+>> -	list_for_each_entry(tmp, &bus->children, node) {
+>> -		n = pci_bus_max_busnr(tmp);
+>> -		if (n > max)
+>> -			max = n;
+>> -	}
+>> -	return max;
+>> -}
+>> -
+>>  static void acpiphp_set_acpi_region(struct acpiphp_slot *slot)
+>>  {
+>>  	struct acpiphp_func *func;
+>> @@ -489,7 +462,7 @@ static void enable_slot(struct acpiphp_slot *slot)
+>>  	LIST_HEAD(add_list);
+>>  
+>>  	acpiphp_rescan_slot(slot);
+>> -	max = acpiphp_max_busnr(bus);
+>> +	max = pci_bus_child_max_busnr(bus);
+>>  	for (pass = 0; pass < 2; pass++) {
+>>  		list_for_each_entry(dev, &bus->devices, bus_list) {
+>>  			if (PCI_SLOT(dev->devfn) != slot->device)
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index c49eec1..0001896 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -108,7 +108,7 @@ static bool pcie_ari_disabled;
+>>   * Given a PCI bus, returns the highest PCI bus number present in the set
+>>   * including the given PCI bus and its list of child PCI buses.
+>>   */
+>> -unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+>> +static unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+>>  {
+>>  	struct pci_bus *tmp;
+>>  	unsigned char max, n;
+>> @@ -121,7 +121,30 @@ unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+>>  	}
+>>  	return max;
+>>  }
+>> -EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
+>> +
+>> +unsigned char pci_bus_child_max_busnr(struct pci_bus *bus)
+>> +{
+>> +	struct pci_bus *tmp;
+>> +	unsigned char max, n;
+>> +
+>> +	/*
+>> +	 * pci_bus_max_busnr will return the highest
+>> +	 * reserved busnr for all these children.
+>> +	 * that is equivalent to the bus->subordinate
+>> +	 * value.  We don't want to use the parent's
+>> +	 * bus->subordinate value because it could have
+>> +	 * padding in it.
+>> +	 */
+>> +	max = bus->busn_res.start;
+>> +
+>> +	list_for_each_entry(tmp, &bus->children, node) {
+>> +		n = pci_bus_max_busnr(tmp);
+>> +		if (n > max)
+>> +			max = n;
+>> +	}
+>> +	return max;
+>> +}
+>> +EXPORT_SYMBOL_GPL(pci_bus_child_max_busnr);
+>>  
+>>  #ifdef CONFIG_HAS_IOMEM
+>>  void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index cfaf217..261b8de 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1181,7 +1181,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
+>>  void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
+>>  		  void *userdata);
+>>  int pci_cfg_space_size(struct pci_dev *dev);
+>> -unsigned char pci_bus_max_busnr(struct pci_bus *bus);
+>> +unsigned char pci_bus_child_max_busnr(struct pci_bus *bus);
+>>  void pci_setup_bridge(struct pci_bus *bus);
+>>  resource_size_t pcibios_window_alignment(struct pci_bus *bus,
+>>  					 unsigned long type);
+>> -- 
+>> 1.7.1
 >>
 > 
-> Yeah, that is still something I need to investigate. Nicolas told me it
-> doesn't work without it. My guess is that it has something to do with
-> secure booting.
+> .
+> 
 
-These io mapping were from the time when we did have all the recently
-developed drivers (RAM, PMC, SoC detection).
 
-As you tested lately, it now works without them.
-
-Bye,
 -- 
-Nicolas Ferre
+Thanks!
+Yijing
