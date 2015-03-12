@@ -1,45 +1,67 @@
-From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
-Date: Thu, 12 Mar 2015 09:18:54 -0400
-Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
-In-Reply-To: <7hh9try12u.fsf@deeprootsystems.com>
-References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
- <7hh9try12u.fsf@deeprootsystems.com>
-Message-ID: <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 12 Mar 2015 21:17:04 +0800
+Subject: [PATCH v6 20/30] sparc/PCI: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <20150312033050.GG10949@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-21-git-send-email-wangyijing@huawei.com>
+ <20150312033050.GG10949@google.com>
+Message-ID: <550191D0.3050707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 March 2015 at 12:02, Kevin Hilman <khilman@kernel.org> wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
->
->> When a CPU is being profiled through PMU events and it enters suspend
->> or idle states, the PMU registers content can be lost, which means that
->> counters that were relied upon on power down entry are reset on power
->> up to values that are incosistent with the profile session.
+>> @@ -667,22 +680,21 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+>>  	pbm->busn.end	= pbm->pci_last_busno;
+>>  	pbm->busn.flags	= IORESOURCE_BUS;
+>>  	pci_add_resource(&resources, &pbm->busn);
+>> -	bus = pci_create_root_bus(parent,
+>> +	host = pci_scan_host_bridge(parent,
+>>  			PCI_DOMBUS(pbm->index, pbm->pci_first_busno),
+>> -			pbm->pci_ops, pbm, &resources);
+>> -	if (!bus) {
+>> -		printk(KERN_ERR "Failed to create bus for %s\n",
+>> +			pbm->pci_ops, pbm, &resources, &phb_ops);
+>> +	if (!host) {
+>> +		printk(KERN_ERR "Failed to create host bridge for %s\n",
+>>  		       node->full_name);
+>>  		pci_free_resource_list(&resources);
+>>  		return NULL;
+>>  	}
+>>  
+> 
+> I would keep "bus" and set it here:
+> 
+> 	bus = host->bus;
+> 
+> That would remove some lines from your patch that really didn't change,
+> which makes it easier to see what actually *is* changing, namely, you're
+> removing the pci_of_scan_bus() call because it is now done inside
+> pci_scan_host_bridge().
+> 
+
+Yes, keep it will make the code more clean, thanks!
+
+>> -	pci_of_scan_bus(pbm, node, bus);
+>> -	pci_bus_register_of_sysfs(bus);
+>> +	pci_bus_register_of_sysfs(host->bus);
+>>  
+>> -	pci_claim_bus_resources(bus);
+>> -	pci_bus_add_devices(bus);
+>> -	return bus;
+>> +	pci_claim_bus_resources(host->bus);
+>> +	pci_bus_add_devices(host->bus);
+>> +	return host->bus;
+>>  }
+>>  
+>>  void pcibios_fixup_bus(struct pci_bus *pbus)
+>> -- 
+>> 1.7.1
 >>
->> This patch adds a CPU PM notifier to arm64 perf code, that detects
->> on entry if events are being monitored, and if so, it returns
->> failure to the CPU PM notification chain, causing the suspend
->> thread or the idle thread to abort power down, therefore preventing
->> registers content loss.
->>
->> By triggering CPU PM notification failure this patch prevents
->> suspending a system if the suspend thread is being profiled and
->> it also prevents entering idle deep states on cores that have profile
->> events in use, somehow limiting power management capabilities when
->> there are active perf sessions.
->
-> I guess that's one choice.  Couldn't you also stop the PMU and
-> save/restore it's context in the notifiers? so that you wouldn't affect
-> PM capabilities?
->
-> That would imply that you lose the ability to profile after a certain
-> point in suspend/idle, but maybe that's a better trade off than having
-> profiling disable certain PM features?
+> 
+> .
+> 
 
-I had something like that a few years ago on the Kraits and Scorpions [1].
 
-[1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/commit/arch/arm/kernel?h=msm-3.4&id=b5ca687960f0fea2f4735e83ca5c9543474c19de
-
-Cheers,
-Ashwin.
+-- 
+Thanks!
+Yijing
