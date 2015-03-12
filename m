@@ -1,57 +1,38 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 12 Mar 2015 10:03:08 +0100
-Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System
- Control Module (MSCM)
-In-Reply-To: <20150311004812.GU20455@dragon>
-References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
- <1425249689-32354-4-git-send-email-stefan@agner.ch>
- <20150311004812.GU20455@dragon>
-Message-ID: <59b0d98827cb4e7497de81e1c0826964@agner.ch>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 12 Mar 2015 11:04:03 +0200
+Subject: [PATCH v3 1/2] remoteproc: use a flag to detect the presence of
+ IOMMU
+In-Reply-To: <1420838519-15669-2-git-send-email-s-anna@ti.com>
+References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
+ <1420838519-15669-2-git-send-email-s-anna@ti.com>
+Message-ID: <CAK=WgbawMvc5Td-1+eEv3+BJWCUwHeZskJwDTPUaD66RT6EOxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-11 01:48, Shawn Guo wrote:
-> On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
->> Add the Miscellaneous System Control Module (MSCM) to the base
->> device tree for Vybrid SoC's. This module contains registers
->> to get information of the individual and current (accessing)
->> CPU. In a second block, there is an interrupt router, which
->> handles the routing of the interrupts between the two CPU cores
->> on VF6xx variants of the SoC. However, also on single core
->> variants the interrupt router needs to be configured in order
->> to receive interrupts on the CPU's interrupt controller. Almost
->> all peripheral interrupts are routed through the router, hence
->> the MSCM module is the default interrupt parent for this SoC.
->>
->> In a earlier commit the interrupt nodes were moved out of the
->> peripheral nodes and specified in the CPU specific vf500.dtsi
->> device tree. This allowed to use the base device tree vfxxx.dtsi
->> also for a Cortex-M4 specific device tree, which uses different
->> interrupt nodes due to the NVIC interrupt controller. However,
->> since the interrupt parent for peripherals is the MSCM module
->> independently which CPU the device tree is used for, we can move
->> the interrupt nodes into the base device tree vfxxx.dtsi again.
->> Depending on which CPU this base device tree will be used with,
->> the correct parent interrupt controller has to be assigned to
->> the MSCM-IR node (GIC or NVIC). The driver takes care of the
->> parent interrupt controller specific needs (interrupt-cells).
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Stefan,
-> 
-> I guess this patch has a run-time dependency on the first two in the
-> series, right?  Or put it another way, if I apply this single patch on
-> my branch, the dtb and kernel built from the same branch do not work
-> together, right?  If so, we will need to either wait for the first two
-> hit mainline or pull Jason's irqchip/vybrid branch into my tree as
-> prerequisite (irqchip/vybrid needs to be stable).
-> 
-> Shawn
+On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
+> The remoteproc driver core currently relies on iommu_present() on
+> the bus the device is on, to perform MMU management. However, this
+> logic doesn't scale for multi-arch, especially for processors that
+> do not have an IOMMU. Replace this logic instead by using a h/w
+> capability flag for the presence of IOMMU in the rproc structure.
+>
+> This issue is seen on OMAP platforms when trying to add a remoteproc
+> driver for a small Cortex M3 called the WkupM3 used for suspend /
+> resume management on TI AM335/AM437x SoCs. This processor does not
+> have an MMU. Same is the case with another processor subsystem
+> PRU-ICSS on AM335/AM437x. All these are platform devices, and the
+> current iommu_present check will not scale for the same kernel image
+> to support OMAP4/OMAP5 and AM335/AM437x.
+>
+> The existing platform implementation drivers - OMAP remoteproc, STE
+> Modem remoteproc and DA8xx remoteproc, are updated as well to properly
+> configure the newly added rproc field.
+>
+> Cc: Robert Tivy <rtivy@ti.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-Yes, that is true. The driver need to be in place in order to
-successfully boot with the new device tree.
+Applied to remoteproc's for-next branch.
 
---
-Stefan
+Thanks,
+Ohad.
