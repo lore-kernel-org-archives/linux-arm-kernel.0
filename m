@@ -1,60 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 12 Mar 2015 11:58:12 +0100
-Subject: [PATCH 3.18-stable v2] ARM: mvebu: do not register custom DMA
- operations when coherency is disabled
-Message-ID: <1426157892-1705-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Mar 2015 11:03:45 +0000
+Subject: [PATCH REPOST 1/2] serial/amba-pl011: Activate TX IRQ passively
+In-Reply-To: <1425472054-7543-2-git-send-email-Dave.Martin@arm.com>
+References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
+ <1425472054-7543-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150312110344.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a partial backport of commit ef01c6c36bb8 ("ARM: mvebu:
-remove Armada 375 Z1 workaround for I/O coherency"). This commit was
-merged in v3.19, so kernel versions later than v3.19 are not affected
-by the problem that this commit fixes.
+On Wed, Mar 04, 2015 at 12:27:33PM +0000, Dave Martin wrote:
+> The current PL011 driver transmits a dummy character when the UART
+> is opened, to assert the TX IRQ for the first time
+> (see pl011_startup()).  The UART is put in loopback mode temporarily,
+> so the receiver presumably shouldn't see anything.
 
-It does not make a lot of sense to backport this commit entirely,
-since it is mainly removing some no longer useful code. However, this
-commit is also making sure that the bus_register_notifier that
-register the custom DMA operations that should be used for HW I/O
-coherency does not get registered when said HW I/O coherency is not
-enabled.
+We do this so that we know for certain that the PL011 has room to accept
+at least one character.
 
-This is particularly critical since we have decided to disable HW I/O
-coherency completely in all kernels < 4.0, to be on the safe side,
-while experimenting a new implementation of the HW I/O coherency in >=
-4.0.
+> However...
+> 
+> At least some platforms containing a PL011 send characters down the
+> wire even when loopback mode is enabled.  This means that a
+> spurious NUL character may be seen at the receiver when the PL011 is
+> opened through the TTY layer.
 
-Without this commit, kernels earlier than 3.18 have the custom DMA
-operations normally used for HW I/O coherency registered (they don't
-do cache maintenance operations), while HW I/O coherency is
-disabled. It essentially causes every DMA transfer to transfer
-garbage.
+... which is an annoyance.
 
-The issue fixed by this commit was introduced by 5ab5afd8ba83 ("ARM:
-mvebu: implement Armada 375 coherency workaround"), but it was not
-visible until now since it didn't cause any problem when HW I/O
-coherency is enabled.
+> The current code also temporarily sets the baud rate to maximum and
+> the character width to the minimum, to that the dummy TX completes
+> as quickly as possible.  If this is seen by the receiver it will
+> result in a framing error and can knock the receiver out of sync --
+> turning subsequent output into garbage until synchronisation
+> is reestablished.  (Particularly problematic during boot with systemd.)
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> v3.16..v3.18
----
- arch/arm/mach-mvebu/coherency.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Yea, I have my own issues with systemd, but let's stay away from that
+potential argument. :)
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index 2ffccd4..01efe13 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -448,8 +448,9 @@ static int __init coherency_late_init(void)
- 			armada_375_coherency_init_wa();
- 	}
- 
--	bus_register_notifier(&platform_bus_type,
--			      &mvebu_hwcc_nb);
-+	if (coherency_available())
-+		bus_register_notifier(&platform_bus_type,
-+				      &mvebu_hwcc_nb);
- 
- 	return 0;
- }
+> To avoid spurious transmissions, this patch removes assumptions about
+> whether the TX IRQ will fire until at least one TX IRQ has been seen.
+> 
+> Instead, the UART will unmask the TX IRQ and then slow-start via
+> polling and timer-based soft IRQs initially.  If the TTY layer writes
+> enough data to fill the FIFO to the interrupt threshold in one go,
+> the TX IRQ should assert, at which point the driver changes to
+> fully interrupt-driven TX.
+
+I'm concerned about this.  What happens if the PL011 is also being used
+as a console, and the UART TX FIFO is fully stuffed?
+
+Reading the updated code, it seems that we can call pl011_tx_chars()
+irrespective of whether the TX FIFO is full or not.  pl011_tx_chars()
+makes the assumption that the TX FIFO can always accept the next
+character, and it results in (eg, in the x_char handling) the next
+character being written, even if the FIFO is full.
+
+If hardware CTS flow control is enabled, the problem gets worse - in
+that mode, the TX FIFO can remain fully occupied for an indeterminant
+amount of time.
+
+This introduces a whole new unreliability to the driver which wasn't
+there to start with.
+
+So, I'm afraid this gets a NAK.
+
+You need to check the TX FIFO status before trying to stuff it with
+characters.
+
 -- 
-2.1.0
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
