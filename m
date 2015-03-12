@@ -1,43 +1,89 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 13:49:21 +0000
-Subject: [PATCH v2 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <550197F5.1020107@arm.com>
-References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
- <1425491994-23913-11-git-send-email-andre.przywara@arm.com>
- <20150312105210.GK8656@n2100.arm.linux.org.uk>
- <550197F5.1020107@arm.com>
-Message-ID: <20150312134921.GR8656@n2100.arm.linux.org.uk>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 12 Mar 2015 21:44:07 +0800
+Subject: [PATCH v6 09/30] PCI: Separate pci_host_bridge creation out of
+ pci_create_root_bus()
+In-Reply-To: <20150312035202.GL10949@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-10-git-send-email-wangyijing@huawei.com>
+ <20150312035202.GL10949@google.com>
+Message-ID: <55019827.2060803@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 01:43:17PM +0000, Andre Przywara wrote:
-> Hi Russel,
+>> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
+>> +	if (!host)
+>> +		return NULL;
+>> +
+>> +	host->busnum = bus;
+>> +	host->domain = domain;
+>> +	/* If support CONFIG_PCI_DOMAINS_GENERIC, use
+>> +	 * pci_host_assign_domain_nr() to assign domain
+>> +	 * number instead PCI_DOMAIN(db).
+>> +	 */
 > 
-> thanks a lot for looking at the patches!
+> Follow the normal Linux comment style:
 > 
-> On 12/03/15 10:52, Russell King - ARM Linux wrote:
-> > On Wed, Mar 04, 2015 at 05:59:54PM +0000, Andre Przywara wrote:
-> >> +module_platform_driver(arm_sbsa_uart_platform_driver);
-> > 
-> > No need to open code the initialisation, rather than using the
-> > module_*_driver() helper macros to avoid the problem which Dave mentioned.
-> > 
-> > These macros are only there to avoid having to write out the same boiler
-> > plate in loads of simple drivers.  As soon as a driver has more than one
-> > device driver structure in it, it needs to be open coded.
+> 	host->domain = domain;
 > 
-> Actually I prepared this already for the ACPI guys, which want to stuff
-> their ACPI table match function in there - I think then we need the open
-> coded version. So if you don't mind too much, I'd like to keep it like
-> this and hope for someone to actually use it ;-)
+> 	/*
+> 	 * If we support ...
+> 	 */
 
-Either your statement is ambiguous, or I'm not understanding you.
+OK.
 
-You can't "keep it like this" where "this" is the above code.  The
-above will fail if the driver is built as a module, and cause a build
-time error.  That is not acceptable.
+> 
+>> +	pci_host_assign_domain_nr(host);
+>> +
+...
+>>  
+>> +struct pci_host_bridge *pci_create_host_bridge(
+>> +		struct device *parent, u32 dombus, struct list_head *resources);
+>> +void pci_free_host_bridge(struct pci_host_bridge *host);
+> 
+> A later patch adds another declaration and a blank line here.  If you want
+> the blank line, add it here, when you're adding the first declarations in
+> this section.
+
+OK.
+
+> 
+>>  #endif /* DRIVERS_PCI_H */
+>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>> index 3d6befd..27ec612 100644
+>> --- a/drivers/pci/probe.c
+>> +++ b/drivers/pci/probe.c
+>> @@ -503,31 +503,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+>>  	return b;
+>>  }
+...
+>>  struct pci_host_bridge {
+>>  	u16	domain;
+>> +	u16 busnum;
+> 
+> Why do we need this?  host_bridge->bus->number and
+> host_bridge->bus->busn_res.start both already contain the same information,
+> and I hate to add a third place.  I know pci_create_host_bridge() doesn't
+> have a struct pci_bus at the point where you initialize busnum, but it does
+> have the resource list, which contains the bus number range.
+
+Hmm, I will try to remove it, I put it here because when call pci_create_root_bus(),
+I could only pass the pci_host_bridge_ops, don't need to provide the bus number,
+pci_scan_root_bus() may lack the bus number resource at that time.
+But I think fix it is not a hard job, I will rework it, thanks.
+
+
+> 
+>>  	struct device dev;
+>>  	struct pci_bus *bus;		/* root bus */
+>>  	struct list_head windows;	/* resource_entry */
+>> -- 
+>> 1.7.1
+>>
+> 
+> .
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks!
+Yijing
