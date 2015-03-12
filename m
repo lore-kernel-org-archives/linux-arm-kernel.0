@@ -1,351 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 12 Mar 2015 17:54:39 +0800
-Subject: [PATCH resend v4] phy: Add driver to support individual USB PHYs on
- sun9i
-Message-ID: <1426154079-423-1-git-send-email-wens@csie.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Mar 2015 10:14:29 +0000
+Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <20150311231141.GG21998@io.lakedaemon.net>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
+ <20150311231141.GG21998@io.lakedaemon.net>
+Message-ID: <55016705.5010406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike previous Allwinner SoCs, there is no central PHY control block
-on the A80. Also, OTG support is completely split off into a different
-controller.
+On 11/03/15 23:11, Jason Cooper wrote:
+> Hey Grant,
+> 
+> On Wed, Mar 11, 2015 at 06:04:50PM +0000, Grant Likely wrote:
+>> On 11 Mar 2015 12:42, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
+>>>
+>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>
+>>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+>>> parse GIC related subtables, collect CPU interface and distributor
+>>> addresses and call driver initialization function (which is hardware
+>>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+>>>
+>>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+>>> While now simple GICv2 init call is used, any further GIC features
+>>> require generic infrastructure for proper ACPI irqchip initialization.
+>>> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+>>> extension, GICv3/4 and its ITS are considered as next steps.
+>>>
+>>> CC: Jason Cooper <jason@lakedaemon.net>
+>>> CC: Marc Zyngier <marc.zyngier@arm.com>
+>>> CC: Thomas Gleixner <tglx@linutronix.de>
+>>
+>> BTW, Thomas is taking a bit of a break, do he is unlikely to give an ack
+>> here in a timely manner. I've not heard from Jason. Personally, I think we
+>> can proceed without their ack if everything else is in order (heck, I used
+>> to help with the irq subsystem, use me as an ack of you want). The patch is
+>> low impact and only had effect for ARM ACPI builds.
+> 
+> I'm not talking much, but I am tracking and collecting everything for irqchip.
+> We do have some other changes in this driver this time around.  So it'd be nice
+> if I could take this.
+> 
+> I had reached out to Olof for his thoughts on this and he hasn't had enough
+> cycles to look at it.  iirc, Marc reviewed a previous version and was happy with
+> the changes.
 
-This adds a new driver to support the regular USB PHYs.
+FWIW, and given the prominent "NOTE" in the commit message, please have my:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Resending this patch in hopes of getting it in 4.1.
-The rest of the series has been merged.
+Thanks,
 
----
- .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
- drivers/phy/Kconfig                                |  12 ++
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-sun9i-usb.c                        | 238 +++++++++++++++++++++
- 4 files changed, 285 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
- create mode 100644 drivers/phy/phy-sun9i-usb.c
-
-diff --git a/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
-new file mode 100644
-index 000000000000..af40dd2fe0eb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
-@@ -0,0 +1,34 @@
-+Allwinner sun9i USB PHY
-+-----------------------
-+
-+Required properties:
-+- compatible : should be one of
-+  * allwinner,sun9i-a80-usb-phy
-+- reg : a list of offset + length pairs
-+- #phy-cells : from the generic phy bindings, must be 0
-+- phy_type : "hsic" for HSIC usage;
-+	     other values or absence of this property indicates normal USB
-+- clocks : phandle + clock specifier for the phy clocks
-+- clock-names : depending on the "phy_type" property,
-+  * "phy" for normal USB
-+  * "hsic_480M", "hsic_12M" for HSIC
-+- resets : a list of phandle + reset specifier pairs
-+- reset-names : depending on the "phy_type" property,
-+  * "phy" for normal USB
-+  * "hsic" for HSIC
-+
-+It is recommended to list all clocks and resets available.
-+The driver will only use those matching the phy_type.
-+
-+Example:
-+	usbphy1: phy at 00a01800 {
-+		compatible = "allwinner,sun9i-a80-usb-phy";
-+		reg = <0x00a01800 0x4>;
-+		clocks = <&usb_phy_clk 2>, <&usb_phy_clk 10>,
-+		       <&usb_phy_clk 3>;
-+		clock-names = "hsic_480M", "hsic_12M", "phy";
-+		resets = <&usb_phy_clk 18>, <&usb_phy_clk 19>;
-+		reset-names = "hsic", "phy";
-+		status = "disabled";
-+		#phy-cells = <0>;
-+	};
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 2962de205ba7..3e6b17682881 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -174,6 +174,18 @@ config PHY_SUN4I_USB
- 	  This driver controls the entire USB PHY block, both the USB OTG
- 	  parts, as well as the 2 regular USB 2 host PHYs.
- 
-+config PHY_SUN9I_USB
-+	tristate "Allwinner sun9i SoC USB PHY driver"
-+	depends on ARCH_SUNXI && HAS_IOMEM && OF
-+	depends on RESET_CONTROLLER
-+	select USB_PHY
-+	select GENERIC_PHY
-+	help
-+	  Enable this to support the transceiver that is part of Allwinner
-+	  sun9i SoCs.
-+
-+	  This driver controls each individual USB 2 host PHY.
-+
- config PHY_SAMSUNG_USB2
- 	tristate "Samsung USB 2.0 PHY driver"
- 	depends on HAS_IOMEM
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index f080e1bb2a74..ab8f9af540a2 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -20,6 +20,7 @@ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
- obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
- obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
- obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
-+obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
- obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
- phy-exynos-usb2-y			+= phy-samsung-usb2.o
- phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
-diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
-new file mode 100644
-index 000000000000..0fddd56df38c
---- /dev/null
-+++ b/drivers/phy/phy-sun9i-usb.c
-@@ -0,0 +1,238 @@
-+/*
-+ * Allwinner sun9i USB phy driver
-+ *
-+ * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * Based on phy-sun4i-usb.c from
-+ * Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * and code from
-+ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/phy/phy.h>
-+#include <linux/usb/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset.h>
-+
-+#define SUNXI_AHB_INCR16_BURST_EN	BIT(11)
-+#define SUNXI_AHB_INCR8_BURST_EN	BIT(10)
-+#define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
-+#define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
-+#define SUNXI_ULPI_BYPASS_EN		BIT(0)
-+
-+/* usb1 HSIC specific bits */
-+#define SUNXI_EHCI_HS_FORCE		BIT(20)
-+#define SUNXI_HSIC_CONNECT_DET		BIT(17)
-+#define SUNXI_HSIC_CONNECT_INT		BIT(16)
-+#define SUNXI_HSIC			BIT(1)
-+
-+struct sun9i_usb_phy {
-+	struct phy *phy;
-+	void __iomem *pmu;
-+	struct regulator *vbus;
-+	struct reset_control *reset;
-+	struct clk *clk;
-+	struct clk *hsic_clk;
-+	enum usb_phy_interface type;
-+};
-+
-+static void sun9i_usb_phy_passby(struct sun9i_usb_phy *phy, int enable)
-+{
-+	u32 bits, reg_value;
-+
-+	bits = SUNXI_AHB_INCR16_BURST_EN | SUNXI_AHB_INCR8_BURST_EN |
-+		SUNXI_AHB_INCR4_BURST_EN | SUNXI_AHB_INCRX_ALIGN_EN |
-+		SUNXI_ULPI_BYPASS_EN;
-+
-+	if (phy->type == USBPHY_INTERFACE_MODE_HSIC)
-+		bits |= SUNXI_HSIC | SUNXI_EHCI_HS_FORCE |
-+			SUNXI_HSIC_CONNECT_DET | SUNXI_HSIC_CONNECT_INT;
-+
-+	reg_value = readl(phy->pmu);
-+
-+	if (enable)
-+		reg_value |= bits;
-+	else
-+		reg_value &= ~bits;
-+
-+	writel(reg_value, phy->pmu);
-+}
-+
-+static int sun9i_usb_phy_init(struct phy *_phy)
-+{
-+	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
-+	int ret;
-+
-+	ret = clk_prepare_enable(phy->clk);
-+	if (ret)
-+		goto err_clk;
-+
-+	ret = clk_prepare_enable(phy->hsic_clk);
-+	if (ret)
-+		goto err_hsic_clk;
-+
-+	ret = reset_control_deassert(phy->reset);
-+	if (ret)
-+		goto err_reset;
-+
-+	sun9i_usb_phy_passby(phy, 1);
-+	return 0;
-+
-+err_reset:
-+	clk_disable_unprepare(phy->hsic_clk);
-+
-+err_hsic_clk:
-+	clk_disable_unprepare(phy->clk);
-+
-+err_clk:
-+	return ret;
-+}
-+
-+static int sun9i_usb_phy_exit(struct phy *_phy)
-+{
-+	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
-+
-+	sun9i_usb_phy_passby(phy, 0);
-+	reset_control_assert(phy->reset);
-+	clk_disable_unprepare(phy->hsic_clk);
-+	clk_disable_unprepare(phy->clk);
-+
-+	return 0;
-+}
-+
-+static int sun9i_usb_phy_power_on(struct phy *_phy)
-+{
-+	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
-+	int ret = 0;
-+
-+	if (phy->vbus)
-+		ret = regulator_enable(phy->vbus);
-+
-+	return ret;
-+}
-+
-+static int sun9i_usb_phy_power_off(struct phy *_phy)
-+{
-+	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
-+
-+	if (phy->vbus)
-+		regulator_disable(phy->vbus);
-+
-+	return 0;
-+}
-+
-+static struct phy_ops sun9i_usb_phy_ops = {
-+	.init		= sun9i_usb_phy_init,
-+	.exit		= sun9i_usb_phy_exit,
-+	.power_on	= sun9i_usb_phy_power_on,
-+	.power_off	= sun9i_usb_phy_power_off,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static int sun9i_usb_phy_probe(struct platform_device *pdev)
-+{
-+	struct sun9i_usb_phy *phy;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct phy_provider *phy_provider;
-+	struct resource *res;
-+
-+	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-+	if (!phy)
-+		return -ENOMEM;
-+
-+	phy->vbus = devm_regulator_get_optional(dev, "vbus");
-+	if (IS_ERR(phy->vbus)) {
-+		if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		phy->vbus = NULL;
-+	}
-+
-+	phy->type = of_usb_get_phy_mode(np);
-+	if (phy->type == USBPHY_INTERFACE_MODE_HSIC) {
-+		phy->clk = devm_clk_get(dev, "hsic_480M");
-+		if (IS_ERR(phy->clk)) {
-+			dev_err(dev, "failed to get hsic_480M clock\n");
-+			return PTR_ERR(phy->clk);
-+		}
-+
-+		phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
-+		if (IS_ERR(phy->clk)) {
-+			dev_err(dev, "failed to get hsic_12M clock\n");
-+			return PTR_ERR(phy->clk);
-+		}
-+
-+		phy->reset = devm_reset_control_get(dev, "hsic");
-+		if (IS_ERR(phy->reset)) {
-+			dev_err(dev, "failed to get reset control\n");
-+			return PTR_ERR(phy->reset);
-+		}
-+	} else {
-+		phy->clk = devm_clk_get(dev, "phy");
-+		if (IS_ERR(phy->clk)) {
-+			dev_err(dev, "failed to get phy clock\n");
-+			return PTR_ERR(phy->clk);
-+		}
-+
-+		phy->reset = devm_reset_control_get(dev, "phy");
-+		if (IS_ERR(phy->reset)) {
-+			dev_err(dev, "failed to get reset control\n");
-+			return PTR_ERR(phy->reset);
-+		}
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	phy->pmu = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(phy->pmu))
-+		return PTR_ERR(phy->pmu);
-+
-+	phy->phy = devm_phy_create(dev, NULL, &sun9i_usb_phy_ops);
-+	if (IS_ERR(phy->phy)) {
-+		dev_err(dev, "failed to create PHY\n");
-+		return PTR_ERR(phy->phy);
-+	}
-+
-+	phy_set_drvdata(phy->phy, phy);
-+	dev_set_drvdata(dev, phy);
-+	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
-+
-+	return PTR_ERR_OR_ZERO(phy_provider);
-+}
-+
-+static const struct of_device_id sun9i_usb_phy_of_match[] = {
-+	{ .compatible = "allwinner,sun9i-a80-usb-phy" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, sun9i_usb_phy_of_match);
-+
-+static struct platform_driver sun9i_usb_phy_driver = {
-+	.probe	= sun9i_usb_phy_probe,
-+	.driver = {
-+		.of_match_table	= sun9i_usb_phy_of_match,
-+		.name  = "sun9i-usb-phy",
-+	}
-+};
-+module_platform_driver(sun9i_usb_phy_driver);
-+
-+MODULE_DESCRIPTION("Allwinner sun9i USB phy driver");
-+MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
-+MODULE_LICENSE("GPL v2");
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
