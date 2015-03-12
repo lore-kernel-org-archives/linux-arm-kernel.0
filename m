@@ -1,98 +1,81 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 20:39:18 -0500
-Subject: [PATCH v6 08/30] PCI: Introduce pci_host_assign_domain_nr() to
- assign domain
-In-Reply-To: <1425868467-9667-9-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-9-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150312013918.GC10949@google.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 12 Mar 2015 09:46:39 +0800
+Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <20150311231141.GG21998@io.lakedaemon.net>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
+ <20150311231141.GG21998@io.lakedaemon.net>
+Message-ID: <5500EFFF.2070807@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:05AM +0800, Yijing Wang wrote:
-> Introduce pci_host_assign_domain_nr() to assign domain
-> number for pci_host_bridge. Later we will remove
-> pci_bus_assign_domain_nr().
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/pci.c   |   20 +++++++++++++++-----
->  include/linux/pci.h |    4 ++++
->  2 files changed, 19 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 81f06e8..c49eec1 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4501,10 +4501,10 @@ int pci_get_new_domain_nr(void)
->  }
->  
->  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +static int pci_assign_domain_nr(struct device *dev)
->  {
->  	static int use_dt_domains = -1;
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain = of_get_pci_domain_nr(dev->of_node);
->  
->  	/*
->  	 * Check DT domain and use_dt_domains values.
-> @@ -4538,12 +4538,22 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  		use_dt_domains = 0;
->  		domain = pci_get_new_domain_nr();
->  	} else {
-> -		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-> -			parent->of_node->full_name);
-> +		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-> +			dev->of_node->full_name);
->  		domain = -1;
->  	}
->  
-> -	bus->domain_nr = domain;
-> +	return domain;
-> +}
-> +
-> +void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-> +{
-> +	host->domain = pci_assign_domain_nr(host->dev.parent);
-> +}
-> +
-> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +{
-> +	bus->domain_nr = pci_assign_domain_nr(parent);
->  }
->  #endif
->  #endif
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 8b3d245..2b1b998 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1327,11 +1327,15 @@ static inline int pci_domain_nr(struct pci_bus *bus)
->  	return bus->domain_nr;
->  }
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
-> +void pci_host_assign_domain_nr(struct pci_host_bridge *host);
+On 2015/3/12 7:11, Jason Cooper wrote:
+> Hey Grant,
+>
+> On Wed, Mar 11, 2015 at 06:04:50PM +0000, Grant Likely wrote:
+>> On 11 Mar 2015 12:42, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
+>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>
+>>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+>>> parse GIC related subtables, collect CPU interface and distributor
+>>> addresses and call driver initialization function (which is hardware
+>>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+>>>
+>>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+>>> While now simple GICv2 init call is used, any further GIC features
+>>> require generic infrastructure for proper ACPI irqchip initialization.
+>>> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+>>> extension, GICv3/4 and its ITS are considered as next steps.
+>>>
+>>> CC: Jason Cooper <jason@lakedaemon.net>
+>>> CC: Marc Zyngier <marc.zyngier@arm.com>
+>>> CC: Thomas Gleixner <tglx@linutronix.de>
+>> BTW, Thomas is taking a bit of a break, do he is unlikely to give an ack
+>> here in a timely manner. I've not heard from Jason. Personally, I think we
+>> can proceed without their ack if everything else is in order (heck, I used
+>> to help with the irq subsystem, use me as an ack of you want). The patch is
+>> low impact and only had effect for ARM ACPI builds.
+> I'm not talking much, but I am tracking and collecting everything for irqchip.
+> We do have some other changes in this driver this time around.  So it'd be nice
+> if I could take this.
+>
+> I had reached out to Olof for his thoughts on this and he hasn't had enough
+> cycles to look at it.  iirc, Marc reviewed a previous version and was happy with
+> the changes.  My only question I had for Olof I'll put below:
 
-I do not think this needs to be in include/linux/pci.h.  It's called only
-from drivers/pci/host-bridge.c, so at most, it needs to be in
-drivers/pci/pci.h.
+Please allow me to explain a little bit before Olof's confirmation, please don't mind if
+any offended.
 
-Better still would be if the definition could be moved from
-drivers/pci/pci.c to drivers/pci/host-bridge.c so we wouldn't need anything
-in a header file at all.
+>
+>>> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+>>> index 0fe2f71..afd1af3 100644
+>>> --- a/drivers/irqchip/irqchip.c
+>>> +++ b/drivers/irqchip/irqchip.c
+>>> @@ -8,6 +8,7 @@
+>>>   * warranty of any kind, whether express or implied.
+>>>   */
+>>>
+>>> +#include <linux/acpi_irq.h>
+>>>  #include <linux/init.h>
+>>>  #include <linux/of_irq.h>
+>>>  #include <linux/irqchip.h>
+>>> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+>>>  void __init irqchip_init(void)
+>>>  {
+>>>         of_irq_init(__irqchip_of_table);
+>>> +
+>>> +       acpi_irq_init();
+>>>  }
+> Is this in line with Olof's idea that providing a dtb would override ACPI?
 
->  #else
->  static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
->  					struct device *parent)
->  {
->  }
-> +static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-> +{
-> +}
->  #endif
->  
->  /* some architectures require additional setup to direct VGA traffic */
-> -- 
-> 1.7.1
-> 
+Yes, it will. Since ACPI is default OFF (disabled), if a dtb provided, and no acpi=force
+passed in the early command line, dtb will be used as system configuration for
+boot (dtb is always the prior one for now) [1]. In acpi_gic_init() which called by
+acpi_irq_init(), it will return immediately if acpi disabled, so it will not parse
+any ACPI table for device configuration.
+
+[1]: [patch 08/21] ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
+
+Thanks
+Hanjun
