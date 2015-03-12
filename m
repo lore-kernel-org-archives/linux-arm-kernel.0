@@ -1,176 +1,50 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:03:12 +0800
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <20150312025537.GD10949@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
- <20150312025537.GD10949@google.com>
-Message-ID: <55018E90.9030301@huawei.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Thu, 12 Mar 2015 16:11:50 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <20150312130445.GO8656@n2100.arm.linux.org.uk>
+References: <54FF21BE.2040506@list.ru>
+ <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
+ <54FF2986.6020503@list.ru> <20150310173807.GU8656@n2100.arm.linux.org.uk>
+ <55003569.1010200@list.ru> <20150311124730.GZ8656@n2100.arm.linux.org.uk>
+ <5500502A.5060905@list.ru> <550187A4.8010704@hurleysoftware.com>
+ <55018AE7.4070207@list.ru> <20150312130445.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <55019096.80605@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/12 10:55, Bjorn Helgaas wrote:
-> On Mon, Mar 09, 2015 at 10:34:07AM +0800, Yijing Wang wrote:
->> Introduce pci_host_bridge_list to manage pci host
->> bridges in system, so we could detect whether
->> the host in domain:bus is alreay registered.
->> Then we could remove bus alreay exist test in
->> __pci_create_root_bus().
-> 
-> It's a nice idea to move this test into the core.  While you're at it, why
-> don't you check for any overlap with the bus ranges of existing host
-> bridges?  For example, if we're trying to create a new host bridge to
-> [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
-> as well as to [bus 40-ff].  I think your current patch will detect the
-> latter conflict but not the former.
-
-Now pci host bridge may only know its start bus number, like acpi _BBN provided,
-but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
-so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
-some pci scan would fail which currently scan success.
-
-> 
->> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
->> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
->> ---
->>  drivers/pci/host-bridge.c |   24 +++++++++++++++++++++++-
->>  drivers/pci/probe.c       |    8 +-------
->>  include/linux/pci.h       |    1 +
->>  3 files changed, 25 insertions(+), 8 deletions(-)
->>
->> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
->> index 3bd45e7..0bb08ef 100644
->> --- a/drivers/pci/host-bridge.c
->> +++ b/drivers/pci/host-bridge.c
->> @@ -8,6 +8,9 @@
->>  
->>  #include "pci.h"
->>  
->> +static LIST_HEAD(pci_host_bridge_list);
->> +static DEFINE_MUTEX(phb_mutex);
-> 
-> We don't use the "phb" abbreviation in the PCI core.
-
-OK
-
-> 
->> +
->>  static void pci_release_host_bridge_dev(struct device *dev)
->>  {
->>  	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
->> @@ -25,7 +28,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->>  	int error;
->>  	int bus = PCI_BUSNUM(db);
->>  	int domain = PCI_DOMAIN(db);
->> -	struct pci_host_bridge *host;
->> +	struct pci_host_bridge *host, *temp;
->>  	struct resource_entry *window, *n;
->>  
->>  	host = kzalloc(sizeof(*host), GFP_KERNEL);
->> @@ -40,6 +43,18 @@ struct pci_host_bridge *pci_create_host_bridge(
->>  	 */
->>  	pci_host_assign_domain_nr(host);
->>  
->> +	mutex_lock(&phb_mutex);
->> +	list_for_each_entry(temp, &pci_host_bridge_list, list)
->> +		if (temp->domain == host->domain
->> +				&& temp->busnum == host->busnum) {
->> +			dev_dbg(&host->dev, "pci host bridge pci%04x:%02x exist\n",
->> +					host->domain, host->busnum);
-> 
-> &host->dev hasn't been initialized yet!  And the text of the original
-> message was better.
-
-Oh, my mistake, good catch.
-
-> 
->> +			mutex_unlock(&phb_mutex);
->> +			kfree(host);
->> +			return NULL;
->> +		}
->> +	mutex_unlock(&phb_mutex);
-> 
-> This is racy.  Two CPUs adding a bridge to [bus 00-7f] at about the same
-> time can both succeed.
-> 
-
-Hmm, I need to unlock after I add the new host bridge to the gloal host bridge list, thanks.
-
-> And it needs curly braces around the list_for_each_entry() body.
-
-OK
-
-> 
->> +
->>  	host->dev.parent = parent;
->>  	INIT_LIST_HEAD(&host->windows);
->>  	host->dev.release = pci_release_host_bridge_dev;
->> @@ -55,11 +70,18 @@ struct pci_host_bridge *pci_create_host_bridge(
->>  	resource_list_for_each_entry_safe(window, n, resources)
->>  		list_move_tail(&window->node, &host->windows);
->>  
->> +	mutex_lock(&phb_mutex);
->> +	list_add_tail(&host->list, &pci_host_bridge_list);
->> +	mutex_unlock(&phb_mutex);
->>  	return host;
->>  }
->>  
->>  void pci_free_host_bridge(struct pci_host_bridge *host)
->>  {
->> +	mutex_lock(&phb_mutex);
->> +	list_del(&host->list);
->> +	mutex_unlock(&phb_mutex);
->> +
->>  	device_unregister(&host->dev);
->>  }
->>  
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 27ec612..7238fa3 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -1870,7 +1870,7 @@ static struct pci_bus *__pci_create_root_bus(
->>  		void *sysdata)
->>  {
->>  	int error;
->> -	struct pci_bus *b, *b2;
->> +	struct pci_bus *b;
->>  	struct resource_entry *window;
->>  	struct device *parent;
->>  	struct resource *res;
->> @@ -1887,12 +1887,6 @@ static struct pci_bus *__pci_create_root_bus(
->>  	b->ops = ops;
->>  	b->number = b->busn_res.start = bridge->busnum;
->>  	pci_bus_assign_domain_nr(b, parent);
->> -	b2 = pci_find_bus(pci_domain_nr(b), b->number);
->> -	if (b2) {
->> -		/* If we already got to this bus through a different bridge, ignore it */
->> -		dev_dbg(&b2->dev, "bus already known\n");
->> -		goto err_out;
->> -	}
->>  
->>  	bridge->bus = b;
->>  	b->bridge = get_device(&bridge->dev);
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 463eaa3..b621f5b 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -406,6 +406,7 @@ struct pci_host_bridge {
->>  	struct device dev;
->>  	struct pci_bus *bus;		/* root bus */
->>  	struct list_head windows;	/* resource_entry */
->> +	struct list_head list;
->>  	void (*release_fn)(struct pci_host_bridge *);
->>  	void *release_data;
->>  };
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
+12.03.2015 16:04, Russell King - ARM Linux ?????:
+> On Thu, Mar 12, 2015 at 03:47:35PM +0300, Stas Sergeev wrote:
+>> 12.03.2015 15:33, Peter Hurley ?????:
+>>> On 03/11/2015 10:24 AM, Stas Sergeev wrote:
+>>>> However, while testing, I've suddenly got another crash happened
+>>>> a bit earlier than the previous one used to happen: (OOM? How??)
+>>>> ---
+>>>> [    0.000000] Booting Linux on physical CPU 0x0
+>>>> [    0.000000] Linux version 4.0.0-rc2-00137-gb672c98-dirty
+>>>> (root at host-010-117) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) )
+>>>> #2 SMP 5
+>>>> [    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7),
+>>>> cr=10c5387d
+>>>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
+>>>> cache
+>>>> [    0.000000] Machine model: Marvell Armada XP Development Board
+>>>> DB-MV784MP-GP
+>>>> [    0.000000] Ignoring memory block 0x100000000 - 0x200000000
+>>> Once you patch your bootloader, you'll want to configure your kernel
+>>> for CONFIG_ARM_LPAE=y to enable the high 4GB of memory you have, as
+>>> it's being ignored in this config right now (as shown above and in
+>>> the oom message below).
+>> Hi Peter, thanks for this hint.
+>> I actually already tried with lpae, and, except for the missing
+>> 256Mb, everything works properly. :)
+> How reproducable is the OOM?  Have you tested LPAE as much as you did
+> without LPAE?
+Hi Russel, OOM is reproduceable quite fine only on old uboot
+and non-lpae mode.
+With lpae mode and old uboot OOM doesn't happen, but the board is not
+very reliable.
+With old uboot and mem=3G OOM is not reproduceable!
+With new uboot and whatever lpae more, OOM does not happen.
+So, after all, it still seems to be related to the problematic memory
+region. Let me know if you still suspect a bug and need more testing.
