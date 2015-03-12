@@ -1,81 +1,88 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 13:07:31 +0100
-Subject: [PATCH v5 07/10] ARM: at91: time: move the system timer driver to
- drivers/clocksource
+Date: Thu, 12 Mar 2015 13:07:34 +0100
+Subject: [PATCH v5 10/10] ARM: at91: remove useless include
 In-Reply-To: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426162054-9987-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426162054-9987-11-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Import at91rm9200_time.c from mach-at91 as timer-atmel-st.c. Further cleanup is
-required to get rid of the mach-at91 headers.
+Both drivers using the system timer are now converted to an MFD. mach/at91_st.h
+is now useless.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-at91/Kconfig                                            | 1 +
- arch/arm/mach-at91/Makefile                                           | 2 +-
- drivers/clocksource/Kconfig                                           | 4 ++++
- drivers/clocksource/Makefile                                          | 1 +
- .../at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c         | 0
- 5 files changed, 7 insertions(+), 1 deletion(-)
- rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (100%)
+ arch/arm/mach-at91/include/mach/at91_st.h | 61 -------------------------------
+ 1 file changed, 61 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c74a44324e5b..dabce086fa47 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -77,6 +77,7 @@ if SOC_SAM_V4_V5
- config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	select ATMEL_AIC_IRQ
-+	select ATMEL_ST
- 	select COMMON_CLK_AT91
- 	select CPU_ARM920T
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 827fdbcce1c7..963c29169242 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -7,7 +7,7 @@ obj-y		:= setup.o
- obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
- 
- # CPU-specific support
--obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o at91rm9200_time.o
-+obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
- obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam9.o
- obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
- 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 1c2506f68122..6c45f504baff 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -138,6 +138,10 @@ config ATMEL_PIT
- 	select CLKSRC_OF if OF
- 	def_bool SOC_AT91SAM9 || SOC_SAMA5
- 
-+config ATMEL_ST
-+	bool
-+	select CLKSRC_OF
-+
- config CLKSRC_METAG_GENERIC
- 	def_bool y if METAG
- 	help
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 752d5c70b0ef..5b85f6adb258 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_CLKSRC_OF)	+= clksrc-of.o
- obj-$(CONFIG_ATMEL_PIT)		+= timer-atmel-pit.o
-+obj-$(CONFIG_ATMEL_ST)		+= timer-atmel-st.o
- obj-$(CONFIG_ATMEL_TCB_CLKSRC)	+= tcb_clksrc.o
- obj-$(CONFIG_X86_PM_TIMER)	+= acpi_pm.o
- obj-$(CONFIG_SCx200HR_TIMER)	+= scx200_hrt.o
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/drivers/clocksource/timer-atmel-st.c
-similarity index 100%
-rename from arch/arm/mach-at91/at91rm9200_time.c
-rename to drivers/clocksource/timer-atmel-st.c
+diff --git a/arch/arm/mach-at91/include/mach/at91_st.h b/arch/arm/mach-at91/include/mach/at91_st.h
+deleted file mode 100644
+index 67fdbd13c3ed..000000000000
+--- a/arch/arm/mach-at91/include/mach/at91_st.h
++++ /dev/null
+@@ -1,61 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/at91_st.h
+- *
+- * Copyright (C) 2005 Ivan Kokshaysky
+- * Copyright (C) SAN People
+- *
+- * System Timer (ST) - System peripherals registers.
+- * Based on AT91RM9200 datasheet revision E.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef AT91_ST_H
+-#define AT91_ST_H
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_st_base;
+-
+-#define at91_st_read(field) \
+-	__raw_readl(at91_st_base + field)
+-
+-#define at91_st_write(field, value) \
+-	__raw_writel(value, at91_st_base + field)
+-#else
+-.extern at91_st_base
+-#endif
+-
+-#define	AT91_ST_CR		0x00			/* Control Register */
+-#define 	AT91_ST_WDRST		(1 << 0)		/* Watchdog Timer Restart */
+-
+-#define	AT91_ST_PIMR		0x04			/* Period Interval Mode Register */
+-#define		AT91_ST_PIV		(0xffff <<  0)		/* Period Interval Value */
+-
+-#define	AT91_ST_WDMR		0x08			/* Watchdog Mode Register */
+-#define		AT91_ST_WDV		(0xffff <<  0)		/* Watchdog Counter Value */
+-#define		AT91_ST_RSTEN		(1	<< 16)		/* Reset Enable */
+-#define		AT91_ST_EXTEN		(1	<< 17)		/* External Signal Assertion Enable */
+-
+-#define	AT91_ST_RTMR		0x0c			/* Real-time Mode Register */
+-#define		AT91_ST_RTPRES		(0xffff <<  0)		/* Real-time Prescalar Value */
+-
+-#define	AT91_ST_SR		0x10			/* Status Register */
+-#define		AT91_ST_PITS		(1 << 0)		/* Period Interval Timer Status */
+-#define		AT91_ST_WDOVF		(1 << 1) 		/* Watchdog Overflow */
+-#define		AT91_ST_RTTINC		(1 << 2) 		/* Real-time Timer Increment */
+-#define		AT91_ST_ALMS		(1 << 3) 		/* Alarm Status */
+-
+-#define	AT91_ST_IER		0x14			/* Interrupt Enable Register */
+-#define	AT91_ST_IDR		0x18			/* Interrupt Disable Register */
+-#define	AT91_ST_IMR		0x1c			/* Interrupt Mask Register */
+-
+-#define	AT91_ST_RTAR		0x20			/* Real-time Alarm Register */
+-#define		AT91_ST_ALMV		(0xfffff << 0)		/* Alarm Value */
+-
+-#define	AT91_ST_CRTR		0x24			/* Current Real-time Register */
+-#define		AT91_ST_CRTV		(0xfffff << 0)		/* Current Real-Time Value */
+-
+-#endif
 -- 
 2.1.0
