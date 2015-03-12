@@ -1,105 +1,62 @@
 From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Thu, 12 Mar 2015 13:53:00 +0200
-Subject: [PATCH v6 1/6] ARM: Alpine: Initial support for Alpine platform
-Message-ID: <55017e1c.ae2j4LOAfljYtvOr%tsahee@annapurnalabs.com>
+Date: Thu, 12 Mar 2015 13:53:04 +0200
+Subject: [PATCH v6 2/6] ARM: Alpine: early-debug print support
+Message-ID: <55017e20.cQfjmLVJ2LRqZ3eD%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces initial architecture and device-tree support.
+Alpine platform includes UART8250 that can be used for early prints.
 
 Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
 Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                      |  2 ++
- arch/arm/Makefile                     |  1 +
- arch/arm/mach-alpine/Kconfig          |  8 ++++++++
- arch/arm/mach-alpine/Makefile         |  1 +
- arch/arm/mach-alpine/alpine_machine.c | 28 ++++++++++++++++++++++++++++
- 5 files changed, 40 insertions(+)
- create mode 100644 arch/arm/mach-alpine/Kconfig
- create mode 100644 arch/arm/mach-alpine/Makefile
- create mode 100644 arch/arm/mach-alpine/alpine_machine.c
+ arch/arm/Kconfig.debug | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 55f1d9b..877380b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -843,6 +843,8 @@ config ARCH_VIRT
- #
- source "arch/arm/mach-mvebu/Kconfig"
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6e55ed9..0fcecbc 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -93,6 +93,14 @@ choice
+ 	prompt "Kernel low-level debugging port"
+ 	depends on DEBUG_LL
  
-+source "arch/arm/mach-alpine/Kconfig"
++	config DEBUG_ALPINE_UART0
++		bool "Kernel low-level debugging messages via Alpine UART0"
++		depends on ARCH_ALPINE
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Alpine based platforms.
 +
- source "arch/arm/mach-asm9260/Kconfig"
- 
- source "arch/arm/mach-at91/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index eb7bb51..ef4da73 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -143,6 +143,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- 
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-+machine-$(CONFIG_ARCH_ALPINE)		+= alpine
- machine-$(CONFIG_ARCH_AT91)		+= at91
- machine-$(CONFIG_ARCH_AXXIA)		+= axxia
- machine-$(CONFIG_ARCH_BCM)		+= bcm
-diff --git a/arch/arm/mach-alpine/Kconfig b/arch/arm/mach-alpine/Kconfig
-new file mode 100644
-index 0000000..44b9a8f
---- /dev/null
-+++ b/arch/arm/mach-alpine/Kconfig
-@@ -0,0 +1,8 @@
-+config ARCH_ALPINE
-+	bool "Annapurna Labs Alpine platform" if ARCH_MULTI_V7
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select GENERIC_IRQ_CHIP
-+	select HAVE_ARM_ARCH_TIMER
-+	help
-+	  This enables support for the Annapurna Labs Alpine V1 boards.
-diff --git a/arch/arm/mach-alpine/Makefile b/arch/arm/mach-alpine/Makefile
-new file mode 100644
-index 0000000..b7dbb12
---- /dev/null
-+++ b/arch/arm/mach-alpine/Makefile
-@@ -0,0 +1 @@
-+obj-y				+= alpine_machine.o
-diff --git a/arch/arm/mach-alpine/alpine_machine.c b/arch/arm/mach-alpine/alpine_machine.c
-new file mode 100644
-index 0000000..b8e2145
---- /dev/null
-+++ b/arch/arm/mach-alpine/alpine_machine.c
-@@ -0,0 +1,28 @@
-+/*
-+ * Machine declaration for Alpine platforms.
-+ *
-+ * Copyright (C) 2015 Annapurna Labs Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/of_platform.h>
-+
-+#include <asm/mach/arch.h>
-+
-+static const char * const al_match[] __initconst = {
-+	"al,alpine",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(AL_DT, "Annapurna Labs Alpine")
-+	.dt_compat	= al_match,
-+MACHINE_END
+ 	config DEBUG_ASM9260_UART
+ 		bool "Kernel low-level debugging via asm9260 UART"
+ 		depends on MACH_ASM9260
+@@ -1416,6 +1424,7 @@ config DEBUG_UART_PHYS
+ 	default 0xf8b00000 if DEBUG_HIX5HD2_UART
+ 	default 0xf991e000 if DEBUG_QCOM_UARTDM
+ 	default 0xfcb00000 if DEBUG_HI3620_UART
++	default 0xfd883000 if DEBUG_ALPINE_UART0
+ 	default 0xfe800000 if ARCH_IOP32X
+ 	default 0xff690000 if DEBUG_RK32_UART2
+ 	default 0xffc02000 if DEBUG_SOCFPGA_UART
+@@ -1482,6 +1491,7 @@ config DEBUG_UART_VIRT
+ 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
+ 	default 0xfd000000 if ARCH_SPEAR13XX
+ 	default 0xfd012000 if ARCH_MV78XX0
++	default 0xfd883000 if DEBUG_ALPINE_UART0
+ 	default 0xfde12000 if ARCH_DOVE
+ 	default 0xfe012000 if ARCH_ORION5X
+ 	default 0xf31004c0 if DEBUG_MESON_UARTAO
+@@ -1542,7 +1552,7 @@ config DEBUG_UART_8250_WORD
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	depends on DEBUG_UART_8250_SHIFT >= 2
+ 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
+-		ARCH_KEYSTONE || \
++		ARCH_KEYSTONE || DEBUG_ALPINE_UART0 || \
+ 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
+ 		DEBUG_DAVINCI_DA8XX_UART2 || \
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
 -- 
 1.9.1
