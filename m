@@ -1,37 +1,55 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Thu, 12 Mar 2015 20:23:18 +0800
-Subject: [PATCH v2 14/17] ata: ahci_tegra: remove power sequence from
- driver
-In-Reply-To: <20150312121912.GJ25944@htj.duckdns.org>
-References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
- <1426162518-7405-15-git-send-email-vinceh@nvidia.com>
- <20150312121912.GJ25944@htj.duckdns.org>
-Message-ID: <55018536.2050904@nvidia.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 12 Mar 2015 20:23:26 +0800
+Subject: [PATCH v6 08/30] PCI: Introduce pci_host_assign_domain_nr() to
+ assign domain
+In-Reply-To: <20150312013918.GC10949@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-9-git-send-email-wangyijing@huawei.com>
+ <20150312013918.GC10949@google.com>
+Message-ID: <5501853E.7050009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'd Hans.
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 8b3d245..2b1b998 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1327,11 +1327,15 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+>>  	return bus->domain_nr;
+>>  }
+>>  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+>> +void pci_host_assign_domain_nr(struct pci_host_bridge *host);
+> 
+> I do not think this needs to be in include/linux/pci.h.  It's called only
+> from drivers/pci/host-bridge.c, so at most, it needs to be in
+> drivers/pci/pci.h.
+> 
+> Better still would be if the definition could be moved from
+> drivers/pci/pci.c to drivers/pci/host-bridge.c so we wouldn't need anything
+> in a header file at all.
 
-Thanks,
-Vince
+This is a good idea, thanks.
 
-On 03/12/2015 08:19 PM, Tejun Heo wrote:
-> On Thu, Mar 12, 2015 at 08:15:15PM +0800, Vince Hsu wrote:
->> We have the generic PM domain support for Tegra SoCs now. So remove the
->> duplicated sequence here.
+> 
+>>  #else
+>>  static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+>>  					struct device *parent)
+>>  {
+>>  }
+>> +static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
+>> +{
+>> +}
+>>  #endif
+>>  
+>>  /* some architectures require additional setup to direct VGA traffic */
+>> -- 
+>> 1.7.1
 >>
->> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-> Can you please repost this patch w/ Hans de Goede
-> <hdegoede@redhat.com> cc'd?  Just reposting the patch as a reply to
-> itself w/ the cc added should do.
->
-> Thanks.
->
+> 
+> .
+> 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0014-ata-ahci_tegra-remove-power-sequence-from-driver.patch
-Type: text/x-patch
-Size: 1619 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150312/c34387fc/attachment.bin>
+
+-- 
+Thanks!
+Yijing
