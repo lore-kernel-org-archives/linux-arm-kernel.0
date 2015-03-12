@@ -1,41 +1,73 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 12 Mar 2015 08:33:40 -0400
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <5500502A.5060905@list.ru>
-References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru> <20150310173807.GU8656@n2100.arm.linux.org.uk>
- <55003569.1010200@list.ru> <20150311124730.GZ8656@n2100.arm.linux.org.uk>
- <5500502A.5060905@list.ru>
-Message-ID: <550187A4.8010704@hurleysoftware.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 12 Mar 2015 13:34:08 +0100
+Subject: [RFC PATCH v15 04/11] ARM: cpuidle: Register cpuidle_ops for
+ QCOM cpus
+In-Reply-To: <5500866F.6080704@codeaurora.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
+ <5500866F.6080704@codeaurora.org>
+Message-ID: <550187C0.4020006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/2015 10:24 AM, Stas Sergeev wrote:
-> However, while testing, I've suddenly got another crash happened
-> a bit earlier than the previous one used to happen: (OOM? How??)
-> ---
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 4.0.0-rc2-00137-gb672c98-dirty
-> (root at host-010-117) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) )
-> #2 SMP 5
-> [    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7),
-> cr=10c5387d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
-> cache
-> [    0.000000] Machine model: Marvell Armada XP Development Board
-> DB-MV784MP-GP
-> [    0.000000] Ignoring memory block 0x100000000 - 0x200000000
+On 03/11/2015 07:16 PM, Stephen Boyd wrote:
+> On 03/09/15 08:16, Lina Iyer wrote:
+>> Register cpuidle ops for Krait Processor Sub-System.
+>> Supports v1 and v2 versions of KPSS.
+>>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>   arch/arm/include/asm/cpuidle_ops.h | 5 +++++
+>>   1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/cpuidle_ops.h b/arch/arm/include/asm/cpuidle_ops.h
+>> index be0a612..40cb262 100644
+>> --- a/arch/arm/include/asm/cpuidle_ops.h
+>> +++ b/arch/arm/include/asm/cpuidle_ops.h
+>> @@ -1,3 +1,8 @@
+>>   /*
+>>    * List of cpuidle operations
+>>    */
+>> +
+>> +#if IS_ENABLED(CONFIG_QCOM_PM)
+>
+> Why not #ifdef CONFIG_QCOM_PM? I thought IS_ENABLED was for C code where
+> you want to put it in an if () statement.
 
-Once you patch your bootloader, you'll want to configure your kernel
-for CONFIG_ARM_LPAE=y to enable the high 4GB of memory you have, as
-it's being ignored in this config right now (as shown above and in
-the oom message below).
+This is right. But the IS_ENABLED is also valid.
 
-> [    7.055570] Mem-info:
-[...]
-> [    7.314368] 983040 pages of RAM
+It seems the current trend is to replace #ifdef with #if IS_ENABLED. It 
+is supposed to prevent to create or'ed conditional with the module support.
 
-Regards,
-Peter Hurley
+eg:
+
+#if defined(CONFIG_FOO) || defined(CONFIG_FOO_MODULE)
+
+is replaced by:
+
+#if IS_ENABLED(CONFIG_FOO)
+
+Lina: By the way, it would be preferable to use the 
+CONFIG_ARM_QCOM_CPUIDLE where IS_ENABLED makes more sense even the 
+drivers are not modules (who knows if they are converted as module again 
+hence #ifdef will be invalid).
+
+
+
+>> +CPUIDLE_OPS(qcom_kpss_v1)
+>> +CPUIDLE_OPS(qcom_kpss_v2)
+>> +#endif
+>
+>
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
