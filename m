@@ -1,89 +1,51 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 12 Mar 2015 17:17:58 +0100
-Subject: [PATCH 1/2] of: base: add function to get highest id of an alias stem
+Date: Thu, 12 Mar 2015 17:17:59 +0100
+Subject: [PATCH 2/2] i2c: busses with dynamic ids should start after fixed ids
+ for DT
 In-Reply-To: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
 References: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1426177093-26820-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <1426177093-26820-3-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2C supports adding adapters using either a dynamic or fixed id. The
-latter is provided by aliases in the DT case. To prevent id collisions
-of those two types, install this function which gives us the highest
-fixed id, so we can then let the dynamically created ones come after
-this highest number.
+Make sure dynamic ids do not interfere with fixed ones and let them
+start after the highest fixed id. This patch might cause different
+bus-numbers for dynamic ids, however it fixes a bug. Assume:
 
+- fixed id0 defers probe
+- fixed id1 succeeds and registers a muxed bus with dynamic id
+- muxed bus gets id0
+- fixed id0 wants to probe again, but its fixed id is gone now
+- fixed id0 probe fails
+
+With this patch, the fixed ids are always reserved in the DT case.
+For legacy board init, we already have a mechanism like this in
+i2c_register_board_info().
+
+Reported-by: Bob Feretich <bob.feretich@rafresearch.com>
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
+ drivers/i2c/i2c-core.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Because this function is so similar to of_alias_get_id(), I thought of merging
-them into __of_alias_get_id(np, stem, bool get_highest) and have two call
-wrappers but then decided the decreased readability is not worth the hazzle.
-
- drivers/of/base.c  | 26 ++++++++++++++++++++++++++
- include/linux/of.h |  6 ++++++
- 2 files changed, 32 insertions(+)
-
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 0a8aeb8523fe7d..63cba04aacf686 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1958,6 +1958,32 @@ int of_alias_get_id(struct device_node *np, const char *stem)
- }
- EXPORT_SYMBOL_GPL(of_alias_get_id);
+diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+index 210cf4874cb7ea..4dda9a529f4464 100644
+--- a/drivers/i2c/i2c-core.c
++++ b/drivers/i2c/i2c-core.c
+@@ -1878,6 +1878,14 @@ static int __init i2c_init(void)
+ {
+ 	int retval;
  
-+/**
-+ * of_alias_get_highest_id - Get highest alias id for the given stem
-+ * @stem:	Alias stem to be examined
-+ *
-+ * The function travels the lookup table to get the highest alias id for the
-+ * given alias stem.  It returns the alias id if found.
-+ */
-+int of_alias_get_highest_id(const char *stem)
-+{
-+	struct alias_prop *app;
-+	int id = -ENODEV;
++	retval = of_alias_get_highest_id("i2c");
 +
-+	mutex_lock(&of_mutex);
-+	list_for_each_entry(app, &aliases_lookup, link) {
-+		if (strcmp(app->stem, stem) != 0)
-+			continue;
-+
-+		if (app->id > id)
-+			id = app->id;
++	down_write(&__i2c_board_lock);
++	if (retval >= __i2c_first_dynamic_bus_num) {
++		__i2c_first_dynamic_bus_num = retval + 1;
 +	}
-+	mutex_unlock(&of_mutex);
++	up_write(&__i2c_board_lock);
 +
-+	return id;
-+}
-+EXPORT_SYMBOL_GPL(of_alias_get_highest_id);
-+
- const __be32 *of_prop_next_u32(struct property *prop, const __be32 *cur,
- 			       u32 *pu)
- {
-diff --git a/include/linux/of.h b/include/linux/of.h
-index dfde07e77a632b..9bfcc18ceab3bf 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -332,6 +332,7 @@ extern int of_count_phandle_with_args(const struct device_node *np,
- 
- extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
- extern int of_alias_get_id(struct device_node *np, const char *stem);
-+extern int of_alias_get_highest_id(const char *stem);
- 
- extern int of_machine_is_compatible(const char *compat);
- 
-@@ -594,6 +595,11 @@ static inline int of_alias_get_id(struct device_node *np, const char *stem)
- 	return -ENOSYS;
- }
- 
-+static inline int of_alias_get_highest_id(const char *stem)
-+{
-+	return -ENOSYS;
-+}
-+
- static inline int of_machine_is_compatible(const char *compat)
- {
- 	return 0;
+ 	retval = bus_register(&i2c_bus_type);
+ 	if (retval)
+ 		return retval;
 -- 
 2.1.4
