@@ -1,92 +1,64 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 13:07:28 +0100
-Subject: [PATCH v5 04/10] watchdog: at91rm9200: implement restart handler
+Date: Thu, 12 Mar 2015 13:07:25 +0100
+Subject: [PATCH v5 01/10] ARM: at91/dt: declare atmel,
+ at91rm9200-st as a syscon
 In-Reply-To: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426162054-9987-5-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426162054-9987-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Restarting the at91rm9200 is done through programming the watchdog and waiting
-for it to reset.
+The system timer register range is used to handle three different
+functionalities: Periodic Interval Timer, Real Time Timer and watchdog. Declare
+it as a syscon to be able to get a regmap.
+Also declare it as a simple-mfd and its watchdog subnode.
+
+Finally, document the watchdog compatible string.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/watchdog/at91rm9200_wdt.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
 
-diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
-index e6fa87d85de3..41cecb55766c 100644
---- a/drivers/watchdog/at91rm9200_wdt.c
-+++ b/drivers/watchdog/at91rm9200_wdt.c
-@@ -12,6 +12,7 @@
- #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+fixup! ARM: at91/dt: declare atmel,at91rm9200-st as a syscon
+---
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 4 +++-
+ arch/arm/boot/dts/at91rm9200.dtsi                    | 6 +++++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index ad319f84f560..2e99b5b57350 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -46,10 +46,12 @@ PIT Timer required properties:
+   shared across all System Controller members.
  
- #include <linux/bitops.h>
-+#include <linux/delay.h>
- #include <linux/errno.h>
- #include <linux/fs.h>
- #include <linux/init.h>
-@@ -23,6 +24,7 @@
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/platform_device.h>
-+#include <linux/reboot.h>
- #include <linux/regmap.h>
- #include <linux/types.h>
- #include <linux/watchdog.h>
-@@ -53,6 +55,27 @@ static unsigned long at91wdt_busy;
+ System Timer (ST) required properties:
+-- compatible: Should be "atmel,at91rm9200-st"
++- compatible: Should be "atmel,at91rm9200-st", "syscon", "simple-mfd"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt for the ST which is the IRQ line
+   shared across all System Controller members.
++Its subnodes can be:
++- watchdog: compatible should be "atmel,at91rm9200-wdt"
  
- /* ......................................................................... */
+ TC/TCLIB Timer required properties:
+ - compatible: Should be "atmel,<chip>-tcb".
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 21c2b504f977..b777d21b8a7c 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -356,9 +356,13 @@
+ 			};
  
-+static int at91rm9200_restart(struct notifier_block *this,
-+					unsigned long mode, void *cmd)
-+{
-+	/*
-+	 * Perform a hardware reset with the use of the Watchdog timer.
-+	 */
-+	regmap_write(regmap_st, AT91_ST_WDMR,
-+		     AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
-+	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
+ 			st: timer at fffffd00 {
+-				compatible = "atmel,at91rm9200-st";
++				compatible = "atmel,at91rm9200-st", "syscon", "simple-mfd";
+ 				reg = <0xfffffd00 0x100>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
 +
-+	mdelay(2000);
-+
-+	pr_emerg("Unable to restart system\n");
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block at91rm9200_restart_nb = {
-+	.notifier_call = at91rm9200_restart,
-+	.priority = 192,
-+};
-+
- /*
-  * Disable the watchdog.
-  */
-@@ -228,6 +251,10 @@ static int at91wdt_probe(struct platform_device *pdev)
- 	if (res)
- 		return res;
++				watchdog {
++					compatible = "atmel,at91rm9200-wdt";
++				};
+ 			};
  
-+	res = register_restart_handler(&at91rm9200_restart_nb);
-+	if (res)
-+		dev_warn(dev, "failed to register restart handler\n");
-+
- 	pr_info("AT91 Watchdog Timer enabled (%d seconds%s)\n",
- 		wdt_time, nowayout ? ", nowayout" : "");
- 	return 0;
-@@ -235,8 +262,13 @@ static int at91wdt_probe(struct platform_device *pdev)
- 
- static int at91wdt_remove(struct platform_device *pdev)
- {
-+	struct device *dev = &pdev->dev;
- 	int res;
- 
-+	res = unregister_restart_handler(&at91rm9200_restart_nb);
-+	if (res)
-+		dev_warn(dev, "failed to unregister restart handler\n");
-+
- 	res = misc_deregister(&at91wdt_miscdev);
- 	if (!res)
- 		at91wdt_miscdev.parent = NULL;
+ 			rtc: rtc at fffffe00 {
 -- 
 2.1.0
