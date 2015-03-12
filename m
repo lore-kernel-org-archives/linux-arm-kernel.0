@@ -1,101 +1,48 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 00:36:11 +0100
-Subject: [PATCH v3 03/12] irqchip: vf610-mscm: support NVIC parent
+Date: Fri, 13 Mar 2015 00:36:14 +0100
+Subject: [PATCH v3 06/12] ARM: unify MMU/!MMU addruart calls
 In-Reply-To: <1426203380-7155-1-git-send-email-stefan@agner.ch>
 References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426203380-7155-4-git-send-email-stefan@agner.ch>
+Message-ID: <1426203380-7155-7-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the NVIC interrupt controller as node parent of the MSCM
-interrupt router. On the dual-core variants of Vybird (VF6xx), the
-NVIC interrupt controller is used by the Cortex-M4. To support
-running Linux on this core too, MSCM needs NVIC parent support too.
+Remove the needless differences between MMU/!MMU addruart calls.
+This allows to use the same addruart macro on SoC level. Useful
+for SoC consisting of multiple CPUs with and without MMU such as
+Freescale Vybrid.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/irqchip/irq-vf610-mscm-ir.c | 32 ++++++++++++++++++++++++++------
- 1 file changed, 26 insertions(+), 6 deletions(-)
+ arch/arm/include/debug/efm32.S | 2 +-
+ arch/arm/kernel/debug.S        | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-vf610-mscm-ir.c b/drivers/irqchip/irq-vf610-mscm-ir.c
-index 9521057..bb0e1a3 100644
---- a/drivers/irqchip/irq-vf610-mscm-ir.c
-+++ b/drivers/irqchip/irq-vf610-mscm-ir.c
-@@ -47,6 +47,7 @@ struct vf610_mscm_ir_chip_data {
- 	void __iomem *mscm_ir_base;
- 	u16 cpu_mask;
- 	u16 saved_irsprc[MSCM_IRSPRC_NUM];
-+	bool is_nvic;
- };
+diff --git a/arch/arm/include/debug/efm32.S b/arch/arm/include/debug/efm32.S
+index 2265a19..660fa1e 100644
+--- a/arch/arm/include/debug/efm32.S
++++ b/arch/arm/include/debug/efm32.S
+@@ -16,7 +16,7 @@
  
- static struct vf610_mscm_ir_chip_data *mscm_ir_data;
-@@ -91,6 +92,7 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
- {
- 	irq_hw_number_t hwirq = data->hwirq;
- 	struct vf610_mscm_ir_chip_data *chip_data = data->chip_data;
-+	struct irq_data *parent = data->parent_data;
- 	u16 irsprc;
+ #define	UARTn_TXDATA		0x0034
  
- 	irsprc = readw_relaxed(chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
-@@ -101,17 +103,25 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
- 	writew_relaxed(chip_data->cpu_mask,
- 		       chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
+-		.macro	addruart, rx, tmp
++		.macro	addruart, rx, tmp, tmp2
+ 		ldr	\rx, =(CONFIG_DEBUG_UART_PHYS)
  
--	irq_chip_unmask_parent(data);
-+	if (parent->chip->irq_enable)
-+		parent->chip->irq_enable(parent);
-+	else
-+		parent->chip->irq_unmask(parent);
-+
- }
+ 		/*
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 78c91b5..ea9646c 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -35,7 +35,7 @@
  
- static void vf610_mscm_ir_disable(struct irq_data *data)
- {
- 	irq_hw_number_t hwirq = data->hwirq;
- 	struct vf610_mscm_ir_chip_data *chip_data = data->chip_data;
-+	struct irq_data *parent = data->parent_data;
+ #else /* !CONFIG_MMU */
+ 		.macro	addruart_current, rx, tmp1, tmp2
+-		addruart	\rx, \tmp1
++		addruart	\rx, \tmp1, \tmp2
+ 		.endm
  
- 	writew_relaxed(0x0, chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
- 
--	irq_chip_mask_parent(data);
-+	if (parent->chip->irq_enable)
-+		parent->chip->irq_disable(parent);
-+	else
-+		parent->chip->irq_mask(parent);
- }
- 
- static struct irq_chip vf610_mscm_ir_irq_chip = {
-@@ -143,10 +153,17 @@ static int vf610_mscm_ir_domain_alloc(struct irq_domain *domain, unsigned int vi
- 					      domain->host_data);
- 
- 	gic_data.np = domain->parent->of_node;
--	gic_data.args_count = 3;
--	gic_data.args[0] = GIC_SPI;
--	gic_data.args[1] = irq_data->args[0];
--	gic_data.args[2] = irq_data->args[1];
-+
-+	if (mscm_ir_data->is_nvic) {
-+		gic_data.args_count = 1;
-+		gic_data.args[0] = irq_data->args[0];
-+	} else {
-+		gic_data.args_count = 3;
-+		gic_data.args[0] = GIC_SPI;
-+		gic_data.args[1] = irq_data->args[0];
-+		gic_data.args[2] = irq_data->args[1];
-+	}
-+
- 	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
- }
- 
-@@ -199,6 +216,9 @@ static int __init vf610_mscm_ir_of_init(struct device_node *node,
- 		goto out_unmap;
- 	}
- 
-+	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
-+		mscm_ir_data->is_nvic = true;
-+
- 	cpu_pm_register_notifier(&mscm_ir_notifier_block);
- 
- 	return 0;
+ #endif /* CONFIG_MMU */
 -- 
 2.3.1
