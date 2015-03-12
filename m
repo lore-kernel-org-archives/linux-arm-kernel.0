@@ -1,269 +1,351 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Mar 2015 09:51:51 +0000
-Subject: [PATCH v10 13/21] ACPI / processor: Introduce phys_cpuid_t for
- CPU hardware ID
-In-Reply-To: <1426077587-1561-14-git-send-email-hanjun.guo@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-14-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150312095151.GB18414@red-moon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 12 Mar 2015 17:54:39 +0800
+Subject: [PATCH resend v4] phy: Add driver to support individual USB PHYs on
+ sun9i
+Message-ID: <1426154079-423-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 12:39:39PM +0000, Hanjun Guo wrote:
-> CPU hardware ID (phys_id) is defined as u32 in structure acpi_processor,
-> but phys_id is used as int in acpi processor driver, so it will lead to
-> some inconsistence for the drivers.
-> 
-> Furthermore, to cater for ACPI arch ports that implement 64 bits CPU
-> ids a generic CPU physical id type is required.
-> 
-> So introduce typedef u32 phys_cpuid_t for x86 and ia64, and introduce
-> a macro CPU_PHYS_ID_INVALID as (u32)(-1), use phys_cpuid_t when phys_id
-> defined in acpi processor driver, and replace CPU_PHYS_ID_INVALID as -1
-> for phys_id, this will solve the inconsistence in acpi processor driver,
-> and will prepare for the ACPI on ARM64 for the 64 bit CPU hardware ID
-> in the following patch.
+Unlike previous Allwinner SoCs, there is no central PHY control block
+on the A80. Also, OTG support is completely split off into a different
+controller.
 
-Nit: Commit log above is stale (since you moved the phys_cpuid_t to
-common declaration for all archs that do not define PHYS_CPUID_INVALID
-and the macro name itself changed) so you should rewrite it before
-asking to merge it. Furthermore you should not describe how you implemented
-the change, you should describe why.
+This adds a new driver to support the regular USB PHYs.
 
-Other than that:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Resending this patch in hopes of getting it in 4.1.
+The rest of the series has been merged.
 
-> CC: Rafael J Wysocki <rjw@rjwysocki.net>
-> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> [hj: reworked cpu physid map return codes]
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/ia64/kernel/acpi.c       |  2 +-
->  arch/x86/kernel/acpi/boot.c   |  2 +-
->  drivers/acpi/acpi_processor.c |  7 ++++---
->  drivers/acpi/processor_core.c | 30 +++++++++++++++---------------
->  include/acpi/processor.h      |  6 +++---
->  include/linux/acpi.h          |  7 ++++++-
->  6 files changed, 30 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/ia64/kernel/acpi.c b/arch/ia64/kernel/acpi.c
-> index 2c44989..067ef44 100644
-> --- a/arch/ia64/kernel/acpi.c
-> +++ b/arch/ia64/kernel/acpi.c
-> @@ -887,7 +887,7 @@ static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
->  }
->  
->  /* wrapper to silence section mismatch warning */
-> -int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
-> +int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
->  {
->  	return _acpi_map_lsapic(handle, physid, pcpu);
->  }
-> diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-> index 3d525c6..e4f8582 100644
-> --- a/arch/x86/kernel/acpi/boot.c
-> +++ b/arch/x86/kernel/acpi/boot.c
-> @@ -757,7 +757,7 @@ static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
->  }
->  
->  /* wrapper to silence section mismatch warning */
-> -int __ref acpi_map_cpu(acpi_handle handle, int physid, int *pcpu)
-> +int __ref acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu)
->  {
->  	return _acpi_map_lsapic(handle, physid, pcpu);
->  }
-> diff --git a/drivers/acpi/acpi_processor.c b/drivers/acpi/acpi_processor.c
-> index 1020b1b..58f335c 100644
-> --- a/drivers/acpi/acpi_processor.c
-> +++ b/drivers/acpi/acpi_processor.c
-> @@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
->  	acpi_status status;
->  	int ret;
->  
-> -	if (pr->phys_id == -1)
-> +	if (pr->phys_id == PHYS_CPUID_INVALID)
->  		return -ENODEV;
->  
->  	status = acpi_evaluate_integer(pr->handle, "_STA", NULL, &sta);
-> @@ -215,7 +215,8 @@ static int acpi_processor_get_info(struct acpi_device *device)
->  	union acpi_object object = { 0 };
->  	struct acpi_buffer buffer = { sizeof(union acpi_object), &object };
->  	struct acpi_processor *pr = acpi_driver_data(device);
-> -	int phys_id, cpu_index, device_declaration = 0;
-> +	phys_cpuid_t phys_id;
-> +	int cpu_index, device_declaration = 0;
->  	acpi_status status = AE_OK;
->  	static int cpu0_initialized;
->  	unsigned long long value;
-> @@ -263,7 +264,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
->  	}
->  
->  	phys_id = acpi_get_phys_id(pr->handle, device_declaration, pr->acpi_id);
-> -	if (phys_id < 0)
-> +	if (phys_id == PHYS_CPUID_INVALID)
->  		acpi_handle_debug(pr->handle, "failed to get CPU physical ID.\n");
->  	pr->phys_id = phys_id;
->  
-> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-> index 7962651..51cc299 100644
-> --- a/drivers/acpi/processor_core.c
-> +++ b/drivers/acpi/processor_core.c
-> @@ -32,7 +32,7 @@ static struct acpi_table_madt *get_madt_table(void)
->  }
->  
->  static int map_lapic_id(struct acpi_subtable_header *entry,
-> -		 u32 acpi_id, int *apic_id)
-> +		 u32 acpi_id, phys_cpuid_t *apic_id)
->  {
->  	struct acpi_madt_local_apic *lapic =
->  		container_of(entry, struct acpi_madt_local_apic, header);
-> @@ -48,7 +48,7 @@ static int map_lapic_id(struct acpi_subtable_header *entry,
->  }
->  
->  static int map_x2apic_id(struct acpi_subtable_header *entry,
-> -			 int device_declaration, u32 acpi_id, int *apic_id)
-> +		int device_declaration, u32 acpi_id, phys_cpuid_t *apic_id)
->  {
->  	struct acpi_madt_local_x2apic *apic =
->  		container_of(entry, struct acpi_madt_local_x2apic, header);
-> @@ -65,7 +65,7 @@ static int map_x2apic_id(struct acpi_subtable_header *entry,
->  }
->  
->  static int map_lsapic_id(struct acpi_subtable_header *entry,
-> -		int device_declaration, u32 acpi_id, int *apic_id)
-> +		int device_declaration, u32 acpi_id, phys_cpuid_t *apic_id)
->  {
->  	struct acpi_madt_local_sapic *lsapic =
->  		container_of(entry, struct acpi_madt_local_sapic, header);
-> @@ -83,10 +83,10 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
->  	return 0;
->  }
->  
-> -static int map_madt_entry(int type, u32 acpi_id)
-> +static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
->  {
->  	unsigned long madt_end, entry;
-> -	int phys_id = -1;	/* CPU hardware ID */
-> +	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
->  	struct acpi_table_madt *madt;
->  
->  	madt = get_madt_table();
-> @@ -117,12 +117,12 @@ static int map_madt_entry(int type, u32 acpi_id)
->  	return phys_id;
->  }
->  
-> -static int map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
-> +static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
->  {
->  	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
->  	union acpi_object *obj;
->  	struct acpi_subtable_header *header;
-> -	int phys_id = -1;
-> +	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;
->  
->  	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
->  		goto exit;
-> @@ -149,27 +149,27 @@ exit:
->  	return phys_id;
->  }
->  
-> -int acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
-> +phys_cpuid_t acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
->  {
-> -	int phys_id;
-> +	phys_cpuid_t phys_id;
->  
->  	phys_id = map_mat_entry(handle, type, acpi_id);
-> -	if (phys_id == -1)
-> +	if (phys_id == PHYS_CPUID_INVALID)
->  		phys_id = map_madt_entry(type, acpi_id);
->  
->  	return phys_id;
->  }
->  
-> -int acpi_map_cpuid(int phys_id, u32 acpi_id)
-> +int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id)
->  {
->  #ifdef CONFIG_SMP
->  	int i;
->  #endif
->  
-> -	if (phys_id == -1) {
-> +	if (phys_id == PHYS_CPUID_INVALID) {
->  		/*
->  		 * On UP processor, there is no _MAT or MADT table.
-> -		 * So above phys_id is always set to -1.
-> +		 * So above phys_id is always set to PHYS_CPUID_INVALID.
->  		 *
->  		 * BIOS may define multiple CPU handles even for UP processor.
->  		 * For example,
-> @@ -190,7 +190,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
->  		if (nr_cpu_ids <= 1 && acpi_id == 0)
->  			return acpi_id;
->  		else
-> -			return phys_id;
-> +			return -1;
->  	}
->  
->  #ifdef CONFIG_SMP
-> @@ -208,7 +208,7 @@ int acpi_map_cpuid(int phys_id, u32 acpi_id)
->  
->  int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
->  {
-> -	int phys_id;
-> +	phys_cpuid_t phys_id;
->  
->  	phys_id = acpi_get_phys_id(handle, type, acpi_id);
->  
-> diff --git a/include/acpi/processor.h b/include/acpi/processor.h
-> index b95dc32..4188a4d 100644
-> --- a/include/acpi/processor.h
-> +++ b/include/acpi/processor.h
-> @@ -196,7 +196,7 @@ struct acpi_processor_flags {
->  struct acpi_processor {
->  	acpi_handle handle;
->  	u32 acpi_id;
-> -	u32 phys_id;	/* CPU hardware ID such as APIC ID for x86 */
-> +	phys_cpuid_t phys_id;	/* CPU hardware ID such as APIC ID for x86 */
->  	u32 id;		/* CPU logical ID allocated by OS */
->  	u32 pblk;
->  	int performance_platform_limit;
-> @@ -310,8 +310,8 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
->  #endif				/* CONFIG_CPU_FREQ */
->  
->  /* in processor_core.c */
-> -int acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
-> -int acpi_map_cpuid(int phys_id, u32 acpi_id);
-> +phys_cpuid_t acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
-> +int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id);
->  int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
->  
->  /* in processor_pdc.c */
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 24c7aa8..6ec33c5 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -146,9 +146,14 @@ void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
->  int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
->  void acpi_numa_arch_fixup(void);
->  
-> +#ifndef PHYS_CPUID_INVALID
-> +typedef u32 phys_cpuid_t;
-> +#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
-> +#endif
-> +
->  #ifdef CONFIG_ACPI_HOTPLUG_CPU
->  /* Arch dependent functions for cpu hotplug support */
-> -int acpi_map_cpu(acpi_handle handle, int physid, int *pcpu);
-> +int acpi_map_cpu(acpi_handle handle, phys_cpuid_t physid, int *pcpu);
->  int acpi_unmap_cpu(int cpu);
->  #endif /* CONFIG_ACPI_HOTPLUG_CPU */
->  
-> -- 
-> 1.9.1
-> 
-> 
+---
+ .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  34 +++
+ drivers/phy/Kconfig                                |  12 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-sun9i-usb.c                        | 238 +++++++++++++++++++++
+ 4 files changed, 285 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+ create mode 100644 drivers/phy/phy-sun9i-usb.c
+
+diff --git a/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+new file mode 100644
+index 000000000000..af40dd2fe0eb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
+@@ -0,0 +1,34 @@
++Allwinner sun9i USB PHY
++-----------------------
++
++Required properties:
++- compatible : should be one of
++  * allwinner,sun9i-a80-usb-phy
++- reg : a list of offset + length pairs
++- #phy-cells : from the generic phy bindings, must be 0
++- phy_type : "hsic" for HSIC usage;
++	     other values or absence of this property indicates normal USB
++- clocks : phandle + clock specifier for the phy clocks
++- clock-names : depending on the "phy_type" property,
++  * "phy" for normal USB
++  * "hsic_480M", "hsic_12M" for HSIC
++- resets : a list of phandle + reset specifier pairs
++- reset-names : depending on the "phy_type" property,
++  * "phy" for normal USB
++  * "hsic" for HSIC
++
++It is recommended to list all clocks and resets available.
++The driver will only use those matching the phy_type.
++
++Example:
++	usbphy1: phy at 00a01800 {
++		compatible = "allwinner,sun9i-a80-usb-phy";
++		reg = <0x00a01800 0x4>;
++		clocks = <&usb_phy_clk 2>, <&usb_phy_clk 10>,
++		       <&usb_phy_clk 3>;
++		clock-names = "hsic_480M", "hsic_12M", "phy";
++		resets = <&usb_phy_clk 18>, <&usb_phy_clk 19>;
++		reset-names = "hsic", "phy";
++		status = "disabled";
++		#phy-cells = <0>;
++	};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 2962de205ba7..3e6b17682881 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -174,6 +174,18 @@ config PHY_SUN4I_USB
+ 	  This driver controls the entire USB PHY block, both the USB OTG
+ 	  parts, as well as the 2 regular USB 2 host PHYs.
+ 
++config PHY_SUN9I_USB
++	tristate "Allwinner sun9i SoC USB PHY driver"
++	depends on ARCH_SUNXI && HAS_IOMEM && OF
++	depends on RESET_CONTROLLER
++	select USB_PHY
++	select GENERIC_PHY
++	help
++	  Enable this to support the transceiver that is part of Allwinner
++	  sun9i SoCs.
++
++	  This driver controls each individual USB 2 host PHY.
++
+ config PHY_SAMSUNG_USB2
+ 	tristate "Samsung USB 2.0 PHY driver"
+ 	depends on HAS_IOMEM
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index f080e1bb2a74..ab8f9af540a2 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+ obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
+ obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
+ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
++obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+ obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
+ phy-exynos-usb2-y			+= phy-samsung-usb2.o
+ phy-exynos-usb2-$(CONFIG_PHY_EXYNOS4210_USB2)	+= phy-exynos4210-usb2.o
+diff --git a/drivers/phy/phy-sun9i-usb.c b/drivers/phy/phy-sun9i-usb.c
+new file mode 100644
+index 000000000000..0fddd56df38c
+--- /dev/null
++++ b/drivers/phy/phy-sun9i-usb.c
+@@ -0,0 +1,238 @@
++/*
++ * Allwinner sun9i USB phy driver
++ *
++ * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
++ *
++ * Based on phy-sun4i-usb.c from
++ * Hans de Goede <hdegoede@redhat.com>
++ *
++ * and code from
++ * Allwinner Technology Co., Ltd. <www.allwinnertech.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/mutex.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/phy/phy.h>
++#include <linux/usb/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset.h>
++
++#define SUNXI_AHB_INCR16_BURST_EN	BIT(11)
++#define SUNXI_AHB_INCR8_BURST_EN	BIT(10)
++#define SUNXI_AHB_INCR4_BURST_EN	BIT(9)
++#define SUNXI_AHB_INCRX_ALIGN_EN	BIT(8)
++#define SUNXI_ULPI_BYPASS_EN		BIT(0)
++
++/* usb1 HSIC specific bits */
++#define SUNXI_EHCI_HS_FORCE		BIT(20)
++#define SUNXI_HSIC_CONNECT_DET		BIT(17)
++#define SUNXI_HSIC_CONNECT_INT		BIT(16)
++#define SUNXI_HSIC			BIT(1)
++
++struct sun9i_usb_phy {
++	struct phy *phy;
++	void __iomem *pmu;
++	struct regulator *vbus;
++	struct reset_control *reset;
++	struct clk *clk;
++	struct clk *hsic_clk;
++	enum usb_phy_interface type;
++};
++
++static void sun9i_usb_phy_passby(struct sun9i_usb_phy *phy, int enable)
++{
++	u32 bits, reg_value;
++
++	bits = SUNXI_AHB_INCR16_BURST_EN | SUNXI_AHB_INCR8_BURST_EN |
++		SUNXI_AHB_INCR4_BURST_EN | SUNXI_AHB_INCRX_ALIGN_EN |
++		SUNXI_ULPI_BYPASS_EN;
++
++	if (phy->type == USBPHY_INTERFACE_MODE_HSIC)
++		bits |= SUNXI_HSIC | SUNXI_EHCI_HS_FORCE |
++			SUNXI_HSIC_CONNECT_DET | SUNXI_HSIC_CONNECT_INT;
++
++	reg_value = readl(phy->pmu);
++
++	if (enable)
++		reg_value |= bits;
++	else
++		reg_value &= ~bits;
++
++	writel(reg_value, phy->pmu);
++}
++
++static int sun9i_usb_phy_init(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret;
++
++	ret = clk_prepare_enable(phy->clk);
++	if (ret)
++		goto err_clk;
++
++	ret = clk_prepare_enable(phy->hsic_clk);
++	if (ret)
++		goto err_hsic_clk;
++
++	ret = reset_control_deassert(phy->reset);
++	if (ret)
++		goto err_reset;
++
++	sun9i_usb_phy_passby(phy, 1);
++	return 0;
++
++err_reset:
++	clk_disable_unprepare(phy->hsic_clk);
++
++err_hsic_clk:
++	clk_disable_unprepare(phy->clk);
++
++err_clk:
++	return ret;
++}
++
++static int sun9i_usb_phy_exit(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++
++	sun9i_usb_phy_passby(phy, 0);
++	reset_control_assert(phy->reset);
++	clk_disable_unprepare(phy->hsic_clk);
++	clk_disable_unprepare(phy->clk);
++
++	return 0;
++}
++
++static int sun9i_usb_phy_power_on(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++	int ret = 0;
++
++	if (phy->vbus)
++		ret = regulator_enable(phy->vbus);
++
++	return ret;
++}
++
++static int sun9i_usb_phy_power_off(struct phy *_phy)
++{
++	struct sun9i_usb_phy *phy = phy_get_drvdata(_phy);
++
++	if (phy->vbus)
++		regulator_disable(phy->vbus);
++
++	return 0;
++}
++
++static struct phy_ops sun9i_usb_phy_ops = {
++	.init		= sun9i_usb_phy_init,
++	.exit		= sun9i_usb_phy_exit,
++	.power_on	= sun9i_usb_phy_power_on,
++	.power_off	= sun9i_usb_phy_power_off,
++	.owner		= THIS_MODULE,
++};
++
++static int sun9i_usb_phy_probe(struct platform_device *pdev)
++{
++	struct sun9i_usb_phy *phy;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct phy_provider *phy_provider;
++	struct resource *res;
++
++	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
++	if (!phy)
++		return -ENOMEM;
++
++	phy->vbus = devm_regulator_get_optional(dev, "vbus");
++	if (IS_ERR(phy->vbus)) {
++		if (PTR_ERR(phy->vbus) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		phy->vbus = NULL;
++	}
++
++	phy->type = of_usb_get_phy_mode(np);
++	if (phy->type == USBPHY_INTERFACE_MODE_HSIC) {
++		phy->clk = devm_clk_get(dev, "hsic_480M");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get hsic_480M clock\n");
++			return PTR_ERR(phy->clk);
++		}
++
++		phy->hsic_clk = devm_clk_get(dev, "hsic_12M");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get hsic_12M clock\n");
++			return PTR_ERR(phy->clk);
++		}
++
++		phy->reset = devm_reset_control_get(dev, "hsic");
++		if (IS_ERR(phy->reset)) {
++			dev_err(dev, "failed to get reset control\n");
++			return PTR_ERR(phy->reset);
++		}
++	} else {
++		phy->clk = devm_clk_get(dev, "phy");
++		if (IS_ERR(phy->clk)) {
++			dev_err(dev, "failed to get phy clock\n");
++			return PTR_ERR(phy->clk);
++		}
++
++		phy->reset = devm_reset_control_get(dev, "phy");
++		if (IS_ERR(phy->reset)) {
++			dev_err(dev, "failed to get reset control\n");
++			return PTR_ERR(phy->reset);
++		}
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	phy->pmu = devm_ioremap_resource(dev, res);
++	if (IS_ERR(phy->pmu))
++		return PTR_ERR(phy->pmu);
++
++	phy->phy = devm_phy_create(dev, NULL, &sun9i_usb_phy_ops);
++	if (IS_ERR(phy->phy)) {
++		dev_err(dev, "failed to create PHY\n");
++		return PTR_ERR(phy->phy);
++	}
++
++	phy_set_drvdata(phy->phy, phy);
++	dev_set_drvdata(dev, phy);
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++
++	return PTR_ERR_OR_ZERO(phy_provider);
++}
++
++static const struct of_device_id sun9i_usb_phy_of_match[] = {
++	{ .compatible = "allwinner,sun9i-a80-usb-phy" },
++	{ },
++};
++MODULE_DEVICE_TABLE(of, sun9i_usb_phy_of_match);
++
++static struct platform_driver sun9i_usb_phy_driver = {
++	.probe	= sun9i_usb_phy_probe,
++	.driver = {
++		.of_match_table	= sun9i_usb_phy_of_match,
++		.name  = "sun9i-usb-phy",
++	}
++};
++module_platform_driver(sun9i_usb_phy_driver);
++
++MODULE_DESCRIPTION("Allwinner sun9i USB phy driver");
++MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
++MODULE_LICENSE("GPL v2");
+-- 
+2.1.4
