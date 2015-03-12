@@ -1,196 +1,137 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 15:54:27 +0100
-Subject: [PATCH v4 5/9] ARM: at91: add soc detection infrastructure
+Date: Thu, 12 Mar 2015 15:54:30 +0100
+Subject: [PATCH v4 8/9] ARM: at91: sama5 use SoC detection infrastructure
 In-Reply-To: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426172071-20743-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426172071-20743-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris BREZILLON <boris.brezillon@free-electrons.com>
+Use the soc detection infrastructure for sama5 initialization.
 
-Add new structures and functions to handle AT91 SoC detection.
-
-[alexandre.belloni at free-electrons.com: reworked DBGU detection]
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
 ---
- arch/arm/Kconfig            |  1 +
- arch/arm/mach-at91/Makefile |  2 +-
- arch/arm/mach-at91/soc.c    | 97 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/soc.h    | 35 ++++++++++++++++
- 4 files changed, 134 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-at91/soc.c
- create mode 100644 arch/arm/mach-at91/soc.h
+ arch/arm/mach-at91/sama5.c | 49 ++++++++++++++++++++++++++++++++--------------
+ arch/arm/mach-at91/soc.h   | 13 ++++++++++++
+ 2 files changed, 47 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index e7ce6612bc42..f6c5b05e8de8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -363,6 +363,7 @@ config ARCH_AT91
- 	select IRQ_DOMAIN
- 	select PINCTRL
- 	select PINCTRL_AT91
-+	select SOC_BUS
- 	select USE_OF
- 	help
- 	  This enables support for systems based on Atmel
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 827fdbcce1c7..44a5c1a92b39 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index 03dcb441f3d2..bb9921e9cf78 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -7,27 +7,41 @@
+  * Licensed under GPLv2 or later.
+  */
  
--obj-y		:= setup.o
-+obj-y		:= setup.o soc.o
+-#include <linux/types.h>
+-#include <linux/init.h>
+-#include <linux/module.h>
+-#include <linux/gpio.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/of.h>
+-#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/phy.h>
+-#include <linux/clk-provider.h>
+-#include <linux/phy.h>
+-
+-#include <mach/hardware.h>
  
- obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+-#include <asm/setup.h>
+-#include <asm/irq.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/irq.h>
++#include <asm/system_misc.h>
++
++#include <mach/hardware.h>
  
-diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-new file mode 100644
-index 000000000000..54343ffa3e53
---- /dev/null
-+++ b/arch/arm/mach-at91/soc.c
-@@ -0,0 +1,97 @@
-+/*
-+ * Copyright (C) 2015 Atmel
-+ *
-+ * Alexandre Belloni <alexandre.belloni at free-electrons.com
-+ * Boris Brezillon <boris.brezillon@free-electrons.com
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#define pr_fmt(fmt)	"AT91: " fmt
-+
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+
+ #include "generic.h"
 +#include "soc.h"
 +
-+#define AT91_DBGU_CIDR			0x40
-+#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
-+#define AT91_DBGU_CIDR_EXT		BIT(31)
-+#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
-+#define AT91_DBGU_EXID			0x44
-+
-+struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	const struct at91_soc *soc;
-+	struct soc_device *soc_dev;
-+	struct device_node *np;
-+	void __iomem *regs;
-+	u32 cidr, exid;
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
-+	if (!np)
-+		np = of_find_compatible_node(NULL, NULL,
-+					     "atmel,at91sam9260-dbgu");
-+
-+	if (!np) {
-+		pr_warn("Could not find DBGU node");
-+		return NULL;
-+	}
-+
-+	regs = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	if (!regs) {
-+		pr_warn("Could not map DBGU iomem range");
-+		return NULL;
-+	}
-+
-+	cidr = readl(regs + AT91_DBGU_CIDR);
-+	exid = readl(regs + AT91_DBGU_EXID);
-+
-+	iounmap(regs);
-+
-+	for (soc = socs; soc->name; soc++) {
-+		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
-+			continue;
-+
-+		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
-+			break;
-+	}
-+
-+	if (!soc->name) {
-+		pr_warn("Could not find matching SoC description\n");
-+		return NULL;
-+	}
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return NULL;
-+
-+	soc_dev_attr->family = soc->family;
-+	soc_dev_attr->soc_id = soc->name;
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
-+					   AT91_DBGU_CIDR_VERSION(cidr));
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev)) {
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr);
-+		pr_warn("Could not register SoC device\n");
-+		return NULL;
-+	}
-+
-+	if (soc->family)
-+		pr_info("Detected SoC family: %s\n", soc->family);
-+	pr_info("Detected SoC: %s, revision %X\n", soc->name,
-+		AT91_DBGU_CIDR_VERSION(cidr));
-+
-+	return soc_dev;
-+}
-diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
-new file mode 100644
-index 000000000000..9678a3b2d282
---- /dev/null
-+++ b/arch/arm/mach-at91/soc.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (C) 2015 Atmel
-+ *
-+ * Boris Brezillon <boris.brezillon@free-electrons.com
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ */
-+
-+#ifndef __AT91_SOC_H
-+#define __AT91_SOC_H
-+
-+#include <linux/sys_soc.h>
-+
-+struct at91_soc {
-+	u32 cidr_match;
-+	u32 exid_match;
-+	const char *name;
-+	const char *family;
++static const struct at91_soc sama5_socs[] = {
++	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D31_EXID_MATCH,
++		 "sama5d31", "sama5d3"),
++	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D33_EXID_MATCH,
++		 "sama5d33", "sama5d3"),
++	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D34_EXID_MATCH,
++		 "sama5d34", "sama5d3"),
++	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D35_EXID_MATCH,
++		 "sama5d35", "sama5d3"),
++	AT91_SOC(SAMA5D3_CIDR_MATCH, SAMA5D36_EXID_MATCH,
++		 "sama5d36", "sama5d3"),
++	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D41_EXID_MATCH,
++		 "sama5d41", "sama5d4"),
++	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D42_EXID_MATCH,
++		 "sama5d41", "sama5d4"),
++	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D43_EXID_MATCH,
++		 "sama5d43", "sama5d4"),
++	AT91_SOC(SAMA5D4_CIDR_MATCH, SAMA5D44_EXID_MATCH,
++		 "sama5d44", "sama5d4"),
++	{ /* sentinel */ },
 +};
+ 
+ static int ksz8081_phy_fixup(struct phy_device *phy)
+ {
+@@ -42,13 +56,20 @@ static int ksz8081_phy_fixup(struct phy_device *phy)
+ 
+ static void __init sama5_dt_device_init(void)
+ {
++	struct soc_device *soc;
++	struct device *soc_dev = NULL;
 +
-+#define AT91_SOC(__cidr, __exid, __name, __family)		\
-+	{							\
-+		.cidr_match = (__cidr),				\
-+		.exid_match = (__exid),				\
-+		.name = (__name),				\
-+		.family = (__family),				\
-+	}
++	soc = at91_soc_init(sama5_socs);
++	if (soc != NULL)
++		soc_dev = soc_device_to_device(soc);
 +
-+struct soc_device * __init
-+at91_soc_init(const struct at91_soc *socs);
+ 	if (of_machine_is_compatible("atmel,sama5d4ek") &&
+ 	   IS_ENABLED(CONFIG_PHYLIB)) {
+ 		phy_register_fixup_for_id("fc028000.etherne:00",
+ 						ksz8081_phy_fixup);
+ 	}
+ 
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+ 	at91sam9x5_pm_init();
+ }
+ 
+@@ -59,7 +80,6 @@ static const char *sama5_dt_board_compat[] __initconst = {
+ 
+ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
+ 	/* Maintainer: Atmel */
+-	.map_io		= at91_map_io,
+ 	.init_machine	= sama5_dt_device_init,
+ 	.dt_compat	= sama5_dt_board_compat,
+ MACHINE_END
+@@ -93,7 +113,6 @@ static struct map_desc at91_io_desc[] __initdata = {
+ 
+ static void __init sama5_alt_map_io(void)
+ {
+-	at91_alt_map_io();
+ 	iotable_init(at91_io_desc, ARRAY_SIZE(at91_io_desc));
+ }
+ 
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index 2510c211f291..be23c400596b 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -62,4 +62,17 @@ at91_soc_init(const struct at91_soc *socs);
+ #define AT91SAM9XE256_CIDR_MATCH	0x329a93a0
+ #define AT91SAM9XE512_CIDR_MATCH	0x329aa3a0
+ 
++#define SAMA5D3_CIDR_MATCH		0x0a5c07c0
++#define SAMA5D31_EXID_MATCH		0x00444300
++#define SAMA5D33_EXID_MATCH		0x00414300
++#define SAMA5D34_EXID_MATCH		0x00414301
++#define SAMA5D35_EXID_MATCH		0x00584300
++#define SAMA5D36_EXID_MATCH		0x00004301
 +
-+#endif /* __AT91_SOC_H */
++#define SAMA5D4_CIDR_MATCH		0x0a5c07c0
++#define SAMA5D41_EXID_MATCH		0x00000001
++#define SAMA5D42_EXID_MATCH		0x00000002
++#define SAMA5D43_EXID_MATCH		0x00000003
++#define SAMA5D44_EXID_MATCH		0x00000004
++
+ #endif /* __AT91_SOC_H */
 -- 
 2.1.0
