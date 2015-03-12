@@ -1,41 +1,92 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 12 Mar 2015 21:00:53 +0900
-Subject: [PATCH] ARM: exynos_defconfig: Enable Marvell WiFi-Ex support
-In-Reply-To: <1423992532-29228-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1423992532-29228-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <02cf01d05cbc$30ab15b0$92014110$@kernel.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 12 Mar 2015 13:07:28 +0100
+Subject: [PATCH v5 04/10] watchdog: at91rm9200: implement restart handler
+In-Reply-To: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426162054-9987-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martinez Canillas wrote:
-> 
-> Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a MMC/SDIO
-> Marvell WiFi-Ex chip. This patch enables wireless support and the
-> mwifiex driver.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/configs/exynos_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 70e5d0bdb4e4..dcef516bcd0d 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -34,6 +34,10 @@ CONFIG_PACKET=y
->  CONFIG_UNIX=y
->  CONFIG_NET_KEY=y
->  CONFIG_INET=y
-> +CONFIG_WIRELESS=y
-> +CONFIG_CFG80211=y
-> +CONFIG_MWIFIEX=y
-> +CONFIG_MWIFIEX_SDIO=y
->  CONFIG_RFKILL_REGULATOR=y
->  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
->  CONFIG_DEVTMPFS=y
-> --
+Restarting the at91rm9200 is done through programming the watchdog and waiting
+for it to reset.
 
-OK, will apply.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/watchdog/at91rm9200_wdt.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Thanks,
-Kukjin
+diff --git a/drivers/watchdog/at91rm9200_wdt.c b/drivers/watchdog/at91rm9200_wdt.c
+index e6fa87d85de3..41cecb55766c 100644
+--- a/drivers/watchdog/at91rm9200_wdt.c
++++ b/drivers/watchdog/at91rm9200_wdt.c
+@@ -12,6 +12,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/bitops.h>
++#include <linux/delay.h>
+ #include <linux/errno.h>
+ #include <linux/fs.h>
+ #include <linux/init.h>
+@@ -23,6 +24,7 @@
+ #include <linux/module.h>
+ #include <linux/moduleparam.h>
+ #include <linux/platform_device.h>
++#include <linux/reboot.h>
+ #include <linux/regmap.h>
+ #include <linux/types.h>
+ #include <linux/watchdog.h>
+@@ -53,6 +55,27 @@ static unsigned long at91wdt_busy;
+ 
+ /* ......................................................................... */
+ 
++static int at91rm9200_restart(struct notifier_block *this,
++					unsigned long mode, void *cmd)
++{
++	/*
++	 * Perform a hardware reset with the use of the Watchdog timer.
++	 */
++	regmap_write(regmap_st, AT91_ST_WDMR,
++		     AT91_ST_RSTEN | AT91_ST_EXTEN | 1);
++	regmap_write(regmap_st, AT91_ST_CR, AT91_ST_WDRST);
++
++	mdelay(2000);
++
++	pr_emerg("Unable to restart system\n");
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block at91rm9200_restart_nb = {
++	.notifier_call = at91rm9200_restart,
++	.priority = 192,
++};
++
+ /*
+  * Disable the watchdog.
+  */
+@@ -228,6 +251,10 @@ static int at91wdt_probe(struct platform_device *pdev)
+ 	if (res)
+ 		return res;
+ 
++	res = register_restart_handler(&at91rm9200_restart_nb);
++	if (res)
++		dev_warn(dev, "failed to register restart handler\n");
++
+ 	pr_info("AT91 Watchdog Timer enabled (%d seconds%s)\n",
+ 		wdt_time, nowayout ? ", nowayout" : "");
+ 	return 0;
+@@ -235,8 +262,13 @@ static int at91wdt_probe(struct platform_device *pdev)
+ 
+ static int at91wdt_remove(struct platform_device *pdev)
+ {
++	struct device *dev = &pdev->dev;
+ 	int res;
+ 
++	res = unregister_restart_handler(&at91rm9200_restart_nb);
++	if (res)
++		dev_warn(dev, "failed to unregister restart handler\n");
++
+ 	res = misc_deregister(&at91wdt_miscdev);
+ 	if (!res)
+ 		at91wdt_miscdev.parent = NULL;
+-- 
+2.1.0
