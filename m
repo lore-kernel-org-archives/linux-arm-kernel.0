@@ -1,47 +1,71 @@
 From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu, 12 Mar 2015 16:45:18 +0530
-Subject: [PATCH v7 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
-Message-ID: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+Date: Thu, 12 Mar 2015 16:45:20 +0530
+Subject: [PATCH v7 2/3] arm64: dts: Add APM X-Gene DMA device and DMA clock
+ DTS nodes
+In-Reply-To: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+Message-ID: <1426158921-8987-3-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set implements the APM X-Gene SoC DMA driver support to offload
-the DMA operations such as memory copy(memcpy), scatter gather memory copy,
-raid5 xor and raid6 p+q.
-
-v7 changes:
-	1. Added raid5 xor offload support.
-	2. Added raid6 p+q offload support.
-v6 changes:
-	1. Maintained sw queue for pending, running, and completed
-	   requests. Used link list as queue.
-	2. Fixed issue_pending and tx_submit routines.
-	3. Fixed prep_dma routines.
-	4. Fixed free_irqs.
-
-v5 changes:
-	1. Minor changes in coding style.
-	2. Added DMA_CTRL_ACK flag initialization
-v4 changes:
-	1. Fixed dma-ranges property on DTS.
+This patch adds the device tree node for APM X-Gene SoC
+DMA controller and DMA clock.
 
 Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
+ arch/arm64/boot/dts/apm/apm-storm.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Rameshwar Prasad Sahu (3):
-  dmaengine: Add support for APM X-Gene SoC DMA engine driver
-  arm64: dts: Add APM X-Gene DMA device and DMA clock DTS nodes
-  Documentation: dma: Add APM X-Gene SoC DMA engine driver documentation
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index f1ad9c2..9471770 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -102,6 +102,7 @@
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
++		dma-ranges = <0x0 0x0 0x0 0x0 0x400 0x0>;
 
- .../devicetree/bindings/dma/apm-xgene-dma.txt      |   47 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |   26 +
- drivers/dma/Kconfig                                |    9 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/xgene-dma.c                            | 2156 ++++++++++++++++++++
- 5 files changed, 2239 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
- create mode 100755 drivers/dma/xgene-dma.c
+ 		clocks {
+ 			#address-cells = <2>;
+@@ -352,6 +353,15 @@
+ 				reg-names = "csr-reg";
+ 				clock-output-names = "pcie4clk";
+ 			};
++
++			dmaclk: dmaclk at 1f27c000 {
++				compatible = "apm,xgene-device-clock";
++				#clock-cells = <1>;
++				clocks = <&socplldiv2 0>;
++				reg = <0x0 0x1f27c000 0x0 0x1000>;
++				reg-names = "csr-reg";
++				clock-output-names = "dmaclk";
++			};
+ 		};
 
+ 		pcie0: pcie at 1f2b0000 {
+@@ -656,5 +666,21 @@
+ 			interrupts = <0x0 0x41 0x4>;
+ 			clocks = <&rngpkaclk 0>;
+ 		};
++
++		dma: dma at 1f270000 {
++			compatible = "apm,xgene-storm-dma";
++			device_type = "dma";
++			reg = <0x0 0x1f270000 0x0 0x10000>,
++			      <0x0 0x1f200000 0x0 0x10000>,
++			      <0x0 0x1b008000 0x0 0x2000>,
++			      <0x0 0x1054a000 0x0 0x100>;
++			interrupts = <0x0 0x82 0x4>,
++				     <0x0 0xb8 0x4>,
++				     <0x0 0xb9 0x4>,
++				     <0x0 0xba 0x4>,
++				     <0x0 0xbb 0x4>;
++			dma-coherent;
++			clocks = <&dmaclk 0>;
++		};
+ 	};
+ };
 --
 1.8.2.1
