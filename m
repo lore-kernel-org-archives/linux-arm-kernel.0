@@ -1,31 +1,43 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 00:36:12 +0100
-Subject: [PATCH v3 04/12] ARM: ARMv7M: define size of vector table for Vybrid
+Date: Fri, 13 Mar 2015 00:36:09 +0100
+Subject: [PATCH v3 01/12] genirq: generic chip: support hierarchy domain
 In-Reply-To: <1426203380-7155-1-git-send-email-stefan@agner.ch>
 References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426203380-7155-5-git-send-email-stefan@agner.ch>
+Message-ID: <1426203380-7155-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vybrids has 112 peripherial interrupts which can be routed to the
-Cortex-M4's NVIC interrupt controller.
+Use the new helper function irq_domain_set_info to make sure the
+function irq_domain_set_hwirq_and_chip is being called, which is
+crucial to save irqdomain specific data to irq_data.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ kernel/irq/generic-chip.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 16d077e..8eebc0d 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
- 	depends on CPU_V7M
- 	default 90 if ARCH_STM32
- 	default 38 if ARCH_EFM32
-+	default 112 if SOC_VF610
- 	default 240
- 	help
- 	  This option indicates the number of interrupts connected to the NVIC.
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 61024e8..15b370d 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -360,7 +360,7 @@ static struct lock_class_key irq_nested_lock_class;
+ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 			 irq_hw_number_t hw_irq)
+ {
+-	struct irq_data *data = irq_get_irq_data(virq);
++	struct irq_data *data = irq_domain_get_irq_data(d, virq);
+ 	struct irq_domain_chip_generic *dgc = d->gc;
+ 	struct irq_chip_generic *gc;
+ 	struct irq_chip_type *ct;
+@@ -405,8 +405,7 @@ int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
+ 	else
+ 		data->mask = 1 << idx;
+ 
+-	irq_set_chip_and_handler(virq, chip, ct->handler);
+-	irq_set_chip_data(virq, gc);
++	irq_domain_set_info(d, virq, hw_irq, chip, gc, ct->handler, NULL, NULL);
+ 	irq_modify_status(virq, dgc->irq_flags_to_clear, dgc->irq_flags_to_set);
+ 	return 0;
+ }
 -- 
 2.3.1
