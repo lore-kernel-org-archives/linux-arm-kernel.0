@@ -1,396 +1,312 @@
 From: eliad@wizery.com (Eliad Peller)
-Date: Thu, 12 Mar 2015 14:09:13 +0200
-Subject: [PATCH v6 5/6] ARM: dts: add wl12xx/wl18xx bindings
+Date: Thu, 12 Mar 2015 14:09:10 +0200
+Subject: [PATCH v6 2/6] wl12xx: use frequency instead of enumerations for
+ pdata clocks
 In-Reply-To: <1426162154-8716-1-git-send-email-eliad@wizery.com>
 References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-Message-ID: <1426162154-8716-6-git-send-email-eliad@wizery.com>
+Message-ID: <1426162154-8716-3-git-send-email-eliad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace all the pdata-quirks for setting wl12xx/wl18xx
-platform data with proper DT definitions.
+From: Luciano Coelho <luca@coelho.fi>
 
-The patch was compile-tested only.
+Instead of defining an enumeration with the FW specific values for the
+different clock rates, use the actual frequency instead.  Also add a
+boolean to specify whether the clock is XTAL or not.
 
+Change all board files to reflect this.
+
+Signed-off-by: Luciano Coelho <luca@coelho.fi>
+[Eliad - small fixes, update board file changes]
 Signed-off-by: Eliad Peller <eliad@wizery.com>
 ---
-v6: add wl12xx definitions as well
+ arch/arm/mach-davinci/board-da850-evm.c |  3 +-
+ arch/arm/mach-omap2/pdata-quirks.c      | 29 ++++++++--------
+ drivers/net/wireless/ti/wl12xx/main.c   | 60 ++++++++++++++++++++++++++++++---
+ drivers/net/wireless/ti/wl12xx/wl12xx.h | 28 +++++++++++++++
+ include/linux/wl12xx.h                  | 27 ++-------------
+ 5 files changed, 103 insertions(+), 44 deletions(-)
 
- arch/arm/boot/dts/am335x-evmsk.dts             | 11 ++++
- arch/arm/boot/dts/omap3-cm-t3517.dts           | 10 ++++
- arch/arm/boot/dts/omap3-cm-t3730.dts           | 10 ++++
- arch/arm/boot/dts/omap3-evm-common.dtsi        | 10 ++++
- arch/arm/boot/dts/omap3-igep0020-rev-f.dts     |  9 +++
- arch/arm/boot/dts/omap3-igep0030-rev-g.dts     |  9 +++
- arch/arm/boot/dts/omap3-zoom3.dts              | 10 ++++
- arch/arm/boot/dts/omap4-panda-common.dtsi      | 10 ++++
- arch/arm/boot/dts/omap4-sdp.dts                | 11 ++++
- arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi | 10 ++++
- arch/arm/mach-omap2/pdata-quirks.c             | 79 --------------------------
- 11 files changed, 100 insertions(+), 79 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index df5fee6..87fc7a3 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -15,6 +15,7 @@
- 
- #include "am33xx.dtsi"
- #include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	model = "TI AM335x EVM-SK";
-@@ -647,6 +648,16 @@
- 	cap-power-off-card;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <31 IRQ_TYPE_LEVEL_HIGH>; /* gpio 31 */
-+		ref-clock-frequency = <38400000>;
-+	};
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 916589c..853b941 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1386,7 +1386,8 @@ static const short da850_wl12xx_pins[] __initconst = {
+ static struct wl12xx_platform_data da850_wl12xx_wlan_data __initdata = {
+ 	.irq			= -1,
+ 	.irq_trigger		= IRQ_TYPE_EDGE_RISING,
+-	.board_ref_clock	= WL12XX_REFCLOCK_38,
++	.ref_clock_freq		= 38400000,
++	.ref_clock_xtal		= false,
  };
  
- &mcasp1 {
-diff --git a/arch/arm/boot/dts/omap3-cm-t3517.dts b/arch/arm/boot/dts/omap3-cm-t3517.dts
-index 0ab748c..f5b5a1d 100644
---- a/arch/arm/boot/dts/omap3-cm-t3517.dts
-+++ b/arch/arm/boot/dts/omap3-cm-t3517.dts
-@@ -133,6 +133,16 @@
- 	non-removable;
- 	bus-width = <4>;
- 	cap-power-off-card;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <17 IRQ_TYPE_LEVEL_HIGH>; /* gpio 145 */
-+		ref-clock-frequency = <38400000>;
-+	};
- };
- 
- &dss {
-diff --git a/arch/arm/boot/dts/omap3-cm-t3730.dts b/arch/arm/boot/dts/omap3-cm-t3730.dts
-index 46eadb2..2294f5b 100644
---- a/arch/arm/boot/dts/omap3-cm-t3730.dts
-+++ b/arch/arm/boot/dts/omap3-cm-t3730.dts
-@@ -73,6 +73,16 @@
- 	non-removable;
- 	bus-width = <4>;
- 	cap-power-off-card;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>; /* gpio 136 */
-+		ref-clock-frequency = <38400000>;
-+	};
- };
- 
- &dss {
-diff --git a/arch/arm/boot/dts/omap3-evm-common.dtsi b/arch/arm/boot/dts/omap3-evm-common.dtsi
-index 127f3e7..346552b 100644
---- a/arch/arm/boot/dts/omap3-evm-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-evm-common.dtsi
-@@ -106,6 +106,16 @@
- 	non-removable;
- 	bus-width = <4>;
- 	cap-power-off-card;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_HIGH>; /* gpio 149 */
-+		ref-clock-frequency = <38400000>;
-+	};
- };
- 
- &twl_gpio {
-diff --git a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
-index cc8bd0c..72f7cdc 100644
---- a/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020-rev-f.dts
-@@ -42,4 +42,13 @@
- 	vmmc-supply = <&lbep5clwmc_wlen>;
- 	bus-width = <4>;
- 	non-removable;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1835";
-+		reg = <2>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <17 IRQ_TYPE_LEVEL_HIGH>; /* gpio 177 */
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-index 9326b28..b899e34 100644
---- a/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030-rev-g.dts
-@@ -64,4 +64,13 @@
- 	vmmc-supply = <&lbep5clwmc_wlen>;
- 	bus-width = <4>;
- 	non-removable;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1835";
-+		reg = <2>;
-+		interrupt-parent = <&gpio5>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_HIGH>; /* gpio 136 */
-+	};
- };
-diff --git a/arch/arm/boot/dts/omap3-zoom3.dts b/arch/arm/boot/dts/omap3-zoom3.dts
-index 6644f51..131448d 100644
---- a/arch/arm/boot/dts/omap3-zoom3.dts
-+++ b/arch/arm/boot/dts/omap3-zoom3.dts
-@@ -195,6 +195,16 @@
- 	cap-power-off-card;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc3_pins &mmc3_2_pins>;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>; /* gpio 162 */
-+		ref-clock-frequency = <26000000>;
-+	};
- };
- 
- &uart1 {
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 1505135..1228de5 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -450,6 +450,16 @@
- 	non-removable;
- 	bus-width = <4>;
- 	cap-power-off-card;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_HIGH>; /* gpio 53 */
-+		ref-clock-frequency = <38400000>;
-+	};
- };
- 
- &emif1 {
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 3e1da43..8c36f51 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -487,6 +487,17 @@
- 	non-removable;
- 	bus-width = <4>;
- 	cap-power-off-card;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1281";
-+		reg = <2>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <21 IRQ_TYPE_LEVEL_HIGH>; /* gpio 53 */
-+		ref-clock-frequency = <26000000>;
-+		tcxo-clock-frequency = <26000000>;
-+	};
- };
- 
- &emif1 {
-diff --git a/arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi b/arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
-index cc66af4..9bceeb7 100644
---- a/arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
-+++ b/arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi
-@@ -65,4 +65,14 @@
- 	bus-width = <4>;
- 	cap-power-off-card;
- 	status = "okay";
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1271";
-+		reg = <2>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <9 IRQ_TYPE_LEVEL_HIGH>; /* gpio 41 */
-+		ref-clock-frequency = <38400000>;
-+	};
- };
+ static __init int da850_wl12xx_init(void)
 diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 337cc22..4464e07 100644
+index 4449f4c..337cc22 100644
 --- a/arch/arm/mach-omap2/pdata-quirks.c
 +++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -14,7 +14,6 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/ti_wilink_st.h>
--#include <linux/wl12xx.h>
+@@ -39,14 +39,14 @@ static struct twl4030_gpio_platform_data twl_gpio_auxdata;
  
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
-@@ -35,35 +34,6 @@ struct pdata_init {
- struct of_dev_auxdata omap_auxdata_lookup[];
- static struct twl4030_gpio_platform_data twl_gpio_auxdata;
+ static struct wl12xx_platform_data wl12xx __initdata;
  
--#if IS_ENABLED(CONFIG_WL12XX)
--
--static struct wl12xx_platform_data wl12xx __initdata;
--
--static void __init __used legacy_init_wl12xx(u32 ref_clock_freq,
--					     u32 tcxo_clock_freq,
--					     int gpio)
--{
--	int res;
--
--	wl12xx.ref_clock_freq = ref_clock_freq;
--	wl12xx.tcxo_clock_freq = tcxo_clock_freq;
--	wl12xx.irq = gpio_to_irq(gpio);
--	wl12xx.irq_trigger = IRQ_TYPE_LEVEL_HIGH;
--
--	res = wl12xx_set_platform_data(&wl12xx);
--	if (res) {
--		pr_err("error setting wl12xx data: %d\n", res);
--		return;
--	}
--}
--#else
--static inline void legacy_init_wl12xx(u32 ref_clock_freq,
--				      u32 tcxo_clock_freq,
--				      int gpio)
--{
--}
--#endif
--
- #ifdef CONFIG_MACH_NOKIA_N8X0
- static void __init omap2420_n8x0_legacy_init(void)
+-static void __init __used legacy_init_wl12xx(unsigned ref_clock,
+-					     unsigned tcxo_clock,
++static void __init __used legacy_init_wl12xx(u32 ref_clock_freq,
++					     u32 tcxo_clock_freq,
+ 					     int gpio)
  {
-@@ -130,7 +100,6 @@ static void __init omap3_sbc_t3730_twl_init(void)
+ 	int res;
+ 
+-	wl12xx.board_ref_clock = ref_clock;
+-	wl12xx.board_tcxo_clock = tcxo_clock;
++	wl12xx.ref_clock_freq = ref_clock_freq;
++	wl12xx.tcxo_clock_freq = tcxo_clock_freq;
+ 	wl12xx.irq = gpio_to_irq(gpio);
+ 	wl12xx.irq_trigger = IRQ_TYPE_LEVEL_HIGH;
+ 
+@@ -57,8 +57,8 @@ static void __init __used legacy_init_wl12xx(unsigned ref_clock,
+ 	}
+ }
+ #else
+-static inline void legacy_init_wl12xx(unsigned ref_clock,
+-				      unsigned tcxo_clock,
++static inline void legacy_init_wl12xx(u32 ref_clock_freq,
++				      u32 tcxo_clock_freq,
+ 				      int gpio)
+ {
+ }
+@@ -130,7 +130,7 @@ static void __init omap3_sbc_t3730_twl_init(void)
  static void __init omap3_sbc_t3730_legacy_init(void)
  {
  	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
--	legacy_init_wl12xx(38400000, 0, 136);
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 136);
++	legacy_init_wl12xx(38400000, 0, 136);
  }
  
  static void __init omap3_sbc_t3530_legacy_init(void)
-@@ -160,28 +129,16 @@ static struct platform_device btwilink_device = {
+@@ -174,12 +174,12 @@ static void __init omap3_igep0030_rev_g_legacy_init(void)
  
- static void __init omap3_igep0020_rev_f_legacy_init(void)
+ static void __init omap3_evm_legacy_init(void)
  {
--	legacy_init_wl12xx(0, 0, 177);
- 	platform_device_register(&wl18xx_device);
- 	platform_device_register(&btwilink_device);
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 149);
++	legacy_init_wl12xx(38400000, 0, 149);
  }
  
- static void __init omap3_igep0030_rev_g_legacy_init(void)
+ static void __init omap3_zoom_legacy_init(void)
  {
--	legacy_init_wl12xx(0, 0, 136);
- 	platform_device_register(&wl18xx_device);
- 	platform_device_register(&btwilink_device);
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_26, 0, 162);
++	legacy_init_wl12xx(26000000, 0, 162);
  }
  
--static void __init omap3_evm_legacy_init(void)
--{
--	legacy_init_wl12xx(38400000, 0, 149);
--}
--
--static void __init omap3_zoom_legacy_init(void)
--{
--	legacy_init_wl12xx(26000000, 0, 162);
--}
--
  static void am35xx_enable_emac_int(void)
- {
- 	u32 v;
-@@ -246,7 +203,6 @@ static void __init omap3_sbc_t3517_legacy_init(void)
+@@ -246,7 +246,7 @@ static void __init omap3_sbc_t3517_legacy_init(void)
  	am35xx_emac_reset();
  	hsmmc2_internal_input_clk();
  	omap3_sbc_t3517_wifi_init();
--	legacy_init_wl12xx(38400000, 0, 145);
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 145);
++	legacy_init_wl12xx(38400000, 0, 145);
  }
  
  static void __init am3517_evm_legacy_init(void)
-@@ -288,23 +244,6 @@ static void __init omap3_tao3530_legacy_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
--#ifdef CONFIG_ARCH_OMAP4
--static void __init omap4_sdp_legacy_init(void)
--{
--	legacy_init_wl12xx(26000000, 26000000, 53);
--}
--
--static void __init omap4_panda_legacy_init(void)
--{
--	legacy_init_wl12xx(38400000, 0, 53);
--}
--
--static void __init var_som_om44_legacy_init(void)
--{
--	legacy_init_wl12xx(38400000, 0, 41);
--}
--#endif
--
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- static struct iommu_platform_data omap4_iommu_pdata = {
- 	.reset_name = "mmu_cache",
-@@ -313,13 +252,6 @@ static struct iommu_platform_data omap4_iommu_pdata = {
- };
- #endif
- 
--#ifdef CONFIG_SOC_AM33XX
--static void __init am335x_evmsk_legacy_init(void)
--{
--	legacy_init_wl12xx(38400000, 0, 31);
--}
--#endif
--
- #ifdef CONFIG_SOC_OMAP5
- static void __init omap5_uevm_legacy_init(void)
+@@ -291,18 +291,17 @@ static void __init omap3_tao3530_legacy_init(void)
+ #ifdef CONFIG_ARCH_OMAP4
+ static void __init omap4_sdp_legacy_init(void)
  {
-@@ -419,20 +351,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
- 	{ "isee,omap3-igep0020-rev-f", omap3_igep0020_rev_f_legacy_init, },
- 	{ "isee,omap3-igep0030-rev-g", omap3_igep0030_rev_g_legacy_init, },
--	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
--	{ "ti,omap3-zoom3", omap3_zoom_legacy_init, },
- 	{ "ti,am3517-evm", am3517_evm_legacy_init, },
- 	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_26,
+-			   WL12XX_TCXOCLOCK_26, 53);
++	legacy_init_wl12xx(26000000, 26000000, 53);
+ }
+ 
+ static void __init omap4_panda_legacy_init(void)
+ {
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
++	legacy_init_wl12xx(38400000, 0, 53);
+ }
+ 
+ static void __init var_som_om44_legacy_init(void)
+ {
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 41);
++	legacy_init_wl12xx(38400000, 0, 41);
+ }
  #endif
--#ifdef CONFIG_ARCH_OMAP4
--	{ "ti,omap4-sdp", omap4_sdp_legacy_init, },
--	{ "ti,omap4-panda", omap4_panda_legacy_init, },
--	{ "variscite,var-dvk-om44", var_som_om44_legacy_init, },
--	{ "variscite,var-stk-om44", var_som_om44_legacy_init, },
--#endif
--#ifdef CONFIG_SOC_AM33XX
--	{ "ti,am335x-evmsk", am335x_evmsk_legacy_init, },
--#endif
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
+ 
+@@ -317,7 +316,7 @@ static struct iommu_platform_data omap4_iommu_pdata = {
+ #ifdef CONFIG_SOC_AM33XX
+ static void __init am335x_evmsk_legacy_init(void)
+ {
+-	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 31);
++	legacy_init_wl12xx(38400000, 0, 31);
+ }
  #endif
+ 
+diff --git a/drivers/net/wireless/ti/wl12xx/main.c b/drivers/net/wireless/ti/wl12xx/main.c
+index 144d1f8..b3f751f 100644
+--- a/drivers/net/wireless/ti/wl12xx/main.c
++++ b/drivers/net/wireless/ti/wl12xx/main.c
+@@ -1770,6 +1770,40 @@ wl12xx_iface_combinations[] = {
+ 	},
+ };
+ 
++static const struct wl12xx_clock wl12xx_refclock_table[] = {
++	{ 19200000,	false,	WL12XX_REFCLOCK_19	},
++	{ 26000000,	false,	WL12XX_REFCLOCK_26	},
++	{ 26000000,	true,	WL12XX_REFCLOCK_26_XTAL	},
++	{ 38400000,	false,	WL12XX_REFCLOCK_38	},
++	{ 38400000,	true,	WL12XX_REFCLOCK_38_XTAL	},
++	{ 52000000,	false,	WL12XX_REFCLOCK_52	},
++	{ 0,		false,	0 }
++};
++
++static const struct wl12xx_clock wl12xx_tcxoclock_table[] = {
++	{ 16368000,	true,	WL12XX_TCXOCLOCK_16_368	},
++	{ 16800000,	true,	WL12XX_TCXOCLOCK_16_8	},
++	{ 19200000,	true,	WL12XX_TCXOCLOCK_19_2	},
++	{ 26000000,	true,	WL12XX_TCXOCLOCK_26	},
++	{ 32736000,	true,	WL12XX_TCXOCLOCK_32_736	},
++	{ 33600000,	true,	WL12XX_TCXOCLOCK_33_6	},
++	{ 38400000,	true,	WL12XX_TCXOCLOCK_38_4	},
++	{ 52000000,	true,	WL12XX_TCXOCLOCK_52	},
++	{ 0,		false,	0 }
++};
++
++static int wl12xx_get_clock_idx(const struct wl12xx_clock *table,
++				u32 freq, bool xtal)
++{
++	int i;
++
++	for (i = 0; table[i].freq != 0; i++)
++		if ((table[i].freq == freq) && (table[i].xtal == xtal))
++			return table[i].hw_idx;
++
++	return -EINVAL;
++}
++
+ static int wl12xx_setup(struct wl1271 *wl)
+ {
+ 	struct wl12xx_priv *priv = wl->priv;
+@@ -1799,7 +1833,17 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 	wl12xx_conf_init(wl);
+ 
+ 	if (!fref_param) {
+-		priv->ref_clock = pdata->board_ref_clock;
++		priv->ref_clock = wl12xx_get_clock_idx(wl12xx_refclock_table,
++						       pdata->ref_clock_freq,
++						       pdata->ref_clock_xtal);
++		if (priv->ref_clock < 0) {
++			wl1271_error("Invalid ref_clock frequency (%d Hz, %s)",
++				     pdata->ref_clock_freq,
++				     pdata->ref_clock_xtal ?
++				     "XTAL" : "not XTAL");
++
++			return priv->ref_clock;
++		}
+ 	} else {
+ 		if (!strcmp(fref_param, "19.2"))
+ 			priv->ref_clock = WL12XX_REFCLOCK_19;
+@@ -1817,9 +1861,17 @@ static int wl12xx_setup(struct wl1271 *wl)
+ 			wl1271_error("Invalid fref parameter %s", fref_param);
+ 	}
+ 
+-	if (!tcxo_param) {
+-		priv->tcxo_clock = pdata->board_tcxo_clock;
+-	} else {
++	if (!tcxo_param && pdata->tcxo_clock_freq) {
++		priv->tcxo_clock = wl12xx_get_clock_idx(wl12xx_tcxoclock_table,
++							pdata->tcxo_clock_freq,
++							true);
++		if (priv->tcxo_clock < 0) {
++			wl1271_error("Invalid tcxo_clock frequency (%d Hz)",
++				     pdata->tcxo_clock_freq);
++
++			return priv->tcxo_clock;
++		}
++	} else if (tcxo_param) {
+ 		if (!strcmp(tcxo_param, "19.2"))
+ 			priv->tcxo_clock = WL12XX_TCXOCLOCK_19_2;
+ 		else if (!strcmp(tcxo_param, "26"))
+diff --git a/drivers/net/wireless/ti/wl12xx/wl12xx.h b/drivers/net/wireless/ti/wl12xx/wl12xx.h
+index 75c9265..5952e99a 100644
+--- a/drivers/net/wireless/ti/wl12xx/wl12xx.h
++++ b/drivers/net/wireless/ti/wl12xx/wl12xx.h
+@@ -82,6 +82,34 @@ struct wl12xx_priv {
+ 	struct wl127x_rx_mem_pool_addr *rx_mem_addr;
+ };
+ 
++/* Reference clock values */
++enum {
++	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */
++	WL12XX_REFCLOCK_26	= 1, /* 26 MHz */
++	WL12XX_REFCLOCK_38	= 2, /* 38.4 MHz */
++	WL12XX_REFCLOCK_52	= 3, /* 52 MHz */
++	WL12XX_REFCLOCK_38_XTAL = 4, /* 38.4 MHz, XTAL */
++	WL12XX_REFCLOCK_26_XTAL = 5, /* 26 MHz, XTAL */
++};
++
++/* TCXO clock values */
++enum {
++	WL12XX_TCXOCLOCK_19_2	= 0, /* 19.2MHz */
++	WL12XX_TCXOCLOCK_26	= 1, /* 26 MHz */
++	WL12XX_TCXOCLOCK_38_4	= 2, /* 38.4MHz */
++	WL12XX_TCXOCLOCK_52	= 3, /* 52 MHz */
++	WL12XX_TCXOCLOCK_16_368	= 4, /* 16.368 MHz */
++	WL12XX_TCXOCLOCK_32_736	= 5, /* 32.736 MHz */
++	WL12XX_TCXOCLOCK_16_8	= 6, /* 16.8 MHz */
++	WL12XX_TCXOCLOCK_33_6	= 7, /* 33.6 MHz */
++};
++
++struct wl12xx_clock {
++	u32	freq;
++	bool	xtal;
++	u8	hw_idx;
++};
++
+ struct wl12xx_fw_packet_counters {
+ 	/* Cumulative counter of released packets per AC */
+ 	u8 tx_released_pkts[NUM_TX_QUEUES];
+diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+index 3876b67..eea1e6d 100644
+--- a/include/linux/wl12xx.h
++++ b/include/linux/wl12xx.h
+@@ -26,28 +26,6 @@
+ 
+ #include <linux/err.h>
+ 
+-/* Reference clock values */
+-enum {
+-	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */
+-	WL12XX_REFCLOCK_26	= 1, /* 26 MHz */
+-	WL12XX_REFCLOCK_38	= 2, /* 38.4 MHz */
+-	WL12XX_REFCLOCK_52	= 3, /* 52 MHz */
+-	WL12XX_REFCLOCK_38_XTAL = 4, /* 38.4 MHz, XTAL */
+-	WL12XX_REFCLOCK_26_XTAL = 5, /* 26 MHz, XTAL */
+-};
+-
+-/* TCXO clock values */
+-enum {
+-	WL12XX_TCXOCLOCK_19_2	= 0, /* 19.2MHz */
+-	WL12XX_TCXOCLOCK_26	= 1, /* 26 MHz */
+-	WL12XX_TCXOCLOCK_38_4	= 2, /* 38.4MHz */
+-	WL12XX_TCXOCLOCK_52	= 3, /* 52 MHz */
+-	WL12XX_TCXOCLOCK_16_368	= 4, /* 16.368 MHz */
+-	WL12XX_TCXOCLOCK_32_736	= 5, /* 32.736 MHz */
+-	WL12XX_TCXOCLOCK_16_8	= 6, /* 16.8 MHz */
+-	WL12XX_TCXOCLOCK_33_6	= 7, /* 33.6 MHz */
+-};
+-
+ struct wl1251_platform_data {
+ 	int power_gpio;
+ 	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
+@@ -58,8 +36,9 @@ struct wl1251_platform_data {
+ struct wl12xx_platform_data {
+ 	int irq;
+ 	u32 irq_trigger;
+-	int board_ref_clock;
+-	int board_tcxo_clock;
++	bool ref_clock_xtal;	/* specify whether the clock is XTAL or not */
++	u32 ref_clock_freq;	/* in Hertz */
++	u32 tcxo_clock_freq;	/* in Hertz, tcxo is always XTAL */
+ 	bool pwr_in_suspend;
+ };
+ 
 -- 
 1.8.5.2.229.g4448466.dirty
