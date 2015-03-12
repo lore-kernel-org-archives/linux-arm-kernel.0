@@ -1,51 +1,44 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Mar 2015 08:21:54 +0100
-Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <7hbnjzxxqo.fsf@deeprootsystems.com>
-References: <1425888603-25800-1-git-send-email-s.hauer@pengutronix.de>
- <1425888603-25800-3-git-send-email-s.hauer@pengutronix.de>
- <7h61a94zy0.fsf@deeprootsystems.com>
- <20150310094142.GD24885@pengutronix.de>
- <1426043791.24243.9.camel@mtksdaap41>
- <20150311090345.GR24885@pengutronix.de>
- <7hbnjzxxqo.fsf@deeprootsystems.com>
-Message-ID: <20150312072154.GB24885@pengutronix.de>
+Date: Thu, 12 Mar 2015 08:28:13 +0100
+Subject: [PATCH 2/2] soc: mediatek: Add PMIC wrapper for MT8135 and
+ MT8173 SoCs
+In-Reply-To: <1426072351.4244.95.camel@x220>
+References: <1426000954-7647-1-git-send-email-s.hauer@pengutronix.de>
+ <1426000954-7647-3-git-send-email-s.hauer@pengutronix.de>
+ <1426072351.4244.95.camel@x220>
+Message-ID: <20150312072813.GC24885@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 10:14:23AM -0700, Kevin Hilman wrote:
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
+On Wed, Mar 11, 2015 at 12:12:31PM +0100, Paul Bolle wrote:
+> On Tue, 2015-03-10 at 16:22 +0100, Sascha Hauer wrote:
+> > --- /dev/null
+> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+> > @@ -0,0 +1,978 @@
+> > +/*
+> > + * Copyright (c) 2014 MediaTek Inc.
+> > + * Author: Flora Fu, MediaTek
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
 > 
-> >> I asked our designer about the bus protection feature, here is his
-> >> response:
-> >> 
-> >> "
-> >> It's for unexpected signal glitch in Power switch process.
-> >> 
-> >> During Power switch process, we have clock switch, reset, isolation
-> >> enable/disable and  power switch involved where the transition of
-> >> asynchronous reset and  isolation is the most critical one,  which have
-> >> risk to introduce a unexpected short period signal transition from
-> >> MTCMOS?s interface to other alive HW . 
-> >> "
-> >> 
-> >> That means it protects unexpected bus accessing from HW, not from SW. So
-> >> it will not hide bugs from wrong SW access.
-> >
-> > Ok, thanks for clarifying. This means we should enable this feature
-> > sooner or later. Since the audio driver which is likely the first user
-> > of this driver doesn't need the protection bits I think we have some
-> > time and can add the protection bits once the clock patches have been
-> > merged.
+> This states the license is GPL v2.
 > 
-> Sounds OK to me.
+> > +MODULE_LICENSE("GPL");
 > 
-> But I still think it belongs in the infracfg layer, and not in the PM
-> domain layer.
+> So you probably want
+>     MODULE_LICENSE("GPL v2");
 
-I already have plans how to put the code into the infracfg driver. Where
-the code is going to be called from remains to be seen. The power domain
-driver might or might not be a good place for it.
+Fixed that, thanks.
+
+Also fixed in the power domain driver you found the same issue.
 
 Sascha
 
