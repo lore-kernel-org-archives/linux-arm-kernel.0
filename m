@@ -1,153 +1,247 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:14:45 +0800
-Subject: [PATCH v6 12/30] PCI: Introduce pci_host_bridge_ops to support
- host specific operations
-In-Reply-To: <20150312032341.GE10949@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-13-git-send-email-wangyijing@huawei.com>
- <20150312032341.GE10949@google.com>
-Message-ID: <55019145.2060504@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Mar 2015 14:18:33 +0100
+Subject: [PATCH v3 5/9] ARM: at91: add soc detection infrastructure
+In-Reply-To: <1426093235-11759-6-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426093235-11759-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426093235-11759-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55019229.5050500@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>  void pci_free_host_bridge(struct pci_host_bridge *host);
->>  #endif /* DRIVERS_PCI_H */
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index c8e074d..59d9be3 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -1889,6 +1889,8 @@ static struct pci_bus *__pci_create_root_bus(
->>  
->>  	bridge->bus = b;
->>  	b->bridge = get_device(&bridge->dev);
->> +	if (bridge->ops && bridge->ops->set_root_bus_speed)
->> +		bridge->ops->set_root_bus_speed(bridge);
+Le 11/03/2015 18:00, Alexandre Belloni a ?crit :
+> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
 > 
-> Before this patch, can you do this:
+> Add new structures and functions to handle AT91 SoC detection.
 > 
->   - Rename the powerpc pcibios_root_bridge_prepare() to
->     pcibios_set_root_bus_speed() and add a call to it here
+> [alexandre.belloni at free-electrons.com: reworked DBGU detection]
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
+> ---
+>  arch/arm/Kconfig            |   1 +
+>  arch/arm/mach-at91/Makefile |   2 +-
+>  arch/arm/mach-at91/soc.c    | 110 ++++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-at91/soc.h    |  48 +++++++++++++++++++
+>  4 files changed, 160 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-at91/soc.c
+>  create mode 100644 arch/arm/mach-at91/soc.h
 > 
->   - Move the pcibios_root_bridge_prepare() call to pci_create_host_bridge()
-> 
-> Then this patch will make a lot more sense because it will look like this,
-> with the host bridge ops call right next to the matching pcibios call:
-> 
->   +	if (host->ops && host->ops->prepare) {
->   +		error = host->ops->prepare(host);
->   +		...
->   +	}
-> 	pcibios_root_bridge_prepare(...);
-> 
->   +	if (bridge->ops && bridge->ops->set_root_bus_speed)
->   +		bridge->ops->set_root_bus_speed(bridge);
-> 	pcibios_set_root_bus_speed(...);
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index e7ce6612bc42..f6c5b05e8de8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -363,6 +363,7 @@ config ARCH_AT91
+>  	select IRQ_DOMAIN
+>  	select PINCTRL
+>  	select PINCTRL_AT91
+> +	select SOC_BUS
+>  	select USE_OF
+>  	help
+>  	  This enables support for systems based on Atmel
+> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+> index 827fdbcce1c7..44a5c1a92b39 100644
+> --- a/arch/arm/mach-at91/Makefile
+> +++ b/arch/arm/mach-at91/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for the linux kernel.
+>  #
+>  
+> -obj-y		:= setup.o
+> +obj-y		:= setup.o soc.o
+>  
+>  obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+>  
+> diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
+> new file mode 100644
+> index 000000000000..332698dbf572
+> --- /dev/null
+> +++ b/arch/arm/mach-at91/soc.c
+> @@ -0,0 +1,110 @@
+> +/*
+> + * Copyright (C) 2015 Atmel
+> + *
+> + * Alexandre Belloni <alexandre.belloni@free-electrons.com
+> + * Boris Brezillon <boris.brezillon@free-electrons.com
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt)	"AT91: " fmt
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+> +
+> +#include "soc.h"
+> +
+> +#define AT91_DBGU_CIDR			0x40
+> +#define AT91_DBGU_CIDR_ARCH(x)		(((x) >> 20) & 0xff)
+> +#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
+> +#define AT91_DBGU_CIDR_EXT		BIT(31)
+> +#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
+> +#define AT91_DBGU_EXID			0x44
+> +
+> +struct soc_device * __init at91_soc_init(const struct at91_soc_family *families)
+> +{
+> +	struct soc_device_attribute *soc_dev_attr;
+> +	const struct at91_soc_family *family;
+> +	const struct at91_soc *soc;
+> +	struct soc_device *soc_dev;
+> +	struct device_node *np;
+> +	void __iomem *regs;
+> +	u32 cidr, exid;
+> +
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
+> +	if (!np)
+> +		np = of_find_compatible_node(NULL, NULL,
+> +					     "atmel,at91sam9260-dbgu");
+> +
+> +	if (!np) {
+> +		pr_warn("Could not find DBGU node");
+> +		return NULL;
+> +	}
+> +
+> +	regs = of_iomap(np, 0);
+> +	of_node_put(np);
+> +
+> +	if (!regs) {
+> +		pr_warn("Could not map DBGU iomem range");
+> +		return NULL;
+> +	}
+> +
+> +	cidr = readl(regs + AT91_DBGU_CIDR);
+> +	exid = readl(regs + AT91_DBGU_EXID);
+> +
+> +	iounmap(regs);
+> +
+> +	for (family = families; family->name; family++) {
+> +		if (family->id == AT91_DBGU_CIDR_ARCH(cidr))
 
-OK, will update.
+Well, I wouldn't use this field as a "family" differentiator.
+For SoC which are part of a family, if there is one, we usually have a
+more precise distinction than at91sam9/sama5/sam9xe.
+The families are a group of SoCs that share the same IPs and same design
+(usually the same die as well...).
 
-> 
->>  	error = pcibios_root_bridge_prepare(bridge);
->>  	if (error)
->>  		goto err_out;
->> @@ -1954,7 +1956,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, u32 db,
->>  {
->>  	struct pci_host_bridge *host;
->>  
->> -	host = pci_create_host_bridge(parent, db, resources, sysdata);
->> +	host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
->>  	if (!host)
->>  		return NULL;
->>  
->> @@ -2051,10 +2053,13 @@ static struct pci_bus *__pci_scan_root_bus(
->>  		pci_bus_insert_busn_res(b, b->number, 255);
->>  	}
->>  
->> -	max = pci_scan_child_bus(b);
->> -
->> -	if (!found)
->> -		pci_bus_update_busn_res_end(b, max);
->> +	if (host->ops && host->ops->scan_bus) {
->> +		host->ops->scan_bus(host);
->> +	} else {
->> +		max = pci_scan_child_bus(b);
->> +		if (!found)
->> +			pci_bus_update_busn_res_end(b, max);
->> +	}
-> 
-> I think host->ops->scan_bus() should have the same prototype as
-> pci_scan_child_bus(), and it should return max, and you should do the same
-> busn update as when you call pci_scan_child_bus().  So the code would look
-> like this:
-> 
->     if (host->ops && host->ops->scan_bus)
-> 	max = host->ops->scan_bus(b);
->     else
-> 	max = pci_scan_child_bus(b);
-> 
->     if (!found)
-> 	pci_bus_update_busn_res_end(b, max);
-> 
-
-OK, I will try to change the of scan_bus(), and make it return the max bus number like pci_scan_child_bus().
-
->>  
->>  	return b;
->>  }
->> @@ -2064,7 +2069,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->>  {
->>  	struct pci_host_bridge *host;
->>  
->> -	host = pci_create_host_bridge(parent, db, resources, sysdata);
->> +	host = pci_create_host_bridge(parent, db, resources, sysdata, NULL);
->>  	if (!host)
->>  		return NULL;
->>  
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index b621f5b..e9922b1 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -400,6 +400,13 @@ static inline int pci_channel_offline(struct pci_dev *pdev)
->>  	return (pdev->error_state != pci_channel_io_normal);
->>  }
->>  
->> +struct pci_host_bridge;
->> +struct pci_host_bridge_ops {
->> +	void (*set_root_bus_speed)(struct pci_host_bridge *host);
->> +	int (*prepare)(struct pci_host_bridge *host);
->> +	void (*scan_bus)(struct pci_host_bridge *);
-> 
-> Needs an argument name to match the style of the other ops.
-
-Sorry, I missed it, will add it, thanks.
+So, can you please re-spin the series and remove this notion: only keep
+type as family and sub-type as SoC (you can even use these words for the
+comment (see below)).
 
 
-> 
->> +};
->> +
->>  struct pci_host_bridge {
->>  	u16	domain;
->>  	u16 busnum;
->> @@ -407,6 +414,7 @@ struct pci_host_bridge {
->>  	struct pci_bus *bus;		/* root bus */
->>  	struct list_head windows;	/* resource_entry */
->>  	struct list_head list;
->> +	struct pci_host_bridge_ops *ops;
->>  	void (*release_fn)(struct pci_host_bridge *);
->>  	void *release_data;
->>  };
->> -- 
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
-> 
-> .
+> +			break;
+> +	}
+> +
+> +	if (!family->name) {
+> +		pr_warn("Could not find matching SoC family\n");
+> +		return NULL;
+> +	}
+> +
+> +	for (soc = family->socs; soc->name; soc++) {
+> +		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
+> +			continue;
+> +
+> +		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
+> +			break;
+> +	}
+> +
+> +	if (!soc->name) {
+> +		pr_warn("Could not find matching SoC description\n");
+> +		return NULL;
+> +	}
+> +
+> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +	if (!soc_dev_attr)
+> +		return NULL;
+> +
+> +	soc_dev_attr->family = family->name;
+> +	soc_dev_attr->soc_id = soc->subname ? soc->subname : soc->name;
+> +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
+> +					   AT91_DBGU_CIDR_VERSION(cidr));
+> +	soc_dev = soc_device_register(soc_dev_attr);
+> +	if (IS_ERR(soc_dev)) {
+> +		kfree(soc_dev_attr->revision);
+> +		kfree(soc_dev_attr);
+> +		pr_warn("Could not register SoC device\n");
+> +		return NULL;
+> +	}
+> +
+> +	pr_info("Detected soc type: %s, revision %X\n", soc->name,
+
+Well, we can have a more appropriated wording:
+
+s/soc type/SoC family/
+
+> +		AT91_DBGU_CIDR_VERSION(cidr));
+> +	if (soc->subname)
+> +		pr_info("Detected soc subtype: %s\n", soc->subname);
+
+s/soc subtype/SoC/
+
+> +
+> +	return soc_dev;
+> +}
+> diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+> new file mode 100644
+> index 000000000000..66dcd146601a
+> --- /dev/null
+> +++ b/arch/arm/mach-at91/soc.h
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (C) 2015 Atmel
+> + *
+> + * Boris Brezillon <boris.brezillon@free-electrons.com
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + */
+> +
+> +#ifndef __AT91_SOC_H
+> +#define __AT91_SOC_H
+> +
+> +#include <linux/sys_soc.h>
+> +
+> +struct at91_soc {
+> +	u32 cidr_match;
+> +	u32 exid_match;
+> +	const char *name;
+> +	const char *subname;
+> +};
+> +
+> +struct at91_soc_family {
+> +	int id;
+> +	const char *name;
+> +	const struct at91_soc *socs;
+> +};
+> +
+> +#define AT91_SOC(__cidr, __exid, __name, __subname)		\
+> +	{							\
+> +		.cidr_match = (__cidr),				\
+> +		.exid_match = (__exid),				\
+> +		.name = (__name),				\
+> +		.subname = (__subname),				\
+> +	}
+> +
+> +#define AT91_SOC_FAMILY(__id, __name, __socs)			\
+> +	{							\
+> +		.id = (__id),					\
+> +		.name = (__name),				\
+> +		.socs = (__socs),				\
+> +	}
+> +
+> +struct soc_device * __init
+> +at91_soc_init(const struct at91_soc_family *families);
+> +
+> +#endif /* __AT91_SOC_H */
 > 
 
 
 -- 
-Thanks!
-Yijing
+Nicolas Ferre
