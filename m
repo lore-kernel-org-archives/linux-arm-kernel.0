@@ -1,25 +1,57 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 12 Mar 2015 12:08:47 -0700
-Subject: Update the clk tree for linux-next
-Message-ID: <CAPtuhTiQvSUMnd7p8D27GQ=hw1MqPSoN9P6pArLpK96QfnGsVg@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 12 Mar 2015 14:32:19 -0500
+Subject: [PATCH v6 03/30] PCI: Export busn_resource to drivers/pci
+In-Reply-To: <55017BA1.7020700@huawei.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
+ <20150311222835.GA1082@google.com> <55017BA1.7020700@huawei.com>
+Message-ID: <20150312193219.GA7346@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen R.,
+On Thu, Mar 12, 2015 at 07:42:25PM +0800, Yijing Wang wrote:
+> >> -static struct resource busn_resource = {
+> >> +struct resource busn_resource = {
+> >>  	.name	= "PCI busn",
+> >>  	.start	= 0,
+> >>  	.end	= 255,
+> >>  	.flags	= IORESOURCE_BUS,
+> >>  };
+> >> +EXPORT_SYMBOL(busn_resource);
+> > 
+> > I don't think this is a good idea.  We support multiple PCI domains, and
+> > each domain has its own 0-255 bus number range.  This busn_resource is
+> > only for domain 0 and probably should be handled in arch code instead of
+> > the PCI core.
+> > 
+> > Right now, I think it's possible to call pci_scan_bus_parented() or
+> > pci_scan_bus() several times for buses in different domains, and they would
+> > all share the same busn_resource, which would cause corruption.
+> > 
+> > So it's already broken, but I don't want to make it harder to fix by
+> > exporting this stuff.
+> 
+> Hi Bjorn, busn_resource may would not be shared by multi domains,
+> 
+> We insert bus number resource like:
+> 
+> pci_add_resource(&resources, &busn_resource);	
+> 	pci_bus_insert_busn_res(root_bus, start, bus_max);	//start is the root bus number provided by arch pci host driver, bus max here == 255
+> 		get_pci_domain_busn_res(domain)	//for root bus	//try to get a domain specific pci_domain_busn_res, if not exist, create it.
+> 			request_resource_conflict(domain_specific_busn_res, res)   //request busn res(start, bus_max) from the pci_domain_busn_res.
+> 
+> So every domain has its own pci_domain_busn_res , different domain would not share the same bus number resource.
 
-Stephen Boyd has kindly agreed to co-maintain the clk framework with
-me and we have shared commit access to a new git tree at kernel.org:
+The intent of pci_add_resource() and passing the resulting resource list
+into pci_scan_root_bus(), etc., is that the host bridge may consume any
+resources described by the list.  If we pass the same resource to multiple
+calls, that means the resource must be shared between the multiple host
+bridges involved.  For bus numbers, that makes some sense if the platform
+considers the bridges to be in the same domain, but not if they are in
+different domains.
 
-https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/
+If we export busn_resource, we have no control over what domains it becomes
+associated with because the domain is passed into pci_scan_root_bus() by
+the caller.
 
-Can you update linux-next to pull from this tree instead of the
-git.linaro.org address? They are currently mirrors but the
-git.kernel.org tree is the canonical tree from this day forth. The
-full path to pull from is:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-
-This is already updated in MAINTAINERS.
-
-Thanks,
-Mike
+Bjorn
