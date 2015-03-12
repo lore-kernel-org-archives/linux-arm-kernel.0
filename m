@@ -1,47 +1,89 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 12 Mar 2015 13:58:58 +0000
-Subject: [PATCH v2 10/10] drivers: PL011: add support for the ARM SBSA
- generic UART
-In-Reply-To: <20150312134921.GR8656@n2100.arm.linux.org.uk>
-References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
- <1425491994-23913-11-git-send-email-andre.przywara@arm.com>
- <20150312105210.GK8656@n2100.arm.linux.org.uk> <550197F5.1020107@arm.com>
- <20150312134921.GR8656@n2100.arm.linux.org.uk>
-Message-ID: <55019BA2.1090404@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Mar 2015 15:04:35 +0100
+Subject: [PATCH v5 00/10] Atmel System Timer cleanups
+In-Reply-To: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55019CF3.7040609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/03/15 13:49, Russell King - ARM Linux wrote:
-> On Thu, Mar 12, 2015 at 01:43:17PM +0000, Andre Przywara wrote:
->> Hi Russel,
->>
->> thanks a lot for looking at the patches!
->>
->> On 12/03/15 10:52, Russell King - ARM Linux wrote:
->>> On Wed, Mar 04, 2015 at 05:59:54PM +0000, Andre Przywara wrote:
->>>> +module_platform_driver(arm_sbsa_uart_platform_driver);
->>>
->>> No need to open code the initialisation, rather than using the
->>> module_*_driver() helper macros to avoid the problem which Dave mentioned.
->>>
->>> These macros are only there to avoid having to write out the same boiler
->>> plate in loads of simple drivers.  As soon as a driver has more than one
->>> device driver structure in it, it needs to be open coded.
->>
->> Actually I prepared this already for the ACPI guys, which want to stuff
->> their ACPI table match function in there - I think then we need the open
->> coded version. So if you don't mind too much, I'd like to keep it like
->> this and hope for someone to actually use it ;-)
+Le 12/03/2015 13:07, Alexandre Belloni a ?crit :
+> This patch set cleans up the system timer driver.
 > 
-> Either your statement is ambiguous, or I'm not understanding you.
+> The main goal is to get rid of the mach/ headers dependency. At the same time,
+> it introduces proper probing and locking (using a regmap) for the watchdog
+> driver.
 > 
-> You can't "keep it like this" where "this" is the above code.  The
-> above will fail if the driver is built as a module, and cause a build
-> time error.  That is not acceptable.
+> This is based on 4.0-rc1 and will have two merge conflicts with my cleanup #1 in
+> mach-at91/at91rm9200.c
+> 
+> It also needs this patch to probe the watchdog properly:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327274.html
+> 
+> Changes in v5:
+>  - Documented the watchdog compatible
+>  - Switched to simple-mfd to probe the system timer subnodes
+>  - Selected ATMEL_ST from mach-at91/Kconfig instead of using def_bool SOC_AT91RM9200
+>  - Reordered the atmel-st probe cleanup and its move to driver/clocksource
+>  - Added a patch to replace setup_irq by request_irq
+>  - Merged the reset handling in the watchdog timer as we are using the watchdog
+>    anyway to reset the board.
+>  - Used a simple space after a #define for registers
+> 
+> Changes in v4:
+>  - Added MODULE_* metadata in at91rm9200-reset
+>  - Proper copyright in at91rm9200-reset
+>  - Use BIT() in atmel-st.h
+>  - changed MODULE_ALIAS in at91rm9200_wdt.c
+> 
+> Changes in v3:
+>  - stop using an mfd and get the syscon directly from the watchdog driver
+>  - introduce a proper reset driver to handle reset
+> 
+> Changes in v2:
+>  - cleaned up more includes in the watchdog driver
+>  - stop using if OF when selecting CLKSRC_OF
+>  - stop initializing .owner
+> 
+> 
+> Alexandre Belloni (10):
+>   ARM: at91/dt: declare atmel,at91rm9200-st as a syscon
+>   mfd: syscon: Add atmel system timer registers definition
+>   watchdog: at91rm9200: use the system timer syscon
+>   watchdog: at91rm9200: implement restart handler
+>   ARM: at91: at91rm9200: remove deprecated arm_pm_restart
+>   ARM: at91: properly initialize timer
+>   ARM: at91: time: move the system timer driver to drivers/clocksource
+>   clocksource: atmel-st: use syscon/regmap
+>   clocksource: atmel-st: remove mach/hardware dependency
+>   ARM: at91: remove useless include
 
-Oh, you are right, I was forgetting about that one, sorry.
-I meant I'd rather leave it open coded, but of course I will fix the
-module issue.
+I'm okay with the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Cheers,
-Andre.
+But anyway, I'm waiting for a couple of more Ack.
+
+Thanks, bye.
+
+>  .../devicetree/bindings/arm/atmel-at91.txt         |   4 +-
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |   6 +-
+>  arch/arm/mach-at91/Kconfig                         |   1 +
+>  arch/arm/mach-at91/Makefile                        |   2 +-
+>  arch/arm/mach-at91/at91rm9200.c                    |  19 ----
+>  arch/arm/mach-at91/generic.h                       |   3 -
+>  arch/arm/mach-at91/include/mach/at91_st.h          |  61 -----------
+>  drivers/clocksource/Kconfig                        |   4 +
+>  drivers/clocksource/Makefile                       |   1 +
+>  .../clocksource/timer-atmel-st.c                   | 115 ++++++++-------------
+>  drivers/watchdog/Kconfig                           |   2 +-
+>  drivers/watchdog/at91rm9200_wdt.c                  |  61 +++++++++--
+>  include/linux/mfd/syscon/atmel-st.h                |  49 +++++++++
+>  13 files changed, 164 insertions(+), 164 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
+>  rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (74%)
+>  create mode 100644 include/linux/mfd/syscon/atmel-st.h
+> 
+
+
+-- 
+Nicolas Ferre
