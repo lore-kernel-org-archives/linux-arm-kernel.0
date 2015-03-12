@@ -1,76 +1,39 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 19:46:45 +0800
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <20150311223211.GB1082@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com>
-Message-ID: <55017CA5.2010502@huawei.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 12 Mar 2015 20:51:22 +0900
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable ChromeOS EC chardev
+ driver
+In-Reply-To: <1425741262-8278-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1425741262-8278-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <028e01d05cba$dc874770$9595d650$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>  	struct pci_bus *b;
->> +	LIST_HEAD(resources);
->>  	struct pcifront_sd *sd = NULL;
->>  	struct pci_bus_entry *bus_entry = NULL;
->>  	int err = 0;
->> @@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>  		err = -ENOMEM;
->>  		goto err_out;
->>  	}
->> +	pci_add_resource(&resources, &ioport_resource);
->> +	pci_add_resource(&resources, &iomem_resource);
->> +	pci_add_resource(&resources, &busn_resource);
+Javier Martinez Canillas wrote:
 > 
-> Since I don't want to export busn_resource, you might have to allocate your
-> own struct resource for it here.  And, of course, figure out the details of
-> which PCI domain you're in and whether you need to share one struct
-> resource across several host bridges in the same domain.
-
-Allocate its own resource here is ok for me, as I mentioned in previous reply,
-so do we still need to add additional info to figure out which domain own the bus resource ?
-
-
+> Exynos Chromebooks have an Embedded Controller known as the ChromeOS EC
+> Enable the driver that provides an interface to access from user-space.
 > 
->>  	pcifront_init_sd(sd, domain, bus, pdev);
->>  
->>  	pci_lock_rescan_remove();
->>  
->> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
->> -				  &pcifront_bus_ops, sd);
->> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
->> +				  &pcifront_bus_ops, sd, &resources);
->>  	if (!b) {
->>  		dev_err(&pdev->xdev->dev,
->>  			"Error creating PCI Frontend Bus!\n");
->>  		err = -ENOMEM;
->>  		pci_unlock_rescan_remove();
->> +		pci_free_resource_list(&resources);
->>  		goto err_out;
->>  	}
->>  
->> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>  
->>  	list_add(&bus_entry->list, &pdev->root_buses);
->>  
->> -	/* pci_scan_bus_parented skips devices which do not have a have
->> +	/* pci_scan_root_bus skips devices which do not have a
->>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
->>  	err = pcifront_scan_bus(pdev, domain, bus, b);
->>  
->> -- 
->> 1.7.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/configs/exynos_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> .
-> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 3d22aae39a83..14fa9f05f768 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -173,6 +173,8 @@ CONFIG_RTC_DRV_S5M=y
+>  CONFIG_RTC_DRV_S3C=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_PL330_DMA=y
+> +CONFIG_CHROME_PLATFORMS=y
+> +CONFIG_CROS_EC_CHARDEV=y
+>  CONFIG_COMMON_CLK_MAX77686=y
+>  CONFIG_COMMON_CLK_MAX77802=y
+>  CONFIG_COMMON_CLK_S2MPS11=y
+> --
 
+OK, will apply.
 
--- 
-Thanks!
-Yijing
+Thanks,
+Kukjin
