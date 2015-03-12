@@ -1,35 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Mar 2015 09:03:04 +0100
-Subject: [PATCH 0/2] ARM: shmobile: Correct SYSCIER values
-In-Reply-To: <1426132537-31606-1-git-send-email-horms+renesas@verge.net.au>
-References: <1426132537-31606-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUuv6YrEUsCpbuZwHUy_a-+sK8O=q8k-OZLZRytKv7gyA@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 12 Mar 2015 10:06:24 +0200
+Subject: [RESEND 0/7] ARM: davinci: McASP related cleanups and fixes
+Message-ID: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-On Thu, Mar 12, 2015 at 4:55 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> this short series corrects the SYSCIER value used on the r9a7790 and
-> r8a7791 SoCs.
+V1 was sent back in 10th of February [1], so resending it rebased on current
+linux-next.
 
-Thanks!
+Clean up series of McASP device creation for da8xx and dm646x DMSoCs.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+[1] https://lkml.org/lkml/2015/2/10/298
 
-> I am not aware of any run-time effect of these changes.
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  ARM: davinci: devices-da8xx: Add resource name for the McASP DMA
+    request
+  ARM: davinci: devices-da8xx: Add interrupt resource to McASP structs
+  ARM: davinci: devices-da8xx: Clean up and correct the McASP device
+    creation
+  ARM: davinci: devices-da8xx: Add support for McASP2 on da830
+  ARM: davinci: dm646x: Clean up the McASP DMA resources
+  ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x
+  ARM: davinci: dm646x: Add interrupt resource for McASPs
 
-They only matter when powering up/down SYSC PM Domains, which is not
-yet implemented for R-Car Gen2.
+ arch/arm/mach-davinci/asp.h               |  7 +++
+ arch/arm/mach-davinci/devices-da8xx.c     | 80 ++++++++++++++++++++++++++++---
+ arch/arm/mach-davinci/dm646x.c            | 23 ++++++---
+ arch/arm/mach-davinci/include/mach/irqs.h |  2 +-
+ 4 files changed, 98 insertions(+), 14 deletions(-)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.3.0
