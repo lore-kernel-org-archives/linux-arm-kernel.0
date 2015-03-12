@@ -1,68 +1,41 @@
-From: fabrice.gasnier@st.com (Fabrice GASNIER)
-Date: Thu, 12 Mar 2015 17:10:13 +0100
-Subject: [PATCH v3] ARM: l2c: Fix prefetch settings dt parsing
-Message-ID: <1426176613-24765-1-git-send-email-fabrice.gasnier@st.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 12 Mar 2015 17:12:37 +0100
+Subject: [PATCH v2] ARM: l2c: Fix prefetch settings dt parsing
+In-Reply-To: <20150312145712.GT8656@n2100.arm.linux.org.uk>
+References: <1425977941-31278-1-git-send-email-fabrice.gasnier@st.com>
+ <20150312145712.GT8656@n2100.arm.linux.org.uk>
+Message-ID: <5501BAF5.5050306@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow device tree to override the L2C prefetch settings, even when
-l2x0_cache_size_of_parse() fails to parse the cache geometry due to (eg)
-missing "cache-size" or "cache-sets" properties.
+Hi Russel,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
----
-V3: enhance commit message
----
-V2: fix typo in commit message
-s/prefect/prefetch/ and s/of tree/device tree/
----
- arch/arm/mm/cache-l2x0.c | 33 ++++++++++++++++-----------------
- 1 file changed, 16 insertions(+), 17 deletions(-)
+I just sent a V3 to follow your remark.
+If this is ok, l'll add it to your patch system.
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c6c7696..8f15f70 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1131,23 +1131,22 @@ static void __init l2c310_of_parse(const struct device_node *np,
- 	}
- 
- 	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_512K);
--	if (ret)
--		return;
--
--	switch (assoc) {
--	case 16:
--		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
--		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		break;
--	case 8:
--		*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
--		break;
--	default:
--		pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
--		       assoc);
--		break;
-+	if (!ret) {
-+		switch (assoc) {
-+		case 16:
-+			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			*aux_val |= L310_AUX_CTRL_ASSOCIATIVITY_16;
-+			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			break;
-+		case 8:
-+			*aux_val &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			*aux_mask &= ~L2X0_AUX_CTRL_ASSOC_MASK;
-+			break;
-+		default:
-+			pr_err("L2C-310 OF cache associativity %d invalid, only 8 or 16 permitted\n",
-+			       assoc);
-+			break;
-+		}
- 	}
- 
- 	prefetch = l2x0_saved_regs.prefetch_ctrl;
--- 
-1.9.1
+Thanks for your review.
+BR,
+Fabrice
+On 03/12/2015 03:57 PM, Russell King - ARM Linux wrote:
+> On Tue, Mar 10, 2015 at 09:59:01AM +0100, Fabrice GASNIER wrote:
+>> Allow prefetch settings overriding by device tree, in case
+>> l2x0_cache_size_of_parse() returns value, prefetch tuning
+>> properties are silently ignored. E.g. arm,double-linefill* and
+>> arm,prefetch*.
+>> This happens for example, when "cache-size" or "cache-sets"
+>> properties haven't been filled in l2c dt node.
+>>
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Patch is okay, but I think the commit message needs to be better :)
+>
+> "Allow device tree to override the L2C prefetch settings, even when
+> l2x0_cache_size_of_parse() fails to parse the cache geometry due to (eg)
+> missing "cache-size" or "cache-sets" properties."
+>
+> I think with something along those lines, the patch can be put in my
+> patch system for when I next get around to applying some kernel patches
+> instead of reading email. :)
+>
+> Thanks.
+>
