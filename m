@@ -1,28 +1,32 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 12 Mar 2015 11:24:27 +0200
-Subject: [PATCH v8 0/4] hwspinlock core & omap dt support
-In-Reply-To: <1425520876-37826-1-git-send-email-s-anna@ti.com>
-References: <1425520876-37826-1-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbY1Gbc+b1YtHafUyph6P60fees1ND_K5OE=9MXuqszbOg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 12 Mar 2015 10:35:50 +0100
+Subject: Bug in i2c-core?
+In-Reply-To: <6018658.iFTJCkgHeH@avalon>
+References: <54F0507F.6030804@armadeus.com> <20150304082237.GA2955@katana>
+ <20150308082617.GA1904@katana> <6018658.iFTJCkgHeH@avalon>
+Message-ID: <20150312093550.GB1000@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
 
-On Thu, Mar 5, 2015 at 4:01 AM, Suman Anna <s-anna@ti.com> wrote:
-> This is the latest version of the hwspinlock dt support series,
-> rebased onto v4.0-rc1 and addressing the long discussion on the
-> bindings in v7 [1]. I really hope that this series can make it
-> into 4.1.
+> > > Adding Rob to CC as he wrote of_irq_get and put it into
+> > > platform_get_irq. Rob, we use of_irq_get() in the I2C core and the
+> > > question is now if we need to dispose the mapping and if so what would
+> > > be a good place for it so managed devices will not have their mappings
+> > > removed before the managed irq is removed.
+> > 
+> > Ping. Just so you know: Without further information, I will revert the
+> > patch in question around rc4/rc5. I'd still like to know if the
+> > non-disposing of the mapping in platform_get_irq() is intentional.
+> 
+> I'll defer that to Rob. I'm fine with the revert at the moment.
 
->From a quick glance this looks great, thanks!
+Added the revert to for-current now with your and Dmitry's ack.
 
-> Mark,
-> Can you please provide your Acked-by for the binding documents
-> so that Ohad can pick up the patches for the next merge window?
-
-That would be perfect. Once we'll have it I could move forward with
-this towards 4.1.
-
-Thanks,
-Ohad.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150312/dc8cd6eb/attachment.sig>
