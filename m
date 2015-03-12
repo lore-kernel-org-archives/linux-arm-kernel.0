@@ -1,55 +1,74 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 12 Mar 2015 10:27:33 +0000
-Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
-In-Reply-To: <7hh9try12u.fsf@deeprootsystems.com>
-References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
- <7hh9try12u.fsf@deeprootsystems.com>
-Message-ID: <20150312102733.GC18414@red-moon>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 12 Mar 2015 11:32:59 +0100
+Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due to
+ missing include file
+In-Reply-To: <1426143074.26140.0.camel@phoenix>
+References: <1426143074.26140.0.camel@phoenix>
+Message-ID: <CABuKBeKB=ghwRGOzUrxZ_46Joe9u883wOWoVrOeZ7EaX7C+--g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc'ing Dave]
+2015-03-12 7:51 GMT+01:00 Axel Lin <axel.lin@ingics.com>:
+> Fix below build error:
+>   CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
+> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
+> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
+> compilation terminated.
+> make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
+> make[2]: *** [drivers/pinctrl/mediatek] Error 2
+> make[1]: *** [drivers/pinctrl] Error 2
+> make: *** [drivers] Error 2
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-On Wed, Mar 11, 2015 at 04:02:17PM +0000, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> 
-> > When a CPU is being profiled through PMU events and it enters suspend
-> > or idle states, the PMU registers content can be lost, which means that
-> > counters that were relied upon on power down entry are reset on power
-> > up to values that are incosistent with the profile session.
-> >
-> > This patch adds a CPU PM notifier to arm64 perf code, that detects
-> > on entry if events are being monitored, and if so, it returns
-> > failure to the CPU PM notification chain, causing the suspend
-> > thread or the idle thread to abort power down, therefore preventing
-> > registers content loss.
-> >
-> > By triggering CPU PM notification failure this patch prevents
-> > suspending a system if the suspend thread is being profiled and
-> > it also prevents entering idle deep states on cores that have profile
-> > events in use, somehow limiting power management capabilities when
-> > there are active perf sessions.
-> 
-> I guess that's one choice.  Couldn't you also stop the PMU and
-> save/restore it's context in the notifiers? so that you wouldn't affect
-> PM capabilities?
+The fix from Guenter already addresses mt8135 case [0].
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Yes, that's why I sent this an RFC. This solution can also be easily
-ported to power domains, when we put them in place.
+for the mt8173 part.
 
-To save/restore PMU counters we can either reuse perf core (IIRC Dave
-had a stab at this, it is not a trivial patch) or do arch specific
-save/restore (with related buffers for registers context) but I think
-Will does not like the idea at all (and he has a point since the context
-memory is already there in perf core).
+Cheers,
+Matthias
 
-> That would imply that you lose the ability to profile after a certain
-> point in suspend/idle, but maybe that's a better trade off than having
-> profiling disable certain PM features?
+[0] https://lkml.org/lkml/2015/3/11/510
 
-I am ok either way, as long as we make a decision, it has been hanging
-in the balance for aeons.
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
+>  drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+> index 5019cef..e17aedb 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
+> @@ -16,7 +16,7 @@
+>  #define __PINCTRL_MTK_MT8135_H
+>
+>  #include <linux/pinctrl/pinctrl.h>
+> -#include <pinctrl-mtk-common.h>
+> +#include "pinctrl-mtk-common.h"
+>
+>  static const struct mtk_desc_pin mtk_pins_mt8135[] = {
+>         MTK_PIN(
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
+> index c1a3ca0..13e5b68 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
+> @@ -16,7 +16,7 @@
+>  #define __PINCTRL_MTK_MT8173_H
+>
+>  #include <linux/pinctrl/pinctrl.h>
+> -#include <pinctrl-mtk-common.h>
+> +#include "pinctrl-mtk-common.h"
+>
+>  static const struct mtk_desc_pin mtk_pins_mt8173[] = {
+>         MTK_PIN(
+> --
+> 1.9.1
+>
+>
+>
 
-Thanks,
-Lorenzo
+
+
+-- 
+motzblog.wordpress.com
