@@ -1,148 +1,49 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 21:55:37 -0500
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150312025537.GD10949@google.com>
+From: scottwood@freescale.com (Scott Wood)
+Date: Wed, 11 Mar 2015 22:13:43 -0500
+Subject: [PATCH 08/22] ARM: %pF is only for function pointers
+In-Reply-To: <1426130037-17956-1-git-send-email-scottwood@freescale.com>
+References: <1426130037-17956-1-git-send-email-scottwood@freescale.com>
+Message-ID: <1426130037-17956-8-git-send-email-scottwood@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:07AM +0800, Yijing Wang wrote:
-> Introduce pci_host_bridge_list to manage pci host
-> bridges in system, so we could detect whether
-> the host in domain:bus is alreay registered.
-> Then we could remove bus alreay exist test in
-> __pci_create_root_bus().
+Use %pS for actual addresses, otherwise you'll get bad output
+on arches like ppc64 where %pF expects a function descriptor.  Even on
+other architectures, refrain from setting a bad example that people
+copy.
 
-It's a nice idea to move this test into the core.  While you're at it, why
-don't you check for any overlap with the bus ranges of existing host
-bridges?  For example, if we're trying to create a new host bridge to
-[bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
-as well as to [bus 40-ff].  I think your current patch will detect the
-latter conflict but not the former.
+Signed-off-by: Scott Wood <scottwood@freescale.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mm/alignment.c   | 2 +-
+ arch/arm/nwfpe/fpmodule.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/host-bridge.c |   24 +++++++++++++++++++++++-
->  drivers/pci/probe.c       |    8 +-------
->  include/linux/pci.h       |    1 +
->  3 files changed, 25 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-> index 3bd45e7..0bb08ef 100644
-> --- a/drivers/pci/host-bridge.c
-> +++ b/drivers/pci/host-bridge.c
-> @@ -8,6 +8,9 @@
->  
->  #include "pci.h"
->  
-> +static LIST_HEAD(pci_host_bridge_list);
-> +static DEFINE_MUTEX(phb_mutex);
-
-We don't use the "phb" abbreviation in the PCI core.
-
-> +
->  static void pci_release_host_bridge_dev(struct device *dev)
->  {
->  	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
-> @@ -25,7 +28,7 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	int error;
->  	int bus = PCI_BUSNUM(db);
->  	int domain = PCI_DOMAIN(db);
-> -	struct pci_host_bridge *host;
-> +	struct pci_host_bridge *host, *temp;
->  	struct resource_entry *window, *n;
->  
->  	host = kzalloc(sizeof(*host), GFP_KERNEL);
-> @@ -40,6 +43,18 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	 */
->  	pci_host_assign_domain_nr(host);
->  
-> +	mutex_lock(&phb_mutex);
-> +	list_for_each_entry(temp, &pci_host_bridge_list, list)
-> +		if (temp->domain == host->domain
-> +				&& temp->busnum == host->busnum) {
-> +			dev_dbg(&host->dev, "pci host bridge pci%04x:%02x exist\n",
-> +					host->domain, host->busnum);
-
-&host->dev hasn't been initialized yet!  And the text of the original
-message was better.
-
-> +			mutex_unlock(&phb_mutex);
-> +			kfree(host);
-> +			return NULL;
-> +		}
-> +	mutex_unlock(&phb_mutex);
-
-This is racy.  Two CPUs adding a bridge to [bus 00-7f] at about the same
-time can both succeed.
-
-And it needs curly braces around the list_for_each_entry() body.
-
-> +
->  	host->dev.parent = parent;
->  	INIT_LIST_HEAD(&host->windows);
->  	host->dev.release = pci_release_host_bridge_dev;
-> @@ -55,11 +70,18 @@ struct pci_host_bridge *pci_create_host_bridge(
->  	resource_list_for_each_entry_safe(window, n, resources)
->  		list_move_tail(&window->node, &host->windows);
->  
-> +	mutex_lock(&phb_mutex);
-> +	list_add_tail(&host->list, &pci_host_bridge_list);
-> +	mutex_unlock(&phb_mutex);
->  	return host;
->  }
->  
->  void pci_free_host_bridge(struct pci_host_bridge *host)
->  {
-> +	mutex_lock(&phb_mutex);
-> +	list_del(&host->list);
-> +	mutex_unlock(&phb_mutex);
-> +
->  	device_unregister(&host->dev);
->  }
->  
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 27ec612..7238fa3 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1870,7 +1870,7 @@ static struct pci_bus *__pci_create_root_bus(
->  		void *sysdata)
->  {
->  	int error;
-> -	struct pci_bus *b, *b2;
-> +	struct pci_bus *b;
->  	struct resource_entry *window;
->  	struct device *parent;
->  	struct resource *res;
-> @@ -1887,12 +1887,6 @@ static struct pci_bus *__pci_create_root_bus(
->  	b->ops = ops;
->  	b->number = b->busn_res.start = bridge->busnum;
->  	pci_bus_assign_domain_nr(b, parent);
-> -	b2 = pci_find_bus(pci_domain_nr(b), b->number);
-> -	if (b2) {
-> -		/* If we already got to this bus through a different bridge, ignore it */
-> -		dev_dbg(&b2->dev, "bus already known\n");
-> -		goto err_out;
-> -	}
->  
->  	bridge->bus = b;
->  	b->bridge = get_device(&bridge->dev);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 463eaa3..b621f5b 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -406,6 +406,7 @@ struct pci_host_bridge {
->  	struct device dev;
->  	struct pci_bus *bus;		/* root bus */
->  	struct list_head windows;	/* resource_entry */
-> +	struct list_head list;
->  	void (*release_fn)(struct pci_host_bridge *);
->  	void *release_data;
->  };
-> -- 
-> 1.7.1
-> 
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 2c0c541..3419550 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -132,7 +132,7 @@ static const char *usermode_action[] = {
+ static int alignment_proc_show(struct seq_file *m, void *v)
+ {
+ 	seq_printf(m, "User:\t\t%lu\n", ai_user);
+-	seq_printf(m, "System:\t\t%lu (%pF)\n", ai_sys, ai_sys_last_pc);
++	seq_printf(m, "System:\t\t%lu (%pS)\n", ai_sys, ai_sys_last_pc);
+ 	seq_printf(m, "Skipped:\t%lu\n", ai_skipped);
+ 	seq_printf(m, "Half:\t\t%lu\n", ai_half);
+ 	seq_printf(m, "Word:\t\t%lu\n", ai_word);
+diff --git a/arch/arm/nwfpe/fpmodule.c b/arch/arm/nwfpe/fpmodule.c
+index ec717c1..2d2bfe2 100644
+--- a/arch/arm/nwfpe/fpmodule.c
++++ b/arch/arm/nwfpe/fpmodule.c
+@@ -147,7 +147,7 @@ void float_raise(signed char flags)
+ #ifdef CONFIG_DEBUG_USER
+ 	if (flags & debug)
+  		printk(KERN_DEBUG
+-		       "NWFPE: %s[%d] takes exception %08x at %pf from %08lx\n",
++		       "NWFPE: %s[%d] takes exception %08x at %ps from %08lx\n",
+ 		       current->comm, current->pid, flags,
+ 		       __builtin_return_address(0), GET_USERREG()->ARM_pc);
+ #endif
+-- 
+2.1.0
