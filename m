@@ -1,51 +1,77 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 12 Mar 2015 12:21:14 +0100
-Subject: [PATCH v6 18/22] x86/olpc/xo15/sci: Use newly added
- power_supply_put API
-In-Reply-To: <1425976046-20973-19-git-send-email-k.kozlowski@samsung.com>
-References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
- <1425976046-20973-19-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150312112114.GC8475@gmail.com>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Thu, 12 Mar 2015 12:32:19 +0100
+Subject: [PATCH v3 3/5] i2c: recovery: change input parameter to
+ i2c_adapter for prepare/unprepare_recovery
+In-Reply-To: <1417448047-15236-4-git-send-email-grygorii.strashko@ti.com>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-4-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <55017943.6040603@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-* Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-
-> Replace direct usage of put_device() with new API: power_supply_put().
+On 01/12/14 16:34, Grygorii Strashko wrote:
+> This patch changes type of input parameter for .prepare/unprepare_recovery()
+> callbacks from struct i2c_bus_recovery_info * to struct i2c_adapter *.
+> This allows to simplify implementation of these callbacks and avoid
+> type conversations from i2c_bus_recovery_info to i2c_adapter.
+> The i2c_bus_recovery_info can be simply retrieved from struct i2c_adapter
+> which contains pointer on it.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Reviewed-by: Sebastian Reichel <sre@kernel.org>
+> CC: Sekhar Nori <nsekhar@ti.com>
+> CC: Kevin Hilman <khilman@deeprootsystems.com>
+> CC: Santosh Shilimkar <ssantosh@kernel.org>
+> CC: Murali Karicheri <m-karicheri2@ti.com>
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 > ---
->  arch/x86/platform/olpc/olpc-xo15-sci.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/i2c/i2c-core.c | 4 ++--
+>  include/linux/i2c.h    | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/x86/platform/olpc/olpc-xo15-sci.c b/arch/x86/platform/olpc/olpc-xo15-sci.c
-> index 186634e9021d..55130846ac87 100644
-> --- a/arch/x86/platform/olpc/olpc-xo15-sci.c
-> +++ b/arch/x86/platform/olpc/olpc-xo15-sci.c
-> @@ -83,7 +83,7 @@ static void battery_status_changed(void)
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 2f90ac6..72b6e34 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -563,7 +563,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+>  	int i = 0, val = 1, ret = 0;
 >  
->  	if (psy) {
->  		power_supply_changed(psy);
-> -		put_device(&psy->dev);
-> +		power_supply_put(psy);
+>  	if (bri->prepare_recovery)
+> -		bri->prepare_recovery(bri);
+> +		bri->prepare_recovery(adap);
+>  
+>  	/*
+>  	 * By this time SCL is high, as we need to give 9 falling-rising edges
+> @@ -588,7 +588,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
 >  	}
->  }
 >  
-> @@ -93,7 +93,7 @@ static void ac_status_changed(void)
+>  	if (bri->unprepare_recovery)
+> -		bri->unprepare_recovery(bri);
+> +		bri->unprepare_recovery(adap);
 >  
->  	if (psy) {
->  		power_supply_changed(psy);
-> -		put_device(&psy->dev);
-> +		power_supply_put(psy);
->  	}
+>  	return ret;
 >  }
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index b556e0a..cf9380f 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -404,8 +404,8 @@ struct i2c_bus_recovery_info {
+>  	void (*set_scl)(struct i2c_adapter *, int val);
+>  	int (*get_sda)(struct i2c_adapter *);
+>  
+> -	void (*prepare_recovery)(struct i2c_bus_recovery_info *bri);
+> -	void (*unprepare_recovery)(struct i2c_bus_recovery_info *bri);
+> +	void (*prepare_recovery)(struct i2c_adapter *);
+> +	void (*unprepare_recovery)(struct i2c_adapter *);
+>  
+>  	/* gpio recovery */
+>  	int scl_gpio;
+> 
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
 
-Thanks,
-
-	Ingo
+-- 
+Best regards,
+Alexander Sverdlin.
+Sent from my pdp-11
