@@ -1,105 +1,16 @@
-From: prabhakar.csengg@gmail.com (Lad Prabhakar)
-Date: Thu, 12 Mar 2015 23:38:21 +0000
-Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
-Message-ID: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 Mar 2015 00:44:28 +0100
+Subject: [PATCH] ARM: dts: rockchip: complete rk3288-evb pmic supplies
+In-Reply-To: <52808563.Ey0qrIVQE3@phil>
+References: <52808563.Ey0qrIVQE3@phil>
+Message-ID: <16051508.S1oI3VTnSI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+Am Sonntag, 8. M?rz 2015, 01:57:59 schrieb Heiko Stuebner:
+> This adds the static vcc_sys regulator to the rk3288-evb, the missing
+> rk808 supplies from it and all the supplies of the act8846 evb-variant.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-this patch does the following:
-1: adds DT node for fixed oscillator.
-2: adds DT node entries for ov2659 sensor
-3: adds remote-endpoint entry for VPFE.
-
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- Note this patch depends on
- https://patchwork.kernel.org/patch/6000161/
- 
- arch/arm/boot/dts/am437x-gp-evm.dts | 42 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index f84d971..195f452 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -106,6 +106,14 @@
- 			};
- 		};
- 	};
-+
-+	/* fixed 12MHz oscillator */
-+	refclk: oscillator {
-+		#clock-cells = <0>;
-+		compatible = "fixed-clock";
-+		clock-frequency = <12000000>;
-+	};
-+
- };
- 
- &am43xx_pinmux {
-@@ -404,6 +412,21 @@
- 			regulator-always-on;
- 		};
- 	};
-+
-+	ov2659 at 30 {
-+		compatible = "ovti,ov2659";
-+		reg = <0x30>;
-+
-+		clocks = <&refclk 0>;
-+		clock-names = "xvclk";
-+
-+		port {
-+			ov2659_0: endpoint {
-+				remote-endpoint = <&vpfe1_ep>;
-+				link-frequencies = /bits/ 64 <70000000>;
-+			};
-+		};
-+	};
- };
- 
- &i2c1 {
-@@ -423,6 +446,21 @@
- 		touchscreen-size-x = <1024>;
- 		touchscreen-size-y = <600>;
- 	};
-+
-+	ov2659 at 30 {
-+		compatible = "ovti,ov2659";
-+		reg = <0x30>;
-+
-+		clocks = <&refclk 0>;
-+		clock-names = "xvclk";
-+
-+		port {
-+			ov2659_1: endpoint {
-+				remote-endpoint = <&vpfe0_ep>;
-+				link-frequencies = /bits/ 64 <70000000>;
-+			};
-+		};
-+	};
- };
- 
- &epwmss0 {
-@@ -626,7 +664,7 @@
- 
- 	port {
- 		vpfe0_ep: endpoint {
--			/* remote-endpoint = <&sensor>; add once we have it */
-+			remote-endpoint = <&ov2659_1>;
- 			ti,am437x-vpfe-interface = <0>;
- 			bus-width = <8>;
- 			hsync-active = <0>;
-@@ -643,7 +681,7 @@
- 
- 	port {
- 		vpfe1_ep: endpoint {
--			/* remote-endpoint = <&sensor>; add once we have it */
-+			remote-endpoint = <&ov2659_0>;
- 			ti,am437x-vpfe-interface = <0>;
- 			bus-width = <8>;
- 			hsync-active = <0>;
--- 
-2.1.0
+applied to my dts branch for 4.1
