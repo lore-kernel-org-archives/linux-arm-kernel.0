@@ -1,38 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 12 Mar 2015 08:26:59 -0500
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55019423.3080506@codeaurora.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Mar 2015 14:28:47 +0100
+Subject: [PATCH 5/6] ARM: at91: remove SoC headers
+In-Reply-To: <20150304171505.GH3989@piout.net>
+References: <1425480446-31711-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425480446-31711-6-git-send-email-alexandre.belloni@free-electrons.com>
+ <8819576.zV70Ce3SCo@wuerfel> <20150304171505.GH3989@piout.net>
+Message-ID: <5501948F.9000509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hanjun Guo wrote:
-> This patch set already tested on multi platforms:
->   - AMD Seattle board;
->   - Cavium Thunder board;
->   - Huawei D02 board;
->   - Qualcomm ARM64 platform
->
-> This version 10 patch set address some minor comments and collect ACKs and
-> Reviewed-bys for v9:
->
->   - new Acks from Rafael, Olof, Grant, Lorenzo
->   - new way to handle typdef phys_cpuid_t which suggested by Rafael,
->     but no functional change
->   - Remove if(!phys) for early ioremappings
->   - Rework sleep function for ARM64
->   - Introduce linux/acpi_irq.h to hold acpi_irq_init()
->   - Disable ACPI if not HW_REDUCED_ACPI compliant
->   - Remove the doc of why ACPI on ARM
+Le 04/03/2015 18:15, Alexandre Belloni a ?crit :
+> On 04/03/2015 at 18:03:45 +0100, Arnd Bergmann wrote :
+>> On Wednesday 04 March 2015 15:47:25 Alexandre Belloni wrote:
+>>> @@ -21,6 +21,14 @@
+>>>  #include "generic.h"
+>>>  #include "soc.h"
+>>>  
+>>> +#define SAMA5D4_BASE_USART3    0xfc00c000 /* (USART3 non-secure) Base Address */
+>>> +#define SAMA5D4_BASE_PMC       0xf0018000 /* (PMC) Base Address */
+>>> +#define SAMA5D4_BASE_MPDDRC    0xf0010000 /* (MPDDRC) Base Address */
+>>> +#define SAMA5D4_BASE_PIOD      0xfc068000 /* (PIOD) Base Address */
+>>> +
+>>> +/* Some other peripherals */
+>>> +#define SAMA5D4_BASE_SYS2      SAMA5D4_BASE_PIOD
+>>>
+>>
+>> Why are these still needed? I would expect that the code using them
+>> can be removed as well.
+>>
+> 
+> Yeah, that is still something I need to investigate. Nicolas told me it
+> doesn't work without it. My guess is that it has something to do with
+> secure booting.
 
-v10 retested and working as before, so ...
+These io mapping were from the time when we did have all the recently
+developed drivers (RAM, PMC, SoC detection).
 
-	Tested-by: Timur Tabi <timur@codeaurora.org>
+As you tested lately, it now works without them.
 
-for the whole patchset.
-
+Bye,
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Nicolas Ferre
