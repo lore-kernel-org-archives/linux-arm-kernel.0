@@ -1,45 +1,37 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Mar 2015 14:56:51 -0500
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <55018E90.9030301@huawei.com>
+Date: Thu, 12 Mar 2015 15:00:46 -0500
+Subject: [PATCH v6 21/30] PCI: Introduce pci_bus_child_max_busnr()
+In-Reply-To: <5501947E.4070801@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
- <20150312025537.GD10949@google.com> <55018E90.9030301@huawei.com>
-Message-ID: <20150312195651.GD7346@google.com>
+ <1425868467-9667-22-git-send-email-wangyijing@huawei.com>
+ <20150312033643.GI10949@google.com> <5501947E.4070801@huawei.com>
+Message-ID: <20150312200046.GE7346@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 09:03:12PM +0800, Yijing Wang wrote:
-> On 2015/3/12 10:55, Bjorn Helgaas wrote:
-> > On Mon, Mar 09, 2015 at 10:34:07AM +0800, Yijing Wang wrote:
-> >> Introduce pci_host_bridge_list to manage pci host
-> >> bridges in system, so we could detect whether
-> >> the host in domain:bus is alreay registered.
-> >> Then we could remove bus alreay exist test in
-> >> __pci_create_root_bus().
+On Thu, Mar 12, 2015 at 09:28:30PM +0800, Yijing Wang wrote:
+> On 2015/3/12 11:36, Bjorn Helgaas wrote:
+> > On Mon, Mar 09, 2015 at 10:34:18AM +0800, Yijing Wang wrote:
+> >> Sometimes, we need to know the highest reserved
+> >> busnr for children bus. Because parent's
+> >> bus->busn_res could have padding in it.
+> >> This function return the max child busnr as
+> >> pci_scan_child_bus().
+> >>
+> >> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> >> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> >> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
 > > 
-> > It's a nice idea to move this test into the core.  While you're at it, why
-> > don't you check for any overlap with the bus ranges of existing host
-> > bridges?  For example, if we're trying to create a new host bridge to
-> > [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
-> > as well as to [bus 40-ff].  I think your current patch will detect the
-> > latter conflict but not the former.
+> > I must have screwed this up.  I don't know where the Signed-off-by from
+> > Fengguang came from, but it shouldn't be there.  And I also screwed up by
+> > adding my own Signed-off-by to the branch while we're still iterating on
+> > this series.  The patches you post should not have my Signed-off-by in
+> > them; I should add that.  But that's my fault because put them in the
+> > branch, and I asked you to pull that branch and modify and repost it.
+> > 
 > 
-> Now pci host bridge may only know its start bus number, like acpi _BBN provided,
-> but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
-> so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
-> some pci scan would fail which currently scan success.
+> -.-! I added the Fengguang Signed-off-by, because his kbuild test robot sent a patch to me to fix a building error.
 
-_BBN is not the correct source for the bridge's bus number range.  There's
-a comment in acpi_pci_root_add() that explains why:
-
-  * We need both the start and end of the downstream bus range
-  * to interpret _CBA (MMCONFIG base address), so it really is
-  * supposed to be in _CRS.  If we don't find it there, all we
-  * can do is assume [_BBN-0xFF] or [0-0xFF].
-
-A platform SHOULD know the start and and end bus number.  If it doesn't I
-think it's the platform's responsibility to carve up the bus number range.
-Maybe this can be done by trimming the range of the [bus 00-ff] bridge when
-we discover another bridge that leads to bus 80.
+Oh, OK.  I forgot about that.  I think it's OK to include Fengguang's
+Signed-off-by for that, but it should come before yours.  Since you're the
+one sending the patch, your Signed-off-by should be last in the list.
