@@ -1,96 +1,118 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 12 Mar 2015 14:54:33 -0700
-Subject: [PATCH] touchscreen: sun4i-ts: Really fix A10 temperature
- reporting
-In-Reply-To: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
-References: <1425893870-28715-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150312215433.GC4720@dtor-ws>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 12 Mar 2015 22:55:46 +0100
+Subject: [PATCH v3  00/15] Add support to STMicroelectronics STM32 family
+Message-ID: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:37:50AM +0100, Hans de Goede wrote:
-> The commit titled:
-> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
-> contains a math error, the offset it uses is in degrees, but the actual code
-> applies the offset before multiplying by stepsize :|
-> 
-> Given that this is rather backwards (every math course ever thought applies
-> the multiplication before the offset for linear functions), this commit
-> fixes things by changing the code applying the offset to do the logical
-> thing, adjusting the offset for the other models accordingly.
-> 
-> This has been tested on an A10, A13, A20 and A31 to make sure everything really
-> is correct now.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Note if possible this commit should be squashed into the original
-> "touchscreen: sun4i-ts: A10 (sun4i) has a different temperature curve"
-> commit as a fixup.
+From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-It's a bit too late, I do not like rewinding my 'next' branch unless it
-is a compile error caught recently. So applied as a separate commit.
+This third round tries to address most of the comments made on previous series.
 
-Thanks.
+It contains few less patches, as the reset_controller_of_init() patch has been
+removed, now that the bootlaoder handles the reset of the timers.
 
-> ---
->  drivers/input/touchscreen/sun4i-ts.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-> index 66ccd5a..178d2ef 100644
-> --- a/drivers/input/touchscreen/sun4i-ts.c
-> +++ b/drivers/input/touchscreen/sun4i-ts.c
-> @@ -193,7 +193,7 @@ static int sun4i_get_temp(const struct sun4i_ts_data *ts, long *temp)
->  	if (ts->temp_data == -1)
->  		return -EAGAIN;
->  
-> -	*temp = (ts->temp_data - ts->temp_offset) * ts->temp_step;
-> +	*temp = ts->temp_data * ts->temp_step - ts->temp_offset;
->  
->  	return 0;
->  }
-> @@ -255,17 +255,17 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->  	ts->ignore_fifo_data = true;
->  	ts->temp_data = -1;
->  	if (of_device_is_compatible(np, "allwinner,sun6i-a31-ts")) {
-> -		/* Allwinner SDK has temperature = -271 + (value / 6) (C) */
-> -		ts->temp_offset = 1626;
-> +		/* Allwinner SDK has temperature (C) = (value / 6) - 271 */
-> +		ts->temp_offset = 271000;
->  		ts->temp_step = 167;
->  	} else if (of_device_is_compatible(np, "allwinner,sun4i-a10-ts")) {
->  		/*
->  		 * The A10 temperature sensor has quite a wide spread, these
->  		 * parameters are based on the averaging of the calibration
->  		 * results of 4 completely different boards, with a spread of
-> -		 * temp_step from 96 - 170 and temp_offset from 1758 - 3310.
-> +		 * temp_step from 0.096 - 0.170 and temp_offset from 176 - 331.
->  		 */
-> -		ts->temp_offset = 2570;
-> +		ts->temp_offset = 257000;
->  		ts->temp_step = 133;
->  	} else {
->  		/*
-> @@ -273,13 +273,13 @@ static int sun4i_ts_probe(struct platform_device *pdev)
->  		 * the temperature. The formula used here is from the AXP209,
->  		 * which is designed by X-Powers, an affiliate of Allwinner:
->  		 *
-> -		 *     temperature = -144.7 + (value * 0.1)
-> +		 *     temperature (C) = (value * 0.1) - 144.7
->  		 *
->  		 * Allwinner does not have any documentation whatsoever for
->  		 * this hardware. Moreover, it is claimed that the sensor
->  		 * is inaccurate and cannot work properly.
->  		 */
-> -		ts->temp_offset = 1447;
-> +		ts->temp_offset = 144700;
->  		ts->temp_step = 100;
->  	}
->  
-> -- 
-> 2.3.1
-> 
+The pinctrl driver has also been removed after Linus review.
+It will be reworked to use the generic pinconf bindings, and may contain
+changes for other machines (Mediatek), to add support for pinmux property
+handling directly in pinconf-generic.
+
+STM32 MCUs are Cortex-M CPU, used in various applications (consumer
+electronics, industrial applications, hobbyists...).
+Datasheets, user and programming manuals are publicly available on
+STMicroelectronics website.
+
+With this series applied, the STM32F419 Discovery can boot succesfully.
+
+
+Changes since v2:
+-----------------
+ - Remove pinctrl driver from the series. 
+ - Remove reset_controller_of_init(), and reset the timers in the bootloader
+ - Add HW flow contrl property for serial driver
+ - Lots of changes in the DTS file, as per Andreas recommendations
+ - Some Kconfig clean-ups
+ - Adapt the config to be compatible with Andreas' bootwrapper, except UART port.
+ - Various fixes in documentation
+
+Changes since v1:
+-----------------
+ - Move bindings documentation in their own patches (Andreas)
+ - Rename ARM System timer to armv7m-systick (Rob)
+ - Add clock-frequency property handling in armv7m-systick (Rob)
+ - Re-factor the reset controllers into a single controller (Philipp)
+ - Add kerneldoc to reset_controller_of_init (Philipp)
+ - Add named constants in include/dt-bindings/reset/ (Philipp)
+ - Make pinctrl driver to depend on ARCH_STM32 or COMPILE_TEST (Geert)
+ - Introduce CPUV7M_NUM_IRQ config flag to indicate the number of interrupts
+supported by the MCU, in order to limit memory waste in vectors' table (Uwe)
+
+
+Maxime Coquelin (15):
+  scripts: link-vmlinux: Don't pass page offset to kallsyms if XIP
+    Kernel
+  ARM: ARMv7-M: Enlarge vector table up to 256 entries
+  dt-bindings: Document the ARM System timer bindings
+  clocksource: Add ARM System timer driver
+  dt-bindings: Document the STM32 reset bindings
+  drivers: reset: Add STM32 reset driver
+  dt-bindings: Document the STM32 timer bindings
+  clockevent: Add STM32 Timer driver
+  dt-bindings: Document the STM32 USART bindings
+  serial: stm32-usart: Add STM32 USART Driver
+  ARM: Add STM32 family machine
+  ARM: dts: Add ARM System timer as clockevent in armv7m
+  ARM: dts: Introduce STM32F429 MCU
+  ARM: configs: Add STM32 defconfig
+  MAINTAINERS: Add entry for STM32 MCUs
+
+ Documentation/arm/stm32/overview.txt               |  32 +
+ Documentation/arm/stm32/stm32f429-overview.txt     |  22 +
+ .../devicetree/bindings/arm/armv7m_systick.txt     |  26 +
+ .../devicetree/bindings/reset/st,stm32-rcc.txt     | 102 +++
+ .../devicetree/bindings/serial/st,stm32-usart.txt  |  32 +
+ .../devicetree/bindings/timer/st,stm32-timer.txt   |  22 +
+ MAINTAINERS                                        |   8 +
+ arch/arm/Kconfig                                   |  18 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/armv7-m.dtsi                     |   6 +
+ arch/arm/boot/dts/stm32f429-disco.dts              |  71 +++
+ arch/arm/boot/dts/stm32f429.dtsi                   | 226 +++++++
+ arch/arm/configs/stm32_defconfig                   |  71 +++
+ arch/arm/kernel/entry-v7m.S                        |  13 +-
+ arch/arm/mach-stm32/Makefile                       |   1 +
+ arch/arm/mach-stm32/Makefile.boot                  |   3 +
+ arch/arm/mach-stm32/board-dt.c                     |  19 +
+ arch/arm/mm/Kconfig                                |  15 +
+ drivers/clocksource/Kconfig                        |  15 +
+ drivers/clocksource/Makefile                       |   2 +
+ drivers/clocksource/armv7m_systick.c               |  78 +++
+ drivers/clocksource/timer-stm32.c                  | 184 ++++++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-stm32.c                        | 125 ++++
+ drivers/tty/serial/Kconfig                         |  17 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/stm32-usart.c                   | 695 +++++++++++++++++++++
+ include/uapi/linux/serial_core.h                   |   3 +
+ scripts/link-vmlinux.sh                            |   2 +-
+ 30 files changed, 1807 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/arm/stm32/overview.txt
+ create mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/armv7m_systick.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/st,stm32-usart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
+ create mode 100644 arch/arm/configs/stm32_defconfig
+ create mode 100644 arch/arm/mach-stm32/Makefile
+ create mode 100644 arch/arm/mach-stm32/Makefile.boot
+ create mode 100644 arch/arm/mach-stm32/board-dt.c
+ create mode 100644 drivers/clocksource/armv7m_systick.c
+ create mode 100644 drivers/clocksource/timer-stm32.c
+ create mode 100644 drivers/reset/reset-stm32.c
+ create mode 100644 drivers/tty/serial/stm32-usart.c
 
 -- 
-Dmitry
+1.9.1
