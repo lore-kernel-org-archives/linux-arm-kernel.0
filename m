@@ -1,93 +1,59 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Mar 2015 18:38:08 +0100
-Subject: [RFT/RFC PATCH 2/6] ARM: move HYP text to end of .text section
+Date: Thu, 12 Mar 2015 18:38:09 +0100
+Subject: [RFT/RFC PATCH 3/6] ARM: add macro to perform far branches (b/bl)
 In-Reply-To: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426181892-15440-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1426181892-15440-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HYP text is essentially a separate binary from the kernel proper,
-so it can be moved away from the rest of the kernel. This helps prevent
-link failures due to branch relocations exceeding their range.
+These macros execute PC-relative branches, but with a larger
+reach than the 24 bits that are available in the b and bl opcodes.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/vmlinux.lds.S | 8 ++++++--
- arch/arm/kvm/init.S           | 5 +----
- arch/arm/kvm/interrupts.S     | 4 +---
- 3 files changed, 8 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index b31aa73e8076..e3b9403bd2d6 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -22,11 +22,14 @@
- 	ALIGN_FUNCTION();						\
- 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
- 	*(.idmap.text)							\
--	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
-+	VMLINUX_SYMBOL(__idmap_text_end) = .;
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index f67fd3afebdf..bd08c3c1b73f 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -108,6 +108,35 @@
+ 	.endm
+ #endif
+ 
++	/*
++	 * Macros to emit relative branches that may exceed the range
++	 * of the 24-bit immediate of the ordinary b/bl instructions.
++	 * NOTE: this doesn't work with locally defined symbols, as they
++	 * might lack the ARM/Thumb annotation (even if they are annotated
++	 * as functions)
++	 */
++	.macro  b_far, target, tmpreg
++#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
++ ARM(	movt	\tmpreg, #:upper16:(\target - (8888f + 8))	)
++ ARM(	movw	\tmpreg, #:lower16:(\target - (8888f + 8))	)
++ THUMB(	movt    \tmpreg, #:upper16:(\target - (8888f + 4))	)
++ THUMB(	movw	\tmpreg, #:lower16:(\target - (8888f + 4))	)
++8888:	add	pc, pc, \tmpreg
++#else
++	ldr	\tmpreg, 8889f
++8888:	add	pc, pc, \tmpreg
++	.align 	2
++8889:
++ ARM(	.word   \target - (8888b + 8)           )
++#endif
++	.endm
 +
-+#define HYP_TEXT							\
- 	. = ALIGN(32);							\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
- 	*(.hyp.idmap.text)						\
--	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
-+	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;			\
-+	*(.hyp.text)
- 
- #ifdef CONFIG_HOTPLUG_CPU
- #define ARM_CPU_DISCARD(x)
-@@ -118,6 +121,7 @@ SECTIONS
- 		. = ALIGN(4);
- 		*(.got)			/* Global offset table		*/
- 			ARM_CPU_KEEP(PROC_INFO)
-+			HYP_TEXT
- 	}
- 
- #ifdef CONFIG_DEBUG_RODATA
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 3988e72d16ff..7a377d36de5d 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -51,8 +51,7 @@
-  *   Switches to the runtime PGD, set stack and vectors.
-  */
- 
--	.text
--	.pushsection    .hyp.idmap.text,"ax"
-+	.section    ".hyp.idmap.text", #alloc
- 	.align 5
- __kvm_hyp_init:
- 	.globl __kvm_hyp_init
-@@ -155,5 +154,3 @@ target:	@ We're now in the trampoline code, switch page tables
- 
- 	.globl __kvm_hyp_init_end
- __kvm_hyp_init_end:
--
--	.popsection
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 79caf79b304a..db22e9bedfcd 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -27,7 +27,7 @@
- #include <asm/vfpmacros.h>
- #include "interrupts_head.S"
- 
--	.text
-+	.section	".hyp.text", #alloc
- 
- __kvm_hyp_code_start:
- 	.globl __kvm_hyp_code_start
-@@ -316,8 +316,6 @@ THUMB(	orr	r2, r2, #PSR_T_BIT	)
- 	eret
- .endm
- 
--	.text
--
- 	.align 5
- __kvm_hyp_vector:
- 	.globl __kvm_hyp_vector
++	.macro	bl_far, target, tmpreg=ip
++	adr	lr, 8887f
++	b_far	\target, \tmpreg
++8887:
++	.endm
++
+ 	.macro asm_trace_hardirqs_off
+ #if defined(CONFIG_TRACE_IRQFLAGS)
+ 	stmdb   sp!, {r0-r3, ip, lr}
 -- 
 1.8.3.2
