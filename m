@@ -1,47 +1,78 @@
 From: vinceh@nvidia.com (Vince Hsu)
-Date: Thu, 12 Mar 2015 20:15:07 +0800
-Subject: [PATCH v2 06/17] clk: tegra: remove TEGRA_PLL_USE_LOCK for PLLD/PLLD2
+Date: Thu, 12 Mar 2015 20:15:06 +0800
+Subject: [PATCH v2 05/17] memory: tegra: add flush operation for Tegra124
+ memory clients
 In-Reply-To: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
 References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
-Message-ID: <1426162518-7405-7-git-send-email-vinceh@nvidia.com>
+Message-ID: <1426162518-7405-6-git-send-email-vinceh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra114 has a HW bug that the PLLD/PLLD2 lock bit cannot be asserted when
-the DIS power domain is during up-powergating process but the clamp to this
-domain is not removed yet. That causes a timeout and aborts the power
-sequence, although the PLLD/PLLD2 has already locked. To remove the false
-alarm, we don't use the lock for PLLD/PLLD2. Just wait 1ms and treat the
-clocks as locked.
+This patch adds the hot reset register table and flush related callback
+functions for Tegra124.
 
 Signed-off-by: Vince Hsu <vinceh@nvidia.com>
----
- drivers/clk/tegra/clk-tegra114.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index d0766423a5d6..e6a480e0dcb6 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -456,8 +456,7 @@ static struct tegra_clk_pll_params pll_d_params = {
- 	.lock_delay = 1000,
- 	.div_nmp = &pllp_nmp,
- 	.freq_table = pll_d_freq_table,
--	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
--		 TEGRA_PLL_USE_LOCK,
-+	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON,
+---
+v2: move the drop of tegra124_mc_clients' const to patch #2
+    move mc flush operations to tegra114
+
+ drivers/memory/tegra/tegra124.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/drivers/memory/tegra/tegra124.c b/drivers/memory/tegra/tegra124.c
+index ec25546835fe..ef74f060e59e 100644
+--- a/drivers/memory/tegra/tegra124.c
++++ b/drivers/memory/tegra/tegra124.c
+@@ -959,7 +959,40 @@ static const struct tegra_smmu_swgroup tegra124_swgroups[] = {
+ 	{ .swgroup = TEGRA_SWGROUP_VI,        .reg = 0x280 },
  };
  
- static struct tegra_clk_pll_params pll_d2_params = {
-@@ -474,8 +473,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
- 	.lock_delay = 1000,
- 	.div_nmp = &pllp_nmp,
- 	.freq_table = pll_d_freq_table,
--	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
--		 TEGRA_PLL_USE_LOCK,
-+	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON,
++static struct tegra_mc_hotreset tegra124_mc_hotreset[] = {
++	{TEGRA_SWGROUP_AFI,        0x200, 0x204,  0},
++	{TEGRA_SWGROUP_AVPC,       0x200, 0x204,  1},
++	{TEGRA_SWGROUP_DC,         0x200, 0x204,  2},
++	{TEGRA_SWGROUP_DCB,        0x200, 0x204,  3},
++	{TEGRA_SWGROUP_HC,         0x200, 0x204,  6},
++	{TEGRA_SWGROUP_HDA,        0x200, 0x204,  7},
++	{TEGRA_SWGROUP_ISP2,       0x200, 0x204,  8},
++	{TEGRA_SWGROUP_MPCORE,     0x200, 0x204,  9},
++	{TEGRA_SWGROUP_MPCORELP,   0x200, 0x204, 10},
++	{TEGRA_SWGROUP_MSENC,      0x200, 0x204, 11},
++	{TEGRA_SWGROUP_PPCS,       0x200, 0x204, 14},
++	{TEGRA_SWGROUP_SATA,       0x200, 0x204, 15},
++	{TEGRA_SWGROUP_VDE,        0x200, 0x204, 16},
++	{TEGRA_SWGROUP_VI,         0x200, 0x204, 17},
++	{TEGRA_SWGROUP_VIC,        0x200, 0x204, 18},
++	{TEGRA_SWGROUP_XUSB_HOST,  0x200, 0x204, 19},
++	{TEGRA_SWGROUP_XUSB_DEV,   0x200, 0x204, 20},
++	{TEGRA_SWGROUP_TSEC,       0x200, 0x204, 22},
++	{TEGRA_SWGROUP_SDMMC1A,    0x200, 0x204, 29},
++	{TEGRA_SWGROUP_SDMMC2A,    0x200, 0x204, 30},
++	{TEGRA_SWGROUP_SDMMC3A,    0x200, 0x204, 31},
++	{TEGRA_SWGROUP_SDMMC4A,    0x970, 0x974,  0},
++	{TEGRA_SWGROUP_ISP2B,      0x970, 0x974,  1},
++	{TEGRA_SWGROUP_GPU,        0x970, 0x974,  2},
++};
++
+ #ifdef CONFIG_ARCH_TEGRA_124_SOC
++
++static const struct tegra_mc_ops tegra124_mc_ops = {
++	.flush = tegra114_mc_flush,
++	.flush_done = tegra114_mc_flush_done,
++};
++
+ static void tegra124_flush_dcache(struct page *page, unsigned long offset,
+ 				  size_t size)
+ {
+@@ -991,5 +1024,8 @@ const struct tegra_mc_soc tegra124_mc_soc = {
+ 	.num_address_bits = 34,
+ 	.atom_size = 32,
+ 	.smmu = &tegra124_smmu_soc,
++	.hotresets = tegra124_mc_hotreset,
++	.num_hotresets = ARRAY_SIZE(tegra124_mc_hotreset),
++	.ops = &tegra124_mc_ops,
  };
- 
- static struct pdiv_map pllu_p[] = {
+ #endif /* CONFIG_ARCH_TEGRA_124_SOC */
 -- 
 2.1.4
