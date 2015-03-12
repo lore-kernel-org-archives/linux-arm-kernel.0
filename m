@@ -1,41 +1,69 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Thu, 12 Mar 2015 21:11:52 +0800
-Subject: [PATCH v2 17/17] soc/tegra: remove lagacy powergate APIs
-In-Reply-To: <20150312124501.GA632@ulmo>
-References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
- <1426162518-7405-18-git-send-email-vinceh@nvidia.com>
- <20150312124501.GA632@ulmo>
-Message-ID: <55019098.3020901@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Mar 2015 14:13:43 +0100
+Subject: [PATCH RFC 2/3] ARM: sun7i: Add A20 SRAM and SRAM controller
+In-Reply-To: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A20 has a few SRAM that can be mapped either to a device or to the CPU,
+with the mapping being controlled by an SRAM controller.
 
-On 03/12/2015 08:45 PM, Thierry Reding wrote:
-> * PGP Signed by an unknown key
->
-> On Thu, Mar 12, 2015 at 08:15:18PM +0800, Vince Hsu wrote:
->> We switch to generic power domain now. So remove the legacy functions.
->>
->> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
->> ---
->>   drivers/soc/tegra/pmc.c | 68 -------------------------------------------------
->>   include/soc/tegra/pmc.h | 22 ----------------
->>   2 files changed, 90 deletions(-)
-> I don't think we can do this. What if somebody updates their kernel but
-> not the DTB? In that case they'll end up with drivers that don't enable
-> power partitions but at the same time the powergate driver won't enable
-> them either because it is missing the corresponding nodes in the DTB.
-You're right.
+Since most of the time these SRAM won't be accessible by the CPU, we can't use
+the mmio-sram driver and compatible.
 
->
-> What we'll have to do is probably keep the code that enables the power
-> partitions and make it conditional on the power domains somehow. Is
-> there a way to determine at runtime whether a device has been attached
-> to a power domain?
->
-Yes, we can check if a power domain is bound to the GPD by DT in the 
-legacy powergate code.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
-Thanks,
-Vince
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index a1ebd80e6f24..a249828a1df5 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -522,12 +522,41 @@
+ 		};
+ 	};
+ 
+-	soc at 01c00000 {
++	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		sram at 00000000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00000000 0x4000>;
++			allwinner,sram-name = "A1";
++		};
++
++		sram at 00004000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00004000 0x4000>;
++			allwinner,sram-name = "A2";
++		};
++
++		sram at 00008000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00008000 0x4000>;
++			allwinner,sram-name = "A3-A4";
++		};
++
++		sram at 00010000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00010000 0x1000>;
++			allwinner,sram-name = "D";
++		};
++
++		sram-controller at 01c00000 {
++			compatible = "allwinner,sun7i-a20-sram-controller";
++			reg = <0x01c00000 0x30>;
++		};
++
+ 		nmi_intc: interrupt-controller at 01c00030 {
+ 			compatible = "allwinner,sun7i-a20-sc-nmi";
+ 			interrupt-controller;
+-- 
+2.3.1
