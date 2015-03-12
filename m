@@ -1,84 +1,124 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 15:54:24 +0100
-Subject: [PATCH v4 2/9] ARM: at91: remove unused at91_ioremap_matrix and header
+Date: Thu, 12 Mar 2015 15:54:23 +0100
+Subject: [PATCH v4 1/9] ARM: at91: remove NEED_MACH_IO_H
 In-Reply-To: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426172071-20743-3-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426172071-20743-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91_ioremap_matrix and the at91_matrix.h header are not used anymore, remove
-them.
+From: Arnd Bergmann <arnd@arndb.de>
 
+The mach/io.h header on at91 is used to support a nonstandard I/O space
+window for the cf card driver. This changes the driver to use pci_ioremap_io
+in order to have the standard location, and then removes the custom
+mach/io.h.
+
+[alexandre.belloni at free-electrons.com: Added PCI dependency]
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-at91/generic.h                  |  4 ----
- arch/arm/mach-at91/include/mach/at91_matrix.h | 23 -----------------------
- arch/arm/mach-at91/setup.c                    | 10 ----------
- 3 files changed, 37 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
+ arch/arm/Kconfig                     |  1 -
+ arch/arm/mach-at91/Kconfig           |  1 +
+ arch/arm/mach-at91/include/mach/io.h | 27 ---------------------------
+ drivers/pcmcia/Kconfig               |  1 +
+ drivers/pcmcia/at91_cf.c             | 13 +++++++------
+ 5 files changed, 9 insertions(+), 34 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/io.h
 
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 583369ffc284..2b396c4e1fc1 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -25,10 +25,6 @@ extern void at91rm9200_timer_init(void);
- extern void at91rm9200_idle(void);
- extern void at91sam9_idle(void);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a2bc9b..e7ce6612bc42 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -361,7 +361,6 @@ config ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select IRQ_DOMAIN
+-	select NEED_MACH_IO_H if PCCARD
+ 	select PINCTRL
+ 	select PINCTRL_AT91
+ 	select USE_OF
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index c74a44324e5b..7ecde7de69da 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -81,6 +81,7 @@ config SOC_AT91RM9200
+ 	select CPU_ARM920T
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_AT91_USB_CLK
++	select MIGHT_HAVE_PCI
  
--/* Matrix */
--extern void at91_ioremap_matrix(u32 base_addr);
--
--
- #ifdef CONFIG_PM
- extern void __init at91rm9200_pm_init(void);
- extern void __init at91sam9260_pm_init(void);
-diff --git a/arch/arm/mach-at91/include/mach/at91_matrix.h b/arch/arm/mach-at91/include/mach/at91_matrix.h
+ config SOC_AT91SAM9
+ 	bool "AT91SAM9"
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
 deleted file mode 100644
-index f8996c954131..000000000000
---- a/arch/arm/mach-at91/include/mach/at91_matrix.h
+index 2d9ca0455745..000000000000
+--- a/arch/arm/mach-at91/include/mach/io.h
 +++ /dev/null
-@@ -1,23 +0,0 @@
+@@ -1,27 +0,0 @@
 -/*
-- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- * arch/arm/mach-at91/include/mach/io.h
 - *
-- * Under GPLv2
+- *  Copyright (C) 2003 SAN People
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
 -
--#ifndef __MACH_AT91_MATRIX_H__
--#define __MACH_AT91_MATRIX_H__
+-#ifndef __ASM_ARCH_IO_H
+-#define __ASM_ARCH_IO_H
 -
--#ifndef __ASSEMBLY__
--extern void __iomem *at91_matrix_base;
+-#define IO_SPACE_LIMIT		0xFFFFFFFF
+-#define __io(a)			__typesafe_io(a)
 -
--#define at91_matrix_read(field) \
--	__raw_readl(at91_matrix_base + field)
--
--#define at91_matrix_write(field, value) \
--	__raw_writel(value, at91_matrix_base + field)
--
--#else
--.extern at91_matrix_base
 -#endif
--
--#endif /* __MACH_AT91_MATRIX_H__ */
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 4e58bc90ed21..ef778f33c488 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -318,13 +318,3 @@ void __init at91_alt_map_io(void)
- 		pr_info("AT91: Detected soc subtype: %s\n",
- 			at91_get_soc_subtype(&at91_soc_initdata));
- }
--
--void __iomem *at91_matrix_base;
--EXPORT_SYMBOL_GPL(at91_matrix_base);
--
--void __init at91_ioremap_matrix(u32 base_addr)
--{
--	at91_matrix_base = ioremap(base_addr, 512);
--	if (!at91_matrix_base)
--		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
--}
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 3bb49252a098..075d5cd4c5ab 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -278,6 +278,7 @@ config BFIN_CFPCMCIA
+ 
+ config AT91_CF
+ 	tristate "AT91 CompactFlash Controller"
++	depends on PCI
+ 	depends on PCMCIA && ARCH_AT91
+ 	depends on !ARCH_MULTIPLATFORM
+ 	help
+diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
+index bfb799c7b343..e7775a41ae5d 100644
+--- a/drivers/pcmcia/at91_cf.c
++++ b/drivers/pcmcia/at91_cf.c
+@@ -317,13 +317,14 @@ static int at91_cf_probe(struct platform_device *pdev)
+ 	} else
+ 		cf->socket.pci_irq = nr_irqs + 1;
+ 
+-	/* pcmcia layer only remaps "real" memory not iospace */
+-	cf->socket.io_offset = (unsigned long) devm_ioremap(&pdev->dev,
+-					cf->phys_baseaddr + CF_IO_PHYS, SZ_2K);
+-	if (!cf->socket.io_offset) {
+-		status = -ENXIO;
++	/*
++	 * pcmcia layer only remaps "real" memory not iospace
++	 * io_offset is set to 0x10000 to avoid the check in static_find_io().
++	 * */
++	cf->socket.io_offset = 0x10000;
++	status = pci_ioremap_io(0x10000, cf->phys_baseaddr + CF_IO_PHYS);
++	if (status)
+ 		goto fail0a;
+-	}
+ 
+ 	/* reserve chip-select regions */
+ 	if (!devm_request_mem_region(&pdev->dev, io->start, resource_size(io), "at91_cf")) {
 -- 
 2.1.0
