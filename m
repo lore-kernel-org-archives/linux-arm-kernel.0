@@ -1,114 +1,74 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 22:48:07 -0500
-Subject: [PATCH v6 30/30] PCI: Remove pci_bus_assign_domain_nr()
-In-Reply-To: <1425868467-9667-31-git-send-email-wangyijing@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-31-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150312034807.GK10949@google.com>
+From: psawargaonkar@apm.com (Pranavkumar Sawargaonkar)
+Date: Thu, 12 Mar 2015 09:22:02 +0530
+Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
+In-Reply-To: <550086B9.4010001@arm.com>
+References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>
+ <550056FD.8060804@arm.com>
+ <CAL85gmCuB4LfNp+6B8cL9+emFqWPM6W9gevTzibyaAzL+7jVdg@mail.gmail.com>
+ <55007BE3.30300@arm.com>
+ <CAL85gmDVfop1_roHyLTRzFY3BahzTWs7nwbpmZD7emFKcFHyLg@mail.gmail.com>
+ <550086B9.4010001@arm.com>
+Message-ID: <CANFfpkQ1QyWEGwwQx1g1By=uXvctJjF8AOO+uA5CFUgO4v9DFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:27AM +0800, Yijing Wang wrote:
-> Now we save the domain number in pci_host_bridge,
-> we could remove pci_bus_assign_domain_nr() and
-> clean the domain member in pci_bus.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/pci.c   |    5 -----
->  drivers/pci/probe.c |   12 ++++--------
->  include/linux/pci.h |    3 ---
->  3 files changed, 4 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 2cf942b..4d8dfe4 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4581,11 +4581,6 @@ void pci_host_assign_domain_nr(struct pci_host_bridge *host)
->  {
->  	host->domain = pci_assign_domain_nr(host->dev.parent);
->  }
-> -
-> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> -{
-> -	bus->domain_nr = pci_assign_domain_nr(parent);
-> -}
+Hi Marc,
 
-I think you forgot to remove the empty pci_bus_assign_domain_nr()
-definition from include/linux/pci.h.
+On Wed, Mar 11, 2015 at 11:47 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 11/03/15 17:57, Feng Kan wrote:
+>> On Wed, Mar 11, 2015 at 10:31 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On 11/03/15 17:19, Feng Kan wrote:
+>>>> On Wed, Mar 11, 2015 at 7:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>>> On 27/01/15 07:03, Pranavkumar Sawargaonkar wrote:
+>>>>>> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
+>>>>>> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
+>>>>>> size due to size alignment checking in vgic driver for VCPU Control and
+>>>>>> VCPU register.
+>>>>>>
+>>>>>> This patch corrects the sizes to be inline with the hardware spec.
+>>>>>
+>>>>> This patch may be correct, but it is useless. The firmware on my APM
+>>>>> system (some version of u-boot) repaints the DT at boot time, negating
+>>>>> the effect of this patch.
+>>>> We have updated u-boot to reflect this change. I can supply you with a updated
+>>>> image if you wish.
+>>>
+>>> That would be useful, thanks.
+>>>
+>>> But more importantly, why bother upstreaming your DT into the kernel
+>>> tree if your firmware is going to overwrite whatever we provide?
+>> We did tried to submit a version upstream but was rejected.
+>>
+>>>
+>>> Either the firmware let the user provide its own DT (and doesn't touch
+>>> it other than to change the CPU enable method, insert a /memreserve/ or
+>>> similar things), or the firmware always provide its own DT, and doesn't
+>>> let the user provide its own. Corrupting the user DT is a disaster, as
+>>> we just found.
+>> Yes, the intent of the change is listed in the link below. It is not a
+>> justification by any means,
+>> just the effects of things appearing in layers.
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-September/288574.html
+>
+> Yeah. This is as wrong as it can possibly be. Oh well...
 
-I'm not sure how much value is left in CONFIG_PCI_DOMAINS_GENERIC.  You're
-removed *almost* everything that uses it.  I wonder how hard it would be to
-get rid of that last little bit.
+Yes there is an issue with u-boot patching the dt for end user who
+wants his DT to be used, for this we can (in fact we should) provide
+an option in u-boot (may be setting some environment variable) which
+will make sure end user's DT does not get modified (apart from
+standard things like patching mac-addresses) by u-boot.
 
->  #endif
->  #endif
->  
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 196f08a..9cd3ca2 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -481,7 +481,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
->  	}
->  }
->  
-> -static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
-> +static struct pci_bus *pci_alloc_bus(void)
->  {
->  	struct pci_bus *b;
->  
-> @@ -496,10 +496,7 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
->  	INIT_LIST_HEAD(&b->resources);
->  	b->max_bus_speed = PCI_SPEED_UNKNOWN;
->  	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
-> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -	if (parent)
-> -		b->domain_nr = parent->domain_nr;
-> -#endif
-> +
->  	return b;
->  }
->  
-> @@ -646,7 +643,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  	/*
->  	 * Allocate a new bus, and inherit stuff from the parent..
->  	 */
-> -	child = pci_alloc_bus(parent);
-> +	child = pci_alloc_bus();
->  	if (!child)
->  		return NULL;
->  
-> @@ -1866,14 +1863,13 @@ static struct pci_bus *pci_create_root_bus(
->  	char *fmt;
->  
->  	parent = bridge->dev.parent;
-> -	b = pci_alloc_bus(NULL);
-> +	b = pci_alloc_bus();
->  	if (!b)
->  		return NULL;
->  
->  	b->sysdata = dev_get_drvdata(&bridge->dev);
->  	b->ops = ops;
->  	b->number = b->busn_res.start = bridge->busnum;
-> -	pci_bus_assign_domain_nr(b, parent);
->  
->  	bridge->bus = b;
->  	b->bridge = get_device(&bridge->dev);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index dc1c710..ebc70bb 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -467,9 +467,6 @@ struct pci_bus {
->  	unsigned char	primary;	/* number of primary bridge */
->  	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
->  	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
-> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -	int		domain_nr;
-> -#endif
->  
->  	char		name[48];
->  
-> -- 
-> 1.7.1
-> 
+Another point I want to reopen here is the how to handle 64K GIC page
+size pointed out in this thread, what would be the best way to tackle
+this (adding a new DT string or any other way) ?
+
+
+Thanks,
+Pranav
+
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
