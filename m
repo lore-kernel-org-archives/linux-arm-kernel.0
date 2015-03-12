@@ -1,71 +1,55 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 12 Mar 2015 16:03:08 +0100
-Subject: [PATCH] ARM: dts: imx25-pinfunc,
- remove input values for pinfuncs without input register
-Message-ID: <1426172588-4255-1-git-send-email-mpa@pengutronix.de>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 12 Mar 2015 09:06:55 -0600
+Subject: [RFC PATCH v15 04/11] ARM: cpuidle: Register cpuidle_ops for
+ QCOM cpus
+In-Reply-To: <550187C0.4020006@linaro.org>
+References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
+ <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
+ <5500866F.6080704@codeaurora.org> <550187C0.4020006@linaro.org>
+Message-ID: <20150312150655.GA497@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-input values are only useful for pin functions which define a input
-register. This patch removes all input values of pin functions which do
-not have an input configuration register.
+On Thu, Mar 12 2015 at 06:34 -0600, Daniel Lezcano wrote:
+>On 03/11/2015 07:16 PM, Stephen Boyd wrote:
+>>On 03/09/15 08:16, Lina Iyer wrote:
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- arch/arm/boot/dts/imx25-pinfunc.h | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+[...]
 
-diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-index 88eebb15da6a..7c245c0a9f55 100644
---- a/arch/arm/boot/dts/imx25-pinfunc.h
-+++ b/arch/arm/boot/dts/imx25-pinfunc.h
-@@ -271,7 +271,7 @@
- #define MX25_PAD_CSI_D4__CSPI3_SCLK		0x128 0x320 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D5__CSI_D5			0x12c 0x324 0x000 0x10 0x000
--#define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x001
-+#define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x000
- #define MX25_PAD_CSI_D5__GPIO_1_30		0x12c 0x324 0x000 0x15 0x000
- #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x17 0x000
- 
-@@ -284,32 +284,32 @@
- #define MX25_PAD_CSI_D7__GPIO_1_6		0x134 0x32c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_D8__CSI_D8			0x138 0x330 0x000 0x10 0x000
--#define MX25_PAD_CSI_D8__AUD6_RXC		0x138 0x330 0x000 0x12 0x001
-+#define MX25_PAD_CSI_D8__AUD6_RXC		0x138 0x330 0x000 0x12 0x000
- #define MX25_PAD_CSI_D8__GPIO_1_7		0x138 0x330 0x000 0x15 0x000
- #define MX25_PAD_CSI_D8__CSPI3_SS2		0x138 0x330 0x4c4 0x17 0x000
- 
- #define MX25_PAD_CSI_D9__CSI_D9			0x13c 0x334 0x000 0x10 0x000
--#define MX25_PAD_CSI_D9__AUD6_RXFS		0x13c 0x334 0x000 0x12 0x001
-+#define MX25_PAD_CSI_D9__AUD6_RXFS		0x13c 0x334 0x000 0x12 0x000
- #define MX25_PAD_CSI_D9__GPIO_4_21		0x13c 0x334 0x000 0x15 0x000
- #define MX25_PAD_CSI_D9__CSPI3_SS3		0x13c 0x334 0x4c8 0x17 0x000
- 
- #define MX25_PAD_CSI_MCLK__CSI_MCLK		0x140 0x338 0x000 0x10 0x000
--#define MX25_PAD_CSI_MCLK__AUD6_TXD		0x140 0x338 0x000 0x11 0x001
-+#define MX25_PAD_CSI_MCLK__AUD6_TXD		0x140 0x338 0x000 0x11 0x000
- #define MX25_PAD_CSI_MCLK__SDHC2_DAT0		0x140 0x338 0x4e4 0x12 0x001
- #define MX25_PAD_CSI_MCLK__GPIO_1_8		0x140 0x338 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_VSYNC__CSI_VSYNC		0x144 0x33c 0x000 0x10 0x000
--#define MX25_PAD_CSI_VSYNC__AUD6_RXD		0x144 0x33c 0x000 0x11 0x001
-+#define MX25_PAD_CSI_VSYNC__AUD6_RXD		0x144 0x33c 0x000 0x11 0x000
- #define MX25_PAD_CSI_VSYNC__SDHC2_DAT1		0x144 0x33c 0x4e8 0x12 0x001
- #define MX25_PAD_CSI_VSYNC__GPIO_1_9		0x144 0x33c 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_HSYNC__CSI_HSYNC		0x148 0x340 0x000 0x10 0x000
--#define MX25_PAD_CSI_HSYNC__AUD6_TXC		0x148 0x340 0x000 0x11 0x001
-+#define MX25_PAD_CSI_HSYNC__AUD6_TXC		0x148 0x340 0x000 0x11 0x000
- #define MX25_PAD_CSI_HSYNC__SDHC2_DAT2		0x148 0x340 0x4ec 0x12 0x001
- #define MX25_PAD_CSI_HSYNC__GPIO_1_10		0x148 0x340 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_PIXCLK__CSI_PIXCLK		0x14c 0x344 0x000 0x10 0x000
--#define MX25_PAD_CSI_PIXCLK__AUD6_TXFS		0x14c 0x344 0x000 0x11 0x001
-+#define MX25_PAD_CSI_PIXCLK__AUD6_TXFS		0x14c 0x344 0x000 0x11 0x000
- #define MX25_PAD_CSI_PIXCLK__SDHC2_DAT3		0x14c 0x344 0x4f0 0x12 0x001
- #define MX25_PAD_CSI_PIXCLK__GPIO_1_11		0x14c 0x344 0x000 0x15 0x000
- 
--- 
-2.1.4
+>>>+#if IS_ENABLED(CONFIG_QCOM_PM)
+>>
+>>Why not #ifdef CONFIG_QCOM_PM? I thought IS_ENABLED was for C code where
+>>you want to put it in an if () statement.
+>
+>This is right. But the IS_ENABLED is also valid.
+>
+>It seems the current trend is to replace #ifdef with #if IS_ENABLED. 
+>It is supposed to prevent to create or'ed conditional with the module 
+>support.
+>
+>eg:
+>
+>#if defined(CONFIG_FOO) || defined(CONFIG_FOO_MODULE)
+>
+>is replaced by:
+>
+>#if IS_ENABLED(CONFIG_FOO)
+>
+>Lina: By the way, it would be preferable to use the 
+>CONFIG_ARM_QCOM_CPUIDLE where IS_ENABLED makes more sense even the 
+
+Daniel: I dont have CONFIG_ARM_QCOM_CPUIDLE defined anymore. By moving
+to generic ARM cpuidle, i removed all changes to drivers/cpuidle/. So I
+used the config item that defineds these items.
+
+Also, having two indpendent CONFIG_ items provides a chance that the
+declaration is not matched with the definition or vice versa.
+
+>drivers are not modules (who knows if they are converted as module 
+>again hence #ifdef will be invalid).
+>
+>
+>
+>>>+CPUIDLE_OPS(qcom_kpss_v1)
+>>>+CPUIDLE_OPS(qcom_kpss_v2)
+>>>+#endif
