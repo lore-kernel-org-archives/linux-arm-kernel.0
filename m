@@ -1,23 +1,25 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Thu, 12 Mar 2015 19:59:43 +0100
-Subject: [PATCH v2.0 0/2] ARM: AT91: pm: add support to disable the DDR's
- clock
-In-Reply-To: <1425873378-8253-1-git-send-email-wenyou.yang@atmel.com>
-References: <1425873378-8253-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20150312185943.GC14267@gradator.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 12 Mar 2015 12:08:47 -0700
+Subject: Update the clk tree for linux-next
+Message-ID: <CAPtuhTiQvSUMnd7p8D27GQ=hw1MqPSoN9P6pArLpK96QfnGsVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wenyou,
+Hi Stephen R.,
 
-On Mon, Mar 09, 2015 at 11:56:18AM +0800, Wenyou Yang wrote:
-> Hi,
-> 
-> The patch series purpose is to disable the DDR controller's clock and DDR
-> system clock during the suspending to achieve the lower power consumption.
+Stephen Boyd has kindly agreed to co-maintain the clk framework with
+me and we have shared commit access to a new git tree at kernel.org:
 
-To the whole series:
+https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/
 
-Tested-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+Can you update linux-next to pull from this tree instead of the
+git.linaro.org address? They are currently mirrors but the
+git.kernel.org tree is the canonical tree from this day forth. The
+full path to pull from is:
 
-Sylvain
+git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+
+This is already updated in MAINTAINERS.
+
+Thanks,
+Mike
