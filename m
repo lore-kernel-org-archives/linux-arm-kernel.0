@@ -1,52 +1,44 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 12 Mar 2015 14:51:14 +0800
-Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due to
- missing include file
-Message-ID: <1426143074.26140.0.camel@phoenix>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 12 Mar 2015 06:59:14 +0000
+Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting the
+ PWM
+In-Reply-To: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150312065914.GA3314@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix below build error:
-  CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
-In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
-drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
-compilation terminated.
-make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
-make[2]: *** [drivers/pinctrl/mediatek] Error 2
-make[1]: *** [drivers/pinctrl] Error 2
-make: *** [drivers] Error 2
+On Thu, 19 Feb 2015, Nicolas Ferre wrote:
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
- drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
+> flag is not handled properly. It can lead to the PWM not being found.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/video/backlight/pwm_bl.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-index 5019cef..e17aedb 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-@@ -16,7 +16,7 @@
- #define __PINCTRL_MTK_MT8135_H
- 
- #include <linux/pinctrl/pinctrl.h>
--#include <pinctrl-mtk-common.h>
-+#include "pinctrl-mtk-common.h"
- 
- static const struct mtk_desc_pin mtk_pins_mt8135[] = {
- 	MTK_PIN(
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-index c1a3ca0..13e5b68 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-@@ -16,7 +16,7 @@
- #define __PINCTRL_MTK_MT8173_H
- 
- #include <linux/pinctrl/pinctrl.h>
--#include <pinctrl-mtk-common.h>
-+#include "pinctrl-mtk-common.h"
- 
- static const struct mtk_desc_pin mtk_pins_mt8173[] = {
- 	MTK_PIN(
+I need a Thierry Ack for this.
+
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index 3a145a643e0d..6897f1c1bc73 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  
+>  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+>  	if (IS_ERR(pb->pwm)) {
+> +		ret = PTR_ERR(pb->pwm);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto err_alloc;
+> +
+>  		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+>  		pb->legacy = true;
+>  		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
+
 -- 
-1.9.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
