@@ -1,87 +1,81 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 12 Mar 2015 17:03:39 -0400 (EDT)
-Subject: [RFT/RFC PATCH 3/6] ARM: add macro to perform far branches (b/bl)
-In-Reply-To: <CAKv+Gu9Jcvr2QsWiwHY9ddcLwaHGUyBLBNzUB5voDXJpD8KLKA@mail.gmail.com>
-References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426181892-15440-4-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1503121625401.27567@knanqh.ubzr>
- <CAKv+Gu9Jcvr2QsWiwHY9ddcLwaHGUyBLBNzUB5voDXJpD8KLKA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1503121644180.27567@knanqh.ubzr>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 12 Mar 2015 22:05:24 +0100
+Subject: [PATCH v2 07/18] drivers: reset: Add STM32 reset driver
+In-Reply-To: <1426079308.3101.57.camel@pengutronix.de>
+References: <1424455277-29983-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <2383270.cAJPOxrkvo@wuerfel>
+ <CALszF6D3XMkjkMTdS-1xnVMFzgAW53NNOKOsfztsCboTdsBaaw@mail.gmail.com>
+ <2455342.zT71E5iyaL@wuerfel>
+ <CALszF6DENRS2L8mHD_iPsPwbAZndbHoB10oHaJ8-E4ajhog=8w@mail.gmail.com>
+ <1426079308.3101.57.camel@pengutronix.de>
+Message-ID: <CALszF6DOtAKLwo=VVYVKRZuhWC_NNvwKrV9R6_GYPdrRqh_0Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Mar 2015, Ard Biesheuvel wrote:
+2015-03-11 14:08 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Am Dienstag, den 10.03.2015, 22:20 +0100 schrieb Maxime Coquelin:
+>> 2015-03-10 21:21 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> > On Tuesday 10 March 2015 16:44:24 Maxime Coquelin wrote:
+>> >> 2015-03-10 16:02 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> >> > On Friday 20 February 2015 19:01:06 Maxime Coquelin wrote:
+>> >> >> +/* AHB1 */
+>> >> >> +#define GPIOA_RESET    0
+>> >> >> +#define GPIOB_RESET    1
+>> >> >> +#define GPIOC_RESET    2
+>> >> >> +#define GPIOD_RESET    3
+>> >> >> +#define GPIOE_RESET    4
+>> >> >> +#define GPIOF_RESET    5
+>> >> >> +#define GPIOG_RESET    6
+>> >> >> +#define GPIOH_RESET    7
+>> >> >> +#define GPIOI_RESET    8
+>> >> >> +#define GPIOJ_RESET    9
+>> >> >> +#define GPIOK_RESET    10
+>> >> >>
+>> >> >
+>> >> > As these are just the hardware numbers, it's better to not make them
+>> >> > part of the binding at all. Instead, just document in the binding that
+>> >> > one is supposed to pass the hardware number as the argument.
+>> >>
+>> >> The reset controller is part of the RCC (Reset & Clock Controller) IP.
+>> >> In this version, I only provided the reset registers to the reset
+>> >> controller driver, but as per Andreas F?rber remark, I should avec a
+>> >> single DT node for both the resets and clocks.
+>> >>
+>> >> In the next version I am preparing, the defines doesn't look as
+>> >> trivial as in this version, GPIOA_RESET being 128 for instance.
+>> >>
+>> >> Is it fine for you if I keep the defines part of the binding?
+>> >>
+>> >>
+>> >
+>> > It's always better to avoid these files entirely, as they are
+>> > a frequent source of merge dependencies, and they make it less
+>> > obvious what's going on than having binary values in the dtb
+>> > that make sense.
+>>
+>> I agree it is always painful to have to have to manage these merge dependencies.
+>> What I will do, if Philipp agrees, is to list all the values in the
+>> binding documentation.
+>>
+>> Doing that, the user of a reset won't have to do the calculation, and
+>> no more merge dependencies.
+>
+> I'd prefer to have #defines for the reset bits if they are named in the
+> documentation and use the names in the dts. But if you want to reference
+> reset bits by number in the device tree instead, I won't insist.
+>
+> Consider using two cells in the phandle for register and bit offset
+> instead of a single number that arbitrarily starts at 128.
 
-> On 12 March 2015 at 21:32, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Thu, 12 Mar 2015, Ard Biesheuvel wrote:
-> >
-> >> These macros execute PC-relative branches, but with a larger
-> >> reach than the 24 bits that are available in the b and bl opcodes.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
-> >>  1 file changed, 29 insertions(+)
-> >>
-> >> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> >> index f67fd3afebdf..bd08c3c1b73f 100644
-> >> --- a/arch/arm/include/asm/assembler.h
-> >> +++ b/arch/arm/include/asm/assembler.h
-> >> @@ -108,6 +108,35 @@
-> >>       .endm
-> >>  #endif
-> >>
-> >> +     /*
-> >> +      * Macros to emit relative branches that may exceed the range
-> >> +      * of the 24-bit immediate of the ordinary b/bl instructions.
-> >> +      * NOTE: this doesn't work with locally defined symbols, as they
-> >> +      * might lack the ARM/Thumb annotation (even if they are annotated
-> >> +      * as functions)
-> >
-> > I really hope you won't need a far call with local symbols ever!
-> >
-> 
-> Well, if you use pushsection/popsection, then local, numbered labels
-> you refer to can be quite far away in the output image, and those will
-> not have the thumb bit set.
+Thanks for your feedback.
 
-Indeed.
+I would prefer using a single cell, which is less error prone in my opinion.
+Will you accept this?
 
-> >> +      */
-> >> +     .macro  b_far, target, tmpreg
-> >> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
-> >> + ARM(        movt    \tmpreg, #:upper16:(\target - (8888f + 8))      )
-> >> + ARM(        movw    \tmpreg, #:lower16:(\target - (8888f + 8))      )
-> >> + THUMB(      movt    \tmpreg, #:upper16:(\target - (8888f + 4))      )
-> >> + THUMB(      movw    \tmpreg, #:lower16:(\target - (8888f + 4))      )
-> >> +8888:        add     pc, pc, \tmpreg
-> >> +#else
-> >> +     ldr     \tmpreg, 8889f
-> >> +8888:        add     pc, pc, \tmpreg
-> >> +     .align  2
-> >> +8889:
-> >> + ARM(        .word   \target - (8888b + 8)           )
-> >
-> > The Thumb relocation value is missing here.
-> >
-> 
-> Yes, this is bogus. But Thumb2 implies v7 or v7m, so it is not
-> actually incorrect in this case.
+Kind regards,
+Maxime
 
-The ".align 2" would be redundant in that case too.
-
-> But I will fix it in the next version
-
-Is it worth optimizing the ARM mode with movw/movt on ARMv7?  If not 
-then this could be simplified as only:
-
-             .macro  b_far, target, tmpreg
- THUMB(      movt    \tmpreg, #:upper16:(\target - (8888f + 4))      )
- THUMB(      movw    \tmpreg, #:lower16:(\target - (8888f + 4))      )
- ARM(        ldr     \tmpreg, 8888f+4                                )
- 8888:       add     pc, pc, \tmpreg
- ARM(        .word   \target - (8888b + 8)           )
-             .endm
-
-
-Nicolas
+>
+> regards
+> Philipp
+>
