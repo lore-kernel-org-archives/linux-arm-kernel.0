@@ -1,84 +1,56 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 12 Mar 2015 20:15:28 +0900
-Subject: [GIT PULL 2/2] Samsung fixes-2 for v4.0
-In-Reply-To: <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
-References: <54F4B33E.3070803@kernel.org> <2064108.qlOP0oDx90@wuerfel>
- <02cd01d057f6$ab1a8e40$014faac0$@kernel.org>
- <20150305123358.GC25728@developer.hsd1.ca.comcast.net>
-Message-ID: <025d01d05cb5$d8c6d650$8a5482f0$@kernel.org>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 12 Mar 2015 19:15:56 +0800
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <CAKohpok=8vU6Nr21n49MHoyk=REEMkuibVk9L+0L7uLnFj==AQ@mail.gmail.com>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
+ <CALx668VypyWbVuph0ir0SRt4kqASvYzwBuyc_r5tFeoHi+HieA@mail.gmail.com>
+ <CAKohpomxXTP6NdPoSmB=eq2sFqqgskS5vYtDNAT6a0VL5K6dCg@mail.gmail.com>
+ <CALx668VFRdeWcK_gKhJrJehnaH5uDpA0m2OfHLqPVUq8oocXaw@mail.gmail.com>
+ <CAKohpokT7fSniPGX2BfM61AtMoMCxEP8WDtbZ34bozUXscEWyg@mail.gmail.com>
+ <20150311105307.GW28806@sirena.org.uk>
+ <CAKohpom4riOhzc3hK8B2tiSwGx0zG96C7QNeQB0yZaPMd_OpLw@mail.gmail.com>
+ <20150311124555.GB28806@sirena.org.uk>
+ <CAKohpok=8vU6Nr21n49MHoyk=REEMkuibVk9L+0L7uLnFj==AQ@mail.gmail.com>
+Message-ID: <CALx668U7EoiMB8D0Num5w9oC0zZkC55uKaSOLrrBhKnLXUtoOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo Valentin wrote:
-> 
-Hi Eduardo,
+On Thu, Mar 12, 2015 at 5:28 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 11 March 2015 at 18:15, Mark Brown <broonie@kernel.org> wrote:
+>> Ugh, no - that's a hideous bodge which is only going to create trouble
+>> later.  Remember, DT is an ABI and should describe the hardware so if
+>> we're doing bodges that are visible there to shoehorn things onto our
+>> implementation that's bad.  The concerns that Pi-Cheng had about what
+>> happens if the PMIC gets changed definitely seem relevant here too.
+>
+> Hmm..
+>
+>> Why not just write a custom cpufreq driver if it's too hard to abstract?
+>
+> Hmm, probably all that can be solved with the new OPP bindings where
+> we can have support for multiple regulator or clock sources to the CPU.
+>
+> @Pi-cheng: How are you going to pass voltages for both the regulators
+> as OPPs today only support a single regulator, in case you have to write
+> your own driver.
 
-> On Fri, Mar 06, 2015 at 07:16:53PM +0900, Kukjin Kim wrote:
-> > Arnd Bergmann wrote:
-> > >
-> > + Eduardo
-> >
-> > Hi Arnd,
-> >
-> > > On Tuesday 03 March 2015 04:00:14 Kukjin Kim wrote:
-> > > > Please pull Samsung tmu and hdmi regression fixes for v4.0 and I know
-> > > > this is quite big for fixes but I couldn't handle this series for
-> > > > previous merge window because of dependency with driver side...sorry for
-> > > > that and please pull so that we could support them in v4.0 on exynos
-> > > > platforms.
-> > >
-> > > What kind of dependency do you have there? It really should not be
-> > > necessary to wait for driver changes, unless you do an incompatible
-> > > DT binding change, which you should avoid.
-> > >
-> > For TMU patches, I've asked Eduardo to provide topic branch for
-> > 'include/dt-bindings/thermal/thermal_exynos.h' has been added via thermal tree
-> > because if I can't apply the patch in Samsung tree for arm-soc, kernel build
-> > breakage will be happened. But I couldn't get Eduardo's topic branch.
-> 
-> 
-> Specifically, the developer, while migrating the driver to support DT
-> and OF thermal, decided to create a header with constants. The header is
-> used by DT files and the driver code. The header was the dependency.
-> 
-Yes, sometimes we can't avoid the situation so it can be a kind of dependency...
+The voltages of the two regulators need to be always under a limitation:
+100mV < Vsram - Vproc < 200mV
+For now, I just calculate the OPPs of Vsram from OPPs of Vproc.
 
+Another thing I should mention, if the voltage difference of two adjacent
+OPPs is greater than 100mV, we need to set the regulator to some
+voltages which are not in OPP table considering the limitation above.
+I think that will make it more difficult to model such flow in a generic
+framework.
 
-Arnd,
-Do you have any updates on this?
+Best Regards,
+Pi-Cheng
 
-Thanks,
-Kukjin
-
-> 
-> BR,
-> 
-> Eduardo Valentin
-> 
-> >
-> > http://www.spinics.net/lists/linux-samsung-soc/msg41877.html
-> >
-> >
-> > For HDMI patches, I thought the DT changes have a dependency with "drm/exynos:
-> > add support for 'hdmi' clock" so waited for its applying then in drm tree. But
-> > I couldn't send it to arm-soc after that...
-> >
-> > http://www.spinics.net/lists/linux-samsung-soc/msg42173.html
-> >
-> >
-> > I asked about the situation (late DT changes?) when I sent a pull-request, then
-> > I couldn't get a access my kernel.org because of biz. trip to China :(
-> >
-> > http://www.spinics.net/lists/linux-samsung-soc/msg42235.html
-> >
-> >
-> > > I've pulled it into fixes, but won't forward it until I hear a
-> > > good explanation.
-> > >
-> > As you know, basically I tried to make a clear branch for pull-request but in
-> > that case, I couldn't find a solution. Sorry for the inconvenience.
-> >
-> > I hope v4.0 can support them properly.
-> >
-> > Thanks,
-> > Kukjin
+>
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
