@@ -1,109 +1,71 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 12 Mar 2015 16:01:44 +0100
-Subject: [PATCH v2 01/17] reset: add of_reset_control_get_by_index()
-In-Reply-To: <1426162518-7405-2-git-send-email-vinceh@nvidia.com>
-References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
- <1426162518-7405-2-git-send-email-vinceh@nvidia.com>
-Message-ID: <1426172504.14455.67.camel@pengutronix.de>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 12 Mar 2015 16:03:08 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc,
+ remove input values for pinfuncs without input register
+Message-ID: <1426172588-4255-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vince,
+input values are only useful for pin functions which define a input
+register. This patch removes all input values of pin functions which do
+not have an input configuration register.
 
-Am Donnerstag, den 12.03.2015, 20:15 +0800 schrieb Vince Hsu:
-> Add of_reset_control_get_by_index() to allow the drivers to get reset device
-> without knowing its name.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/boot/dts/imx25-pinfunc.h | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-I see this is useful in the case of PM domain drivers that just need to
-trigger a list of resets in whatever order.
-
-> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-> 
-> ---
-> v2: minor changes according to Alex's comments
-> 
->  drivers/reset/core.c  | 44 +++++++++++++++++++++++++++++---------------
->  include/linux/reset.h |  9 +++++++++
->  2 files changed, 38 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-> index 7955e00d04d4..5e78866acd62 100644
-> --- a/drivers/reset/core.c
-> +++ b/drivers/reset/core.c
-> @@ -140,28 +140,15 @@ int reset_control_status(struct reset_control *rstc)
->  }
->  EXPORT_SYMBOL_GPL(reset_control_status);
->  
-> -/**
-> - * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-> - * @node: device to be reset by the controller
-> - * @id: reset line name
-> - *
-> - * Returns a struct reset_control or IS_ERR() condition containing errno.
-> - *
-> - * Use of id names is optional.
-> - */
-> -struct reset_control *of_reset_control_get(struct device_node *node,
-> -					   const char *id)
-> +struct reset_control *__of_reset_control_get(struct device_node *node,
-> +						int index)
-
-static
-
->  {
->  	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
->  	struct reset_controller_dev *r, *rcdev;
->  	struct of_phandle_args args;
-> -	int index = 0;
->  	int rstc_id;
->  	int ret;
->  
-> -	if (id)
-> -		index = of_property_match_string(node,
-> -						 "reset-names", id);
->  	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
->  					 index, &args);
->  	if (ret)
-> @@ -202,6 +189,33 @@ struct reset_control *of_reset_control_get(struct device_node *node,
->  
->  	return rstc;
->  }
-> +
-> +struct reset_control *of_reset_control_get_by_index(struct device_node *node,
-> +					   int index)
-> +{
-> +	return __of_reset_control_get(node, index);
-> +}
-> +EXPORT_SYMBOL_GPL(of_reset_control_get_by_index);
-
-This function is missing a kerneldoc comment, and please add a note that
-this is only to be used if the order of the resets doesn't matter.
-
-Actually, I see no reason not to just merge __of_reset_control_get into
-of_reset_control_get_by_index and then just call that from
-of_reset_control_get.
-
-> +/**
-> + * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-> + * @node: device to be reset by the controller
-> + * @id: reset line name
-> + *
-> + * Returns a struct reset_control or IS_ERR() condition containing errno.
-> + *
-> + * Use of id names is optional.
-> + */
-> +struct reset_control *of_reset_control_get(struct device_node *node,
-> +					   const char *id)
-> +{
-> +	int index = 0;
-> +
-> +	if (id)
-> +		index = of_property_match_string(node,
-> +						 "reset-names", id);
-> +	return __of_reset_control_get(node, index);
-> +}
->  EXPORT_SYMBOL_GPL(of_reset_control_get);
-[...]
-
-regards
-Philipp
+diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+index 88eebb15da6a..7c245c0a9f55 100644
+--- a/arch/arm/boot/dts/imx25-pinfunc.h
++++ b/arch/arm/boot/dts/imx25-pinfunc.h
+@@ -271,7 +271,7 @@
+ #define MX25_PAD_CSI_D4__CSPI3_SCLK		0x128 0x320 0x000 0x17 0x000
+ 
+ #define MX25_PAD_CSI_D5__CSI_D5			0x12c 0x324 0x000 0x10 0x000
+-#define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x001
++#define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x000
+ #define MX25_PAD_CSI_D5__GPIO_1_30		0x12c 0x324 0x000 0x15 0x000
+ #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x17 0x000
+ 
+@@ -284,32 +284,32 @@
+ #define MX25_PAD_CSI_D7__GPIO_1_6		0x134 0x32c 0x000 0x15 0x000
+ 
+ #define MX25_PAD_CSI_D8__CSI_D8			0x138 0x330 0x000 0x10 0x000
+-#define MX25_PAD_CSI_D8__AUD6_RXC		0x138 0x330 0x000 0x12 0x001
++#define MX25_PAD_CSI_D8__AUD6_RXC		0x138 0x330 0x000 0x12 0x000
+ #define MX25_PAD_CSI_D8__GPIO_1_7		0x138 0x330 0x000 0x15 0x000
+ #define MX25_PAD_CSI_D8__CSPI3_SS2		0x138 0x330 0x4c4 0x17 0x000
+ 
+ #define MX25_PAD_CSI_D9__CSI_D9			0x13c 0x334 0x000 0x10 0x000
+-#define MX25_PAD_CSI_D9__AUD6_RXFS		0x13c 0x334 0x000 0x12 0x001
++#define MX25_PAD_CSI_D9__AUD6_RXFS		0x13c 0x334 0x000 0x12 0x000
+ #define MX25_PAD_CSI_D9__GPIO_4_21		0x13c 0x334 0x000 0x15 0x000
+ #define MX25_PAD_CSI_D9__CSPI3_SS3		0x13c 0x334 0x4c8 0x17 0x000
+ 
+ #define MX25_PAD_CSI_MCLK__CSI_MCLK		0x140 0x338 0x000 0x10 0x000
+-#define MX25_PAD_CSI_MCLK__AUD6_TXD		0x140 0x338 0x000 0x11 0x001
++#define MX25_PAD_CSI_MCLK__AUD6_TXD		0x140 0x338 0x000 0x11 0x000
+ #define MX25_PAD_CSI_MCLK__SDHC2_DAT0		0x140 0x338 0x4e4 0x12 0x001
+ #define MX25_PAD_CSI_MCLK__GPIO_1_8		0x140 0x338 0x000 0x15 0x000
+ 
+ #define MX25_PAD_CSI_VSYNC__CSI_VSYNC		0x144 0x33c 0x000 0x10 0x000
+-#define MX25_PAD_CSI_VSYNC__AUD6_RXD		0x144 0x33c 0x000 0x11 0x001
++#define MX25_PAD_CSI_VSYNC__AUD6_RXD		0x144 0x33c 0x000 0x11 0x000
+ #define MX25_PAD_CSI_VSYNC__SDHC2_DAT1		0x144 0x33c 0x4e8 0x12 0x001
+ #define MX25_PAD_CSI_VSYNC__GPIO_1_9		0x144 0x33c 0x000 0x15 0x000
+ 
+ #define MX25_PAD_CSI_HSYNC__CSI_HSYNC		0x148 0x340 0x000 0x10 0x000
+-#define MX25_PAD_CSI_HSYNC__AUD6_TXC		0x148 0x340 0x000 0x11 0x001
++#define MX25_PAD_CSI_HSYNC__AUD6_TXC		0x148 0x340 0x000 0x11 0x000
+ #define MX25_PAD_CSI_HSYNC__SDHC2_DAT2		0x148 0x340 0x4ec 0x12 0x001
+ #define MX25_PAD_CSI_HSYNC__GPIO_1_10		0x148 0x340 0x000 0x15 0x000
+ 
+ #define MX25_PAD_CSI_PIXCLK__CSI_PIXCLK		0x14c 0x344 0x000 0x10 0x000
+-#define MX25_PAD_CSI_PIXCLK__AUD6_TXFS		0x14c 0x344 0x000 0x11 0x001
++#define MX25_PAD_CSI_PIXCLK__AUD6_TXFS		0x14c 0x344 0x000 0x11 0x000
+ #define MX25_PAD_CSI_PIXCLK__SDHC2_DAT3		0x14c 0x344 0x4f0 0x12 0x001
+ #define MX25_PAD_CSI_PIXCLK__GPIO_1_11		0x14c 0x344 0x000 0x15 0x000
+ 
+-- 
+2.1.4
