@@ -1,62 +1,187 @@
 From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Thu, 12 Mar 2015 13:53:04 +0200
-Subject: [PATCH v6 2/6] ARM: Alpine: early-debug print support
-Message-ID: <55017e20.cQfjmLVJ2LRqZ3eD%tsahee@annapurnalabs.com>
+Date: Thu, 12 Mar 2015 13:53:09 +0200
+Subject: [PATCH v6 4/6] ARM: dts: Alpine platform binding documentation
+Message-ID: <55017e25.+YC0O9kly8Rbiti6%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alpine platform includes UART8250 that can be used for early prints.
+This patch introduces documentation for alpine devicetree bindings.
 
-Signed-off-by: Saeed Bishara <saeed@annapurnalabs.com>
+Signed-off-by: Barak Wasserstrom <barak@annapurnalabs.com>
 Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig.debug | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/arm/al,alpine.txt          | 88 ++++++++++++++++++++++
+ .../bindings/arm/cpu-enable-method/al,alpine-smp   | 52 +++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  2 +
+ 3 files changed, 142 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6e55ed9..0fcecbc 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -93,6 +93,14 @@ choice
- 	prompt "Kernel low-level debugging port"
- 	depends on DEBUG_LL
- 
-+	config DEBUG_ALPINE_UART0
-+		bool "Kernel low-level debugging messages via Alpine UART0"
-+		depends on ARCH_ALPINE
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Alpine based platforms.
+diff --git a/Documentation/devicetree/bindings/arm/al,alpine.txt b/Documentation/devicetree/bindings/arm/al,alpine.txt
+new file mode 100644
+index 0000000..f404a4f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/al,alpine.txt
+@@ -0,0 +1,88 @@
++Annapurna Labs Alpine Platform Device Tree Bindings
++---------------------------------------------------------------
 +
- 	config DEBUG_ASM9260_UART
- 		bool "Kernel low-level debugging via asm9260 UART"
- 		depends on MACH_ASM9260
-@@ -1416,6 +1424,7 @@ config DEBUG_UART_PHYS
- 	default 0xf8b00000 if DEBUG_HIX5HD2_UART
- 	default 0xf991e000 if DEBUG_QCOM_UARTDM
- 	default 0xfcb00000 if DEBUG_HI3620_UART
-+	default 0xfd883000 if DEBUG_ALPINE_UART0
- 	default 0xfe800000 if ARCH_IOP32X
- 	default 0xff690000 if DEBUG_RK32_UART2
- 	default 0xffc02000 if DEBUG_SOCFPGA_UART
-@@ -1482,6 +1491,7 @@ config DEBUG_UART_VIRT
- 	default 0xfd000000 if ARCH_SPEAR3XX || ARCH_SPEAR6XX
- 	default 0xfd000000 if ARCH_SPEAR13XX
- 	default 0xfd012000 if ARCH_MV78XX0
-+	default 0xfd883000 if DEBUG_ALPINE_UART0
- 	default 0xfde12000 if ARCH_DOVE
- 	default 0xfe012000 if ARCH_ORION5X
- 	default 0xf31004c0 if DEBUG_MESON_UARTAO
-@@ -1542,7 +1552,7 @@ config DEBUG_UART_8250_WORD
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	depends on DEBUG_UART_8250_SHIFT >= 2
- 	default y if DEBUG_PICOXCELL_UART || DEBUG_SOCFPGA_UART || \
--		ARCH_KEYSTONE || \
-+		ARCH_KEYSTONE || DEBUG_ALPINE_UART0 || \
- 		DEBUG_DAVINCI_DMx_UART0 || DEBUG_DAVINCI_DA8XX_UART1 || \
- 		DEBUG_DAVINCI_DA8XX_UART2 || \
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
++Boards in the Alpine family shall have the following properties:
++
++* Required root node properties:
++compatible: must contain "al,alpine"
++
++* Example:
++
++/ {
++	model = "Annapurna Labs Alpine Dev Board";
++	compatible = "al,alpine";
++
++	...
++}
++
++* CPU node:
++
++The Alpine platform includes cortex-a15 cores.
++enable-method: must be "al,alpine-smp" to allow smp  [1]
++
++Example:
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	enable-method = "al,alpine-smp";
++
++	cpu at 0 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <0>;
++	};
++
++	cpu at 1 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <1>;
++	};
++
++	cpu at 2 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <2>;
++	};
++
++	cpu at 3 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <3>;
++	};
++};
++
++
++* Alpine CPU resume registers
++
++The CPU resume register are used to define required resume address after
++reset.
++
++Properties:
++- compatible : Should contain "al,alpine-cpu-resume".
++- reg : Offset and length of the register set for the device
++
++Example:
++
++cpu_resume {
++	compatible = "al,alpine-cpu-resume";
++	reg = <0xfbff5ed0 0x30>;
++};
++
++* Alpine System-Fabric Service Registers
++
++The System-Fabric Service Registers allow various operation on CPU and
++system fabric, like powering CPUs off.
++
++Properties:
++- compatible : Should contain "al,alpine-sysfabric-service" and "syscon".
++- reg : Offset and length of the register set for the device
++
++Example:
++
++nb_service {
++        compatible = "al,alpine-sysfabric-service", "syscon";
++        reg = <0xfb070000 0x10000>;
++};
++
++[1] arm/cpu-enable-method/al,alpine-smp
+diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+new file mode 100644
+index 0000000..c2e0cc5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/al,alpine-smp
+@@ -0,0 +1,52 @@
++========================================================
++Secondary CPU enable-method "al,alpine-smp" binding
++========================================================
++
++This document describes the "al,alpine-smp" method for
++enabling secondary CPUs. To apply to all CPUs, a single
++"al,alpine-smp" enable method should be defined in the
++"cpus" node.
++
++Enable method name:	"al,alpine-smp"
++Compatible machines:	"al,alpine"
++Compatible CPUs:	"arm,cortex-a15"
++Related properties:	(none)
++
++Note:
++This enable method requires valid nodes compatible with
++"al,alpine-cpu-resume" and "al,alpine-nb-service"[1].
++
++Example:
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	enable-method = "al,alpine-smp";
++
++	cpu at 0 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <0>;
++	};
++
++	cpu at 1 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <1>;
++	};
++
++	cpu at 2 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <2>;
++	};
++
++	cpu at 3 {
++		compatible = "arm,cortex-a15";
++		device_type = "cpu";
++		reg = <3>;
++	};
++};
++
++--
++[1] arm/al,alpine.txt
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index aeb5bb5..cb94a098 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -11,6 +11,8 @@ adapteva	Adapteva, Inc.
+ adh	AD Holdings Plc.
+ adi	Analog Devices, Inc.
+ aeroflexgaisler	Aeroflex Gaisler AB
++ak	Asahi Kasei Corp.
++al	Annapurna Labs
+ allwinner	Allwinner Technology Co., Ltd.
+ alphascale	AlphaScale Integrated Circuits Systems, Inc.
+ altr	Altera Corp.
 -- 
 1.9.1
