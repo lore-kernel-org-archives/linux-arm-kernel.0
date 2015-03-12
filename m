@@ -1,66 +1,31 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 00:36:10 +0100
-Subject: [PATCH v3 02/12] irqchip: nvic: support hierarchy irq domain
+Date: Fri, 13 Mar 2015 00:36:12 +0100
+Subject: [PATCH v3 04/12] ARM: ARMv7M: define size of vector table for Vybrid
 In-Reply-To: <1426203380-7155-1-git-send-email-stefan@agner.ch>
 References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426203380-7155-3-git-send-email-stefan@agner.ch>
+Message-ID: <1426203380-7155-5-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for hierarchy irq domain. Use to support the interrupt
-router found in Vybrid SoC, which is between the NVIC and the
-peripherals.
+Vybrids has 112 peripherial interrupts which can be routed to the
+Cortex-M4's NVIC interrupt controller.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ arch/arm/mm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-index 4ff0805..5fac910 100644
---- a/drivers/irqchip/irq-nvic.c
-+++ b/drivers/irqchip/irq-nvic.c
-@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
- 	handle_IRQ(irq, regs);
- }
- 
-+static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *arg)
-+{
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	unsigned int type = IRQ_TYPE_NONE;
-+	struct of_phandle_args *irq_data = arg;
-+
-+	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
-+				   irq_data->args_count, &hwirq, &type);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_map_generic_chip(domain, virq + i, hwirq + i);
-+
-+	return 0;
-+}
-+
-+static const struct irq_domain_ops nvic_irq_domain_ops = {
-+	.xlate = irq_domain_xlate_onecell,
-+	.alloc = nvic_irq_domain_alloc,
-+	.free = irq_domain_free_irqs_top,
-+};
-+
- static int __init nvic_of_init(struct device_node *node,
- 			       struct device_node *parent)
- {
-@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
- 		irqs = NVIC_MAX_IRQ;
- 
- 	nvic_irq_domain =
--		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
-+		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
-+
- 	if (!nvic_irq_domain) {
- 		pr_warn("Failed to allocate irq domain\n");
- 		return -ENOMEM;
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 16d077e..8eebc0d 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -609,6 +609,7 @@ config CPUV7M_NUM_IRQ
+ 	depends on CPU_V7M
+ 	default 90 if ARCH_STM32
+ 	default 38 if ARCH_EFM32
++	default 112 if SOC_VF610
+ 	default 240
+ 	help
+ 	  This option indicates the number of interrupts connected to the NVIC.
 -- 
 2.3.1
