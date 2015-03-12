@@ -1,73 +1,45 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:15:11 +0800
-Subject: [PATCH v6 13/30] PCI: Introduce new scan function
- pci_scan_host_bridge()
-In-Reply-To: <20150312032515.GF10949@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-14-git-send-email-wangyijing@huawei.com>
- <20150312032515.GF10949@google.com>
-Message-ID: <5501915F.80404@huawei.com>
+From: ashwin.chaugule@linaro.org (Ashwin Chaugule)
+Date: Thu, 12 Mar 2015 09:18:54 -0400
+Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
+In-Reply-To: <7hh9try12u.fsf@deeprootsystems.com>
+References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hh9try12u.fsf@deeprootsystems.com>
+Message-ID: <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
->> +		u32 db, struct pci_ops *ops, void *sysdata,
->> +		struct list_head *resources,
->> +		struct pci_host_bridge_ops *phb_ops)
-> 
-> Drop the "phb_" prefix.
-
-OK.
-
-> 
->> +{
->> +	struct pci_host_bridge *host;
->> +	struct pci_bus *bus;
->> +
->> +	host = pci_create_host_bridge(parent, db, resources,
->> +			sysdata, phb_ops);
->> +	if (!host)
->> +		return NULL;
->> +
->> +	bus = __pci_scan_root_bus(host, ops);
->> +	if (!bus)
->> +		pci_free_host_bridge(host);
->> +
->> +	return host;
->> +}
->> +EXPORT_SYMBOL(pci_scan_host_bridge);
->> +
->> +
->>  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->>  		struct pci_ops *ops, void *sysdata, struct list_head *resources)
->>  {
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index e9922b1..28eafb5 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -790,6 +790,10 @@ void pci_bus_release_busn_res(struct pci_bus *b);
->>  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 dombus,
->>  					     struct pci_ops *ops, void *sysdata,
->>  					     struct list_head *resources);
->> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
->> +		u32 dombus, struct pci_ops *ops, void *sysdata,
->> +		struct list_head *resources,
->> +		struct pci_host_bridge_ops *phb_ops);
->>  struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
->>  				int busnr);
->>  void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
->> -- 
->> 1.7.1
+On 11 March 2015 at 12:02, Kevin Hilman <khilman@kernel.org> wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>
+>> When a CPU is being profiled through PMU events and it enters suspend
+>> or idle states, the PMU registers content can be lost, which means that
+>> counters that were relied upon on power down entry are reset on power
+>> up to values that are incosistent with the profile session.
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+>> This patch adds a CPU PM notifier to arm64 perf code, that detects
+>> on entry if events are being monitored, and if so, it returns
+>> failure to the CPU PM notification chain, causing the suspend
+>> thread or the idle thread to abort power down, therefore preventing
+>> registers content loss.
+>>
+>> By triggering CPU PM notification failure this patch prevents
+>> suspending a system if the suspend thread is being profiled and
+>> it also prevents entering idle deep states on cores that have profile
+>> events in use, somehow limiting power management capabilities when
+>> there are active perf sessions.
+>
+> I guess that's one choice.  Couldn't you also stop the PMU and
+> save/restore it's context in the notifiers? so that you wouldn't affect
+> PM capabilities?
+>
+> That would imply that you lose the ability to profile after a certain
+> point in suspend/idle, but maybe that's a better trade off than having
+> profiling disable certain PM features?
 
+I had something like that a few years ago on the Kraits and Scorpions [1].
 
--- 
-Thanks!
-Yijing
+[1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/commit/arch/arm/kernel?h=msm-3.4&id=b5ca687960f0fea2f4735e83ca5c9543474c19de
+
+Cheers,
+Ashwin.
