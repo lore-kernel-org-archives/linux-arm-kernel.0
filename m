@@ -1,30 +1,33 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 00:36:15 +0100
-Subject: [PATCH v3 07/12] ARM: imx: depend MXC debug board on 3DS machines
+Date: Fri, 13 Mar 2015 00:36:13 +0100
+Subject: [PATCH v3 05/12] clocksource: add dependencies for Vybrid pit
+ clocksource
 In-Reply-To: <1426203380-7155-1-git-send-email-stefan@agner.ch>
 References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426203380-7155-8-git-send-email-stefan@agner.ch>
+Message-ID: <1426203380-7155-6-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depend the MXC debug board on machines which actually support it.
+Add the minimal dependencies required to use the Vybrid PIT
+clocksource driver. Those are not part of the SoC dependencies.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/mach-imx/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c8dffce..d21cb9a 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -21,6 +21,7 @@ config MXC_AVIC
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 1c2506f..350e742 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -164,6 +164,8 @@ config FSL_FTM_TIMER
  
- config MXC_DEBUG_BOARD
- 	bool "Enable MXC debug board(for 3-stack)"
-+	depends on MACH_MX27_3DS || MACH_MX31_3DS || MACH_MX35_3DS
+ config VF_PIT_TIMER
+ 	bool
++	select CLKSRC_MMIO
++	select CLKSRC_OF
  	help
- 	  The debug board is an integral part of the MXC 3-stack(PDK)
- 	  platforms, it can be attached or removed from the peripheral
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+ 
 -- 
 2.3.1
