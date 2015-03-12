@@ -1,37 +1,47 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Thu, 12 Mar 2015 22:14:59 +0100
-Subject: [PATCH 2/2] Documentation: omap-twl4030: Remove ti,codec property
-In-Reply-To: <1426194899-14037-1-git-send-email-marek@goldelico.com>
-References: <1426194899-14037-1-git-send-email-marek@goldelico.com>
-Message-ID: <1426194899-14037-3-git-send-email-marek@goldelico.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 12 Mar 2015 22:18:26 +0100
+Subject: [RFT/RFC PATCH 6/6] ARM: keep .text and .fixup regions together
+In-Reply-To: <20150312211051.GZ8656@n2100.arm.linux.org.uk>
+References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426181892-15440-7-git-send-email-ard.biesheuvel@linaro.org>
+ <20150312211051.GZ8656@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu8h=8wQO7NWOXbLvvWF+WhiL63s9pF9JZCT7BUUu-pSdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ti,codec property is not necessary anymore thus removing references
-from documentation.
+On 12 March 2015 at 22:10, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Mar 12, 2015 at 06:38:12PM +0100, Ard Biesheuvel wrote:
+>> Fixup snippets are put into a dedicated section so that they don't
+>> bloat cache lines with instructions that are usually not executed.
+>> But there is no reason to put all these snippets together at the far
+>> end of the .text output region, where the branch instruction they
+>> contain could go out of range if the kernel grows in size.
+>>
+>> Instead, emit .text and .fixup regions together for each input object.
+>> They should still be out of the way, but not so far that they go out
+>> of range.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> Note that the TEXT_TEXT macro will emit *(.text) again but this should be
+>> harmless.
+>
+> However, I wonder if by doing this, we're weakening the ability for
+> kallsyms final link to succeed:
+>
+> /* .text section. Map to function alignment to avoid address changes
+>  * during second ld run in second ld pass when generating System.map */
+>
+> Can we not just move .fixup before TEXT_TEXT?  The only thing between it
+> and .text would be .text.hot.
+>
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- Documentation/devicetree/bindings/sound/omap-twl4030.txt | 2 --
- 1 file changed, 2 deletions(-)
+Putting .fixup before .text already helps, but not enough for the
+.config Arnd gave me that I have been testing this with.
 
-diff --git a/Documentation/devicetree/bindings/sound/omap-twl4030.txt b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-index 1ab6bc8..656165f 100644
---- a/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-+++ b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-@@ -4,7 +4,6 @@ Required properties:
- - compatible: "ti,omap-twl4030"
- - ti,model: Name of the sound card (for example "omap3beagle")
- - ti,mcbsp: phandle for the McBSP node
--- ti,codec: phandle for the twl4030 audio node
- 
- Optional properties:
- - ti,mcbsp-voice: phandle for the McBSP node connected to the voice port of twl
-@@ -59,5 +58,4 @@ sound {
- 	ti,model = "omap3beagle";
- 
- 	ti,mcbsp = <&mcbsp2>;
--	ti,codec = <&twl_audio>;
- };
--- 
-1.9.1
+What *(.text .fixup) does (i.e., putting both section names inside the
+parentheses), is emitting both sections for each input object file, so
+they will always be close to the object that it refers to, so it is
+not the same thing.
