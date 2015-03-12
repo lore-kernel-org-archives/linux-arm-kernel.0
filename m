@@ -1,49 +1,109 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 12 Mar 2015 08:28:13 +0100
-Subject: [PATCH 2/2] soc: mediatek: Add PMIC wrapper for MT8135 and
- MT8173 SoCs
-In-Reply-To: <1426072351.4244.95.camel@x220>
-References: <1426000954-7647-1-git-send-email-s.hauer@pengutronix.de>
- <1426000954-7647-3-git-send-email-s.hauer@pengutronix.de>
- <1426072351.4244.95.camel@x220>
-Message-ID: <20150312072813.GC24885@pengutronix.de>
+From: moon.linux@yahoo.com (Anand Moon)
+Date: Thu, 12 Mar 2015 12:59:51 +0530
+Subject: [PATCH] ARM: dts: exynos5420 Fixes -ELOOP (Too many levels of
+ symbolic links)
+Message-ID: <1426145391-30089-1-git-send-email-moon.linux@yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 12:12:31PM +0100, Paul Bolle wrote:
-> On Tue, 2015-03-10 at 16:22 +0100, Sascha Hauer wrote:
-> > --- /dev/null
-> > +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> > @@ -0,0 +1,978 @@
-> > +/*
-> > + * Copyright (c) 2014 MediaTek Inc.
-> > + * Author: Flora Fu, MediaTek
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> 
-> This states the license is GPL v2.
-> 
-> > +MODULE_LICENSE("GPL");
-> 
-> So you probably want
->     MODULE_LICENSE("GPL v2");
+BUG of recursive symbolic link and be observed by using below powerdebug
+        git://git.linaro.org/tools/powerdebug.git.
 
-Fixed that, thanks.
+This utility populates the Clock, Regulators, Sensors and Gpio.
+Some how the regulators were not getting populated by this utility.
+After debugging this powerdebug application using 'strace' I can across following.
 
-Also fixed in the power domain driver you found the same issue.
+Below output is trunkated.
 
-Sascha
+stat64("/sys/class/regulator/regulator.0/usb at 12000000-vdd10/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group/devices/usb at 12000000/
+iommu_group/devices/usb at 12000000/iommu_group", 0xbec45fb8) = -1 ELOOP (Too many levels of symbolic links)
+close(63)                               = 0
+close(62)                               = 0
 
+These changes depend on following series of commit.
+ Pull iommu fixes from Joerg Roedel:
+     "The patches contain:
+
+       - fix multiple ARM IOMMU drivers to behave well when the hardware is
+         not present
+
+       - mark MSM driver as broken
+
+       - fix build errors with the new ARM generic io-page-table code"
+
+    * tag 'iommu-fixes-v4.0-rc3' of git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu:
+      iommu/io-pgtable-arm: Add built time dependency
+      iommu/msm: Mark driver BROKEN
+      iommu/rockchip: Play nice in multi-platform builds
+      iommu/omap: Play nice in multi-platform builds
+      iommu/exynos: Play nice in multi-platform builds
+      iommu/io-pgtable-arm: Fix self-test WARNs on i386
+
+After these changes powerdebug will populate regulators.
+
+Tested on OdroidXU3 board.
+
+Signed-off-by: Anand Moon <moon.linux@yahoo.com>
+---
+ arch/arm/boot/dts/exynos5420.dtsi | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 9dc2e97..a5f13a3 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -840,14 +840,14 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
++	};
+ 
+-		usbdrd_dwc3_0: dwc3 {
+-			compatible = "snps,dwc3";
+-			reg = <0x12000000 0x10000>;
+-			interrupts = <0 72 0>;
+-			phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
+-			phy-names = "usb2-phy", "usb3-phy";
+-		};
++	usbdrd_dwc3_0: dwc3 {
++		compatible = "snps,dwc3";
++		reg = <0x12000000 0x10000>;
++		interrupts = <0 72 0>;
++		phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
++		phy-names = "usb2-phy", "usb3-phy";
+ 	};
+ 
+ 	usbdrd_phy0: phy at 12100000 {
+@@ -866,14 +866,14 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
++	};
+ 
+-		usbdrd_dwc3_1: dwc3 {
+-			compatible = "snps,dwc3";
+-			reg = <0x12400000 0x10000>;
+-			interrupts = <0 73 0>;
+-			phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
+-			phy-names = "usb2-phy", "usb3-phy";
+-		};
++	usbdrd_dwc3_1: dwc3 {
++		compatible = "snps,dwc3";
++		reg = <0x12400000 0x10000>;
++		interrupts = <0 73 0>;
++		phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
++		phy-names = "usb2-phy", "usb3-phy";
+ 	};
+ 
+ 	usbdrd_phy1: phy at 12500000 {
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.0
