@@ -1,206 +1,168 @@
 From: eliad@wizery.com (Eliad Peller)
-Date: Thu, 12 Mar 2015 14:09:09 +0200
-Subject: [PATCH v6 1/6] wlcore: set irq_trigger in board files instead of
- hiding behind a quirk
+Date: Thu, 12 Mar 2015 14:09:12 +0200
+Subject: [PATCH v6 4/6] wlcore: add device-tree support
 In-Reply-To: <1426162154-8716-1-git-send-email-eliad@wizery.com>
 References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-Message-ID: <1426162154-8716-2-git-send-email-eliad@wizery.com>
+Message-ID: <1426162154-8716-5-git-send-email-eliad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Luciano Coelho <luca@coelho.fi>
+When running with device-tree, we no longer have a board file
+that can set up the platform data for wlcore.
+Allow this data to be passed from DT.
 
-The platform_quirk element in the platform data was used
-to change the way the IRQ is triggered.  When set,
-the EDGE_IRQ quirk would change the irqflags used
-and treat edge trigger differently from the rest.
-
-Instead of hiding this irq flag setting behind the quirk,
-have the board files set the irq_trigger explicitly.
-
-This will allow us to use standard irq DT definitions
-later on.
-
-Signed-off-by: Luciano Coelho <luca@coelho.fi>
-[Eliad - rebase, add irq_trigger field and pass it,
-update board file changes]
+Signed-off-by: Ido Yariv <ido@wizery.com>
 Signed-off-by: Eliad Peller <eliad@wizery.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c  |  2 +-
- arch/arm/mach-omap2/pdata-quirks.c       |  1 +
- drivers/net/wireless/ti/wlcore/debugfs.c |  2 +-
- drivers/net/wireless/ti/wlcore/main.c    | 27 ++++++++++++++++-----------
- drivers/net/wireless/ti/wlcore/sdio.c    |  2 +-
- drivers/net/wireless/ti/wlcore/wlcore.h  |  5 ++---
- include/linux/wl12xx.h                   |  5 +----
- 7 files changed, 23 insertions(+), 21 deletions(-)
+v6: parse frequency properties, add wl12xx compatible strings
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6b5a97d..916589c 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1385,8 +1385,8 @@ static const short da850_wl12xx_pins[] __initconst = {
- 
- static struct wl12xx_platform_data da850_wl12xx_wlan_data __initdata = {
- 	.irq			= -1,
-+	.irq_trigger		= IRQ_TYPE_EDGE_RISING,
- 	.board_ref_clock	= WL12XX_REFCLOCK_38,
--	.platform_quirks	= WL12XX_PLATFORM_QUIRK_EDGE_IRQ,
- };
- 
- static __init int da850_wl12xx_init(void)
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 190fa43..4449f4c 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -48,6 +48,7 @@ static void __init __used legacy_init_wl12xx(unsigned ref_clock,
- 	wl12xx.board_ref_clock = ref_clock;
- 	wl12xx.board_tcxo_clock = tcxo_clock;
- 	wl12xx.irq = gpio_to_irq(gpio);
-+	wl12xx.irq_trigger = IRQ_TYPE_LEVEL_HIGH;
- 
- 	res = wl12xx_set_platform_data(&wl12xx);
- 	if (res) {
-diff --git a/drivers/net/wireless/ti/wlcore/debugfs.c b/drivers/net/wireless/ti/wlcore/debugfs.c
-index 68f3bf2..eb43f94 100644
---- a/drivers/net/wireless/ti/wlcore/debugfs.c
-+++ b/drivers/net/wireless/ti/wlcore/debugfs.c
-@@ -502,7 +502,7 @@ static ssize_t driver_state_read(struct file *file, char __user *user_buf,
- 	DRIVER_STATE_PRINT_HEX(irq);
- 	/* TODO: ref_clock and tcxo_clock were moved to wl12xx priv */
- 	DRIVER_STATE_PRINT_HEX(hw_pg_ver);
--	DRIVER_STATE_PRINT_HEX(platform_quirks);
-+	DRIVER_STATE_PRINT_HEX(irq_flags);
- 	DRIVER_STATE_PRINT_HEX(chip.id);
- 	DRIVER_STATE_PRINT_STR(chip.fw_ver_str);
- 	DRIVER_STATE_PRINT_STR(chip.phy_fw_ver_str);
-diff --git a/drivers/net/wireless/ti/wlcore/main.c b/drivers/net/wireless/ti/wlcore/main.c
-index 1e13699..67518f6 100644
---- a/drivers/net/wireless/ti/wlcore/main.c
-+++ b/drivers/net/wireless/ti/wlcore/main.c
-@@ -27,6 +27,7 @@
- #include <linux/vmalloc.h>
- #include <linux/wl12xx.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- 
- #include "wlcore.h"
- #include "debug.h"
-@@ -538,7 +539,7 @@ static int wlcore_irq_locked(struct wl1271 *wl)
- 	 * In case edge triggered interrupt must be used, we cannot iterate
- 	 * more than once without introducing race conditions with the hardirq.
- 	 */
--	if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ)
-+	if (wl->irq_flags & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING))
- 		loopcount = 1;
- 
- 	wl1271_debug(DEBUG_IRQ, "IRQ work");
-@@ -6249,7 +6250,6 @@ struct ieee80211_hw *wlcore_alloc_hw(size_t priv_size, u32 aggr_buf_size,
- 	wl->ap_ps_map = 0;
- 	wl->ap_fw_ps_map = 0;
- 	wl->quirks = 0;
--	wl->platform_quirks = 0;
- 	wl->system_hlid = WL12XX_SYSTEM_HLID;
- 	wl->active_sta_count = 0;
- 	wl->active_link_count = 0;
-@@ -6391,7 +6391,8 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
- 	struct platform_device *pdev = wl->pdev;
- 	struct wlcore_platdev_data *pdev_data = dev_get_platdata(&pdev->dev);
- 	struct wl12xx_platform_data *pdata = pdev_data->pdata;
--	unsigned long irqflags;
-+	struct resource *res;
-+
- 	int ret;
- 	irq_handler_t hardirq_fn = NULL;
- 
-@@ -6418,19 +6419,23 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
- 	/* adjust some runtime configuration parameters */
- 	wlcore_adjust_conf(wl);
- 
--	wl->irq = platform_get_irq(pdev, 0);
--	wl->platform_quirks = pdata->platform_quirks;
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!res) {
-+		wl1271_error("Could not get IRQ resource");
-+		goto out_free_nvs;
-+	}
-+
-+	wl->irq = res->start;
-+	wl->irq_flags = res->flags & IRQF_TRIGGER_MASK;
- 	wl->if_ops = pdev_data->if_ops;
- 
--	if (wl->platform_quirks & WL12XX_PLATFORM_QUIRK_EDGE_IRQ) {
--		irqflags = IRQF_TRIGGER_RISING;
-+	if (wl->irq_flags & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING))
- 		hardirq_fn = wlcore_hardirq;
--	} else {
--		irqflags = IRQF_TRIGGER_HIGH | IRQF_ONESHOT;
--	}
-+	else
-+		wl->irq_flags |= IRQF_ONESHOT;
- 
- 	ret = request_threaded_irq(wl->irq, hardirq_fn, wlcore_irq,
--				   irqflags, pdev->name, wl);
-+				   wl->irq_flags, pdev->name, wl);
- 	if (ret < 0) {
- 		wl1271_error("request_irq() failed: %d", ret);
- 		goto out_free_nvs;
+ drivers/net/wireless/ti/wlcore/sdio.c | 93 ++++++++++++++++++++++++++++++++---
+ 1 file changed, 87 insertions(+), 6 deletions(-)
+
 diff --git a/drivers/net/wireless/ti/wlcore/sdio.c b/drivers/net/wireless/ti/wlcore/sdio.c
-index d3dd7bf..2bce00a 100644
+index 2bce00a..b55dc0e 100644
 --- a/drivers/net/wireless/ti/wlcore/sdio.c
 +++ b/drivers/net/wireless/ti/wlcore/sdio.c
-@@ -287,7 +287,7 @@ static int wl1271_probe(struct sdio_func *func,
- 	memset(res, 0x00, sizeof(res));
+@@ -34,6 +34,8 @@
+ #include <linux/wl12xx.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/printk.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
  
- 	res[0].start = pdev_data.pdata->irq;
--	res[0].flags = IORESOURCE_IRQ;
-+	res[0].flags = IORESOURCE_IRQ | pdev_data.pdata->irq_trigger;
- 	res[0].name = "irq";
- 
- 	ret = platform_device_add_resources(glue->core, res, ARRAY_SIZE(res));
-diff --git a/drivers/net/wireless/ti/wlcore/wlcore.h b/drivers/net/wireless/ti/wlcore/wlcore.h
-index d599c86..7f363fa 100644
---- a/drivers/net/wireless/ti/wlcore/wlcore.h
-+++ b/drivers/net/wireless/ti/wlcore/wlcore.h
-@@ -197,6 +197,8 @@ struct wl1271 {
- 
- 	int irq;
- 
-+	int irq_flags;
-+
- 	spinlock_t wl_lock;
- 
- 	enum wlcore_state state;
-@@ -404,9 +406,6 @@ struct wl1271 {
- 	/* Quirks of specific hardware revisions */
- 	unsigned int quirks;
- 
--	/* Platform limitations */
--	unsigned int platform_quirks;
--
- 	/* number of currently active RX BA sessions */
- 	int ba_rx_session_count;
- 
-diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
-index a9c723b..3876b67 100644
---- a/include/linux/wl12xx.h
-+++ b/include/linux/wl12xx.h
-@@ -57,15 +57,12 @@ struct wl1251_platform_data {
- 
- struct wl12xx_platform_data {
- 	int irq;
-+	u32 irq_trigger;
- 	int board_ref_clock;
- 	int board_tcxo_clock;
--	unsigned long platform_quirks;
- 	bool pwr_in_suspend;
+ #include "wlcore.h"
+ #include "wl12xx_80211.h"
+@@ -214,6 +216,82 @@ static struct wl1271_if_operations sdio_ops = {
+ 	.set_block_size = wl1271_sdio_set_block_size,
  };
  
--/* Platform does not support level trigger interrupts */
--#define WL12XX_PLATFORM_QUIRK_EDGE_IRQ	BIT(0)
--
- #ifdef CONFIG_WILINK_PLATFORM_DATA
++#ifdef CONFIG_OF
++static const struct of_device_id wlcore_sdio_of_match_table[] = {
++	{ .compatible = "ti,wl1271" },
++	{ .compatible = "ti,wl1273" },
++	{ .compatible = "ti,wl1281" },
++	{ .compatible = "ti,wl1283" },
++	{ .compatible = "ti,wl1801" },
++	{ .compatible = "ti,wl1805" },
++	{ .compatible = "ti,wl1807" },
++	{ .compatible = "ti,wl1831" },
++	{ .compatible = "ti,wl1835" },
++	{ .compatible = "ti,wl1837" },
++	{ }
++};
++
++static struct wl12xx_platform_data *wlcore_probe_of(struct device *dev)
++{
++	struct device_node *np = dev->of_node;
++	struct wl12xx_platform_data *pdata;
++
++	if (!np || !of_match_node(wlcore_sdio_of_match_table, np))
++		return NULL;
++
++	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return NULL;
++
++	pdata->irq = irq_of_parse_and_map(np, 0);
++	if (!pdata->irq) {
++		dev_err(dev, "No irq in platform data\n");
++		kfree(pdata);
++		return NULL;
++	}
++
++	pdata->irq_trigger =
++		irqd_get_trigger_type(irq_get_irq_data(pdata->irq));
++
++	/* optional clock frequency params */
++	of_property_read_u32(np, "ref-clock-frequency",
++			     &pdata->ref_clock_freq);
++	of_property_read_u32(np, "tcxo-clock-frequency",
++			     &pdata->tcxo_clock_freq);
++
++	return pdata;
++}
++#else
++static struct wl12xx_platform_data *wlcore_probe_of(struct device *dev)
++{
++	return NULL;
++}
++#endif
++
++static struct wl12xx_platform_data *
++wlcore_get_platform_data(struct device *dev)
++{
++	struct wl12xx_platform_data *pdata;
++
++	/* first, look for DT data */
++	pdata = wlcore_probe_of(dev);
++	if (pdata)
++		return pdata;
++
++	/* if not found - fallback to static platform data */
++	pdata = wl12xx_get_platform_data();
++	if (!IS_ERR(pdata))
++		return kmemdup(pdata, sizeof(*pdata), GFP_KERNEL);
++
++	dev_err(dev, "No platform data set\n");
++	return NULL;
++}
++
++static void wlcore_del_platform_data(struct wl12xx_platform_data *pdata)
++{
++	kfree(pdata);
++}
++
+ static int wl1271_probe(struct sdio_func *func,
+ 				  const struct sdio_device_id *id)
+ {
+@@ -245,12 +323,9 @@ static int wl1271_probe(struct sdio_func *func,
+ 	/* Use block mode for transferring over one block size of data */
+ 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
  
- int wl12xx_set_platform_data(const struct wl12xx_platform_data *data);
+-	pdev_data.pdata = wl12xx_get_platform_data();
+-	if (IS_ERR(pdev_data.pdata)) {
+-		ret = PTR_ERR(pdev_data.pdata);
+-		dev_err(glue->dev, "missing wlan platform data: %d\n", ret);
++	pdev_data.pdata = wlcore_get_platform_data(&func->dev);
++	if (!pdev_data.pdata)
+ 		goto out_free_glue;
+-	}
+ 
+ 	/* if sdio can keep power while host is suspended, enable wow */
+ 	mmcflags = sdio_get_host_pm_caps(func);
+@@ -279,7 +354,7 @@ static int wl1271_probe(struct sdio_func *func,
+ 	if (!glue->core) {
+ 		dev_err(glue->dev, "can't allocate platform_device");
+ 		ret = -ENOMEM;
+-		goto out_free_glue;
++		goto out_free_pdata;
+ 	}
+ 
+ 	glue->core->dev.parent = &func->dev;
+@@ -313,6 +388,9 @@ static int wl1271_probe(struct sdio_func *func,
+ out_dev_put:
+ 	platform_device_put(glue->core);
+ 
++out_free_pdata:
++	wlcore_del_platform_data(pdev_data.pdata);
++
+ out_free_glue:
+ 	kfree(glue);
+ 
+@@ -323,11 +401,14 @@ out:
+ static void wl1271_remove(struct sdio_func *func)
+ {
+ 	struct wl12xx_sdio_glue *glue = sdio_get_drvdata(func);
++	struct wlcore_platdev_data *pdev_data = glue->core->dev.platform_data;
++	struct wl12xx_platform_data *pdata = pdev_data->pdata;
+ 
+ 	/* Undo decrement done above in wl1271_probe */
+ 	pm_runtime_get_noresume(&func->dev);
+ 
+ 	platform_device_unregister(glue->core);
++	wlcore_del_platform_data(pdata);
+ 	kfree(glue);
+ }
+ 
 -- 
 1.8.5.2.229.g4448466.dirty
