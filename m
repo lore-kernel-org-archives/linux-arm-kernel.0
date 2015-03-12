@@ -1,87 +1,84 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 15:54:22 +0100
-Subject: [PATCH v4 0/9] ARM: at91 cleanups for 4.1 #1
-Message-ID: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Thu, 12 Mar 2015 15:54:24 +0100
+Subject: [PATCH v4 2/9] ARM: at91: remove unused at91_ioremap_matrix and header
+In-Reply-To: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426172071-20743-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series removes more mach/headers.
+at91_ioremap_matrix and the at91_matrix.h header are not used anymore, remove
+them.
 
-Then it introduces a more scalable SoC detection infrastructure which allows to
-remove the at91_map_io/at91_alt_map_io and iotable_init ugliness.
-
-Changes in v4:
- - Changes soc family and name display, as requested by Nicolas
-
-Changes in v3:
- - Stop trying to unmap a range that failed ot be mapped
-
-Changes in v2:
- - All the SoC names are lowercased
- - Removed the unused compatible string
- - Use name/subname to display the type and subtype
-
-
-Alexandre Belloni (7):
-  ARM: at91: remove unused at91_ioremap_matrix and header
-  ARM: at91: remove unused _matrix.h headers
-  ARM: at91/dt: introduce atmel,<chip>-dbgu
-  ARM: at91: at91rm9200 use SoC detection infrastructure
-  ARM: at91: at91sam9: use SoC detection infrastructure
-  ARM: at91: sama5 use SoC detection infrastructure
-  ARM: at91: remove old setup
-
-Arnd Bergmann (1):
-  ARM: at91: remove NEED_MACH_IO_H
-
-Boris BREZILLON (1):
-  ARM: at91: add soc detection infrastructure
-
- .../devicetree/bindings/serial/atmel-usart.txt     |   3 +-
- arch/arm/Kconfig                                   |   2 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
- arch/arm/boot/dts/at91sam9260.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9261.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9rl.dtsi                  |   2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
- arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
- arch/arm/mach-at91/Kconfig                         |   1 +
- arch/arm/mach-at91/Makefile                        |   2 +-
- arch/arm/mach-at91/at91rm9200.c                    |  29 +-
- arch/arm/mach-at91/at91sam9.c                      |  76 +++--
- arch/arm/mach-at91/generic.h                       |   4 -
- arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
- .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 -----
- .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
- .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 --------
- .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 ----------
- .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ----
- .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 ------
- .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ----
- arch/arm/mach-at91/include/mach/io.h               |  27 --
- arch/arm/mach-at91/sama5.c                         |  49 ++-
- arch/arm/mach-at91/setup.c                         | 330 ---------------------
- arch/arm/mach-at91/soc.c                           |  97 ++++++
- arch/arm/mach-at91/soc.h                           |  78 +++++
- drivers/pcmcia/Kconfig                             |   1 +
- drivers/pcmcia/at91_cf.c                           |  13 +-
- 32 files changed, 301 insertions(+), 1082 deletions(-)
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/generic.h                  |  4 ----
+ arch/arm/mach-at91/include/mach/at91_matrix.h | 23 -----------------------
+ arch/arm/mach-at91/setup.c                    | 10 ----------
+ 3 files changed, 37 deletions(-)
  delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/io.h
- delete mode 100644 arch/arm/mach-at91/setup.c
- create mode 100644 arch/arm/mach-at91/soc.c
- create mode 100644 arch/arm/mach-at91/soc.h
 
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 583369ffc284..2b396c4e1fc1 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -25,10 +25,6 @@ extern void at91rm9200_timer_init(void);
+ extern void at91rm9200_idle(void);
+ extern void at91sam9_idle(void);
+ 
+-/* Matrix */
+-extern void at91_ioremap_matrix(u32 base_addr);
+-
+-
+ #ifdef CONFIG_PM
+ extern void __init at91rm9200_pm_init(void);
+ extern void __init at91sam9260_pm_init(void);
+diff --git a/arch/arm/mach-at91/include/mach/at91_matrix.h b/arch/arm/mach-at91/include/mach/at91_matrix.h
+deleted file mode 100644
+index f8996c954131..000000000000
+--- a/arch/arm/mach-at91/include/mach/at91_matrix.h
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * Under GPLv2
+- */
+-
+-#ifndef __MACH_AT91_MATRIX_H__
+-#define __MACH_AT91_MATRIX_H__
+-
+-#ifndef __ASSEMBLY__
+-extern void __iomem *at91_matrix_base;
+-
+-#define at91_matrix_read(field) \
+-	__raw_readl(at91_matrix_base + field)
+-
+-#define at91_matrix_write(field, value) \
+-	__raw_writel(value, at91_matrix_base + field)
+-
+-#else
+-.extern at91_matrix_base
+-#endif
+-
+-#endif /* __MACH_AT91_MATRIX_H__ */
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 4e58bc90ed21..ef778f33c488 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -318,13 +318,3 @@ void __init at91_alt_map_io(void)
+ 		pr_info("AT91: Detected soc subtype: %s\n",
+ 			at91_get_soc_subtype(&at91_soc_initdata));
+ }
+-
+-void __iomem *at91_matrix_base;
+-EXPORT_SYMBOL_GPL(at91_matrix_base);
+-
+-void __init at91_ioremap_matrix(u32 base_addr)
+-{
+-	at91_matrix_base = ioremap(base_addr, 512);
+-	if (!at91_matrix_base)
+-		panic(pr_fmt("Impossible to ioremap at91_matrix_base\n"));
+-}
 -- 
 2.1.0
