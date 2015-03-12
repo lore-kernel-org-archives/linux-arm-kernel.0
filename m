@@ -1,123 +1,149 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:32:35 +0800
-Subject: [PATCH v6 30/30] PCI: Remove pci_bus_assign_domain_nr()
-In-Reply-To: <20150312034807.GK10949@google.com>
+Date: Thu, 12 Mar 2015 21:28:30 +0800
+Subject: [PATCH v6 21/30] PCI: Introduce pci_bus_child_max_busnr()
+In-Reply-To: <20150312033643.GI10949@google.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-31-git-send-email-wangyijing@huawei.com>
- <20150312034807.GK10949@google.com>
-Message-ID: <55019573.4060108@huawei.com>
+ <1425868467-9667-22-git-send-email-wangyijing@huawei.com>
+ <20150312033643.GI10949@google.com>
+Message-ID: <5501947E.4070801@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/12 11:48, Bjorn Helgaas wrote:
-> On Mon, Mar 09, 2015 at 10:34:27AM +0800, Yijing Wang wrote:
->> Now we save the domain number in pci_host_bridge,
->> we could remove pci_bus_assign_domain_nr() and
->> clean the domain member in pci_bus.
+On 2015/3/12 11:36, Bjorn Helgaas wrote:
+> On Mon, Mar 09, 2015 at 10:34:18AM +0800, Yijing Wang wrote:
+>> Sometimes, we need to know the highest reserved
+>> busnr for children bus. Because parent's
+>> bus->busn_res could have padding in it.
+>> This function return the max child busnr as
+>> pci_scan_child_bus().
 >>
 >> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 >> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>> Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
+> 
+> I must have screwed this up.  I don't know where the Signed-off-by from
+> Fengguang came from, but it shouldn't be there.  And I also screwed up by
+> adding my own Signed-off-by to the branch while we're still iterating on
+> this series.  The patches you post should not have my Signed-off-by in
+> them; I should add that.  But that's my fault because put them in the
+> branch, and I asked you to pull that branch and modify and repost it.
+> 
+
+-.-! I added the Fengguang Signed-off-by, because his kbuild test robot sent a patch to me to fix a building error.
+
+Sorry, will remove Fengguang and your Signed-off-by.
+
 >> ---
->>  drivers/pci/pci.c   |    5 -----
->>  drivers/pci/probe.c |   12 ++++--------
->>  include/linux/pci.h |    3 ---
->>  3 files changed, 4 insertions(+), 16 deletions(-)
+>>  drivers/pci/hotplug/acpiphp_glue.c |   29 +----------------------------
+>>  drivers/pci/pci.c                  |   27 +++++++++++++++++++++++++--
+>>  include/linux/pci.h                |    2 +-
+>>  3 files changed, 27 insertions(+), 31 deletions(-)
 >>
+>> diff --git a/drivers/pci/hotplug/acpiphp_glue.c b/drivers/pci/hotplug/acpiphp_glue.c
+>> index bcb90e4..84f2584 100644
+>> --- a/drivers/pci/hotplug/acpiphp_glue.c
+>> +++ b/drivers/pci/hotplug/acpiphp_glue.c
+>> @@ -397,33 +397,6 @@ static void cleanup_bridge(struct acpiphp_bridge *bridge)
+>>  	acpi_unlock_hp_context();
+>>  }
+>>  
+>> -/**
+>> - * acpiphp_max_busnr - return the highest reserved bus number under the given bus.
+>> - * @bus: bus to start search with
+>> - */
+>> -static unsigned char acpiphp_max_busnr(struct pci_bus *bus)
+>> -{
+>> -	struct pci_bus *tmp;
+>> -	unsigned char max, n;
+>> -
+>> -	/*
+>> -	 * pci_bus_max_busnr will return the highest
+>> -	 * reserved busnr for all these children.
+>> -	 * that is equivalent to the bus->subordinate
+>> -	 * value.  We don't want to use the parent's
+>> -	 * bus->subordinate value because it could have
+>> -	 * padding in it.
+>> -	 */
+>> -	max = bus->busn_res.start;
+>> -
+>> -	list_for_each_entry(tmp, &bus->children, node) {
+>> -		n = pci_bus_max_busnr(tmp);
+>> -		if (n > max)
+>> -			max = n;
+>> -	}
+>> -	return max;
+>> -}
+>> -
+>>  static void acpiphp_set_acpi_region(struct acpiphp_slot *slot)
+>>  {
+>>  	struct acpiphp_func *func;
+>> @@ -489,7 +462,7 @@ static void enable_slot(struct acpiphp_slot *slot)
+>>  	LIST_HEAD(add_list);
+>>  
+>>  	acpiphp_rescan_slot(slot);
+>> -	max = acpiphp_max_busnr(bus);
+>> +	max = pci_bus_child_max_busnr(bus);
+>>  	for (pass = 0; pass < 2; pass++) {
+>>  		list_for_each_entry(dev, &bus->devices, bus_list) {
+>>  			if (PCI_SLOT(dev->devfn) != slot->device)
 >> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index 2cf942b..4d8dfe4 100644
+>> index c49eec1..0001896 100644
 >> --- a/drivers/pci/pci.c
 >> +++ b/drivers/pci/pci.c
->> @@ -4581,11 +4581,6 @@ void pci_host_assign_domain_nr(struct pci_host_bridge *host)
+>> @@ -108,7 +108,7 @@ static bool pcie_ari_disabled;
+>>   * Given a PCI bus, returns the highest PCI bus number present in the set
+>>   * including the given PCI bus and its list of child PCI buses.
+>>   */
+>> -unsigned char pci_bus_max_busnr(struct pci_bus *bus)
+>> +static unsigned char pci_bus_max_busnr(struct pci_bus *bus)
 >>  {
->>  	host->domain = pci_assign_domain_nr(host->dev.parent);
->>  }
->> -
->> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->> -{
->> -	bus->domain_nr = pci_assign_domain_nr(parent);
->> -}
-> 
-> I think you forgot to remove the empty pci_bus_assign_domain_nr()
-> definition from include/linux/pci.h.
-
-Yes, I forgot it, thanks your remind.
-
-> 
-> I'm not sure how much value is left in CONFIG_PCI_DOMAINS_GENERIC.  You're
-> removed *almost* everything that uses it.  I wonder how hard it would be to
-> get rid of that last little bit.
-
-I will take time to find it, thanks!
-
-
-> 
->>  #endif
->>  #endif
->>  
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 196f08a..9cd3ca2 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -481,7 +481,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+>>  	struct pci_bus *tmp;
+>>  	unsigned char max, n;
+>> @@ -121,7 +121,30 @@ unsigned char pci_bus_max_busnr(struct pci_bus *bus)
 >>  	}
+>>  	return max;
 >>  }
->>  
->> -static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
->> +static struct pci_bus *pci_alloc_bus(void)
->>  {
->>  	struct pci_bus *b;
->>  
->> @@ -496,10 +496,7 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
->>  	INIT_LIST_HEAD(&b->resources);
->>  	b->max_bus_speed = PCI_SPEED_UNKNOWN;
->>  	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
->> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
->> -	if (parent)
->> -		b->domain_nr = parent->domain_nr;
->> -#endif
+>> -EXPORT_SYMBOL_GPL(pci_bus_max_busnr);
 >> +
->>  	return b;
->>  }
+>> +unsigned char pci_bus_child_max_busnr(struct pci_bus *bus)
+>> +{
+>> +	struct pci_bus *tmp;
+>> +	unsigned char max, n;
+>> +
+>> +	/*
+>> +	 * pci_bus_max_busnr will return the highest
+>> +	 * reserved busnr for all these children.
+>> +	 * that is equivalent to the bus->subordinate
+>> +	 * value.  We don't want to use the parent's
+>> +	 * bus->subordinate value because it could have
+>> +	 * padding in it.
+>> +	 */
+>> +	max = bus->busn_res.start;
+>> +
+>> +	list_for_each_entry(tmp, &bus->children, node) {
+>> +		n = pci_bus_max_busnr(tmp);
+>> +		if (n > max)
+>> +			max = n;
+>> +	}
+>> +	return max;
+>> +}
+>> +EXPORT_SYMBOL_GPL(pci_bus_child_max_busnr);
 >>  
->> @@ -646,7 +643,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->>  	/*
->>  	 * Allocate a new bus, and inherit stuff from the parent..
->>  	 */
->> -	child = pci_alloc_bus(parent);
->> +	child = pci_alloc_bus();
->>  	if (!child)
->>  		return NULL;
->>  
->> @@ -1866,14 +1863,13 @@ static struct pci_bus *pci_create_root_bus(
->>  	char *fmt;
->>  
->>  	parent = bridge->dev.parent;
->> -	b = pci_alloc_bus(NULL);
->> +	b = pci_alloc_bus();
->>  	if (!b)
->>  		return NULL;
->>  
->>  	b->sysdata = dev_get_drvdata(&bridge->dev);
->>  	b->ops = ops;
->>  	b->number = b->busn_res.start = bridge->busnum;
->> -	pci_bus_assign_domain_nr(b, parent);
->>  
->>  	bridge->bus = b;
->>  	b->bridge = get_device(&bridge->dev);
+>>  #ifdef CONFIG_HAS_IOMEM
+>>  void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar)
 >> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index dc1c710..ebc70bb 100644
+>> index cfaf217..261b8de 100644
 >> --- a/include/linux/pci.h
 >> +++ b/include/linux/pci.h
->> @@ -467,9 +467,6 @@ struct pci_bus {
->>  	unsigned char	primary;	/* number of primary bridge */
->>  	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
->>  	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
->> -#ifdef CONFIG_PCI_DOMAINS_GENERIC
->> -	int		domain_nr;
->> -#endif
->>  
->>  	char		name[48];
->>  
+>> @@ -1181,7 +1181,7 @@ int pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
+>>  void pci_walk_bus(struct pci_bus *top, int (*cb)(struct pci_dev *, void *),
+>>  		  void *userdata);
+>>  int pci_cfg_space_size(struct pci_dev *dev);
+>> -unsigned char pci_bus_max_busnr(struct pci_bus *bus);
+>> +unsigned char pci_bus_child_max_busnr(struct pci_bus *bus);
+>>  void pci_setup_bridge(struct pci_bus *bus);
+>>  resource_size_t pcibios_window_alignment(struct pci_bus *bus,
+>>  					 unsigned long type);
 >> -- 
 >> 1.7.1
 >>
