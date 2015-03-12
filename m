@@ -1,11 +1,11 @@
 From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 12 Mar 2015 12:20:57 +0100
-Subject: [PATCH v6 17/22] x86/olpc/xo1/sci: Use newly added
+Date: Thu, 12 Mar 2015 12:21:14 +0100
+Subject: [PATCH v6 18/22] x86/olpc/xo15/sci: Use newly added
  power_supply_put API
-In-Reply-To: <1425976046-20973-18-git-send-email-k.kozlowski@samsung.com>
+In-Reply-To: <1425976046-20973-19-git-send-email-k.kozlowski@samsung.com>
 References: <1425976046-20973-1-git-send-email-k.kozlowski@samsung.com>
- <1425976046-20973-18-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150312112057.GB8475@gmail.com>
+ <1425976046-20973-19-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150312112114.GC8475@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,14 +19,14 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > Reviewed-by: Sebastian Reichel <sre@kernel.org>
 > ---
->  arch/x86/platform/olpc/olpc-xo1-sci.c | 4 ++--
+>  arch/x86/platform/olpc/olpc-xo15-sci.c | 4 ++--
 >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/x86/platform/olpc/olpc-xo1-sci.c b/arch/x86/platform/olpc/olpc-xo1-sci.c
-> index e4ed28bbf79d..7fa8b3b53bc0 100644
-> --- a/arch/x86/platform/olpc/olpc-xo1-sci.c
-> +++ b/arch/x86/platform/olpc/olpc-xo1-sci.c
-> @@ -61,7 +61,7 @@ static void battery_status_changed(void)
+> diff --git a/arch/x86/platform/olpc/olpc-xo15-sci.c b/arch/x86/platform/olpc/olpc-xo15-sci.c
+> index 186634e9021d..55130846ac87 100644
+> --- a/arch/x86/platform/olpc/olpc-xo15-sci.c
+> +++ b/arch/x86/platform/olpc/olpc-xo15-sci.c
+> @@ -83,7 +83,7 @@ static void battery_status_changed(void)
 >  
 >  	if (psy) {
 >  		power_supply_changed(psy);
@@ -35,7 +35,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >  	}
 >  }
 >  
-> @@ -71,7 +71,7 @@ static void ac_status_changed(void)
+> @@ -93,7 +93,7 @@ static void ac_status_changed(void)
 >  
 >  	if (psy) {
 >  		power_supply_changed(psy);
