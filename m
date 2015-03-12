@@ -1,30 +1,87 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 12 Mar 2015 00:28:18 -0400 (EDT)
-Subject: [PATCH v2] rds: avoid potential stack overflow
-In-Reply-To: <4321699.nNdBmxDHpu@wuerfel>
-References: <4321699.nNdBmxDHpu@wuerfel>
-Message-ID: <20150312.002818.1582458495369122296.davem@davemloft.net>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 12 Mar 2015 05:12:45 +0000
+Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <5500EFFF.2070807@huawei.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
+ <20150311231141.GG21998@io.lakedaemon.net>
+ <5500EFFF.2070807@huawei.com>
+Message-ID: <20150312051245.GI21998@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 11 Mar 2015 22:46:59 +0100
+On Thu, Mar 12, 2015 at 09:46:39AM +0800, Hanjun Guo wrote:
+> On 2015/3/12 7:11, Jason Cooper wrote:
+> > Hey Grant,
+> >
+> > On Wed, Mar 11, 2015 at 06:04:50PM +0000, Grant Likely wrote:
+> >> On 11 Mar 2015 12:42, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
+> >>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >>>
+> >>> ACPI kernel uses MADT table for proper GIC initialization. It needs to
+> >>> parse GIC related subtables, collect CPU interface and distributor
+> >>> addresses and call driver initialization function (which is hardware
+> >>> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
+> >>>
+> >>> NOTE: This commit allow to initialize GICv1/2 basic functionality.
+> >>> While now simple GICv2 init call is used, any further GIC features
+> >>> require generic infrastructure for proper ACPI irqchip initialization.
+> >>> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
+> >>> extension, GICv3/4 and its ITS are considered as next steps.
+> >>>
+> >>> CC: Jason Cooper <jason@lakedaemon.net>
+> >>> CC: Marc Zyngier <marc.zyngier@arm.com>
+> >>> CC: Thomas Gleixner <tglx@linutronix.de>
+> >> BTW, Thomas is taking a bit of a break, do he is unlikely to give an ack
+> >> here in a timely manner. I've not heard from Jason. Personally, I think we
+> >> can proceed without their ack if everything else is in order (heck, I used
+> >> to help with the irq subsystem, use me as an ack of you want). The patch is
+> >> low impact and only had effect for ARM ACPI builds.
+> > I'm not talking much, but I am tracking and collecting everything for irqchip.
+> > We do have some other changes in this driver this time around.  So it'd be nice
+> > if I could take this.
+> >
+> > I had reached out to Olof for his thoughts on this and he hasn't had enough
+> > cycles to look at it.  iirc, Marc reviewed a previous version and was happy with
+> > the changes.  My only question I had for Olof I'll put below:
+> 
+> Please allow me to explain a little bit before Olof's confirmation, please don't mind if
+> any offended.
 
-> The rds_iw_update_cm_id function stores a large 'struct rds_sock' object
-> on the stack in order to pass a pair of addresses. This happens to just
-> fit withint the 1024 byte stack size warning limit on x86, but just
-> exceed that limit on ARM, which gives us this warning:
-> 
-> net/rds/iw_rdma.c:200:1: warning: the frame size of 1056 bytes is larger than 1024 bytes [-Wframe-larger-than=]
-> 
-> As the use of this large variable is basically bogus, we can rearrange
-> the code to not do that. Instead of passing an rds socket into
-> rds_iw_get_device, we now just pass the two addresses that we have
-> available in rds_iw_update_cm_id, and we change rds_iw_get_mr accordingly,
-> to create two address structures on the stack there.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: fix incorrect commit message
+I'm not sure I parse this correctly, but fwiw, I'm not easily offended.  :-)
 
-Applied, thanks Arnd.
+> >>> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> >>> index 0fe2f71..afd1af3 100644
+> >>> --- a/drivers/irqchip/irqchip.c
+> >>> +++ b/drivers/irqchip/irqchip.c
+> >>> @@ -8,6 +8,7 @@
+> >>>   * warranty of any kind, whether express or implied.
+> >>>   */
+> >>>
+> >>> +#include <linux/acpi_irq.h>
+> >>>  #include <linux/init.h>
+> >>>  #include <linux/of_irq.h>
+> >>>  #include <linux/irqchip.h>
+> >>> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+> >>>  void __init irqchip_init(void)
+> >>>  {
+> >>>         of_irq_init(__irqchip_of_table);
+> >>> +
+> >>> +       acpi_irq_init();
+> >>>  }
+> > Is this in line with Olof's idea that providing a dtb would override ACPI?
+> 
+> Yes, it will. Since ACPI is default OFF (disabled), if a dtb provided, and no acpi=force
+> passed in the early command line, dtb will be used as system configuration for
+> boot (dtb is always the prior one for now) [1]. In acpi_gic_init() which called by
+> acpi_irq_init(), it will return immediately if acpi disabled, so it will not parse
+> any ACPI table for device configuration.
+
+Ok, that matches my recollection.  Thanks for refreshing my memory.  I'll apply
+this on a topic branch for irqchip/gic when I return from travel.  Most likely
+Friday or over the weekend.
+
+thx,
+
+Jason.
