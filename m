@@ -1,44 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 12 Mar 2015 09:02:24 +0000
-Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting the
- PWM
-In-Reply-To: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150312090224.GC3314@x1>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 12 Mar 2015 10:03:08 +0100
+Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System
+ Control Module (MSCM)
+In-Reply-To: <20150311004812.GU20455@dragon>
+References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+ <1425249689-32354-4-git-send-email-stefan@agner.ch>
+ <20150311004812.GU20455@dragon>
+Message-ID: <59b0d98827cb4e7497de81e1c0826964@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Feb 2015, Nicolas Ferre wrote:
-
-> When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
-> flag is not handled properly. It can lead to the PWM not being found.
+On 2015-03-11 01:48, Shawn Guo wrote:
+> On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
+>> Add the Miscellaneous System Control Module (MSCM) to the base
+>> device tree for Vybrid SoC's. This module contains registers
+>> to get information of the individual and current (accessing)
+>> CPU. In a second block, there is an interrupt router, which
+>> handles the routing of the interrupts between the two CPU cores
+>> on VF6xx variants of the SoC. However, also on single core
+>> variants the interrupt router needs to be configured in order
+>> to receive interrupts on the CPU's interrupt controller. Almost
+>> all peripheral interrupts are routed through the router, hence
+>> the MSCM module is the default interrupt parent for this SoC.
+>>
+>> In a earlier commit the interrupt nodes were moved out of the
+>> peripheral nodes and specified in the CPU specific vf500.dtsi
+>> device tree. This allowed to use the base device tree vfxxx.dtsi
+>> also for a Cortex-M4 specific device tree, which uses different
+>> interrupt nodes due to the NVIC interrupt controller. However,
+>> since the interrupt parent for peripherals is the MSCM module
+>> independently which CPU the device tree is used for, we can move
+>> the interrupt nodes into the base device tree vfxxx.dtsi again.
+>> Depending on which CPU this base device tree will be used with,
+>> the correct parent interrupt controller has to be assigned to
+>> the MSCM-IR node (GIC or NVIC). The driver takes care of the
+>> parent interrupt controller specific needs (interrupt-cells).
+>>
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/video/backlight/pwm_bl.c | 4 ++++
->  1 file changed, 4 insertions(+)
+> Stefan,
+> 
+> I guess this patch has a run-time dependency on the first two in the
+> series, right?  Or put it another way, if I apply this single patch on
+> my branch, the dtb and kernel built from the same branch do not work
+> together, right?  If so, we will need to either wait for the first two
+> hit mainline or pull Jason's irqchip/vybrid branch into my tree as
+> prerequisite (irqchip/vybrid needs to be stable).
+> 
+> Shawn
 
-Applied, thanks.
+Yes, that is true. The driver need to be in place in order to
+successfully boot with the new device tree.
 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index 3a145a643e0d..6897f1c1bc73 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  
->  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
->  	if (IS_ERR(pb->pwm)) {
-> +		ret = PTR_ERR(pb->pwm);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto err_alloc;
-> +
->  		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
->  		pb->legacy = true;
->  		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+Stefan
