@@ -1,43 +1,44 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:29:17 +0800
-Subject: [PATCH v6 28/30] PCI: Export find_pci_host_bridge() and rename
- to pci_find_host_bridge()
-In-Reply-To: <20150312034305.GJ10949@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-29-git-send-email-wangyijing@huawei.com>
- <20150312034305.GJ10949@google.com>
-Message-ID: <550194AD.6080204@huawei.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 12 Mar 2015 14:37:07 +0100
+Subject: [PATCH v2 RESEND 0/4] Fix power domains handling on exynos542x
+Message-ID: <1426167431-24470-1-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
->> index a1dc9f2..45252dd 100644
->> --- a/drivers/pci/pci.h
->> +++ b/drivers/pci/pci.h
->> @@ -328,4 +328,6 @@ struct pci_host_bridge *pci_create_host_bridge(
->>  		void *sysdata, struct pci_host_bridge_ops *ops);
->>  
->>  void pci_free_host_bridge(struct pci_host_bridge *host);
->> +struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
-> 
-> This is only used in drivers/pci/host-bridge.c and in drivers/pci/pci.c for
-> pci_domain_nr().  Can you drop this patch and put the generic
-> pci_domain_nr() implementation (next patch) in host-bridge.c instead of in
-> pci.c?
+Hi Kukjin,
 
-Of course, thanks.
+This is resend of my patchset with added (Reviewed|Tested)-by tags and removed RFC
+prefix.
 
-> 
->> +
->>  #endif /* DRIVERS_PCI_H */
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
+Exynos chipsets since 542x have asynchronous bridges connecting different IPs.
+These bridges should be operational during power domain switching, ie associated
+clocks cannot be gated.
+This patchset adds binding to provide such clocks per power domain and adds code
+which enables them during domain on/off operation.
 
+This patchset fixes power domain issues with disp1 domain and HDMI (some of them)
+on Odroid XU3:
+- disp1 power domain can be turned off,
+- no more "imprecise external abort" faults.
+
+The patchset is based on samsung-fixes-dt tag from kgene/linux-samsung.
+
+It was successfully tested on OdroidXU3.
+
+Regards
+Andrzej
+
+
+Andrzej Hajda (4):
+  arm/exynos: add asynchronous bridge clock bindings
+  arm/exynos/pm_domains: add support for async-bridge clocks
+  ARM: dts: exynos5420: add async-bridge clocks to disp1 power domain
+  ARM: dts: exynos5420: add async-bridge clocks to gsc power domain
+
+ .../bindings/arm/exynos/power_domain.txt           |  3 +++
+ arch/arm/boot/dts/exynos5420.dtsi                  |  8 +++++--
+ arch/arm/mach-exynos/pm_domains.c                  | 27 ++++++++++++++++++----
+ 3 files changed, 32 insertions(+), 6 deletions(-)
 
 -- 
-Thanks!
-Yijing
+1.9.1
