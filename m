@@ -1,81 +1,98 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 11 Mar 2015 22:25:15 -0500
-Subject: [PATCH v6 13/30] PCI: Introduce new scan function
- pci_scan_host_bridge()
-In-Reply-To: <1425868467-9667-14-git-send-email-wangyijing@huawei.com>
+Date: Wed, 11 Mar 2015 22:30:50 -0500
+Subject: [PATCH v6 20/30] sparc/PCI: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <1425868467-9667-21-git-send-email-wangyijing@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-14-git-send-email-wangyijing@huawei.com>
-Message-ID: <20150312032515.GF10949@google.com>
+ <1425868467-9667-21-git-send-email-wangyijing@huawei.com>
+Message-ID: <20150312033050.GG10949@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 09, 2015 at 10:34:10AM +0800, Yijing Wang wrote:
-> Introduce new scan function pci_scan_host_bridge() to
-> support host bridge drivers that need to provide platform
-> own pci_host_bridge_ops.
+On Mon, Mar 09, 2015 at 10:34:17AM +0800, Yijing Wang wrote:
+> Now we could use pci_scan_host_bridge() to scan
+> pci buses, provide sparc specific pci_host_bridge_ops.
 > 
 > Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+> CC: "David S. Miller" <davem@davemloft.net>
+> CC: sparclinux at vger.kernel.org
 > Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 > ---
->  drivers/pci/probe.c |   22 ++++++++++++++++++++++
->  include/linux/pci.h |    4 ++++
->  2 files changed, 26 insertions(+), 0 deletions(-)
+>  arch/sparc/kernel/pci.c |   32 ++++++++++++++++++++++----------
+>  1 files changed, 22 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 59d9be3..99f17e3 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2064,6 +2064,28 @@ static struct pci_bus *__pci_scan_root_bus(
->  	return b;
+> diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+> index 21f804a..7e28f74 100644
+> --- a/arch/sparc/kernel/pci.c
+> +++ b/arch/sparc/kernel/pci.c
+> @@ -650,12 +650,25 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+>  		pci_claim_bus_resources(child_bus);
 >  }
 >  
-> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
-> +		u32 db, struct pci_ops *ops, void *sysdata,
-> +		struct list_head *resources,
-> +		struct pci_host_bridge_ops *phb_ops)
-
-Drop the "phb_" prefix.
-
+> +static void pci_host_bridge_of_scan_bus(
+> +		struct pci_host_bridge *host)
 > +{
-> +	struct pci_host_bridge *host;
-> +	struct pci_bus *bus;
+> +	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
+> +	struct device_node *node = pbm->op->dev.of_node;
 > +
-> +	host = pci_create_host_bridge(parent, db, resources,
-> +			sysdata, phb_ops);
-> +	if (!host)
-> +		return NULL;
-> +
-> +	bus = __pci_scan_root_bus(host, ops);
-> +	if (!bus)
-> +		pci_free_host_bridge(host);
-> +
-> +	return host;
+> +	pci_of_scan_bus(pbm, node, host->bus);
 > +}
-> +EXPORT_SYMBOL(pci_scan_host_bridge);
 > +
+> +static struct pci_host_bridge_ops phb_ops = {
+> +	.scan_bus = pci_host_bridge_of_scan_bus,
+> +};
 > +
->  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 db,
->  		struct pci_ops *ops, void *sysdata, struct list_head *resources)
+>  struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+>  				 struct device *parent)
 >  {
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index e9922b1..28eafb5 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -790,6 +790,10 @@ void pci_bus_release_busn_res(struct pci_bus *b);
->  struct pci_bus *pci_scan_root_bus(struct device *parent, u32 dombus,
->  					     struct pci_ops *ops, void *sysdata,
->  					     struct list_head *resources);
-> +struct pci_host_bridge *pci_scan_host_bridge(struct device *parent,
-> +		u32 dombus, struct pci_ops *ops, void *sysdata,
-> +		struct list_head *resources,
-> +		struct pci_host_bridge_ops *phb_ops);
->  struct pci_bus *pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev,
->  				int busnr);
->  void pcie_update_link_speed(struct pci_bus *bus, u16 link_status);
+>  	LIST_HEAD(resources);
+>  	struct device_node *node = pbm->op->dev.of_node;
+> -	struct pci_bus *bus;
+> +	struct pci_host_bridge *host;
+>  
+>  	printk("PCI: Scanning PBM %s\n", node->full_name);
+>  
+> @@ -667,22 +680,21 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+>  	pbm->busn.end	= pbm->pci_last_busno;
+>  	pbm->busn.flags	= IORESOURCE_BUS;
+>  	pci_add_resource(&resources, &pbm->busn);
+> -	bus = pci_create_root_bus(parent,
+> +	host = pci_scan_host_bridge(parent,
+>  			PCI_DOMBUS(pbm->index, pbm->pci_first_busno),
+> -			pbm->pci_ops, pbm, &resources);
+> -	if (!bus) {
+> -		printk(KERN_ERR "Failed to create bus for %s\n",
+> +			pbm->pci_ops, pbm, &resources, &phb_ops);
+> +	if (!host) {
+> +		printk(KERN_ERR "Failed to create host bridge for %s\n",
+>  		       node->full_name);
+>  		pci_free_resource_list(&resources);
+>  		return NULL;
+>  	}
+>  
+
+I would keep "bus" and set it here:
+
+	bus = host->bus;
+
+That would remove some lines from your patch that really didn't change,
+which makes it easier to see what actually *is* changing, namely, you're
+removing the pci_of_scan_bus() call because it is now done inside
+pci_scan_host_bridge().
+
+> -	pci_of_scan_bus(pbm, node, bus);
+> -	pci_bus_register_of_sysfs(bus);
+> +	pci_bus_register_of_sysfs(host->bus);
+>  
+> -	pci_claim_bus_resources(bus);
+> -	pci_bus_add_devices(bus);
+> -	return bus;
+> +	pci_claim_bus_resources(host->bus);
+> +	pci_bus_add_devices(host->bus);
+> +	return host->bus;
+>  }
+>  
+>  void pcibios_fixup_bus(struct pci_bus *pbus)
 > -- 
 > 1.7.1
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
