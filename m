@@ -1,51 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 12 Mar 2015 17:17:59 +0100
-Subject: [PATCH 2/2] i2c: busses with dynamic ids should start after fixed ids
- for DT
-In-Reply-To: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
-References: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1426177093-26820-3-git-send-email-wsa@the-dreams.de>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 12 Mar 2015 18:18:49 +0200
+Subject: [PATCH v2 17/17] soc/tegra: remove lagacy powergate APIs
+In-Reply-To: <20150312124501.GA632@ulmo>
+References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
+ <1426162518-7405-18-git-send-email-vinceh@nvidia.com>
+ <20150312124501.GA632@ulmo>
+Message-ID: <20150312161849.GF6072@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure dynamic ids do not interfere with fixed ones and let them
-start after the highest fixed id. This patch might cause different
-bus-numbers for dynamic ids, however it fixes a bug. Assume:
+On Thu, Mar 12, 2015 at 01:45:02PM +0100, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Thu, Mar 12, 2015 at 08:15:18PM +0800, Vince Hsu wrote:
+> > We switch to generic power domain now. So remove the legacy functions.
+> > 
+> > Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+> > ---
+> >  drivers/soc/tegra/pmc.c | 68 -------------------------------------------------
+> >  include/soc/tegra/pmc.h | 22 ----------------
+> >  2 files changed, 90 deletions(-)
+> 
+> I don't think we can do this. What if somebody updates their kernel but
+> not the DTB? In that case they'll end up with drivers that don't enable
+> power partitions but at the same time the powergate driver won't enable
+> them either because it is missing the corresponding nodes in the DTB.
+> 
+> What we'll have to do is probably keep the code that enables the power
+> partitions and make it conditional on the power domains somehow. Is
+> there a way to determine at runtime whether a device has been attached
+> to a power domain?
 
-- fixed id0 defers probe
-- fixed id1 succeeds and registers a muxed bus with dynamic id
-- muxed bus gets id0
-- fixed id0 wants to probe again, but its fixed id is gone now
-- fixed id0 probe fails
+Or use DT overlays to 'load' a hardcoded overlay for the specific SoC?
 
-With this patch, the fixed ids are always reserved in the DT case.
-For legacy board init, we already have a mechanism like this in
-i2c_register_board_info().
+Cheers,
 
-Reported-by: Bob Feretich <bob.feretich@rafresearch.com>
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
----
- drivers/i2c/i2c-core.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 210cf4874cb7ea..4dda9a529f4464 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -1878,6 +1878,14 @@ static int __init i2c_init(void)
- {
- 	int retval;
- 
-+	retval = of_alias_get_highest_id("i2c");
-+
-+	down_write(&__i2c_board_lock);
-+	if (retval >= __i2c_first_dynamic_bus_num) {
-+		__i2c_first_dynamic_bus_num = retval + 1;
-+	}
-+	up_write(&__i2c_board_lock);
-+
- 	retval = bus_register(&i2c_bus_type);
- 	if (retval)
- 		return retval;
--- 
-2.1.4
+Peter.
