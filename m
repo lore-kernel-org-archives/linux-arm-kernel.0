@@ -1,71 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 11:03:45 +0000
-Subject: [PATCH REPOST 1/2] serial/amba-pl011: Activate TX IRQ passively
-In-Reply-To: <1425472054-7543-2-git-send-email-Dave.Martin@arm.com>
-References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
- <1425472054-7543-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150312110344.GL8656@n2100.arm.linux.org.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 12 Mar 2015 20:04:18 +0900
+Subject: [GIT PULL] Exynos fixes for v4.0
+In-Reply-To: <1426083637.24734.14.camel@AMDC1943>
+References: <1426083637.24734.14.camel@AMDC1943>
+Message-ID: <021d01d05cb4$49599260$dc0cb720$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 12:27:33PM +0000, Dave Martin wrote:
-> The current PL011 driver transmits a dummy character when the UART
-> is opened, to assert the TX IRQ for the first time
-> (see pl011_startup()).  The UART is put in loopback mode temporarily,
-> so the receiver presumably shouldn't see anything.
-
-We do this so that we know for certain that the PL011 has room to accept
-at least one character.
-
-> However...
+Krzysztof Kozlowski wrote:
 > 
-> At least some platforms containing a PL011 send characters down the
-> wire even when loopback mode is enabled.  This means that a
-> spurious NUL character may be seen at the receiver when the PL011 is
-> opened through the TTY layer.
-
-... which is an annoyance.
-
-> The current code also temporarily sets the baud rate to maximum and
-> the character width to the minimum, to that the dummy TX completes
-> as quickly as possible.  If this is seen by the receiver it will
-> result in a framing error and can knock the receiver out of sync --
-> turning subsequent output into garbage until synchronisation
-> is reestablished.  (Particularly problematic during boot with systemd.)
-
-Yea, I have my own issues with systemd, but let's stay away from that
-potential argument. :)
-
-> To avoid spurious transmissions, this patch removes assumptions about
-> whether the TX IRQ will fire until at least one TX IRQ has been seen.
+> Dear Kukjin,
 > 
-> Instead, the UART will unmask the TX IRQ and then slow-start via
-> polling and timer-based soft IRQs initially.  If the TTY layer writes
-> enough data to fill the FIFO to the interrupt threshold in one go,
-> the TX IRQ should assert, at which point the driver changes to
-> fully interrupt-driven TX.
+Hi,
 
-I'm concerned about this.  What happens if the PL011 is also being used
-as a console, and the UART TX FIFO is fully stuffed?
+> This groups important fixes for this v4.0-rc cycle. I hope you will find
+> useful such grouping them in a pull request.
+> 
+Thanks for your gentle reminder :-)
 
-Reading the updated code, it seems that we can call pl011_tx_chars()
-irrespective of whether the TX FIFO is full or not.  pl011_tx_chars()
-makes the assumption that the TX FIFO can always accept the next
-character, and it results in (eg, in the x_char handling) the next
-character being written, even if the FIFO is full.
+> 1. Fix second suspend to RAM on Trats2 board. This has shown up
+>    after enabling L2 cache but actually the "use delayed reset
+>    assertion" is to be blamed.
+> 2. Fix power domain issues with disp1 domain and HDMI (some of them)
+>    on Odroid XU3:
+>    - disp1 power domain can be turned off,
+>    - no more "imprecise external abort" faults.
+> 3. Proper fix for build breakage of cpuidle on !SMP. This allows using
+>    Exynos cpuidle driver on UP.
+> 
+> Best regards,
+> Krzysztof
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 2d2c9a8d0a4f90e298315d2f4a282d8bd5d45e5c:
+> 
+>   ARM: dts: add display power domain for exynos5250 (2015-02-27 05:29:32 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.0-rc1-exynos-fixes
+> 
+> for you to fetch changes up to c1b57bce36a69f3972a1db433d3c8b34e0541e63:
+> 
+>   ARM: EXYNOS: cpuidle: Fix build breakage on !SMP (2015-03-11 13:02:08 +0100)
+> 
+> ----------------------------------------------------------------
+> Andrzej Hajda (4):
+>       arm/exynos: add asynchronous bridge clock bindings
+>       arm/exynos/pm_domains: add support for async-bridge clocks
+>       ARM: dts: exynos5420: add async-bridge clocks to disp1 power domain
+>       ARM: dts: exynos5420: add async-bridge clocks to gsc power domain
+> 
+When I checked the patches, I expected that we could get the review from clock
+guys even we could do it though. And basically/usually the 'RFC' tagging means
+it's not a patch can be upstreamed and will be posted after gathering some
+comments so I didn't queue them in my tree. I'm still thinking like that...
 
-If hardware CTS flow control is enabled, the problem gets worse - in
-that mode, the TX FIFO can remain fully occupied for an indeterminant
-amount of time.
+> Bartlomiej Zolnierkiewicz (1):
+>       ARM: EXYNOS: cpuidle: Fix build breakage on !SMP
+> 
+Yeah, we need to fix it up asap and I'll finish it by this weekend. Sorry for
+the inconvenience.
 
-This introduces a whole new unreliability to the driver which wasn't
-there to start with.
+> Krzysztof Kozlowski (1):
+>       ARM: EXYNOS: Fix failed second suspend on Exynos4
+> 
+I'll have a look at this with above.
 
-So, I'm afraid this gets a NAK.
+Thanks,
+Kukjin
 
-You need to check the TX FIFO status before trying to stuff it with
-characters.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+>  .../bindings/arm/exynos/power_domain.txt           |  3 ++
+>  arch/arm/boot/dts/exynos5420.dtsi                  |  8 +++--
+>  arch/arm/mach-exynos/common.h                      |  2 ++
+>  arch/arm/mach-exynos/exynos.c                      | 29 +++++++++++++++-
+>  arch/arm/mach-exynos/platsmp.c                     | 39 ++--------------------
+>  arch/arm/mach-exynos/pm.c                          |  2 ++
+>  arch/arm/mach-exynos/pm_domains.c                  | 27 ++++++++++++---
+>  arch/arm/mach-exynos/suspend.c                     |  3 ++
+>  drivers/cpuidle/cpuidle-exynos.c                   |  3 +-
+>  9 files changed, 71 insertions(+), 45 deletions(-)
