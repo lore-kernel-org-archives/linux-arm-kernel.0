@@ -1,36 +1,39 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Mar 2015 16:08:56 -0500
-Subject: [PATCH v6 3/4] pci: iproc: Add Broadcom iProc PCIe support
-In-Reply-To: <1426097169-20805-4-git-send-email-rjui@broadcom.com>
-References: <1426097169-20805-1-git-send-email-rjui@broadcom.com>
- <1426097169-20805-4-git-send-email-rjui@broadcom.com>
-Message-ID: <20150312210856.GF7346@google.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Mar 2015 21:10:52 +0000
+Subject: [RFT/RFC PATCH 6/6] ARM: keep .text and .fixup regions together
+In-Reply-To: <1426181892-15440-7-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426181892-15440-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150312211051.GZ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 11:06:08AM -0700, Ray Jui wrote:
-> This adds the support for Broadcom iProc PCIe controller
+On Thu, Mar 12, 2015 at 06:38:12PM +0100, Ard Biesheuvel wrote:
+> Fixup snippets are put into a dedicated section so that they don't
+> bloat cache lines with instructions that are usually not executed.
+> But there is no reason to put all these snippets together at the far
+> end of the .text output region, where the branch instruction they
+> contain could go out of range if the kernel grows in size.
 > 
-> pcie-iproc.c servers as the common core driver, and front-end bus
-> interface needs to be added to support different bus interfaces
+> Instead, emit .text and .fixup regions together for each input object.
+> They should still be out of the way, but not so far that they go out
+> of range.
 > 
-> pcie-iproc-pltfm.c contains the support for the platform bus interface
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 > 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ...
+> Note that the TEXT_TEXT macro will emit *(.text) again but this should be
+> harmless.
 
-> +static int iproc_pcie_check_link(struct iproc_pcie *pcie, struct pci_bus *bus)
-> +{
-> +	u8 hdr_type;
-> +	u32 link_ctrl;
-> +	u16 pos, link_status;
-> +	int link_is_active = 0;
-> +
-> +	/* make sure we are not in EP mode */
-> +	pci_bus_read_config_byte(bus, 0, PCI_HEADER_TYPE, &hdr_type);
-> +	if ((hdr_type & 0x7f) != PCI_HEADER_TYPE_BRIDGE) {
-> +		dev_err(pcie->dev, "in EP mode, hdr=0x08%x\n", hdr_type);
+However, I wonder if by doing this, we're weakening the ability for
+kallsyms final link to succeed:
 
-"0x08%x" doesn't look right.  I changed it to "%#02x"; is that what you
-intended?
+/* .text section. Map to function alignment to avoid address changes
+ * during second ld run in second ld pass when generating System.map */
+
+Can we not just move .fixup before TEXT_TEXT?  The only thing between it
+and .text would be .text.hot.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
