@@ -1,48 +1,84 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 12 Mar 2015 00:40:11 +0000
-Subject: [PATCH 2/2 v2] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from
- ARM defconfigs
-In-Reply-To: <87pp8ff3sb.wl%kuninori.morimoto.gx@renesas.com>
-References: <87pp8ff3sb.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87mw3jf3qe.wl%kuninori.morimoto.gx@renesas.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 12 Mar 2015 08:40:20 +0800
+Subject: [PATCH] soc/tegra: move soc_device_register call out of arch/arm
+In-Reply-To: <20150311083424.GA19391@ulmo.nvidia.com>
+References: <1425868301-22767-1-git-send-email-josephl@nvidia.com>
+ <20150311083424.GA19391@ulmo.nvidia.com>
+Message-ID: <5500E074.8050007@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On 03/11/2015 04:34 PM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Mon, Mar 09, 2015 at 10:31:41AM +0800, Joseph Lo wrote:
+>> Expending the usage for both Tegra & Tegra64 SoCs.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>   arch/arm/mach-tegra/tegra.c | 31 +------------------------------
+>>   drivers/soc/tegra/common.c  | 33 +++++++++++++++++++++++++++++++++
+>>   2 files changed, 34 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+>> index 914341bcef25..95df6a97b956 100644
+>> --- a/arch/arm/mach-tegra/tegra.c
+>> +++ b/arch/arm/mach-tegra/tegra.c
+>> @@ -87,36 +87,7 @@ static void __init tegra_dt_init_irq(void)
+>>
+>>   static void __init tegra_dt_init(void)
+>>   {
+>> -	struct soc_device_attribute *soc_dev_attr;
+>> -	struct soc_device *soc_dev;
+>> -	struct device *parent = NULL;
+>> -
+>> -	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+>> -	if (!soc_dev_attr)
+>> -		goto out;
+>> -
+>> -	soc_dev_attr->family = kasprintf(GFP_KERNEL, "Tegra");
+>> -	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d",
+>> -					   tegra_sku_info.revision);
+>> -	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%u", tegra_get_chip_id());
+>> -
+>> -	soc_dev = soc_device_register(soc_dev_attr);
+>> -	if (IS_ERR(soc_dev)) {
+>> -		kfree(soc_dev_attr->family);
+>> -		kfree(soc_dev_attr->revision);
+>> -		kfree(soc_dev_attr->soc_id);
+>> -		kfree(soc_dev_attr);
+>> -		goto out;
+>> -	}
+>> -
+>> -	parent = soc_device_to_device(soc_dev);
+>> -
+>> -	/*
+>> -	 * Finished with the static registrations now; fill in the missing
+>> -	 * devices
+>> -	 */
+>> -out:
+>> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, parent);
+>> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>
+> One of the reasons for adding the soc_device in the first place was so
+> that it would be possible to use it as the parent for all devices that
+> are instantiated from device tree. You remove that here, and break the
+> ABI in the process. Arguably no userspace should be relying on the exact
+> path in sysfs, but I'd still like to keep the top-level parent.
+>
+That would be a problem if you want to keep the same "ABI" in ARM64 kernel.
 
-Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
-Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
-And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
-But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
-not a general purpose DMAC (2nd DMAC is for Device to Device inside
-sound system). Additionally, current DMAEngine can't support Device to
-Device, and we don't have correct DT bindings for it at this point.
-So the easiest solution for it is that move it from DMAEngine to rsnd
-driver.
-Audio DMAC peri peri DMAEngine is no longer needed.
-Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v1 -> v2
-
- - new patch
-
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 06075b6..e805984 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -505,7 +505,6 @@ CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_SH_DMAE=y
--CONFIG_RCAR_AUDMAC_PP=m
- CONFIG_RCAR_DMAC=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
--- 
-1.9.1
+> Which reminds me of a discussion a while back about introducing a top-
+> level driver for the SoC. I'm not sure if anything came of that.
+>
+> Stephen, do you know if there was a conclusion on that discussion? As
+> far as I remember this sparked around the time when we moved drivers to
+> drivers/soc and started splitting things up into initcalls. I'm thinking
+> that if nothing like that was created yet, perhaps soc_device and
+> soc_bus_type would be good candidates to implement this on top of.
+>
+> Thierry
+>
+> * Unknown Key
+> * 0x7F3EB3A1
+>
