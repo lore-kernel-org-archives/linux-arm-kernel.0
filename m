@@ -1,82 +1,67 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 12 Mar 2015 03:41:45 -0700
-Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due
- to missing include file
-In-Reply-To: <CABuKBeKB=ghwRGOzUrxZ_46Joe9u883wOWoVrOeZ7EaX7C+--g@mail.gmail.com>
-References: <1426143074.26140.0.camel@phoenix>
- <CABuKBeKB=ghwRGOzUrxZ_46Joe9u883wOWoVrOeZ7EaX7C+--g@mail.gmail.com>
-Message-ID: <55016D69.8070802@roeck-us.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Mar 2015 10:42:59 +0000
+Subject: [PATCH v2 01/10] drivers: PL011: avoid potential
+ unregister_driver call
+In-Reply-To: <1425491994-23913-2-git-send-email-andre.przywara@arm.com>
+References: <1425491994-23913-1-git-send-email-andre.przywara@arm.com>
+ <1425491994-23913-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150312104258.GI8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2015 03:32 AM, Matthias Brugger wrote:
-> 2015-03-12 7:51 GMT+01:00 Axel Lin <axel.lin@ingics.com>:
->> Fix below build error:
->>    CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
->> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
->> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
->> compilation terminated.
->> make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
->> make[2]: *** [drivers/pinctrl/mediatek] Error 2
->> make[1]: *** [drivers/pinctrl] Error 2
->> make: *** [drivers] Error 2
->>
->> Signed-off-by: Axel Lin <axel.lin@ingics.com>
->
-> The fix from Guenter already addresses mt8135 case [0].
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
->
-> for the mt8173 part.
->
+On Wed, Mar 04, 2015 at 05:59:45PM +0000, Andre Przywara wrote:
+> Although we care about not unregistering the driver if there are
+> still ports connected during the .remove callback, we do miss this
+> check in the pl011_probe function. So if the current port allocation
+> fails, but there are other ports already registered, we will kill
+> those.
+> So factor out the port removal into a separate function and use that
+> in the probe function, too.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  drivers/tty/serial/amba-pl011.c |   38 +++++++++++++++++++++-----------------
+>  1 file changed, 21 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 92783fc..961f9b0 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2235,6 +2235,24 @@ static int pl011_probe_dt_alias(int index, struct device *dev)
+>  	return ret;
+>  }
+>  
+> +/* unregisters the driver also if no more ports are left */
+> +static void pl011_unregister_port(struct uart_amba_port *uap)
+> +{
+> +	int i;
+> +	bool busy = false;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
+> +		if (amba_ports[i] == uap)
+> +			amba_ports[i] = NULL;
+> +		else if (amba_ports[i])
+> +			busy = true;
+> +	}
+> +	pl011_dma_remove(uap);
+> +	if (!busy)
+> +		uart_unregister_driver(&amba_reg);
+> +}
 
-Axel's patch is more complete, so if my patch has not been applied yet
-I would suggest to take this one instead.
+This is still racy, as I pointed out at the time this crap was dreamt
+up.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+There is _no_ locking between an individual driver's ->probe or ->remove
+functions being called concurrently for different devices.  The only
+locking which the driver model guarantees is that a single struct device
+can only be probed by one driver at a time.
 
-Guenter
+Multiple struct device's can be in-progress of ->probe or ->remove
+simultaneously.
 
-> Cheers,
-> Matthias
->
-> [0] https://lkml.org/lkml/2015/3/11/510
->
->> ---
->>   drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
->>   drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h | 2 +-
->>   2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
->> index 5019cef..e17aedb 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
->> @@ -16,7 +16,7 @@
->>   #define __PINCTRL_MTK_MT8135_H
->>
->>   #include <linux/pinctrl/pinctrl.h>
->> -#include <pinctrl-mtk-common.h>
->> +#include "pinctrl-mtk-common.h"
->>
->>   static const struct mtk_desc_pin mtk_pins_mt8135[] = {
->>          MTK_PIN(
->> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
->> index c1a3ca0..13e5b68 100644
->> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
->> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
->> @@ -16,7 +16,7 @@
->>   #define __PINCTRL_MTK_MT8173_H
->>
->>   #include <linux/pinctrl/pinctrl.h>
->> -#include <pinctrl-mtk-common.h>
->> +#include "pinctrl-mtk-common.h"
->>
->>   static const struct mtk_desc_pin mtk_pins_mt8173[] = {
->>          MTK_PIN(
->> --
->> 1.9.1
->>
->>
->>
->
->
->
+However, this isn't your bug to solve... it's those who were proponents
+of this crap approach.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
