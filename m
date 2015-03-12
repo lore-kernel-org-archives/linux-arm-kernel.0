@@ -1,38 +1,107 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 12 Mar 2015 11:04:03 +0200
-Subject: [PATCH v3 1/2] remoteproc: use a flag to detect the presence of
- IOMMU
-In-Reply-To: <1420838519-15669-2-git-send-email-s-anna@ti.com>
-References: <1420838519-15669-1-git-send-email-s-anna@ti.com>
- <1420838519-15669-2-git-send-email-s-anna@ti.com>
-Message-ID: <CAK=WgbawMvc5Td-1+eEv3+BJWCUwHeZskJwDTPUaD66RT6EOxw@mail.gmail.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 12 Mar 2015 10:07:09 +0100
+Subject: [PATCH] arm64: fix implementation of mmap2 compat syscall
+In-Reply-To: <55008557.3000200@suse.de> (Alexander Graf's message of "Wed, 11
+ Mar 2015 13:11:35 -0500")
+References: <1417707993-82290-1-git-send-email-agraf@suse.de>
+ <C0CF99B1-8706-4D9B-87E0-13A7C6C619D6@suse.de>
+ <mvmegovejx0.fsf@hawking.suse.de> <2583329.jVX0TanYzO@wuerfel>
+ <mvma8zjeixd.fsf@hawking.suse.de> <550062D6.3000101@suse.de>
+ <mvmtwxrcy81.fsf@hawking.suse.de> <55008557.3000200@suse.de>
+Message-ID: <mvmh9tqd1oi.fsf_-_@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 9, 2015 at 11:21 PM, Suman Anna <s-anna@ti.com> wrote:
-> The remoteproc driver core currently relies on iommu_present() on
-> the bus the device is on, to perform MMU management. However, this
-> logic doesn't scale for multi-arch, especially for processors that
-> do not have an IOMMU. Replace this logic instead by using a h/w
-> capability flag for the presence of IOMMU in the rproc structure.
->
-> This issue is seen on OMAP platforms when trying to add a remoteproc
-> driver for a small Cortex M3 called the WkupM3 used for suspend /
-> resume management on TI AM335/AM437x SoCs. This processor does not
-> have an MMU. Same is the case with another processor subsystem
-> PRU-ICSS on AM335/AM437x. All these are platform devices, and the
-> current iommu_present check will not scale for the same kernel image
-> to support OMAP4/OMAP5 and AM335/AM437x.
->
-> The existing platform implementation drivers - OMAP remoteproc, STE
-> Modem remoteproc and DA8xx remoteproc, are updated as well to properly
-> configure the newly added rproc field.
->
-> Cc: Robert Tivy <rtivy@ti.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+The arm mmap2 syscall takes the offset in units of 4K, thus with 64K pages
+the offset needs to be scaled to units of pages.
 
-Applied to remoteproc's for-next branch.
+Signed-off-by: Andreas Schwab <schwab@suse.de>
+---
+ arch/arm64/include/asm/unistd32.h |  2 +-
+ arch/arm64/kernel/entry32.S       | 18 ++++++++++++++++++
+ arch/arm64/kernel/sys32.c         |  6 ++++++
+ 3 files changed, 25 insertions(+), 1 deletion(-)
 
-Thanks,
-Ohad.
+diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+index 2722442..cef934a 100644
+--- a/arch/arm64/include/asm/unistd32.h
++++ b/arch/arm64/include/asm/unistd32.h
+@@ -406,7 +406,7 @@ __SYSCALL(__NR_vfork, sys_vfork)
+ #define __NR_ugetrlimit 191	/* SuS compliant getrlimit */
+ __SYSCALL(__NR_ugetrlimit, compat_sys_getrlimit)		/* SuS compliant getrlimit */
+ #define __NR_mmap2 192
+-__SYSCALL(__NR_mmap2, sys_mmap_pgoff)
++__SYSCALL(__NR_mmap2, compat_sys_mmap2_wrapper)
+ #define __NR_truncate64 193
+ __SYSCALL(__NR_truncate64, compat_sys_truncate64_wrapper)
+ #define __NR_ftruncate64 194
+diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
+index 9a8f6ae..17f3296 100644
+--- a/arch/arm64/kernel/entry32.S
++++ b/arch/arm64/kernel/entry32.S
+@@ -19,9 +19,12 @@
+  */
+ 
+ #include <linux/linkage.h>
++#include <linux/const.h>
+ 
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/page.h>
+ 
+ /*
+  * System call wrappers for the AArch32 compatibility layer.
+@@ -54,6 +57,21 @@ ENTRY(compat_sys_fstatfs64_wrapper)
+ ENDPROC(compat_sys_fstatfs64_wrapper)
+ 
+ /*
++ * Note: off_4k (w5) is always units of 4K.  If we can't do the requested
++ * offset, we return EINVAL.
++ */
++#if PAGE_SHIFT > 12
++ENTRY(compat_sys_mmap2_wrapper)
++	tst	w5, #~PAGE_MASK >> 12
++	b.ne	1f
++	lsr	w5, w5, #PAGE_SHIFT - 12
++	b	sys_mmap_pgoff
++1:	mov	x0, #-EINVAL
++	ret	lr
++ENDPROC(compat_sys_mmap2_wrapper)
++#endif
++
++/*
+  * Wrappers for AArch32 syscalls that either take 64-bit parameters
+  * in registers or that take 32-bit parameters which require sign
+  * extension.
+diff --git a/arch/arm64/kernel/sys32.c b/arch/arm64/kernel/sys32.c
+index 2d5ab3c..7800bb1 100644
+--- a/arch/arm64/kernel/sys32.c
++++ b/arch/arm64/kernel/sys32.c
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/compiler.h>
+ #include <linux/syscalls.h>
++#include <asm/page.h>
+ 
+ asmlinkage long compat_sys_sigreturn_wrapper(void);
+ asmlinkage long compat_sys_rt_sigreturn_wrapper(void);
+@@ -37,6 +38,11 @@ asmlinkage long compat_sys_readahead_wrapper(void);
+ asmlinkage long compat_sys_fadvise64_64_wrapper(void);
+ asmlinkage long compat_sys_sync_file_range2_wrapper(void);
+ asmlinkage long compat_sys_fallocate_wrapper(void);
++#if PAGE_SHIFT > 12
++asmlinkage long compat_sys_mmap2_wrapper(void);
++#else
++#define compat_sys_mmap2_wrapper sys_mmap_pgoff
++#endif
+ 
+ #undef __SYSCALL
+ #define __SYSCALL(nr, sym)	[nr] = sym,
+-- 
+2.3.2
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
