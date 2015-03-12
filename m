@@ -1,140 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Mar 2015 22:37:56 +0100
-Subject: [RFT/RFC PATCH 3/6] ARM: add macro to perform far branches (b/bl)
-In-Reply-To: <CAKv+Gu8KegZBvE8sNAY6tnrOSEE7zxRzf8JywPxbHYL_fjJDwg@mail.gmail.com>
-References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426181892-15440-4-git-send-email-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.11.1503121625401.27567@knanqh.ubzr>
- <CAKv+Gu9Jcvr2QsWiwHY9ddcLwaHGUyBLBNzUB5voDXJpD8KLKA@mail.gmail.com>
- <alpine.LFD.2.11.1503121644180.27567@knanqh.ubzr>
- <CAKv+Gu8KegZBvE8sNAY6tnrOSEE7zxRzf8JywPxbHYL_fjJDwg@mail.gmail.com>
-Message-ID: <CAKv+Gu_ZNrVg9iXD4hgQyyfHS5gAWycaRV-CbkM0BXvmKc6U5A@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 12 Mar 2015 22:40:34 +0100
+Subject: [PATCH v2 0/3] arm/arm64: KVM: Add support for page aging
+In-Reply-To: <1426184212-29333-1-git-send-email-marc.zyngier@arm.com>
+References: <1426184212-29333-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150312214034.GA3067@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 March 2015 at 22:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 12 March 2015 at 22:03, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> On Thu, 12 Mar 2015, Ard Biesheuvel wrote:
->>
->>> On 12 March 2015 at 21:32, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->>> > On Thu, 12 Mar 2015, Ard Biesheuvel wrote:
->>> >
->>> >> These macros execute PC-relative branches, but with a larger
->>> >> reach than the 24 bits that are available in the b and bl opcodes.
->>> >>
->>> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> >> ---
->>> >>  arch/arm/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
->>> >>  1 file changed, 29 insertions(+)
->>> >>
->>> >> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
->>> >> index f67fd3afebdf..bd08c3c1b73f 100644
->>> >> --- a/arch/arm/include/asm/assembler.h
->>> >> +++ b/arch/arm/include/asm/assembler.h
->>> >> @@ -108,6 +108,35 @@
->>> >>       .endm
->>> >>  #endif
->>> >>
->>> >> +     /*
->>> >> +      * Macros to emit relative branches that may exceed the range
->>> >> +      * of the 24-bit immediate of the ordinary b/bl instructions.
->>> >> +      * NOTE: this doesn't work with locally defined symbols, as they
->>> >> +      * might lack the ARM/Thumb annotation (even if they are annotated
->>> >> +      * as functions)
->>> >
->>> > I really hope you won't need a far call with local symbols ever!
->>> >
->>>
->>> Well, if you use pushsection/popsection, then local, numbered labels
->>> you refer to can be quite far away in the output image, and those will
->>> not have the thumb bit set.
->>
->> Indeed.
->>
->>> >> +      */
->>> >> +     .macro  b_far, target, tmpreg
->>> >> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
->>> >> + ARM(        movt    \tmpreg, #:upper16:(\target - (8888f + 8))      )
->>> >> + ARM(        movw    \tmpreg, #:lower16:(\target - (8888f + 8))      )
->>> >> + THUMB(      movt    \tmpreg, #:upper16:(\target - (8888f + 4))      )
->>> >> + THUMB(      movw    \tmpreg, #:lower16:(\target - (8888f + 4))      )
->>> >> +8888:        add     pc, pc, \tmpreg
->>> >> +#else
->>> >> +     ldr     \tmpreg, 8889f
->>> >> +8888:        add     pc, pc, \tmpreg
->>> >> +     .align  2
->>> >> +8889:
->>> >> + ARM(        .word   \target - (8888b + 8)           )
->>> >
->>> > The Thumb relocation value is missing here.
->>> >
->>>
->>> Yes, this is bogus. But Thumb2 implies v7 or v7m, so it is not
->>> actually incorrect in this case.
->>
->> The ".align 2" would be redundant in that case too.
->>
->
-> Correct, the #else bit is essentially ARM only
->
->>> But I will fix it in the next version
->>
->> Is it worth optimizing the ARM mode with movw/movt on ARMv7?  If not
->> then this could be simplified as only:
->>
->>              .macro  b_far, target, tmpreg
->>  THUMB(      movt    \tmpreg, #:upper16:(\target - (8888f + 4))      )
->>  THUMB(      movw    \tmpreg, #:lower16:(\target - (8888f + 4))      )
->>  ARM(        ldr     \tmpreg, 8888f+4                                )
->>  8888:       add     pc, pc, \tmpreg
->>  ARM(        .word   \target - (8888b + 8)           )
->>              .endm
->>
->
-> movw/movt is preferred if available, since it circumvents the D-cache.
-> And actually, I should rewrite the bl_far macro for v7 to use blx
-> instead of adr+ldr to make better use of the return stack predictor or
-> whatever it is called in the h/w
->
-> And, as Russell points out, I should put a PC_BIAS #define somewhere
-> that assumes the correct value for the used mode, instead of the +4/+8
-> immediates.
->
-> So I am thinking along the lines of
->
-> .macro  b_far, target, tmpreg
-> #if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
-> movt \tmpreg, #:upper16:(\target - (8888f + PC_BIAS))
-> movw \tmpreg, #:lower16:(\target - (8888f + PC_BIAS))
-> 8888: add pc, pc, \tmpreg
-> #else
-> ldr \tmpreg, =\target - (8888f + PC_BIAS)
+On Thu, Mar 12, 2015 at 06:16:49PM +0000, Marc Zyngier wrote:
+> So far, KVM/arm doesn't implement any support for page aging, leading
+> to rather bad performance when the system is swapping. This short
+> series implements the required hooks and fault handling to deal with
+> pages being marked old/young.
+> 
+> The three patches are fairly straightforward:
+> 
+> - First patch changes the range iterator to be able to return a value
+> 
+> - Second patch implements the actual page aging (clearing the AF bit
+>   in the page tables, and relying on the normal faulting code to set
+>   the bit again).
+> 
+> - Last patch optimizes the access fault path by only doing the minimum
+>   to satisfy the fault.
+> 
+> The end result is a system that behaves visibly better under load, as
+> VM pages don't get evicted that easily.
+> 
+> Based on 4.0-rc3, tested on Seattle and X-Gene.
+> 
+> Also at git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/page-aging
+> 
+> * From v1 [1]:
+> - Removed all TLBIs from kvm_age_hva_handler, as the core KVM code
+>   already does use quite a large hammer to nuke the TLBs on its own
+> - Don't mark old a page that is already old
+> - Rebased on top of 4.0-rc3
+> 
 
-Replying to self: this doesn't work
+Thanks, applied to queue!
 
-/home/ard/linux-2.6/arch/arm/kernel/sleep.S: Assembler messages:
-/home/ard/linux-2.6/arch/arm/kernel/sleep.S:131: Error: constant
-expression expected -- `ldr ip,=__hyp_stub_install_secondary-8888f+4'
-
-so the only way this is feasible is with an explicit literal, which
-kind of sucks indeed for Dcache performance
-
-Any other ideas?
-
-
-> 8888: add pc, pc, \tmpreg
-> #endif
-> .endm
->
-> .macro bl_far, target, tmpreg=ip
-> #if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
-> movt \tmpreg, #:upper16:(\target - (8887f + PC_BIAS))
-> movw \tmpreg, #:lower16:(\target - (8887f + PC_BIAS))
-> 8887: add \tmpreg, \tmpreg, pc
-> blx \tmpreg
-> #else
-> adr lr, BSYM(8887f)
-> b_far \target, \tmpreg
-> 8887:
-> #endif
-> .endm
+-Christoffer
