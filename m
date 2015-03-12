@@ -1,57 +1,86 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Mar 2015 14:32:19 -0500
-Subject: [PATCH v6 03/30] PCI: Export busn_resource to drivers/pci
-In-Reply-To: <55017BA1.7020700@huawei.com>
+Date: Thu, 12 Mar 2015 14:35:05 -0500
+Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
+In-Reply-To: <55017CA5.2010502@huawei.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-4-git-send-email-wangyijing@huawei.com>
- <20150311222835.GA1082@google.com> <55017BA1.7020700@huawei.com>
-Message-ID: <20150312193219.GA7346@google.com>
+ <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
+ <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
+Message-ID: <20150312193505.GB7346@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 07:42:25PM +0800, Yijing Wang wrote:
-> >> -static struct resource busn_resource = {
-> >> +struct resource busn_resource = {
-> >>  	.name	= "PCI busn",
-> >>  	.start	= 0,
-> >>  	.end	= 255,
-> >>  	.flags	= IORESOURCE_BUS,
-> >>  };
-> >> +EXPORT_SYMBOL(busn_resource);
+On Thu, Mar 12, 2015 at 07:46:45PM +0800, Yijing Wang wrote:
+> >>  	struct pci_bus *b;
+> >> +	LIST_HEAD(resources);
+> >>  	struct pcifront_sd *sd = NULL;
+> >>  	struct pci_bus_entry *bus_entry = NULL;
+> >>  	int err = 0;
+> >> @@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+> >>  		err = -ENOMEM;
+> >>  		goto err_out;
+> >>  	}
+> >> +	pci_add_resource(&resources, &ioport_resource);
+> >> +	pci_add_resource(&resources, &iomem_resource);
+> >> +	pci_add_resource(&resources, &busn_resource);
 > > 
-> > I don't think this is a good idea.  We support multiple PCI domains, and
-> > each domain has its own 0-255 bus number range.  This busn_resource is
-> > only for domain 0 and probably should be handled in arch code instead of
-> > the PCI core.
+> > Since I don't want to export busn_resource, you might have to allocate your
+> > own struct resource for it here.  And, of course, figure out the details of
+> > which PCI domain you're in and whether you need to share one struct
+> > resource across several host bridges in the same domain.
+> 
+> Allocate its own resource here is ok for me, as I mentioned in previous reply,
+> so do we still need to add additional info to figure out which domain own the bus resource ?
+
+That's up to the caller.  Only the platform knows which bridges it wants to
+have in the same domain.  In principle, every host bridge could be in its
+own domain, since each bridge is the root of a unique PCI hierarchy.  But
+some platforms have firmware that assumes otherwise.  I have no idea what
+xen assumes.
+
+> >>  	pcifront_init_sd(sd, domain, bus, pdev);
+> >>  
+> >>  	pci_lock_rescan_remove();
+> >>  
+> >> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
+> >> -				  &pcifront_bus_ops, sd);
+> >> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
+> >> +				  &pcifront_bus_ops, sd, &resources);
+> >>  	if (!b) {
+> >>  		dev_err(&pdev->xdev->dev,
+> >>  			"Error creating PCI Frontend Bus!\n");
+> >>  		err = -ENOMEM;
+> >>  		pci_unlock_rescan_remove();
+> >> +		pci_free_resource_list(&resources);
+> >>  		goto err_out;
+> >>  	}
+> >>  
+> >> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
+> >>  
+> >>  	list_add(&bus_entry->list, &pdev->root_buses);
+> >>  
+> >> -	/* pci_scan_bus_parented skips devices which do not have a have
+> >> +	/* pci_scan_root_bus skips devices which do not have a
+> >>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
+> >>  	err = pcifront_scan_bus(pdev, domain, bus, b);
+> >>  
+> >> -- 
+> >> 1.7.1
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > > 
-> > Right now, I think it's possible to call pci_scan_bus_parented() or
-> > pci_scan_bus() several times for buses in different domains, and they would
-> > all share the same busn_resource, which would cause corruption.
+> > .
 > > 
-> > So it's already broken, but I don't want to make it harder to fix by
-> > exporting this stuff.
 > 
-> Hi Bjorn, busn_resource may would not be shared by multi domains,
 > 
-> We insert bus number resource like:
+> -- 
+> Thanks!
+> Yijing
 > 
-> pci_add_resource(&resources, &busn_resource);	
-> 	pci_bus_insert_busn_res(root_bus, start, bus_max);	//start is the root bus number provided by arch pci host driver, bus max here == 255
-> 		get_pci_domain_busn_res(domain)	//for root bus	//try to get a domain specific pci_domain_busn_res, if not exist, create it.
-> 			request_resource_conflict(domain_specific_busn_res, res)   //request busn res(start, bus_max) from the pci_domain_busn_res.
-> 
-> So every domain has its own pci_domain_busn_res , different domain would not share the same bus number resource.
-
-The intent of pci_add_resource() and passing the resulting resource list
-into pci_scan_root_bus(), etc., is that the host bridge may consume any
-resources described by the list.  If we pass the same resource to multiple
-calls, that means the resource must be shared between the multiple host
-bridges involved.  For bus numbers, that makes some sense if the platform
-considers the bridges to be in the same domain, but not if they are in
-different domains.
-
-If we export busn_resource, we have no control over what domains it becomes
-associated with because the domain is passed into pci_scan_root_bus() by
-the caller.
-
-Bjorn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
