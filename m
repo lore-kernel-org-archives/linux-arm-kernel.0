@@ -1,32 +1,41 @@
-From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
-Date: Thu, 12 Mar 2015 13:53:25 +0200
-Subject: [PATCH v6 6/6] MAINTAINERS: add maintainer for Alpine Arm machine
-Message-ID: <55017e35.noNGF5pCBfgSxdvb%tsahee@annapurnalabs.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 12 Mar 2015 21:00:53 +0900
+Subject: [PATCH] ARM: exynos_defconfig: Enable Marvell WiFi-Ex support
+In-Reply-To: <1423992532-29228-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1423992532-29228-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <02cf01d05cbc$30ab15b0$92014110$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as a maintainer for arch/arm/mach-alpine/
+Martinez Canillas wrote:
+> 
+> Exynos5420 Peach Pit and Exynos5800 Peach Pi boards have a MMC/SDIO
+> Marvell WiFi-Ex chip. This patch enables wireless support and the
+> mwifiex driver.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/configs/exynos_defconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 70e5d0bdb4e4..dcef516bcd0d 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -34,6 +34,10 @@ CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+>  CONFIG_NET_KEY=y
+>  CONFIG_INET=y
+> +CONFIG_WIRELESS=y
+> +CONFIG_CFG80211=y
+> +CONFIG_MWIFIEX=y
+> +CONFIG_MWIFIEX_SDIO=y
+>  CONFIG_RFKILL_REGULATOR=y
+>  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+>  CONFIG_DEVTMPFS=y
+> --
 
-Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
----
- MAINTAINERS | 5 +++++
- 1 file changed, 5 insertions(+)
+OK, will apply.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 48c42f0..b33b095 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -881,6 +881,11 @@ S:	Maintained
- F:	drivers/media/rc/meson-ir.c
- N:	meson[x68]
- 
-+ARM/Annapurna Labs ALPINE ARCHITECTURE
-+M:	Tsahee Zidenberg <tsahee@annapurnalabs.com>
-+S:	Maintained
-+F:	arch/arm/mach-alpine/
-+
- ARM/ATMEL AT91RM9200 AND AT91SAM ARM ARCHITECTURES
- M:	Andrew Victor <linux@maxim.org.za>
- M:	Nicolas Ferre <nicolas.ferre@atmel.com>
--- 
-1.9.1
+Thanks,
+Kukjin
