@@ -1,74 +1,45 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Thu, 12 Mar 2015 14:54:15 -0500
-Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <20150312182508.GF30145@leverpostej>
-References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
- <1426107080-29079-2-git-send-email-galak@codeaurora.org>
- <20150312170541.GE30145@leverpostej>
- <E114AF0E-5DA9-412A-B3E2-DDD95D224C66@codeaurora.org>
- <20150312182508.GF30145@leverpostej>
-Message-ID: <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 12 Mar 2015 14:56:51 -0500
+Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
+ host bridges
+In-Reply-To: <55018E90.9030301@huawei.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
+ <20150312025537.GD10949@google.com> <55018E90.9030301@huawei.com>
+Message-ID: <20150312195651.GD7346@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 12, 2015, at 1:25 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-
->>>> +	cpus {
->>>> +		#address-cells = <1>;
->>>> +		#size-cells = <0>;
->>>> +
->>>> +		CPU0: cpu at 0 {
->>>> +			device_type = "cpu";
->>>> +			compatible = "arm,cortex-a53", "arm,armv8";
->>>> +			reg = <0x0>;
->>>> +		};
->>>> +
->>>> +		CPU1: cpu at 1 {
->>>> +			device_type = "cpu";
->>>> +			compatible = "arm,cortex-a53", "arm,armv8";
->>>> +			reg = <0x1>;
->>>> +		};
->>>> +
->>>> +		CPU2: cpu at 2 {
->>>> +			device_type = "cpu";
->>>> +			compatible = "arm,cortex-a53", "arm,armv8";
->>>> +			reg = <0x2>;
->>>> +		};
->>>> +
->>>> +		CPU3: cpu at 3 {
->>>> +			device_type = "cpu";
->>>> +			compatible = "arm,cortex-a53", "arm,armv8";
->>>> +			reg = <0x3>;
->>>> +		};
->>>> +	};
->>> 
->>> The secondary CPUs need an enable-method. Are you using PSCI or
->>> spin-table?
->> 
->> This is on purpose.  We aren?t using either PSCI or spin-table.  Right
->> now the dts is for booting on a single core.  I can drop CPU1..CPU3 if
->> that helps.
+On Thu, Mar 12, 2015 at 09:03:12PM +0800, Yijing Wang wrote:
+> On 2015/3/12 10:55, Bjorn Helgaas wrote:
+> > On Mon, Mar 09, 2015 at 10:34:07AM +0800, Yijing Wang wrote:
+> >> Introduce pci_host_bridge_list to manage pci host
+> >> bridges in system, so we could detect whether
+> >> the host in domain:bus is alreay registered.
+> >> Then we could remove bus alreay exist test in
+> >> __pci_create_root_bus().
+> > 
+> > It's a nice idea to move this test into the core.  While you're at it, why
+> > don't you check for any overlap with the bus ranges of existing host
+> > bridges?  For example, if we're trying to create a new host bridge to
+> > [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
+> > as well as to [bus 40-ff].  I think your current patch will detect the
+> > latter conflict but not the former.
 > 
-> We won't poke the CPUs without an enable-method, so personally I'm not
-> too worried either way about having the CPUs listed.
+> Now pci host bridge may only know its start bus number, like acpi _BBN provided,
+> but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
+> so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
+> some pci scan would fail which currently scan success.
 
-That was my thinking, so left them in.
+_BBN is not the correct source for the bridge's bus number range.  There's
+a comment in acpi_pci_root_add() that explains why:
 
-> Which of spin-table/psci are you planning on using for SMP support, and
-> when would that be likely to appear?
+  * We need both the start and end of the downstream bus range
+  * to interpret _CBA (MMCONFIG base address), so it really is
+  * supposed to be in _CRS.  If we don't find it there, all we
+  * can do is assume [_BBN-0xFF] or [0-0xFF].
 
-We have a qcom specific SMP enablement method for this device.  This was one of our first devices so it utilized as much from arm 32-bit as possible.
-
-> Which exception level do CPUs enter the kernel? Even without a
-> virt-capable GIC booting at EL2 is less work for the FW and gives the
-> kernel a better chance of fixing things up (e.g. CNTVOFF).
-
-I think the enter in EL1.
-
-- k
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+A platform SHOULD know the start and and end bus number.  If it doesn't I
+think it's the platform's responsibility to carve up the bus number range.
+Maybe this can be done by trimming the range of the [bus 00-ff] bridge when
+we discover another bridge that leads to bus 80.
