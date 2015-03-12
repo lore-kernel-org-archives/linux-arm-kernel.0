@@ -1,74 +1,71 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 12 Mar 2015 11:32:59 +0100
-Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due to
- missing include file
-In-Reply-To: <1426143074.26140.0.camel@phoenix>
-References: <1426143074.26140.0.camel@phoenix>
-Message-ID: <CABuKBeKB=ghwRGOzUrxZ_46Joe9u883wOWoVrOeZ7EaX7C+--g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Mar 2015 10:36:56 +0000
+Subject: [PATCH] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <CAKohpo=90YH3TLfnMro0AQOM6_uMB_SPS9Q3j6Myz4RqqBdVHg@mail.gmail.com>
+References: <1425466152-7867-1-git-send-email-pi-cheng.chen@linaro.org>
+ <20150304112109.GB11010@pengutronix.de>
+ <CALx668WKKmifhuODsV+Uaoq4ggcmB1=wbpLzXBnjEtxbuB4qig@mail.gmail.com>
+ <20150305074207.GC11010@pengutronix.de>
+ <CAKohponSqLPcULA9-T8y9b_b44Torti0p6W3sJfRZ1oKUWqtTw@mail.gmail.com>
+ <20150305091948.GH11010@pengutronix.de>
+ <CALx668X2m0hMVQumGQmhhrKnv4h1hiYp20Q4FcKuECK3mhoJiA@mail.gmail.com>
+ <20150305105104.GJ11010@pengutronix.de>
+ <CAKohpo=90YH3TLfnMro0AQOM6_uMB_SPS9Q3j6Myz4RqqBdVHg@mail.gmail.com>
+Message-ID: <20150312103655.GH8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-12 7:51 GMT+01:00 Axel Lin <axel.lin@ingics.com>:
-> Fix below build error:
->   CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
-> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
-> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
-> compilation terminated.
-> make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
-> make[2]: *** [drivers/pinctrl/mediatek] Error 2
-> make[1]: *** [drivers/pinctrl] Error 2
-> make: *** [drivers] Error 2
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+On Thu, Mar 05, 2015 at 04:32:06PM +0530, Viresh Kumar wrote:
+> On 5 March 2015 at 16:21, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > Given the variance of different SoCs I don't think it makes sense
+> > to try to handle all these cases. Instead the cpufreq-dt driver
+> > should just call clk_set_rate() on the CPU clock with the desired
+> > target frequency. Everything else should be handled in the clock
+> > driver which has intimate knowledge about the SoC anyway.
+> 
+> I agree..
+> 
+> @Russell: I wanted to ask you this since sometime..
 
-The fix from Guenter already addresses mt8135 case [0].
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Remember that I've been "away" from mail for several days last week, as
+I had widely published on google+ and on the lists.
 
-for the mt8173 part.
+> On CPU-freq changes we fire PRE/POST notifiers and they are
+> used for updating loops_per_jiffies which then controls delays.
 
-Cheers,
-Matthias
+Their main purpose is to allow drivers to shut down their peripherals
+before the change and bring them back up after the change on SoCs where
+the peripherals are clocked off the CPU clock or a derivative of it.
 
-[0] https://lkml.org/lkml/2015/3/11/510
+For example, SA11x0 SoCs were never actually designed for CPU frequency
+scaling, but we made it work - and in doing so, you have to reprogram a
+bunch of peripherals such as PCMCIA timings, LCD controller, and SDRAM
+controller - and because of the need to quiesce the SDRAM controller
+over the transition, we need to shut down anything which may cause RAM
+to be accessed (such as DMA.)
 
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-> index 5019cef..e17aedb 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h
-> @@ -16,7 +16,7 @@
->  #define __PINCTRL_MTK_MT8135_H
->
->  #include <linux/pinctrl/pinctrl.h>
-> -#include <pinctrl-mtk-common.h>
-> +#include "pinctrl-mtk-common.h"
->
->  static const struct mtk_desc_pin mtk_pins_mt8135[] = {
->         MTK_PIN(
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> index c1a3ca0..13e5b68 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt8173.h
-> @@ -16,7 +16,7 @@
->  #define __PINCTRL_MTK_MT8173_H
->
->  #include <linux/pinctrl/pinctrl.h>
-> -#include <pinctrl-mtk-common.h>
-> +#include "pinctrl-mtk-common.h"
->
->  static const struct mtk_desc_pin mtk_pins_mt8173[] = {
->         MTK_PIN(
-> --
-> 1.9.1
->
->
->
+> Now, it is fine to do that for normal frequencies, but what should be
+> the approach for intermediate frequencies ?
 
+I don't think so - calling the notifiers can be expensive where peripheral
+drivers are involved - peripherals may need to wait for the hardware to
+quiesce before they can allow the notifier to continue.  You could make
+it a different reason code (so that drivers such as the SA11x0 stuff can
+ignore these intermediate steps.)
 
+> The *wild* thought I earlier had was to fire these notifiers for even
+> these intermediate frequencies, otherwise some of the delays will end
+> before they should have and that *might* cause other problems.
+
+The real answer is not to use the software delay at all when cpufreq is
+enabled, and use a timer based delay which is then independent of the
+CPU clock rate.
+
+The only case where a software delay is acceptable is as a last resort
+fallback if the platform has no other option, or the CPU clock is
+stable.
 
 -- 
-motzblog.wordpress.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
