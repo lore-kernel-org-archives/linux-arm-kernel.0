@@ -1,75 +1,85 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Thu, 12 Mar 2015 14:09:11 +0200
-Subject: [PATCH v6 3/6] dt: bindings: add TI's wilink wireless device
-In-Reply-To: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-Message-ID: <1426162154-8716-4-git-send-email-eliad@wizery.com>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Thu, 12 Mar 2015 20:15:01 +0800
+Subject: [PATCH v2 00/17] Add generic PM domain support for Tegra SoCs
+Message-ID: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree binding documentation for TI's wilink
-(wl12xx and wl18xx) wlan chip.
+Hi,
 
-Signed-off-by: Eliad Peller <eliad@wizery.com>
----
-v6: add wl12xx, use IRQ_TYPE_LEVEL_HIGH
+This is the v2 of Tegra generic PM domain support. The v1 is the RFC
+series[1].
 
- .../devicetree/bindings/net/wireless/ti,wlcore.txt | 47 ++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
+Patch 1 adds the new function of_reset_control_get_by_index().
 
-diff --git a/Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt b/Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
-new file mode 100644
-index 0000000..2a3d90d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
-@@ -0,0 +1,47 @@
-+TI Wilink 6/7/8 (wl12xx/wl18xx) SDIO devices
-+
-+This node provides properties for controlling the wilink wireless device. The
-+node is expected to be specified as a child node to the SDIO controller that
-+connects the device to the system.
-+
-+Required properties:
-+ - compatible: should be one of the following:
-+    * "ti,wl1271"
-+    * "ti,wl1273"
-+    * "ti,wl1281"
-+    * "ti,wl1283"
-+    * "ti,wl1801"
-+    * "ti,wl1805"
-+    * "ti,wl1807"
-+    * "ti,wl1831"
-+    * "ti,wl1835"
-+    * "ti,wl1837"
-+ - interrupts : specifies attributes for the out-of-band interrupt.
-+
-+Optional properties:
-+ - interrupt-parent : the phandle for the interrupt controller to which the
-+	device interrupts are connected.
-+ - ref-clock-frequency : ref clock frequency in Hz
-+ - tcxo-clock-frequency : tcxo clock frequency in Hz
-+
-+Note: the *-clock-frequency properties assume internal clocks. In case of external
-+clock, new bindings (for parsing the clock nodes) have to be added.
-+
-+Example:
-+
-+&mmc3 {
-+	status = "okay";
-+	vmmc-supply = <&wlan_en_reg>;
-+	bus-width = <4>;
-+	cap-power-off-card;
-+	keep-power-in-suspend;
-+
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1835";
-+		reg = <2>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+};
+Patch 2 - 5 add the MC flush operations for Tegra30/Tegra114/Tegra124.
+
+Patch 6 is a PLLD fix for Tegra114.
+
+Patch 7 is based on Thierry's proof-of-concept work and adds necessary
+changes to support DT parsing and power sequence.
+
+Patch 8 - 11 add the power domain nodes into DT.
+
+Patch 12 - 17 are the clean up for the legacy powergate API. 
+
+TODO:
+* The GR3D is broken on ToT now. Have to verify it with this series after
+   we fix it properly.
+
+v2:
+* Add support for Tegra30/Tegra114
+* Address Alex's comments 
+
+[1] http://www.spinics.net/lists/linux-tegra/msg21012.html
+
+Thanks,
+Vince
+
+Thierry Reding (1):
+  soc: tegra: pmc: Add generic PM domain support
+
+Vince Hsu (16):
+  reset: add of_reset_control_get_by_index()
+  memory: tegra: add mc flush support
+  memory: tegra: add flush operation for Tegra30 memory clients
+  memory: tegra: add flush operation for Tegra114 memory clients
+  memory: tegra: add flush operation for Tegra124 memory clients
+  clk: tegra: remove TEGRA_PLL_USE_LOCK for PLLD/PLLD2
+  ARM: tegra: add PM domain device nodes to Tegra30 DT
+  ARM: tegra: add PM domain device nodes to Tegra114 DT
+  ARM: tegra: add PM domain device nodes to Tegra124 DT
+  ARM: tegra: add GPU power supply to Jetson TK1 DT
+  drm/tegra: dc: remove the power sequence from driver
+  PCI: tegra: remove the power sequence from driver
+  ata: ahci_tegra: remove power sequence from driver
+  drm/tegra: remove GR3D power sequence from driver
+  ARM: tegra: select PM_GENERIC_DOMAINS
+  soc/tegra: remove lagacy powergate APIs
+
+ arch/arm/boot/dts/tegra114.dtsi             |  43 +-
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts   |   4 +
+ arch/arm/boot/dts/tegra124.dtsi             |  86 +++-
+ arch/arm/boot/dts/tegra30.dtsi              |  45 +-
+ arch/arm/mach-tegra/Kconfig                 |   1 +
+ drivers/ata/ahci_tegra.c                    |  11 -
+ drivers/clk/tegra/clk-tegra114.c            |   6 +-
+ drivers/gpu/drm/tegra/dc.c                  |  46 +-
+ drivers/gpu/drm/tegra/gr3d.c                |  32 +-
+ drivers/memory/tegra/mc.c                   | 122 ++++++
+ drivers/memory/tegra/mc.h                   |   5 +
+ drivers/memory/tegra/tegra114.c             | 106 ++++-
+ drivers/memory/tegra/tegra124.c             |  38 +-
+ drivers/memory/tegra/tegra30.c              |  80 +++-
+ drivers/pci/host/pci-tegra.c                |  22 +-
+ drivers/reset/core.c                        |  44 +-
+ drivers/soc/tegra/pmc.c                     | 657 +++++++++++++++++++++++++---
+ include/dt-bindings/power/tegra-powergate.h |  30 ++
+ include/linux/reset.h                       |   9 +
+ include/soc/tegra/mc.h                      |  46 +-
+ include/soc/tegra/pmc.h                     |  22 -
+ 21 files changed, 1255 insertions(+), 200 deletions(-)
+ create mode 100644 include/dt-bindings/power/tegra-powergate.h
+
 -- 
-1.8.5.2.229.g4448466.dirty
+2.1.4
