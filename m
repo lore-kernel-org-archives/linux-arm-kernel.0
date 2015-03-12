@@ -1,57 +1,104 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 12 Mar 2015 10:06:27 +0200
-Subject: [RESEND 3/7] ARM: davinci: devices-da8xx: Clean up and correct the
- McASP device creation
+Date: Thu, 12 Mar 2015 10:06:28 +0200
+Subject: [RESEND 4/7] ARM: davinci: devices-da8xx: Add support for McASP2 on
+ da830
 In-Reply-To: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1426147591-31764-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1426147591-31764-5-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both DA830 and DA850 has McASP0 module, so do not restrict the use of
-McASP0 for da850 only.
+da830 has three McASP blocks.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ arch/arm/mach-davinci/asp.h           |  7 ++++++
+ arch/arm/mach-davinci/devices-da8xx.c | 41 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
+diff --git a/arch/arm/mach-davinci/asp.h b/arch/arm/mach-davinci/asp.h
+index d9b2acd12393..1128e1d8e4b4 100644
+--- a/arch/arm/mach-davinci/asp.h
++++ b/arch/arm/mach-davinci/asp.h
+@@ -21,6 +21,9 @@
+ /* Bases of da830 McASP1 register banks */
+ #define DAVINCI_DA830_MCASP1_REG_BASE	0x01D04000
+ 
++/* Bases of da830 McASP2 register banks */
++#define DAVINCI_DA830_MCASP2_REG_BASE	0x01D08000
++
+ /* EDMA channels of dm644x and dm355 */
+ #define DAVINCI_DMA_ASP0_TX	2
+ #define DAVINCI_DMA_ASP0_RX	3
+@@ -40,6 +43,10 @@
+ #define DAVINCI_DA830_DMA_MCASP1_AREVT	2
+ #define DAVINCI_DA830_DMA_MCASP1_AXEVT	3
+ 
++/* EDMA channels of da830 McASP2 */
++#define DAVINCI_DA830_DMA_MCASP2_AREVT	4
++#define DAVINCI_DA830_DMA_MCASP2_AXEVT	5
++
+ /* Interrupts */
+ #define DAVINCI_ASP0_RX_INT	IRQ_MBRINT
+ #define DAVINCI_ASP0_TX_INT	IRQ_MBXINT
 diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index e15e046c5438..fdc3219ba684 100644
+index fdc3219ba684..ddfdd820e6f2 100644
 --- a/arch/arm/mach-davinci/devices-da8xx.c
 +++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -526,14 +526,25 @@ static struct platform_device da850_mcasp_device = {
+@@ -489,6 +489,41 @@ static struct platform_device da830_mcasp1_device = {
+ 	.resource	= da830_mcasp1_resources,
+ };
  
- void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
- {
--	/* DA830/OMAP-L137 has 3 instances of McASP */
--	if (cpu_is_davinci_da830() && id == 1) {
--		da830_mcasp1_device.dev.platform_data = pdata;
--		platform_device_register(&da830_mcasp1_device);
--	} else if (cpu_is_davinci_da850()) {
--		da850_mcasp_device.dev.platform_data = pdata;
--		platform_device_register(&da850_mcasp_device);
-+	struct platform_device *pdev;
++static struct resource da830_mcasp2_resources[] = {
++	{
++		.name	= "mpu",
++		.start	= DAVINCI_DA830_MCASP2_REG_BASE,
++		.end	= DAVINCI_DA830_MCASP2_REG_BASE + (SZ_1K * 12) - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	/* TX event */
++	{
++		.name	= "tx",
++		.start	= DAVINCI_DA830_DMA_MCASP2_AXEVT,
++		.end	= DAVINCI_DA830_DMA_MCASP2_AXEVT,
++		.flags	= IORESOURCE_DMA,
++	},
++	/* RX event */
++	{
++		.name	= "rx",
++		.start	= DAVINCI_DA830_DMA_MCASP2_AREVT,
++		.end	= DAVINCI_DA830_DMA_MCASP2_AREVT,
++		.flags	= IORESOURCE_DMA,
++	},
++	{
++		.name	= "common",
++		.start	= IRQ_DA8XX_MCASPINT,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
 +
-+	switch (id) {
-+	case 0:
-+		/* Valid for DA830/OMAP-L137 or DA850/OMAP-L138 */
-+		pdev = &da850_mcasp_device;
-+		break;
-+	case 1:
++static struct platform_device da830_mcasp2_device = {
++	.name		= "davinci-mcasp",
++	.id		= 2,
++	.num_resources	= ARRAY_SIZE(da830_mcasp2_resources),
++	.resource	= da830_mcasp2_resources,
++};
++
+ static struct resource da850_mcasp_resources[] = {
+ 	{
+ 		.name	= "mpu",
+@@ -539,6 +574,12 @@ void __init da8xx_register_mcasp(int id, struct snd_platform_data *pdata)
+ 			return;
+ 		pdev = &da830_mcasp1_device;
+ 		break;
++	case 2:
 +		/* Valid for DA830/OMAP-L137 only */
 +		if (!cpu_is_davinci_da830())
 +			return;
-+		pdev = &da830_mcasp1_device;
++		pdev = &da830_mcasp2_device;
 +		break;
-+	default:
-+		return;
+ 	default:
+ 		return;
  	}
-+
-+	pdev->dev.platform_data = pdata;
-+	platform_device_register(pdev);
- }
- 
- static struct resource da8xx_pruss_resources[] = {
 -- 
 2.3.0
