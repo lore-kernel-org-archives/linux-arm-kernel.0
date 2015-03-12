@@ -1,78 +1,104 @@
 From: vinceh@nvidia.com (Vince Hsu)
-Date: Thu, 12 Mar 2015 20:15:06 +0800
-Subject: [PATCH v2 05/17] memory: tegra: add flush operation for Tegra124
- memory clients
+Date: Thu, 12 Mar 2015 20:15:10 +0800
+Subject: [PATCH v2 09/17] ARM: tegra: add PM domain device nodes to Tegra114 DT
 In-Reply-To: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
 References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
-Message-ID: <1426162518-7405-6-git-send-email-vinceh@nvidia.com>
+Message-ID: <1426162518-7405-10-git-send-email-vinceh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the hot reset register table and flush related callback
-functions for Tegra124.
+Also bind the PM domain provider and consumer together.
 
 Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-
 ---
-v2: move the drop of tegra124_mc_clients' const to patch #2
-    move mc flush operations to tegra114
+ arch/arm/boot/dts/tegra114.dtsi | 43 ++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
- drivers/memory/tegra/tegra124.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
-
-diff --git a/drivers/memory/tegra/tegra124.c b/drivers/memory/tegra/tegra124.c
-index ec25546835fe..ef74f060e59e 100644
---- a/drivers/memory/tegra/tegra124.c
-+++ b/drivers/memory/tegra/tegra124.c
-@@ -959,7 +959,40 @@ static const struct tegra_smmu_swgroup tegra124_swgroups[] = {
- 	{ .swgroup = TEGRA_SWGROUP_VI,        .reg = 0x280 },
- };
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 4296b5398bf5..79e1f5cfa53c 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -2,6 +2,7 @@
+ #include <dt-bindings/gpio/tegra-gpio.h>
+ #include <dt-bindings/memory/tegra114-mc.h>
+ #include <dt-bindings/pinctrl/pinctrl-tegra.h>
++#include <dt-bindings/power/tegra-powergate.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
  
-+static struct tegra_mc_hotreset tegra124_mc_hotreset[] = {
-+	{TEGRA_SWGROUP_AFI,        0x200, 0x204,  0},
-+	{TEGRA_SWGROUP_AVPC,       0x200, 0x204,  1},
-+	{TEGRA_SWGROUP_DC,         0x200, 0x204,  2},
-+	{TEGRA_SWGROUP_DCB,        0x200, 0x204,  3},
-+	{TEGRA_SWGROUP_HC,         0x200, 0x204,  6},
-+	{TEGRA_SWGROUP_HDA,        0x200, 0x204,  7},
-+	{TEGRA_SWGROUP_ISP2,       0x200, 0x204,  8},
-+	{TEGRA_SWGROUP_MPCORE,     0x200, 0x204,  9},
-+	{TEGRA_SWGROUP_MPCORELP,   0x200, 0x204, 10},
-+	{TEGRA_SWGROUP_MSENC,      0x200, 0x204, 11},
-+	{TEGRA_SWGROUP_PPCS,       0x200, 0x204, 14},
-+	{TEGRA_SWGROUP_SATA,       0x200, 0x204, 15},
-+	{TEGRA_SWGROUP_VDE,        0x200, 0x204, 16},
-+	{TEGRA_SWGROUP_VI,         0x200, 0x204, 17},
-+	{TEGRA_SWGROUP_VIC,        0x200, 0x204, 18},
-+	{TEGRA_SWGROUP_XUSB_HOST,  0x200, 0x204, 19},
-+	{TEGRA_SWGROUP_XUSB_DEV,   0x200, 0x204, 20},
-+	{TEGRA_SWGROUP_TSEC,       0x200, 0x204, 22},
-+	{TEGRA_SWGROUP_SDMMC1A,    0x200, 0x204, 29},
-+	{TEGRA_SWGROUP_SDMMC2A,    0x200, 0x204, 30},
-+	{TEGRA_SWGROUP_SDMMC3A,    0x200, 0x204, 31},
-+	{TEGRA_SWGROUP_SDMMC4A,    0x970, 0x974,  0},
-+	{TEGRA_SWGROUP_ISP2B,      0x970, 0x974,  1},
-+	{TEGRA_SWGROUP_GPU,        0x970, 0x974,  2},
-+};
+ #include "skeleton.dtsi"
+@@ -36,6 +37,7 @@
+ 		gr3d at 54180000 {
+ 			compatible = "nvidia,tegra114-gr3d", "nvidia,tegra20-gr3d";
+ 			reg = <0x54180000 0x00040000>;
++			power-domains = <&pmc TEGRA_POWERGATE_3D>;
+ 			clocks = <&tegra_car TEGRA114_CLK_GR3D>;
+ 			resets = <&tegra_car 24>;
+ 			reset-names = "3d";
+@@ -45,6 +47,7 @@
+ 			compatible = "nvidia,tegra114-dc", "nvidia,tegra20-dc";
+ 			reg = <0x54200000 0x00040000>;
+ 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			power-domains = <&pmc TEGRA_POWERGATE_DIS>;
+ 			clocks = <&tegra_car TEGRA114_CLK_DISP1>,
+ 				 <&tegra_car TEGRA114_CLK_PLL_P>;
+ 			clock-names = "dc", "parent";
+@@ -64,6 +67,7 @@
+ 			compatible = "nvidia,tegra114-dc", "nvidia,tegra20-dc";
+ 			reg = <0x54240000 0x00040000>;
+ 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			power-domains = <&pmc TEGRA_POWERGATE_DISB>;
+ 			clocks = <&tegra_car TEGRA114_CLK_DISP2>,
+ 				 <&tegra_car TEGRA114_CLK_PLL_P>;
+ 			clock-names = "dc", "parent";
+@@ -487,11 +491,48 @@
+ 		status = "disabled";
+ 	};
+ 
+-	pmc at 7000e400 {
++	pmc: pmc at 7000e400 {
+ 		compatible = "nvidia,tegra114-pmc";
+ 		reg = <0x7000e400 0x400>;
+ 		clocks = <&tegra_car TEGRA114_CLK_PCLK>, <&clk32k_in>;
+ 		clock-names = "pclk", "clk32k_in";
++		#power-domain-cells = <1>;
++	};
 +
- #ifdef CONFIG_ARCH_TEGRA_124_SOC
++	dcpd: dc-power-domain {
++		compatible = "nvidia,power-domains";
++		name = "dc-power-domain";
++		domain = <TEGRA_POWERGATE_DIS>;
++		clocks = <&tegra_car TEGRA114_CLK_DISP1>,
++			<&tegra_car TEGRA114_CLK_DSIA>,
++			<&tegra_car TEGRA114_CLK_DSIB>,
++			<&tegra_car TEGRA114_CLK_MIPI_CAL>;
++		resets = <&tegra_car 27>,
++			<&tegra_car 48>,
++			<&tegra_car 82>,
++			<&tegra_car 56>;
++		nvidia,swgroup = <&mc TEGRA_SWGROUP_DC>;
++	};
 +
-+static const struct tegra_mc_ops tegra124_mc_ops = {
-+	.flush = tegra114_mc_flush,
-+	.flush_done = tegra114_mc_flush_done,
-+};
++	dcb-power-domain {
++		compatible = "nvidia,power-domains";
++		name = "dcb-power-domain";
++		domain = <TEGRA_POWERGATE_DISB>;
++		clocks = <&tegra_car TEGRA114_CLK_DISP2>,
++			<&tegra_car TEGRA114_CLK_HDMI>;
++		resets = <&tegra_car 26>,
++			<&tegra_car 51>;
++		nvidia,swgroup = <&mc TEGRA_SWGROUP_DCB>;
++		depend-on = <&dcpd>;
++	};
 +
- static void tegra124_flush_dcache(struct page *page, unsigned long offset,
- 				  size_t size)
- {
-@@ -991,5 +1024,8 @@ const struct tegra_mc_soc tegra124_mc_soc = {
- 	.num_address_bits = 34,
- 	.atom_size = 32,
- 	.smmu = &tegra124_smmu_soc,
-+	.hotresets = tegra124_mc_hotreset,
-+	.num_hotresets = ARRAY_SIZE(tegra124_mc_hotreset),
-+	.ops = &tegra124_mc_ops,
- };
- #endif /* CONFIG_ARCH_TEGRA_124_SOC */
++	gr3d-power-domain {
++		compatible = "nvidia,power-domains";
++		name = "gr3d-power-domain";
++		domain = <TEGRA_POWERGATE_3D>;
++		clocks = <&tegra_car TEGRA114_CLK_GR3D>;
++		resets = <&tegra_car 24>;
++		nvidia,swgroup = <&mc TEGRA_SWGROUP_NV>;
+ 	};
+ 
+ 	fuse at 7000f800 {
 -- 
 2.1.4
