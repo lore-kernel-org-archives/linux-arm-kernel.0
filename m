@@ -1,71 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Mar 2015 09:21:56 +0100
-Subject: [PATCH 0/2] ARM: shmobile: Correct SYSCIER values
-In-Reply-To: <20150312081442.GA4295@verge.net.au>
-References: <1426132537-31606-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdUuv6YrEUsCpbuZwHUy_a-+sK8O=q8k-OZLZRytKv7gyA@mail.gmail.com>
- <20150312081442.GA4295@verge.net.au>
-Message-ID: <CAMuHMdUh=FE4_ZrKKg03aEKCWNhWWdNVHN361v39aA2JZKyFHQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 12 Mar 2015 08:25:32 +0000
+Subject: [PATCH v6] ARM: imx6: convert GPC to stacked domains
+In-Reply-To: <20150312022613.GE20455@dragon>
+References: <1426088672-15587-1-git-send-email-marc.zyngier@arm.com>
+ <20150312022613.GE20455@dragon>
+Message-ID: <55014D7C.2030304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Shawn,
 
-On Thu, Mar 12, 2015 at 9:14 AM, Simon Horman <horms@verge.net.au> wrote:
-> FWIW the values in these patches are the ones that
-> you supplied in another email thread. However, I did
-> verify them against (my reading of) the documentation.
+On 12/03/15 02:26, Shawn Guo wrote:
+> On Wed, Mar 11, 2015 at 03:44:32PM +0000, Marc Zyngier wrote:
+>> IMX6 has been (ab)using the gic_arch_extn to provide
+>> wakeup from suspend, and it makes a lot of sense to convert
+>> this code to use stacked domains instead.
+>>
+>> This patch does just this, updating the DT files to actually
+>> reflect what the HW provides.
+>>
+>> BIG FAT WARNING: because the DTs were so far lying by not
+>> exposing the fact that the GPC block is actually the first
+>> interrupt controller in the chain, kernels with this patch
+>> applied wont have any suspend-resume facility when booted
+>> with old DTs, and old kernels with updated DTs won't even boot.
+>>
+>> Tested-by: Stefan Agner <stefan@agner.ch>
+>> Acked-by: Stefan Agner <stefan@agner.ch>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>> * From v5:
+>> - Added a big fat warning when an old DT is detected (as requested by Jason)
+>> - Allow interrupt affinity to be changed
+> 
+> Marc,
+> 
+> I already applied v5 [1].  Can these change become an incremental patch?
 
-We could introduce symbols for them. I don't think it's worth doing that at
-this point, as ideally these values should come from DT.
+Ah, my bad, I should have thought of that.
 
-If you disagree, feel free to use what I was carrying in my local tree
-to get a better understanding (needs some consolidation):
+I'll send this as a couple of patches your way.
 
-/* SYSC Interrupt Status/Status Clear/Enable/Mask Register */
-/* R-Car H1 */
-#define SYSCI_IMP               BIT(24) /* IMP-X3 */
-#define SYSCI_VDP               BIT(21) /* VDP1 */
-#define SYSCI_SGX               BIT(20) /* SGX543 MP2 */
-#define SYSCI_SH4A              BIT(16) /* SH-4A (Not documented on H1) */
-#define SYSCI_ARM3              BIT(3)  /* ARM3 */
-#define SYSCI_ARM2              BIT(2)  /* ARM2 */
-#define SYSCI_ARM1              BIT(1)  /* ARM1 */
+Sorry for the noise,
 
-/* R-Car H2 */
-#define SYSCI_IMP               BIT(24) /* IMP-X4 */
-#define SYSCI_CA7_SCU           BIT(21) /* CA7-SCU */
-#define SYSCI_RGX               BIT(20) /* RGX */
-#define SYSCI_SH4A              BIT(16) /* SH-4A */
-#define SYSCI_CA15_SCU          BIT(12) /* CA15-SCU */
-#define SYSCI_CA7_CPU(i)        BIT(5 + (i))    /* CA7-CPUi */
-#define SYSCI_CA15_CPU(i)       BIT(i)  /* CA15-CPUi */
-
-/* R-Car M2-W/M2-N */
-#define SYSCI_SGX               BIT(20) /* SGX */
-#define SYSCI_SH4A              BIT(16) /* SH-4A */
-#define SYSCI_CA15_SCU          BIT(12) /* CA15-SCU */
-#define SYSCI_CA15_CPU(i)       BIT(i)  /* CA15-CPUi */
-
-/* R-Car V2H */
-#define SYSCI_IMP               BIT(24) /* IMP-X4 */
-#define SYSCI_SGX               BIT(20) /* SGX */
-#define SYSCI_CA15_SCU          BIT(12) /* CA15-SCU */
-#define SYSCI_CA15_CPU(i)       BIT(i)  /* CA15-CPUi */
-
-/* R-Car E2 */
-#define SYSCI_CA7_SCU           BIT(21) /* CA7-SCU */
-#define SYSCI_SGX               BIT(20) /* SGX */
-#define SYSCI_SH4A              BIT(16) /* SH-4A */
-#define SYSCI_CA7_CPU(i)        BIT(5 + (i))    /* CA7-CPUi */
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Jazz is not dead. It just smells funny...
