@@ -1,45 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Mar 2015 14:13:41 +0100
-Subject: [PATCH RFC 0/3] ARM: sunxi: SRAM mapping support
-Message-ID: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
+From: stsp@list.ru (Stas Sergeev)
+Date: Thu, 12 Mar 2015 16:16:03 +0300
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
+ on armada-xp
+In-Reply-To: <20150312131207.GQ8656@n2100.arm.linux.org.uk>
+References: <54FF21BE.2040506@list.ru>
+ <20150311175227.499612af@free-electrons.com> <55007ADD.6080505@list.ru>
+ <20150311174618.GE8656@n2100.arm.linux.org.uk> <55008483.8050603@list.ru>
+ <20150311193343.0317e3e1@free-electrons.com> <55018A3C.7020409@list.ru>
+ <20150312134756.5335cb32@free-electrons.com> <55018E8B.8060704@list.ru>
+ <20150312131207.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <55019193.6090406@list.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-The Allwinner SoCs all have a bunch of SRAMs (the exact number
-depending on the SoC itself) that can all be mapped to the CPU or to a
-bunch of devices, each SRAM having different possible devices to be
-mapped to.
-
-Since this SRAM setup is highly SoC dependant, relying on syscon would
-put to much duplicated logic to devices that are using these SRAMs,
-among which the USB OTG and EMAC controllers.
-
-Here is an RFC to introduce a custom API to control the mapping of
-these SRAM, ideally in a SoC-independant way.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (3):
-  drivers: soc: sunxi: Introduce SoC driver to map SRAMs
-  ARM: sun7i: Add A20 SRAM and SRAM controller
-  net: allwinner: emac: Claim our SRAM
-
- arch/arm/boot/dts/sun7i-a20.dtsi            |  31 +++-
- drivers/net/ethernet/allwinner/sun4i-emac.c |  13 +-
- drivers/soc/Kconfig                         |   1 +
- drivers/soc/Makefile                        |   1 +
- drivers/soc/sunxi/Kconfig                   |  12 ++
- drivers/soc/sunxi/Makefile                  |   1 +
- drivers/soc/sunxi/sunxi_sram.c              | 234 ++++++++++++++++++++++++++++
- include/linux/soc/sunxi/sunxi_sram.h        |  24 +++
- 8 files changed, 314 insertions(+), 3 deletions(-)
- create mode 100644 drivers/soc/sunxi/Kconfig
- create mode 100644 drivers/soc/sunxi/Makefile
- create mode 100644 drivers/soc/sunxi/sunxi_sram.c
- create mode 100644 include/linux/soc/sunxi/sunxi_sram.h
-
--- 
-2.3.1
+12.03.2015 16:12, Russell King - ARM Linux ?????:
+> On Thu, Mar 12, 2015 at 04:03:07PM +0300, Stas Sergeev wrote:
+>> Yeah, I realize that, but I was hoping that some work-around
+>> exists. For example, move entire dimm above 4G? Is this really
+>> impossible? Or maybe move overlapping region above 8G...
+> You /really/ don't want to do that.  We have that situation on TI Keystone
+> SoCs and it's really horrible for the kernel to deal with.
+>
+> For early kernel boot, we require RAM below the 4GB boundary, so that
+> we are able to execute code before the MMU is enabled.  No RAM below
+> 4GB basically means there is no way to execute any code from RAM.
+Then maybe it is possible to move the iomem to 1Gb and move
+RAM above 1Gb, so that 3Gb of RAM are still available for early boot?
+I mean, well, huh, giving up 256Mb of RAM so easily... :)
