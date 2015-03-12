@@ -1,81 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 12:59:11 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <550187A4.8010704@hurleysoftware.com>
-References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru>
- <20150310173807.GU8656@n2100.arm.linux.org.uk>
- <55003569.1010200@list.ru>
- <20150311124730.GZ8656@n2100.arm.linux.org.uk>
- <5500502A.5060905@list.ru> <550187A4.8010704@hurleysoftware.com>
-Message-ID: <20150312125910.GN8656@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 12 Mar 2015 14:00:07 +0100
+Subject: [RFC PATCH v2 3/3] ARM: dts: exynos5420: add async-bridge clocks
+ to disp1 power domain
+In-Reply-To: <1423220154-5333-1-git-send-email-a.hajda@samsung.com>
+References: <54D48701.10105@collabora.co.uk>
+ <1423220154-5333-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <55018DD7.2010608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 08:33:40AM -0400, Peter Hurley wrote:
-> On 03/11/2015 10:24 AM, Stas Sergeev wrote:
-> > However, while testing, I've suddenly got another crash happened
-> > a bit earlier than the previous one used to happen: (OOM? How??)
-> > ---
-> > [    0.000000] Booting Linux on physical CPU 0x0
-> > [    0.000000] Linux version 4.0.0-rc2-00137-gb672c98-dirty
-> > (root at host-010-117) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) )
-> > #2 SMP 5
-> > [    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7),
-> > cr=10c5387d
-> > [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
-> > cache
-> > [    0.000000] Machine model: Marvell Armada XP Development Board
-> > DB-MV784MP-GP
-> > [    0.000000] Ignoring memory block 0x100000000 - 0x200000000
+On 06/02/15 11:55, Andrzej Hajda wrote:
+> FIMD and MIXER IPs in disp1 power domain have async-bridges (to GSCALER),
+> therefore their clocks should be enabled during power domain switch.
 > 
-> Once you patch your bootloader, you'll want to configure your kernel
-> for CONFIG_ARM_LPAE=y to enable the high 4GB of memory you have, as
-> it's being ignored in this config right now (as shown above and in
-> the oom message below).
+> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index e1fa800..58579f5 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -293,9 +293,11 @@
+>  			 <&clock CLK_MOUT_SW_ACLK300>,
+>  			 <&clock CLK_MOUT_USER_ACLK300_DISP1>,
+>  			 <&clock CLK_MOUT_SW_ACLK400>,
+> -			 <&clock CLK_MOUT_USER_ACLK400_DISP1>;
+> +			 <&clock CLK_MOUT_USER_ACLK400_DISP1>,
+> +			 <&clock CLK_FIMD1>, <&clock CLK_MIXER>;
+>  		clock-names = "oscclk", "pclk0", "clk0",
+> -			      "pclk1", "clk1", "pclk2", "clk2";
+> +			      "pclk1", "clk1", "pclk2", "clk2",
+> +			      "asb0", "asb1";
+>  	};
 
-The OOM is happening during boot.  During boot, there is 760MB of lowmem
-free initially, along with a few gigabytes of highmem.
+In general I don't like those clock/clock-names properties in the power
+domain nodes, since the power domains are not really consumers of those
+clocks. However these clocks are essential for the exynos power domains
+operation. There are more dependencies between the clocks and the power
+domains which adding of those properties does not cover. And we'll need
+to address those dependencies somehow.
+Anyway, the subject patch looks OK to me, given that support for clocks/
+clock-names in the exynos power domain device nodes has been merged
+for quite long already.
+The entire feature has been merged without PM or clk subsystem
+maintainer ACK, I don't see a reason not to merge this small addition
+of more clocks, especially that it fixes a real bug.
 
-If we look at the buddy state:
-
-[    7.220815] Normal: 2*4kB (UR) 17*8kB (UR) 0*16kB 0*32kB 0*64kB
-0*128kB 1*256kB (R) 0*512kB 1*1024kB (R) 1*2048kB (R) 0*4096kB = 3472kB
-[    7.233210] HighMem: 0*4kB 1*8kB (M) 0*16kB 0*32kB 0*64kB 0*128kB
-2*256kB (UM) 1*512kB (M) 1*1024kB (M) 1*2048kB (M) 767*4096kB (MR) = 3B
-
-we can see that most of lowmem is in the reserve migration type, and
-some is also in the unmovable type.  3MB of reserved lowmem for atomic
-allocations is about what I'd expect given the memory sizes.
-
-Highmem has some memory in the movable migratation type, but the bulk
-is in the reserve migration type - but this is irrelevant as you'll
-see from the next bit of information:
-
-[    6.818183] swapper/0 invoked oom-killer: gfp_mask=0x2040d0, order=0,
-oom_score_adj=0
-
-Let's decode that gfp_mask.
-
-	___GFP_NOTRACK | ___GFP_COMP | ___GFP_FS | ___GFP_IO | ___GFP_WAIT
-
-This does not give the allocator permission to allocate from highmem -
-for that, it needs ___GFP_HIGH to be in there, but it isn't.
-
-The kernel should _not_ consume 760MB of lowmem during boot, but according
-to the accounting, it looks like it has.
-
-If the memory allocation structures are ending up in the problem region
-of physical RAM, then that could be responsible for this OOM - but that
-won't happen, because we don't place that stuff into highmem.
-
-In short, I don't have a clue what would cause 760MB of lowmem to be
-gobbled up, but one thing I'm absolutely certain of is that adding more
-highmem won't solve this - if anything, it'll probably make things worse
-due to more lowmem being consumed to track the additional highmem pages.
+Please feel free to add:
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Sylwester
