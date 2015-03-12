@@ -1,124 +1,175 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Mar 2015 15:54:23 +0100
-Subject: [PATCH v4 1/9] ARM: at91: remove NEED_MACH_IO_H
+Date: Thu, 12 Mar 2015 15:54:26 +0100
+Subject: [PATCH v4 4/9] ARM: at91/dt: introduce atmel,<chip>-dbgu
 In-Reply-To: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426172071-20743-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426172071-20743-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+The DBGU is not a simple UART and we need to be able to distinguish it from the
+other UARTs, in particular to get its address and check the chip id.
 
-The mach/io.h header on at91 is used to support a nonstandard I/O space
-window for the cf card driver. This changes the driver to use pci_ioremap_io
-in order to have the standard location, and then removes the custom
-mach/io.h.
-
-[alexandre.belloni at free-electrons.com: Added PCI dependency]
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/Kconfig                     |  1 -
- arch/arm/mach-at91/Kconfig           |  1 +
- arch/arm/mach-at91/include/mach/io.h | 27 ---------------------------
- drivers/pcmcia/Kconfig               |  1 +
- drivers/pcmcia/at91_cf.c             | 13 +++++++------
- 5 files changed, 9 insertions(+), 34 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/io.h
+ Documentation/devicetree/bindings/serial/atmel-usart.txt | 3 ++-
+ arch/arm/boot/dts/at91rm9200.dtsi                        | 2 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                       | 2 +-
+ arch/arm/boot/dts/at91sam9261.dtsi                       | 2 +-
+ arch/arm/boot/dts/at91sam9263.dtsi                       | 2 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi                       | 2 +-
+ arch/arm/boot/dts/at91sam9n12.dtsi                       | 2 +-
+ arch/arm/boot/dts/at91sam9rl.dtsi                        | 2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                        | 2 +-
+ arch/arm/boot/dts/sama5d3.dtsi                           | 2 +-
+ arch/arm/boot/dts/sama5d4.dtsi                           | 2 +-
+ 11 files changed, 12 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a2bc9b..e7ce6612bc42 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -361,7 +361,6 @@ config ARCH_AT91
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select IRQ_DOMAIN
--	select NEED_MACH_IO_H if PCCARD
- 	select PINCTRL
- 	select PINCTRL_AT91
- 	select USE_OF
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c74a44324e5b..7ecde7de69da 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -81,6 +81,7 @@ config SOC_AT91RM9200
- 	select CPU_ARM920T
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_AT91_USB_CLK
-+	select MIGHT_HAVE_PCI
+diff --git a/Documentation/devicetree/bindings/serial/atmel-usart.txt b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+index a6391e70a8fd..90787aa2e648 100644
+--- a/Documentation/devicetree/bindings/serial/atmel-usart.txt
++++ b/Documentation/devicetree/bindings/serial/atmel-usart.txt
+@@ -1,9 +1,10 @@
+ * Atmel Universal Synchronous Asynchronous Receiver/Transmitter (USART)
  
- config SOC_AT91SAM9
- 	bool "AT91SAM9"
-diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
-deleted file mode 100644
-index 2d9ca0455745..000000000000
---- a/arch/arm/mach-at91/include/mach/io.h
-+++ /dev/null
-@@ -1,27 +0,0 @@
--/*
-- * arch/arm/mach-at91/include/mach/io.h
-- *
-- *  Copyright (C) 2003 SAN People
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--
--#ifndef __ASM_ARCH_IO_H
--#define __ASM_ARCH_IO_H
--
--#define IO_SPACE_LIMIT		0xFFFFFFFF
--#define __io(a)			__typesafe_io(a)
--
--#endif
-diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
-index 3bb49252a098..075d5cd4c5ab 100644
---- a/drivers/pcmcia/Kconfig
-+++ b/drivers/pcmcia/Kconfig
-@@ -278,6 +278,7 @@ config BFIN_CFPCMCIA
+ Required properties:
+-- compatible: Should be "atmel,<chip>-usart"
++- compatible: Should be "atmel,<chip>-usart" or "atmel,<chip>-dbgu"
+   The compatible <chip> indicated will be the first SoC to support an
+   additional mode or an USART new feature.
++  For the dbgu UART, use "atmel,<chip>-dbgu", "atmel,<chip>-usart"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain interrupt
+ - clock-names: tuple listing input clock names.
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 21c2b504f977..c515e4b160be 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -830,7 +830,7 @@
+ 			};
  
- config AT91_CF
- 	tristate "AT91 CompactFlash Controller"
-+	depends on PCI
- 	depends on PCMCIA && ARCH_AT91
- 	depends on !ARCH_MULTIPLATFORM
- 	help
-diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
-index bfb799c7b343..e7775a41ae5d 100644
---- a/drivers/pcmcia/at91_cf.c
-+++ b/drivers/pcmcia/at91_cf.c
-@@ -317,13 +317,14 @@ static int at91_cf_probe(struct platform_device *pdev)
- 	} else
- 		cf->socket.pci_irq = nr_irqs + 1;
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91rm9200-usart";
++				compatible = "atmel,at91rm9200-dbgu", "atmel,at91rm9200-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index fff0ee69aab4..9ea347eff3a7 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -753,7 +753,7 @@
+ 			};
  
--	/* pcmcia layer only remaps "real" memory not iospace */
--	cf->socket.io_offset = (unsigned long) devm_ioremap(&pdev->dev,
--					cf->phys_baseaddr + CF_IO_PHYS, SZ_2K);
--	if (!cf->socket.io_offset) {
--		status = -ENXIO;
-+	/*
-+	 * pcmcia layer only remaps "real" memory not iospace
-+	 * io_offset is set to 0x10000 to avoid the check in static_find_io().
-+	 * */
-+	cf->socket.io_offset = 0x10000;
-+	status = pci_ioremap_io(0x10000, cf->phys_baseaddr + CF_IO_PHYS);
-+	if (status)
- 		goto fail0a;
--	}
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index e247b0b5fdab..45973554f229 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -275,7 +275,7 @@
+ 			};
  
- 	/* reserve chip-select regions */
- 	if (!devm_request_mem_region(&pdev->dev, io->start, resource_size(io), "at91_cf")) {
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index 1f67bb4c144e..111a4e029cca 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -762,7 +762,7 @@
+ 			};
+ 
+ 			dbgu: serial at ffffee00 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index ee80aa9c0759..d5ec0fb935fb 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -893,7 +893,7 @@
+ 			};
+ 
+ 			dbgu: serial at ffffee00 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index c2666a7cb5b1..00934c005ff9 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -757,7 +757,7 @@
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9rl.dtsi b/arch/arm/boot/dts/at91sam9rl.dtsi
+index 40f645b8fe25..ebfd5ce9cb38 100644
+--- a/arch/arm/boot/dts/at91sam9rl.dtsi
++++ b/arch/arm/boot/dts/at91sam9rl.dtsi
+@@ -377,7 +377,7 @@
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 818dabdd8c0e..ce1494622205 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -860,7 +860,7 @@
+ 			};
+ 
+ 			dbgu: serial at fffff200 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 261311bdf65b..8e850d1bc588 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -439,7 +439,7 @@
+ 			};
+ 
+ 			dbgu: serial at ffffee00 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+ 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(13)>,
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index d986b41b9654..d3627c4a58e0 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -1063,7 +1063,7 @@
+ 			};
+ 
+ 			dbgu: serial at fc069000 {
+-				compatible = "atmel,at91sam9260-usart";
++				compatible = "atmel,at91sam9260-dbgu", "atmel,at91sam9260-usart";
+ 				reg = <0xfc069000 0x200>;
+ 				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
 -- 
 2.1.0
