@@ -1,42 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 12 Mar 2015 09:57:53 +0100
-Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
-In-Reply-To: <5500EA26.7090007@codeaurora.org>
-References: <20150221085620.GV19388@pengutronix.de>
- <1424515225-6929-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150306185730.11109.45998@quantum>
- <20150306192813.GG10717@pengutronix.de> <54FA02B7.8090703@codeaurora.org>
- <1425895136.3152.22.camel@pengutronix.de> <54FDEEFE.1060803@codeaurora.org>
- <20150309210735.14952.91257@quantum> <20150309215803.GD7525@pengutronix.de>
- <54FE215D.7090804@codeaurora.org> <20150309233416.GF7525@pengutronix.de>
- <5500EA26.7090007@codeaurora.org>
-Message-ID: <1426150673.14455.11.camel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 12 Mar 2015 09:02:24 +0000
+Subject: [PATCH] backlight: pwm: handle EPROBE_DEFER while requesting the
+ PWM
+In-Reply-To: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1424338214-24236-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150312090224.GC3314@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Thu, 19 Feb 2015, Nicolas Ferre wrote:
 
-Am Mittwoch, den 11.03.2015, 18:21 -0700 schrieb Stephen Boyd:
-[...]
-> Why does Philipp like 110Hz the most? Where is the desire for that rate
-> coming from?
+> When trying to request the PWM device with devm_pwm_get(), the EPROBE_DEFER
+> flag is not handled properly. It can lead to the PWM not being found.
 > 
-> > And the lower
-> > abs(1 / 110 - 1 / r) the better. 
-> 
-> Similarly, where is this requirement coming from? Some datasheet? Or is
-> it just some arbitrary decision we've made that may not hold true for
-> all consumers?
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/video/backlight/pwm_bl.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-In my panel example the datasheet usually documents the typical pixel
-clock and vertical and horizontal timings that exactly result in the
-nominal panel refresh rate, currently most often 60 Hz.
+Applied, thanks.
 
-In this use case, the driver doesn't want the pixel clock to stay below
-a hard frequency limit, but to get as close as possible to the target
-frequency, either above or below, so the relative error to the nominal
-panel refresh rate stays as small as possible. Thus for a fictional
-target rate of 110 Hz, I'd like to minimize abs((round_rate / 110) - 1).
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index 3a145a643e0d..6897f1c1bc73 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -274,6 +274,10 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  
+>  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+>  	if (IS_ERR(pb->pwm)) {
+> +		ret = PTR_ERR(pb->pwm);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto err_alloc;
+> +
+>  		dev_err(&pdev->dev, "unable to request PWM, trying legacy API\n");
+>  		pb->legacy = true;
+>  		pb->pwm = pwm_request(data->pwm_id, "pwm-backlight");
 
-regards
-Philipp
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
