@@ -1,69 +1,78 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 12 Mar 2015 14:13:43 +0100
-Subject: [PATCH RFC 2/3] ARM: sun7i: Add A20 SRAM and SRAM controller
+Date: Thu, 12 Mar 2015 14:13:44 +0100
+Subject: [PATCH RFC 3/3] net: allwinner: emac: Claim our SRAM
 In-Reply-To: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1426166024-24922-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20 has a few SRAM that can be mapped either to a device or to the CPU,
-with the mapping being controlled by an SRAM controller.
+The SRAM the EMAC is using might not have been mapped accordingly by the
+bootloader, preventing the EMAC to work properly.
 
-Since most of the time these SRAM won't be accessible by the CPU, we can't use
-the mmio-sram driver and compatible.
+Ask for that SRAM to be mapped at probe time to make sure that this never
+happens.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index a1ebd80e6f24..a249828a1df5 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -522,12 +522,41 @@
- 		};
- 	};
+diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
+index f3470d96837a..9d0136b1fab8 100644
+--- a/drivers/net/ethernet/allwinner/sun4i-emac.c
++++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
+@@ -29,6 +29,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/phy.h>
  
--	soc at 01c00000 {
-+	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
++#include <linux/soc/sunxi/sunxi_sram.h>
++
+ #include "sun4i-emac.h"
  
-+		sram at 00000000 {
-+			compatible = "allwinner,sun4i-a10-sram";
-+			reg = <0x00000000 0x4000>;
-+			allwinner,sram-name = "A1";
-+		};
+ #define DRV_NAME		"sun4i-emac"
+@@ -857,11 +859,15 @@ static int emac_probe(struct platform_device *pdev)
+ 
+ 	clk_prepare_enable(db->clk);
+ 
++	ret = sunxi_sram_claim(SUNXI_SRAM_EMAC, "emac");
++	if (ret)
++		dev_warn(&pdev->dev, "Couldn't map SRAM to device\n");
 +
-+		sram at 00004000 {
-+			compatible = "allwinner,sun4i-a10-sram";
-+			reg = <0x00004000 0x4000>;
-+			allwinner,sram-name = "A2";
-+		};
-+
-+		sram at 00008000 {
-+			compatible = "allwinner,sun4i-a10-sram";
-+			reg = <0x00008000 0x4000>;
-+			allwinner,sram-name = "A3-A4";
-+		};
-+
-+		sram at 00010000 {
-+			compatible = "allwinner,sun4i-a10-sram";
-+			reg = <0x00010000 0x1000>;
-+			allwinner,sram-name = "D";
-+		};
-+
-+		sram-controller at 01c00000 {
-+			compatible = "allwinner,sun7i-a20-sram-controller";
-+			reg = <0x01c00000 0x30>;
-+		};
-+
- 		nmi_intc: interrupt-controller at 01c00030 {
- 			compatible = "allwinner,sun7i-a20-sc-nmi";
- 			interrupt-controller;
+ 	db->phy_node = of_parse_phandle(np, "phy", 0);
+ 	if (!db->phy_node) {
+ 		dev_err(&pdev->dev, "no associated PHY\n");
+ 		ret = -ENODEV;
+-		goto out;
++		goto out_release_sram;
+ 	}
+ 
+ 	/* Read MAC-address from DT */
+@@ -893,7 +899,7 @@ static int emac_probe(struct platform_device *pdev)
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Registering netdev failed!\n");
+ 		ret = -ENODEV;
+-		goto out;
++		goto out_release_sram;
+ 	}
+ 
+ 	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
+@@ -901,6 +907,8 @@ static int emac_probe(struct platform_device *pdev)
+ 
+ 	return 0;
+ 
++out_release_sram:
++	sunxi_sram_release(SUNXI_SRAM_EMAC);
+ out:
+ 	dev_err(db->dev, "not found (%d).\n", ret);
+ 
+@@ -914,6 +922,7 @@ static int emac_remove(struct platform_device *pdev)
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 
+ 	unregister_netdev(ndev);
++	sunxi_sram_release(SUNXI_SRAM_EMAC);
+ 	free_netdev(ndev);
+ 
+ 	dev_dbg(&pdev->dev, "released and freed device\n");
 -- 
 2.3.1
