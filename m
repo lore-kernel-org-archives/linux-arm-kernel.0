@@ -1,69 +1,74 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 19:51:16 +0000
-Subject: [PATCH 08/22] ARM: %pF is only for function pointers
-In-Reply-To: <1426130037-17956-8-git-send-email-scottwood@freescale.com>
-References: <1426130037-17956-1-git-send-email-scottwood@freescale.com>
- <1426130037-17956-8-git-send-email-scottwood@freescale.com>
-Message-ID: <20150312195116.GV8656@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Thu, 12 Mar 2015 14:54:15 -0500
+Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <20150312182508.GF30145@leverpostej>
+References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
+ <1426107080-29079-2-git-send-email-galak@codeaurora.org>
+ <20150312170541.GE30145@leverpostej>
+ <E114AF0E-5DA9-412A-B3E2-DDD95D224C66@codeaurora.org>
+ <20150312182508.GF30145@leverpostej>
+Message-ID: <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 10:13:43PM -0500, Scott Wood wrote:
-> Use %pS for actual addresses, otherwise you'll get bad output
-> on arches like ppc64 where %pF expects a function descriptor.  Even on
-> other architectures, refrain from setting a bad example that people
-> copy.
+
+On Mar 12, 2015, at 1:25 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+
+>>>> +	cpus {
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <0>;
+>>>> +
+>>>> +		CPU0: cpu at 0 {
+>>>> +			device_type = "cpu";
+>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>> +			reg = <0x0>;
+>>>> +		};
+>>>> +
+>>>> +		CPU1: cpu at 1 {
+>>>> +			device_type = "cpu";
+>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>> +			reg = <0x1>;
+>>>> +		};
+>>>> +
+>>>> +		CPU2: cpu at 2 {
+>>>> +			device_type = "cpu";
+>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>> +			reg = <0x2>;
+>>>> +		};
+>>>> +
+>>>> +		CPU3: cpu at 3 {
+>>>> +			device_type = "cpu";
+>>>> +			compatible = "arm,cortex-a53", "arm,armv8";
+>>>> +			reg = <0x3>;
+>>>> +		};
+>>>> +	};
+>>> 
+>>> The secondary CPUs need an enable-method. Are you using PSCI or
+>>> spin-table?
+>> 
+>> This is on purpose.  We aren?t using either PSCI or spin-table.  Right
+>> now the dts is for booting on a single core.  I can drop CPU1..CPU3 if
+>> that helps.
 > 
-> Signed-off-by: Scott Wood <scottwood@freescale.com>
-> Cc: linux-arm-kernel at lists.infradead.org
+> We won't poke the CPUs without an enable-method, so personally I'm not
+> too worried either way about having the CPUs listed.
 
-Would've been nice to have been Cc'd on the patch, but luckily I saw it
-amongst all the traffic anyway.  If the trivial folk want to take it:
+That was my thinking, so left them in.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Which of spin-table/psci are you planning on using for SMP support, and
+> when would that be likely to appear?
 
-Thanks.
+We have a qcom specific SMP enablement method for this device.  This was one of our first devices so it utilized as much from arm 32-bit as possible.
 
-> ---
->  arch/arm/mm/alignment.c   | 2 +-
->  arch/arm/nwfpe/fpmodule.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-> index 2c0c541..3419550 100644
-> --- a/arch/arm/mm/alignment.c
-> +++ b/arch/arm/mm/alignment.c
-> @@ -132,7 +132,7 @@ static const char *usermode_action[] = {
->  static int alignment_proc_show(struct seq_file *m, void *v)
->  {
->  	seq_printf(m, "User:\t\t%lu\n", ai_user);
-> -	seq_printf(m, "System:\t\t%lu (%pF)\n", ai_sys, ai_sys_last_pc);
-> +	seq_printf(m, "System:\t\t%lu (%pS)\n", ai_sys, ai_sys_last_pc);
->  	seq_printf(m, "Skipped:\t%lu\n", ai_skipped);
->  	seq_printf(m, "Half:\t\t%lu\n", ai_half);
->  	seq_printf(m, "Word:\t\t%lu\n", ai_word);
-> diff --git a/arch/arm/nwfpe/fpmodule.c b/arch/arm/nwfpe/fpmodule.c
-> index ec717c1..2d2bfe2 100644
-> --- a/arch/arm/nwfpe/fpmodule.c
-> +++ b/arch/arm/nwfpe/fpmodule.c
-> @@ -147,7 +147,7 @@ void float_raise(signed char flags)
->  #ifdef CONFIG_DEBUG_USER
->  	if (flags & debug)
->   		printk(KERN_DEBUG
-> -		       "NWFPE: %s[%d] takes exception %08x at %pf from %08lx\n",
-> +		       "NWFPE: %s[%d] takes exception %08x at %ps from %08lx\n",
->  		       current->comm, current->pid, flags,
->  		       __builtin_return_address(0), GET_USERREG()->ARM_pc);
->  #endif
-> -- 
-> 2.1.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Which exception level do CPUs enter the kernel? Even without a
+> virt-capable GIC booting at EL2 is less work for the FW and gives the
+> kernel a better chance of fixing things up (e.g. CNTVOFF).
 
+I think the enter in EL1.
+
+- k
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
