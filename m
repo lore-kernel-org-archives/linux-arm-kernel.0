@@ -1,77 +1,96 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Mar 2015 18:01 +0100
-Subject: [PATCH 06/10] iio: exynos-adc: add experimental touchscreen
- support
-In-Reply-To: <20150304231000.GD38298@dtor-ws>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
- <1425299763-4066822-7-git-send-email-arnd@arndb.de>
- <20150304231000.GD38298@dtor-ws>
-Message-ID: <2880161.O2Qj0NkBq3@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 12 Mar 2015 17:05:41 +0000
+Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <1426107080-29079-2-git-send-email-galak@codeaurora.org>
+References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
+ <1426107080-29079-2-git-send-email-galak@codeaurora.org>
+Message-ID: <20150312170541.GE30145@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 March 2015 15:10:00 Dmitry Torokhov wrote:
-> > +static int exynos_adc_ts_init(struct exynos_adc *info)
-> > +{
-> > +     int ret;
-> > +
-> > +     if (info->tsirq <= 0)
-> > +             return -ENODEV;
-> > +
-> > +     info->input = input_allocate_device();
-> > +     if (!info->input)
-> > +             return -ENOMEM;
-> > +
-> > +     info->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> > +     info->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> > +
-> > +     input_set_abs_params(info->input, ABS_X, 0, 0x3FF, 0, 0);
-> > +     input_set_abs_params(info->input, ABS_Y, 0, 0x3FF, 0, 0);
-> > +
-> > +     info->input->name = "S3C24xx TouchScreen";
-> > +     info->input->id.bustype = BUS_HOST;
-> > +     info->input->open = exynos_adc_ts_open;
-> > +     info->input->close = exynos_adc_ts_close;
-> > +
-> > +     input_set_drvdata(info->input, info);
-> > +
-> > +     ret = input_register_device(info->input);
-> > +     if (ret)
-> > +             input_free_device(info->input);
-> 
-> 
-> If you fail to register input device are you sure you want to continue
-> and register interrupt?
-> 
-> > +
-> > +     disable_irq(info->tsirq);
-> > +     ret = request_threaded_irq(info->tsirq, NULL, exynos_ts_isr,
-> > +                                0, "touchscreen", info);
-> > +     if (ret)
-> > +             input_unregister_device(info->input);
-> > +
-> > +     return ret;
-> > +}
+Hi Kumar,
 
-Sorry for the delayed reply, I've now folded in this patch:
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
+> +	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
+> +			"qcom,msm8916", "qcom,mtp";
+> +};
 
+No /chosen/stdout-path?
 
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index 75cd381a8181..d11cd604562c 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -732,8 +732,10 @@ static int exynos_adc_ts_init(struct exynos_adc *info)
- 	input_set_drvdata(info->input, info);
- 
- 	ret = input_register_device(info->input);
--	if (ret)
-+	if (ret) {
- 		input_free_device(info->input);
-+		return ret;
-+	}
- 
- 	disable_irq(info->tsirq);
- 	ret = request_threaded_irq(info->tsirq, NULL, exynos_ts_isr,
+Does your UART driver support earlycon?
 
+[...]
 
-	Arnd
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		CPU0: cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x0>;
+> +		};
+> +
+> +		CPU1: cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x1>;
+> +		};
+> +
+> +		CPU2: cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x2>;
+> +		};
+> +
+> +		CPU3: cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a53", "arm,armv8";
+> +			reg = <0x3>;
+> +		};
+> +	};
+
+The secondary CPUs need an enable-method. Are you using PSCI or
+spin-table? 
+
+Which exception level do the CPUs enter the kernel?
+
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+
+This should be "arm,armv8-timer".
+
+> +		interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 3 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 4 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 1 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+> +		clock-frequency = <19200000>;
+> +	};
+
+NAK. CNTFRQ should be programmed on all CPUs prior to entering the
+kernel, per the boot protocol. You should not need clock-frequency here.
+
+[...]
+
+> +		intc: interrupt-controller at b000000 {
+> +			compatible = "qcom,msm-qgic2";
+
+This string isn't documented (but seems to be supported by the GIC
+driver).
+
+How does this differ from other GIC implementations?
+
+> +			interrupt-controller;
+> +			#interrupt-cells = <3>;
+> +			reg = <0x0b000000 0x1000>, <0x0b002000 0x1000>;
+> +		};
+
+No GICH, GICV, maintenance interrupt?
+
+Minor nit, but I'd prefer if the reg entries were on individual lines as
+happens in other dts.
+
+Thanks,
+Mark.
