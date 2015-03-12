@@ -1,167 +1,128 @@
-From: d.eppel@samsung.com (Damian Eppel)
-Date: Thu, 12 Mar 2015 10:11:36 +0100
-Subject: [PATCH v2] clocksource: exynos_mct: fix for sleeping in atomic ctx
- handling cpu hotplug notif.
-Message-ID: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 12 Mar 2015 10:14:27 +0100
+Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+In-Reply-To: <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150312091427.GA4329@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to fix an issue of sleeping in atomic context when processing
-hotplug notifications in Exynos MCT(Multi-Core Timer).
-The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
-(Arndale Octa board).
+Hi,
 
-Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
-and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
-request_irq() and free_irq() in the context of hotplug notification
-(which is in this case atomic context).
+As part of the system timer cleanup, I'll actually be needing that
+patch. Is it scheduled for inclusion or should I use "simple-bus" in the
+meantime?
 
-root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
+On 03/03/2015 at 10:32:24 +0100, Linus Walleij wrote :
+> This defines a new compatible option for MFD devices "simple-mfd" that will
+> make the OF core spawn child devices for all subnodes of that MFD device.
+> It is optional but handy for things like syscon and possibly other
+> simpler MFD devices.
+> 
+> Since there was no file to put the documentation in, I took this opportunity
+> to make a small writeup on MFD devices and add the compatible definition
+> there.
+> 
+> Suggested-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Devicetree <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I make the patch to the OF core in this one, it makes much more sense since
+> it's a oneliner
+> 
+> Lee: this is a (tested!) implementation of your suggestion for simple-mfd.
+> If you can eventually ACK this from the MFD side, I think it should be
+> funneled through the ARM SoC tree.
+> 
+> Grant/Rob: if either of you can ACK the change to the OF core likewise it can
+> be taken through ARM SoC.
+> 
+> DT binings maintainers: there is some background discussion on this here:
+> http://marc.info/?l=linux-arm-kernel&m=142486676603889&w=2
+> http://marc.info/?l=devicetree&m=142166313621469&w=2
+> ---
+>  Documentation/devicetree/bindings/mfd/mfd.txt | 40 +++++++++++++++++++++++++++
+>  drivers/of/platform.c                         |  1 +
+>  2 files changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
+> new file mode 100644
+> index 000000000000..cc057438abe8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/mfd.txt
+> @@ -0,0 +1,40 @@
+> +Multi-Function Devices (MFD)
+> +
+> +These devices comprise a nexus for heterogeneous hardware blocks spawning
+> +multiple child devices.
+> +
+> +A typical MFD can be:
+> +
+> +- A mixed signal ASIC on an external bus, sometimes a PMIC (power management
+> +  integrated circuit) that is manufactured in a lower technology node (rough
+> +  silicon) that handles analog drivers for things like audio amplifiers, LED
+> +  drivers, level shifters, PHY (physical interfaces to things like USB or
+> +  ethernet), regulators etc.
+> +
+> +- A range of memory registers containing "miscellaneous system registers" also
+> +  known as a system controller "syscon" or any other memory range containing a
+> +  mix of unrelated registers.
+> +
+> +Optional properties:
+> +
+> +- compatible : "simple-mfd" - this signifies that the operating system should
+> +  spawn child devices for all the subnodes of the MFD device akin to how
+> +  "simple-bus" inidicates when to spawn children for a simple memory-mapped
+> +  bus. For more complex devices, when the nexus driver has to probe registers
+> +  to figure out what children exist etc, this should not be used. In the latter
+> +  case the child devices will be instantiated by the operating system.
+> +
+> +Example:
+> +
+> +foo at 1000 {
+> +		compatible = "syscon", "simple-mfd";
+> +		reg = <0x010000 0x1000>;
+> +
+> +		led at 08.0 {
+> +			compatible = "register-bit-led";
+> +			offset = <0x08>;
+> +			mask = <0x01>;
+> +			label = "myled";
+> +			default-state = "on";
+> +		};
+> +};
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index b189733a1539..969ba4e1460c 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -26,6 +26,7 @@
+>  
+>  const struct of_device_id of_default_bus_match_table[] = {
+>  	{ .compatible = "simple-bus", },
+> +	{ .compatible = "simple-mfd", },
+>  #ifdef CONFIG_ARM_AMBA
+>  	{ .compatible = "arm,amba-bus", },
+>  #endif /* CONFIG_ARM_AMBA */
+> -- 
+> 1.9.3
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-[   25.157867] IRQ18 no longer affine to CPU1
-...
-[   25.158445] CPU1: shutdown
-
-root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
-
-[   40.785859] CPU1: Software reset
-[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
-[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[   40.786678] Preemption disabled at:[<  (null)>]   (null)
-[   40.786681]
-[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
-[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
-[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
-[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
-[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
-[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
-[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
-[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
-[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
-[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
-
-Solution:
-Clockevent irqs cannot be requested/freed every time cpu is
-hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
-that signals hotplug or unplug events are sent with both preemption
-and local interrupts disabled. Since request_irq() may sleep it is
-moved to the initialization stage and performed for all possible
-cpus prior putting them online. Then, in the case of hotplug event
-the irq asociated with the given cpu will simply be enabled.
-Similarly on cpu unplug event the interrupt is not freed but just
-disabled.
-
-Note that after successful request_irq() call for a clockevent device
-associated to given cpu the requested irq is disabled (via disable_irq()).
-That is to make things symmetric as we expect hotplug event as a next
-thing (which will enable irq again). This should not pose any problems
-because at the time of requesting irq the clockevent device is not
-fully initialized yet, therefore should not produce interrupts at that point.
-
-For disabling an irq at cpu unplug notification disable_irq_nosync() is
-chosen which is a non-blocking function. This again shouldn't be a problem as
-prior sending CPU_DYING notification interrupts are migrated away
-from the cpu.
-
-Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
-Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-Cc: <stable@vger.kernel.org>
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-(Tested on Arndale Octa Board)
-Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-(Tested on Rinato B2 (Exynos 3250) board)
----
-
-Notes:
-    Changes since v1:
-            o added Krzysztof's and Marcin's Reviewed-by / Tested-by
-              with information about the test HW.
-
- drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
- 1 file changed, 32 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 83564c9..9beca58 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
- 
- 	if (mct_int_type == MCT_INT_SPI) {
--		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
--		if (request_irq(evt->irq, exynos4_mct_tick_isr,
--				IRQF_TIMER | IRQF_NOBALANCING,
--				evt->name, mevt)) {
--			pr_err("exynos-mct: cannot register IRQ %d\n",
--				evt->irq);
-+
-+		if (evt->irq == -1)
- 			return -EIO;
--		}
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+
-+		irq_force_affinity(evt->irq, cpumask_of(cpu));
-+		enable_irq(evt->irq);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
--	if (mct_int_type == MCT_INT_SPI)
--		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
--	else
-+	if (mct_int_type == MCT_INT_SPI) {
-+		if (evt->irq != -1)
-+			disable_irq_nosync(evt->irq);
-+	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-+	}
- }
- 
- static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
- 
- static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
- {
--	int err;
-+	int err, cpu;
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	struct clk *mct_clk, *tick_clk;
- 
-@@ -549,7 +548,27 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     mct_irqs[MCT_L0_IRQ], err);
- 	} else {
--		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-+		for_each_possible_cpu(cpu) {
-+			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-+			struct mct_clock_event_device *pcpu_mevt =
-+				per_cpu_ptr(&percpu_mct_tick, cpu);
-+
-+			pcpu_mevt->evt.irq = -1;
-+
-+			if (request_irq(mct_irq,
-+					exynos4_mct_tick_isr,
-+					IRQF_TIMER | IRQF_NOBALANCING,
-+					pcpu_mevt->name, pcpu_mevt)) {
-+				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-+									cpu);
-+
-+				continue;
-+			}
-+			pcpu_mevt->evt.irq = mct_irq;
-+			irq_force_affinity(mct_irq, cpumask_of(cpu));
-+
-+			disable_irq(mct_irq);
-+		}
- 	}
- 
- 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
