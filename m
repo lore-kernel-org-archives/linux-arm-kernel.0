@@ -1,86 +1,44 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 12 Mar 2015 14:35:05 -0500
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <55017CA5.2010502@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
-Message-ID: <20150312193505.GB7346@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 12 Mar 2015 12:43:40 -0700
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <20150312172006.GA18418@breakpoint.cc>
+References: <20150201212432.22722.70917@quantum>
+ <54CFE1FE.7040404@codeaurora.org>
+ <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
+ <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
+ <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
+ <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
+ <54E3BA20.3080205@codeaurora.org> <20150312172006.GA18418@breakpoint.cc>
+Message-ID: <5501EC6C.5010100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 07:46:45PM +0800, Yijing Wang wrote:
-> >>  	struct pci_bus *b;
-> >> +	LIST_HEAD(resources);
-> >>  	struct pcifront_sd *sd = NULL;
-> >>  	struct pci_bus_entry *bus_entry = NULL;
-> >>  	int err = 0;
-> >> @@ -470,17 +472,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
-> >>  		err = -ENOMEM;
-> >>  		goto err_out;
-> >>  	}
-> >> +	pci_add_resource(&resources, &ioport_resource);
-> >> +	pci_add_resource(&resources, &iomem_resource);
-> >> +	pci_add_resource(&resources, &busn_resource);
-> > 
-> > Since I don't want to export busn_resource, you might have to allocate your
-> > own struct resource for it here.  And, of course, figure out the details of
-> > which PCI domain you're in and whether you need to share one struct
-> > resource across several host bridges in the same domain.
-> 
-> Allocate its own resource here is ok for me, as I mentioned in previous reply,
-> so do we still need to add additional info to figure out which domain own the bus resource ?
+On 03/12/15 10:20, Sebastian Andrzej Siewior wrote:
+> On 2015-02-17 14:01:04 [-0800], Stephen Boyd wrote:
+>> diff = 
+>> --- arch/arm/mach-imx/mach-imx6q.c
+>> +++ /tmp/cocci-output-11792-b62223-mach-imx6q.c
+>> @@ -211,7 +211,6 @@ static void __init imx6q_1588_init(void)
+>>  	 * set bit IOMUXC_GPR1[21].  Or the PTP clock must be from pad
+>>  	 * (external OSC), and we need to clear the bit.
+>>  	 */
+>> -	clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
+>>  				       IMX6Q_GPR1_ENET_CLK_SEL_PAD;
+>>  	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+>>  	if (!IS_ERR(gpr))
+> Any idea how to do the comparison here? Or should we rely that the bootloader
+> sets this properly (it managed already to select a frequency)? The phy has no
+> clock node in current DT's so we can check this.
+>
 
-That's up to the caller.  Only the platform knows which bridges it wants to
-have in the same domain.  In principle, every host bridge could be in its
-own domain, since each bridge is the root of a unique PCI hierarchy.  But
-some platforms have firmware that assumes otherwise.  I have no idea what
-xen assumes.
+This has been fixed by adding a clk_is_match() helper and using that to
+compare instead of comparing raw pointers. It would be nice if we could
+replace the patch with something else that doesn't require this helper
+though. It looks like this is static board configuration, so I wonder
+why we didn't just have a DT property that indicates how the gpr should
+be configured for this particular board.
 
-> >>  	pcifront_init_sd(sd, domain, bus, pdev);
-> >>  
-> >>  	pci_lock_rescan_remove();
-> >>  
-> >> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
-> >> -				  &pcifront_bus_ops, sd);
-> >> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
-> >> +				  &pcifront_bus_ops, sd, &resources);
-> >>  	if (!b) {
-> >>  		dev_err(&pdev->xdev->dev,
-> >>  			"Error creating PCI Frontend Bus!\n");
-> >>  		err = -ENOMEM;
-> >>  		pci_unlock_rescan_remove();
-> >> +		pci_free_resource_list(&resources);
-> >>  		goto err_out;
-> >>  	}
-> >>  
-> >> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
-> >>  
-> >>  	list_add(&bus_entry->list, &pdev->root_buses);
-> >>  
-> >> -	/* pci_scan_bus_parented skips devices which do not have a have
-> >> +	/* pci_scan_root_bus skips devices which do not have a
-> >>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
-> >>  	err = pcifront_scan_bus(pdev, domain, bus, b);
-> >>  
-> >> -- 
-> >> 1.7.1
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
-> > .
-> > 
-> 
-> 
-> -- 
-> Thanks!
-> Yijing
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
