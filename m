@@ -1,80 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 14:39:30 +0000
-Subject: [PATCH REPOST 1/2] serial/amba-pl011: Activate TX IRQ passively
-In-Reply-To: <20150312125500.GA15596@e103592.cambridge.arm.com>
-References: <1425472054-7543-1-git-send-email-Dave.Martin@arm.com>
- <1425472054-7543-2-git-send-email-Dave.Martin@arm.com>
- <20150312110344.GL8656@n2100.arm.linux.org.uk>
- <20150312125500.GA15596@e103592.cambridge.arm.com>
-Message-ID: <20150312143930.GS8656@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 Mar 2015 15:43:33 +0100
+Subject: [PATCH v2.0 0/3] ARM: AT91: pm cleanup for 4.1
+In-Reply-To: <1425872581-7570-1-git-send-email-wenyou.yang@atmel.com>
+References: <1425872581-7570-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <5501A615.3020708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 12:55:19PM +0000, Dave Martin wrote:
-> I don't think my patches change this situation.  For normal printk,
-> pl011_console_write() will disable IRQs at the CPU and take port->lock:
-> so either pl011_int() finishes all its work safely before the console
-> output is done, or the console output is done first.
+Le 09/03/2015 04:43, Wenyou Yang a ?crit :
+> Hi,
 > 
-> In the latter case, the condition that triggered the IRQ (i.e., TX
-> FIFO has space) may no longer be true: the lock protects pl011_int()
-> from the race that would otherwise exist between the check on TXIS
-> and the actual writes to the FIFO.
+> The patch series purpose is to clean up the AT91 PM code.
 > 
-> Only in special cases (sysrq and oopses) might the lock not be
-> held.  But this problem exists independently of my changes AFAICT.
-> Correct output seems to be best-effort in these cases, which is
-> probably the right thing to do.
-
-Actually, yes, you're right, I'm wrong.  The console won't drop the
-spinlock until the last character has left the TX FIFO and has been
-sent on the wire, so at the point I was originally thinking of, we
-guarantee that the FIFO is empty (if it weren't like that, it'd
-almost certainly be full.)
-
-> > If hardware CTS flow control is enabled, the problem gets worse - in
-> > that mode, the TX FIFO can remain fully occupied for an indeterminant
-> > amount of time.
+> It is based on the branch: at91-4.0-fixes
+> git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+> 	+ [PATCH] ARM: at91: pm: change at91_pm_set_standby() to static
 > 
-> Not really?  Regardless of why the FIFO is full, pl011_int() won't
-> call pl011_tx_chars() because a full FIFO means TXIS is deasserted.
+> Change log for v2.0
+>  - rebase on the branch: at91-4.0-fixes + the above patch. 
 > 
-> In the start_tx/softirq case TXFF will be checked, as I try to
-> explain above.
+> Wenyou Yang (3):
+>   pm: at91: pm_slowclock: remove the unused code related with
+>     SLOWDOWN_MASTER_CLOCK
+>   ARM: at91: move "select SRAM" under SOC_AT91SAM9 and SOC_SAMA5
+>   pm: at91: remove CONFIG_AT91_SLOW_CLOCK config option
 
-Yes, in that case, pl011_int() won't be called for transmit, but what
-about the softirq case.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Whole series stacked on at91-4.1-cleanup.
 
-Looking at the patch again, I don't see pl011_tx_chars() ever returning
-true - so the while (pl011_tx_chars()); in the softirq looks strange
-(if it always returns false, we won't ever iterate.)
+Thanks.
 
-> Unless you have any other ideas I will try to simplify the code
-> along the above lines.
 
-I forget whether we have problems with UARTs which don't generate any TX
-irqs - I hope we don't.
+> 
+>  arch/arm/mach-at91/Kconfig        |   17 +++--------------
+>  arch/arm/mach-at91/Makefile       |    2 +-
+>  arch/arm/mach-at91/pm.c           |   12 +-----------
+>  arch/arm/mach-at91/pm_slowclock.S |   37 -------------------------------------
+>  4 files changed, 5 insertions(+), 63 deletions(-)
+> 
 
-What about doing this instead, which should result in fewer changes to
-the driver (especially to the fast paths):
-
-- On startup, set a flag to indicate that the TX state is unknown (so we
-  can detect the first start_tx().)
-- When we get our first start_tx(), check the flag.
-  - read the FIFO flags and interrupt status.  If the FIFO flags indicate
-    that the TX FIFO is empty, but there is no transmit interrupt, read
-    and load the first character into the FIFO.  Instead of just loading
-    the first character, as we've checked the FIFO status, we could
-    alternatively load the first half of the FIFO via a call to
-    pl011_tx_chars().
-  - clear the flag.
-
-This should mean that we keep the driver structure we have today.
-
-The only concern I have about that is (from what I remember) we don't
-expect a call to ->start_tx to cause a tx stop event, though I don't
-see anything in serial_core which would get upset if we did.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
