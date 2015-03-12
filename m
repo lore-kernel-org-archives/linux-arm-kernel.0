@@ -1,50 +1,42 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Thu, 12 Mar 2015 16:11:50 +0300
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 Mar 2015 13:12:07 +0000
 Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
  on armada-xp
-In-Reply-To: <20150312130445.GO8656@n2100.arm.linux.org.uk>
+In-Reply-To: <55018E8B.8060704@list.ru>
 References: <54FF21BE.2040506@list.ru>
- <20150310171751.GD13687@e104818-lin.cambridge.arm.com>
- <54FF2986.6020503@list.ru> <20150310173807.GU8656@n2100.arm.linux.org.uk>
- <55003569.1010200@list.ru> <20150311124730.GZ8656@n2100.arm.linux.org.uk>
- <5500502A.5060905@list.ru> <550187A4.8010704@hurleysoftware.com>
- <55018AE7.4070207@list.ru> <20150312130445.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <55019096.80605@list.ru>
+ <20150311175227.499612af@free-electrons.com>
+ <55007ADD.6080505@list.ru>
+ <20150311174618.GE8656@n2100.arm.linux.org.uk>
+ <55008483.8050603@list.ru>
+ <20150311193343.0317e3e1@free-electrons.com>
+ <55018A3C.7020409@list.ru>
+ <20150312134756.5335cb32@free-electrons.com>
+ <55018E8B.8060704@list.ru>
+Message-ID: <20150312131207.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-12.03.2015 16:04, Russell King - ARM Linux ?????:
-> On Thu, Mar 12, 2015 at 03:47:35PM +0300, Stas Sergeev wrote:
->> 12.03.2015 15:33, Peter Hurley ?????:
->>> On 03/11/2015 10:24 AM, Stas Sergeev wrote:
->>>> However, while testing, I've suddenly got another crash happened
->>>> a bit earlier than the previous one used to happen: (OOM? How??)
->>>> ---
->>>> [    0.000000] Booting Linux on physical CPU 0x0
->>>> [    0.000000] Linux version 4.0.0-rc2-00137-gb672c98-dirty
->>>> (root at host-010-117) (gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) )
->>>> #2 SMP 5
->>>> [    0.000000] CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7),
->>>> cr=10c5387d
->>>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
->>>> cache
->>>> [    0.000000] Machine model: Marvell Armada XP Development Board
->>>> DB-MV784MP-GP
->>>> [    0.000000] Ignoring memory block 0x100000000 - 0x200000000
->>> Once you patch your bootloader, you'll want to configure your kernel
->>> for CONFIG_ARM_LPAE=y to enable the high 4GB of memory you have, as
->>> it's being ignored in this config right now (as shown above and in
->>> the oom message below).
->> Hi Peter, thanks for this hint.
->> I actually already tried with lpae, and, except for the missing
->> 256Mb, everything works properly. :)
-> How reproducable is the OOM?  Have you tested LPAE as much as you did
-> without LPAE?
-Hi Russel, OOM is reproduceable quite fine only on old uboot
-and non-lpae mode.
-With lpae mode and old uboot OOM doesn't happen, but the board is not
-very reliable.
-With old uboot and mem=3G OOM is not reproduceable!
-With new uboot and whatever lpae more, OOM does not happen.
-So, after all, it still seems to be related to the problematic memory
-region. Let me know if you still suspect a bug and need more testing.
+On Thu, Mar 12, 2015 at 04:03:07PM +0300, Stas Sergeev wrote:
+> Yeah, I realize that, but I was hoping that some work-around
+> exists. For example, move entire dimm above 4G? Is this really
+> impossible? Or maybe move overlapping region above 8G...
+
+You /really/ don't want to do that.  We have that situation on TI Keystone
+SoCs and it's really horrible for the kernel to deal with.
+
+For early kernel boot, we require RAM below the 4GB boundary, so that
+we are able to execute code before the MMU is enabled.  No RAM below
+4GB basically means there is no way to execute any code from RAM.
+
+Keystone SoCs work around that by having an alias of RAM below 4GB,
+and by doing some architecturally dubious, potentially fault-inducing
+manipulation of the kernel page tables - so dubious that booting Linux
+on Keystone SoCs with this leads us to print a big warning, and
+immediately taint the kernel at the moment.
+
+That's on my list of things which need to be worked on, subject to
+commercial issues.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
