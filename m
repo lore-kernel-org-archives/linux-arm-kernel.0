@@ -1,195 +1,105 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 00:36:19 +0100
-Subject: [PATCH v3 11/12] ARM: dts: add support for Vybrid running on Cortex-M4
-In-Reply-To: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426203380-7155-12-git-send-email-stefan@agner.ch>
+From: prabhakar.csengg@gmail.com (Lad Prabhakar)
+Date: Thu, 12 Mar 2015 23:38:21 +0000
+Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
+Message-ID: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an initial device tree to run Linux on the Cortex-M4 on
-the Vybrid based Colibri VF61 module.
+From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
+this patch does the following:
+1: adds DT node for fixed oscillator.
+2: adds DT node entries for ov2659 sensor
+3: adds remote-endpoint entry for VPFE.
+
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 ---
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/vf610m4-colibri.dts | 98 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vf610m4.dtsi        | 50 ++++++++++++++++++
- 3 files changed, 149 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610m4-colibri.dts
- create mode 100644 arch/arm/boot/dts/vf610m4.dtsi
+ Note this patch depends on
+ https://patchwork.kernel.org/patch/6000161/
+ 
+ arch/arm/boot/dts/am437x-gp-evm.dts | 42 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..3a6ff9f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -309,6 +309,7 @@ dtb-$(CONFIG_SOC_LS1021A) += \
- dtb-$(CONFIG_SOC_VF610) += \
- 	vf500-colibri-eval-v3.dtb \
- 	vf610-colibri-eval-v3.dtb \
-+	vf610m4-colibri.dtb \
- 	vf610-cosmic.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += \
-diff --git a/arch/arm/boot/dts/vf610m4-colibri.dts b/arch/arm/boot/dts/vf610m4-colibri.dts
-new file mode 100644
-index 0000000..acd6cb5
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610m4-colibri.dts
-@@ -0,0 +1,98 @@
-+/*
-+ * Device tree for Colibri VF61 Cortex-M4 support
-+ *
-+ * Copyright (C) 2015 Stefan Agner
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index f84d971..195f452 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -106,6 +106,14 @@
+ 			};
+ 		};
+ 	};
 +
-+/dts-v1/;
-+#include "vf610m4.dtsi"
-+
-+/ {
-+	model = "VF610 Cortex-M4";
-+	compatible = "fsl,vf610m4";
-+
-+	chosen {
-+		bootargs = "console=ttyLP2,115200 clk_ignore_unused init=/linuxrc rw";
++	/* fixed 12MHz oscillator */
++	refclk: oscillator {
++		#clock-cells = <0>;
++		compatible = "fixed-clock";
++		clock-frequency = <12000000>;
 +	};
 +
-+	memory {
-+		reg = <0x8c000000 0x3000000>;
-+	};
-+};
+ };
+ 
+ &am43xx_pinmux {
+@@ -404,6 +412,21 @@
+ 			regulator-always-on;
+ 		};
+ 	};
 +
-+&gpio0 {
-+	status = "disabled";
-+};
++	ov2659 at 30 {
++		compatible = "ovti,ov2659";
++		reg = <0x30>;
 +
-+&gpio1 {
-+	status = "disabled";
-+};
++		clocks = <&refclk 0>;
++		clock-names = "xvclk";
 +
-+&gpio2 {
-+	status = "disabled";
-+};
-+
-+&gpio3 {
-+	status = "disabled";
-+};
-+
-+&gpio4 {
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	vf610-colibri {
-+		pinctrl_uart2: uart2grp {
-+			fsl,pins = <
-+				VF610_PAD_PTD0__UART2_TX		0x21a2
-+				VF610_PAD_PTD1__UART2_RX		0x21a1
-+				VF610_PAD_PTD2__UART2_RTS		0x21a2
-+				VF610_PAD_PTD3__UART2_CTS		0x21a1
-+			>;
++		port {
++			ov2659_0: endpoint {
++				remote-endpoint = <&vpfe1_ep>;
++				link-frequencies = /bits/ 64 <70000000>;
++			};
 +		};
 +	};
-+};
-diff --git a/arch/arm/boot/dts/vf610m4.dtsi b/arch/arm/boot/dts/vf610m4.dtsi
-new file mode 100644
-index 0000000..9ffe2eb
---- /dev/null
-+++ b/arch/arm/boot/dts/vf610m4.dtsi
-@@ -0,0 +1,50 @@
-+/*
-+ * Device tree for VF6xx Cortex-M4 support
-+ *
-+ * Copyright (C) 2015 Stefan Agner
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+ };
+ 
+ &i2c1 {
+@@ -423,6 +446,21 @@
+ 		touchscreen-size-x = <1024>;
+ 		touchscreen-size-y = <600>;
+ 	};
 +
-+#include "armv7-m.dtsi"
-+#include "vfxxx.dtsi"
++	ov2659 at 30 {
++		compatible = "ovti,ov2659";
++		reg = <0x30>;
 +
-+&mscm_ir {
-+	interrupt-parent = <&nvic>;
-+};
++		clocks = <&refclk 0>;
++		clock-names = "xvclk";
++
++		port {
++			ov2659_1: endpoint {
++				remote-endpoint = <&vpfe0_ep>;
++				link-frequencies = /bits/ 64 <70000000>;
++			};
++		};
++	};
+ };
+ 
+ &epwmss0 {
+@@ -626,7 +664,7 @@
+ 
+ 	port {
+ 		vpfe0_ep: endpoint {
+-			/* remote-endpoint = <&sensor>; add once we have it */
++			remote-endpoint = <&ov2659_1>;
+ 			ti,am437x-vpfe-interface = <0>;
+ 			bus-width = <8>;
+ 			hsync-active = <0>;
+@@ -643,7 +681,7 @@
+ 
+ 	port {
+ 		vpfe1_ep: endpoint {
+-			/* remote-endpoint = <&sensor>; add once we have it */
++			remote-endpoint = <&ov2659_0>;
+ 			ti,am437x-vpfe-interface = <0>;
+ 			bus-width = <8>;
+ 			hsync-active = <0>;
 -- 
-2.3.1
+2.1.0
