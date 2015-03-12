@@ -1,117 +1,136 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 12 Mar 2015 23:57:19 +0100
-Subject: [PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <1426077587-1561-7-git-send-email-hanjun.guo@linaro.org>
+Date: Fri, 13 Mar 2015 00:02:43 +0100
+Subject: [PATCH v10 14/21] ACPI / processor: Make it possible to get CPU
+ hardware ID via GICC
+In-Reply-To: <1426077587-1561-15-git-send-email-hanjun.guo@linaro.org>
 References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-7-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <3629643.daQYNeVrsM@vostro.rjw.lan>
+ <1426077587-1561-15-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1560062.pl024AE6s4@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 11, 2015 08:39:32 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+On Wednesday, March 11, 2015 08:39:40 PM Hanjun Guo wrote:
+> Introduce a new function map_gicc_mpidr() to allow MPIDRs to be obtained
+> from the GICC Structure introduced by ACPI 5.1, since MPIDR for ARM64 is
+> 64-bit, so typedef u64 for phys_cpuid_t.
 > 
-> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
-> for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
-> and select it for x86 and ia64 only to make sleep functions available,
-> and also introduce stub function to allow other drivers to function
-> until S states are defined for ARM64.
-> 
-> It will be no functional change for x86 and IA64.
+> The ARM architecture defines the MPIDR register as the CPU hardware
+> identifier. This patch adds the code infrastructure to retrieve the MPIDR
+> values from the ARM ACPI GICC structure in order to look-up the kernel CPU
+> hardware ids required by the ACPI core code to identify CPUs.
 > 
 > CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Robert Richter <rrichter@cavium.com>
 > Acked-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Reviewed-by: Grant Likely <grant.likely@linaro.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
 > ---
->  arch/ia64/Kconfig       | 1 +
->  arch/x86/Kconfig        | 1 +
->  drivers/acpi/Kconfig    | 4 ++++
->  drivers/acpi/Makefile   | 2 +-
->  drivers/acpi/internal.h | 4 ++++
->  5 files changed, 11 insertions(+), 1 deletion(-)
+>  arch/arm64/include/asm/acpi.h | 12 ++++++++++++
+>  drivers/acpi/processor_core.c | 30 ++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
 > 
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index 074e52b..e8728d7 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -10,6 +10,7 @@ config IA64
->  	select ARCH_MIGHT_HAVE_PC_SERIO
->  	select PCI if (!IA64_HP_SIM)
->  	select ACPI if (!IA64_HP_SIM)
-> +	select ACPI_GENERIC_SLEEP if ACPI
->  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->  	select HAVE_UNSTABLE_SCHED_CLOCK
->  	select HAVE_IDE
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index b7d31ca..9804431 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -22,6 +22,7 @@ config X86_64
->  ### Arch settings
->  config X86
->  	def_bool y
-> +	select ACPI_GENERIC_SLEEP if ACPI
->  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->  	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
->  	select ARCH_HAS_FAST_MULTIPLIER
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index e6c3ddd..a7b9120 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
->  config ARCH_MIGHT_HAVE_ACPI_PDC
->  	bool
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 9719921..eea0bc3 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -13,6 +13,8 @@
+>  #define _ASM_ACPI_H
 >  
-> +config ACPI_GENERIC_SLEEP
-> +	bool
+>  #include <linux/mm.h>
+> +#include <asm/cputype.h>
+> +#include <asm/smp_plat.h>
+>  
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+> @@ -27,6 +29,9 @@ static inline void __iomem *acpi_os_ioremap(acpi_physical_address phys,
+>  }
+>  #define acpi_os_ioremap acpi_os_ioremap
+>  
+> +typedef u64 phys_cpuid_t;
+> +#define PHYS_CPUID_INVALID INVALID_HWID
 > +
->  config ACPI_SLEEP
->  	bool
->  	depends on SUSPEND || HIBERNATION
-> +	depends on ACPI_GENERIC_SLEEP
->  	default y
+>  #define acpi_strict 1	/* No out-of-spec workarounds on ARM64 */
+>  extern int acpi_disabled;
+>  extern int acpi_noirq;
+> @@ -59,6 +64,13 @@ static inline void enable_acpi(void)
+>  }
 >  
->  config ACPI_PROCFS_POWER
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 623b117..2397822 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -23,7 +23,7 @@ acpi-y				+= nvs.o
+>  /*
+> + * The ACPI processor driver for ACPI core code needs this macro
+> + * to find out this cpu was already mapped (mapping from CPU hardware
+> + * ID to CPU logical ID) or not.
+> + */
+> +#define cpu_physical_id(cpu) cpu_logical_map(cpu)
+> +
+> +/*
+>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>   * with this check the ACPI core will not override the CPU index
+>   * obtained from GICC with 0 and not print some error message as well.
+> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+> index 51cc299..b1ec78b 100644
+> --- a/drivers/acpi/processor_core.c
+> +++ b/drivers/acpi/processor_core.c
+> @@ -83,6 +83,31 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
+>  	return 0;
+>  }
 >  
->  # Power management related files
->  acpi-y				+= wakeup.o
-> -acpi-y				+= sleep.o
-> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
->  acpi-y				+= device_pm.o
->  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+> +/*
+> + * Retrieve the ARM CPU physical identifier (MPIDR)
+> + */
+> +static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+> +		int device_declaration, u32 acpi_id, phys_cpuid_t *mpidr)
+> +{
+> +	struct acpi_madt_generic_interrupt *gicc =
+> +	    container_of(entry, struct acpi_madt_generic_interrupt, header);
+> +
+> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+> +		return -ENODEV;
+> +
+> +	/* device_declaration means Device object in DSDT, in the
+> +	 * GIC interrupt model, logical processors are required to
+> +	 * have a Processor Device object in the DSDT, so we should
+> +	 * check device_declaration here
+> +	 */
+> +	if (device_declaration && (gicc->uid == acpi_id)) {
+> +		*mpidr = gicc->arm_mpidr;
+> +		return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+>  {
+>  	unsigned long madt_end, entry;
+> @@ -111,6 +136,9 @@ static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+>  		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
+>  			if (!map_lsapic_id(header, type, acpi_id, &phys_id))
+>  				break;
+> +		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+> +			if (!map_gicc_mpidr(header, type, acpi_id, &phys_id))
+> +				break;
+>  		}
+>  		entry += header->length;
+>  	}
+> @@ -143,6 +171,8 @@ static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
+>  		map_lsapic_id(header, type, acpi_id, &phys_id);
+>  	else if (header->type == ACPI_MADT_TYPE_LOCAL_X2APIC)
+>  		map_x2apic_id(header, type, acpi_id, &phys_id);
+> +	else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT)
+> +		map_gicc_mpidr(header, type, acpi_id, &phys_id);
 >  
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 56b321a..b5eef4c 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
->  /*--------------------------------------------------------------------------
->                                    Suspend/Resume
->    -------------------------------------------------------------------------- */
-> +#ifdef CONFIG_ACPI_GENERIC_SLEEP
->  extern int acpi_sleep_init(void);
-> +#else
-> +static inline int acpi_sleep_init(void) { return -ENOSYS; }
-
-Please change the return value here, preferably to -ENXIO.
-
--ENOSYS *specifically* means "system call not implemented" and should only be
-used to indicate this particular condition.
-
-> +#endif
->  
->  #ifdef CONFIG_ACPI_SLEEP
->  int acpi_sleep_proc_init(void);
+>  exit:
+>  	kfree(buffer.pointer);
 > 
 
 -- 
