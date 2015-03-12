@@ -1,42 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 Mar 2015 13:12:07 +0000
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <55018E8B.8060704@list.ru>
-References: <54FF21BE.2040506@list.ru>
- <20150311175227.499612af@free-electrons.com>
- <55007ADD.6080505@list.ru>
- <20150311174618.GE8656@n2100.arm.linux.org.uk>
- <55008483.8050603@list.ru>
- <20150311193343.0317e3e1@free-electrons.com>
- <55018A3C.7020409@list.ru>
- <20150312134756.5335cb32@free-electrons.com>
- <55018E8B.8060704@list.ru>
-Message-ID: <20150312131207.GQ8656@n2100.arm.linux.org.uk>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Thu, 12 Mar 2015 21:11:52 +0800
+Subject: [PATCH v2 17/17] soc/tegra: remove lagacy powergate APIs
+In-Reply-To: <20150312124501.GA632@ulmo>
+References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
+ <1426162518-7405-18-git-send-email-vinceh@nvidia.com>
+ <20150312124501.GA632@ulmo>
+Message-ID: <55019098.3020901@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 04:03:07PM +0300, Stas Sergeev wrote:
-> Yeah, I realize that, but I was hoping that some work-around
-> exists. For example, move entire dimm above 4G? Is this really
-> impossible? Or maybe move overlapping region above 8G...
+Hi,
 
-You /really/ don't want to do that.  We have that situation on TI Keystone
-SoCs and it's really horrible for the kernel to deal with.
+On 03/12/2015 08:45 PM, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+>
+> On Thu, Mar 12, 2015 at 08:15:18PM +0800, Vince Hsu wrote:
+>> We switch to generic power domain now. So remove the legacy functions.
+>>
+>> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+>> ---
+>>   drivers/soc/tegra/pmc.c | 68 -------------------------------------------------
+>>   include/soc/tegra/pmc.h | 22 ----------------
+>>   2 files changed, 90 deletions(-)
+> I don't think we can do this. What if somebody updates their kernel but
+> not the DTB? In that case they'll end up with drivers that don't enable
+> power partitions but at the same time the powergate driver won't enable
+> them either because it is missing the corresponding nodes in the DTB.
+You're right.
 
-For early kernel boot, we require RAM below the 4GB boundary, so that
-we are able to execute code before the MMU is enabled.  No RAM below
-4GB basically means there is no way to execute any code from RAM.
+>
+> What we'll have to do is probably keep the code that enables the power
+> partitions and make it conditional on the power domains somehow. Is
+> there a way to determine at runtime whether a device has been attached
+> to a power domain?
+>
+Yes, we can check if a power domain is bound to the GPD by DT in the 
+legacy powergate code.
 
-Keystone SoCs work around that by having an alias of RAM below 4GB,
-and by doing some architecturally dubious, potentially fault-inducing
-manipulation of the kernel page tables - so dubious that booting Linux
-on Keystone SoCs with this leads us to print a big warning, and
-immediately taint the kernel at the moment.
-
-That's on my list of things which need to be worked on, subject to
-commercial issues.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Vince
