@@ -1,38 +1,53 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 12 Mar 2015 10:06:24 +0200
-Subject: [RESEND 0/7] ARM: davinci: McASP related cleanups and fixes
-Message-ID: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Thu, 12 Mar 2015 10:06:25 +0200
+Subject: [RESEND 1/7] ARM: davinci: devices-da8xx: Add resource name for the
+ McASP DMA request
+In-Reply-To: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1426147591-31764-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add "tx" or "rx" as resource name for the DMA resources.
 
-V1 was sent back in 10th of February [1], so resending it rebased on current
-linux-next.
-
-Clean up series of McASP device creation for da8xx and dm646x DMSoCs.
-
-[1] https://lkml.org/lkml/2015/2/10/298
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Peter Ujfalusi (7):
-  ARM: davinci: devices-da8xx: Add resource name for the McASP DMA
-    request
-  ARM: davinci: devices-da8xx: Add interrupt resource to McASP structs
-  ARM: davinci: devices-da8xx: Clean up and correct the McASP device
-    creation
-  ARM: davinci: devices-da8xx: Add support for McASP2 on da830
-  ARM: davinci: dm646x: Clean up the McASP DMA resources
-  ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x
-  ARM: davinci: dm646x: Add interrupt resource for McASPs
+ arch/arm/mach-davinci/devices-da8xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- arch/arm/mach-davinci/asp.h               |  7 +++
- arch/arm/mach-davinci/devices-da8xx.c     | 80 ++++++++++++++++++++++++++++---
- arch/arm/mach-davinci/dm646x.c            | 23 ++++++---
- arch/arm/mach-davinci/include/mach/irqs.h |  2 +-
- 4 files changed, 98 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index b85b781b05fd..f35174317770 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -463,12 +463,14 @@ static struct resource da830_mcasp1_resources[] = {
+ 	},
+ 	/* TX event */
+ 	{
++		.name	= "tx",
+ 		.start	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
+ 		.end	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	/* RX event */
+ 	{
++		.name	= "rx",
+ 		.start	= DAVINCI_DA830_DMA_MCASP1_AREVT,
+ 		.end	= DAVINCI_DA830_DMA_MCASP1_AREVT,
+ 		.flags	= IORESOURCE_DMA,
+@@ -491,12 +493,14 @@ static struct resource da850_mcasp_resources[] = {
+ 	},
+ 	/* TX event */
+ 	{
++		.name	= "tx",
+ 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
+ 		.end	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
+ 		.flags	= IORESOURCE_DMA,
+ 	},
+ 	/* RX event */
+ 	{
++		.name	= "rx",
+ 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
+ 		.end	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
+ 		.flags	= IORESOURCE_DMA,
 -- 
 2.3.0
