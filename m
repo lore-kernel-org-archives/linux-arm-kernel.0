@@ -1,107 +1,167 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 12 Mar 2015 10:07:09 +0100
-Subject: [PATCH] arm64: fix implementation of mmap2 compat syscall
-In-Reply-To: <55008557.3000200@suse.de> (Alexander Graf's message of "Wed, 11
- Mar 2015 13:11:35 -0500")
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <C0CF99B1-8706-4D9B-87E0-13A7C6C619D6@suse.de>
- <mvmegovejx0.fsf@hawking.suse.de> <2583329.jVX0TanYzO@wuerfel>
- <mvma8zjeixd.fsf@hawking.suse.de> <550062D6.3000101@suse.de>
- <mvmtwxrcy81.fsf@hawking.suse.de> <55008557.3000200@suse.de>
-Message-ID: <mvmh9tqd1oi.fsf_-_@hawking.suse.de>
+From: d.eppel@samsung.com (Damian Eppel)
+Date: Thu, 12 Mar 2015 10:11:36 +0100
+Subject: [PATCH v2] clocksource: exynos_mct: fix for sleeping in atomic ctx
+ handling cpu hotplug notif.
+Message-ID: <1426151496-5509-1-git-send-email-d.eppel@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm mmap2 syscall takes the offset in units of 4K, thus with 64K pages
-the offset needs to be scaled to units of pages.
+This is to fix an issue of sleeping in atomic context when processing
+hotplug notifications in Exynos MCT(Multi-Core Timer).
+The issue was reproducible on Exynos 3250 (Rinato board) and Exynos 5420
+(Arndale Octa board).
 
-Signed-off-by: Andreas Schwab <schwab@suse.de>
+Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+request_irq() and free_irq() in the context of hotplug notification
+(which is in this case atomic context).
+
+root at target:~# echo 0 > /sys/devices/system/cpu/cpu1/online
+
+[   25.157867] IRQ18 no longer affine to CPU1
+...
+[   25.158445] CPU1: shutdown
+
+root at target:~# echo 1 > /sys/devices/system/cpu/cpu1/online
+
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Solution:
+Clockevent irqs cannot be requested/freed every time cpu is
+hot-plugged/unplugged as CPU_STARTING/CPU_DYING notifications
+that signals hotplug or unplug events are sent with both preemption
+and local interrupts disabled. Since request_irq() may sleep it is
+moved to the initialization stage and performed for all possible
+cpus prior putting them online. Then, in the case of hotplug event
+the irq asociated with the given cpu will simply be enabled.
+Similarly on cpu unplug event the interrupt is not freed but just
+disabled.
+
+Note that after successful request_irq() call for a clockevent device
+associated to given cpu the requested irq is disabled (via disable_irq()).
+That is to make things symmetric as we expect hotplug event as a next
+thing (which will enable irq again). This should not pose any problems
+because at the time of requesting irq the clockevent device is not
+fully initialized yet, therefore should not produce interrupts at that point.
+
+For disabling an irq at cpu unplug notification disable_irq_nosync() is
+chosen which is a non-blocking function. This again shouldn't be a problem as
+prior sending CPU_DYING notification interrupts are migrated away
+from the cpu.
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: <stable@vger.kernel.org>
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+(Tested on Arndale Octa Board)
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+(Tested on Rinato B2 (Exynos 3250) board)
 ---
- arch/arm64/include/asm/unistd32.h |  2 +-
- arch/arm64/kernel/entry32.S       | 18 ++++++++++++++++++
- arch/arm64/kernel/sys32.c         |  6 ++++++
- 3 files changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index 2722442..cef934a 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -406,7 +406,7 @@ __SYSCALL(__NR_vfork, sys_vfork)
- #define __NR_ugetrlimit 191	/* SuS compliant getrlimit */
- __SYSCALL(__NR_ugetrlimit, compat_sys_getrlimit)		/* SuS compliant getrlimit */
- #define __NR_mmap2 192
--__SYSCALL(__NR_mmap2, sys_mmap_pgoff)
-+__SYSCALL(__NR_mmap2, compat_sys_mmap2_wrapper)
- #define __NR_truncate64 193
- __SYSCALL(__NR_truncate64, compat_sys_truncate64_wrapper)
- #define __NR_ftruncate64 194
-diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
-index 9a8f6ae..17f3296 100644
---- a/arch/arm64/kernel/entry32.S
-+++ b/arch/arm64/kernel/entry32.S
-@@ -19,9 +19,12 @@
-  */
+Notes:
+    Changes since v1:
+            o added Krzysztof's and Marcin's Reviewed-by / Tested-by
+              with information about the test HW.
+
+ drivers/clocksource/exynos_mct.c | 45 ++++++++++++++++++++++++++++------------
+ 1 file changed, 32 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 83564c9..9beca58 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
  
- #include <linux/linkage.h>
-+#include <linux/const.h>
- 
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
-+#include <asm/errno.h>
-+#include <asm/page.h>
- 
- /*
-  * System call wrappers for the AArch32 compatibility layer.
-@@ -54,6 +57,21 @@ ENTRY(compat_sys_fstatfs64_wrapper)
- ENDPROC(compat_sys_fstatfs64_wrapper)
- 
- /*
-+ * Note: off_4k (w5) is always units of 4K.  If we can't do the requested
-+ * offset, we return EINVAL.
-+ */
-+#if PAGE_SHIFT > 12
-+ENTRY(compat_sys_mmap2_wrapper)
-+	tst	w5, #~PAGE_MASK >> 12
-+	b.ne	1f
-+	lsr	w5, w5, #PAGE_SHIFT - 12
-+	b	sys_mmap_pgoff
-+1:	mov	x0, #-EINVAL
-+	ret	lr
-+ENDPROC(compat_sys_mmap2_wrapper)
-+#endif
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
 +
-+/*
-  * Wrappers for AArch32 syscalls that either take 64-bit parameters
-  * in registers or that take 32-bit parameters which require sign
-  * extension.
-diff --git a/arch/arm64/kernel/sys32.c b/arch/arm64/kernel/sys32.c
-index 2d5ab3c..7800bb1 100644
---- a/arch/arm64/kernel/sys32.c
-+++ b/arch/arm64/kernel/sys32.c
-@@ -24,6 +24,7 @@
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
  
- #include <linux/compiler.h>
- #include <linux/syscalls.h>
-+#include <asm/page.h>
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
  
- asmlinkage long compat_sys_sigreturn_wrapper(void);
- asmlinkage long compat_sys_rt_sigreturn_wrapper(void);
-@@ -37,6 +38,11 @@ asmlinkage long compat_sys_readahead_wrapper(void);
- asmlinkage long compat_sys_fadvise64_64_wrapper(void);
- asmlinkage long compat_sys_sync_file_range2_wrapper(void);
- asmlinkage long compat_sys_fallocate_wrapper(void);
-+#if PAGE_SHIFT > 12
-+asmlinkage long compat_sys_mmap2_wrapper(void);
-+#else
-+#define compat_sys_mmap2_wrapper sys_mmap_pgoff
-+#endif
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
  
- #undef __SYSCALL
- #define __SYSCALL(nr, sym)	[nr] = sym,
+@@ -549,7 +548,27 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++			irq_force_affinity(mct_irq, cpumask_of(cpu));
++
++			disable_irq(mct_irq);
++		}
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
 -- 
-2.3.2
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+1.9.1
