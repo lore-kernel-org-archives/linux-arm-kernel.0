@@ -1,53 +1,48 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 12 Mar 2015 10:06:25 +0200
-Subject: [RESEND 1/7] ARM: davinci: devices-da8xx: Add resource name for the
- McASP DMA request
+Date: Thu, 12 Mar 2015 10:06:26 +0200
+Subject: [RESEND 2/7] ARM: davinci: devices-da8xx: Add interrupt resource to
+ McASP structs
 In-Reply-To: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1426147591-31764-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1426147591-31764-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "tx" or "rx" as resource name for the DMA resources.
+On da8xx McASP TX/RX interrupt requests are combined.
+The interrupt can be used for error recovery.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-davinci/devices-da8xx.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index b85b781b05fd..f35174317770 100644
+index f35174317770..e15e046c5438 100644
 --- a/arch/arm/mach-davinci/devices-da8xx.c
 +++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -463,12 +463,14 @@ static struct resource da830_mcasp1_resources[] = {
- 	},
- 	/* TX event */
- 	{
-+		.name	= "tx",
- 		.start	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
- 		.end	= DAVINCI_DA830_DMA_MCASP1_AXEVT,
- 		.flags	= IORESOURCE_DMA,
- 	},
- 	/* RX event */
- 	{
-+		.name	= "rx",
- 		.start	= DAVINCI_DA830_DMA_MCASP1_AREVT,
+@@ -475,6 +475,11 @@ static struct resource da830_mcasp1_resources[] = {
  		.end	= DAVINCI_DA830_DMA_MCASP1_AREVT,
  		.flags	= IORESOURCE_DMA,
-@@ -491,12 +493,14 @@ static struct resource da850_mcasp_resources[] = {
  	},
- 	/* TX event */
- 	{
-+		.name	= "tx",
- 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
- 		.end	= DAVINCI_DA8XX_DMA_MCASP0_AXEVT,
- 		.flags	= IORESOURCE_DMA,
- 	},
- 	/* RX event */
- 	{
-+		.name	= "rx",
- 		.start	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
++	{
++		.name	= "common",
++		.start	= IRQ_DA8XX_MCASPINT,
++		.flags	= IORESOURCE_IRQ,
++	},
+ };
+ 
+ static struct platform_device da830_mcasp1_device = {
+@@ -505,6 +510,11 @@ static struct resource da850_mcasp_resources[] = {
  		.end	= DAVINCI_DA8XX_DMA_MCASP0_AREVT,
  		.flags	= IORESOURCE_DMA,
+ 	},
++	{
++		.name	= "common",
++		.start	= IRQ_DA8XX_MCASPINT,
++		.flags	= IORESOURCE_IRQ,
++	},
+ };
+ 
+ static struct platform_device da850_mcasp_device = {
 -- 
 2.3.0
