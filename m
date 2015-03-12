@@ -1,184 +1,88 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 12 Mar 2015 22:16:18 +0800
-Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <CAAFQd5CWOjT6XU8PFT+PO6Q2mb-i+iMTtZPSo_RDNUzpOO6TvA@mail.gmail.com>
-References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
- <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
- <CAAFQd5CWOjT6XU8PFT+PO6Q2mb-i+iMTtZPSo_RDNUzpOO6TvA@mail.gmail.com>
-Message-ID: <1426169778.695.34.camel@mhfsdcap03>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 12 Mar 2015 15:25:34 +0100
+Subject: [PATCH 0/6] ARM: cpuidle: Unify the ARM64/ARM DT approach
+In-Reply-To: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <5501A1DE.9020804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tomasz,
 
-      Thanks very much for review so detail!
+Catalin, Rob,
 
-      Please check my reply below. Others I will fix it in the next
-version.
-       
-      And I have got your comment of [2/5]. Do you have plan for the
-other patch?
+do you agree with this patchset ?
 
-On Sun, 2015-03-08 at 13:12 +0900, Tomasz Figa wrote:
-> Hi Yong Wu,
-> 
-> Thanks for this series. Please see my comments inline.
-> 
-> On Fri, Mar 6, 2015 at 7:48 PM,  <yong.wu@mediatek.com> wrote:
-> > From: Yong Wu <yong.wu@mediatek.com>
-> >
-> > This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
-> > Currently this only supports m4u gen 2 with 2 levels of page table on mt8173.
-> 
-[snip]
-> > +static const struct mtk_iommu_port mtk_iommu_mt8173_port[] = {
-> > +       /* port name                m4uid slaveid larbid portid tfid */
-> > +       /* larb0 */
-> > +       {"M4U_PORT_DISP_OVL0",          0,  0,    0,  0, MTK_TFID(0, 0)},
-> > +       {"M4U_PORT_DISP_RDMA0",         0,  0,    0,  1, MTK_TFID(0, 1)},
-> > +       {"M4U_PORT_DISP_WDMA0",         0,  0,    0,  2, MTK_TFID(0, 2)},
-> > +       {"M4U_PORT_DISP_OD_R",          0,  0,    0,  3, MTK_TFID(0, 3)},
-> > +       {"M4U_PORT_DISP_OD_W",          0,  0,    0,  4, MTK_TFID(0, 4)},
-> > +       {"M4U_PORT_MDP_RDMA0",          0,  0,    0,  5, MTK_TFID(0, 5)},
-> > +       {"M4U_PORT_MDP_WDMA",           0,  0,    0,  6, MTK_TFID(0, 6)},
-> > +       {"M4U_PORT_MDP_WROT0",          0,  0,    0,  7, MTK_TFID(0, 7)},
-> 
-> [snip]
-> 
-> > +       {"M4U_PORT_HSIC_MAS",              1,  0,    6,  12, 0x11},
-> > +       {"M4U_PORT_HSIC_DEV",              1,  0,    6,  13, 0x19},
-> > +       {"M4U_PORT_AP_DMA",                1,  0,    6,  14, 0x18},
-> > +       {"M4U_PORT_HSIC_DMA",              1,  0,    6,  15, 0xc8},
-> > +       {"M4U_PORT_MSDC0",                 1,  0,    6,  16, 0x0},
-> > +       {"M4U_PORT_MSDC3",                 1,  0,    6,  17, 0x20},
-> > +       {"M4U_PORT_UNKNOWN",               1,  0,    6,  18, 0xf},
-> 
-> Why the MTK_TFID() macro is not used for perisys iommu?
-> 
-       The perisys iommu don't connected with SMI and Local arbiter.
-it's translation fault id is not MTK_TFID(x, y).it is special.
-       For this perisys iommu , it is different with multimedia iommu,
-we don't support it in this version, We have plan to delete perisys
-iommu port next time.
+Thanks
+   -- Daniel
 
-> > +};
-> > +
-> 
-> Anyway, is it really necessary to hardcode the SoC specific topology
-> data in this driver? Is there really any use besides of printing port
-> name? If not, you could just print the values in a way letting you
-> quickly look up in the datasheet, without hardcoding this. Or even
-> better, you could print which devices are attached to the port.
-> 
-a) Printing the port name is for debug. We could not request every iommu
-user to understand smi&local arbiter. When there is irq, they have to
-look up the iommu's datasheet to find out which port error. if we print
-it directly, It may be more easily to debug.
+On 03/03/2015 01:29 PM, Daniel Lezcano wrote:
+> There is a big number of cpuidle drivers for the ARM architecture.
+>
+> These drivers have been cleaned up and grouped into the drivers/cpuidle
+> directory to keep track of the changes more easily and ensure the code
+> is following the same scheme across the drivers.
+>
+> That had the benefit of simplifying the code and factor out a lot of common
+> parts. Beside that, as the drivers belong to the 'drivers' directory, we had
+> to split the arch specific bits and the generic code in order to keep
+> everything self contained. The platform driver paradigm was used for this
+> purpose.
+>
+> Unfortunately, this approach is now no longer accepted and a different solution
+> must be provided to reach the same goal: one example is the Qualcomm cpuidle
+> driver upstreaming attempt [1].
+>
+> In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
+>
+> The DT definition provides an 'enable-method' to specify one of the cpu
+> operations (PSCI, ...).
+>
+> This patchset unify this driver with ARM32, using the same DT definition.
+>
+> Thanks with this patchset we can use the 'enable-method' to specify a cpu
+> operations, hence get rid of the platform driver approach and go further in the
+> cpuidle driver flexibility via the DT.
+>
+> Daniel Lezcano (6):
+>    ARM: cpuidle: Remove duplicate header inclusion
+>    ARM: cpuidle: Add a cpuidle ops structure to be used for DT
+>    ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
+>    ARM64: cpuidle: Rename cpu_init_idle to a common function name
+>    ARM64: cpuidle: Remove arm64 reference
+>    ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
+>
+>   arch/arm/include/asm/cpuidle.h                     | 12 +++
+>   arch/arm/include/asm/cpuidle_ops.h                 |  3 +
+>   arch/arm/kernel/cpuidle.c                          | 87 +++++++++++++++++++++-
+>   arch/arm/mach-davinci/cpuidle.c                    |  1 -
+>   arch/arm/mach-imx/cpuidle-imx6q.c                  |  1 -
+>   arch/arm/mach-imx/cpuidle-imx6sl.c                 |  1 -
+>   arch/arm/mach-imx/cpuidle-imx6sx.c                 |  1 -
+>   arch/arm/mach-omap2/cpuidle44xx.c                  |  1 -
+>   arch/arm/mach-tegra/cpuidle-tegra20.c              |  1 -
+>   arch/arm/mach-tegra/cpuidle-tegra30.c              |  1 -
+>   arch/arm64/include/asm/cpuidle.h                   |  9 ++-
+>   arch/arm64/kernel/cpuidle.c                        |  2 +-
+>   drivers/cpuidle/Kconfig                            |  7 +-
+>   drivers/cpuidle/Kconfig.arm                        | 10 +++
+>   drivers/cpuidle/Kconfig.arm64                      | 13 ----
+>   drivers/cpuidle/Makefile                           |  5 +-
+>   drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} | 38 +++++-----
+>   drivers/cpuidle/cpuidle-at91.c                     |  1 -
+>   drivers/cpuidle/cpuidle-exynos.c                   |  1 -
+>   drivers/cpuidle/cpuidle-kirkwood.c                 |  1 -
+>   drivers/cpuidle/cpuidle-ux500.c                    |  1 -
+>   drivers/cpuidle/cpuidle-zynq.c                     |  1 -
+>   22 files changed, 139 insertions(+), 59 deletions(-)
+>   create mode 100644 arch/arm/include/asm/cpuidle_ops.h
+>   delete mode 100644 drivers/cpuidle/Kconfig.arm64
+>   rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (72%)
+>
 
-b) In mtk_iommu_config_port, according to this hardcode we can be easily
-to get out which local arbiter and which port we prepare to config.
 
-c) If we support different SOCs, we could change this arrays easily.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> > +static const struct mtk_iommu_cfg mtk_iommu_mt8173_cfg = {
-> > +       .larb_nr = 6,
-> > +       .m4u_port_nr = ARRAY_SIZE(mtk_iommu_mt8173_port),
-> > +       .pport = mtk_iommu_mt8173_port,
-> > +};
-> > +
-> > +static const char *mtk_iommu_get_port_name(const struct mtk_iommu_info *piommu,
-> > +                                          unsigned int portid)
-> > +{
-> > +       const struct mtk_iommu_port *pcurport = NULL;
-> > +
-> > +       pcurport = piommu->imucfg->pport + portid;
-> > +       if (portid < piommu->imucfg->m4u_port_nr && pcurport)
-> > +               return pcurport->port_name;
-> > +       else
-> > +               return "UNKNOWN_PORT";
-> > +}
-> 
-> This function seems to be used just for printing the hardcoded port names.
-> 
-> > +
-> > +static int mtk_iommu_get_port_by_tfid(const struct mtk_iommu_info *pimu,
-> > +                                     int tf_id)
-> > +{
-> > +       const struct mtk_iommu_cfg *pimucfg = pimu->imucfg;
-> > +       int i;
-> > +       unsigned int portid = pimucfg->m4u_port_nr;
-> > +
-> > +       for (i = 0; i < pimucfg->m4u_port_nr; i++) {
-> > +               if (pimucfg->pport[i].tf_id == tf_id) {
-> > +                       portid = i;
-> > +                       break;
-> > +               }
-> > +       }
-> > +       if (i == pimucfg->m4u_port_nr)
-> > +               dev_err(pimu->dev, "tf_id find fail, tfid %d\n", tf_id);
-> > +       return portid;
-> > +}
-> 
-> This function seems to be used just for finding an index into the
-> array of hardcoded port names for printing purposes.
-   Yes. "mtk_iommu_get_port_name" and "mtk_iommu_get_port_by_tfid" is
-only for find out the right port to print for improve debug.
-> 
-[snip]
-> > +
-> > +static int mtk_iommu_invalidate_tlb(const struct mtk_iommu_info *piommu,
-> > +                                   int isinvall, unsigned int iova_start,
-> > +                                   unsigned int iova_end)
-> > +{
-> > +       void __iomem *m4u_base = piommu->m4u_base;
-> > +       u32 val;
-> > +       u64 start, end;
-> > +
-> > +       start = sched_clock();
-> 
-> I don't think this is the preferred way of checking time in kernel
-> drivers, especially after seeing this comment:
-> http://lxr.free-electrons.com/source/include/linux/sched.h#L2134
-> 
-> You should use ktime_get() and other ktime_ helpers.
-> 
-   I will try to replace this with readl_polling_timeout from Mitchel.
-Is it ok?
-
-> > +
-> > +       if (!isinvall) {
-> > +               iova_start = round_down(iova_start, SZ_4K);
-> > +               iova_end = round_up(iova_end, SZ_4K);
-> > +       }
-> > +
-> > +       val = F_MMU_INV_EN_L2 | F_MMU_INV_EN_L1;
-> > +
-> > +       writel(val, m4u_base + REG_INVLID_SEL);
-> > +
-> > +       if (isinvall) {
-> > +               writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
-> 
-> Please move invalidate all into separate function and just call it
-> wherever the code currently passes true as invall argument. You will
-> get rid of two of the ifs in this function.
-> 
-> > +       } else {
-> > +               writel(iova_start, m4u_base + REG_MMU_INVLD_SA);
-> > +               writel(iova_end, m4u_base + REG_MMU_INVLD_EA);
-> > +               writel(F_MMU_INV_RANGE, m4u_base + REG_MMU_INVLD);
-> > +
-> > +               while (!readl(m4u_base + REG_MMU_CPE_DONE)) {
-> > +                       end = sched_clock();
-> > +                       if (end - start >= 100000000ULL) {
-> 
-> Looks like a very interesting magic number. Please define a macro and
-> use normal time units along with ktime_to_<unit>() helpers.
-> 
-> > +                               dev_warn(piommu->dev, "invalid don't done\n");
-> > +                               writel(F_MMU_INV_ALL, m4u_base + REG_MMU_INVLD);
-> 
-> By following my comment above, you could just call the new invalidate
-> all function here instead of duplicating the same register write.
-[snip]
-> Best regards,
-> Tomasz
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
