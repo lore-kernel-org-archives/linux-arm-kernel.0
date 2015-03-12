@@ -1,43 +1,37 @@
-From: stsp@list.ru (Stas Sergeev)
-Date: Thu, 12 Mar 2015 15:44:44 +0300
-Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid crash
- on armada-xp
-In-Reply-To: <20150311193343.0317e3e1@free-electrons.com>
-References: <54FF21BE.2040506@list.ru>	<20150311175227.499612af@free-electrons.com>	<55007ADD.6080505@list.ru>	<20150311174618.GE8656@n2100.arm.linux.org.uk>	<55008483.8050603@list.ru>
- <20150311193343.0317e3e1@free-electrons.com>
-Message-ID: <55018A3C.7020409@list.ru>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 12 Mar 2015 13:45:02 +0100
+Subject: [PATCH v2 17/17] soc/tegra: remove lagacy powergate APIs
+In-Reply-To: <1426162518-7405-18-git-send-email-vinceh@nvidia.com>
+References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>
+ <1426162518-7405-18-git-send-email-vinceh@nvidia.com>
+Message-ID: <20150312124501.GA632@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-11.03.2015 21:33, Thomas Petazzoni ?????:
-> Dear Stas Sergeev,
->
-> On Wed, 11 Mar 2015 21:08:03 +0300, Stas Sergeev wrote:
->
->> mem=0xc0000000 seems to work!
->> 0xd0000000 or 0xe0000000 do not.
->> OK, so 3Gb instead of 8... but at least it boots! :)
-> What is the value of the register 0xf1020254 ?
-Hello Thomas, I haven't got to look into that register:
-uboot is updated to v2011.12-2014_T2.0 and everything
-is working! So thanks once again.
-The only problem I now have is the lack of 256Mb of
-ram.
+On Thu, Mar 12, 2015 at 08:15:18PM +0800, Vince Hsu wrote:
+> We switch to generic power domain now. So remove the legacy functions.
+> 
+> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+> ---
+>  drivers/soc/tegra/pmc.c | 68 -------------------------------------------------
+>  include/soc/tegra/pmc.h | 22 ----------------
+>  2 files changed, 90 deletions(-)
 
-[    0.000000] MEMBLOCK
-configuration:                                         
-[    0.000000]  memory size = 0x1f0000000 reserved size =
-0x70d6e3             
-[    0.000000]  memory.cnt  =
-0x2                                              
-[    0.000000]  memory[0x0]     [0x00000000000000-0x000000efffffff],
-0xf0000000
-bytes flags:
-0x0                                                               
-[    0.000000]  memory[0x1]     [0x00000100000000-0x000001ffffffff],
-0x100000000
- bytes flags: 0x0 
+I don't think we can do this. What if somebody updates their kernel but
+not the DTB? In that case they'll end up with drivers that don't enable
+power partitions but at the same time the powergate driver won't enable
+them either because it is missing the corresponding nodes in the DTB.
 
-There is a 8Gb in a single dimm.
-Do you have any idea why 0xf0000000-0xffffffff range is missing?
-I suspect this is something with uboot too.
+What we'll have to do is probably keep the code that enables the power
+partitions and make it conditional on the power domains somehow. Is
+there a way to determine at runtime whether a device has been attached
+to a power domain?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150312/c7f4acbc/attachment.sig>
