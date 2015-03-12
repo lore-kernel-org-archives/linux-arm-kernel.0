@@ -1,89 +1,45 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 12 Mar 2015 21:44:07 +0800
-Subject: [PATCH v6 09/30] PCI: Separate pci_host_bridge creation out of
- pci_create_root_bus()
-In-Reply-To: <20150312035202.GL10949@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-10-git-send-email-wangyijing@huawei.com>
- <20150312035202.GL10949@google.com>
-Message-ID: <55019827.2060803@huawei.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 12 Mar 2015 14:55:54 +0100
+Subject: [PATCH] n_tty: use kmalloc() instead of vmalloc() to avoid
+ crash on armada-xp
+In-Reply-To: <55018E8B.8060704@list.ru>
+References: <54FF21BE.2040506@list.ru>
+ <20150311175227.499612af@free-electrons.com>
+ <55007ADD.6080505@list.ru>
+ <20150311174618.GE8656@n2100.arm.linux.org.uk>
+ <55008483.8050603@list.ru>
+ <20150311193343.0317e3e1@free-electrons.com>
+ <55018A3C.7020409@list.ru>
+ <20150312134756.5335cb32@free-electrons.com>
+ <55018E8B.8060704@list.ru>
+Message-ID: <20150312145554.72a6b09d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +	host = kzalloc(sizeof(*host), GFP_KERNEL);
->> +	if (!host)
->> +		return NULL;
->> +
->> +	host->busnum = bus;
->> +	host->domain = domain;
->> +	/* If support CONFIG_PCI_DOMAINS_GENERIC, use
->> +	 * pci_host_assign_domain_nr() to assign domain
->> +	 * number instead PCI_DOMAIN(db).
->> +	 */
-> 
-> Follow the normal Linux comment style:
-> 
-> 	host->domain = domain;
-> 
-> 	/*
-> 	 * If we support ...
-> 	 */
+Dear Stas Sergeev,
 
-OK.
+On Thu, 12 Mar 2015 16:03:07 +0300, Stas Sergeev wrote:
 
-> 
->> +	pci_host_assign_domain_nr(host);
->> +
-...
->>  
->> +struct pci_host_bridge *pci_create_host_bridge(
->> +		struct device *parent, u32 dombus, struct list_head *resources);
->> +void pci_free_host_bridge(struct pci_host_bridge *host);
-> 
-> A later patch adds another declaration and a blank line here.  If you want
-> the blank line, add it here, when you're adding the first declarations in
-> this section.
+> > No, this is expected. Your physical address space is shared between RAM
+> > and I/O devices. So the space 0xf0000000 -> 0xffffffff in the physical
+> > address space is where all the registers for your SoC and PCIe devices
+> Yeah, I realize that, but I was hoping that some work-around
+> exists. For example, move entire dimm above 4G? Is this really
+> impossible? Or maybe move overlapping region above 8G...
 
-OK.
+I am not aware of any trick that would allow to do that, but I have
+also never looked in the deep details of the Marvell memory controller
+and what's possible to do with it.
 
-> 
->>  #endif /* DRIVERS_PCI_H */
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index 3d6befd..27ec612 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -503,31 +503,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
->>  	return b;
->>  }
-...
->>  struct pci_host_bridge {
->>  	u16	domain;
->> +	u16 busnum;
-> 
-> Why do we need this?  host_bridge->bus->number and
-> host_bridge->bus->busn_res.start both already contain the same information,
-> and I hate to add a third place.  I know pci_create_host_bridge() doesn't
-> have a struct pci_bus at the point where you initialize busnum, but it does
-> have the resource list, which contains the bus number range.
+Moving entire DIMM above 4G is clearly not possible: devices can only
+do DMA on the first 32 bits of the physical address space. So if you
+move all the physical memory above 4G, you don't have any memory left
+for DMA.
 
-Hmm, I will try to remove it, I put it here because when call pci_create_root_bus(),
-I could only pass the pci_host_bridge_ops, don't need to provide the bus number,
-pci_scan_root_bus() may lack the bus number resource at that time.
-But I think fix it is not a hard job, I will rework it, thanks.
+Best regards,
 
-
-> 
->>  	struct device dev;
->>  	struct pci_bus *bus;		/* root bus */
->>  	struct list_head windows;	/* resource_entry */
->> -- 
->> 1.7.1
->>
-> 
-> .
-> 
-
-
+Thomas
 -- 
-Thanks!
-Yijing
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
