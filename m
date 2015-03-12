@@ -1,59 +1,30 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Mar 2015 18:38:09 +0100
-Subject: [RFT/RFC PATCH 3/6] ARM: add macro to perform far branches (b/bl)
+Date: Thu, 12 Mar 2015 18:38:10 +0100
+Subject: [RFT/RFC PATCH 4/6] ARM: use bl_far to call
+ __hyp_stub_install_secondary from the .data section
 In-Reply-To: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426181892-15440-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1426181892-15440-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros execute PC-relative branches, but with a larger
-reach than the 24 bits that are available in the b and bl opcodes.
-
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/assembler.h | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/kernel/sleep.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index f67fd3afebdf..bd08c3c1b73f 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -108,6 +108,35 @@
- 	.endm
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index e1e60e5a7a27..0ea3813fedce 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -128,7 +128,7 @@ ENDPROC(cpu_resume_after_mmu)
+ ENTRY(cpu_resume)
+ ARM_BE8(setend be)			@ ensure we are in BE mode
+ #ifdef CONFIG_ARM_VIRT_EXT
+-	bl	__hyp_stub_install_secondary
++	bl_far	__hyp_stub_install_secondary
  #endif
- 
-+	/*
-+	 * Macros to emit relative branches that may exceed the range
-+	 * of the 24-bit immediate of the ordinary b/bl instructions.
-+	 * NOTE: this doesn't work with locally defined symbols, as they
-+	 * might lack the ARM/Thumb annotation (even if they are annotated
-+	 * as functions)
-+	 */
-+	.macro  b_far, target, tmpreg
-+#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
-+ ARM(	movt	\tmpreg, #:upper16:(\target - (8888f + 8))	)
-+ ARM(	movw	\tmpreg, #:lower16:(\target - (8888f + 8))	)
-+ THUMB(	movt    \tmpreg, #:upper16:(\target - (8888f + 4))	)
-+ THUMB(	movw	\tmpreg, #:lower16:(\target - (8888f + 4))	)
-+8888:	add	pc, pc, \tmpreg
-+#else
-+	ldr	\tmpreg, 8889f
-+8888:	add	pc, pc, \tmpreg
-+	.align 	2
-+8889:
-+ ARM(	.word   \target - (8888b + 8)           )
-+#endif
-+	.endm
-+
-+	.macro	bl_far, target, tmpreg=ip
-+	adr	lr, 8887f
-+	b_far	\target, \tmpreg
-+8887:
-+	.endm
-+
- 	.macro asm_trace_hardirqs_off
- #if defined(CONFIG_TRACE_IRQFLAGS)
- 	stmdb   sp!, {r0-r3, ip, lr}
+ 	safe_svcmode_maskall r1
+ 	mov	r1, #0
 -- 
 1.8.3.2
