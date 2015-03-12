@@ -1,44 +1,36 @@
 From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 12 Mar 2015 14:37:07 +0100
-Subject: [PATCH v2 RESEND 0/4] Fix power domains handling on exynos542x
-Message-ID: <1426167431-24470-1-git-send-email-a.hajda@samsung.com>
+Date: Thu, 12 Mar 2015 14:37:08 +0100
+Subject: [PATCH v2 RESEND 1/4] arm/exynos: add asynchronous bridge clock
+ bindings
+In-Reply-To: <1426167431-24470-1-git-send-email-a.hajda@samsung.com>
+References: <1426167431-24470-1-git-send-email-a.hajda@samsung.com>
+Message-ID: <1426167431-24470-2-git-send-email-a.hajda@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
+The patch adds bindings for clocks required by async-bridges
+present in the particular power domain.
 
-This is resend of my patchset with added (Reviewed|Tested)-by tags and removed RFC
-prefix.
+Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Exynos chipsets since 542x have asynchronous bridges connecting different IPs.
-These bridges should be operational during power domain switching, ie associated
-clocks cannot be gated.
-This patchset adds binding to provide such clocks per power domain and adds code
-which enables them during domain on/off operation.
-
-This patchset fixes power domain issues with disp1 domain and HDMI (some of them)
-on Odroid XU3:
-- disp1 power domain can be turned off,
-- no more "imprecise external abort" faults.
-
-The patchset is based on samsung-fixes-dt tag from kgene/linux-samsung.
-
-It was successfully tested on OdroidXU3.
-
-Regards
-Andrzej
-
-
-Andrzej Hajda (4):
-  arm/exynos: add asynchronous bridge clock bindings
-  arm/exynos/pm_domains: add support for async-bridge clocks
-  ARM: dts: exynos5420: add async-bridge clocks to disp1 power domain
-  ARM: dts: exynos5420: add async-bridge clocks to gsc power domain
-
- .../bindings/arm/exynos/power_domain.txt           |  3 +++
- arch/arm/boot/dts/exynos5420.dtsi                  |  8 +++++--
- arch/arm/mach-exynos/pm_domains.c                  | 27 ++++++++++++++++++----
- 3 files changed, 32 insertions(+), 6 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index 1e09703..5da38c5 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -22,6 +22,9 @@ Optional Properties:
+ 	- pclkN, clkN: Pairs of parent of input clock and input clock to the
+ 		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+ 		are supported currently.
++	- asbN: Clocks required by asynchronous bridges (ASB) present in
++		the power domain. These clock should be enabled during power
++		domain on/off operations.
+ - power-domains: phandle pointing to the parent power domain, for more details
+ 		 see Documentation/devicetree/bindings/power/power_domain.txt
+ 
 -- 
 1.9.1
