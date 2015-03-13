@@ -1,28 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 16:36:06 +0100
-Subject: [PATCH 5/9] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <20150313152843.GP8656@n2100.arm.linux.org.uk>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <2439386.JhP59gsGzr@wuerfel> <20150313152843.GP8656@n2100.arm.linux.org.uk>
-Message-ID: <62638459.PRFbbMQpY2@wuerfel>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 13 Mar 2015 16:43:40 +0100
+Subject: [PATCH 0/9] PM / Domains: Don't leave unused PM domains powered after
+ ->probe()
+Message-ID: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015 15:28:43 Russell King - ARM Linux wrote:
-> On Fri, Mar 13, 2015 at 04:08:31PM +0100, Arnd Bergmann wrote:
-> > I think the easiest and cleanest way would be to let that case not
-> > happen. Adding the reset controller core makes the kernel about 2kb
-> > larger, but in most multiplatform configurations, you get it already.
-> 
-> Well, I personally hate selecting visible Kconfig symbols.  It's
-> against my religion.
-> 
+Commit "PM / Domains: Power on the PM domain right after attach completes",
+helped to make sure a PM domain stays powered during ->probe(), but unfurtunate
+it also caused a regression.
 
-I know what you mean. I already created a patch for this:
- 
-https://lkml.org/lkml/2015/2/24/317
+In those scenario where the driver leaves its device in runtime PM suspended
+state, and don't bring it to active state during ->probe(), could cause an
+unsued PM domain to stay powered.
 
-Need to dig that out again and address the comments I got.
+The intent from this patchset, is to fix this regression and to rework the
+solution of how to make sure PM domains stays powered during ->probe().
 
-	Arnd
+This patchset is a rebased version of the below earlier posted patchset.
+[PATCH v3 0/9] PM / Domains: Fix race conditions during boot
+
+You may find that patchset from here:
+http://marc.info/?l=linux-pm&m=141320895122707&w=2
+
+>From that patchset, there is a "scenario 5" described, which actually is a more
+detailed description the regression commit "PM / Domains: Power on the PM domain
+right after attach completes" was about to introduce.
+
+
+Ulf Hansson (9):
+  PM / Domains: Add dev_pm_domain_get|put() APIs
+  PM / Domains: Enable genpd to support ->get|put() callbacks
+  amba: Keep PM domain powered during ->probe()
+  drivercore / platform: Keep PM domain powered during ->probe()
+  i2c: core: Keep PM domain powered during ->probe()
+  spi: core: Keep PM domain powered during ->probe()
+  mmc: core: Attach PM domain prior probing of SDIO func driver
+  mmmc: core: Keep PM domain powered during ->probe() of SDIO func
+    driver
+  Revert "PM / Domains: Power on the PM domain right after attach
+    completes"
+
+ drivers/amba/bus.c          |  8 ++++++++
+ drivers/base/platform.c     |  7 +++++++
+ drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
+ drivers/base/power/domain.c | 27 +++++++++++++++++++++++++--
+ drivers/i2c/i2c-core.c      |  7 +++++++
+ drivers/mmc/core/sdio_bus.c | 21 +++++++++++++++++----
+ drivers/spi/spi.c           |  7 +++++++
+ include/linux/pm.h          |  2 ++
+ include/linux/pm_domain.h   |  5 +++++
+ 9 files changed, 118 insertions(+), 6 deletions(-)
+
+-- 
+1.9.1
