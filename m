@@ -1,58 +1,65 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 13 Mar 2015 00:44:43 -0400
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <20141205111455.GC28339@e104818-lin.cambridge.arm.com>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <CAOesGMhv+0_SZb2eSiwCGaD77hd=a6EhMp6tVvcrZoBnrHKQjA@mail.gmail.com>
- <20141205111455.GC28339@e104818-lin.cambridge.arm.com>
-Message-ID: <55026B3B.8050507@redhat.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Mar 2015 12:48:01 +0800
+Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System Control
+ Module (MSCM)
+In-Reply-To: <59b0d98827cb4e7497de81e1c0826964@agner.ch>
+References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
+ <1425249689-32354-4-git-send-email-stefan@agner.ch>
+ <20150311004812.GU20455@dragon>
+ <59b0d98827cb4e7497de81e1c0826964@agner.ch>
+Message-ID: <20150313044759.GQ20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2014 06:14 AM, Catalin Marinas wrote:
-> On Thu, Dec 04, 2014 at 09:15:12PM +0000, Olof Johansson wrote:
->> On Thu, Dec 4, 2014 at 7:46 AM, Alexander Graf <agraf@suse.de> wrote:
->>> With binutils 2.25 the default alignment for 32bit arm sections changed to
->>> have everything 64k aligned. Armv7 binaries built with this binutils version
->>> run successfully on an arm64 system.
->>>
->>> Since effectively there is now the chance to run armv7 code on arm64 even
->>> with 64k page size, it doesn't make sense to block people from enabling
->>> CONFIG_COMPAT on those configurations.
->>>
->>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>> ---
->>>  arch/arm64/Kconfig | 1 -
->>>  1 file changed, 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 9532f8d..3cf4f238 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -409,7 +409,6 @@ source "fs/Kconfig.binfmt"
->>>
->>>  config COMPAT
->>>         bool "Kernel support for 32-bit EL0"
->>> -       depends on !ARM64_64K_PAGES
->>>         select COMPAT_BINFMT_ELF
->>>         select HAVE_UID16
->>>         select OLD_SIGSUSPEND3
->>
->> This is hardly "compat". Sure, it's great to have a new binutils that
->> has larger alignment, but practically not a single existing binary
->> will work today if someone tries to do this.
->>
->> So, it seems very premature to take this off. At the very least
->> document it like Will requested, and make it depend on !ARM_64K_PAGES
->> || EXPERT.
+On Thu, Mar 12, 2015 at 10:03:08AM +0100, Stefan Agner wrote:
+> On 2015-03-11 01:48, Shawn Guo wrote:
+> > On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
+> >> Add the Miscellaneous System Control Module (MSCM) to the base
+> >> device tree for Vybrid SoC's. This module contains registers
+> >> to get information of the individual and current (accessing)
+> >> CPU. In a second block, there is an interrupt router, which
+> >> handles the routing of the interrupts between the two CPU cores
+> >> on VF6xx variants of the SoC. However, also on single core
+> >> variants the interrupt router needs to be configured in order
+> >> to receive interrupts on the CPU's interrupt controller. Almost
+> >> all peripheral interrupts are routed through the router, hence
+> >> the MSCM module is the default interrupt parent for this SoC.
+> >>
+> >> In a earlier commit the interrupt nodes were moved out of the
+> >> peripheral nodes and specified in the CPU specific vf500.dtsi
+> >> device tree. This allowed to use the base device tree vfxxx.dtsi
+> >> also for a Cortex-M4 specific device tree, which uses different
+> >> interrupt nodes due to the NVIC interrupt controller. However,
+> >> since the interrupt parent for peripherals is the MSCM module
+> >> independently which CPU the device tree is used for, we can move
+> >> the interrupt nodes into the base device tree vfxxx.dtsi again.
+> >> Depending on which CPU this base device tree will be used with,
+> >> the correct parent interrupt controller has to be assigned to
+> >> the MSCM-IR node (GIC or NVIC). The driver takes care of the
+> >> parent interrupt controller specific needs (interrupt-cells).
+> >>
+> >> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > 
+> > Stefan,
+> > 
+> > I guess this patch has a run-time dependency on the first two in the
+> > series, right?  Or put it another way, if I apply this single patch on
+> > my branch, the dtb and kernel built from the same branch do not work
+> > together, right?  If so, we will need to either wait for the first two
+> > hit mainline or pull Jason's irqchip/vybrid branch into my tree as
+> > prerequisite (irqchip/vybrid needs to be stable).
+> > 
+> > Shawn
 > 
-> That would work for me. We need to be clear that most existing 32-bit
-> binaries will fail.
+> Yes, that is true. The driver need to be in place in order to
+> successfully boot with the new device tree.
 
-Agreed. Btw we intend to ensure that a future Fedora mass rebuild
-incorporates this change in alignment on 32-bit to allow 32-bit Fedora
-userspace to exist inside a (32-bit personality) chroot on AArch64. This
-will allow us to migrate to 64-bit native builders both for 32 and
-64-bit in advance of the eventual plan for KVM based build guests.
+Okay.  Pulled Jason's irqchip/vybrid branch in, and applied the patch.
 
-Jon.
+Stefan,
+
+There was a conflict on device dspi1 when applying the patch to my
+imx/dt branch.  Please take a look to see if I solved it correctly.
+
+Shawn
