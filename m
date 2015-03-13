@@ -1,87 +1,228 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Fri, 13 Mar 2015 12:15:54 +0200
-Subject: [PATCH v3 3/5] i2c: recovery: change input parameter to
- i2c_adapter for prepare/unprepare_recovery
-In-Reply-To: <55017943.6040603@nokia.com>
-References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
- <1417448047-15236-4-git-send-email-grygorii.strashko@ti.com>
- <55017943.6040603@nokia.com>
-Message-ID: <5502B8DA.70504@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 13 Mar 2015 11:17:01 +0100
+Subject: [PATCH v5 08/10] clocksource: atmel-st: use syscon/regmap
+In-Reply-To: <1426162054-9987-9-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426162054-9987-9-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <5502B91D.4050002@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+On 03/12/2015 01:07 PM, Alexandre Belloni wrote:
+> The register range from the system timer is also used by the watchdog driver.
+> Use a regmap to handle concurrent accesses.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-On 03/12/2015 01:32 PM, Alexander Sverdlin wrote:
-> On 01/12/14 16:34, Grygorii Strashko wrote:
->> This patch changes type of input parameter for .prepare/unprepare_recovery()
->> callbacks from struct i2c_bus_recovery_info * to struct i2c_adapter *.
->> This allows to simplify implementation of these callbacks and avoid
->> type conversations from i2c_bus_recovery_info to i2c_adapter.
->> The i2c_bus_recovery_info can be simply retrieved from struct i2c_adapter
->> which contains pointer on it.
->>
->> CC: Sekhar Nori <nsekhar@ti.com>
->> CC: Kevin Hilman <khilman@deeprootsystems.com>
->> CC: Santosh Shilimkar <ssantosh@kernel.org>
->> CC: Murali Karicheri <m-karicheri2@ti.com>
->> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> ---
->>   drivers/i2c/i2c-core.c | 4 ++--
->>   include/linux/i2c.h    | 4 ++--
->>   2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
->> index 2f90ac6..72b6e34 100644
->> --- a/drivers/i2c/i2c-core.c
->> +++ b/drivers/i2c/i2c-core.c
->> @@ -563,7 +563,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
->>   	int i = 0, val = 1, ret = 0;
->>   
->>   	if (bri->prepare_recovery)
->> -		bri->prepare_recovery(bri);
->> +		bri->prepare_recovery(adap);
->>   
->>   	/*
->>   	 * By this time SCL is high, as we need to give 9 falling-rising edges
->> @@ -588,7 +588,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
->>   	}
->>   
->>   	if (bri->unprepare_recovery)
->> -		bri->unprepare_recovery(bri);
->> +		bri->unprepare_recovery(adap);
->>   
->>   	return ret;
->>   }
->> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
->> index b556e0a..cf9380f 100644
->> --- a/include/linux/i2c.h
->> +++ b/include/linux/i2c.h
->> @@ -404,8 +404,8 @@ struct i2c_bus_recovery_info {
->>   	void (*set_scl)(struct i2c_adapter *, int val);
->>   	int (*get_sda)(struct i2c_adapter *);
->>   
->> -	void (*prepare_recovery)(struct i2c_bus_recovery_info *bri);
->> -	void (*unprepare_recovery)(struct i2c_bus_recovery_info *bri);
->> +	void (*prepare_recovery)(struct i2c_adapter *);
->> +	void (*unprepare_recovery)(struct i2c_adapter *);
->>   
->>   	/* gpio recovery */
->>   	int scl_gpio;
->>
-> 
-> Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> 
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Could I ask you to consider this patch for 4.1?
-Now my I2C Davinci series is based on it and probably I2C OMAP changes
-will need to be based on it too - if Felipe would agree with this of course.
-
-regards,
--grygorii
+> ---
+>   drivers/clocksource/timer-atmel-st.c | 94 ++++++++++++++----------------------
+>   1 file changed, 35 insertions(+), 59 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+> index 7d062ab32674..674ef2519d6b 100644
+> --- a/drivers/clocksource/timer-atmel-st.c
+> +++ b/drivers/clocksource/timer-atmel-st.c
+> @@ -24,18 +24,19 @@
+>   #include <linux/irq.h>
+>   #include <linux/clockchips.h>
+>   #include <linux/export.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/atmel-st.h>
+>   #include <linux/of_irq.h>
+> +#include <linux/regmap.h>
+>
+>   #include <asm/mach/time.h>
+>
+> -#include <mach/at91_st.h>
+>   #include <mach/hardware.h>
+>
+>   static unsigned long last_crtr;
+>   static u32 irqmask;
+>   static struct clock_event_device clkevt;
+> +static struct regmap *regmap_st;
+>
+>   #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
+>
+> @@ -46,11 +47,11 @@ static struct clock_event_device clkevt;
+>    */
+>   static inline unsigned long read_CRTR(void)
+>   {
+> -	unsigned long x1, x2;
+> +	unsigned int x1, x2;
+>
+> -	x1 = at91_st_read(AT91_ST_CRTR);
+> +	regmap_read(regmap_st, AT91_ST_CRTR, &x1);
+>   	do {
+> -		x2 = at91_st_read(AT91_ST_CRTR);
+> +		regmap_read(regmap_st, AT91_ST_CRTR, &x2);
+>   		if (x1 == x2)
+>   			break;
+>   		x1 = x2;
+> @@ -63,7 +64,10 @@ static inline unsigned long read_CRTR(void)
+>    */
+>   static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+>   {
+> -	u32	sr = at91_st_read(AT91_ST_SR) & irqmask;
+> +	u32 sr;
+> +
+> +	regmap_read(regmap_st, AT91_ST_SR, &sr);
+> +	sr &= irqmask;
+>
+>   	/*
+>   	 * irqs should be disabled here, but as the irq is shared they are only
+> @@ -115,23 +119,25 @@ static struct clocksource clk32k = {
+>   static void
+>   clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>   {
+> +	unsigned int val;
+> +
+>   	/* Disable and flush pending timer interrupts */
+> -	at91_st_write(AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_write(regmap_st, AT91_ST_IDR, AT91_ST_PITS | AT91_ST_ALMS);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+>
+>   	last_crtr = read_CRTR();
+>   	switch (mode) {
+>   	case CLOCK_EVT_MODE_PERIODIC:
+>   		/* PIT for periodic irqs; fixed rate of 1/HZ */
+>   		irqmask = AT91_ST_PITS;
+> -		at91_st_write(AT91_ST_PIMR, RM9200_TIMER_LATCH);
+> +		regmap_write(regmap_st, AT91_ST_PIMR, RM9200_TIMER_LATCH);
+>   		break;
+>   	case CLOCK_EVT_MODE_ONESHOT:
+>   		/* ALM for oneshot irqs, set by next_event()
+>   		 * before 32 seconds have passed
+>   		 */
+>   		irqmask = AT91_ST_ALMS;
+> -		at91_st_write(AT91_ST_RTAR, last_crtr);
+> +		regmap_write(regmap_st, AT91_ST_RTAR, last_crtr);
+>   		break;
+>   	case CLOCK_EVT_MODE_SHUTDOWN:
+>   	case CLOCK_EVT_MODE_UNUSED:
+> @@ -139,7 +145,7 @@ clkevt32k_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>   		irqmask = 0;
+>   		break;
+>   	}
+> -	at91_st_write(AT91_ST_IER, irqmask);
+> +	regmap_write(regmap_st, AT91_ST_IER, irqmask);
+>   }
+>
+>   static int
+> @@ -147,6 +153,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+>   {
+>   	u32		alm;
+>   	int		status = 0;
+> +	unsigned int	val;
+>
+>   	BUG_ON(delta < 2);
+>
+> @@ -162,12 +169,12 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
+>   	alm = read_CRTR();
+>
+>   	/* Cancel any pending alarm; flush any pending IRQ */
+> -	at91_st_write(AT91_ST_RTAR, alm);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+>
+>   	/* Schedule alarm by writing RTAR. */
+>   	alm += delta;
+> -	at91_st_write(AT91_ST_RTAR, alm);
+> +	regmap_write(regmap_st, AT91_ST_RTAR, alm);
+>
+>   	return status;
+>   }
+> @@ -180,57 +187,26 @@ static struct clock_event_device clkevt = {
+>   	.set_mode	= clkevt32k_mode,
+>   };
+>
+> -void __iomem *at91_st_base;
+> -EXPORT_SYMBOL_GPL(at91_st_base);
+> -
+> -static const struct of_device_id at91rm9200_st_timer_ids[] = {
+> -	{ .compatible = "atmel,at91rm9200-st" },
+> -	{ /* sentinel */ }
+> -};
+> -
+> -static int __init of_at91rm9200_st_init(void)
+> -{
+> -	struct device_node *np;
+> -	int ret;
+> -
+> -	np = of_find_matching_node(NULL, at91rm9200_st_timer_ids);
+> -	if (!np)
+> -		goto err;
+> -
+> -	at91_st_base = of_iomap(np, 0);
+> -	if (!at91_st_base)
+> -		goto node_err;
+> -
+> -	/* Get the interrupts property */
+> -	ret = irq_of_parse_and_map(np, 0);
+> -	if (!ret)
+> -		goto ioremap_err;
+> -	at91rm9200_timer_irq.irq = ret;
+> -
+> -	of_node_put(np);
+> -
+> -	return 0;
+> -
+> -ioremap_err:
+> -	iounmap(at91_st_base);
+> -node_err:
+> -	of_node_put(np);
+> -err:
+> -	return -EINVAL;
+> -}
+> -
+>   /*
+>    * ST (system timer) module supports both clockevents and clocksource.
+>    */
+>   static void __init atmel_st_timer_init(struct device_node *node)
+>   {
+> -	/* For device tree enabled device: initialize here */
+> -	of_at91rm9200_st_init();
+> +	unsigned int val;
+> +
+> +	regmap_st = syscon_node_to_regmap(node);
+> +	if (IS_ERR(regmap_st))
+> +		panic(pr_fmt("Unable to get regmap\n"));
+>
+>   	/* Disable all timer interrupts, and clear any pending ones */
+> -	at91_st_write(AT91_ST_IDR,
+> +	regmap_write(regmap_st, AT91_ST_IDR,
+>   		AT91_ST_PITS | AT91_ST_WDOVF | AT91_ST_RTTINC | AT91_ST_ALMS);
+> -	at91_st_read(AT91_ST_SR);
+> +	regmap_read(regmap_st, AT91_ST_SR, &val);
+> +
+> +	/* Get the interrupts property */
+> +	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
+> +	if (!at91rm9200_timer_irq.irq)
+> +		panic(pr_fmt("Unable to get IRQ from DT\n"));
+>
+>   	/* Make IRQs happen for the system timer */
+>   	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
+> @@ -239,7 +215,7 @@ static void __init atmel_st_timer_init(struct device_node *node)
+>   	 * directly for the clocksource and all clockevents, after adjusting
+>   	 * its prescaler from the 1 Hz default.
+>   	 */
+> -	at91_st_write(AT91_ST_RTMR, 1);
+> +	regmap_write(regmap_st, AT91_ST_RTMR, 1);
+>
+>   	/* Setup timer clockevent, with minimum of two ticks (important!!) */
+>   	clkevt.cpumask = cpumask_of(0);
+>
 
 
 -- 
-regards,
--grygorii
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
