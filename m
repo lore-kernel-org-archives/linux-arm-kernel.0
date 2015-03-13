@@ -1,62 +1,80 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 13 Mar 2015 20:30:22 +0900
-Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
- errors
-In-Reply-To: <1426002490-2014-1-git-send-email-dianders@chromium.org>
-References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
-Message-ID: <5502CA4E.9060401@samsung.com>
+From: liviu@dudau.co.uk (Liviu Dudau)
+Date: Fri, 13 Mar 2015 11:31:56 +0000
+Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic pci
+ host bridge
+In-Reply-To: <20150312212306.GH7346@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <20150312212306.GH7346@google.com>
+Message-ID: <20150313113156.GA4739@bart.dudau.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Doug.
+On Thu, Mar 12, 2015 at 04:23:06PM -0500, Bjorn Helgaas wrote:
+> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
+> > ...
+> > Yijing Wang (29):
+> >   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
+> >   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
+> >   sparc/PCI: Claim bus resources before pci_bus_add_devices()
+> 
+> I put the above patches plus a cleanup patch on my pci/enumeration branch.
+> Please rebase your next revision to that.  If there's anything else
+> non-controversial that we can pull in to chip away at this, let me know.
 
-On 03/11/2015 12:48 AM, Doug Anderson wrote:
-> The dw_mmc driver enables HLE errors as part of DW_MCI_ERROR_FLAGS but
-> nothing in the interrupt handler actually handles them and ACKs them.
-> That means that if we ever get an HLE error we'll just keep getting
-> interrupts and we'll wedge things.
-> 
-> We really don't expect HLE errors but if we ever get them we shouldn't
-> silently ignore them.
-> 
-> Note that I have seen HLE errors while constantly ejecting and
-> inserting cards (ejecting while inserting, etc).
+Hi Bjorn and Yijing,
 
-Right, It is occurred when card inserting/ejecting.(This case is the case of removable card.)
-Did you test with eMMC? We needs to consider how control HLE error.
-But I think this patch can't solve all of HLE problem.
+Sorry for not providing feedback earlier on this series (or any previous ones),
+I'm just crawling out from under a rock of doing graphics drivers :)
 
-Best Regards,
-Jaehoon Chung
+The patch ripping out pci_bus_add_devices() from pci_scan_root_bus() misses out
+the users of that function from drivers/pci/host. If Yijing is going to refresh
+the series it is probably worth starting with adding back the call into pcie-xilinx.c
+and pci-versatile.c.
+
+Will try to review (and test) the rest of the series soon.
+
+Best regards,
+Liviu
 
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
-> Note that this works together with the patch I sent up yesterday (the
-> CMD 11 timer).  I would have sent the two together except that I had
-> local printouts (and ACKing of HLE) and didn't realize that this was
-> also required for a full solution.
+> >   PCI: Export busn_resource to drivers/pci
+> >   PCI: Remove deprecated pci_scan_bus_parented()
+> >   PCI: Combine PCI domain and bus number in u32 arg
+> >   PCI: Pass PCI domain number combined with root bus number
+> >   PCI: Introduce pci_host_assign_domain_nr() to assign domain
+> >   PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
+> >   PCI: Introduce pci_host_bridge_list to manage host bridges
+> >   PCI: Save sysdata in pci_host_bridge drvdata
+> >   PCI: Introduce pci_host_bridge_ops to support host specific
+> >     operations
+> >   PCI: Introduce new scan function pci_scan_host_bridge()
+> >   x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+> >   ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+> >   powerpc/pci: Rename pcibios_root_bridge_prepare()
+> >   powerpc/pci: Use pci_scan_host_bridge() for simplicity
+> >   PCI: Remove weak pcibios_root_bridge_prepare()
+> >   sparc/PCI: Use pci_scan_host_bridge() for simplicity
+> >   PCI: Introduce pci_bus_child_max_busnr()
+> >   parisc/PCI: Use pci_scan_root_bus() for simplicity
+> >   PCI/mvebu: Use pci_common_init_dev() to simplify code
+> >   PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+> >   PCI/designware: Use pci_scan_root_bus() for simplicity
+> >   PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
+> >   PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
+> >   PCI: Export find_pci_host_bridge() and rename to
+> >     pci_find_host_bridge()
+> >   PCI: Remove platform specific pci_domain_nr()
+> >   PCI: Remove pci_bus_assign_domain_nr()
 > 
->  drivers/mmc/host/dw_mmc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 47dfd0e..294edc9c 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -44,11 +44,11 @@
->  /* Common flag combinations */
->  #define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | \
->  				 SDMMC_INT_HTO | SDMMC_INT_SBE  | \
-> -				 SDMMC_INT_EBE)
-> +				 SDMMC_INT_EBE | SDMMC_INT_HLE)
->  #define DW_MCI_CMD_ERROR_FLAGS	(SDMMC_INT_RTO | SDMMC_INT_RCRC | \
-> -				 SDMMC_INT_RESP_ERR)
-> +				 SDMMC_INT_RESP_ERR | SDMMC_INT_HLE)
->  #define DW_MCI_ERROR_FLAGS	(DW_MCI_DATA_ERROR_FLAGS | \
-> -				 DW_MCI_CMD_ERROR_FLAGS  | SDMMC_INT_HLE)
-> +				 DW_MCI_CMD_ERROR_FLAGS)
->  #define DW_MCI_SEND_STATUS	1
->  #define DW_MCI_RECV_STATUS	2
->  #define DW_MCI_DMA_THRESHOLD	16
-> 
+
+-- 
+-------------------
+   .oooO
+   (   )
+    \ (  Oooo.
+     \_) (   )
+          ) /
+         (_/
+
+ One small step
+   for me ...
