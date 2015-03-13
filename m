@@ -1,33 +1,35 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Mar 2015 22:31:09 +0100
-Subject: [PATCH 0/6] ARM: cpuidle: Unify the ARM64/ARM DT approach
-In-Reply-To: <CAL_Jsq+HSE997h4CtM-hM29t5Yhrkc0ikkfJDOUhHf3JTH-g4w@mail.gmail.com>
-References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
- <5501A1DE.9020804@linaro.org>
- <CAL_Jsq+HSE997h4CtM-hM29t5Yhrkc0ikkfJDOUhHf3JTH-g4w@mail.gmail.com>
-Message-ID: <5503571D.9000703@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 13 Mar 2015 22:57:19 +0100
+Subject: [PATCH v3 2/7] ARM: at91: switch at91_dt_defconfig to multiplatform
+In-Reply-To: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426283844-463-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2015 09:51 PM, Rob Herring wrote:
-> On Thu, Mar 12, 2015 at 9:25 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->>
->> Catalin, Rob,
->>
->> do you agree with this patchset ?
->
-> There's very little to do with DT, but looks fine to me.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/configs/at91_dt_defconfig | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Shall I consider as a acked-by for the entire patchset or only the DT part ?
-
-Thanks for taking the time to look at the patches.
-
-   -- Daniel
-
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 811e72bbe642..bcef49a21801 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -13,10 +13,13 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_MULTI_V4T=y
++CONFIG_ARCH_MULTI_V5=y
++# CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_AT91=y
++CONFIG_SOC_SAM_V4_V5=y
+ CONFIG_SOC_AT91RM9200=y
+ CONFIG_SOC_AT91SAM9=y
+-CONFIG_AT91_TIMER_HZ=128
+ CONFIG_AEABI=y
+ CONFIG_UACCESS_WITH_MEMCPY=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.0
