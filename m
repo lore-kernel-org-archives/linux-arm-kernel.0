@@ -1,79 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Mar 2015 17:49:30 +0000
-Subject: [PATCH v6 0/7] irqchip: Move OMAP{4,
- 5}/DRA7 to use stacked domains
-In-Reply-To: <20150313173823.GM5264@atomide.com>
-References: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
- <20150313154039.GL5264@atomide.com>
- <20150313172535.GM21998@io.lakedaemon.net>
- <20150313173823.GM5264@atomide.com>
-Message-ID: <5503232A.4070408@arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 13 Mar 2015 23:19:47 +0530
+Subject: [PATCH 1/6] i2c: qup: Change qup_wait_writeready function to use for
+ all timeouts
+In-Reply-To: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1426268992-19298-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/15 17:38, Tony Lindgren wrote:
-> * Jason Cooper <jason@lakedaemon.net> [150313 10:25]:
->> Hey Tony,
->>
->> On Fri, Mar 13, 2015 at 08:40:39AM -0700, Tony Lindgren wrote:
->>> * Marc Zyngier <marc.zyngier@arm.com> [150311 08:44]:
->>>> This series is extracted from [4], which is trying to remove all
->>>> traces of gic_arch_extn from the tree. As some maintainers are more
->>>> responsive than others (understatement of the year...), I've decided
->>>> to split it per sub-arch, and get it moving, at least partially.
->>>>
->>>> This series addresses OMAP{4,5} by converting the WUGEN to stacked
->>>> domains. The DRA7 crossbar gets the same treatment.
->>> ...
->>>>
->>>>  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
->>>>  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
->>>>  .../interrupt-controller/ti,omap4-wugen-mpu        |  33 ++++
->>>>  arch/arm/boot/dts/am4372.dtsi                      |  11 +-
->>>>  arch/arm/boot/dts/am437x-gp-evm.dts                |   1 -
->>>>  arch/arm/boot/dts/am437x-sk-evm.dts                |   1 -
->>>>  arch/arm/boot/dts/am43x-epos-evm.dts               |   1 -
->>>>  arch/arm/boot/dts/am57xx-beagle-x15.dts            |   3 +-
->>>>  arch/arm/boot/dts/dra7-evm.dts                     |   2 +-
->>>>  arch/arm/boot/dts/dra7.dtsi                        |  43 +++--
->>>>  arch/arm/boot/dts/dra72-evm.dts                    |   1 -
->>>>  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
->>>>  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
->>>>  arch/arm/boot/dts/omap4-duovero.dtsi               |   2 -
->>>>  arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
->>>>  arch/arm/boot/dts/omap4-sdp.dts                    |   8 +-
->>>>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   2 -
->>>>  arch/arm/boot/dts/omap4.dtsi                       |  18 +-
->>>>  arch/arm/boot/dts/omap5-cm-t54.dts                 |   1 -
->>>>  arch/arm/boot/dts/omap5-uevm.dts                   |   2 -
->>>>  arch/arm/boot/dts/omap5.dtsi                       |  26 ++-
->>>>  arch/arm/mach-omap2/omap-wakeupgen.c               | 128 ++++++++++---
->>>>  arch/arm/mach-omap2/omap-wakeupgen.h               |   1 -
->>>>  arch/arm/mach-omap2/omap4-common.c                 |  27 +--
->>>>  drivers/irqchip/irq-crossbar.c                     | 210 ++++++++++++---------
->>>>  drivers/irqchip/irq-gic.c                          |  59 +-----
->>>>  include/linux/irq.h                                |   1 +
->>>>  include/linux/irqchip/arm-gic.h                    |   6 -
->>>>  include/linux/irqchip/irq-crossbar.h               |  11 --
->>>>  kernel/irq/chip.c                                  |  16 ++
->>>>  30 files changed, 376 insertions(+), 278 deletions(-)
->>>>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
->>>>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
->>>
->>> For merging this, how about Marc sets up an immutable branch against
->>> v4.0-rc1 that both Jason and I can merge it in? Then Jason can
->>> send the pull request I can sort out the merge conflict issues.
->>
->> If you don't mind, I'll create the branch.  I tend to fixup some nitpicks when
->> I apply patches for irqchip.  If there are any nits you'd like me to fix while
->> I'm applying, just let me know.
-> 
-> That works for me thanks as long as it works for Marc.
+qup_wait_writeready waits only on a output fifo empty event.
+Change the same function to accept the event and data length
+to wait as parameters. This way the same function can be used for
+timeouts in otherplaces as well.
 
-Definitely works for me. I just want to get rid of these patches! ;-)
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ drivers/i2c/busses/i2c-qup.c | 30 +++++++++++++++++++++++-------
+ 1 file changed, 23 insertions(+), 7 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 4dad23b..49c6cba 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -221,26 +221,42 @@ static int qup_i2c_change_state(struct qup_i2c_dev *qup, u32 state)
+ 	return 0;
+ }
+ 
+-static int qup_i2c_wait_writeready(struct qup_i2c_dev *qup)
++/**
++ * qup_i2c_wait_ready - wait for a give number of bytes in tx/rx path
++ * @qup: The qup_i2c_dev device
++ * @op: The bit/event to wait on
++ * @val: value of the bit to wait on, 0 or 1
++ * @len: The length the bytes to be transferred
++ */
++static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
++			      int len)
+ {
+ 	unsigned long timeout;
+ 	u32 opflags;
+ 	u32 status;
++	u32 shift = __ffs(op);
+ 
+-	timeout = jiffies + HZ;
++	len *= qup->one_byte_t;
++	/* timeout after a wait of twice the max time */
++	timeout = jiffies + len * 4;
+ 
+ 	for (;;) {
+ 		opflags = readl(qup->base + QUP_OPERATIONAL);
+ 		status = readl(qup->base + QUP_I2C_STATUS);
+ 
+-		if (!(opflags & QUP_OUT_NOT_EMPTY) &&
+-		    !(status & I2C_STATUS_BUS_ACTIVE))
+-			return 0;
++		if (((opflags & op) >> shift) == val) {
++			if (op == QUP_OUT_NOT_EMPTY) {
++				if (!(status & I2C_STATUS_BUS_ACTIVE))
++					return 0;
++			} else {
++				return 0;
++			}
++		}
+ 
+ 		if (time_after(jiffies, timeout))
+ 			return -ETIMEDOUT;
+ 
+-		usleep_range(qup->one_byte_t, qup->one_byte_t * 2);
++		usleep_range(len, len * 2);
+ 	}
+ }
+ 
+@@ -347,7 +363,7 @@ static int qup_i2c_write_one(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+ 	} while (qup->pos < msg->len);
+ 
+ 	/* Wait for the outstanding data in the fifo to drain */
+-	ret = qup_i2c_wait_writeready(qup);
++	ret = qup_i2c_wait_ready(qup, QUP_OUT_NOT_EMPTY, 0, 1);
+ 
+ err:
+ 	disable_irq(qup->irq);
 -- 
-Jazz is not dead. It just smells funny...
+1.8.2.1
