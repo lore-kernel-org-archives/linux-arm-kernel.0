@@ -1,49 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Mar 2015 14:43:09 +0100
-Subject: [PATCH v2.0 0/2] ARM: AT91: pm: add support to disable the DDR's
- clock
-In-Reply-To: <1425873378-8253-1-git-send-email-wenyou.yang@atmel.com>
-References: <1425873378-8253-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <5502E96D.2050002@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 13 Mar 2015 14:40:16 +0100
+Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
+ support of the mvebu SoCs
+In-Reply-To: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150313134016.GV7311@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/03/2015 04:56, Wenyou Yang a ?crit :
-> Hi,
+On Fri, Mar 13, 2015 at 02:41:45PM +0100, Gregory CLEMENT wrote:
+> I will also take care of the legacy support(not fully converted to DT)
+> of the mvebu SoCs.
 > 
-> The patch series purpose is to disable the DDR controller's clock and DDR
-> system clock during the suspending to achieve the lower power consumption.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> It is based on the branch, at91-4.0-fixes
-> git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
-> 	+ [PATCH] ARM: at91: Add pm support for sama5d3 and sama5d4
-> 
-> Change log for v2.0
->  - rebase.
-> 
-> Wenyou Yang (2):
->   pm: at91: add the PM initialization for the sama5d3 and sama5d4
->   pm: at91: add support to disable/enable the DDR clock
-
-I still have to make up my mind with this series. I keep it out of my
-first cleanup pull-request for now.
-
-Let's keep on thinking about it...
-
-Bye,
-
-
->  arch/arm/mach-at91/generic.h              |    4 ++
->  arch/arm/mach-at91/include/mach/sama5d3.h |    1 +
->  arch/arm/mach-at91/include/mach/sama5d4.h |    5 ++
->  arch/arm/mach-at91/pm.c                   |   25 +++++++++
->  arch/arm/mach-at91/pm.h                   |    9 ++++
->  arch/arm/mach-at91/pm_suspend.S           |   83 +++++++++++++++++++++++++++++
->  arch/arm/mach-at91/sama5.c                |    8 ++-
->  include/linux/clk/at91_pmc.h              |    1 +
->  8 files changed, 135 insertions(+), 1 deletion(-)
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index ddc5a8cf9a8a..39b27f52e217 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
+>  M:	Jason Cooper <jason@lakedaemon.net>
+>  M:	Andrew Lunn <andrew@lunn.ch>
+>  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> +M:	Gregory Clement <gregory.clement@free-electrons.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  F:	arch/arm/mach-dove/
+> -- 
+> 2.1.0
 > 
 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
--- 
-Nicolas Ferre
+Thanks
+	Andrew
