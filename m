@@ -1,45 +1,17 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 14:51:51 +0100
-Subject: [PATCH 2/2] tty: serial: fsl_lpuart: clear receive flag on FIFO flush
-In-Reply-To: <1426254711-618-1-git-send-email-stefan@agner.ch>
-References: <1426254711-618-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426254711-618-2-git-send-email-stefan@agner.ch>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Mar 2015 21:53:39 +0800
+Subject: [PATCH v2 0/3] imx: add max7310 and usb support for imx6qdl
+ sabreauto
+In-Reply-To: <1426227704-26294-1-git-send-email-peter.chen@freescale.com>
+References: <1426227704-26294-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20150313135337.GX20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the receiver was enabled during startup, a character could
-have been in the FIFO when the UART get initially used. The
-driver configures the (receive) watermark level, and flushes the
-FIFO. However, the receive flag (RDRF) could still be set at that
-stage (as mentioned in the register description of UARTx_RWFIFO).
-This leads to an interrupt which won't be handled properly in
-interrupt mode: The receive interrupt function lpuart_rxint checks
-the FIFO count, which is 0 at that point (due to the flush
-during initialization). The problem does not manifest when using
-DMA to receive characters.
+On Fri, Mar 13, 2015 at 02:21:41PM +0800, Peter Chen wrote:
+> Peter Chen (3):
+>   ARM: imx6qdl-sabreauto.dtsi: add max7310 support
+>   ARM: imx6qdl-sabreauto.dtsi: enable USB support
+>   ARM: imx_v6_v7_defconfig: Add CONFIG_GPIO_PCA953X
 
-Fix this situation by explicitly read the status register, which
-leads to clearing of the RDRF flag. Due to the flush just after
-the status flag read, a explicit data read is not to required.
-
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/tty/serial/fsl_lpuart.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 7ec9110..3ad1458 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -921,6 +921,9 @@ static void lpuart_setup_watermark(struct lpuart_port *sport)
- 	writeb(val | UARTPFIFO_TXFE | UARTPFIFO_RXFE,
- 			sport->port.membase + UARTPFIFO);
- 
-+	/* explicitly clear RDRF */
-+	readb(sport->port.membase + UARTSR1);
-+
- 	/* flush Tx and Rx FIFO */
- 	writeb(UARTCFIFO_TXFLUSH | UARTCFIFO_RXFLUSH,
- 			sport->port.membase + UARTCFIFO);
--- 
-2.3.1
+Applied all, thanks.
