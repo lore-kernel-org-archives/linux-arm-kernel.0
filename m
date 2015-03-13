@@ -1,28 +1,50 @@
-From: sebastien.szymanski@armadeus.com (=?windows-1252?Q?S=E9bastien_Szymanski?=)
-Date: Fri, 13 Mar 2015 17:11:46 +0100
-Subject: [PATCH v6 0/6] wlcore: add device-tree support
-In-Reply-To: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
-Message-ID: <55030C42.6020206@armadeus.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 Mar 2015 16:10:03 +0000
+Subject: [PATCH 03/12] KVM: arm/arm64: remove now unneeded include directory
+ from Makefile
+In-Reply-To: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1426263012-22935-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+virt/kvm was never really a good include directory for anything else
+than locally included headers.
+With the move of iodev.h there is no need anymore to add this
+directory the compiler's include path, so remove it from the arm and
+arm64 kvm Makefile.
 
-On 03/12/2015 01:09 PM, Eliad Peller wrote:
-> 
-> NOTE: all the platform patches were compile-tested
-> only. I'm looking for some wl12xx card (that i should
-> have somewhere) to test the wl12xx changes (wrt. clocks),
-> but haven't found it yet.
-> 
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ arch/arm/kvm/Makefile   |    2 +-
+ arch/arm64/kvm/Makefile |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-I have tested this series on a APF6 board, i.MX6 based board with a
-Jorjin WG7311-0A Wifi/BT module which is based on the wl1271l.
-
-It works. I was able to power up the wlan0 interface and ping google.
-
-Best regards,
-
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index a093bf1..139e46c 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -7,7 +7,7 @@ ifeq ($(plus_virt),+virt)
+ 	plus_virt_def := -DREQUIRES_VIRT=1
+ endif
+ 
+-ccflags-y += -Ivirt/kvm -Iarch/arm/kvm
++ccflags-y += -Iarch/arm/kvm
+ CFLAGS_arm.o := -I. $(plus_virt_def)
+ CFLAGS_mmu.o := -I.
+ 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index b22c636..d5904f8 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module
+ #
+ 
+-ccflags-y += -Ivirt/kvm -Iarch/arm64/kvm
++ccflags-y += -Iarch/arm64/kvm
+ CFLAGS_arm.o := -I.
+ CFLAGS_mmu.o := -I.
+ 
 -- 
-S?bastien Szymanski
+1.7.9.5
