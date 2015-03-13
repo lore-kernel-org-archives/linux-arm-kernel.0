@@ -1,40 +1,25 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 13 Mar 2015 15:08:00 +0100
-Subject: [PATCH 7/7] common.c:105 Variable 'gephy' is  never used.
-In-Reply-To: <1426254264-5105-1-git-send-email-ameenali023@gmail.com>
-References: <1426254264-5105-1-git-send-email-ameenali023@gmail.com>
-Message-ID: <20150313140800.GY7311@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 13 Mar 2015 14:14:28 +0000
+Subject: [PATCH] arm64: Get rid of struct cpu_table
+In-Reply-To: <CAKv+Gu-H=q7HsFx-BAUPOOxsA9O7VT=zz4B8rJ5P2_CmF4oLNw@mail.gmail.com>
+References: <1426248133-20032-1-git-send-email-marc.zyngier@arm.com>
+ <CAKv+Gu-H=q7HsFx-BAUPOOxsA9O7VT=zz4B8rJ5P2_CmF4oLNw@mail.gmail.com>
+Message-ID: <20150313141427.GB17279@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 03:44:24PM +0200, Ameen Ali wrote:
-> Variable 'gephy' is assigned a value that is never used.
+On Fri, Mar 13, 2015 at 02:33:27PM +0100, Ard Biesheuvel wrote:
+> On 13 March 2015 at 13:02, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > struct cpu_table is an artifact left from the (very) early days of
+> > the arm64 port, and its only real use is to allow the most beautiful
+> > "AArch64 Processor" string to be displayed at boot time.
 > 
-> Signed-off-by : <AmeenALi023@gmail.com>
-> ---
->  arch/arm/mach-dove/common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index 0d1a892..115a413 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -113,7 +113,7 @@ static void __init dove_clk_init(void)
->  	orion_clkdev_add(NULL, "orion_spi.1", tclk);
->  	orion_clkdev_add(NULL, "orion_wdt", tclk);
->  	orion_clkdev_add(NULL, "mv64xxx_i2c.0", tclk);
-> -
-> +        orion_clkdev_add(NULL,"mv643xx_eth_port.0",gephy);
+> Heh, I looked at that code and assumed it was there for a reason.
+> Apparently not :-)
 
-It looks like you have used spaces, not a tab?
+There's a very good reason _not_ to be there: it encourages people to
+add implementation specific tweaks to the early kernel boot code. These
+must be done in firmware or boot-loader.
 
-Other than that, this looks sensible.
-
-      Andrew
-
->  	orion_clkdev_add(NULL, "orion-ehci.0", usb0);
->  	orion_clkdev_add(NULL, "orion-ehci.1", usb1);
->  	orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
-> -- 
-> 2.1.0
-> 
+-- 
+Catalin
