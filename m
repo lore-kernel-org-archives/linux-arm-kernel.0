@@ -1,37 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Mar 2015 08:27:52 -0700
-Subject: [PATCH v6 5/6] ARM: dts: add wl12xx/wl18xx bindings
-In-Reply-To: <1426162154-8716-6-git-send-email-eliad@wizery.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <1426162154-8716-6-git-send-email-eliad@wizery.com>
-Message-ID: <20150313152751.GK5264@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Mar 2015 16:36:06 +0100
+Subject: [PATCH 5/9] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <20150313152843.GP8656@n2100.arm.linux.org.uk>
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+ <2439386.JhP59gsGzr@wuerfel> <20150313152843.GP8656@n2100.arm.linux.org.uk>
+Message-ID: <62638459.PRFbbMQpY2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eliad Peller <eliad@wizery.com> [150312 05:09]:
-> --- a/arch/arm/mach-omap2/pdata-quirks.c
-> +++ b/arch/arm/mach-omap2/pdata-quirks.c
->  
-> -static void __init omap3_evm_legacy_init(void)
-> -{
-> -	legacy_init_wl12xx(38400000, 0, 149);
-> -}
+On Friday 13 March 2015 15:28:43 Russell King - ARM Linux wrote:
+> On Fri, Mar 13, 2015 at 04:08:31PM +0100, Arnd Bergmann wrote:
+> > I think the easiest and cleanest way would be to let that case not
+> > happen. Adding the reset controller core makes the kernel about 2kb
+> > larger, but in most multiplatform configurations, you get it already.
+> 
+> Well, I personally hate selecting visible Kconfig symbols.  It's
+> against my religion.
+> 
 
-FYI, at least this part conflicts with the fixes in the arm-soc
-tree for the v4.0-rc series as omap3 evm also needs the copy clock
-quirk.
+I know what you mean. I already created a patch for this:
+ 
+https://lkml.org/lkml/2015/2/24/317
 
-> @@ -419,20 +351,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
->  	{ "nokia,omap3-n950", hsmmc2_internal_input_clk, },
->  	{ "isee,omap3-igep0020-rev-f", omap3_igep0020_rev_f_legacy_init, },
->  	{ "isee,omap3-igep0030-rev-g", omap3_igep0030_rev_g_legacy_init, },
-> -	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
+Need to dig that out again and address the comments I got.
 
-So this function cannot be yet removed.
-
-With that fixed, I was able to iw dev wlan0 scan with series on
-omap3 evm :)
-
-Regards,
-
-Tony
+	Arnd
