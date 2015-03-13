@@ -1,122 +1,58 @@
-From: vinceh@nvidia.com (Vince Hsu)
-Date: Fri, 13 Mar 2015 11:04:46 +0800
-Subject: [PATCH v2 01/17] reset: add of_reset_control_get_by_index()
-In-Reply-To: <1426172504.14455.67.camel@pengutronix.de>
-References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>	
- <1426162518-7405-2-git-send-email-vinceh@nvidia.com>
- <1426172504.14455.67.camel@pengutronix.de>
-Message-ID: <550253CE.80201@nvidia.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 13 Mar 2015 11:19:12 +0800
+Subject: [PATCH v6 06/30] PCI: Combine PCI domain and bus number in u32 arg
+In-Reply-To: <20150312194927.GC7346@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-7-git-send-email-wangyijing@huawei.com>
+ <20150312012946.GA10949@google.com> <55018330.5050002@huawei.com>
+ <20150312194927.GC7346@google.com>
+Message-ID: <55025730.40504@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On 03/12/2015 11:01 PM, Philipp Zabel wrote:
-> Hi Vince,
->
-> Am Donnerstag, den 12.03.2015, 20:15 +0800 schrieb Vince Hsu:
->> Add of_reset_control_get_by_index() to allow the drivers to get reset device
->> without knowing its name.
-> I see this is useful in the case of PM domain drivers that just need to
-> trigger a list of resets in whatever order.
-Yep.
-
->
->> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+>> struct pci_scan_info {
+>> 	int bus;
+>> 	struct device *parent;
+>> 	struct pci_ops *ops;
+>> 	void *sysdata;
+>> 	struct list_head *resource;
+>> 	int domain;
+>> 	struct pci_host_bridge_ops;
+>> }
 >>
->> ---
->> v2: minor changes according to Alex's comments
+>> Do you like this one or keep it like now ?
 >>
->>   drivers/reset/core.c  | 44 +++++++++++++++++++++++++++++---------------
->>   include/linux/reset.h |  9 +++++++++
->>   2 files changed, 38 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
->> index 7955e00d04d4..5e78866acd62 100644
->> --- a/drivers/reset/core.c
->> +++ b/drivers/reset/core.c
->> @@ -140,28 +140,15 @@ int reset_control_status(struct reset_control *rstc)
->>   }
->>   EXPORT_SYMBOL_GPL(reset_control_status);
->>   
->> -/**
->> - * of_reset_control_get - Lookup and obtain a reference to a reset controller.
->> - * @node: device to be reset by the controller
->> - * @id: reset line name
->> - *
->> - * Returns a struct reset_control or IS_ERR() condition containing errno.
->> - *
->> - * Use of id names is optional.
->> - */
->> -struct reset_control *of_reset_control_get(struct device_node *node,
->> -					   const char *id)
->> +struct reset_control *__of_reset_control_get(struct device_node *node,
->> +						int index)
-> static
-Will merge to of_reset_control_get_by_index.
+>> pci_scan_root_bus(struct device *parent, int domain, int bus,
+>> 		struct pci_ops *ops, void *sysdata, struct list_head *resources, struct pci_host_bridge_ops *ops)
+> 
+> I don't think reducing the number of arguments is a good argument for
+> squashing some of them together.
+> 
+> I don't really want to add a structure like that because it adds management
+> complexity for all the callers because it contains per-bridge things (bus,
+> parent, domain, resource, sysdata).  Things like struct pci_ops and struct
+> pci_host_bridge_ops are much simpler because drivers can statically
+> allocate a single copy and use it for multiple devices.
+> 
+> I think it might make sense to put the struct pci_ops pointer inside struct
+> pci_host_bridge_ops.  That would get rid of one of the arguments.
+> 
+> You might also be able to get rid of the "bus" argument, since the caller
+> should be passing an IORESOURCE_BUS resource in the resource list, and
+> "bus" should be the same as res->start.
 
->
->>   {
->>   	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
->>   	struct reset_controller_dev *r, *rcdev;
->>   	struct of_phandle_args args;
->> -	int index = 0;
->>   	int rstc_id;
->>   	int ret;
->>   
->> -	if (id)
->> -		index = of_property_match_string(node,
->> -						 "reset-names", id);
->>   	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
->>   					 index, &args);
->>   	if (ret)
->> @@ -202,6 +189,33 @@ struct reset_control *of_reset_control_get(struct device_node *node,
->>   
->>   	return rstc;
->>   }
->> +
->> +struct reset_control *of_reset_control_get_by_index(struct device_node *node,
->> +					   int index)
->> +{
->> +	return __of_reset_control_get(node, index);
->> +}
->> +EXPORT_SYMBOL_GPL(of_reset_control_get_by_index);
-> This function is missing a kerneldoc comment, and please add a note that
-> this is only to be used if the order of the resets doesn't matter.
-Will add comment.
+I think this make sense, I will try to find a better solution.
 
->
-> Actually, I see no reason not to just merge __of_reset_control_get into
-> of_reset_control_get_by_index and then just call that from
-> of_reset_control_get.
-Indeed. Will fix.
+Thanks!
+Yijing.
 
-Thanks for the review. :)
-Vince
+> 
+> Bjorn
+> 
+> .
+> 
 
->
->> +/**
->> + * of_reset_control_get - Lookup and obtain a reference to a reset controller.
->> + * @node: device to be reset by the controller
->> + * @id: reset line name
->> + *
->> + * Returns a struct reset_control or IS_ERR() condition containing errno.
->> + *
->> + * Use of id names is optional.
->> + */
->> +struct reset_control *of_reset_control_get(struct device_node *node,
->> +					   const char *id)
->> +{
->> +	int index = 0;
->> +
->> +	if (id)
->> +		index = of_property_match_string(node,
->> +						 "reset-names", id);
->> +	return __of_reset_control_get(node, index);
->> +}
->>   EXPORT_SYMBOL_GPL(of_reset_control_get);
-> [...]
->
-> regards
-> Philipp
->
+
+-- 
+Thanks!
+Yijing
