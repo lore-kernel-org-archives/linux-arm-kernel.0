@@ -1,42 +1,42 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 13 Mar 2015 11:09:41 -0700
-Subject: [PATCH 08/12] ehci-msm: Remove dead dependency
+Date: Fri, 13 Mar 2015 11:09:44 -0700
+Subject: [PATCH 11/12] ufs-qcom: Switch dependency to ARCH_QCOM
 In-Reply-To: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
 References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426270185-19510-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1426270185-19510-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This dependency no longer exists now that mach-msm has been
-removed. Delete it.
+This device only exists on platforms under ARCH_QCOM, not
+ARCH_MSM.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: linux-usb at vger.kernel.org
+Cc: Yaniv Gardi <ygardi@codeaurora.org>
+Cc: Dov Levenglick <dovl@codeaurora.org>
+Cc: Christoph Hellwig <hch@lst.de>
 Cc: David Brown <davidb@codeaurora.org>
 Cc: Bryan Huntsman <bryanh@codeaurora.org>
 Cc: Daniel Walker <dwalker@fifo99.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
 
-This can be acked and go through arm-soc or applied directly to usb tree.
+This can be acked and go through arm-soc or applied directly. 
 
- drivers/usb/host/Kconfig | 2 +-
+ drivers/scsi/ufs/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5ad60e46dc2b..197a6a3e613b 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -198,7 +198,7 @@ config USB_EHCI_HCD_AT91
+diff --git a/drivers/scsi/ufs/Kconfig b/drivers/scsi/ufs/Kconfig
+index 8a1f4b355416..e94538362536 100644
+--- a/drivers/scsi/ufs/Kconfig
++++ b/drivers/scsi/ufs/Kconfig
+@@ -73,7 +73,7 @@ config SCSI_UFSHCD_PLATFORM
  
- config USB_EHCI_MSM
- 	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
--	depends on ARCH_MSM || ARCH_QCOM
-+	depends on ARCH_QCOM
- 	select USB_EHCI_ROOT_HUB_TT
- 	---help---
- 	  Enables support for the USB Host controller present on the
+ config SCSI_UFS_QCOM
+ 	bool "QCOM specific hooks to UFS controller platform driver"
+-	depends on SCSI_UFSHCD_PLATFORM && ARCH_MSM
++	depends on SCSI_UFSHCD_PLATFORM && ARCH_QCOM
+ 	select PHY_QCOM_UFS
+ 	help
+ 	  This selects the QCOM specific additions to UFSHCD platform driver.
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
