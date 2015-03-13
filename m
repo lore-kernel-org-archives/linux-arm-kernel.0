@@ -1,23 +1,25 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 13:43:43 +0800
-Subject: [PATCH] ARM: dts: imx25-pinfunc, remove input values for
- pinfuncs without input register
-In-Reply-To: <1426172588-4255-1-git-send-email-mpa@pengutronix.de>
-References: <1426172588-4255-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150313054342.GU20455@dragon>
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+Date: Fri, 13 Mar 2015 06:59:38 +0100
+Subject: [PATCH 14/15] ARM: cns3xxx: don't export static symbol
+In-Reply-To: <34582069.IEgAMbDRxk@wuerfel> (Arnd Bergmann's message of "Wed,
+ 11 Mar 2015 22:09:20 +0100")
+References: <1426092997-30605-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1426092997-30605-15-git-send-email-Julia.Lawall@lip6.fr>
+ <34582069.IEgAMbDRxk@wuerfel>
+Message-ID: <m3d24dwi7p.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 04:03:08PM +0100, Markus Pargmann wrote:
-> input values are only useful for pin functions which define a input
-> register. This patch removes all input values of pin functions which do
-> not have an input configuration register.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Applied, thanks.
+> Looks good. Krzysztof, do you want to pick this up and send me a
+> pull request together with other patches, or should I apply this
+> to the arm-soc fixes directly?
 
-In the future, please use ':' instead of ',' as separator in patch
-subject.
+The latter, please.
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+-- 
+Krzysztof Halasa
 
-Shawn
+Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
