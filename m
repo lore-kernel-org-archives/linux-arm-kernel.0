@@ -1,52 +1,51 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Fri, 13 Mar 2015 12:50:56 +0100
-Subject: [PATCH 2/2] Documentation: omap-twl4030: Remove ti, codec property
-In-Reply-To: <5502CE9E.1020705@ti.com>
-References: <1426194899-14037-1-git-send-email-marek@goldelico.com>
- <1426194899-14037-3-git-send-email-marek@goldelico.com>
- <38159868.RLZZTyUOlK@wuerfel> <5502CE9E.1020705@ti.com>
-Message-ID: <CAAfyv35r+dKtd4kia44omCo5L5ajWV+qyJ8AUjWobFas+BQFgw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Mar 2015 12:52:09 +0100
+Subject: [RFT/RFC PATCH 6/6] ARM: keep .text and .fixup regions together
+In-Reply-To: <CAKv+Gu-bhir4J-vavJAzTYKEvrB5G9ijtLALbtmQOz-yvNAU9Q@mail.gmail.com>
+References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
+ <3810696.X76shyuPzC@wuerfel>
+ <CAKv+Gu-bhir4J-vavJAzTYKEvrB5G9ijtLALbtmQOz-yvNAU9Q@mail.gmail.com>
+Message-ID: <4174992.WOHRCcIhdN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 12:48 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
-> On 03/13/2015 01:05 PM, Arnd Bergmann wrote:
->> On Thursday 12 March 2015 22:14:59 Marek Belisko wrote:
->>> diff --git a/Documentation/devicetree/bindings/sound/omap-twl4030.txt b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
->>> index 1ab6bc8..656165f 100644
->>> --- a/Documentation/devicetree/bindings/sound/omap-twl4030.txt
->>> +++ b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
->>> @@ -4,7 +4,6 @@ Required properties:
->>>  - compatible: "ti,omap-twl4030"
->>>  - ti,model: Name of the sound card (for example "omap3beagle")
->>>  - ti,mcbsp: phandle for the McBSP node
->>> -- ti,codec: phandle for the twl4030 audio node
->>
->> As this was a required property, are you sure that no other operating system
->> uses it?
->>
->> Even if not, you should probably change it to be an optional property, so
->> that the existing dtbs do not become noncompliant after the change.
->
-> After I sent my Ack, I also started to think about the same thing. It is
-> better to change it to optional.
-OK will do and post v2. Thanks.
->
-> --
-> P?ter
+On Friday 13 March 2015 12:26:11 Ard Biesheuvel wrote:
+> On 13 March 2015 at 12:18, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 12 March 2015 21:22:02 Russell King - ARM Linux wrote:
+> >> On Thu, Mar 12, 2015 at 10:18:26PM +0100, Ard Biesheuvel wrote:
+> >> > >> Note that the TEXT_TEXT macro will emit *(.text) again but this should be
+> >> > >> harmless.
+> >> > >
+> >> > > However, I wonder if by doing this, we're weakening the ability for
+> >> > > kallsyms final link to succeed:
+> >> > >
+> >> > > /* .text section. Map to function alignment to avoid address changes
+> >> > >  * during second ld run in second ld pass when generating System.map */
+> >> > >
+> >> > > Can we not just move .fixup before TEXT_TEXT?  The only thing between it
+> >> > > and .text would be .text.hot.
+> >> > >
+> >> >
+> >> > Putting .fixup before .text already helps, but not enough for the
+> >> > .config Arnd gave me that I have been testing this with.
+> >> >
+> >> > What *(.text .fixup) does (i.e., putting both section names inside the
+> >> > parentheses), is emitting both sections for each input object file, so
+> >> > they will always be close to the object that it refers to, so it is
+> >> > not the same thing.
+> >>
+> >> I'll suggest a different solution then - how about modifying
+> >> asm-generic/vmlinux.lds.h to change *(.text) to *(.text .text.fixup)
+> >> and we move all the .fixup sections to .text.fixup ?  Arnd?
+> >
+> > No objections from me, but I really don't know enough about the possible
+> > side-effects this may have on the other architectures, so we need to
+> > run this by the linux-arch mailing list.
+> >
+> 
+> I don't think it could affect any other architecture if nobody is
+> populating .text.fixup yet.
 
-BR,
+Ah, I missed that part of the suggestion. Yes, sounds good to me then.
 
-marek
-
--- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+	Arnd
