@@ -1,11 +1,11 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Fri, 13 Mar 2015 14:30:36 +0100
-Subject: [PATCH 2/8] ARM: dts: rockchip: relicense rk3066a.dtsi under
+Date: Fri, 13 Mar 2015 14:31:10 +0100
+Subject: [PATCH 3/8] ARM: dts: rockchip: relicense rk3188.dtsi under
  GPLv2/X11
-In-Reply-To: <1425665046-22927-3-git-send-email-heiko@sntech.de>
+In-Reply-To: <1425665046-22927-4-git-send-email-heiko@sntech.de>
 References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-3-git-send-email-heiko@sntech.de>
-Message-ID: <CABgxDoLVAAS-Frgpmf0rZRvzFgs84y+qnoeivpL2SBWte5eDZA@mail.gmail.com>
+ <1425665046-22927-4-git-send-email-heiko@sntech.de>
+Message-ID: <CABgxDoK+4iMbr71FxqBHWCO69ZZ5EQD3V68+dVkpnGu2vAE0gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,25 +16,26 @@ Acked-by: Romain Perier <romain.perier@gmail.com>
 > under a different license.
 >
 > The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-> so relicense the rk3066a.dtsi to this combination.
+> so relicense the rk3188.dtsi to this combination.
 >
 > CCs were aquired by git shortlog -sne so it should've hopefully catched
 > every contributor.
 >
 > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Cc: Beniamino Galvani <b.galvani@gmail.com>
 > Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+> Cc: Beniamino Galvani <b.galvani@gmail.com>
+> Cc: Max Schwarz <max.schwarz@online.de>
 > Cc: Romain Perier <romain.perier@gmail.com>
 > ---
 > I'm hoping to get Acked-by tags from the people in the Cc-list.
 >
->  arch/arm/boot/dts/rk3066a.dtsi | 44 ++++++++++++++++++++++++++++++++++--------
+>  arch/arm/boot/dts/rk3188.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
 >  1 file changed, 36 insertions(+), 8 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-> index 41ffd49..d32229b 100644
-> --- a/arch/arm/boot/dts/rk3066a.dtsi
-> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index 1d4d79c..0f23aed 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
 > @@ -2,15 +2,43 @@
 >   * Copyright (c) 2013 MundoReader S.L.
 >   * Author: Heiko Stuebner <heiko@sntech.de>
