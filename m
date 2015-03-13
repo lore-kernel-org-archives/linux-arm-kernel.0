@@ -1,53 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 11:21:41 +0800
-Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
-References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
- <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150313032139.GN20455@dragon>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 13 Mar 2015 11:28:21 +0800
+Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
+ host bridges
+In-Reply-To: <20150312195651.GD7346@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
+ <20150312025537.GD10949@google.com> <55018E90.9030301@huawei.com>
+ <20150312195651.GD7346@google.com>
+Message-ID: <55025955.3020000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
-> Now that the GPC has been converted to be a full blown irqchip
-> (and not a mole on the side of the GIC), booting a new kernel
-> with an old DT is likely to result in a rough ride for the user.
+>>> It's a nice idea to move this test into the core.  While you're at it, why
+>>> don't you check for any overlap with the bus ranges of existing host
+>>> bridges?  For example, if we're trying to create a new host bridge to
+>>> [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
+>>> as well as to [bus 40-ff].  I think your current patch will detect the
+>>> latter conflict but not the former.
+>>
+>> Now pci host bridge may only know its start bus number, like acpi _BBN provided,
+>> but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
+>> so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
+>> some pci scan would fail which currently scan success.
 > 
-> This patch makes sure such a situation is promptly detected and
-> the user made aware that a DT update is in order.
+> _BBN is not the correct source for the bridge's bus number range.  There's
+> a comment in acpi_pci_root_add() that explains why:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>   * We need both the start and end of the downstream bus range
+>   * to interpret _CBA (MMCONFIG base address), so it really is
+>   * supposed to be in _CRS.  If we don't find it there, all we
+>   * can do is assume [_BBN-0xFF] or [0-0xFF].
 > 
-> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
-> index 6a7c6fc..f03f30f0 100644
-> --- a/arch/arm/mach-imx/pm-imx6.c
-> +++ b/arch/arm/mach-imx/pm-imx6.c
-> @@ -554,11 +554,17 @@ put_node:
->  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
->  					*socdata)
->  {
-> +	struct device_node *np;
->  	struct regmap *gpr;
->  	int ret;
->  
->  	WARN_ON(!ccm_base);
->  
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-> +	if (WARN_ON(!np ||
-> +		    !of_find_property(np, "interrupt-controller", NULL)))
-> +		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
-> +
+> A platform SHOULD know the start and and end bus number.  If it doesn't I
+> think it's the platform's responsibility to carve up the bus number range.
+> Maybe this can be done by trimming the range of the [bus 00-ff] bridge when
+> we discover another bridge that leads to bus 80.
 
-Can this be done in imx_gpc_init() instead?
+Currently, if platform does not know the end bus number (not provide the bus resource),
+we will update the max bus number returned by pci_scan_child_bus() to the bus resource end,
+and I think this is reasonable. I consider to introduce a flag to identify the bus resource
+which end bus number is undefined, then we could force all pci_scan_root_bus()  etc. callers
+to provide the bus resource, and we could process the bus resource end according the bus resource flag.
+Also then we could reduce the bus argument which is the same as busn_res->start.
+I would try to provide draft patch, then we could discuss it more clearly.
 
-Shawn
+Thanks!
+Yijing.
 
->  	if (IS_ENABLED(CONFIG_SUSPEND)) {
->  		ret = imx6q_suspend_init(socdata);
->  		if (ret)
-> -- 
-> 2.1.4
 > 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
