@@ -1,34 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 13 Mar 2015 11:46:33 +0100
-Subject: [PATCH 5/8] ARM: dts: rockchip: relicense rk3288-thermal.dtsi
- under GPLv2/X11
-In-Reply-To: <54FB0D6D.6070406@163.com>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-6-git-send-email-heiko@sntech.de>
- <54FB0D6D.6070406@163.com>
-Message-ID: <1934004.brotWK6oIh@phil>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Mar 2015 10:52:07 +0000
+Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
+References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
+Message-ID: <20150313105207.GB3592@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+> +/ {
+> +	chosen {
+> +		stdout-path = &blsp1_uart2;
+> +	};
 
-Am Samstag, 7. M?rz 2015, 22:38:37 schrieb Caesar Wang:
-> ? 2015?03?07? 02:04, Heiko Stuebner ??:
-> > GPLv2-only devicetrees make reuse difficult for software components
-> > licensed under a different license.
-> > 
-> > The consensus is that a GPL/X11 dual-license should allow all necessary
-> > uses, so relicense the rk3288-thermal.dtsi to this combination.
-> > 
-> > CCs were aquired by git shortlog -sne so it should've hopefully catched
-> > every contributor.
-> 
-> Acked-by: caesar.wang at rock-chips.com
+It would be good if we had the configuration too (see
+Documentation/devicetree/bindings/chosen.txt), as that avoids any
+reliance on kernel defaults.
 
-thanks :-)
+You can refer to an alias, so this could be:
 
-could you also Ack patch 8/8, as you also contributed there?
+aliases {
+	serial0 = &blsp1_uart2;
+};
+
+chosen {
+	stdout-path = "serial0:115200n8";
+};
+
+...assuming that 115200n8 is correct for your UART, of course.
 
 
-Thanks
-Heiko
+[...]
+
+> +#include "skeleton.dtsi"
+
+I'd like to get rid of skeleton.dtsi; it causes more problems than it
+solves (the address/size cells mismatch is confusing and hidden, people
+forget to fill in memory nodes appropriately, etc).
+
+Please remove this include and place appropriate #address-cells and #size-cells here.
+
+I'd strongly recommend going with /#size-cells = <2>; it' will save on a
+lot of pain if you need to add PCIe or something with large ranges
+later. If things all fall in 4GB within the SoC then have
+/soc/#size=cells = <1> and an appropriate /soc/ranges property.
+
+I note this DT doesn't have any memory nodes. Is that an accident or
+does the loader fill that in?
+
+If the latter, have an empty node with a comment to that effect.
+
+Mark.
