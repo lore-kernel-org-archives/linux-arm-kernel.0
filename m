@@ -1,213 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Mar 2015 17:54:18 +0000
-Subject: [PATCH 1/6] ARM: cpuidle: Remove duplicate header inclusion
-In-Reply-To: <1425385777-14766-2-git-send-email-daniel.lezcano@linaro.org>
-References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
- <1425385777-14766-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150313175418.GB1763@e102568-lin.cambridge.arm.com>
+From: alexinbeijing@gmail.com (Alex Dowad)
+Date: Fri, 13 Mar 2015 20:04:19 +0200
+Subject: [PATCH 04/32] arm: copy_thread(): rename 'stk_sz' argument to
+ 'kthread_arg'
+In-Reply-To: <1426269888-25600-1-git-send-email-alexinbeijing@gmail.com>
+References: <1426269888-25600-1-git-send-email-alexinbeijing@gmail.com>
+Message-ID: <1426269888-25600-4-git-send-email-alexinbeijing@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 12:29:32PM +0000, Daniel Lezcano wrote:
-> The cpu_do_idle() function is always used by the cpuidle drivers.
-> 
-> That led to have each driver including cpuidle.h and proc-fns.h, they are
-> always paired. That makes a lot of duplicate headers inclusion. Instead of
-> including both in each .c file, move the proc-fns.h header inclusion in the
-> cpuidle.h header file directly, so we can save some line of code.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+'stk_sz' is a misnomer: it is never used for a stack size. Rather, it is an
+argument which is passed to the main function executed by a kernel thread, when
+forking a new kthread. The most appropriate name is 'kthread_arg'.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Alex Dowad <alexinbeijing@gmail.com>
+---
+ arch/arm/kernel/process.c | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-> ---
->  arch/arm/include/asm/cpuidle.h        | 2 ++
->  arch/arm/kernel/cpuidle.c             | 2 +-
->  arch/arm/mach-davinci/cpuidle.c       | 1 -
->  arch/arm/mach-imx/cpuidle-imx6q.c     | 1 -
->  arch/arm/mach-imx/cpuidle-imx6sl.c    | 1 -
->  arch/arm/mach-imx/cpuidle-imx6sx.c    | 1 -
->  arch/arm/mach-omap2/cpuidle44xx.c     | 1 -
->  arch/arm/mach-tegra/cpuidle-tegra20.c | 1 -
->  arch/arm/mach-tegra/cpuidle-tegra30.c | 1 -
->  drivers/cpuidle/cpuidle-at91.c        | 1 -
->  drivers/cpuidle/cpuidle-exynos.c      | 1 -
->  drivers/cpuidle/cpuidle-kirkwood.c    | 1 -
->  drivers/cpuidle/cpuidle-ux500.c       | 1 -
->  drivers/cpuidle/cpuidle-zynq.c        | 1 -
->  14 files changed, 3 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-> index af319ac..348dc81 100644
-> --- a/arch/arm/include/asm/cpuidle.h
-> +++ b/arch/arm/include/asm/cpuidle.h
-> @@ -1,6 +1,8 @@
->  #ifndef __ASM_ARM_CPUIDLE_H
->  #define __ASM_ARM_CPUIDLE_H
->  
-> +#include <asm/proc-fns.h>
-> +
->  #ifdef CONFIG_CPU_IDLE
->  extern int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->  		struct cpuidle_driver *drv, int index);
-> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> index 89545f6..45969f8 100644
-> --- a/arch/arm/kernel/cpuidle.c
-> +++ b/arch/arm/kernel/cpuidle.c
-> @@ -10,7 +10,7 @@
->   */
->  
->  #include <linux/cpuidle.h>
-> -#include <asm/proc-fns.h>
-> +#include <asm/cpuidle.h>
->  
->  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->  		struct cpuidle_driver *drv, int index)
-> diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-> index e365c1b..306ebc5 100644
-> --- a/arch/arm/mach-davinci/cpuidle.c
-> +++ b/arch/arm/mach-davinci/cpuidle.c
-> @@ -17,7 +17,6 @@
->  #include <linux/cpuidle.h>
->  #include <linux/io.h>
->  #include <linux/export.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/cpuidle.h>
->  
->  #include <mach/cpuidle.h>
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-> index d76d086..8e21ccc 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -9,7 +9,6 @@
->  #include <linux/cpuidle.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  
->  #include "common.h"
->  #include "cpuidle.h"
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-> index 7d92e65..5742a9f 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6sl.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-> @@ -9,7 +9,6 @@
->  #include <linux/cpuidle.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  
->  #include "common.h"
->  #include "cpuidle.h"
-> diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> index 5a36722..2c9f1a8 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-> @@ -10,7 +10,6 @@
->  #include <linux/cpu_pm.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/suspend.h>
->  
->  #include "common.h"
-> diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-> index 01e398a..7622dbb 100644
-> --- a/arch/arm/mach-omap2/cpuidle44xx.c
-> +++ b/arch/arm/mach-omap2/cpuidle44xx.c
-> @@ -17,7 +17,6 @@
->  #include <linux/clockchips.h>
->  
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  
->  #include "common.h"
->  #include "pm.h"
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> index 4f25a7c..e22b0d9 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-> @@ -27,7 +27,6 @@
->  #include <linux/module.h>
->  
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/smp_plat.h>
->  #include <asm/suspend.h>
->  
-> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> index f8815ed..a2400ab4 100644
-> --- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-> +++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> @@ -27,7 +27,6 @@
->  #include <linux/module.h>
->  
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/smp_plat.h>
->  #include <asm/suspend.h>
->  
-> diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
-> index aae7bfc..f2446c7 100644
-> --- a/drivers/cpuidle/cpuidle-at91.c
-> +++ b/drivers/cpuidle/cpuidle-at91.c
-> @@ -19,7 +19,6 @@
->  #include <linux/cpuidle.h>
->  #include <linux/io.h>
->  #include <linux/export.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/cpuidle.h>
->  
->  #define AT91_MAX_STATES	2
-> diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-> index 26f5f29..0c06ea2 100644
-> --- a/drivers/cpuidle/cpuidle-exynos.c
-> +++ b/drivers/cpuidle/cpuidle-exynos.c
-> @@ -19,7 +19,6 @@
->  #include <linux/of.h>
->  #include <linux/platform_data/cpuidle-exynos.h>
->  
-> -#include <asm/proc-fns.h>
->  #include <asm/suspend.h>
->  #include <asm/cpuidle.h>
->  
-> diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-> index cea0a6c..d23d8f4 100644
-> --- a/drivers/cpuidle/cpuidle-kirkwood.c
-> +++ b/drivers/cpuidle/cpuidle-kirkwood.c
-> @@ -21,7 +21,6 @@
->  #include <linux/cpuidle.h>
->  #include <linux/io.h>
->  #include <linux/export.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/cpuidle.h>
->  
->  #define KIRKWOOD_MAX_STATES	2
-> diff --git a/drivers/cpuidle/cpuidle-ux500.c b/drivers/cpuidle/cpuidle-ux500.c
-> index 66f81e4..8bf895c 100644
-> --- a/drivers/cpuidle/cpuidle-ux500.c
-> +++ b/drivers/cpuidle/cpuidle-ux500.c
-> @@ -19,7 +19,6 @@
->  #include <linux/platform_device.h>
->  
->  #include <asm/cpuidle.h>
-> -#include <asm/proc-fns.h>
->  
->  static atomic_t master = ATOMIC_INIT(0);
->  static DEFINE_SPINLOCK(master_lock);
-> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
-> index 002b8c9..543292b 100644
-> --- a/drivers/cpuidle/cpuidle-zynq.c
-> +++ b/drivers/cpuidle/cpuidle-zynq.c
-> @@ -28,7 +28,6 @@
->  #include <linux/init.h>
->  #include <linux/cpuidle.h>
->  #include <linux/platform_device.h>
-> -#include <asm/proc-fns.h>
->  #include <asm/cpuidle.h>
->  
->  #define ZYNQ_MAX_STATES		2
-> -- 
-> 1.9.1
-> 
-> 
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index fdfa3a7..4183ebd 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -342,9 +342,12 @@ void release_thread(struct task_struct *dead_task)
+ 
+ asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
+ 
++/*
++ * Copy architecture-specific thread state
++ */
+ int
+ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+-	    unsigned long stk_sz, struct task_struct *p)
++	    unsigned long kthread_arg, struct task_struct *p)
+ {
+ 	struct thread_info *thread = task_thread_info(p);
+ 	struct pt_regs *childregs = task_pt_regs(p);
+@@ -352,13 +355,15 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
+ 
+ 	if (likely(!(p->flags & PF_KTHREAD))) {
++		/* user thread */
+ 		*childregs = *current_pt_regs();
+ 		childregs->ARM_r0 = 0;
+ 		if (stack_start)
+ 			childregs->ARM_sp = stack_start;
+ 	} else {
++		/* kernel thread */
+ 		memset(childregs, 0, sizeof(struct pt_regs));
+-		thread->cpu_context.r4 = stk_sz;
++		thread->cpu_context.r4 = kthread_arg;
+ 		thread->cpu_context.r5 = stack_start;
+ 		childregs->ARM_cpsr = SVC_MODE;
+ 	}
+-- 
+2.0.0.GIT
