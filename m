@@ -1,61 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Mar 2015 16:45:46 +0000
-Subject: read_cpuid_id() in arch/arm/kernel/setup.c
-In-Reply-To: <550312BB.8020902@free.fr>
-References: <55030A68.6070002@free.fr>
- <20150313161953.GS8656@n2100.arm.linux.org.uk>
- <550312BB.8020902@free.fr>
-Message-ID: <20150313164546.GV8656@n2100.arm.linux.org.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Mar 2015 17:46:32 +0100
+Subject: [PATCH 1/5] clk: mediatek: Add initial common clock support for
+ Mediatek SoCs.
+In-Reply-To: <1424605765-19751-2-git-send-email-s.hauer@pengutronix.de>
+References: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
+ <1424605765-19751-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <55031468.2040109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 05:39:23PM +0100, Mason wrote:
-> Good point. I hadn't thought of that.
-> 
-> Do you know the latency of an mrc instruction? (compared to a mov)
 
-Not offhand.  It'll be different for different CPUs, but it's probably
-not far off mov.
 
-> >It seems that GCC 4.7.4 optimises better than Linaro's 4.9.3.  In fact,
-> >it looks like Linaro's 4.9.3 is rather buggy as far as optimisation
-> >goes.
-> >
-> >Later compilers aren't always better.
-> 
-> I did NOT expect that. Compiler optimizations passes are so fragile.
+On 22/02/15 12:49, Sascha Hauer wrote:
+> From: James Liao <jamesjj.liao@mediatek.com>
 
-You're learning :)
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> new file mode 100644
+> index 0000000..c7c0d35
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-mtk.h
 
-> Anyway, here's another proposed nano-improvement ;-)
-> (This one is code factorization)
-> 
-> --- setup.c	2015-03-03 18:04:59.000000000 +0100
-> +++ setup.bar.c	2015-03-13 17:29:23.800668429 +0100
-> @@ -246,12 +246,9 @@
->  		if (cpu_arch)
->  			cpu_arch += CPU_ARCH_ARMv3;
->  	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
-> -		unsigned int mmfr0;
-> -
->  		/* Revised CPUID format. Read the Memory Model Feature
->  		 * Register 0 and check for VMSAv7 or PMSAv7 */
-> -		asm("mrc	p15, 0, %0, c0, c1, 4"
-> -		    : "=r" (mmfr0));
-> +		unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
->  		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
->  		    (mmfr0 & 0x000000f0) >= 0x00000030)
->  			cpu_arch = CPU_ARCH_ARMv7;
-> 
-> 
-> This one looks good, doesn't it? :-)
+[...]
 
-Yes, this one I like - and it probably fixes a potential latent bug
-where the compiler was free to re-order that mrc outside of the if()
-statement.
+> +void __init mtk_clk_register_plls(struct device_node *node,
+> +		const struct mtk_pll_data *plls, int num_plls);
+> +
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +void mtk_register_reset_controller(struct device_node *np,
+> +			unsigned int num_regs, int regofs);
+> +#else
+> +static inline void mtk_register_reset_controller(struct device_node *np,
+> +			unsigned int num_regs, int regofs)
+> +{
+> +}
+> +#endif
 
-Please wrap it up as a normal submission, thanks.
+This lines should only be added once in [2/5], compiling ends with:
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+In file included from drivers/clk/mediatek/clk-mtk.c:24:0:
+drivers/clk/mediatek/clk-mtk.h:168:20: error: redefinition of ?mtk_register_reset_controller?
+drivers/clk/mediatek/clk-mtk.h:158:20: note: previous definition of ?mtk_register_reset_controller? was here
+
+Cheers,
+Matthias
