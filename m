@@ -1,59 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Mar 2015 08:13:11 +0000
-Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <20150313032139.GN20455@dragon>
-References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
- <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
- <20150313032139.GN20455@dragon>
-Message-ID: <20150313081311.1ebfe8e2@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 13 Mar 2015 09:13:52 +0100
+Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
+In-Reply-To: <20150313075058.GL952@pengutronix.de>
+References: <20150306192813.GG10717@pengutronix.de>
+ <54FA02B7.8090703@codeaurora.org> <1425895136.3152.22.camel@pengutronix.de>
+ <54FDEEFE.1060803@codeaurora.org> <20150309210735.14952.91257@quantum>
+ <20150309215803.GD7525@pengutronix.de> <54FE215D.7090804@codeaurora.org>
+ <20150309233416.GF7525@pengutronix.de> <5500EA26.7090007@codeaurora.org>
+ <1426150673.14455.11.camel@pengutronix.de>
+ <20150313075058.GL952@pengutronix.de>
+Message-ID: <1426234432.3083.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Mar 2015 03:21:41 +0000
-Shawn Guo <shawn.guo@linaro.org> wrote:
-
-> On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
-> > Now that the GPC has been converted to be a full blown irqchip
-> > (and not a mole on the side of the GIC), booting a new kernel
-> > with an old DT is likely to result in a rough ride for the user.
-> > 
-> > This patch makes sure such a situation is promptly detected and
-> > the user made aware that a DT update is in order.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/pm-imx6.c
-> > b/arch/arm/mach-imx/pm-imx6.c index 6a7c6fc..f03f30f0 100644
-> > --- a/arch/arm/mach-imx/pm-imx6.c
-> > +++ b/arch/arm/mach-imx/pm-imx6.c
-> > @@ -554,11 +554,17 @@ put_node:
-> >  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
-> >  					*socdata)
-> >  {
-> > +	struct device_node *np;
-> >  	struct regmap *gpr;
-> >  	int ret;
-> >  
-> >  	WARN_ON(!ccm_base);
-> >  
-> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-> > +	if (WARN_ON(!np ||
-> > +		    !of_find_property(np, "interrupt-controller",
-> > NULL)))
-> > +		pr_warn("Outdated DT detected, suspend/resume will
-> > NOT work\n"); +
+Am Freitag, den 13.03.2015, 08:50 +0100 schrieb Uwe Kleine-K?nig:
+> On Thu, Mar 12, 2015 at 09:57:53AM +0100, Philipp Zabel wrote:
+> > Am Mittwoch, den 11.03.2015, 18:21 -0700 schrieb Stephen Boyd:
+> > [...]
+> > > Why does Philipp like 110Hz the most? Where is the desire for that rate
+> > > coming from?
+> > > 
+> > > > And the lower
+> > > > abs(1 / 110 - 1 / r) the better. 
+> > > 
+> > > Similarly, where is this requirement coming from? Some datasheet? Or is
+> > > it just some arbitrary decision we've made that may not hold true for
+> > > all consumers?
+> It's not comming from a datasheet. But that's what I guess is the right
+> metric for quite some cases. E.g. an UART sample rate and I also
+> wouldn't be surprised if Philipp's panel example would call for this
+> metric, too.
 > 
-> Can this be done in imx_gpc_init() instead?
+> For an UART running with say 38400 Bd you want to sample with a freqency
+> of 38400 Hz (not considering oversampling, but that is only a factor
+> that doesn't makes my reasoning wrong). If you now consider 38401 Hz and
+> 38399 Hz the respective deltas are 1 Hz. But if you look at the time
+> between two samples we have:
+> 
+> 	38401 Hz -> 26.04098852 us -> delta: 0.6781507 ns
+> 	38400 Hz -> 26.04166667 us
+> 	38399 Hz -> 26.04234485 us -> delta: 0.6781861 ns
+> 
+> So with 38401 it takes a little longer until the slightly deviating rate
+> results in sampling the wrong bit.
+> 
+> > In this use case, the driver doesn't want the pixel clock to stay below
+> > a hard frequency limit, but to get as close as possible to the target
+> > frequency, either above or below, so the relative error to the nominal
+> > panel refresh rate stays as small as possible. Thus for a fictional
+> > target rate of 110 Hz, I'd like to minimize abs((round_rate / 110) - 1).
+> Note that minimizing
+> 
+> 	abs((round_rate / 110) - 1)
+> 
+> is equivalent to minimizing
+> 
+> 	abs(round_rate - 110)
 
-Unfortunately not, as imx_gpc_init() is only called if the above
-properties are satisfied (that's exactly the case we want to detect: if
-imx_gpc_init is called, we're already in a pretty good shape).
+Of course, and you're right, I should want to minimize the delta of the
+interval time, not of the rate so that if playing back a video stream at
+exactly the nominal frequency, it takes as long as possible until I have
+to drop or duplicate a frame to stay in sync.
 
-Hope this helps,
-
-        M.
--- 
-Jazz is not dead. It just smells funny.
+regards
+Philipp
