@@ -1,94 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Mar 2015 16:56:00 +0000
-Subject: read_cpuid_id() in arch/arm/kernel/setup.c
-In-Reply-To: <55030A68.6070002@free.fr>
-References: <55030A68.6070002@free.fr>
-Message-ID: <20150313165600.GB9603@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Mar 2015 18:01:50 +0100
+Subject: [PATCH v2 5/7] ARM: at91: sama5d4: remove useless map_io
+In-Reply-To: <1425583068-5826-6-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1425583068-5826-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1425583068-5826-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <550317FE.6000401@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> /*
->   * The CPU ID never changes at run time, so we might as well tell the
->   * compiler that it's constant.  Use this function to read the CPU ID
->   * rather than directly reading processor_id or read_cpuid() directly.
->   */
-> static inline unsigned int __attribute_const__ read_cpuid_id(void)
-> {
-> 	return read_cpuid(CPUID_ID);
-> }
+Le 05/03/2015 20:17, Alexandre Belloni a ?crit :
+> All the peripheral remapped at io_map are taken care of by their respective
+> drivers.
 > 
-> Despite the comment and attribute, my compiler(*) still reloads the
-> value every time.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-In the presence of big.LITTLE the comment and premise of the
-optimisation here is wrong. A thread can migrate between cores of
-differing microarchitectures.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-So __attribute_const__ is simply broken, and we probably need to do
-something like the black magic SP hazarding hack we do for the tpidr
-percpu accesses (only expecting this to be called in non-preemptible
-context) if it makes sense to allow the value to be cached.
+Nice: I take this one with the at91-cleanup2 tag. So I'll skip this one
+when taking care of this series ;-)
 
-> (*) gcc version 4.9.3 20141031 (prerelease) (Linaro GCC 2014.11)
+> ---
+>  arch/arm/mach-at91/sama5.c | 33 ---------------------------------
+>  1 file changed, 33 deletions(-)
 > 
-> e.g.
+> diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+> index 26b718a0c235..d7593d572a77 100644
+> --- a/arch/arm/mach-at91/sama5.c
+> +++ b/arch/arm/mach-at91/sama5.c
+> @@ -89,38 +89,6 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
+>  	.dt_compat	= sama5_dt_board_compat,
+>  MACHINE_END
+>  
+> -static struct map_desc at91_io_desc[] __initdata = {
+> -	{
+> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_MPDDRC),
+> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_MPDDRC),
+> -	.length         = SZ_512,
+> -	.type           = MT_DEVICE,
+> -	},
+> -	{
+> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_PMC),
+> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_PMC),
+> -	.length         = SZ_512,
+> -	.type           = MT_DEVICE,
+> -	},
+> -	{ /* On sama5d4, we use USART3 as serial console */
+> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_USART3),
+> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_USART3),
+> -	.length         = SZ_256,
+> -	.type           = MT_DEVICE,
+> -	},
+> -	{ /* A bunch of peripheral with fine grained IO space */
+> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_SYS2),
+> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_SYS2),
+> -	.length         = SZ_2K,
+> -	.type           = MT_DEVICE,
+> -	},
+> -};
+> -
+> -static void __init sama5_alt_map_io(void)
+> -{
+> -	iotable_init(at91_io_desc, ARRAY_SIZE(at91_io_desc));
+> -}
+> -
+>  static const char *sama5_alt_dt_board_compat[] __initconst = {
+>  	"atmel,sama5d4",
+>  	NULL
+> @@ -128,7 +96,6 @@ static const char *sama5_alt_dt_board_compat[] __initconst = {
+>  
+>  DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
+>  	/* Maintainer: Atmel */
+> -	.map_io		= sama5_alt_map_io,
+>  	.init_machine	= sama5_dt_device_init,
+>  	.dt_compat	= sama5_alt_dt_board_compat,
+>  	.l2c_aux_mask	= ~0UL,
 > 
-> static int __get_cpu_architecture(void)
-> {
-> 	int cpu_arch;
-> 
-> 	unsigned int id = read_cpuid_id();
-> 	if ((id & 0x0008f000) == 0) {
-> 		cpu_arch = CPU_ARCH_UNKNOWN;
-> 	} else if ((id & 0x0008f000) == 0x00007000) {
-> 		cpu_arch = (id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
-> 	} else if ((id & 0x00080000) == 0x00000000) {
-> 		cpu_arch = (id >> 16) & 7;
-> 		if (cpu_arch)
-> 			cpu_arch += CPU_ARCH_ARMv3;
-> 	} else if ((id & 0x000f0000) == 0x000f0000) {
 
-[...]
 
-> So I thought it would be nice to give the poor compiler a break,
-> and just stuff the result in a local variable:
-> 
-> --- setup.c	2015-03-03 18:04:59.000000000 +0100
-> +++ setup.foo.c	2015-03-13 16:26:56.413380663 +0100
-> @@ -237,15 +237,16 @@
->   {
->   	int cpu_arch;
->   
-> -	if ((read_cpuid_id() & 0x0008f000) == 0) {
-> +	unsigned int id = read_cpuid_id();
-> +	if ((id & 0x0008f000) == 0) {
->   		cpu_arch = CPU_ARCH_UNKNOWN;
-> -	} else if ((read_cpuid_id() & 0x0008f000) == 0x00007000) {
-> -		cpu_arch = (read_cpuid_id() & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
-> -	} else if ((read_cpuid_id() & 0x00080000) == 0x00000000) {
-> -		cpu_arch = (read_cpuid_id() >> 16) & 7;
-> +	} else if ((id & 0x0008f000) == 0x00007000) {
-> +		cpu_arch = (id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
-> +	} else if ((id & 0x00080000) == 0x00000000) {
-> +		cpu_arch = (id >> 16) & 7;
->   		if (cpu_arch)
->   			cpu_arch += CPU_ARCH_ARMv3;
-> -	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
-> +	} else if ((id & 0x000f0000) == 0x000f0000) {
-
-[...]
-
-> Is this nano-optimization worth considering?
-
-This is only ever called at early boot time in setup_processor, so I'm
-not sure I see the point in making changes for optimisation's sake --
-this is far from a hot path.
-
-Howevever it would be possible to make __get_cpu_architecture a little
-more legible (we should be able to return early in each of the cases),
-and having single read of read_cpuid_id() at the start would make the
-lines a little shorter.
-
-Mark.
+-- 
+Nicolas Ferre
