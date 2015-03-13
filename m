@@ -1,81 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Mar 2015 18:01:50 +0100
-Subject: [PATCH v2 5/7] ARM: at91: sama5d4: remove useless map_io
-In-Reply-To: <1425583068-5826-6-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1425583068-5826-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1425583068-5826-6-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <550317FE.6000401@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 17:02:51 +0000
+Subject: read_cpuid_id() in arch/arm/kernel/setup.c
+In-Reply-To: <20150313165600.GB9603@leverpostej>
+References: <55030A68.6070002@free.fr>
+ <20150313165600.GB9603@leverpostej>
+Message-ID: <20150313170250.GX8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 05/03/2015 20:17, Alexandre Belloni a ?crit :
-> All the peripheral remapped at io_map are taken care of by their respective
-> drivers.
+On Fri, Mar 13, 2015 at 04:56:00PM +0000, Mark Rutland wrote:
+> In the presence of big.LITTLE the comment and premise of the
+> optimisation here is wrong. A thread can migrate between cores of
+> differing microarchitectures.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> So __attribute_const__ is simply broken, and we probably need to do
+> something like the black magic SP hazarding hack we do for the tpidr
+> percpu accesses (only expecting this to be called in non-preemptible
+> context) if it makes sense to allow the value to be cached.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Yes, it's true that with big.LITTLE, lots of stuff is broken in this
+regard, and you are partially right, but you are not entirely right
+either.
 
-Nice: I take this one with the at91-cleanup2 tag. So I'll skip this one
-when taking care of this series ;-)
+It's not the reading of the CPU ID which is the problem, it's the
+reading _and_ use of derived results which is a problem.
 
-> ---
->  arch/arm/mach-at91/sama5.c | 33 ---------------------------------
->  1 file changed, 33 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
-> index 26b718a0c235..d7593d572a77 100644
-> --- a/arch/arm/mach-at91/sama5.c
-> +++ b/arch/arm/mach-at91/sama5.c
-> @@ -89,38 +89,6 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
->  	.dt_compat	= sama5_dt_board_compat,
->  MACHINE_END
->  
-> -static struct map_desc at91_io_desc[] __initdata = {
-> -	{
-> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_MPDDRC),
-> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_MPDDRC),
-> -	.length         = SZ_512,
-> -	.type           = MT_DEVICE,
-> -	},
-> -	{
-> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_PMC),
-> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_PMC),
-> -	.length         = SZ_512,
-> -	.type           = MT_DEVICE,
-> -	},
-> -	{ /* On sama5d4, we use USART3 as serial console */
-> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_USART3),
-> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_USART3),
-> -	.length         = SZ_256,
-> -	.type           = MT_DEVICE,
-> -	},
-> -	{ /* A bunch of peripheral with fine grained IO space */
-> -	.virtual        = (unsigned long)AT91_ALT_IO_P2V(SAMA5D4_BASE_SYS2),
-> -	.pfn            = __phys_to_pfn(SAMA5D4_BASE_SYS2),
-> -	.length         = SZ_2K,
-> -	.type           = MT_DEVICE,
-> -	},
-> -};
-> -
-> -static void __init sama5_alt_map_io(void)
-> -{
-> -	iotable_init(at91_io_desc, ARRAY_SIZE(at91_io_desc));
-> -}
-> -
->  static const char *sama5_alt_dt_board_compat[] __initconst = {
->  	"atmel,sama5d4",
->  	NULL
-> @@ -128,7 +96,6 @@ static const char *sama5_alt_dt_board_compat[] __initconst = {
->  
->  DT_MACHINE_START(sama5_alt_dt, "Atmel SAMA5")
->  	/* Maintainer: Atmel */
-> -	.map_io		= sama5_alt_map_io,
->  	.init_machine	= sama5_dt_device_init,
->  	.dt_compat	= sama5_alt_dt_board_compat,
->  	.l2c_aux_mask	= ~0UL,
-> 
-
+What this basically means is that in the presence of big.LITTLE, we
+need __get_cpu_architecture() as a whole, and whatever makes use of
+its return value to /all/ be non-preemptible... and probably a lot
+more code too.
 
 -- 
-Nicolas Ferre
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
