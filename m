@@ -1,135 +1,44 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 13 Mar 2015 10:36:37 +0800
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <20150312193505.GB7346@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
- <20150312193505.GB7346@google.com>
-Message-ID: <55024D35.6050509@huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 13 Mar 2015 10:40:43 +0800
+Subject: [PATCH 1/3] ARM: imx6qdl-sabreauto.dtsi: add max7310 support
+In-Reply-To: <20150311014606.GY20455@dragon>
+References: <1425893288-1517-1-git-send-email-peter.chen@freescale.com>
+ <1425893288-1517-2-git-send-email-peter.chen@freescale.com>
+ <20150311014606.GY20455@dragon>
+Message-ID: <20150313024041.GA24143@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> +	pci_add_resource(&resources, &ioport_resource);
->>>> +	pci_add_resource(&resources, &iomem_resource);
->>>> +	pci_add_resource(&resources, &busn_resource);
->>>
->>> Since I don't want to export busn_resource, you might have to allocate your
->>> own struct resource for it here.  And, of course, figure out the details of
->>> which PCI domain you're in and whether you need to share one struct
->>> resource across several host bridges in the same domain.
->>
->> Allocate its own resource here is ok for me, as I mentioned in previous reply,
->> so do we still need to add additional info to figure out which domain own the bus resource ?
+On Wed, Mar 11, 2015 at 09:46:09AM +0800, Shawn Guo wrote:
+> On Mon, Mar 09, 2015 at 05:28:06PM +0800, Peter Chen wrote:
+> > max7310 is an i2c interface gpio expander
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > ---
+> >  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 43 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 43 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > index 009abd6..51acfec 100644
+> > --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> > @@ -28,6 +28,13 @@
+> >  		};
+> >  	};
+> >  
+> > +	max7310_reset: max7310-reset {
+> > +		compatible = "gpio-reset";
 > 
-> That's up to the caller.  Only the platform knows which bridges it wants to
-> have in the same domain.  In principle, every host bridge could be in its
-> own domain, since each bridge is the root of a unique PCI hierarchy.  But
-> some platforms have firmware that assumes otherwise.  I have no idea what
-> xen assumes.
-
-I'm not xen guy, so I don't know much about it, but because it call pci_scan_bus_parented()
-before, and in which busn_resource is always shared for different host bridges(same domain or not),
-I think add a static bus resource(0,255) should be safe, at least, it would not introduce new risk.
-
-Something like:
-
-diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-index b1ffebe..a69e529 100644
---- a/drivers/pci/xen-pcifront.c
-+++ b/drivers/pci/xen-pcifront.c
-@@ -446,9 +446,15 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
-                                 unsigned int domain, unsigned int bus)
- {
-        struct pci_bus *b;
-+       LIST_HEAD(resources);
-        struct pcifront_sd *sd = NULL;
-        struct pci_bus_entry *bus_entry = NULL;
-        int err = 0;
-+       static struct resource busn_res = {
-+               .start = 0,
-+               .end = 255,
-+               .flags = IORESOURCE_BUS,
-+       };
-
- #ifndef CONFIG_PCI_DOMAINS
-        if (domain != 0) {
-@@ -470,17 +476,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
-                err = -ENOMEM;
-                goto err_out;
-        }
-+       pci_add_resource(&resources, &ioport_resource);
-+       pci_add_resource(&resources, &iomem_resource);
-+       pci_add_resource(&resources, &busn_res);
-        pcifront_init_sd(sd, domain, bus, pdev);
-
-        pci_lock_rescan_remove();
-
--       b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
--                                 &pcifront_bus_ops, sd);
-+       b = pci_scan_root_bus(&pdev->xdev->dev, bus,
-+                                 &pcifront_bus_ops, sd, &resources);
-        if (!b) {
-
-Bjorn, what do you think about ?
-
-Thanks!
-Yijing.
-
-
-> 
->>>>  	pcifront_init_sd(sd, domain, bus, pdev);
->>>>  
->>>>  	pci_lock_rescan_remove();
->>>>  
->>>> -	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
->>>> -				  &pcifront_bus_ops, sd);
->>>> +	b = pci_scan_root_bus(&pdev->xdev->dev, bus,
->>>> +				  &pcifront_bus_ops, sd, &resources);
->>>>  	if (!b) {
->>>>  		dev_err(&pdev->xdev->dev,
->>>>  			"Error creating PCI Frontend Bus!\n");
->>>>  		err = -ENOMEM;
->>>>  		pci_unlock_rescan_remove();
->>>> +		pci_free_resource_list(&resources);
->>>>  		goto err_out;
->>>>  	}
->>>>  
->>>> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>>>  
->>>>  	list_add(&bus_entry->list, &pdev->root_buses);
->>>>  
->>>> -	/* pci_scan_bus_parented skips devices which do not have a have
->>>> +	/* pci_scan_root_bus skips devices which do not have a
->>>>  	* devfn==0. The pcifront_scan_bus enumerates all devfn. */
->>>>  	err = pcifront_scan_bus(pdev, domain, bus, b);
->>>>  
->>>> -- 
->>>> 1.7.1
->>>>
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>> .
->>>
->>
->>
->> -- 
->> Thanks!
->> Yijing
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
+> The mainline kernel doesn't seem to have a gpio-reset driver/binding
+> yet.
 > 
 
+Yeah, the driver still handles reset by itself instead of DT.
+Even without reset operation, my max7310 chip works ok.
+Would you accept that I delete this reset operation
+and send v2?
 
 -- 
-Thanks!
-Yijing
+
+Best Regards,
+Peter Chen
