@@ -1,58 +1,53 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 13 Mar 2015 11:19:12 +0800
-Subject: [PATCH v6 06/30] PCI: Combine PCI domain and bus number in u32 arg
-In-Reply-To: <20150312194927.GC7346@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-7-git-send-email-wangyijing@huawei.com>
- <20150312012946.GA10949@google.com> <55018330.5050002@huawei.com>
- <20150312194927.GC7346@google.com>
-Message-ID: <55025730.40504@huawei.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Mar 2015 11:21:41 +0800
+Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
+In-Reply-To: <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
+References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
+ <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150313032139.GN20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> struct pci_scan_info {
->> 	int bus;
->> 	struct device *parent;
->> 	struct pci_ops *ops;
->> 	void *sysdata;
->> 	struct list_head *resource;
->> 	int domain;
->> 	struct pci_host_bridge_ops;
->> }
->>
->> Do you like this one or keep it like now ?
->>
->> pci_scan_root_bus(struct device *parent, int domain, int bus,
->> 		struct pci_ops *ops, void *sysdata, struct list_head *resources, struct pci_host_bridge_ops *ops)
+On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
+> Now that the GPC has been converted to be a full blown irqchip
+> (and not a mole on the side of the GIC), booting a new kernel
+> with an old DT is likely to result in a rough ride for the user.
 > 
-> I don't think reducing the number of arguments is a good argument for
-> squashing some of them together.
+> This patch makes sure such a situation is promptly detected and
+> the user made aware that a DT update is in order.
 > 
-> I don't really want to add a structure like that because it adds management
-> complexity for all the callers because it contains per-bridge things (bus,
-> parent, domain, resource, sysdata).  Things like struct pci_ops and struct
-> pci_host_bridge_ops are much simpler because drivers can statically
-> allocate a single copy and use it for multiple devices.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> I think it might make sense to put the struct pci_ops pointer inside struct
-> pci_host_bridge_ops.  That would get rid of one of the arguments.
-> 
-> You might also be able to get rid of the "bus" argument, since the caller
-> should be passing an IORESOURCE_BUS resource in the resource list, and
-> "bus" should be the same as res->start.
+> diff --git a/arch/arm/mach-imx/pm-imx6.c b/arch/arm/mach-imx/pm-imx6.c
+> index 6a7c6fc..f03f30f0 100644
+> --- a/arch/arm/mach-imx/pm-imx6.c
+> +++ b/arch/arm/mach-imx/pm-imx6.c
+> @@ -554,11 +554,17 @@ put_node:
+>  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+>  					*socdata)
+>  {
+> +	struct device_node *np;
+>  	struct regmap *gpr;
+>  	int ret;
+>  
+>  	WARN_ON(!ccm_base);
+>  
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+> +	if (WARN_ON(!np ||
+> +		    !of_find_property(np, "interrupt-controller", NULL)))
+> +		pr_warn("Outdated DT detected, suspend/resume will NOT work\n");
+> +
 
-I think this make sense, I will try to find a better solution.
+Can this be done in imx_gpc_init() instead?
 
-Thanks!
-Yijing.
+Shawn
 
+>  	if (IS_ENABLED(CONFIG_SUSPEND)) {
+>  		ret = imx6q_suspend_init(socdata);
+>  		if (ret)
+> -- 
+> 2.1.4
 > 
-> Bjorn
-> 
-> .
-> 
-
-
--- 
-Thanks!
-Yijing
