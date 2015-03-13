@@ -1,80 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 13 Mar 2015 10:23:47 -0500
-Subject: [PATCH v3 2/3] of: add optional options parameter to
- of_find_node_by_path()
-In-Reply-To: <54F9F92F.7080900@hurleysoftware.com>
-References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
- <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
- <54F7287E.6060302@hurleysoftware.com>
- <20150306165253.GJ4278@bivouac.eciton.net>
- <54F9EDE8.1090902@hurleysoftware.com> <54F9F92F.7080900@hurleysoftware.com>
-Message-ID: <CAL_Jsq+hznVHJommOhZ1hCjhvp81kZjEHUGtmJyxFreTXZ5T7A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Mar 2015 16:24:57 +0100
+Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
+ support of the mvebu SoCs
+In-Reply-To: <20150313134016.GV7311@lunn.ch>
+References: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150313134016.GV7311@lunn.ch>
+Message-ID: <49808502.FHjQOLPYaI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 6, 2015 at 12:59 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
-> On 03/06/2015 01:11 PM, Peter Hurley wrote:
->> On 03/06/2015 11:52 AM, Leif Lindholm wrote:
->
-> [...]
->
->>> Could you give the below a spin, and if it works for you, send me the
->>> above tests as a full patch so that I can post both as a series?
->>
->> Will do as soon as I finish testing.
->
-> All passed with your patch; patch for testcases below.
+On Friday 13 March 2015 14:40:16 Andrew Lunn wrote:
+> On Fri, Mar 13, 2015 at 02:41:45PM +0100, Gregory CLEMENT wrote:
+> > I will also take care of the legacy support(not fully converted to DT)
+> > of the mvebu SoCs.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > ---
+> >  MAINTAINERS | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index ddc5a8cf9a8a..39b27f52e217 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
+> >  M:   Jason Cooper <jason@lakedaemon.net>
+> >  M:   Andrew Lunn <andrew@lunn.ch>
+> >  M:   Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > +M:   Gregory Clement <gregory.clement@free-electrons.com>
+> >  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >  S:   Maintained
+> >  F:   arch/arm/mach-dove/
+> > -- 
+> > 2.1.0
+> > 
+> 
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
+> 
 
-Applied both for 4.0. Thanks.
+Should we pick this up for the 4.0 fixes branch directly?
 
-Rob
-
->
-> Regards,
-> Peter Hurley
->
-> --- >% ---
-> From: Peter Hurley <peter@hurleysoftware.com>
-> Subject: [PATCH] of: unittest: Add options string testcase variants
->
-> Add testcase variants with '/' in the options string to test for
-> scan beyond end path name terminated by ':'.
->
-> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
->  drivers/of/unittest.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-> index 0cf9a23..b2d7547 100644
-> --- a/drivers/of/unittest.c
-> +++ b/drivers/of/unittest.c
-> @@ -92,6 +92,11 @@ static void __init of_selftest_find_node_by_name(void)
->                  "option path test failed\n");
->         of_node_put(np);
->
-> +       np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
-> +       selftest(np && !strcmp("test/option", options),
-> +                "option path test, subcase #1 failed\n");
-> +       of_node_put(np);
-> +
->         np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
->         selftest(np, "NULL option path test failed\n");
->         of_node_put(np);
-> @@ -102,6 +107,12 @@ static void __init of_selftest_find_node_by_name(void)
->                  "option alias path test failed\n");
->         of_node_put(np);
->
-> +       np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
-> +                                      &options);
-> +       selftest(np && !strcmp("test/alias/option", options),
-> +                "option alias path test, subcase #1 failed\n");
-> +       of_node_put(np);
-> +
->         np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
->         selftest(np, "NULL option alias path test failed\n");
->         of_node_put(np);
-> --
-> 2.3.1
->
->
+	Arnd
