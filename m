@@ -1,93 +1,34 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Thu, 12 Mar 2015 17:48:52 -0700
-Subject: [PATCH v7 4/4] ARM: dts: enable PCIe support for Cygnus
-In-Reply-To: <1426207732-31625-1-git-send-email-rjui@broadcom.com>
-References: <1426207732-31625-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1426207732-31625-5-git-send-email-rjui@broadcom.com>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Thu, 12 Mar 2015 18:11:01 -0700
+Subject: [PATCH] mmc: sdhci-iproc: fix oops in sdhci_iproc_writew
+Message-ID: <20150313011101.GA24853@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCIe device nodes in bcm-cygnus.dtsi but keep them disabled there.
-Only enable them for bcm958300k where PCIe interfaces are populated
+The driver co-allocates sdhci_iproc_host with sdhci_pltfm_host and so to
+access it we need to use sdhci_pltfm_priv() and not pltfm_host->priv.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi |   42 +++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm958300k.dts  |    8 +++++++
- 2 files changed, 50 insertions(+)
+ drivers/mmc/host/sdhci-iproc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index ff5fb6a..ee0c6e4 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -90,6 +90,48 @@
- 		status = "disabled";
- 	};
- 
-+	pcie0: pcie at 18012000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18012000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 100 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <0>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x28000000 0 0x00010000
-+			  0x82000000 0 0x20000000 0x20000000 0 0x04000000>;
-+
-+		status = "disabled";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		compatible = "brcm,iproc-pcie";
-+		reg = <0x18013000 0x1000>;
-+
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0 0 0 0 &gic GIC_SPI 106 IRQ_TYPE_NONE>;
-+
-+		linux,pci-domain = <1>;
-+
-+		bus-range = <0x00 0xff>;
-+
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x81000000 0 0	  0x48000000 0 0x00010000
-+			  0x82000000 0 0x40000000 0x40000000 0 0x04000000>;
-+
-+		status = "disabled";
-+	};
-+
- 	uart0: serial at 18020000 {
- 		compatible = "snps,dw-apb-uart";
- 		reg = <0x18020000 0x100>;
-diff --git a/arch/arm/boot/dts/bcm958300k.dts b/arch/arm/boot/dts/bcm958300k.dts
-index f1bb36f..c9eb856 100644
---- a/arch/arm/boot/dts/bcm958300k.dts
-+++ b/arch/arm/boot/dts/bcm958300k.dts
-@@ -47,6 +47,14 @@
- 		bootargs = "console=ttyS0,115200";
- 	};
- 
-+	pcie0: pcie at 18012000 {
-+		status = "okay";
-+	};
-+
-+	pcie1: pcie at 18013000 {
-+		status = "okay";
-+	};
-+
- 	uart3: serial at 18023000 {
- 		status = "okay";
- 	};
+diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
+index 4139d34..3b423b0 100644
+--- a/drivers/mmc/host/sdhci-iproc.c
++++ b/drivers/mmc/host/sdhci-iproc.c
+@@ -97,7 +97,7 @@ static inline void sdhci_iproc_writel(struct sdhci_host *host, u32 val, int reg)
+ static void sdhci_iproc_writew(struct sdhci_host *host, u16 val, int reg)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct sdhci_iproc_host *iproc_host = pltfm_host->priv;
++	struct sdhci_iproc_host *iproc_host = sdhci_pltfm_priv(pltfm_host);
+ 	u32 word_shift = REG_OFFSET_IN_BITS(reg);
+ 	u32 mask = 0xffff << word_shift;
+ 	u32 oldval, newval;
 -- 
-1.7.9.5
+2.2.0.rc0.207.ga3a616c
+
+
+-- 
+Dmitry
