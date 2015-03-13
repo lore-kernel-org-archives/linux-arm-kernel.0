@@ -1,48 +1,38 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 13 Mar 2015 10:38:58 +0000
-Subject: [PATCH v2 3/6] hw/char: pl011 don't keep setting the IRQ if
- nothing changed
-In-Reply-To: <CAFEAcA-UOfgxBA969U6ADdra75fxYQPi6JFe017J6-oMG1rGhg@mail.gmail.com>
-References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
- <1425479753-18349-4-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA-RhZVe1qwKQ3LzfWbzYVcBQ-jrwTnhH0OX69GNtnoysw@mail.gmail.com>
- <CAFEAcA-UOfgxBA969U6ADdra75fxYQPi6JFe017J6-oMG1rGhg@mail.gmail.com>
-Message-ID: <87ioe5b2rh.fsf@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 13 Mar 2015 11:40:32 +0100
+Subject: [PATCH v5 02/10] mfd: syscon: Add atmel system timer registers
+ definition
+In-Reply-To: <20150313080315.GC3383@x1>
+References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426162054-9987-3-git-send-email-alexandre.belloni@free-electrons.com>
+ <20150313080315.GC3383@x1>
+Message-ID: <20150313104032.GG4329@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Peter Maydell <peter.maydell@linaro.org> writes:
+On 13/03/2015 at 08:03:15 +0000, Lee Jones wrote :
+> On Thu, 12 Mar 2015, Alexandre Belloni wrote:
+> 
+> > AT91RM920 has a memory range reserved for timer and watchdog configuration.
+> > Expose those registers so that drivers can make use of the system timer syscon
+> > declared in at91 DTs.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  include/linux/mfd/syscon/atmel-st.h | 49 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 49 insertions(+)
+> >  create mode 100644 include/linux/mfd/syscon/atmel-st.h
+> 
+> Applied, thanks.
+> 
 
-> On 12 March 2015 at 15:51, Peter Maydell <peter.maydell@linaro.org> wrote:
->> On 4 March 2015 at 14:35, Alex Benn?e <alex.bennee@linaro.org> wrote:
->>> While observing KVM traces I can see additional IRQ calls on pretty much
->>> every MMIO access which is just plain inefficient. Only update the QEMU
->>> IRQ level if something has actually changed from last time. Otherwise we
->>> may be papering over other failure modes.
->
->> Consider this sequence of events:
->
-> Incidentally, the code review rule of thumb that led me to
-> construct that scenario is:
->  * state inside the device struct which doesn't correspond
->    to real hardware state is suspicious
->  * state which doesn't have any handling on migration
->    save/restore is doubly suspicious
-> ...and then it was just a matter of "find the situation
-> where this is broken" :-)
->
-> If we want to avoid making syscalls back into KVM it might
-> be better to attack the problem in the GIC object rather
-> than in all the devices that might be connected to it.
-> In general QEMU devices tend to assume they can just
-> always call qemu_set_irq() and it's the other end's
-> job to avoid doing anything too expensive in that situation.
-
-Fair enough - I'll drop this patch on the re-spin
-
->
-> -- PMM
+Actually, I was thinking this could go through the at91 to avoid
+depending on your branch.
 
 -- 
-Alex Benn?e
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
