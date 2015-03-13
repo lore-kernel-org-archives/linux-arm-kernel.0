@@ -1,69 +1,94 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 13 Mar 2015 10:50:42 -0500
-Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <20150313105207.GB3592@leverpostej>
-References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
- <20150313105207.GB3592@leverpostej>
-Message-ID: <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Fri, 13 Mar 2015 10:56:22 -0500
+Subject: [PATCH 1/1 v2] ARM: coresight: fix system halt when etm enable
+ and add nosmp to command line
+In-Reply-To: <CANLsYkwpmbK3Z=mEq65MKN6ETiHKL2nZbq7=LBimJkLSCi3=2g@mail.gmail.com>
+References: <1424354275-18747-1-git-send-email-Frank.Li@freescale.com>
+ <CANLsYkwpmbK3Z=mEq65MKN6ETiHKL2nZbq7=LBimJkLSCi3=2g@mail.gmail.com>
+Message-ID: <CAHrpEqTrW6S6g-F1A3XrxLg1uNrC9fsB1C0GE4eOxsj43yf7yw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 24, 2015 at 4:00 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> On 19 February 2015 at 06:57,  <Frank.Li@freescale.com> wrote:
+>> From: Frank Li <Frank.Li@freescale.com>
+>>
+>> when nosmp set, only 1 core enabled. try to access disable core will halt.
+>> dts need added arm,primecell-periphid =  <id> for none-boot core
+>> otherwise amba_device_add will halt when read peripheral id.
+>>
+>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+>> ---
+>> Change from v1 to v2
+>>         - fixed typo
+>>
+>>  drivers/coresight/coresight-etm3x.c | 4 ++++
+>>  drivers/coresight/of_coresight.c    | 3 +--
+>>  2 files changed, 5 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
+>> index 73c3669..d312952 100644
+>> --- a/drivers/coresight/coresight-etm3x.c
+>> +++ b/drivers/coresight/coresight-etm3x.c
+>> @@ -1829,6 +1829,10 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+>>                 return ret;
+>>
+>>         drvdata->cpu = pdata ? pdata->cpu : 0;
+>> +       if (drvdata->cpu < 0) {
+>> +               ret = -EINVAL;
+>> +               goto err_arch_supported;
+>> +       }
+>>
+>>         get_online_cpus();
+>>         etmdrvdata[drvdata->cpu] = drvdata;
+>> diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+>> index c3efa41..6804bbd 100644
+>> --- a/drivers/coresight/of_coresight.c
+>> +++ b/drivers/coresight/of_coresight.c
+>> @@ -196,8 +196,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+>>                 if (cell) {
+>>                         hwid = of_read_number(cell, of_n_addr_cells(dn));
+>>                         index = get_logical_index(hwid);
+>> -                       if (index != -EINVAL)
+>> -                               pdata->cpu = index;
+>> +                       pdata->cpu = index;
+>>                 }
+>>         }
+>>
+>> --
+>> 1.9.1
+>>
+>
+> Frank,
+>
+> Thanks for your submission - this is a valid scenario.  On the flip
+> side things have changed in "of_get_coresight_platform_data()" and
+> your patch's logic doesn't apply.  Go look at my next branch [1] - we
+> are now using "of_get_cpu_node()" so that things work on 64-bit
+> implementations.
 
-On Mar 13, 2015, at 5:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+Okay I will rebase to you next branch.
 
->> +/ {
->> +	chosen {
->> +		stdout-path = &blsp1_uart2;
->> +	};
-> 
-> It would be good if we had the configuration too (see
-> Documentation/devicetree/bindings/chosen.txt), as that avoids any
-> reliance on kernel defaults.
-> 
-> You can refer to an alias, so this could be:
-> 
-> aliases {
-> 	serial0 = &blsp1_uart2;
-> };
-> 
-> chosen {
-> 	stdout-path = "serial0:115200n8";
-> };
-> 
-> ...assuming that 115200n8 is correct for your UART, of course.
-> 
-> 
-> [?]
+>
+> Keep what you've done in "etm_probe()" but you will have to re-work
+> the other part - meddling with "cpu_online()" would be my first
+> choice...
 
-Where is the code that actually handles this parsing?  I?m not see it in early_init_dt_scan_chosen_serial and I don?t believe fdt_path_offset does anything special with ?:'
+of_get_cpu_node may return NULL if core is not exist. I will test it
+when I get hardware.
+pdata->cpu will always return 0 if nosmp.
 
-> 
->> +#include "skeleton.dtsi"
-> 
-> I'd like to get rid of skeleton.dtsi; it causes more problems than it
-> solves (the address/size cells mismatch is confusing and hidden, people
-> forget to fill in memory nodes appropriately, etc).
-> 
-> Please remove this include and place appropriate #address-cells and #size-cells here.
-> 
-> I'd strongly recommend going with /#size-cells = <2>; it' will save on a
-> lot of pain if you need to add PCIe or something with large ranges
-> later. If things all fall in 4GB within the SoC then have
-> /soc/#size=cells = <1> and an appropriate /soc/ranges property.
-> 
-> I note this DT doesn't have any memory nodes. Is that an accident or
-> does the loader fill that in?
+>
+> Lastly please improve the commit log.  Adding a peripheral ID in the
+> DTS will indeed prevent AMBA from proving a non-responsive memory area
+> but it is not the point of the patch itself.
 
-it was coming out of skeleton.dtsi
+Our imx7 just come out.  dts part have not upstream yet.
+So I just sent out coresight part change.
 
-> 
-> If the latter, have an empty node with a comment to that effect.
-
-I?ll kill off usage of skeleton.dtsi
-
-- k
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> Thanks,
+> Mathieu
+>
+> [1]. https://git.linaro.org/kernel/coresight.git/shortlog/refs/heads/next
