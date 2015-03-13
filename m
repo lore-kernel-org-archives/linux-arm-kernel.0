@@ -1,57 +1,152 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 13 Mar 2015 11:28:21 +0800
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <20150312195651.GD7346@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
- <20150312025537.GD10949@google.com> <55018E90.9030301@huawei.com>
- <20150312195651.GD7346@google.com>
-Message-ID: <55025955.3020000@huawei.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 13 Mar 2015 11:28:45 +0800
+Subject: [PATCH v10 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
+ if ACPI is enabled on ARM64
+In-Reply-To: <20150312182151.GA3867@red-moon>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-19-git-send-email-hanjun.guo@linaro.org>
+ <20150312182151.GA3867@red-moon>
+Message-ID: <5502596D.6020901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> It's a nice idea to move this test into the core.  While you're at it, why
->>> don't you check for any overlap with the bus ranges of existing host
->>> bridges?  For example, if we're trying to create a new host bridge to
->>> [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
->>> as well as to [bus 40-ff].  I think your current patch will detect the
->>> latter conflict but not the former.
+On 2015/3/13 2:21, Lorenzo Pieralisi wrote:
+> On Wed, Mar 11, 2015 at 12:39:44PM +0000, Hanjun Guo wrote:
+>> From: Al Stone <al.stone@linaro.org>
 >>
->> Now pci host bridge may only know its start bus number, like acpi _BBN provided,
->> but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
->> so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
->> some pci scan would fail which currently scan success.
-> 
-> _BBN is not the correct source for the bridge's bus number range.  There's
-> a comment in acpi_pci_root_add() that explains why:
-> 
->   * We need both the start and end of the downstream bus range
->   * to interpret _CBA (MMCONFIG base address), so it really is
->   * supposed to be in _CRS.  If we don't find it there, all we
->   * can do is assume [_BBN-0xFF] or [0-0xFF].
-> 
-> A platform SHOULD know the start and and end bus number.  If it doesn't I
-> think it's the platform's responsibility to carve up the bus number range.
-> Maybe this can be done by trimming the range of the [bus 00-ff] bridge when
-> we discover another bridge that leads to bus 80.
+>> ACPI reduced hardware mode is disabled by default, but ARM64
+>> can only run properly in ACPI hardware reduced mode, so select
+>> ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
+>>
+>> If the firmware is not using hardware reduced ACPI mode, we
+>> will disable ACPI to avoid nightmare such as accessing some
+>> registers which are not available on ARM64.
+>>
+[...]
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 6468f88..5819ef7 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -303,6 +303,11 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>  	 */
+>>  	if (table->revision > 5 ||
+>>  	    (table->revision == 5 && fadt->minor_revision >= 1)) {
+>> +		if (!acpi_gbl_reduced_hardware) {
+>> +			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
+>> +			goto disable_acpi;
+>> +		}
+>> +
+> I reviewed the code and found that acpi_parse_fadt has become very
+> complex to read and understand. On top of that, I still do not understand
+> why you check PSCI presence in there (to print a warning ?) and as it
 
-Currently, if platform does not know the end bus number (not provide the bus resource),
-we will update the max bus number returned by pci_scan_child_bus() to the bus resource end,
-and I think this is reasonable. I consider to introduce a flag to identify the bus resource
-which end bus number is undefined, then we could force all pci_scan_root_bus()  etc. callers
-to provide the bus resource, and we could process the bus resource end according the bus resource flag.
-Also then we could reduce the bus argument which is the same as busn_res->start.
-I would try to provide draft patch, then we could discuss it more clearly.
+Since Parking protocol for bringing up secondary CPUs will be upstreamed,
+it is ok to me to print no message for not supporting PSCI.
 
-Thanks!
-Yijing.
+> was raised before disable_acpi() is scattered all over the place.
+> I do not understand why we enable ACPI to disable it again if
+> one of the checks fails, IMHO it is better to leave it disabled,
+> carry out the checks and enable ACPI if all of them pass.
+>
+> I came up with the patch attached on top of your series, which should be
+> split, tested on Juno, please test, let me know your opinion and shout if
+> you spot something wrong, it should simplify things a lot.
 
-> 
-> .
-> 
+Thanks, I have some minor comments below.
 
+>
+> I wonder if acpi_get_table_with_size() usage is frowned upon, but you
+> use it anyway and it helps us remove the FADT parsing function that
+> in my opinion is useless, since its return value is dumped by ACPI
+> core.
+>
+> Thanks,
+> Lorenzo
+>
+> ---
+>  arch/arm64/kernel/acpi.c | 92 ++++++++++++++++++++++++------------------------
+>  1 file changed, 46 insertions(+), 46 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 5819ef7..b7497fa 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -291,56 +291,23 @@ void acpi_unregister_gsi(u32 gsi)
+>  }
+>  EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+>  
+> -static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> -{
+> -	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> -
+> -	/*
+> -	 * Revision in table header is the FADT Major revision, and there
+> -	 * is a minor revision of FADT which was introduced by ACPI 5.1,
+> -	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
+> -	 * boot protocol configuration data, or we will disable ACPI.
+> -	 */
+> -	if (table->revision > 5 ||
+> -	    (table->revision == 5 && fadt->minor_revision >= 1)) {
+> -		if (!acpi_gbl_reduced_hardware) {
+> -			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
+> -			goto disable_acpi;
+> -		}
+> -
+> -		/*
+> -		 * ACPI 5.1 only has two explicit methods to boot up SMP,
+> -		 * PSCI and Parking protocol, but the Parking protocol is
+> -		 * only specified for ARMv7 now, so make PSCI as the only
+> -		 * way for the SMP boot protocol before some updates for
+> -		 * the Parking protocol spec.
+> -		 */
+> -		if (acpi_psci_present())
+> -			return 0;
+> -
+> -		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
+> -		return -EOPNOTSUPP;
+> -	}
+> -
+> -	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+> -		table->revision, fadt->minor_revision);
+> -
+> -disable_acpi:
+> -	disable_acpi();
+> -	return -EINVAL;
+> -}
+> -
+>  /*
+>   * acpi_boot_table_init() called from setup_arch(), always.
+>   *	1. find RSDP and get its address, and then find XSDT
+>   *	2. extract all tables and checksums them all
+>   *	3. check ACPI FADT revision
+> + *	4. check ACPI FADT HW reduced flag
+>   *
+>   * We can parse ACPI boot-time tables such as MADT after
+>   * this function is called.
+>   */
+>  void __init acpi_boot_table_init(void)
+>  {
+> +	struct acpi_table_header *table;
+> +	struct acpi_table_fadt *fadt;
+> +	acpi_status status;
+> +	acpi_size tbl_size;
+> +
+>  	/*
+>  	 * Enable ACPI instead of device tree unless
+>  	 * - ACPI has been disabled explicitly (acpi=off), or
+> @@ -351,19 +318,52 @@ void __init acpi_boot_table_init(void)
+>  	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>  		return;
+>  
+> -	enable_acpi();
+> -
+>  	/* Initialize the ACPI boot-time table parser. */
+>  	if (acpi_table_init()) {
 
--- 
-Thanks!
-Yijing
+Since we disable ACPI in default, it is a bit strange for me to init all
+the ACPI tables and parse FADT when ACPI is disabled, could you
+put some comments here to clarify the purpose? other than that, it is looks
+good to me.
+
+Thanks
+Hanjun
