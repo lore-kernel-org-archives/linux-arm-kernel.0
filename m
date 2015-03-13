@@ -1,44 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 11:37:15 +0800
-Subject: [PATCH 1/3] ARM: imx6qdl-sabreauto.dtsi: add max7310 support
-In-Reply-To: <20150313024041.GA24143@shlinux2>
-References: <1425893288-1517-1-git-send-email-peter.chen@freescale.com>
- <1425893288-1517-2-git-send-email-peter.chen@freescale.com>
- <20150311014606.GY20455@dragon> <20150313024041.GA24143@shlinux2>
-Message-ID: <20150313033713.GP20455@dragon>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 13 Mar 2015 11:29:46 +0800
+Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic
+ pci host bridge
+In-Reply-To: <20150312212306.GH7346@google.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <20150312212306.GH7346@google.com>
+Message-ID: <550259AA.2030609@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 10:40:43AM +0800, Peter Chen wrote:
-> On Wed, Mar 11, 2015 at 09:46:09AM +0800, Shawn Guo wrote:
-> > On Mon, Mar 09, 2015 at 05:28:06PM +0800, Peter Chen wrote:
-> > > max7310 is an i2c interface gpio expander
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > ---
-> > >  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 43 ++++++++++++++++++++++++++++++++
-> > >  1 file changed, 43 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > > index 009abd6..51acfec 100644
-> > > --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > > +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > > @@ -28,6 +28,13 @@
-> > >  		};
-> > >  	};
-> > >  
-> > > +	max7310_reset: max7310-reset {
-> > > +		compatible = "gpio-reset";
-> > 
-> > The mainline kernel doesn't seem to have a gpio-reset driver/binding
-> > yet.
-> > 
+On 2015/3/13 5:23, Bjorn Helgaas wrote:
+> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
+>> ...
+>> Yijing Wang (29):
+>>   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
+>>   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
+>>   sparc/PCI: Claim bus resources before pci_bus_add_devices()
 > 
-> Yeah, the driver still handles reset by itself instead of DT.
-> Even without reset operation, my max7310 chip works ok.
-> Would you accept that I delete this reset operation
-> and send v2?
+> I put the above patches plus a cleanup patch on my pci/enumeration branch.
+> Please rebase your next revision to that.  If there's anything else
+> non-controversial that we can pull in to chip away at this, let me know.
+> 
 
-Yes.
+Nice, so we could rebase the rest series easier, thanks!
 
-Shawn
+>>   PCI: Export busn_resource to drivers/pci
+>>   PCI: Remove deprecated pci_scan_bus_parented()
+>>   PCI: Combine PCI domain and bus number in u32 arg
+>>   PCI: Pass PCI domain number combined with root bus number
+>>   PCI: Introduce pci_host_assign_domain_nr() to assign domain
+>>   PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
+>>   PCI: Introduce pci_host_bridge_list to manage host bridges
+>>   PCI: Save sysdata in pci_host_bridge drvdata
+>>   PCI: Introduce pci_host_bridge_ops to support host specific
+>>     operations
+>>   PCI: Introduce new scan function pci_scan_host_bridge()
+>>   x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+>>   ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
+>>   powerpc/pci: Rename pcibios_root_bridge_prepare()
+>>   powerpc/pci: Use pci_scan_host_bridge() for simplicity
+>>   PCI: Remove weak pcibios_root_bridge_prepare()
+>>   sparc/PCI: Use pci_scan_host_bridge() for simplicity
+>>   PCI: Introduce pci_bus_child_max_busnr()
+>>   parisc/PCI: Use pci_scan_root_bus() for simplicity
+>>   PCI/mvebu: Use pci_common_init_dev() to simplify code
+>>   PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+>>   PCI/designware: Use pci_scan_root_bus() for simplicity
+>>   PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
+>>   PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
+>>   PCI: Export find_pci_host_bridge() and rename to
+>>     pci_find_host_bridge()
+>>   PCI: Remove platform specific pci_domain_nr()
+>>   PCI: Remove pci_bus_assign_domain_nr()
+> 
+> .
+> 
+
+
+-- 
+Thanks!
+Yijing
