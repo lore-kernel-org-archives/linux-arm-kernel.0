@@ -1,76 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Mar 2015 15:21:21 +0000
-Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <20150313150309.GA20455@dragon>
-References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
- <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
- <20150313032139.GN20455@dragon> <20150313081311.1ebfe8e2@arm.com>
- <20150313150309.GA20455@dragon>
-Message-ID: <55030071.8030207@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 13 Mar 2015 10:23:47 -0500
+Subject: [PATCH v3 2/3] of: add optional options parameter to
+ of_find_node_by_path()
+In-Reply-To: <54F9F92F.7080900@hurleysoftware.com>
+References: <1417110967-16284-1-git-send-email-leif.lindholm@linaro.org>
+ <1417110967-16284-3-git-send-email-leif.lindholm@linaro.org>
+ <54F7287E.6060302@hurleysoftware.com>
+ <20150306165253.GJ4278@bivouac.eciton.net>
+ <54F9EDE8.1090902@hurleysoftware.com> <54F9F92F.7080900@hurleysoftware.com>
+Message-ID: <CAL_Jsq+hznVHJommOhZ1hCjhvp81kZjEHUGtmJyxFreTXZ5T7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/15 15:03, Shawn Guo wrote:
-> On Fri, Mar 13, 2015 at 08:13:11AM +0000, Marc Zyngier wrote:
->> On Fri, 13 Mar 2015 03:21:41 +0000
->> Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, Mar 6, 2015 at 12:59 PM, Peter Hurley <peter@hurleysoftware.com> wrote:
+> On 03/06/2015 01:11 PM, Peter Hurley wrote:
+>> On 03/06/2015 11:52 AM, Leif Lindholm wrote:
+>
+> [...]
+>
+>>> Could you give the below a spin, and if it works for you, send me the
+>>> above tests as a full patch so that I can post both as a series?
 >>
->>> On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
->>>> Now that the GPC has been converted to be a full blown irqchip
->>>> (and not a mole on the side of the GIC), booting a new kernel
->>>> with an old DT is likely to result in a rough ride for the user.
->>>>
->>>> This patch makes sure such a situation is promptly detected and
->>>> the user made aware that a DT update is in order.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
->>>>  1 file changed, 6 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-imx/pm-imx6.c
->>>> b/arch/arm/mach-imx/pm-imx6.c index 6a7c6fc..f03f30f0 100644
->>>> --- a/arch/arm/mach-imx/pm-imx6.c
->>>> +++ b/arch/arm/mach-imx/pm-imx6.c
->>>> @@ -554,11 +554,17 @@ put_node:
->>>>  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
->>>>  					*socdata)
->>>>  {
->>>> +	struct device_node *np;
->>>>  	struct regmap *gpr;
->>>>  	int ret;
->>>>  
->>>>  	WARN_ON(!ccm_base);
->>>>  
->>>> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
->>>> +	if (WARN_ON(!np ||
->>>> +		    !of_find_property(np, "interrupt-controller",
->>>> NULL)))
->>>> +		pr_warn("Outdated DT detected, suspend/resume will
->>>> NOT work\n"); +
->>>
->>> Can this be done in imx_gpc_init() instead?
->>
->> Unfortunately not, as imx_gpc_init() is only called if the above
->> properties are satisfied (that's exactly the case we want to detect: if
->> imx_gpc_init is called, we're already in a pretty good shape).
-> 
-> Ah, yes.  I forgot that the way imx_gpc_init() is called has been
-> changed.
-> 
-> I just gave the patch a go with an old DTB, and found that the kernel
-> stops booting before we can even see this fat warning (see log below).
-> It seems detecting at .init_machine time is too late.  I tried to move
-> the code to the beginning of function imx6q_init_irq(), and found it
-> works as expected.
+>> Will do as soon as I finish testing.
+>
+> All passed with your patch; patch for testcases below.
 
-[...]
+Applied both for 4.0. Thanks.
 
-Bummer. OK, I'll respin something shortly (we need to cover all three
-imx6 variants separately, it seems).
+Rob
 
-Thanks for testing,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Regards,
+> Peter Hurley
+>
+> --- >% ---
+> From: Peter Hurley <peter@hurleysoftware.com>
+> Subject: [PATCH] of: unittest: Add options string testcase variants
+>
+> Add testcase variants with '/' in the options string to test for
+> scan beyond end path name terminated by ':'.
+>
+> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+> ---
+>  drivers/of/unittest.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+> index 0cf9a23..b2d7547 100644
+> --- a/drivers/of/unittest.c
+> +++ b/drivers/of/unittest.c
+> @@ -92,6 +92,11 @@ static void __init of_selftest_find_node_by_name(void)
+>                  "option path test failed\n");
+>         of_node_put(np);
+>
+> +       np = of_find_node_opts_by_path("/testcase-data:test/option", &options);
+> +       selftest(np && !strcmp("test/option", options),
+> +                "option path test, subcase #1 failed\n");
+> +       of_node_put(np);
+> +
+>         np = of_find_node_opts_by_path("/testcase-data:testoption", NULL);
+>         selftest(np, "NULL option path test failed\n");
+>         of_node_put(np);
+> @@ -102,6 +107,12 @@ static void __init of_selftest_find_node_by_name(void)
+>                  "option alias path test failed\n");
+>         of_node_put(np);
+>
+> +       np = of_find_node_opts_by_path("testcase-alias:test/alias/option",
+> +                                      &options);
+> +       selftest(np && !strcmp("test/alias/option", options),
+> +                "option alias path test, subcase #1 failed\n");
+> +       of_node_put(np);
+> +
+>         np = of_find_node_opts_by_path("testcase-alias:testaliasoption", NULL);
+>         selftest(np, "NULL option alias path test failed\n");
+>         of_node_put(np);
+> --
+> 2.3.1
+>
+>
