@@ -1,54 +1,302 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 13 Mar 2015 09:33:29 -0500
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <55025955.3020000@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
- <20150312025537.GD10949@google.com>
- <55018E90.9030301@huawei.com> <20150312195651.GD7346@google.com>
- <55025955.3020000@huawei.com>
-Message-ID: <CAErSpo5RgADWDPDvA-sg+MhmayPgTCfQqN1j0hYorAzZ=8_-qg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Mar 2015 14:35:59 +0000
+Subject: [PATCH v2] arm64: Get rid of struct cpu_table
+Message-ID: <1426257359-13395-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 10:28 PM, Yijing Wang <wangyijing@huawei.com> wrote:
->>>> It's a nice idea to move this test into the core.  While you're at it, why
->>>> don't you check for any overlap with the bus ranges of existing host
->>>> bridges?  For example, if we're trying to create a new host bridge to
->>>> [bus 40-7f], it should conflict with existing bridges to [bus 00-7f]
->>>> as well as to [bus 40-ff].  I think your current patch will detect the
->>>> latter conflict but not the former.
->>>
->>> Now pci host bridge may only know its start bus number, like acpi _BBN provided,
->>> but does not limit the end bus number, Eg. two pci roots report _BBN 0x0 and 0x80,
->>> so we have two bus number resource (0, 0xff) and (0x80, 0xff), if we check it strictly,
->>> some pci scan would fail which currently scan success.
->>
->> _BBN is not the correct source for the bridge's bus number range.  There's
->> a comment in acpi_pci_root_add() that explains why:
->>
->>   * We need both the start and end of the downstream bus range
->>   * to interpret _CBA (MMCONFIG base address), so it really is
->>   * supposed to be in _CRS.  If we don't find it there, all we
->>   * can do is assume [_BBN-0xFF] or [0-0xFF].
->>
->> A platform SHOULD know the start and and end bus number.  If it doesn't I
->> think it's the platform's responsibility to carve up the bus number range.
->> Maybe this can be done by trimming the range of the [bus 00-ff] bridge when
->> we discover another bridge that leads to bus 80.
->
-> Currently, if platform does not know the end bus number (not provide the bus resource),
-> we will update the max bus number returned by pci_scan_child_bus() to the bus resource end,
-> and I think this is reasonable. I consider to introduce a flag to identify the bus resource
-> which end bus number is undefined, then we could force all pci_scan_root_bus()  etc. callers
-> to provide the bus resource, and we could process the bus resource end according the bus resource flag.
-> Also then we could reduce the bus argument which is the same as busn_res->start.
-> I would try to provide draft patch, then we could discuss it more clearly.
+struct cpu_table is an artifact left from the (very) early days of
+the arm64 port, and its only real use is to allow the most beautiful
+"AArch64 Processor" string to be displayed at boot time.
 
-Without having seen a patch, my inclination is to avoid a flag because
-flags change the behavior of the code you call, which makes that code
-harder to follow.  Maybe we could require these platforms to
-explicitly update the ending bus number after scanning the bus.
+Really? Yes, really.
 
-Bjorn
+Let's get rid of it. In order to avoid another BogoMips-gate, the
+aforementioned string is preserved.
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+* From v1:
+- Don't bother using adrp/add to compute the branch to __cpu_setup,
+  the kernel is small enough to be addressed with an imm26.
+- Nuke some more unreachable code (__error_p and co).
+
+ arch/arm64/include/asm/cputable.h | 30 ----------------
+ arch/arm64/kernel/Makefile        |  2 +-
+ arch/arm64/kernel/asm-offsets.c   |  4 ---
+ arch/arm64/kernel/cputable.c      | 33 -----------------
+ arch/arm64/kernel/head.S          | 76 +++------------------------------------
+ arch/arm64/kernel/setup.c         | 16 ++-------
+ 6 files changed, 8 insertions(+), 153 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/cputable.h
+ delete mode 100644 arch/arm64/kernel/cputable.c
+
+diff --git a/arch/arm64/include/asm/cputable.h b/arch/arm64/include/asm/cputable.h
+deleted file mode 100644
+index e3bd983..0000000
+--- a/arch/arm64/include/asm/cputable.h
++++ /dev/null
+@@ -1,30 +0,0 @@
+-/*
+- * arch/arm64/include/asm/cputable.h
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software: you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#ifndef __ASM_CPUTABLE_H
+-#define __ASM_CPUTABLE_H
+-
+-struct cpu_info {
+-	unsigned int	cpu_id_val;
+-	unsigned int	cpu_id_mask;
+-	const char	*cpu_name;
+-	unsigned long	(*cpu_setup)(void);
+-};
+-
+-extern struct cpu_info *lookup_processor_type(unsigned int);
+-
+-#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 5ee07ee..d5e7074 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -12,7 +12,7 @@ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
+ 
+ # Object file lists.
+-arm64-obj-y		:= cputable.o debug-monitors.o entry.o irq.o fpsimd.o	\
++arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
+ 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
+ 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index f7fa65d..14dd3d1 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -24,7 +24,6 @@
+ #include <linux/kvm_host.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+-#include <asm/cputable.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+@@ -71,9 +70,6 @@ int main(void)
+   BLANK();
+   DEFINE(PAGE_SZ,	       	PAGE_SIZE);
+   BLANK();
+-  DEFINE(CPU_INFO_SZ,		sizeof(struct cpu_info));
+-  DEFINE(CPU_INFO_SETUP,	offsetof(struct cpu_info, cpu_setup));
+-  BLANK();
+   DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+   DEFINE(DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+diff --git a/arch/arm64/kernel/cputable.c b/arch/arm64/kernel/cputable.c
+deleted file mode 100644
+index fd3993c..0000000
+--- a/arch/arm64/kernel/cputable.c
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- * arch/arm64/kernel/cputable.c
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software: you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-
+-#include <linux/init.h>
+-
+-#include <asm/cputable.h>
+-
+-extern unsigned long __cpu_setup(void);
+-
+-struct cpu_info cpu_table[] = {
+-	{
+-		.cpu_id_val	= 0x000f0000,
+-		.cpu_id_mask	= 0x000f0000,
+-		.cpu_name	= "AArch64 Processor",
+-		.cpu_setup	= __cpu_setup,
+-	},
+-	{ /* Empty */ },
+-};
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 8ce88e0..ee26aef 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -245,22 +245,12 @@ ENTRY(stext)
+ 	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+ 	bl	set_cpu_boot_mode_flag
+ 	mrs	x22, midr_el1			// x22=cpuid
+-	mov	x0, x22
+-	bl	lookup_processor_type
+-	mov	x23, x0				// x23=current cpu_table
+-	/*
+-	 * __error_p may end up out of range for cbz if text areas are
+-	 * aligned up to section sizes.
+-	 */
+-	cbnz	x23, 1f				// invalid processor (x23=0)?
+-	b	__error_p
+-1:
++
+ 	bl	__vet_fdt
+ 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
+ 	/*
+-	 * The following calls CPU specific code in a position independent
+-	 * manner. See arch/arm64/mm/proc.S for details. x23 = base of
+-	 * cpu_info structure selected by lookup_processor_type above.
++	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
++	 * details.
+ 	 * On return, the CPU will be ready for the MMU to be turned on and
+ 	 * the TCR will have been set.
+ 	 */
+@@ -268,9 +258,7 @@ ENTRY(stext)
+ 						// MMU has been enabled
+ 	adrp	lr, __enable_mmu		// return (PIC) address
+ 	add	lr, lr, #:lo12:__enable_mmu
+-	ldr	x12, [x23, #CPU_INFO_SETUP]
+-	add	x12, x12, x28			// __virt_to_phys
+-	br	x12				// initialise processor
++	b	__cpu_setup			// initialise processor
+ ENDPROC(stext)
+ 
+ /*
+@@ -634,15 +622,9 @@ ENTRY(secondary_startup)
+ 	 * Common entry point for secondary CPUs.
+ 	 */
+ 	mrs	x22, midr_el1			// x22=cpuid
+-	mov	x0, x22
+-	bl	lookup_processor_type
+-	mov	x23, x0				// x23=current cpu_table
+-	cbz	x23, __error_p			// invalid processor (x23=0)?
+ 
+ 	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
+-	ldr	x12, [x23, #CPU_INFO_SETUP]
+-	add	x12, x12, x28			// __virt_to_phys
+-	blr	x12				// initialise processor
++	bl	__cpu_setup			// initialise processor
+ 
+ 	ldr	x21, =secondary_data
+ 	ldr	x27, =__secondary_switched	// address to jump to after enabling the MMU
+@@ -708,51 +690,3 @@ ENDPROC(__calc_phys_offset)
+ 	.align 3
+ 1:	.quad	.
+ 	.quad	PAGE_OFFSET
+-
+-/*
+- * Exception handling. Something went wrong and we can't proceed. We ought to
+- * tell the user, but since we don't have any guarantee that we're even
+- * running on the right architecture, we do virtually nothing.
+- */
+-__error_p:
+-ENDPROC(__error_p)
+-
+-__error:
+-1:	nop
+-	b	1b
+-ENDPROC(__error)
+-
+-/*
+- * This function gets the processor ID in w0 and searches the cpu_table[] for
+- * a match. It returns a pointer to the struct cpu_info it found. The
+- * cpu_table[] must end with an empty (all zeros) structure.
+- *
+- * This routine can be called via C code and it needs to work with the MMU
+- * both disabled and enabled (the offset is calculated automatically).
+- */
+-ENTRY(lookup_processor_type)
+-	adr	x1, __lookup_processor_type_data
+-	ldp	x2, x3, [x1]
+-	sub	x1, x1, x2			// get offset between VA and PA
+-	add	x3, x3, x1			// convert VA to PA
+-1:
+-	ldp	w5, w6, [x3]			// load cpu_id_val and cpu_id_mask
+-	cbz	w5, 2f				// end of list?
+-	and	w6, w6, w0
+-	cmp	w5, w6
+-	b.eq	3f
+-	add	x3, x3, #CPU_INFO_SZ
+-	b	1b
+-2:
+-	mov	x3, #0				// unknown processor
+-3:
+-	mov	x0, x3
+-	ret
+-ENDPROC(lookup_processor_type)
+-
+-	.align	3
+-	.type	__lookup_processor_type_data, %object
+-__lookup_processor_type_data:
+-	.quad	.
+-	.quad	cpu_table
+-	.size	__lookup_processor_type_data, . - __lookup_processor_type_data
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index e8420f6..a19eae2 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -50,7 +50,6 @@
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/elf.h>
+-#include <asm/cputable.h>
+ #include <asm/cpufeature.h>
+ #include <asm/cpu_ops.h>
+ #include <asm/sections.h>
+@@ -83,7 +82,6 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+ 
+ DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 
+-static const char *cpu_name;
+ phys_addr_t __fdt_pointer __initdata;
+ 
+ /*
+@@ -209,22 +207,12 @@ static void __init smp_build_mpidr_hash(void)
+ 
+ static void __init setup_processor(void)
+ {
+-	struct cpu_info *cpu_info;
+ 	u64 features, block;
+ 	u32 cwg;
+ 	int cls;
+ 
+-	cpu_info = lookup_processor_type(read_cpuid_id());
+-	if (!cpu_info) {
+-		printk("CPU configuration botched (ID %08x), unable to continue.\n",
+-		       read_cpuid_id());
+-		while (1);
+-	}
+-
+-	cpu_name = cpu_info->cpu_name;
+-
+-	printk("CPU: %s [%08x] revision %d\n",
+-	       cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
++	printk("CPU: AArch64 Processor [%08x] revision %d\n",
++	       read_cpuid_id(), read_cpuid_id() & 15);
+ 
+ 	sprintf(init_utsname()->machine, ELF_PLATFORM);
+ 	elf_hwcap = 0;
+-- 
+2.1.4
