@@ -1,94 +1,50 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Fri, 13 Mar 2015 10:56:22 -0500
-Subject: [PATCH 1/1 v2] ARM: coresight: fix system halt when etm enable
- and add nosmp to command line
-In-Reply-To: <CANLsYkwpmbK3Z=mEq65MKN6ETiHKL2nZbq7=LBimJkLSCi3=2g@mail.gmail.com>
-References: <1424354275-18747-1-git-send-email-Frank.Li@freescale.com>
- <CANLsYkwpmbK3Z=mEq65MKN6ETiHKL2nZbq7=LBimJkLSCi3=2g@mail.gmail.com>
-Message-ID: <CAHrpEqTrW6S6g-F1A3XrxLg1uNrC9fsB1C0GE4eOxsj43yf7yw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 13 Mar 2015 15:56:22 +0000
+Subject: [PATCH v2 2/2] serial/amba-pl011: Leave the TX IRQ alone when the
+ UART is not open
+In-Reply-To: <1426262182-2298-1-git-send-email-Dave.Martin@arm.com>
+References: <1426262182-2298-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1426262182-2298-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 24, 2015 at 4:00 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 19 February 2015 at 06:57,  <Frank.Li@freescale.com> wrote:
->> From: Frank Li <Frank.Li@freescale.com>
->>
->> when nosmp set, only 1 core enabled. try to access disable core will halt.
->> dts need added arm,primecell-periphid =  <id> for none-boot core
->> otherwise amba_device_add will halt when read peripheral id.
->>
->> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->> ---
->> Change from v1 to v2
->>         - fixed typo
->>
->>  drivers/coresight/coresight-etm3x.c | 4 ++++
->>  drivers/coresight/of_coresight.c    | 3 +--
->>  2 files changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/coresight/coresight-etm3x.c
->> index 73c3669..d312952 100644
->> --- a/drivers/coresight/coresight-etm3x.c
->> +++ b/drivers/coresight/coresight-etm3x.c
->> @@ -1829,6 +1829,10 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
->>                 return ret;
->>
->>         drvdata->cpu = pdata ? pdata->cpu : 0;
->> +       if (drvdata->cpu < 0) {
->> +               ret = -EINVAL;
->> +               goto err_arch_supported;
->> +       }
->>
->>         get_online_cpus();
->>         etmdrvdata[drvdata->cpu] = drvdata;
->> diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
->> index c3efa41..6804bbd 100644
->> --- a/drivers/coresight/of_coresight.c
->> +++ b/drivers/coresight/of_coresight.c
->> @@ -196,8 +196,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
->>                 if (cell) {
->>                         hwid = of_read_number(cell, of_n_addr_cells(dn));
->>                         index = get_logical_index(hwid);
->> -                       if (index != -EINVAL)
->> -                               pdata->cpu = index;
->> +                       pdata->cpu = index;
->>                 }
->>         }
->>
->> --
->> 1.9.1
->>
->
-> Frank,
->
-> Thanks for your submission - this is a valid scenario.  On the flip
-> side things have changed in "of_get_coresight_platform_data()" and
-> your patch's logic doesn't apply.  Go look at my next branch [1] - we
-> are now using "of_get_cpu_node()" so that things work on 64-bit
-> implementations.
+Getting the TX IRQ re-asserted from scratch can be inefficient in
+some setups.
 
-Okay I will rebase to you next branch.
+This patch avoids clearing the TX IRQ across pl011_shutdown()...
+pl011_startup(), so that if the port is closed and reopened, the
+IRQ will still work afterwards without having to bootstrap it again.
 
->
-> Keep what you've done in "etm_probe()" but you will have to re-work
-> the other part - meddling with "cpu_online()" would be my first
-> choice...
+The TX IRQ continues to be masked in IMSC when the UART is not in
+use.
 
-of_get_cpu_node may return NULL if core is not exist. I will test it
-when I get hardware.
-pdata->cpu will always return 0 if nosmp.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
->
-> Lastly please improve the commit log.  Adding a peripheral ID in the
-> DTS will indeed prevent AMBA from proving a non-responsive memory area
-> but it is not the point of the patch itself.
-
-Our imx7 just come out.  dts part have not upstream yet.
-So I just sent out coresight part change.
-
->
-> Thanks,
-> Mathieu
->
-> [1]. https://git.linaro.org/kernel/coresight.git/shortlog/refs/heads/next
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index bdb4831..c3d631d 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1646,9 +1646,6 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+-	/* Assume that TX IRQ doesn't work until we see one: */
+-	uap->tx_irq_seen = false;
+-
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
+@@ -1712,7 +1709,7 @@ static void pl011_shutdown(struct uart_port *port)
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->im = 0;
+ 	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff, uap->port.membase + UART011_ICR);
++	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
+ 	spin_unlock_irq(&uap->port.lock);
+ 
+ 	pl011_dma_shutdown(uap);
+-- 
+1.7.10.4
