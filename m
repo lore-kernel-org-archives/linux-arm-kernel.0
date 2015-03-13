@@ -1,63 +1,37 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 13 Mar 2015 10:33:41 -0700
-Subject: [PATCH 04/10] pm: domains: sync runtime PM status with PM domains
- after probe
-In-Reply-To: <E1YWSN5-0006G5-Ld@rmk-PC.arm.linux.org.uk> (Russell King's
- message of "Fri, 13 Mar 2015 16:23:35 +0000")
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 17:35:03 +0000
+Subject: [PATCH 02/10] pm: domains: factor out code to get the generic PM
+ domain from a struct device
+In-Reply-To: <7hpp8crezu.fsf@deeprootsystems.com>
 References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <E1YWSN5-0006G5-Ld@rmk-PC.arm.linux.org.uk>
-Message-ID: <7hzj7gpzt6.fsf@deeprootsystems.com>
+ <E1YWSMv-0006Fx-E6@rmk-PC.arm.linux.org.uk>
+ <7hpp8crezu.fsf@deeprootsystems.com>
+Message-ID: <20150313173503.GY8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King <rmk+kernel@arm.linux.org.uk> writes:
+On Fri, Mar 13, 2015 at 10:20:21AM -0700, Kevin Hilman wrote:
+> Russell King <rmk+kernel@arm.linux.org.uk> writes:
+> 
+> > The PM domain code contains two methods to get the generic PM domain
+> > for a struct device.  One is dev_to_genpd() which is only safe when
+> > we know for certain that the device has a generic PM domain attached.
+> > The other is coded into genpd_dev_pm_detach() which ensures that the
+> > PM domain in the struct device is a generic PM domain (and so is safer).
+> >
+> > This commit factors out the safer version and documents it.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Acked-by: Kevin Hilman <khilman@linaro.org>
+> 
+> On top of this, I assume you're thinking that the externally available
+> dev_to_genpd() should probably be replaced by pm_genpd_lookup_dev(), and
+> dev_to_genpd() should only be used internally to genpd?
 
-> Synchronise the PM domain status with runtime PM's status after a
-> platform device has been probed.  This augments the solution in commit
-> 2ed127697eb1 ("PM / Domains: Power on the PM domain right after attach
-> completes").
->
-> The above commit added a call to power up the PM domain when a device
-> attaches to the domain in order to match the behaviour required by
-> drivers that make no use of runtime PM.  The assumption is that the
-> device driver will cause a runtime PM transition, which will synchronise
-> the PM domain state with the runtime PM state.
->
-> However, by default, runtime PM will assume that the device is initially
-> suspended, and some drivers may make use of this should they not need to
-> touch the hardware during probe.
->
-> In order to allow such drivers, trigger the PM domain code to check
-> whether the PM domain can be suspended after the probe function, undoing
-> the effect of the power-on prior to the probe.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+I think that would be a sensible improvement over leaving the unsafe
+dev_to_genpd() exposed.
 
-[ Since I hadn't seen this version yet, repeating comment from the
-  previous version so it doesn't get lost. ]
-
-I think this is a good fix to the existing problem.  One minor nit on a
-comment below, otherwise:
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-
-> +/**
-> + * dev_pm_domain_sync - synchronise the PM domain state with its devices
-> + * @dev: device corresponding with domain
-> + *
-> + * Synchronise the PM domain state with the recently probed device, which
-> + * may be in a variety of PM states.  This ensures that a device which
-> + * enables runtime PM in suspended state, and never transitions to active
-> + * in its probe handler is properly suspended after the probe.
-> + */
-
-It's not the *device* tha needs to be properly suspended after the probe
-(since it's already/still runtime suspended), but the pm_domain that
-would be potentially powered down.  Hence, I'd reword the last sentence
-slightly:
-
-   This ensures that a device which enables runtime PM in suspended
-   state, and never transitions to active in its probe handler gives an
-   opportunity for the PM domain to be powered down after the probe.
-
-Kevin
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
