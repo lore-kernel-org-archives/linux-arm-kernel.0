@@ -1,35 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 Mar 2015 18:21:03 +0000
-Subject: [PATCH 3/6] ARM64: cpuidle: Replace cpu_suspend by the common
- ARM/ARM64 function
-In-Reply-To: <1425385777-14766-4-git-send-email-daniel.lezcano@linaro.org>
-References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
- <1425385777-14766-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150313182102.GS30671@e104818-lin.cambridge.arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 13 Mar 2015 11:22:34 -0700
+Subject: [PATCH 07/12] clocksource: qcom: Remove dead code
+In-Reply-To: <55032913.2000506@linaro.org>
+References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+ <1426270185-19510-8-git-send-email-sboyd@codeaurora.org>
+ <55032913.2000506@linaro.org>
+Message-ID: <55032AEA.3020304@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 01:29:34PM +0100, Daniel Lezcano wrote:
-> Call the common ARM/ARM64 'arm_cpuidle_suspend' instead of cpu_suspend function
-> which is specific to ARM64.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/cpuidle/cpuidle-arm64.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-> index 39a2c62..0cea244 100644
-> --- a/drivers/cpuidle/cpuidle-arm64.c
-> +++ b/drivers/cpuidle/cpuidle-arm64.c
-> @@ -49,7 +49,7 @@ static int arm64_enter_idle_state(struct cpuidle_device *dev,
->  		 * call the CPU ops suspend protocol with idle index as a
->  		 * parameter.
->  		 */
-> -		ret = cpu_suspend(idx);
-> +		arm_cpuidle_suspend(idx);
+On 03/13/15 11:14, Daniel Lezcano wrote:
+> On 03/13/2015 07:09 PM, Stephen Boyd wrote:
+>> This code is no longer used now that mach-msm has been removed.
+>> Delete it.
+>>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: David Brown <davidb@codeaurora.org>
+>> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+>> Cc: Daniel Walker <dwalker@fifo99.com>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>
+>> This can be acked and go through arm-soc or applied directly to
+>> clocksource
+>> tree.
+>>
+>>   drivers/clocksource/qcom-timer.c | 59
+>> ----------------------------------------
+>>   1 file changed, 59 deletions(-)
+>
+> Applied to my tree for 4.1.
+>
 
-Nitpick: why don't we just rename the arm one cpuidle_suspend()?
+
+Ah sorry, this one has to go with patch 1 through arm-soc, because it
+deletes symbols that patch 1 is using.
 
 -- 
-Catalin
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
