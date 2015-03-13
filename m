@@ -1,65 +1,202 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Mar 2015 22:57:24 +0100
-Subject: [PATCH v3 7/7] ARM: at91: drop AT91_TIMER_HZ
+Date: Fri, 13 Mar 2015 22:57:23 +0100
+Subject: [PATCH v3 6/7] ARM: at91: remove hardware.h
 In-Reply-To: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426283844-463-8-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426283844-463-7-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop AT91_TIMER_HZ as this can be handled using HZ_FIXED. Initial help message
-was:
-
-On AT91rm9200 chips where you're using a system clock derived
-from the 32768 Hz hardware clock, this tick rate should divide
-it exactly: use a power-of-two value, such as 128 or 256, to
-reduce timing errors caused by rounding.
+hardware.h is now mostyl unused, move the remaining declarations to pm.c and
+remove it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/Kconfig           |  2 +-
- arch/arm/mach-at91/Kconfig | 18 ------------------
- 2 files changed, 1 insertion(+), 19 deletions(-)
+ arch/arm/mach-at91/include/mach/hardware.h | 123 -----------------------------
+ arch/arm/mach-at91/pm.c                    |  11 ++-
+ arch/arm/mach-at91/pm_suspend.S            |   1 -
+ arch/arm/mach-at91/sama5.c                 |   2 -
+ 4 files changed, 9 insertions(+), 128 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/hardware.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a1d153098001..8d5c4f9c15f9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1502,7 +1502,7 @@ config HZ_FIXED
- 	int
- 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || \
- 		ARCH_S5PV210 || ARCH_EXYNOS4
--	default AT91_TIMER_HZ if ARCH_AT91
-+	default 128 if SOC_AT91RM9200
- 	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE_LEGACY
- 	default 0
+diff --git a/arch/arm/mach-at91/include/mach/hardware.h b/arch/arm/mach-at91/include/mach/hardware.h
+deleted file mode 100644
+index 2f8ce2d69fdb..000000000000
+--- a/arch/arm/mach-at91/include/mach/hardware.h
++++ /dev/null
+@@ -1,123 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/hardware.h
+- *
+- *  Copyright (C) 2003 SAN People
+- *  Copyright (C) 2003 ATMEL
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- */
+-
+-#ifndef __ASM_ARCH_HARDWARE_H
+-#define __ASM_ARCH_HARDWARE_H
+-
+-#include <asm/sizes.h>
+-
+-/* DBGU base */
+-/* rm9200, 9260/9g20, 9261/9g10, 9rl */
+-#define AT91_BASE_DBGU0	0xfffff200
+-/* 9263, 9g45, sama5d3 */
+-#define AT91_BASE_DBGU1	0xffffee00
+-/* sama5d4 */
+-#define AT91_BASE_DBGU2	0xfc069000
+-
+-/*
+- * On all at91 except rm9200 and x40 have the System Controller starts
+- * at address 0xffffc000 and has a size of 16KiB.
+- *
+- * On rm9200 it's start at 0xfffe4000 of 111KiB with non reserved data starting
+- * at 0xfffff000
+- *
+- * Removes the individual definitions of AT91_BASE_SYS and
+- * replaces them with a common version at base 0xfffffc000 and size 16KiB
+- * and map the same memory space
+- */
+-#define AT91_BASE_SYS	0xffffc000
+-
+-/*
+- * On sama5d4 there is no system controller, we map some needed peripherals
+- */
+-#define AT91_ALT_BASE_SYS	0xfc069000
+-
+-/*
+- * On all at91 have the Advanced Interrupt Controller starts at address
+- * 0xfffff000 and the Power Management Controller starts at 0xfffffc00
+- */
+-#define AT91_AIC	0xfffff000
+-#define AT91_PMC	0xfffffc00
+-
+-/*
+- * Peripheral identifiers/interrupts.
+- */
+-#define AT91_ID_FIQ		0	/* Advanced Interrupt Controller (FIQ) */
+-#define AT91_ID_SYS		1	/* System Peripherals */
+-
+-#ifdef CONFIG_MMU
+-/*
+- * Remap the peripherals from address 0xFFF78000 .. 0xFFFFFFFF
+- * to 0xFEF78000 .. 0xFF000000.  (544Kb)
+- */
+-#define AT91_IO_PHYS_BASE	0xFFF78000
+-#define AT91_IO_VIRT_BASE	IOMEM(0xFF000000 - AT91_IO_SIZE)
+-
+-/*
+- * On sama5d4, remap the peripherals from address 0xFC069000 .. 0xFC06F000
+- * to 0xFB069000 .. 0xFB06F000.  (24Kb)
+- */
+-#define AT91_ALT_IO_PHYS_BASE	AT91_ALT_BASE_SYS
+-#define AT91_ALT_IO_VIRT_BASE	IOMEM(0xFB069000)
+-#else
+-/*
+- * Identity mapping for the non MMU case.
+- */
+-#define AT91_IO_PHYS_BASE	AT91_BASE_SYS
+-#define AT91_IO_VIRT_BASE	IOMEM(AT91_IO_PHYS_BASE)
+-
+-#define AT91_ALT_IO_PHYS_BASE	AT91_ALT_BASE_SYS
+-#define AT91_ALT_IO_VIRT_BASE	IOMEM(AT91_ALT_BASE_SYS)
+-#endif
+-
+-#define AT91_IO_SIZE		(0xFFFFFFFF - AT91_IO_PHYS_BASE + 1)
+-
+- /* Convert a physical IO address to virtual IO address */
+-#define AT91_IO_P2V(x)		((x) - AT91_IO_PHYS_BASE + AT91_IO_VIRT_BASE)
+-#define AT91_ALT_IO_P2V(x)	((x) - AT91_ALT_IO_PHYS_BASE + AT91_ALT_IO_VIRT_BASE)
+-
+-/*
+- * Virtual to Physical Address mapping for IO devices.
+- */
+-#define AT91_VA_BASE_SYS	AT91_IO_P2V(AT91_BASE_SYS)
+-#define AT91_ALT_VA_BASE_SYS	AT91_ALT_IO_P2V(AT91_ALT_BASE_SYS)
+-
+- /* Internal SRAM is mapped below the IO devices */
+-#define AT91_SRAM_MAX		SZ_1M
+-#define AT91_VIRT_BASE		(AT91_IO_VIRT_BASE - AT91_SRAM_MAX)
+-
+-/* External Memory Map */
+-#define AT91_CHIPSELECT_0	0x10000000
+-#define AT91_CHIPSELECT_1	0x20000000
+-#define AT91_CHIPSELECT_2	0x30000000
+-#define AT91_CHIPSELECT_3	0x40000000
+-#define AT91_CHIPSELECT_4	0x50000000
+-#define AT91_CHIPSELECT_5	0x60000000
+-#define AT91_CHIPSELECT_6	0x70000000
+-#define AT91_CHIPSELECT_7	0x80000000
+-
+-/* Clocks */
+-#define AT91_SLOW_CLOCK		32768		/* slow clock */
+-
+-/*
+- * FIXME: this is needed to communicate between the pinctrl driver and
+- * the PM implementation in the machine. Possibly part of the PM
+- * implementation should be moved down into the pinctrl driver and get
+- * called as part of the generic suspend/resume path.
+- */
+-#ifndef __ASSEMBLY__
+-extern void at91_pinctrl_gpio_suspend(void);
+-extern void at91_pinctrl_gpio_resume(void);
+-#endif
+-
+-#endif
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 2a12c01afc67..f93a735ba327 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -32,11 +32,18 @@
+ #include <asm/fncpy.h>
+ #include <asm/cacheflush.h>
  
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 4662eae06753..da977699c037 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -100,22 +100,4 @@ config SOC_SAMA5
- 	select SOC_SAM_V7
- 	select SRAM if PM
+-#include <mach/hardware.h>
+-
+ #include "generic.h"
+ #include "pm.h"
  
--comment "Atmel SoCs Feature Selections"
++/*
++ * FIXME: this is needed to communicate between the pinctrl driver and
++ * the PM implementation in the machine. Possibly part of the PM
++ * implementation should be moved down into the pinctrl driver and get
++ * called as part of the generic suspend/resume path.
++ */
++extern void at91_pinctrl_gpio_suspend(void);
++extern void at91_pinctrl_gpio_resume(void);
++
+ static struct {
+ 	unsigned long uhp_udp_mask;
+ 	int memctrl;
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index 7c444c259740..bd22b2c8a051 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -13,7 +13,6 @@
+  */
+ #include <linux/linkage.h>
+ #include <linux/clk/at91_pmc.h>
+-#include <mach/hardware.h>
+ #include <mach/at91_ramc.h>
+ #include "pm.h"
+ 
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index ef5d2073774b..41d829d8e7d5 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -14,8 +14,6 @@
+ #include <asm/mach/map.h>
+ #include <asm/system_misc.h>
+ 
+-#include <mach/hardware.h>
 -
--config AT91_TIMER_HZ
--	int "Kernel HZ (jiffies per second)"
--	range 32 1024
--	depends on ARCH_AT91
--	default "128" if SOC_AT91RM9200
--	default "100"
--	help
--	  On AT91rm9200 chips where you're using a system clock derived
--	  from the 32768 Hz hardware clock, this tick rate should divide
--	  it exactly: use a power-of-two value, such as 128 or 256, to
--	  reduce timing errors caused by rounding.
--
--	  On AT91sam926x chips, or otherwise when using a higher precision
--	  system clock (of at least several MHz), rounding is less of a
--	  problem so it can be safer to use a decimal values like 100.
--
- endif
+ #include "generic.h"
+ #include "soc.h"
+ 
 -- 
 2.1.0
