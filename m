@@ -1,39 +1,113 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 13 Mar 2015 09:48:25 -0500
-Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic pci
- host bridge
-In-Reply-To: <20150313113156.GA4739@bart.dudau.co.uk>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <20150312212306.GH7346@google.com> <20150313113156.GA4739@bart.dudau.co.uk>
-Message-ID: <CAErSpo7KuchFy0U=80buz4oRKwn-tcwz1Ej9-hBZHg+a-eYCbw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Mar 2015 14:51:11 +0000
+Subject: [PATCH v10 10/21] ARM64 / ACPI: Get PSCI flags in FADT for PSCI
+ init
+In-Reply-To: <1426077587-1561-11-git-send-email-hanjun.guo@linaro.org>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-11-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150313145111.GB5229@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 6:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
-> On Thu, Mar 12, 2015 at 04:23:06PM -0500, Bjorn Helgaas wrote:
->> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
->> > ...
->> > Yijing Wang (29):
->> >   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
->> >   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
->> >   sparc/PCI: Claim bus resources before pci_bus_add_devices()
->>
->> I put the above patches plus a cleanup patch on my pci/enumeration branch.
->> Please rebase your next revision to that.  If there's anything else
->> non-controversial that we can pull in to chip away at this, let me know.
->
-> Hi Bjorn and Yijing,
->
-> Sorry for not providing feedback earlier on this series (or any previous ones),
-> I'm just crawling out from under a rock of doing graphics drivers :)
->
-> The patch ripping out pci_bus_add_devices() from pci_scan_root_bus() misses out
-> the users of that function from drivers/pci/host. If Yijing is going to refresh
-> the series it is probably worth starting with adding back the call into pcie-xilinx.c
-> and pci-versatile.c.
+On Wed, Mar 11, 2015 at 12:39:36PM +0000, Hanjun Guo wrote:
 
-Huh, sure enough, I missed those, too.  Yijing, when you add those,
-can you pull my branch, update the patch, and repost it?  That way
-you'll keep my changelog and cleanup updates.
+[...]
 
-Bjorn
+> +static void __init psci_0_2_set_functions(void)
+> +{
+> +	pr_info("Using standard PSCI v0.2 function IDs\n");
+> +	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> +	psci_ops.cpu_suspend = psci_cpu_suspend;
+> +
+> +	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> +	psci_ops.cpu_off = psci_cpu_off;
+> +
+> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> +	psci_ops.cpu_on = psci_cpu_on;
+> +
+> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> +	psci_ops.migrate = psci_migrate;
+> +
+> +	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> +	psci_ops.affinity_info = psci_affinity_info;
+> +
+> +	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> +		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> +	psci_ops.migrate_info_type = psci_migrate_info_type;
+> +
+> +	arm_pm_restart = psci_sys_reset;
+> +
+> +	pm_power_off = psci_sys_poweroff;
+> +}
+> +
+>  /*
+>   * PSCI Function IDs for v0.2+ are well defined so use
+>   * standard values.
+> @@ -306,29 +335,7 @@ static int __init psci_0_2_init(struct device_node *np)
+>  		}
+>  	}
+>  
+> -	pr_info("Using standard PSCI v0.2 function IDs\n");
+> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
+> -	psci_ops.cpu_suspend = psci_cpu_suspend;
+> -
+> -	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
+> -	psci_ops.cpu_off = psci_cpu_off;
+> -
+> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
+> -	psci_ops.cpu_on = psci_cpu_on;
+> -
+> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
+> -	psci_ops.migrate = psci_migrate;
+> -
+> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
+> -	psci_ops.affinity_info = psci_affinity_info;
+> -
+> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
+> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
+> -	psci_ops.migrate_info_type = psci_migrate_info_type;
+> -
+> -	arm_pm_restart = psci_sys_reset;
+> -
+> -	pm_power_off = psci_sys_poweroff;
+> +	psci_0_2_set_functions();
+
+You should have factored out the firmware version probing too, that's
+the only way we can detect the PSCI firmware version when booting through
+ACPI. You can end up initializing pointers for v0.2+ with a mismatching
+version implemented in PSCI firmware, eg 0.1.
+
+We should do that incrementally, I will put together a patch to
+factor out the FW version probing first, you can rebase on top of it.
+
+>  out_put_node:
+>  	of_node_put(np);
+> @@ -381,7 +388,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
+>  	{},
+>  };
+>  
+> -int __init psci_init(void)
+> +int __init psci_dt_init(void)
+>  {
+>  	struct device_node *np;
+>  	const struct of_device_id *matched_np;
+> @@ -396,6 +403,29 @@ int __init psci_init(void)
+>  	return init_fn(np);
+>  }
+>  
+> +/*
+> + * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
+> + * explicitly clarified in SBBR
+> + */
+> +int __init psci_acpi_init(void)
+> +{
+> +	if (!acpi_psci_present()) {
+> +		pr_info("is not implemented in ACPI.\n");
+> +		return -EOPNOTSUPP;
+> +	}
+
+If PSCI is not present, that's a problem related to SMP init, right ?
+That's where a warning should be printed if any, not here, the SBBR
+mandates PSCI as secondaries bring up method, warn otherwise.
+
+Lorenzo
