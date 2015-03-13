@@ -1,35 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
 Date: Fri, 13 Mar 2015 17:02:51 +0000
-Subject: read_cpuid_id() in arch/arm/kernel/setup.c
-In-Reply-To: <20150313165600.GB9603@leverpostej>
-References: <55030A68.6070002@free.fr>
- <20150313165600.GB9603@leverpostej>
-Message-ID: <20150313170250.GX8656@n2100.arm.linux.org.uk>
+Subject: [PATCH v3 0/5] KVM ARM64 Migration Fixes
+Message-ID: <1426266176-14933-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 04:56:00PM +0000, Mark Rutland wrote:
-> In the presence of big.LITTLE the comment and premise of the
-> optimisation here is wrong. A thread can migrate between cores of
-> differing microarchitectures.
-> 
-> So __attribute_const__ is simply broken, and we probably need to do
-> something like the black magic SP hazarding hack we do for the tpidr
-> percpu accesses (only expecting this to be called in non-preemptible
-> context) if it makes sense to allow the value to be cached.
+Some fairly minor updates from the last series I sent out:
 
-Yes, it's true that with big.LITTLE, lots of stuff is broken in this
-regard, and you are partially right, but you are not entirely right
-either.
+  - Re-based on v4.0-rc3
+  - Use KVM_MP_STATE_STOPPED instead of KVM_MP_STATE_HALTED
+  - Some minor textual tidy ups on commit msgs and comments
+  - Move the re-factored vgic_queue_irq_to_lr to before the active changes
 
-It's not the reading of the CPU ID which is the problem, it's the
-reading _and_ use of derived results which is a problem.
+The branch I've been working with can be found at:
 
-What this basically means is that in the presence of big.LITTLE, we
-need __get_cpu_architecture() as a whole, and whatever makes use of
-its return value to /all/ be non-preemptible... and probably a lot
-more code too.
+  http://git.linaro.org/people/alex.bennee/linux.git
+  branch: migration/kvmarm-fixes-for-4.0-v3
+
+Alex Benn?e (2):
+  arm/arm64: KVM: export VCPU power state via MP_STATE ioctl
+  arm/arm64: KVM: add a common vgic_queue_irq_to_lr fn
+
+Christoffer Dall (3):
+  arm/arm64: KVM: support for un-queuing active IRQs
+  arm/arm64: KVM: Fix migration race in the arch timer
+  arm/arm64: KVM: Keep elrsr/aisr in sync with software model
+
+ Documentation/virtual/kvm/api.txt |  16 ++-
+ arch/arm/kvm/arm.c                |  23 +++-
+ include/kvm/arm_arch_timer.h      |   7 ++
+ include/kvm/arm_vgic.h            |  16 ++-
+ virt/kvm/arm/arch_timer.c         |  45 +++++--
+ virt/kvm/arm/vgic-v2-emul.c       |  20 +++-
+ virt/kvm/arm/vgic-v2.c            |   8 ++
+ virt/kvm/arm/vgic-v3.c            |   8 ++
+ virt/kvm/arm/vgic.c               | 244 +++++++++++++++++++++++++++++++-------
+ virt/kvm/arm/vgic.h               |   8 ++
+ 10 files changed, 335 insertions(+), 60 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.3.2
