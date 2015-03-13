@@ -1,109 +1,77 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 13 Mar 2015 20:19:39 +0900
-Subject: [PATCH] mmc: dw_mmc: Add a timeout for sending CMD11
-In-Reply-To: <1425943101-11976-1-git-send-email-dianders@chromium.org>
-References: <1425943101-11976-1-git-send-email-dianders@chromium.org>
-Message-ID: <5502C7CB.3010504@samsung.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 13 Mar 2015 12:19:36 +0100
+Subject: [rtc-linux] [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
+In-Reply-To: <1426242563.18291.19.camel@mtksdaap41>
+References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>	
+ <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>	
+ <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
+ <1426242563.18291.19.camel@mtksdaap41>
+Message-ID: <5502C7C8.1020002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug.
 
-This patch is a right process. Just i wonder something.
 
-On 03/10/2015 08:18 AM, Doug Anderson wrote:
-> In the Designware databook's description of the "Voltage Switch Normal
-> Scenario" it instructs us to set a timer and fail the voltage change
-> if we don't see the voltage change interrupt within 2ms.  Let's
-> implement that.  Without implementing this I have often been able to
-> reproduce a hang while trying to send CMD11 on an rk3288-based board
-> while constantly ejecting and inserting UHS cards.
+On 13/03/15 11:29, Eddie Huang wrote:
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
-> ---
->  drivers/mmc/host/dw_mmc.c  | 26 ++++++++++++++++++++++++++
->  include/linux/mmc/dw_mmc.h |  2 ++
->  2 files changed, 28 insertions(+)
+> I encounter some trouble when I add code to check return value of
+> regmap_read and regmap_write. Every RTC register access through regmap,
+> and there are many register read/write in this driver. If I check every
+> return value, the driver will become ugly. I try to make this driver
+> clean using following macro.
 > 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 47dfd0e..d259662 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1020,6 +1020,15 @@ static void __dw_mci_start_request(struct dw_mci *host,
->  
->  	dw_mci_start_command(host, cmd, cmdflags);
->  
-> +	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
-> +		/*
-> +		 * Databook says to fail after 2ms w/ no response; give an
-> +		 * extra jiffy just in case we're about to roll over.
-> +		 */
-> +		mod_timer(&host->cmd11_timer,
-> +			  jiffies + msecs_to_jiffies(2) + 1);
-
-What's "plus one"?
-
-> +	}
-> +
->  	if (mrq->stop)
->  		host->stop_cmdr = dw_mci_prepare_command(slot->mmc, mrq->stop);
->  	else
-> @@ -2158,6 +2167,8 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->  		/* Check volt switch first, since it can look like an error */
->  		if ((host->state == STATE_SENDING_CMD11) &&
->  		    (pending & SDMMC_INT_VOLT_SWITCH)) {
-> +			del_timer(&host->cmd11_timer);
-> +
->  			mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
->  			pending &= ~SDMMC_INT_VOLT_SWITCH;
->  			dw_mci_cmd_interrupt(host, pending);
-> @@ -2571,6 +2582,18 @@ ciu_out:
->  	return ret;
->  }
->  
-> +static void dw_mci_cmd11_timer(unsigned long arg)
-> +{
-> +	struct dw_mci *host = (struct dw_mci *)arg;
-> +
-> +	if (host->state != STATE_SENDING_CMD11)
-> +		dev_info(host->dev, "Unexpected CMD11 timeout\n");
-
-If Unexpected CMD11 timeout, can it do  just" return"?
-Well, I think Unexpected CMD11 timeout is an rare case.
-
-Best Regards,
-Jaehoon Chung
-
-> +
-> +	host->cmd_status = SDMMC_INT_RTO;
-> +	set_bit(EVENT_CMD_COMPLETE, &host->pending_events);
-> +	tasklet_schedule(&host->tasklet);
-> +}
-> +
->  #ifdef CONFIG_OF
->  static struct dw_mci_of_quirks {
->  	char *quirk;
-> @@ -2745,6 +2768,9 @@ int dw_mci_probe(struct dw_mci *host)
->  		}
->  	}
->  
-> +	setup_timer(&host->cmd11_timer,
-> +		    dw_mci_cmd11_timer, (unsigned long)host);
-> +
->  	host->quirks = host->pdata->quirks;
->  
->  	spin_lock_init(&host->lock);
-> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-> index 471fb31..9efc567 100644
-> --- a/include/linux/mmc/dw_mmc.h
-> +++ b/include/linux/mmc/dw_mmc.h
-> @@ -202,6 +202,8 @@ struct dw_mci {
->  	int			irq;
->  
->  	int			sdio_id0;
-> +
-> +	struct timer_list       cmd11_timer;
->  };
->  
->  /* DMA ops for Internal/External DMAC interface */
+> static int __rtc_read(struct mt6397_rtc *rtc, u32 offset, u32 *data)
+> {
+>         u32 addr = rtc->addr_base + offset;
 > 
+>         if (offset < rtc->addr_range)
+>                 return regmap_read(rtc->regmap, addr, data);
+> 
+>         return -EINVAL;
+> }
+> 
+> #define rtc_read(ret, rtc, offset, data)                \
+> ({                                                      \
+>         ret = __rtc_read(rtc, offset, data);            \
+>         if (ret < 0)                                    \
+>                 goto rtc_exit;                          \
+> })                                                      \
+> 
+
+I agree with Sascha on hiding a goto statement in a macro is not a good idea.
+
+> 
+> And function call rtc_read, rtc_write looks like:
+> 
+> static int mtk_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> {
+>         unsigned long time;
+>         struct mt6397_rtc *rtc = dev_get_drvdata(dev);
+>         int ret = 0;
+>         u32 sec;
+> 
+>         mutex_lock(&rtc->lock);
+>         do {
+>                 rtc_read(ret, rtc, RTC_TC_SEC, &tm->tm_sec);
+>                 rtc_read(ret, rtc, RTC_TC_MIN, &tm->tm_min);
+>                 rtc_read(ret, rtc, RTC_TC_HOU, &tm->tm_hour);
+>                 rtc_read(ret, rtc, RTC_TC_DOM, &tm->tm_mday);
+>                 rtc_read(ret, rtc, RTC_TC_MTH, &tm->tm_mon);
+>                 rtc_read(ret, rtc, RTC_TC_YEA, &tm->tm_year);
+>                 rtc_read(ret, rtc, RTC_TC_SEC, &sec);
+>         } while (sec < tm->tm_sec);
+
+What about introducing
+static int __mtk_rtc_read_time(struct mt6397_rtc *rtc, struct rtc_time *tm, u32 *sec)
+and hide the checks of return values from regmap_read and the offset check in there. You return the error code or 0.
+
+This way the while loop would look like this:
+
+do {
+	ret = __mtk_rtc_read_time(rtc, &tm, &sec);
+	if (ret < 0)
+		goto rtc_exit;
+} while (sec < tm->tm_sec);
+
+Best regards,
+Matthias
