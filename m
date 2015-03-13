@@ -1,46 +1,115 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 11:29:32 +0800
-Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
- clk instances
-In-Reply-To: <5501EC6C.5010100@codeaurora.org>
-References: <alpine.DEB.2.02.1502022230110.2045@localhost6.localdomain6>
- <54CFFBCF.90706@codeaurora.org> <20150202225036.421.43421@quantum>
- <54D0F179.1040906@gmail.com> <54D2AA9B.7010800@codeaurora.org>
- <54D3900A.9060200@gmail.com> <54D423C3.9030105@codeaurora.org>
- <54E3BA20.3080205@codeaurora.org>
- <20150312172006.GA18418@breakpoint.cc>
- <5501EC6C.5010100@codeaurora.org>
-Message-ID: <20150313032931.GO20455@dragon>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 13 Mar 2015 11:31:38 +0800
+Subject: [PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <3629643.daQYNeVrsM@vostro.rjw.lan>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-7-git-send-email-hanjun.guo@linaro.org>
+ <3629643.daQYNeVrsM@vostro.rjw.lan>
+Message-ID: <55025A1A.7020507@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 12:43:40PM -0700, Stephen Boyd wrote:
-> On 03/12/15 10:20, Sebastian Andrzej Siewior wrote:
-> > On 2015-02-17 14:01:04 [-0800], Stephen Boyd wrote:
-> >> diff = 
-> >> --- arch/arm/mach-imx/mach-imx6q.c
-> >> +++ /tmp/cocci-output-11792-b62223-mach-imx6q.c
-> >> @@ -211,7 +211,6 @@ static void __init imx6q_1588_init(void)
-> >>  	 * set bit IOMUXC_GPR1[21].  Or the PTP clock must be from pad
-> >>  	 * (external OSC), and we need to clear the bit.
-> >>  	 */
-> >> -	clksel = ptp_clk == enet_ref ? IMX6Q_GPR1_ENET_CLK_SEL_ANATOP :
-> >>  				       IMX6Q_GPR1_ENET_CLK_SEL_PAD;
-> >>  	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> >>  	if (!IS_ERR(gpr))
-> > Any idea how to do the comparison here? Or should we rely that the bootloader
-> > sets this properly (it managed already to select a frequency)? The phy has no
-> > clock node in current DT's so we can check this.
-> >
-> 
-> This has been fixed by adding a clk_is_match() helper and using that to
-> compare instead of comparing raw pointers. It would be nice if we could
-> replace the patch with something else that doesn't require this helper
-> though. It looks like this is static board configuration, so I wonder
-> why we didn't just have a DT property that indicates how the gpr should
-> be configured for this particular board.
+On 2015/3/13 6:57, Rafael J. Wysocki wrote:
+> On Wednesday, March 11, 2015 08:39:32 PM Hanjun Guo wrote:
+>> From: Graeme Gregory <graeme.gregory@linaro.org>
+>>
+>> ACPI 5.1 does not currently support S states for ARM64 hardware but
+>> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
+>> for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
+>> and select it for x86 and ia64 only to make sleep functions available,
+>> and also introduce stub function to allow other drivers to function
+>> until S states are defined for ARM64.
+>>
+>> It will be no functional change for x86 and IA64.
+>>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> Acked-by: Robert Richter <rrichter@cavium.com>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  arch/ia64/Kconfig       | 1 +
+>>  arch/x86/Kconfig        | 1 +
+>>  drivers/acpi/Kconfig    | 4 ++++
+>>  drivers/acpi/Makefile   | 2 +-
+>>  drivers/acpi/internal.h | 4 ++++
+>>  5 files changed, 11 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+>> index 074e52b..e8728d7 100644
+>> --- a/arch/ia64/Kconfig
+>> +++ b/arch/ia64/Kconfig
+>> @@ -10,6 +10,7 @@ config IA64
+>>  	select ARCH_MIGHT_HAVE_PC_SERIO
+>>  	select PCI if (!IA64_HP_SIM)
+>>  	select ACPI if (!IA64_HP_SIM)
+>> +	select ACPI_GENERIC_SLEEP if ACPI
+>>  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+>>  	select HAVE_UNSTABLE_SCHED_CLOCK
+>>  	select HAVE_IDE
+>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+>> index b7d31ca..9804431 100644
+>> --- a/arch/x86/Kconfig
+>> +++ b/arch/x86/Kconfig
+>> @@ -22,6 +22,7 @@ config X86_64
+>>  ### Arch settings
+>>  config X86
+>>  	def_bool y
+>> +	select ACPI_GENERIC_SLEEP if ACPI
+>>  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+>>  	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+>>  	select ARCH_HAS_FAST_MULTIPLIER
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index e6c3ddd..a7b9120 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
+>>  config ARCH_MIGHT_HAVE_ACPI_PDC
+>>  	bool
+>>  
+>> +config ACPI_GENERIC_SLEEP
+>> +	bool
+>> +
+>>  config ACPI_SLEEP
+>>  	bool
+>>  	depends on SUSPEND || HIBERNATION
+>> +	depends on ACPI_GENERIC_SLEEP
+>>  	default y
+>>  
+>>  config ACPI_PROCFS_POWER
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 623b117..2397822 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -23,7 +23,7 @@ acpi-y				+= nvs.o
+>>  
+>>  # Power management related files
+>>  acpi-y				+= wakeup.o
+>> -acpi-y				+= sleep.o
+>> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+>>  acpi-y				+= device_pm.o
+>>  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+>>  
+>> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+>> index 56b321a..b5eef4c 100644
+>> --- a/drivers/acpi/internal.h
+>> +++ b/drivers/acpi/internal.h
+>> @@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
+>>  /*--------------------------------------------------------------------------
+>>                                    Suspend/Resume
+>>    -------------------------------------------------------------------------- */
+>> +#ifdef CONFIG_ACPI_GENERIC_SLEEP
+>>  extern int acpi_sleep_init(void);
+>> +#else
+>> +static inline int acpi_sleep_init(void) { return -ENOSYS; }
+> Please change the return value here, preferably to -ENXIO.
+>
+> -ENOSYS *specifically* means "system call not implemented" and should only be
+> used to indicate this particular condition.
 
-We did not add a DT property for it, because there was already enough
-info (clock configuration) in DT for kernel to figure it out.
+Oops, you mentioned this for another patch, I will send a updated patch for this one.
 
-Shawn
+Thanks
+Hanjun
