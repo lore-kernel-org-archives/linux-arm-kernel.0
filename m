@@ -1,20 +1,44 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 21:46:28 +0800
-Subject: [PATCH] ARM: dts: imx6sl-warp: Add BCM4330 support
-In-Reply-To: <1426198032-21072-1-git-send-email-festevam@gmail.com>
-References: <1426198032-21072-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150313134626.GW20455@dragon>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 13 Mar 2015 14:51:50 +0100
+Subject: [PATCH 1/2] tty: serial: fsl_lpuart: specify transmit FIFO size
+Message-ID: <1426254711-618-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 07:07:12PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Warp has a Murata chip based on a BCM4330 that provides Wifi and Bluetooth 
-> functionality.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Specify transmit FIFO size which might be different depending on
+LPUART instance. This makes sure uart_wait_until_sent in serial
+core getting called, which in turn waits and checks if the FIFO
+is really empty on shutdown by using the tx_empty callback.
+Without the call of this callback, the last several characters
+might not yet be transmitted when closing the serial port. This
+can be reproduced by simply using echo and redirect the output to
+a ttyLP device.
 
-Applied, thanks.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+Hi Greg,
+
+Another two fixes for this driver. I think they both are worthwhile
+fixes to be part of stable kernels too...
+
+--
+Stefan
+
+ drivers/tty/serial/fsl_lpuart.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index b1893f3..7ec9110 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -1076,6 +1076,8 @@ static int lpuart_startup(struct uart_port *port)
+ 	sport->txfifo_size = 0x1 << (((temp >> UARTPFIFO_TXSIZE_OFF) &
+ 		UARTPFIFO_FIFOSIZE_MASK) + 1);
+ 
++	sport->port.fifosize = sport->txfifo_size;
++
+ 	sport->rxfifo_size = 0x1 << (((temp >> UARTPFIFO_RXSIZE_OFF) &
+ 		UARTPFIFO_FIFOSIZE_MASK) + 1);
+ 
+-- 
+2.3.1
