@@ -1,47 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 13:26:17 +0100
-Subject: [FOR DISCUSSION 0/9] Dove PMU support
-In-Reply-To: <20150313121126.GE8656@n2100.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 12:29:44 +0000
+Subject: [PATCH 5/9] ARM: dove: create a proper PMU driver for power
+ domains, PMU IRQs and resets
+In-Reply-To: <89767639.F6rHWX5yIj@wuerfel>
 References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <5579362.zNki0VzW6v@wuerfel> <20150313121126.GE8656@n2100.arm.linux.org.uk>
-Message-ID: <3456973.vXF9zkXSFZ@wuerfel>
+ <E1YW7t5-0003mI-Sk@rmk-PC.arm.linux.org.uk>
+ <89767639.F6rHWX5yIj@wuerfel>
+Message-ID: <20150313122944.GF8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015 12:11:27 Russell King - ARM Linux wrote:
-> On Fri, Mar 13, 2015 at 12:57:11PM +0100, Arnd Bergmann wrote:
-> > On Thursday 12 March 2015 18:30:21 Russell King - ARM Linux wrote:
-> > >  Documentation/devicetree/bindings/soc/dove/pmu.txt |  49 +++
-> > >  arch/arm/boot/dts/dove.dtsi                        |  25 ++
-> > >  arch/arm/mach-mvebu/Kconfig                        |   1 +
-> > >  drivers/base/platform.c                            |   2 +
-> > >  drivers/base/power/common.c                        |  15 +
-> > >  drivers/base/power/domain.c                        |  33 +-
-> > >  drivers/soc/Makefile                               |   1 +
-> > >  drivers/soc/dove/Makefile                          |   1 +
-> > >  drivers/soc/dove/pmu.c                             | 399 +++++++++++++++++++++
-> > >  include/linux/pm.h                                 |   1 +
-> > >  include/linux/pm_domain.h                          |   4 +
-> > >  include/linux/soc/dove/pmu.h                       |   6 +
-> > >  12 files changed, 532 insertions(+), 5 deletions(-)
-> > 
-> > I see add the header file and the global dove_init_pmu() function,
-> > but I don't see a caller of that function. Is that intentional, or
-> > did you accidentally leave out another patch that you meant to include?
+On Fri, Mar 13, 2015 at 01:07:06PM +0100, Arnd Bergmann wrote:
+> On Thursday 12 March 2015 18:31:15 Russell King wrote:
+> > +int __init dove_init_pmu(void)
+> > +{
+> > +       struct device_node *np_pmu, *np;
+> > +       struct pmu_data *pmu;
+> > +       int ret, parent_irq;
+> > +
+> > +       /* Lookup the PMU node */
+> > +       np_pmu = of_find_compatible_node(NULL, NULL, "marvell,dove-pmu");
+> > +       if (!np_pmu)
+> > +               return 0;
 > 
-> I kind'a did - it needs an explicit call from arch/arm/mach-mvebu/dove.c
-> which I haven't added even in my tree (because I don't use that path,
-> even when I test DT booting - I still use most of the arch/arm/mach-dove
-> code when DT booting.)  I'll add that now.
+> What is the reason that this is not a platform_driver? I think you
+> should try to make it one, or explain in the changelog the reason
+> for not making it one. This obviously ties in with the question I
+> asked about who calls dove_init_pmu().
+
+It's because I need for the PM domain support to be available early
+right now, and much of this code pre-dates the integration of OF with
+PM domains.  Even booting with DT, I still need some platform devices
+manually declared and bound to these PM domains in order to (a) properly
+test this code, (b) test other parts of the system effectively, and
+(c) have a working system.
+
+However, I do agree that in the longer term this should probably be
+converted to a platform device driver, assuming that everything that
+makes use of it copes with it.
+
+However, one thing that is a concern with that is the PM domain code
+does not yet support the removal of PM domains.  I guess we should
+ensure that PM domain providers set driver.suppress_bind_attrs so
+that at least userspace can't unbind these drivers.
+
+> > +               ret = of_parse_phandle_with_args(np, "resets", "#reset-cells",
+> > +                                                0, &args);
+> > +               if (ret == 0) {
+> > +                       if (args.np == pmu->of_node)
+> > +                               domain->rst_mask = BIT(args.args[0]);
+> > +                       of_node_put(args.np);
+> > +               }
 > 
-> Of course, I also have a patch which adds legacy support to
-> arch/arm/mach-dove, but I've assumed you're not interested in that...
+> In particular, manually parsing the "resets" property is something
+> we should try to avoid. With a platform driver, this could become
+> devm_reset_control_get(), otherwise I think of_reset_control_get()
+> would also do the right thing here.
 
-You mean legacy support in mach-mvebu?
+The hardware requires a specific sequence of register writes for the
+PM domain code, which includes the reset register.
 
-I don't mind that at all, it was the mvebu maintainers that decided
-it would be best to combine the multiplatform and DT work in order
-to simplify both. I've also sent a patch set that moves mach-dove
-into multiplatform, which is a different way of doing the same thing.
+The problem is that if we were to use the reset API directly from the
+PM domain code, we would have to separate the locks for the reset code
+from the PM domain code.  That then leads to there being a race between
+the reset code potentially being able to write to the reset register in
+the middle of a PM domain sequence.
 
-	Arnd
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
