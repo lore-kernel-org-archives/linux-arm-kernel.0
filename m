@@ -1,91 +1,50 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 13 Mar 2015 16:10:11 +0000
-Subject: [PATCH 11/12] KVM: ARM: on IO mem abort - route the call to KVM MMIO
- bus
-In-Reply-To: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
-References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1426263012-22935-12-git-send-email-andre.przywara@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 13 Mar 2015 17:15:11 +0100
+Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
+ support of the mvebu SoCs
+In-Reply-To: <49808502.FHjQOLPYaI@wuerfel>
+References: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150313134016.GV7311@lunn.ch> <49808502.FHjQOLPYaI@wuerfel>
+Message-ID: <20150313161511.GE7311@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+On Fri, Mar 13, 2015 at 04:24:57PM +0100, Arnd Bergmann wrote:
+> On Friday 13 March 2015 14:40:16 Andrew Lunn wrote:
+> > On Fri, Mar 13, 2015 at 02:41:45PM +0100, Gregory CLEMENT wrote:
+> > > I will also take care of the legacy support(not fully converted to DT)
+> > > of the mvebu SoCs.
+> > > 
+> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > ---
+> > >  MAINTAINERS | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > index ddc5a8cf9a8a..39b27f52e217 100644
+> > > --- a/MAINTAINERS
+> > > +++ b/MAINTAINERS
+> > > @@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
+> > >  M:   Jason Cooper <jason@lakedaemon.net>
+> > >  M:   Andrew Lunn <andrew@lunn.ch>
+> > >  M:   Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > +M:   Gregory Clement <gregory.clement@free-electrons.com>
+> > >  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > >  S:   Maintained
+> > >  F:   arch/arm/mach-dove/
+> > > -- 
+> > > 2.1.0
+> > > 
+> > 
+> > Acked-by: Andrew Lunn <andrew@lunn.ch>
+> > 
+> 
+> Should we pick this up for the 4.0 fixes branch directly?
 
-On IO memory abort, try to handle the MMIO access through the KVM
-registered read/write callbacks. This is done by invoking the relevant
-kvm_io_bus_* API.
+Hi Arnd
 
-[Andre: Since we converted the VGIC already, we can get rid of the
-VGIC specific MMIO handler alltogether.]
+Is it a fix?
 
-Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arch/arm/kvm/mmio.c    |   32 +++++++++++++++++++++++++++++++-
- include/kvm/arm_vgic.h |    2 --
- 2 files changed, 31 insertions(+), 3 deletions(-)
+I don't really care either way.
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 5d3bfc0..8dc2fde 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	return 0;
- }
- 
-+/**
-+ * handle_kernel_mmio - handle an in-kernel MMIO access
-+ * @vcpu:	pointer to the vcpu performing the access
-+ * @run:	pointer to the kvm_run structure
-+ * @mmio:	pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		struct kvm_exit_mmio *mmio)
-+{
-+	int ret;
-+
-+	if (mmio->is_write) {
-+		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-+				mmio->len, &mmio->data);
-+
-+	} else {
-+		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
-+				mmio->len, &mmio->data);
-+	}
-+	if (!ret) {
-+		kvm_prepare_mmio(run, mmio);
-+		kvm_handle_mmio_return(vcpu, run);
-+	}
-+
-+	return !ret;
-+}
-+
- int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		 phys_addr_t fault_ipa)
- {
-@@ -200,7 +230,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			       fault_ipa, 0);
- 	}
- 
--	if (vgic_handle_mmio(vcpu, run, &mmio))
-+	if (handle_kernel_mmio(vcpu, run, &mmio))
- 		return 1;
- 
- 	kvm_prepare_mmio(run, &mmio);
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 09fd324..91976c8 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -317,8 +317,6 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level);
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
--bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
--		      struct kvm_exit_mmio *mmio);
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
--- 
-1.7.9.5
+  Andrew
