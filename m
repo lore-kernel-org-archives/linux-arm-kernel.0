@@ -1,65 +1,61 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 13 Mar 2015 11:43:28 -0500
-Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <20150313162516.GA9603@leverpostej>
-References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
- <20150313105207.GB3592@leverpostej>
- <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
- <20150313162516.GA9603@leverpostej>
-Message-ID: <91E83B79-5004-48C5-948B-7A9FD7F13BFE@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 16:45:46 +0000
+Subject: read_cpuid_id() in arch/arm/kernel/setup.c
+In-Reply-To: <550312BB.8020902@free.fr>
+References: <55030A68.6070002@free.fr>
+ <20150313161953.GS8656@n2100.arm.linux.org.uk>
+ <550312BB.8020902@free.fr>
+Message-ID: <20150313164546.GV8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mar 13, 2015, at 11:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-
-> On Fri, Mar 13, 2015 at 03:50:42PM +0000, Kumar Gala wrote:
->> 
->> On Mar 13, 2015, at 5:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> 
->>>> +/ {
->>>> +	chosen {
->>>> +		stdout-path = &blsp1_uart2;
->>>> +	};
->>> 
->>> It would be good if we had the configuration too (see
->>> Documentation/devicetree/bindings/chosen.txt), as that avoids any
->>> reliance on kernel defaults.
->>> 
->>> You can refer to an alias, so this could be:
->>> 
->>> aliases {
->>> 	serial0 = &blsp1_uart2;
->>> };
->>> 
->>> chosen {
->>> 	stdout-path = "serial0:115200n8";
->>> };
->>> 
->>> ...assuming that 115200n8 is correct for your UART, of course.
->>> 
->>> 
->>> [?]
->> 
->> Where is the code that actually handles this parsing?  I?m not see it
->> in early_init_dt_scan_chosen_serial and I don?t believe
->> fdt_path_offset does anything special with ?:'
+On Fri, Mar 13, 2015 at 05:39:23PM +0100, Mason wrote:
+> Good point. I hadn't thought of that.
 > 
-> Take a look at commit 7914a7c5651a5161 ("of: support passing console options with
-> stdout-path").
+> Do you know the latency of an mrc instruction? (compared to a mov)
+
+Not offhand.  It'll be different for different CPUs, but it's probably
+not far off mov.
+
+> >It seems that GCC 4.7.4 optimises better than Linaro's 4.9.3.  In fact,
+> >it looks like Linaro's 4.9.3 is rather buggy as far as optimisation
+> >goes.
+> >
+> >Later compilers aren't always better.
 > 
-> Early on of_alias_scan will find the options and in of_console_check
-> we'll call add_preferred_console as appropriate. That'll be called in
-> uart_add_one_port.
+> I did NOT expect that. Compiler optimizations passes are so fragile.
 
-Ok, but earlycon dt code doesn?t utilize this, as its setup is before we unflatten the dt.
+You're learning :)
 
-So it breaks earlycon parsing right now, I?ll look at fixing that.
+> Anyway, here's another proposed nano-improvement ;-)
+> (This one is code factorization)
+> 
+> --- setup.c	2015-03-03 18:04:59.000000000 +0100
+> +++ setup.bar.c	2015-03-13 17:29:23.800668429 +0100
+> @@ -246,12 +246,9 @@
+>  		if (cpu_arch)
+>  			cpu_arch += CPU_ARCH_ARMv3;
+>  	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+> -		unsigned int mmfr0;
+> -
+>  		/* Revised CPUID format. Read the Memory Model Feature
+>  		 * Register 0 and check for VMSAv7 or PMSAv7 */
+> -		asm("mrc	p15, 0, %0, c0, c1, 4"
+> -		    : "=r" (mmfr0));
+> +		unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
+>  		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
+>  		    (mmfr0 & 0x000000f0) >= 0x00000030)
+>  			cpu_arch = CPU_ARCH_ARMv7;
+> 
+> 
+> This one looks good, doesn't it? :-)
 
-- k
+Yes, this one I like - and it probably fixes a potential latent bug
+where the compiler was free to re-order that mrc outside of the if()
+statement.
+
+Please wrap it up as a normal submission, thanks.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
