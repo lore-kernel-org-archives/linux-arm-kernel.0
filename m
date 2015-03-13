@@ -1,39 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 13 Mar 2015 14:40:16 +0100
-Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
- support of the mvebu SoCs
-In-Reply-To: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20150313134016.GV7311@lunn.ch>
+From: ameenali023@gmail.com (Ameen Ali)
+Date: Fri, 13 Mar 2015 15:44:24 +0200
+Subject: [PATCH 7/7] common.c:105 Variable 'gephy' is  never used.
+Message-ID: <1426254264-5105-1-git-send-email-ameenali023@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 02:41:45PM +0100, Gregory CLEMENT wrote:
-> I will also take care of the legacy support(not fully converted to DT)
-> of the mvebu SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ddc5a8cf9a8a..39b27f52e217 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> +M:	Gregory Clement <gregory.clement@free-electrons.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-dove/
-> -- 
-> 2.1.0
-> 
+Variable 'gephy' is assigned a value that is never used.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by : <AmeenALi023@gmail.com>
+---
+ arch/arm/mach-dove/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks
-	Andrew
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index 0d1a892..115a413 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -113,7 +113,7 @@ static void __init dove_clk_init(void)
+ 	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+ 	orion_clkdev_add(NULL, "orion_wdt", tclk);
+ 	orion_clkdev_add(NULL, "mv64xxx_i2c.0", tclk);
+-
++        orion_clkdev_add(NULL,"mv643xx_eth_port.0",gephy);
+ 	orion_clkdev_add(NULL, "orion-ehci.0", usb0);
+ 	orion_clkdev_add(NULL, "orion-ehci.1", usb1);
+ 	orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
+-- 
+2.1.0
