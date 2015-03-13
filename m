@@ -1,32 +1,39 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 13 Mar 2015 16:23:56 +0000
-Subject: [PATCH 08/10] ARM: dt: dove: wire up RTC interrupt
+Date: Fri, 13 Mar 2015 16:23:51 +0000
+Subject: [PATCH 07/10] ARM: dt: dove: add Dove PMU DT entry to dove.dtsi
 In-Reply-To: <20150312183020.GU8656@n2100.arm.linux.org.uk>
 References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
-Message-ID: <E1YWSNQ-0006GL-7x@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YWSNL-0006GH-3y@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a PMU driver, we can wire up the RTC interrupt in the
-DT description for Dove.
+Add the PMU description to the Dove DT file.  The PMU provides multiple
+features, including an interrupt, reset, power and isolation controller.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/dove.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/dove.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 43d4ebf414be..7e80407bdcf8 100644
+index a5441d5482a6..43d4ebf414be 100644
 --- a/arch/arm/boot/dts/dove.dtsi
 +++ b/arch/arm/boot/dts/dove.dtsi
-@@ -624,6 +624,8 @@
- 			rtc: real-time-clock at d8500 {
- 				compatible = "marvell,orion-rtc";
- 				reg = <0xd8500 0x20>;
-+				interrupt-parent = <&pmu>;
-+				interrupts = <5>;
+@@ -380,6 +380,15 @@
+ 				status = "disabled";
  			};
  
- 			gconf: global-config at e802c {
++			pmu: power-management at d0000 {
++				compatible = "marvell,dove-pmu";
++				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
++				interrupts = <33>;
++				interrupt-controller;
++				#interrupt-cells = <1>;
++				#reset-cells = <1>;
++			};
++
+ 			thermal: thermal-diode at d001c {
+ 				compatible = "marvell,dove-thermal";
+ 				reg = <0xd001c 0x0c>, <0xd005c 0x08>;
 -- 
 1.8.3.1
