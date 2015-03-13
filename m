@@ -1,51 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 12:52:09 +0100
-Subject: [RFT/RFC PATCH 6/6] ARM: keep .text and .fixup regions together
-In-Reply-To: <CAKv+Gu-bhir4J-vavJAzTYKEvrB5G9ijtLALbtmQOz-yvNAU9Q@mail.gmail.com>
-References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
- <3810696.X76shyuPzC@wuerfel>
- <CAKv+Gu-bhir4J-vavJAzTYKEvrB5G9ijtLALbtmQOz-yvNAU9Q@mail.gmail.com>
-Message-ID: <4174992.WOHRCcIhdN@wuerfel>
+Date: Fri, 13 Mar 2015 12:57:11 +0100
+Subject: [FOR DISCUSSION 0/9] Dove PMU support
+In-Reply-To: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <5579362.zNki0VzW6v@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015 12:26:11 Ard Biesheuvel wrote:
-> On 13 March 2015 at 12:18, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 12 March 2015 21:22:02 Russell King - ARM Linux wrote:
-> >> On Thu, Mar 12, 2015 at 10:18:26PM +0100, Ard Biesheuvel wrote:
-> >> > >> Note that the TEXT_TEXT macro will emit *(.text) again but this should be
-> >> > >> harmless.
-> >> > >
-> >> > > However, I wonder if by doing this, we're weakening the ability for
-> >> > > kallsyms final link to succeed:
-> >> > >
-> >> > > /* .text section. Map to function alignment to avoid address changes
-> >> > >  * during second ld run in second ld pass when generating System.map */
-> >> > >
-> >> > > Can we not just move .fixup before TEXT_TEXT?  The only thing between it
-> >> > > and .text would be .text.hot.
-> >> > >
-> >> >
-> >> > Putting .fixup before .text already helps, but not enough for the
-> >> > .config Arnd gave me that I have been testing this with.
-> >> >
-> >> > What *(.text .fixup) does (i.e., putting both section names inside the
-> >> > parentheses), is emitting both sections for each input object file, so
-> >> > they will always be close to the object that it refers to, so it is
-> >> > not the same thing.
-> >>
-> >> I'll suggest a different solution then - how about modifying
-> >> asm-generic/vmlinux.lds.h to change *(.text) to *(.text .text.fixup)
-> >> and we move all the .fixup sections to .text.fixup ?  Arnd?
-> >
-> > No objections from me, but I really don't know enough about the possible
-> > side-effects this may have on the other architectures, so we need to
-> > run this by the linux-arch mailing list.
-> >
+On Thursday 12 March 2015 18:30:21 Russell King - ARM Linux wrote:
+> This is a re-posting of the patch set which I posted almost 10 months
+> ago to support the Dove PMU, with a few additional changes.  This set
+> is based upon 3.19.
 > 
-> I don't think it could affect any other architecture if nobody is
-> populating .text.fixup yet.
+> In this set are:
+> 
+> * two patches which Rafael originally acked, but there was indecision
+>   last time around how to handle them due to potential conflicts with
+>   work that Ulf was doing.  These patches have been updated to apply
+>   cleanly to 3.19.  I don't know if people want to take these as
+>   fixes to the PM domain code or not (hence why I'm posting this
+>   series during the merge window - if it weren't for this, I'd hold
+>   it off.)
 
-Ah, I missed that part of the suggestion. Yes, sounds good to me then.
+I don't seem to have received the first three patches for some reason.
+Can you check if you got them back from the mailing list?
+
+> 
+>  Documentation/devicetree/bindings/soc/dove/pmu.txt |  49 +++
+>  arch/arm/boot/dts/dove.dtsi                        |  25 ++
+>  arch/arm/mach-mvebu/Kconfig                        |   1 +
+>  drivers/base/platform.c                            |   2 +
+>  drivers/base/power/common.c                        |  15 +
+>  drivers/base/power/domain.c                        |  33 +-
+>  drivers/soc/Makefile                               |   1 +
+>  drivers/soc/dove/Makefile                          |   1 +
+>  drivers/soc/dove/pmu.c                             | 399 +++++++++++++++++++++
+>  include/linux/pm.h                                 |   1 +
+>  include/linux/pm_domain.h                          |   4 +
+>  include/linux/soc/dove/pmu.h                       |   6 +
+>  12 files changed, 532 insertions(+), 5 deletions(-)
+
+I see add the header file and the global dove_init_pmu() function,
+but I don't see a caller of that function. Is that intentional, or
+did you accidentally leave out another patch that you meant to include?
 
 	Arnd
