@@ -1,42 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 13:07:06 +0100
-Subject: [PATCH 5/9] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <E1YW7t5-0003mI-Sk@rmk-PC.arm.linux.org.uk>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <E1YW7t5-0003mI-Sk@rmk-PC.arm.linux.org.uk>
-Message-ID: <89767639.F6rHWX5yIj@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 13 Mar 2015 13:07:24 +0100
+Subject: [PATCH v2 0/8] ARM kernel size fixes
+Message-ID: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 March 2015 18:31:15 Russell King wrote:
-> +int __init dove_init_pmu(void)
-> +{
-> +       struct device_node *np_pmu, *np;
-> +       struct pmu_data *pmu;
-> +       int ret, parent_irq;
-> +
-> +       /* Lookup the PMU node */
-> +       np_pmu = of_find_compatible_node(NULL, NULL, "marvell,dove-pmu");
-> +       if (!np_pmu)
-> +               return 0;
+This series is a suggested approach to preventing linker failures on large
+kernels. It is somewhat unpolished, and posted for comments/testing primarily.
 
-What is the reason that this is not a platform_driver? I think you
-should try to make it one, or explain in the changelog the reason
-for not making it one. This obviously ties in with the question I
-asked about who calls dove_init_pmu().
+The issues were found and reported by Arnd Bergmann, and these patches are
+loosely based on his initial approach to work around them.
 
-> +               ret = of_parse_phandle_with_args(np, "resets", "#reset-cells",
-> +                                                0, &args);
-> +               if (ret == 0) {
-> +                       if (args.np == pmu->of_node)
-> +                               domain->rst_mask = BIT(args.args[0]);
-> +                       of_node_put(args.np);
-> +               }
+Changes since v1:
+- Updated PROCINFO patch (#1) to refer to the base of the struct by name, and
+  simplify the calling code (rmk)
+- Updated b_far/bl_far patch (#3) to remove ARM/THUMB alternatives and use a
+  conditionally defined PC_BIAS instead. Also added b_abs/bl_abs versions,
+  which can only be used for absolute branches but can be implemented in fewer
+  instructions. Added conditional branch support as well.
+- introduce (#6) and use (#7) the .text.fixup input section which gets emitted
+  after each .text section for each .o
+- added patch #8 that allows the kallsyms data to be moved to .data
 
-In particular, manually parsing the "resets" property is something
-we should try to avoid. With a platform driver, this could become
-devm_reset_control_get(), otherwise I think of_reset_control_get()
-would also do the right thing here.
+Ard Biesheuvel (8):
+  ARM: replace PROCINFO embedded branch with relative offset
+  ARM: move HYP text to end of .text section
+  ARM: add macro to perform far branches (b/bl)
+  ARM: use bl_far to call __hyp_stub_install_secondary from the .data
+    section
+  ARM: move the .idmap.text section closer to .head.text
+  asm-generic: introduce .text.fixup input section
+  ARM: keep .text and .fixup regions together
+  kallsyms: allow kallsyms data to reside in the .data section
 
-	Arnd
+ arch/arm/Kconfig                      |  1 +
+ arch/arm/include/asm/assembler.h      | 83 +++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/futex.h          |  2 +-
+ arch/arm/include/asm/uaccess.h        | 10 ++---
+ arch/arm/include/asm/word-at-a-time.h |  2 +-
+ arch/arm/kernel/entry-armv.S          |  2 +-
+ arch/arm/kernel/head.S                | 14 +++---
+ arch/arm/kernel/sleep.S               |  2 +-
+ arch/arm/kernel/swp_emulate.c         |  2 +-
+ arch/arm/kernel/vmlinux.lds.S         | 15 ++++---
+ arch/arm/kvm/init.S                   |  5 +--
+ arch/arm/kvm/interrupts.S             |  4 +-
+ arch/arm/lib/clear_user.S             |  2 +-
+ arch/arm/lib/copy_to_user.S           |  2 +-
+ arch/arm/lib/csumpartialcopyuser.S    |  2 +-
+ arch/arm/mm/alignment.c               |  6 +--
+ arch/arm/mm/proc-arm1020.S            |  4 +-
+ arch/arm/mm/proc-arm1020e.S           |  4 +-
+ arch/arm/mm/proc-arm1022.S            |  4 +-
+ arch/arm/mm/proc-arm1026.S            |  4 +-
+ arch/arm/mm/proc-arm720.S             |  4 +-
+ arch/arm/mm/proc-arm740.S             |  4 +-
+ arch/arm/mm/proc-arm7tdmi.S           |  4 +-
+ arch/arm/mm/proc-arm920.S             |  4 +-
+ arch/arm/mm/proc-arm922.S             |  4 +-
+ arch/arm/mm/proc-arm925.S             |  4 +-
+ arch/arm/mm/proc-arm926.S             |  4 +-
+ arch/arm/mm/proc-arm940.S             |  4 +-
+ arch/arm/mm/proc-arm946.S             |  4 +-
+ arch/arm/mm/proc-arm9tdmi.S           |  4 +-
+ arch/arm/mm/proc-fa526.S              |  4 +-
+ arch/arm/mm/proc-feroceon.S           |  5 ++-
+ arch/arm/mm/proc-macros.S             |  4 ++
+ arch/arm/mm/proc-mohawk.S             |  4 +-
+ arch/arm/mm/proc-sa110.S              |  4 +-
+ arch/arm/mm/proc-sa1100.S             |  4 +-
+ arch/arm/mm/proc-v6.S                 |  4 +-
+ arch/arm/mm/proc-v7.S                 | 28 ++++++------
+ arch/arm/mm/proc-v7m.S                |  4 +-
+ arch/arm/mm/proc-xsc3.S               |  4 +-
+ arch/arm/mm/proc-xscale.S             |  4 +-
+ arch/arm/nwfpe/entry.S                |  2 +-
+ include/asm-generic/vmlinux.lds.h     | 14 +++++-
+ init/Kconfig                          |  4 ++
+ scripts/kallsyms.c                    |  2 +-
+ 45 files changed, 200 insertions(+), 101 deletions(-)
+
+-- 
+1.8.3.2
