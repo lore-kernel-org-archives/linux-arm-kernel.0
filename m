@@ -1,87 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 13 Mar 2015 08:03:15 +0000
-Subject: [PATCH v5 02/10] mfd: syscon: Add atmel system timer registers
- definition
-In-Reply-To: <1426162054-9987-3-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1426162054-9987-3-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150313080315.GC3383@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 13 Mar 2015 08:13:11 +0000
+Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
+In-Reply-To: <20150313032139.GN20455@dragon>
+References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
+ <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
+ <20150313032139.GN20455@dragon>
+Message-ID: <20150313081311.1ebfe8e2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Mar 2015, Alexandre Belloni wrote:
+On Fri, 13 Mar 2015 03:21:41 +0000
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> AT91RM920 has a memory range reserved for timer and watchdog configuration.
-> Expose those registers so that drivers can make use of the system timer syscon
-> declared in at91 DTs.
+> On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
+> > Now that the GPC has been converted to be a full blown irqchip
+> > (and not a mole on the side of the GIC), booting a new kernel
+> > with an old DT is likely to result in a rough ride for the user.
+> > 
+> > This patch makes sure such a situation is promptly detected and
+> > the user made aware that a DT update is in order.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-imx/pm-imx6.c
+> > b/arch/arm/mach-imx/pm-imx6.c index 6a7c6fc..f03f30f0 100644
+> > --- a/arch/arm/mach-imx/pm-imx6.c
+> > +++ b/arch/arm/mach-imx/pm-imx6.c
+> > @@ -554,11 +554,17 @@ put_node:
+> >  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
+> >  					*socdata)
+> >  {
+> > +	struct device_node *np;
+> >  	struct regmap *gpr;
+> >  	int ret;
+> >  
+> >  	WARN_ON(!ccm_base);
+> >  
+> > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
+> > +	if (WARN_ON(!np ||
+> > +		    !of_find_property(np, "interrupt-controller",
+> > NULL)))
+> > +		pr_warn("Outdated DT detected, suspend/resume will
+> > NOT work\n"); +
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  include/linux/mfd/syscon/atmel-st.h | 49 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 include/linux/mfd/syscon/atmel-st.h
+> Can this be done in imx_gpc_init() instead?
 
-Applied, thanks.
+Unfortunately not, as imx_gpc_init() is only called if the above
+properties are satisfied (that's exactly the case we want to detect: if
+imx_gpc_init is called, we're already in a pretty good shape).
 
-> diff --git a/include/linux/mfd/syscon/atmel-st.h b/include/linux/mfd/syscon/atmel-st.h
-> new file mode 100644
-> index 000000000000..8acf1ec1fa32
-> --- /dev/null
-> +++ b/include/linux/mfd/syscon/atmel-st.h
-> @@ -0,0 +1,49 @@
-> +/*
-> + * Copyright (C) 2005 Ivan Kokshaysky
-> + * Copyright (C) SAN People
-> + *
-> + * System Timer (ST) - System peripherals registers.
-> + * Based on AT91RM9200 datasheet revision E.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#ifndef _LINUX_MFD_SYSCON_ATMEL_ST_H
-> +#define _LINUX_MFD_SYSCON_ATMEL_ST_H
-> +
-> +#include <linux/bitops.h>
-> +
-> +#define AT91_ST_CR	0x00	/* Control Register */
-> +#define		AT91_ST_WDRST	BIT(0)	/* Watchdog Timer Restart */
-> +
-> +#define AT91_ST_PIMR	0x04	/* Period Interval Mode Register */
-> +#define		AT91_ST_PIV	0xffff	/* Period Interval Value */
-> +
-> +#define AT91_ST_WDMR	0x08	/* Watchdog Mode Register */
-> +#define		AT91_ST_WDV	0xffff	/* Watchdog Counter Value */
-> +#define		AT91_ST_RSTEN	BIT(16)	/* Reset Enable */
-> +#define		AT91_ST_EXTEN	BIT(17)	/* External Signal Assertion Enable */
-> +
-> +#define AT91_ST_RTMR	0x0c	/* Real-time Mode Register */
-> +#define		AT91_ST_RTPRES	0xffff	/* Real-time Prescalar Value */
-> +
-> +#define AT91_ST_SR	0x10	/* Status Register */
-> +#define		AT91_ST_PITS	BIT(0)	/* Period Interval Timer Status */
-> +#define		AT91_ST_WDOVF	BIT(1)	/* Watchdog Overflow */
-> +#define		AT91_ST_RTTINC	BIT(2)	/* Real-time Timer Increment */
-> +#define		AT91_ST_ALMS	BIT(3)	/* Alarm Status */
-> +
-> +#define AT91_ST_IER	0x14	/* Interrupt Enable Register */
-> +#define AT91_ST_IDR	0x18	/* Interrupt Disable Register */
-> +#define AT91_ST_IMR	0x1c	/* Interrupt Mask Register */
-> +
-> +#define AT91_ST_RTAR	0x20	/* Real-time Alarm Register */
-> +#define		AT91_ST_ALMV	0xfffff	/* Alarm Value */
-> +
-> +#define AT91_ST_CRTR	0x24	/* Current Real-time Register */
-> +#define		AT91_ST_CRTV	0xfffff	/* Current Real-Time Value */
-> +
-> +#endif /* _LINUX_MFD_SYSCON_ATMEL_ST_H */
+Hope this helps,
 
+        M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny.
