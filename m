@@ -1,183 +1,72 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Mar 2015 14:15:43 +0100
-Subject: [RFC PATCH 04/18] mmc: msm: move clk-reset logic to platform
-In-Reply-To: <1425497592-1831064-5-git-send-email-arnd@arndb.de>
-References: <1425497592-1831064-1-git-send-email-arnd@arndb.de>
- <1425497592-1831064-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAPDyKFr7x8sqdvYgPDFh_KmMfOjiquhk=16kjkLDZVHZ1EjDKg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Mar 2015 14:16:13 +0100
+Subject: [GIT PULL] at91: cleanup for 4.1 #1
+Message-ID: <1426252573-9291-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2015 at 20:32, Arnd Bergmann <arnd@arndb.de> wrote:
-> There is no generic interface for resetting a clock, and
-> creating a reset driver for msm seems overkill, so this
-> moves the reset logic from the msm_sdcc driver into
-> a platform_data callback that calls into the clock driver.
->
-> This follows the model that is used for all other devices
-> on the msm platform that require a clk reset.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Arnd, Olof, Kevin,
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Big PM cleanup by Wenyou this time. I'll add other cleanup material by
+Alexandre on top of it real soon.
+Note that these patches are stacked on top of all the "fixes" tags that you
+already took (at91-fixes3): it was needed for avoiding conflicts in the PM code.
 
-> ---
->  arch/arm/mach-msm/board-qsd8x50.c          | 18 +++++++++++++++++-
->  arch/arm/mach-msm/board-trout-mmc.c        | 18 ++++++++++++++++++
->  arch/arm/mach-msm/clock.c                  |  2 +-
->  drivers/mmc/host/msm_sdcc.c                | 12 ++----------
->  include/linux/platform_data/mmc-msm_sdcc.h |  3 +++
->  5 files changed, 41 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
-> index 4c748616ef47..9676a73683d2 100644
-> --- a/arch/arm/mach-msm/board-qsd8x50.c
-> +++ b/arch/arm/mach-msm/board-qsd8x50.c
-> @@ -180,6 +180,21 @@ static uint32_t msm_sdcc_setup_power(struct device *dv, unsigned int vdd)
->         return 0;
->  }
->
-> +static void msm_sdcc_clk_reset(struct clk *clk)
-> +{
-> +       int ret;
-> +
-> +       ret = clk_reset(clk, CLK_RESET_ASSERT);
-> +       if (ret)
-> +               pr_err("sdcc clock assert failed at %lu Hz with err %d\n",
-> +                       clk_get_rate(clk), ret);
-> +
-> +       ret = clk_reset(clk, CLK_RESET_DEASSERT);
-> +       if (ret)
-> +               pr_err("sdcc clock deassert failed at %lu Hz with err %d\n",
-> +                       clk_get_rate(clk), ret);
-> +}
-> +
->  static struct msm_mmc_gpio_data sdc1_gpio = {
->         .gpio = sdc1_gpio_cfg,
->         .size = ARRAY_SIZE(sdc1_gpio_cfg),
-> @@ -188,7 +203,8 @@ static struct msm_mmc_gpio_data sdc1_gpio = {
->  static struct msm_mmc_platform_data qsd8x50_sdc1_data = {
->         .ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
->         .translate_vdd  = msm_sdcc_setup_power,
-> -       .gpio_data = &sdc1_gpio,
-> +       .gpio_data      = &sdc1_gpio,
-> +       .clk_reset      = msm_sdcc_clk_reset,
->  };
->
->  static void __init qsd8x50_init_mmc(void)
-> diff --git a/arch/arm/mach-msm/board-trout-mmc.c b/arch/arm/mach-msm/board-trout-mmc.c
-> index 3723e55819d6..2474bba71c8b 100644
-> --- a/arch/arm/mach-msm/board-trout-mmc.c
-> +++ b/arch/arm/mach-msm/board-trout-mmc.c
-> @@ -2,6 +2,7 @@
->  ** Author: Brian Swetland <swetland@google.com>
->  */
->  #include <linux/gpio.h>
-> +#include <linux/clk.h>
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/platform_device.h>
-> @@ -14,6 +15,7 @@
->  #include <asm/io.h>
->
->  #include <mach/vreg.h>
-> +#include <mach/clk.h>
->
->  #include <linux/platform_data/mmc-msm_sdcc.h>
->
-> @@ -154,6 +156,21 @@ static unsigned int trout_sdslot_status(struct device *dev)
->         return (!status);
->  }
->
-> +static void trout_sdcc_clk_reset(struct clk *clk)
-> +{
-> +       int ret;
-> +
-> +       ret = clk_reset(clk, CLK_RESET_ASSERT);
-> +       if (ret)
-> +               pr_err("sdcc clock assert failed at %lu Hz with err %d\n",
-> +                       clk_get_rate(clk), ret);
-> +
-> +       ret = clk_reset(clk, CLK_RESET_DEASSERT);
-> +       if (ret)
-> +               pr_err("sdcc clock deassert failed at %lu Hz with err %d\n",
-> +                       clk_get_rate(clk), ret);
-> +}
-> +
->  #define TROUT_MMC_VDD  MMC_VDD_165_195 | MMC_VDD_20_21 | MMC_VDD_21_22 \
->                         | MMC_VDD_22_23 | MMC_VDD_23_24 | MMC_VDD_24_25 \
->                         | MMC_VDD_25_26 | MMC_VDD_26_27 | MMC_VDD_27_28 \
-> @@ -163,6 +180,7 @@ static struct msm_mmc_platform_data trout_sdslot_data = {
->         .ocr_mask       = TROUT_MMC_VDD,
->         .status         = trout_sdslot_status,
->         .translate_vdd  = trout_sdslot_switchvdd,
-> +       .clk_reset      = trout_sdcc_clk_reset,
->  };
->
->  int __init trout_init_mmc(unsigned int sys_rev)
-> diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-> index 35ea02b52483..0b59ad5eb557 100644
-> --- a/arch/arm/mach-msm/clock.c
-> +++ b/arch/arm/mach-msm/clock.c
-> @@ -23,6 +23,6 @@ int clk_reset(struct clk *clk, enum clk_reset_action action)
->  {
->         struct clk_hw *hw = __clk_get_hw(clk);
->         struct msm_clk *m = to_msm_clk(hw);
-> +
->         return m->reset(hw, action);
->  }
-> -EXPORT_SYMBOL(clk_reset);
-> diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-> index 3002e377e9f7..be5b9b3b3843 100644
-> --- a/drivers/mmc/host/msm_sdcc.c
-> +++ b/drivers/mmc/host/msm_sdcc.c
-> @@ -45,7 +45,6 @@
->  #include <asm/sizes.h>
->
->  #include <linux/platform_data/mmc-msm_sdcc.h>
-> -#include <mach/clk.h>
->
->  /* data mover definitions */
->
-> @@ -493,15 +492,8 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
->         mci_mask0 = readl(host->base + MMCIMASK0);
->
->         /* Reset the controller */
-> -       ret = clk_reset(host->clk, CLK_RESET_ASSERT);
-> -       if (ret)
-> -               pr_err("%s: Clock assert failed at %u Hz with err %d\n",
-> -                               mmc_hostname(host->mmc), host->clk_rate, ret);
-> -
-> -       ret = clk_reset(host->clk, CLK_RESET_DEASSERT);
-> -       if (ret)
-> -               pr_err("%s: Clock deassert failed at %u Hz with err %d\n",
-> -                               mmc_hostname(host->mmc), host->clk_rate, ret);
-> +       if (host->plat->clk_reset)
-> +               host->plat->clk_reset(host->clk);
->
->         pr_info("%s: Controller has been re-initialiazed\n",
->                         mmc_hostname(host->mmc));
-> diff --git a/include/linux/platform_data/mmc-msm_sdcc.h b/include/linux/platform_data/mmc-msm_sdcc.h
-> index 55aa873c9396..6f1821a4bf93 100644
-> --- a/include/linux/platform_data/mmc-msm_sdcc.h
-> +++ b/include/linux/platform_data/mmc-msm_sdcc.h
-> @@ -15,6 +15,8 @@ struct msm_mmc_gpio_data {
->         u8 size;
->  };
->
-> +struct clk;
-> +
->  struct msm_mmc_platform_data {
->         unsigned int ocr_mask;                  /* available voltages */
->         u32 (*translate_vdd)(struct device *, unsigned int);
-> @@ -22,6 +24,7 @@ struct msm_mmc_platform_data {
->         int (*register_status_notify)(void (*callback)(int card_present, void *dev_id), void *dev_id);
->         struct msm_mmc_gpio_data *gpio_data;
->         void (*init_card)(struct mmc_card *card);
-> +       void (*clk_reset)(struct clk *clk);
->  };
->
->  #endif
-> --
-> 2.1.0.rc2
->
+Thanks, best regards,
+
+The following changes since commit 5e7f82d73057a4b99643999e02c036cfbf1ed3ba:
+
+  Merge tag 'at91-fixes3' into at91-4.1-cleanup (2015-03-12 15:30:03 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup
+
+for you to fetch changes up to 385acc0dac88d79447a03a1363072fc258429dec:
+
+  ARM: at91/pm: flush data cache and clean, invalidate and disable the L2 cache (2015-03-13 13:34:55 +0100)
+
+----------------------------------------------------------------
+First batch of cleanup for 4.1:
+- little phy fixup that is not needed anymore
+- hudge cleanup of the PM code:
+  - removal of "use slow clock" option => always use this for suspend to RAM
+  - quicker suspend as the asm function is copied only once to SRAM
+  - use of the same asm function for "standby" and "mem" types of suspend
+    actions
+  - adaptation to the ARMv7 processors
+
+----------------------------------------------------------------
+Boris Brezillon (1):
+      ARM: at91: remove ksz8081 phy fixup registration for sama5d4ek board
+
+Sylvain Rochet (1):
+      ARM: at91/pm_slowclock: remove clocks which are already stopped when entering slow clock mode
+
+Wenyou Yang (12):
+      ARM: at91: pm: change at91_pm_set_standby() to static
+      ARM: at91/pm_slowclock: remove the unused code related with SLOWDOWN_MASTER_CLOCK
+      ARM: at91: move "select SRAM" under SOC_AT91SAM9 and SOC_SAMA5
+      ARM: at91/pm: remove CONFIG_AT91_SLOW_CLOCK config option
+      ARM: at91/pm_slowclock: create the procedure to handle the sdram self-refresh
+      ARM: at91/pm: move the copying the sram function to the sram initialization phase
+      ARM: at91/pm: standby mode uses same sram function as suspend to memory mode
+      ARM: at91/pm: rename file name: pm_slowclock.S --> pm_suspend.S
+      ARM: at91/pm: rename function name: at91_slow_clock() --> at91_pm_suspend_sram_fn()
+      ARM: at91/pm: remove unused void (*at91_pm_standby)(void)
+      ARM: at91/pm_suspend: add the WFI instruction support for ARMv7
+      ARM: at91/pm: flush data cache and clean, invalidate and disable the L2 cache
+
+ arch/arm/mach-at91/Kconfig        |  18 +-
+ arch/arm/mach-at91/Makefile       |   2 +-
+ arch/arm/mach-at91/pm.c           | 139 +++++++-------
+ arch/arm/mach-at91/pm.h           |  14 +-
+ arch/arm/mach-at91/pm_slowclock.S | 335 ----------------------------------
+ arch/arm/mach-at91/pm_suspend.S   | 338 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/sama5.c        |  20 ---
+ 7 files changed, 418 insertions(+), 448 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/pm_slowclock.S
+ create mode 100644 arch/arm/mach-at91/pm_suspend.S
+
+-- 
+Nicolas Ferre
