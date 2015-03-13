@@ -1,80 +1,67 @@
-From: liviu@dudau.co.uk (Liviu Dudau)
-Date: Fri, 13 Mar 2015 11:31:56 +0000
-Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic pci
- host bridge
-In-Reply-To: <20150312212306.GH7346@google.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <20150312212306.GH7346@google.com>
-Message-ID: <20150313113156.GA4739@bart.dudau.co.uk>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 13 Mar 2015 20:32:43 +0900
+Subject: [PATCH v4 1/4] mmc: dw_mmc: Don't try to enable the CD until we're
+ sure we're not deferring
+In-Reply-To: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+Message-ID: <5502CADB.4040204@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 04:23:06PM -0500, Bjorn Helgaas wrote:
-> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
-> > ...
-> > Yijing Wang (29):
-> >   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
-> >   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
-> >   sparc/PCI: Claim bus resources before pci_bus_add_devices()
+Hi Doug,
+
+Will apply. Thanks!
+
+Best Regards,
+Jaehoon Chung
+
+On 03/12/2015 07:15 AM, Doug Anderson wrote:
+> If dw_mci_init_slot() returns that we got a probe deferral then it may
+> leave slot->mmc as NULL.  That will cause dw_mci_enable_cd() to crash
+> when it calls mmc_gpio_get_cd().
 > 
-> I put the above patches plus a cleanup patch on my pci/enumeration branch.
-> Please rebase your next revision to that.  If there's anything else
-> non-controversial that we can pull in to chip away at this, let me know.
-
-Hi Bjorn and Yijing,
-
-Sorry for not providing feedback earlier on this series (or any previous ones),
-I'm just crawling out from under a rock of doing graphics drivers :)
-
-The patch ripping out pci_bus_add_devices() from pci_scan_root_bus() misses out
-the users of that function from drivers/pci/host. If Yijing is going to refresh
-the series it is probably worth starting with adding back the call into pcie-xilinx.c
-and pci-versatile.c.
-
-Will try to review (and test) the rest of the series soon.
-
-Best regards,
-Liviu
-
+> Fix this by moving the call of dw_mci_enable_cd() until we're sure
+> that we're good.  Note that if we have more than one slot and one
+> defers (but the others don't) things won't work so well.  ...but
+> that's not a new thing and everyone has already agreed that multislot
+> support ought to be removed from dw_mmc eventually anyway since it is
+> unused, untested, and you can see several bugs like this by inspecting
+> the code.
 > 
-> >   PCI: Export busn_resource to drivers/pci
-> >   PCI: Remove deprecated pci_scan_bus_parented()
-> >   PCI: Combine PCI domain and bus number in u32 arg
-> >   PCI: Pass PCI domain number combined with root bus number
-> >   PCI: Introduce pci_host_assign_domain_nr() to assign domain
-> >   PCI: Separate pci_host_bridge creation out of pci_create_root_bus()
-> >   PCI: Introduce pci_host_bridge_list to manage host bridges
-> >   PCI: Save sysdata in pci_host_bridge drvdata
-> >   PCI: Introduce pci_host_bridge_ops to support host specific
-> >     operations
-> >   PCI: Introduce new scan function pci_scan_host_bridge()
-> >   x86/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-> >   ia64/PCI: Refine pci_acpi_scan_root() with generic pci_host_bridge
-> >   powerpc/pci: Rename pcibios_root_bridge_prepare()
-> >   powerpc/pci: Use pci_scan_host_bridge() for simplicity
-> >   PCI: Remove weak pcibios_root_bridge_prepare()
-> >   sparc/PCI: Use pci_scan_host_bridge() for simplicity
-> >   PCI: Introduce pci_bus_child_max_busnr()
-> >   parisc/PCI: Use pci_scan_root_bus() for simplicity
-> >   PCI/mvebu: Use pci_common_init_dev() to simplify code
-> >   PCI/tegra: Remove redundant tegra_pcie_scan_bus()
-> >   PCI/designware: Use pci_scan_root_bus() for simplicity
-> >   PCI/xgene: Use pci_scan_root_bus() instead of pci_create_root_bus()
-> >   PCI: Rename __pci_create_root_bus() to pci_create_root_bus()
-> >   PCI: Export find_pci_host_bridge() and rename to
-> >     pci_find_host_bridge()
-> >   PCI: Remove platform specific pci_domain_nr()
-> >   PCI: Remove pci_bus_assign_domain_nr()
+> Fixes: bcafaf5470f0 ("mmc: dw_mmc: Only enable CD after setup and only if needed")
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v4:
+> - Defer vs. card detect fix patch new for v4.
 > 
-
--- 
--------------------
-   .oooO
-   (   )
-    \ (  Oooo.
-     \_) (   )
-          ) /
-         (_/
-
- One small step
-   for me ...
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/mmc/host/dw_mmc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 47dfd0e..e2811cf 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2863,9 +2863,6 @@ int dw_mci_probe(struct dw_mci *host)
+>  			init_slots++;
+>  	}
+>  
+> -	/* Now that slots are all setup, we can enable card detect */
+> -	dw_mci_enable_cd(host);
+> -
+>  	if (init_slots) {
+>  		dev_info(host->dev, "%d slots initialized\n", init_slots);
+>  	} else {
+> @@ -2874,6 +2871,9 @@ int dw_mci_probe(struct dw_mci *host)
+>  		goto err_dmaunmap;
+>  	}
+>  
+> +	/* Now that slots are all setup, we can enable card detect */
+> +	dw_mci_enable_cd(host);
+> +
+>  	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
+>  		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
+>  
+> 
