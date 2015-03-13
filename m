@@ -1,204 +1,65 @@
-From: sasukewxt@163.com (Caesar Wang)
-Date: Fri, 13 Mar 2015 18:54:11 +0800
-Subject: [PATCH 8/8] ARM: dts: rockchip: relicense rk3288-evb* under
- GPLv2/X11
-In-Reply-To: <1425665046-22927-9-git-send-email-heiko@sntech.de>
-References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
- <1425665046-22927-9-git-send-email-heiko@sntech.de>
-Message-ID: <5502C1D3.3050407@163.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 13 Mar 2015 11:57:42 +0100
+Subject: [rtc-linux] [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
+In-Reply-To: <1426242563.18291.19.camel@mtksdaap41>
+References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
+ <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
+ <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
+ <1426242563.18291.19.camel@mtksdaap41>
+Message-ID: <20150313105742.GS24885@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi Eddie,
 
-? 2015?03?07? 02:04, Heiko Stuebner ??:
-> GPLv2-only devicetrees make reuse difficult for software components licensed
-> under a different license.
->
-> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
-> so relicense the rk3288-evb files to this combination.
->
-> CCs were aquired by git shortlog -sne so it should've hopefully catched
-> every contributor.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Chris Zhong <zyw@rock-chips.com>
-> Cc: Roger Chen <roger.chen@rock-chips.com>
-> Cc: Romain Perier <romain.perier@gmail.com>
-> Cc: Caesar Wang <caesar.wang@rock-chips.com>
-> Cc: Kever Yang <kever.yang@rock-chips.com>
-> Cc: Yunzhi Li <lyz@rock-chips.com>
-> ---
-> I'm hoping to get Acked-by tags from the people in the Cc-list.
+On Fri, Mar 13, 2015 at 06:29:23PM +0800, Eddie Huang wrote:
+> > regmap_read() and regmap_write() can return errors.  There is no
+> > checking for this.
+> > 
+> 
+> I encounter some trouble when I add code to check return value of
+> regmap_read and regmap_write. Every RTC register access through regmap,
+> and there are many register read/write in this driver. If I check every
+> return value, the driver will become ugly. I try to make this driver
+> clean using following macro.
+> 
+> static int __rtc_read(struct mt6397_rtc *rtc, u32 offset, u32 *data)
+> {
+>         u32 addr = rtc->addr_base + offset;
+> 
+>         if (offset < rtc->addr_range)
+>                 return regmap_read(rtc->regmap, addr, data);
+> 
+>         return -EINVAL;
+> }
+> 
+> #define rtc_read(ret, rtc, offset, data)                \
+> ({                                                      \
+>         ret = __rtc_read(rtc, offset, data);            \
+>         if (ret < 0)                                    \
+>                 goto rtc_exit;                          \
+> })                                                      \
 
-Obviously,it makes sense.
-Acked-by:caesar.wang at rock-chips.com
+Hiding a goto (or return) in a macro is a very bad idea.
 
->   arch/arm/boot/dts/rk3288-evb-act8846.dts | 44 ++++++++++++++++++++++++++------
->   arch/arm/boot/dts/rk3288-evb-rk808.dts   | 44 ++++++++++++++++++++++++++------
->   arch/arm/boot/dts/rk3288-evb.dtsi        | 44 ++++++++++++++++++++++++++------
->   3 files changed, 108 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> index d7b8bbc..7ea0e61 100644
-> --- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> +++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
-> @@ -1,13 +1,41 @@
->   /*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->    *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->    */
->   
->   /dts-v1/;
-> diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> index a1c294b..48ae8ed 100644
-> --- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> +++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
-> @@ -1,13 +1,41 @@
->   /*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->    *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->    */
->   
->   /dts-v1/;
-> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
-> index 287a162..bf75f62 100644
-> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
-> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
-> @@ -1,13 +1,41 @@
->   /*
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
->    *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
->    */
->   
->   #include <dt-bindings/pwm/pwm.h>
+what you can do is
+
+	ret |= regmap_read(rtc->regmap, RTC_TC_SEC, &tm->tm_sec);
+	ret |= regmap_read(rtc->regmap, RTC_TC_MIN, &tm->tm_min);
+
+	if (ret)
+		return -EIO;
+
+(Don't return ret in this case though as it might contain different
+error codes orred together)
+
+Another possibilty at least for contiguous registers would be
+regmap_bulk_read().
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
