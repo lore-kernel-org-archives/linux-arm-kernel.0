@@ -1,113 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 13 Mar 2015 14:51:11 +0000
-Subject: [PATCH v10 10/21] ARM64 / ACPI: Get PSCI flags in FADT for PSCI
- init
-In-Reply-To: <1426077587-1561-11-git-send-email-hanjun.guo@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-11-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150313145111.GB5229@red-moon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 13 Mar 2015 15:48:40 +0100
+Subject: [PATCH 7/7] common.c:105 Variable 'gephy' is  never used.
+In-Reply-To: <20150313141926.GM8656@n2100.arm.linux.org.uk>
+References: <1426254264-5105-1-git-send-email-ameenali023@gmail.com>
+ <20150313141926.GM8656@n2100.arm.linux.org.uk>
+Message-ID: <20150313144840.GA7311@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 12:39:36PM +0000, Hanjun Guo wrote:
+On Fri, Mar 13, 2015 at 02:19:26PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Mar 13, 2015 at 03:44:24PM +0200, Ameen Ali wrote:
+> > Variable 'gephy' is assigned a value that is never used.
+> > 
+> > Signed-off-by : <AmeenALi023@gmail.com>
+> > ---
+> >  arch/arm/mach-dove/common.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> > index 0d1a892..115a413 100644
+> > --- a/arch/arm/mach-dove/common.c
+> > +++ b/arch/arm/mach-dove/common.c
+> > @@ -113,7 +113,7 @@ static void __init dove_clk_init(void)
+> >  	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+> >  	orion_clkdev_add(NULL, "orion_wdt", tclk);
+> >  	orion_clkdev_add(NULL, "mv64xxx_i2c.0", tclk);
+> > -
+> > +        orion_clkdev_add(NULL,"mv643xx_eth_port.0",gephy);
+> 
+> NAK.  Just because some variable isn't read doesn't mean that you need
+> to dream up some way to make it used.
+> 
+> In any case, this is wrong because it will duplicate this entry:
+> 
+> >  	orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
 
-[...]
+Hi Russell
 
-> +static void __init psci_0_2_set_functions(void)
-> +{
-> +	pr_info("Using standard PSCI v0.2 function IDs\n");
-> +	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-> +	psci_ops.cpu_suspend = psci_cpu_suspend;
-> +
-> +	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> +	psci_ops.cpu_off = psci_cpu_off;
-> +
-> +	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-> +	psci_ops.cpu_on = psci_cpu_on;
-> +
-> +	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-> +	psci_ops.migrate = psci_migrate;
-> +
-> +	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
-> +	psci_ops.affinity_info = psci_affinity_info;
-> +
-> +	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> +		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> +	psci_ops.migrate_info_type = psci_migrate_info_type;
-> +
-> +	arm_pm_restart = psci_sys_reset;
-> +
-> +	pm_power_off = psci_sys_poweroff;
-> +}
-> +
->  /*
->   * PSCI Function IDs for v0.2+ are well defined so use
->   * standard values.
-> @@ -306,29 +335,7 @@ static int __init psci_0_2_init(struct device_node *np)
->  		}
->  	}
->  
-> -	pr_info("Using standard PSCI v0.2 function IDs\n");
-> -	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
-> -	psci_ops.cpu_suspend = psci_cpu_suspend;
-> -
-> -	psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-> -	psci_ops.cpu_off = psci_cpu_off;
-> -
-> -	psci_function_id[PSCI_FN_CPU_ON] = PSCI_0_2_FN64_CPU_ON;
-> -	psci_ops.cpu_on = psci_cpu_on;
-> -
-> -	psci_function_id[PSCI_FN_MIGRATE] = PSCI_0_2_FN64_MIGRATE;
-> -	psci_ops.migrate = psci_migrate;
-> -
-> -	psci_function_id[PSCI_FN_AFFINITY_INFO] = PSCI_0_2_FN64_AFFINITY_INFO;
-> -	psci_ops.affinity_info = psci_affinity_info;
-> -
-> -	psci_function_id[PSCI_FN_MIGRATE_INFO_TYPE] =
-> -		PSCI_0_2_FN_MIGRATE_INFO_TYPE;
-> -	psci_ops.migrate_info_type = psci_migrate_info_type;
-> -
-> -	arm_pm_restart = psci_sys_reset;
-> -
-> -	pm_power_off = psci_sys_poweroff;
-> +	psci_0_2_set_functions();
+Missed that. Sorry.
 
-You should have factored out the firmware version probing too, that's
-the only way we can detect the PSCI firmware version when booting through
-ACPI. You can end up initializing pointers for v0.2+ with a mismatching
-version implemented in PSCI firmware, eg 0.1.
+What happens in the DT world is that ge clock is a child of the gephy
+clock, so that when you enable the ge clock, it walks up towards the
+parent and enables the gephy clock.
 
-We should do that incrementally, I will put together a patch to
-factor out the FW version probing first, you can rebase on top of it.
+I don't see anything like this in the legacy Dove world. Are you just
+relying on the bootloader turning on the phy and nothing turning it
+off?
 
->  out_put_node:
->  	of_node_put(np);
-> @@ -381,7 +388,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
->  	{},
->  };
->  
-> -int __init psci_init(void)
-> +int __init psci_dt_init(void)
->  {
->  	struct device_node *np;
->  	const struct of_device_id *matched_np;
-> @@ -396,6 +403,29 @@ int __init psci_init(void)
->  	return init_fn(np);
->  }
->  
-> +/*
-> + * We use PSCI 0.2+ when ACPI is deployed on ARM64 and it's
-> + * explicitly clarified in SBBR
-> + */
-> +int __init psci_acpi_init(void)
-> +{
-> +	if (!acpi_psci_present()) {
-> +		pr_info("is not implemented in ACPI.\n");
-> +		return -EOPNOTSUPP;
-> +	}
-
-If PSCI is not present, that's a problem related to SMP init, right ?
-That's where a warning should be printed if any, not here, the SBBR
-mandates PSCI as secondaries bring up method, warn otherwise.
-
-Lorenzo
+	Andrew
