@@ -1,49 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 Mar 2015 08:13:02 -0700
-Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <1426162154-8716-7-git-send-email-eliad@wizery.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <1426162154-8716-7-git-send-email-eliad@wizery.com>
-Message-ID: <20150313151301.GJ5264@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 15:18:18 +0000
+Subject: [PATCH 7/7] common.c:105 Variable 'gephy' is  never used.
+In-Reply-To: <20150313144840.GA7311@lunn.ch>
+References: <1426254264-5105-1-git-send-email-ameenali023@gmail.com>
+ <20150313141926.GM8656@n2100.arm.linux.org.uk>
+ <20150313144840.GA7311@lunn.ch>
+Message-ID: <20150313151818.GO8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eliad Peller <eliad@wizery.com> [150312 05:10]:
-> Now that we have wlcore device-tree bindings in place
-> (for both wl12xx and wl18xx), remove the legacy
-> wl12xx_platform_data struct, and move its members
-> into the platform device data (that is passed to wlcore)
+On Fri, Mar 13, 2015 at 03:48:40PM +0100, Andrew Lunn wrote:
+> On Fri, Mar 13, 2015 at 02:19:26PM +0000, Russell King - ARM Linux wrote:
+> > On Fri, Mar 13, 2015 at 03:44:24PM +0200, Ameen Ali wrote:
+> > > Variable 'gephy' is assigned a value that is never used.
+> > > 
+> > > Signed-off-by : <AmeenALi023@gmail.com>
+> > > ---
+> > >  arch/arm/mach-dove/common.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+> > > index 0d1a892..115a413 100644
+> > > --- a/arch/arm/mach-dove/common.c
+> > > +++ b/arch/arm/mach-dove/common.c
+> > > @@ -113,7 +113,7 @@ static void __init dove_clk_init(void)
+> > >  	orion_clkdev_add(NULL, "orion_spi.1", tclk);
+> > >  	orion_clkdev_add(NULL, "orion_wdt", tclk);
+> > >  	orion_clkdev_add(NULL, "mv64xxx_i2c.0", tclk);
+> > > -
+> > > +        orion_clkdev_add(NULL,"mv643xx_eth_port.0",gephy);
+> > 
+> > NAK.  Just because some variable isn't read doesn't mean that you need
+> > to dream up some way to make it used.
+> > 
+> > In any case, this is wrong because it will duplicate this entry:
+> > 
+> > >  	orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
 > 
-> Davinci 850 is the only platform that still set
-> the platform data in the legacy way (and doesn't
-> have DT bindings), so remove the relevant
-> code/Kconfig option from the board file (as suggested
-> by Sekhar Nori)
+> Hi Russell
 > 
-> Signed-off-by: Luciano Coelho <luca@coelho.fi>
-> Signed-off-by: Eliad Peller <eliad@wizery.com>
-> ---
->  arch/arm/mach-davinci/Kconfig                  |  11 ---
->  arch/arm/mach-davinci/board-da850-evm.c        | 113 -------------------------
->  drivers/net/wireless/ti/wilink_platform_data.c |  25 ------
->  drivers/net/wireless/ti/wl12xx/main.c          |  19 ++---
->  drivers/net/wireless/ti/wlcore/boot.c          |   1 -
->  drivers/net/wireless/ti/wlcore/main.c          |   4 +-
->  drivers/net/wireless/ti/wlcore/sdio.c          |  75 +++++-----------
->  drivers/net/wireless/ti/wlcore/wlcore_i.h      |   8 +-
->  include/linux/wl12xx.h                         |  25 ------
->  9 files changed, 36 insertions(+), 245 deletions(-)
+> Missed that. Sorry.
+> 
+> What happens in the DT world is that ge clock is a child of the gephy
+> clock, so that when you enable the ge clock, it walks up towards the
+> parent and enables the gephy clock.
+> 
+> I don't see anything like this in the legacy Dove world. Are you just
+> relying on the bootloader turning on the phy and nothing turning it
+> off?
 
-I got a build error related to the SPI driver with this series, probably
-need to update this patch:
+See, this is why I hate these trivial patches - they waste people's time
+and create a load of unnecessary confusion where there's absolutely none
+needed.
 
-drivers/net/wireless/ti/wlcore/spi.c: In function ?wl1271_probe?:
-drivers/net/wireless/ti/wlcore/spi.c:334:11: error: ?struct wlcore_platdev_data? has no member named ?pdata?
-  pdev_data.pdata = dev_get_platdata(&spi->dev);
-           ^
-drivers/net/wireless/ti/wlcore/spi.c:335:16: error: ?struct wlcore_platdev_data? has no member named ?pdata?
-  if (!pdev_data.pdata) {
+Here's the legacy code:
 
-Regards,
+        gephy = dove_register_gate("gephy", "tclk", CLOCK_GATING_BIT_GIGA_PHY);
 
-Tony
+Here, we have a gate controlled by the CLOCK_GATING_BIT_GIGA_PHY bit
+between the tclk, and gephy clock.  This is immediately followed by:
+
+        ge = dove_register_gate("ge", "gephy", CLOCK_GATING_BIT_GBE);
+
+which is a gate controlled by the CLOCK_GATING_BIT_GBE bit between the
+gephy clock and the ge clock.  This second clock is then registered for
+use by the ethernet device:
+
+        orion_clkdev_add(NULL, "mv643xx_eth_port.0", ge);
+
+If we look at clk_summary, we see:
+
+ tclk                                    12           12   166666667          0 0
+    gephy                                 1            1   166666667          0 0
+       ge                                 1            1   166666667          0 0
+
+which is the same relationship as in DT:
+
+ tclk                                    13           13   166666667          0 0
+    gephy                                 1            1   166666667          0 0
+       ge                                 2            2   166666667          0 0
+
+There is no problem here; this has been a complete waste of our time
+while we discuss this non-problem.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
