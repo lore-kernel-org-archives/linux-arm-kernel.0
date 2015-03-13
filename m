@@ -1,72 +1,43 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Mar 2015 10:57:18 +0100
-Subject: [RFC PATCH v15 04/11] ARM: cpuidle: Register cpuidle_ops for
- QCOM cpus
-In-Reply-To: <20150312150655.GA497@linaro.org>
-References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
- <1425914206-22295-5-git-send-email-lina.iyer@linaro.org>
- <5500866F.6080704@codeaurora.org> <550187C0.4020006@linaro.org>
- <20150312150655.GA497@linaro.org>
-Message-ID: <5502B47E.4010106@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Mar 2015 11:04:03 +0100
+Subject: [PATCH v2.0 0/3] ARM: AT91: pm cleanup for 4.1
+In-Reply-To: <1425872581-7570-1-git-send-email-wenyou.yang@atmel.com>
+References: <1425872581-7570-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <5502B613.6090900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2015 04:06 PM, Lina Iyer wrote:
-> On Thu, Mar 12 2015 at 06:34 -0600, Daniel Lezcano wrote:
->> On 03/11/2015 07:16 PM, Stephen Boyd wrote:
->>> On 03/09/15 08:16, Lina Iyer wrote:
->
-> [...]
->
->>>> +#if IS_ENABLED(CONFIG_QCOM_PM)
->>>
->>> Why not #ifdef CONFIG_QCOM_PM? I thought IS_ENABLED was for C code where
->>> you want to put it in an if () statement.
->>
->> This is right. But the IS_ENABLED is also valid.
->>
->> It seems the current trend is to replace #ifdef with #if IS_ENABLED.
->> It is supposed to prevent to create or'ed conditional with the module
->> support.
->>
->> eg:
->>
->> #if defined(CONFIG_FOO) || defined(CONFIG_FOO_MODULE)
->>
->> is replaced by:
->>
->> #if IS_ENABLED(CONFIG_FOO)
->>
->> Lina: By the way, it would be preferable to use the
->> CONFIG_ARM_QCOM_CPUIDLE where IS_ENABLED makes more sense even the
->
-> Daniel: I dont have CONFIG_ARM_QCOM_CPUIDLE defined anymore. By moving
-> to generic ARM cpuidle, i removed all changes to drivers/cpuidle/. So I
-> used the config item that defineds these items.
->
-> Also, having two indpendent CONFIG_ items provides a chance that the
-> declaration is not matched with the definition or vice versa.
+Le 09/03/2015 04:43, Wenyou Yang a ?crit :
+> Hi,
+> 
+> The patch series purpose is to clean up the AT91 PM code.
+> 
+> It is based on the branch: at91-4.0-fixes
+> git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+> 	+ [PATCH] ARM: at91: pm: change at91_pm_set_standby() to static
+> 
+> Change log for v2.0
+>  - rebase on the branch: at91-4.0-fixes + the above patch. 
+> 
+> Wenyou Yang (3):
+>   pm: at91: pm_slowclock: remove the unused code related with
+>     SLOWDOWN_MASTER_CLOCK
+>   ARM: at91: move "select SRAM" under SOC_AT91SAM9 and SOC_SAMA5
+>   pm: at91: remove CONFIG_AT91_SLOW_CLOCK config option
 
-I think CONFIG_ARM_QCOM_CPUIDLE should be defined as a bool in the 
-Kconfig.arm in drivers/cpuidle.
+Whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-We may want to disable the different cpuidle drivers even if they rely 
-on the generic cpuidle driver.
+And stacked on top of at91-4.1-cleanup: thanks for your patience Wenyou ;-)
 
->> drivers are not modules (who knows if they are converted as module
->> again hence #ifdef will be invalid).
->>
->>
->>
->>>> +CPUIDLE_OPS(qcom_kpss_v1)
->>>> +CPUIDLE_OPS(qcom_kpss_v2)
->>>> +#endif
->
+> 
+>  arch/arm/mach-at91/Kconfig        |   17 +++--------------
+>  arch/arm/mach-at91/Makefile       |    2 +-
+>  arch/arm/mach-at91/pm.c           |   12 +-----------
+>  arch/arm/mach-at91/pm_slowclock.S |   37 -------------------------------------
+>  4 files changed, 5 insertions(+), 63 deletions(-)
+> 
 
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas Ferre
