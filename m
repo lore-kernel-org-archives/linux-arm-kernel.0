@@ -1,121 +1,98 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Mar 2015 16:43:41 +0100
-Subject: [PATCH 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
+Date: Fri, 13 Mar 2015 16:43:42 +0100
+Subject: [PATCH 2/9] PM / Domains: Enable genpd to support ->get|put()
+ callbacks
 In-Reply-To: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
 References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1426261429-31883-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1426261429-31883-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There may be more than one device in a PM domain which then will be
-probed at different points in time.
+To provide users control over whether the power should be maintained,
+implement the ->get|put() callbacks for genpd's PM domain.
 
-Depending on timing and runtime PM support, in for the device related
-driver/subsystem, a PM domain may be advised to power off after a
-successful probe sequence.
+A usage count variable keeps track of the number of users. A positive
+value tells genpd to keep supplying power and also to power up if it's
+the first user.
 
-A general requirement for a device within a PM domain, is that the
-PM domain must stay powered during the probe sequence. To cope with
-such requirement, let's add the dev_pm_domain_get|put() APIs.
-
-These APIs are intended to be invoked from subsystem-level code and the
-calls between get/put needs to be balanced.
-
-dev_pm_domain_get(), tells the PM domain that it needs to increase a
-usage count and to keep supplying power. dev_pm_domain_put(), does the
-opposite.
-
-For a PM domain to support this feature, it must implement the optional
-->get|put() callbacks.
+Once the usage count reaches zero, genpd tries to power off its PM
+domain.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
- include/linux/pm.h          |  2 ++
- include/linux/pm_domain.h   |  4 ++++
- 3 files changed, 46 insertions(+)
+ drivers/base/power/domain.c | 26 +++++++++++++++++++++++++-
+ include/linux/pm_domain.h   |  1 +
+ 2 files changed, 26 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index f32b802..99225af 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -128,3 +128,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
- 		dev->pm_domain->detach(dev, power_off);
- }
- EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
-+
-+/**
-+ * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
-+ * @domain: The PM domain to operate on.
-+ *
-+ * This function will not by itself increase the usage count, that's up to each
-+ * PM domain implementation to support. Typically it should be invoked from
-+ * subsystem level code prior drivers starts probing.
-+ *
-+ * Do note, it's optional to implement the ->get() callback for a PM domain.
-+ *
-+ * Returns 0 on successfully increased usage count or negative error code.
-+ */
-+int dev_pm_domain_get(struct dev_pm_domain *domain)
-+{
-+	int ret = 0;
-+
-+	if (domain && domain->get)
-+		ret = domain->get(domain);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_domain_get);
-+
-+/**
-+ * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
-+ * @domain: The PM domain to operate on.
-+ *
-+ * This function will not by itself decrease the usage count, that's up to each
-+ * PM domain implementation to support. Typically it should be invoked from
-+ * subsystem level code after drivers has finished probing.
-+ *
-+ * Do note, it's optional to implement the ->put() callback for a PM domain.
-+ */
-+void dev_pm_domain_put(struct dev_pm_domain *domain)
-+{
-+	if (domain && domain->put)
-+		domain->put(domain);
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_domain_put);
-diff --git a/include/linux/pm.h b/include/linux/pm.h
-index e2f1be6..e62330b 100644
---- a/include/linux/pm.h
-+++ b/include/linux/pm.h
-@@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struct device *dev);
- struct dev_pm_domain {
- 	struct dev_pm_ops	ops;
- 	void (*detach)(struct device *dev, bool power_off);
-+	int (*get)(struct dev_pm_domain *domain);
-+	void (*put)(struct dev_pm_domain *domain);
- };
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 45937f8..7314459 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -495,10 +495,12 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
+ 	 * (2) The domain is waiting for its master to power up.
+ 	 * (3) One of the domain's devices is being resumed right now.
+ 	 * (4) System suspend is in progress.
++	 * (5) The usage_count > 0, since it tells us to stay powered.
+ 	 */
+ 	if (genpd->status == GPD_STATE_POWER_OFF
+ 	    || genpd->status == GPD_STATE_WAIT_MASTER
+-	    || genpd->resume_count > 0 || genpd->prepared_count > 0)
++	    || genpd->resume_count > 0 || genpd->prepared_count > 0
++	    || atomic_read(&genpd->usage_count) > 0)
+ 		return 0;
  
- /*
+ 	if (atomic_read(&genpd->sd_count) > 0)
+@@ -1377,6 +1379,25 @@ EXPORT_SYMBOL_GPL(pm_genpd_syscore_poweron);
+ 
+ #endif /* CONFIG_PM_SLEEP */
+ 
++static int genpd_get(struct dev_pm_domain *domain)
++{
++	struct generic_pm_domain *genpd = pd_to_genpd(domain);
++
++	atomic_inc(&genpd->usage_count);
++
++	return pm_genpd_poweron(genpd);
++}
++
++static void genpd_put(struct dev_pm_domain *domain)
++{
++	struct generic_pm_domain *genpd = pd_to_genpd(domain);
++
++	if (!atomic_dec_and_test(&genpd->usage_count))
++		return;
++
++	genpd_queue_power_off_work(genpd);
++}
++
+ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
+ 					struct generic_pm_domain *genpd,
+ 					struct gpd_timing_data *td)
+@@ -1874,10 +1895,13 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ 	genpd->status = is_off ? GPD_STATE_POWER_OFF : GPD_STATE_ACTIVE;
+ 	init_waitqueue_head(&genpd->status_wait_queue);
+ 	genpd->poweroff_task = NULL;
++	atomic_set(&genpd->usage_count, 0);
+ 	genpd->resume_count = 0;
+ 	genpd->device_count = 0;
+ 	genpd->max_off_time_ns = -1;
+ 	genpd->max_off_time_changed = true;
++	genpd->domain.get = genpd_get;
++	genpd->domain.put = genpd_put;
+ 	genpd->domain.ops.runtime_suspend = pm_genpd_runtime_suspend;
+ 	genpd->domain.ops.runtime_resume = pm_genpd_runtime_resume;
+ 	genpd->domain.ops.prepare = pm_genpd_prepare;
 diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 080e778..c80d6ac 100644
+index c80d6ac..698ecbe 100644
 --- a/include/linux/pm_domain.h
 +++ b/include/linux/pm_domain.h
-@@ -315,12 +315,16 @@ static inline int of_genpd_add_provider_onecell(struct device_node *np,
- #ifdef CONFIG_PM
- extern int dev_pm_domain_attach(struct device *dev, bool power_on);
- extern void dev_pm_domain_detach(struct device *dev, bool power_off);
-+extern int dev_pm_domain_get(struct dev_pm_domain *domain);
-+extern void dev_pm_domain_put(struct dev_pm_domain *domain);
- #else
- static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
- 	return -ENODEV;
- }
- static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
-+static inline int dev_pm_domain_get(struct dev_pm_domain *domain) { return 0; }
-+static inline void dev_pm_domain_put(struct dev_pm_domain *domain) {}
- #endif
- 
- #endif /* _LINUX_PM_DOMAIN_H */
+@@ -61,6 +61,7 @@ struct generic_pm_domain {
+ 	enum gpd_status status;	/* Current state of the domain */
+ 	wait_queue_head_t status_wait_queue;
+ 	struct task_struct *poweroff_task;	/* Powering off task */
++	atomic_t usage_count;		/* Number of users of the domain */
+ 	unsigned int resume_count;	/* Number of devices being resumed */
+ 	unsigned int device_count;	/* Number of devices */
+ 	unsigned int suspended_count;	/* System suspend device counter */
 -- 
 1.9.1
