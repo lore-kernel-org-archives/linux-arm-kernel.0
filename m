@@ -1,44 +1,87 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 13 Mar 2015 11:15:44 +0100
-Subject: [PATCH] mmc: sdhci-iproc: fix oops in sdhci_iproc_writew
-In-Reply-To: <20150313011101.GA24853@dtor-ws>
-References: <20150313011101.GA24853@dtor-ws>
-Message-ID: <CAPDyKFpZQyOC3=TdQe8ymwnzCn0BXFJCgmYBHH+3qhDB_9AXgg@mail.gmail.com>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Fri, 13 Mar 2015 12:15:54 +0200
+Subject: [PATCH v3 3/5] i2c: recovery: change input parameter to
+ i2c_adapter for prepare/unprepare_recovery
+In-Reply-To: <55017943.6040603@nokia.com>
+References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
+ <1417448047-15236-4-git-send-email-grygorii.strashko@ti.com>
+ <55017943.6040603@nokia.com>
+Message-ID: <5502B8DA.70504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2015 at 02:11, Dmitry Torokhov <dtor@chromium.org> wrote:
-> The driver co-allocates sdhci_iproc_host with sdhci_pltfm_host and so to
-> access it we need to use sdhci_pltfm_priv() and not pltfm_host->priv.
->
-> Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
+Hi Wolfram,
 
-Thanks, applied!
+On 03/12/2015 01:32 PM, Alexander Sverdlin wrote:
+> On 01/12/14 16:34, Grygorii Strashko wrote:
+>> This patch changes type of input parameter for .prepare/unprepare_recovery()
+>> callbacks from struct i2c_bus_recovery_info * to struct i2c_adapter *.
+>> This allows to simplify implementation of these callbacks and avoid
+>> type conversations from i2c_bus_recovery_info to i2c_adapter.
+>> The i2c_bus_recovery_info can be simply retrieved from struct i2c_adapter
+>> which contains pointer on it.
+>>
+>> CC: Sekhar Nori <nsekhar@ti.com>
+>> CC: Kevin Hilman <khilman@deeprootsystems.com>
+>> CC: Santosh Shilimkar <ssantosh@kernel.org>
+>> CC: Murali Karicheri <m-karicheri2@ti.com>
+>> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> ---
+>>   drivers/i2c/i2c-core.c | 4 ++--
+>>   include/linux/i2c.h    | 4 ++--
+>>   2 files changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>> index 2f90ac6..72b6e34 100644
+>> --- a/drivers/i2c/i2c-core.c
+>> +++ b/drivers/i2c/i2c-core.c
+>> @@ -563,7 +563,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+>>   	int i = 0, val = 1, ret = 0;
+>>   
+>>   	if (bri->prepare_recovery)
+>> -		bri->prepare_recovery(bri);
+>> +		bri->prepare_recovery(adap);
+>>   
+>>   	/*
+>>   	 * By this time SCL is high, as we need to give 9 falling-rising edges
+>> @@ -588,7 +588,7 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+>>   	}
+>>   
+>>   	if (bri->unprepare_recovery)
+>> -		bri->unprepare_recovery(bri);
+>> +		bri->unprepare_recovery(adap);
+>>   
+>>   	return ret;
+>>   }
+>> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+>> index b556e0a..cf9380f 100644
+>> --- a/include/linux/i2c.h
+>> +++ b/include/linux/i2c.h
+>> @@ -404,8 +404,8 @@ struct i2c_bus_recovery_info {
+>>   	void (*set_scl)(struct i2c_adapter *, int val);
+>>   	int (*get_sda)(struct i2c_adapter *);
+>>   
+>> -	void (*prepare_recovery)(struct i2c_bus_recovery_info *bri);
+>> -	void (*unprepare_recovery)(struct i2c_bus_recovery_info *bri);
+>> +	void (*prepare_recovery)(struct i2c_adapter *);
+>> +	void (*unprepare_recovery)(struct i2c_adapter *);
+>>   
+>>   	/* gpio recovery */
+>>   	int scl_gpio;
+>>
+> 
+> Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> 
 
-Kind regards
-Uffe
+Could I ask you to consider this patch for 4.1?
+Now my I2C Davinci series is based on it and probably I2C OMAP changes
+will need to be based on it too - if Felipe would agree with this of course.
+
+regards,
+-grygorii
 
 
-> ---
->  drivers/mmc/host/sdhci-iproc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-> index 4139d34..3b423b0 100644
-> --- a/drivers/mmc/host/sdhci-iproc.c
-> +++ b/drivers/mmc/host/sdhci-iproc.c
-> @@ -97,7 +97,7 @@ static inline void sdhci_iproc_writel(struct sdhci_host *host, u32 val, int reg)
->  static void sdhci_iproc_writew(struct sdhci_host *host, u16 val, int reg)
->  {
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -       struct sdhci_iproc_host *iproc_host = pltfm_host->priv;
-> +       struct sdhci_iproc_host *iproc_host = sdhci_pltfm_priv(pltfm_host);
->         u32 word_shift = REG_OFFSET_IN_BITS(reg);
->         u32 mask = 0xffff << word_shift;
->         u32 oldval, newval;
-> --
-> 2.2.0.rc0.207.ga3a616c
->
->
-> --
-> Dmitry
+-- 
+regards,
+-grygorii
