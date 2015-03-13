@@ -1,42 +1,39 @@
-From: marek@goldelico.com (Marek Belisko)
-Date: Fri, 13 Mar 2015 21:40:37 +0100
-Subject: [PATCH v2 2/2] Documentation: omap-twl4030: Move ti,
- codec property to optional
-In-Reply-To: <1426279237-15940-1-git-send-email-marek@goldelico.com>
-References: <1426279237-15940-1-git-send-email-marek@goldelico.com>
-Message-ID: <1426279237-15940-3-git-send-email-marek@goldelico.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 13 Mar 2015 13:44:03 -0700
+Subject: [PATCH 01/12] ARM: Remove mach-msm and associated ARM architecture
+ code
+In-Reply-To: <1426275371.7778.10.camel@x220>
+References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>	
+ <1426270185-19510-2-git-send-email-sboyd@codeaurora.org>
+ <1426275371.7778.10.camel@x220>
+Message-ID: <55034C13.9060808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ti,codec property is not used in omap-twl4030 driver in linux kernel but
-we keep it as optional property, so that the existing dtbs do not
-become noncompliant after the change on other OS.
+On 03/13/15 12:36, Paul Bolle wrote:
+> I've checked this series with my local Kconfig checker (for no other
+> reason than that it removes board-sapphire.c and I had promised to do so
+> too a week ago).
+>
+> On Fri, 2015-03-13 at 11:09 -0700, Stephen Boyd wrote:
+>> --- a/arch/arm/mach-msm/Kconfig
+>> +++ /dev/null
+>> -config MSM_SMD
+>> -	bool
+> After this series MSM_SMD is still referenced in drivers/char/Kconfig
+> (sin the entry for MSM_SMD_PKT) and drivers/tty/serial/Kconfig (in the
+> entry for SERIAL_MSM_SMD).
+>
+> So I think those two Kconfing entries, drivers/char/msm_smd_pkt.c,
+> drivers/tty/serial/msm_smd_tty.c, and the related lines in the two
+> Makefiles involved, can be removed too. (A quick glance at those tow
+> entries and those two files suggests there are no second order effects
+> from removing all that.)
+>
 
-Signed-off-by: Marek Belisko <marek@goldelico.com>
----
- Documentation/devicetree/bindings/sound/omap-twl4030.txt | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Oh yeah I missed those. We can delete them now and reintroduce them when
+they're needed.
 
-diff --git a/Documentation/devicetree/bindings/sound/omap-twl4030.txt b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-index 1ab6bc8..f6a715e 100644
---- a/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-+++ b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-@@ -4,9 +4,9 @@ Required properties:
- - compatible: "ti,omap-twl4030"
- - ti,model: Name of the sound card (for example "omap3beagle")
- - ti,mcbsp: phandle for the McBSP node
--- ti,codec: phandle for the twl4030 audio node
- 
- Optional properties:
-+- ti,codec: phandle for the twl4030 audio node
- - ti,mcbsp-voice: phandle for the McBSP node connected to the voice port of twl
- - ti, jack-det-gpio: Jack detect GPIO
- - ti,audio-routing: List of connections between audio components.
-@@ -59,5 +59,4 @@ sound {
- 	ti,model = "omap3beagle";
- 
- 	ti,mcbsp = <&mcbsp2>;
--	ti,codec = <&twl_audio>;
- };
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
