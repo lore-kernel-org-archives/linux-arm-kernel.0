@@ -1,55 +1,23 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Mar 2015 18:08:12 +0100
-Subject: [PATCH 0/6] ARM: cpuidle: Unify the ARM64/ARM DT approach
-In-Reply-To: <7hfv98vnhn.fsf@deeprootsystems.com>
-References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
- <7hfv98vnhn.fsf@deeprootsystems.com>
-Message-ID: <5503197C.8030105@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 13 Mar 2015 10:10:56 -0700
+Subject: [PATCH 01/10] pm: domains: quieten down generic pm domains
+In-Reply-To: <E1YWSMq-0006Ft-9z@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Fri, 13 Mar 2015 16:23:20 +0000")
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+ <E1YWSMq-0006Ft-9z@rmk-PC.arm.linux.org.uk>
+Message-ID: <7hy4n0rffj.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2015 06:03 PM, Kevin Hilman wrote:
-> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
+
+> PM domains are rather noisy; scheduling behaviour can cause callbacks
+> to take longer, which causes them to spit out a warning-level message
+> each time a callback takes a little longer than the previous time.
+> There really isn't a need for this, except when debugging.
 >
->> There is a big number of cpuidle drivers for the ARM architecture.
->>
->> These drivers have been cleaned up and grouped into the drivers/cpuidle
->> directory to keep track of the changes more easily and ensure the code
->> is following the same scheme across the drivers.
->>
->> That had the benefit of simplifying the code and factor out a lot of common
->> parts. Beside that, as the drivers belong to the 'drivers' directory, we had
->> to split the arch specific bits and the generic code in order to keep
->> everything self contained. The platform driver paradigm was used for this
->> purpose.
->>
->> Unfortunately, this approach is now no longer accepted and a different solution
->> must be provided to reach the same goal: one example is the Qualcomm cpuidle
->> driver upstreaming attempt [1].
->>
->> In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
->>
->> The DT definition provides an 'enable-method' to specify one of the cpu
->> operations (PSCI, ...).
->>
->> This patchset unify this driver with ARM32, using the same DT definition.
->>
->> Thanks with this patchset we can use the 'enable-method' to specify a cpu
->> operations, hence get rid of the platform driver approach and go further in the
->> cpuidle driver flexibility via the DT.
->
-> I really like that these two are unified now.
->
-> Acked-by: Kevin Hilman <khilman@linaro.org>
+> Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Thanks for reviewing the patchset.
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Acked-by: Kevin Hilman <khilman@linaro.org>
