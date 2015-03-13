@@ -1,94 +1,44 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 13 Mar 2015 14:46:35 +0800
-Subject: [PATCH 2/2] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
-In-Reply-To: <3011616.9oVy3HN0Pj@wuerfel>
-References: <1425623091-30478-1-git-send-email-yingjoe.chen@mediatek.com>
- <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
- <3011616.9oVy3HN0Pj@wuerfel>
-Message-ID: <1426229195.16768.278.camel@mtksdaap41>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 13 Mar 2015 09:09:01 +0200
+Subject: [PATCH 0/2] ARM: devicetree: Remove unused ti,codec property
+In-Reply-To: <1426194899-14037-1-git-send-email-marek@goldelico.com>
+References: <1426194899-14037-1-git-send-email-marek@goldelico.com>
+Message-ID: <55028D0D.3050403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/12/2015 11:14 PM, Marek Belisko wrote:
+> ti,codec in not parsed in omap-twl4030 sound driver. It's not necessary
+> to specify this property in DT because ti,twl4030-audio which ti,codec
+> was pointing to by phandle is mfd driver and device for ASoC ic created w/o
+> any DT property (codec name is hardcoded in ASoC driver).
+
+All:
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
 
-Hi Arnd,
-
-Thanks for your suggestion.
-
-On Mon, 2015-03-09 at 21:36 +0100, Arnd Bergmann wrote:
-> On Friday 06 March 2015 14:24:51 Yingjoe Chen wrote:
-> > Linus,
-> > This one make PINCTRL_MT8173 option user selectable and is based on
-> > mtk-staging in your tree. If you think this is OK, please applied or
-> > squash this into previous change. Thanks.
 > 
-> The patch looks good in principle, just two small comments
+> Please see reply [1] from Peter Ujfalusi.
 > 
-> > --------------------------------------------------
+> [1]: http://comments.gmane.org/gmane.linux.ports.arm.omap/124273
 > 
-> To simplify the job for Linus here, please start the line above
-> with 
+> Marek Belisko (2):
+>   ARM: dts: omap3: Remove all references to ti,codec property
+>   Documentation: omap-twl4030: Remove ti,codec property
 > 
-> 8<------
+>  Documentation/devicetree/bindings/sound/omap-twl4030.txt | 2 --
+>  arch/arm/boot/dts/omap3-beagle-xm.dts                    | 1 -
+>  arch/arm/boot/dts/omap3-beagle.dts                       | 1 -
+>  arch/arm/boot/dts/omap3-cm-t3x30.dtsi                    | 1 -
+>  arch/arm/boot/dts/omap3-devkit8000.dts                   | 1 -
+>  arch/arm/boot/dts/omap3-gta04.dtsi                       | 1 -
+>  arch/arm/boot/dts/omap3-igep.dtsi                        | 1 -
+>  arch/arm/boot/dts/omap3-lilly-a83x.dtsi                  | 1 -
+>  arch/arm/boot/dts/omap3-overo-base.dtsi                  | 1 -
+>  arch/arm/boot/dts/omap3-tao3530.dtsi                     | 1 -
+>  10 files changed, 11 deletions(-)
 > 
-> (a stylized pair if scissors)
-> 
-> which is the magic that git-am looks for.
-
-Will do next time.
 
 
-<...>
-> You have slightly different logic here: PINCTRL_MT8135 will
-> always be enabled when COMPILE_TEST is on, while PINCTRL_MT8173
-> is enabled by default in this case, but can be turned off.
-> Neither of them is what you really want, which would be
-> 
-> config PINCTRL_MT8135
-> 	bool "Mediatek MT8135 pin control"
-> 	depends on MACH_MT8135 || COMPILE_TEST
-> 	default MACH_MT8135
-> 	select PINCTRL_MTK_COMMON
-> 
-> config PINCTRL_MT8135
-> 	bool "Mediatek MT8173 pin control"
-> 	depends on MACH_MT8173 || COMPILE_TEST
-> 	default MACH_MT8173
-> 	select PINCTRL_MTK_COMMON
-> 
-> This way, the options are only enabled by default if MACH_MT8135
-> or MACH_MT8173 are enabled, but you are free to enable or disable
-> them when COMPILE_TEST is set. Alternatively, you can do
-> 
-> config PINCTRL_MT8135
-> 	bool "Mediatek MT8135 pin control" if COMPILE_TEST && !MACH_MT8135
-> 	default MACH_MT8135
-> 	select PINCTRL_MTK_COMMON
-> 
-> config PINCTRL_MT8135
-> 	bool "Mediatek MT8173 pin control" if COMPILE_TEST && !MACH_MT8173
-> 	default MACH_MT8173
-> 	select PINCTRL_MTK_COMMON
-> 
-> which will let you turn on the options if COMPILE_TEST is set, but not
-> let you turn them off when the drivers are required.
-
-Yes, this is preferred. Because we don't have MACH_MT8173, so it is
-possible a ARM64 + ARCH_MEDIATEK system doesn't need PINCTRL_MT8173, so
-we still need 2 slightly different logic. Is it OK if I do this?
-Also add some comments so future SoCs can follow the correct template.
-
-# For ARMv7 SoCs
-config PINCTRL_MT8135
-        bool "Mediatek MT8135 pin control" if COMPILE_TEST && !MACH_MT8135
-        default MACH_MT8135
-        select PINCTRL_MTK_COMMON
-
-# For ARMv8 SoCs
-config PINCTRL_MT8173
-        bool "Mediatek MT8173 pin control"
-        depends on ARM64 || COMPILE_TEST
-        default ARM64
-        select PINCTRL_MTK_COMMON
-
-Joe.C
+-- 
+P?ter
