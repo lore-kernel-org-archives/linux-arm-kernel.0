@@ -1,28 +1,45 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 13 Mar 2015 10:24:21 +0000
-Subject: [PATCH] arm/arm64: KVM: fix missing unlock on error in
- kvm_vgic_create()
-In-Reply-To: <20150302172947.GC10137@lvm>
-References: <1425037305-23292-1-git-send-email-weiyj_lk@163.com>
- <20150302172947.GC10137@lvm>
-Message-ID: <5502BAD5.3040004@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 13 Mar 2015 11:25:29 +0100
+Subject: [PATCH v3 05/12] clocksource: add dependencies for Vybrid pit
+ clocksource
+In-Reply-To: <1426203380-7155-6-git-send-email-stefan@agner.ch>
+References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
+ <1426203380-7155-6-git-send-email-stefan@agner.ch>
+Message-ID: <5502BB19.1020509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej Christoffer,
+On 03/13/2015 12:36 AM, Stefan Agner wrote:
+> Add the minimal dependencies required to use the Vybrid PIT
+> clocksource driver. Those are not part of the SoC dependencies.
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-On 02/03/15 17:29, Christoffer Dall wrote:
-> On Fri, Feb 27, 2015 at 07:41:45PM +0800, weiyj_lk at 163.com wrote:
->> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->>
->> Add the missing unlock before return from function kvm_vgic_create()
->> in the error handling case.
->>
->> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Thanks, applied.
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Have I missed this or is this patch nor appearing in any of your branches?
+> ---
+>   drivers/clocksource/Kconfig | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 1c2506f..350e742 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -164,6 +164,8 @@ config FSL_FTM_TIMER
+>
+>   config VF_PIT_TIMER
+>   	bool
+> +	select CLKSRC_MMIO
+> +	select CLKSRC_OF
+>   	help
+>   	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+>
+>
 
-Cheers,
-Andre.
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
