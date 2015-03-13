@@ -1,88 +1,117 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 13 Mar 2015 15:56:20 +0000
-Subject: [PATCH v2 0/2] serial/amba-pl011: Activate TX IRQ passively
-Message-ID: <1426262182-2298-1-git-send-email-Dave.Martin@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 13 Mar 2015 17:03:52 +0100
+Subject: read_cpuid_id() in arch/arm/kernel/setup.c
+Message-ID: <55030A68.6070002@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes since v1:
+Hello everyone,
 
-This is a cleanup of v1 which significantly simplifies some things and
-fixes a couple of bugs.
+As far as I can tell, read_cpuid_id() resolves to read_cpuid(CPUID_ID)
+which resolves to mrc 15, 0, rN, cr0, cr0, {0}
 
-Due to these changes, I've stripped the Tested-bys.  If the guys who
-already gave a Tested-by (thanks) have a chance, a re-test would be
-much appreciated.
+Consider this:
 
- * Refactored pl011_tx_char() and associated control flow to have
-   "try to transmit a char" semantics, instead of "transmit, then
-   tell me whether I can transmit another".
+/*
+  * The CPU ID never changes at run time, so we might as well tell the
+  * compiler that it's constant.  Use this function to read the CPU ID
+  * rather than directly reading processor_id or read_cpuid() directly.
+  */
+static inline unsigned int __attribute_const__ read_cpuid_id(void)
+{
+	return read_cpuid(CPUID_ID);
+}
 
-   This makes the code clearer, and ensures by construction that TXFF is
-   always checked before sending a char, if character transmission was
-   not triggered by an interrupt.
+Despite the comment and attribute, my compiler(*) still reloads the
+value every time.
 
-   As a side effect, this change exposed and also fixes a bug which can
-   cause the last character to be sent twice when the FIFO becomes full
-   (thanks to Dom Cobley for reporting this).
+(*) gcc version 4.9.3 20141031 (prerelease) (Linaro GCC 2014.11)
 
- * Removal of some redundant changes, and verbose comments that are no
-   longer needed.
+e.g.
 
-[Russell: I didn't do all the restructuring you suggested, because I
-wanted to clean up and stabilise the existing series.  The result seems
-a fair bit less convoluted, but I'm happy to further restructuring if
-you feel it's needed.]
+static int __get_cpu_architecture(void)
+{
+	int cpu_arch;
+
+	unsigned int id = read_cpuid_id();
+	if ((id & 0x0008f000) == 0) {
+		cpu_arch = CPU_ARCH_UNKNOWN;
+	} else if ((id & 0x0008f000) == 0x00007000) {
+		cpu_arch = (id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+	} else if ((id & 0x00080000) == 0x00000000) {
+		cpu_arch = (id >> 16) & 7;
+		if (cpu_arch)
+			cpu_arch += CPU_ARCH_ARMv3;
+	} else if ((id & 0x000f0000) == 0x000f0000) {
+
+resolves to
+
+c01fec74:       ee10cf10        mrc     15, 0, ip, cr0, cr0, {0}
+c01fec78:       e21cca8f        ands    ip, ip, #585728 ; 0x8f000
+c01fec7c:       e34c3023        movt    r3, #49187      ; 0xc023
+c01fec80:       e5837008        str     r7, [r3, #8]
+c01fec84:       e50b304c        str     r3, [fp, #-76]  ; 0x4c
+c01fec88:       0a000022        beq     c01fed18 <setup_arch+0xe4>
+c01fec8c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
+c01fec90:       e2033a8f        and     r3, r3, #585728 ; 0x8f000
+c01fec94:       e3530a07        cmp     r3, #28672      ; 0x7000
+c01fec98:       1a000004        bne     c01fecb0 <setup_arch+0x7c>
+c01fec9c:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
+c01feca0:       e3130502        tst     r3, #8388608    ; 0x800000
+c01feca4:       13a0c003        movne   ip, #3
+c01feca8:       03a0c001        moveq   ip, #1
+c01fecac:       ea000019        b       c01fed18 <setup_arch+0xe4>
+c01fecb0:       ee103f10        mrc     15, 0, r3, cr0, cr0, {0}
+c01fecb4:       e3130702        tst     r3, #524288     ; 0x80000
 
 
-Original cover letter:
+So I thought it would be nice to give the poor compiler a break,
+and just stuff the result in a local variable:
 
-The current PL011 driver transmits a dummy character when the UART
-is opened, to assert the TX IRQ for the first time
-(see pl011_startup()).  The UART is put in loopback mode temporarily,
-so the receiver presumably shouldn't see anything.
+--- setup.c	2015-03-03 18:04:59.000000000 +0100
++++ setup.foo.c	2015-03-13 16:26:56.413380663 +0100
+@@ -237,15 +237,16 @@
+  {
+  	int cpu_arch;
+  
+-	if ((read_cpuid_id() & 0x0008f000) == 0) {
++	unsigned int id = read_cpuid_id();
++	if ((id & 0x0008f000) == 0) {
+  		cpu_arch = CPU_ARCH_UNKNOWN;
+-	} else if ((read_cpuid_id() & 0x0008f000) == 0x00007000) {
+-		cpu_arch = (read_cpuid_id() & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
+-	} else if ((read_cpuid_id() & 0x00080000) == 0x00000000) {
+-		cpu_arch = (read_cpuid_id() >> 16) & 7;
++	} else if ((id & 0x0008f000) == 0x00007000) {
++		cpu_arch = (id & (1 << 23)) ? CPU_ARCH_ARMv4T : CPU_ARCH_ARMv3;
++	} else if ((id & 0x00080000) == 0x00000000) {
++		cpu_arch = (id >> 16) & 7;
+  		if (cpu_arch)
+  			cpu_arch += CPU_ARCH_ARMv3;
+-	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
++	} else if ((id & 0x000f0000) == 0x000f0000) {
+  		unsigned int mmfr0;
+  
+  		/* Revised CPUID format. Read the Memory Model Feature
 
-However...
 
-At least some platforms containing a PL011 send characters down the
-wire even when loopback mode is enabled.  This means that a
-spurious NUL character may be seen at the receiver when the PL011 is
-opened through the TTY layer.
+which compiles to
 
-The current code also temporarily sets the baud rate to maximum and
-the character width to the minimum, to that the dummy TX completes
-as quickly as possible.  If this is seen by the receiver it will
-result in a framing error and can knock the receiver out of sync --
-turning subsequent output into garbage until synchronisation
-is reestablished.  (Particularly problematic during boot with systemd.)
+c01fec74:       ee102f10        mrc     15, 0, r2, cr0, cr0, {0}
+c01fec78:       e212ca8f        ands    ip, r2, #585728 ; 0x8f000
+c01fec7c:       e34c3023        movt    r3, #49187      ; 0xc023
+c01fec80:       e5837008        str     r7, [r3, #8]
+c01fec84:       e50b304c        str     r3, [fp, #-76]  ; 0x4c
+c01fec88:       0a00001c        beq     c01fed00 <setup_arch+0xcc>
+c01fec8c:       e35c0a07        cmp     ip, #28672      ; 0x7000
+c01fec90:       1a000003        bne     c01feca4 <setup_arch+0x70>
+c01fec94:       e3120502        tst     r2, #8388608    ; 0x800000
+c01fec98:       13a0c003        movne   ip, #3
+c01fec9c:       03a0c001        moveq   ip, #1
+c01feca0:       ea000016        b       c01fed00 <setup_arch+0xcc>
+c01feca4:       e3120702        tst     r2, #524288     ; 0x80000
 
-To avoid spurious transmissions, this patch removes assumptions about
-whether the TX IRQ will fire until at least one TX IRQ has been seen.
 
-Instead, the UART will unmask the TX IRQ and then slow-start via
-polling and timer-based soft IRQs initially.  If the TTY layer writes
-enough data to fill the FIFO to the interrupt threshold in one go,
-the TX IRQ should assert, at which point the driver changes to
-fully interrupt-driven TX.
+Is this nano-optimization worth considering?
 
-In this way, the TX IRQ is activated as a side-effect instead of
-being done deliberately.
-
-This should also mean that the driver works on the SBSA Generic
-UART[1] (a cut-down PL011) without invasive changes.  The Generic
-UART lacks some features needed for the dummy TX approach to work
-(FIFO disabling and loopback).
-
-[1] Server Base System Architecture (ARM-DEN-0029-v2.3)
-    http://infocenter.arm.com/
-    (click-thru required :/)
-
-Dave Martin (2):
-  serial/amba-pl011: Activate TX IRQ passively
-  serial/amba-pl011: Leave the TX IRQ alone when the UART is not open
-
- drivers/tty/serial/amba-pl011.c |  120 +++++++++++++++++++++++++--------------
- 1 file changed, 76 insertions(+), 44 deletions(-)
-
--- 
-1.7.10.4
+Regards.
