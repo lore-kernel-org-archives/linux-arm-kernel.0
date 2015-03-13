@@ -1,112 +1,63 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 13 Mar 2015 16:10:00 +0000
-Subject: [PATCH 00/12] KVM: arm/arm64: move VGIC MMIO to kvm_io_bus
-Message-ID: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Mar 2015 16:10:14 +0000
+Subject: [PATCH 8/9] mmmc: core: Keep PM domain powered during ->probe()
+ of SDIO func driver
+In-Reply-To: <1426261429-31883-9-git-send-email-ulf.hansson@linaro.org>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <1426261429-31883-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <20150313161014.GR8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series converts the VGIC MMIO handling routines to the generic
-kvm_io_bus framework. The framework is needed for the ioeventfd
-functionality, some people on the list wanted to see the VGIC
-converted over to use it, too.
-Looking at the diffstat it doesn't look too useful after all, but
-it cleans up the code a bit and gets rid of an ugly ping-pong
-between vgic.c and vgic-v[23]-emul.c.
+On Fri, Mar 13, 2015 at 04:43:48PM +0100, Ulf Hansson wrote:
+> To sucessfully probe some devices their corresponding PM domains may
+> need to be powered.
+> 
+> Use the dev_pm_domain_get|put() APIs, to control the behavior of the PM
+> domain.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/mmc/core/sdio_bus.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+> index 71357b8..0d89b4b 100644
+> --- a/drivers/mmc/core/sdio_bus.c
+> +++ b/drivers/mmc/core/sdio_bus.c
+> @@ -320,7 +320,14 @@ int sdio_add_func(struct sdio_func *func)
+>  	if (ret)
+>  		return ret;
+>  
+> +	ret = dev_pm_domain_get(func->dev.pm_domain);
+> +	if (ret) {
+> +		dev_pm_domain_detach(&func->dev, false);
+> +		return ret;
+> +	}
+> +
+>  	ret = device_add(&func->dev);
+> +	dev_pm_domain_put(func->dev.pm_domain);
 
-It's based on Nikolay's work[1], thanks especially for the tedious
-first patch.
-I totally reworked Nikolay's 3/5. I don't see much point in adding
-another MMIO handling layer on top of the already quite convoluted
-VGIC MMIO handling.
-Instead I let the kvm_io_bus call into the final MMIO dispatcher of
-the VGIC directly, which redirects the access to the actual register
-handlers. We would loose quite some checking and some neatness of the
-current functionality if that would be skipped, so I kept this in.
+This is broken.  It assumes that the device will be probed in device_add().
+That's not always the case.  Come on Ulf, I'm dismayed at you producing
+bad and fragile patches like this.  You are the apparent maintainer for
+several important subsystems, and you are putting yourself up for more,
+yet you don't seem to know the basics about the kernel infrastructure.
+That makes you dangerous.
 
-Unfortunately kvm_io_bus lacks an opaque pointer to pass in some data,
-so I worked around this by using container_of.
-Now for every struct kvm_mmio_range array a KVM I/O device is
-registered (one for VGICv2, 2*nr_vcpus + 1 for VGICv3), using the
-struct kvm_io_device variable as an anchor into the new
-struct vgic_io_device. This one holds the base address, the
-vgic_io_range pointer and (in case of the GICv3 redistributor) the
-associated vCPU, so that we can access all instance-specific data
-easily.
+Look, device_add() adds the device to the list of available devices,
+publishes it in sysfs, triggers a uevent, and tries to find a driver to
+bind it to.
 
-Patch 2 moves the iodev.h header file around, that solves a problem
-when embedding a struct in arm_vgic.h later. That looks like a nice
-cleanup anyway, so I added two patches to remove the compiler switch
-to add virt/kvm as a include directory. This has been tested for
-arm/arm64 and x86. As soon as I get around to compile-test the other
-architectures, I can send out the respective patches for those, too.
+If it doesn't find a driver already registered in the kernel, that could
+be because the required driver is a module.  In that case, device_add()
+will already have returned.
 
-Patches 5-7 tweak the existing code a bit to make it fit for the
-conversion.
-Patch 8 contains the framework for the new handling, while
-patch 9 and 10 enable the GICv2 and GICv3 emulation, respectively.
-Patch 11 finally switches over to the new kvm_io_bus handling (this
-is basically Nikolay's 2/5 with some additions), patch 12 removes the
-now unneeded code. I split this up to ease reviewing, I could merge
-patches as well if needed.
-
-The series goes on top of the kvmarm.git/next branch and was briefly
-tested on an arm64 model with a GICv2 and a GICv3 guest and on Midway
-(GICv2 guest).
-
-Cheers,
-Andre.
-
-[1] https://lists.cs.columbia.edu/pipermail/kvmarm/2015-January/013379.html
-
-Andre Przywara (10):
-  KVM: move iodev.h from virt/kvm/ to include/kvm
-  KVM: arm/arm64: remove now unneeded include directory from Makefile
-  KVM: x86: remove now unneeded include directory from Makefile
-  KVM: arm/arm64: rename struct kvm_mmio_range to vgic_io_range
-  KVM: mark kvm->buses as empty once they were destroyed
-  KVM: arm/arm64: simplify vgic_find_range() and callers
-  KVM: arm/arm64: implement kvm_io_bus MMIO handling for the VGIC
-  KVM: arm/arm64: prepare GICv2 emulation to be handled by kvm_io_bus
-  KVM: arm/arm64: prepare GICv3 emulation to use kvm_io_bus MMIO
-    handling
-  KVM: arm/arm64: remove now obsolete VGIC specific MMIO handling code
-
-Nikolay Nikolaev (2):
-  KVM: Redesign kvm_io_bus_ API to pass VCPU structure to the
-    callbacks.
-  KVM: ARM: on IO mem abort - route the call to KVM MMIO bus
-
- arch/arm/kvm/Makefile       |    2 +-
- arch/arm/kvm/mmio.c         |   32 +++++++-
- arch/arm64/kvm/Makefile     |    2 +-
- arch/powerpc/kvm/mpic.c     |   12 +--
- arch/powerpc/kvm/powerpc.c  |    4 +-
- arch/s390/kvm/diag.c        |    2 +-
- arch/x86/kvm/Makefile       |    2 +-
- arch/x86/kvm/i8254.c        |   14 ++--
- arch/x86/kvm/i8254.h        |    2 +-
- arch/x86/kvm/i8259.c        |   12 +--
- arch/x86/kvm/ioapic.c       |    8 +-
- arch/x86/kvm/ioapic.h       |    2 +-
- arch/x86/kvm/irq.h          |    2 +-
- arch/x86/kvm/lapic.c        |    4 +-
- arch/x86/kvm/lapic.h        |    2 +-
- arch/x86/kvm/vmx.c          |    2 +-
- arch/x86/kvm/x86.c          |   13 +--
- include/kvm/arm_vgic.h      |   15 +++-
- include/kvm/iodev.h         |   76 ++++++++++++++++++
- include/linux/kvm_host.h    |   10 +--
- virt/kvm/arm/vgic-v2-emul.c |   40 +++-------
- virt/kvm/arm/vgic-v3-emul.c |   77 ++++++++----------
- virt/kvm/arm/vgic.c         |  186 +++++++++++++++++++++++++++++--------------
- virt/kvm/arm/vgic.h         |   21 ++---
- virt/kvm/coalesced_mmio.c   |    7 +-
- virt/kvm/eventfd.c          |    6 +-
- virt/kvm/iodev.h            |   70 ----------------
- virt/kvm/kvm_main.c         |   38 ++++-----
- 28 files changed, 379 insertions(+), 284 deletions(-)
- create mode 100644 include/kvm/iodev.h
- delete mode 100644 virt/kvm/iodev.h
+At some point later, the module will be loaded by user space, and that
+will cause the list of devices to be scanned, looking for devices which
+the newly registered driver can bind to.  With your code above, these
+will _not_ result in the PM domain being "got" before probing.
 
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
