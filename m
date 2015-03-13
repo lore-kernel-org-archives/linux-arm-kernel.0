@@ -1,26 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 13 Mar 2015 17:39:07 +0000
-Subject: [PATCH v2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <1426262737-32762-1-git-send-email-marc.zyngier@arm.com>
-References: <1426262737-32762-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150313173906.GP21998@io.lakedaemon.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 13 Mar 2015 17:40:03 +0000
+Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
+In-Reply-To: <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
+References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hh9try12u.fsf@deeprootsystems.com>
+ <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
+Message-ID: <20150313174002.GA1763@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 04:05:37PM +0000, Marc Zyngier wrote:
-> Now that the GPC has been converted to be a full blown irqchip
-> (and not a mole on the side of the GIC), booting a new kernel
-> with an old DT is likely to result in a rough ride for the user.
+On Thu, Mar 12, 2015 at 01:18:54PM +0000, Ashwin Chaugule wrote:
+> On 11 March 2015 at 12:02, Kevin Hilman <khilman@kernel.org> wrote:
+> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> >
+> >> When a CPU is being profiled through PMU events and it enters suspend
+> >> or idle states, the PMU registers content can be lost, which means that
+> >> counters that were relied upon on power down entry are reset on power
+> >> up to values that are incosistent with the profile session.
+> >>
+> >> This patch adds a CPU PM notifier to arm64 perf code, that detects
+> >> on entry if events are being monitored, and if so, it returns
+> >> failure to the CPU PM notification chain, causing the suspend
+> >> thread or the idle thread to abort power down, therefore preventing
+> >> registers content loss.
+> >>
+> >> By triggering CPU PM notification failure this patch prevents
+> >> suspending a system if the suspend thread is being profiled and
+> >> it also prevents entering idle deep states on cores that have profile
+> >> events in use, somehow limiting power management capabilities when
+> >> there are active perf sessions.
+> >
+> > I guess that's one choice.  Couldn't you also stop the PMU and
+> > save/restore it's context in the notifiers? so that you wouldn't affect
+> > PM capabilities?
+> >
+> > That would imply that you lose the ability to profile after a certain
+> > point in suspend/idle, but maybe that's a better trade off than having
+> > profiling disable certain PM features?
 > 
-> This patch makes sure such a situation is promptly detected and
-> the user made aware that a DT update is in order.
+> I had something like that a few years ago on the Kraits and Scorpions [1].
+
+That's another option, but the point is understanding how we want to
+tackle the issue, by preventing power down or by restoring the
+PMU registers.
+
+BTW, does your patch below need optimizing ? IIUC it "restores" the PMU
+counters even when that's not needed, I spotted some code in your tree
+that adds additional checks (ie check if returning from idle but I am not
+sure that's viable).
+
+All in all going to deep idle must emulate a perf context switch through power
+down, I am pretty sured Dave implemented something like that, I will
+chase the code and then we will see what's the best option.
+
+Lorenzo
+
+> [1] https://www.codeaurora.org/cgit/quic/la/kernel/msm/commit/arch/arm/kernel?h=msm-3.4&id=b5ca687960f0fea2f4735e83ca5c9543474c19de
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks for doing this, Marc!
-
-Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-thx,
-
-Jason.
+> Cheers,
+> Ashwin.
+> 
