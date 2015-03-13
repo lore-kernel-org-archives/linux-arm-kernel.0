@@ -1,69 +1,268 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Mar 2015 22:57:17 +0100
-Subject: [PATCH v3 0/7] Switch mach-at91 to multiplatform
-Message-ID: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
+Date: Fri, 13 Mar 2015 22:57:21 +0100
+Subject: [PATCH v3 4/7] ARM: at91: remove useless mach/cpu.h
+In-Reply-To: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426283844-463-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AT91 is now ready to switch to multiplatform. Do it and clean the remaining mach
-includes.
+mach/cpu.h is not used anymore, remove it.
 
-Changes in v3:
- - use a menu structure as asked by Arnd
- - remove useless selects as pointed by Rob
- - drop a patch that has already been applied
- - add a patch to remove AT91_TIMER_HZ
-
-Changes in v2:
- - moved the bool for ARCH_AT91 to the top
- - added a patch to remove the sama5d4 map_io
-
-Alexandre Belloni (7):
-  ARM: at91: switch to multiplatform
-  ARM: at91: switch at91_dt_defconfig to multiplatform
-  ARM: at91: remove unused headers
-  ARM: at91: remove useless mach/cpu.h
-  ARM: at91: remove SoC headers
-  ARM: at91: remove hardware.h
-  ARM: at91: drop AT91_TIMER_HZ
-
- arch/arm/Kconfig                               |  15 +-
- arch/arm/configs/at91_dt_defconfig             |   5 +-
- arch/arm/mach-at91/Kconfig                     | 115 +++++--------
- arch/arm/mach-at91/Makefile                    |   2 +
- arch/arm/mach-at91/include/mach/at91_dbgu.h    |  63 -------
- arch/arm/mach-at91/include/mach/at91rm9200.h   | 103 ------------
- arch/arm/mach-at91/include/mach/at91sam9260.h  | 129 ---------------
- arch/arm/mach-at91/include/mach/at91sam9261.h  |  99 -----------
- arch/arm/mach-at91/include/mach/at91sam9263.h  | 117 -------------
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
  arch/arm/mach-at91/include/mach/at91sam9_smc.h |   2 -
- arch/arm/mach-at91/include/mach/at91sam9g45.h  | 143 ----------------
- arch/arm/mach-at91/include/mach/at91sam9n12.h  |  65 --------
- arch/arm/mach-at91/include/mach/at91sam9rl.h   | 105 ------------
- arch/arm/mach-at91/include/mach/at91sam9x5.h   |  71 --------
- arch/arm/mach-at91/include/mach/cpu.h          | 216 ------------------------
- arch/arm/mach-at91/include/mach/hardware.h     | 134 ---------------
- arch/arm/mach-at91/include/mach/sama5d3.h      |  86 ----------
- arch/arm/mach-at91/include/mach/sama5d4.h      |  33 ----
- arch/arm/mach-at91/include/mach/uncompress.h   | 218 -------------------------
- arch/arm/mach-at91/pm.c                        |  12 +-
- arch/arm/mach-at91/pm_suspend.S                |   1 -
- arch/arm/mach-at91/sama5.c                     |   2 -
- 22 files changed, 55 insertions(+), 1681 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_dbgu.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5.h
+ arch/arm/mach-at91/include/mach/cpu.h          | 216 -------------------------
+ arch/arm/mach-at91/pm.c                        |   1 -
+ 3 files changed, 219 deletions(-)
  delete mode 100644 arch/arm/mach-at91/include/mach/cpu.h
- delete mode 100644 arch/arm/mach-at91/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
- delete mode 100644 arch/arm/mach-at91/include/mach/sama5d4.h
- delete mode 100644 arch/arm/mach-at91/include/mach/uncompress.h
 
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+index 175e1fdd9fe8..ff54a0ce90e3 100644
+--- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
++++ b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+@@ -16,8 +16,6 @@
+ #ifndef AT91SAM9_SMC_H
+ #define AT91SAM9_SMC_H
+ 
+-#include <mach/cpu.h>
+-
+ #ifndef __ASSEMBLY__
+ struct sam9_smc_config {
+ 	/* Setup register */
+diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
+deleted file mode 100644
+index ce7c80a44983..000000000000
+--- a/arch/arm/mach-at91/include/mach/cpu.h
++++ /dev/null
+@@ -1,216 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/cpu.h
+- *
+- * Copyright (C) 2006 SAN People
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- */
+-
+-#ifndef __MACH_CPU_H__
+-#define __MACH_CPU_H__
+-
+-#define ARCH_ID_AT91RM9200	0x09290780
+-#define ARCH_ID_AT91SAM9260	0x019803a0
+-#define ARCH_ID_AT91SAM9261	0x019703a0
+-#define ARCH_ID_AT91SAM9263	0x019607a0
+-#define ARCH_ID_AT91SAM9G10	0x019903a0
+-#define ARCH_ID_AT91SAM9G20	0x019905a0
+-#define ARCH_ID_AT91SAM9RL64	0x019b03a0
+-#define ARCH_ID_AT91SAM9G45	0x819b05a0
+-#define ARCH_ID_AT91SAM9G45MRL	0x819b05a2	/* aka 9G45-ES2 & non ES lots */
+-#define ARCH_ID_AT91SAM9G45ES	0x819b05a1	/* 9G45-ES (Engineering Sample) */
+-#define ARCH_ID_AT91SAM9X5	0x819a05a0
+-#define ARCH_ID_AT91SAM9N12	0x819a07a0
+-
+-#define ARCH_ID_AT91SAM9XE128	0x329973a0
+-#define ARCH_ID_AT91SAM9XE256	0x329a93a0
+-#define ARCH_ID_AT91SAM9XE512	0x329aa3a0
+-
+-#define ARCH_ID_AT91M40800	0x14080044
+-#define ARCH_ID_AT91R40807	0x44080746
+-#define ARCH_ID_AT91M40807	0x14080745
+-#define ARCH_ID_AT91R40008	0x44000840
+-
+-#define ARCH_ID_SAMA5		0x8A5C07C0
+-
+-#define ARCH_EXID_AT91SAM9M11	0x00000001
+-#define ARCH_EXID_AT91SAM9M10	0x00000002
+-#define ARCH_EXID_AT91SAM9G46	0x00000003
+-#define ARCH_EXID_AT91SAM9G45	0x00000004
+-
+-#define ARCH_EXID_AT91SAM9G15	0x00000000
+-#define ARCH_EXID_AT91SAM9G35	0x00000001
+-#define ARCH_EXID_AT91SAM9X35	0x00000002
+-#define ARCH_EXID_AT91SAM9G25	0x00000003
+-#define ARCH_EXID_AT91SAM9X25	0x00000004
+-
+-#define ARCH_EXID_SAMA5D3	0x00004300
+-#define ARCH_EXID_SAMA5D31	0x00444300
+-#define ARCH_EXID_SAMA5D33	0x00414300
+-#define ARCH_EXID_SAMA5D34	0x00414301
+-#define ARCH_EXID_SAMA5D35	0x00584300
+-#define ARCH_EXID_SAMA5D36	0x00004301
+-
+-#define ARCH_EXID_SAMA5D4	0x00000007
+-#define ARCH_EXID_SAMA5D41	0x00000001
+-#define ARCH_EXID_SAMA5D42	0x00000002
+-#define ARCH_EXID_SAMA5D43	0x00000003
+-#define ARCH_EXID_SAMA5D44	0x00000004
+-
+-#define ARCH_FAMILY_AT91SAM9	0x01900000
+-#define ARCH_FAMILY_AT91SAM9XE	0x02900000
+-
+-/* RM9200 type */
+-#define ARCH_REVISON_9200_BGA	(0 << 0)
+-#define ARCH_REVISON_9200_PQFP	(1 << 0)
+-
+-#ifndef __ASSEMBLY__
+-enum at91_soc_type {
+-	/* 920T */
+-	AT91_SOC_RM9200,
+-
+-	/* SAM92xx */
+-	AT91_SOC_SAM9260, AT91_SOC_SAM9261, AT91_SOC_SAM9263,
+-
+-	/* SAM9Gxx */
+-	AT91_SOC_SAM9G10, AT91_SOC_SAM9G20, AT91_SOC_SAM9G45,
+-
+-	/* SAM9RL */
+-	AT91_SOC_SAM9RL,
+-
+-	/* SAM9X5 */
+-	AT91_SOC_SAM9X5,
+-
+-	/* SAM9N12 */
+-	AT91_SOC_SAM9N12,
+-
+-	/* SAMA5D3 */
+-	AT91_SOC_SAMA5D3,
+-
+-	/* SAMA5D4 */
+-	AT91_SOC_SAMA5D4,
+-
+-	/* Unknown type */
+-	AT91_SOC_UNKNOWN,
+-};
+-
+-enum at91_soc_subtype {
+-	/* RM9200 */
+-	AT91_SOC_RM9200_BGA, AT91_SOC_RM9200_PQFP,
+-
+-	/* SAM9260 */
+-	AT91_SOC_SAM9XE,
+-
+-	/* SAM9G45 */
+-	AT91_SOC_SAM9G45ES, AT91_SOC_SAM9M10, AT91_SOC_SAM9G46, AT91_SOC_SAM9M11,
+-
+-	/* SAM9X5 */
+-	AT91_SOC_SAM9G15, AT91_SOC_SAM9G35, AT91_SOC_SAM9X35,
+-	AT91_SOC_SAM9G25, AT91_SOC_SAM9X25,
+-
+-	/* SAMA5D3 */
+-	AT91_SOC_SAMA5D31, AT91_SOC_SAMA5D33, AT91_SOC_SAMA5D34,
+-	AT91_SOC_SAMA5D35, AT91_SOC_SAMA5D36,
+-
+-	/* SAMA5D4 */
+-	AT91_SOC_SAMA5D41, AT91_SOC_SAMA5D42, AT91_SOC_SAMA5D43,
+-	AT91_SOC_SAMA5D44,
+-
+-	/* No subtype for this SoC */
+-	AT91_SOC_SUBTYPE_NONE,
+-
+-	/* Unknown subtype */
+-	AT91_SOC_SUBTYPE_UNKNOWN,
+-};
+-
+-struct at91_socinfo {
+-	unsigned int type, subtype;
+-	unsigned int cidr, exid;
+-};
+-
+-extern struct at91_socinfo at91_soc_initdata;
+-const char *at91_get_soc_type(struct at91_socinfo *c);
+-const char *at91_get_soc_subtype(struct at91_socinfo *c);
+-
+-static inline int at91_soc_is_detected(void)
+-{
+-	return at91_soc_initdata.type != AT91_SOC_UNKNOWN;
+-}
+-
+-#ifdef CONFIG_SOC_AT91RM9200
+-#define cpu_is_at91rm9200()	(at91_soc_initdata.type == AT91_SOC_RM9200)
+-#define cpu_is_at91rm9200_bga()	(at91_soc_initdata.subtype == AT91_SOC_RM9200_BGA)
+-#define cpu_is_at91rm9200_pqfp() (at91_soc_initdata.subtype == AT91_SOC_RM9200_PQFP)
+-#else
+-#define cpu_is_at91rm9200()	(0)
+-#define cpu_is_at91rm9200_bga()	(0)
+-#define cpu_is_at91rm9200_pqfp() (0)
+-#endif
+-
+-#ifdef CONFIG_SOC_AT91SAM9
+-#define cpu_is_at91sam9xe()	(at91_soc_initdata.subtype == AT91_SOC_SAM9XE)
+-#define cpu_is_at91sam9260()	(at91_soc_initdata.type == AT91_SOC_SAM9260)
+-#define cpu_is_at91sam9g20()	(at91_soc_initdata.type == AT91_SOC_SAM9G20)
+-#define cpu_is_at91sam9261()	(at91_soc_initdata.type == AT91_SOC_SAM9261)
+-#define cpu_is_at91sam9g10()	(at91_soc_initdata.type == AT91_SOC_SAM9G10)
+-#define cpu_is_at91sam9263()	(at91_soc_initdata.type == AT91_SOC_SAM9263)
+-#define cpu_is_at91sam9rl()	(at91_soc_initdata.type == AT91_SOC_SAM9RL)
+-#define cpu_is_at91sam9g45()	(at91_soc_initdata.type == AT91_SOC_SAM9G45)
+-#define cpu_is_at91sam9g45es()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G45ES)
+-#define cpu_is_at91sam9m10()	(at91_soc_initdata.subtype == AT91_SOC_SAM9M10)
+-#define cpu_is_at91sam9g46()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G46)
+-#define cpu_is_at91sam9m11()	(at91_soc_initdata.subtype == AT91_SOC_SAM9M11)
+-#define cpu_is_at91sam9x5()	(at91_soc_initdata.type == AT91_SOC_SAM9X5)
+-#define cpu_is_at91sam9g15()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G15)
+-#define cpu_is_at91sam9g35()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G35)
+-#define cpu_is_at91sam9x35()	(at91_soc_initdata.subtype == AT91_SOC_SAM9X35)
+-#define cpu_is_at91sam9g25()	(at91_soc_initdata.subtype == AT91_SOC_SAM9G25)
+-#define cpu_is_at91sam9x25()	(at91_soc_initdata.subtype == AT91_SOC_SAM9X25)
+-#define cpu_is_at91sam9n12()	(at91_soc_initdata.type == AT91_SOC_SAM9N12)
+-#else
+-#define cpu_is_at91sam9xe()	(0)
+-#define cpu_is_at91sam9260()	(0)
+-#define cpu_is_at91sam9g20()	(0)
+-#define cpu_is_at91sam9261()	(0)
+-#define cpu_is_at91sam9g10()	(0)
+-#define cpu_is_at91sam9263()	(0)
+-#define cpu_is_at91sam9rl()	(0)
+-#define cpu_is_at91sam9g45()	(0)
+-#define cpu_is_at91sam9g45es()	(0)
+-#define cpu_is_at91sam9m10()	(0)
+-#define cpu_is_at91sam9g46()	(0)
+-#define cpu_is_at91sam9m11()	(0)
+-#define cpu_is_at91sam9x5()	(0)
+-#define cpu_is_at91sam9g15()	(0)
+-#define cpu_is_at91sam9g35()	(0)
+-#define cpu_is_at91sam9x35()	(0)
+-#define cpu_is_at91sam9g25()	(0)
+-#define cpu_is_at91sam9x25()	(0)
+-#define cpu_is_at91sam9n12()	(0)
+-#endif
+-
+-#ifdef CONFIG_SOC_SAMA5D3
+-#define cpu_is_sama5d3()	(at91_soc_initdata.type == AT91_SOC_SAMA5D3)
+-#else
+-#define cpu_is_sama5d3()	(0)
+-#endif
+-
+-#ifdef CONFIG_SOC_SAMA5D4
+-#define cpu_is_sama5d4()	(at91_soc_initdata.type == AT91_SOC_SAMA5D4)
+-#else
+-#define cpu_is_sama5d4()	(0)
+-#endif
+-
+-/*
+- * Since this is ARM, we will never run on any AVR32 CPU. But these
+- * definitions may reduce clutter in common drivers.
+- */
+-#define cpu_is_at32ap7000()	(0)
+-#endif /* __ASSEMBLY__ */
+-
+-#endif /* __MACH_CPU_H__ */
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index ac947cdd506c..2a12c01afc67 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -32,7 +32,6 @@
+ #include <asm/fncpy.h>
+ #include <asm/cacheflush.h>
+ 
+-#include <mach/cpu.h>
+ #include <mach/hardware.h>
+ 
+ #include "generic.h"
 -- 
 2.1.0
