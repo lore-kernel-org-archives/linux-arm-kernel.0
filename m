@@ -1,100 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 13 Mar 2015 13:38:17 -0700
-Subject: [PATCH] mmc: dw_mmc: Add a timeout for sending CMD11
-In-Reply-To: <5502C7CB.3010504@samsung.com>
-References: <1425943101-11976-1-git-send-email-dianders@chromium.org>
- <5502C7CB.3010504@samsung.com>
-Message-ID: <CAD=FV=VcaW3eG49ASWxVV4YgUjiex77Z4ShJV0RJLYh2FEPMsw@mail.gmail.com>
+From: marek@goldelico.com (Marek Belisko)
+Date: Fri, 13 Mar 2015 21:40:35 +0100
+Subject: [PATCH v2 0/2] ARM: devicetree: Remove unused ti,codec property
+Message-ID: <1426279237-15940-1-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+ti,codec in not parsed in omap-twl4030 sound driver. It's not necessary
+to specify this property in DT because ti,twl4030-audio which ti,codec
+was pointing to by phandle is mfd driver and device for ASoC ic created w/o
+any DT property (codec name is hardcoded in ASoC driver).
 
-On Fri, Mar 13, 2015 at 4:19 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi Doug.
->
-> This patch is a right process. Just i wonder something.
->
-> On 03/10/2015 08:18 AM, Doug Anderson wrote:
->> In the Designware databook's description of the "Voltage Switch Normal
->> Scenario" it instructs us to set a timer and fail the voltage change
->> if we don't see the voltage change interrupt within 2ms.  Let's
->> implement that.  Without implementing this I have often been able to
->> reproduce a hang while trying to send CMD11 on an rk3288-based board
->> while constantly ejecting and inserting UHS cards.
->>
->> Signed-off-by: Doug Anderson <dianders@chromium.org>
->> ---
->>  drivers/mmc/host/dw_mmc.c  | 26 ++++++++++++++++++++++++++
->>  include/linux/mmc/dw_mmc.h |  2 ++
->>  2 files changed, 28 insertions(+)
->>
->> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
->> index 47dfd0e..d259662 100644
->> --- a/drivers/mmc/host/dw_mmc.c
->> +++ b/drivers/mmc/host/dw_mmc.c
->> @@ -1020,6 +1020,15 @@ static void __dw_mci_start_request(struct dw_mci *host,
->>
->>       dw_mci_start_command(host, cmd, cmdflags);
->>
->> +     if (cmd->opcode == SD_SWITCH_VOLTAGE) {
->> +             /*
->> +              * Databook says to fail after 2ms w/ no response; give an
->> +              * extra jiffy just in case we're about to roll over.
->> +              */
->> +             mod_timer(&host->cmd11_timer,
->> +                       jiffies + msecs_to_jiffies(2) + 1);
->
-> What's "plus one"?
+Please see reply [1] from Peter Ujfalusi.
 
-I tried to briefly describe it in the comment above with the "in case
-we're about to roll over".  ...but more detail...
+Changes from v1:
+- keep ti,codec property in Documentation as optional that the
+existing dtbs do not become noncompliant after the change
 
-* I expect HZ to be something like 100.  ...so a jiffy will be 10ms.
-2ms will be rounded up to 1 jiffy.
+[1]: http://comments.gmane.org/gmane.linux.ports.arm.omap/124273
 
-* It's entirely possible that we're about to roll over jiffies.  That
-is, we might make the mod_timer call when we're 1 nanosecond away from
-moving from 999 to 1000 jiffies.  We'll still read "jiffies" as 999
-and add "msecs_to_jiffies(2)" to get 1000 jiffies.  ...but then it
-will roll over and we'll make the call mod_timer(1000) when jiffies is
-already 1000.  That means that we really got a 1ns delay--not so good.
+Marek Belisko (2):
+  ARM: dts: omap3: Remove all references to ti,codec property
+  Documentation: omap-twl4030: Move ti,codec property to optional
 
-...if we add the extra 1 jiffy then we'll probably really delay for
-10-20ms, but that should be fine in this case.
+ Documentation/devicetree/bindings/sound/omap-twl4030.txt | 3 +--
+ arch/arm/boot/dts/omap3-beagle-xm.dts                    | 1 -
+ arch/arm/boot/dts/omap3-beagle.dts                       | 1 -
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi                    | 1 -
+ arch/arm/boot/dts/omap3-devkit8000.dts                   | 1 -
+ arch/arm/boot/dts/omap3-gta04.dtsi                       | 1 -
+ arch/arm/boot/dts/omap3-igep.dtsi                        | 1 -
+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi                  | 1 -
+ arch/arm/boot/dts/omap3-overo-base.dtsi                  | 1 -
+ arch/arm/boot/dts/omap3-tao3530.dtsi                     | 1 -
+ 10 files changed, 1 insertion(+), 11 deletions(-)
 
-
-If I misunderstood the above, please correct me.
-
->> +     }
->> +
->>       if (mrq->stop)
->>               host->stop_cmdr = dw_mci_prepare_command(slot->mmc, mrq->stop);
->>       else
->> @@ -2158,6 +2167,8 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
->>               /* Check volt switch first, since it can look like an error */
->>               if ((host->state == STATE_SENDING_CMD11) &&
->>                   (pending & SDMMC_INT_VOLT_SWITCH)) {
->> +                     del_timer(&host->cmd11_timer);
->> +
->>                       mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
->>                       pending &= ~SDMMC_INT_VOLT_SWITCH;
->>                       dw_mci_cmd_interrupt(host, pending);
->> @@ -2571,6 +2582,18 @@ ciu_out:
->>       return ret;
->>  }
->>
->> +static void dw_mci_cmd11_timer(unsigned long arg)
->> +{
->> +     struct dw_mci *host = (struct dw_mci *)arg;
->> +
->> +     if (host->state != STATE_SENDING_CMD11)
->> +             dev_info(host->dev, "Unexpected CMD11 timeout\n");
->
-> If Unexpected CMD11 timeout, can it do  just" return"?
-> Well, I think Unexpected CMD11 timeout is an rare case.
-
-Duh, of course.  I'm happy to respin this or I'm happy if you want to
-just add a "return;"  Please let me know.
-
--Doug
+-- 
+1.9.1
