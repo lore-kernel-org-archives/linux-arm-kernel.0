@@ -1,94 +1,85 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 13 Mar 2015 16:05:37 +0000
-Subject: [PATCH v2] ARM: imx6: Warn when an old DT is detected
-Message-ID: <1426262737-32762-1-git-send-email-marc.zyngier@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 13 Mar 2015 09:06:01 -0700
+Subject: [PATCH v4 02/10] mtd: st_spi_fsm: Fetch boot device locations
+ from DT match tables
+In-Reply-To: <20150224094110.GA20969@x1>
+References: <1421853868-8262-1-git-send-email-lee.jones@linaro.org>
+ <1421853868-8262-3-git-send-email-lee.jones@linaro.org>
+ <20150206042744.GK18140@ld-irv-0074> <20150210074634.GD8020@x1>
+ <20150224050452.GG18140@ld-irv-0074> <20150224094110.GA20969@x1>
+Message-ID: <20150313160601.GI12966@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the GPC has been converted to be a full blown irqchip
-(and not a mole on the side of the GIC), booting a new kernel
-with an old DT is likely to result in a rough ride for the user.
+On Tue, Feb 24, 2015 at 09:41:10AM +0000, Lee Jones wrote:
+> On Mon, 23 Feb 2015, Brian Norris wrote:
+> > On Tue, Feb 10, 2015 at 03:46:34PM +0800, Lee Jones wrote:
+> > > On Thu, 05 Feb 2015, Brian Norris wrote:
 
-This patch makes sure such a situation is promptly detected and
-the user made aware that a DT update is in order.
+[snip other discussion]
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-* From v1:
-- Moved the DT check as early as possible (reported by Shawn)
+> > Now, unless you were able to provide an additional enlightening
+> > viewpoint, then the following paragraph likely all holds true:
+> > 
+> > > > Also, I realized that all this boot device / syscfg gymnastics is just
+> > > > for one simple fact; your driver is trying to hide the fact that your
+> > > > system can't reliably handle 4-byte addressing for the boot device. Even
+> > > > if you try your best at toggling 4-byte addressing before/after each
+> > > > read/write/erase, you still are vulnerable to power cuts during the
+> > > > operation. This is a bad design, and we have consistently agreed that we
+> > > > aren't going to work around that in Linux.
+> > > > 
+> > > > Better solutions: hook up a reset line to your flash; improve your boot
+> > > > ROM / bootloader to handle 4-byte addressing for large flash.
+> 
+> Okay, I'm re-read the code and have a new understanding about the
+> boot-from-spi 'gymnastics'. 
 
- arch/arm/mach-imx/common.h      |  1 +
- arch/arm/mach-imx/gpc.c         | 10 ++++++++++
- arch/arm/mach-imx/mach-imx6q.c  |  1 +
- arch/arm/mach-imx/mach-imx6sl.c |  1 +
- arch/arm/mach-imx/mach-imx6sx.c |  1 +
- 5 files changed, 14 insertions(+)
+Great! See, much of that could be done by reading your own code (yeah,
+yeah, not "yours"; but still) and honestly dealing with my questions,
+rather than giving up and deferring to me or your MIA authorities. I'm
+happy to return to technical points and avoid the other unpleasantness.
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index f22e400..aba6831 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -71,6 +71,7 @@ unsigned int imx_get_soc_revision(void);
- void imx_init_revision_from_anatop(void);
- struct device *imx_soc_device_init(void);
- void imx6_enable_rbc(bool enable);
-+void imx_gpc_check_dt(void);
- void imx_gpc_set_arm_power_in_lpm(bool power_off);
- void imx_gpc_set_arm_power_up_timing(u32 sw2iso, u32 sw);
- void imx_gpc_set_arm_power_down_timing(u32 sw2iso, u32 sw);
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index db89c35..7017f02 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -249,3 +249,13 @@ static int __init imx_gpc_init(struct device_node *node,
-  * drivers/irqchip, so we're forced to roll our own. Not very nice.
-  */
- OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
-+
-+void __init imx_gpc_check_dt(void)
-+{
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-+	if (WARN_ON(!np ||
-+		    !of_find_property(np, "interrupt-controller", NULL)))
-+		pr_warn("Outdated DT detected, system is about to crash!!!\n");
-+}
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 6fc2b7e..e21a693 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -387,6 +387,7 @@ static void __init imx6q_map_io(void)
- 
- static void __init imx6q_init_irq(void)
- {
-+	imx_gpc_check_dt();
- 	imx_init_revision_from_anatop();
- 	imx_init_l2cache();
- 	imx_src_init();
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
-index d39c274..12a1b09 100644
---- a/arch/arm/mach-imx/mach-imx6sl.c
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -61,6 +61,7 @@ static void __init imx6sl_init_machine(void)
- 
- static void __init imx6sl_init_irq(void)
- {
-+	imx_gpc_check_dt();
- 	imx_init_revision_from_anatop();
- 	imx_init_l2cache();
- 	imx_src_init();
-diff --git a/arch/arm/mach-imx/mach-imx6sx.c b/arch/arm/mach-imx/mach-imx6sx.c
-index 8595f9e..f17b700 100644
---- a/arch/arm/mach-imx/mach-imx6sx.c
-+++ b/arch/arm/mach-imx/mach-imx6sx.c
-@@ -81,6 +81,7 @@ static void __init imx6sx_init_machine(void)
- 
- static void __init imx6sx_init_irq(void)
- {
-+	imx_gpc_check_dt();
- 	imx_init_revision_from_anatop();
- 	imx_init_l2cache();
- 	imx_src_init();
--- 
-2.1.4
+> There is a separate controller on the platform which acts as a boot
+> device and makes the NOR chip appear as though it is memory mapped.
+> This expects the NOR Controller to be in its default state [24-bit
+> addressing] on boot.  The issue arises if a warm-reset occurs and the
+> device is still in 32-bit addressing mode.
+
+OK, this is all familiar. This is common to many other systems.
+
+> To minimise the risk, the
+> controller attempts to stay in 24-bit addressing mode for as long as
+> possible.
+
+This is the part where we differ, I suppose. The "as long as possible"
+statement is still not sufficient; I believe this still leaves holes
+that simply cannot be fixed in Linux.
+
+> You mentioned power-cuts.  I do not believe this to be an issue, as
+> when the power is completely removed the controller will reset back
+> into default state.  Only warm-resets are an issue.
+
+You're right: power cuts shouldn't be a problem. But what about other
+unexpected warm resets? (Watchdogs?) Do you have any solution for them?
+
+> > > > What's the possibility of dropping all this 4-byte address toggling
+> > > > shenanigans? This will be a blocker to merging with spi-nor.c.
+> 
+> We wouldn't be able to remove this code without significantly
+> weakening resilience to warm-reset mishaps, and changing the hardware
+> design for devices which have already been released is obviously out
+> of the question.
+
+Then maybe we can't solve this. That doesn't mean that upstream will
+support you, though.
+
+Problems like this are why "release early, release often" makes sense.
+If your employer didn't take the "fire the engineers and dump software
+support to the community" approach, but rather honestly engaged on
+driver support earlier, then perhaps your employer could have fixed the
+SoCs/boot ROMs/board designs earlier, rather than later, and you
+wouldn't be stuck trying to wedge in upstream workarounds for bad
+designs in the wild.
+
+Brian
