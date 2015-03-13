@@ -1,63 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Mar 2015 21:21:19 +0100
-Subject: [PATCH 3/4] arm64: fix hyp mode mismatch detection
-In-Reply-To: <1426263277-9827-4-git-send-email-mark.rutland@arm.com>
-References: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
- <1426263277-9827-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu-LiQnvWv6_yh=G5=YO4ohNLCFpmedFYRyHKS39PubcHw@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 13 Mar 2015 13:27:58 -0700
+Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
+ errors
+In-Reply-To: <5502CA4E.9060401@samsung.com>
+References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+ <5502CA4E.9060401@samsung.com>
+Message-ID: <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2015 at 17:14, Mark Rutland <mark.rutland@arm.com> wrote:
-> Commit 828e9834e9a5b7e6 ("arm64: head: create a new function for setting
-> the boot_cpu_mode flag") added BOOT_CPU_MODE_EL1, a nonzero value
-> replacing uses of zero. However it failed to update __boot_cpu_mode
-> appropriately.
->
-> A CPU booted at EL2 writes BOOT_CPU_MODE_EL2 to __boot_cpu_mode[0], and
-> a CPU booted at EL1 writes BOOT_CPU_MODE_EL1 to __boot_cpu_mode[1].
-> Later is_hyp_mode_mismatched() determines there to be a mismatch if
-> __boot_cpu_mode[0] != __boot_cpu_mode[1].
->
-> If all CPUs are booted at EL1, __boot_cpu_mode[0] will be set to
-> BOOT_CPU_MODE_EL1, but __boot_cpu_mode[1] will retain its initial value
-> of zero, and is_hyp_mode_mismatched will erroneously determine that the
-> boot modes are mismatched. This hasn't been a problem so far, but later
-> patches which will make use of is_hyp_mode_mismatched() expect it to
-> work correctly.
->
-> This patch initialises __boot_cpu_mode[1] to BOOT_CPU_MODE_EL1, fixing
-> the erroneous mismatch detection when all CPUs are booted at EL1.
->
+Hi,
 
-Maybe it's just me, but isn't it *much* easier to understand to
-initialise both values to 0, and use 'both are non-zero' as the error
-condition?
-'HYP mode available' would then be '__boot_cpu_mode[0] ==
-BOOT_CPU_MODE_EL2 && __boot_cpu_mode[1] == 0'
+On Fri, Mar 13, 2015 at 4:30 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+> Hi, Doug.
+>
+> On 03/11/2015 12:48 AM, Doug Anderson wrote:
+>> The dw_mmc driver enables HLE errors as part of DW_MCI_ERROR_FLAGS but
+>> nothing in the interrupt handler actually handles them and ACKs them.
+>> That means that if we ever get an HLE error we'll just keep getting
+>> interrupts and we'll wedge things.
+>>
+>> We really don't expect HLE errors but if we ever get them we shouldn't
+>> silently ignore them.
+>>
+>> Note that I have seen HLE errors while constantly ejecting and
+>> inserting cards (ejecting while inserting, etc).
+>
+> Right, It is occurred when card inserting/ejecting.(This case is the case of removable card.)
+> Did you test with eMMC? We needs to consider how control HLE error.
+
+I'm running it on systems with eMMC, SD Cards, and SDIO WiFi.  HLE
+doesn't show up in normal circumstances, only in ejecting the SD card
+at the wrong time.  ...since you can't eject eMMC, I didn't see
+problems there.
+
+> But I think this patch can't solve all of HLE problem.
+
+Agreed.  HLE means that the controller is pretty wedged and (as I
+understand it) means that there's something else we're doing wrong
+elsewhere in the dw_mmc driver (like writing more data to an already
+busy controller).  We should probably track down and find those cases,
+too.
+
+I agree also that this code probably won't fix the controller in all
+cases of HLE errors.  ...but I'm not 100% certain of the best way to
+really do that, do you know?
+
+...but in any case the absolute worst thing to do is what the driver
+is already doing: unmask the HLE interrupt but never handle it
+anywhere...  My patch is at least better than that...
+
+If you have another suggested way to make HLE error handling better
+(or avoid them to begin with) I'm happy to test!  :)
 
 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 07f9305..d17649d 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -588,7 +588,7 @@ ENDPROC(set_cpu_boot_mode_flag)
->         .align  L1_CACHE_SHIFT
->  ENTRY(__boot_cpu_mode)
->         .long   BOOT_CPU_MODE_EL2
-> -       .long   0
-> +       .long   BOOT_CPU_MODE_EL1
->         .popsection
->
->  #ifdef CONFIG_SMP
-> --
-> 1.9.1
->
+-Doug
