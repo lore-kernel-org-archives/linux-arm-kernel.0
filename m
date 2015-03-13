@@ -1,45 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Mar 2015 17:52:23 +0100
-Subject: [PATCH v5 02/10] mfd: syscon: Add atmel system timer registers
- definition
-In-Reply-To: <20150313104032.GG4329@piout.net>
-References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1426162054-9987-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20150313080315.GC3383@x1> <20150313104032.GG4329@piout.net>
-Message-ID: <550315C7.7010403@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Mar 2015 17:52:39 +0100
+Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
+ support of the mvebu SoCs
+In-Reply-To: <20150313161511.GE7311@lunn.ch>
+References: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+ <49808502.FHjQOLPYaI@wuerfel> <20150313161511.GE7311@lunn.ch>
+Message-ID: <10396055.aDQnxkV0zV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 13/03/2015 11:40, Alexandre Belloni a ?crit :
-> Hi,
+On Friday 13 March 2015 17:15:11 Andrew Lunn wrote:
+> On Fri, Mar 13, 2015 at 04:24:57PM +0100, Arnd Bergmann wrote:
+> > On Friday 13 March 2015 14:40:16 Andrew Lunn wrote:
+> > > On Fri, Mar 13, 2015 at 02:41:45PM +0100, Gregory CLEMENT wrote:
+> > > > I will also take care of the legacy support(not fully converted to DT)
+> > > > of the mvebu SoCs.
+> > > > 
+> > > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > > > ---
+> > > >  MAINTAINERS | 1 +
+> > > >  1 file changed, 1 insertion(+)
+> > > > 
+> > > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > > index ddc5a8cf9a8a..39b27f52e217 100644
+> > > > --- a/MAINTAINERS
+> > > > +++ b/MAINTAINERS
+> > > > @@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
+> > > >  M:   Jason Cooper <jason@lakedaemon.net>
+> > > >  M:   Andrew Lunn <andrew@lunn.ch>
+> > > >  M:   Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > > +M:   Gregory Clement <gregory.clement@free-electrons.com>
+> > > >  L:   linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > > >  S:   Maintained
+> > > >  F:   arch/arm/mach-dove/
+> > > 
+> > > Acked-by: Andrew Lunn <andrew@lunn.ch>
+> > > 
+> > 
+> > Should we pick this up for the 4.0 fixes branch directly?
 > 
-> On 13/03/2015 at 08:03:15 +0000, Lee Jones wrote :
->> On Thu, 12 Mar 2015, Alexandre Belloni wrote:
->>
->>> AT91RM920 has a memory range reserved for timer and watchdog configuration.
->>> Expose those registers so that drivers can make use of the system timer syscon
->>> declared in at91 DTs.
->>>
->>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>  include/linux/mfd/syscon/atmel-st.h | 49 +++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 49 insertions(+)
->>>  create mode 100644 include/linux/mfd/syscon/atmel-st.h
->>
->> Applied, thanks.
+> Hi Arnd
+> 
+> Is it a fix?
+> 
+> I don't really care either way.
 
-> Actually, I was thinking this could go through the at91 to avoid
-> depending on your branch.
+I think it should be in 4.0-rc in order to get people to Cc you on
+patches, so I consider it a fix. My question was more about how
+it gets there: whether I pick it up first, or one of you sends a
+pull request for mvebu fixes.
 
-Lee,
-
-I was planning to take the whole series with me to limit the number of
-merge conflicts and dependencies.
-Do you mind if I take this patch with the other AT91 cleanup patches
-through the arm-soc tree?
-If you are okay, can you remove this patch already applied on your tree?
-
-Thanks, bye.
--- 
-Nicolas Ferre
+	Arnd
