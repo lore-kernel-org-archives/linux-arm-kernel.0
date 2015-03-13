@@ -1,54 +1,31 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 13 Mar 2015 11:16:56 -0600
-Subject: [PATCH v4 0/3] firmware: qcom: scm: Add cpu power on/off support
-In-Reply-To: <1425339030-45828-1-git-send-email-lina.iyer@linaro.org>
-References: <1425339030-45828-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20150313171656.GI497@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 13 Mar 2015 10:20:21 -0700
+Subject: [PATCH 02/10] pm: domains: factor out code to get the generic PM
+ domain from a struct device
+In-Reply-To: <E1YWSMv-0006Fx-E6@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Fri, 13 Mar 2015 16:23:25 +0000")
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+ <E1YWSMv-0006Fx-E6@rmk-PC.arm.linux.org.uk>
+Message-ID: <7hpp8crezu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kumar, Stephen, Andy,
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-Any comments on this patchset?
+> The PM domain code contains two methods to get the generic PM domain
+> for a struct device.  One is dev_to_genpd() which is only safe when
+> we know for certain that the device has a generic PM domain attached.
+> The other is coded into genpd_dev_pm_detach() which ensures that the
+> PM domain in the struct device is a generic PM domain (and so is safer).
+>
+> This commit factors out the safer version and documents it.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Thanks,
-Lina
+Acked-by: Kevin Hilman <khilman@linaro.org>
 
-On Mon, Mar 02 2015 at 16:30 -0700, Lina Iyer wrote:
->Hi,
->
->This series of patches adds SCM cold boot clean up and support for warm boot
->for QCOM quad core (and dual core) cpus.
->
->v4 Changes:
->- Added QCOM_SCM_CPU_DOWN_ prefix for L2 on/off enums, relocated them to be close
->  to the function declaration.
->
->v3 Changes:
->- Addressed review comments from Kumar.
->	+ Cleaned up the cold boot api and the warm boot api to match
->	+ Uniform qcom_scm_ prefix
->- Add support for cpu power down using scm_call_atomic1() from [1].
->	+ No longer dependent on the series from sboyd.
->
->v2 Changes:
->- Merge the warm boot patches into a single patch.
->
->[1]. https://lkml.org/lkml/2014/8/4/765
->
->Thanks,
->Lina
->
->Lina Iyer (3):
->  firmware: qcom: scm: Clean cold boot entry to export only the API
->  firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr function
->  firmware: qcom: scm: Support cpu power down through SCM
->
-> arch/arm/mach-qcom/platsmp.c |  21 +-----
-> drivers/firmware/qcom_scm.c  | 154 ++++++++++++++++++++++++++++++++++++++++++-
-> include/linux/qcom_scm.h     |  17 +++--
-> 3 files changed, 163 insertions(+), 29 deletions(-)
->
->-- 
->2.1.0
->
+On top of this, I assume you're thinking that the externally available
+dev_to_genpd() should probably be replaced by pm_genpd_lookup_dev(), and
+dev_to_genpd() should only be used internally to genpd?
+
+Kevin
