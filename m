@@ -1,33 +1,59 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 13 Mar 2015 20:36:11 +0100
-Subject: [PATCH 01/12] ARM: Remove mach-msm and associated ARM
- architecture code
-In-Reply-To: <1426270185-19510-2-git-send-email-sboyd@codeaurora.org>
-References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
- <1426270185-19510-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426275371.7778.10.camel@x220>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 13 Mar 2015 20:40:25 +0100
+Subject: [PATCHv2] thermal: add omap3 support
+In-Reply-To: <20150313050300.GA30104@developer>
+References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
+ <20150313050300.GA30104@developer>
+Message-ID: <20150313194025.GA22182@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've checked this series with my local Kconfig checker (for no other
-reason than that it removes board-sapphire.c and I had promised to do so
-too a week ago).
+Hi!
 
-On Fri, 2015-03-13 at 11:09 -0700, Stephen Boyd wrote:
-> --- a/arch/arm/mach-msm/Kconfig
-> +++ /dev/null
-> -config MSM_SMD
-> -	bool
+> > @@ -384,25 +385,10 @@ int ti_bandgap_set_sensor_data(struct ti_bandgap *bgp, int id, void *data);
+> >  void *ti_bandgap_get_sensor_data(struct ti_bandgap *bgp, int id);
+> >  int ti_bandgap_get_trend(struct ti_bandgap *bgp, int id, int *trend);
+> >  
+> > -#ifdef CONFIG_OMAP4_THERMAL
+> > +extern const struct ti_bandgap_data omap34xx_data;
+> >  extern const struct ti_bandgap_data omap4430_data;
+> >  extern const struct ti_bandgap_data omap4460_data;
+> >  extern const struct ti_bandgap_data omap4470_data;
+> > -#else
+> > -#define omap4430_data					NULL
+> > -#define omap4460_data					NULL
+> > -#define omap4470_data					NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_OMAP5_THERMAL
+> >  extern const struct ti_bandgap_data omap5430_data;
+> > -#else
+> > -#define omap5430_data					NULL
+> > -#endif
+> > -
+> > -#ifdef CONFIG_DRA752_THERMAL
+> >  extern const struct ti_bandgap_data dra752_data;
+> > -#else
+> > -#define dra752_data					NULL
+> > -#endif
+> 
+> Pavel,
+> 
+> Why do we need to remove the existing symbols for other chips in this file to get OMAP3 support in?
+> 
 
-After this series MSM_SMD is still referenced in drivers/char/Kconfig
-(sin the entry for MSM_SMD_PKT) and drivers/tty/serial/Kconfig (in the
-entry for SERIAL_MSM_SMD).
+No, I don't need to remove this, and you can safely drop this hunk.
 
-So I think those two Kconfing entries, drivers/char/msm_smd_pkt.c,
-drivers/tty/serial/msm_smd_tty.c, and the related lines in the two
-Makefiles involved, can be removed too. (A quick glance at those tow
-entries and those two files suggests there are no second order effects
-from removing all that.)
+OTOH those ifdefs are unneccessary and eye-sore: extern symbol
+declarations do not really hurt, and .c files already contain enough
+#ifdefs for other reasons that the symbols will not be needed when it
+is not configured.
 
+Try it, it should work ok.
 
-Paul Bolle
+Best regards,
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
