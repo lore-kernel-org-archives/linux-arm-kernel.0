@@ -1,44 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Mar 2015 11:44:50 +0100
-Subject: [PATCH v5 09/10] clocksource: atmel-st: remove mach/hardware
- dependency
-In-Reply-To: <5502BA2F.4040600@linaro.org>
-References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1426162054-9987-10-git-send-email-alexandre.belloni@free-electrons.com>
- <5502BA2F.4040600@linaro.org>
-Message-ID: <20150313104450.GH4329@piout.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 Mar 2015 11:46:33 +0100
+Subject: [PATCH 5/8] ARM: dts: rockchip: relicense rk3288-thermal.dtsi
+ under GPLv2/X11
+In-Reply-To: <54FB0D6D.6070406@163.com>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-6-git-send-email-heiko@sntech.de>
+ <54FB0D6D.6070406@163.com>
+Message-ID: <1934004.brotWK6oIh@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/03/2015 at 11:21:35 +0100, Daniel Lezcano wrote :
-> On 03/12/2015 01:07 PM, Alexandre Belloni wrote:
-> >Remove the mach/hardware dependency to prepare the driver for multiplatform
-> >support.
-> >Also switch from setup_irq() to request_irq()
-> >
-> >Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >---
-> >  drivers/clocksource/timer-atmel-st.c | 21 +++++++++------------
-> >  1 file changed, 9 insertions(+), 12 deletions(-)
-> >
-> >diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-> >index 674ef2519d6b..91d6cbb7a56b 100644
-> >--- a/drivers/clocksource/timer-atmel-st.c
-> >+++ b/drivers/clocksource/timer-atmel-st.c
-> >@@ -31,13 +31,12 @@
-> >
-> >  #include <asm/mach/time.h>
+Hi Caesar,
+
+Am Samstag, 7. M?rz 2015, 22:38:37 schrieb Caesar Wang:
+> ? 2015?03?07? 02:04, Heiko Stuebner ??:
+> > GPLv2-only devicetrees make reuse difficult for software components
+> > licensed under a different license.
+> > 
+> > The consensus is that a GPL/X11 dual-license should allow all necessary
+> > uses, so relicense the rk3288-thermal.dtsi to this combination.
+> > 
+> > CCs were aquired by git shortlog -sne so it should've hopefully catched
+> > every contributor.
 > 
-> Couldn't the header above be removed ?
-> 
+> Acked-by: caesar.wang at rock-chips.com
 
-Indeed, it can but that is starting to be further cleanup than I
-intended ;)
+thanks :-)
 
-I'll send a v6 of that patch for Nicolas to pick.
+could you also Ack patch 8/8, as you also contributed there?
 
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks
+Heiko
