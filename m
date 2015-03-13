@@ -1,39 +1,56 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 13 Mar 2015 16:23:51 +0000
-Subject: [PATCH 07/10] ARM: dt: dove: add Dove PMU DT entry to dove.dtsi
-In-Reply-To: <20150312183020.GU8656@n2100.arm.linux.org.uk>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
-Message-ID: <E1YWSNL-0006GH-3y@rmk-PC.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Mar 2015 16:25:16 +0000
+Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
+References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
+ <20150313105207.GB3592@leverpostej>
+ <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
+Message-ID: <20150313162516.GA9603@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PMU description to the Dove DT file.  The PMU provides multiple
-features, including an interrupt, reset, power and isolation controller.
+On Fri, Mar 13, 2015 at 03:50:42PM +0000, Kumar Gala wrote:
+> 
+> On Mar 13, 2015, at 5:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> >> +/ {
+> >> +	chosen {
+> >> +		stdout-path = &blsp1_uart2;
+> >> +	};
+> > 
+> > It would be good if we had the configuration too (see
+> > Documentation/devicetree/bindings/chosen.txt), as that avoids any
+> > reliance on kernel defaults.
+> > 
+> > You can refer to an alias, so this could be:
+> > 
+> > aliases {
+> > 	serial0 = &blsp1_uart2;
+> > };
+> > 
+> > chosen {
+> > 	stdout-path = "serial0:115200n8";
+> > };
+> > 
+> > ...assuming that 115200n8 is correct for your UART, of course.
+> > 
+> > 
+> > [?]
+> 
+> Where is the code that actually handles this parsing?  I?m not see it
+> in early_init_dt_scan_chosen_serial and I don?t believe
+> fdt_path_offset does anything special with ?:'
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/dove.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Take a look at commit 7914a7c5651a5161 ("of: support passing console options with
+stdout-path").
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index a5441d5482a6..43d4ebf414be 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -380,6 +380,15 @@
- 				status = "disabled";
- 			};
- 
-+			pmu: power-management at d0000 {
-+				compatible = "marvell,dove-pmu";
-+				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
-+				interrupts = <33>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				#reset-cells = <1>;
-+			};
-+
- 			thermal: thermal-diode at d001c {
- 				compatible = "marvell,dove-thermal";
- 				reg = <0xd001c 0x0c>, <0xd005c 0x08>;
--- 
-1.8.3.1
+Early on of_alias_scan will find the options and in of_console_check
+we'll call add_preferred_console as appropriate. That'll be called in
+uart_add_one_port.
+
+> I?ll kill off usage of skeleton.dtsi
+
+Cheers.
+
+Mark.
