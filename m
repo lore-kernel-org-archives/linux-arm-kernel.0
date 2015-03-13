@@ -1,43 +1,36 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 13 Mar 2015 11:33:59 +0100
-Subject: [PATCH v5 00/10] Atmel System Timer cleanups
-In-Reply-To: <20150313103329.GF4329@piout.net>
-References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5502BA89.8020100@linaro.org> <20150313103329.GF4329@piout.net>
-Message-ID: <5502BD17.6030509@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 13 Mar 2015 10:34:54 +0000
+Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
+References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
+ <1426107080-29079-2-git-send-email-galak@codeaurora.org>
+ <20150312170541.GE30145@leverpostej>
+ <E114AF0E-5DA9-412A-B3E2-DDD95D224C66@codeaurora.org>
+ <20150312182508.GF30145@leverpostej>
+ <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
+Message-ID: <20150313103453.GA3592@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2015 11:33 AM, Alexandre Belloni wrote:
-> On 13/03/2015 at 11:23:05 +0100, Daniel Lezcano wrote :
->> On 03/12/2015 01:07 PM, Alexandre Belloni wrote:
->>> This patch set cleans up the system timer driver.
->>>
->>> The main goal is to get rid of the mach/ headers dependency. At the same time,
->>> it introduces proper probing and locking (using a regmap) for the watchdog
->>> driver.
->>>
->>> This is based on 4.0-rc1 and will have two merge conflicts with my cleanup #1 in
->>> mach-at91/at91rm9200.c
->>>
->>> It also needs this patch to probe the watchdog properly:
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/327274.html
->>
->>
->> Hi Alexandre,
->>
->> through which tree do you want this patchset to be merged ?
->>
->
-> I'd say through the at91 tree as I have another series that depend on
-> that one
+> > Which of spin-table/psci are you planning on using for SMP support, and
+> > when would that be likely to appear?
+> 
+> We have a qcom specific SMP enablement method for this device.  This
+> was one of our first devices so it utilized as much from arm 32-bit as
+> possible.
 
-Ok.
+Implementation specific enable methods are something we really don't
+want to see for arm64. If PSCI is out of the question then a spin-table
+shim in your bootloader shouldn't be too hard to implement.
 
+> > Which exception level do CPUs enter the kernel? Even without a
+> > virt-capable GIC booting at EL2 is less work for the FW and gives the
+> > kernel a better chance of fixing things up (e.g. CNTVOFF).
+> 
+> I think the enter in EL1.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+That's unfortunate, but so long as they are consistent, it's not the end
+of the world.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Mark.
