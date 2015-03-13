@@ -1,29 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Mar 2015 16:40:06 +0000
-Subject: [PATCH v2 3/8] ARM: add macro to perform far branches (b/bl)
-In-Reply-To: <1426248452-4773-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426248452-4773-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150313164005.GU8656@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 13 Mar 2015 11:43:28 -0500
+Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
+ evaluation board dts
+In-Reply-To: <20150313162516.GA9603@leverpostej>
+References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
+ <20150313105207.GB3592@leverpostej>
+ <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
+ <20150313162516.GA9603@leverpostej>
+Message-ID: <91E83B79-5004-48C5-948B-7A9FD7F13BFE@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 01:07:27PM +0100, Ard Biesheuvel wrote:
-> +	.macro	bl_abs, target, c=
-> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
-> +	movt\c	lr, #:upper16:\target
-> +	movw\c	lr, #:lower16:\target
-> +	blx\c	lr
 
-So I've looked this up, and it's valid, which is surprising because BLX
-itself writes to LR - the read from LR must happen before BLX itself
-writes to LR.  Thankfully, because of the pipelining, this is probably
-guaranteed.
+On Mar 13, 2015, at 11:25 AM, Mark Rutland <mark.rutland@arm.com> wrote:
 
-I wonder whether there will be any errata on this... maybe on non-ARM
-CPUs?  It'll be interesting to find out what happens once we merge
-this... :)
+> On Fri, Mar 13, 2015 at 03:50:42PM +0000, Kumar Gala wrote:
+>> 
+>> On Mar 13, 2015, at 5:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> 
+>>>> +/ {
+>>>> +	chosen {
+>>>> +		stdout-path = &blsp1_uart2;
+>>>> +	};
+>>> 
+>>> It would be good if we had the configuration too (see
+>>> Documentation/devicetree/bindings/chosen.txt), as that avoids any
+>>> reliance on kernel defaults.
+>>> 
+>>> You can refer to an alias, so this could be:
+>>> 
+>>> aliases {
+>>> 	serial0 = &blsp1_uart2;
+>>> };
+>>> 
+>>> chosen {
+>>> 	stdout-path = "serial0:115200n8";
+>>> };
+>>> 
+>>> ...assuming that 115200n8 is correct for your UART, of course.
+>>> 
+>>> 
+>>> [?]
+>> 
+>> Where is the code that actually handles this parsing?  I?m not see it
+>> in early_init_dt_scan_chosen_serial and I don?t believe
+>> fdt_path_offset does anything special with ?:'
+> 
+> Take a look at commit 7914a7c5651a5161 ("of: support passing console options with
+> stdout-path").
+> 
+> Early on of_alias_scan will find the options and in of_console_check
+> we'll call add_preferred_console as appropriate. That'll be called in
+> uart_add_one_port.
+
+Ok, but earlycon dt code doesn?t utilize this, as its setup is before we unflatten the dt.
+
+So it breaks earlycon parsing right now, I?ll look at fixing that.
+
+- k
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
