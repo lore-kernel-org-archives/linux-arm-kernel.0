@@ -1,24 +1,99 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Mar 2015 15:28:43 +0000
-Subject: [PATCH 5/9] ARM: dove: create a proper PMU driver for power
- domains, PMU IRQs and resets
-In-Reply-To: <2439386.JhP59gsGzr@wuerfel>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <65456683.XbdNkPUDTs@wuerfel>
- <20150313124748.GI8656@n2100.arm.linux.org.uk>
- <2439386.JhP59gsGzr@wuerfel>
-Message-ID: <20150313152843.GP8656@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 13 Mar 2015 16:28:54 +0100
+Subject: [PATCH v4 0/9] ARM: at91 cleanups for 4.1 #1
+In-Reply-To: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426172071-20743-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <55030236.40509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 04:08:31PM +0100, Arnd Bergmann wrote:
-> I think the easiest and cleanest way would be to let that case not
-> happen. Adding the reset controller core makes the kernel about 2kb
-> larger, but in most multiplatform configurations, you get it already.
+Le 12/03/2015 15:54, Alexandre Belloni a ?crit :
+> This series removes more mach/headers.
+> 
+> Then it introduces a more scalable SoC detection infrastructure which allows to
+> remove the at91_map_io/at91_alt_map_io and iotable_init ugliness.
+> 
+> Changes in v4:
+>  - Changes soc family and name display, as requested by Nicolas
+> 
+> Changes in v3:
+>  - Stop trying to unmap a range that failed ot be mapped
+> 
+> Changes in v2:
+>  - All the SoC names are lowercased
+>  - Removed the unused compatible string
+>  - Use name/subname to display the type and subtype
+> 
+> 
+> Alexandre Belloni (7):
+>   ARM: at91: remove unused at91_ioremap_matrix and header
+>   ARM: at91: remove unused _matrix.h headers
+>   ARM: at91/dt: introduce atmel,<chip>-dbgu
+>   ARM: at91: at91rm9200 use SoC detection infrastructure
+>   ARM: at91: at91sam9: use SoC detection infrastructure
+>   ARM: at91: sama5 use SoC detection infrastructure
+>   ARM: at91: remove old setup
+> 
+> Arnd Bergmann (1):
+>   ARM: at91: remove NEED_MACH_IO_H
+> 
+> Boris BREZILLON (1):
+>   ARM: at91: add soc detection infrastructure
 
-Well, I personally hate selecting visible Kconfig symbols.  It's
-against my religion.
+Fully satisfied with the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I take everything for at91-4.1-cleanup.
+
+Bye,
+
+>  .../devicetree/bindings/serial/atmel-usart.txt     |   3 +-
+>  arch/arm/Kconfig                                   |   2 +-
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
+>  arch/arm/boot/dts/at91sam9260.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9261.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 |   2 +-
+>  arch/arm/boot/dts/at91sam9rl.dtsi                  |   2 +-
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+>  arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
+>  arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
+>  arch/arm/mach-at91/Kconfig                         |   1 +
+>  arch/arm/mach-at91/Makefile                        |   2 +-
+>  arch/arm/mach-at91/at91rm9200.c                    |  29 +-
+>  arch/arm/mach-at91/at91sam9.c                      |  76 +++--
+>  arch/arm/mach-at91/generic.h                       |   4 -
+>  arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
+>  .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 -----
+>  .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
+>  .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 --------
+>  .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 ----------
+>  .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ----
+>  .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 ------
+>  .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ----
+>  arch/arm/mach-at91/include/mach/io.h               |  27 --
+>  arch/arm/mach-at91/sama5.c                         |  49 ++-
+>  arch/arm/mach-at91/setup.c                         | 330 ---------------------
+>  arch/arm/mach-at91/soc.c                           |  97 ++++++
+>  arch/arm/mach-at91/soc.h                           |  78 +++++
+>  drivers/pcmcia/Kconfig                             |   1 +
+>  drivers/pcmcia/at91_cf.c                           |  13 +-
+>  32 files changed, 301 insertions(+), 1082 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/io.h
+>  delete mode 100644 arch/arm/mach-at91/setup.c
+>  create mode 100644 arch/arm/mach-at91/soc.c
+>  create mode 100644 arch/arm/mach-at91/soc.h
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Nicolas Ferre
