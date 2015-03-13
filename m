@@ -1,30 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 13 Mar 2015 14:41:45 +0100
-Subject: [PATCH] MAINTAINERS: Add myself as co-maintainer to the legacy
- support of the mvebu SoCs
-Message-ID: <1426254105-28649-1-git-send-email-gregory.clement@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 13 Mar 2015 21:42:14 +0800
+Subject: [Cocci] [PATCH v13 3/6] clk: Make clk API return per-user struct
+ clk instances
+In-Reply-To: <20150313082010.GA1033@breakpoint.cc>
+References: <20150202225036.421.43421@quantum> <54D0F179.1040906@gmail.com>
+ <54D2AA9B.7010800@codeaurora.org> <54D3900A.9060200@gmail.com>
+ <54D423C3.9030105@codeaurora.org> <54E3BA20.3080205@codeaurora.org>
+ <20150312172006.GA18418@breakpoint.cc>
+ <5501EC6C.5010100@codeaurora.org> <20150313032931.GO20455@dragon>
+ <20150313082010.GA1033@breakpoint.cc>
+Message-ID: <20150313134211.GV20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I will also take care of the legacy support(not fully converted to DT)
-of the mvebu SoCs.
+On Fri, Mar 13, 2015 at 09:20:10AM +0100, Sebastian Andrzej Siewior wrote:
+> Hi Shawn,
+> 
+> On Fri, Mar 13, 2015 at 11:29:32AM +0800, Shawn Guo wrote:
+> 
+> > We did not add a DT property for it, because there was already enough
+> > info (clock configuration) in DT for kernel to figure it out.
+> Correct. My understanding is whatever can be figured out without DT should
+> be done that way.
+> 
+> Is there a way to get this clock-select bit set without
+> enable_fec_anatop_clock() in u-boot? Because this one selects the clock and
+> frequency and also sets the proper bit in gpr1. My question is simply why do
+> we need to do this here as well.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+I'm not sure I follow your question.  But we had been doing this setup
+in kernel function imx6q_1588_init() for a while.  The problem we're
+having now is that the clk core change broke it since v4.0-rc1.  And the
+fix is already queued there [1].
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ddc5a8cf9a8a..39b27f52e217 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1188,6 +1188,7 @@ ARM/Marvell Dove/MV78xx0/Orion SOC support
- M:	Jason Cooper <jason@lakedaemon.net>
- M:	Andrew Lunn <andrew@lunn.ch>
- M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+M:	Gregory Clement <gregory.clement@free-electrons.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-dove/
--- 
-2.1.0
+Shawn
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/log/?h=clk-fixes
