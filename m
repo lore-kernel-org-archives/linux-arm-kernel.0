@@ -1,56 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Mar 2015 16:25:16 +0000
-Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
-References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
- <20150313105207.GB3592@leverpostej>
- <04AD8E46-277D-4652-88AF-D16538C2AA87@codeaurora.org>
-Message-ID: <20150313162516.GA9603@leverpostej>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 13 Mar 2015 16:24:01 +0000
+Subject: [PATCH 09/10] ARM: dt: dove: add video decoder power domain
+ description
+In-Reply-To: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YWSNV-0006GP-DF@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 03:50:42PM +0000, Kumar Gala wrote:
-> 
-> On Mar 13, 2015, at 5:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> >> +/ {
-> >> +	chosen {
-> >> +		stdout-path = &blsp1_uart2;
-> >> +	};
-> > 
-> > It would be good if we had the configuration too (see
-> > Documentation/devicetree/bindings/chosen.txt), as that avoids any
-> > reliance on kernel defaults.
-> > 
-> > You can refer to an alias, so this could be:
-> > 
-> > aliases {
-> > 	serial0 = &blsp1_uart2;
-> > };
-> > 
-> > chosen {
-> > 	stdout-path = "serial0:115200n8";
-> > };
-> > 
-> > ...assuming that 115200n8 is correct for your UART, of course.
-> > 
-> > 
-> > [?]
-> 
-> Where is the code that actually handles this parsing?  I?m not see it
-> in early_init_dt_scan_chosen_serial and I don?t believe
-> fdt_path_offset does anything special with ?:'
+Add the description of the video decoder power domain to the PMU DT
+entry.
 
-Take a look at commit 7914a7c5651a5161 ("of: support passing console options with
-stdout-path").
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/dove.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Early on of_alias_scan will find the options and in of_console_check
-we'll call add_preferred_console as appropriate. That'll be called in
-uart_add_one_port.
-
-> I?ll kill off usage of skeleton.dtsi
-
-Cheers.
-
-Mark.
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 7e80407bdcf8..3dcf5322bf0e 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -387,6 +387,13 @@
+ 				interrupt-controller;
+ 				#interrupt-cells = <1>;
+ 				#reset-cells = <1>;
++
++				vpu_domain: vpu-domain {
++					#power-domain-cells = <0>;
++					marvell,pmu_pwr_mask = <0x00000008>;
++					marvell,pmu_iso_mask = <0x00000001>;
++					resets = <&pmu 16>;
++				};
+ 			};
+ 
+ 			thermal: thermal-diode at d001c {
+-- 
+1.8.3.1
