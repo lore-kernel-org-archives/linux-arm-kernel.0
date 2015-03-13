@@ -1,157 +1,336 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 13 Mar 2015 23:03:12 +0800
-Subject: [PATCH 1/2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <20150313081311.1ebfe8e2@arm.com>
-References: <1426149637-22062-1-git-send-email-marc.zyngier@arm.com>
- <1426149637-22062-2-git-send-email-marc.zyngier@arm.com>
- <20150313032139.GN20455@dragon> <20150313081311.1ebfe8e2@arm.com>
-Message-ID: <20150313150309.GA20455@dragon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Mar 2015 08:00:47 -0700
+Subject: [PATCH v6 2/6] wl12xx: use frequency instead of enumerations for
+ pdata clocks
+In-Reply-To: <1426162154-8716-3-git-send-email-eliad@wizery.com>
+References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
+ <1426162154-8716-3-git-send-email-eliad@wizery.com>
+Message-ID: <20150313150047.GI5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 08:13:11AM +0000, Marc Zyngier wrote:
-> On Fri, 13 Mar 2015 03:21:41 +0000
-> Shawn Guo <shawn.guo@linaro.org> wrote:
+* Eliad Peller <eliad@wizery.com> [150312 05:09]:
+> From: Luciano Coelho <luca@coelho.fi>
 > 
-> > On Thu, Mar 12, 2015 at 08:40:36AM +0000, Marc Zyngier wrote:
-> > > Now that the GPC has been converted to be a full blown irqchip
-> > > (and not a mole on the side of the GIC), booting a new kernel
-> > > with an old DT is likely to result in a rough ride for the user.
-> > > 
-> > > This patch makes sure such a situation is promptly detected and
-> > > the user made aware that a DT update is in order.
-> > > 
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > >  arch/arm/mach-imx/pm-imx6.c | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/mach-imx/pm-imx6.c
-> > > b/arch/arm/mach-imx/pm-imx6.c index 6a7c6fc..f03f30f0 100644
-> > > --- a/arch/arm/mach-imx/pm-imx6.c
-> > > +++ b/arch/arm/mach-imx/pm-imx6.c
-> > > @@ -554,11 +554,17 @@ put_node:
-> > >  static void __init imx6_pm_common_init(const struct imx6_pm_socdata
-> > >  					*socdata)
-> > >  {
-> > > +	struct device_node *np;
-> > >  	struct regmap *gpr;
-> > >  	int ret;
-> > >  
-> > >  	WARN_ON(!ccm_base);
-> > >  
-> > > +	np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-gpc");
-> > > +	if (WARN_ON(!np ||
-> > > +		    !of_find_property(np, "interrupt-controller",
-> > > NULL)))
-> > > +		pr_warn("Outdated DT detected, suspend/resume will
-> > > NOT work\n"); +
-> > 
-> > Can this be done in imx_gpc_init() instead?
+> Instead of defining an enumeration with the FW specific values for the
+> different clock rates, use the actual frequency instead.  Also add a
+> boolean to specify whether the clock is XTAL or not.
+
+Thanks for doing this. Just one comment on how we're going to get this
+all merged. Chances are this will cause merge conflicts between the
+wireless tree and the omap tree for the platform data and dts changes.
+
+Can you please separate the wireless changes in this series so we can
+do this in the following sets:
+
+1. Add support for new things to wireless driver
+
+2. Switch platform code to use the new support
+
+3. Remove support for platform data with a follow-up patch
+
+The other option would be to have the whole series in a immutable
+branch against v3.0-rc1 that can be merged into both wirelss tree
+and omap tree.
+
+Regards,
+
+Tony
+ 
+> Change all board files to reflect this.
 > 
-> Unfortunately not, as imx_gpc_init() is only called if the above
-> properties are satisfied (that's exactly the case we want to detect: if
-> imx_gpc_init is called, we're already in a pretty good shape).
-
-Ah, yes.  I forgot that the way imx_gpc_init() is called has been
-changed.
-
-I just gave the patch a go with an old DTB, and found that the kernel
-stops booting before we can even see this fat warning (see log below).
-It seems detecting at .init_machine time is too late.  I tried to move
-the code to the beginning of function imx6q_init_irq(), and found it
-works as expected.
-
-Shawn
-
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.0.0-rc1-00056-gd8b16e70e2e9 (r65073 at dragon) (gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) ) #543 SMP Fri Mar 13 22:47:53 CST 2015
-[    0.000000] CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-[    0.000000] Machine model: Freescale i.MX6 Quad SABRE Smart Device Board
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] cma: Reserved 16 MiB at 0x4f000000
-[    0.000000] Memory policy: Data cache writealloc
-[    0.000000] On node 0 totalpages: 262144
-[    0.000000] free_area_init_node: node 0, pgdat 80a11d40, node_mem_map be7ef000
-[    0.000000]   Normal zone: 2048 pages used for memmap
-[    0.000000]   Normal zone: 0 pages reserved
-[    0.000000]   Normal zone: 262144 pages, LIFO batch:31
-[    0.000000] PERCPU: Embedded 11 pages/cpu @be799000 s12352 r8192 d24512 u45056
-[    0.000000] pcpu-alloc: s12352 r8192 d24512 u45056 alloc=11*4096
-[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096
-[    0.000000] Kernel command line: console=ttymxc0,115200 debug earlyprintk no_console_suspend root=/dev/nfs ip=dhcp nfsroot=192.168.1.108:/home/r65073/nfs/debian,v3,tcp
-[    0.000000] PID hash table entries: 4096 (order: 2, 16384 bytes)
-[    0.000000] Dentry cache hash table entries: 131072 (order: 7, 524288 bytes)
-[    0.000000] Inode-cache hash table entries: 65536 (order: 6, 262144 bytes)
-[    0.000000] Memory: 1004116K/1048576K available (7023K kernel code, 387K rwdata, 2488K rodata, 380K init, 8345K bss, 28076K reserved, 16384K cma-reserved, 0K highmem)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xc0800000 - 0xff000000   (1000 MB)
-[    0.000000]     lowmem  : 0x80000000 - 0xc0000000   (1024 MB)
-[    0.000000]     pkmap   : 0x7fe00000 - 0x80000000   (   2 MB)
-[    0.000000]     modules : 0x7f000000 - 0x7fe00000   (  14 MB)
-[    0.000000]       .text : 0x80008000 - 0x8095201c   (9513 kB)
-[    0.000000]       .init : 0x80953000 - 0x809b2000   ( 380 kB)
-[    0.000000]       .data : 0x809b2000 - 0x80a12dc0   ( 388 kB)
-[    0.000000]        .bss : 0x80a12dc0 - 0x812394b8   (8346 kB)
-[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=4, Nodes=1
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000]  Additional per-CPU info printed with stalls.
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] L2C-310 erratum 769419 enabled
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
-[    0.000000] L2C-310 ID prefetch enabled, offset 1 lines
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 16 ways, 1024 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c7, AUX_CTRL 0x76070001
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000008
-[    0.000000] pgd = 80004000
-[    0.000000] [00000008] *pgd=00000000
-[    0.000000] Internal error: Oops: 5 [#1] SMP ARM
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.0.0-rc1-00056-gd8b16e70e2e9 #543
-[    0.000000] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-[    0.000000] task: 809b80b8 ti: 809b2000 task.ti: 809b2000
-[    0.000000] PC is at imx_gpc_hwirq_unmask+0x20/0x3c
-[    0.000000] LR is at imx6q_set_lpm+0x70/0xfc
-[    0.000000] pc : [<80026b28>]    lr : [<800279a4>]    psr: 800001d3
-[    0.000000] sp : 809b3eb0  ip : 809b3ec0  fp : 809b3ebc
-[    0.000000] r10: c0810078  r9 : 80a138e8  r8 : c0810074
-[    0.000000] r7 : 80a138e8  r6 : 809a9328  r5 : 80a143c0  r4 : 00000078
-[    0.000000] r3 : 00000008  r2 : 00000000  r1 : 809b3e30  r0 : 00000000
-[    0.000000] Flags: Nzcv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-[    0.000000] Control: 10c5387d  Table: 1000404a  DAC: 00000015
-[    0.000000] Process swapper/0 (pid: 0, stack limit = 0x809b2210)
-[    0.000000] Stack: (0x809b3eb0 to 0x809b4000)
-[    0.000000] 3ea0:                                     809b3ed4 809b3ec0 800279a4 80026b14
-[    0.000000] 3ec0: 80a138e8 80a138e8 809b3f64 809b3ed8 80969808 80027940 c0810060 00000018
-[    0.000000] 3ee0: 00000000 809ba848 00000000 809ba848 0000001a be7d0160 c081003c c0810020
-[    0.000000] 3f00: c0810024 c0810028 c0810034 c0810048 c0810060 c0810038 c081002c c0810068
-[    0.000000] 3f20: c0810030 c0810014 c081001c c081006c c0810018 c0810080 016e3600 00000001
-[    0.000000] 3f40: be7d0160 be002680 80a02214 00000000 80a0210c 80a0221c 809b3fa4 809b3f68
-[    0.000000] 3f60: 80991834 80966034 00000008 00000001 00000000 00000000 00000000 00000000
-[    0.000000] 3f80: 00000001 ffffffff 80a12dc0 8099fc18 412fc09a befff9c0 809b3fb4 809b3fa8
-[    0.000000] 3fa0: 80957624 8099176c 809b3ff4 809b3fb8 80953b9c 80957604 ffffffff ffffffff
-[    0.000000] 3fc0: 809536d4 00000000 00000000 8099fc18 80a13054 809b496c 8099fc14 809b9824
-[    0.000000] 3fe0: 1000406a 00000000 00000000 809b3ff8 10008074 8095395c 00000000 00000000
-[    0.000000] Backtrace: 
-[    0.000000] [<80026b08>] (imx_gpc_hwirq_unmask) from [<800279a4>] (imx6q_set_lpm+0x70/0xfc)
-[    0.000000] [<80027934>] (imx6q_set_lpm) from [<80969808>] (imx6q_clocks_init+0x37e0/0x37e8)
-[    0.000000]  r5:80a138e8 r4:80a138e8
-[    0.000000] [<80966028>] (imx6q_clocks_init) from [<80991834>] (of_clk_init+0xd4/0x1a0)
-[    0.000000]  r10:80a0221c r9:80a0210c r8:00000000 r7:80a02214 r6:be002680 r5:be7d0160
-[    0.000000]  r4:00000001
-[    0.000000] [<80991760>] (of_clk_init) from [<80957624>] (time_init+0x2c/0x38)
-[    0.000000]  r10:befff9c0 r9:412fc09a r8:8099fc18 r7:80a12dc0 r6:ffffffff r5:00000001
-[    0.000000]  r4:00000000
-[    0.000000] [<809575f8>] (time_init) from [<80953b9c>] (start_kernel+0x24c/0x3dc)
-[    0.000000] [<80953950>] (start_kernel) from [<10008074>] (0x10008074)
-[    0.000000]  r10:00000000 r8:1000406a r7:809b9824 r6:8099fc14 r5:809b496c r4:80a13054
-[    0.000000] Code: e1a032a0 e2833002 e5922010 e0823103 (e5932000) 
-[    0.000000] ---[ end trace cb88537fdc8fa200 ]---
-[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
-[    0.000000] ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+> Signed-off-by: Luciano Coelho <luca@coelho.fi>
+> [Eliad - small fixes, update board file changes]
+> Signed-off-by: Eliad Peller <eliad@wizery.com>
+> ---
+>  arch/arm/mach-davinci/board-da850-evm.c |  3 +-
+>  arch/arm/mach-omap2/pdata-quirks.c      | 29 ++++++++--------
+>  drivers/net/wireless/ti/wl12xx/main.c   | 60 ++++++++++++++++++++++++++++++---
+>  drivers/net/wireless/ti/wl12xx/wl12xx.h | 28 +++++++++++++++
+>  include/linux/wl12xx.h                  | 27 ++-------------
+>  5 files changed, 103 insertions(+), 44 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 916589c..853b941 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -1386,7 +1386,8 @@ static const short da850_wl12xx_pins[] __initconst = {
+>  static struct wl12xx_platform_data da850_wl12xx_wlan_data __initdata = {
+>  	.irq			= -1,
+>  	.irq_trigger		= IRQ_TYPE_EDGE_RISING,
+> -	.board_ref_clock	= WL12XX_REFCLOCK_38,
+> +	.ref_clock_freq		= 38400000,
+> +	.ref_clock_xtal		= false,
+>  };
+>  
+>  static __init int da850_wl12xx_init(void)
+> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+> index 4449f4c..337cc22 100644
+> --- a/arch/arm/mach-omap2/pdata-quirks.c
+> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+> @@ -39,14 +39,14 @@ static struct twl4030_gpio_platform_data twl_gpio_auxdata;
+>  
+>  static struct wl12xx_platform_data wl12xx __initdata;
+>  
+> -static void __init __used legacy_init_wl12xx(unsigned ref_clock,
+> -					     unsigned tcxo_clock,
+> +static void __init __used legacy_init_wl12xx(u32 ref_clock_freq,
+> +					     u32 tcxo_clock_freq,
+>  					     int gpio)
+>  {
+>  	int res;
+>  
+> -	wl12xx.board_ref_clock = ref_clock;
+> -	wl12xx.board_tcxo_clock = tcxo_clock;
+> +	wl12xx.ref_clock_freq = ref_clock_freq;
+> +	wl12xx.tcxo_clock_freq = tcxo_clock_freq;
+>  	wl12xx.irq = gpio_to_irq(gpio);
+>  	wl12xx.irq_trigger = IRQ_TYPE_LEVEL_HIGH;
+>  
+> @@ -57,8 +57,8 @@ static void __init __used legacy_init_wl12xx(unsigned ref_clock,
+>  	}
+>  }
+>  #else
+> -static inline void legacy_init_wl12xx(unsigned ref_clock,
+> -				      unsigned tcxo_clock,
+> +static inline void legacy_init_wl12xx(u32 ref_clock_freq,
+> +				      u32 tcxo_clock_freq,
+>  				      int gpio)
+>  {
+>  }
+> @@ -130,7 +130,7 @@ static void __init omap3_sbc_t3730_twl_init(void)
+>  static void __init omap3_sbc_t3730_legacy_init(void)
+>  {
+>  	omap3_sbc_t3x_usb_hub_init(167, "sb-t35 usb hub");
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 136);
+> +	legacy_init_wl12xx(38400000, 0, 136);
+>  }
+>  
+>  static void __init omap3_sbc_t3530_legacy_init(void)
+> @@ -174,12 +174,12 @@ static void __init omap3_igep0030_rev_g_legacy_init(void)
+>  
+>  static void __init omap3_evm_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 149);
+> +	legacy_init_wl12xx(38400000, 0, 149);
+>  }
+>  
+>  static void __init omap3_zoom_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_26, 0, 162);
+> +	legacy_init_wl12xx(26000000, 0, 162);
+>  }
+>  
+>  static void am35xx_enable_emac_int(void)
+> @@ -246,7 +246,7 @@ static void __init omap3_sbc_t3517_legacy_init(void)
+>  	am35xx_emac_reset();
+>  	hsmmc2_internal_input_clk();
+>  	omap3_sbc_t3517_wifi_init();
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 145);
+> +	legacy_init_wl12xx(38400000, 0, 145);
+>  }
+>  
+>  static void __init am3517_evm_legacy_init(void)
+> @@ -291,18 +291,17 @@ static void __init omap3_tao3530_legacy_init(void)
+>  #ifdef CONFIG_ARCH_OMAP4
+>  static void __init omap4_sdp_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_26,
+> -			   WL12XX_TCXOCLOCK_26, 53);
+> +	legacy_init_wl12xx(26000000, 26000000, 53);
+>  }
+>  
+>  static void __init omap4_panda_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 53);
+> +	legacy_init_wl12xx(38400000, 0, 53);
+>  }
+>  
+>  static void __init var_som_om44_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 41);
+> +	legacy_init_wl12xx(38400000, 0, 41);
+>  }
+>  #endif
+>  
+> @@ -317,7 +316,7 @@ static struct iommu_platform_data omap4_iommu_pdata = {
+>  #ifdef CONFIG_SOC_AM33XX
+>  static void __init am335x_evmsk_legacy_init(void)
+>  {
+> -	legacy_init_wl12xx(WL12XX_REFCLOCK_38, 0, 31);
+> +	legacy_init_wl12xx(38400000, 0, 31);
+>  }
+>  #endif
+>  
+> diff --git a/drivers/net/wireless/ti/wl12xx/main.c b/drivers/net/wireless/ti/wl12xx/main.c
+> index 144d1f8..b3f751f 100644
+> --- a/drivers/net/wireless/ti/wl12xx/main.c
+> +++ b/drivers/net/wireless/ti/wl12xx/main.c
+> @@ -1770,6 +1770,40 @@ wl12xx_iface_combinations[] = {
+>  	},
+>  };
+>  
+> +static const struct wl12xx_clock wl12xx_refclock_table[] = {
+> +	{ 19200000,	false,	WL12XX_REFCLOCK_19	},
+> +	{ 26000000,	false,	WL12XX_REFCLOCK_26	},
+> +	{ 26000000,	true,	WL12XX_REFCLOCK_26_XTAL	},
+> +	{ 38400000,	false,	WL12XX_REFCLOCK_38	},
+> +	{ 38400000,	true,	WL12XX_REFCLOCK_38_XTAL	},
+> +	{ 52000000,	false,	WL12XX_REFCLOCK_52	},
+> +	{ 0,		false,	0 }
+> +};
+> +
+> +static const struct wl12xx_clock wl12xx_tcxoclock_table[] = {
+> +	{ 16368000,	true,	WL12XX_TCXOCLOCK_16_368	},
+> +	{ 16800000,	true,	WL12XX_TCXOCLOCK_16_8	},
+> +	{ 19200000,	true,	WL12XX_TCXOCLOCK_19_2	},
+> +	{ 26000000,	true,	WL12XX_TCXOCLOCK_26	},
+> +	{ 32736000,	true,	WL12XX_TCXOCLOCK_32_736	},
+> +	{ 33600000,	true,	WL12XX_TCXOCLOCK_33_6	},
+> +	{ 38400000,	true,	WL12XX_TCXOCLOCK_38_4	},
+> +	{ 52000000,	true,	WL12XX_TCXOCLOCK_52	},
+> +	{ 0,		false,	0 }
+> +};
+> +
+> +static int wl12xx_get_clock_idx(const struct wl12xx_clock *table,
+> +				u32 freq, bool xtal)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; table[i].freq != 0; i++)
+> +		if ((table[i].freq == freq) && (table[i].xtal == xtal))
+> +			return table[i].hw_idx;
+> +
+> +	return -EINVAL;
+> +}
+> +
+>  static int wl12xx_setup(struct wl1271 *wl)
+>  {
+>  	struct wl12xx_priv *priv = wl->priv;
+> @@ -1799,7 +1833,17 @@ static int wl12xx_setup(struct wl1271 *wl)
+>  	wl12xx_conf_init(wl);
+>  
+>  	if (!fref_param) {
+> -		priv->ref_clock = pdata->board_ref_clock;
+> +		priv->ref_clock = wl12xx_get_clock_idx(wl12xx_refclock_table,
+> +						       pdata->ref_clock_freq,
+> +						       pdata->ref_clock_xtal);
+> +		if (priv->ref_clock < 0) {
+> +			wl1271_error("Invalid ref_clock frequency (%d Hz, %s)",
+> +				     pdata->ref_clock_freq,
+> +				     pdata->ref_clock_xtal ?
+> +				     "XTAL" : "not XTAL");
+> +
+> +			return priv->ref_clock;
+> +		}
+>  	} else {
+>  		if (!strcmp(fref_param, "19.2"))
+>  			priv->ref_clock = WL12XX_REFCLOCK_19;
+> @@ -1817,9 +1861,17 @@ static int wl12xx_setup(struct wl1271 *wl)
+>  			wl1271_error("Invalid fref parameter %s", fref_param);
+>  	}
+>  
+> -	if (!tcxo_param) {
+> -		priv->tcxo_clock = pdata->board_tcxo_clock;
+> -	} else {
+> +	if (!tcxo_param && pdata->tcxo_clock_freq) {
+> +		priv->tcxo_clock = wl12xx_get_clock_idx(wl12xx_tcxoclock_table,
+> +							pdata->tcxo_clock_freq,
+> +							true);
+> +		if (priv->tcxo_clock < 0) {
+> +			wl1271_error("Invalid tcxo_clock frequency (%d Hz)",
+> +				     pdata->tcxo_clock_freq);
+> +
+> +			return priv->tcxo_clock;
+> +		}
+> +	} else if (tcxo_param) {
+>  		if (!strcmp(tcxo_param, "19.2"))
+>  			priv->tcxo_clock = WL12XX_TCXOCLOCK_19_2;
+>  		else if (!strcmp(tcxo_param, "26"))
+> diff --git a/drivers/net/wireless/ti/wl12xx/wl12xx.h b/drivers/net/wireless/ti/wl12xx/wl12xx.h
+> index 75c9265..5952e99a 100644
+> --- a/drivers/net/wireless/ti/wl12xx/wl12xx.h
+> +++ b/drivers/net/wireless/ti/wl12xx/wl12xx.h
+> @@ -82,6 +82,34 @@ struct wl12xx_priv {
+>  	struct wl127x_rx_mem_pool_addr *rx_mem_addr;
+>  };
+>  
+> +/* Reference clock values */
+> +enum {
+> +	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */
+> +	WL12XX_REFCLOCK_26	= 1, /* 26 MHz */
+> +	WL12XX_REFCLOCK_38	= 2, /* 38.4 MHz */
+> +	WL12XX_REFCLOCK_52	= 3, /* 52 MHz */
+> +	WL12XX_REFCLOCK_38_XTAL = 4, /* 38.4 MHz, XTAL */
+> +	WL12XX_REFCLOCK_26_XTAL = 5, /* 26 MHz, XTAL */
+> +};
+> +
+> +/* TCXO clock values */
+> +enum {
+> +	WL12XX_TCXOCLOCK_19_2	= 0, /* 19.2MHz */
+> +	WL12XX_TCXOCLOCK_26	= 1, /* 26 MHz */
+> +	WL12XX_TCXOCLOCK_38_4	= 2, /* 38.4MHz */
+> +	WL12XX_TCXOCLOCK_52	= 3, /* 52 MHz */
+> +	WL12XX_TCXOCLOCK_16_368	= 4, /* 16.368 MHz */
+> +	WL12XX_TCXOCLOCK_32_736	= 5, /* 32.736 MHz */
+> +	WL12XX_TCXOCLOCK_16_8	= 6, /* 16.8 MHz */
+> +	WL12XX_TCXOCLOCK_33_6	= 7, /* 33.6 MHz */
+> +};
+> +
+> +struct wl12xx_clock {
+> +	u32	freq;
+> +	bool	xtal;
+> +	u8	hw_idx;
+> +};
+> +
+>  struct wl12xx_fw_packet_counters {
+>  	/* Cumulative counter of released packets per AC */
+>  	u8 tx_released_pkts[NUM_TX_QUEUES];
+> diff --git a/include/linux/wl12xx.h b/include/linux/wl12xx.h
+> index 3876b67..eea1e6d 100644
+> --- a/include/linux/wl12xx.h
+> +++ b/include/linux/wl12xx.h
+> @@ -26,28 +26,6 @@
+>  
+>  #include <linux/err.h>
+>  
+> -/* Reference clock values */
+> -enum {
+> -	WL12XX_REFCLOCK_19	= 0, /* 19.2 MHz */
+> -	WL12XX_REFCLOCK_26	= 1, /* 26 MHz */
+> -	WL12XX_REFCLOCK_38	= 2, /* 38.4 MHz */
+> -	WL12XX_REFCLOCK_52	= 3, /* 52 MHz */
+> -	WL12XX_REFCLOCK_38_XTAL = 4, /* 38.4 MHz, XTAL */
+> -	WL12XX_REFCLOCK_26_XTAL = 5, /* 26 MHz, XTAL */
+> -};
+> -
+> -/* TCXO clock values */
+> -enum {
+> -	WL12XX_TCXOCLOCK_19_2	= 0, /* 19.2MHz */
+> -	WL12XX_TCXOCLOCK_26	= 1, /* 26 MHz */
+> -	WL12XX_TCXOCLOCK_38_4	= 2, /* 38.4MHz */
+> -	WL12XX_TCXOCLOCK_52	= 3, /* 52 MHz */
+> -	WL12XX_TCXOCLOCK_16_368	= 4, /* 16.368 MHz */
+> -	WL12XX_TCXOCLOCK_32_736	= 5, /* 32.736 MHz */
+> -	WL12XX_TCXOCLOCK_16_8	= 6, /* 16.8 MHz */
+> -	WL12XX_TCXOCLOCK_33_6	= 7, /* 33.6 MHz */
+> -};
+> -
+>  struct wl1251_platform_data {
+>  	int power_gpio;
+>  	/* SDIO only: IRQ number if WLAN_IRQ line is used, 0 for SDIO IRQs */
+> @@ -58,8 +36,9 @@ struct wl1251_platform_data {
+>  struct wl12xx_platform_data {
+>  	int irq;
+>  	u32 irq_trigger;
+> -	int board_ref_clock;
+> -	int board_tcxo_clock;
+> +	bool ref_clock_xtal;	/* specify whether the clock is XTAL or not */
+> +	u32 ref_clock_freq;	/* in Hertz */
+> +	u32 tcxo_clock_freq;	/* in Hertz, tcxo is always XTAL */
+>  	bool pwr_in_suspend;
+>  };
+>  
+> -- 
+> 1.8.5.2.229.g4448466.dirty
+> 
