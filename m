@@ -1,59 +1,39 @@
-From: giedrius.statkevicius@gmail.com (=?UTF-8?B?R2llZHJpdXMgU3RhdGtldmnEjWl1cw==?=)
-Date: Fri, 13 Mar 2015 16:47:30 +0200
-Subject: [PATCH 10/10] mach-osiris-dvs.c : use "&&" (not "&") with bool
- operands
-In-Reply-To: <1426257067-5723-1-git-send-email-ameenali023@gmail.com>
-References: <1426257067-5723-1-git-send-email-ameenali023@gmail.com>
-Message-ID: <5502F882.2010502@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 13 Mar 2015 09:48:25 -0500
+Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic pci
+ host bridge
+In-Reply-To: <20150313113156.GA4739@bart.dudau.co.uk>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <20150312212306.GH7346@google.com> <20150313113156.GA4739@bart.dudau.co.uk>
+Message-ID: <CAErSpo7KuchFy0U=80buz4oRKwn-tcwz1Ej9-hBZHg+a-eYCbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015.03.13 16:31, Ameen Ali wrote:
-> itwise AND ("&") was used
-> in logical expressions with operands having "bool" type. Replaced
-> bitwise AND operators with logical AND.
-> 
-> Signed-off-by : <AmeenAli023@gmail.com
-This line's messed up. The correct format is:
-Signed-off-by: Full name <email>
-Always use checkpatch to check the .patch for these kinds of issues.
-Also the Subject: is not properly formatted. Usually we do something
-like:
-subsystem/architecture: bla bla bla
-You can look at the 'git log' for examples and format it similarly.
+On Fri, Mar 13, 2015 at 6:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+> On Thu, Mar 12, 2015 at 04:23:06PM -0500, Bjorn Helgaas wrote:
+>> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
+>> > ...
+>> > Yijing Wang (29):
+>> >   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
+>> >   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
+>> >   sparc/PCI: Claim bus resources before pci_bus_add_devices()
+>>
+>> I put the above patches plus a cleanup patch on my pci/enumeration branch.
+>> Please rebase your next revision to that.  If there's anything else
+>> non-controversial that we can pull in to chip away at this, let me know.
+>
+> Hi Bjorn and Yijing,
+>
+> Sorry for not providing feedback earlier on this series (or any previous ones),
+> I'm just crawling out from under a rock of doing graphics drivers :)
+>
+> The patch ripping out pci_bus_add_devices() from pci_scan_root_bus() misses out
+> the users of that function from drivers/pci/host. If Yijing is going to refresh
+> the series it is probably worth starting with adding back the call into pcie-xilinx.c
+> and pci-versatile.c.
 
-> ---
->  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> index ce2db23..e189836 100644
-> --- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> +++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
-> @@ -70,16 +70,16 @@ static int osiris_dvs_notify(struct notifier_block *nb,
->  
->  	switch (val) {
->  	case CPUFREQ_PRECHANGE:
-> -		if (old_dvs & !new_dvs ||
-> -		    cur_dvs & !new_dvs) {
-> +		if (old_dvs && !new_dvs ||
-> +		    cur_dvs && !new_dvs) {
->  			pr_debug("%s: exiting dvs\n", __func__);
->  			cur_dvs = false;
->  			gpio_set_value(OSIRIS_GPIO_DVS, 1);
->  		}
->  		break;
->  	case CPUFREQ_POSTCHANGE:
-> -		if (!old_dvs & new_dvs ||
-> -		    !cur_dvs & new_dvs) {
-> +		if (!old_dvs && new_dvs ||
-> +		    !cur_dvs && new_dvs) {
->  			pr_debug("entering dvs\n");
->  			cur_dvs = true;
->  			gpio_set_value(OSIRIS_GPIO_DVS, 0);
-> 
+Huh, sure enough, I missed those, too.  Yijing, when you add those,
+can you pull my branch, update the patch, and repost it?  That way
+you'll keep my changelog and cleanup updates.
 
-
--- 
-Thanks,
-Giedrius
+Bjorn
