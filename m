@@ -1,28 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 12:05:20 +0100
-Subject: [PATCH 2/2] Documentation: omap-twl4030: Remove ti, codec property
-In-Reply-To: <1426194899-14037-3-git-send-email-marek@goldelico.com>
-References: <1426194899-14037-1-git-send-email-marek@goldelico.com>
- <1426194899-14037-3-git-send-email-marek@goldelico.com>
-Message-ID: <38159868.RLZZTyUOlK@wuerfel>
+Date: Fri, 13 Mar 2015 12:07:21 +0100
+Subject: [PATCH v6 2/4] pci: iProc: define iProc PCIe platform bus binding
+In-Reply-To: <20150312211448.GG7346@google.com>
+References: <1426097169-20805-1-git-send-email-rjui@broadcom.com>
+ <1426097169-20805-3-git-send-email-rjui@broadcom.com>
+ <20150312211448.GG7346@google.com>
+Message-ID: <2401049.ClHMSX33l5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 March 2015 22:14:59 Marek Belisko wrote:
-> diff --git a/Documentation/devicetree/bindings/sound/omap-twl4030.txt b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-> index 1ab6bc8..656165f 100644
-> --- a/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-> +++ b/Documentation/devicetree/bindings/sound/omap-twl4030.txt
-> @@ -4,7 +4,6 @@ Required properties:
->  - compatible: "ti,omap-twl4030"
->  - ti,model: Name of the sound card (for example "omap3beagle")
->  - ti,mcbsp: phandle for the McBSP node
-> -- ti,codec: phandle for the twl4030 audio node
+On Thursday 12 March 2015 16:14:48 Bjorn Helgaas wrote:
+> [+cc Rob, Pawel, Mark, Ian, Kumar]
+> 
+> On Wed, Mar 11, 2015 at 11:06:07AM -0700, Ray Jui wrote:
+> > Document the Broadcom iProc PCIe platform interface device tree binding
+> > 
+> > Signed-off-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> 
+> I'd like to get an ack for this from Arnd, Rob, or other device tree folks
+> (CC'd).
+> 
 
-As this was a required property, are you sure that no other operating system
-uses it?
+Sorry, I should have given my ack earlier. I've carefully reviewed the
+previous versions and am happy with the current one.
 
-Even if not, you should probably change it to be an optional property, so
-that the existing dtbs do not become noncompliant after the change.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+for the whole series.
 
 	Arnd
