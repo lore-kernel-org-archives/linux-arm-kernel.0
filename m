@@ -1,85 +1,204 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 13 Mar 2015 11:54:37 +0100
-Subject: [PATCH v6 09/10] clocksource: atmel-st: remove mach/hardware
- dependency
-In-Reply-To: <1426162054-9987-10-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1426162054-9987-10-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426244077-31167-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: sasukewxt@163.com (Caesar Wang)
+Date: Fri, 13 Mar 2015 18:54:11 +0800
+Subject: [PATCH 8/8] ARM: dts: rockchip: relicense rk3288-evb* under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-9-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-9-git-send-email-heiko@sntech.de>
+Message-ID: <5502C1D3.3050407@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the mach/hardware dependency to prepare the driver for multiplatform
-support.
-Also switch from setup_irq() to request_irq()
+Heiko,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/timer-atmel-st.c | 23 +++++++++--------------
- 1 file changed, 9 insertions(+), 14 deletions(-)
+? 2015?03?07? 02:04, Heiko Stuebner ??:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
+>
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3288-evb files to this combination.
+>
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Chris Zhong <zyw@rock-chips.com>
+> Cc: Roger Chen <roger.chen@rock-chips.com>
+> Cc: Romain Perier <romain.perier@gmail.com>
+> Cc: Caesar Wang <caesar.wang@rock-chips.com>
+> Cc: Kever Yang <kever.yang@rock-chips.com>
+> Cc: Yunzhi Li <lyz@rock-chips.com>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
 
-diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
-index 674ef2519d6b..1692e17e096b 100644
---- a/drivers/clocksource/timer-atmel-st.c
-+++ b/drivers/clocksource/timer-atmel-st.c
-@@ -29,15 +29,12 @@
- #include <linux/of_irq.h>
- #include <linux/regmap.h>
- 
--#include <asm/mach/time.h>
--
--#include <mach/hardware.h>
--
- static unsigned long last_crtr;
- static u32 irqmask;
- static struct clock_event_device clkevt;
- static struct regmap *regmap_st;
- 
-+#define AT91_SLOW_CLOCK		32768
- #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
- 
- /*
-@@ -96,13 +93,6 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct irqaction at91rm9200_timer_irq = {
--	.name		= "at91_tick",
--	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= at91rm9200_timer_interrupt,
--	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
--};
--
- static cycle_t read_clk32k(struct clocksource *cs)
- {
- 	return read_CRTR();
-@@ -193,6 +183,7 @@ static struct clock_event_device clkevt = {
- static void __init atmel_st_timer_init(struct device_node *node)
- {
- 	unsigned int val;
-+	int irq, ret;
- 
- 	regmap_st = syscon_node_to_regmap(node);
- 	if (IS_ERR(regmap_st))
-@@ -204,12 +195,16 @@ static void __init atmel_st_timer_init(struct device_node *node)
- 	regmap_read(regmap_st, AT91_ST_SR, &val);
- 
- 	/* Get the interrupts property */
--	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
--	if (!at91rm9200_timer_irq.irq)
-+	irq  = irq_of_parse_and_map(node, 0);
-+	if (!irq)
- 		panic(pr_fmt("Unable to get IRQ from DT\n"));
- 
- 	/* Make IRQs happen for the system timer */
--	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
-+	ret = request_irq(irq, at91rm9200_timer_interrupt,
-+			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-+			  "at91_tick", regmap_st);
-+	if (ret)
-+		panic(pr_fmt("Unable to setup IRQ\n"));
- 
- 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
- 	 * directly for the clocksource and all clockevents, after adjusting
--- 
-2.1.0
+Obviously,it makes sense.
+Acked-by:caesar.wang at rock-chips.com
+
+>   arch/arm/boot/dts/rk3288-evb-act8846.dts | 44 ++++++++++++++++++++++++++------
+>   arch/arm/boot/dts/rk3288-evb-rk808.dts   | 44 ++++++++++++++++++++++++++------
+>   arch/arm/boot/dts/rk3288-evb.dtsi        | 44 ++++++++++++++++++++++++++------
+>   3 files changed, 108 insertions(+), 24 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3288-evb-act8846.dts b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> index d7b8bbc..7ea0e61 100644
+> --- a/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> +++ b/arch/arm/boot/dts/rk3288-evb-act8846.dts
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   /dts-v1/;
+> diff --git a/arch/arm/boot/dts/rk3288-evb-rk808.dts b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+> index a1c294b..48ae8ed 100644
+> --- a/arch/arm/boot/dts/rk3288-evb-rk808.dts
+> +++ b/arch/arm/boot/dts/rk3288-evb-rk808.dts
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   /dts-v1/;
+> diff --git a/arch/arm/boot/dts/rk3288-evb.dtsi b/arch/arm/boot/dts/rk3288-evb.dtsi
+> index 287a162..bf75f62 100644
+> --- a/arch/arm/boot/dts/rk3288-evb.dtsi
+> +++ b/arch/arm/boot/dts/rk3288-evb.dtsi
+> @@ -1,13 +1,41 @@
+>   /*
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>    *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>    */
+>   
+>   #include <dt-bindings/pwm/pwm.h>
