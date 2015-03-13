@@ -1,307 +1,41 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 13 Mar 2015 16:10:02 +0000
-Subject: [PATCH 02/12] KVM: move iodev.h from virt/kvm/ to include/kvm
+Date: Fri, 13 Mar 2015 16:10:06 +0000
+Subject: [PATCH 06/12] KVM: mark kvm->buses as empty once they were destroyed
 In-Reply-To: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
 References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1426263012-22935-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1426263012-22935-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iodev.h contains definitions for the kvm_io_bus framework. This is
-needed both by the generic KVM code in virt/kvm as well as by
-architecture specific code under arch/. Putting the header file in
-virt/kvm and using local includes in the architecture part seems at
-least dodgy to me, so let's move the file into include/kvm, so that a
-more natural "#include <kvm/iodev.h>" can be used by all of the code.
-This also solves a problem later when using struct kvm_io_device
-in arm_vgic.h.
-Fixing up the FSF address in the GPL header and a wrong include path
-on the way.
+In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
+especially before calling kvm_arch_destroy_vm(). To avoid
+unregistering devices from the already destroyed bus, let's mark
+the bus with NULL to let other users know it has been destroyed
+already.
+This avoids a crash on a VM shutdown with the VGIC using the
+kvm_io_bus later (the unregistering is in there to be able to roll
+back a faulting init).
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/powerpc/kvm/mpic.c   |    2 +-
- arch/x86/kvm/i8254.h      |    2 +-
- arch/x86/kvm/ioapic.h     |    2 +-
- arch/x86/kvm/irq.h        |    2 +-
- arch/x86/kvm/lapic.h      |    2 +-
- include/kvm/iodev.h       |   76 ++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/coalesced_mmio.c |    2 +-
- virt/kvm/eventfd.c        |    2 +-
- virt/kvm/iodev.h          |   77 ---------------------------------------------
- virt/kvm/kvm_main.c       |    2 +-
- 10 files changed, 84 insertions(+), 85 deletions(-)
- create mode 100644 include/kvm/iodev.h
- delete mode 100644 virt/kvm/iodev.h
+ virt/kvm/kvm_main.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/kvm/mpic.c b/arch/powerpc/kvm/mpic.c
-index 8542f07..4703fad 100644
---- a/arch/powerpc/kvm/mpic.c
-+++ b/arch/powerpc/kvm/mpic.c
-@@ -34,7 +34,7 @@
- #include <asm/kvm_para.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_ppc.h>
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- #define MAX_CPU     32
- #define MAX_SRC     256
-diff --git a/arch/x86/kvm/i8254.h b/arch/x86/kvm/i8254.h
-index dd1b16b..c84990b 100644
---- a/arch/x86/kvm/i8254.h
-+++ b/arch/x86/kvm/i8254.h
-@@ -3,7 +3,7 @@
- 
- #include <linux/kthread.h>
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- struct kvm_kpit_channel_state {
- 	u32 count; /* can be 65536 */
-diff --git a/arch/x86/kvm/ioapic.h b/arch/x86/kvm/ioapic.h
-index c2e36d9..d9e02ca 100644
---- a/arch/x86/kvm/ioapic.h
-+++ b/arch/x86/kvm/ioapic.h
-@@ -3,7 +3,7 @@
- 
- #include <linux/kvm_host.h>
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- struct kvm;
- struct kvm_vcpu;
-diff --git a/arch/x86/kvm/irq.h b/arch/x86/kvm/irq.h
-index 2d03568..ad68c73 100644
---- a/arch/x86/kvm/irq.h
-+++ b/arch/x86/kvm/irq.h
-@@ -27,7 +27,7 @@
- #include <linux/kvm_host.h>
- #include <linux/spinlock.h>
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- #include "ioapic.h"
- #include "lapic.h"
- 
-diff --git a/arch/x86/kvm/lapic.h b/arch/x86/kvm/lapic.h
-index 0bc6c65..e284c28 100644
---- a/arch/x86/kvm/lapic.h
-+++ b/arch/x86/kvm/lapic.h
-@@ -1,7 +1,7 @@
- #ifndef __KVM_X86_LAPIC_H
- #define __KVM_X86_LAPIC_H
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- #include <linux/kvm_host.h>
- 
-diff --git a/include/kvm/iodev.h b/include/kvm/iodev.h
-new file mode 100644
-index 0000000..a6d208b
---- /dev/null
-+++ b/include/kvm/iodev.h
-@@ -0,0 +1,76 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __KVM_IODEV_H__
-+#define __KVM_IODEV_H__
-+
-+#include <linux/kvm_types.h>
-+#include <linux/errno.h>
-+
-+struct kvm_io_device;
-+struct kvm_vcpu;
-+
-+/**
-+ * kvm_io_device_ops are called under kvm slots_lock.
-+ * read and write handlers return 0 if the transaction has been handled,
-+ * or non-zero to have it passed to the next device.
-+ **/
-+struct kvm_io_device_ops {
-+	int (*read)(struct kvm_vcpu *vcpu,
-+		    struct kvm_io_device *this,
-+		    gpa_t addr,
-+		    int len,
-+		    void *val);
-+	int (*write)(struct kvm_vcpu *vcpu,
-+		     struct kvm_io_device *this,
-+		     gpa_t addr,
-+		     int len,
-+		     const void *val);
-+	void (*destructor)(struct kvm_io_device *this);
-+};
-+
-+
-+struct kvm_io_device {
-+	const struct kvm_io_device_ops *ops;
-+};
-+
-+static inline void kvm_iodevice_init(struct kvm_io_device *dev,
-+				     const struct kvm_io_device_ops *ops)
-+{
-+	dev->ops = ops;
-+}
-+
-+static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *dev, gpa_t addr,
-+				    int l, void *v)
-+{
-+	return dev->ops->read ? dev->ops->read(vcpu, dev, addr, l, v)
-+				: -EOPNOTSUPP;
-+}
-+
-+static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
-+				     struct kvm_io_device *dev, gpa_t addr,
-+				     int l, const void *v)
-+{
-+	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
-+				 : -EOPNOTSUPP;
-+}
-+
-+static inline void kvm_iodevice_destructor(struct kvm_io_device *dev)
-+{
-+	if (dev->ops->destructor)
-+		dev->ops->destructor(dev);
-+}
-+
-+#endif /* __KVM_IODEV_H__ */
-diff --git a/virt/kvm/coalesced_mmio.c b/virt/kvm/coalesced_mmio.c
-index c831a40..571c1ce 100644
---- a/virt/kvm/coalesced_mmio.c
-+++ b/virt/kvm/coalesced_mmio.c
-@@ -8,7 +8,7 @@
-  *
-  */
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- #include <linux/kvm_host.h>
- #include <linux/slab.h>
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index 26c72f3..9ff4193 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -36,7 +36,7 @@
- #include <linux/seqlock.h>
- #include <trace/events/kvm.h>
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- #ifdef CONFIG_HAVE_KVM_IRQFD
- /*
-diff --git a/virt/kvm/iodev.h b/virt/kvm/iodev.h
-deleted file mode 100644
-index 9ef709c..0000000
---- a/virt/kvm/iodev.h
-+++ /dev/null
-@@ -1,77 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-- */
--
--#ifndef __KVM_IODEV_H__
--#define __KVM_IODEV_H__
--
--#include <linux/kvm_types.h>
--#include <asm/errno.h>
--
--struct kvm_io_device;
--struct kvm_vcpu;
--
--/**
-- * kvm_io_device_ops are called under kvm slots_lock.
-- * read and write handlers return 0 if the transaction has been handled,
-- * or non-zero to have it passed to the next device.
-- **/
--struct kvm_io_device_ops {
--	int (*read)(struct kvm_vcpu *vcpu,
--		    struct kvm_io_device *this,
--		    gpa_t addr,
--		    int len,
--		    void *val);
--	int (*write)(struct kvm_vcpu *vcpu,
--		     struct kvm_io_device *this,
--		     gpa_t addr,
--		     int len,
--		     const void *val);
--	void (*destructor)(struct kvm_io_device *this);
--};
--
--
--struct kvm_io_device {
--	const struct kvm_io_device_ops *ops;
--};
--
--static inline void kvm_iodevice_init(struct kvm_io_device *dev,
--				     const struct kvm_io_device_ops *ops)
--{
--	dev->ops = ops;
--}
--
--static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
--				    struct kvm_io_device *dev, gpa_t addr,
--				    int l, void *v)
--{
--	return dev->ops->read ? dev->ops->read(vcpu, dev, addr, l, v)
--				: -EOPNOTSUPP;
--}
--
--static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
--				     struct kvm_io_device *dev, gpa_t addr,
--				     int l, const void *v)
--{
--	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
--				 : -EOPNOTSUPP;
--}
--
--static inline void kvm_iodevice_destructor(struct kvm_io_device *dev)
--{
--	if (dev->ops->destructor)
--		dev->ops->destructor(dev);
--}
--
--#endif /* __KVM_IODEV_H__ */
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index ce86493..8c7ab0b 100644
+index 8c7ab0b..6f164eb 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -16,7 +16,7 @@
-  *
-  */
- 
--#include "iodev.h"
-+#include <kvm/iodev.h>
- 
- #include <linux/kvm_host.h>
- #include <linux/kvm.h>
+@@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
+ 	list_del(&kvm->vm_list);
+ 	spin_unlock(&kvm_lock);
+ 	kvm_free_irq_routing(kvm);
+-	for (i = 0; i < KVM_NR_BUSES; i++)
++	for (i = 0; i < KVM_NR_BUSES; i++) {
+ 		kvm_io_bus_destroy(kvm->buses[i]);
++		kvm->buses[i] = NULL;
++	}
+ 	kvm_coalesced_mmio_free(kvm);
+ #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
+ 	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
 -- 
 1.7.9.5
