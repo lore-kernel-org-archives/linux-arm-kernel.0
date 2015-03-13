@@ -1,103 +1,53 @@
-From: bamvor.zhangjian@huawei.com (Bamvor Jian Zhang)
-Date: Fri, 13 Mar 2015 16:16:06 +0800
-Subject: Question about aarch64 ILP32 ABI changes
-Message-ID: <55029CC6.2050306@huawei.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 13 Mar 2015 09:17:18 +0100
+Subject: [PATCH v6 5/6] ARM: dts: add wl12xx/wl18xx bindings
+In-Reply-To: <CABxcv=mETO9ESVa04YjRO1d-h5ksEwvwGKb1G-jxVk6ttr9JYg@mail.gmail.com>
+References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
+ <1426162154-8716-6-git-send-email-eliad@wizery.com>
+ <CABxcv=mETO9ESVa04YjRO1d-h5ksEwvwGKb1G-jxVk6ttr9JYg@mail.gmail.com>
+Message-ID: <CAFqH_53D52WGDZUTv=w7SguTeROwrzmn9XLB+cTg-3y+Q4FxfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Hi,
+2015-03-13 9:01 GMT+01:00 Javier Martinez Canillas <javier@dowhile0.org>:
+> Hello Eliad,
+>
+> On Thu, Mar 12, 2015 at 1:09 PM, Eliad Peller <eliad@wizery.com> wrote:
+>> Replace all the pdata-quirks for setting wl12xx/wl18xx
+>> platform data with proper DT definitions.
+>>
+>> The patch was compile-tested only.
+>>
+>> Signed-off-by: Eliad Peller <eliad@wizery.com>
+>> ---
+>
+> I wanted to test your series but I realized that the IGEPv2 I've
+> access is the old revision that has another SDIO wlan module instead
+> of a Wilink8.
+>
+> Maybe Enric have the new revision? I also added to Pau Pajuel as cc
+> who still works in the company manufacturing these boards so he should
+> be able to test it.
+>
 
-I am testing Andrew ILP32 patches[ilp32 v3 patch] through LTP testsuite.
-Most of the testcases are passed. Some testcases are failed because of
-LTP issue while the other testcases are failed because ILP32 ABI is
-difference from arm 32bit.
+Sorry, now I only have an old revision too, so I can't test, cc'ing
+Agust? that has access to the hardware, maybe he can test it or he can
+provide to us a board ;)
 
-So, how should we deal with it? It would be fixed in kernel/glibc or
-in application. Fix it in application may hurt the ABI compatabilities.
+> But in any case, your patch looks good to me so for the
+> arch/arm/boot/dts/omap3-igep00* changes:
+>
+> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+>
 
-1.  ABI changes in msgrcv and msgsnd
-    In current ILP32 ABI, msgsnd and msgrcv is 64bit syscall. I guess
-it is because the msgctl must be 64bit syscall after time_t is defined
-as 64bit. This will lead to the issue when application define the
-msgbuf struct. Such struct usually defined out of glibc and kernel,
-because application may need the difference size of msgbuf.mtext.
+For my part also looks good.
 
-    If the msgsnd and msgrcv remain 64bit syscall, the header in
-application may like this:
+Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
 
-```
-    #ifdef __ILP32
-        typedef long long _mtype;
-    #else
-        typedef long _mtype;
-    #endif
-    typedef struct mbuf {          /* a generic message structure */
-        _mtype mtype;
-        char mtext[MSGSIZE + 1];  /* add 1 here so the message can be 1024   */
-    } MSGBUF;                        /* characters long with a '\0' termination */
-```
+Best regards,
+   Enric
 
-    Compare with above change in application, there is another way to
-sovle this issue: map msgsnd and msgrcv to compat syscall (base on
-Andrew patch [ilp32 syscall table]).
-
-```
-    diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-    index 8c68d28..00d4f65 100644
-    --- a/arch/arm64/kernel/sys_ilp32.c
-    +++ b/arch/arm64/kernel/sys_ilp32.c
-    @@ -132,6 +132,11 @@ asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes,
-      */
-     #define sys_mq_notify          ilp32_sys_mq_notify
-
-    +/*
-    + * msgsnd, msgrcv
-    + */
-    +#define sys_msgrcv              compat_sys_msgrcv
-    +#define sys_msgsnd              compat_sys_msgsnd
-
-     /*
-      * sigaltstack needs some special handling as the
-```
-
-    From our perspective, life may be earier if the code of applcation
-is same between ilp32 and arm 32bit.
-
-2.  ABI changes around off_t.
-    Current ILP32 abi define off_t as 64bit long which make only one
-register is needed when pass offset from userspace to kernel. At the
-same time, it lead to some corner case failure, e.g. ftest02. It failed
-bacause the compiler treat the negative number as 32bit integer while
-the off_t is 64bit integer which make the kernel treat the 32bit
-negative integer as 64bit position integer.
-
-    This will be ok if force a cast in application code:
-```
-    diff --git a/testcases/kernel/fs/ftest/ftest02.c b/testcases/kernel/fs/ftest/ftest02.c
-    index 35cc0d8..472887e 100644
-    --- a/testcases/kernel/fs/ftest/ftest02.c
-    +++ b/testcases/kernel/fs/ftest/ftest02.c
-    @@ -269,7 +269,7 @@ static void crfile(int me, int count)
-            val = write(fd, crmsg, sizeof(crmsg) - 1);
-            warn(val, "write", 0);
-
-    -       val = lseek(fd, -(sizeof(crmsg) - 1), 1);
-    +       val = lseek(fd, -(off_t)(sizeof(crmsg) - 1), 1);
-            warn(val, "lseek", 0);
-
-            val = read(fd, buf, sizeof(crmsg) - 1);
-```
-
-cc'd H J Lu, I appreciate some suggestions if x32 encounter the similar
-issue.
-
-BTW, six month past after previous round review, is there any plan about
-when will the community would like to ack these series patches?
-
-regards
-
-bamvor
-
-[ilp32 v3 patch] (https://lkml.org/lkml/2014/9/3/704)
-[ilp32 syscall table] (https://lkml.org/lkml/2014/9/3/725)
+> Best regards,
+> Javier
