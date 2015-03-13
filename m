@@ -1,66 +1,107 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 13 Mar 2015 09:13:52 +0100
-Subject: [PATCH 0/3] clk: divider: three exactness fixes (and a rant)
-In-Reply-To: <20150313075058.GL952@pengutronix.de>
-References: <20150306192813.GG10717@pengutronix.de>
- <54FA02B7.8090703@codeaurora.org> <1425895136.3152.22.camel@pengutronix.de>
- <54FDEEFE.1060803@codeaurora.org> <20150309210735.14952.91257@quantum>
- <20150309215803.GD7525@pengutronix.de> <54FE215D.7090804@codeaurora.org>
- <20150309233416.GF7525@pengutronix.de> <5500EA26.7090007@codeaurora.org>
- <1426150673.14455.11.camel@pengutronix.de>
- <20150313075058.GL952@pengutronix.de>
-Message-ID: <1426234432.3083.4.camel@pengutronix.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 13 Mar 2015 16:14:29 +0800
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+Message-ID: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 13.03.2015, 08:50 +0100 schrieb Uwe Kleine-K?nig:
-> On Thu, Mar 12, 2015 at 09:57:53AM +0100, Philipp Zabel wrote:
-> > Am Mittwoch, den 11.03.2015, 18:21 -0700 schrieb Stephen Boyd:
-> > [...]
-> > > Why does Philipp like 110Hz the most? Where is the desire for that rate
-> > > coming from?
-> > > 
-> > > > And the lower
-> > > > abs(1 / 110 - 1 / r) the better. 
-> > > 
-> > > Similarly, where is this requirement coming from? Some datasheet? Or is
-> > > it just some arbitrary decision we've made that may not hold true for
-> > > all consumers?
-> It's not comming from a datasheet. But that's what I guess is the right
-> metric for quite some cases. E.g. an UART sample rate and I also
-> wouldn't be surprised if Philipp's panel example would call for this
-> metric, too.
-> 
-> For an UART running with say 38400 Bd you want to sample with a freqency
-> of 38400 Hz (not considering oversampling, but that is only a factor
-> that doesn't makes my reasoning wrong). If you now consider 38401 Hz and
-> 38399 Hz the respective deltas are 1 Hz. But if you look at the time
-> between two samples we have:
-> 
-> 	38401 Hz -> 26.04098852 us -> delta: 0.6781507 ns
-> 	38400 Hz -> 26.04166667 us
-> 	38399 Hz -> 26.04234485 us -> delta: 0.6781861 ns
-> 
-> So with 38401 it takes a little longer until the slightly deviating rate
-> results in sampling the wrong bit.
-> 
-> > In this use case, the driver doesn't want the pixel clock to stay below
-> > a hard frequency limit, but to get as close as possible to the target
-> > frequency, either above or below, so the relative error to the nominal
-> > panel refresh rate stays as small as possible. Thus for a fictional
-> > target rate of 110 Hz, I'd like to minimize abs((round_rate / 110) - 1).
-> Note that minimizing
-> 
-> 	abs((round_rate / 110) - 1)
-> 
-> is equivalent to minimizing
-> 
-> 	abs(round_rate - 110)
+From: Graeme Gregory <graeme.gregory@linaro.org>
 
-Of course, and you're right, I should want to minimize the delta of the
-interval time, not of the rate so that if playing back a video stream at
-exactly the nominal frequency, it takes as long as possible until I have
-to drop or duplicate a frame to stay in sync.
+ACPI 5.1 does not currently support S states for ARM64 hardware but
+ACPI code will call acpi_target_system_state() and acpi_sleep_init()
+for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
+and select it for x86 and ia64 only to make sleep functions available,
+and also introduce stub function to allow other drivers to function
+until S states are defined for ARM64.
 
-regards
-Philipp
+It will be no functional change for x86 and IA64.
+
+CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Acked-by: Robert Richter <rrichter@cavium.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/ia64/Kconfig       | 1 +
+ arch/x86/Kconfig        | 1 +
+ drivers/acpi/Kconfig    | 4 ++++
+ drivers/acpi/Makefile   | 2 +-
+ drivers/acpi/internal.h | 4 ++++
+ 5 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+index 074e52b..e8728d7 100644
+--- a/arch/ia64/Kconfig
++++ b/arch/ia64/Kconfig
+@@ -10,6 +10,7 @@ config IA64
+ 	select ARCH_MIGHT_HAVE_PC_SERIO
+ 	select PCI if (!IA64_HP_SIM)
+ 	select ACPI if (!IA64_HP_SIM)
++	select ACPI_GENERIC_SLEEP if ACPI
+ 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+ 	select HAVE_UNSTABLE_SCHED_CLOCK
+ 	select HAVE_IDE
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index b7d31ca..9804431 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -22,6 +22,7 @@ config X86_64
+ ### Arch settings
+ config X86
+ 	def_bool y
++	select ACPI_GENERIC_SLEEP if ACPI
+ 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+ 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+ 	select ARCH_HAS_FAST_MULTIPLIER
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index e6c3ddd..a7b9120 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
+ config ARCH_MIGHT_HAVE_ACPI_PDC
+ 	bool
+ 
++config ACPI_GENERIC_SLEEP
++	bool
++
+ config ACPI_SLEEP
+ 	bool
+ 	depends on SUSPEND || HIBERNATION
++	depends on ACPI_GENERIC_SLEEP
+ 	default y
+ 
+ config ACPI_PROCFS_POWER
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 623b117..2397822 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -23,7 +23,7 @@ acpi-y				+= nvs.o
+ 
+ # Power management related files
+ acpi-y				+= wakeup.o
+-acpi-y				+= sleep.o
++acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+ acpi-y				+= device_pm.o
+ acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+ 
+diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+index 56b321a..6f08c85 100644
+--- a/drivers/acpi/internal.h
++++ b/drivers/acpi/internal.h
+@@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
+ /*--------------------------------------------------------------------------
+                                   Suspend/Resume
+   -------------------------------------------------------------------------- */
++#ifdef CONFIG_ACPI_GENERIC_SLEEP
+ extern int acpi_sleep_init(void);
++#else
++static inline int acpi_sleep_init(void) { return -ENXIO; }
++#endif
+ 
+ #ifdef CONFIG_ACPI_SLEEP
+ int acpi_sleep_proc_init(void);
+-- 
+1.9.1
