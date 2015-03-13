@@ -1,101 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 Mar 2015 18:12:29 +0100
-Subject: [GIT PULL] at91: cleanup for 4.1 #2
-Message-ID: <1426266749-9714-1-git-send-email-nicolas.ferre@atmel.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 13 Mar 2015 17:15:27 +0000
+Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
+In-Reply-To: <550140ED.3080808@huawei.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
+ <CACxGe6uWwts6X=Yc2ioBdQizXkF1_YgoNNOsREWirk2MFBVDHg@mail.gmail.com>
+ <20150311231141.GG21998@io.lakedaemon.net>
+ <5500EFFF.2070807@huawei.com>
+ <20150312051245.GI21998@io.lakedaemon.net>
+ <550140ED.3080808@huawei.com>
+Message-ID: <20150313171526.GL21998@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hanjun, Catalin,
 
-Another cleanup series on top of the previous one that I sent you this
-afternoon ;-) I think it is the last time that we can remove a whole bunch of
-files and legacy code... We were getting used to it!
-I still have another one dealing with at91rm9200 ST cleanup that I plan to send
-early next week (dependencies between trees to solve).
+On Thu, Mar 12, 2015 at 03:31:57PM +0800, Hanjun Guo wrote:
+> On 2015/3/12 13:12, Jason Cooper wrote:
+> > On Thu, Mar 12, 2015 at 09:46:39AM +0800, Hanjun Guo wrote:
+> >> On 2015/3/12 7:11, Jason Cooper wrote:
+> >>> Hey Grant,
+> >>>
+> >>> On Wed, Mar 11, 2015 at 06:04:50PM +0000, Grant Likely wrote:
+> >>>> On 11 Mar 2015 12:42, "Hanjun Guo" <hanjun.guo@linaro.org> wrote:
+> [...]
+> >>>>> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> >>>>> index 0fe2f71..afd1af3 100644
+> >>>>> --- a/drivers/irqchip/irqchip.c
+> >>>>> +++ b/drivers/irqchip/irqchip.c
+> >>>>> @@ -8,6 +8,7 @@
+> >>>>>   * warranty of any kind, whether express or implied.
+> >>>>>   */
+> >>>>>
+> >>>>> +#include <linux/acpi_irq.h>
+> >>>>>  #include <linux/init.h>
+> >>>>>  #include <linux/of_irq.h>
+> >>>>>  #include <linux/irqchip.h>
+> >>>>> @@ -26,4 +27,6 @@ extern struct of_device_id __irqchip_of_table[];
+> >>>>>  void __init irqchip_init(void)
+> >>>>>  {
+> >>>>>         of_irq_init(__irqchip_of_table);
+> >>>>> +
+> >>>>> +       acpi_irq_init();
+> >>>>>  }
+> >>> Is this in line with Olof's idea that providing a dtb would override ACPI?
+> >> Yes, it will. Since ACPI is default OFF (disabled), if a dtb provided, and no acpi=force
+> >> passed in the early command line, dtb will be used as system configuration for
+> >> boot (dtb is always the prior one for now) [1]. In acpi_gic_init() which called by
+> >> acpi_irq_init(), it will return immediately if acpi disabled, so it will not parse
+> >> any ACPI table for device configuration.
+> > Ok, that matches my recollection.  Thanks for refreshing my memory.  I'll apply
+> > this on a topic branch for irqchip/gic when I return from travel.  Most likely
+> > Friday or over the weekend.
+> 
+> Thank you very much! But this patch can't be applied without previous ones in this
+> patch set, how about you ack this patch and Catalin takes it via ARM64 tree? I'm
+> not sure for this, it depends on your decision.
 
-Thanks, best regards,
+Is this a build dependency or a boot dependency?  I only received this patch in
+the series and I apologize, I'm a bit swamped atm.  Catalin, would an immutable
+irqchip/gic topic branch with this in it work for you?
 
-The following changes since commit 385acc0dac88d79447a03a1363072fc258429dec:
+thx,
 
-  ARM: at91/pm: flush data cache and clean, invalidate and disable the L2 cache (2015-03-13 13:34:55 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup2
-
-for you to fetch changes up to 598e085590fc5ac1fecff00e842a8a6c2ae010e5:
-
-  ARM: at91: remove old setup (2015-03-13 18:01:10 +0100)
-
-----------------------------------------------------------------
-Second batch of cleanup for 4.1:
-- remove unused matrix header files
-- dbgu + chip identification: new driver for SoC detection
-  this allow to remove all additional io mapping
-- remove old non-standard AT91 setup code
-
-----------------------------------------------------------------
-Alexandre Belloni (8):
-      ARM: at91: remove unused at91_ioremap_matrix and header
-      ARM: at91: remove unused _matrix.h headers
-      ARM: at91/dt: introduce atmel,<chip>-dbgu
-      ARM: at91: at91rm9200 use SoC detection infrastructure
-      ARM: at91: at91sam9: use SoC detection infrastructure
-      ARM: at91: sama5 use SoC detection infrastructure
-      ARM: at91: sama5d4: remove useless map_io
-      ARM: at91: remove old setup
-
-Arnd Bergmann (1):
-      ARM: at91: remove NEED_MACH_IO_H
-
-Boris BREZILLON (1):
-      ARM: at91: add soc detection infrastructure
-
- .../devicetree/bindings/serial/atmel-usart.txt     |   3 +-
- arch/arm/Kconfig                                   |   2 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
- arch/arm/boot/dts/at91sam9260.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9261.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9263.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g45.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9rl.dtsi                  |   2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |   2 +-
- arch/arm/boot/dts/sama5d4.dtsi                     |   2 +-
- arch/arm/mach-at91/Kconfig                         |   1 +
- arch/arm/mach-at91/Makefile                        |   2 +-
- arch/arm/mach-at91/at91rm9200.c                    |  29 +-
- arch/arm/mach-at91/at91sam9.c                      |  76 +++--
- arch/arm/mach-at91/generic.h                       |   4 -
- arch/arm/mach-at91/include/mach/at91_matrix.h      |  23 --
- .../mach-at91/include/mach/at91sam9260_matrix.h    |  80 -----
- .../mach-at91/include/mach/at91sam9261_matrix.h    |  64 ----
- .../mach-at91/include/mach/at91sam9263_matrix.h    | 129 --------
- .../mach-at91/include/mach/at91sam9g45_matrix.h    | 153 ----------
- .../mach-at91/include/mach/at91sam9n12_matrix.h    |  53 ----
- .../arm/mach-at91/include/mach/at91sam9rl_matrix.h |  96 ------
- .../arm/mach-at91/include/mach/at91sam9x5_matrix.h |  53 ----
- arch/arm/mach-at91/include/mach/io.h               |  27 --
- arch/arm/mach-at91/sama5.c                         |  81 +++--
- arch/arm/mach-at91/setup.c                         | 330 ---------------------
- arch/arm/mach-at91/soc.c                           |  97 ++++++
- arch/arm/mach-at91/soc.h                           |  78 +++++
- drivers/pcmcia/Kconfig                             |   1 +
- drivers/pcmcia/at91_cf.c                           |  13 +-
- 32 files changed, 301 insertions(+), 1114 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9260_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9261_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9263_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9g45_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9n12_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9rl_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9x5_matrix.h
- delete mode 100644 arch/arm/mach-at91/include/mach/io.h
- delete mode 100644 arch/arm/mach-at91/setup.c
- create mode 100644 arch/arm/mach-at91/soc.c
- create mode 100644 arch/arm/mach-at91/soc.h
-
--- 
-Nicolas Ferre
+Jason.
