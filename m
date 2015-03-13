@@ -1,31 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 20:52:49 +0100
-Subject: [PATCH 05/12] net: smc91x: Remove dead code
-In-Reply-To: <1426270185-19510-6-git-send-email-sboyd@codeaurora.org>
-References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
- <1426270185-19510-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <2309042.KQEDUaQCkU@wuerfel>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 13 Mar 2015 14:54:25 -0500
+Subject: [PATCH 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
+In-Reply-To: <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+ <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20150313195425.GA16977@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015 11:09:38 Stephen Boyd wrote:
-> This config no longer exists now that mach-msm has been removed.
-> Delete it and the associated code.
-> 
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Fri, Mar 13, 2015 at 11:19:52PM +0530, Sricharan R wrote:
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
+
+Reviewed-by: Andy Gross <agross@codeaurora.org>
+
+>  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> This can be acked and go through arm-soc or applied directly.
-> 
->  drivers/net/ethernet/smsc/smc91x.h | 14 --------------
->  1 file changed, 14 deletions(-)
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index 3f648ae..1ec7ec5 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -246,6 +246,8 @@
+>  			clock-names = "core", "iface";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
+> +			dma-names = "bam-tx", "bam-rx";
+
+more of a nit, but the bam- is unnecessary.  it's just rx/tx.
+>  		};
+>  
+>  		blsp2_dma: dma at f9944000 {
+> -- 
+> 1.8.2.1
 > 
 
-David Miller already merged a patch that removes this and the other
-platform specific parts of that file that are no longer needed.
-
-	Arnd
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
