@@ -1,123 +1,106 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Fri, 13 Mar 2015 18:29:23 +0800
-Subject: [rtc-linux] [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
-In-Reply-To: <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
-References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
- <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
- <20150223135044.108ea32a65063a50aa36a309@linux-foundation.org>
-Message-ID: <1426242563.18291.19.camel@mtksdaap41>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 13 Mar 2015 11:33:14 +0100
+Subject: [PATCH] cpuidle: mvebu: update cpuidle thresholds for Armada
+ XP SOCs
+In-Reply-To: <20150310190507.64b3c153@free-electrons.com>
+References: <alpine.LNX.2.02.1502131534360.8729@sbrk.sbrk.org>
+ <20150310190507.64b3c153@free-electrons.com>
+Message-ID: <5502BCEA.7000209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/10/2015 07:05 PM, Thomas Petazzoni wrote:
+> Hello Daniel,
+>
+> I know you suggested a more rigorous method of determining the exit
+> latency and target residency times, but would it be nonetheless
+> possible to apply this patch, which clearly improves performance a lot,
+> and actually makes the code match the values used in the vendor kernel?
+>
+> I also think this patch should be marked for stable, it fixes values
+> introduced in commit b858fbc1919720f7f54360098ece03b383e961fa, and
+> should therefore be backported all the way to v3.16.
 
-On Mon, 2015-02-23 at 13:50 -0800, Andrew Morton wrote:
-> On Wed, 28 Jan 2015 17:27:56 +0800 Eddie Huang <eddie.huang@mediatek.com> wrote:
-> 
-> > From: Tianping Fang <tianping.fang@mediatek.com>
-> > 
-> > Add Mediatek MT63xx RTC driver
-> 
-> There are a couple of checkpatch warnings which should be addressed,
-> please:
-> 
-> WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
-> #150: 
-> new file mode 100644
-> 
-> WARNING: DT compatible string "mediatek,mt6397-rtc" appears un-documented -- check ./Documentation/devicetree/bindings/
-> #488: FILE: drivers/rtc/rtc-mt6397.c:334:
-> +	{ .compatible = "mediatek,mt6397-rtc", },
-> 
-> 
-> 
-> 
-> >
-> > ...
-> >
-> > +static u16 rtc_read(struct mt6397_rtc *rtc, u32 offset)
-> > +{
-> > +	u32 rdata = 0;
-> > +	u32 addr = rtc->addr_base + offset;
-> > +
-> > +	if (offset < rtc->addr_range)
-> > +		regmap_read(rtc->regmap, addr, &rdata);
-> > +
-> > +	return (u16)rdata;
-> > +}
-> > +
-> > +static void rtc_write(struct mt6397_rtc *rtc, u32 offset, u32 data)
-> > +{
-> > +	u32 addr;
-> > +
-> > +	addr = rtc->addr_base + offset;
-> > +
-> > +	if (offset < rtc->addr_range)
-> > +		regmap_write(rtc->regmap, addr, data);
-> > +}
-> 
-> regmap_read() and regmap_write() can return errors.  There is no
-> checking for this.
-> 
+I applied the patch for v4.1.
 
-I encounter some trouble when I add code to check return value of
-regmap_read and regmap_write. Every RTC register access through regmap,
-and there are many register read/write in this driver. If I check every
-return value, the driver will become ugly. I try to make this driver
-clean using following macro.
+I will let you send later an mail to stable@ with the commit-id to ask 
+backport. I don't want to put a stable@ tag in the patch as it does not 
+enter in the stable kernel rules.
 
-static int __rtc_read(struct mt6397_rtc *rtc, u32 offset, u32 *data)
-{
-        u32 addr = rtc->addr_base + offset;
-
-        if (offset < rtc->addr_range)
-                return regmap_read(rtc->regmap, addr, data);
-
-        return -EINVAL;
-}
-
-#define rtc_read(ret, rtc, offset, data)                \
-({                                                      \
-        ret = __rtc_read(rtc, offset, data);            \
-        if (ret < 0)                                    \
-                goto rtc_exit;                          \
-})                                                      \
+Thanks
+   -- Daniel
 
 
-And function call rtc_read, rtc_write looks like:
 
-static int mtk_rtc_read_time(struct device *dev, struct rtc_time *tm)
-{
-        unsigned long time;
-        struct mt6397_rtc *rtc = dev_get_drvdata(dev);
-        int ret = 0;
-        u32 sec;
+> On Fri, 13 Feb 2015 15:55:03 +0100 (CET), s. rannou wrote:
+>> Originally, the thresholds used in the cpuidle driver for Armada SOCs
+>> were temporarily chosen, leaving room for improvements.
+>>
+>> This commit updates the thresholds for the Armada XP SOCs with values
+>> that positively impact performances:
+>>
+>>                                  without patch  with patch   vendor kernel
+>>   - iperf localhost (gbit/sec)   ~3.7           ~6.4         ~5.4
+>>   - ioping tmpfs (iops)          ~163k          ~206k        ~179k
+>>   - ioping tmpfs (mib/s)         ~636           ~805         ~699
+>>
+>> The idle power consumption is negatively impacted (proportionally less
+>> than the performance gain), and we are still performing better than
+>> the vendor kernel here:
+>>
+>>                                  without patch   with patch  vendor kernel
+>>   - power consumption idle (W)   ~2.4            ~3.2        ~4.4
+>>   - power consumption busy (W)   ~8.6            ~8.3        ~8.6
+>>
+>> There is still room for improvement regarding the value of these
+>> thresholds, they were chosen to mimic the vendor kernel.
+>>
+>> This patch only impacts Armada XP SOCs and was tested on Online Labs
+>> C1 boards. A similar approach can be taken to improve the performances
+>> of the Armada 370 and Armada 38x SOCs.
+>>
+>> Thanks a lot to Thomas Petazzoni, Gregory Clement and Willy Tarreau
+>> for the discussions and tips around this topic.
+>>
+>> Signed-off-by: Sebastien Rannou <mxs@sbrk.org>
+>> ---
+>>   drivers/cpuidle/cpuidle-mvebu-v7.c | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-mvebu-v7.c b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> index 38e6861..3716a1f 100644
+>> --- a/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> +++ b/drivers/cpuidle/cpuidle-mvebu-v7.c
+>> @@ -50,17 +50,17 @@ static struct cpuidle_driver armadaxp_idle_driver = {
+>>   	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+>>   	.states[1]		= {
+>>   		.enter			= mvebu_v7_enter_idle,
+>> -		.exit_latency		= 10,
+>> +		.exit_latency		= 100,
+>>   		.power_usage		= 50,
+>> -		.target_residency	= 100,
+>> +		.target_residency	= 1000,
+>>   		.name			= "MV CPU IDLE",
+>>   		.desc			= "CPU power down",
+>>   	},
+>>   	.states[2]		= {
+>>   		.enter			= mvebu_v7_enter_idle,
+>> -		.exit_latency		= 100,
+>> +		.exit_latency		= 1000,
+>>   		.power_usage		= 5,
+>> -		.target_residency	= 1000,
+>> +		.target_residency	= 10000,
+>>   		.flags			= MVEBU_V7_FLAG_DEEP_IDLE,
+>>   		.name			= "MV CPU DEEP IDLE",
+>>   		.desc			= "CPU and L2 Fabric power down",
+>
+>
+>
 
-        mutex_lock(&rtc->lock);
-        do {
-                rtc_read(ret, rtc, RTC_TC_SEC, &tm->tm_sec);
-                rtc_read(ret, rtc, RTC_TC_MIN, &tm->tm_min);
-                rtc_read(ret, rtc, RTC_TC_HOU, &tm->tm_hour);
-                rtc_read(ret, rtc, RTC_TC_DOM, &tm->tm_mday);
-                rtc_read(ret, rtc, RTC_TC_MTH, &tm->tm_mon);
-                rtc_read(ret, rtc, RTC_TC_YEA, &tm->tm_year);
-                rtc_read(ret, rtc, RTC_TC_SEC, &sec);
-        } while (sec < tm->tm_sec);
-        mutex_unlock(&rtc->lock);
 
-        tm->tm_year += RTC_MIN_YEAR_OFFSET;
-        tm->tm_mon--;
-        rtc_tm_to_time(tm, &time);
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-        tm->tm_wday = (time / 86400 + 4) % 7;
-
-        return 0;
-
-rtc_exit:
-        mutex_unlock(&rtc->lock);
-        return ret;
-}
-
-It's a little tricky, does anyone have good suggestion ?
-
-Eddie
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
