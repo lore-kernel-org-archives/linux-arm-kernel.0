@@ -1,32 +1,109 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Mar 2015 12:07:21 +0100
-Subject: [PATCH v6 2/4] pci: iProc: define iProc PCIe platform bus binding
-In-Reply-To: <20150312211448.GG7346@google.com>
-References: <1426097169-20805-1-git-send-email-rjui@broadcom.com>
- <1426097169-20805-3-git-send-email-rjui@broadcom.com>
- <20150312211448.GG7346@google.com>
-Message-ID: <2401049.ClHMSX33l5@wuerfel>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 13 Mar 2015 20:19:39 +0900
+Subject: [PATCH] mmc: dw_mmc: Add a timeout for sending CMD11
+In-Reply-To: <1425943101-11976-1-git-send-email-dianders@chromium.org>
+References: <1425943101-11976-1-git-send-email-dianders@chromium.org>
+Message-ID: <5502C7CB.3010504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 March 2015 16:14:48 Bjorn Helgaas wrote:
-> [+cc Rob, Pawel, Mark, Ian, Kumar]
+Hi Doug.
+
+This patch is a right process. Just i wonder something.
+
+On 03/10/2015 08:18 AM, Doug Anderson wrote:
+> In the Designware databook's description of the "Voltage Switch Normal
+> Scenario" it instructs us to set a timer and fail the voltage change
+> if we don't see the voltage change interrupt within 2ms.  Let's
+> implement that.  Without implementing this I have often been able to
+> reproduce a hang while trying to send CMD11 on an rk3288-based board
+> while constantly ejecting and inserting UHS cards.
 > 
-> On Wed, Mar 11, 2015 at 11:06:07AM -0700, Ray Jui wrote:
-> > Document the Broadcom iProc PCIe platform interface device tree binding
-> > 
-> > Signed-off-by: Ray Jui <rjui@broadcom.com>
-> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/mmc/host/dw_mmc.c  | 26 ++++++++++++++++++++++++++
+>  include/linux/mmc/dw_mmc.h |  2 ++
+>  2 files changed, 28 insertions(+)
 > 
-> I'd like to get an ack for this from Arnd, Rob, or other device tree folks
-> (CC'd).
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 47dfd0e..d259662 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1020,6 +1020,15 @@ static void __dw_mci_start_request(struct dw_mci *host,
+>  
+>  	dw_mci_start_command(host, cmd, cmdflags);
+>  
+> +	if (cmd->opcode == SD_SWITCH_VOLTAGE) {
+> +		/*
+> +		 * Databook says to fail after 2ms w/ no response; give an
+> +		 * extra jiffy just in case we're about to roll over.
+> +		 */
+> +		mod_timer(&host->cmd11_timer,
+> +			  jiffies + msecs_to_jiffies(2) + 1);
+
+What's "plus one"?
+
+> +	}
+> +
+>  	if (mrq->stop)
+>  		host->stop_cmdr = dw_mci_prepare_command(slot->mmc, mrq->stop);
+>  	else
+> @@ -2158,6 +2167,8 @@ static irqreturn_t dw_mci_interrupt(int irq, void *dev_id)
+>  		/* Check volt switch first, since it can look like an error */
+>  		if ((host->state == STATE_SENDING_CMD11) &&
+>  		    (pending & SDMMC_INT_VOLT_SWITCH)) {
+> +			del_timer(&host->cmd11_timer);
+> +
+>  			mci_writel(host, RINTSTS, SDMMC_INT_VOLT_SWITCH);
+>  			pending &= ~SDMMC_INT_VOLT_SWITCH;
+>  			dw_mci_cmd_interrupt(host, pending);
+> @@ -2571,6 +2582,18 @@ ciu_out:
+>  	return ret;
+>  }
+>  
+> +static void dw_mci_cmd11_timer(unsigned long arg)
+> +{
+> +	struct dw_mci *host = (struct dw_mci *)arg;
+> +
+> +	if (host->state != STATE_SENDING_CMD11)
+> +		dev_info(host->dev, "Unexpected CMD11 timeout\n");
+
+If Unexpected CMD11 timeout, can it do  just" return"?
+Well, I think Unexpected CMD11 timeout is an rare case.
+
+Best Regards,
+Jaehoon Chung
+
+> +
+> +	host->cmd_status = SDMMC_INT_RTO;
+> +	set_bit(EVENT_CMD_COMPLETE, &host->pending_events);
+> +	tasklet_schedule(&host->tasklet);
+> +}
+> +
+>  #ifdef CONFIG_OF
+>  static struct dw_mci_of_quirks {
+>  	char *quirk;
+> @@ -2745,6 +2768,9 @@ int dw_mci_probe(struct dw_mci *host)
+>  		}
+>  	}
+>  
+> +	setup_timer(&host->cmd11_timer,
+> +		    dw_mci_cmd11_timer, (unsigned long)host);
+> +
+>  	host->quirks = host->pdata->quirks;
+>  
+>  	spin_lock_init(&host->lock);
+> diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+> index 471fb31..9efc567 100644
+> --- a/include/linux/mmc/dw_mmc.h
+> +++ b/include/linux/mmc/dw_mmc.h
+> @@ -202,6 +202,8 @@ struct dw_mci {
+>  	int			irq;
+>  
+>  	int			sdio_id0;
+> +
+> +	struct timer_list       cmd11_timer;
+>  };
+>  
+>  /* DMA ops for Internal/External DMAC interface */
 > 
-
-Sorry, I should have given my ack earlier. I've carefully reviewed the
-previous versions and am happy with the current one.
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-for the whole series.
-
-	Arnd
