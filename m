@@ -1,59 +1,52 @@
-From: alexinbeijing@gmail.com (Alex Dowad)
-Date: Fri, 13 Mar 2015 20:04:20 +0200
-Subject: [PATCH 05/32] arm64: copy_thread(): rename 'stk_sz' argument to
- 'kthread_arg'
-In-Reply-To: <1426269888-25600-1-git-send-email-alexinbeijing@gmail.com>
-References: <1426269888-25600-1-git-send-email-alexinbeijing@gmail.com>
-Message-ID: <1426269888-25600-5-git-send-email-alexinbeijing@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 13 Mar 2015 11:09:38 -0700
+Subject: [PATCH 05/12] net: smc91x: Remove dead code
+In-Reply-To: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1426270185-19510-6-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'stk_sz' is a misnomer: it is never used for a stack size. Rather, it is an
-argument which is passed to the main function executed by a kernel thread, when
-forking a new kthread. The most appropriate name is 'kthread_arg'.
+This config no longer exists now that mach-msm has been removed.
+Delete it and the associated code.
 
-Signed-off-by: Alex Dowad <alexinbeijing@gmail.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm64/kernel/process.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index fde9923..734e2b6 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -242,8 +242,11 @@ int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
+This can be acked and go through arm-soc or applied directly.
+
+ drivers/net/ethernet/smsc/smc91x.h | 14 --------------
+ 1 file changed, 14 deletions(-)
+
+diff --git a/drivers/net/ethernet/smsc/smc91x.h b/drivers/net/ethernet/smsc/smc91x.h
+index be67baf5f677..6fd5643c4fba 100644
+--- a/drivers/net/ethernet/smsc/smc91x.h
++++ b/drivers/net/ethernet/smsc/smc91x.h
+@@ -237,20 +237,6 @@ SMC_outw(u16 val, void __iomem *ioaddr, int reg)
+ #define RPC_LSA_DEFAULT         RPC_LED_100_10
+ #define RPC_LSB_DEFAULT         RPC_LED_TX_RX
  
- asmlinkage void ret_from_fork(void) asm("ret_from_fork");
+-#elif defined(CONFIG_ARCH_MSM)
+-
+-#define SMC_CAN_USE_8BIT	0
+-#define SMC_CAN_USE_16BIT	1
+-#define SMC_CAN_USE_32BIT	0
+-#define SMC_NOWAIT		1
+-
+-#define SMC_inw(a, r)		readw((a) + (r))
+-#define SMC_outw(v, a, r)	writew(v, (a) + (r))
+-#define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
+-#define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
+-
+-#define SMC_IRQ_FLAGS		IRQF_TRIGGER_HIGH
+-
+ #elif defined(CONFIG_COLDFIRE)
  
-+/*
-+ * Copy architecture-specific thread state
-+ */
- int copy_thread(unsigned long clone_flags, unsigned long stack_start,
--		unsigned long stk_sz, struct task_struct *p)
-+		unsigned long kthread_arg, struct task_struct *p)
- {
- 	struct pt_regs *childregs = task_pt_regs(p);
- 	unsigned long tls = p->thread.tp_value;
-@@ -251,6 +254,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	memset(&p->thread.cpu_context, 0, sizeof(struct cpu_context));
- 
- 	if (likely(!(p->flags & PF_KTHREAD))) {
-+		/* user thread */
- 		*childregs = *current_pt_regs();
- 		childregs->regs[0] = 0;
- 		if (is_compat_thread(task_thread_info(p))) {
-@@ -276,10 +280,11 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		if (clone_flags & CLONE_SETTLS)
- 			tls = childregs->regs[3];
- 	} else {
-+		/* kernel thread */
- 		memset(childregs, 0, sizeof(struct pt_regs));
- 		childregs->pstate = PSR_MODE_EL1h;
- 		p->thread.cpu_context.x19 = stack_start;
--		p->thread.cpu_context.x20 = stk_sz;
-+		p->thread.cpu_context.x20 = kthread_arg;
- 	}
- 	p->thread.cpu_context.pc = (unsigned long)ret_from_fork;
- 	p->thread.cpu_context.sp = (unsigned long)childregs;
+ #define SMC_CAN_USE_8BIT	0
 -- 
-2.0.0.GIT
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
