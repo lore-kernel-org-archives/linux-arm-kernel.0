@@ -1,47 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 13 Mar 2015 12:26:11 +0100
-Subject: [RFT/RFC PATCH 6/6] ARM: keep .text and .fixup regions together
-In-Reply-To: <3810696.X76shyuPzC@wuerfel>
-References: <1426181892-15440-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8h=8wQO7NWOXbLvvWF+WhiL63s9pF9JZCT7BUUu-pSdQ@mail.gmail.com>
- <20150312212202.GA8656@n2100.arm.linux.org.uk>
- <3810696.X76shyuPzC@wuerfel>
-Message-ID: <CAKv+Gu-bhir4J-vavJAzTYKEvrB5G9ijtLALbtmQOz-yvNAU9Q@mail.gmail.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 13 Mar 2015 20:30:22 +0900
+Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
+ errors
+In-Reply-To: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+Message-ID: <5502CA4E.9060401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2015 at 12:18, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 12 March 2015 21:22:02 Russell King - ARM Linux wrote:
->> On Thu, Mar 12, 2015 at 10:18:26PM +0100, Ard Biesheuvel wrote:
->> > >> Note that the TEXT_TEXT macro will emit *(.text) again but this should be
->> > >> harmless.
->> > >
->> > > However, I wonder if by doing this, we're weakening the ability for
->> > > kallsyms final link to succeed:
->> > >
->> > > /* .text section. Map to function alignment to avoid address changes
->> > >  * during second ld run in second ld pass when generating System.map */
->> > >
->> > > Can we not just move .fixup before TEXT_TEXT?  The only thing between it
->> > > and .text would be .text.hot.
->> > >
->> >
->> > Putting .fixup before .text already helps, but not enough for the
->> > .config Arnd gave me that I have been testing this with.
->> >
->> > What *(.text .fixup) does (i.e., putting both section names inside the
->> > parentheses), is emitting both sections for each input object file, so
->> > they will always be close to the object that it refers to, so it is
->> > not the same thing.
->>
->> I'll suggest a different solution then - how about modifying
->> asm-generic/vmlinux.lds.h to change *(.text) to *(.text .text.fixup)
->> and we move all the .fixup sections to .text.fixup ?  Arnd?
->
-> No objections from me, but I really don't know enough about the possible
-> side-effects this may have on the other architectures, so we need to
-> run this by the linux-arch mailing list.
->
+Hi, Doug.
 
-I don't think it could affect any other architecture if nobody is
-populating .text.fixup yet.
+On 03/11/2015 12:48 AM, Doug Anderson wrote:
+> The dw_mmc driver enables HLE errors as part of DW_MCI_ERROR_FLAGS but
+> nothing in the interrupt handler actually handles them and ACKs them.
+> That means that if we ever get an HLE error we'll just keep getting
+> interrupts and we'll wedge things.
+> 
+> We really don't expect HLE errors but if we ever get them we shouldn't
+> silently ignore them.
+> 
+> Note that I have seen HLE errors while constantly ejecting and
+> inserting cards (ejecting while inserting, etc).
+
+Right, It is occurred when card inserting/ejecting.(This case is the case of removable card.)
+Did you test with eMMC? We needs to consider how control HLE error.
+But I think this patch can't solve all of HLE problem.
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Note that this works together with the patch I sent up yesterday (the
+> CMD 11 timer).  I would have sent the two together except that I had
+> local printouts (and ACKing of HLE) and didn't realize that this was
+> also required for a full solution.
+> 
+>  drivers/mmc/host/dw_mmc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 47dfd0e..294edc9c 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -44,11 +44,11 @@
+>  /* Common flag combinations */
+>  #define DW_MCI_DATA_ERROR_FLAGS	(SDMMC_INT_DRTO | SDMMC_INT_DCRC | \
+>  				 SDMMC_INT_HTO | SDMMC_INT_SBE  | \
+> -				 SDMMC_INT_EBE)
+> +				 SDMMC_INT_EBE | SDMMC_INT_HLE)
+>  #define DW_MCI_CMD_ERROR_FLAGS	(SDMMC_INT_RTO | SDMMC_INT_RCRC | \
+> -				 SDMMC_INT_RESP_ERR)
+> +				 SDMMC_INT_RESP_ERR | SDMMC_INT_HLE)
+>  #define DW_MCI_ERROR_FLAGS	(DW_MCI_DATA_ERROR_FLAGS | \
+> -				 DW_MCI_CMD_ERROR_FLAGS  | SDMMC_INT_HLE)
+> +				 DW_MCI_CMD_ERROR_FLAGS)
+>  #define DW_MCI_SEND_STATUS	1
+>  #define DW_MCI_RECV_STATUS	2
+>  #define DW_MCI_DMA_THRESHOLD	16
+> 
