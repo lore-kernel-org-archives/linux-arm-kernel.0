@@ -1,75 +1,66 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 13 Mar 2015 10:42:07 +0100
-Subject: [PATCH v6 3/3] ARM: dts: vf610: add Miscellaneous System
- Control Module (MSCM)
-In-Reply-To: <20150313044759.GQ20455@dragon>
-References: <1425249689-32354-1-git-send-email-stefan@agner.ch>
- <1425249689-32354-4-git-send-email-stefan@agner.ch>
- <20150311004812.GU20455@dragon> <59b0d98827cb4e7497de81e1c0826964@agner.ch>
- <20150313044759.GQ20455@dragon>
-Message-ID: <9eef9ff618d869fe37c9f1d6dd88c641@agner.ch>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 13 Mar 2015 10:44:33 +0100
+Subject: [PATCH 0/4] Allow to use leds-ns2 with n090401 boards
+In-Reply-To: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
+References: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150313094433.GU1509@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-13 05:48, Shawn Guo wrote:
-> On Thu, Mar 12, 2015 at 10:03:08AM +0100, Stefan Agner wrote:
->> On 2015-03-11 01:48, Shawn Guo wrote:
->> > On Sun, Mar 01, 2015 at 11:41:29PM +0100, Stefan Agner wrote:
->> >> Add the Miscellaneous System Control Module (MSCM) to the base
->> >> device tree for Vybrid SoC's. This module contains registers
->> >> to get information of the individual and current (accessing)
->> >> CPU. In a second block, there is an interrupt router, which
->> >> handles the routing of the interrupts between the two CPU cores
->> >> on VF6xx variants of the SoC. However, also on single core
->> >> variants the interrupt router needs to be configured in order
->> >> to receive interrupts on the CPU's interrupt controller. Almost
->> >> all peripheral interrupts are routed through the router, hence
->> >> the MSCM module is the default interrupt parent for this SoC.
->> >>
->> >> In a earlier commit the interrupt nodes were moved out of the
->> >> peripheral nodes and specified in the CPU specific vf500.dtsi
->> >> device tree. This allowed to use the base device tree vfxxx.dtsi
->> >> also for a Cortex-M4 specific device tree, which uses different
->> >> interrupt nodes due to the NVIC interrupt controller. However,
->> >> since the interrupt parent for peripherals is the MSCM module
->> >> independently which CPU the device tree is used for, we can move
->> >> the interrupt nodes into the base device tree vfxxx.dtsi again.
->> >> Depending on which CPU this base device tree will be used with,
->> >> the correct parent interrupt controller has to be assigned to
->> >> the MSCM-IR node (GIC or NVIC). The driver takes care of the
->> >> parent interrupt controller specific needs (interrupt-cells).
->> >>
->> >> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> >
->> > Stefan,
->> >
->> > I guess this patch has a run-time dependency on the first two in the
->> > series, right?  Or put it another way, if I apply this single patch on
->> > my branch, the dtb and kernel built from the same branch do not work
->> > together, right?  If so, we will need to either wait for the first two
->> > hit mainline or pull Jason's irqchip/vybrid branch into my tree as
->> > prerequisite (irqchip/vybrid needs to be stable).
->> >
->> > Shawn
->>
->> Yes, that is true. The driver need to be in place in order to
->> successfully boot with the new device tree.
+On Wed, Mar 04, 2015 at 03:52:15PM +0100, Simon Guinot wrote:
+> Hello,
 > 
-> Okay.  Pulled Jason's irqchip/vybrid branch in, and applied the patch.
+> This patch series allows to use the leds-ns2 driver with the n090401
+> boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
 > 
-> Stefan,
+> Here is the list changes:
 > 
-> There was a conflict on device dspi1 when applying the patch to my
-> imx/dt branch.  Please take a look to see if I solved it correctly.
+> - Allow to configure the LED mode mapping.
+> - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
+>   GPIO expander.
+> - Make leds-ns2 depends on MACH_ARMADA_370.
+
+Hi Brian,
+
+Please consider applying the leds-ns2 patches of this serie.
+
+Thanks in advance.
+
+Simon
+
+> Simon Guinot (2):
+>   leds: leds-ns2: handle can_sleep GPIOs
+>   leds: leds-ns2: depends on MACH_ARMADA_370
 > 
-
-Hi Shawn,
-
-Your updated patch looks good to me. Also quickly boot tested the
-branch, worked fine.
-
-Thx!
-
---
-Stefan
+> Vincent Donnefort (2):
+>   leds: leds-ns2: move LED modes mapping outside of the driver
+>   ARM: Kirkwood: add modes-map property to ns2-leds nodes
+> 
+>  .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
+>  arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
+>  arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
+>  arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
+>  arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
+>  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
+>  drivers/leds/Kconfig                               |  12 +-
+>  drivers/leds/leds-ns2.c                            | 156 +++++++++++++--------
+>  include/dt-bindings/leds/leds-ns2.h                |   8 ++
+>  include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
+>  10 files changed, 159 insertions(+), 65 deletions(-)
+>  create mode 100644 include/dt-bindings/leds/leds-ns2.h
+> 
+> -- 
+> 2.1.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150313/2f153504/attachment.sig>
