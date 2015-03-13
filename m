@@ -1,139 +1,92 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 13 Mar 2015 08:24:58 -0500
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <55024D35.6050509@huawei.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com>
- <55017CA5.2010502@huawei.com> <20150312193505.GB7346@google.com>
- <55024D35.6050509@huawei.com>
-Message-ID: <CAErSpo4T7f9PNVMLrQbCvW2a=HnRauQR2eBz6H69B7Q2=ELNWw@mail.gmail.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Fri, 13 Mar 2015 14:29:42 +0100
+Subject: [PATCH 1/8] ARM: dts: rockchip: relicense rk3xxx.dtsi under
+ GPLv2/X11
+In-Reply-To: <1425665046-22927-2-git-send-email-heiko@sntech.de>
+References: <1425665046-22927-1-git-send-email-heiko@sntech.de>
+ <1425665046-22927-2-git-send-email-heiko@sntech.de>
+Message-ID: <CABgxDoLau2+4fHVjx+YazHCZGMA3MaJOm_GmexGMpcvdvD_+2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 9:36 PM, Yijing Wang <wangyijing@huawei.com> wrote:
->>>>> +  pci_add_resource(&resources, &ioport_resource);
->>>>> +  pci_add_resource(&resources, &iomem_resource);
->>>>> +  pci_add_resource(&resources, &busn_resource);
->>>>
->>>> Since I don't want to export busn_resource, you might have to allocate your
->>>> own struct resource for it here.  And, of course, figure out the details of
->>>> which PCI domain you're in and whether you need to share one struct
->>>> resource across several host bridges in the same domain.
->>>
->>> Allocate its own resource here is ok for me, as I mentioned in previous reply,
->>> so do we still need to add additional info to figure out which domain own the bus resource ?
->>
->> That's up to the caller.  Only the platform knows which bridges it wants to
->> have in the same domain.  In principle, every host bridge could be in its
->> own domain, since each bridge is the root of a unique PCI hierarchy.  But
->> some platforms have firmware that assumes otherwise.  I have no idea what
->> xen assumes.
->
-> I'm not xen guy, so I don't know much about it, but because it call pci_scan_bus_parented()
-> before, and in which busn_resource is always shared for different host bridges(same domain or not),
-> I think add a static bus resource(0,255) should be safe, at least, it would not introduce new risk.
->
-> Something like:
->
-> diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
-> index b1ffebe..a69e529 100644
-> --- a/drivers/pci/xen-pcifront.c
-> +++ b/drivers/pci/xen-pcifront.c
-> @@ -446,9 +446,15 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->                                  unsigned int domain, unsigned int bus)
->  {
->         struct pci_bus *b;
-> +       LIST_HEAD(resources);
->         struct pcifront_sd *sd = NULL;
->         struct pci_bus_entry *bus_entry = NULL;
->         int err = 0;
-> +       static struct resource busn_res = {
-> +               .start = 0,
-> +               .end = 255,
-> +               .flags = IORESOURCE_BUS,
-> +       };
->
->  #ifndef CONFIG_PCI_DOMAINS
->         if (domain != 0) {
-> @@ -470,17 +476,21 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->                 err = -ENOMEM;
->                 goto err_out;
->         }
-> +       pci_add_resource(&resources, &ioport_resource);
-> +       pci_add_resource(&resources, &iomem_resource);
-> +       pci_add_resource(&resources, &busn_res);
->         pcifront_init_sd(sd, domain, bus, pdev);
->
->         pci_lock_rescan_remove();
->
-> -       b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
-> -                                 &pcifront_bus_ops, sd);
-> +       b = pci_scan_root_bus(&pdev->xdev->dev, bus,
-> +                                 &pcifront_bus_ops, sd, &resources);
->         if (!b) {
->
-> Bjorn, what do you think about ?
+Acked-by: romain.perier at gmail.com
 
-That seems OK to me.  Probably still wrong, but no worse than it was before.
-
->>>>>    pcifront_init_sd(sd, domain, bus, pdev);
->>>>>
->>>>>    pci_lock_rescan_remove();
->>>>>
->>>>> -  b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
->>>>> -                            &pcifront_bus_ops, sd);
->>>>> +  b = pci_scan_root_bus(&pdev->xdev->dev, bus,
->>>>> +                            &pcifront_bus_ops, sd, &resources);
->>>>>    if (!b) {
->>>>>            dev_err(&pdev->xdev->dev,
->>>>>                    "Error creating PCI Frontend Bus!\n");
->>>>>            err = -ENOMEM;
->>>>>            pci_unlock_rescan_remove();
->>>>> +          pci_free_resource_list(&resources);
->>>>>            goto err_out;
->>>>>    }
->>>>>
->>>>> @@ -488,7 +494,7 @@ static int pcifront_scan_root(struct pcifront_device *pdev,
->>>>>
->>>>>    list_add(&bus_entry->list, &pdev->root_buses);
->>>>>
->>>>> -  /* pci_scan_bus_parented skips devices which do not have a have
->>>>> +  /* pci_scan_root_bus skips devices which do not have a
->>>>>    * devfn==0. The pcifront_scan_bus enumerates all devfn. */
->>>>>    err = pcifront_scan_bus(pdev, domain, bus, b);
->>>>>
->>>>> --
->>>>> 1.7.1
->>>>>
->>>>> --
->>>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>>>> the body of a message to majordomo at vger.kernel.org
->>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>
->>>> .
->>>>
->>>
->>>
->>> --
->>> Thanks!
->>> Yijing
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->> .
->>
+2015-03-06 19:03 GMT+01:00 Heiko Stuebner <heiko@sntech.de>:
+> GPLv2-only devicetrees make reuse difficult for software components licensed
+> under a different license.
 >
+> The consensus is that a GPL/X11 dual-license should allow all necessary uses,
+> so relicense the rk3xxx.dtsi to this combination.
 >
+> CCs were aquired by git shortlog -sne so it should've hopefully catched
+> every contributor.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Cc: Julien CHAUVEAU <julien.chauveau@neo-technologies.fr>
+> Cc: Beniamino Galvani <b.galvani@gmail.com>
+> Cc: Romain Perier <romain.perier@gmail.com>
+> ---
+> I'm hoping to get Acked-by tags from the people in the Cc-list.
+>
+>  arch/arm/boot/dts/rk3xxx.dtsi | 44 +++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 36 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+> index c54a971..a2ae9f3 100644
+> --- a/arch/arm/boot/dts/rk3xxx.dtsi
+> +++ b/arch/arm/boot/dts/rk3xxx.dtsi
+> @@ -2,15 +2,43 @@
+>   * Copyright (c) 2013 MundoReader S.L.
+>   * Author: Heiko Stuebner <heiko@sntech.de>
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>
+>  #include <dt-bindings/interrupt-controller/irq.h>
 > --
-> Thanks!
-> Yijing
+> 2.1.4
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
