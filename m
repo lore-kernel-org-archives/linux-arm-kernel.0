@@ -1,61 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Mar 2015 16:14:37 +0000
-Subject: [PATCH 4/4] arm64: log CPU boot modes
-In-Reply-To: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
-References: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1426263277-9827-5-git-send-email-mark.rutland@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 Mar 2015 16:10:11 +0000
+Subject: [PATCH 11/12] KVM: ARM: on IO mem abort - route the call to KVM MMIO
+ bus
+In-Reply-To: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1426263012-22935-12-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently don't log the boot mode for arm64 as we do for arm, and
-without KVM the user is provided with no indication as to which mode(s)
-CPUs were booted in, which can seriously hinder debugging in some cases.
+From: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
 
-Add logging to the boot path once all CPUs are up. Where CPUs are
-mismatched in violation of the boot protocol, WARN and set a taint (as
-we do for CPU other CPU feature mismatches) given that the
-firmware/bootloader is buggy and should be fixed.
+On IO memory abort, try to handle the MMIO access through the KVM
+registered read/write callbacks. This is done by invoking the relevant
+kvm_io_bus_* API.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+[Andre: Since we converted the VGIC already, we can get rid of the
+VGIC specific MMIO handler alltogether.]
+
+Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm64/kernel/setup.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/kvm/mmio.c    |   32 +++++++++++++++++++++++++++++++-
+ include/kvm/arm_vgic.h |    2 --
+ 2 files changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 781f469..1480894 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -62,6 +62,7 @@
- #include <asm/memblock.h>
- #include <asm/psci.h>
- #include <asm/efi.h>
-+#include <asm/virt.h>
- 
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-@@ -207,8 +208,20 @@ static void __init smp_build_mpidr_hash(void)
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 5d3bfc0..8dc2fde 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -162,6 +162,36 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 	return 0;
  }
- #endif
  
-+static void __init hyp_mode_check(void)
++/**
++ * handle_kernel_mmio - handle an in-kernel MMIO access
++ * @vcpu:	pointer to the vcpu performing the access
++ * @run:	pointer to the kvm_run structure
++ * @mmio:	pointer to the data describing the access
++ *
++ * returns true if the MMIO access has been performed in kernel space,
++ * and false if it needs to be emulated in user space.
++ */
++static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		struct kvm_exit_mmio *mmio)
 +{
-+	if (is_hyp_mode_available())
-+		pr_info("CPU: All CPU(s) started at EL2\n");
-+	else if (is_hyp_mode_mismatched())
-+		WARN_TAINT(1, TAINT_CPU_OUT_OF_SPEC,
-+			   "CPU: CPUs started in inconsistent modes");
-+	else
-+		pr_info("CPU: All CPU(s) started at EL1\n");
++	int ret;
++
++	if (mmio->is_write) {
++		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
++				mmio->len, &mmio->data);
++
++	} else {
++		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, mmio->phys_addr,
++				mmio->len, &mmio->data);
++	}
++	if (!ret) {
++		kvm_prepare_mmio(run, mmio);
++		kvm_handle_mmio_return(vcpu, run);
++	}
++
++	return !ret;
 +}
 +
- void __init do_post_cpus_up_work(void)
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa)
  {
-+	hyp_mode_check();
- 	apply_alternatives_all();
- }
+@@ -200,7 +230,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			       fault_ipa, 0);
+ 	}
  
+-	if (vgic_handle_mmio(vcpu, run, &mmio))
++	if (handle_kernel_mmio(vcpu, run, &mmio))
+ 		return 1;
+ 
+ 	kvm_prepare_mmio(run, &mmio);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 09fd324..91976c8 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -317,8 +317,6 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level);
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+-bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-		      struct kvm_exit_mmio *mmio);
+ 
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
 -- 
-1.9.1
+1.7.9.5
