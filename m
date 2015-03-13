@@ -1,53 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Mar 2015 10:52:07 +0000
-Subject: [PATCH v4 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
-References: <1426182985-10425-1-git-send-email-galak@codeaurora.org>
-Message-ID: <20150313105207.GB3592@leverpostej>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 13 Mar 2015 11:54:37 +0100
+Subject: [PATCH v6 09/10] clocksource: atmel-st: remove mach/hardware
+ dependency
+In-Reply-To: <1426162054-9987-10-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426162054-9987-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426244077-31167-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/ {
-> +	chosen {
-> +		stdout-path = &blsp1_uart2;
-> +	};
+Remove the mach/hardware dependency to prepare the driver for multiplatform
+support.
+Also switch from setup_irq() to request_irq()
 
-It would be good if we had the configuration too (see
-Documentation/devicetree/bindings/chosen.txt), as that avoids any
-reliance on kernel defaults.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/timer-atmel-st.c | 23 +++++++++--------------
+ 1 file changed, 9 insertions(+), 14 deletions(-)
 
-You can refer to an alias, so this could be:
-
-aliases {
-	serial0 = &blsp1_uart2;
-};
-
-chosen {
-	stdout-path = "serial0:115200n8";
-};
-
-...assuming that 115200n8 is correct for your UART, of course.
-
-
-[...]
-
-> +#include "skeleton.dtsi"
-
-I'd like to get rid of skeleton.dtsi; it causes more problems than it
-solves (the address/size cells mismatch is confusing and hidden, people
-forget to fill in memory nodes appropriately, etc).
-
-Please remove this include and place appropriate #address-cells and #size-cells here.
-
-I'd strongly recommend going with /#size-cells = <2>; it' will save on a
-lot of pain if you need to add PCIe or something with large ranges
-later. If things all fall in 4GB within the SoC then have
-/soc/#size=cells = <1> and an appropriate /soc/ranges property.
-
-I note this DT doesn't have any memory nodes. Is that an accident or
-does the loader fill that in?
-
-If the latter, have an empty node with a comment to that effect.
-
-Mark.
+diff --git a/drivers/clocksource/timer-atmel-st.c b/drivers/clocksource/timer-atmel-st.c
+index 674ef2519d6b..1692e17e096b 100644
+--- a/drivers/clocksource/timer-atmel-st.c
++++ b/drivers/clocksource/timer-atmel-st.c
+@@ -29,15 +29,12 @@
+ #include <linux/of_irq.h>
+ #include <linux/regmap.h>
+ 
+-#include <asm/mach/time.h>
+-
+-#include <mach/hardware.h>
+-
+ static unsigned long last_crtr;
+ static u32 irqmask;
+ static struct clock_event_device clkevt;
+ static struct regmap *regmap_st;
+ 
++#define AT91_SLOW_CLOCK		32768
+ #define RM9200_TIMER_LATCH	((AT91_SLOW_CLOCK + HZ/2) / HZ)
+ 
+ /*
+@@ -96,13 +93,6 @@ static irqreturn_t at91rm9200_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-static struct irqaction at91rm9200_timer_irq = {
+-	.name		= "at91_tick",
+-	.flags		= IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler	= at91rm9200_timer_interrupt,
+-	.irq		= NR_IRQS_LEGACY + AT91_ID_SYS,
+-};
+-
+ static cycle_t read_clk32k(struct clocksource *cs)
+ {
+ 	return read_CRTR();
+@@ -193,6 +183,7 @@ static struct clock_event_device clkevt = {
+ static void __init atmel_st_timer_init(struct device_node *node)
+ {
+ 	unsigned int val;
++	int irq, ret;
+ 
+ 	regmap_st = syscon_node_to_regmap(node);
+ 	if (IS_ERR(regmap_st))
+@@ -204,12 +195,16 @@ static void __init atmel_st_timer_init(struct device_node *node)
+ 	regmap_read(regmap_st, AT91_ST_SR, &val);
+ 
+ 	/* Get the interrupts property */
+-	at91rm9200_timer_irq.irq  = irq_of_parse_and_map(node, 0);
+-	if (!at91rm9200_timer_irq.irq)
++	irq  = irq_of_parse_and_map(node, 0);
++	if (!irq)
+ 		panic(pr_fmt("Unable to get IRQ from DT\n"));
+ 
+ 	/* Make IRQs happen for the system timer */
+-	setup_irq(at91rm9200_timer_irq.irq, &at91rm9200_timer_irq);
++	ret = request_irq(irq, at91rm9200_timer_interrupt,
++			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
++			  "at91_tick", regmap_st);
++	if (ret)
++		panic(pr_fmt("Unable to setup IRQ\n"));
+ 
+ 	/* The 32KiHz "Slow Clock" (tick every 30517.58 nanoseconds) is used
+ 	 * directly for the clocksource and all clockevents, after adjusting
+-- 
+2.1.0
