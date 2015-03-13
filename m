@@ -1,42 +1,32 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 13 Mar 2015 14:54:25 -0500
-Subject: [PATCH 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
-In-Reply-To: <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20150313195425.GA16977@qualcomm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Mar 2015 20:55:30 +0100
+Subject: [PATCH 00/12] Remove mach-msm and associated code
+In-Reply-To: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <3936339.LqGDoxnsbi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 11:19:52PM +0530, Sricharan R wrote:
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
-
-Reviewed-by: Andy Gross <agross@codeaurora.org>
-
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+On Friday 13 March 2015 11:09:33 Stephen Boyd wrote:
+> The maintainers for mach-msm no longer have any plans to support
+> or test the platforms supported by this architecture[1]. Most likely
+> there aren't any active users of this code anyway, so let's
+> delete it and the associated drivers/code. We should probably merge
+> this as one big series through arm-soc. Although some patches
+> should be fine to take through maintainers, some things like
+> mmc and usb have header file dependencies for platform_data.
 > 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index 3f648ae..1ec7ec5 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -246,6 +246,8 @@
->  			clock-names = "core", "iface";
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
-> +			dma-names = "bam-tx", "bam-rx";
-
-more of a nit, but the bam- is unnecessary.  it's just rx/tx.
->  		};
->  
->  		blsp2_dma: dma at f9944000 {
-> -- 
-> 1.8.2.1
+> [1] http://lkml.kernel.org/r/20150307031212.GA8434 at fifo99.com
 > 
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+As I wrote, I'd have a mild preference for doing the multiplatform
+conversion first and then removing the support in the following merge
+window, just in case someone wants that code back.
+
+If everyone wants to see that code die rather sooner than later,
+that's fine with me as well.
+
+I think the MMC driver should also be removed when the platform
+code is deleted, new code would use the mmci driver anyway.
+
+	Arnd
