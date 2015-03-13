@@ -1,44 +1,122 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 13 Mar 2015 10:40:43 +0800
-Subject: [PATCH 1/3] ARM: imx6qdl-sabreauto.dtsi: add max7310 support
-In-Reply-To: <20150311014606.GY20455@dragon>
-References: <1425893288-1517-1-git-send-email-peter.chen@freescale.com>
- <1425893288-1517-2-git-send-email-peter.chen@freescale.com>
- <20150311014606.GY20455@dragon>
-Message-ID: <20150313024041.GA24143@shlinux2>
+From: vinceh@nvidia.com (Vince Hsu)
+Date: Fri, 13 Mar 2015 11:04:46 +0800
+Subject: [PATCH v2 01/17] reset: add of_reset_control_get_by_index()
+In-Reply-To: <1426172504.14455.67.camel@pengutronix.de>
+References: <1426162518-7405-1-git-send-email-vinceh@nvidia.com>	
+ <1426162518-7405-2-git-send-email-vinceh@nvidia.com>
+ <1426172504.14455.67.camel@pengutronix.de>
+Message-ID: <550253CE.80201@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 09:46:09AM +0800, Shawn Guo wrote:
-> On Mon, Mar 09, 2015 at 05:28:06PM +0800, Peter Chen wrote:
-> > max7310 is an i2c interface gpio expander
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 43 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 43 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > index 009abd6..51acfec 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> > @@ -28,6 +28,13 @@
-> >  		};
-> >  	};
-> >  
-> > +	max7310_reset: max7310-reset {
-> > +		compatible = "gpio-reset";
-> 
-> The mainline kernel doesn't seem to have a gpio-reset driver/binding
-> yet.
-> 
+Hi Philipp,
 
-Yeah, the driver still handles reset by itself instead of DT.
-Even without reset operation, my max7310 chip works ok.
-Would you accept that I delete this reset operation
-and send v2?
+On 03/12/2015 11:01 PM, Philipp Zabel wrote:
+> Hi Vince,
+>
+> Am Donnerstag, den 12.03.2015, 20:15 +0800 schrieb Vince Hsu:
+>> Add of_reset_control_get_by_index() to allow the drivers to get reset device
+>> without knowing its name.
+> I see this is useful in the case of PM domain drivers that just need to
+> trigger a list of resets in whatever order.
+Yep.
 
--- 
+>
+>> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+>>
+>> ---
+>> v2: minor changes according to Alex's comments
+>>
+>>   drivers/reset/core.c  | 44 +++++++++++++++++++++++++++++---------------
+>>   include/linux/reset.h |  9 +++++++++
+>>   2 files changed, 38 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+>> index 7955e00d04d4..5e78866acd62 100644
+>> --- a/drivers/reset/core.c
+>> +++ b/drivers/reset/core.c
+>> @@ -140,28 +140,15 @@ int reset_control_status(struct reset_control *rstc)
+>>   }
+>>   EXPORT_SYMBOL_GPL(reset_control_status);
+>>   
+>> -/**
+>> - * of_reset_control_get - Lookup and obtain a reference to a reset controller.
+>> - * @node: device to be reset by the controller
+>> - * @id: reset line name
+>> - *
+>> - * Returns a struct reset_control or IS_ERR() condition containing errno.
+>> - *
+>> - * Use of id names is optional.
+>> - */
+>> -struct reset_control *of_reset_control_get(struct device_node *node,
+>> -					   const char *id)
+>> +struct reset_control *__of_reset_control_get(struct device_node *node,
+>> +						int index)
+> static
+Will merge to of_reset_control_get_by_index.
 
-Best Regards,
-Peter Chen
+>
+>>   {
+>>   	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
+>>   	struct reset_controller_dev *r, *rcdev;
+>>   	struct of_phandle_args args;
+>> -	int index = 0;
+>>   	int rstc_id;
+>>   	int ret;
+>>   
+>> -	if (id)
+>> -		index = of_property_match_string(node,
+>> -						 "reset-names", id);
+>>   	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
+>>   					 index, &args);
+>>   	if (ret)
+>> @@ -202,6 +189,33 @@ struct reset_control *of_reset_control_get(struct device_node *node,
+>>   
+>>   	return rstc;
+>>   }
+>> +
+>> +struct reset_control *of_reset_control_get_by_index(struct device_node *node,
+>> +					   int index)
+>> +{
+>> +	return __of_reset_control_get(node, index);
+>> +}
+>> +EXPORT_SYMBOL_GPL(of_reset_control_get_by_index);
+> This function is missing a kerneldoc comment, and please add a note that
+> this is only to be used if the order of the resets doesn't matter.
+Will add comment.
+
+>
+> Actually, I see no reason not to just merge __of_reset_control_get into
+> of_reset_control_get_by_index and then just call that from
+> of_reset_control_get.
+Indeed. Will fix.
+
+Thanks for the review. :)
+Vince
+
+>
+>> +/**
+>> + * of_reset_control_get - Lookup and obtain a reference to a reset controller.
+>> + * @node: device to be reset by the controller
+>> + * @id: reset line name
+>> + *
+>> + * Returns a struct reset_control or IS_ERR() condition containing errno.
+>> + *
+>> + * Use of id names is optional.
+>> + */
+>> +struct reset_control *of_reset_control_get(struct device_node *node,
+>> +					   const char *id)
+>> +{
+>> +	int index = 0;
+>> +
+>> +	if (id)
+>> +		index = of_property_match_string(node,
+>> +						 "reset-names", id);
+>> +	return __of_reset_control_get(node, index);
+>> +}
+>>   EXPORT_SYMBOL_GPL(of_reset_control_get);
+> [...]
+>
+> regards
+> Philipp
+>
