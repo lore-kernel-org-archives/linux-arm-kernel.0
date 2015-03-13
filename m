@@ -1,36 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Mar 2015 10:34:54 +0000
-Subject: [PATCH v3 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
-References: <1426107080-29079-1-git-send-email-galak@codeaurora.org>
- <1426107080-29079-2-git-send-email-galak@codeaurora.org>
- <20150312170541.GE30145@leverpostej>
- <E114AF0E-5DA9-412A-B3E2-DDD95D224C66@codeaurora.org>
- <20150312182508.GF30145@leverpostej>
- <F0B0524B-AC0E-4E60-9A21-1208C4A978F5@codeaurora.org>
-Message-ID: <20150313103453.GA3592@leverpostej>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Fri, 13 Mar 2015 10:38:58 +0000
+Subject: [PATCH v2 3/6] hw/char: pl011 don't keep setting the IRQ if
+ nothing changed
+In-Reply-To: <CAFEAcA-UOfgxBA969U6ADdra75fxYQPi6JFe017J6-oMG1rGhg@mail.gmail.com>
+References: <1425479753-18349-1-git-send-email-alex.bennee@linaro.org>
+ <1425479753-18349-4-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA-RhZVe1qwKQ3LzfWbzYVcBQ-jrwTnhH0OX69GNtnoysw@mail.gmail.com>
+ <CAFEAcA-UOfgxBA969U6ADdra75fxYQPi6JFe017J6-oMG1rGhg@mail.gmail.com>
+Message-ID: <87ioe5b2rh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Which of spin-table/psci are you planning on using for SMP support, and
-> > when would that be likely to appear?
-> 
-> We have a qcom specific SMP enablement method for this device.  This
-> was one of our first devices so it utilized as much from arm 32-bit as
-> possible.
 
-Implementation specific enable methods are something we really don't
-want to see for arm64. If PSCI is out of the question then a spin-table
-shim in your bootloader shouldn't be too hard to implement.
+Peter Maydell <peter.maydell@linaro.org> writes:
 
-> > Which exception level do CPUs enter the kernel? Even without a
-> > virt-capable GIC booting at EL2 is less work for the FW and gives the
-> > kernel a better chance of fixing things up (e.g. CNTVOFF).
-> 
-> I think the enter in EL1.
+> On 12 March 2015 at 15:51, Peter Maydell <peter.maydell@linaro.org> wrote:
+>> On 4 March 2015 at 14:35, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>>> While observing KVM traces I can see additional IRQ calls on pretty much
+>>> every MMIO access which is just plain inefficient. Only update the QEMU
+>>> IRQ level if something has actually changed from last time. Otherwise we
+>>> may be papering over other failure modes.
+>
+>> Consider this sequence of events:
+>
+> Incidentally, the code review rule of thumb that led me to
+> construct that scenario is:
+>  * state inside the device struct which doesn't correspond
+>    to real hardware state is suspicious
+>  * state which doesn't have any handling on migration
+>    save/restore is doubly suspicious
+> ...and then it was just a matter of "find the situation
+> where this is broken" :-)
+>
+> If we want to avoid making syscalls back into KVM it might
+> be better to attack the problem in the GIC object rather
+> than in all the devices that might be connected to it.
+> In general QEMU devices tend to assume they can just
+> always call qemu_set_irq() and it's the other end's
+> job to avoid doing anything too expensive in that situation.
 
-That's unfortunate, but so long as they are consistent, it's not the end
-of the world.
+Fair enough - I'll drop this patch on the re-spin
 
-Mark.
+>
+> -- PMM
+
+-- 
+Alex Benn?e
