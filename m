@@ -1,40 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Mar 2015 22:21:37 +0100
-Subject: [PATCH 01/10] ARM: zx: add basic support of ZTE ZX296702
-In-Reply-To: <1426333785-3952-2-git-send-email-jun.nie@linaro.org>
-References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
- <1426333785-3952-2-git-send-email-jun.nie@linaro.org>
-Message-ID: <21916189.IW6rzVPlyV@wuerfel>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 15 Mar 2015 00:57:29 +0100
+Subject: [GIT PULL] ARM: rockchip: small fixes for 4.0-rc
+Message-ID: <3637038.xZyfPJIQzf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 March 2015 19:49:36 Jun Nie wrote:
-> @@ -0,0 +1,21 @@
-> +config ARCH_ZX
-> +       bool "ZTE ZX family" if ARCH_MULTI_V7
-> +       help
-> +         Support for ZTE ZX-based family of processors. TV
-> +         set-top-box processor is supported. More will be
-> +         added soon.
-> +
-> +menu "ZTE ZX options"
-> +       depends on ARCH_ZX
+Hi Arnd, Olof,
 
-Better use a "menuconfig" statement here.
+a small issue surfaced with the new gmac node on rk3288 which is missing a
+	status = "disabled";
+in the rk3288.dtsi and thus enabling the mac unconditionally.
+The second patch in that branch simply adds a rockchip regexp to MAINTAINERS, so
+that it also matches stuff like the (slightly) new rockchip drm stuff.
 
-> +config SOC_ZX296702
-> +       bool "Enable support for ZX296702 SoC"
-> +       select ARM_GIC
-> +       select ARM_GLOBAL_TIMER
-> +       select HAVE_ARM_SCU if SMP
-> +       select HAVE_ARM_TWD if SMP
-> +       select MIGHT_HAVE_CACHE_L2X0
-> +       help
-> +         Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
-> +
-> +endmenu
+So if acceptable, please pull
 
-MIGHT_HAVE_CACHE_L2X0 is implied by ARCH_MULTI_V7, so you can drop
-that here.
+Thanks
+Heiko
 
-	Arnd
+
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.0-rockchip-armfixes1
+
+for you to fetch changes up to 54b0bc602541fcc2dd9f2480623c00552e0b220e:
+
+  ARM: dts: rockchip: disable gmac by default in rk3288.dtsi (2015-03-14 19:35:26 +0100)
+
+----------------------------------------------------------------
+Adding a default-disabled state to the new gmac node and an
+update to the MAINTAINERS entry adding a rockchip regexp entry.
+
+----------------------------------------------------------------
+Alexandru M Stan (1):
+      ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
+
+Heiko Stuebner (1):
+      MAINTAINERS: add rockchip regexp to the ARM/Rockchip entry
+
+ MAINTAINERS                   | 1 +
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
