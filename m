@@ -1,54 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 14 Mar 2015 08:59:02 +0100
-Subject: [PATCH 0/4] arm64: boot fixes/updates
-In-Reply-To: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
-References: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu_CDJu5Wx3uEU4Qv4_d1350n0hNnQye147gH4a=Qcow_w@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Sat, 14 Mar 2015 09:11:56 +0100
+Subject: [PATCH 1/1] ARM: dts: don't make DP a consumer of DISP1 on Exynos5250
+Message-ID: <1426320716-28137-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2015 at 17:14, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi all,
->
-> The following patches address a few boot related issues I spotted
-> recently.
->
-> The first patch fixes alternatives for !SMP kernels, the second fixes a
-> potential issue with boot mode detection, and the final patches give us
-> some better logging of the boot mode, fixing a latent bug in mismatch
-> detection (though until now this has not been a problem).
->
-> Ard, Marc, I guess our recent boot patches are all going to clash. Do we
-> need to sort that out between us or are we relying on the arm64
-> maintainers? ;)
->
+By making the DP controller a consumer of DISP1, the PD is powered
+off when the exynos-dp probe is deferred and powered on again when
+the exynos-drm driver is probed.
 
-Seems we spotted and fixed the same bug at the same time :-)
-(but I failed to put you on cc)
+But this causes the exynos-dp driver failing to obtain the stream
+clock since the FIMD has been powered off with the DISP1 PD:
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/400100
+exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+exynos-dp 145b0000.dp-controller: unable to config video
 
-I can stick all of our patches on a branch for Will to pull, if people
-are ok with that?
-I need another couple of acks though
+The Exynos5250 documentation doesn't mention that the Display Port
+Transmitter module is included in the DISP1 PD so the device should
+not have a reference to this Power Domain.
 
+This patch fixes video display on an Exynos5250 Snow Chromebook.
+
+Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+
+Hello Andrzej and Marek,
+
+I need this patch to have display working on an Snow Chromebook with
+next20150312. I remember testing the mentioned patch that introduced
+the regression when it was posted and I did not find any issues with
+it. Do you know what could had caused this behavior change?
+
+According to the Exynos5250 documentation I've access to, the modules
+that are included in the DISP1 power domain are LCD controller (FIMD),
+MIE1 VP, MIXER, TV Encoder and HDMI so I think this patch is correct
+since it not only solves the regression but also models the HW better.
+
+Please let me know if you think it should be fixed in a different way.
+
+Best regards,
+Javier
+
+ arch/arm/boot/dts/exynos5250.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index adbde1adad95..ffb505171216 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -775,7 +775,6 @@
+ 	};
+ 
+ 	dp: dp-controller at 145B0000 {
+-		power-domains = <&pd_disp1>;
+ 		clocks = <&clock CLK_DP>;
+ 		clock-names = "dp";
+ 		phys = <&dp_phy>;
 -- 
-Ard.
-
-
-> Mark Rutland (4):
->   arm64: apply alternatives for !SMP kernels
->   arm64: head.S: fix __boot_cpu_mode alignment
->   arm64: fix hyp mode mismatch detection
->   arm64: log CPU boot modes
->
->  arch/arm64/Kconfig                |  4 ++++
->  arch/arm64/include/asm/smp_plat.h |  2 ++
->  arch/arm64/kernel/head.S          |  4 ++--
->  arch/arm64/kernel/setup.c         | 25 +++++++++++++++++++++++++
->  arch/arm64/kernel/smp.c           |  2 +-
->  5 files changed, 34 insertions(+), 3 deletions(-)
->
-> --
-> 1.9.1
->
+2.1.4
