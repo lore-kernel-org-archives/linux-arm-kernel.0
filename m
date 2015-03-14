@@ -1,28 +1,48 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 14 Mar 2015 12:14:51 +0100
-Subject: [RFC V2 00/12] i2c: describe adapter quirks in a generic way
-In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <20150314111450.GC970@katana>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 14 Mar 2015 11:34:17 +0000
+Subject: [GIT PULL] arm64 fixes for 4.0-rc4
+Message-ID: <20150314113406.GA26776@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 05:01:51PM +0100, Wolfram Sang wrote:
-> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> 
-> Here is the second version of the patch series to describe i2c adapter quirks
-> in a generic way. For the motivation, please read description of patch 1. This
-> is still RFC because I would like to do some more tests on my own, but I need
-> to write a tool for that. However, I'd really like to have the driver authors
-> to have a look already. Actual testing is very much appreciated. Thanks to the
-> Mediatek guys for rebasing their new driver to this framework. That helps, too!
+Hi Linus,
 
-Thanks for all the testing. Merged this branch now into for-next!
+Please pull the arm64 fixes below. Thanks.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150314/f24f3abe/attachment.sig>
+The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
+
+  Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 947bb7587fc2c1d1f6b89462ef1255ec30d4e682:
+
+  arm64: put __boot_cpu_mode label after alignment instead of before (2015-03-14 11:02:26 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+- add TLB invalidation for page table tear-down which was missed when
+  support for CONFIG_HAVE_RCU_TABLE_FREE was added (assuming page table
+  freeing was always deferred)
+- use UEFI for system and reset poweroff if available
+- fix asm label placement in relation to the alignment statement
+
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      efi/arm64: use UEFI for system reset and poweroff
+      arm64: put __boot_cpu_mode label after alignment instead of before
+
+Catalin Marinas (1):
+      arm64: Invalidate the TLB corresponding to intermediate page table levels
+
+ arch/arm64/include/asm/tlb.h      |  3 +++
+ arch/arm64/include/asm/tlbflush.h | 13 +++++++++++++
+ arch/arm64/kernel/efi.c           |  9 +++++++++
+ arch/arm64/kernel/head.S          |  2 +-
+ arch/arm64/kernel/process.c       |  8 ++++++++
+ 5 files changed, 34 insertions(+), 1 deletion(-)
+
+-- 
+Catalin
