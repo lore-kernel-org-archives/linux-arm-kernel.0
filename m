@@ -1,36 +1,33 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 14 Mar 2015 12:47:48 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6sx: Add label snvs_rtc
-In-Reply-To: <1426348068-17745-1-git-send-email-festevam@gmail.com>
-References: <1426348068-17745-1-git-send-email-festevam@gmail.com>
-Message-ID: <1426348068-17745-2-git-send-email-festevam@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 14 Mar 2015 19:02:40 +0100
+Subject: [PATCHv2] thermal: add omap3 support
+In-Reply-To: <20150313165343.GB30104@developer>
+References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
+ <20150313120935.GA27533@amd> <20150313165343.GB30104@developer>
+Message-ID: <20150314180240.GB4332@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri 2015-03-13 12:53:45, Eduardo Valentin wrote:
+> 
+> Hey Pavel,
+> 
+> On Fri, Mar 13, 2015 at 01:09:35PM +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > I checked 4.0-rc3 and linux-next as of today, and can not see omap3
+> > thermal support. Can you apply the patches?
+> 
+> Yeah, it should be possible. Apologize, it really fell into the cracks.
+> 
+> There is a comment on it though. Please check my concern in you v2.
 
-It may be useful to disable the internal snvs-rtc when an external rtc is
-available. This patch adds a label so that dts files can disable it.
+And there's explanation for that concern :-). Let me know what you
+need.
 
-Based on a patch from Markus Pargmann for imx6qdl.dtsi.
+Best regards,
+									Pavel
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6sx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index c1bd35e..708175d 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -667,7 +667,7 @@
- 				#size-cells = <1>;
- 				ranges = <0 0x020cc000 0x4000>;
- 
--				snvs-rtc-lp at 34 {
-+				snvs_rtc: snvs-rtc-lp at 34 {
- 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
- 					reg = <0x34 0x58>;
- 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
