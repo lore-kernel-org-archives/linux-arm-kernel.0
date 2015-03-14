@@ -1,31 +1,107 @@
-From: amstan@chromium.org (Alexandru M Stan)
-Date: Fri, 13 Mar 2015 17:55:32 -0700
-Subject: [PATCH] ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
-In-Reply-To: <1426294532-32078-1-git-send-email-amstan@chromium.org>
-References: <1426294532-32078-1-git-send-email-amstan@chromium.org>
-Message-ID: <1426294532-32078-2-git-send-email-amstan@chromium.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 14 Mar 2015 02:31:47 +0100
+Subject: [PATCH 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
+In-Reply-To: <1426261429-31883-2-git-send-email-ulf.hansson@linaro.org>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <1426261429-31883-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1566917.2Z45cAj17k@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This block should not be enabled by default or else if the kconfig is set,
-it will try to load/probe even if there's no phy connected.
+On Friday, March 13, 2015 04:43:41 PM Ulf Hansson wrote:
+> There may be more than one device in a PM domain which then will be
+> probed at different points in time.
+> 
+> Depending on timing and runtime PM support, in for the device related
+> driver/subsystem, a PM domain may be advised to power off after a
+> successful probe sequence.
+> 
+> A general requirement for a device within a PM domain, is that the
+> PM domain must stay powered during the probe sequence. To cope with
+> such requirement, let's add the dev_pm_domain_get|put() APIs.
+> 
+> These APIs are intended to be invoked from subsystem-level code and the
+> calls between get/put needs to be balanced.
+> 
+> dev_pm_domain_get(), tells the PM domain that it needs to increase a
+> usage count and to keep supplying power. dev_pm_domain_put(), does the
+> opposite.
+> 
+> For a PM domain to support this feature, it must implement the optional
+> ->get|put() callbacks.
+> 
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pm.h          |  2 ++
+>  include/linux/pm_domain.h   |  4 ++++
+>  3 files changed, 46 insertions(+)
+> 
+> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+> index f32b802..99225af 100644
+> --- a/drivers/base/power/common.c
+> +++ b/drivers/base/power/common.c
+> @@ -128,3 +128,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
+>  		dev->pm_domain->detach(dev, power_off);
+>  }
+>  EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
+> +
+> +/**
+> + * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
+> + * @domain: The PM domain to operate on.
+> + *
+> + * This function will not by itself increase the usage count, that's up to each
+> + * PM domain implementation to support. Typically it should be invoked from
+> + * subsystem level code prior drivers starts probing.
+> + *
+> + * Do note, it's optional to implement the ->get() callback for a PM domain.
+> + *
+> + * Returns 0 on successfully increased usage count or negative error code.
+> + */
+> +int dev_pm_domain_get(struct dev_pm_domain *domain)
+> +{
+> +	int ret = 0;
+> +
+> +	if (domain && domain->get)
+> +		ret = domain->get(domain);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(dev_pm_domain_get);
+> +
+> +/**
+> + * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
+> + * @domain: The PM domain to operate on.
+> + *
+> + * This function will not by itself decrease the usage count, that's up to each
+> + * PM domain implementation to support. Typically it should be invoked from
+> + * subsystem level code after drivers has finished probing.
+> + *
+> + * Do note, it's optional to implement the ->put() callback for a PM domain.
+> + */
+> +void dev_pm_domain_put(struct dev_pm_domain *domain)
+> +{
+> +	if (domain && domain->put)
+> +		domain->put(domain);
+> +}
+> +EXPORT_SYMBOL_GPL(dev_pm_domain_put);
+> diff --git a/include/linux/pm.h b/include/linux/pm.h
+> index e2f1be6..e62330b 100644
+> --- a/include/linux/pm.h
+> +++ b/include/linux/pm.h
+> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struct device *dev);
+>  struct dev_pm_domain {
+>  	struct dev_pm_ops	ops;
+>  	void (*detach)(struct device *dev, bool power_off);
+> +	int (*get)(struct dev_pm_domain *domain);
+> +	void (*put)(struct dev_pm_domain *domain);
 
-Signed-off-by: Alexandru M Stan <amstan@chromium.org>
----
- arch/arm/boot/dts/rk3288.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+I don't like these names.  They suggest that it's always going to be about
+reference counting which doesn't have to be the case in principle.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index d771f68..eccc78d 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -411,6 +411,7 @@
- 			"mac_clk_rx", "mac_clk_tx",
- 			"clk_mac_ref", "clk_mac_refout",
- 			"aclk_mac", "pclk_mac";
-+		status = "disabled";
- 	};
- 
- 	usb_host0_ehci: usb at ff500000 {
+Also what about calling these from the driver core, ie. really_probe()?
+
+
 -- 
-2.2.0.rc0.207.ga3a616c
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
