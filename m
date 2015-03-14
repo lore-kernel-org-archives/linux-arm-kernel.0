@@ -1,33 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 14 Mar 2015 19:02:40 +0100
-Subject: [PATCHv2] thermal: add omap3 support
-In-Reply-To: <20150313165343.GB30104@developer>
-References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
- <20150313120935.GA27533@amd> <20150313165343.GB30104@developer>
-Message-ID: <20150314180240.GB4332@amd>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 14 Mar 2015 19:40:21 +0100
+Subject: [PATCH] ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
+In-Reply-To: <1426294532-32078-2-git-send-email-amstan@chromium.org>
+References: <1426294532-32078-1-git-send-email-amstan@chromium.org>
+ <1426294532-32078-2-git-send-email-amstan@chromium.org>
+Message-ID: <27431752.zqze5zkeW3@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-03-13 12:53:45, Eduardo Valentin wrote:
+Am Freitag, 13. M?rz 2015, 17:55:32 schrieb Alexandru M Stan:
+> This block should not be enabled by default or else if the kconfig is set,
+> it will try to load/probe even if there's no phy connected.
 > 
-> Hey Pavel,
-> 
-> On Fri, Mar 13, 2015 at 01:09:35PM +0100, Pavel Machek wrote:
-> > Hi!
-> > 
-> > I checked 4.0-rc3 and linux-next as of today, and can not see omap3
-> > thermal support. Can you apply the patches?
-> 
-> Yeah, it should be possible. Apologize, it really fell into the cracks.
-> 
-> There is a comment on it though. Please check my concern in you v2.
+> Signed-off-by: Alexandru M Stan <amstan@chromium.org>
 
-And there's explanation for that concern :-). Let me know what you
-need.
+applied to my fixes branch
 
-Best regards,
-									Pavel
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks
+Heiko
+
+> ---
+>  arch/arm/boot/dts/rk3288.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index d771f68..eccc78d 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -411,6 +411,7 @@
+>  			"mac_clk_rx", "mac_clk_tx",
+>  			"clk_mac_ref", "clk_mac_refout",
+>  			"aclk_mac", "pclk_mac";
+> +		status = "disabled";
+>  	};
+> 
+>  	usb_host0_ehci: usb at ff500000 {
