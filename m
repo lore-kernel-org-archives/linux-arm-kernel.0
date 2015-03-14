@@ -1,54 +1,46 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 14 Mar 2015 11:57:15 +0800
-Subject: [PATCH v5 0/2] ARM: sun9i: Add USB host controller support for A80
-Message-ID: <1426305437-15208-1-git-send-email-wens@csie.org>
+Date: Sat, 14 Mar 2015 11:57:17 +0800
+Subject: [PATCH v5 2/2] ARM: dts: sun9i: optimus: Switch to phy core regulator
+ bindings for usb phys
+In-Reply-To: <1426305437-15208-1-git-send-email-wens@csie.org>
+References: <1426305437-15208-1-git-send-email-wens@csie.org>
+Message-ID: <1426305437-15208-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Since the phy core already supports specifying a regulator to handle
+during power up/down, it was decided to drop the regulator support
+in the sun9i usb phy driver.
 
-This is v5 of my A80 USB support series. v5 addresses some comments
-on the phy driver, and adds a patch switching the dts from phy driver
-regulator bindings to phy core bindings.
+This patch switches the DT to the core bindings. This and the phy driver
+would be in the same release and should not be a problem as far as DT
+stability goes.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun9i-a80-optimus.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v4:
-
-  - Fixed copyright date
-
-  - Dropped unused header files
-
-  - Dropped regulator code in the phy driver in favor of phy core
-    power sequencing code
-
-  - Dropped unneeded dev_set_drvdata()
-
-  - Fixed MODULE_LICENSE to say GPL, matching header
-
-  - Dropped unneeded "select USB_PHY" in Kconfig
-
-  - Mention optional "phy-supply" property in bindings
-
-  - Added "ARM: dts: sun9i: optimus: Switch to phy core regulator
-    bindings for usb phys"
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (2):
-  phy: Add driver to support individual USB PHYs on sun9i
-  ARM: dts: sun9i: optimus: Switch to phy core regulator bindings for
-    usb phys
-
- .../devicetree/bindings/phy/sun9i-usb-phy.txt      |  38 ++++
- arch/arm/boot/dts/sun9i-a80-optimus.dts            |   4 +-
- drivers/phy/Kconfig                                |  11 ++
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-sun9i-usb.c                        | 202 +++++++++++++++++++++
- 5 files changed, 254 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/sun9i-usb-phy.txt
- create mode 100644 drivers/phy/phy-sun9i-usb.c
-
+diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+index e53f2656c2d0..c6ca116c59d2 100644
+--- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
++++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+@@ -203,7 +203,7 @@
+ };
+ 
+ &usbphy1 {
+-	vbus-supply = <&reg_usb1_vbus>;
++	phy-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
+ 
+@@ -212,6 +212,6 @@
+ };
+ 
+ &usbphy3 {
+-	vbus-supply = <&reg_usb3_vbus>;
++	phy-supply = <&reg_usb3_vbus>;
+ 	status = "okay";
+ };
 -- 
 2.1.4
