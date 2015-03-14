@@ -1,25 +1,31 @@
 From: amstan@chromium.org (Alexandru M Stan)
-Date: Fri, 13 Mar 2015 17:55:31 -0700
-Subject: [PATCH 0/1] ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
-Message-ID: <1426294532-32078-1-git-send-email-amstan@chromium.org>
+Date: Fri, 13 Mar 2015 17:55:32 -0700
+Subject: [PATCH] ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
+In-Reply-To: <1426294532-32078-1-git-send-email-amstan@chromium.org>
+References: <1426294532-32078-1-git-send-email-amstan@chromium.org>
+Message-ID: <1426294532-32078-2-git-send-email-amstan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way it is right now, each board using rk3288.dtsi has to disable
-it or else (given CONFIG_DWMAC_RK is set) it will try loading the driver
-and looking for phy's even though none are connected.
+This block should not be enabled by default or else if the kconfig is set,
+it will try to load/probe even if there's no phy connected.
 
-The status should be "disabled".
-
-PS: I'm ok with "the big relicensing"
-(http://www.spinics.net/lists/arm-kernel/msg403629.html) to GPLv2/X11.
-
-
-Alexandru M Stan (1):
-  ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
-
+Signed-off-by: Alexandru M Stan <amstan@chromium.org>
+---
  arch/arm/boot/dts/rk3288.dtsi | 1 +
  1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index d771f68..eccc78d 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -411,6 +411,7 @@
+ 			"mac_clk_rx", "mac_clk_tx",
+ 			"clk_mac_ref", "clk_mac_refout",
+ 			"aclk_mac", "pclk_mac";
++		status = "disabled";
+ 	};
+ 
+ 	usb_host0_ehci: usb at ff500000 {
 -- 
 2.2.0.rc0.207.ga3a616c
