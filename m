@@ -1,47 +1,35 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 15 Mar 2015 00:57:29 +0100
-Subject: [GIT PULL] ARM: rockchip: small fixes for 4.0-rc
-Message-ID: <3637038.xZyfPJIQzf@phil>
+Date: Sun, 15 Mar 2015 00:59:55 +0100
+Subject: [PATCH] MAINTAINERS: add rockchip regexp to the ARM/Rockchip entry
+In-Reply-To: <3637038.xZyfPJIQzf@phil>
+References: <3637038.xZyfPJIQzf@phil>
+Message-ID: <1549608.4TUoCrjlkv@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+The regexp option is a nice way to catch even weirder paths like the current
+drivers/gpu/drm/rockchip/* or others in the future.
 
-a small issue surfaced with the new gmac node on rk3288 which is missing a
-	status = "disabled";
-in the rk3288.dtsi and thus enabling the mac unconditionally.
-The second patch in that branch simply adds a rockchip regexp to MAINTAINERS, so
-that it also matches stuff like the (slightly) new rockchip drm stuff.
-
-So if acceptable, please pull
-
-Thanks
-Heiko
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+This patch is included in the pull above and only meant for completeness sake
+to not hide it in the pull alone.
 
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.0-rockchip-armfixes1
-
-for you to fetch changes up to 54b0bc602541fcc2dd9f2480623c00552e0b220e:
-
-  ARM: dts: rockchip: disable gmac by default in rk3288.dtsi (2015-03-14 19:35:26 +0100)
-
-----------------------------------------------------------------
-Adding a default-disabled state to the new gmac node and an
-update to the MAINTAINERS entry adding a rockchip regexp entry.
-
-----------------------------------------------------------------
-Alexandru M Stan (1):
-      ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
-
-Heiko Stuebner (1):
-      MAINTAINERS: add rockchip regexp to the ARM/Rockchip entry
-
- MAINTAINERS                   | 1 +
- arch/arm/boot/dts/rk3288.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddc5a8c..0d273bd 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1351,6 +1351,7 @@ F:	drivers/i2c/busses/i2c-rk3x.c
+ F:	drivers/*/*rockchip*
+ F:	drivers/*/*/*rockchip*
+ F:	sound/soc/rockchip/
++N:	rockchip
+ 
+ ARM/SAMSUNG EXYNOS ARM ARCHITECTURES
+ M:	Kukjin Kim <kgene@kernel.org>
+-- 
+2.1.4
