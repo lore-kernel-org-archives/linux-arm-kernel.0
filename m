@@ -1,36 +1,28 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 14 Mar 2015 11:00:43 +0000
-Subject: [PATCH v2] efi/arm64: use UEFI for system reset and poweroff
-In-Reply-To: <20150310144857.GE17573@codeblueprint.co.uk>
-References: <1425653364-12591-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150310144857.GE17573@codeblueprint.co.uk>
-Message-ID: <20150314110043.GA9696@e104818-lin.cambridge.arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 14 Mar 2015 12:14:51 +0100
+Subject: [RFC V2 00/12] i2c: describe adapter quirks in a generic way
+In-Reply-To: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+References: <1424880126-15047-1-git-send-email-wsa@the-dreams.de>
+Message-ID: <20150314111450.GC970@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 02:48:57PM +0000, Matt Fleming wrote:
-> On Fri, 06 Mar, at 03:49:24PM, Ard Biesheuvel wrote:
-> > If UEFI Runtime Services are available, they are preferred over direct
-> > PSCI calls or other methods to reset the system.
-> > 
-> > For the reset case, we need to hook into machine_restart(), as the
-> > arm_pm_restart function pointer may be overwritten by modules.
-> > 
-> > Tested-by: Mark Rutland <mark.rutland@arm.com>
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/kernel/efi.c     | 9 +++++++++
-> >  arch/arm64/kernel/process.c | 8 ++++++++
-> >  2 files changed, 17 insertions(+)
+On Wed, Feb 25, 2015 at 05:01:51PM +0100, Wolfram Sang wrote:
+> From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 > 
-> Looks good to me.
-> 
-> Reviewed-by: Matt Fleming <matt.fleming@intel.com>
-> 
-> Catalin, are you picking this up?
+> Here is the second version of the patch series to describe i2c adapter quirks
+> in a generic way. For the motivation, please read description of patch 1. This
+> is still RFC because I would like to do some more tests on my own, but I need
+> to write a tool for that. However, I'd really like to have the driver authors
+> to have a look already. Actual testing is very much appreciated. Thanks to the
+> Mediatek guys for rebasing their new driver to this framework. That helps, too!
 
-Yes, I will. Thanks.
+Thanks for all the testing. Merged this branch now into for-next!
 
--- 
-Catalin
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150314/f24f3abe/attachment.sig>
