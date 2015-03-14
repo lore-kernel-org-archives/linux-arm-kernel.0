@@ -1,218 +1,155 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Sat, 14 Mar 2015 19:49:43 +0800
-Subject: [PATCH 08/10] ARM: dts: zx: add an initial dts for zx296702
+Date: Sat, 14 Mar 2015 19:49:44 +0800
+Subject: [PATCH 09/10] ARM: zx: Add basic defconfig support to ZX296702
 In-Reply-To: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
 References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <1426333785-3952-9-git-send-email-jun.nie@linaro.org>
+Message-ID: <1426333785-3952-10-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts file for ZX296702 and board ZX296702-AD1.  More
-peripherals will be added later.
+Add basic defconfig support to zx SOC, including uart, mmc
+ and other common config
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Jun Nie <jun.nie@linaro.org>
 ---
- arch/arm/boot/dts/Makefile         |   1 +
- arch/arm/boot/dts/zx296702-ad1.dts |  43 +++++++++++++
- arch/arm/boot/dts/zx296702.dtsi    | 127 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 171 insertions(+)
- create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
- create mode 100644 arch/arm/boot/dts/zx296702.dtsi
+ arch/arm/configs/zx_defconfig | 129 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
+ create mode 100644 arch/arm/configs/zx_defconfig
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..55dcfbc 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -645,6 +645,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt6592-evb.dtb \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
-+dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
- endif
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm/boot/dts/zx296702-ad1.dts b/arch/arm/boot/dts/zx296702-ad1.dts
+diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
 new file mode 100644
-index 0000000..cac207a
+index 0000000..a9a62fc
 --- /dev/null
-+++ b/arch/arm/boot/dts/zx296702-ad1.dts
-@@ -0,0 +1,43 @@
-+
-+/dts-v1/;
-+
-+#include "zx296702.dtsi"
-+
-+/ {
-+	model = "ZTE ZX296702 AD1 Board";
-+	compatible = "zte,zx296702-ad1", "zte,zx296702";
-+
-+	memory {
-+		reg = <0x50000000 0x20000000>;
-+	};
-+};
-+
-+&dwmmc0 {
-+	num-slots = <1>;
-+	supports-highspeed;
-+	non-removable;
-+	disable-wp;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <4>;
-+	};
-+};
-+
-+&dwmmc1 {
-+	num-slots = <1>;
-+	supports-highspeed;
-+	non-removable;
-+	disable-wp;
-+	status = "okay";
-+
-+	slot at 0 {
-+		reg = <0>;
-+		bus-width = <8>;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/zx296702.dtsi b/arch/arm/boot/dts/zx296702.dtsi
-new file mode 100644
-index 0000000..2e66345
---- /dev/null
-+++ b/arch/arm/boot/dts/zx296702.dtsi
-@@ -0,0 +1,127 @@
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/clock/zx296702-clock.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a9";
-+			device_type = "cpu";
-+			reg = <1>;
-+		};
-+	};
-+
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+		ranges;
-+
-+		intc: interrupt-controller at 00801000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			interrupt-controller;
-+			reg = <0x00801000 0x1000>,
-+			      <0x00800100 0x100>;
-+		};
-+
-+		global_timer: timer at 008000200 {
-+			compatible = "arm,cortex-a9-global-timer";
-+			reg = <0x00800200 0x20>;
-+			interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-parent = <&intc>;
-+			clocks = <&clks ZX296702_A9_PERIPHCLK>;
-+		};
-+
-+		l2cc: cache-controller at 0x00c00000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x00c00000 0x1000>;
-+			arm,data-latency = <1 1 1>;
-+			arm,tag-latency = <1 1 1>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
-+		lsp1crpm: lsp1crpm at 0x09400000 {
-+			compatible = "zte,zx296702-lsp1crpm";
-+			reg = <0x09400000 0x1000>;
-+		};
-+
-+		uart0: serial at 0x09405000 {
-+			compatible = "zte,zx296702-uart";
-+			reg = <0x09405000 0x1000>;
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks ZX296702_UART0_PCLK>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 0x09406000 {
-+			compatible = "zte,zx296702-uart";
-+			reg = <0x09406000 0x1000>;
-+			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clks ZX296702_UART1_WCLK>;
-+			status = "disabled";
-+		};
-+
-+		dwmmc0: dwmmc at 0x09408000 {
-+			compatible = "snps,dw-mshc";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x09408000 0x1000>;
-+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
-+			fifo-depth = <32>;
-+			clocks = <&clks ZX296702_SDMMC0_PCLK>,
-+				 <&clks ZX296702_SDMMC0_WCLK>;
-+			clock-names = "biu", "ciu";
-+			status = "disabled";
-+		};
-+
-+		clks: topcrm at 0x09800000 {
-+			compatible = "zte,zx296702-topcrm";
-+			reg = <0x09800000 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
-+		lsp0crpm: lsp0crpm at 0x0b000000 {
-+			compatible = "zte,zx296702-lsp0crpm";
-+			reg = <0x0b000000 0x1000>;
-+		};
-+
-+		dwmmc1: dwmmc at 0x0b003000 {
-+			compatible = "snps,dw-mshc";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0b003000 0x1000>;
-+			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+			fifo-depth = <32>;
-+			clocks = <&clks ZX296702_SDMMC1_PCLK>,
-+				 <&clks ZX296702_SDMMC1_WCLK>;
-+			clock-names = "biu", "ciu";
-+			status = "disabled";
-+		};
-+
-+		aon_sysctrl: aon-sysctrl at 0xa0007000 {
-+			compatible = "zte,aon-sysctrl";
-+			reg = <0xa0007000 0x1000>;
-+		};
-+	};
-+};
++++ b/arch/arm/configs/zx_defconfig
+@@ -0,0 +1,129 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
++CONFIG_CGROUP_DEBUG=y
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_RESOURCE_COUNTERS=y
++CONFIG_CGROUP_SCHED=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_NAMESPACES=y
++CONFIG_USER_NS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_ZX=y
++CONFIG_SOC_ZX296702=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_ARM_ERRATA_775420=y
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_KSM=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HIBERNATION=y
++CONFIG_PM_RUNTIME=y
++CONFIG_PM_DEBUG=y
++CONFIG_SUSPEND_TIME=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="root=/dev/nfs rootfstype=nfs nfsroot=192.168.2.100:/nfsroot/ ip=192.168.2.101:192.168.2.100::255.255.255.0::eth0:on console=ttyS0,115200 mem=128M earlyprintk"
++#CONFIG_NET is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=192
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=1
++CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_UID_STAT=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_SCSI_MULTI_LUN=y
++CONFIG_MD=y
++CONFIG_BLK_DEV_DM=y
++CONFIG_DM_CRYPT=y
++CONFIG_DM_UEVENT=y
++CONFIG_DM_VERITY=y
++CONFIG_NETDEVICES=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIO=y
++CONFIG_SERIO_LIBPS2=y
++CONFIG_SPI=y
++CONFIG_LOGO=y
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_CONSOLE_POLL=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_UNSAFE_RESUME=y
++CONFIG_MMC_BLOCK_MINORS=16
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_IDMAC=y
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_EXT4_FS_SECURITY=y
++CONFIG_EXT4_DEBUG=y
++CONFIG_FUSE_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=936
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++#CONFIG_NFS_FS is not set
++CONFIG_NLS_CODEPAGE_936=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
++CONFIG_PRINTK_TIME=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++# CONFIG_DEBUG_PREEMPT is not set
++CONFIG_DEBUG_INFO=y
++CONFIG_FRAME_WARN=4096
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_PANIC_TIMEOUT=5
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_SCHEDSTATS=y
++CONFIG_TIMER_STATS=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++CONFIG_RCU_CPU_STALL_TIMEOUT=60
++# CONFIG_FTRACE is not set
++CONFIG_KGDB=y
++CONFIG_KGDB_KDB=y
++# CONFIG_ARM_UNWIND is not set
++CONFIG_DEBUG_PREEMPT=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_STACKTRACE=y
++CONFIG_DEBUG_ZTE_ZX=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_LZO=y
++CONFIG_GPIOLIB=y
 -- 
 1.9.1
