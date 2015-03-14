@@ -1,25 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 Mar 2015 11:23:18 +0100
-Subject: [PATCH v3 0/7] Switch mach-at91 to multiplatform
-In-Reply-To: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1426283844-463-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <2957715.PVTpiODd1f@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 14 Mar 2015 11:00:43 +0000
+Subject: [PATCH v2] efi/arm64: use UEFI for system reset and poweroff
+In-Reply-To: <20150310144857.GE17573@codeblueprint.co.uk>
+References: <1425653364-12591-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150310144857.GE17573@codeblueprint.co.uk>
+Message-ID: <20150314110043.GA9696@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015 22:57:17 Alexandre Belloni wrote:
-> AT91 is now ready to switch to multiplatform. Do it and clean the remaining mach
-> includes.
+On Tue, Mar 10, 2015 at 02:48:57PM +0000, Matt Fleming wrote:
+> On Fri, 06 Mar, at 03:49:24PM, Ard Biesheuvel wrote:
+> > If UEFI Runtime Services are available, they are preferred over direct
+> > PSCI calls or other methods to reset the system.
+> > 
+> > For the reset case, we need to hook into machine_restart(), as the
+> > arm_pm_restart function pointer may be overwritten by modules.
+> > 
+> > Tested-by: Mark Rutland <mark.rutland@arm.com>
+> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/kernel/efi.c     | 9 +++++++++
+> >  arch/arm64/kernel/process.c | 8 ++++++++
+> >  2 files changed, 17 insertions(+)
 > 
-> Changes in v3:
->  - use a menu structure as asked by Arnd
->  - remove useless selects as pointed by Rob
->  - drop a patch that has already been applied
->  - add a patch to remove AT91_TIMER_HZ
+> Looks good to me.
 > 
+> Reviewed-by: Matt Fleming <matt.fleming@intel.com>
 > 
+> Catalin, are you picking this up?
 
-Looks all good to me. Are there any headers left in include/mach that
-can be moved to mach-at91, or does this cover all of them?
+Yes, I will. Thanks.
 
-	Arnd
+-- 
+Catalin
