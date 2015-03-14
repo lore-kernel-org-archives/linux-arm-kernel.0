@@ -1,38 +1,66 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 13 Mar 2015 17:08:48 -0700
-Subject: [GIT PULL] Broadcom Device Tree changes for 4.1 #2
-Message-ID: <1426291728-22915-1-git-send-email-f.fainelli@gmail.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 13 Mar 2015 19:52:34 -0500
+Subject: [PATCH v4 0/3] firmware: qcom: scm: Add cpu power on/off support
+In-Reply-To: <20150313171656.GI497@linaro.org>
+References: <1425339030-45828-1-git-send-email-lina.iyer@linaro.org>
+ <20150313171656.GI497@linaro.org>
+Message-ID: <FF397312-A395-40ED-8FCF-E893E2849208@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7875b470c9d80dff2d58ae9692adb3a2b5814a89:
+I?ve applied these to my ?soc? branch.
 
-  ARM: BCM5301X: Fix default state of power LEDs on Netgear R6250 (2015-03-06 22:26:48 -0800)
+- k
 
-are available in the git repository at:
+On Mar 13, 2015, at 12:16 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-4.1/devicetree-part-2
+> Kumar, Stephen, Andy,
+> 
+> Any comments on this patchset?
+> 
+> Thanks,
+> Lina
+> 
+> On Mon, Mar 02 2015 at 16:30 -0700, Lina Iyer wrote:
+>> Hi,
+>> 
+>> This series of patches adds SCM cold boot clean up and support for warm boot
+>> for QCOM quad core (and dual core) cpus.
+>> 
+>> v4 Changes:
+>> - Added QCOM_SCM_CPU_DOWN_ prefix for L2 on/off enums, relocated them to be close
+>> to the function declaration.
+>> 
+>> v3 Changes:
+>> - Addressed review comments from Kumar.
+>> 	+ Cleaned up the cold boot api and the warm boot api to match
+>> 	+ Uniform qcom_scm_ prefix
+>> - Add support for cpu power down using scm_call_atomic1() from [1].
+>> 	+ No longer dependent on the series from sboyd.
+>> 
+>> v2 Changes:
+>> - Merge the warm boot patches into a single patch.
+>> 
+>> [1]. https://lkml.org/lkml/2014/8/4/765
+>> 
+>> Thanks,
+>> Lina
+>> 
+>> Lina Iyer (3):
+>> firmware: qcom: scm: Clean cold boot entry to export only the API
+>> firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr function
+>> firmware: qcom: scm: Support cpu power down through SCM
+>> 
+>> arch/arm/mach-qcom/platsmp.c |  21 +-----
+>> drivers/firmware/qcom_scm.c  | 154 ++++++++++++++++++++++++++++++++++++++++++-
+>> include/linux/qcom_scm.h     |  17 +++--
+>> 3 files changed, 163 insertions(+), 29 deletions(-)
+>> 
+>> -- 
+>> 2.1.0
+>> 
 
-for you to fetch changes up to cd590b50a9367b52520f6866b27f72317bb1a07e:
-
-  ARM: dts: enable PCIe support for Cygnus (2015-03-13 09:20:47 -0700)
-
-----------------------------------------------------------------
-This pull request contains the following changes from Ray for Cygnus SoCs:
-
-- enable IOMUX, required for pinmux/pinctrl
-- enable GPIO, required for the GPIO driver
-- enable GPIO hook detection for BCM911360-based phone designs
-- enable PCIe controller for the bcm958300k designs
-
-----------------------------------------------------------------
-Ray Jui (4):
-      ARM: dts: enable IOMUX for Broadcom Cygnus
-      ARM: dts: enable GPIO for Broadcom Cygnus
-      ARM: dts: cygnus: enable GPIO based hook detection
-      ARM: dts: enable PCIe support for Cygnus
-
- arch/arm/boot/dts/bcm-cygnus.dtsi      | 78 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm911360_entphn.dts | 13 ++++++
- arch/arm/boot/dts/bcm958300k.dts       |  8 ++++
- 3 files changed, 99 insertions(+)
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
