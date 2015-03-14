@@ -1,168 +1,88 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Sat, 14 Mar 2015 19:49:41 +0800
-Subject: [PATCH 06/10] ARM: zx: add cpu hotplug support
+Date: Sat, 14 Mar 2015 19:49:42 +0800
+Subject: [PATCH 07/10] dt/binding: Document ZTE zx296702 devicetree
 In-Reply-To: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
 References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <1426333785-3952-7-git-send-email-jun.nie@linaro.org>
+Message-ID: <1426333785-3952-8-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a clone of vexpress cpu hotplug implementation.
+Document the new compatible for zx296702 platform and
+clock control.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Jun Nie <jun.nie@linaro.org>
 ---
- arch/arm/mach-zx/Makefile  |   1 +
- arch/arm/mach-zx/core.h    |   1 +
- arch/arm/mach-zx/hotplug.c | 108 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-zx/platsmp.c |   3 ++
- 4 files changed, 113 insertions(+)
- create mode 100644 arch/arm/mach-zx/hotplug.c
+ Documentation/devicetree/bindings/arm/zte.txt      |  9 ++++++
+ .../devicetree/bindings/clock/zx296702-clk.txt     | 35 ++++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ 3 files changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
 
-diff --git a/arch/arm/mach-zx/Makefile b/arch/arm/mach-zx/Makefile
-index 7c2edf6..a3b386e7 100644
---- a/arch/arm/mach-zx/Makefile
-+++ b/arch/arm/mach-zx/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_SOC_ZX296702) += zx296702.o
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-+obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
-diff --git a/arch/arm/mach-zx/core.h b/arch/arm/mach-zx/core.h
-index 400c7b4..9f6b719 100644
---- a/arch/arm/mach-zx/core.h
-+++ b/arch/arm/mach-zx/core.h
-@@ -13,5 +13,6 @@
- extern struct smp_operations zx_smp_ops;
- 
- void zx_secondary_startup(void);
-+void zx_cpu_die(unsigned int cpu);
- 
- #endif /* __MACH_ZX_CORE_H */
-diff --git a/arch/arm/mach-zx/hotplug.c b/arch/arm/mach-zx/hotplug.c
+diff --git a/Documentation/devicetree/bindings/arm/zte.txt b/Documentation/devicetree/bindings/arm/zte.txt
 new file mode 100644
-index 0000000..1b660e1
+index 0000000..edd6791
 --- /dev/null
-+++ b/arch/arm/mach-zx/hotplug.c
-@@ -0,0 +1,108 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * Copyright (C) 2002 ARM Ltd.
-+ * All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++++ b/Documentation/devicetree/bindings/arm/zte.txt
+@@ -0,0 +1,9 @@
++ZTE platforms device tree bindings
++---------------------------------------
 +
-+#include <linux/kernel.h>
-+#include <linux/errno.h>
-+#include <linux/smp.h>
++-  ZX296702 board:
++    Required root node properties:
++      - compatible = "zte,zx296702-ad1", "zte,zx296702"
 +
-+#include <asm/smp_plat.h>
-+#include <asm/cp15.h>
++Low power management required properties:
++      - compatible = "zte,aon-sysctrl"
+diff --git a/Documentation/devicetree/bindings/clock/zx296702-clk.txt b/Documentation/devicetree/bindings/clock/zx296702-clk.txt
+new file mode 100644
+index 0000000..9b527b5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/zx296702-clk.txt
+@@ -0,0 +1,35 @@
++Device Tree Clock bindings for ZTE zx296702
 +
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
++This binding uses the common clock binding[1].
 +
-+	asm volatile(
-+		"mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	mcr	p15, 0, %1, c7, c10, 4\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, %3\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-+	  : "cc");
-+}
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+static inline void cpu_leave_lowpower(void)
-+{
-+	unsigned int v;
++Required properties:
++- compatible : shall be one of the following:
++	"zte,zx296702-topcrm":
++		zx296702 top clock selection, divider and gating
 +
-+	asm volatile(
-+		"mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	orr	%0, %0, %1\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	orr	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	  : "=&r" (v)
-+	  : "Ir" (CR_C), "Ir" (0x40)
-+	  : "cc");
-+}
++	"zte,zx296702-lsp0crpm" or
++	"zte,zx296702-lsp1crpm":
++		zx296702 device level clock selection and gating
 +
-+static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-+{
-+	/*
-+	 * there is no power-control hardware on this platform, so all
-+	 * we can do is put the core into WFI; this is safe as the calling
-+	 * code will have already disabled interrupts
-+	 */
-+	for (;;) {
-+		wfi();
++- reg: Address and length of the register set
 +
-+		if (pen_release == cpu_logical_map(cpu)) {
-+			/*
-+			 * OK, proper wakeup, we're done
-+			 */
-+			break;
-+		}
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell. See include/dt-bindings/clock/imx5-clock.h
++for the full list of i.MX5 clock IDs.
 +
-+		/*
-+		 * Getting here, means that we have come out of WFI without
-+		 * having been woken up - this shouldn't happen
-+		 *
-+		 * Just note it happening - when we're woken, we can report
-+		 * its occurrence.
-+		 */
-+		(*spurious)++;
-+	}
-+}
 +
-+/*
-+ * platform-specific code to shutdown a CPU
-+ *
-+ * Called with IRQs disabled
-+ */
-+void __ref zx_cpu_die(unsigned int cpu)
-+{
-+	int spurious = 0;
++clks: topcrm at 0x09800000 {
++        compatible = "zte,zx296702-topcrm";
++        reg = <0x09800000 0x1000>;
++        #clock-cells = <1>;
++};
 +
-+	/*
-+	 * we're ready for shutdown now, so do it
-+	 */
-+	cpu_enter_lowpower();
-+	platform_do_lowpower(cpu, &spurious);
-+
-+	/*
-+	 * bring this CPU back into the world of cache
-+	 * coherency, and then restore interrupts
-+	 */
-+	cpu_leave_lowpower();
-+
-+	if (spurious)
-+		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
-+}
-diff --git a/arch/arm/mach-zx/platsmp.c b/arch/arm/mach-zx/platsmp.c
-index e508a9c..ca157c3 100644
---- a/arch/arm/mach-zx/platsmp.c
-+++ b/arch/arm/mach-zx/platsmp.c
-@@ -144,4 +144,7 @@ struct smp_operations zx_smp_ops __initdata = {
- 	.smp_prepare_cpus	= zx_smp_prepare_cpus,
- 	.smp_secondary_init	= zx_secondary_init,
- 	.smp_boot_secondary	= zx_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_die		= zx_cpu_die,
-+#endif
- };
++uart0: serial at 0x09405000 {
++        compatible = "zte,zx296702-uart";
++        reg = <0x09405000 0x1000>;
++        interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++        clocks = <&clks ZX296702_UART0_PCLK>;
++        status = "disabled";
++};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 389ca13..e4f96ad 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -197,3 +197,4 @@ xillybus	Xillybus Ltd.
+ xlnx	Xilinx
+ zyxel	ZyXEL Communications Corp.
+ zarlink	Zarlink Semiconductor
++zte	ZTE Corp.
 -- 
 1.9.1
