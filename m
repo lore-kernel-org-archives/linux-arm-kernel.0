@@ -1,54 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 14 Mar 2015 18:44:20 +0000
-Subject: [PATCH v10 16/21] irqchip: Add GICv2 specific ACPI boot support
-In-Reply-To: <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-17-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150314184420.GT21998@io.lakedaemon.net>
+From: bgamari.foss@gmail.com (Ben Gamari)
+Date: Sat, 14 Mar 2015 15:13:29 -0400
+Subject: [RFC 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+In-Reply-To: <53D9CA35.1030800@suse.de>
+References: <1406549892-5558-1-git-send-email-afaerber@suse.de>
+ <53D9CA35.1030800@suse.de>
+Message-ID: <87oanv9yue.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 08:39:42PM +0800, Hanjun Guo wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> 
-> ACPI kernel uses MADT table for proper GIC initialization. It needs to
-> parse GIC related subtables, collect CPU interface and distributor
-> addresses and call driver initialization function (which is hardware
-> abstraction agnostic). In a similar way, FDT initialize GICv1/2.
-> 
-> NOTE: This commit allow to initialize GICv1/2 basic functionality.
-> While now simple GICv2 init call is used, any further GIC features
-> require generic infrastructure for proper ACPI irqchip initialization.
-> That mechanism and stacked irqdomains to support GICv2 MSI/virtualization
-> extension, GICv3/4 and its ITS are considered as next steps.
-> 
-> CC: Jason Cooper <jason@lakedaemon.net>
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> CC: Thomas Gleixner <tglx@linutronix.de>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/include/asm/acpi.h        |   2 +
->  arch/arm64/include/asm/irq.h         |  13 +++++
->  arch/arm64/kernel/acpi.c             |  25 +++++++++
->  drivers/irqchip/irq-gic.c            | 102 +++++++++++++++++++++++++++++++++++
->  drivers/irqchip/irqchip.c            |   3 ++
->  include/linux/acpi_irq.h             |  10 ++++
->  include/linux/irqchip/arm-gic-acpi.h |  31 +++++++++++
->  7 files changed, 186 insertions(+)
->  create mode 100644 include/linux/acpi_irq.h
->  create mode 100644 include/linux/irqchip/arm-gic-acpi.h
+Andreas F?rber <afaerber@suse.de> writes:
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Kukjin,
+>
+> Am 28.07.2014 14:18, schrieb Andreas F?rber:
+>> Hello,
+>> 
+>> This series adds a dedicated ODROID-XU device tree and enhances it with 
+>> LED configuration, to match the downstream 3.14 based behavior.
+>> 
+>> It had turned out less trivial than I initially thought as the whole 
+>> pinctrl stuff is still missing. I thus cherry-pick two downstream commits.
+>> 
+>> Hakjoo, can you please reply with a Signed-off-by to your patches
+>> so that we can get them into upstream? Thanks in advance!
+>
+> FTR, Hakjoo Kim did reply with signed off patches (thanks again!) and
+> updated their branch accordingly:
+>
+> https://github.com/hardkernel/linux/commits/odroid-3.14.y-linaro
+> https://github.com/hardkernel/linux/commit/53edc3da0d1da287517681b47daf36679637b6ba
+> https://github.com/hardkernel/linux/commit/afdc310e47e4d1799719566bfb5a47c55141a7cb
+>
+>> Andreas F?rber (3):
+>>   ARM: dts: exynos5410: Clean up SMDK5410 indentation
+>>   ARM: dts: exynos5410: Prepare ODROID-XU device tree
+>
+> The functional changes below haven't been reviewed yet, but could you
+> consider applying trivial patches 1-2?
+>
+> Regards,
+> Andreas
+>
+>>   ARM: dts: exynos5410: Add ODROID-XU LEDs
+>> 
+>> Hakjoo Kim (2):
+>>   pinctrl: exynos: add exynos5410 SoC specific data
+>>   ARM: dts: add pinctrl support to Exynos5410
+>> 
 
-thx,
+What happened with this set? It appears that 1-2 were never merged nor
+was there any review of the remaining patches.
 
-Jason.
+Cheers,
+
+- Ben
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 472 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150314/2eab00f4/attachment.sig>
