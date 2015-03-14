@@ -1,66 +1,25 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Fri, 13 Mar 2015 19:52:34 -0500
-Subject: [PATCH v4 0/3] firmware: qcom: scm: Add cpu power on/off support
-In-Reply-To: <20150313171656.GI497@linaro.org>
-References: <1425339030-45828-1-git-send-email-lina.iyer@linaro.org>
- <20150313171656.GI497@linaro.org>
-Message-ID: <FF397312-A395-40ED-8FCF-E893E2849208@codeaurora.org>
+From: amstan@chromium.org (Alexandru M Stan)
+Date: Fri, 13 Mar 2015 17:55:31 -0700
+Subject: [PATCH 0/1] ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
+Message-ID: <1426294532-32078-1-git-send-email-amstan@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I?ve applied these to my ?soc? branch.
+The way it is right now, each board using rk3288.dtsi has to disable
+it or else (given CONFIG_DWMAC_RK is set) it will try loading the driver
+and looking for phy's even though none are connected.
 
-- k
+The status should be "disabled".
 
-On Mar 13, 2015, at 12:16 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+PS: I'm ok with "the big relicensing"
+(http://www.spinics.net/lists/arm-kernel/msg403629.html) to GPLv2/X11.
 
-> Kumar, Stephen, Andy,
-> 
-> Any comments on this patchset?
-> 
-> Thanks,
-> Lina
-> 
-> On Mon, Mar 02 2015 at 16:30 -0700, Lina Iyer wrote:
->> Hi,
->> 
->> This series of patches adds SCM cold boot clean up and support for warm boot
->> for QCOM quad core (and dual core) cpus.
->> 
->> v4 Changes:
->> - Added QCOM_SCM_CPU_DOWN_ prefix for L2 on/off enums, relocated them to be close
->> to the function declaration.
->> 
->> v3 Changes:
->> - Addressed review comments from Kumar.
->> 	+ Cleaned up the cold boot api and the warm boot api to match
->> 	+ Uniform qcom_scm_ prefix
->> - Add support for cpu power down using scm_call_atomic1() from [1].
->> 	+ No longer dependent on the series from sboyd.
->> 
->> v2 Changes:
->> - Merge the warm boot patches into a single patch.
->> 
->> [1]. https://lkml.org/lkml/2014/8/4/765
->> 
->> Thanks,
->> Lina
->> 
->> Lina Iyer (3):
->> firmware: qcom: scm: Clean cold boot entry to export only the API
->> firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr function
->> firmware: qcom: scm: Support cpu power down through SCM
->> 
->> arch/arm/mach-qcom/platsmp.c |  21 +-----
->> drivers/firmware/qcom_scm.c  | 154 ++++++++++++++++++++++++++++++++++++++++++-
->> include/linux/qcom_scm.h     |  17 +++--
->> 3 files changed, 163 insertions(+), 29 deletions(-)
->> 
->> -- 
->> 2.1.0
->> 
+
+Alexandru M Stan (1):
+  ARM: dts: rockchip: disable gmac by default in rk3288.dtsi
+
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.2.0.rc0.207.ga3a616c
