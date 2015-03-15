@@ -1,29 +1,28 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 15 Mar 2015 01:31:31 +0000
-Subject: [PATCH v6 0/2] irqchip: Move Exynos PM to use stacked domains
-In-Reply-To: <1426088693-15724-1-git-send-email-marc.zyngier@arm.com>
-References: <1426088693-15724-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150315013131.GC4463@io.lakedaemon.net>
+Date: Sun, 15 Mar 2015 01:48:09 +0000
+Subject: [PATCH v6 0/4] irqchip: move away from gic_arch_extn.irq_set_wake
+In-Reply-To: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150315014809.GD4463@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marc,
 
-On Wed, Mar 11, 2015 at 03:44:51PM +0000, Marc Zyngier wrote:
+On Wed, Mar 11, 2015 at 03:45:33PM +0000, Marc Zyngier wrote:
 > This series is extracted from [4], which is trying to remove all
 > traces of gic_arch_extn from the tree. As some maintainers are more
 > responsive than others (understatement of the year...), I've decided
 > to split it per sub-arch, and get it moving, at least partially.
 > 
-> This series addresses Exynos by converting its PM support to a stacked
-> domain on top of the standard GIC.
+> This small set of patches slightly modifies some of the least
+> offending platforms, by providing a much limited hook into the GIC
+> driver.
 > 
 > Based on 4.0-rc1.
 > 
 > * From v5: [5]
-> - Added a big fat warning when an old DT is detected (as requested by Jason)
-> - Added support for Exynos3250
-> - Allow interrupt affinity to be changed
+> - No change
 > 
 > * From v4: [4]
 > - Extracted from the full series
@@ -45,26 +44,27 @@ On Wed, Mar 11, 2015 at 03:44:51PM +0000, Marc Zyngier wrote:
 > - Added crossbar conversion to stacked domains
 > - Merged bug fixes from Nishanth
 > 
-> [5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325368.html
+> [5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325190.html
 > [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
 > [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
 > [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
 > [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
 > 
-> Marc Zyngier (2):
->   ARM: exynos4/5: convert pmu wakeup to stacked domains
->   DT: exynos: update PMU binding
+> Marc Zyngier (4):
+>   irqchip: gic: add an entry point to set up irqchip flags
+>   ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
+>   ARM: ux500: switch from gic_arch_extn to gic_set_irqchip_flags
+>   ARM: zynq: switch from gic_arch_extn to gic_set_irqchip_flags
 > 
->  .../devicetree/bindings/arm/samsung/pmu.txt        |  17 +++
->  arch/arm/boot/dts/exynos3250.dtsi                  |   6 +-
->  arch/arm/boot/dts/exynos4.dtsi                     |   4 +
->  arch/arm/boot/dts/exynos5250.dtsi                  |   4 +
->  arch/arm/boot/dts/exynos5420.dtsi                  |   4 +
->  arch/arm/mach-exynos/exynos.c                      |  15 +--
->  arch/arm/mach-exynos/suspend.c                     | 139 ++++++++++++++++++---
->  7 files changed, 164 insertions(+), 25 deletions(-)
+>  arch/arm/mach-shmobile/intc-sh73a0.c   | 7 +------
+>  arch/arm/mach-shmobile/setup-r8a7779.c | 7 +------
+>  arch/arm/mach-ux500/cpu.c              | 2 +-
+>  arch/arm/mach-zynq/common.c            | 2 +-
+>  drivers/irqchip/irq-gic.c              | 5 +++++
+>  include/linux/irqchip/arm-gic.h        | 1 +
+>  6 files changed, 10 insertions(+), 14 deletions(-)
 
-Applied to irqchip/stacked-exynos to give the series some time in -next.
+Applied to irqchip/stacked-irq_set_wake.  I know, not the best name... :)
 
 thx,
 
