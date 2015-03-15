@@ -1,49 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Mon, 16 Mar 2015 08:03:16 +0900
-Subject: [GIT PULL v2] Second Round of Renesas ARM Based SoC Cleanup for v4.1
-Message-ID: <cover.1426456752.git.horms+renesas@verge.net.au>
+Subject: [PATCH 2/3] ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
+In-Reply-To: <cover.1426456752.git.horms+renesas@verge.net.au>
+References: <cover.1426456752.git.horms+renesas@verge.net.au>
+Message-ID: <8883e72da3a0859e910f96c0372baf08ab47f7ae.1426456752.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
+Since commit e042681894b62d60 ("ARM: shmobile: r8a7790: Remove legacy
+code"), all R-Car Gen2 SoCs are supported by multiplatform kernels only.
+As CONFIG_COMMON_CLK is always set for multiplatform kernels, we can
+remove related #ifdefs in code specific to R-Car Gen2 SoCs.
 
-
-As requested by Arnd v2 of this pull request is based on v4.0-rc1.  The
-previous version of this pull request was based on "Renesas ARM Based SoC
-Cleanup for v4.1", tagged as renesas-soc-cleanup2-for-v4.1.  There are no
-other changes between v1 and v2 of this pull request.
-
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-cleanup2-for-v4.1
-
-for you to fetch changes up to 6e5e9c6835e05ccc2be67486bc998b6f62663621:
-
-  ARM: shmobile: r8a7740: Remove restart callback (2015-03-12 08:43:35 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Cleanup for v4.1
-
-* Remove restart callback from r8a7740 SoC
-* Remove unnecessary check on always set CONFIG_COMMON_CLK from
-  shared R-Car Gen2 SoC code
-* Remove stray closing parenthesis in SCIF debug description
-  for R-Car Gen2 SoC
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      ARM: shmobile: Remove stray closing parenthesis in debug description
-      ARM: shmobile: R-Car Gen2: CONFIG_COMMON_CLK is always set
-      ARM: shmobile: r8a7740: Remove restart callback
-
- arch/arm/Kconfig.debug                   | 2 +-
- arch/arm/mach-shmobile/setup-r8a7740.c   | 8 --------
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-rcar-gen2.c | 4 ----
- 3 files changed, 1 insertion(+), 13 deletions(-)
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+index d1fa625..51464cc 100644
+--- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -50,9 +50,7 @@ u32 rcar_gen2_read_mode_pins(void)
+ 
+ void __init rcar_gen2_timer_init(void)
+ {
+-#if defined(CONFIG_ARM_ARCH_TIMER) || defined(CONFIG_COMMON_CLK)
+ 	u32 mode = rcar_gen2_read_mode_pins();
+-#endif
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 	void __iomem *base;
+ 	int extal_mhz = 0;
+@@ -128,9 +126,7 @@ void __init rcar_gen2_timer_init(void)
+ 	iounmap(base);
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+-#ifdef CONFIG_COMMON_CLK
+ 	rcar_gen2_clocks_init(mode);
+-#endif
+ #ifdef CONFIG_ARCH_SHMOBILE_MULTI
+ 	clocksource_of_init();
+ #endif
+-- 
+2.1.4
