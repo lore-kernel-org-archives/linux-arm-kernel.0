@@ -1,32 +1,24 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Sun, 15 Mar 2015 10:58:45 +0200
-Subject: [PATCH v6 0/6] wlcore: add device-tree support
-In-Reply-To: <55030C42.6020206@armadeus.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <55030C42.6020206@armadeus.com>
-Message-ID: <CAB3XZEc0FOayfmrWvD-aq0Ez987G4JFkvHxO-ttF48z_F=_9Vg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 15 Mar 2015 10:19:42 +0100
+Subject: [PATCH] i2c: wmt: use msecs_to_jiffies for time conversions
+In-Reply-To: <1425216032-8163-1-git-send-email-hofrat@osadl.org>
+References: <1425216032-8163-1-git-send-email-hofrat@osadl.org>
+Message-ID: <20150315091942.GC3393@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi S?bastien,
+On Sun, Mar 01, 2015 at 08:20:32AM -0500, Nicholas Mc Guire wrote:
+> This is only an API consolidation and should make things more readable
+> it replaces var * HZ / 1000 by msecs_to_jiffies(var).
+> 
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
 
-On Fri, Mar 13, 2015 at 6:11 PM, S?bastien Szymanski
-<sebastien.szymanski@armadeus.com> wrote:
-> Hello,
->
-> On 03/12/2015 01:09 PM, Eliad Peller wrote:
->>
->> NOTE: all the platform patches were compile-tested
->> only. I'm looking for some wl12xx card (that i should
->> have somewhere) to test the wl12xx changes (wrt. clocks),
->> but haven't found it yet.
->>
->
-> I have tested this series on a APF6 board, i.MX6 based board with a
-> Jorjin WG7311-0A Wifi/BT module which is based on the wl1271l.
->
-> It works. I was able to power up the wlan0 interface and ping google.
->
-thanks for testing it!
+Applied to for-next, thanks!
 
-Eliad.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150315/dacae707/attachment.sig>
