@@ -1,55 +1,30 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Sun, 15 Mar 2015 23:43:53 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Remove MSIOF address from device
- tree
-Message-ID: <1426430633-3867-1-git-send-email-ykaneko0929@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 Mar 2015 17:07:57 +0100
+Subject: ARM: SoC fixes for 3.20-rc3
+In-Reply-To: <2980862.5zoRejcBRG@wuerfel>
+References: <2980862.5zoRejcBRG@wuerfel>
+Message-ID: <3303352.GqchCZM9gK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+On Saturday 14 March 2015 23:26:25 Arnd Bergmann wrote:
+> The following changes since commit 13a7a6ac0a11197edcd0f756a035f472b42cdf8b:
+> 
+>   Linux 4.0-rc2 (2015-03-03 09:04:59 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+> 
+> for you to fetch changes up to bfda4031621b048ca634abc5f6bce1aa490ac4e5:
+> 
+>   MAINTAINERS: Add myself as co-maintainer to the legacy support of the mvebu SoCs (2015-03-13 22:11:19 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM: SoC fixes for 3.20-rc3
+> 
 
-MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
-MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
+Sorry about the version number mixup, I've updated the tag description now 
+to refer to v4.0-rc3 instead. The contents are unchanged.
 
-Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
----
-
-This patch is based on devel branch of Simon Horman's renesas tree.
-
- arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 4696062..3e9f824 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1288,7 +1288,7 @@
- 
- 	msiof0: spi at e6e20000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
-+		reg = <0 0xe6e20000 0 0x0064>;
- 		interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
- 		dmas = <&dmac0 0x51>, <&dmac0 0x52>;
-@@ -1300,7 +1300,7 @@
- 
- 	msiof1: spi at e6e10000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
-+		reg = <0 0xe6e10000 0 0x0064>;
- 		interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF1>;
- 		dmas = <&dmac0 0x55>, <&dmac0 0x56>;
-@@ -1312,7 +1312,7 @@
- 
- 	msiof2: spi at e6e00000 {
- 		compatible = "renesas,msiof-r8a7791";
--		reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
-+		reg = <0 0xe6e00000 0 0x0064>;
- 		interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp2_clks R8A7791_CLK_MSIOF2>;
- 		dmas = <&dmac0 0x41>, <&dmac0 0x42>;
--- 
-1.9.1
+	Arnd
