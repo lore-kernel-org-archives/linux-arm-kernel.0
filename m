@@ -1,50 +1,58 @@
 From: eliad@wizery.com (Eliad Peller)
-Date: Sun, 15 Mar 2015 10:43:35 +0200
-Subject: [PATCH v6 2/6] wl12xx: use frequency instead of enumerations for
- pdata clocks
-In-Reply-To: <20150313150047.GI5264@atomide.com>
+Date: Sun, 15 Mar 2015 10:50:42 +0200
+Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
+In-Reply-To: <20150313151301.GJ5264@atomide.com>
 References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <1426162154-8716-3-git-send-email-eliad@wizery.com>
- <20150313150047.GI5264@atomide.com>
-Message-ID: <CAB3XZEcOytqpJ4pWoemLS3d+DCeA8C75MencDfGn_vhfEYrduw@mail.gmail.com>
+ <1426162154-8716-7-git-send-email-eliad@wizery.com>
+ <20150313151301.GJ5264@atomide.com>
+Message-ID: <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Kalle
-
-On Fri, Mar 13, 2015 at 5:00 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Eliad Peller <eliad@wizery.com> [150312 05:09]:
->> From: Luciano Coelho <luca@coelho.fi>
+On Fri, Mar 13, 2015 at 5:13 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Eliad Peller <eliad@wizery.com> [150312 05:10]:
+>> Now that we have wlcore device-tree bindings in place
+>> (for both wl12xx and wl18xx), remove the legacy
+>> wl12xx_platform_data struct, and move its members
+>> into the platform device data (that is passed to wlcore)
 >>
->> Instead of defining an enumeration with the FW specific values for the
->> different clock rates, use the actual frequency instead.  Also add a
->> boolean to specify whether the clock is XTAL or not.
+>> Davinci 850 is the only platform that still set
+>> the platform data in the legacy way (and doesn't
+>> have DT bindings), so remove the relevant
+>> code/Kconfig option from the board file (as suggested
+>> by Sekhar Nori)
+>>
+>> Signed-off-by: Luciano Coelho <luca@coelho.fi>
+>> Signed-off-by: Eliad Peller <eliad@wizery.com>
+>> ---
+>>  arch/arm/mach-davinci/Kconfig                  |  11 ---
+>>  arch/arm/mach-davinci/board-da850-evm.c        | 113 -------------------------
+>>  drivers/net/wireless/ti/wilink_platform_data.c |  25 ------
+>>  drivers/net/wireless/ti/wl12xx/main.c          |  19 ++---
+>>  drivers/net/wireless/ti/wlcore/boot.c          |   1 -
+>>  drivers/net/wireless/ti/wlcore/main.c          |   4 +-
+>>  drivers/net/wireless/ti/wlcore/sdio.c          |  75 +++++-----------
+>>  drivers/net/wireless/ti/wlcore/wlcore_i.h      |   8 +-
+>>  include/linux/wl12xx.h                         |  25 ------
+>>  9 files changed, 36 insertions(+), 245 deletions(-)
 >
-> Thanks for doing this. Just one comment on how we're going to get this
-> all merged. Chances are this will cause merge conflicts between the
-> wireless tree and the omap tree for the platform data and dts changes.
+> I got a build error related to the SPI driver with this series, probably
+> need to update this patch:
 >
-> Can you please separate the wireless changes in this series so we can
-> do this in the following sets:
+> drivers/net/wireless/ti/wlcore/spi.c: In function ?wl1271_probe?:
+> drivers/net/wireless/ti/wlcore/spi.c:334:11: error: ?struct wlcore_platdev_data? has no member named ?pdata?
+>   pdev_data.pdata = dev_get_platdata(&spi->dev);
+>            ^
+> drivers/net/wireless/ti/wlcore/spi.c:335:16: error: ?struct wlcore_platdev_data? has no member named ?pdata?
+>   if (!pdev_data.pdata) {
 >
-> 1. Add support for new things to wireless driver
->
-> 2. Switch platform code to use the new support
->
-> 3. Remove support for platform data with a follow-up patch
->
-the series will still be dependent on each other (e.g. (3) must come
-only after (2) was applied), so i'm not sure that will be very
-helpful?
+yeah, i missed it :/
 
-> The other option would be to have the whole series in a immutable
-> branch against v3.0-rc1 that can be merged into both wirelss tree
-> and omap tree.
->
-i think that could be easier.
+looks like there's no platform that defines platform data for it.
+i'll replace the dev_get_platdata() with a function that only parses
+the clock-frequency properties (the irq is taken in this case from the
+spi_device).
+(or maybe i should just drop it, as no one actually uses it?)
 
-or maybe you can just take them all through the omap tree? the wlcore
-tree is not under active development, so i don't expect conflicts
-there.
-
+thanks,
 Eliad.
