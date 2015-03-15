@@ -1,42 +1,32 @@
 From: eliad@wizery.com (Eliad Peller)
-Date: Sun, 15 Mar 2015 10:55:34 +0200
-Subject: [PATCH v6 5/6] ARM: dts: add wl12xx/wl18xx bindings
-In-Reply-To: <20150313152751.GK5264@atomide.com>
+Date: Sun, 15 Mar 2015 10:58:45 +0200
+Subject: [PATCH v6 0/6] wlcore: add device-tree support
+In-Reply-To: <55030C42.6020206@armadeus.com>
 References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <1426162154-8716-6-git-send-email-eliad@wizery.com>
- <20150313152751.GK5264@atomide.com>
-Message-ID: <CAB3XZEc5m0SFdZtJVj0AKu6YuDjTsd7pmNViNy3GDfj42mcdsg@mail.gmail.com>
+ <55030C42.6020206@armadeus.com>
+Message-ID: <CAB3XZEc0FOayfmrWvD-aq0Ez987G4JFkvHxO-ttF48z_F=_9Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 5:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Eliad Peller <eliad@wizery.com> [150312 05:09]:
->> --- a/arch/arm/mach-omap2/pdata-quirks.c
->> +++ b/arch/arm/mach-omap2/pdata-quirks.c
+hi S?bastien,
+
+On Fri, Mar 13, 2015 at 6:11 PM, S?bastien Szymanski
+<sebastien.szymanski@armadeus.com> wrote:
+> Hello,
+>
+> On 03/12/2015 01:09 PM, Eliad Peller wrote:
 >>
->> -static void __init omap3_evm_legacy_init(void)
->> -{
->> -     legacy_init_wl12xx(38400000, 0, 149);
->> -}
+>> NOTE: all the platform patches were compile-tested
+>> only. I'm looking for some wl12xx card (that i should
+>> have somewhere) to test the wl12xx changes (wrt. clocks),
+>> but haven't found it yet.
+>>
 >
-> FYI, at least this part conflicts with the fixes in the arm-soc
-> tree for the v4.0-rc series as omap3 evm also needs the copy clock
-> quirk.
+> I have tested this series on a APF6 board, i.MX6 based board with a
+> Jorjin WG7311-0A Wifi/BT module which is based on the wl1271l.
 >
->> @@ -419,20 +351,9 @@ static struct pdata_init pdata_quirks[] __initdata = {
->>       { "nokia,omap3-n950", hsmmc2_internal_input_clk, },
->>       { "isee,omap3-igep0020-rev-f", omap3_igep0020_rev_f_legacy_init, },
->>       { "isee,omap3-igep0030-rev-g", omap3_igep0030_rev_g_legacy_init, },
->> -     { "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
->
-> So this function cannot be yet removed.
->
-> With that fixed, I was able to iw dev wlan0 scan with series on
-> omap3 evm :)
+> It works. I was able to power up the wlan0 interface and ping google.
 >
 thanks for testing it!
-
-let's continue the discussion in the other thread regarding the way to
-merge the patches, and i'll rebase the patches appropriately.
 
 Eliad.
