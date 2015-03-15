@@ -1,60 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 16 Mar 2015 08:03:07 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC da9063/da9210 Regulator Quirk for
- v4.1
-Message-ID: <cover.1426456462.git.horms+renesas@verge.net.au>
+Date: Mon, 16 Mar 2015 08:03:06 +0900
+Subject: [PATCH 2/5] ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
+In-Reply-To: <cover.1426456462.git.horms+renesas@verge.net.au>
+References: <cover.1426456462.git.horms+renesas@verge.net.au>
+Message-ID: <4be7338df39037266da832f6598557cc4ca3de10.1426456462.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC da9063/da9210 regulator quirk
-for v4.1.
+The da9210 regulator is connected to IRQ2. Reflect this in its device
+node, so the driver can use it when it gains interrupt support.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-da9063-da9210-quirk-for-v4.1
-
-for you to fetch changes up to 46dd8a809effdc7ebe6ec760e3e421d5ac2a40f1:
-
-  ARM: shmobile: lager: Add da9063 PMIC device node for system restart (2015-03-11 09:52:21 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC da9063/da9210 Regulator Quirk for v4.1
-
-The r8a7790/lager and r8a7791/koelsch development boards have da9063 and
-da9210 regulators.  Both regulators have their interrupt request lines
-tied to the same interrupt pin (IRQ2) on the SoC.
-
-After cold boot or da9063-induced restart, both the da9063 and da9210
-seem to assert their interrupt request lines.  Hence as soon as one
-driver requests this irq, it gets stuck in an interrupt storm, as it
-only manages to deassert its own interrupt request line, and the other
-driver hasn't installed an interrupt handler yet.
-
-To handle this, install a quirk that masks the interrupts in both the
-da9063 and da9210.  This quirk has to run after the i2c master driver
-has been initialized, but before the i2c slave drivers are initialized.
-As it depends on i2c, select I2C if one of the affected platforms is
-enabled in the kernel config.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (5):
-      ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk
-      ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
-      ARM: shmobile: koelsch: Add da9063 PMIC device node for system restart
-      ARM: shmobile: lager dts: Add da9210 regulator interrupt
-      ARM: shmobile: lager: Add da9063 PMIC device node for system restart
-
- arch/arm/boot/dts/r8a7790-lager.dts                |  18 +++
- arch/arm/boot/dts/r8a7791-koelsch.dts              |  18 +++
- arch/arm/mach-shmobile/Kconfig                     |   2 +
- arch/arm/mach-shmobile/Makefile                    |   2 +
- arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 147 +++++++++++++++++++++
- 5 files changed, 187 insertions(+)
- create mode 100644 arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index a3c2780..213a643 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -520,6 +520,8 @@
+ 	vdd_dvfs: regulator at 68 {
+ 		compatible = "dlg,da9210";
+ 		reg = <0x68>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+ 
+ 		regulator-min-microvolt = <1000000>;
+ 		regulator-max-microvolt = <1000000>;
+-- 
+2.1.4
