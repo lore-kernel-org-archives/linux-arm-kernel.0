@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 16 Mar 2015 08:03:06 +0900
-Subject: [PATCH 2/5] ARM: shmobile: koelsch dts: Add da9210 regulator interrupt
+Date: Mon, 16 Mar 2015 08:03:08 +0900
+Subject: [PATCH 4/5] ARM: shmobile: lager dts: Add da9210 regulator interrupt
 In-Reply-To: <cover.1426456462.git.horms+renesas@verge.net.au>
 References: <cover.1426456462.git.horms+renesas@verge.net.au>
-Message-ID: <4be7338df39037266da832f6598557cc4ca3de10.1426456462.git.horms+renesas@verge.net.au>
+Message-ID: <ceb7747993adcc40581629e4abb0d9ea7853e857.1426456462.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,14 +15,14 @@ node, so the driver can use it when it gains interrupt support.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 ++
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index a3c2780..213a643 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -520,6 +520,8 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 0c3b678..e2f4746 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -516,6 +516,8 @@
  	vdd_dvfs: regulator at 68 {
  		compatible = "dlg,da9210";
  		reg = <0x68>;
