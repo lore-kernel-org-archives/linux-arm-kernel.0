@@ -1,30 +1,32 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 15 Mar 2015 01:03:41 +0000
-Subject: [PATCH v6 0/6] irqchip: Move Tegra LIC to use stacked domains
-In-Reply-To: <1426088583-15097-1-git-send-email-marc.zyngier@arm.com>
-References: <1426088583-15097-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150315010341.GA4463@io.lakedaemon.net>
+Date: Sun, 15 Mar 2015 01:22:50 +0000
+Subject: [PATCH v6 0/7] irqchip: Move OMAP{4,5}/DRA7 to use stacked domains
+In-Reply-To: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
+References: <1426088629-15377-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150315012250.GB4463@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 03:42:57PM +0000, Marc Zyngier wrote:
+Marc,
+
+On Wed, Mar 11, 2015 at 03:43:42PM +0000, Marc Zyngier wrote:
 > This series is extracted from [4], which is trying to remove all
 > traces of gic_arch_extn from the tree. As some maintainers are more
 > responsive than others (understatement of the year...), I've decided
 > to split it per sub-arch, and get it moving, at least partially.
 > 
-> This series addresses Tegra by moving its legacy interrupt controller
-> support to drivers/irqchip and implementing a stacked domain on top of
-> the standard GIC.
+> This series addresses OMAP{4,5} by converting the WUGEN to stacked
+> domains. The DRA7 crossbar gets the same treatment.
 > 
 > It is worth realizing that:
 > 
 > - I haven't been able to test this as much as I would have wanted to
->   (it's only been tested on tegra2).
+>   (it's only been tested on omap4 and omap5).
 > 
 > - This actively *breaks* existing setups. Once you boot a new kernel
 >   with an old DT, suspend/resume *will* be broken. Old kernels on a
->   new DT won't even boot!
+>   new DT won't even boot! You've been warned. This really outline the
+>   necessity of actually describing the HW in device trees...
 > 
 > Based on 4.0-rc1.
 > 
@@ -51,38 +53,56 @@ On Wed, Mar 11, 2015 at 03:42:57PM +0000, Marc Zyngier wrote:
 > - Added crossbar conversion to stacked domains
 > - Merged bug fixes from Nishanth
 > 
-> [5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325172.html
+> [5]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325178.html
 > [4]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317531.html
 > [3]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315385.html
 > [2]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314041.html
 > [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/307338.html
 > 
+> Marc Zyngier (7):
+>   genirq: Add irqchip_set_wake_parent
+>   irqchip: crossbar: convert dra7 crossbar to stacked domains
+>   DT: update ti,irq-crossbar binding
+>   irqchip: GIC: get rid of routable domain
+>   DT: arm,gic: kill arm,routable-irqs
+>   DT: omap4/5: add binding for the wake-up generator
+>   ARM: omap: convert wakeupgen to stacked domains
 > 
-> Marc Zyngier (6):
->   ARM: tegra: irq: nuke leftovers from non-DT support
->   irqchip: tegra: add DT-based support for legacy interrupt controller
->   ARM: tegra: skip gic_arch_extn setup if DT has a LIC node
->   ARM: tegra: update DTs to expose legacy interrupt controller
->   DT: tegra: add binding for the legacy interrupt controller
->   ARM: tegra: remove old LIC support
-> 
->  .../interrupt-controller/nvidia,tegra-ictlr.txt    |  43 +++
->  arch/arm/boot/dts/tegra114.dtsi                    |  16 +-
->  arch/arm/boot/dts/tegra124.dtsi                    |  16 +-
->  arch/arm/boot/dts/tegra20.dtsi                     |  15 +-
->  arch/arm/boot/dts/tegra30.dtsi                     |  16 +-
->  arch/arm/mach-tegra/iomap.h                        |  15 -
->  arch/arm/mach-tegra/irq.c                          | 209 +-----------
->  arch/arm/mach-tegra/irq.h                          |   6 -
->  arch/arm/mach-tegra/tegra.c                        |   1 -
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-tegra.c                        | 371 +++++++++++++++++++++
->  11 files changed, 482 insertions(+), 227 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/nvidia,tegra-ictlr.txt
->  create mode 100644 drivers/irqchip/irq-tegra.c
+>  Documentation/devicetree/bindings/arm/gic.txt      |   6 -
+>  .../devicetree/bindings/arm/omap/crossbar.txt      |  18 +-
+>  .../interrupt-controller/ti,omap4-wugen-mpu        |  33 ++++
+>  arch/arm/boot/dts/am4372.dtsi                      |  11 +-
+>  arch/arm/boot/dts/am437x-gp-evm.dts                |   1 -
+>  arch/arm/boot/dts/am437x-sk-evm.dts                |   1 -
+>  arch/arm/boot/dts/am43x-epos-evm.dts               |   1 -
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts            |   3 +-
+>  arch/arm/boot/dts/dra7-evm.dts                     |   2 +-
+>  arch/arm/boot/dts/dra7.dtsi                        |  43 +++--
+>  arch/arm/boot/dts/dra72-evm.dts                    |   1 -
+>  arch/arm/boot/dts/dra72x.dtsi                      |   3 +-
+>  arch/arm/boot/dts/dra74x.dtsi                      |   5 +-
+>  arch/arm/boot/dts/omap4-duovero.dtsi               |   2 -
+>  arch/arm/boot/dts/omap4-panda-common.dtsi          |   8 +-
+>  arch/arm/boot/dts/omap4-sdp.dts                    |   8 +-
+>  arch/arm/boot/dts/omap4-var-som-om44.dtsi          |   2 -
+>  arch/arm/boot/dts/omap4.dtsi                       |  18 +-
+>  arch/arm/boot/dts/omap5-cm-t54.dts                 |   1 -
+>  arch/arm/boot/dts/omap5-uevm.dts                   |   2 -
+>  arch/arm/boot/dts/omap5.dtsi                       |  26 ++-
+>  arch/arm/mach-omap2/omap-wakeupgen.c               | 128 ++++++++++---
+>  arch/arm/mach-omap2/omap-wakeupgen.h               |   1 -
+>  arch/arm/mach-omap2/omap4-common.c                 |  27 +--
+>  drivers/irqchip/irq-crossbar.c                     | 210 ++++++++++++---------
+>  drivers/irqchip/irq-gic.c                          |  59 +-----
+>  include/linux/irq.h                                |   1 +
+>  include/linux/irqchip/arm-gic.h                    |   6 -
+>  include/linux/irqchip/irq-crossbar.h               |  11 --
+>  kernel/irq/chip.c                                  |  16 ++
+>  30 files changed, 376 insertions(+), 278 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,omap4-wugen-mpu
+>  delete mode 100644 include/linux/irqchip/irq-crossbar.h
 
-I've applied this series to irqchip/stacked-tegra to give it some time in
--next.
+Applied to irqchip/stacked-omap.
 
 thx,
 
