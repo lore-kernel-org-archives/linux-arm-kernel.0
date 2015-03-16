@@ -1,103 +1,126 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Mon, 16 Mar 2015 09:21:38 +0000
-Subject: Bug in drivers/net/ethernet/freescale/fec_main.c, TX is broken.
- In 4.0.0-rc3
-In-Reply-To: <3625951426018334@web26j.yandex.ru>
-References: <390621425930628@web28o.yandex.ru>
- <3625951426018334@web26j.yandex.ru>
-Message-ID: <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 Mar 2015 10:26:46 +0100
+Subject: [PATCH 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
+In-Reply-To: <1566917.2Z45cAj17k@vostro.rjw.lan>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <1426261429-31883-2-git-send-email-ulf.hansson@linaro.org>
+ <1566917.2Z45cAj17k@vostro.rjw.lan>
+Message-ID: <CAPDyKFqpZn=URB3W5ZrW5msxdqoGzj9pdD-Z8bKk-OGnyLZvOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ????? ?????? <rockford@yandex.ru> Sent: Wednesday, March 11, 2015 4:12 AM
-> To: Duan Fugang-B38611; netdev at vger.kernel.org; linux-arm-kernel
-> Subject: Re: Bug in drivers/net/ethernet/freescale/fec_main.c, TX is
-> broken. In 4.0.0-rc3
-> 
-> Hello!
-> Adding lakml to cc:
-> 
-> > Commit 2b995f63987013bacde99168218f9c7b252bdcf1 in 4.0.0-rc3 introduces
-> a nasty bug in transmit, corrupting packets.
-> >
-> > To reproduce:
-> >
-> > $ dd if=/dev/zero of=zeros bs=1M count=20 $ md5sum -b zeros
-> > 8f4e33f3dc3e414ff94e5fb6905cba8c *zeros
-> >
-> > This checksum is correct.
-> >
-> > Copy file "zeros" to another host with NFS, and it gets corrupted,
-> checksum is changed.
-> > File should be big, small amounts of transmit isn't affected.
-> >
-> > I use an i.MX6 Quad board.
-> >
-> > If this commit is reverted, all works fine.
-> 
-> 3.19 works fine too.
-> And it is not random corruption, when copying all-zero file this is
-> received on NFS host:
-> $ hd zeros | head -16
-> 00000000  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00
-> |................|
-> *
-> 0052c0f0  00 00 00 00 00 00 00 00  1c f0 9f e5 1c f0 9f e5
-> |................|
-> 0052c100  1c f0 9f e5 1c f0 9f e5  1c f0 9f e5 1c f0 9f e5
-> |................|
-> 0052c110  1c f0 9f e5 1c f0 9f e5  1c f0 9f e5 74 fb 00 00
-> |............t...|
-> 0052c120  bc ff 93 00 c0 ff 93 00  c4 ff 93 00 c8 ff 93 00
-> |................|
-> 0052c130  cc ff 93 00 d0 ff 93 00  d4 ff 93 00 d8 ff 93 00
-> |................|
-> 0052c140  13 00 00 00 28 63 29 20  43 6f 70 79 72 69 67 68  |....(c)
-> Copyrigh|
-> 0052c150  74 20 32 30 30 37 2d 32  30 31 32 2c 20 46 72 65  |t 2007-2012,
-> Fre|
-> 0052c160  65 73 63 61 6c 65 20 53  65 6d 69 63 6f 6e 64 75  |escale
-> Semicondu|
-> 0052c170  63 74 6f 72 2e 20 41 6c  6c 20 72 69 67 68 74 73  |ctor. All
-> rights|
-> 0052c180  20 72 65 73 65 72 76 65  64 2e 00 00 dd 00 2c 41  |
-> reserved.....,A|
-> 0052c190  11 73 00 00 d3 74 00 00  3d 75 00 00 a9 78 00 00
-> |.s...t..=u...x..|
-> 0052c1a0  4f 78 00 00 75 77 00 00  07 76 00 00 c3 79 00 00
-> |Ox..uw...v...y..|
-> 0052c1b0  09 7a 00 00 75 7a 00 00  97 22 00 00 49 1f 00 00
-> |.z..uz..."..I...|
-> 0052c1c0  b9 21 00 00 ff 70 00 00  90 21 90 00 23 4a 52 f8
-> |.!...p...!..#JR.|
-> 
-> Looks like zero page with vectors at beginning.
-> Freescale i.MX6 Quad-based Embedsky E9 board.
-> 
-Hi, 
+On 14 March 2015 at 02:31, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Friday, March 13, 2015 04:43:41 PM Ulf Hansson wrote:
+>> There may be more than one device in a PM domain which then will be
+>> probed at different points in time.
+>>
+>> Depending on timing and runtime PM support, in for the device related
+>> driver/subsystem, a PM domain may be advised to power off after a
+>> successful probe sequence.
+>>
+>> A general requirement for a device within a PM domain, is that the
+>> PM domain must stay powered during the probe sequence. To cope with
+>> such requirement, let's add the dev_pm_domain_get|put() APIs.
+>>
+>> These APIs are intended to be invoked from subsystem-level code and the
+>> calls between get/put needs to be balanced.
+>>
+>> dev_pm_domain_get(), tells the PM domain that it needs to increase a
+>> usage count and to keep supplying power. dev_pm_domain_put(), does the
+>> opposite.
+>>
+>> For a PM domain to support this feature, it must implement the optional
+>> ->get|put() callbacks.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> ---
+>>  drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/pm.h          |  2 ++
+>>  include/linux/pm_domain.h   |  4 ++++
+>>  3 files changed, 46 insertions(+)
+>>
+>> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+>> index f32b802..99225af 100644
+>> --- a/drivers/base/power/common.c
+>> +++ b/drivers/base/power/common.c
+>> @@ -128,3 +128,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
+>>               dev->pm_domain->detach(dev, power_off);
+>>  }
+>>  EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
+>> +
+>> +/**
+>> + * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
+>> + * @domain: The PM domain to operate on.
+>> + *
+>> + * This function will not by itself increase the usage count, that's up to each
+>> + * PM domain implementation to support. Typically it should be invoked from
+>> + * subsystem level code prior drivers starts probing.
+>> + *
+>> + * Do note, it's optional to implement the ->get() callback for a PM domain.
+>> + *
+>> + * Returns 0 on successfully increased usage count or negative error code.
+>> + */
+>> +int dev_pm_domain_get(struct dev_pm_domain *domain)
+>> +{
+>> +     int ret = 0;
+>> +
+>> +     if (domain && domain->get)
+>> +             ret = domain->get(domain);
+>> +
+>> +     return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(dev_pm_domain_get);
+>> +
+>> +/**
+>> + * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
+>> + * @domain: The PM domain to operate on.
+>> + *
+>> + * This function will not by itself decrease the usage count, that's up to each
+>> + * PM domain implementation to support. Typically it should be invoked from
+>> + * subsystem level code after drivers has finished probing.
+>> + *
+>> + * Do note, it's optional to implement the ->put() callback for a PM domain.
+>> + */
+>> +void dev_pm_domain_put(struct dev_pm_domain *domain)
+>> +{
+>> +     if (domain && domain->put)
+>> +             domain->put(domain);
+>> +}
+>> +EXPORT_SYMBOL_GPL(dev_pm_domain_put);
+>> diff --git a/include/linux/pm.h b/include/linux/pm.h
+>> index e2f1be6..e62330b 100644
+>> --- a/include/linux/pm.h
+>> +++ b/include/linux/pm.h
+>> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struct device *dev);
+>>  struct dev_pm_domain {
+>>       struct dev_pm_ops       ops;
+>>       void (*detach)(struct device *dev, bool power_off);
+>> +     int (*get)(struct dev_pm_domain *domain);
+>> +     void (*put)(struct dev_pm_domain *domain);
+>
+> I don't like these names.  They suggest that it's always going to be about
+> reference counting which doesn't have to be the case in principle.
 
-I try your case on i.MX6q sabresd board with net tree kernel.
-root at freescale ~$ uname -r
-4.0.0-rc3-11071-gf00bbd2
+I am happy to change, you don't happen to have a proposal? :-)
 
-With below test steps for 10 time, the zero file size range from 20M to 300M bytes, 
-compare the md5sum checksum between i.MX6q and i.MX6q/PC host,  the checksum is the same.
+For genpd we already have these related APIs:
 
-root at freescale ~$ rm zeros
-root at freescale ~$ dd if=/dev/zero of=zeros bs=1M count=300
-300+0 records in
-300+0 records out
-314572800 bytes (300.0MB) copied, 1.811459 seconds, 165.6MB/s
-root at freescale ~$ md5sum -b zeros
-0d97a9cd8bbd7ce75a2a76bb06258915  zeros
-root at freescale ~$ cp zeros /mnt/nfs/ -f
-root at freescale ~$ rm zeros
-root at freescale ~$ cp /mnt/nfs/zeros ./
-root at freescale ~$ md5sum -b zeros
-0d97a9cd8bbd7ce75a2a76bb06258915  zeros
+pm_genpd_poweron()
+pm_genpd_name_poweron()
+pm_genpd_poweroff_unused()
 
-Do you have any lost for reproduce the issue ?
+Theoretically we should be able to replace these with
+dev_pm_domain_get|put() or whatever we decide to name them to.
 
+>
+> Also what about calling these from the driver core, ie. really_probe()?
 
-Regards,
-Andy
+I like that!
+
+That also implies moving the calls to dev_pm_domain_attach|detach()
+out of the buses and into the drivercore, since we need the PM domain
+to be attached before calling dev_pm_domain_get|put(). I assume that's
+what you also propose me to change, right?
+
+Kind regards
+Uffe
