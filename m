@@ -1,41 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 15:30:45 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix socbus family info for AM33xx devices
-In-Reply-To: <1426117118-11806-1-git-send-email-s-anna@ti.com>
-References: <1426117118-11806-1-git-send-email-s-anna@ti.com>
-Message-ID: <20150316223045.GT12397@atomide.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 16 Mar 2015 23:44:38 +0100
+Subject: [PATCH 02/10] ARM: at91/pm: move AT91_MEMCTRL_* to pm.h
+In-Reply-To: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426545886-19162-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150311 16:39]:
-> The family information in the soc-bus data is currently
-> not classified properly for AM33xx devices, and a read
-> of /sys/bus/soc/devices/soc0/family currently shows
-> "Unknown". Fix the same.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+the AT91_MEMCTRL_* defines are only used by the pm code, move them to pm.h
 
-Thanks applying into omap-for-v4.0/fixes.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/mach-at91/include/mach/at91_ramc.h | 4 ----
+ arch/arm/mach-at91/pm.h                     | 4 ++++
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Tony
-
-> ---
->  arch/arm/mach-omap2/id.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index 2a2f4d56e4c8..25f1beea453e 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -720,6 +720,8 @@ static const char * __init omap_get_family(void)
->  		return kasprintf(GFP_KERNEL, "OMAP4");
->  	else if (soc_is_omap54xx())
->  		return kasprintf(GFP_KERNEL, "OMAP5");
-> +	else if (soc_is_am33xx() || soc_is_am335x())
-> +		return kasprintf(GFP_KERNEL, "AM33xx");
->  	else if (soc_is_am43xx())
->  		return kasprintf(GFP_KERNEL, "AM43xx");
->  	else if (soc_is_dra7xx())
-> -- 
-> 2.3.0
-> 
+diff --git a/arch/arm/mach-at91/include/mach/at91_ramc.h b/arch/arm/mach-at91/include/mach/at91_ramc.h
+index e4492b151fee..493bc486e858 100644
+--- a/arch/arm/mach-at91/include/mach/at91_ramc.h
++++ b/arch/arm/mach-at91/include/mach/at91_ramc.h
+@@ -21,10 +21,6 @@ extern void __iomem *at91_ramc_base[];
+ .extern at91_ramc_base
+ #endif
+ 
+-#define AT91_MEMCTRL_MC		0
+-#define AT91_MEMCTRL_SDRAMC	1
+-#define AT91_MEMCTRL_DDRSDR	2
+-
+ #include <soc/at91/at91rm9200_sdramc.h>
+ #include <soc/at91/at91sam9_ddrsdr.h>
+ #include <soc/at91/at91sam9_sdramc.h>
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index 3223967d3460..ecd875a91d52 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -15,6 +15,10 @@
+ 
+ #include <mach/at91_ramc.h>
+ 
++#define AT91_MEMCTRL_MC		0
++#define AT91_MEMCTRL_SDRAMC	1
++#define AT91_MEMCTRL_DDRSDR	2
++
+ #define	AT91_PM_MEMTYPE_MASK	0x0f
+ 
+ #define	AT91_PM_MODE_OFFSET	4
+-- 
+2.1.0
