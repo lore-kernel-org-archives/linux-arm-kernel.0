@@ -1,52 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Mar 2015 08:17:16 +0000
-Subject: [PATCH v5 02/10] mfd: syscon: Add atmel system timer registers
- definition
-In-Reply-To: <550315C7.7010403@atmel.com>
-References: <1426162054-9987-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1426162054-9987-3-git-send-email-alexandre.belloni@free-electrons.com>
- <20150313080315.GC3383@x1> <20150313104032.GG4329@piout.net>
- <550315C7.7010403@atmel.com>
-Message-ID: <20150316081716.GF3383@x1>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 16 Mar 2015 16:17:04 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6sl: Add label snvs_rtc
+In-Reply-To: <1426348068-17745-1-git-send-email-festevam@gmail.com>
+References: <1426348068-17745-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150316081702.GN20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Mar 2015, Nicolas Ferre wrote:
-
-> Le 13/03/2015 11:40, Alexandre Belloni a ?crit :
-> > Hi,
-> > 
-> > On 13/03/2015 at 08:03:15 +0000, Lee Jones wrote :
-> >> On Thu, 12 Mar 2015, Alexandre Belloni wrote:
-> >>
-> >>> AT91RM920 has a memory range reserved for timer and watchdog configuration.
-> >>> Expose those registers so that drivers can make use of the system timer syscon
-> >>> declared in at91 DTs.
-> >>>
-> >>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> >>> Acked-by: Lee Jones <lee.jones@linaro.org>
-> >>> ---
-> >>>  include/linux/mfd/syscon/atmel-st.h | 49 +++++++++++++++++++++++++++++++++++++
-> >>>  1 file changed, 49 insertions(+)
-> >>>  create mode 100644 include/linux/mfd/syscon/atmel-st.h
-> >>
-> >> Applied, thanks.
+On Sat, Mar 14, 2015 at 12:47:47PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> > Actually, I was thinking this could go through the at91 to avoid
-> > depending on your branch.
+> It may be useful to disable the internal snvs-rtc when an external rtc is
+> available. This patch adds a label so that dts files can disable it.
 > 
-> Lee,
+> Based on a patch from Markus Pargmann for imx6qdl.dtsi.
 > 
-> I was planning to take the whole series with me to limit the number of
-> merge conflicts and dependencies.
-> Do you mind if I take this patch with the other AT91 cleanup patches
-> through the arm-soc tree?
-> If you are okay, can you remove this patch already applied on your tree?
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Yes, no problem.
+A second thought - it might be useful for some out-of-tree board
+support.  Applied, both.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6sl.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index ea682e3..a78e715 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -569,7 +569,7 @@
+>  				#size-cells = <1>;
+>  				ranges = <0 0x020cc000 0x4000>;
+>  
+> -				snvs-rtc-lp at 34 {
+> +				snvs_rtc: snvs-rtc-lp at 34 {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+>  					reg = <0x34 0x58>;
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 1.9.1
+> 
