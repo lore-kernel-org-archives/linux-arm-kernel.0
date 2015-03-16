@@ -1,39 +1,48 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 16 Mar 2015 16:52:24 +0100
-Subject: [PATCH 0/4] Allow to use leds-ns2 with n090401 boards
-In-Reply-To: <20150313094433.GU1509@kw.sim.vm.gnt>
-References: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
- <20150313094433.GU1509@kw.sim.vm.gnt>
-Message-ID: <5506FC38.3020904@free-electrons.com>
+Date: Mon, 16 Mar 2015 17:01:10 +0100
+Subject: [PATCH 0/3] Add DT support for netxbig LEDs
+In-Reply-To: <20150309094107.GL1509@kw.sim.vm.gnt>
+References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
+ <20150309094107.GL1509@kw.sim.vm.gnt>
+Message-ID: <5506FE46.4000405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Bryan,
+Hi all,
 
-On 13/03/2015 10:44, Simon Guinot wrote:
-> On Wed, Mar 04, 2015 at 03:52:15PM +0100, Simon Guinot wrote:
+On 09/03/2015 10:41, Simon Guinot wrote:
+> On Mon, Feb 23, 2015 at 04:04:18PM +0100, Simon Guinot wrote:
 >> Hello,
 >>
->> This patch series allows to use the leds-ns2 driver with the n090401
->> boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
+>> This patch series adds DT support for the LEDs found on the Kirkwood-based
+>> LaCie boards 2Big and 5Big Network v2.
 >>
->> Here is the list changes:
+>> Simon
 >>
->> - Allow to configure the LED mode mapping.
->> - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
->>   GPIO expander.
->> - Make leds-ns2 depends on MACH_ARMADA_370.
+>> Simon Guinot (3):
+>>   leds: netxbig: add device tree binding
+>>   ARM: Kirkwood: add LED DT entries for netxbig boards
+>>   ARM: mvebu: remove static LED setup for netxbig boards
 > 
 > Hi Brian,
 > 
-> Please consider applying the leds-ns2 patches of this serie.
+> Please, consider merging the first patch of this serie.
 
-Let me know when this will be applied so I will be able to
-apply the patch 3. I will also need a stable tag for the dependency.
+Brian,
+
+here again let me know when this patch will be merged, and I will
+also need a stable tag as patch 2 depends on this one.
+
+Andrew, Jason,
+
+patch 2 and 3 looks OK for me. What is your opinion about it?
+
 
 Thanks,
 
 Gregory
+
+
 
 
 > 
@@ -41,29 +50,33 @@ Gregory
 > 
 > Simon
 > 
->> Simon Guinot (2):
->>   leds: leds-ns2: handle can_sleep GPIOs
->>   leds: leds-ns2: depends on MACH_ARMADA_370
 >>
->> Vincent Donnefort (2):
->>   leds: leds-ns2: move LED modes mapping outside of the driver
->>   ARM: Kirkwood: add modes-map property to ns2-leds nodes
->>
->>  .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
->>  arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
->>  arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
->>  arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
->>  arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
->>  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
->>  drivers/leds/Kconfig                               |  12 +-
->>  drivers/leds/leds-ns2.c                            | 156 +++++++++++++--------
->>  include/dt-bindings/leds/leds-ns2.h                |   8 ++
->>  include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
->>  10 files changed, 159 insertions(+), 65 deletions(-)
->>  create mode 100644 include/dt-bindings/leds/leds-ns2.h
+>>  .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+>>  .../devicetree/bindings/leds/leds-netxbig.txt      |  90 ++++++++
+>>  arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
+>>  arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
+>>  arch/arm/mach-mvebu/Kconfig                        |   7 -
+>>  arch/arm/mach-mvebu/Makefile                       |   1 -
+>>  arch/arm/mach-mvebu/board.h                        |  21 --
+>>  arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+>>  arch/arm/mach-mvebu/netxbig.c                      | 191 ----------------
+>>  drivers/leds/leds-netxbig.c                        | 244 +++++++++++++++++++--
+>>  include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+>>  11 files changed, 493 insertions(+), 245 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+>>  create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
+>>  delete mode 100644 arch/arm/mach-mvebu/board.h
+>>  delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+>>  create mode 100644 include/dt-bindings/leds/leds-netxbig.h
 >>
 >> -- 
 >> 2.1.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>
 >>
 >> _______________________________________________
