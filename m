@@ -1,25 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Mar 2015 15:23:13 +0100
-Subject: [GIT PULL] ARM: rockchip: small fixes for 4.0-rc
-In-Reply-To: <3637038.xZyfPJIQzf@phil>
-References: <3637038.xZyfPJIQzf@phil>
-Message-ID: <4556908.EaV8ua9jfr@wuerfel>
+From: gabriel.fernandez@st.com (Gabriel FERNANDEZ)
+Date: Mon, 16 Mar 2015 15:20:35 +0100
+Subject: [PATCH v2 5/5] MAINTAINERS: Add pci-st.c to ARCH/STI architecture
+In-Reply-To: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1426515635-9466-6-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 March 2015 00:57:29 Heiko Stuebner wrote:
-> Hi Arnd, Olof,
-> 
-> a small issue surfaced with the new gmac node on rk3288 which is missing a
->         status = "disabled";
-> in the rk3288.dtsi and thus enabling the mac unconditionally.
-> The second patch in that branch simply adds a rockchip regexp to MAINTAINERS, so
-> that it also matches stuff like the (slightly) new rockchip drm stuff.
-> 
-> So if acceptable, please pull
-> 
-> 
+This patch adds the pci-st.c pci driver found on STMicroelectronics
+SoC's into the STI arch section of the maintainers file.
 
-Pulled into fixes, thanks!
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a0dadde..83ed2c3 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1455,6 +1455,7 @@ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
+ F:	drivers/mmc/host/sdhci-st.c
++F:	drivers/pci/host/pci-st.c
+ F:	drivers/phy/phy-stih407-usb.c
+ F:	drivers/phy/phy-stih41x-usb.c
+ F:	drivers/pinctrl/pinctrl-st.c
+-- 
+1.9.1
