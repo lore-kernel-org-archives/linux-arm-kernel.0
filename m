@@ -1,73 +1,88 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 16 Mar 2015 12:28:42 +0100
-Subject: [PATCH 3/3] ARM: dts: Define stdout-path property for Spring board
-In-Reply-To: <5506B908.1060007@suse.de>
-References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
- <1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>
- <5506B908.1060007@suse.de>
-Message-ID: <CABxcv=mmr-WWXY7-KUJe-3EP8FHRBzv-SabJma9VwGRPiHio3Q@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 16 Mar 2015 16:57:30 +0530
+Subject: [PATCH v7 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
+References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+ <1426158921-8987-2-git-send-email-rsahu@apm.com>
+ <20150316092756.GH32683@intel.com>
+ <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
+Message-ID: <20150316112730.GN32683@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andreas,
+On Mon, Mar 16, 2015 at 04:00:22PM +0530, Rameshwar Sahu wrote:
 
->> index f02775487cd4..b9ec763a5602 100644
->> --- a/arch/arm/boot/dts/exynos5250-spring.dts
->> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->> @@ -25,6 +25,7 @@
->>
->>       chosen {
->>               bootargs = "console=tty1";
->> +             stdout-path = "serial3:115200n8";
->
-> Is this a guess or did you verify that against some schematics?
->
+> >> +static struct xgene_dma_desc_sw *xgene_dma_alloc_descriptor(
+> >> +                              struct xgene_dma_chan *chan)
+> >> +{
+> >> +     struct xgene_dma_desc_sw *desc;
+> >> +     dma_addr_t phys;
+> >> +
+> >> +     desc = dma_pool_alloc(chan->desc_pool, GFP_NOWAIT, &phys);
+> >> +     if (!desc) {
+> >> +             chan_dbg(chan, "Failed to allocate LDs\n");
+> > not error?
+> 
+> Yes it's error only by lacking of dma memory, do I need to use dev_err
+> to show the error msg ??
+yes
 
-I don't have access to the Spring schematics but it is based on what
-is defined in the vendor u-boot for Spring [0].
+> 
+> >
+> >> +static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
+> >> +                                          struct list_head *list)
+> > do we really care about free order?
+> 
+> Yes it start dellocation of descriptor by tail.
+and why by tail is not clear.
 
-There isn't a Spring specific configuration file but only a
-chromeos_daisy.h which is shared by Snow, Spring and Kate (not yet in
-mainline):
+> > where are you mapping dma buffers?
+> 
+>  I didn't get you here. Can you please explain me here what you mean.
+> As per my understanding client should map the dma buffer and give the
+> physical address and size to this callback prep routines.
+not for memcpy, that is true for slave transfers
 
-#define CONFIG_DIRECT_BOOTARGS \
-"console=ttySAC3," STRINGIFY(CONFIG_BAUDRATE) " debug earlyprintk"
+For mempcy the idea is that drivers will do buffer mapping
 
-So I assumed that all daisy-based Chromebooks use the same UART for debug.
+> > why are you calling this here, status check shouldnt do this...
+> 
+> Okay, I will remove it.
+> 
+> 
+> >> +                     spin_unlock_bh(&chan->lock);
+> >> +                     return DMA_IN_PROGRESS;
+> > residue here is size of transacation.
+> 
+> We can't calculate here residue size. We don't have any controller
+> register which will tell about remaining transaction size.
+Okay if you cant calculate residue why do we have this fn?
 
->>       };
->>
->>       gpio-keys {
->
-> Assuming that bootargs still work,
->
+> 
+> >> +             }
+> >> +     }
+> >> +
+> >> +     /* Check if this descriptor is in running queue */
+> >> +     list_for_each_entry(desc, &chan->ld_running, node) {
+> >> +             if (desc->tx.cookie == cookie) {
+> >> +                     /* Cleanup any running and executed descriptors */
+> >> +                     xgene_dma_cleanup_descriptors(chan);
+> > ditto?
+> 
+> Okay
+> 
+> 
+> >> +                     spin_unlock_bh(&chan->lock);
+> >> +                     return dma_cookie_status(&chan->dma_chan,
+> >> +                                              cookie, txstate);
+> > and you havent touched txstate so what is the intent here...?
+> 
+> txstate can filled by caller, so it may be NULL or not NULL, we are
+> passing same.
+something seems very wrong here. Status should return the current satue of
+queried descriptor and if residue value in txstate, you seem to be doing
+something else, quotesion is what and why :)
 
-Yes, the semantics are not changed. The std-out property is only used
-as a default if no console= parameter is passed so if you already are
-passing one in your bootloader or using the one defined in the /chosen
-bootargs by enabling CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND, that
-will be used instead of std-out.
-
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
->
-> I do wonder why this mechanism could not point to the same location as
-> bootargs? ("dp-controller"?) The device does not even have screws for
-
-I did wonder the same indeed but I don't know if you can use a display
-as std-out or only works for serial consoles.
-
-> opening it, so accessing the serial port is highly theoretical.
->
-
-I see, in that case I think we could just drop this patch if is not
-possible to have a serial console even with some soldering like is the
-case in Snow, Peach Pit and Peach Pi.
-
-> Regards,
-> Andreas
->
-
-Best regards,
-Javier
-
-[0]: https://chromium.googlesource.com/chromiumos/third_party/u-boot/+/firmware-spring-3824.B/include/configs/chromeos_daisy.h
+-- 
+~Vinod
