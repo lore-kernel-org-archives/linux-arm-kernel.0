@@ -1,46 +1,127 @@
-From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
-Date: Mon, 16 Mar 2015 13:15:01 +0100
-Subject: [PATCH 1/1] ARM: dts: don't make DP a consumer of DISP1 on
- Exynos5250
-In-Reply-To: <1426320716-28137-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1426320716-28137-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <5506C945.5030603@suse.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 16 Mar 2015 13:52:04 +0100
+Subject: [PATCH v4 4/5] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
+ <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150316125204.GB26480@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.03.2015 um 09:11 schrieb Javier Martinez Canillas:
-> By making the DP controller a consumer of DISP1, the PD is powered
-> off when the exynos-dp probe is deferred and powered on again when
-> the exynos-drm driver is probed.
+On Mon, Mar 16, 2015 at 11:01:55AM +0000, Alex Benn?e wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> But this causes the exynos-dp driver failing to obtain the stream
-> clock since the FIMD has been powered off with the DISP1 PD:
+> The current code was negatively indexing the cpu state array and not
+> synchronizing banked spsr register state with the current mode's spsr
+> state, causing occasional failures with migration.
 > 
-> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-> exynos-dp 145b0000.dp-controller: unable to config video
+> Some munging is done to take care of the aarch64 mapping and also to
+> ensure the most current value of the spsr is updated to the banked
+> registers (relevant for KVM<->TCG migration).
 > 
-> The Exynos5250 documentation doesn't mention that the Display Port
-> Transmitter module is included in the DISP1 PD so the device should
-> not have a reference to this Power Domain.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 > 
-> This patch fixes video display on an Exynos5250 Snow Chromebook.
-> 
-> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
+> v2 (ajb)
+>   - minor tweaks and clarifications
+> v3
+>   - Use the correct bank index function for setting/getting env->spsr
+>   - only deal with spsrs in elevated exception levels
+> v4
+>  - try and make commentary clearer
+>  - ensure env->banked_spsr[0] = env->spsr before we sync
 > 
-> Hello Andrzej and Marek,
+> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> index 8fd0c8d..7ddb1b1 100644
+> --- a/target-arm/kvm64.c
+> +++ b/target-arm/kvm64.c
+> @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>      uint64_t val;
+>      int i;
+>      int ret;
+> +    unsigned int el;
+>  
+>      ARMCPU *cpu = ARM_CPU(cs);
+>      CPUARMState *env = &cpu->env;
+> @@ -206,9 +207,29 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          return ret;
+>      }
+>  
+> +    /* Saved Program State Registers
+> +     *
+> +     * Before we restore from the banked_spsr[] array we need to
+> +     * ensure that any modifications to env->spsr are correctly
+> +     * reflected and map aarch64 exception levels if required.
+> +     */
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            env->banked_spsr[0] = env->spsr;
+> +            /* QEMUs AARCH64 EL1 SPSR is in bank 0, so map it to
+> +             * KVM_SPSR_SVC for syncing to KVM */
+> +            env->banked_spsr[1] = env->banked_spsr[0];
+> +        } else {
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> +            env->banked_spsr[i] = env->spsr;
+> +        }
+> +    }
+> +
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+>          ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+> @@ -254,6 +275,7 @@ int kvm_arch_get_registers(CPUState *cs)
+>      struct kvm_one_reg reg;
+>      uint64_t val;
+>      uint32_t fpr;
+> +    unsigned int el;
+>      int i;
+>      int ret;
+>  
+> @@ -326,15 +348,34 @@ int kvm_arch_get_registers(CPUState *cs)
+>          return ret;
+>      }
+>  
+> +    /* Fetch the SPSR registers
+> +     *
+> +     * KVM has an array of state indexed for all the possible aarch32
+> +     * privilege levels. These map onto QEMUs aarch32 banks 1 - 4.
+> +     */
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+>          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+>          }
+>      }
+>  
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            /* KVM_SPSR_SVC holds the AARCH64 EL1 SPSR which QEMU
+> +             * keeps in bank 0 so copy it across. */
+> +            env->banked_spsr[0] = env->banked_spsr[1];
+> +            i = aarch64_banked_spsr_index(el);
+> +        } else {
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> +        }
+> +        env->spsr = env->banked_spsr[i];
+> +    }
+> +
+>      /* Advanced SIMD and FP registers */
+>      for (i = 0; i < 32; i++) {
+>          reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
+> -- 
+> 2.3.2
 > 
-> I need this patch to have display working on an Snow Chromebook
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
-
-This fixes the display on the Spring Chromebook as well!
-
-Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+looks good!
+-Christoffer
