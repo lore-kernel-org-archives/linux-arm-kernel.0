@@ -1,20 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Mar 2015 16:07:31 +0800
-Subject: [PATCH v2] ARM: imx6: Warn when an old DT is detected
-In-Reply-To: <1426262737-32762-1-git-send-email-marc.zyngier@arm.com>
-References: <1426262737-32762-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150316080729.GL20455@dragon>
+Date: Mon, 16 Mar 2015 16:09:48 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6sl: Add label snvs_rtc
+In-Reply-To: <1426348068-17745-1-git-send-email-festevam@gmail.com>
+References: <1426348068-17745-1-git-send-email-festevam@gmail.com>
+Message-ID: <20150316080946.GM20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 04:05:37PM +0000, Marc Zyngier wrote:
-> Now that the GPC has been converted to be a full blown irqchip
-> (and not a mole on the side of the GIC), booting a new kernel
-> with an old DT is likely to result in a rough ride for the user.
+On Sat, Mar 14, 2015 at 12:47:47PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> This patch makes sure such a situation is promptly detected and
-> the user made aware that a DT update is in order.
+> It may be useful to disable the internal snvs-rtc when an external rtc is
+> available. This patch adds a label so that dts files can disable it.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Based on a patch from Markus Pargmann for imx6qdl.dtsi.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied, thanks.
+Let's do this when there is a real user for it.
+
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx6sl.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index ea682e3..a78e715 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -569,7 +569,7 @@
+>  				#size-cells = <1>;
+>  				ranges = <0 0x020cc000 0x4000>;
+>  
+> -				snvs-rtc-lp at 34 {
+> +				snvs_rtc: snvs-rtc-lp at 34 {
+>  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+>  					reg = <0x34 0x58>;
+>  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 1.9.1
+> 
