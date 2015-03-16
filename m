@@ -1,52 +1,83 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 15:20:44 -0700
-Subject: [PATCH v2 0/2] ARM: devicetree: Remove unused ti,codec property
-In-Reply-To: <55068350.9080500@ti.com>
-References: <1426279237-15940-1-git-send-email-marek@goldelico.com>
- <55068350.9080500@ti.com>
-Message-ID: <20150316222044.GR12397@atomide.com>
+Date: Mon, 16 Mar 2015 15:29:10 -0700
+Subject: [PATCH] ARM: dts: DRA7: Remove ti,timer-dsp and ti,timer-pwm
+ properties
+In-Reply-To: <1426526437-63741-1-git-send-email-s-anna@ti.com>
+References: <1426526437-63741-1-git-send-email-s-anna@ti.com>
+Message-ID: <20150316222909.GS12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [150316 00:16]:
-> On 03/13/2015 10:40 PM, Marek Belisko wrote:
-> > ti,codec in not parsed in omap-twl4030 sound driver. It's not necessary
-> > to specify this property in DT because ti,twl4030-audio which ti,codec
-> > was pointing to by phandle is mfd driver and device for ASoC ic created w/o
-> > any DT property (codec name is hardcoded in ASoC driver).
-> > 
-> > Please see reply [1] from Peter Ujfalusi.
+* Suman Anna <s-anna@ti.com> [150316 10:21]:
+> Remove the 'ti,timer-dsp' and 'ti,timer-pwm' properties from the timer
+> nodes that still have them. This seems to be copied from OMAP5, on
+> which only certain timers are capable of providing PWM functionality
+> or be able to interrupt the DSP. All the GPTimers On DRA7 are capable
+> of PWM and interrupting any core (due to the presence of Crossbar).
 > 
-> All:
-> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> These properties were used by the driver to add capabilities to each
+> timer, and support requesting timers by capability. In the DT world,
+> we expect any users of timers to use phandles to the respective timer,
+> and use the omap_dm_timer_request_by_node() API. The API to request
+> using capabilities, omap_dm_timer_request_by_cap() API should be
+> deprecated eventually.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-Applying both into omap-for-v4.1/dt thanks.
+Applying into omap-for-v4.1/dt thanks.
 
-Tony 
- 
-> > Changes from v1:
-> > - keep ti,codec property in Documentation as optional that the
-> > existing dtbs do not become noncompliant after the change
-> > 
-> > [1]: http://comments.gmane.org/gmane.linux.ports.arm.omap/124273
-> > 
-> > Marek Belisko (2):
-> >   ARM: dts: omap3: Remove all references to ti,codec property
-> >   Documentation: omap-twl4030: Move ti,codec property to optional
-> > 
-> >  Documentation/devicetree/bindings/sound/omap-twl4030.txt | 3 +--
-> >  arch/arm/boot/dts/omap3-beagle-xm.dts                    | 1 -
-> >  arch/arm/boot/dts/omap3-beagle.dts                       | 1 -
-> >  arch/arm/boot/dts/omap3-cm-t3x30.dtsi                    | 1 -
-> >  arch/arm/boot/dts/omap3-devkit8000.dts                   | 1 -
-> >  arch/arm/boot/dts/omap3-gta04.dtsi                       | 1 -
-> >  arch/arm/boot/dts/omap3-igep.dtsi                        | 1 -
-> >  arch/arm/boot/dts/omap3-lilly-a83x.dtsi                  | 1 -
-> >  arch/arm/boot/dts/omap3-overo-base.dtsi                  | 1 -
-> >  arch/arm/boot/dts/omap3-tao3530.dtsi                     | 1 -
-> >  10 files changed, 1 insertion(+), 11 deletions(-)
-> > 
+Tony
+
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 7 -------
+>  1 file changed, 7 deletions(-)
 > 
-> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 5827fedafd43..318d9409e8cd 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -658,7 +658,6 @@
+>  			reg = <0x48820000 0x80>;
+>  			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "timer5";
+> -			ti,timer-dsp;
+>  		};
+>  
+>  		timer6: timer at 48822000 {
+> @@ -666,8 +665,6 @@
+>  			reg = <0x48822000 0x80>;
+>  			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "timer6";
+> -			ti,timer-dsp;
+> -			ti,timer-pwm;
+>  		};
+>  
+>  		timer7: timer at 48824000 {
+> @@ -675,7 +672,6 @@
+>  			reg = <0x48824000 0x80>;
+>  			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "timer7";
+> -			ti,timer-dsp;
+>  		};
+>  
+>  		timer8: timer at 48826000 {
+> @@ -683,8 +679,6 @@
+>  			reg = <0x48826000 0x80>;
+>  			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "timer8";
+> -			ti,timer-dsp;
+> -			ti,timer-pwm;
+>  		};
+>  
+>  		timer9: timer at 4803e000 {
+> @@ -706,7 +700,6 @@
+>  			reg = <0x48088000 0x80>;
+>  			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+>  			ti,hwmods = "timer11";
+> -			ti,timer-pwm;
+>  		};
+>  
+>  		timer13: timer at 48828000 {
 > -- 
-> P?ter
+> 2.3.2
+> 
