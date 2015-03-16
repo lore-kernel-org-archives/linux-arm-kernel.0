@@ -1,45 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Mar 2015 15:19:41 +0100
-Subject: [PATCH] arm64: Enable CONFIG_COMPAT also for 64k page size
-In-Reply-To: <5506E5C5.3000209@codeaurora.org>
-References: <1417707993-82290-1-git-send-email-agraf@suse.de>
- <5396604.TRferrWZgF@wuerfel> <5506E5C5.3000209@codeaurora.org>
-Message-ID: <3082389.jo5M8JGykQ@wuerfel>
+Date: Mon, 16 Mar 2015 15:21:45 +0100
+Subject: [GIT PULL v2] Second Round of Renesas ARM Based SoC Cleanup for
+ v4.1
+In-Reply-To: <cover.1426456752.git.horms+renesas@verge.net.au>
+References: <cover.1426456752.git.horms+renesas@verge.net.au>
+Message-ID: <57687741.xrEbQ8vakN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 March 2015 10:16:37 Christopher Covington wrote:
+On Monday 16 March 2015 08:03:16 Simon Horman wrote:
 > 
-> On 03/11/2015 08:47 AM, Arnd Bergmann wrote:
-> > On Wednesday 11 March 2015 06:24:16 Alexander Graf wrote:
-> >> So after recompiling all of the distribution with newer binutils we now
-> >> have an openSUSE Factory tree that has 64k aligned 32bit binaries.
-> >>
-> >> Unfortunately however, the 32bit glibc has a bogus mmap() implementation
-> >> that hard codes 4k page size.
-> >>
-> >> With the patch below applied to glibc, I can successfully run 32bit user
-> >> space on Seattle with 64k PAGE_SIZE though. So I guess we'll need to fix
-> >> up glibc next.
-> >>
-> >> Do you know of anyone who's fluent enough in 32bit ARM assembly to
-> >> convert the hard coded assumptions in there to instead use a variable
-> >> that takes the actual host page size into account?
-> > 
-> > I believe this is a kernel bug, and the kernel API for 32-bit emulation
-> > should always take the pgoff argument in 4KB units instead of PAGE_SIZE
-> > units, see the implementation of sys_mmap2 in
-> > arch/powerpc/kernel/sys_ppc32.c.
-> > 
-> > All user space programs that call mmap2 still need to make sure that
-> > their arguments are PAGE_SIZE aligned, but the libc need not care
-> > about this here.
+> Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
 > 
-> What is the correct behavior for /proc/pid/pagemap, /proc/kpagecount, and
-> /proc/kpageflags for a AArch32 process running on an AArch64 kernel with
-> non-4K translation granule? Actual page frame number or units-of-4K frame number?
+> 
+> As requested by Arnd v2 of this pull request is based on v4.0-rc1.  The
+> previous version of this pull request was based on "Renesas ARM Based SoC
+> Cleanup for v4.1", tagged as renesas-soc-cleanup2-for-v4.1.  There are no
+> other changes between v1 and v2 of this pull request.
+> 
+> 
 > 
 
-Not sure, see what PowerPC does in that case.
+Merged into next/cleanup, thanks a lot for the rebase!
 
 	Arnd
