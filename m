@@ -1,88 +1,186 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 16 Mar 2015 16:57:30 +0530
-Subject: [PATCH v7 1/3] dmaengine: Add support for APM X-Gene SoC DMA
- engine driver
-In-Reply-To: <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
-References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
- <1426158921-8987-2-git-send-email-rsahu@apm.com>
- <20150316092756.GH32683@intel.com>
- <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
-Message-ID: <20150316112730.GN32683@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 11:33:27 +0000
+Subject: [PATCH 10/10] clk: zx: add zx296702 clock support
+In-Reply-To: <1426333785-3952-11-git-send-email-jun.nie@linaro.org>
+References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
+ <1426333785-3952-11-git-send-email-jun.nie@linaro.org>
+Message-ID: <20150316113327.GH8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 04:00:22PM +0530, Rameshwar Sahu wrote:
+On Sat, Mar 14, 2015 at 07:49:45PM +0800, Jun Nie wrote:
+> +static int hw_to_idx(struct clk_zx_pll *zx_pll)
+> +{
+> +	const struct zx_pll_config *config = zx_pll->lookup_table;
+> +	u32 hw_cfg0, hw_cfg1;
+> +	unsigned long flags = 0;
+> +	int i;
+> +
+> +	if (zx_pll->lock)
+> +		spin_lock_irqsave(zx_pll->lock, flags);
+> +
+> +	hw_cfg0 = readl(zx_pll->reg_base);
+> +	hw_cfg1 = readl(zx_pll->reg_base + 4);
+> +
+> +	if (zx_pll->lock)
+> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+> +
+> +	/* For matching the value in lookup table */
+> +	hw_cfg0 &= ~BIT(30); /* clear lock bit */
+> +	hw_cfg0 |= BIT(31); /* set PD bit */
 
-> >> +static struct xgene_dma_desc_sw *xgene_dma_alloc_descriptor(
-> >> +                              struct xgene_dma_chan *chan)
-> >> +{
-> >> +     struct xgene_dma_desc_sw *desc;
-> >> +     dma_addr_t phys;
-> >> +
-> >> +     desc = dma_pool_alloc(chan->desc_pool, GFP_NOWAIT, &phys);
-> >> +     if (!desc) {
-> >> +             chan_dbg(chan, "Failed to allocate LDs\n");
-> > not error?
-> 
-> Yes it's error only by lacking of dma memory, do I need to use dev_err
-> to show the error msg ??
-yes
+Use definitions for these bits rather than BIT(n) and a comment.
 
-> 
-> >
-> >> +static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
-> >> +                                          struct list_head *list)
-> > do we really care about free order?
-> 
-> Yes it start dellocation of descriptor by tail.
-and why by tail is not clear.
+> +static int zx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			   unsigned long parent_rate)
+> +{
+> +	/* Assume current cpu is not running on current PLL */
+> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
+> +	const struct zx_pll_config *config;
+> +	unsigned long flags = 0;
+> +	int idx;
+> +	u32 reg;
+> +
+> +	idx = rate_to_idx(zx_pll, rate);
+> +	config = &zx_pll->lookup_table[idx];
+> +
+> +	if (zx_pll->lock)
+> +		spin_lock_irqsave(zx_pll->lock, flags);
 
-> > where are you mapping dma buffers?
-> 
->  I didn't get you here. Can you please explain me here what you mean.
-> As per my understanding client should map the dma buffer and give the
-> physical address and size to this callback prep routines.
-not for memcpy, that is true for slave transfers
+Is this code ever safe without having a lock to take?
 
-For mempcy the idea is that drivers will do buffer mapping
+> +
+> +	writel(config->cfg0, zx_pll->reg_base);
+> +	writel(config->cfg1, zx_pll->reg_base + 4);
 
-> > why are you calling this here, status check shouldnt do this...
-> 
-> Okay, I will remove it.
-> 
-> 
-> >> +                     spin_unlock_bh(&chan->lock);
-> >> +                     return DMA_IN_PROGRESS;
-> > residue here is size of transacation.
-> 
-> We can't calculate here residue size. We don't have any controller
-> register which will tell about remaining transaction size.
-Okay if you cant calculate residue why do we have this fn?
+Use a definition for this +4 (and also for the first register too.)
 
-> 
-> >> +             }
-> >> +     }
-> >> +
-> >> +     /* Check if this descriptor is in running queue */
-> >> +     list_for_each_entry(desc, &chan->ld_running, node) {
-> >> +             if (desc->tx.cookie == cookie) {
-> >> +                     /* Cleanup any running and executed descriptors */
-> >> +                     xgene_dma_cleanup_descriptors(chan);
-> > ditto?
-> 
-> Okay
-> 
-> 
-> >> +                     spin_unlock_bh(&chan->lock);
-> >> +                     return dma_cookie_status(&chan->dma_chan,
-> >> +                                              cookie, txstate);
-> > and you havent touched txstate so what is the intent here...?
-> 
-> txstate can filled by caller, so it may be NULL or not NULL, we are
-> passing same.
-something seems very wrong here. Status should return the current satue of
-queried descriptor and if residue value in txstate, you seem to be doing
-something else, quotesion is what and why :)
+> +	reg = readl(zx_pll->reg_base);
+> +	reg &= ~BIT(31);
+> +	writel(reg, zx_pll->reg_base);
+
+You've only just written zx_pll->reg_base - why do you need to read it
+back?  Wouldn't this be better (and in any case, using relaxed
+accessors is probably a good idea):
+
+	writel_relaxed(config->cfg0, zx_pll->reg_base);
+	writel_relaxed(config->cfg1, zx_pll->reg_base + 4);
+	writel_relaxed(config->cfg0 & ~ZX_PLL_PD, zx_pll->reg_base);
+
+Looks nicer, doesn't it?
+
+In any case, why should setting the rate enable the PLL?  I notice you
+use the PD bit below in the enable/disable functions, so this seems
+rather silly - it looks like it should be preserved, and then the wait
+for the PLL to lock (below) should be conditional on the PLL being
+enabled.
+
+> +	while (!(readl(zx_pll->reg_base) & BIT(30)))
+> +		cpu_relax();
+
+What if the bit never sets?  You can probably use readl_relaxed() here.
+
+> +
+> +	if (zx_pll->lock)
+> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx_pll_enable(struct clk_hw *hw)
+> +{
+> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
+> +	unsigned long flags = 0;
+> +	u32 reg;
+> +
+> +	if (zx_pll->lock)
+> +		spin_lock_irqsave(zx_pll->lock, flags);
+> +
+> +	reg = readl(zx_pll->reg_base);
+> +	writel(reg & ~BIT(31), zx_pll->reg_base);
+> +	while (!(readl(zx_pll->reg_base) & BIT(30)))
+> +		cpu_relax();
+
+What if the bit never sets?
+
+> +
+> +	if (zx_pll->lock)
+> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static void zx_pll_disable(struct clk_hw *hw)
+> +{
+> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
+> +	unsigned long flags = 0;
+> +	u32 reg;
+> +
+> +	if (zx_pll->lock)
+> +		spin_lock_irqsave(zx_pll->lock, flags);
+> +
+> +	reg = readl(zx_pll->reg_base);
+> +	writel(reg | BIT(31), zx_pll->reg_base);
+> +
+> +	if (zx_pll->lock)
+> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+> +}
+> +
+> +static int zx_pll_is_enabled(struct clk_hw *hw)
+> +{
+> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
+> +	unsigned long flags = 0;
+> +	u32 reg;
+> +
+> +	if (zx_pll->lock)
+> +		spin_lock_irqsave(zx_pll->lock, flags);
+> +
+> +	reg = readl(zx_pll->reg_base);
+> +
+> +	if (zx_pll->lock)
+> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+
+You don't need locking to read from a single register.
+
+> +
+> +	return !(reg & BIT(31));
+> +}
+> +
+> +static const struct clk_ops zx_pll_ops = {
+> +	.recalc_rate = zx_pll_recalc_rate,
+> +	.round_rate = zx_pll_round_rate,
+> +	.set_rate = zx_pll_set_rate,
+> +	.enable = zx_pll_enable,
+> +	.disable = zx_pll_disable,
+> +	.is_enabled = zx_pll_is_enabled,
+> +};
+> +
+> +struct clk *clk_register_zx_pll(const char *name, const char *parent_name,
+> +	unsigned long flags, void __iomem *reg_base,
+> +	const struct zx_pll_config *lookup_table, int count, spinlock_t *lock)
+> +{
+> +	struct clk_zx_pll *zx_pll;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	zx_pll = kzalloc(sizeof(*zx_pll), GFP_KERNEL);
+> +	if (!zx_pll)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &zx_pll_ops;
+> +	init.flags = flags;
+> +	init.parent_names = (parent_name ? &parent_name : NULL);
+> +	init.num_parents = (parent_name ? 1 : 0);
+> +
+> +	zx_pll->reg_base = reg_base;
+> +	zx_pll->lookup_table = lookup_table;
+> +	zx_pll->count = count;
+> +	zx_pll->lock = lock;
+
+As mentioned above, I think this is unsafe if lock is NULL.  You probably
+want to subsitute a lock specific to the PLL if none was provided.
 
 -- 
-~Vinod
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
