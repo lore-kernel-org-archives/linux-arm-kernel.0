@@ -1,122 +1,69 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 16 Mar 2015 13:00:51 -0500
-Subject: [PATCH v2 4/5] PCI: designware: Add disable IO support
-In-Reply-To: <1426515635-9466-5-git-send-email-gabriel.fernandez@linaro.org>
-References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
- <1426515635-9466-5-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <582D947C-1229-4DD9-BC82-812D1560C49E@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 11:10:26 -0700
+Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
+In-Reply-To: <20150316161449.GJ8656@n2100.arm.linux.org.uk>
+References: <201502271645.58765@pali>
+ <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
+ <20150302112836.GA27317@amd> <20150316154409.GQ5264@atomide.com>
+ <20150316161449.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <20150316181023.GT5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [150316 09:15]:
+> On Mon, Mar 16, 2015 at 08:44:10AM -0700, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [150302 03:32]:
+> > > On Fri 2015-02-27 16:55:26, Pali Roh?r wrote:
+> > > > This patch adds support for DT "/revision" and convert ATAG_REVISION to DT.
+> > > > 
+> > > > Pali Roh?r (2):
+> > > >   arm: devtree: Set system_rev from DT revision
+> > > >   arm: boot: convert ATAG_REVISION to DT revision field
+> > > 
+> > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > Are these queued somewhere now? Sounds like this is the last pending
+> > issue for n900 to use legacy user space with current mainline kernels,
+> > so I'd like to get these in so we can get closer to making omap3 boot
+> > in device tree only mode.
+> 
+> Not that I know of.  As everyone is aware, patches need to be in my
+> patch system if they want me to apply them - which would've been
+> especially important as I was away from kernel stuff for a week at
+> the start of March (for medical reasons) and I can't be expected to
+> track the status of stuff which is buried behind 1000+ extra mails.
 
-On Mar 16, 2015, at 9:20 AM, Gabriel FERNANDEZ <gabriel.fernandez@st.com> wrote:
+Pali, care to upload these two patches to Russell's patch tracking
+system if no other comments?
+ 
+> In any case, I'm currently not accepting /any/ patches into my tree at
+> present; I'm chasing a horrid instability on one of my test platforms
+> which is making it impossible to tell whether any particular change or
+> changes in my tree is responsible or not for it.  It doesn't seem to be
+> a hardware failure (if it was, I'd simply take the board out of the
+> nightly test system.)
+> 
+> It's quite literally taking hours to figure out what's going on - I've
+> been on this for about 12 hours now and still not much closer to knowing
+> what's causing it (other than I know that -rc1 plus my queue seems to be
+> fine, -rc3 plus my queue is definitely broken, -rc3 alone is fine.  So
+> something I'm already carrying seems to be responsible, but each time I
+> identify a particular patch and drop _just_ that change, I find that the
+> problem is back when I try my queue minus the bad changes.  With a test
+> cycle time of 20+ minutes (due to the number of boots required to make
+> certain of a dependable result), this is /really/ slow progress.
+> 
+> Right now, I can't be positively sure that /anything/ I have already
+> merged isn't a factor in causing this problem, so I don't want to
+> augment my tree with any additional patches which would upset my
+> ability to move about in the tree, and get reproducable results from
+> repeated testing.  To merge something else will probably mean I'll
+> have to start again from the beginning and the last 12 hours spent
+> testing will have been wasted.
 
-> ST sti SoCs PCIe IPs are built around DesignWare IP Core.
-> But in these SoCs PCIe IP doesn't support IO.
-> 
-> This patch adds the possibility to disable it through
-> a DT property, by creating an empty IO window and by
-> removing PCI_COMMAND_IO from the setup register.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
-> .../devicetree/bindings/pci/designware-pcie.txt    |  2 ++
-> drivers/pci/host/pcie-designware.c                 | 24 ++++++++++++++++++++--
-> drivers/pci/host/pcie-designware.h                 |  1 +
-> 3 files changed, 25 insertions(+), 2 deletions(-)
+Oh debugging those things sucks. Maybe try with CONFIG_DEBUG_SLAB to
+see if you trigger any poison.
 
-Why not just update the code such that if the ranges doesn?t have an IO space rather than introducing a new DT property?
+Regards,
 
-- k
-
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index 9f4faa8..40544d4 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -26,3 +26,5 @@ Optional properties:
-> - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
->   specify this property, to keep backwards compatibility a range of 0x00-0xff
->   is assumed if not present)
-> +- disable_io_support: set this property for PCIe host controller without IO
-> +  port access
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 1f4ea6f..f9d70f5 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -471,6 +471,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
-> 		return -EINVAL;
-> 	}
-> 
-> +	pp->disable_io_support = of_property_read_bool(np,
-> +			"disable_io_support");
-> +
-> 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> 		if (!pp->ops->msi_host_init) {
-> 			pp->irq_domain = irq_domain_add_linear(pp->dev->of_node,
-> @@ -704,6 +707,7 @@ static struct pci_ops dw_pcie_ops = {
-> static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> {
-> 	struct pcie_port *pp;
-> +	struct resource *res;
-> 
-> 	pp = sys_to_pcie(sys);
-> 
-> @@ -719,6 +723,18 @@ static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> 	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
-> 	pci_add_resource(&sys->resources, &pp->busn);
-> 
-> +	if (pp->disable_io_support) {
-> +		/* This PCIe controller does not support IO, set an empty one */
-> +		res = devm_kzalloc(pp->dev, sizeof(*res), GFP_KERNEL);
-> +		if (res) {
-> +			res->start = 0;
-> +			res->end = 0;
-> +			res->name = "PCIe empty IO space";
-> +			res->flags = IORESOURCE_IO;
-> +			pci_add_resource(&sys->resources, res);
-
-Do we really need an empty resource?  What happens if we just dont have one?
-
-> +		}
-> +	}
-> +
-> 	return 1;
-> }
-> 
-> @@ -822,8 +838,12 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
-> 	/* setup command register */
-> 	dw_pcie_readl_rc(pp, PCI_COMMAND, &val);
-> 	val &= 0xffff0000;
-> -	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-> -		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
-> +
-> +	if (!pp->disable_io_support)
-> +		val |= PCI_COMMAND_IO;
-> +
-> +	val |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
-> +
-> 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
-> }
-> 
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index d0bbd27..027045d 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -52,6 +52,7 @@ struct pcie_port {
-> 	int			msi_irq;
-> 	struct irq_domain	*irq_domain;
-> 	unsigned long		msi_data;
-> +	bool			disable_io_support;
-> 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
-> };
-> 
-> -- 
-> 1.9.1
-> 
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
