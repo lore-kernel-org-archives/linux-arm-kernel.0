@@ -1,48 +1,79 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 16 Mar 2015 23:44:42 +0100
-Subject: [PATCH 06/10] ARM: at91: declare the at91rm9200 memory controller as
- a syscon
+Date: Mon, 16 Mar 2015 23:44:44 +0100
+Subject: [PATCH 08/10] ARM: at91/pm: use the atmel-mc syscon defines
 In-Reply-To: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426545886-19162-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426545886-19162-9-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at91rm9200 memory controller is not simply an SDRAM controller. It also
-controls the EBI (External Bus Interface), the SMC (Static Memory Controller)and
-the Burst Flash Controller.
+Use the defines from atmel-mc.h instead of at91rm9200_sdramc.h
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/devicetree/bindings/arm/atmel-at91.txt | 2 +-
- arch/arm/boot/dts/at91rm9200.dtsi                    | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/include/mach/at91_ramc.h | 2 +-
+ arch/arm/mach-at91/pm.c                     | 8 ++++----
+ arch/arm/mach-at91/pm_suspend.S             | 2 +-
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 2e99b5b57350..424ac8cbfa08 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -98,7 +98,7 @@ Example:
- 	};
+diff --git a/arch/arm/mach-at91/include/mach/at91_ramc.h b/arch/arm/mach-at91/include/mach/at91_ramc.h
+index 493bc486e858..39547496d4b0 100644
+--- a/arch/arm/mach-at91/include/mach/at91_ramc.h
++++ b/arch/arm/mach-at91/include/mach/at91_ramc.h
+@@ -21,7 +21,7 @@ extern void __iomem *at91_ramc_base[];
+ .extern at91_ramc_base
+ #endif
  
- RAMC SDRAM/DDR Controller required properties:
--- compatible: Should be "atmel,at91rm9200-sdramc",
-+- compatible: Should be "atmel,at91rm9200-sdramc", "syscon"
- 			"atmel,at91sam9260-sdramc",
- 			"atmel,at91sam9g45-ddramc",
- 			"atmel,sama5d3-ddramc",
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index 4fb333bd1f85..6d0fa9b87f46 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -92,7 +92,7 @@
- 			};
+-#include <soc/at91/at91rm9200_sdramc.h>
++#include <linux/mfd/syscon/atmel-mc.h>
+ #include <soc/at91/at91sam9_ddrsdr.h>
+ #include <soc/at91/at91sam9_sdramc.h>
  
- 			ramc0: ramc at ffffff00 {
--				compatible = "atmel,at91rm9200-sdramc";
-+				compatible = "atmel,at91rm9200-sdramc", "syscon";
- 				reg = <0xffffff00 0x100>;
- 			};
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index 5062699cbb12..1e184767c3be 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -233,7 +233,7 @@ static void at91_pm_set_standby(void (*at91_standby)(void))
+  */
+ static void at91rm9200_standby(void)
+ {
+-	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
++	u32 lpr = at91_ramc_read(0, AT91_MC_SDRAMC_LPR);
  
+ 	asm volatile(
+ 		"b    1f\n\t"
+@@ -244,8 +244,8 @@ static void at91rm9200_standby(void)
+ 		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+ 		"    str    %5, [%1, %2]"
+ 		:
+-		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
++		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91_MC_SDRAMC_LPR),
++		  "r" (1), "r" (AT91_MC_SDRAMC_SRR),
+ 		  "r" (lpr));
+ }
+ 
+@@ -414,7 +414,7 @@ void __init at91rm9200_pm_init(void)
+ 	/*
+ 	 * AT91RM9200 SDRAM low-power mode cannot be used with self-refresh.
+ 	 */
+-	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
++	at91_ramc_write(0, AT91_MC_SDRAMC_LPR, 0);
+ 
+ 	at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
+ 	at91_pm_data.memctrl = AT91_MEMCTRL_MC;
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index bd22b2c8a051..fda4e0164ed7 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -216,7 +216,7 @@ ENTRY(at91_sramc_self_refresh)
+ 
+ 	/* Active SDRAM self-refresh mode */
+ 	mov	r3, #1
+-	str	r3, [r2, #AT91RM9200_SDRAMC_SRR]
++	str	r3, [r2, #AT91_MC_SDRAMC_SRR]
+ 	b	exit_sramc_sf
+ 
+ ddrc_sf:
 -- 
 2.1.0
