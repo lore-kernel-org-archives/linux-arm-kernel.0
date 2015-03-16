@@ -1,196 +1,157 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Mar 2015 17:14:27 +0000
-Subject: [RFC PATCH 1/3] arm64: head.S: replace early literals with
- constant immediates
-In-Reply-To: <1426519423-28263-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426519423-28263-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150316171427.GC18277@leverpostej>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Mar 2015 17:15:03 +0000 (UTC)
+Subject: OMAP baseline test results for v4.0-rc4
+Message-ID: <alpine.DEB.2.02.1503161713210.29420@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
 
-On Mon, Mar 16, 2015 at 03:23:41PM +0000, Ard Biesheuvel wrote:
-> In preparation of making the kernel relocatable, replace literal
-> symbol references with immediate constants. This is necessary, as
-> the literals will not be populated with meaningful values until
-> after the relocation code has executed.
+Here are some basic OMAP test results for Linux v4.0-rc4.
+Logs and other details at:
 
-The majority of these changes look like nice cleanups/simplifications
-regardless of whether the kernel is relocatable, so I like most of the
-patch.
+    http://www.pwsan.com/omap/testlogs/test_v4.0-rc4/20150315232818/
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-entry.S |  2 +-
->  arch/arm64/kernel/head.S      | 36 +++++++++++++++---------------------
->  2 files changed, 16 insertions(+), 22 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> index 8ce9b0577442..f78e6a1de825 100644
-> --- a/arch/arm64/kernel/efi-entry.S
-> +++ b/arch/arm64/kernel/efi-entry.S
-> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
->  	 */
->  	mov	x20, x0		// DTB address
->  	ldr	x0, [sp, #16]	// relocated _text address
-> -	ldr	x21, =stext_offset
-> +	movz	x21, #:abs_g0:stext_offset
 
-This looks a little scary. Why do we need to use a movz with a special
-relocation rather than a simple mov? As far as I can see mov has
-sufficient range.
+Test summary
+------------
 
->  	add	x21, x0, x21
->  
->  	/*
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 9c856f2aa7a5..1ea3cd2aba34 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -46,11 +46,9 @@
->  #error TEXT_OFFSET must be less than 2MB
->  #endif
->  
-> -	.macro	pgtbl, ttb0, ttb1, virt_to_phys
-> -	ldr	\ttb1, =swapper_pg_dir
-> -	ldr	\ttb0, =idmap_pg_dir
-> -	add	\ttb1, \ttb1, \virt_to_phys
-> -	add	\ttb0, \ttb0, \virt_to_phys
-> +	.macro	pgtbl, ttb0, ttb1
-> +	adrp	\ttb1, swapper_pg_dir
-> +	adrp	\ttb0, idmap_pg_dir
->  	.endm
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
-I reckon we should just kill pgtbl and use adrp inline in both of the
-callsites. That way we can also get rid of the comment in each case,
-beacuse the assembly itself will document which register gets which
-table address.
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-som,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
 
->  #ifdef CONFIG_ARM64_64K_PAGES
-> @@ -63,7 +61,7 @@
->  #define TABLE_SHIFT	PUD_SHIFT
->  #endif
->  
-> -#define KERNEL_START	KERNEL_RAM_VADDR
-> +#define KERNEL_START	_text
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
 
-We can kill the KERNEL_RAM_VADDR definition too, I believe. It's only
-used here.
+Build warnings from toolchain: uImage:
+    FAIL ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
 
->  #define KERNEL_END	_end
->  
->  /*
-> @@ -322,7 +320,7 @@ ENDPROC(stext)
->   *     been enabled
->   */
->  __create_page_tables:
-> -	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
-> +	pgtbl	x25, x26			// idmap_pg_dir and swapper_pg_dir addresses
+Build warnings from toolchain: uImage+dtb:
+    (none)
 
-Here we could just have:
+Build warnings from toolchain: zImage:
+    FAIL (15/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_oldconfig, multi_v7_defconfig
 
-	adrp	x25, idmap_pg_dir
-	adrp	x26, swapper_pg_dir
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 2/17): 5912osk, 3517evm
+    Pass (14/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  5430es2sbct54, 2420n800
 
->  	mov	x27, lr
->  
->  	/*
-> @@ -351,8 +349,7 @@ __create_page_tables:
->  	 * Create the identity mapping.
->  	 */
->  	mov	x0, x25				// idmap_pg_dir
-> -	ldr	x3, =KERNEL_START
-> -	add	x3, x3, x28			// __pa(KERNEL_START)
-> +	adr_l	x3, KERNEL_START		// __pa(KERNEL_START)
->  
->  #ifndef CONFIG_ARM64_VA_BITS_48
->  #define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
-> @@ -391,9 +388,8 @@ __create_page_tables:
->  #endif
->  
->  	create_pgd_entry x0, x3, x5, x6
-> -	ldr	x6, =KERNEL_END
->  	mov	x5, x3				// __pa(KERNEL_START)
-> -	add	x6, x6, x28			// __pa(KERNEL_END)
-> +	adr_l	x6, KERNEL_END			// __pa(KERNEL_END)
->  	create_block_map x0, x7, x3, x5, x6
->  
->  	/*
-> @@ -402,8 +398,10 @@ __create_page_tables:
->  	mov	x0, x26				// swapper_pg_dir
->  	mov	x5, #PAGE_OFFSET
->  	create_pgd_entry x0, x5, x3, x6
-> -	ldr	x6, =KERNEL_END
-> +	adr_l	x6, KERNEL_END
->  	mov	x3, x24				// phys offset
-> +	sub	x6, x6, x3			// kernel memsize
-> +	add	x6, x6, x5			// __va(KERNEL_END)
+Kernel warnings during boot to userspace:
+    FAIL ( 3/17): 4430es2panda, 4460varsomom, cmt3517
 
-I'm not sure on this; it makes it consistent with the rest w.r.t. using
-adr* but it's now a little harder to read :/
+PM: chip retention via suspend:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
 
->  	create_block_map x0, x7, x3, x5, x6
->  
->  	/*
-> @@ -538,8 +536,7 @@ ENDPROC(el2_setup)
->   * in x20. See arch/arm64/include/asm/virt.h for more info.
->   */
->  ENTRY(set_cpu_boot_mode_flag)
-> -	ldr	x1, =__boot_cpu_mode		// Compute __boot_cpu_mode
-> -	add	x1, x1, x28
-> +	adr_l	x1, __boot_cpu_mode		// Compute __boot_cpu_mode
+PM: chip retention via dynamic idle:
+    FAIL ( 6/12): am335xbonelt, 4430es2panda, 4460varsomom, 2430sdp,
+		  5430es2uevm, 5430es2sbct54
+    Pass ( 6/12): 4460pandaes, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
 
-The comment seems redundant now (and arguably was before). I think it's
-a distraction we can drop.
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
 
->  	cmp	w20, #BOOT_CPU_MODE_EL2
->  	b.ne	1f
->  	add	x1, x1, #4
-> @@ -598,7 +595,7 @@ ENTRY(secondary_startup)
->  	/*
->  	 * Common entry point for secondary CPUs.
->  	 */
-> -	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
-> +	pgtbl	x25, x26			// x25=TTBR0, x26=TTBR1
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
 
-As mentioned above, I think this is clearer as:
+PM: chip off via suspend:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
 
-	adrp	x25, idmap_pg_dir
-	adrp	x26, swapper_pg_dir
+PM: chip off via dynamic idle:
+    Pass ( 4/ 4): 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730es12beaglexm
 
->  	bl	__cpu_setup			// initialise processor
->  
->  	ldr	x21, =secondary_data
-> @@ -655,17 +652,14 @@ ENDPROC(__turn_mmu_on)
->   * Calculate the start of physical memory.
->   */
->  __calc_phys_offset:
-> -	adr	x0, 1f
-> -	ldp	x1, x2, [x0]
-> +	adrp	x0, KERNEL_START		// __pa(KERNEL_START)
-> +	ldr	x1, =KERNEL_RAM_VADDR		// __va(KERNEL_START)
-> +	mov	x2, PAGE_OFFSET
+Kernel warnings during PM test:
+    FAIL ( 2/17): 4430es2panda, 4460varsomom
 
-Missing '#' on the PAGE_OFFSET immediate.
+Obsolete Kconfig symbols:
+    FAIL ( 2/20): omap1_defconfig, multi_v7_defconfig
 
-Thanks,
-Mark.
 
->  	sub	x28, x0, x1			// x28 = PHYS_OFFSET - PAGE_OFFSET
->  	add	x24, x2, x28			// x24 = PHYS_OFFSET
->  	ret
->  ENDPROC(__calc_phys_offset)
->  
-> -	.align 3
-> -1:	.quad	.
-> -	.quad	PAGE_OFFSET
-> -
->  /*
->   * Exception handling. Something went wrong and we can't proceed. We ought to
->   * tell the user, but since we don't have any guarantee that we're even
-> -- 
-> 1.8.3.2
-> 
-> 
+vmlinux object size
+(delta in bytes from test_v4.0-rc3 (9eccca0843205f87c00404b663188b88eb248051)):
+   text     data      bss    total  kernel
+   +377     +128        0     +505  omap1_defconfig
+   +377     +104        0     +481  omap1_defconfig_1510innovator_only
+   +377      +96        0     +473  omap1_defconfig_5912osk_only
+  +1316     -104    +1472    +2684  multi_v7_defconfig
+  -2948    +4088        0    +1140  omap2plus_defconfig
+   +700      +32        0     +732  omap2plus_defconfig_2430sdp_only
+  +1048     +680        0    +1728  omap2plus_defconfig_am33xx_only
+  +1116     +744        0    +1860  omap2plus_defconfig_am43xx_only
+  -2948    +4032        0    +1084  omap2plus_defconfig_cpupm
+  +1180     +360        0    +1540  omap2plus_defconfig_dra7xx_only
+   +552     +520        0    +1072  omap2plus_defconfig_n800_multi_omap2xxx
+   +452     +424        0     +876  omap2plus_defconfig_n800_only_a
+  -2948    +4016        0    +1068  omap2plus_defconfig_no_pm
+  +1116    +1288        0    +2404  omap2plus_defconfig_omap2_4_only
+  +1084    +1528        0    +2612  omap2plus_defconfig_omap3_4_only
+  +1116     +648        0    +1764  omap2plus_defconfig_omap5_only
+   +720        0      -88     +632  rmk_omap3430_ldp_allnoconfig
+   +604    +1016      +64    +1684  rmk_omap3430_ldp_oldconfig
+   +684        0     -104     +580  rmk_omap4430_sdp_allnoconfig
+   +568     +904      +64    +1536  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.0-rc3 (9eccca0843205f87c00404b663188b88eb248051))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  2430sdp        omap2plus_defconfig
+    -4k     4k      .     4k  3530es31beagle omap2plus_defconfig
+    -4k     4k      .     4k  3530es3beagle  omap2plus_defconfig
+    -4k     4k      .     4k  3730beaglexm   omap2plus_defconfig
+    -4k     4k      .     4k  3730es12beaglexmomap2plus_defconfig
+    -4k     4k      .     4k  37xxevm        omap2plus_defconfig
+    -4k     4k      .     4k  4430es2panda   omap2plus_defconfig
+    -4k     4k      .     4k  4460pandaes    omap2plus_defconfig
+    -4k     4k      .     4k  4460varsomom   omap2plus_defconfig
+    -4k     4k      .     4k  5430es2sbct54  omap2plus_defconfig
+    -8k     8k      .     4k  5430es2uevm    omap2plus_defconfig
+    -4k     4k      .      .  am335xbone     omap2plus_defconfig_am33xx_only
+    -4k     4k      .     4k  am335xbonelt   omap2plus_defconfig
