@@ -1,62 +1,35 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 16 Mar 2015 21:18:38 +0100
-Subject: sunxi: cpufreq-dt usage causes schedule_delayed_work to execute
- sooner?
-Message-ID: <55073A9E.3070600@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 16 Mar 2015 23:23:28 +0300
+Subject: [PATCH 25/35 linux-next] PCI: constify of_device_id array
+In-Reply-To: <1426535685-25996-4-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-4-git-send-email-fabf@skynet.be>
+Message-ID: <55073BC0.3020009@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ChenYu, Maxime,
+Hello.
 
-For the sunxi musb code I've been writing uses schedule_delayed_work in a few places,
-while looking at debugging printk-s in dmesg I noticed that the time stamps between
-scheduling the work and executing it are of.
+On 03/16/2015 10:54 PM, Fabian Frederick wrote:
 
-If I build a kernel without cpufreq-dt or do:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
 
-echo performance > scaling_governor
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
+>   drivers/gpio/gpio-mpc8xxx.c      | 2 +-
+>   drivers/gpio/gpio-octeon.c       | 2 +-
+>   drivers/gpio/gpio-tz1090-pdc.c   | 2 +-
+>   drivers/gpio/gpio-tz1090.c       | 2 +-
+>   drivers/gpio/gpio-zynq.c         | 2 +-
 
-The problem goes away.
+    What the GPIO driver changes are doing here, in the PCI patch?
 
-I've done some debugging and the problem is not the actual timing of the
-code, the timestamps in the dmesg output are wrong, very wrong even
-here are 2 messages where I plugged in a cable, then waited 10 seconds
-using a clock with a second hand to count them of, then unplugged:
+>   drivers/pci/host/pci-rcar-gen2.c | 2 +-
+>   drivers/pci/host/pcie-xilinx.c   | 2 +-
+>   7 files changed, 7 insertions(+), 7 deletions(-)
 
+[...]
 
-[  635.006201] musb vbus 0 -> 1
-[  637.877098] musb vbus 1 -> 0
-
-This is after doing:
-
-echo powersave > scaling_governor
-
-So it seems that the clocksource used by printk to generate timestamps
-goes slower as we scale down cpufreq, not good (tm).
-
-This:
-
-[root at localhost clocksource0]# cat available_clocksource
-arch_sys_counter timer hstimer
-[root at localhost clocksource0]# echo timer > current_clocksource
-[  725.728887] Switched to clocksource timer
-
-Does not help.
-
-I believe that the "sched_clock_register(sun5i_timer_sched_read, 32, rate);"
-call in drivers/clocksource/timer-sun5i.c is the culprit, it seems this ends
-up overriding the sched_clock_register call in
-drivers/clocksource/arm_arch_timer.c which likely does not suffer from cpufreq
-issues, and is faster (part of the cpucore) then using the hstimer anyways.
-
-Note I've not tested yet if disabling the hstimer fixes things, but I believe
-it will. Note that the hstimer will likewise be a bad clockevent source too,
-this can be fixed by registering a cpufreq notifier and calling clockevents_update_freq
-whenever the cpufreq, and thus the hstimer clkrate changes.
-
-Alternatively we could simply remove the driver altogether since the kernel
-prefers the sun4i_tick eventsource anyways.
-
-Regards,
-
-Hans
+WBR, Sergei
