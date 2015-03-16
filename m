@@ -1,74 +1,41 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon, 16 Mar 2015 20:01:18 +0100
-Subject: [PATCH v6] crypto: Add Allwinner Security System crypto accelerator
-Message-ID: <1426532482-28830-1-git-send-email-clabbe.montjoie@gmail.com>
+Date: Mon, 16 Mar 2015 20:01:19 +0100
+Subject: [PATCH v6 1/4] ARM: sun7i: dt: Add Security System to A20 SoC DTS
+In-Reply-To: <1426532482-28830-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1426532482-28830-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1426532482-28830-2-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+The Security System is a hardware cryptographic accelerator that support
+AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+It could be found on many Allwinner SoC.
 
-This is the driver for the Security System included in Allwinner SoC A20.
-The Security System (SS for short) is a hardware cryptographic accelerator that
-support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
-It could be found on others Allwinner SoC: 
-- A10s, A33 and A31 diagram speak about it with precisions (AES/DES/3DES/Md5/SHA1/PRNG)
-- A10 and A13 manual give the same datasheet for SS than A20
-- A23 speak about a security system but without precisions
-- A80 datasheet speak about a security system with more functions
-  (SHA224/SHA256/RSA/CRC) but without precisions
-  But I do not have access on any of those hardware, tests are welcome.
+This patch enable the Security System on the Allwinner A20 SoC Device-tree.
 
-  This driver currently supports:
-  - MD5 and SHA1 hash algorithms
-  - AES block cipher in CBC mode with 128/196/256bits keys.
-  - DES and 3DES block cipher in CBC mode
-  The driver exposes all those algorithms through the kernel cryptographic API.
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-  The driver support only CPU driven (aka poll mode) transfer mode,
-  since the DMA engine of the A20 does not have a mainline driver yet.
-
-  Changes since v5:
-  - Hash functions now keep partial hash states in sunxi_ss structures
-  - Use of spinlock instead of mutex
-  - Remove the static sunxi_ss structures by using container of
-  - Add export/import functions
-  - replace lots of writel by writesl
-  - replace lots of readl by readsl
-
-  Changes since v4:
-  - Rework all mutex path
-  - Use ahash_request_ctx() in hash functions
-  - Major rework of hash functions for solving mutex problems
-  - Split sunxi_req_ctx in two since ciphers now use struct sunxi_tfm_ctx
-  - Hash functions now test FIFO space register
-
-  Changes since v3:
-  - Remove all algorithms options from Kconfig, so now only one module is used
-  - Add the sunxi_ss_cipher function to unify mode calculation
-  - Remove the sunxi_cipher_exit empty function
-  - Add some missing mutex_unlock()
-  - Drop PRNG support, I wait for more comment on its results before re-enabling it.
-
-  Changes since v2:
-  - Fix Makefile and Kconfig for static kernel.
-
-  Changes since v1:
-  - annotate ss->base as __iomem
-  - regroup all mutex in the ss_ctx structure
-  - splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
-  - use dev_exit_p() for .remove
-  - added missing CRYPTO_BLKCIPHER dep in Kconfig
-  - use ahash instead of shash
-  - use ablkcipher instead of blkcipher
-  - use crypto_rng_ctx instead of crypto_tfm_ctx
-  - set seed as an u32
-  - drop useless comment decoration
-  - drop useless debug
-  - ss_ctx is now a static pointer and whole structure being allocated
-  - fix the platform_get_resource/devm_ioremap_resource pattern
-  - invert getting die id and configuring clock
-  - set clock value as a const unsigned long
-  - add MODULE_ALIAS
-  - use define names more consistency (SS_xxx)
-  - fix PRNG errors
-  - respell SS to Security System in DT documentation
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 3a8530b..8995bec 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -680,6 +680,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		crypto: crypto-engine at 01c15000 {
++			compatible = "allwinner,sun7i-a20-crypto";
++			reg = <0x01c15000 0x1000>;
++			interrupts = <0 86 4>;
++			clocks = <&ahb_gates 5>, <&ss_clk>;
++			clock-names = "ahb", "mod";
++		};
++
+ 		spi2: spi at 01c17000 {
+ 			compatible = "allwinner,sun4i-a10-spi";
+ 			reg = <0x01c17000 0x1000>;
+-- 
+2.0.5
