@@ -1,32 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 14:01:43 -0700
-Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <201503162158.50587@pali>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <2070859.WcMooC33YH@wuerfel> <20150316152939.GP5264@atomide.com>
- <201503162158.50587@pali>
-Message-ID: <20150316210143.GF12397@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 21:08:17 +0000
+Subject: [PATCH] ARM: amba: Increase number of IRQs
+In-Reply-To: <1426529962-2204-1-git-send-email-sbranden@broadcom.com>
+References: <sbranden@broadcom.com>
+ <1426529962-2204-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <20150316210817.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [150316 13:59]:
-> On Monday 16 March 2015 16:29:39 Tony Lindgren wrote:
-> > I believe the last pending issues is the support for
-> > ATAG_REVISION in device tree mode as posted by Pali.
-> > 
-> 
-> No. In DT boot there is missing /proc/atags file (readable by 
-> userspace processes).
+On Mon, Mar 16, 2015 at 11:19:22AM -0700, Scott Branden wrote:
+> The current AMBA bus only allows up to 9 IRQs per device. This is
+> incorrect, as in peripherals like PL330 can have up to 32 IRQs.
+> Increase AMBA_NR_IRQS from 9 to 32.
 
-Oh OK thanks for the update.
+I'm quite certain that 32 will also be "incorrect" at some point in the
+future, so let's not use such language.  Let's make this more neutral
+and say "This does not suit peripherals like the PL330 which can have
+up to 32 IRQs."
 
-> And also broken AES/SHA/MD5 support. Fix for crypto DT stuff
-> I already sent.
+Thanks.
 
-But this is not a regression in mainline with legacy boot vs
-device tree based booting, right? Sounds like it never worked
-in the mainline or am thinking of some other set of patches?
-
-Regards,
-
-Tony
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
