@@ -1,95 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Mar 2015 16:09:49 +0000
-Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
-In-Reply-To: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150316160948.GB18277@leverpostej>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 16:14:49 +0000
+Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
+In-Reply-To: <20150316154409.GQ5264@atomide.com>
+References: <201502271645.58765@pali>
+ <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
+ <20150302112836.GA27317@amd> <20150316154409.GQ5264@atomide.com>
+Message-ID: <20150316161449.GJ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-I agree that we want to be able to load the kernel anywhwere in memory
-(modulo alignment restrictions and the like). However, I'm not keen on
-the approach taken; I'd rather see the linear mapping split from the
-text mapping. More on that below.
-
-On Mon, Mar 16, 2015 at 03:23:40PM +0000, Ard Biesheuvel wrote:
-> These patches is a proof of concept of how we could potentially relocate
-> the kernel at runtime. This code is rough around the edges, and there are
-> a few unresolved issues, hence this RFC.
+On Mon, Mar 16, 2015 at 08:44:10AM -0700, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [150302 03:32]:
+> > On Fri 2015-02-27 16:55:26, Pali Roh?r wrote:
+> > > This patch adds support for DT "/revision" and convert ATAG_REVISION to DT.
+> > > 
+> > > Pali Roh?r (2):
+> > >   arm: devtree: Set system_rev from DT revision
+> > >   arm: boot: convert ATAG_REVISION to DT revision field
+> > 
+> > Acked-by: Pavel Machek <pavel@ucw.cz>
 > 
-> With these patches, the kernel can essentially execute at any virtual offset.
-> There are a couple of reasons why we would want this:
-> - performance: we can align PHYS_OFFSET so that most of the linear mapping can
->   be done using 512 MB or 1 GB blocks (depending on page size), instead of
->   the more granular level that is currently unavoidable if Image cannot be
->   loaded at base of RAM (since PHYS_OFFSET is tied to the start of the kernel
->   Image).
+> Are these queued somewhere now? Sounds like this is the last pending
+> issue for n900 to use legacy user space with current mainline kernels,
+> so I'd like to get these in so we can get closer to making omap3 boot
+> in device tree only mode.
 
-Isn't this gain somewhat offset by having to build the kernel as a PIE?
-If we're doing this for performance it would be good to see numbers.
+Not that I know of.  As everyone is aware, patches need to be in my
+patch system if they want me to apply them - which would've been
+especially important as I was away from kernel stuff for a week at
+the start of March (for medical reasons) and I can't be expected to
+track the status of stuff which is buried behind 1000+ extra mails.
 
-> - security: with these changes, we can put the kernel Image anywhere in physical
->   memory, and we can put the physical memory anywhere in the upper half of the
->   virtual address range (modulo alignment). This gives us quite a number of
->   bits of to play with if we were to randomize the kernel virtual address space.
->   Also, this is entirely under the control of the boot loader, which is probably
->   in better shape to get its hands on some entropy than the early kernel boot
->   code.
-> - convenience: fewer constraints when loading the kernel into memory, as it
->   can execute from anywhere.
+In any case, I'm currently not accepting /any/ patches into my tree at
+present; I'm chasing a horrid instability on one of my test platforms
+which is making it impossible to tell whether any particular change or
+changes in my tree is responsible or not for it.  It doesn't seem to be
+a hardware failure (if it was, I'd simply take the board out of the
+nightly test system.)
 
-I agree that making things easier for loaders is for the best.
+It's quite literally taking hours to figure out what's going on - I've
+been on this for about 12 hours now and still not much closer to knowing
+what's causing it (other than I know that -rc1 plus my queue seems to be
+fine, -rc3 plus my queue is definitely broken, -rc3 alone is fine.  So
+something I'm already carrying seems to be responsible, but each time I
+identify a particular patch and drop _just_ that change, I find that the
+problem is back when I try my queue minus the bad changes.  With a test
+cycle time of 20+ minutes (due to the number of boots required to make
+certain of a dependable result), this is /really/ slow progress.
 
-> How it works:
-> - an additional boot argument 'image offset' is passed in x1 by the boot loader,
->   which should contain a value that is at least the offset of Image into physical
->   memory. Higher values are also possible, and may be used to randomize the
->   kernel VA space.
+Right now, I can't be positively sure that /anything/ I have already
+merged isn't a factor in causing this problem, so I don't want to
+augment my tree with any additional patches which would upset my
+ability to move about in the tree, and get reproducable results from
+repeated testing.  To merge something else will probably mean I'll
+have to start again from the beginning and the last 12 hours spent
+testing will have been wasted.
 
-I have a very strong suspicion that bootloaders in the wild don't zero
-x1-x3, and that given that we might not have a reliable mechanism for
-acquiring the offset.
+Sorry.
 
-> - the kernel binary is runtime relocated to PAGE_OFFSET + image offset
-> 
-> Issues:
-> - Since AArch64 uses the ELF RELA format (where the addends are in the
->   relocation table and not in the code), the relocations need to be applied even
->   if the Image runs from the same offset it was linked at. It also means that
->   some values that are produced by the linker (_kernel_size_le, etc) are missing
->   from the binary. This will probably need a fixup step.
-> - The module area may be out of range, which needs to be worked around with
->   module PLTs. This is straight forward but I haven't implemented it yet for
->   arm64.
-> - The core extable is most likely broken, and would need to be changed to use
->   relative offsets instead of absolute addresses.
-
-This sounds like it's going to be a big headache.
-
-I'd rather see that we decouple the kernel (text/data) mapping from the
-linear mapping, with the former given a fixed VA independent of the PA
-of the kernel Image (which would still need to be at a 2M-aligned
-address + text_offset, and not straddling a 512M boundary).
-
-That would allow us to place the kernel anywhere in memory (modulo those
-constraints), enable us to address memory below the kernel when we do
-so, and would still allow the kernel to be built with absolute
-addressing, which keeps things simple and fast.
-
-That doesn't give us VA randomisation, but that could be built atop by
-reserving a larger VA range than necessary for the kernel, and have the
-kernel pick a window from within that (assuming we can find some entropy
-early on) to relocate itself to. That would also be independent of the
-physical layout, which is nice -- we could have randomised VAs even with
-a trivial loader that always placed the kernel at the same address
-(which is likely to be the common case).
-
-When I looked at this a while back it seemed like the majority of the
-changes were fairly mechanical (introducing and using
-text_to_phys/phys_to_text and leaving virt_to_x for the linear mapping),
-and the big pain points seemed to be the page table init (where we rely
-on memory at the end of the kernel mapping) and KVM.
-
-Mark.
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
