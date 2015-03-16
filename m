@@ -1,60 +1,157 @@
-From: fugang.duan@freescale.com (fugang.duan at freescale.com)
-Date: Mon, 16 Mar 2015 14:01:12 +0000
-Subject: Bug in drivers/net/ethernet/freescale/fec_main.c, TX is broken.
- In 4.0.0-rc3
-In-Reply-To: <726281426513068@web10o.yandex.ru>
-References: <390621425930628@web28o.yandex.ru>
- <3625951426018334@web26j.yandex.ru>
- <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
- <726281426513068@web10o.yandex.ru>
-Message-ID: <BLUPR03MB3739B9C6E14A106CCAEBA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 Mar 2015 15:05:59 +0100
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <1426112117-18220-2-git-send-email-dianders@chromium.org>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+Message-ID: <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ????? ?????? <rockford@yandex.ru> Sent: Monday, March 16, 2015 9:38 PM
-> To: Duan Fugang-B38611; netdev at vger.kernel.org; linux-arm-kernel
-> Subject: Re: Bug in drivers/net/ethernet/freescale/fec_main.c, TX is
-> broken. In 4.0.0-rc3
-> 
-> Hi!
-> 
-> 16.03.2015, 12:21, "fugang.duan at freescale.com"
-> <fugang.duan@freescale.com>:
-> >
-> > I try your case on i.MX6q sabresd board with net tree kernel.
-> > root at freescale ~$ uname -r
-> > 4.0.0-rc3-11071-gf00bbd2
-> >
-> > With below test steps for 10 time, the zero file size range from 20M
-> > to 300M bytes, compare the md5sum checksum between i.MX6q and i.MX6q/PC
-> host, ?the checksum is the same.
-> >
-> > root at freescale ~$ rm zeros
-> > root at freescale ~$ dd if=/dev/zero of=zeros bs=1M count=300
-> > 300+0 records in
-> > 300+0 records out
-> > 314572800 bytes (300.0MB) copied, 1.811459 seconds, 165.6MB/s
-> > root at freescale ~$ md5sum -b zeros
-> > 0d97a9cd8bbd7ce75a2a76bb06258915 ?zeros root at freescale ~$ cp zeros
-> > /mnt/nfs/ -f root at freescale ~$ rm zeros root at freescale ~$ cp
-> > /mnt/nfs/zeros ./ root at freescale ~$ md5sum -b zeros
-> > 0d97a9cd8bbd7ce75a2a76bb06258915 ?zeros
-> >
-> > Do you have any lost for reproduce the issue ?
-> 
-> Current net tree does not have this issue, it works fine. Thanks to all.
-> 
-> From git://git.kernel.org/pub/scm/linux/kernel/git/davem/net.git
-> 
-> apx at astra:~$ uname -r
-> 4.0.0-rc3-00150-g10640d3-dirty
-> 
-> 
+On 11 March 2015 at 23:15, Doug Anderson <dianders@chromium.org> wrote:
+> This adds logic to the MMC core to set VQMMC.  This is expected to be
+> called by MMC drivers like dw_mmc as part of (or instead of) their
+> start_signal_voltage_switch() callback.
+>
+> A few notes:
+>
+> * When setting the signal voltage to 3.3V we do our best to make VQMMC
+>   and VMMC match.  It's been reported that this makes some old cards
+>   happy since they were tested back in the day before UHS when VQMMC
+>   and VMMC were provided by the same regulator.  A nice side effect of
+>   this is that we don't end up on the hairy edge of VQMMC (2.7V),
+>   which some EEs claim is a little too close to the minimum for
+>   comfort.
+>
+> * When setting the signal voltage to 1.8V or 1.2V we aim for that
+>   specific voltage instead of picking the lowest one in the range.
+>
+> * We very purposely don't print errors in mmc_regulator_set_vqmmc().
+>   There are cases where the MMC core will try several different
+>   voltages and we don't want to pollute the logs.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Reviewed-by: Andrew Bresticker <abrestic@chromium.org>
+> ---
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2:
+> - Now use existing regulator_set_voltage_tol() function.
+>
+>  drivers/mmc/core/core.c  | 51 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mmc/host.h |  7 +++++++
+>  2 files changed, 58 insertions(+)
+>
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index 23f10f7..1d3b84e 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1394,6 +1394,57 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
+>  }
+>  EXPORT_SYMBOL_GPL(mmc_regulator_set_ocr);
+>
+> +static int mmc_regulator_set_voltage_if_supported(struct regulator *regulator,
+> +                                                 int new_uV, int tol_uV)
+> +{
+> +       /*
+> +        * Check if supported first to avoid errors since we may try several
+> +        * signal levels during power up and don't want to show errors.
+> +        */
+> +       if (!regulator_is_supported_voltage_tol(regulator, new_uV, tol_uV))
+> +               return -EINVAL;
+> +
+> +       return regulator_set_voltage_tol(regulator, new_uV, tol_uV);
+> +}
+> +
+> +/**
+> + * mmc_regulator_set_vqmmc - Set VQMMC as per the ios
+> + *
+> + * For 3.3V signaling, we try to match VQMMC to VMMC as closely as possible.
+> + * That will match the behavior of old boards where VQMMC and VMMC were supplied
+> + * by the same supply.  The Bus Operating conditions for 3.3V signaling in the
+> + * SD card spec also define VQMMC in terms of VMMC.
+> + *
+> + * For 1.2V and 1.8V signaling we'll try to get as close as possible to the
+> + * requested voltage.  This is definitely a good idea for UHS where there's a
+> + * separate regulator on the card that's trying to make 1.8V and it's best if
+> + * we match.
+> + *
+> + * This function is expected to be used by a controller's
+> + * start_signal_voltage_switch() function.
+> + */
+> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios)
+> +{
+> +       /* If no vqmmc supply then we can't change the voltage */
+> +       if (IS_ERR(mmc->supply.vqmmc))
+> +               return -EINVAL;
+> +
+> +       switch (ios->signal_voltage) {
+> +       case MMC_SIGNAL_VOLTAGE_120:
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                       1200000, 100000);
+
+Is 1V the lowest possible value? How did you get to that?
+
+> +       case MMC_SIGNAL_VOLTAGE_180:
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                       1800000, 100000);
+
+Is 1V the lowest possible value? How did you get to that?
+
+> +       case MMC_SIGNAL_VOLTAGE_330:
+> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
+> +                       regulator_get_voltage(mmc->supply.vmmc), 300000);
+
+Why 3V? Shouldn't it be 2.7V? How will else those SoC that for example
+supports 2.9V only work?
+
+> +       default:
+> +               return -EINVAL;
+> +       }
+> +}
+> +EXPORT_SYMBOL_GPL(mmc_regulator_set_vqmmc);
+> +
+>  #endif /* CONFIG_REGULATOR */
+>
+>  int mmc_regulator_get_supply(struct mmc_host *mmc)
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index 0c8cbe5..edd7d59 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -416,6 +416,7 @@ int mmc_regulator_get_ocrmask(struct regulator *supply);
+>  int mmc_regulator_set_ocr(struct mmc_host *mmc,
+>                         struct regulator *supply,
+>                         unsigned short vdd_bit);
+> +int mmc_regulator_set_vqmmc(struct mmc_host *mmc, struct mmc_ios *ios);
+>  #else
+>  static inline int mmc_regulator_get_ocrmask(struct regulator *supply)
+>  {
+> @@ -428,6 +429,12 @@ static inline int mmc_regulator_set_ocr(struct mmc_host *mmc,
+>  {
+>         return 0;
+>  }
+> +
+> +static inline int mmc_regulator_set_vqmmc(struct mmc_host *mmc,
+> +                                         struct mmc_ios *ios)
+> +{
+> +       return -EINVAL;
+> +}
+>  #endif
+>
+>  int mmc_regulator_get_supply(struct mmc_host *mmc);
+
+One more thought,s as for the vmmc regulator we have a
+"regulator_enabled" member in the mmc_host. Should we add a similar
+member for vqmmc? That would prevent host drivers from keeping track
+of this state themselves.
+
+Kind regards
+Uffe
+
 > --
->  ??????
-
-I test the commit f00bbd2 that include the patch 2b995f63987.
-But cannot reproduce your issue. Pls double confirm it in your board.
-
-Regards,
-Andy
+> 2.2.0.rc0.207.ga3a616c
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
