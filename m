@@ -1,27 +1,57 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Mon, 16 Mar 2015 20:51:34 +0100
-Subject: [PATCH 05/35 linux-next] tty: constify of_device_id array
-In-Reply-To: <1426533469-25458-6-git-send-email-fabf@skynet.be> (Fabian
- Frederick's message of "Mon, 16 Mar 2015 20:17:11 +0100")
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426533469-25458-6-git-send-email-fabf@skynet.be>
-Message-ID: <878uewen5l.fsf@dell.be.48ers.dk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Mar 2015 20:52:45 +0100
+Subject: PM: knowing the system state in the device callback
+In-Reply-To: <20150316191742.GI4560@piout.net>
+References: <20150316191742.GI4560@piout.net>
+Message-ID: <20150316205245.1b66bbea@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Fabian" == Fabian Frederick <fabf@skynet.be> writes:
+Hi Alexandre,
 
- > of_device_id is always used as const.
- > (See driver.of_match_table and open firmware functions)
+On Mon, 16 Mar 2015 20:17:42 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
- > Signed-off-by: Fabian Frederick <fabf@skynet.be>
- > ---
+> Hi,
+> 
+> I'm trying to get rid of at91_suspend_entering_slow_clock() which is
+> exposing the platform suspend_state_t to the devices. From what I
+> understand, whenever suspend_state_t is PM_SUSPEND_MEM or
+> PM_SUSPEND_STANDBY, the pm_message_t passed to the device driver is
+> always PM_EVENT_SUSPEND.
+> 
+> The requirement is to know whether we are going to cut the master clock
+> and in that case, avoid calling enable_irq_wake() because we will not be
+> able to wakeup from the device.
 
-For this:
+Actually the master clock is never switched off, we're only changing
+its source (from PLLA to slow clk) which in turn changes its rate.
 
->  drivers/tty/serial/uartlite.c               | 2 +-
+> 
+> Is there a better way to do that? Or should I implement a similar
+> function in the pm core (which I guess would already be there if
+> really needed)?
 
-Acked-by: Peter Korsgaard <peter@korsgaard.com>
+IMHO we should let devices (RTC/RTT, debug UART, GPIOC, ...) mark their
+interrupt line as a wakeup interrupt, and adapt the device
+configuration (UART baudrate, ...) according to the new master clock
+rate instead of testing the suspend mode to check whether we can mark
+irq lines as wakeup sources or not.
+The fact that we're disabling PLLA is not really related to
+suspend-to-ram mode (we could leave the master clock unchanged and
+still put the SDRAM chip in self-refresh mode).
+
+The problem here is that we need some kind of notifier infrastructure
+that would be called before the master clock source is switched to slow
+clock. This notifier must be written in asm so that it can be called
+from the asm code executed from SRAM (the SDRAM chip is placed in self
+refresh before switching to slow clock).
+
+Best Regards,
+
+Boris
 
 -- 
-Bye, Peter Korsgaard
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
