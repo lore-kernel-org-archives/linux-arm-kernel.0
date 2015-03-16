@@ -1,94 +1,46 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 16 Mar 2015 20:14:52 +0800
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <2027737.r7gkxqZ3Xv@vostro.rjw.lan>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <2027737.r7gkxqZ3Xv@vostro.rjw.lan>
-Message-ID: <5506C93C.704@linaro.org>
+From: afaerber@suse.de (=?windows-1252?Q?Andreas_F=E4rber?=)
+Date: Mon, 16 Mar 2015 13:15:01 +0100
+Subject: [PATCH 1/1] ARM: dts: don't make DP a consumer of DISP1 on
+ Exynos5250
+In-Reply-To: <1426320716-28137-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1426320716-28137-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <5506C945.5030603@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
-> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
->> From: Graeme Gregory <graeme.gregory@linaro.org>
->>
->> ACPI 5.1 does not currently support S states for ARM64 hardware but
->> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
->> for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
->> and select it for x86 and ia64 only to make sleep functions available,
->> and also introduce stub function to allow other drivers to function
->> until S states are defined for ARM64.
->>
->> It will be no functional change for x86 and IA64.
->>
->> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
->> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> Acked-by: Robert Richter <rrichter@cavium.com>
->> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   arch/ia64/Kconfig       | 1 +
->>   arch/x86/Kconfig        | 1 +
->>   drivers/acpi/Kconfig    | 4 ++++
->>   drivers/acpi/Makefile   | 2 +-
->>   drivers/acpi/internal.h | 4 ++++
->>   5 files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
->> index 074e52b..e8728d7 100644
->> --- a/arch/ia64/Kconfig
->> +++ b/arch/ia64/Kconfig
->> @@ -10,6 +10,7 @@ config IA64
->>   	select ARCH_MIGHT_HAVE_PC_SERIO
->>   	select PCI if (!IA64_HP_SIM)
->>   	select ACPI if (!IA64_HP_SIM)
->> +	select ACPI_GENERIC_SLEEP if ACPI
->>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->>   	select HAVE_UNSTABLE_SCHED_CLOCK
->>   	select HAVE_IDE
->> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
->> index b7d31ca..9804431 100644
->> --- a/arch/x86/Kconfig
->> +++ b/arch/x86/Kconfig
->> @@ -22,6 +22,7 @@ config X86_64
->>   ### Arch settings
->>   config X86
->>   	def_bool y
->> +	select ACPI_GENERIC_SLEEP if ACPI
->
-> One more nit.  If you did
->
-> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
->
-> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
-> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+Am 14.03.2015 um 09:11 schrieb Javier Martinez Canillas:
+> By making the DP controller a consumer of DISP1, the PD is powered
+> off when the exynos-dp probe is deferred and powered on again when
+> the exynos-drm driver is probed.
+> 
+> But this causes the exynos-dp driver failing to obtain the stream
+> clock since the FIMD has been powered off with the DISP1 PD:
+> 
+> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+> exynos-dp 145b0000.dp-controller: unable to config video
+> 
+> The Exynos5250 documentation doesn't mention that the Display Port
+> Transmitter module is included in the DISP1 PD so the device should
+> not have a reference to this Power Domain.
+> 
+> This patch fixes video display on an Exynos5250 Snow Chromebook.
+> 
+> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
+> Hello Andrzej and Marek,
+> 
+> I need this patch to have display working on an Snow Chromebook
 
-In sleep.c,
+Tested-by: Andreas F?rber <afaerber@suse.de>
 
-#ifdef CONFIG_ACPI_SLEEP
-acpi_target_system_state()
-{
-}
-#endif
+This fixes the display on the Spring Chromebook as well!
 
-and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
-which one of them will be enabled on ARM64 so ACPI_SLEEP
-will also enabled too.
+Thanks,
+Andreas
 
-So if we
-
-+select ACPI_GENERIC_SLEEP if ACPI_SLEEP
-
-and
-
-+acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
-
-it will lead to errors for acpi_target_system_state() that
-is declared but not defined, so I will keep the code as
-it is, what do you think?
-
-Thanks
-Hanjun
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
