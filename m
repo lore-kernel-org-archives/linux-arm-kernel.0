@@ -1,50 +1,44 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Mar 2015 10:52:07 +0000
-Subject: [PATCH] arm64: put __boot_cpu_mode label after alignment instead
- of before
-In-Reply-To: <1426260078-20720-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426260078-20720-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150316105206.GB15066@leverpostej>
+Date: Mon, 16 Mar 2015 10:53:30 +0000
+Subject: [PATCH 0/4] arm64: boot fixes/updates
+In-Reply-To: <CAKv+Gu_CDJu5Wx3uEU4Qv4_d1350n0hNnQye147gH4a=Qcow_w@mail.gmail.com>
+References: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu_CDJu5Wx3uEU4Qv4_d1350n0hNnQye147gH4a=Qcow_w@mail.gmail.com>
+Message-ID: <20150316105330.GC15066@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 03:21:18PM +0000, Ard Biesheuvel wrote:
-> Another one for the big head.S spring cleaning: the label should
-> be after the .align or it may point to the padding.
+On Sat, Mar 14, 2015 at 07:59:02AM +0000, Ard Biesheuvel wrote:
+> On 13 March 2015 at 17:14, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi all,
+> >
+> > The following patches address a few boot related issues I spotted
+> > recently.
+> >
+> > The first patch fixes alternatives for !SMP kernels, the second fixes a
+> > potential issue with boot mode detection, and the final patches give us
+> > some better logging of the boot mode, fixing a latent bug in mismatch
+> > detection (though until now this has not been a problem).
+> >
+> > Ard, Marc, I guess our recent boot patches are all going to clash. Do we
+> > need to sort that out between us or are we relying on the arm64
+> > maintainers? ;)
+> >
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Seems we spotted and fixed the same bug at the same time :-)
+> (but I failed to put you on cc)
+> 
+> http://article.gmane.org/gmane.linux.ports.arm.kernel/400100
 
-Given I managed to produce the exact same patch, this obviously looks
-good to me:
+Haha. Your patch looks good to me, so I've given it my Ack. :)
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+> I can stick all of our patches on a branch for Will to pull, if people
+> are ok with that?
+
+That sounds fine by me.
+
+> I need another couple of acks though
+
+Understood.
 
 Mark.
-
-> ---
->  arch/arm64/kernel/head.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 3e300bfb0089..9c856f2aa7a5 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -557,8 +557,8 @@ ENDPROC(set_cpu_boot_mode_flag)
->   * zeroing of .bss would clobber it.
->   */
->  	.pushsection	.data..cacheline_aligned
-> -ENTRY(__boot_cpu_mode)
->  	.align	L1_CACHE_SHIFT
-> +ENTRY(__boot_cpu_mode)
->  	.long	BOOT_CPU_MODE_EL2
->  	.long	0
->  	.popsection
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
