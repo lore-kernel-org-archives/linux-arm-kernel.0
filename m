@@ -1,54 +1,948 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Mar 2015 06:34:19 +0100
+Date: Mon, 16 Mar 2015 06:55:07 +0100
 Subject: [PATCH 1/5] clk: mediatek: Add initial common clock support for
  Mediatek SoCs.
-In-Reply-To: <55031468.2040109@gmail.com>
-References: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
- <1424605765-19751-2-git-send-email-s.hauer@pengutronix.de>
- <55031468.2040109@gmail.com>
-Message-ID: <20150316053419.GE24798@pengutronix.de>
+In-Reply-To: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
+References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1426485311-31428-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 05:46:32PM +0100, Matthias Brugger wrote:
-> 
-> 
-> On 22/02/15 12:49, Sascha Hauer wrote:
-> > From: James Liao <jamesjj.liao@mediatek.com>
-> 
-> > diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-> > new file mode 100644
-> > index 0000000..c7c0d35
-> > --- /dev/null
-> > +++ b/drivers/clk/mediatek/clk-mtk.h
-> 
-> [...]
-> 
-> > +void __init mtk_clk_register_plls(struct device_node *node,
-> > +		const struct mtk_pll_data *plls, int num_plls);
-> > +
-> > +#ifdef CONFIG_RESET_CONTROLLER
-> > +void mtk_register_reset_controller(struct device_node *np,
-> > +			unsigned int num_regs, int regofs);
-> > +#else
-> > +static inline void mtk_register_reset_controller(struct device_node *np,
-> > +			unsigned int num_regs, int regofs)
-> > +{
-> > +}
-> > +#endif
-> 
-> This lines should only be added once in [2/5], compiling ends with:
-> 
-> In file included from drivers/clk/mediatek/clk-mtk.c:24:0:
-> drivers/clk/mediatek/clk-mtk.h:168:20: error: redefinition of ?mtk_register_reset_controller?
-> drivers/clk/mediatek/clk-mtk.h:158:20: note: previous definition of ?mtk_register_reset_controller? was here
+From: James Liao <jamesjj.liao@mediatek.com>
 
-Hm, seems to be a rebase accident. Fixed, thanks
+This patch adds common clock support for Mediatek SoCs, including plls,
+muxes and clock gates.
 
-Sascha
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/clk/Makefile            |   1 +
+ drivers/clk/mediatek/Makefile   |   1 +
+ drivers/clk/mediatek/clk-gate.c | 137 +++++++++++++++++
+ drivers/clk/mediatek/clk-gate.h |  49 ++++++
+ drivers/clk/mediatek/clk-mtk.c  | 197 ++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.h  | 155 +++++++++++++++++++
+ drivers/clk/mediatek/clk-pll.c  | 325 ++++++++++++++++++++++++++++++++++++++++
+ 7 files changed, 865 insertions(+)
+ create mode 100644 drivers/clk/mediatek/Makefile
+ create mode 100644 drivers/clk/mediatek/clk-gate.c
+ create mode 100644 drivers/clk/mediatek/clk-gate.h
+ create mode 100644 drivers/clk/mediatek/clk-mtk.c
+ create mode 100644 drivers/clk/mediatek/clk-mtk.h
+ create mode 100644 drivers/clk/mediatek/clk-pll.c
 
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index d478ceb..6d97203 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -49,6 +49,7 @@ obj-$(CONFIG_ARCH_HI3xxx)		+= hisilicon/
+ obj-$(CONFIG_ARCH_HIP04)		+= hisilicon/
+ obj-$(CONFIG_ARCH_HIX5HD2)		+= hisilicon/
+ obj-$(CONFIG_COMMON_CLK_KEYSTONE)	+= keystone/
++obj-$(CONFIG_ARCH_MEDIATEK)		+= mediatek/
+ ifeq ($(CONFIG_COMMON_CLK), y)
+ obj-$(CONFIG_ARCH_MMP)			+= mmp/
+ endif
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+new file mode 100644
+index 0000000..c384e97
+--- /dev/null
++++ b/drivers/clk/mediatek/Makefile
+@@ -0,0 +1 @@
++obj-y += clk-mtk.o clk-pll.o clk-gate.o
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+new file mode 100644
+index 0000000..9d77ee3
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -0,0 +1,137 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/clkdev.h>
++
++#include "clk-mtk.h"
++#include "clk-gate.h"
++
++static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
++{
++	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	u32 val;
++
++	regmap_read(cg->regmap, cg->sta_ofs, &val);
++
++	val &= BIT(cg->bit);
++
++	return val == 0;
++}
++
++static int mtk_cg_bit_is_set(struct clk_hw *hw)
++{
++	struct mtk_clk_gate *cg = to_clk_gate(hw);
++	u32 val;
++
++	regmap_read(cg->regmap, cg->sta_ofs, &val);
++
++	val &= BIT(cg->bit);
++
++	return val != 0;
++}
++
++static void mtk_cg_set_bit(struct clk_hw *hw)
++{
++	struct mtk_clk_gate *cg = to_clk_gate(hw);
++
++	regmap_write(cg->regmap, cg->set_ofs, BIT(cg->bit));
++}
++
++static void mtk_cg_clr_bit(struct clk_hw *hw)
++{
++	struct mtk_clk_gate *cg = to_clk_gate(hw);
++
++	regmap_write(cg->regmap, cg->clr_ofs, BIT(cg->bit));
++}
++
++static int mtk_cg_enable(struct clk_hw *hw)
++{
++	mtk_cg_clr_bit(hw);
++
++	return 0;
++}
++
++static void mtk_cg_disable(struct clk_hw *hw)
++{
++	mtk_cg_set_bit(hw);
++}
++
++static int mtk_cg_enable_inv(struct clk_hw *hw)
++{
++	mtk_cg_set_bit(hw);
++
++	return 0;
++}
++
++static void mtk_cg_disable_inv(struct clk_hw *hw)
++{
++	mtk_cg_clr_bit(hw);
++}
++
++const struct clk_ops mtk_clk_gate_ops_setclr = {
++	.is_enabled	= mtk_cg_bit_is_cleared,
++	.enable		= mtk_cg_enable,
++	.disable	= mtk_cg_disable,
++};
++
++const struct clk_ops mtk_clk_gate_ops_setclr_inv = {
++	.is_enabled	= mtk_cg_bit_is_set,
++	.enable		= mtk_cg_enable_inv,
++	.disable	= mtk_cg_disable_inv,
++};
++
++struct clk *mtk_clk_register_gate(
++		const char *name,
++		const char *parent_name,
++		struct regmap *regmap,
++		int set_ofs,
++		int clr_ofs,
++		int sta_ofs,
++		u8 bit,
++		const struct clk_ops *ops)
++{
++	struct mtk_clk_gate *cg;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	cg = kzalloc(sizeof(*cg), GFP_KERNEL);
++	if (!cg)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.flags = CLK_SET_RATE_PARENT;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
++	init.ops = ops;
++
++	cg->regmap = regmap;
++	cg->set_ofs = set_ofs;
++	cg->clr_ofs = clr_ofs;
++	cg->sta_ofs = sta_ofs;
++	cg->bit = bit;
++
++	cg->hw.init = &init;
++
++	clk = clk_register(NULL, &cg->hw);
++	if (IS_ERR(clk))
++		kfree(cg);
++
++	return clk;
++}
+diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+new file mode 100644
+index 0000000..6b6780b
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-gate.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __DRV_CLK_GATE_H
++#define __DRV_CLK_GATE_H
++
++#include <linux/regmap.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++
++struct mtk_clk_gate {
++	struct clk_hw	hw;
++	struct regmap	*regmap;
++	int		set_ofs;
++	int		clr_ofs;
++	int		sta_ofs;
++	u8		bit;
++};
++
++static inline struct mtk_clk_gate *to_clk_gate(struct clk_hw *hw)
++{
++	return container_of(hw, struct mtk_clk_gate, hw);
++}
++
++extern const struct clk_ops mtk_clk_gate_ops_setclr;
++extern const struct clk_ops mtk_clk_gate_ops_setclr_inv;
++
++struct clk *mtk_clk_register_gate(
++		const char *name,
++		const char *parent_name,
++		struct regmap *regmap,
++		int set_ofs,
++		int clr_ofs,
++		int sta_ofs,
++		u8 bit,
++		const struct clk_ops *ops);
++
++#endif /* __DRV_CLK_GATE_H */
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+new file mode 100644
+index 0000000..5d3a53b
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -0,0 +1,197 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/delay.h>
++#include <linux/clkdev.h>
++#include <linux/mfd/syscon.h>
++
++#include "clk-mtk.h"
++#include "clk-gate.h"
++
++struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num)
++{
++	int i;
++	struct clk_onecell_data *clk_data;
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return NULL;
++
++	clk_data->clks = kcalloc(clk_num, sizeof(*clk_data->clks), GFP_KERNEL);
++	if (!clk_data->clks)
++		goto err_out;
++
++	clk_data->clk_num = clk_num;
++
++	for (i = 0; i < clk_num; ++i)
++		clk_data->clks[i] = ERR_PTR(-ENOENT);
++
++	return clk_data;
++err_out:
++	kfree(clk_data);
++
++	return NULL;
++}
++
++void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
++		struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_fixed_factor *ff = &clks[i];
++
++		clk = clk_register_fixed_factor(NULL, ff->name, ff->parent_name,
++				CLK_SET_RATE_PARENT, ff->mult, ff->div);
++
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++					ff->name, PTR_ERR(clk));
++			continue;
++		}
++
++		if (clk_data)
++			clk_data->clks[ff->id] = clk;
++	}
++}
++
++int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks,
++		int num, struct clk_onecell_data *clk_data)
++{
++	int i;
++	struct clk *clk;
++	struct regmap *regmap;
++
++	if (!clk_data)
++		return -ENOMEM;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
++				PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_gate *gate = &clks[i];
++
++		clk = mtk_clk_register_gate(gate->name, gate->parent_name,
++				regmap,
++				gate->regs->set_ofs,
++				gate->regs->clr_ofs,
++				gate->regs->sta_ofs,
++				gate->shift, gate->ops);
++
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++					gate->name, PTR_ERR(clk));
++			continue;
++		}
++
++		clk_data->clks[gate->id] = clk;
++	}
++
++	return 0;
++}
++
++struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
++		void __iomem *base, spinlock_t *lock)
++{
++	struct clk *clk;
++	struct clk_mux *mux = NULL;
++	struct clk_gate *gate = NULL;
++	struct clk_divider *div = NULL;
++	struct clk_hw *mux_hw = NULL, *gate_hw = NULL, *div_hw = NULL;
++	const struct clk_ops *mux_ops = NULL, *gate_ops = NULL, *div_ops = NULL;
++	const char **parent_names;
++	const char *parent;
++	int num_parents;
++	int ret;
++
++	if (mc->mux_shift >= 0) {
++		mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++		if (!mux)
++			return ERR_PTR(-ENOMEM);
++
++		mux->reg = base + mc->mux_reg;
++		mux->mask = BIT(mc->mux_width) - 1;
++		mux->shift = mc->mux_shift;
++		mux->lock = lock;
++
++		mux_hw = &mux->hw;
++		mux_ops = &clk_mux_ops;
++
++		parent_names = mc->parent_names;
++		num_parents = mc->num_parents;
++	} else {
++		parent = mc->parent;
++		parent_names = &parent;
++		num_parents = 1;
++	}
++
++	if (mc->gate_shift >= 0) {
++		gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++		if (!gate) {
++			ret = -ENOMEM;
++			goto err_out;
++		}
++
++		gate->reg = base + mc->gate_reg;
++		gate->bit_idx = mc->gate_shift;
++		gate->flags = CLK_GATE_SET_TO_DISABLE;
++		gate->lock = lock;
++
++		gate_hw = &gate->hw;
++		gate_ops = &clk_gate_ops;
++	}
++
++	if (mc->divider_shift >= 0) {
++		div = kzalloc(sizeof(*div), GFP_KERNEL);
++		if (!div) {
++			ret = -ENOMEM;
++			goto err_out;
++		}
++
++		div->reg = base + mc->divider_reg;
++		div->shift = mc->divider_shift;
++		div->width = mc->divider_width;
++		div->lock = lock;
++
++		div_hw = &div->hw;
++		div_ops = &clk_divider_ops;
++	}
++
++	clk = clk_register_composite(NULL, mc->name, parent_names, num_parents,
++		mux_hw, mux_ops,
++		div_hw, div_ops,
++		gate_hw, gate_ops,
++		mc->flags);
++
++	if (IS_ERR(clk)) {
++		kfree(gate);
++		kfree(mux);
++	}
++
++	return clk;
++err_out:
++	kfree(mux);
++
++	return ERR_PTR(ret);
++}
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+new file mode 100644
+index 0000000..c660a9e
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -0,0 +1,155 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __DRV_CLK_MTK_H
++#define __DRV_CLK_MTK_H
++
++#include <linux/regmap.h>
++#include <linux/bitops.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++
++#define MAX_MUX_GATE_BIT	31
++#define INVALID_MUX_GATE_BIT	(MAX_MUX_GATE_BIT + 1)
++
++#define MHZ (1000 * 1000)
++
++struct mtk_fixed_factor {
++	int id;
++	const char *name;
++	const char *parent_name;
++	int mult;
++	int div;
++};
++
++#define FACTOR(_id, _name, _parent, _mult, _div) {	\
++		.id = _id,				\
++		.name = _name,				\
++		.parent_name = _parent,			\
++		.mult = _mult,				\
++		.div = _div,				\
++	}
++
++extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
++		int num, struct clk_onecell_data *clk_data);
++
++struct mtk_composite {
++	int id;
++	const char *name;
++	const char **parent_names;
++	const char *parent;
++	unsigned flags;
++
++	uint32_t mux_reg;
++	uint32_t divider_reg;
++	uint32_t gate_reg;
++
++	signed char mux_shift;
++	signed char mux_width;
++	signed char gate_shift;
++
++	signed char divider_shift;
++	signed char divider_width;
++
++	signed char num_parents;
++};
++
++#define MUX_GATE(_id, _name, _parents, _reg, _shift, _width, _gate) {	\
++		.id = _id,						\
++		.name = _name,						\
++		.mux_reg = _reg,					\
++		.mux_shift = _shift,					\
++		.mux_width = _width,					\
++		.gate_reg = _reg,					\
++		.gate_shift = _gate,					\
++		.divider_shift = -1,					\
++		.parent_names = _parents,				\
++		.num_parents = ARRAY_SIZE(_parents),			\
++		.flags = CLK_SET_RATE_PARENT,				\
++	}
++
++#define MUX(_id, _name, _parents, _reg, _shift, _width) {		\
++		.id = _id,						\
++		.name = _name,						\
++		.mux_reg = _reg,					\
++		.mux_shift = _shift,					\
++		.mux_width = _width,					\
++		.gate_shift = -1,					\
++		.divider_shift = -1,					\
++		.parent_names = _parents,				\
++		.num_parents = ARRAY_SIZE(_parents),			\
++		.flags = CLK_SET_RATE_PARENT,				\
++	}
++
++#define DIV_GATE(_id, _name, _parent, _gate_reg, _gate_shift, _div_reg, _div_width, _div_shift) {	\
++		.id = _id,						\
++		.parent = _parent,					\
++		.name = _name,						\
++		.divider_reg = _div_reg,				\
++		.divider_shift = _div_shift,				\
++		.divider_width = _div_width,				\
++		.gate_reg = _gate_reg,					\
++		.gate_shift = _gate_shift,				\
++		.mux_shift = -1,					\
++		.flags = 0,						\
++	}
++
++struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
++		void __iomem *base, spinlock_t *lock);
++
++struct mtk_gate_regs {
++	u32 sta_ofs;
++	u32 clr_ofs;
++	u32 set_ofs;
++};
++
++struct mtk_gate {
++	int id;
++	const char *name;
++	const char *parent_name;
++	const struct mtk_gate_regs *regs;
++	int shift;
++	const struct clk_ops *ops;
++};
++
++int mtk_clk_register_gates(struct device_node *node, const struct mtk_gate *clks,
++		int num, struct clk_onecell_data *clk_data);
++
++struct clk_onecell_data *mtk_alloc_clk_data(unsigned int clk_num);
++
++#define HAVE_RST_BAR	BIT(0)
++
++struct mtk_pll_data {
++	int id;
++	const char *name;
++	uint32_t reg;
++	uint32_t pwr_reg;
++	uint32_t en_mask;
++	uint32_t pd_reg;
++	uint32_t tuner_reg;
++	int pd_shift;
++	unsigned int flags;
++	const struct clk_ops *ops;
++	u32 rst_bar_mask;
++	unsigned long fmax;
++	int pcwbits;
++	uint32_t pcw_reg;
++	int pcw_shift;
++};
++
++void __init mtk_clk_register_plls(struct device_node *node,
++		const struct mtk_pll_data *plls, int num_plls,
++		struct clk_onecell_data *clk_data);
++
++#endif /* __DRV_CLK_MTK_H */
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+new file mode 100644
+index 0000000..5589e45
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -0,0 +1,325 @@
++/*
++ * Copyright (c) 2014 MediaTek Inc.
++ * Author: James Liao <jamesjj.liao@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++#include <linux/clkdev.h>
++#include <linux/delay.h>
++
++#include "clk-mtk.h"
++
++#define CON0_BASE_EN		BIT(0)
++#define CON0_PWR_ON		BIT(0)
++#define CON0_ISO_EN		BIT(1)
++#define CON0_PCW_CHG		BIT(31)
++
++#define AUDPLL_TUNER_EN		BIT(31)
++
++/*
++ * MediaTek PLLs are configured through their pcw value. The pcw value describes
++ * a divider in the PLL feedback loop which consists of 7 bits for the integer
++ * part and the remaining bits (if present) for the fractional part. Also they
++ * have a 3 bit power-of-two post divider.
++ */
++
++struct mtk_clk_pll {
++	struct clk_hw	hw;
++	void __iomem	*base_addr;
++	void __iomem	*pd_addr;
++	void __iomem	*pwr_addr;
++	void __iomem	*tuner_addr;
++	void __iomem	*pcw_addr;
++	const struct mtk_pll_data *data;
++};
++
++static inline struct mtk_clk_pll *to_mtk_clk_pll(struct clk_hw *hw)
++{
++	return container_of(hw, struct mtk_clk_pll, hw);
++}
++
++static int mtk_pll_is_prepared(struct clk_hw *hw)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++
++	return (readl(pll->base_addr) & CON0_BASE_EN) != 0;
++}
++
++static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
++		u32 pcw, int postdiv)
++{
++	int pcwbits = pll->data->pcwbits;
++	int pcwfbits;
++	u64 vco;
++	u8 c = 0;
++
++	/* The fractional part of the PLL divider. */
++	pcwfbits = pcwbits > 7 ? pcwbits - 7 : 0;
++
++	vco = (u64)fin * pcw;
++
++	if (pcwfbits && (vco & GENMASK(pcwfbits - 1, 0)))
++		c = 1;
++
++	vco >>= pcwfbits;
++
++	if (c)
++		++vco;
++
++	return ((unsigned long)vco + postdiv - 1) / postdiv;
++}
++
++static void mtk_pll_set_rate_regs(struct clk_hw *hw, u32 pcw,
++		int postdiv)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 con1, pd, val;
++	int pll_en;
++
++	/* set postdiv */
++	pd = readl(pll->pd_addr);
++	pd &= ~(0x7 << pll->data->pd_shift);
++	pd |= (ffs(postdiv) - 1) << pll->data->pd_shift;
++	writel(pd, pll->pd_addr);
++
++	pll_en = readl(pll->base_addr) & CON0_BASE_EN;
++
++	/* set pcw */
++	val = readl(pll->pcw_addr);
++
++	val &= ~GENMASK(pll->data->pcw_shift + pll->data->pcwbits - 1,
++			pll->data->pcw_shift);
++	val |= pcw << pll->data->pcw_shift;
++	writel(val, pll->pcw_addr);
++
++	con1 = readl(pll->base_addr + 4);
++
++	if (pll_en)
++		con1 |= CON0_PCW_CHG;
++
++	writel(con1, pll->base_addr + 4);
++	if (pll->tuner_addr)
++		writel(con1 + 1, pll->tuner_addr);
++
++	if (pll_en)
++		usleep_range(20, 1000);
++}
++
++/*
++ * mtk_pll_calc_values - calculate good values for a given input frequency.
++ * @pll:	The pll
++ * @pcw:	The pcw value (output)
++ * @postdiv:	The post divider (output)
++ * @freq:	The desired target frequency
++ * @fin:	The input frequency
++ *
++ */
++static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
++		u32 freq, u32 fin)
++{
++	unsigned long fmin = 1000 * MHZ;
++	u64 _pcw;
++	u32 val;
++
++	if (freq > pll->data->fmax)
++		freq = pll->data->fmax;
++
++	for (val = 0; val < 4; val++) {
++		*postdiv = 1 << val;
++		if (freq * *postdiv >= fmin)
++			break;
++	}
++
++	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
++	_pcw = ((u64)freq << val) << (pll->data->pcwbits - 7);
++	do_div(_pcw, fin);
++
++	*pcw = (u32)_pcw;
++}
++
++static int mtk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 pcw = 0;
++	u32 postdiv;
++
++	mtk_pll_calc_values(pll, &pcw, &postdiv, rate, parent_rate);
++	mtk_pll_set_rate_regs(hw, pcw, postdiv);
++
++	return 0;
++}
++
++static unsigned long mtk_pll_recalc_rate(struct clk_hw *hw,
++		unsigned long parent_rate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 postdiv;
++	u32 pcw;
++
++	postdiv = (readl(pll->pd_addr) >> pll->data->pd_shift) & 0x7;
++	postdiv = 1 << postdiv;
++
++	pcw = readl(pll->pcw_addr) >> pll->data->pcw_shift;
++	pcw &= GENMASK(pll->data->pcwbits - 1, 0);
++
++	return __mtk_pll_recalc_rate(pll, parent_rate, pcw, postdiv);
++}
++
++static long mtk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long *prate)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 pcw = 0;
++	int postdiv;
++
++	mtk_pll_calc_values(pll, &pcw, &postdiv, rate, *prate);
++
++	return __mtk_pll_recalc_rate(pll, *prate, pcw, postdiv);
++}
++
++static int mtk_pll_prepare(struct clk_hw *hw)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
++
++	r = readl(pll->pwr_addr) | CON0_PWR_ON;
++	writel(r, pll->pwr_addr);
++	usleep_range(1, 100);
++
++	r = readl(pll->pwr_addr) & ~CON0_ISO_EN;
++	writel(r, pll->pwr_addr);
++	usleep_range(1, 100);
++
++	r = readl(pll->base_addr) | pll->data->en_mask;
++	writel(r, pll->base_addr);
++
++	if (pll->tuner_addr) {
++		r = readl(pll->tuner_addr) | AUDPLL_TUNER_EN;
++		writel(r, pll->tuner_addr);
++	}
++
++	usleep_range(20, 1000);
++
++	if (pll->data->flags & HAVE_RST_BAR) {
++		r = readl(pll->base_addr) | pll->data->rst_bar_mask;
++		writel(r, pll->base_addr);
++	}
++
++	return 0;
++}
++
++static void mtk_pll_unprepare(struct clk_hw *hw)
++{
++	struct mtk_clk_pll *pll = to_mtk_clk_pll(hw);
++	u32 r;
++
++	if (pll->data->flags & HAVE_RST_BAR) {
++		r = readl(pll->base_addr) & ~pll->data->rst_bar_mask;
++		writel(r, pll->base_addr);
++	}
++
++	if (pll->tuner_addr) {
++		r = readl(pll->tuner_addr) & ~AUDPLL_TUNER_EN;
++		writel(r, pll->tuner_addr);
++	}
++
++	r = readl(pll->base_addr) & ~CON0_BASE_EN;
++	writel(r, pll->base_addr);
++
++	r = readl(pll->pwr_addr) | CON0_ISO_EN;
++	writel(r, pll->pwr_addr);
++
++	r = readl(pll->pwr_addr) & ~CON0_PWR_ON;
++	writel(r, pll->pwr_addr);
++}
++
++static const struct clk_ops mtk_pll_ops = {
++	.is_prepared	= mtk_pll_is_prepared,
++	.prepare	= mtk_pll_prepare,
++	.unprepare	= mtk_pll_unprepare,
++	.recalc_rate	= mtk_pll_recalc_rate,
++	.round_rate	= mtk_pll_round_rate,
++	.set_rate	= mtk_pll_set_rate,
++};
++
++static struct clk *mtk_clk_register_pll(const struct mtk_pll_data *data,
++		void __iomem *base)
++{
++	struct mtk_clk_pll *pll;
++	struct clk_init_data init;
++	struct clk *clk;
++	const char *parent_name = "clk26m";
++
++	pr_debug("%s(): name: %s\n", __func__, data->name);
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	pll->base_addr = base + data->reg;
++	pll->pwr_addr = base + data->pwr_reg;
++	pll->pd_addr = base + data->pd_reg;
++	pll->pcw_addr = base + data->pcw_reg;
++	if (data->tuner_reg)
++		pll->tuner_addr = base + data->tuner_reg;
++	pll->hw.init = &init;
++	pll->data = data;
++
++	init.name = data->name;
++	init.ops = &mtk_pll_ops;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	clk = clk_register(NULL, &pll->hw);
++
++	if (IS_ERR(clk))
++		kfree(pll);
++
++	return clk;
++}
++
++void __init mtk_clk_register_plls(struct device_node *node,
++		const struct mtk_pll_data *plls, int num_plls, struct clk_onecell_data *clk_data)
++{
++	void __iomem *base;
++	int r, i;
++	struct clk *clk;
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s(): ioremap failed\n", __func__);
++		return;
++	}
++
++	for (i = 0; i < num_plls; i++) {
++		const struct mtk_pll_data *pll = &plls[i];
++
++		clk = mtk_clk_register_pll(pll, base);
++
++		if (IS_ERR(clk)) {
++			pr_err("Failed to register clk %s: %ld\n",
++					pll->name, PTR_ERR(clk));
++			continue;
++		}
++
++		clk_data->clks[pll->id] = clk;
++	}
++
++	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		pr_err("%s(): could not register clock provider: %d\n",
++			__func__, r);
++}
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.4
