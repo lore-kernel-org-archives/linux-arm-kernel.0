@@ -1,75 +1,48 @@
-From: walter@vanguardiasur.com.ar (Walter Lozano)
-Date: Mon, 16 Mar 2015 10:10:45 -0300
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <20150105092153.GJ13070@pengutronix.de>
-References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
- <20150105092153.GJ13070@pengutronix.de>
-Message-ID: <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
+From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
+Date: Mon, 16 Mar 2015 16:37:48 +0300
+Subject: Bug in drivers/net/ethernet/freescale/fec_main.c,
+ TX is broken. In 4.0.0-rc3
+In-Reply-To: <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <390621425930628@web28o.yandex.ru>
+ <3625951426018334@web26j.yandex.ru>
+ <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <726281426513068@web10o.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
-<s.trumtrar@pengutronix.de> wrote:
-> Hi!
->
-> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
->> This patch adds the DTS bindings for the adxl34x digital
->> accelerometer.
->>
->> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
->> ---
->>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> index 16ea6f5..d343e03 100644
->> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> @@ -60,6 +60,22 @@
->>       rxc-skew-ps = <2000>;
->>  };
->>
->> +&gpio2 {
->> +     status = "okay";
->> +};
->> +
->> +&i2c1 {
->> +     status = "okay";
->> +
->> +     accel1: accelerometer at 53 {
->> +             compatible = "adxl34x";
->> +             reg = <0x53>;
->> +
->> +             interrupt-parent = <&portc>;
->> +             interrupts = <3 2>;
->> +     };
->> +};
->> +
->>  &mmc0 {
->>       vmmc-supply = <&regulator_3_3v>;
->>       vqmmc-supply = <&regulator_3_3v>;
->
-> I just gave it a short spin. I get some interrupts and the position property
-> changes, so it seems to work:
->
->         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->
-> Regards,
-> Steffen
->
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Hi!
 
-Ping?
-How should this continue?
+16.03.2015, 12:21, "fugang.duan at freescale.com" <fugang.duan@freescale.com>:
+>
+> I try your case on i.MX6q sabresd board with net tree kernel.
+> root at freescale ~$ uname -r
+> 4.0.0-rc3-11071-gf00bbd2
+>
+> With below test steps for 10 time, the zero file size range from 20M to 300M bytes,
+> compare the md5sum checksum between i.MX6q and i.MX6q/PC host, ?the checksum is the same.
+>
+> root at freescale ~$ rm zeros
+> root at freescale ~$ dd if=/dev/zero of=zeros bs=1M count=300
+> 300+0 records in
+> 300+0 records out
+> 314572800 bytes (300.0MB) copied, 1.811459 seconds, 165.6MB/s
+> root at freescale ~$ md5sum -b zeros
+> 0d97a9cd8bbd7ce75a2a76bb06258915 ?zeros
+> root at freescale ~$ cp zeros /mnt/nfs/ -f
+> root at freescale ~$ rm zeros
+> root at freescale ~$ cp /mnt/nfs/zeros ./
+> root at freescale ~$ md5sum -b zeros
+> 0d97a9cd8bbd7ce75a2a76bb06258915 ?zeros
+>
+> Do you have any lost for reproduce the issue ?
 
-Regards,
+Current net tree does not have this issue, it works fine. Thanks to all.
 
-Walter
+>From git://git.kernel.org/pub/scm/linux/kernel/git/davem/net.git
 
--- 
-Walter Lozano, VanguardiaSur
-www.vanguardiasur.com.ar
+apx at astra:~$ uname -r
+4.0.0-rc3-00150-g10640d3-dirty
+
+
+--
+ ??????
