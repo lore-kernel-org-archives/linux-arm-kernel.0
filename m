@@ -1,43 +1,32 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Mon, 16 Mar 2015 11:01:53 +0000
-Subject: [PATCH v4 2/5] hw/intc: arm_gic_kvm.c restore config first
+Date: Mon, 16 Mar 2015 11:01:56 +0000
+Subject: [PATCH v4 5/5] target-arm: cpu.h document why env->spsr exists
 In-Reply-To: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
 References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1426503716-13931-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1426503716-13931-6-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As there is logic to deal with the difference between edge and level
-triggered interrupts in the kernel we must ensure it knows the
-configuration of the IRQs before we restore the pending state.
+I was getting very confused about the duplication of state so wanted to
+make it explicit.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-diff --git a/hw/intc/arm_gic_kvm.c b/hw/intc/arm_gic_kvm.c
-index 1ad3eb0..2f21ae7 100644
---- a/hw/intc/arm_gic_kvm.c
-+++ b/hw/intc/arm_gic_kvm.c
-@@ -370,6 +370,11 @@ static void kvm_arm_gic_put(GICState *s)
-      * the appropriate CPU interfaces in the kernel) */
-     kvm_dist_put(s, 0x800, 8, s->num_irq, translate_targets);
+diff --git a/target-arm/cpu.h b/target-arm/cpu.h
+index 083211c..6dc1799 100644
+--- a/target-arm/cpu.h
++++ b/target-arm/cpu.h
+@@ -155,6 +155,11 @@ typedef struct CPUARMState {
+        This contains all the other bits.  Use cpsr_{read,write} to access
+        the whole CPSR.  */
+     uint32_t uncached_cpsr;
++    /* The spsr is a alias for spsr_elN where N is the current
++     * exception level. It is provided for here so the TCG msr/mrs
++     * implementation can access one register. Care needs to be taken
++     * to ensure the banked_spsr[] is also updated.
++     */
+     uint32_t spsr;
  
-+    /* irq_state[n].trigger -> GICD_ICFGRn
-+     * (restore targets before pending IRQs so we treat level/edge
-+     * correctly */
-+    kvm_dist_put(s, 0xc00, 2, s->num_irq, translate_trigger);
-+
-     /* irq_state[n].pending + irq_state[n].level -> GICD_ISPENDRn */
-     kvm_dist_put(s, 0x280, 1, s->num_irq, translate_clear);
-     kvm_dist_put(s, 0x200, 1, s->num_irq, translate_pending);
-@@ -378,8 +383,6 @@ static void kvm_arm_gic_put(GICState *s)
-     kvm_dist_put(s, 0x380, 1, s->num_irq, translate_clear);
-     kvm_dist_put(s, 0x300, 1, s->num_irq, translate_active);
- 
--    /* irq_state[n].trigger -> GICD_ICFRn */
--    kvm_dist_put(s, 0xc00, 2, s->num_irq, translate_trigger);
- 
-     /* s->priorityX[irq] -> ICD_IPRIORITYRn */
-     kvm_dist_put(s, 0x400, 8, s->num_irq, translate_priority);
+     /* Banked registers.  */
 -- 
 2.3.2
