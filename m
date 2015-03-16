@@ -1,31 +1,44 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 16 Mar 2015 09:28:16 +0800
-Subject: [PATCH v6 10/30] PCI: Introduce pci_host_bridge_list to manage
- host bridges
-In-Reply-To: <CAErSpo5RgADWDPDvA-sg+MhmayPgTCfQqN1j0hYorAzZ=8_-qg@mail.gmail.com>
+Date: Mon, 16 Mar 2015 09:31:19 +0800
+Subject: [PATCH v6 00/30] Refine PCI scan interfaces and make generic
+ pci host bridge
+In-Reply-To: <CAErSpo7KuchFy0U=80buz4oRKwn-tcwz1Ej9-hBZHg+a-eYCbw@mail.gmail.com>
 References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-11-git-send-email-wangyijing@huawei.com>
- <20150312025537.GD10949@google.com> <55018E90.9030301@huawei.com>
- <20150312195651.GD7346@google.com> <55025955.3020000@huawei.com>
- <CAErSpo5RgADWDPDvA-sg+MhmayPgTCfQqN1j0hYorAzZ=8_-qg@mail.gmail.com>
-Message-ID: <550631B0.2030709@huawei.com>
+ <20150312212306.GH7346@google.com> <20150313113156.GA4739@bart.dudau.co.uk>
+ <CAErSpo7KuchFy0U=80buz4oRKwn-tcwz1Ej9-hBZHg+a-eYCbw@mail.gmail.com>
+Message-ID: <55063267.2010202@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Currently, if platform does not know the end bus number (not provide the bus resource),
->> we will update the max bus number returned by pci_scan_child_bus() to the bus resource end,
->> and I think this is reasonable. I consider to introduce a flag to identify the bus resource
->> which end bus number is undefined, then we could force all pci_scan_root_bus()  etc. callers
->> to provide the bus resource, and we could process the bus resource end according the bus resource flag.
->> Also then we could reduce the bus argument which is the same as busn_res->start.
->> I would try to provide draft patch, then we could discuss it more clearly.
+On 2015/3/13 22:48, Bjorn Helgaas wrote:
+> On Fri, Mar 13, 2015 at 6:31 AM, Liviu Dudau <liviu@dudau.co.uk> wrote:
+>> On Thu, Mar 12, 2015 at 04:23:06PM -0500, Bjorn Helgaas wrote:
+>>> On Mon, Mar 09, 2015 at 10:33:57AM +0800, Yijing Wang wrote:
+>>>> ...
+>>>> Yijing Wang (29):
+>>>>   PCI: Rip out pci_bus_add_devices() from pci_scan_bus()
+>>>>   PCI: Rip out pci_bus_add_devices() from pci_scan_root_bus()
+>>>>   sparc/PCI: Claim bus resources before pci_bus_add_devices()
+>>>
+>>> I put the above patches plus a cleanup patch on my pci/enumeration branch.
+>>> Please rebase your next revision to that.  If there's anything else
+>>> non-controversial that we can pull in to chip away at this, let me know.
+>>
+>> Hi Bjorn and Yijing,
+>>
+>> Sorry for not providing feedback earlier on this series (or any previous ones),
+>> I'm just crawling out from under a rock of doing graphics drivers :)
+>>
+>> The patch ripping out pci_bus_add_devices() from pci_scan_root_bus() misses out
+>> the users of that function from drivers/pci/host. If Yijing is going to refresh
+>> the series it is probably worth starting with adding back the call into pcie-xilinx.c
+>> and pci-versatile.c.
 > 
-> Without having seen a patch, my inclination is to avoid a flag because
-> flags change the behavior of the code you call, which makes that code
-> harder to follow.  Maybe we could require these platforms to
-> explicitly update the ending bus number after scanning the bus.
+> Huh, sure enough, I missed those, too.  Yijing, when you add those,
+> can you pull my branch, update the patch, and repost it?  That way
+> you'll keep my changelog and cleanup updates.
 
-OK, agree, thanks for your suggestion :)
+Sure, I will repost it today.
 
 > 
 > Bjorn
