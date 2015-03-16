@@ -1,56 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Mar 2015 12:05:42 +0100
-Subject: [PATCH 3/4] arm64: fix hyp mode mismatch detection
-In-Reply-To: <5506B888.4050700@arm.com>
-References: <1426263277-9827-1-git-send-email-mark.rutland@arm.com>
- <1426263277-9827-4-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-LiQnvWv6_yh=G5=YO4ohNLCFpmedFYRyHKS39PubcHw@mail.gmail.com>
- <20150316105614.GD15066@leverpostej> <5506B888.4050700@arm.com>
-Message-ID: <CAKv+Gu9qC552+Ys-fYcc8UL++kuhRC_YehK1S-vJFN+d+7ZifA@mail.gmail.com>
+From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
+Date: Mon, 16 Mar 2015 12:05:44 +0100
+Subject: [PATCH 3/3] ARM: dts: Define stdout-path property for Spring board
+In-Reply-To: <1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>
+References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <5506B908.1060007@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 March 2015 at 12:03, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 16/03/15 10:56, Mark Rutland wrote:
->> On Fri, Mar 13, 2015 at 08:21:19PM +0000, Ard Biesheuvel wrote:
->>> On 13 March 2015 at 17:14, Mark Rutland <mark.rutland@arm.com> wrote:
->>>> Commit 828e9834e9a5b7e6 ("arm64: head: create a new function for setting
->>>> the boot_cpu_mode flag") added BOOT_CPU_MODE_EL1, a nonzero value
->>>> replacing uses of zero. However it failed to update __boot_cpu_mode
->>>> appropriately.
->>>>
->>>> A CPU booted at EL2 writes BOOT_CPU_MODE_EL2 to __boot_cpu_mode[0], and
->>>> a CPU booted at EL1 writes BOOT_CPU_MODE_EL1 to __boot_cpu_mode[1].
->>>> Later is_hyp_mode_mismatched() determines there to be a mismatch if
->>>> __boot_cpu_mode[0] != __boot_cpu_mode[1].
->>>>
->>>> If all CPUs are booted at EL1, __boot_cpu_mode[0] will be set to
->>>> BOOT_CPU_MODE_EL1, but __boot_cpu_mode[1] will retain its initial value
->>>> of zero, and is_hyp_mode_mismatched will erroneously determine that the
->>>> boot modes are mismatched. This hasn't been a problem so far, but later
->>>> patches which will make use of is_hyp_mode_mismatched() expect it to
->>>> work correctly.
->>>>
->>>> This patch initialises __boot_cpu_mode[1] to BOOT_CPU_MODE_EL1, fixing
->>>> the erroneous mismatch detection when all CPUs are booted at EL1.
->>>>
->>>
->>> Maybe it's just me, but isn't it *much* easier to understand to
->>> initialise both values to 0, and use 'both are non-zero' as the error
->>> condition?
->>> 'HYP mode available' would then be '__boot_cpu_mode[0] ==
->>> BOOT_CPU_MODE_EL2 && __boot_cpu_mode[1] == 0'
->>
->> I agree that change would make this easier to follow.
->>
->> Marc, are you happy with Ard's proposed change?
->
-> Absolutely. If that makes it more obvious, please go for it.
->
->
+Hi,
 
-OK, thanks
+Am 16.03.2015 um 11:28 schrieb Javier Martinez Canillas:
+> The kernel can use as the default console a serial port if is defined
 
-Actually, simply checking for  __boot_cpu_mode[1] == 0 (i.e., no CPUs
-booted at EL1) would be sufficient to implement 'is HYP mode
-available'.
+"The kernel can use a serial port as the default console if it's defined
+..."
+
+> as stdout device in the Device Tree.
+> 
+> This allows a board to be booted without the need of having a console
+> parameter in the kernel command line.
+> 
+> Currently the Spring DTS has bootargs in the /chosen node and this is
+> kept since users that don't have a serial console on this board might
+> be using it to have the boot log shown in the display. This will have
+> more precedence than the stdout-path but it's fine since is only used
+
+"since it's"
+
+> when CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is enabled.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  arch/arm/boot/dts/exynos5250-spring.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+> index f02775487cd4..b9ec763a5602 100644
+> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+> @@ -25,6 +25,7 @@
+>  
+>  	chosen {
+>  		bootargs = "console=tty1";
+> +		stdout-path = "serial3:115200n8";
+
+Is this a guess or did you verify that against some schematics?
+
+>  	};
+>  
+>  	gpio-keys {
+
+Assuming that bootargs still work,
+
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+
+I do wonder why this mechanism could not point to the same location as
+bootargs? ("dp-controller"?) The device does not even have screws for
+opening it, so accessing the serial port is highly theoretical.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
