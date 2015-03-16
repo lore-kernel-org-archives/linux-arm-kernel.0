@@ -1,45 +1,32 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Mar 2015 22:05:32 +0100
-Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <1423088075-10025-4-git-send-email-marek@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-4-git-send-email-marek@goldelico.com>
-Message-ID: <20150316210532.GA11441@amd>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 14:01:43 -0700
+Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
+In-Reply-To: <201503162158.50587@pali>
+References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
+ <2070859.WcMooC33YH@wuerfel> <20150316152939.GP5264@atomide.com>
+ <201503162158.50587@pali>
+Message-ID: <20150316210143.GF12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2015-02-04 23:14:32, Marek Belisko wrote:
-> Signed-off-by: Marek Belisko <marek@goldelico.com>
-> ---
->  .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+* Pali Roh?r <pali.rohar@gmail.com> [150316 13:59]:
+> On Monday 16 March 2015 16:29:39 Tony Lindgren wrote:
+> > I believe the last pending issues is the support for
+> > ATAG_REVISION in device tree mode as posted by Pali.
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> new file mode 100644
-> index 0000000..bb3580c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> @@ -0,0 +1,43 @@
-> +twl4030_madc_battery
-> +
-> +Required properties:
-> + - compatible : "ti,twl4030-madc-battery"
-> + - capacity-uah : battery capacity in uAh
+> No. In DT boot there is missing /proc/atags file (readable by 
+> userspace processes).
 
-Could we make it capacity-uAh ?
+Oh OK thanks for the update.
 
-> + - volt-to-capacity-charging-map : list of voltage(mV):level(%) values
-> +	for charging calibration (see example)
-> + - volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
-> +	for discharging calibration (see example)
+> And also broken AES/SHA/MD5 support. Fix for crypto DT stuff
+> I already sent.
 
-Would "mV-to-capacity..." be more accurate? Also, would it make sense
-to introduce coefficients for temperature and discharge rate?
+But this is not a regression in mainline with legacy boot vs
+device tree based booting, right? Sounds like it never worked
+in the mainline or am thinking of some other set of patches?
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Regards,
+
+Tony
