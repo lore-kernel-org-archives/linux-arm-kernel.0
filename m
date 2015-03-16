@@ -1,40 +1,27 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Mon, 16 Mar 2015 15:55:53 +0100
-Subject: [PATCH] ARM: dts: Update exynos5250-spring with mmc node changes
-In-Reply-To: <54E5CD2E.9070608@collabora.co.uk>
-References: <1424275812-6797-1-git-send-email-afaerber@suse.de>
- <54E5CD2E.9070608@collabora.co.uk>
-Message-ID: <5506EEF9.7080100@suse.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 16 Mar 2015 16:10:11 +0100
+Subject: [PATCH v2 0/3] iio: adc: vf610: respect ADC clocking limitations
+Message-ID: <1426518614-20201-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.02.2015 um 12:46 schrieb Javier Martinez Canillas:
-> Hello Andreas,
-> 
-> On 02/18/2015 05:10 PM, Andreas F?rber wrote:
->> Resolve a merge conflict with mmc refactoring aaa25a5a33cb ("ARM: dts:
->> unuse the slot-node and deprecate the supports-highspeed for dw-mmc in
->> exynos") by dropping the slot at 0 nodes, moving its bus-width property to
->> the mmc node and replacing supports-highspeed with cap-{mmc,sd}-highspeed,
->> matching exynos5250-snow.
->>
->> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->> Fixes: 53dd4138bb0a ("ARM: dts: Add exynos5250-spring device tree")
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  arch/arm/boot/dts/exynos5250-spring.dts | 16 ++++------------
->>  1 file changed, 4 insertions(+), 12 deletions(-)
->>
-> 
-> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Respect ADC clocking limitations. The current clock settings lead
+to bogous reading on a 500MHz clocked Vybrid SoC's. Additionally,
+also implement a sysfs-property to configure the conversion mode
+available in this ADC peripherial.
 
-Ping!
+Changes since v1:
+- Use ext_info for conversion mode
 
-> 
-> Best regards,
-> Javier
+Stefan Agner (3):
+  iio: adc: vf610: use ADC clock within specification
+  iio: adc: vf610: implement configurable conversion modes
+  ARM: dts: add property for maximum ADC clock frequencies
+
+ .../devicetree/bindings/iio/adc/vf610-adc.txt      |   9 +
+ arch/arm/boot/dts/vfxxx.dtsi                       |   4 +
+ drivers/iio/adc/vf610_adc.c                        | 225 +++++++++++++++------
+ 3 files changed, 172 insertions(+), 66 deletions(-)
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+2.3.3
