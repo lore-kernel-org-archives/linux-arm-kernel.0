@@ -1,54 +1,28 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Mon, 16 Mar 2015 21:47:09 +0100
-Subject: [PATCH v3 4/6] ARM: dts: omap3-gta04: Add battery support
-In-Reply-To: <20150316203537.GA12397@atomide.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-5-git-send-email-marek@goldelico.com>
- <20150305003651.GB1033@earth> <20150316203537.GA12397@atomide.com>
-Message-ID: <CAAfyv34oWPgXw4tcy8zZ_vyU9=CxTPFZALVDkqqubAb4R41bvw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 20:50:04 +0000
+Subject: [PATCH] dts: cubox: Map gpio-keys and pps-gpio to gpio3 8
+In-Reply-To: <1426538201-7571-1-git-send-email-george.joseph@fairview5.com>
+References: <1426538201-7571-1-git-send-email-george.joseph@fairview5.com>
+Message-ID: <20150316205004.GO8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, Mar 16, 2015 at 02:36:41PM -0600, George Joseph wrote:
+> The Cubox has a recessed button between the HDMI and RJ-45 connectors
+> that wasn't mapped in the device tree.  Since the button is normally
+> open and there's no external pull up/down, that pad (EIM_DA8) can be
+> used for almost anything so I've mapped it to gpio-keys BTN_0 and
+> pps-gpio.  Whichever driver claims it first wins.  If both drivers
+> are build as modules, you can even switch between them at run time
+> and the pinmux will adjust the pin configuration as required.
+> If neither driver claims the gpio, it's still available in the normal
+> gpio sysfs.
 
-On Mon, Mar 16, 2015 at 9:35 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Sebastian Reichel <sre@kernel.org> [150304 16:41]:
->> Hi,
->>
->> On Wed, Feb 04, 2015 at 11:14:33PM +0100, Marek Belisko wrote:
->> > Signed-off-by: Marek Belisko <marek@goldelico.com>
->> > ---
->> >  arch/arm/boot/dts/omap3-gta04.dtsi | 30 ++++++++++++++++++++++++++++++
->> >  1 file changed, 30 insertions(+)
->>
->> DTS changes must go via omap-dt tree once the driver changes have been
->> merged.
->
-> And looks like you wanted to add ti, prefix to the binding. I'll
-> mark this one as read, please repost this one separately once the
-> driver changes are in Linux next.
-ti prefix Iis done in v4 series already [1]
->
-> Regards,
->
-> Tony
-
-[1] - http://lkml.iu.edu/hypermail/linux/kernel/1503.1/02157.html
-
-BR,
-
-marek
-
-
+I wonder why we want to have the PPS support in mainline, given that
+you would need to solder to the board to make use of that.  I can see
+the point of the gpio-keys going into mainline, but not the PPS bit.
+That's more like a local hack.
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
