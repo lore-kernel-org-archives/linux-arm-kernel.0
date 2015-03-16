@@ -1,64 +1,45 @@
-From: george.joseph@fairview5.com (George Joseph)
-Date: Mon, 16 Mar 2015 15:53:49 -0600
-Subject: [PATCH v2] dts: cubox: Map gpio-keys to gpio3 8
-Message-ID: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 15:01:43 -0700
+Subject: [PATCH] ARM: DTS: dra7xx-clocks: Add gate clock for CLKOUT2
+In-Reply-To: <1424957963-15418-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1424957963-15418-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150316220143.GL12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubox has a recessed button between the HDMI and RJ-45 connectors
-that wasn't mapped in the device tree, so I've mapped it to gpio-keys
-BTN_0.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150226 05:43]:
+> To be able to control the gate for the clkout2 clock output.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Jyri Sarha <jsarha@ti.com>
 
-Signed-off-by: George Joseph <george.joseph@fairview5.com>
-Tested-by: George Joseph <george.joseph@fairview5.com>
----
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Applying into omap-for-v4.1/dt thanks.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 6a524ca..de6e3a8 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -3,6 +3,8 @@
-  */
- #include "imx6qdl-microsom.dtsi"
- #include "imx6qdl-microsom-ar8035.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	ir_recv: ir-receiver {
-@@ -66,6 +68,18 @@
- 		spdif-controller = <&spdif>;
- 		spdif-out;
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&pinctrl_gpio_key>;
-+		pinctrl-names = "default";
-+
-+		button_0 {
-+			label = "Button 0";
-+			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
-+			linux,code = <BTN_0>;
-+		};
-+	};
- };
- 
- &hdmi {
-@@ -170,6 +184,12 @@
- 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
- 			>;
- 		};
-+
-+		pinctrl_gpio_key: gpio-key {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_DA8__GPIO3_IO08	0x17059
-+			>;
-+		};
- 	};
- };
- 
--- 
-2.1.0
+Tony
+
+> ---
+>  arch/arm/boot/dts/dra7xx-clocks.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> index 4bdcbd61ce47..2a9994f73974 100644
+> --- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+> @@ -1421,6 +1421,14 @@
+>  		ti,dividers = <1>, <8>;
+>  	};
+>  
+> +	clkout2_clk: clkout2_clk {
+> +		#clock-cells = <0>;
+> +		compatible = "ti,gate-clock";
+> +		clocks = <&clkoutmux2_clk_mux>;
+> +		ti,bit-shift = <8>;
+> +		reg = <0x06b0>;
+> +	};
+> +
+>  	l3init_960m_gfclk: l3init_960m_gfclk {
+>  		#clock-cells = <0>;
+>  		compatible = "ti,gate-clock";
+> -- 
+> 2.3.0
+> 
