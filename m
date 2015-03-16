@@ -1,153 +1,90 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Mar 2015 06:55:08 +0100
-Subject: [PATCH 2/5] clk: mediatek: Add reset controller support
-In-Reply-To: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
-References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1426485311-31428-3-git-send-email-s.hauer@pengutronix.de>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 16 Mar 2015 14:56:13 +0900
+Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
+ errors
+In-Reply-To: <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
+References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+ <5502CA4E.9060401@samsung.com>
+ <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
+Message-ID: <5506707D.40708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pericfg and infracfg units also provide reset lines to several
-other SoC internal units. Add support for the reset controller.
+Hi, Doug.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/clk/mediatek/Makefile  |  1 +
- drivers/clk/mediatek/clk-mtk.h | 10 +++++
- drivers/clk/mediatek/reset.c   | 99 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+)
- create mode 100644 drivers/clk/mediatek/reset.c
+On 03/14/2015 05:27 AM, Doug Anderson wrote:
+> Hi,
+> 
+> On Fri, Mar 13, 2015 at 4:30 AM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> Hi, Doug.
+>>
+>> On 03/11/2015 12:48 AM, Doug Anderson wrote:
+>>> The dw_mmc driver enables HLE errors as part of DW_MCI_ERROR_FLAGS but
+>>> nothing in the interrupt handler actually handles them and ACKs them.
+>>> That means that if we ever get an HLE error we'll just keep getting
+>>> interrupts and we'll wedge things.
+>>>
+>>> We really don't expect HLE errors but if we ever get them we shouldn't
+>>> silently ignore them.
+>>>
+>>> Note that I have seen HLE errors while constantly ejecting and
+>>> inserting cards (ejecting while inserting, etc).
+>>
+>> Right, It is occurred when card inserting/ejecting.(This case is the case of removable card.)
+>> Did you test with eMMC? We needs to consider how control HLE error.
+> 
+> I'm running it on systems with eMMC, SD Cards, and SDIO WiFi.  HLE
+> doesn't show up in normal circumstances, only in ejecting the SD card
+> at the wrong time.  ...since you can't eject eMMC, I didn't see
+> problems there.
 
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index c384e97..0b6f1c3 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -1 +1,2 @@
- obj-y += clk-mtk.o clk-pll.o clk-gate.o
-+obj-$(CONFIG_RESET_CONTROLLER) += reset.o
-diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index c660a9e..fc98101 100644
---- a/drivers/clk/mediatek/clk-mtk.h
-+++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -152,4 +152,14 @@ void __init mtk_clk_register_plls(struct device_node *node,
- 		const struct mtk_pll_data *plls, int num_plls,
- 		struct clk_onecell_data *clk_data);
- 
-+#ifdef CONFIG_RESET_CONTROLLER
-+void mtk_register_reset_controller(struct device_node *np,
-+			unsigned int num_regs, int regofs);
-+#else
-+static inline void mtk_register_reset_controller(struct device_node *np,
-+			unsigned int num_regs, int regofs)
-+{
-+}
-+#endif
-+
- #endif /* __DRV_CLK_MTK_H */
-diff --git a/drivers/clk/mediatek/reset.c b/drivers/clk/mediatek/reset.c
-new file mode 100644
-index 0000000..3a85a53
---- /dev/null
-+++ b/drivers/clk/mediatek/reset.c
-@@ -0,0 +1,99 @@
-+/*
-+ * Copyright (c) 2014 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+
-+#include "clk-mtk.h"
-+
-+struct mtk_reset {
-+	struct regmap *regmap;
-+	int regofs;
-+	struct reset_controller_dev rcdev;
-+};
-+
-+static int mtk_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct mtk_reset *data = container_of(rcdev, struct mtk_reset, rcdev);
-+
-+	return regmap_update_bits(data->regmap, data->regofs + ((id / 32) << 2),
-+			BIT(id % 32), ~0);
-+}
-+
-+static int mtk_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct mtk_reset *data = container_of(rcdev, struct mtk_reset, rcdev);
-+
-+	return regmap_update_bits(data->regmap, data->regofs + ((id / 32) << 2),
-+			BIT(id % 32), 0);
-+}
-+
-+static int mtk_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	int ret;
-+
-+	ret = mtk_reset_assert(rcdev, id);
-+	if (ret)
-+		return ret;
-+
-+	return mtk_reset_deassert(rcdev, id);
-+}
-+
-+static struct reset_control_ops mtk_reset_ops = {
-+	.assert = mtk_reset_assert,
-+	.deassert = mtk_reset_deassert,
-+	.reset = mtk_reset,
-+};
-+
-+void mtk_register_reset_controller(struct device_node *np,
-+			unsigned int num_regs, int regofs)
-+{
-+	struct mtk_reset *data;
-+	int ret;
-+	struct regmap *regmap;
-+
-+	regmap = syscon_node_to_regmap(np);
-+	if (IS_ERR(regmap)) {
-+		pr_err("Cannot find regmap for %s: %ld\n", np->full_name,
-+				PTR_ERR(regmap));
-+		return;
-+	}
-+
-+	data = kzalloc(sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return;
-+
-+	data->regmap = regmap;
-+	data->regofs = regofs;
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = num_regs * 32;
-+	data->rcdev.ops = &mtk_reset_ops;
-+	data->rcdev.of_node = np;
-+
-+	ret = reset_controller_register(&data->rcdev);
-+	if (ret) {
-+		pr_err("could not register reset controller: %d\n", ret);
-+		kfree(data);
-+		return;
-+	}
-+}
--- 
-2.1.4
+When card is inserting/removing, HLE is often occurred.
+Since there is some request into queue when card is removed.(in my understanding.)
+It's also related with controlling clock.
+
+> 
+>> But I think this patch can't solve all of HLE problem.
+> 
+> Agreed.  HLE means that the controller is pretty wedged and (as I
+> understand it) means that there's something else we're doing wrong
+> elsewhere in the dw_mmc driver (like writing more data to an already
+> busy controller).  We should probably track down and find those cases,
+> too.
+> 
+> I agree also that this code probably won't fix the controller in all
+> cases of HLE errors.  ...but I'm not 100% certain of the best way to
+> really do that, do you know?
+> 
+> ...but in any case the absolute worst thing to do is what the driver
+> is already doing: unmask the HLE interrupt but never handle it
+> anywhere...  My patch is at least better than that...
+
+Agreed, your patch should be at least better than now.
+But if pending is set HLE error bit,
+it should hit the cases of DW_MCI_DATA_ERROR_FLAGS & DW_MCI_CMD_ERROR_FLAGS.
+and i think send_stop_abort() can't run, doesn't?
+(If HLE is occurred at non-removable card, controller can't do anything.)
+
+If i can reproduce HLE error, i can check more detailedly.(Trying to reproduce it.)
+I don't find fully solution yet. But finding the solution is my or our(?) part/role in future.
+Actually, i'm using the ctrl reset at my local tree, when HLE error is occurred.
+(Also it's not solution..)
+According to TRM, "HLE is raised, software then has to reload the command."
+We needs to consider how reload the command without lost previous request.
+
+> 
+> If you have another suggested way to make HLE error handling better
+> (or avoid them to begin with) I'm happy to test!  :)
+
+I will try to find HLE error handling..if you also have other opinion, let me know, plz.
+I needs to listen other opinion, it's great helpful to me.. :)
+
+Thank you a lot!
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> 
+> -Doug
+> 
