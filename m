@@ -1,37 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Mar 2015 15:23:29 +0800
-Subject: [PATCH 05/10] ARM: zx: bring up the secondary core
-In-Reply-To: <2076674.uPo0q8sg2C@wuerfel>
-References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
- <1426333785-3952-6-git-send-email-jun.nie@linaro.org>
- <2076674.uPo0q8sg2C@wuerfel>
-Message-ID: <20150316072327.GK20455@dragon>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 16 Mar 2015 08:24:58 +0100
+Subject: [PATCH v4 1/5] ARM: dts: Clean up exynos5410-smdk5410 indentation
+In-Reply-To: <1426456834-6308-2-git-send-email-afaerber@suse.de>
+References: <1426456834-6308-1-git-send-email-afaerber@suse.de>
+ <1426456834-6308-2-git-send-email-afaerber@suse.de>
+Message-ID: <CABxcv=n3BCy9LZHSfypaTQONZ5V0rT9WMkbffo=fexMMmQ8LxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 14, 2015 at 10:25:03PM +0100, Arnd Bergmann wrote:
-> On Saturday 14 March 2015 19:49:40 Jun Nie wrote:
-> > +
-> > +       /*
-> > +        * This is really belt and braces; we hold unintended secondary
-> > +        * CPUs in the holding pen until we're ready for them.  However,
-> > +        * since we haven't sent them a soft interrupt, they shouldn't
-> > +        * be there.
-> > +        */
-> > +       write_pen_release(cpu);
-> > +
-> > 
-> 
-> Why do you need the holding pen on this platform? Is there a firmware
-> bug or just missing hardware support for proper SMP power management?
+Hello Andreas,
 
-Arnd,
+On Sun, Mar 15, 2015 at 11:00 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> The UART status properties are indented one level too deep, and we want
+> to derive a device tree for the ODROID-XU. Fix this before it propagates.
+>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
 
-As this is how things are handled in vendor's kernel, we thought the
-hardware might be lack of SMP power management.  But we will check with
-vendor to see if there is any level of hardware support for secondary
-core management, so that we can save the use of holding pen.
+Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Thanks for the comment.
-
-Shawn
+Best regards,
+Javier
