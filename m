@@ -1,71 +1,66 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 Mar 2015 21:51:16 +0100
-Subject: [GIT PULL] pxa: for-next v4.1
-Message-ID: <87ioe08y4b.fsf@free.fr>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 16 Mar 2015 21:54:27 +0100
+Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
+In-Reply-To: <20150316195904.GN8656@n2100.arm.linux.org.uk>
+References: <201502271645.58765@pali> <20150316181023.GT5264@atomide.com>
+ <20150316195904.GN8656@n2100.arm.linux.org.uk>
+Message-ID: <201503162154.27450@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+On Monday 16 March 2015 20:59:04 Russell King - ARM Linux wrote:
+> On Mon, Mar 16, 2015 at 11:10:26AM -0700, Tony Lindgren wrote:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150316
+> > 09:15]:
+> > > On Mon, Mar 16, 2015 at 08:44:10AM -0700, Tony Lindgren
+> > > wrote:
+> > > > * Pavel Machek <pavel@ucw.cz> [150302 03:32]:
+> > > > > On Fri 2015-02-27 16:55:26, Pali Roh?r wrote:
+> > > > > > This patch adds support for DT "/revision" and
+> > > > > > convert ATAG_REVISION to DT.
+> > > > > > 
+> > > > > > Pali Roh?r (2):
+> > > > > >   arm: devtree: Set system_rev from DT revision
+> > > > > >   arm: boot: convert ATAG_REVISION to DT revision
+> > > > > >   field
+> > > > > 
+> > > > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > > > 
+> > > > Are these queued somewhere now? Sounds like this is the
+> > > > last pending issue for n900 to use legacy user space
+> > > > with current mainline kernels, so I'd like to get these
+> > > > in so we can get closer to making omap3 boot in device
+> > > > tree only mode.
+> > > 
+> > > Not that I know of.  As everyone is aware, patches need to
+> > > be in my patch system if they want me to apply them -
+> > > which would've been especially important as I was away
+> > > from kernel stuff for a week at the start of March (for
+> > > medical reasons) and I can't be expected to track the
+> > > status of stuff which is buried behind 1000+ extra mails.
+> > 
+> > Pali, care to upload these two patches to Russell's patch
+> > tracking system if no other comments?
+> 
+> If it's done soon, I should be able to send them to Linus
+> fairly quickly, since this problem I'm grappling with is
+> being seen by others who have better tools to be able to
+> investigate the problem (and hence they're in a better
+> position to investigate what's going on.)
 
-Please consider these pxa for next for v4.1 cycle. This is my leap of faith,
-with the conversion of all pxa variants to clock framework. The diffstat is
-quite pretty, given all the code moved to drivers/clk.
+I have no idea how to upload those patches into tracking system. 
+Right now I do not have enough time for testing any patches...
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.1
-
-for you to fetch changes up to 6fe9642bed2e8760be51d4278a21efccc8cceb06:
-
-  ARM: pxa: Transition pxa25x, pxa27x, pxa3xx to clk framework (2015-03-16 21:35:10 +0100)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.1 cycle.
-
-The main and only feature is the conversion of all pxa variants to clock
-framework. This encompasses pxa25x, pxa27x and pxa3xx, for all boards.
-
-This should be a disruptive cycle in the normally quiet pxa history, as
-the change can break any platform, and the test were performed on only 4
-boards (lubbock, zylonite, mioa701, cm-x300).
-
-----------------------------------------------------------------
-Robert Jarzmik (7):
-      ARM: pxa: change clocks init sequence
-      ARM: pxa: move gpio11 clock to board files
-      clk: pxa: add missing pxa27x clocks for Irda and sa1100-rtc
-      ARM: pxa: pxa27x skip default device initialization with DT
-      ARM: pxa: Transition pxa25x and pxa27x to clk framework
-      ARM: pxa: convert eseries to clock framework
-      ARM: pxa: Transition pxa25x, pxa27x, pxa3xx to clk framework
-
- arch/arm/Kconfig                 |   1 +
- arch/arm/mach-pxa/Makefile       |   9 +-
- arch/arm/mach-pxa/clock-pxa2xx.c |  55 ----------
- arch/arm/mach-pxa/clock-pxa3xx.c | 212 ---------------------------------------
- arch/arm/mach-pxa/clock.c        |  86 ----------------
- arch/arm/mach-pxa/clock.h        |  80 ---------------
- arch/arm/mach-pxa/eseries.c      |  27 ++---
- arch/arm/mach-pxa/generic.c      |   6 ++
- arch/arm/mach-pxa/generic.h      |   3 +
- arch/arm/mach-pxa/lubbock.c      |   4 +-
- arch/arm/mach-pxa/pxa25x.c       | 183 ---------------------------------
- arch/arm/mach-pxa/pxa27x.c       | 182 ++-------------------------------
- arch/arm/mach-pxa/pxa300.c       |  20 +---
- arch/arm/mach-pxa/pxa320.c       |  10 --
- arch/arm/mach-pxa/pxa3xx.c       |  59 -----------
- arch/arm/mach-pxa/raumfeld.c     |   1 -
- arch/arm/mach-pxa/tosa.c         |   1 -
- drivers/clk/pxa/clk-pxa27x.c     |  32 +++++-
- 18 files changed, 62 insertions(+), 909 deletions(-)
- delete mode 100644 arch/arm/mach-pxa/clock-pxa2xx.c
- delete mode 100644 arch/arm/mach-pxa/clock-pxa3xx.c
- delete mode 100644 arch/arm/mach-pxa/clock.c
- delete mode 100644 arch/arm/mach-pxa/clock.h
+Tony, or somebody else, if you have free time, can you upload 
+(my) patches to that needed tracking system?
 
 -- 
-Robert
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150316/a2326a34/attachment.sig>
