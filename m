@@ -1,86 +1,213 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Mar 2015 16:23:40 +0100
-Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
-Message-ID: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 16 Mar 2015 16:23:42 +0100
+Subject: [RFC PATCH 2/3] arm64: add support for relocatable kernel
+In-Reply-To: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1426519423-28263-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches is a proof of concept of how we could potentially relocate
-the kernel at runtime. This code is rough around the edges, and there are
-a few unresolved issues, hence this RFC.
+This adds support for runtime relocation of the kernel Image, by
+building it as a PIE (ET_DYN) executable and applying the relocations
+in the early boot code.
 
-With these patches, the kernel can essentially execute at any virtual offset.
-There are a couple of reasons why we would want this:
-- performance: we can align PHYS_OFFSET so that most of the linear mapping can
-  be done using 512 MB or 1 GB blocks (depending on page size), instead of
-  the more granular level that is currently unavoidable if Image cannot be
-  loaded at base of RAM (since PHYS_OFFSET is tied to the start of the kernel
-  Image).
-- security: with these changes, we can put the kernel Image anywhere in physical
-  memory, and we can put the physical memory anywhere in the upper half of the
-  virtual address range (modulo alignment). This gives us quite a number of
-  bits of to play with if we were to randomize the kernel virtual address space.
-  Also, this is entirely under the control of the boot loader, which is probably
-  in better shape to get its hands on some entropy than the early kernel boot
-  code.
-- convenience: fewer constraints when loading the kernel into memory, as it
-  can execute from anywhere.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/Kconfig              |  3 +++
+ arch/arm64/Makefile             |  4 +++
+ arch/arm64/kernel/head.S        | 58 ++++++++++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/image.h       |  8 +++++-
+ arch/arm64/kernel/vmlinux.lds.S | 12 +++++++++
+ scripts/sortextable.c           |  4 +--
+ 6 files changed, 85 insertions(+), 4 deletions(-)
 
-How it works:
-- an additional boot argument 'image offset' is passed in x1 by the boot loader,
-  which should contain a value that is at least the offset of Image into physical
-  memory. Higher values are also possible, and may be used to randomize the
-  kernel VA space.
-- the kernel binary is runtime relocated to PAGE_OFFSET + image offset
-
-Issues:
-- Since AArch64 uses the ELF RELA format (where the addends are in the
-  relocation table and not in the code), the relocations need to be applied even
-  if the Image runs from the same offset it was linked at. It also means that
-  some values that are produced by the linker (_kernel_size_le, etc) are missing
-  from the binary. This will probably need a fixup step.
-- The module area may be out of range, which needs to be worked around with
-  module PLTs. This is straight forward but I haven't implemented it yet for
-  arm64.
-- The core extable is most likely broken, and would need to be changed to use
-  relative offsets instead of absolute addresses.
-- Probably lots and lots of other roadblocks, hence this RFC
-
-Output from QEMU/efi with 2 GB of memory:
-
-Base of RAM:
-  0x000040000000-0x00004000ffff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
-
-Physical location of Image:
-  0x00007f400000-0x00007fe6ffff [Loader Data        |   |  |  |  |   |WB|WT|WC|UC]
-
-Virtual kernel memory layout:
-    vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
-    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-              0xffffffbdc1000000 - 0xffffffbdc3000000   (    32 MB actual)
-    fixed   : 0xffffffbffa9fe000 - 0xffffffbffac00000   (  2056 KB)
-    PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-    modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-    memory  : 0xffffffc000000000 - 0xffffffc080000000   (  2048 MB)
-      .init : 0xffffffc03fb82000 - 0xffffffc03fdbe000   (  2288 KB)
-      .text : 0xffffffc03f480000 - 0xffffffc03fb81344   (  7173 KB)
-      .data : 0xffffffc03fdc2000 - 0xffffffc03fe28c00   (   411 KB)
-
-
-Ard Biesheuvel (3):
-  arm64: head.S: replace early literals with constant immediates
-  arm64: add support for relocatable kernel
-  arm64/efi: use relocated kernel
-
- arch/arm64/Kconfig              |  3 ++
- arch/arm64/Makefile             |  4 ++
- arch/arm64/kernel/efi-entry.S   |  6 ++-
- arch/arm64/kernel/efi-stub.c    |  5 ++-
- arch/arm64/kernel/head.S        | 94 +++++++++++++++++++++++++++++++----------
- arch/arm64/kernel/image.h       |  8 +++-
- arch/arm64/kernel/vmlinux.lds.S | 12 ++++++
- scripts/sortextable.c           |  4 +-
- 8 files changed, 107 insertions(+), 29 deletions(-)
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e97331ffb..cc6504998f2c 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -143,6 +143,9 @@ config KERNEL_MODE_NEON
+ config FIX_EARLYCON_MEM
+ 	def_bool y
+ 
++config RELOCATABLE_KERNEL
++	def_bool y
++
+ source "init/Kconfig"
+ 
+ source "kernel/Kconfig.freezer"
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 69ceedc982a5..e3914049c389 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -15,6 +15,10 @@ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
+ OBJCOPYFLAGS	:=-O binary -R .note -R .note.gnu.build-id -R .comment -S
+ GZFLAGS		:=-9
+ 
++ifneq ($(CONFIG_RELOCATABLE_KERNEL),)
++LDFLAGS_vmlinux		+= -pie
++endif
++
+ KBUILD_DEFCONFIG := defconfig
+ 
+ KBUILD_CFLAGS	+= -mgeneral-regs-only
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 1ea3cd2aba34..874754794b25 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -239,6 +239,7 @@ section_table:
+ 
+ ENTRY(stext)
+ 	mov	x21, x0				// x21=FDT
++	mov	x23, x1				// x23=image offset
+ 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+ 	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+ 	bl	set_cpu_boot_mode_flag
+@@ -249,8 +250,12 @@ ENTRY(stext)
+ 	 * On return, the CPU will be ready for the MMU to be turned on and
+ 	 * the TCR will have been set.
+ 	 */
++#ifndef CONFIG_RELOCATABLE_KERNEL
+ 	ldr	x27, =__mmap_switched		// address to jump to after
+ 						// MMU has been enabled
++#else
++	adr	x27, __relocate_kernel
++#endif
+ 	adrp	lr, __enable_mmu		// return (PIC) address
+ 	add	lr, lr, #:lo12:__enable_mmu
+ 	b	 __cpu_setup			// initialise processor
+@@ -397,9 +402,10 @@ __create_page_tables:
+ 	 */
+ 	mov	x0, x26				// swapper_pg_dir
+ 	mov	x5, #PAGE_OFFSET
++	add	x5, x5, x23			// __va(KERNEL_START)
+ 	create_pgd_entry x0, x5, x3, x6
+ 	adr_l	x6, KERNEL_END
+-	mov	x3, x24				// phys offset
++	add	x3, x23, x24			// phys offset + image offset
+ 	sub	x6, x6, x3			// kernel memsize
+ 	add	x6, x6, x5			// __va(KERNEL_END)
+ 	create_block_map x0, x7, x3, x5, x6
+@@ -438,6 +444,55 @@ __mmap_switched:
+ 	b	start_kernel
+ ENDPROC(__mmap_switched)
+ 
++#ifdef CONFIG_RELOCATABLE_KERNEL
++
++#define R_AARCH64_RELATIVE	0x403
++#define R_AARCH64_ABS64		0x101
++
++	/*
++	 * Iterate over each entry in the relocation table, and apply the
++	 * relocations in place.
++	 */
++__relocate_kernel:
++	adr_l	x8, __dynsym_start		// start of symbol table
++	adr_l	x9, __reloc_start		// start of reloc table
++	adr_l	x10, __reloc_end		// end of reloc table
++0:	cmp	x9, x10
++	b.hs	2f
++	ldp	x11, x12, [x9], #24
++	cmp	x12, #R_AARCH64_RELATIVE
++	b.ne	1f
++	ldr	x12, [x9, #-8]
++	add	x12, x12, x23			// relocate
++	str	x12, [x11, x28]
++	b	0b
++
++1:	ubfx	x13, x12, #0, #32
++	cmp	x13, #R_AARCH64_ABS64
++	b.ne	0b
++	lsr	x13, x12, #32			// symbol index
++	ldr	x12, [x9, #-8]
++	add	x13, x13, x13, lsl #1		// x 3
++	add	x13, x8, x13, lsl #3		// x 8
++	ldrsh	w14, [x13, #6]			// Elf64_Sym::st_shndx
++	ldr	x15, [x13, #8]			// Elf64_Sym::st_value
++	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
++	add	x14, x15, x23			// relocate
++	csel	x15, x14, x15, ne
++	add	x15, x12, x15
++	str	x15, [x11, x28]
++	b	0b
++
++2:	ldr	x8, =vectors			// reload VBAR_EL1 with
++	msr	vbar_el1, x8			// relocated address
++	isb
++
++	ldr	x9, =__mmap_switched
++	br	x9
++ENDPROC(__relocate_kernel)
++
++#endif
++
+ /*
+  * end early head section, begin head code that is also used for
+  * hotplug and needs to have the same protections as the text region
+@@ -657,6 +712,7 @@ __calc_phys_offset:
+ 	mov	x2, PAGE_OFFSET
+ 	sub	x28, x0, x1			// x28 = PHYS_OFFSET - PAGE_OFFSET
+ 	add	x24, x2, x28			// x24 = PHYS_OFFSET
++	sub	x24, x24, x23			// subtract image offset
+ 	ret
+ ENDPROC(__calc_phys_offset)
+ 
+diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+index 8fae0756e175..8b1e9fa8fc8c 100644
+--- a/arch/arm64/kernel/image.h
++++ b/arch/arm64/kernel/image.h
+@@ -47,7 +47,13 @@
+ #define __HEAD_FLAG_BE	0
+ #endif
+ 
+-#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0)
++#ifdef CONFIG_RELOCATABLE_KERNEL
++#define __HEAD_FLAG_RELOC	1
++#else
++#define __HEAD_FLAG_RELOC	0
++#endif
++
++#define __HEAD_FLAGS	(__HEAD_FLAG_BE << 0) | (__HEAD_FLAG_RELOC << 1)
+ 
+ /*
+  * These will output as part of the Image header, which should be little-endian
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index a2c29865c3fe..df706a8c22f1 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -131,6 +131,18 @@ SECTIONS
+ 
+ 	PERCPU_SECTION(64)
+ 
++	.rela : {
++		. = ALIGN(8);
++		__reloc_start = .;
++		*(.rela .rela*)
++		__reloc_end = .;
++	}
++	.dynsym : {
++		. = ALIGN(8);
++		__dynsym_start = .;
++		*(.dynsym)
++	}
++
+ 	. = ALIGN(PAGE_SIZE);
+ 	__init_end = .;
+ 
+diff --git a/scripts/sortextable.c b/scripts/sortextable.c
+index 1052d4834a44..77fcc1a80011 100644
+--- a/scripts/sortextable.c
++++ b/scripts/sortextable.c
+@@ -262,9 +262,9 @@ do_file(char const *const fname)
+ 		break;
+ 	}  /* end switch */
+ 	if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+-	||  r2(&ehdr->e_type) != ET_EXEC
++	|| (r2(&ehdr->e_type) != ET_EXEC && r2(&ehdr->e_type) != ET_DYN)
+ 	||  ehdr->e_ident[EI_VERSION] != EV_CURRENT) {
+-		fprintf(stderr, "unrecognized ET_EXEC file %s\n", fname);
++		fprintf(stderr, "unrecognized ET_EXEC/ET_DYN file %s\n", fname);
+ 		fail_file();
+ 	}
+ 
 -- 
 1.8.3.2
