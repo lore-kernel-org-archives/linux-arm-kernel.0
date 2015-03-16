@@ -1,143 +1,102 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 16 Mar 2015 16:51:27 -0600
-Subject: [RFC PATCH v15 02/11] ARM: qcom: Add Subsystem Power Manager
- (SPM) driver
-In-Reply-To: <5507506B.6060201@codeaurora.org>
-References: <1425914206-22295-1-git-send-email-lina.iyer@linaro.org>
- <1425914206-22295-3-git-send-email-lina.iyer@linaro.org>
- <5507506B.6060201@codeaurora.org>
-Message-ID: <20150316225127.GC501@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 17 Mar 2015 00:15:48 +0100
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <5506C93C.704@linaro.org>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <2027737.r7gkxqZ3Xv@vostro.rjw.lan> <5506C93C.704@linaro.org>
+Message-ID: <5704037.pUGdJ0Q9hF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16 2015 at 15:51 -0600, Stephen Boyd wrote:
->On 03/09/15 08:16, Lina Iyer wrote:
->> +
->> +static int qcom_idle_enter(int cpu, unsigned long index)
->> +{
->> +	if (!per_cpu(qcom_idle_ops, cpu)[index])
->> +		return -EOPNOTSUPP;
->
->Is this case still happening?
->
-I think, I can remove it safely now.
->> +
->> +	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
->> +}
->> +
->> +const struct of_device_id qcom_idle_state_match[] __initconst = {
->
->static?
->
-Ok
+On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
+> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
+> > On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
+> >> From: Graeme Gregory <graeme.gregory@linaro.org>
+> >>
+> >> ACPI 5.1 does not currently support S states for ARM64 hardware but
+> >> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
+> >> for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
+> >> and select it for x86 and ia64 only to make sleep functions available,
+> >> and also introduce stub function to allow other drivers to function
+> >> until S states are defined for ARM64.
+> >>
+> >> It will be no functional change for x86 and IA64.
+> >>
+> >> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> >> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >> Acked-by: Robert Richter <rrichter@cavium.com>
+> >> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> ---
+> >>   arch/ia64/Kconfig       | 1 +
+> >>   arch/x86/Kconfig        | 1 +
+> >>   drivers/acpi/Kconfig    | 4 ++++
+> >>   drivers/acpi/Makefile   | 2 +-
+> >>   drivers/acpi/internal.h | 4 ++++
+> >>   5 files changed, 11 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> >> index 074e52b..e8728d7 100644
+> >> --- a/arch/ia64/Kconfig
+> >> +++ b/arch/ia64/Kconfig
+> >> @@ -10,6 +10,7 @@ config IA64
+> >>   	select ARCH_MIGHT_HAVE_PC_SERIO
+> >>   	select PCI if (!IA64_HP_SIM)
+> >>   	select ACPI if (!IA64_HP_SIM)
+> >> +	select ACPI_GENERIC_SLEEP if ACPI
+> >>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+> >>   	select HAVE_UNSTABLE_SCHED_CLOCK
+> >>   	select HAVE_IDE
+> >> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> >> index b7d31ca..9804431 100644
+> >> --- a/arch/x86/Kconfig
+> >> +++ b/arch/x86/Kconfig
+> >> @@ -22,6 +22,7 @@ config X86_64
+> >>   ### Arch settings
+> >>   config X86
+> >>   	def_bool y
+> >> +	select ACPI_GENERIC_SLEEP if ACPI
+> >
+> > One more nit.  If you did
+> >
+> > +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> >
+> > here (and above for ia64), you'd avoid having to make ACPI_SLEEP
+> > depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+> 
+> In sleep.c,
+> 
+> #ifdef CONFIG_ACPI_SLEEP
+> acpi_target_system_state()
+> {
+> }
+> #endif
+> 
+> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
+> which one of them will be enabled on ARM64 so ACPI_SLEEP
+> will also enabled too.
+> 
+> So if we
+> 
+> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> 
+> and
+> 
+> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+> 
+> it will lead to errors for acpi_target_system_state() that
+> is declared but not defined, so I will keep the code as
+> it is, what do you think?
 
->> +	{ .compatible = "qcom,idle-state-stby", .data = qcom_cpu_standby },
->> +	{ .compatible = "qcom,idle-state-spc", .data = qcom_cpu_spc },
->> +	{ },
->> +};
->> +
->> +static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
->> +{
->> +	const struct of_device_id *match_id;
->> +	struct device_node *state_node;
->> +	int i;
->> +	int state_count = 0;
->> +	idle_fn idle_fns[CPUIDLE_STATE_MAX];
->> +	idle_fn *fns;
->> +	cpumask_t mask;
->> +	bool use_scm_power_down = false;
->> +
->> +	for (i = 0; ; i++) {
->> +		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
->> +		if (!state_node)
->> +			break;
->> +
->> +		if (!of_device_is_available(state_node))
->> +			continue;
->> +
->> +		if (i == CPUIDLE_STATE_MAX) {
->> +			pr_warn("%s: cpuidle states reached max possible\n",
->> +					__func__);
->> +			break;
->> +		}
->> +
->> +		match_id = of_match_node(qcom_idle_state_match, state_node);
->> +		if (!match_id)
->> +			return -ENODEV;
->> +
->> +		idle_fns[state_count] = match_id->data;
->> +
->> +		/* Check if any of the states allow power down */
->> +		if (match_id->data == qcom_cpu_spc)
->> +			use_scm_power_down = true;
->> +
->> +		state_count++;
->> +	}
->> +
->> +	if (!state_count) {
->> +		pr_warn("No idle ops founds for cpu %d\n", cpu);
->
->Maybe pr_debug? It's not the end of the world that we don't have cpuidle.
->
-Sure.
+No, we need to hash this out.  Having two different Kconfig options meaning
+almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
 
->> +		return -ENODEV;
->> +	}
->> +
->> +	fns = kcalloc(state_count, sizeof(*fns), GFP_KERNEL);
->> +	if (!fns)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0; i < state_count; i++)
->> +		fns[i] = idle_fns[i];
->> +
->> +	if (use_scm_power_down) {
->> +		/* We have atlease one power down mode */
->
->s/atlease/at least/
->
-Thanks!
+Do you need ACPI_SLEEP on ARM64 at all?
 
->> +		cpumask_clear(&mask);
->> +		cpumask_set_cpu(cpu, &mask);
->> +		qcom_scm_set_warm_boot_addr(cpu_resume, &mask);
->> +	}
->> +
->> +	per_cpu(qcom_idle_ops, cpu) = fns;
->> +
->> +	/*
->> +	 * Condition: cpuidle_driver_register() needs to happen before
->> +	 * cpuidle_register_device().
->> +	 * Check if the SPM probe has happened -
->> +	 * - If SPM probed successfully before arm_idle_init(), then defer
->> +	 *   the registration of cpuidle_device back to arm_idle_init()
->> +	 * - If the SPM probe happens in the future, then let the SPM probe
->> +	 *   register the cpuidle device, return -ENOSYS.
->> +	 */
->> +	return per_cpu(cpu_spm_drv, cpu) ? 0 : -ENOSYS;
->> +}
->> +
->> +struct cpuidle_ops qcom_kpss_v1_cpuidle_ops __initdata = {
->> +	.name = "qcom,kpss-acc-v1",
->> +	.suspend = qcom_idle_enter,
->> +	.init = qcom_cpuidle_init,
->> +};
->> +
->> +struct cpuidle_ops qcom_kpss_v2_cpuidle_ops __initdata = {
->> +	.name = "qcom,kpss-acc-v2",
->> +	.suspend = qcom_idle_enter,
->> +	.init = qcom_cpuidle_init,
->> +};
->> +
->>
->
->This just looks weird because of the macro magic in Daniel's series. Any
->reason we can't use the linker instead of doing preprocessor magic so
->that it looks like these structures are actually used?
->
-Hmm.. Will wait on Daniel's response to your other mail.
 
->-- 
->Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
