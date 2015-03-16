@@ -1,10 +1,10 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Mon, 16 Mar 2015 20:54:35 +0100
-Subject: [PATCH 25/35 linux-next] PCI: constify of_device_id array
+Date: Mon, 16 Mar 2015 20:54:36 +0100
+Subject: [PATCH 26/35 linux-next] hwmon: constify of_device_id array
 In-Reply-To: <1426535685-25996-1-git-send-email-fabf@skynet.be>
 References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
  <1426535685-25996-1-git-send-email-fabf@skynet.be>
-Message-ID: <1426535685-25996-4-git-send-email-fabf@skynet.be>
+Message-ID: <1426535685-25996-5-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,105 +13,35 @@ of_device_id is always used as const.
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- drivers/gpio/gpio-mpc8xxx.c      | 2 +-
- drivers/gpio/gpio-octeon.c       | 2 +-
- drivers/gpio/gpio-tz1090-pdc.c   | 2 +-
- drivers/gpio/gpio-tz1090.c       | 2 +-
- drivers/gpio/gpio-zynq.c         | 2 +-
- drivers/pci/host/pci-rcar-gen2.c | 2 +-
- drivers/pci/host/pcie-xilinx.c   | 2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/hwmon/pwm-fan.c  | 2 +-
+ drivers/hwmon/vexpress.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mpc8xxx.c b/drivers/gpio/gpio-mpc8xxx.c
-index a65b751..59c4c11 100644
---- a/drivers/gpio/gpio-mpc8xxx.c
-+++ b/drivers/gpio/gpio-mpc8xxx.c
-@@ -334,7 +334,7 @@ static struct irq_domain_ops mpc8xxx_gpio_irq_ops = {
- 	.xlate	= irq_domain_xlate_twocell,
+diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+index 4170728..31d793b 100644
+--- a/drivers/hwmon/pwm-fan.c
++++ b/drivers/hwmon/pwm-fan.c
+@@ -322,7 +322,7 @@ static int pwm_fan_resume(struct device *dev)
+ 
+ static SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
+ 
+-static struct of_device_id of_pwm_fan_match[] = {
++static const struct of_device_id of_pwm_fan_match[] = {
+ 	{ .compatible = "pwm-fan", },
+ 	{},
  };
- 
--static struct of_device_id mpc8xxx_gpio_ids[] = {
-+static const struct of_device_id mpc8xxx_gpio_ids[] = {
- 	{ .compatible = "fsl,mpc8349-gpio", },
- 	{ .compatible = "fsl,mpc8572-gpio", },
- 	{ .compatible = "fsl,mpc8610-gpio", },
-diff --git a/drivers/gpio/gpio-octeon.c b/drivers/gpio/gpio-octeon.c
-index 62ae251..41b5a4f 100644
---- a/drivers/gpio/gpio-octeon.c
-+++ b/drivers/gpio/gpio-octeon.c
-@@ -133,7 +133,7 @@ static int octeon_gpio_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id octeon_gpio_match[] = {
-+static const struct of_device_id octeon_gpio_match[] = {
- 	{
- 		.compatible = "cavium,octeon-3860-gpio",
+diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
+index cf1848b..8ba419d 100644
+--- a/drivers/hwmon/vexpress.c
++++ b/drivers/hwmon/vexpress.c
+@@ -193,7 +193,7 @@ static struct vexpress_hwmon_type vexpress_hwmon_energy = {
  	},
-diff --git a/drivers/gpio/gpio-tz1090-pdc.c b/drivers/gpio/gpio-tz1090-pdc.c
-index ede7e40..d04d814 100644
---- a/drivers/gpio/gpio-tz1090-pdc.c
-+++ b/drivers/gpio/gpio-tz1090-pdc.c
-@@ -222,7 +222,7 @@ static int tz1090_pdc_gpio_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id tz1090_pdc_gpio_of_match[] = {
-+static const struct of_device_id tz1090_pdc_gpio_of_match[] = {
- 	{ .compatible = "img,tz1090-pdc-gpio" },
- 	{ },
  };
-diff --git a/drivers/gpio/gpio-tz1090.c b/drivers/gpio/gpio-tz1090.c
-index 445660a..44f9dc7 100644
---- a/drivers/gpio/gpio-tz1090.c
-+++ b/drivers/gpio/gpio-tz1090.c
-@@ -585,7 +585,7 @@ static int tz1090_gpio_probe(struct platform_device *pdev)
- 	return 0;
- }
  
--static struct of_device_id tz1090_gpio_of_match[] = {
-+static const struct of_device_id tz1090_gpio_of_match[] = {
- 	{ .compatible = "img,tz1090-gpio" },
- 	{ },
- };
-diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-index 184c4b1..8ff311a 100644
---- a/drivers/gpio/gpio-zynq.c
-+++ b/drivers/gpio/gpio-zynq.c
-@@ -695,7 +695,7 @@ static int zynq_gpio_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id zynq_gpio_of_match[] = {
-+static const struct of_device_id zynq_gpio_of_match[] = {
- 	{ .compatible = "xlnx,zynq-gpio-1.0", },
- 	{ /* end of table */ }
- };
-diff --git a/drivers/pci/host/pci-rcar-gen2.c b/drivers/pci/host/pci-rcar-gen2.c
-index dd6b84e..db52c6a 100644
---- a/drivers/pci/host/pci-rcar-gen2.c
-+++ b/drivers/pci/host/pci-rcar-gen2.c
-@@ -356,7 +356,7 @@ static int rcar_pci_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id rcar_pci_of_match[] = {
-+static const struct of_device_id rcar_pci_of_match[] = {
- 	{ .compatible = "renesas,pci-r8a7790", },
- 	{ .compatible = "renesas,pci-r8a7791", },
- 	{ },
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index f1a06a0..caae2e4 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -869,7 +869,7 @@ static int xilinx_pcie_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct of_device_id xilinx_pcie_of_match[] = {
-+static const struct of_device_id xilinx_pcie_of_match[] = {
- 	{ .compatible = "xlnx,axi-pcie-host-1.00.a", },
- 	{}
- };
+-static struct of_device_id vexpress_hwmon_of_match[] = {
++static const struct of_device_id vexpress_hwmon_of_match[] = {
+ #if !defined(CONFIG_REGULATOR_VEXPRESS)
+ 	{
+ 		.compatible = "arm,vexpress-volt",
 -- 
 2.1.0
