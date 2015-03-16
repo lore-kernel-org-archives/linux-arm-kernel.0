@@ -1,146 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Mar 2015 16:23:41 +0100
-Subject: [RFC PATCH 1/3] arm64: head.S: replace early literals with constant
- immediates
-In-Reply-To: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426519423-28263-2-git-send-email-ard.biesheuvel@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 08:29:39 -0700
+Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
+In-Reply-To: <2070859.WcMooC33YH@wuerfel>
+References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
+ <20150313151301.GJ5264@atomide.com>
+ <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
+ <2070859.WcMooC33YH@wuerfel>
+Message-ID: <20150316152939.GP5264@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation of making the kernel relocatable, replace literal
-symbol references with immediate constants. This is necessary, as
-the literals will not be populated with meaningful values until
-after the relocation code has executed.
+* Arnd Bergmann <arnd@arndb.de> [150315 05:10]:
+> On Sunday 15 March 2015 10:50:42 Eliad Peller wrote:
+> > yeah, i missed it :/
+> > 
+> > looks like there's no platform that defines platform data for it.
+> > i'll replace the dev_get_platdata() with a function that only parses
+> > the clock-frequency properties (the irq is taken in this case from the
+> > spi_device).
+> > (or maybe i should just drop it, as no one actually uses it?)
+> 
+> I don't think we should drop the driver, but dropping the platform_data
+> support sounds reasonable. New users of this driver should all be using
+> DT, and if there is a good reason to use platform_data, it's easily
+> put back.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-entry.S |  2 +-
- arch/arm64/kernel/head.S      | 36 +++++++++++++++---------------------
- 2 files changed, 16 insertions(+), 22 deletions(-)
+Well we have n8x0 and n900 using the spi driver. For those, n8x0 boot
+all in dts mode, but n900 still also boots in legacy mode. It seems the
+board-rx51-peripherals.c only passes the power_gpio though, so that
+should be easy to keep around.
 
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 8ce9b0577442..f78e6a1de825 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
- 	 */
- 	mov	x20, x0		// DTB address
- 	ldr	x0, [sp, #16]	// relocated _text address
--	ldr	x21, =stext_offset
-+	movz	x21, #:abs_g0:stext_offset
- 	add	x21, x0, x21
- 
- 	/*
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 9c856f2aa7a5..1ea3cd2aba34 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -46,11 +46,9 @@
- #error TEXT_OFFSET must be less than 2MB
- #endif
- 
--	.macro	pgtbl, ttb0, ttb1, virt_to_phys
--	ldr	\ttb1, =swapper_pg_dir
--	ldr	\ttb0, =idmap_pg_dir
--	add	\ttb1, \ttb1, \virt_to_phys
--	add	\ttb0, \ttb0, \virt_to_phys
-+	.macro	pgtbl, ttb0, ttb1
-+	adrp	\ttb1, swapper_pg_dir
-+	adrp	\ttb0, idmap_pg_dir
- 	.endm
- 
- #ifdef CONFIG_ARM64_64K_PAGES
-@@ -63,7 +61,7 @@
- #define TABLE_SHIFT	PUD_SHIFT
- #endif
- 
--#define KERNEL_START	KERNEL_RAM_VADDR
-+#define KERNEL_START	_text
- #define KERNEL_END	_end
- 
- /*
-@@ -322,7 +320,7 @@ ENDPROC(stext)
-  *     been enabled
-  */
- __create_page_tables:
--	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
-+	pgtbl	x25, x26			// idmap_pg_dir and swapper_pg_dir addresses
- 	mov	x27, lr
- 
- 	/*
-@@ -351,8 +349,7 @@ __create_page_tables:
- 	 * Create the identity mapping.
- 	 */
- 	mov	x0, x25				// idmap_pg_dir
--	ldr	x3, =KERNEL_START
--	add	x3, x3, x28			// __pa(KERNEL_START)
-+	adr_l	x3, KERNEL_START		// __pa(KERNEL_START)
- 
- #ifndef CONFIG_ARM64_VA_BITS_48
- #define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
-@@ -391,9 +388,8 @@ __create_page_tables:
- #endif
- 
- 	create_pgd_entry x0, x3, x5, x6
--	ldr	x6, =KERNEL_END
- 	mov	x5, x3				// __pa(KERNEL_START)
--	add	x6, x6, x28			// __pa(KERNEL_END)
-+	adr_l	x6, KERNEL_END			// __pa(KERNEL_END)
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-@@ -402,8 +398,10 @@ __create_page_tables:
- 	mov	x0, x26				// swapper_pg_dir
- 	mov	x5, #PAGE_OFFSET
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	x6, =KERNEL_END
-+	adr_l	x6, KERNEL_END
- 	mov	x3, x24				// phys offset
-+	sub	x6, x6, x3			// kernel memsize
-+	add	x6, x6, x5			// __va(KERNEL_END)
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-@@ -538,8 +536,7 @@ ENDPROC(el2_setup)
-  * in x20. See arch/arm64/include/asm/virt.h for more info.
-  */
- ENTRY(set_cpu_boot_mode_flag)
--	ldr	x1, =__boot_cpu_mode		// Compute __boot_cpu_mode
--	add	x1, x1, x28
-+	adr_l	x1, __boot_cpu_mode		// Compute __boot_cpu_mode
- 	cmp	w20, #BOOT_CPU_MODE_EL2
- 	b.ne	1f
- 	add	x1, x1, #4
-@@ -598,7 +595,7 @@ ENTRY(secondary_startup)
- 	/*
- 	 * Common entry point for secondary CPUs.
- 	 */
--	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
-+	pgtbl	x25, x26			// x25=TTBR0, x26=TTBR1
- 	bl	__cpu_setup			// initialise processor
- 
- 	ldr	x21, =secondary_data
-@@ -655,17 +652,14 @@ ENDPROC(__turn_mmu_on)
-  * Calculate the start of physical memory.
-  */
- __calc_phys_offset:
--	adr	x0, 1f
--	ldp	x1, x2, [x0]
-+	adrp	x0, KERNEL_START		// __pa(KERNEL_START)
-+	ldr	x1, =KERNEL_RAM_VADDR		// __va(KERNEL_START)
-+	mov	x2, PAGE_OFFSET
- 	sub	x28, x0, x1			// x28 = PHYS_OFFSET - PAGE_OFFSET
- 	add	x24, x2, x28			// x24 = PHYS_OFFSET
- 	ret
- ENDPROC(__calc_phys_offset)
- 
--	.align 3
--1:	.quad	.
--	.quad	PAGE_OFFSET
--
- /*
-  * Exception handling. Something went wrong and we can't proceed. We ought to
-  * tell the user, but since we don't have any guarantee that we're even
--- 
-1.8.3.2
+We should keep things still working for n900 in legacy mode until the
+pending regressions with device tree based booting have been cleared
+for at least one merge cycle. I believe the last pending issues is the
+support for ATAG_REVISION in device tree mode as posted by Pali.
+
+Regards,
+
+Tony
