@@ -1,36 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 11:22:15 -0700
-Subject: [PATCH] ARM: omap1_defconfig: drop obsolete Kconfig symbols
-In-Reply-To: <alpine.DEB.2.02.1502070024030.3767@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1502070024030.3767@utopia.booyaka.com>
-Message-ID: <20150316182214.GV5264@atomide.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 16 Mar 2015 19:27:30 +0100
+Subject: [PATCH 6/9] ARM: dt: dove: add Dove PMU DT entry to dove.dtsi
+In-Reply-To: <E1YW7tB-0003mM-1L@rmk-PC.arm.linux.org.uk>
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+ <E1YW7tB-0003mM-1L@rmk-PC.arm.linux.org.uk>
+Message-ID: <55072092.9040207@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150206 16:29]:
-> 
-> scripts/checkkconfigsymbols.py indicates that omap1_defconfig
-> references the following obsolete Kconfig symbols:
-> 
-> CONFIG_BT_L2CAP
-> CONFIG_BT_SCO
-> CONFIG_DEBUG_ERRORS
-> CONFIG_EXPERIMENTAL
-> CONFIG_FB_OMAP_BOOTLOADER_INIT
-> CONFIG_LEDS_CPU
-> CONFIG_MACH_OMAP_HTCWIZARD
-> CONFIG_MTD_CHAR
-> CONFIG_MTD_DEBUG
-> CONFIG_MTD_DEBUG_VERBOSE
-> CONFIG_MTD_PARTITIONS
-> CONFIG_NET_ETHERNET
-> CONFIG_RCU_CPU_STALL_DETECTOR
-> CONFIG_SCSI_MULTI_LUN
-> CONFIG_USB_DEVICE_CLASS
-> CONFIG_VIDEO_OUTPUT_CONTROL
-> 
-> Drop them from omap1_defconfig.
+Hi Russell,
 
-Applying this one into omap-for-v4.1/defconfig thanks.
+On 12/03/2015 19:31, Russell King wrote:
+> Add the PMU description to the Dove DT file.  The PMU provides multiple
+> features, including an interrupt, reset, power and isolation controller.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/boot/dts/dove.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index a5441d5482a6..43d4ebf414be 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -380,6 +380,15 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			pmu: power-management at d0000 {
+> +				compatible = "marvell,dove-pmu";
+> +				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
 
-Tony
+Here you overlap some other nodes such as the thermal one (from 0xd001c to 0xd0028),
+the clock gate one (from 0xd0038 to 0xd003c), the gpio one, the pinctrl one ...
+
+Could you be more specific?
+
+Thanks,
+
+Gregory
+
+> +				interrupts = <33>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <1>;
+> +				#reset-cells = <1>;
+> +			};
+> +
+>  			thermal: thermal-diode at d001c {
+>  				compatible = "marvell,dove-thermal";
+>  				reg = <0xd001c 0x0c>, <0xd005c 0x08>;
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
