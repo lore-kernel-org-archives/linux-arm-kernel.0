@@ -1,186 +1,234 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Mar 2015 11:33:27 +0000
-Subject: [PATCH 10/10] clk: zx: add zx296702 clock support
-In-Reply-To: <1426333785-3952-11-git-send-email-jun.nie@linaro.org>
-References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
- <1426333785-3952-11-git-send-email-jun.nie@linaro.org>
-Message-ID: <20150316113327.GH8656@n2100.arm.linux.org.uk>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 16 Mar 2015 19:33:29 +0800
+Subject: [PATCH v10 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
+ if ACPI is enabled on ARM64
+In-Reply-To: <20150313110421.GA5229@red-moon>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-19-git-send-email-hanjun.guo@linaro.org>
+ <20150312182151.GA3867@red-moon> <5502596D.6020901@huawei.com>
+ <20150313110421.GA5229@red-moon>
+Message-ID: <5506BF89.9040703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 14, 2015 at 07:49:45PM +0800, Jun Nie wrote:
-> +static int hw_to_idx(struct clk_zx_pll *zx_pll)
-> +{
-> +	const struct zx_pll_config *config = zx_pll->lookup_table;
-> +	u32 hw_cfg0, hw_cfg1;
-> +	unsigned long flags = 0;
-> +	int i;
-> +
-> +	if (zx_pll->lock)
-> +		spin_lock_irqsave(zx_pll->lock, flags);
-> +
-> +	hw_cfg0 = readl(zx_pll->reg_base);
-> +	hw_cfg1 = readl(zx_pll->reg_base + 4);
-> +
-> +	if (zx_pll->lock)
-> +		spin_unlock_irqrestore(zx_pll->lock, flags);
-> +
-> +	/* For matching the value in lookup table */
-> +	hw_cfg0 &= ~BIT(30); /* clear lock bit */
-> +	hw_cfg0 |= BIT(31); /* set PD bit */
+On 2015?03?13? 19:04, Lorenzo Pieralisi wrote:
+> On Fri, Mar 13, 2015 at 03:28:45AM +0000, Hanjun Guo wrote:
+>
+> [...]
+>
+>>>   /*
+>>>    * acpi_boot_table_init() called from setup_arch(), always.
+>>>    *	1. find RSDP and get its address, and then find XSDT
+>>>    *	2. extract all tables and checksums them all
+>>>    *	3. check ACPI FADT revision
+>>> + *	4. check ACPI FADT HW reduced flag
+>>>    *
+>>>    * We can parse ACPI boot-time tables such as MADT after
+>>>    * this function is called.
+>>>    */
+>>>   void __init acpi_boot_table_init(void)
+>>>   {
+>>> +	struct acpi_table_header *table;
+>>> +	struct acpi_table_fadt *fadt;
+>>> +	acpi_status status;
+>>> +	acpi_size tbl_size;
+>>> +
+>>>   	/*
+>>>   	 * Enable ACPI instead of device tree unless
+>>>   	 * - ACPI has been disabled explicitly (acpi=off), or
+>>> @@ -351,19 +318,52 @@ void __init acpi_boot_table_init(void)
+>>>   	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>>   		return;
+>>>
+>>> -	enable_acpi();
+>>> -
+>>>   	/* Initialize the ACPI boot-time table parser. */
+>>>   	if (acpi_table_init()) {
+>>
+>> Since we disable ACPI in default, it is a bit strange for me to init all
+>> the ACPI tables and parse FADT when ACPI is disabled, could you
+>> put some comments here to clarify the purpose? other than that, it is looks
+>> good to me.
+>
+> Ok, the purpose was to make things simpler, but I think that given
+> current code it is not 100% safe to init ACPI tables with
+> acpi_disabled == 1.
+>
+> To me having to enable ACPI to parse the tables and check *if* ACPI tables
+> are there is a bit crazy, but I agree with you that given current code
+> it is safer.
+>
+> Patch rewritten, here below, please have a look, test it and rework
+> bits as needed, I added comments where I thought they were needed but
+> please add to that if you feel it is worth it.
+>
+> It should be easy to split, let me know if you want an incremental
+> version.
 
-Use definitions for these bits rather than BIT(n) and a comment.
+This one is much better, pretty fine to me, thanks!
 
-> +static int zx_pll_set_rate(struct clk_hw *hw, unsigned long rate,
-> +			   unsigned long parent_rate)
-> +{
-> +	/* Assume current cpu is not running on current PLL */
-> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-> +	const struct zx_pll_config *config;
-> +	unsigned long flags = 0;
-> +	int idx;
-> +	u32 reg;
-> +
-> +	idx = rate_to_idx(zx_pll, rate);
-> +	config = &zx_pll->lookup_table[idx];
-> +
-> +	if (zx_pll->lock)
-> +		spin_lock_irqsave(zx_pll->lock, flags);
+I assume that this patch is cleanup patch on top of ARM64 ACPI
+core patches, right?
 
-Is this code ever safe without having a lock to take?
+Thanks
+Hanjun
 
+>
+> Thanks !
+> Lorenzo
+>
+> ---
+>   arch/arm64/kernel/acpi.c | 103 +++++++++++++++++++++++++++++++----------------
+>   1 file changed, 69 insertions(+), 34 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 5819ef7..e5ee4d4 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -291,43 +291,60 @@ void acpi_unregister_gsi(u32 gsi)
+>   }
+>   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+>
+> -static int __init acpi_parse_fadt(struct acpi_table_header *table)
+> +/*
+> + * acpi_fadt_sanity_check() - Check FADT presence and carry out sanity
+> + *			      checks on it
+> + *
+> + * Return 0 on success,  <0 on failure
+> + */
+> +static int __init acpi_fadt_sanity_check(void)
+>   {
+> -	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> +	struct acpi_table_header *table;
+> +	struct acpi_table_fadt *fadt;
+> +	acpi_status status;
+> +	acpi_size tbl_size;
+> +	int ret = 0;
 > +
-> +	writel(config->cfg0, zx_pll->reg_base);
-> +	writel(config->cfg1, zx_pll->reg_base + 4);
-
-Use a definition for this +4 (and also for the first register too.)
-
-> +	reg = readl(zx_pll->reg_base);
-> +	reg &= ~BIT(31);
-> +	writel(reg, zx_pll->reg_base);
-
-You've only just written zx_pll->reg_base - why do you need to read it
-back?  Wouldn't this be better (and in any case, using relaxed
-accessors is probably a good idea):
-
-	writel_relaxed(config->cfg0, zx_pll->reg_base);
-	writel_relaxed(config->cfg1, zx_pll->reg_base + 4);
-	writel_relaxed(config->cfg0 & ~ZX_PLL_PD, zx_pll->reg_base);
-
-Looks nicer, doesn't it?
-
-In any case, why should setting the rate enable the PLL?  I notice you
-use the PD bit below in the enable/disable functions, so this seems
-rather silly - it looks like it should be preserved, and then the wait
-for the PLL to lock (below) should be conditional on the PLL being
-enabled.
-
-> +	while (!(readl(zx_pll->reg_base) & BIT(30)))
-> +		cpu_relax();
-
-What if the bit never sets?  You can probably use readl_relaxed() here.
-
+> +	/*
+> +	 * FADT is required on arm64; retrieve it to check its presence
+> +	 * and carry out revision and ACPI HW reduced compliancy tests
+> +	 */
+> +	status = acpi_get_table_with_size(ACPI_SIG_FADT, 0, &table, &tbl_size);
+> +	if (ACPI_FAILURE(status)) {
+> +		const char *msg = acpi_format_exception(status);
 > +
-> +	if (zx_pll->lock)
-> +		spin_unlock_irqrestore(zx_pll->lock, flags);
+> +		pr_err("Failed to get FADT table, %s\n", msg);
+> +		return -ENODEV;
+> +	}
 > +
-> +	return 0;
-> +}
+> +	fadt = (struct acpi_table_fadt *)table;
+>
+>   	/*
+>   	 * Revision in table header is the FADT Major revision, and there
+>   	 * is a minor revision of FADT which was introduced by ACPI 5.1,
+>   	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
+> -	 * boot protocol configuration data, or we will disable ACPI.
+> +	 * boot protocol configuration data.
+>   	 */
+> -	if (table->revision > 5 ||
+> -	    (table->revision == 5 && fadt->minor_revision >= 1)) {
+> -		if (!acpi_gbl_reduced_hardware) {
+> -			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
+> -			goto disable_acpi;
+> -		}
+> -
+> -		/*
+> -		 * ACPI 5.1 only has two explicit methods to boot up SMP,
+> -		 * PSCI and Parking protocol, but the Parking protocol is
+> -		 * only specified for ARMv7 now, so make PSCI as the only
+> -		 * way for the SMP boot protocol before some updates for
+> -		 * the Parking protocol spec.
+> -		 */
+> -		if (acpi_psci_present())
+> -			return 0;
+> -
+> -		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
+> -		return -EOPNOTSUPP;
+> +	if (table->revision < 5 ||
+> +	   (table->revision == 5 && fadt->minor_revision < 1)) {
+> +		pr_err("Unsupported FADT revision %d.%d, should be 5.1+\n",
+> +		       table->revision, fadt->minor_revision);
+> +		ret = -EINVAL;
+> +		goto out;
+>   	}
+>
+> -	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+> -		table->revision, fadt->minor_revision);
+> +	if (!(fadt->flags & ACPI_FADT_HW_REDUCED)) {
+> +		pr_err("FADT not ACPI hardware reduced compliant\n");
+> +		ret = -EINVAL;
+> +	}
+>
+> -disable_acpi:
+> -	disable_acpi();
+> -	return -EINVAL;
+> +out:
+> +	/*
+> +	 * acpi_get_table_with_size() creates FADT table mapping that
+> +	 * should be released after parsing and before resuming boot
+> +	 */
+> +	early_acpi_os_unmap_memory((char *)table, tbl_size);
+> +	return ret;
+>   }
+>
+>   /*
+> @@ -335,12 +352,17 @@ disable_acpi:
+>    *	1. find RSDP and get its address, and then find XSDT
+>    *	2. extract all tables and checksums them all
+>    *	3. check ACPI FADT revision
+> + *	4. check ACPI FADT HW reduced flag
+>    *
+>    * We can parse ACPI boot-time tables such as MADT after
+>    * this function is called.
+> + *
+> + * ACPI is enabled on return if ACPI tables initialized and sanity checks
+> + * passed, disabled otherwise
+>    */
+>   void __init acpi_boot_table_init(void)
+>   {
 > +
-> +static int zx_pll_enable(struct clk_hw *hw)
-> +{
-> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-> +	unsigned long flags = 0;
-> +	u32 reg;
+>   	/*
+>   	 * Enable ACPI instead of device tree unless
+>   	 * - ACPI has been disabled explicitly (acpi=off), or
+> @@ -351,19 +373,32 @@ void __init acpi_boot_table_init(void)
+>   	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>   		return;
+>
+> +	/*
+> +	 * ACPI is disabled at this point. Enable it in order to parse
+> +	 * the ACPI tables and carry out sanity checks
+> +	 */
+>   	enable_acpi();
+>
+>   	/* Initialize the ACPI boot-time table parser. */
+>   	if (acpi_table_init()) {
+> -		disable_acpi();
+> -		return;
+> +		pr_err("Failed to init ACPI tables\n");
+> +		goto init_failed;
+>   	}
+>
+> -	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
+> -		/* disable ACPI if no FADT is found */
+> -		disable_acpi();
+> -		pr_err("Can't find FADT\n");
+> -	}
+> +	/*
+> +	 * Check FADT presence and carry out FADT sanity checks
+> +	 */
+> +	if (acpi_fadt_sanity_check() < 0)
+> +		goto init_failed;
 > +
-> +	if (zx_pll->lock)
-> +		spin_lock_irqsave(zx_pll->lock, flags);
+> +	/*
+> +	 * ACPI tables initialized and FADT sanity checks passed, leave
+> +	 * ACPI enabled and carry on booting
+> +	 */
+> +	return;
 > +
-> +	reg = readl(zx_pll->reg_base);
-> +	writel(reg & ~BIT(31), zx_pll->reg_base);
-> +	while (!(readl(zx_pll->reg_base) & BIT(30)))
-> +		cpu_relax();
-
-What if the bit never sets?
-
-> +
-> +	if (zx_pll->lock)
-> +		spin_unlock_irqrestore(zx_pll->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static void zx_pll_disable(struct clk_hw *hw)
-> +{
-> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-> +	unsigned long flags = 0;
-> +	u32 reg;
-> +
-> +	if (zx_pll->lock)
-> +		spin_lock_irqsave(zx_pll->lock, flags);
-> +
-> +	reg = readl(zx_pll->reg_base);
-> +	writel(reg | BIT(31), zx_pll->reg_base);
-> +
-> +	if (zx_pll->lock)
-> +		spin_unlock_irqrestore(zx_pll->lock, flags);
-> +}
-> +
-> +static int zx_pll_is_enabled(struct clk_hw *hw)
-> +{
-> +	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
-> +	unsigned long flags = 0;
-> +	u32 reg;
-> +
-> +	if (zx_pll->lock)
-> +		spin_lock_irqsave(zx_pll->lock, flags);
-> +
-> +	reg = readl(zx_pll->reg_base);
-> +
-> +	if (zx_pll->lock)
-> +		spin_unlock_irqrestore(zx_pll->lock, flags);
-
-You don't need locking to read from a single register.
-
-> +
-> +	return !(reg & BIT(31));
-> +}
-> +
-> +static const struct clk_ops zx_pll_ops = {
-> +	.recalc_rate = zx_pll_recalc_rate,
-> +	.round_rate = zx_pll_round_rate,
-> +	.set_rate = zx_pll_set_rate,
-> +	.enable = zx_pll_enable,
-> +	.disable = zx_pll_disable,
-> +	.is_enabled = zx_pll_is_enabled,
-> +};
-> +
-> +struct clk *clk_register_zx_pll(const char *name, const char *parent_name,
-> +	unsigned long flags, void __iomem *reg_base,
-> +	const struct zx_pll_config *lookup_table, int count, spinlock_t *lock)
-> +{
-> +	struct clk_zx_pll *zx_pll;
-> +	struct clk *clk;
-> +	struct clk_init_data init;
-> +
-> +	zx_pll = kzalloc(sizeof(*zx_pll), GFP_KERNEL);
-> +	if (!zx_pll)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	init.name = name;
-> +	init.ops = &zx_pll_ops;
-> +	init.flags = flags;
-> +	init.parent_names = (parent_name ? &parent_name : NULL);
-> +	init.num_parents = (parent_name ? 1 : 0);
-> +
-> +	zx_pll->reg_base = reg_base;
-> +	zx_pll->lookup_table = lookup_table;
-> +	zx_pll->count = count;
-> +	zx_pll->lock = lock;
-
-As mentioned above, I think this is unsafe if lock is NULL.  You probably
-want to subsitute a lock specific to the PLL if none was provided.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> +init_failed:
+> +	disable_acpi();
+>   }
+>
+>   void __init acpi_gic_init(void)
+>
