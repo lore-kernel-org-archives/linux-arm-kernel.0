@@ -1,76 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 13:00:03 -0700
-Subject: [PATCH 3/3] ARM: omap2plus_defconfig: Enable n900 modem as loadable
- modules
-In-Reply-To: <1426536003-7077-1-git-send-email-tony@atomide.com>
-References: <1426536003-7077-1-git-send-email-tony@atomide.com>
-Message-ID: <1426536003-7077-4-git-send-email-tony@atomide.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 16 Mar 2015 21:15:29 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <54FF1BAA.3060409@wwwdotorg.org>
+References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <54FF1BAA.3060409@wwwdotorg.org>
+Message-ID: <550739E1.4010607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable n900 modem as loadable modules.
+On 10.03.2015 17:28, Stephen Warren wrote:
+> On 03/09/2015 06:21 AM, Sebastian Hesselbarth wrote:
+>> I2C mux pinctrl driver currently determines the number of sub-busses by
+>> counting available pinctrl-names. Unfortunately, this requires each
+>> incarnation of the devicetree node with different available sub-busses
+>> to be rewritten.
+>>
+>> This patch reworks i2c-mux-pinctrl driver to count the number of
+>> available sub-nodes instead. The rework should be compatible to the old
+>> way of probing for sub-busses and additionally allows to disable unused
+>> sub-busses with standard DT property status = "disabled".
+>>
+>> This also amends the corresponding devicetree binding documentation to
+>> reflect the new functionality to disable unused sub-nodes. While at it,
+>> also fix two references to binding documentation files that miss an
+>> "i2c-"
+>> prefix.
+>
+> The DT binding changes at least,
+> Acked-by: Stephen Warren <swarren@nvidia.com>
 
-Cc: Sebastian Reichel <sre@ring0.de>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/configs/omap2plus_defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Wolfram,
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 6c7722d..cd1c0f3 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -87,6 +87,7 @@ CONFIG_IP_PNP_BOOTP=y
- CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_LRO is not set
- CONFIG_NETFILTER=y
-+CONFIG_PHONET=m
- CONFIG_CAN=m
- CONFIG_CAN_C_CAN=m
- CONFIG_CAN_C_CAN_PLATFORM=m
-@@ -178,6 +179,7 @@ CONFIG_USB_EPSON2888=y
- CONFIG_USB_EHCI_HCD=m
- CONFIG_USB_OHCI_HCD=m
- CONFIG_USB_KC2190=y
-+CONFIG_USB_CDC_PHONET=m
- CONFIG_LIBERTAS=m
- CONFIG_LIBERTAS_USB=m
- CONFIG_LIBERTAS_SDIO=m
-@@ -224,6 +226,11 @@ CONFIG_I2C_CHARDEV=y
- CONFIG_SPI=y
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_TI_QSPI=m
-+CONFIG_HSI=m
-+CONFIG_OMAP_SSI=m
-+CONFIG_NOKIA_MODEM=m
-+CONFIG_SSI_PROTOCOL=m
-+CONFIG_HSI_CHAR=m
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
-@@ -348,6 +355,7 @@ CONFIG_USB_CONFIGFS_ECM=y
- CONFIG_USB_CONFIGFS_ECM_SUBSET=y
- CONFIG_USB_CONFIGFS_RNDIS=y
- CONFIG_USB_CONFIGFS_EEM=y
-+CONFIG_USB_CONFIGFS_PHONET=y
- CONFIG_USB_CONFIGFS_MASS_STORAGE=y
- CONFIG_USB_CONFIGFS_F_LB_SS=y
- CONFIG_USB_CONFIGFS_F_FS=y
-@@ -356,6 +364,7 @@ CONFIG_USB_CONFIGFS_F_UAC2=y
- CONFIG_USB_CONFIGFS_F_MIDI=y
- CONFIG_USB_CONFIGFS_F_HID=y
- CONFIG_USB_ZERO=m
-+CONFIG_USB_G_NOKIA=m
- CONFIG_MMC=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_OMAP=y
-@@ -405,6 +414,7 @@ CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_CONFIGFS_FS=y
- CONFIG_JFFS2_FS=y
- CONFIG_JFFS2_SUMMARY=y
- CONFIG_JFFS2_FS_XATTR=y
--- 
-2.1.4
+are you going to pick this patch through your tree now that Stephen
+ack'ed the binding documentation change, too?
+
+I can also split the patch up into driver/doc changes if you prefer.
+
+Sebastian
