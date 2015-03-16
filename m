@@ -1,40 +1,1094 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 08:29:39 -0700
-Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <2070859.WcMooC33YH@wuerfel>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <20150313151301.GJ5264@atomide.com>
- <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
- <2070859.WcMooC33YH@wuerfel>
-Message-ID: <20150316152939.GP5264@atomide.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Mon, 16 Mar 2015 15:48:35 +0000
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+Message-ID: <20150316154835.GA31336@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [150315 05:10]:
-> On Sunday 15 March 2015 10:50:42 Eliad Peller wrote:
-> > yeah, i missed it :/
-> > 
-> > looks like there's no platform that defines platform data for it.
-> > i'll replace the dev_get_platdata() with a function that only parses
-> > the clock-frequency properties (the irq is taken in this case from the
-> > spi_device).
-> > (or maybe i should just drop it, as no one actually uses it?)
-> 
-> I don't think we should drop the driver, but dropping the platform_data
-> support sounds reasonable. New users of this driver should all be using
-> DT, and if there is a good reason to use platform_data, it's easily
-> put back.
+Add Andy Polyakov's NEON optimized SHA-256 implementation.
 
-Well we have n8x0 and n900 using the spi driver. For those, n8x0 boot
-all in dts mode, but n900 still also boots in legacy mode. It seems the
-board-rx51-peripherals.c only passes the power_gpio though, so that
-should be easy to keep around.
+On Nexus 6, this implementation is ~2x faster than sha256-generic.
 
-We should keep things still working for n900 in legacy mode until the
-pending regressions with device tree based booting have been cleared
-for at least one merge cycle. I believe the last pending issues is the
-support for ATAG_REVISION in device tree mode as posted by Pali.
+Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 
-Regards,
+---
+ arch/arm/crypto/Makefile            |    2 
+ arch/arm/crypto/sha256-armv7-neon.S |  819 ++++++++++++++++++++++++++++++++++++
+ arch/arm/crypto/sha256_neon_glue.c  |  201 ++++++++
+ crypto/Kconfig                      |   12 
+ 4 files changed, 1034 insertions(+)
 
-Tony
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index b48fa34..316dba2 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -6,12 +6,14 @@ obj-$(CONFIG_CRYPTO_AES_ARM) += aes-arm.o
+ obj-$(CONFIG_CRYPTO_AES_ARM_BS) += aes-arm-bs.o
+ obj-$(CONFIG_CRYPTO_SHA1_ARM) += sha1-arm.o
+ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
++obj-$(CONFIG_CRYPTO_SHA256_ARM_NEON) += sha256-arm-neon.o
+ obj-$(CONFIG_CRYPTO_SHA512_ARM_NEON) += sha512-arm-neon.o
+ 
+ aes-arm-y	:= aes-armv4.o aes_glue.o
+ aes-arm-bs-y	:= aesbs-core.o aesbs-glue.o
+ sha1-arm-y	:= sha1-armv4-large.o sha1_glue.o
+ sha1-arm-neon-y	:= sha1-armv7-neon.o sha1_neon_glue.o
++sha256-arm-neon-y := sha256-armv7-neon.o sha256_neon_glue.o
+ sha512-arm-neon-y := sha512-armv7-neon.o sha512_neon_glue.o
+ 
+ quiet_cmd_perl = PERL    $@
+diff --git a/arch/arm/crypto/sha256-armv7-neon.S b/arch/arm/crypto/sha256-armv7-neon.S
+new file mode 100644
+index 0000000..5ce04c2
+--- /dev/null
++++ b/arch/arm/crypto/sha256-armv7-neon.S
+@@ -0,0 +1,819 @@
++@ sha256-armv7-neon.S  -  ARM/NEON assembly implementation of SHA-256 transform
++@
++@ ====================================================================
++@ Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++@ project. The module is, however, dual licensed under OpenSSL and
++@ CRYPTOGAMS licenses depending on where you obtain it. For further
++@ details see http://www.openssl.org/~appro/cryptogams/.
++@ ====================================================================
++
++#include <linux/linkage.h>
++
++.text
++.code   32
++.fpu neon
++
++.type	K256,%object
++.align	5
++K256:
++.word	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5
++.word	0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5
++.word	0xd807aa98,0x12835b01,0x243185be,0x550c7dc3
++.word	0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174
++.word	0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc
++.word	0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da
++.word	0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7
++.word	0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967
++.word	0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13
++.word	0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85
++.word	0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3
++.word	0xd192e819,0xd6990624,0xf40e3585,0x106aa070
++.word	0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5
++.word	0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3
++.word	0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208
++.word	0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
++.size	K256,.-K256
++.word	0				@ terminator
++.word	0
++.align	5
++
++.align 5
++ENTRY(sha256_transform_neon)
++	/* Input:
++	 *	%r0: SHA256_CONTEXT
++	 *	%r1: data
++	 *	%r2: nblks
++	 */
++	sub	r3,pc,#8		@ sha256_transform_neon
++	add	r2,r1,r2,lsl#6	@ len to point at the end of inp
++
++	stmdb	sp!,{r4-r12,lr}
++
++	mov	r12,sp
++	sub	sp,sp,#16*4+16		@ alloca
++	sub	r14,r3,#256+32	@ K256
++	bic	sp,sp,#15		@ align for 128-bit stores
++
++	vld1.8		{q0},[r1]!
++	vld1.8		{q1},[r1]!
++	vld1.8		{q2},[r1]!
++	vld1.8		{q3},[r1]!
++	vld1.32		{q8},[r14,:128]!
++	vld1.32		{q9},[r14,:128]!
++	vld1.32		{q10},[r14,:128]!
++	vld1.32		{q11},[r14,:128]!
++	vrev32.8	q0,q0		@ yes, even on
++	str		r0,[sp,#64]
++	vrev32.8	q1,q1		@ big-endian
++	str		r1,[sp,#68]
++	mov		r1,sp
++	vrev32.8	q2,q2
++	str		r2,[sp,#72]
++	vrev32.8	q3,q3
++	str		r12,[sp,#76]		@ save original sp
++	vadd.i32	q8,q8,q0
++	vadd.i32	q9,q9,q1
++	vst1.32		{q8},[r1,:128]!
++	vadd.i32	q10,q10,q2
++	vst1.32		{q9},[r1,:128]!
++	vadd.i32	q11,q11,q3
++	vst1.32		{q10},[r1,:128]!
++	vst1.32		{q11},[r1,:128]!
++
++	ldmia		r0,{r4-r11}
++	sub		r1,r1,#64
++	ldr		r2,[sp,#0]
++	eor		r12,r12,r12
++	eor		r3,r5,r6
++	b		.L_00_48
++
++.align	4
++.L_00_48:
++	vext.8	q8,q0,q1,#4
++	add	r11,r11,r2
++	eor	r2,r9,r10
++	eor	r0,r8,r8,ror#5
++	vext.8	q9,q2,q3,#4
++	add	r4,r4,r12
++	and	r2,r2,r8
++	eor	r12,r0,r8,ror#19
++	vshr.u32	q10,q8,#7
++	eor	r0,r4,r4,ror#11
++	eor	r2,r2,r10
++	vadd.i32	q0,q0,q9
++	add	r11,r11,r12,ror#6
++	eor	r12,r4,r5
++	vshr.u32	q9,q8,#3
++	eor	r0,r0,r4,ror#20
++	add	r11,r11,r2
++	vsli.32	q10,q8,#25
++	ldr	r2,[sp,#4]
++	and	r3,r3,r12
++	vshr.u32	q11,q8,#18
++	add	r7,r7,r11
++	add	r11,r11,r0,ror#2
++	eor	r3,r3,r5
++	veor	q9,q9,q10
++	add	r10,r10,r2
++	vsli.32	q11,q8,#14
++	eor	r2,r8,r9
++	eor	r0,r7,r7,ror#5
++	vshr.u32	d24,d7,#17
++	add	r11,r11,r3
++	and	r2,r2,r7
++	veor	q9,q9,q11
++	eor	r3,r0,r7,ror#19
++	eor	r0,r11,r11,ror#11
++	vsli.32	d24,d7,#15
++	eor	r2,r2,r9
++	add	r10,r10,r3,ror#6
++	vshr.u32	d25,d7,#10
++	eor	r3,r11,r4
++	eor	r0,r0,r11,ror#20
++	vadd.i32	q0,q0,q9
++	add	r10,r10,r2
++	ldr	r2,[sp,#8]
++	veor	d25,d25,d24
++	and	r12,r12,r3
++	add	r6,r6,r10
++	vshr.u32	d24,d7,#19
++	add	r10,r10,r0,ror#2
++	eor	r12,r12,r4
++	vsli.32	d24,d7,#13
++	add	r9,r9,r2
++	eor	r2,r7,r8
++	veor	d25,d25,d24
++	eor	r0,r6,r6,ror#5
++	add	r10,r10,r12
++	vadd.i32	d0,d0,d25
++	and	r2,r2,r6
++	eor	r12,r0,r6,ror#19
++	vshr.u32	d24,d0,#17
++	eor	r0,r10,r10,ror#11
++	eor	r2,r2,r8
++	vsli.32	d24,d0,#15
++	add	r9,r9,r12,ror#6
++	eor	r12,r10,r11
++	vshr.u32	d25,d0,#10
++	eor	r0,r0,r10,ror#20
++	add	r9,r9,r2
++	veor	d25,d25,d24
++	ldr	r2,[sp,#12]
++	and	r3,r3,r12
++	vshr.u32	d24,d0,#19
++	add	r5,r5,r9
++	add	r9,r9,r0,ror#2
++	eor	r3,r3,r11
++	vld1.32	{q8},[r14,:128]!
++	add	r8,r8,r2
++	vsli.32	d24,d0,#13
++	eor	r2,r6,r7
++	eor	r0,r5,r5,ror#5
++	veor	d25,d25,d24
++	add	r9,r9,r3
++	and	r2,r2,r5
++	vadd.i32	d1,d1,d25
++	eor	r3,r0,r5,ror#19
++	eor	r0,r9,r9,ror#11
++	vadd.i32	q8,q8,q0
++	eor	r2,r2,r7
++	add	r8,r8,r3,ror#6
++	eor	r3,r9,r10
++	eor	r0,r0,r9,ror#20
++	add	r8,r8,r2
++	ldr	r2,[sp,#16]
++	and	r12,r12,r3
++	add	r4,r4,r8
++	vst1.32	{q8},[r1,:128]!
++	add	r8,r8,r0,ror#2
++	eor	r12,r12,r10
++	vext.8	q8,q1,q2,#4
++	add	r7,r7,r2
++	eor	r2,r5,r6
++	eor	r0,r4,r4,ror#5
++	vext.8	q9,q3,q0,#4
++	add	r8,r8,r12
++	and	r2,r2,r4
++	eor	r12,r0,r4,ror#19
++	vshr.u32	q10,q8,#7
++	eor	r0,r8,r8,ror#11
++	eor	r2,r2,r6
++	vadd.i32	q1,q1,q9
++	add	r7,r7,r12,ror#6
++	eor	r12,r8,r9
++	vshr.u32	q9,q8,#3
++	eor	r0,r0,r8,ror#20
++	add	r7,r7,r2
++	vsli.32	q10,q8,#25
++	ldr	r2,[sp,#20]
++	and	r3,r3,r12
++	vshr.u32	q11,q8,#18
++	add	r11,r11,r7
++	add	r7,r7,r0,ror#2
++	eor	r3,r3,r9
++	veor	q9,q9,q10
++	add	r6,r6,r2
++	vsli.32	q11,q8,#14
++	eor	r2,r4,r5
++	eor	r0,r11,r11,ror#5
++	vshr.u32	d24,d1,#17
++	add	r7,r7,r3
++	and	r2,r2,r11
++	veor	q9,q9,q11
++	eor	r3,r0,r11,ror#19
++	eor	r0,r7,r7,ror#11
++	vsli.32	d24,d1,#15
++	eor	r2,r2,r5
++	add	r6,r6,r3,ror#6
++	vshr.u32	d25,d1,#10
++	eor	r3,r7,r8
++	eor	r0,r0,r7,ror#20
++	vadd.i32	q1,q1,q9
++	add	r6,r6,r2
++	ldr	r2,[sp,#24]
++	veor	d25,d25,d24
++	and	r12,r12,r3
++	add	r10,r10,r6
++	vshr.u32	d24,d1,#19
++	add	r6,r6,r0,ror#2
++	eor	r12,r12,r8
++	vsli.32	d24,d1,#13
++	add	r5,r5,r2
++	eor	r2,r11,r4
++	veor	d25,d25,d24
++	eor	r0,r10,r10,ror#5
++	add	r6,r6,r12
++	vadd.i32	d2,d2,d25
++	and	r2,r2,r10
++	eor	r12,r0,r10,ror#19
++	vshr.u32	d24,d2,#17
++	eor	r0,r6,r6,ror#11
++	eor	r2,r2,r4
++	vsli.32	d24,d2,#15
++	add	r5,r5,r12,ror#6
++	eor	r12,r6,r7
++	vshr.u32	d25,d2,#10
++	eor	r0,r0,r6,ror#20
++	add	r5,r5,r2
++	veor	d25,d25,d24
++	ldr	r2,[sp,#28]
++	and	r3,r3,r12
++	vshr.u32	d24,d2,#19
++	add	r9,r9,r5
++	add	r5,r5,r0,ror#2
++	eor	r3,r3,r7
++	vld1.32	{q8},[r14,:128]!
++	add	r4,r4,r2
++	vsli.32	d24,d2,#13
++	eor	r2,r10,r11
++	eor	r0,r9,r9,ror#5
++	veor	d25,d25,d24
++	add	r5,r5,r3
++	and	r2,r2,r9
++	vadd.i32	d3,d3,d25
++	eor	r3,r0,r9,ror#19
++	eor	r0,r5,r5,ror#11
++	vadd.i32	q8,q8,q1
++	eor	r2,r2,r11
++	add	r4,r4,r3,ror#6
++	eor	r3,r5,r6
++	eor	r0,r0,r5,ror#20
++	add	r4,r4,r2
++	ldr	r2,[sp,#32]
++	and	r12,r12,r3
++	add	r8,r8,r4
++	vst1.32	{q8},[r1,:128]!
++	add	r4,r4,r0,ror#2
++	eor	r12,r12,r6
++	vext.8	q8,q2,q3,#4
++	add	r11,r11,r2
++	eor	r2,r9,r10
++	eor	r0,r8,r8,ror#5
++	vext.8	q9,q0,q1,#4
++	add	r4,r4,r12
++	and	r2,r2,r8
++	eor	r12,r0,r8,ror#19
++	vshr.u32	q10,q8,#7
++	eor	r0,r4,r4,ror#11
++	eor	r2,r2,r10
++	vadd.i32	q2,q2,q9
++	add	r11,r11,r12,ror#6
++	eor	r12,r4,r5
++	vshr.u32	q9,q8,#3
++	eor	r0,r0,r4,ror#20
++	add	r11,r11,r2
++	vsli.32	q10,q8,#25
++	ldr	r2,[sp,#36]
++	and	r3,r3,r12
++	vshr.u32	q11,q8,#18
++	add	r7,r7,r11
++	add	r11,r11,r0,ror#2
++	eor	r3,r3,r5
++	veor	q9,q9,q10
++	add	r10,r10,r2
++	vsli.32	q11,q8,#14
++	eor	r2,r8,r9
++	eor	r0,r7,r7,ror#5
++	vshr.u32	d24,d3,#17
++	add	r11,r11,r3
++	and	r2,r2,r7
++	veor	q9,q9,q11
++	eor	r3,r0,r7,ror#19
++	eor	r0,r11,r11,ror#11
++	vsli.32	d24,d3,#15
++	eor	r2,r2,r9
++	add	r10,r10,r3,ror#6
++	vshr.u32	d25,d3,#10
++	eor	r3,r11,r4
++	eor	r0,r0,r11,ror#20
++	vadd.i32	q2,q2,q9
++	add	r10,r10,r2
++	ldr	r2,[sp,#40]
++	veor	d25,d25,d24
++	and	r12,r12,r3
++	add	r6,r6,r10
++	vshr.u32	d24,d3,#19
++	add	r10,r10,r0,ror#2
++	eor	r12,r12,r4
++	vsli.32	d24,d3,#13
++	add	r9,r9,r2
++	eor	r2,r7,r8
++	veor	d25,d25,d24
++	eor	r0,r6,r6,ror#5
++	add	r10,r10,r12
++	vadd.i32	d4,d4,d25
++	and	r2,r2,r6
++	eor	r12,r0,r6,ror#19
++	vshr.u32	d24,d4,#17
++	eor	r0,r10,r10,ror#11
++	eor	r2,r2,r8
++	vsli.32	d24,d4,#15
++	add	r9,r9,r12,ror#6
++	eor	r12,r10,r11
++	vshr.u32	d25,d4,#10
++	eor	r0,r0,r10,ror#20
++	add	r9,r9,r2
++	veor	d25,d25,d24
++	ldr	r2,[sp,#44]
++	and	r3,r3,r12
++	vshr.u32	d24,d4,#19
++	add	r5,r5,r9
++	add	r9,r9,r0,ror#2
++	eor	r3,r3,r11
++	vld1.32	{q8},[r14,:128]!
++	add	r8,r8,r2
++	vsli.32	d24,d4,#13
++	eor	r2,r6,r7
++	eor	r0,r5,r5,ror#5
++	veor	d25,d25,d24
++	add	r9,r9,r3
++	and	r2,r2,r5
++	vadd.i32	d5,d5,d25
++	eor	r3,r0,r5,ror#19
++	eor	r0,r9,r9,ror#11
++	vadd.i32	q8,q8,q2
++	eor	r2,r2,r7
++	add	r8,r8,r3,ror#6
++	eor	r3,r9,r10
++	eor	r0,r0,r9,ror#20
++	add	r8,r8,r2
++	ldr	r2,[sp,#48]
++	and	r12,r12,r3
++	add	r4,r4,r8
++	vst1.32	{q8},[r1,:128]!
++	add	r8,r8,r0,ror#2
++	eor	r12,r12,r10
++	vext.8	q8,q3,q0,#4
++	add	r7,r7,r2
++	eor	r2,r5,r6
++	eor	r0,r4,r4,ror#5
++	vext.8	q9,q1,q2,#4
++	add	r8,r8,r12
++	and	r2,r2,r4
++	eor	r12,r0,r4,ror#19
++	vshr.u32	q10,q8,#7
++	eor	r0,r8,r8,ror#11
++	eor	r2,r2,r6
++	vadd.i32	q3,q3,q9
++	add	r7,r7,r12,ror#6
++	eor	r12,r8,r9
++	vshr.u32	q9,q8,#3
++	eor	r0,r0,r8,ror#20
++	add	r7,r7,r2
++	vsli.32	q10,q8,#25
++	ldr	r2,[sp,#52]
++	and	r3,r3,r12
++	vshr.u32	q11,q8,#18
++	add	r11,r11,r7
++	add	r7,r7,r0,ror#2
++	eor	r3,r3,r9
++	veor	q9,q9,q10
++	add	r6,r6,r2
++	vsli.32	q11,q8,#14
++	eor	r2,r4,r5
++	eor	r0,r11,r11,ror#5
++	vshr.u32	d24,d5,#17
++	add	r7,r7,r3
++	and	r2,r2,r11
++	veor	q9,q9,q11
++	eor	r3,r0,r11,ror#19
++	eor	r0,r7,r7,ror#11
++	vsli.32	d24,d5,#15
++	eor	r2,r2,r5
++	add	r6,r6,r3,ror#6
++	vshr.u32	d25,d5,#10
++	eor	r3,r7,r8
++	eor	r0,r0,r7,ror#20
++	vadd.i32	q3,q3,q9
++	add	r6,r6,r2
++	ldr	r2,[sp,#56]
++	veor	d25,d25,d24
++	and	r12,r12,r3
++	add	r10,r10,r6
++	vshr.u32	d24,d5,#19
++	add	r6,r6,r0,ror#2
++	eor	r12,r12,r8
++	vsli.32	d24,d5,#13
++	add	r5,r5,r2
++	eor	r2,r11,r4
++	veor	d25,d25,d24
++	eor	r0,r10,r10,ror#5
++	add	r6,r6,r12
++	vadd.i32	d6,d6,d25
++	and	r2,r2,r10
++	eor	r12,r0,r10,ror#19
++	vshr.u32	d24,d6,#17
++	eor	r0,r6,r6,ror#11
++	eor	r2,r2,r4
++	vsli.32	d24,d6,#15
++	add	r5,r5,r12,ror#6
++	eor	r12,r6,r7
++	vshr.u32	d25,d6,#10
++	eor	r0,r0,r6,ror#20
++	add	r5,r5,r2
++	veor	d25,d25,d24
++	ldr	r2,[sp,#60]
++	and	r3,r3,r12
++	vshr.u32	d24,d6,#19
++	add	r9,r9,r5
++	add	r5,r5,r0,ror#2
++	eor	r3,r3,r7
++	vld1.32	{q8},[r14,:128]!
++	add	r4,r4,r2
++	vsli.32	d24,d6,#13
++	eor	r2,r10,r11
++	eor	r0,r9,r9,ror#5
++	veor	d25,d25,d24
++	add	r5,r5,r3
++	and	r2,r2,r9
++	vadd.i32	d7,d7,d25
++	eor	r3,r0,r9,ror#19
++	eor	r0,r5,r5,ror#11
++	vadd.i32	q8,q8,q3
++	eor	r2,r2,r11
++	add	r4,r4,r3,ror#6
++	eor	r3,r5,r6
++	eor	r0,r0,r5,ror#20
++	add	r4,r4,r2
++	ldr	r2,[r14]
++	and	r12,r12,r3
++	add	r8,r8,r4
++	vst1.32	{q8},[r1,:128]!
++	add	r4,r4,r0,ror#2
++	eor	r12,r12,r6
++	teq	r2,#0				@ check for K256 terminator
++	ldr	r2,[sp,#0]
++	sub	r1,r1,#64
++	bne	.L_00_48
++
++	ldr		r1,[sp,#68]
++	ldr		r0,[sp,#72]
++	sub		r14,r14,#256	@ rewind r14
++	teq		r1,r0
++	subeq		r1,r1,#64		@ avoid SEGV
++	vld1.8		{q0},[r1]!		@ load next input block
++	vld1.8		{q1},[r1]!
++	vld1.8		{q2},[r1]!
++	vld1.8		{q3},[r1]!
++	strne		r1,[sp,#68]
++	mov		r1,sp
++	add	r11,r11,r2
++	eor	r2,r9,r10
++	eor	r0,r8,r8,ror#5
++	add	r4,r4,r12
++	vld1.32	{q8},[r14,:128]!
++	and	r2,r2,r8
++	eor	r12,r0,r8,ror#19
++	eor	r0,r4,r4,ror#11
++	eor	r2,r2,r10
++	vrev32.8	q0,q0
++	add	r11,r11,r12,ror#6
++	eor	r12,r4,r5
++	eor	r0,r0,r4,ror#20
++	add	r11,r11,r2
++	vadd.i32	q8,q8,q0
++	ldr	r2,[sp,#4]
++	and	r3,r3,r12
++	add	r7,r7,r11
++	add	r11,r11,r0,ror#2
++	eor	r3,r3,r5
++	add	r10,r10,r2
++	eor	r2,r8,r9
++	eor	r0,r7,r7,ror#5
++	add	r11,r11,r3
++	and	r2,r2,r7
++	eor	r3,r0,r7,ror#19
++	eor	r0,r11,r11,ror#11
++	eor	r2,r2,r9
++	add	r10,r10,r3,ror#6
++	eor	r3,r11,r4
++	eor	r0,r0,r11,ror#20
++	add	r10,r10,r2
++	ldr	r2,[sp,#8]
++	and	r12,r12,r3
++	add	r6,r6,r10
++	add	r10,r10,r0,ror#2
++	eor	r12,r12,r4
++	add	r9,r9,r2
++	eor	r2,r7,r8
++	eor	r0,r6,r6,ror#5
++	add	r10,r10,r12
++	and	r2,r2,r6
++	eor	r12,r0,r6,ror#19
++	eor	r0,r10,r10,ror#11
++	eor	r2,r2,r8
++	add	r9,r9,r12,ror#6
++	eor	r12,r10,r11
++	eor	r0,r0,r10,ror#20
++	add	r9,r9,r2
++	ldr	r2,[sp,#12]
++	and	r3,r3,r12
++	add	r5,r5,r9
++	add	r9,r9,r0,ror#2
++	eor	r3,r3,r11
++	add	r8,r8,r2
++	eor	r2,r6,r7
++	eor	r0,r5,r5,ror#5
++	add	r9,r9,r3
++	and	r2,r2,r5
++	eor	r3,r0,r5,ror#19
++	eor	r0,r9,r9,ror#11
++	eor	r2,r2,r7
++	add	r8,r8,r3,ror#6
++	eor	r3,r9,r10
++	eor	r0,r0,r9,ror#20
++	add	r8,r8,r2
++	ldr	r2,[sp,#16]
++	and	r12,r12,r3
++	add	r4,r4,r8
++	add	r8,r8,r0,ror#2
++	eor	r12,r12,r10
++	vst1.32	{q8},[r1,:128]!
++	add	r7,r7,r2
++	eor	r2,r5,r6
++	eor	r0,r4,r4,ror#5
++	add	r8,r8,r12
++	vld1.32	{q8},[r14,:128]!
++	and	r2,r2,r4
++	eor	r12,r0,r4,ror#19
++	eor	r0,r8,r8,ror#11
++	eor	r2,r2,r6
++	vrev32.8	q1,q1
++	add	r7,r7,r12,ror#6
++	eor	r12,r8,r9
++	eor	r0,r0,r8,ror#20
++	add	r7,r7,r2
++	vadd.i32	q8,q8,q1
++	ldr	r2,[sp,#20]
++	and	r3,r3,r12
++	add	r11,r11,r7
++	add	r7,r7,r0,ror#2
++	eor	r3,r3,r9
++	add	r6,r6,r2
++	eor	r2,r4,r5
++	eor	r0,r11,r11,ror#5
++	add	r7,r7,r3
++	and	r2,r2,r11
++	eor	r3,r0,r11,ror#19
++	eor	r0,r7,r7,ror#11
++	eor	r2,r2,r5
++	add	r6,r6,r3,ror#6
++	eor	r3,r7,r8
++	eor	r0,r0,r7,ror#20
++	add	r6,r6,r2
++	ldr	r2,[sp,#24]
++	and	r12,r12,r3
++	add	r10,r10,r6
++	add	r6,r6,r0,ror#2
++	eor	r12,r12,r8
++	add	r5,r5,r2
++	eor	r2,r11,r4
++	eor	r0,r10,r10,ror#5
++	add	r6,r6,r12
++	and	r2,r2,r10
++	eor	r12,r0,r10,ror#19
++	eor	r0,r6,r6,ror#11
++	eor	r2,r2,r4
++	add	r5,r5,r12,ror#6
++	eor	r12,r6,r7
++	eor	r0,r0,r6,ror#20
++	add	r5,r5,r2
++	ldr	r2,[sp,#28]
++	and	r3,r3,r12
++	add	r9,r9,r5
++	add	r5,r5,r0,ror#2
++	eor	r3,r3,r7
++	add	r4,r4,r2
++	eor	r2,r10,r11
++	eor	r0,r9,r9,ror#5
++	add	r5,r5,r3
++	and	r2,r2,r9
++	eor	r3,r0,r9,ror#19
++	eor	r0,r5,r5,ror#11
++	eor	r2,r2,r11
++	add	r4,r4,r3,ror#6
++	eor	r3,r5,r6
++	eor	r0,r0,r5,ror#20
++	add	r4,r4,r2
++	ldr	r2,[sp,#32]
++	and	r12,r12,r3
++	add	r8,r8,r4
++	add	r4,r4,r0,ror#2
++	eor	r12,r12,r6
++	vst1.32	{q8},[r1,:128]!
++	add	r11,r11,r2
++	eor	r2,r9,r10
++	eor	r0,r8,r8,ror#5
++	add	r4,r4,r12
++	vld1.32	{q8},[r14,:128]!
++	and	r2,r2,r8
++	eor	r12,r0,r8,ror#19
++	eor	r0,r4,r4,ror#11
++	eor	r2,r2,r10
++	vrev32.8	q2,q2
++	add	r11,r11,r12,ror#6
++	eor	r12,r4,r5
++	eor	r0,r0,r4,ror#20
++	add	r11,r11,r2
++	vadd.i32	q8,q8,q2
++	ldr	r2,[sp,#36]
++	and	r3,r3,r12
++	add	r7,r7,r11
++	add	r11,r11,r0,ror#2
++	eor	r3,r3,r5
++	add	r10,r10,r2
++	eor	r2,r8,r9
++	eor	r0,r7,r7,ror#5
++	add	r11,r11,r3
++	and	r2,r2,r7
++	eor	r3,r0,r7,ror#19
++	eor	r0,r11,r11,ror#11
++	eor	r2,r2,r9
++	add	r10,r10,r3,ror#6
++	eor	r3,r11,r4
++	eor	r0,r0,r11,ror#20
++	add	r10,r10,r2
++	ldr	r2,[sp,#40]
++	and	r12,r12,r3
++	add	r6,r6,r10
++	add	r10,r10,r0,ror#2
++	eor	r12,r12,r4
++	add	r9,r9,r2
++	eor	r2,r7,r8
++	eor	r0,r6,r6,ror#5
++	add	r10,r10,r12
++	and	r2,r2,r6
++	eor	r12,r0,r6,ror#19
++	eor	r0,r10,r10,ror#11
++	eor	r2,r2,r8
++	add	r9,r9,r12,ror#6
++	eor	r12,r10,r11
++	eor	r0,r0,r10,ror#20
++	add	r9,r9,r2
++	ldr	r2,[sp,#44]
++	and	r3,r3,r12
++	add	r5,r5,r9
++	add	r9,r9,r0,ror#2
++	eor	r3,r3,r11
++	add	r8,r8,r2
++	eor	r2,r6,r7
++	eor	r0,r5,r5,ror#5
++	add	r9,r9,r3
++	and	r2,r2,r5
++	eor	r3,r0,r5,ror#19
++	eor	r0,r9,r9,ror#11
++	eor	r2,r2,r7
++	add	r8,r8,r3,ror#6
++	eor	r3,r9,r10
++	eor	r0,r0,r9,ror#20
++	add	r8,r8,r2
++	ldr	r2,[sp,#48]
++	and	r12,r12,r3
++	add	r4,r4,r8
++	add	r8,r8,r0,ror#2
++	eor	r12,r12,r10
++	vst1.32	{q8},[r1,:128]!
++	add	r7,r7,r2
++	eor	r2,r5,r6
++	eor	r0,r4,r4,ror#5
++	add	r8,r8,r12
++	vld1.32	{q8},[r14,:128]!
++	and	r2,r2,r4
++	eor	r12,r0,r4,ror#19
++	eor	r0,r8,r8,ror#11
++	eor	r2,r2,r6
++	vrev32.8	q3,q3
++	add	r7,r7,r12,ror#6
++	eor	r12,r8,r9
++	eor	r0,r0,r8,ror#20
++	add	r7,r7,r2
++	vadd.i32	q8,q8,q3
++	ldr	r2,[sp,#52]
++	and	r3,r3,r12
++	add	r11,r11,r7
++	add	r7,r7,r0,ror#2
++	eor	r3,r3,r9
++	add	r6,r6,r2
++	eor	r2,r4,r5
++	eor	r0,r11,r11,ror#5
++	add	r7,r7,r3
++	and	r2,r2,r11
++	eor	r3,r0,r11,ror#19
++	eor	r0,r7,r7,ror#11
++	eor	r2,r2,r5
++	add	r6,r6,r3,ror#6
++	eor	r3,r7,r8
++	eor	r0,r0,r7,ror#20
++	add	r6,r6,r2
++	ldr	r2,[sp,#56]
++	and	r12,r12,r3
++	add	r10,r10,r6
++	add	r6,r6,r0,ror#2
++	eor	r12,r12,r8
++	add	r5,r5,r2
++	eor	r2,r11,r4
++	eor	r0,r10,r10,ror#5
++	add	r6,r6,r12
++	and	r2,r2,r10
++	eor	r12,r0,r10,ror#19
++	eor	r0,r6,r6,ror#11
++	eor	r2,r2,r4
++	add	r5,r5,r12,ror#6
++	eor	r12,r6,r7
++	eor	r0,r0,r6,ror#20
++	add	r5,r5,r2
++	ldr	r2,[sp,#60]
++	and	r3,r3,r12
++	add	r9,r9,r5
++	add	r5,r5,r0,ror#2
++	eor	r3,r3,r7
++	add	r4,r4,r2
++	eor	r2,r10,r11
++	eor	r0,r9,r9,ror#5
++	add	r5,r5,r3
++	and	r2,r2,r9
++	eor	r3,r0,r9,ror#19
++	eor	r0,r5,r5,ror#11
++	eor	r2,r2,r11
++	add	r4,r4,r3,ror#6
++	eor	r3,r5,r6
++	eor	r0,r0,r5,ror#20
++	add	r4,r4,r2
++	ldr	r2,[sp,#64]
++	and	r12,r12,r3
++	add	r8,r8,r4
++	add	r4,r4,r0,ror#2
++	eor	r12,r12,r6
++	vst1.32	{q8},[r1,:128]!
++	ldr	r0,[r2,#0]
++	add	r4,r4,r12			@ h+=Maj(a,b,c) from the past
++	ldr	r12,[r2,#4]
++	ldr	r3,[r2,#8]
++	ldr	r1,[r2,#12]
++	add	r4,r4,r0			@ accumulate
++	ldr	r0,[r2,#16]
++	add	r5,r5,r12
++	ldr	r12,[r2,#20]
++	add	r6,r6,r3
++	ldr	r3,[r2,#24]
++	add	r7,r7,r1
++	ldr	r1,[r2,#28]
++	add	r8,r8,r0
++	str	r4,[r2],#4
++	add	r9,r9,r12
++	str	r5,[r2],#4
++	add	r10,r10,r3
++	str	r6,[r2],#4
++	add	r11,r11,r1
++	str	r7,[r2],#4
++	stmia	r2,{r8-r11}
++
++	movne	r1,sp
++	ldrne	r2,[sp,#0]
++	eorne	r12,r12,r12
++	ldreq	sp,[sp,#76]			@ restore original sp
++	eorne	r3,r5,r6
++	bne	.L_00_48
++
++	ldmia	sp!,{r4-r12,pc}
++ENDPROC(sha256_transform_neon)
+diff --git a/arch/arm/crypto/sha256_neon_glue.c b/arch/arm/crypto/sha256_neon_glue.c
+new file mode 100644
+index 0000000..698a498
+--- /dev/null
++++ b/arch/arm/crypto/sha256_neon_glue.c
+@@ -0,0 +1,201 @@
++/*
++ * Glue code for the SHA256 Secure Hash Algorithm assembly implementation
++ * using NEON instructions.
++ *
++ * Copyright ? 2015 Google Inc.
++ *
++ * This file is based on sha512_neon_glue.c:
++ *   Copyright ? 2014 Jussi Kivilinna <jussi.kivilinna@iki.fi>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the Free
++ * Software Foundation; either version 2 of the License, or (at your option)
++ * any later version.
++ *
++ */
++
++#include <crypto/internal/hash.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/mm.h>
++#include <linux/cryptohash.h>
++#include <linux/types.h>
++#include <linux/string.h>
++#include <crypto/sha.h>
++#include <asm/byteorder.h>
++#include <asm/simd.h>
++#include <asm/neon.h>
++
++asmlinkage void sha256_transform_neon(u32 *digest, const void *data,
++				      unsigned int num_blks);
++
++
++static int sha256_neon_init(struct shash_desc *desc)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	sctx->state[0] = SHA256_H0;
++	sctx->state[1] = SHA256_H1;
++	sctx->state[2] = SHA256_H2;
++	sctx->state[3] = SHA256_H3;
++	sctx->state[4] = SHA256_H4;
++	sctx->state[5] = SHA256_H5;
++	sctx->state[6] = SHA256_H6;
++	sctx->state[7] = SHA256_H7;
++	sctx->count = 0;
++
++	return 0;
++}
++
++static int __sha256_neon_update(struct shash_desc *desc, const u8 *data,
++				unsigned int len, unsigned int partial)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	unsigned int done = 0;
++
++	sctx->count += len;
++
++	if (partial) {
++		done = SHA256_BLOCK_SIZE - partial;
++		memcpy(sctx->buf + partial, data, done);
++		sha256_transform_neon(sctx->state, sctx->buf, 1);
++	}
++
++	if (len - done >= SHA256_BLOCK_SIZE) {
++		const unsigned int rounds = (len - done) / SHA256_BLOCK_SIZE;
++
++		sha256_transform_neon(sctx->state, data + done, rounds);
++		done += rounds * SHA256_BLOCK_SIZE;
++	}
++
++	memcpy(sctx->buf, data + done, len - done);
++
++	return 0;
++}
++
++static int sha256_neon_update(struct shash_desc *desc, const u8 *data,
++			     unsigned int len)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	unsigned int partial = sctx->count % SHA256_BLOCK_SIZE;
++	int res;
++
++	/* Handle the fast case right here */
++	if (partial + len < SHA256_BLOCK_SIZE) {
++		sctx->count += len;
++		memcpy(sctx->buf + partial, data, len);
++
++		return 0;
++	}
++
++	if (!may_use_simd()) {
++		res = crypto_sha256_update(desc, data, len);
++	} else {
++		kernel_neon_begin();
++		res = __sha256_neon_update(desc, data, len, partial);
++		kernel_neon_end();
++	}
++
++	return res;
++}
++
++/* Add padding and return the message digest. */
++static int sha256_neon_final(struct shash_desc *desc, u8 *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++	unsigned int i, index, padlen;
++	__be32 *dst = (__be32 *)out;
++	__be64 bits;
++	static const u8 padding[SHA256_BLOCK_SIZE] = { 0x80, };
++
++	/* save number of bits */
++	bits = cpu_to_be64(sctx->count << 3);
++
++	/* Pad out to 56 mod 64 and append length */
++	index = sctx->count % SHA256_BLOCK_SIZE;
++	padlen = (index < 56) ? (56 - index) : ((SHA256_BLOCK_SIZE+56)-index);
++
++	if (!may_use_simd()) {
++		crypto_sha256_update(desc, padding, padlen);
++		crypto_sha256_update(desc, (const u8 *)&bits, sizeof(bits));
++	} else {
++		kernel_neon_begin();
++		/* We need to fill a whole block for __sha256_neon_update() */
++		if (padlen <= 56) {
++			sctx->count += padlen;
++			memcpy(sctx->buf + index, padding, padlen);
++		} else {
++			__sha256_neon_update(desc, padding, padlen, index);
++		}
++		__sha256_neon_update(desc, (const u8 *)&bits,
++					sizeof(bits), 56);
++		kernel_neon_end();
++	}
++
++	/* Store state in digest */
++	for (i = 0; i < 8; i++)
++		dst[i] = cpu_to_be32(sctx->state[i]);
++
++	/* Wipe context */
++	memset(sctx, 0, sizeof(*sctx));
++
++	return 0;
++}
++
++static int sha256_neon_export(struct shash_desc *desc, void *out)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	memcpy(out, sctx, sizeof(*sctx));
++
++	return 0;
++}
++
++static int sha256_neon_import(struct shash_desc *desc, const void *in)
++{
++	struct sha256_state *sctx = shash_desc_ctx(desc);
++
++	memcpy(sctx, in, sizeof(*sctx));
++
++	return 0;
++}
++
++static struct shash_alg alg = {
++	.digestsize	=	SHA256_DIGEST_SIZE,
++	.init		=	sha256_neon_init,
++	.update		=	sha256_neon_update,
++	.final		=	sha256_neon_final,
++	.export		=	sha256_neon_export,
++	.import		=	sha256_neon_import,
++	.descsize	=	sizeof(struct sha256_state),
++	.statesize	=	sizeof(struct sha256_state),
++	.base		=	{
++		.cra_name	=	"sha256",
++		.cra_driver_name =	"sha256-neon",
++		.cra_priority	=	350,
++		.cra_flags	=	CRYPTO_ALG_TYPE_SHASH,
++		.cra_blocksize	=	SHA256_BLOCK_SIZE,
++		.cra_module	=	THIS_MODULE,
++	}
++};
++
++static int __init sha256_neon_mod_init(void)
++{
++	if (!cpu_has_neon())
++		return -ENODEV;
++
++	return crypto_register_shash(&alg);
++}
++
++static void __exit sha256_neon_mod_fini(void)
++{
++	crypto_unregister_shash(&alg);
++}
++
++module_init(sha256_neon_mod_init);
++module_exit(sha256_neon_mod_fini);
++
++MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("SHA256 Secure Hash Algorithm, NEON accelerated");
++
++MODULE_ALIAS("sha256");
+diff --git a/crypto/Kconfig b/crypto/Kconfig
+index 50f4da4..0505523 100644
+--- a/crypto/Kconfig
++++ b/crypto/Kconfig
+@@ -610,6 +610,18 @@ config CRYPTO_SHA256
+ 	  This code also includes SHA-224, a 224 bit hash with 112 bits
+ 	  of security against collision attacks.
+ 
++config CRYPTO_SHA256_ARM_NEON
++	tristate "SHA256 digest algorithm (ARM NEON)"
++	depends on ARM && KERNEL_MODE_NEON && !CPU_BIG_ENDIAN
++	select CRYPTO_SHA256
++	select CRYPTO_HASH
++	help
++	  SHA-256 secure hash standard (DFIPS 180-2) implemented
++	  using ARM NEON instructions, when available.
++
++	  This version of SHA implements a 256 bit hash with 128 bits of
++	  security against collision attacks.
++
+ config CRYPTO_SHA256_SPARC64
+ 	tristate "SHA224 and SHA256 digest algorithm (SPARC64)"
+ 	depends on SPARC64
