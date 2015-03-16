@@ -1,86 +1,50 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 Mar 2015 06:33:18 +0100
+Date: Mon, 16 Mar 2015 06:33:38 +0100
 Subject: [PATCH 3/5] clk: mediatek: Add basic clocks for Mediatek MT8135.
-In-Reply-To: <CAGS+omBrJObfif2aRWYwpqEstfv0gFESXSubAbG7dcQGfnVvxg@mail.gmail.com>
+In-Reply-To: <1426232670.1716.21.camel@mtksdaap41>
 References: <1424605765-19751-1-git-send-email-s.hauer@pengutronix.de>
  <1424605765-19751-4-git-send-email-s.hauer@pengutronix.de>
- <CAGS+omBrJObfif2aRWYwpqEstfv0gFESXSubAbG7dcQGfnVvxg@mail.gmail.com>
-Message-ID: <20150316053318.GC24798@pengutronix.de>
+ <1426232670.1716.21.camel@mtksdaap41>
+Message-ID: <20150316053338.GD24798@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 12:27:20AM +0800, Daniel Kurtz wrote:
-> Hi Sascha,
-> 
-> Drive-by review...
-> 
-> On Sun, Feb 22, 2015 at 7:49 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > From: James Liao <jamesjj.liao@mediatek.com>
-> >
-> > This patch adds basic clocks for MT8135, including TOPCKGEN, PLLs,
-> > INFRA and PERI clocks.
-> >
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  drivers/clk/mediatek/Makefile                      |   1 +
-> >  drivers/clk/mediatek/clk-mt8135.c                  | 634 +++++++++++++++++++++
-> >  include/dt-bindings/clock/mt8135-clk.h             | 190 ++++++
-> >  .../dt-bindings/reset-controller/mt8135-resets.h   |  64 +++
-> >  4 files changed, 889 insertions(+)
-> >  create mode 100644 drivers/clk/mediatek/clk-mt8135.c
-> >  create mode 100644 include/dt-bindings/clock/mt8135-clk.h
-> >  create mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
-> >
-> > diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-> > index 0b6f1c3..12ce576 100644
-> > --- a/drivers/clk/mediatek/Makefile
-> > +++ b/drivers/clk/mediatek/Makefile
-> > @@ -1,2 +1,3 @@
-> >  obj-y += clk-mtk.o clk-pll.o clk-gate.o
-> >  obj-$(CONFIG_RESET_CONTROLLER) += reset.o
-> > +obj-y += clk-mt8135.o
-> > diff --git a/drivers/clk/mediatek/clk-mt8135.c b/drivers/clk/mediatek/clk-mt8135.c
-> > new file mode 100644
-> > index 0000000..6157447
-> > --- /dev/null
-> > +++ b/drivers/clk/mediatek/clk-mt8135.c
-> > @@ -0,0 +1,634 @@
-> > +/*
-> > + * Copyright (c) 2014 MediaTek Inc.
-> > + * Author: James Liao <jamesjj.liao@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
+On Fri, Mar 13, 2015 at 03:44:30PM +0800, Henry Chen wrote:
+> On Sun, 2015-02-22 at 12:49 +0100, Sascha Hauer wrote:
+> > +#define PLL(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits, _pd_reg, _pd_shift, _tuner_reg, _pcw_reg, _pcw_shift) { \
+> > +		.id = _id,						\
+> > +		.name = _name,						\
+> > +		.reg = _reg,						\
+> > +		.pwr_reg = _pwr_reg,					\
+> > +		.en_mask = _en_mask,					\
+> > +		.flags = _flags,					\
+> > +		.rst_bar_mask = CON0_MT8135_RST_BAR,			\
+> > +		.fmax = MT8135_PLL_FMAX,				\
+> > +		.pcwbits = _pcwbits,					\
+> > +		.pd_reg = _pd_reg,					\
+> > +		.pd_shift = _pd_shift,					\
+> > +		.tuner_reg = _tuner_reg,				\
+> > +		.pcw_reg = _pcw_reg,					\
+> > +		.pcw_shift = _pcw_shift,				\
+> > +	}
 > > +
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <dt-bindings/clock/mt8135-clk.h>
-> > +
-> > +#include "clk-mtk.h"
-> > +#include "clk-gate.h"
-> > +
-> > +static DEFINE_SPINLOCK(lock);
-> > +
+> > +static struct mtk_pll_data plls[] = {
+> > +	PLL(APMIXED_ARMPLL1, "armpll1", 0x200, 0x218, 0x80000001, 0, 21, 0x204, 24, 0x0, 0x204, 0),
+> > +	PLL(APMIXED_ARMPLL2, "armpll2", 0x2cc, 0x2e4, 0x80000001, 0, 21, 0x2d0, 24, 0x0, 0x2d0, 0),
+> > +	PLL(APMIXED_MAINPLL, "mainpll", 0x21c, 0x234, 0xf0000001, HAVE_RST_BAR, 21, 0x21c, 6, 0x0, 0x220, 0),
+> > +	PLL(APMIXED_UNIVPLL, "univpll", 0x238, 0x250, 0xf3000001, HAVE_RST_BAR, 7, 0x238, 6, 0x0, 0x238, 9),
+> > +	PLL(APMIXED_MMPLL, "mmpll", 0x254, 0x26c, 0xf0000001, HAVE_RST_BAR, 21, 0x254, 6, 0x0, 0x258, 0),
+> > +	PLL(APMIXED_MSDCPLL, "msdcpll", 0x278, 0x290, 0x80000001, 0, 21, 0x278, 6, 0x0, 0x27c, 0),
+> > +	PLL(APMIXED_TVDPLL, "tvdpll", 0x294, 0x2ac, 0x80000001, 0, 31, 0x296, 6, 0x0, 0x298, 0),
 > 
-> > +static struct mtk_fixed_factor root_clk_alias[] __initdata = {
+> Hi Sasha,
 > 
-> Any reason you can't use "static const" here, and on all of the other
-> static constant structures/arrays throughout this patch.
+> The pd_reg of tvdpll should be 0x294.
 
-No, there is no reason. Changed it. Thanks
+Fixed, thanks
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
