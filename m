@@ -1,48 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 13:50:09 -0700
-Subject: [PATCH 2/3] ARM: dts: am335x: Add DTS for ChiliSOM module
-In-Reply-To: <1423493285-4231-2-git-send-email-lisovy@jablotron.cz>
-References: <1423493285-4231-1-git-send-email-lisovy@jablotron.cz>
- <1423493285-4231-2-git-send-email-lisovy@jablotron.cz>
-Message-ID: <20150316205008.GB12397@atomide.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 16 Mar 2015 15:54:52 -0500
+Subject: [PATCH 0/2] Couple of DRA7 hwmod patches on Timers
+Message-ID: <1426539294-28375-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rostislav Lisovy <lisovy@gmail.com> [150209 06:51]:
-> Since this is a SOM (System on Module) that will be part
-> of another embedded board (and can't really exist on its own)
-> define it as a "dtsi" that will be included in the Device tree
-> describing the whole system later on.
-> 
-> Hardware specification:
-> * AM335x SoC
-> * up to 512 MB RAM
-> * NAND Flash (8x interface, cs0)
-> * UART0
-> * PMIC
-> * I2C0 (for PMIC)
-> * 1x Ethernet MAC
+Hi Paul,
 
-Applying all three into omap-for-v4.1/dt with one change
-below.
- 
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-chilisom.dtsi
-> +
-> +&gpmc {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&nandflash_pins>;
-> +	ranges = <0 0 0x08000000 0x01000000>; /* CS0 0 @addr 0x08000000, size 0x01000000 */
-> +	nand at 0,0 {
-> +		reg = <0 0 0x01000000>; /* CS0 */
+Following are couple of DRA7 hwmod patches for the GPTimers.
+Patches based on 4.0-rc1.
 
-I've changed this to say just:
-		reg = <0 0 4>;  /* CS0, offset 0, IO size 4 */
+The first patch adds the data for timers 13 through 16, the DT
+nodes are already present, and when enabled without the hwmod
+data triggers a l3_noc interrupt and hangs the kernel boot [1].
+The boot hang can also be fixed by checking the return status
+of pm_runtime_get_sync() in the OMAP dmtimer probe, I will post
+a separate fix for that.
 
-As for NAND the device has just one IO register. The 0x01000000
-is the size of a minimum GPMC partition.
+Second patch is a minor fix.
 
-Regards,
+regards
+Suman
 
-Tony
+[1] http://pastebin.ubuntu.com/10611882/
+
+Suman Anna (2):
+  ARM: DRA7: hwmod: Add data for GPTimers 13 through 16
+  ARM: DRA7: hwmod: Fix the hwmod class for GPTimer4
+
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 98 ++++++++++++++++++++++++++++++-
+ 1 file changed, 97 insertions(+), 1 deletion(-)
+
+-- 
+2.3.2
