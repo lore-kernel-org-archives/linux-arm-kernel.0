@@ -1,41 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 16 Mar 2015 15:24:20 +0530
-Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
-In-Reply-To: <CAKohpokF0_or8aXwzWZ=bUX1Robk8THyqRpKjbaarg9NHufLmw@mail.gmail.com>
-References: <cover.1423642246.git.viresh.kumar@linaro.org>
- <CAKohpokF0_or8aXwzWZ=bUX1Robk8THyqRpKjbaarg9NHufLmw@mail.gmail.com>
-Message-ID: <CAKohpok1rQFywhgpajomXYu+uc7zmuhVhg0RY4vJzaH2uKNURA@mail.gmail.com>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Mon, 16 Mar 2015 09:55:26 -0000
+Subject: [PATCH 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
+In-Reply-To: <20150313195425.GA16977@qualcomm.com>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+ <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
+ <20150313195425.GA16977@qualcomm.com>
+Message-ID: <0ac0be987e1d6b8bdfd524f14c83fcb4.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 10:55, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 11 February 2015 at 13:46, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> Now that I have received an verbal Ack from Rob Herring (in a personal
->> conversation) about the bindings, I am showing how the code looks like with
->> these new bindings.
+Hi,
+
+> On Fri, Mar 13, 2015 at 11:19:52PM +0530, Sricharan R wrote:
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>
+> Reviewed-by: Andy Gross <agross@codeaurora.org>
+>
+>>  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
 >>
->> Some part is still now done:
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index 3f648ae..1ec7ec5 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -246,6 +246,8 @@
+>>  			clock-names = "core", "iface";
+>>  			#address-cells = <1>;
+>>  			#size-cells = <0>;
+>> +			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
+>> +			dma-names = "bam-tx", "bam-rx";
 >
-> s/now/not
->
->> - Interface for adding new detailed OPPs from platform code instead of DT
->> - Providing cpufreq helpers for the next OPPs
->> - Providing regulator helpers for the target/min/max ranges
->>
->> Please provide feedback on how this looks like..
->
-> Can we have some reviews of the code changes please ?
+> more of a nit, but the bam- is unnecessary.  it's just rx/tx.
 
-Rob/Rafael/Arnd/Nishanth,
+  Ok, will change it.
 
-Reviews please? This had been hanging since a long time, can we get this merged
-in next merge window please?
-
-Bindings are already OK'd by Rob (in personal conversation) and its
-all about code
-now. Which can be updated later on as well if we find an issue..
-
-@Rob: Can you please Ack whatever stuff you are okay with ?
-
---
-viresh
+Regards,
+ Sricharan
