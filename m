@@ -1,40 +1,41 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Mon, 16 Mar 2015 09:55:26 -0000
-Subject: [PATCH 6/6] dts: msm8974: Add dma channels for blsp2_i2c1 node
-In-Reply-To: <20150313195425.GA16977@qualcomm.com>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-7-git-send-email-sricharan@codeaurora.org>
- <20150313195425.GA16977@qualcomm.com>
-Message-ID: <0ac0be987e1d6b8bdfd524f14c83fcb4.squirrel@www.codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Mar 2015 11:08:56 +0100
+Subject: [PATCH 02/10] ARM: zx: add low level debug support
+In-Reply-To: <20150316023740.GH20455@dragon>
+References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
+ <20150315224817.GC8656@n2100.arm.linux.org.uk>
+ <20150316023740.GH20455@dragon>
+Message-ID: <2441999.X7UitNkZIV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 16 March 2015 10:37:42 Shawn Guo wrote:
+> 
+> We chose to duplicate the file to avoid churning generic pl01x.S.  Would
+> something like below be acceptable?  Or any better idea?
+> 
+> diff --git a/arch/arm/include/debug/pl01x.S b/arch/arm/include/debug/pl01x.S
+> index 92ef808a2337..da83512c4788 100644
+> --- a/arch/arm/include/debug/pl01x.S
+> +++ b/arch/arm/include/debug/pl01x.S
+> @@ -12,6 +12,13 @@
+>  */
+>  #include <linux/amba/serial.h>
+>  
+> +#ifdef CONFIG_ARCH_ZX
+> +#undef UART01x_DR
+> +#undef UART01x_FR
+> +#define UART01x_DR     0x04
+> +#define UART01x_FR     0x14
+> +#endif
+> +
+>  #ifdef CONFIG_DEBUG_UART_PHYS
+> 
 
-> On Fri, Mar 13, 2015 at 11:19:52PM +0530, Sricharan R wrote:
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->
-> Reviewed-by: Andy Gross <agross@codeaurora.org>
->
->>  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> index 3f648ae..1ec7ec5 100644
->> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -246,6 +246,8 @@
->>  			clock-names = "core", "iface";
->>  			#address-cells = <1>;
->>  			#size-cells = <0>;
->> +			dmas = <&blsp2_dma 20>, <&blsp2_dma 21>;
->> +			dma-names = "bam-tx", "bam-rx";
->
-> more of a nit, but the bam- is unnecessary.  it's just rx/tx.
+This is almost right, but breaks a corner case where you want to debug
+the boot on a platform other than ZX, but in a kernel that also has
+ARCH_ZX enabled. I think the best way to solve this is to have
+CONFIG_DEBUG_ZTE_ZX select CONFIG_DEBUG_UART_PL01X, and then
+use #ifdef CONFIG_DEBUG_ZTE_ZX above rather than CONFIG_ARCH_ZX.
 
-  Ok, will change it.
-
-Regards,
- Sricharan
+	Arnd
