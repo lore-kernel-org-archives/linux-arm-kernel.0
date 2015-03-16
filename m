@@ -1,10 +1,9 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Mon, 16 Mar 2015 20:54:41 +0100
-Subject: [PATCH 31/35 linux-next] EDAC: constify of_device_id array
-In-Reply-To: <1426535685-25996-1-git-send-email-fabf@skynet.be>
+Date: Mon, 16 Mar 2015 20:59:06 +0100
+Subject: [PATCH 32/35 linux-next] clk: constify of_device_id array
+In-Reply-To: <1426533469-25458-1-git-send-email-fabf@skynet.be>
 References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535685-25996-1-git-send-email-fabf@skynet.be>
-Message-ID: <1426535685-25996-10-git-send-email-fabf@skynet.be>
+Message-ID: <1426535949-26107-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,72 +12,141 @@ of_device_id is always used as const.
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- drivers/edac/highbank_mc_edac.c | 2 +-
- drivers/edac/mpc85xx_edac.c     | 4 ++--
- drivers/edac/ppc4xx_edac.c      | 2 +-
- drivers/edac/synopsys_edac.c    | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/clk/clk-palmas.c                 | 2 +-
+ drivers/clk/st/clkgen-fsyn.c             | 2 +-
+ drivers/clk/st/clkgen-mux.c              | 8 ++++----
+ drivers/clk/st/clkgen-pll.c              | 4 ++--
+ drivers/clk/ti/clk-dra7-atl.c            | 2 +-
+ drivers/clk/ti/clockdomain.c             | 2 +-
+ drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
+ 7 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/edac/highbank_mc_edac.c b/drivers/edac/highbank_mc_edac.c
-index 4754847..11260cc 100644
---- a/drivers/edac/highbank_mc_edac.c
-+++ b/drivers/edac/highbank_mc_edac.c
-@@ -146,7 +146,7 @@ static struct hb_mc_settings mw_settings = {
- 	.int_offset = MW_DDR_ECC_INT_BASE,
+diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
+index 8d45992..45a535a 100644
+--- a/drivers/clk/clk-palmas.c
++++ b/drivers/clk/clk-palmas.c
+@@ -161,7 +161,7 @@ static struct palmas_clks_of_match_data palmas_of_clk32kgaudio = {
+ 	},
  };
  
--static struct of_device_id hb_ddr_ctrl_of_match[] = {
-+static const struct of_device_id hb_ddr_ctrl_of_match[] = {
- 	{ .compatible = "calxeda,hb-ddr-ctrl",		.data = &hb_settings },
- 	{ .compatible = "calxeda,ecx-2000-ddr-ctrl",	.data = &mw_settings },
- 	{},
-diff --git a/drivers/edac/mpc85xx_edac.c b/drivers/edac/mpc85xx_edac.c
-index 7be979c..68bf234 100644
---- a/drivers/edac/mpc85xx_edac.c
-+++ b/drivers/edac/mpc85xx_edac.c
-@@ -670,7 +670,7 @@ static int mpc85xx_l2_err_remove(struct platform_device *op)
- 	return 0;
- }
- 
--static struct of_device_id mpc85xx_l2_err_of_match[] = {
-+static const struct of_device_id mpc85xx_l2_err_of_match[] = {
- /* deprecate the fsl,85.. forms in the future, 2.6.30? */
- 	{ .compatible = "fsl,8540-l2-cache-controller", },
- 	{ .compatible = "fsl,8541-l2-cache-controller", },
-@@ -1160,7 +1160,7 @@ static int mpc85xx_mc_err_remove(struct platform_device *op)
- 	return 0;
- }
- 
--static struct of_device_id mpc85xx_mc_err_of_match[] = {
-+static const struct of_device_id mpc85xx_mc_err_of_match[] = {
- /* deprecate the fsl,85.. forms in the future, 2.6.30? */
- 	{ .compatible = "fsl,8540-memory-controller", },
- 	{ .compatible = "fsl,8541-memory-controller", },
-diff --git a/drivers/edac/ppc4xx_edac.c b/drivers/edac/ppc4xx_edac.c
-index 1b64fd0..3515b38 100644
---- a/drivers/edac/ppc4xx_edac.c
-+++ b/drivers/edac/ppc4xx_edac.c
-@@ -193,7 +193,7 @@ static int ppc4xx_edac_remove(struct platform_device *device);
-  * Device tree node type and compatible tuples this driver can match
-  * on.
-  */
--static struct of_device_id ppc4xx_edac_match[] = {
-+static const struct of_device_id ppc4xx_edac_match[] = {
+-static struct of_device_id palmas_clks_of_match[] = {
++static const struct of_device_id palmas_clks_of_match[] = {
  	{
- 		.compatible	= "ibm,sdram-4xx-ddr2"
- 	},
-diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-index 1c96915..fc153ae 100644
---- a/drivers/edac/synopsys_edac.c
-+++ b/drivers/edac/synopsys_edac.c
-@@ -512,7 +512,7 @@ static int synps_edac_mc_remove(struct platform_device *pdev)
+ 		.compatible = "ti,palmas-clk32kg",
+ 		.data = &palmas_of_clk32kg,
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index af94ed8..a917c4c 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -1057,7 +1057,7 @@ static struct clk * __init st_clk_register_quadfs_fsynth(
+ 	return clk;
+ }
+ 
+-static struct of_device_id quadfs_of_match[] = {
++static const struct of_device_id quadfs_of_match[] = {
+ 	{
+ 		.compatible = "st,stih416-quadfs216",
+ 		.data = &st_fs216c65_416
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 9a15ec3..fdcff10 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
+ 	.fb_start_bit_idx = 24,
+ };
+ 
+-static struct of_device_id clkgena_divmux_of_match[] = {
++static const struct of_device_id clkgena_divmux_of_match[] = {
+ 	{
+ 		.compatible = "st,clkgena-divmux-c65-hs",
+ 		.data = &st_divmux_c65hs,
+@@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
+ 	.table = prediv_table16,
+ };
+ 
+-static struct of_device_id clkgena_prediv_of_match[] = {
++static const struct of_device_id clkgena_prediv_of_match[] = {
+ 	{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
+ 	{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
+ 	{}
+@@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
+ 	.width = 2,
+ };
+ 
+-static struct of_device_id mux_of_match[] = {
++static const struct of_device_id mux_of_match[] = {
+ 	{
+ 		.compatible = "st,stih416-clkgenc-vcc-hd",
+ 		.data = &clkgen_mux_c_vcc_hd_416,
+@@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
+ 	.lock = &clkgenf_lock,
+ };
+ 
+-static struct of_device_id vcc_of_match[] = {
++static const struct of_device_id vcc_of_match[] = {
+ 	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
+ 	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
+ 	{}
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+index 29769d7..d204ba8 100644
+--- a/drivers/clk/st/clkgen-pll.c
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -593,7 +593,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
+ 	return clk;
+ }
+ 
+-static struct of_device_id c32_pll_of_match[] = {
++static const struct of_device_id c32_pll_of_match[] = {
+ 	{
+ 		.compatible = "st,plls-c32-a1x-0",
+ 		.data = &st_pll3200c32_a1x_0,
+@@ -708,7 +708,7 @@ err:
+ }
+ CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
+ 
+-static struct of_device_id c32_gpu_pll_of_match[] = {
++static const struct of_device_id c32_gpu_pll_of_match[] = {
+ 	{
+ 		.compatible = "st,stih415-gpu-pll-c32",
+ 		.data = &st_pll1200c32_gpu_415,
+diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
+index 59bb4b3..d86bc46 100644
+--- a/drivers/clk/ti/clk-dra7-atl.c
++++ b/drivers/clk/ti/clk-dra7-atl.c
+@@ -294,7 +294,7 @@ static int of_dra7_atl_clk_remove(struct platform_device *pdev)
  	return 0;
  }
  
--static struct of_device_id synps_edac_match[] = {
-+static const struct of_device_id synps_edac_match[] = {
- 	{ .compatible = "xlnx,zynq-ddrc-a05", },
- 	{ /* end of table */ }
+-static struct of_device_id of_dra7_atl_clk_match_tbl[] = {
++static const struct of_device_id of_dra7_atl_clk_match_tbl[] = {
+ 	{ .compatible = "ti,dra7-atl", },
+ 	{},
+ };
+diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+index b4c5fac..35fe108 100644
+--- a/drivers/clk/ti/clockdomain.c
++++ b/drivers/clk/ti/clockdomain.c
+@@ -52,7 +52,7 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
+ 	}
+ }
+ 
+-static struct of_device_id ti_clkdm_match_table[] __initdata = {
++static const struct of_device_id ti_clkdm_match_table[] __initconst = {
+ 	{ .compatible = "ti,clockdomain" },
+ 	{ }
+ };
+diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+index 765f1e0..89c0609 100644
+--- a/drivers/clk/versatile/clk-vexpress-osc.c
++++ b/drivers/clk/versatile/clk-vexpress-osc.c
+@@ -110,7 +110,7 @@ static int vexpress_osc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct of_device_id vexpress_osc_of_match[] = {
++static const struct of_device_id vexpress_osc_of_match[] = {
+ 	{ .compatible = "arm,vexpress-osc", },
+ 	{}
  };
 -- 
 2.1.0
