@@ -1,71 +1,70 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 16 Mar 2015 16:03:12 -0500 (CDT)
-Subject: [GIT PULL] qcom SoC changes for v4.1
-Message-ID: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 13:59:57 -0700
+Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
+In-Reply-To: <201503162154.27450@pali>
+References: <201502271645.58765@pali> <20150316181023.GT5264@atomide.com>
+ <20150316195904.GN8656@n2100.arm.linux.org.uk>
+ <201503162154.27450@pali>
+Message-ID: <20150316205956.GE12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+* Pali Roh?r <pali.rohar@gmail.com> [150316 13:54]:
+> On Monday 16 March 2015 20:59:04 Russell King - ARM Linux wrote:
+> > On Mon, Mar 16, 2015 at 11:10:26AM -0700, Tony Lindgren wrote:
+> > > * Russell King - ARM Linux <linux@arm.linux.org.uk> [150316
+> > > 09:15]:
+> > > > On Mon, Mar 16, 2015 at 08:44:10AM -0700, Tony Lindgren
+> > > > wrote:
+> > > > > * Pavel Machek <pavel@ucw.cz> [150302 03:32]:
+> > > > > > On Fri 2015-02-27 16:55:26, Pali Roh?r wrote:
+> > > > > > > This patch adds support for DT "/revision" and
+> > > > > > > convert ATAG_REVISION to DT.
+> > > > > > > 
+> > > > > > > Pali Roh?r (2):
+> > > > > > >   arm: devtree: Set system_rev from DT revision
+> > > > > > >   arm: boot: convert ATAG_REVISION to DT revision
+> > > > > > >   field
+> > > > > > 
+> > > > > > Acked-by: Pavel Machek <pavel@ucw.cz>
+> > > > > 
+> > > > > Are these queued somewhere now? Sounds like this is the
+> > > > > last pending issue for n900 to use legacy user space
+> > > > > with current mainline kernels, so I'd like to get these
+> > > > > in so we can get closer to making omap3 boot in device
+> > > > > tree only mode.
+> > > > 
+> > > > Not that I know of.  As everyone is aware, patches need to
+> > > > be in my patch system if they want me to apply them -
+> > > > which would've been especially important as I was away
+> > > > from kernel stuff for a week at the start of March (for
+> > > > medical reasons) and I can't be expected to track the
+> > > > status of stuff which is buried behind 1000+ extra mails.
+> > > 
+> > > Pali, care to upload these two patches to Russell's patch
+> > > tracking system if no other comments?
+> > 
+> > If it's done soon, I should be able to send them to Linus
+> > fairly quickly, since this problem I'm grappling with is
+> > being seen by others who have better tools to be able to
+> > investigate the problem (and hence they're in a better
+> > position to investigate what's going on.)
+> 
+> I have no idea how to upload those patches into tracking system. 
+> Right now I do not have enough time for testing any patches...
 
-   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Well it's pretty easy, all you have to do is upload them to:
 
-are available in the git repository at:
+http://www.arm.linux.org.uk/developer/patches/
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-soc-for-4.1
+There's an email interface it too.
+ 
+> Tony, or somebody else, if you have free time, can you upload 
+> (my) patches to that needed tracking system?
 
-for you to fetch changes up to e5fdad68d47ed344832b7ca4e18b2e9708d8141e:
+Eeek, I'm swamped too, probably best that you do it yourself
+since they're your patches.
 
-   soc: qcom: gsbi: Add support for ADM CRCI muxing (2015-03-11 15:18:39 -0500)
+Regards,
 
-----------------------------------------------------------------
-Qualcomm ARM Based SoC Updates for v4.1
-
-* Merged the based Qualcomm SCM and SCM boot support
-* Cleaned up SCM interface to only expose functional SCM APIs
-* Moved Qualcomm SCM code into drivers/firmware
-* Updated the SCM APIs for setting cpu cold and warm boot addresses
-* Added support for ADM CRCI muxing
-
-----------------------------------------------------------------
-Andy Gross (1):
-       soc: qcom: gsbi: Add support for ADM CRCI muxing
-
-Kumar Gala (4):
-       ARM: qcom: Merge scm and scm boot code together
-       ARM: qcom: Cleanup scm interface to only export what is needed
-       ARM: qcom: Prep scm code for move to drivers/firmware
-       firmware: qcom: scm: Move the scm driver to drivers/firmware
-
-Lina Iyer (3):
-       firmware: qcom: scm: Clean cold boot entry to export only the API
-       firmware: qcom: scm: Add qcom_scm_set_warm_boot_addr function
-       firmware: qcom: scm: Support cpu power down through SCM
-
-  .../devicetree/bindings/soc/qcom/qcom,gsbi.txt     |  30 +-
-  MAINTAINERS                                        |   1 +
-  arch/arm/Kconfig                                   |   2 +
-  arch/arm/mach-qcom/Kconfig                         |   3 -
-  arch/arm/mach-qcom/Makefile                        |   3 -
-  arch/arm/mach-qcom/platsmp.c                       |  23 +-
-  arch/arm/mach-qcom/scm-boot.c                      |  39 --
-  arch/arm/mach-qcom/scm-boot.h                      |  26 --
-  arch/arm/mach-qcom/scm.c                           | 326 --------------
-  arch/arm/mach-qcom/scm.h                           |  25 --
-  drivers/firmware/Kconfig                           |   4 +
-  drivers/firmware/Makefile                          |   2 +
-  drivers/firmware/qcom_scm.c                        | 494 +++++++++++++++++++++
-  drivers/soc/qcom/Kconfig                           |   1 +
-  drivers/soc/qcom/qcom_gsbi.c                       | 152 +++++++
-  include/linux/qcom_scm.h                           |  28 ++
-  16 files changed, 708 insertions(+), 451 deletions(-)
-  delete mode 100644 arch/arm/mach-qcom/scm-boot.c
-  delete mode 100644 arch/arm/mach-qcom/scm-boot.h
-  delete mode 100644 arch/arm/mach-qcom/scm.c
-  delete mode 100644 arch/arm/mach-qcom/scm.h
-  create mode 100644 drivers/firmware/qcom_scm.c
-  create mode 100644 include/linux/qcom_scm.h
-
---
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
