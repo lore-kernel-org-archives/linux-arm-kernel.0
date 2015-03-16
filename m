@@ -1,30 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Mar 2015 10:07:24 +0100
-Subject: [PATCH 9/9] Revert "PM / Domains: Power on the PM domain right
- after attach completes"
-In-Reply-To: <1426261429-31883-10-git-send-email-ulf.hansson@linaro.org>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <1426261429-31883-10-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAMuHMdXYt8JwaUg1DPey7DTqGS_oOKDDeCOu5ojnQns8822TFA@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 16 Mar 2015 14:44:45 +0530
+Subject: [PATCH 0/3] clockevents: Manage device's state separately for core
+In-Reply-To: <20150310130541.GA26185@gmail.com>
+References: <cover.1425037853.git.viresh.kumar@linaro.org>
+ <CAKohpok+bfVVm-6fW5+tJCOKQA+dY=8zHykdyJEcUNbgGQyrcQ@mail.gmail.com>
+ <20150310130541.GA26185@gmail.com>
+Message-ID: <CAKohpok1RL8RnT1K+k=Bv23bgnGyny9fMhB=wGn_9yO4VgJUsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 4:43 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> Due to the invent of dev_pm_domain_get|put() API and related code in the
-> generic PM domain, we can now safely revert this commit.
+On 10 March 2015 at 18:35, Ingo Molnar <mingo@kernel.org> wrote:
 
-... revert commit 2ed127697eb13766 ("PM / Domains: Power on the PM domain
-right after attach completes").
+> Yeah, so I'd like PeterZ to ACK/NAK this approach before I move
+> forward with the patches - but he's on the road right now, so it
+> will take a week I suspect.
 
-So not everyone has to look for the commit ID.
+Hi Ingo,
 
-Gr{oetje,eeting}s,
-
-                        Geert
+Now that Peter has already Acked them, will you be taking these as
+is or want some rework to be done before that ?
 
 --
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+viresh
