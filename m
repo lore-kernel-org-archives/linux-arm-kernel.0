@@ -1,164 +1,252 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Mar 2015 18:16:34 +0000
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <55071742.6000405@arm.com>
-References: <20150315213330.GB8656@n2100.arm.linux.org.uk>
- <20150316000438.GD8656@n2100.arm.linux.org.uk>
- <20150316004239.GE8656@n2100.arm.linux.org.uk>
- <20150316093553.GF8656@n2100.arm.linux.org.uk>
- <20150316130419.GI8656@n2100.arm.linux.org.uk>
- <55071742.6000405@arm.com>
-Message-ID: <20150316181634.GK8656@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Mar 2015 18:16:59 +0000
+Subject: [PATCH 2/6] ARM: cpuidle: Add a cpuidle ops structure to be used
+ for DT
+In-Reply-To: <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+ <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150316181659.GA13335@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 05:47:46PM +0000, Sudeep Holla wrote:
-> Hi Russell,
+On Tue, Mar 03, 2015 at 12:29:33PM +0000, Daniel Lezcano wrote:
+> The current state of the different cpuidle drivers is the different PM
+
+Nit: "The current state of cpuidle drivers is such that different ..."
+
+> operations are passed via the platform_data using the platform driver
+> paradigm.
 > 
-> I was able to see exact behaviour on my VExpress setup with CA9X4 core-tile.
-> Few observations from my side:
+> This approach allowed to split the low level PM code from the arch specific
+> and the generic cpuidle code.
 > 
-> 1. This issue can be reproduced even on v3.19
-> 2. As you suspected L2C, I tried disabling L2C and it seems to solve
->    the issue
+> Unfortunately there are complains about this approach as, in the context of the
 
-My L2C says it's cache ID is 0x410000c3 - which is indeed a L2C-310, but
-with an undocumented revision ID of 3, which as far as we can make out,
-it's a R1Px where x > 0.
+Nit: s/complains/complaints
 
-> 3. Since it's very random and enabling LL_DEBUG made it difficult to
->    reproduce the issue, I tried to dump the stack using DS5 debugger
-> 4. The stack is exactly same always both on v4.0-rc* and v3.19 kernel
->    and on multiple runs
-
-Hmm, I haven't seen them before I moved to 4.0-rc3 - before then my
-nightly boot tests (which run two boots on the platform each night)
-always seemed to succeed.
-
-> 5. Connecting to h/w debugger, stopping and re-starting the CPUs,
->    solves the issue. It's helping CPUs to get out of __radix_tree_lookup
->    somehow
-
-Interesting.  Are the traces below from 4.0-rc3 or an older kernel?
-
-> Stacktrace
-> ==========
-> (sorry it's looks different from std. Linux backtrace as this one id dump
-> from DS5)
+> single kernel image, we have multiple drivers loaded in memory for nothing and
+> the platform driver is not adequate for cpuidle.
 > 
-> CPU 0
-> ----
-> #0 __radix_tree_lookup( root = <Value currently has no location>, index =
-> 16, nodep = (struct radix_tree_node**) 0x0, slotp = (void***) 0x0 ) at
-> radix-tree.c:517
+> This patch provides a common interface via cpuidle ops for all new cpuidle
+> driver and a definition for the device tree.
+> 
+> It will allow with the next patches to a have a common definition with ARM64
+> and share the same cpuidle driver.
+> 
+> The code is optimized to use the __init section intensively in order to reduce
+> the memory footprint after the driver is initialized and unify the function
+> names with ARM64.
+> 
+> In order to prevent multiple declarations and the specific cpuidle ops to be
+> spread across the different headers, a mechanism, similar to the cgroup subsys,
+> has been introduced.
+> 
+> A new platform willing to add its cpuidle ops must add an entry in the file
+> cpuidle_ops.h in the current form:
+> 
+>  #if IS_ENABLED(CONFIG_ARM_FOO_CPUIDLE)
+>  CPUIDLE_OPS(foo)
+>  #endif
+> 
+> ... and use the variable name in the specific low level code:
+> 
+> struct cpuidle_ops foo_cpuidle_ops;
+> 
+> The CPUIDLE_OPS macro will be processed in different way in the cpuidle.c file,
+> thus allowing to keep untouched the arm cpuidle core code in the future when
+> a new platform is added.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/include/asm/cpuidle.h     | 10 +++++
+>  arch/arm/include/asm/cpuidle_ops.h |  3 ++
+>  arch/arm/kernel/cpuidle.c          | 85 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/cpuidle.h   |  5 ++-
+>  4 files changed, 102 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/include/asm/cpuidle_ops.h
+> 
+> diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+> index 348dc81..3d31459 100644
+> --- a/arch/arm/include/asm/cpuidle.h
+> +++ b/arch/arm/include/asm/cpuidle.h
+> @@ -27,4 +27,14 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>   */
+>  #define ARM_CPUIDLE_WFI_STATE ARM_CPUIDLE_WFI_STATE_PWR(UINT_MAX)
+>  
+> +struct cpuidle_ops {
+> +	const char *name;
+> +	int (*suspend)(int cpu, unsigned long arg);
+> +	int (*init)(struct device_node *, int cpu);
+> +};
+> +
+> +extern int arm_cpuidle_suspend(int index);
+> +
+> +extern int arm_cpuidle_init(int cpu);
 
-Can you dump the disassembly around this location for both CPU0 and CPU1
-and the register values please?  I think it would be interesting to see
-if they're both stuck on exactly the same address access.
+idle_cpu_suspend()
+idle_cpu_init()
 
-I've currently narrowed down my latest potential culpret to something in
-my Cubox-i code... specifically something in my "cubox-i-sdio" or
-"imx-drm^" branches.
+?
 
-The cubox-i-sdio branch contains Olof's modifications to MMC to support
-resets and regulators associated with wifi cards, which would be built,
-but we would not have executed any of the MMC code at the point where
-we'd be bringing the secondary CPUs up.  The imx-drm^ changes don't
-touch any file which is built into my Versatile Express kernel, so it's
-unlikely to affect anything (though, I'm build-boot-testing with imx-drm^
-but cubox-i-sdio dropped just to make absolutely sure.)
+I am really not fussed about the naming.
 
-One thing I've tried is turning off are the Cortex-A9 features - early
-BRESP and full line of zeros.  That seems to make no apparent difference,
-though it's hard to tell when #if 0'ing out the code, because that changes
-the code placement and seems to stop the problem triggering.  I did have
-a case where disabling FLZ (via #if 0'ing it out) seemed to solve it with
-errata 588369 enabled, but changing the code to clear the FLZ bit instead
-(which should have had the same effect) resulted in the problem
-re-appearing.
+To make this and x86 driver name compliant (well, function signatures
+are a bit different) we could use:
 
-I'm beginning to believe at this point that there /is/ a bug in the L2C on
-the test chip, and that we're probably better off changing the Versatile
-Express DT files to disable the L2C cache controller... what are your
-thoughts on that?
+arm_idle()
+arm_idle_cpu_init()
 
-I'm currently doing up to 8 boot tests - if I can do 8 consecutive boot
-tests which all succeed, I'm declaring it a pass, otherwise it's a fail.
-Generally, I've found that it will fail very early (like the first) but
-sometimes up to the 4th.
+even though I think the arch prefix is useless.
 
-I guess one thing we need to confirm is whether we have exactly the same
-hardware and firmware versions.  Here's my board's early boot messages:
+Side note: why is the x86 driver in drivers/idle ? To have another dir :) ?
 
-ARM V2M Boot loader v1.1.1
-HBI0190 build 2313
+> +
+>  #endif
+> diff --git a/arch/arm/include/asm/cpuidle_ops.h b/arch/arm/include/asm/cpuidle_ops.h
+> new file mode 100644
+> index 0000000..be0a612
+> --- /dev/null
+> +++ b/arch/arm/include/asm/cpuidle_ops.h
+> @@ -0,0 +1,3 @@
+> +/*
+> + * List of cpuidle operations
+> + */
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 45969f8..25e9789c 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -10,8 +10,29 @@
+>   */
+>  
+>  #include <linux/cpuidle.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <asm/cpuidle.h>
+>  
+> +#define CPUIDLE_OPS(__x) extern struct cpuidle_ops __x ## _cpuidle_ops;
+> +#include <asm/cpuidle_ops.h>
+> +#undef CPUIDLE_OPS
+> +
+> +#define CPUIDLE_OPS(__x) __x ## _cpuidle_ops_id,
+> +enum cpuidle_ops_id {
+> +#include <asm/cpuidle_ops.h>
+> +        CPUIDLE_OPS_COUNT,
+> +};
+> +#undef CPUIDLE_OPS
+> +
+> +#define CPUIDLE_OPS(__x) [__x ## _cpuidle_ops_id ] = &__x ## _cpuidle_ops,
+> +static struct cpuidle_ops *supported_cpuidle_ops[] __initconst = {
+> +#include <asm/cpuidle_ops.h>
+> +};
+> +#undef CPUIDLE_OPS
+> +
+> +static struct cpuidle_ops cpuidle_ops[NR_CPUS];
 
-ARM V2M Firmware v3.1.2
-Build Date: Apr 16 2013
+That's because you want platform cpuidle_ops to be __initdata ?
 
-Date: Mon 30 Mar 2009
-Time:     16:59:14
+It should not be a big overhead on arm32 to have a number of
+structs equal to NR_CPUS, on arm64 it is the other way around
+there are few cpu_ops, but number of CPUs can be high so it
+is an array of pointers.
 
-Cmd> reboot
+I think it is ok to leave it as it is (or probably make cpuidle_ops
+a single struct, I expect enable-method to be common across cpus).
 
-Powering up system...
-Daughterboard fitted to site 1.
+> +
+>  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>  		struct cpuidle_driver *drv, int index)
+>  {
+> @@ -19,3 +40,67 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>  
+>  	return index;
+>  }
+> +
+> +int arm_cpuidle_suspend(int index)
+> +{
+> +	int ret = -EOPNOTSUPP;
+> +	int cpu = smp_processor_id();
+> +
+> +	if (cpuidle_ops[cpu].suspend)
+> +		ret = cpuidle_ops[cpu].suspend(cpu, index);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *name)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < CPUIDLE_OPS_COUNT; i++) {
+> +		if (!strcmp(name, supported_cpuidle_ops[i]->name))
+> +			return supported_cpuidle_ops[i];
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+> +{
+> +	const char *enable_method;
+> +	struct cpuidle_ops *ops;
+> +
+> +	enable_method = of_get_property(dn, "enable-method", NULL);
+> +	if (!enable_method)
+> +		return -ENOENT;
+> +
+> +	ops = arm_cpuidle_get_ops(enable_method);
+> +	if (!ops) {
+> +		pr_warn("%s: unsupported enable-method property: %s\n",
+> +			dn->full_name, enable_method);
+> +		return -EOPNOTSUPP;
+> +	}
+> +
+> +	cpuidle_ops[cpu] = *ops; /* structure copy */
 
-Switching on ATXPSU...
-ATX3V3: ON
-VIOset: 1.8V
-MBtemp: 27 degC
+See above.
 
-Configuring motherboard (rev D, var A)...
-IOFPGA  config: PASSED
-MUXFPGA config: PASSED
-OSC CLK config: PASSED
+> +
+> +	pr_notice("cpuidle: enable-method property '%s'"
+> +		  " found operations\n", ops->name);
+> +
+> +	return 0;
+> +}
+> +
+> +int __init arm_cpuidle_init(int cpu)
+> +{
+> +	int ret = -EOPNOTSUPP;
 
-Testing SMC devices (FPGA build 8)...
-SRAM 32MB test: PASSED
-VRAM  8MB test: PASSED
-LAN9118   test: PASSED
-USB & OTG test: PASSED
-KMI1/KMI2 test: PASSED
-MMC & SD  test: PASSED
-DVI image test: PASSED
-AACI AC97 test: PASSED
-CF card   test: PASSED
-UART port test: PASSED
-MAC addrs test: PASSED
+Nit: You always assign ret, so there is no point in initializing it.
 
-Reading Site 1 Board File \SITE1\HBI0191B\board.txt
-DB1 JTAG configuration complete.
-Setting DB1 OSCCLKS...
-DB1.0 DCC 0 SPI configuration complete.
+Lorenzo
 
-Writing SCC 0x40610000 with 0xBB8A802A
-Writing SCC 0x40610001 with 0x00001F09
-Writing SCC 0x40610002 with 0x00000000
-DB1.0 DCC 0 SCC configuration complete.
-
-DB SMB clock enabled.
-Waiting for SITE1 CB_READY...
-Testing SMB clock...
-Configuring MUXFPGA for MB.
-Setting DVI mode for VGA.
-Releasing Daughterboard resets.
-Switching MCC log to UART1.
-
-Warning: Card Format not recognised, please check card.
-
-ARM Versatile Express Boot Monitor
-Version:    V5.2.1
-Build Date: Apr  4 2013
-Daughterboard Site 1: V2P-CA9 Cortex A9
-Daughterboard Site 2: Not Used
-Running boot script from flash - BOOTSCRIPT
-
-
-U-Boot 2013.01.-rc1-00003-g43ee87aabf17-dirty (Jan 07 2014 - 00:00:38)
-...
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> +	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
+> +
+> +	if (!cpu_node)
+> +		return -ENODEV;
+> +
+> +	ret = arm_cpuidle_read_ops(cpu_node, cpu);
+> +	if (!ret && cpuidle_ops[cpu].init)
+> +		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+> +
+> +	of_node_put(cpu_node);
+> +
+> +	return ret;
+> +}
+> diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+> index 0710654..1bee287 100644
+> --- a/arch/arm64/include/asm/cpuidle.h
+> +++ b/arch/arm64/include/asm/cpuidle.h
+> @@ -15,5 +15,8 @@ static inline int cpu_suspend(unsigned long arg)
+>  	return -EOPNOTSUPP;
+>  }
+>  #endif
+> -
+> +static inline int arm_cpuidle_suspend(int index)
+> +{
+> +	return cpu_suspend(index);
+> +}
+>  #endif
+> -- 
+> 1.9.1
+> 
+> 
