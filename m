@@ -1,89 +1,85 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Mon, 16 Mar 2015 16:01:01 +0530
-Subject: [PATCH v7 3/3] Documentation: dma: Add APM X-Gene SoC DMA engine
- driver documentation
-In-Reply-To: <20150316092912.GI32683@intel.com>
-References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
- <1426158921-8987-4-git-send-email-rsahu@apm.com>
- <20150316092912.GI32683@intel.com>
-Message-ID: <CAFd313ywcfzQvoP__NcXfZRCPJfJGxNKPJtCnH7Bo5N1JssCTw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 10:41:33 +0000
+Subject: [PATCH 04/10] ARM: zx: add initial L2CC initialization
+In-Reply-To: <1426333785-3952-5-git-send-email-jun.nie@linaro.org>
+References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
+ <1426333785-3952-5-git-send-email-jun.nie@linaro.org>
+Message-ID: <20150316104133.GG8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Sat, Mar 14, 2015 at 07:49:39PM +0800, Jun Nie wrote:
+> +static void __init zx_l2x0_init(void)
+> +{
+> +	void __iomem *base;
+> +	struct device_node *np;
+> +	unsigned int val;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
+> +	if (!np)
+> +		goto out;
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base) {
+> +		of_node_put(np);
+> +		goto out;
+> +	}
 
-On Mon, Mar 16, 2015 at 2:59 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Thu, Mar 12, 2015 at 04:45:21PM +0530, Rameshwar Prasad Sahu wrote:
->> This patch adds device tree binding for APM X-Gene SoC DMA engine driver.
-> The patch title should be to add the bindings and not Documentation
+NAK, really, NAK.  We're trying to get away from platforms doing crap
+like this.
 
-Got it, thanks
->
-> --
-> ~Vinod
->>
->> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> ---
->>  .../devicetree/bindings/dma/apm-xgene-dma.txt      | 47 ++++++++++++++++++++++
->>  1 file changed, 47 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
->>
->> diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
->> new file mode 100644
->> index 0000000..d305876
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
->> @@ -0,0 +1,47 @@
->> +Applied Micro X-Gene SoC DMA nodes
->> +
->> +DMA nodes are defined to describe on-chip DMA interfaces in
->> +APM X-Gene SoC.
->> +
->> +Required properties for DMA interfaces:
->> +- compatible: Should be "apm,xgene-dma".
->> +- device_type: set to "dma".
->> +- reg: Address and length of the register set for the device.
->> +  It contains the information of registers in the following order:
->> +  1st - DMA control and status register address space.
->> +  2nd - Descriptor ring control and status register address space.
->> +  3rd - Descriptor ring command register address space.
->> +  4th - Soc efuse register address space.
->> +- interrupts: DMA has 5 interrupts sources. 1st interrupt is
->> +  DMA error reporting interrupt. 2nd, 3rd, 4th and 5th interrupts
->> +  are completion interrupts for each DMA channels.
->> +- clocks: Reference to the clock entry.
->> +
->> +Optional properties:
->> +- dma-coherent : Present if dma operations are coherent
->> +
->> +Example:
->> +     dmaclk: dmaclk at 1f27c000 {
->> +             compatible = "apm,xgene-device-clock";
->> +             #clock-cells = <1>;
->> +             clocks = <&socplldiv2 0>;
->> +             reg = <0x0 0x1f27c000 0x0 0x1000>;
->> +             reg-names = "csr-reg";
->> +             clock-output-names = "dmaclk";
->> +     };
->> +
->> +     dma: dma at 1f270000 {
->> +                     compatible = "apm,xgene-storm-dma";
->> +                     device_type = "dma";
->> +                     reg = <0x0 0x1f270000 0x0 0x10000>,
->> +                           <0x0 0x1f200000 0x0 0x10000>,
->> +                           <0x0 0x1b008000 0x0 0x2000>,
->> +                           <0x0 0x1054a000 0x0 0x100>;
->> +                     interrupts = <0x0 0x82 0x4>,
->> +                                  <0x0 0xb8 0x4>,
->> +                                  <0x0 0xb9 0x4>,
->> +                                  <0x0 0xba 0x4>,
->> +                                  <0x0 0xbb 0x4>;
->> +                     dma-coherent;
->> +                     clocks = <&dmaclk 0>;
->> +     };
->> --
->> 1.8.2.1
->>
->
-> --
+> +
+> +	val = readl_relaxed(base + L310_PREFETCH_CTRL);
+> +	val |= 0x70800000;
+> +	writel_relaxed(val, base + L310_PREFETCH_CTRL);
+
+So that's:
+
+	L310_PREFETCH_CTRL_DBL_LINEFILL |
+	L310_PREFETCH_CTRL_INSTR_PREFETCH |
+	L310_PREFETCH_CTRL_DATA_PREFETCH |
+	L310_PREFETCH_CTRL_DBL_LINEFILL_INCR
+
+which you can enable by adding:
+
+	arm,double-linefill
+	arm,double-linefill-incr
+
+The prefetch enables are also accessible via the auxillary control
+register when the cache is not enabled (see below.)
+
+> +
+> +	writel_relaxed(L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN,
+> +		       base + L310_POWER_CTRL);
+
+These should be done by your boot loader - they're highly SoC specific.
+
+> +out:
+> +	l2x0_of_init(0x7c433C01, 0x8000c3fe);
+
+Why these random values?
+
+Firstly, the L2 code takes care of bits 0, 26, 27, 30 for you already.
+I fail to see why you would want to hard-code the cache size here
+either; the cache size is supposed to be configured by the hardware
+designers at implementation stage and the aux control register is
+supposed to take up that configuration at reset.
+
+You see to be setting bits 10-13 inclusive, which include:
+
+	L310_AUX_CTRL_HIGHPRIO_SO_DEV
+	L310_AUX_CTRL_STORE_LIMITATION
+	L310_AUX_CTRL_EXCLUSIVE_CACHE
+
+Are you sure you're supposed to be setting these bits?
+
+Bits 28 and 29 are the same as bits 28 and 29 in the prefetch register
+(as in, you read or write those bits in either register and you're
+accessing the exact same bits.)
+
+The only possible bits you should be playing around with here which
+we don't have a way to cater for are bits 22, 28, 29.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
