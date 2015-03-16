@@ -1,70 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 16 Mar 2015 17:42:06 +0100
-Subject: [GIT PULL] at91: cleanup for 4.1 #3
-Message-ID: <1426524126-29068-1-git-send-email-nicolas.ferre@atmel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 16 Mar 2015 12:43:47 -0400 (EDT)
+Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for
+ Revision
+In-Reply-To: <20150316161449.GJ8656@n2100.arm.linux.org.uk>
+References: <201502271645.58765@pali>
+ <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
+ <20150302112836.GA27317@amd> <20150316154409.GQ5264@atomide.com>
+ <20150316161449.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1503161238560.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+On Mon, 16 Mar 2015, Russell King - ARM Linux wrote:
 
-This batch deals with the at91rm9200 System Timer. It is a complete re-work by
-Alexandre to make it use modern kernel infrastructure and move its features to
-proper drivers. I stacked it on top of cleanup to lower the risk of conflict
-and above all to be sure that it'll be merged before multi-platform. And you
-know... well, it's the last step needed before switching to multi-platform!
+> In any case, I'm currently not accepting /any/ patches into my tree at
+> present; I'm chasing a horrid instability on one of my test platforms
+> which is making it impossible to tell whether any particular change or
+> changes in my tree is responsible or not for it.  It doesn't seem to be
+> a hardware failure (if it was, I'd simply take the board out of the
+> nightly test system.)
+> 
+> It's quite literally taking hours to figure out what's going on - I've
+> been on this for about 12 hours now and still not much closer to knowing
+> what's causing it (other than I know that -rc1 plus my queue seems to be
+> fine, -rc3 plus my queue is definitely broken, -rc3 alone is fine.  So
+> something I'm already carrying seems to be responsible, but each time I
+> identify a particular patch and drop _just_ that change, I find that the
+> problem is back when I try my queue minus the bad changes.  With a test
+> cycle time of 20+ minutes (due to the number of boots required to make
+> certain of a dependable result), this is /really/ slow progress.
+> 
+> Right now, I can't be positively sure that /anything/ I have already
+> merged isn't a factor in causing this problem, so I don't want to
+> augment my tree with any additional patches which would upset my
+> ability to move about in the tree, and get reproducable results from
+> repeated testing.  To merge something else will probably mean I'll
+> have to start again from the beginning and the last 12 hours spent
+> testing will have been wasted.
 
-Thanks, best regards,
+Your publicly visible tree contains only a few mundane patches.
+Is that the tree you're testing with?  If no then could you publish it 
+for others to have a look and test?
 
-The following changes since commit 598e085590fc5ac1fecff00e842a8a6c2ae010e5:
 
-  ARM: at91: remove old setup (2015-03-13 18:01:10 +0100)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup3
-
-for you to fetch changes up to 8590ca655a19f9e124b52bfbf28f14eb16a05bec:
-
-  ARM: at91: remove useless include (2015-03-16 17:03:08 +0100)
-
-----------------------------------------------------------------
-Third batch of cleanup for 4.1:
-- System Timer (ST) for at91rm9200 re-work (syscon/regmap):
-  - watchdog
-  - restart handler
-  - timer as a proper clocksource
-  => remove mach dependency + cleanup
-
-----------------------------------------------------------------
-Alexandre Belloni (10):
-      ARM: at91/dt: declare atmel,at91rm9200-st as a syscon
-      mfd: syscon: Add atmel system timer registers definition
-      watchdog: at91rm9200: use the system timer syscon
-      watchdog: at91rm9200: implement restart handler
-      ARM: at91: at91rm9200: remove deprecated arm_pm_restart
-      ARM: at91: properly initialize timer
-      ARM: at91: time: move the system timer driver to drivers/clocksource
-      clocksource: atmel-st: use syscon/regmap
-      clocksource: atmel-st: remove mach/hardware dependency
-      ARM: at91: remove useless include
-
- .../devicetree/bindings/arm/atmel-at91.txt         |   4 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  |   6 +-
- arch/arm/mach-at91/Kconfig                         |   1 +
- arch/arm/mach-at91/Makefile                        |   2 +-
- arch/arm/mach-at91/at91rm9200.c                    |  19 ----
- arch/arm/mach-at91/generic.h                       |   3 -
- arch/arm/mach-at91/include/mach/at91_st.h          |  61 -----------
- drivers/clocksource/Kconfig                        |   4 +
- drivers/clocksource/Makefile                       |   1 +
- .../clocksource/timer-atmel-st.c                   | 117 ++++++++-------------
- drivers/watchdog/Kconfig                           |   2 +-
- drivers/watchdog/at91rm9200_wdt.c                  |  61 +++++++++--
- include/linux/mfd/syscon/atmel-st.h                |  49 +++++++++
- 13 files changed, 164 insertions(+), 166 deletions(-)
- delete mode 100644 arch/arm/mach-at91/include/mach/at91_st.h
- rename arch/arm/mach-at91/at91rm9200_time.c => drivers/clocksource/timer-atmel-st.c (73%)
- create mode 100644 include/linux/mfd/syscon/atmel-st.h
-
--- 
-Nicolas Ferre
+Nicolas
