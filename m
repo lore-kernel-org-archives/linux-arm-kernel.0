@@ -1,69 +1,76 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 16 Mar 2015 08:12:43 -0700
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
-Message-ID: <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 16 Mar 2015 16:17:55 +0100
+Subject: [PATCH v2 3/3] ARM: dts: add property for maximum ADC clock
+ frequencies
+In-Reply-To: <1426518614-20201-4-git-send-email-stefan@agner.ch>
+References: <1426518614-20201-1-git-send-email-stefan@agner.ch>
+ <1426518614-20201-4-git-send-email-stefan@agner.ch>
+Message-ID: <80ba0aa345e8bb04e23e2988f51a851d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+Forgot to add i.MX/Vybrid maintainers Shawn and Sascha.
 
-On Mon, Mar 16, 2015 at 7:05 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> +       switch (ios->signal_voltage) {
->> +       case MMC_SIGNAL_VOLTAGE_120:
->> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
->> +                       1200000, 100000);
->
-> Is 1V the lowest possible value? How did you get to that?
-
-I think you've added a zero in your mind and not realized that I'm
-calling regulator_set_voltage_tol() here and in other calls.  Please
-read the above as:
-
-* Try to set the voltage to exactly 1,200,000 uV (1.2V).
-* If you can't get 1.2V exactly, a tolerance ("tol") of 100,000 uV
-(.1V) is OK.
-* In other words, 1.1V - 1.3V are OK, but aim for 1.2V
-
-
->> +       case MMC_SIGNAL_VOLTAGE_180:
->> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
->> +                       1800000, 100000);
->
-> Is 1V the lowest possible value? How did you get to that?
-
-Again, check my zeros.  This should be 1.7 - 1.9V, aiming for 1.8V.
-
-
->> +       case MMC_SIGNAL_VOLTAGE_330:
->> +               return mmc_regulator_set_voltage_if_supported(mmc->supply.vqmmc,
->> +                       regulator_get_voltage(mmc->supply.vmmc), 300000);
->
-> Why 3V? Shouldn't it be 2.7V? How will else those SoC that for example
-> supports 2.9V only work?
-
-This will get us within .3V of whatever vmmc is.  If vmmc is 3.3V, it
-will allow vqmmc of 3.0V - 3.6V.
-
-This _seems_ sane to me and given any sane system design we should be
-fine here, I think.  I can't see someone designing a system where
-vqmmc was not within .3V of vmmc, can you?  If we think someone will
-actually build a system where vmmc is 3.3V and vqmmc can't go higher
-than 2.7V then we'll either need to increase the tolerance here or add
-a new asymmetric system call like my original patches did.
-
->>  int mmc_regulator_get_supply(struct mmc_host *mmc);
->
-> One more thought,s as for the vmmc regulator we have a
-> "regulator_enabled" member in the mmc_host. Should we add a similar
-> member for vqmmc? That would prevent host drivers from keeping track
-> of this state themselves.
-
-Yeah, that does sound nice.  Are you suggesting that I modify this
-patch or submit a new one.  Let me know.
-
-
--Doug
+On 2015-03-16 16:10, Stefan Agner wrote:
+> The ADC clock frequency is limited depending on modes used. Add
+> device tree property which allow to set the mode used and the
+> maximum frequency ratings for the instance. These allows to
+> set the ADC clock to a frequency which is within specification
+> according to the actual mode used.
+> 
+> Acked-by: Fugang Duan <B38611@freescale.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/vf610-adc.txt | 9 +++++++++
+>  arch/arm/boot/dts/vfxxx.dtsi                            | 4 ++++
+>  2 files changed, 13 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> index 1a4a43d..3eb40e2 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
+> @@ -11,6 +11,13 @@ Required properties:
+>  - clock-names: Must contain "adc", matching entry in the clocks property.
+>  - vref-supply: The regulator supply ADC reference voltage.
+>  
+> +Recommended properties:
+> +- fsl,adck-max-frequency: Maximum frequencies according to datasheets operating
+> +  requirements. Three values are required, depending on conversion mode:
+> +  - Frequency in normal mode (ADLPC=0, ADHSC=0)
+> +  - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
+> +  - Frequency in low-power mode (ADLPC=1, ADHSC=0)
+> +
+>  Example:
+>  adc0: adc at 4003b000 {
+>  	compatible = "fsl,vf610-adc";
+> @@ -18,5 +25,7 @@ adc0: adc at 4003b000 {
+>  	interrupts = <0 53 0x04>;
+>  	clocks = <&clks VF610_CLK_ADC0>;
+>  	clock-names = "adc";
+> +	fsl,adck-max-frequency = <30000000>, <40000000>,
+> +				<20000000>;
+>  	vref-supply = <&reg_vcc_3v3_mcu>;
+>  };
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index a29c7ce..c6609bd 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -189,6 +189,8 @@
+>  				clocks = <&clks VF610_CLK_ADC0>;
+>  				clock-names = "adc";
+>  				status = "disabled";
+> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+> +							<20000000>;
+>  			};
+>  
+>  			wdoga5: wdog at 4003e000 {
+> @@ -387,6 +389,8 @@
+>  				clocks = <&clks VF610_CLK_ADC1>;
+>  				clock-names = "adc";
+>  				status = "disabled";
+> +				fsl,adck-max-frequency = <30000000>, <40000000>,
+> +							<20000000>;
+>  			};
+>  
+>  			esdhc1: esdhc at 400b2000 {
