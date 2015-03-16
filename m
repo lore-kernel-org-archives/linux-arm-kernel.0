@@ -1,109 +1,101 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Mar 2015 09:52:05 -0700
-Subject: [PATCH] ARM: BCM5301X: Implement SMP support
-In-Reply-To: <1424385148-15026-1-git-send-email-zajec5@gmail.com>
-References: <1423600375-18665-1-git-send-email-zajec5@gmail.com>
- <1424385148-15026-1-git-send-email-zajec5@gmail.com>
-Message-ID: <55070A35.4040804@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 16 Mar 2015 16:54:23 +0000 (UTC)
+Subject: read_cpuid_id() in arch/arm/kernel/setup.c
+In-Reply-To: <550697FE.1020804@free.fr>
+References: <55030A68.6070002@free.fr>
+ <20150313161953.GS8656@n2100.arm.linux.org.uk> <550312BB.8020902@free.fr>
+ <20150313164546.GV8656@n2100.arm.linux.org.uk> <5505C40C.1050001@free.fr>
+ <550697FE.1020804@free.fr>
+Message-ID: <alpine.DEB.2.02.1503161641000.29420@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/02/15 14:32, Rafa? Mi?ecki wrote:
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+Hi
+
+On Mon, 16 Mar 2015, Mason wrote:
+
+> On 15/03/2015 18:40, Mason wrote:
+> 
+> > On 13/03/2015 17:45, Russell King - ARM Linux wrote:
+> > 
+> >> Yes, this one I like - and it probably fixes a potential latent bug
+> >> where the compiler was free to re-order that mrc outside of the if()
+> >> statement.
+> >>
+> >> Please wrap it up as a normal submission, thanks.
+> > 
+> > Proposed patch at the end of this message.
+> > 
+> > I'm now puzzling over why it's required to have "memory"
+> > in read_cpuid_ext's clobber list, and not in read_cpuid's?
+> 
+> Same player shoot again.
+
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+
+Looks reasonable to me.  I'd suggest updating the patch message to 
+describe your change, and why it's needed.  Consider something like:
+
+---
+
+Convert the open-coded MMFR0 register read in __get_cpu_architecture() to 
+use the read_cpuid_ext() macro.  This shortens the function and ensures 
+that a memory clobber is used on the coprocessor read instruction.  The 
+memory clobber works around a bug in gcc 4.5.  gcc 4.5 can reorder 
+coprocessor read instructions with respect to other code, disregarding 
+potential side-effects of the coprocessor read.
+
+---
+
+Once you've got something that you're happy with, and have reposted it to 
+the public lists, I believe the next step will be for you to post it to 
+rmk's patch tracker at:
+
+http://www.arm.linux.org.uk/developer/patches/
+
+
+
+- Paul
+
+> 
+> -- >8 --
+> Date: Sun, 15 Mar 2015 17:59:53 +0100
+> Subject: [PATCH] Use read_cpuid_ext() macro instead of inline asm
+> 
+> In commit 067e710b9a98 ("ARM: 7801/1: prevent gcc 4.5 from reordering extended
+> CP15 reads above is_smp() test") Paul Walmsley fixed read_cpuid_ext() and added
+> the following comment.
+> 
+>     The memory clobber prevents gcc 4.5 from reordering the mrc before
+>     any is_smp() tests, which can cause undefined instruction aborts on
+>     ARM1136 r0 due to the missing extended CP15 registers.
+> 
+> Signed-off-by: Mason <slash.tmp@free.fr>
 > ---
+>  arch/arm/kernel/setup.c | 5 +----
+>  1 file changed, 1 insertion(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index e55408e..1d60beb 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -246,12 +246,9 @@ static int __get_cpu_architecture(void)
+>  		if (cpu_arch)
+>  			cpu_arch += CPU_ARCH_ARMv3;
+>  	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+> -		unsigned int mmfr0;
+> -
+>  		/* Revised CPUID format. Read the Memory Model Feature
+>  		 * Register 0 and check for VMSAv7 or PMSAv7 */
+> -		asm("mrc	p15, 0, %0, c0, c1, 4"
+> -		    : "=r" (mmfr0));
+> +		unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
+>  		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
+>  		    (mmfr0 & 0x000000f0) >= 0x00000030)
+>  			cpu_arch = CPU_ARCH_ARMv7;
+> -- 
+> 2.3.2
+> 
 
-[snip]
 
-> +Optional sub-node properties:
-> +
-> +compatible = "brcm,bcm4708-sysram" SYSRAM for SMP bringup.
-> +		SMP-capable SoCs use part of the SYSRAM for storing
-> +		location of code to be executed by the extra cores.
-
-Is this a regular kind of SRAM? If so, can you use "mmio-sram" as a
-compatible fallback?
-
-[snip]
-
-> +
-> +	/*
-> +	 * In case L1 cache has unpredictable contents at power-up
-> +	 * clean its contents without flushing.
-> +	 */
-> +	/* bl	v7_l1_cache_invalidate */
-
-You can remove that comment now
-
-> +	bl      v7_invalidate_l1
-> +
-> +	mov	r0,#0
-> +	mcr	p15,0,r0,c7,c5,0	/* Invalidate icache */
-
-For consistency with the previous lines, you would want to space operands.
-
-> +	dsb
-> +	isb
-> +
-> +	/*
-> +	 * we've been released from the holding pen: secondary_stack
-> +	 * should now contain the SVC stack for this core
-> +	 */
-> +	b	secondary_startup
-> +ENDPROC(bcm5301x_secondary_startup)
-> +
-> +	.align 2
-> +1:	.long	.
-> +	.long	pen_release
-> diff --git a/arch/arm/mach-bcm/bcm5301x_smp.c b/arch/arm/mach-bcm/bcm5301x_smp.c
-> new file mode 100644
-> index 0000000..903cc0d
-> --- /dev/null
-> +++ b/arch/arm/mach-bcm/bcm5301x_smp.c
-> @@ -0,0 +1,160 @@
-> +/*
-> + * Broadcom BCM470X / BCM5301X ARM platform code.
-> + *
-> + * Copyright (C) 2002 ARM Ltd.
-> + * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-> + *
-> + * Licensed under the GNU/GPL. See COPYING for details.
-> + */
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/delay.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +
-> +#define SOC_ROM_LUT_OFF		0x400
-> +
-> +extern void bcm5301x_secondary_startup(void);
-> +
-> +static void __cpuinit write_pen_release(int val)
-> +{
-> +	pen_release = val;
-> +	smp_wmb();
-> +	sync_cache_w(&pen_release);
-> +}
-> +
-> +static DEFINE_SPINLOCK(boot_lock);
-> +
-> +static void __init bcm5301x_smp_secondary_set_entry(void (*entry_point)(void))
-> +{
-> +	void __iomem *sysram_base_addr = NULL;
-> +	struct device_node *node;
-> +
-> +	for_each_compatible_node(node, NULL, "brcm,bcm4708-sysram") {
-> +		if (!of_device_is_available(node))
-> +			continue;
-> +		sysram_base_addr = of_iomap(node, 0);
-> +		break;
-> +	}
-
-How about of_find_compatible()? Do you expect more than one sysram node
-in a DTS?
--- 
-Florian
+- Paul
