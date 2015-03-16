@@ -1,55 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 11:24:26 -0700
-Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <20150316182536.GA16829@earth>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <20150313151301.GJ5264@atomide.com>
- <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
- <2070859.WcMooC33YH@wuerfel> <20150316152939.GP5264@atomide.com>
- <20150316182536.GA16829@earth>
-Message-ID: <20150316182426.GW5264@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Mar 2015 11:33:47 -0700
+Subject: [PATCH 0/5] ARM: Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <5507220B.5070506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@ring0.de> [150316 11:26]:
-> Hi,
+On 06/03/15 16:54, Florian Fainelli wrote:
+> Hi all,
 > 
-> On Mon, Mar 16, 2015 at 08:29:39AM -0700, Tony Lindgren wrote:
-> > * Arnd Bergmann <arnd@arndb.de> [150315 05:10]:
-> > > On Sunday 15 March 2015 10:50:42 Eliad Peller wrote:
-> > > > yeah, i missed it :/
-> > > > 
-> > > > looks like there's no platform that defines platform data for it.
-> > > > i'll replace the dev_get_platdata() with a function that only parses
-> > > > the clock-frequency properties (the irq is taken in this case from the
-> > > > spi_device).
-> > > > (or maybe i should just drop it, as no one actually uses it?)
-> > > 
-> > > I don't think we should drop the driver, but dropping the platform_data
-> > > support sounds reasonable. New users of this driver should all be using
-> > > DT, and if there is a good reason to use platform_data, it's easily
-> > > put back.
-> > 
-> > Well we have n8x0 and n900 using the spi driver. For those, n8x0 boot
-> > all in dts mode, but n900 still also boots in legacy mode. It seems the
-> > board-rx51-peripherals.c only passes the power_gpio though, so that
-> > should be easy to keep around.
-> > 
-> > We should keep things still working for n900 in legacy mode until the
-> > pending regressions with device tree based booting have been cleared
-> > for at least one merge cycle. I believe the last pending issues is the
-> > support for ATAG_REVISION in device tree mode as posted by Pali.
+> This patch series adds support for the Broadcom Brahma-B15 CPU read-ahead cache
+> which is to be found in several Broadcom SoCs, and mainline brcmstb.
 > 
-> mh by migrating to newer gpiod interface platform data is no longer
-> needed (instead the boardfile would need a gpiod_lookup_table). That
-> way all of the dirty code is in the board file and will be removed
-> once the time comes. See for example rx51_fmtx_gpios_table.
+> Let me know your thoughts on this, we have tried to minimize both the
+> compile-time and runtime impact for non-Broadcom CPU parts.
+
+Any feedback on this implementation? Thanks!
+
 > 
-> Note: This is independent of wl12xx changes, since N900 uses wl1251.
+> Florian Fainelli (5):
+>   ARM: v7: allow setting different cache functions
+>   ARM: Add Broadcom Brahma-B15 readahead cache support
+>   ARM: Hook B15 readahead cache functions based on processor
+>   ARM: B15: Add CPU hotplug awareness
+>   ARM: B15: Add suspend/resume hooks
+> 
+>  arch/arm/include/asm/cacheflush.h             |   2 +-
+>  arch/arm/include/asm/glue-cache.h             |   4 +
+>  arch/arm/include/asm/hardware/cache-b15-rac.h |  12 +
+>  arch/arm/mm/Kconfig                           |   8 +
+>  arch/arm/mm/Makefile                          |   1 +
+>  arch/arm/mm/cache-b15-rac.c                   | 329 ++++++++++++++++++++++++++
+>  arch/arm/mm/cache-v7.S                        |  21 ++
+>  arch/arm/mm/proc-v7.S                         |   6 +-
+>  8 files changed, 379 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
+>  create mode 100644 arch/arm/mm/cache-b15-rac.c
+> 
 
-Oh sorry yes sounds like that's different platform data then. In that
-case I see no reasons to drop the platform data for wl12xx.
 
-Regards,
-
-Tony
+-- 
+Florian
