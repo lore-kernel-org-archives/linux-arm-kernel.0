@@ -1,43 +1,68 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 16 Mar 2015 16:09:48 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6sl: Add label snvs_rtc
-In-Reply-To: <1426348068-17745-1-git-send-email-festevam@gmail.com>
-References: <1426348068-17745-1-git-send-email-festevam@gmail.com>
-Message-ID: <20150316080946.GM20455@dragon>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 16 Mar 2015 17:12:05 +0900
+Subject: [PATCH] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
+ allocations
+Message-ID: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 14, 2015 at 12:47:47PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> It may be useful to disable the internal snvs-rtc when an external rtc is
-> available. This patch adds a label so that dts files can disable it.
-> 
-> Based on a patch from Markus Pargmann for imx6qdl.dtsi.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+IOMMU should be able to use single pages as well as bigger blocks, so if
+higher order allocations fail, we should not affect state of the system,
+with events such as OOM killer, but rather fall back to order 0
+allocations.
 
-Let's do this when there is a real user for it.
+This patch changes the behavior of ARM IOMMU DMA allocator to use
+__GFP_NORETRY, which bypasses OOM invocation, for positive orders and
+only if that fails doing OOMable order 0 allocation as a fall back.
 
-Shawn
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ arch/arm/mm/dma-mapping.c | 29 +++++++++++++++++++++--------
+ 1 file changed, 21 insertions(+), 8 deletions(-)
 
-> ---
->  arch/arm/boot/dts/imx6sl.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> index ea682e3..a78e715 100644
-> --- a/arch/arm/boot/dts/imx6sl.dtsi
-> +++ b/arch/arm/boot/dts/imx6sl.dtsi
-> @@ -569,7 +569,7 @@
->  				#size-cells = <1>;
->  				ranges = <0 0x020cc000 0x4000>;
->  
-> -				snvs-rtc-lp at 34 {
-> +				snvs_rtc: snvs-rtc-lp at 34 {
->  					compatible = "fsl,sec-v4.0-mon-rtc-lp";
->  					reg = <0x34 0x58>;
->  					interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>,
-> -- 
-> 1.9.1
-> 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 83cd5ac..f081e9e 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1145,18 +1145,31 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	}
+ 
+ 	/*
+-	 * IOMMU can map any pages, so himem can also be used here
++	 * IOMMU can map any pages, so himem can also be used here.
++	 * We do not want OOM killer to be invoked as long as we can fall back
++	 * to single pages, so we use __GFP_NORETRY for positive orders.
+ 	 */
+-	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
++	gfp |= __GFP_NOWARN | __GFP_HIGHMEM | __GFP_NORETRY;
+ 
+ 	while (count) {
+-		int j, order = __fls(count);
++		int j, order;
+ 
+-		pages[i] = alloc_pages(gfp, order);
+-		while (!pages[i] && order)
+-			pages[i] = alloc_pages(gfp, --order);
+-		if (!pages[i])
+-			goto error;
++		for (order = __fls(count); order; --order) {
++			/* Will not trigger OOM. */
++			pages[i] = alloc_pages(gfp, order);
++			if (pages[i])
++				break;
++		}
++
++		if (!pages[i]) {
++			/*
++			 * Fall back to single page allocation.
++			 * Might invoke OOM killer as last resort.
++			 */
++			pages[i] = alloc_pages(gfp & ~__GFP_NORETRY, 0);
++			if (!pages[i])
++				goto error;
++		}
+ 
+ 		if (order) {
+ 			split_page(pages[i], order);
+-- 
+2.1.2
