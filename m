@@ -1,26 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Mar 2015 15:21:45 +0100
-Subject: [GIT PULL v2] Second Round of Renesas ARM Based SoC Cleanup for
- v4.1
-In-Reply-To: <cover.1426456752.git.horms+renesas@verge.net.au>
-References: <cover.1426456752.git.horms+renesas@verge.net.au>
-Message-ID: <57687741.xrEbQ8vakN@wuerfel>
+Date: Mon, 16 Mar 2015 15:23:13 +0100
+Subject: [GIT PULL] ARM: rockchip: small fixes for 4.0-rc
+In-Reply-To: <3637038.xZyfPJIQzf@phil>
+References: <3637038.xZyfPJIQzf@phil>
+Message-ID: <4556908.EaV8ua9jfr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 March 2015 08:03:16 Simon Horman wrote:
+On Sunday 15 March 2015 00:57:29 Heiko Stuebner wrote:
+> Hi Arnd, Olof,
 > 
-> Please consider these second round of Renesas ARM based SoC cleanup for v4.1.
+> a small issue surfaced with the new gmac node on rk3288 which is missing a
+>         status = "disabled";
+> in the rk3288.dtsi and thus enabling the mac unconditionally.
+> The second patch in that branch simply adds a rockchip regexp to MAINTAINERS, so
+> that it also matches stuff like the (slightly) new rockchip drm stuff.
 > 
-> 
-> As requested by Arnd v2 of this pull request is based on v4.0-rc1.  The
-> previous version of this pull request was based on "Renesas ARM Based SoC
-> Cleanup for v4.1", tagged as renesas-soc-cleanup2-for-v4.1.  There are no
-> other changes between v1 and v2 of this pull request.
-> 
+> So if acceptable, please pull
 > 
 > 
 
-Merged into next/cleanup, thanks a lot for the rebase!
+Pulled into fixes, thanks!
 
 	Arnd
