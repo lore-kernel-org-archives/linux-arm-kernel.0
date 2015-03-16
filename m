@@ -1,68 +1,47 @@
-From: afaerber@suse.de (=?ISO-8859-15?Q?Andreas_F=E4rber?=)
-Date: Mon, 16 Mar 2015 12:05:44 +0100
-Subject: [PATCH 3/3] ARM: dts: Define stdout-path property for Spring board
-In-Reply-To: <1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>
-References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
- <1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <5506B908.1060007@suse.de>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Mon, 16 Mar 2015 11:01:51 +0000
+Subject: [PATCH v4 0/5] QEMU ARM64 Migration Fixes
+Message-ID: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is hopefully the final update to the series. I've skipped v3 for
+the purposes of having a sane relationship to the branch name ;-)
 
-Am 16.03.2015 um 11:28 schrieb Javier Martinez Canillas:
-> The kernel can use as the default console a serial port if is defined
+v4
+  - Dropped the pl011 IRQ fiddling patch
+  - Save/Restore MP STATE
+    - moved into kvm.c
+    - changed MP_STATE to STOPPED
+  - Sync FP State
+    - Removed superfluous reg.id++
+  - Save/Restore SPSR
+    - try and make commentary clearer
+    - ensure env->banked_spsr[0] = env->spsr before we sync
+  - document env->spsr
+    - briefer commit message, leaving questions for the list ;-)
 
-"The kernel can use a serial port as the default console if it's defined
-..."
+I submitted the kernel side of this on Friday
 
-> as stdout device in the Device Tree.
-> 
-> This allows a board to be booted without the need of having a console
-> parameter in the kernel command line.
-> 
-> Currently the Spring DTS has bootargs in the /chosen node and this is
-> kept since users that don't have a serial console on this board might
-> be using it to have the boot log shown in the display. This will have
-> more precedence than the stdout-path but it's fine since is only used
+Branch: https://github.com/stsquad/qemu/tree/migration/fixes-v4
+Kernel: https://git.linaro.org/people/alex.bennee/linux.git/shortlog/refs/heads/migration/kvmarm-fixes-for-4.0-v3
 
-"since it's"
+Alex Benn?e (4):
+  target-arm: kvm: save/restore mp state
+  hw/intc: arm_gic_kvm.c restore config first
+  target-arm: kvm64 sync FP register state
+  target-arm: cpu.h document why env->spsr exists
 
-> when CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND is enabled.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->  arch/arm/boot/dts/exynos5250-spring.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-> index f02775487cd4..b9ec763a5602 100644
-> --- a/arch/arm/boot/dts/exynos5250-spring.dts
-> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
-> @@ -25,6 +25,7 @@
->  
->  	chosen {
->  		bootargs = "console=tty1";
-> +		stdout-path = "serial3:115200n8";
+Christoffer Dall (1):
+  target-arm: kvm64 fix save/restore of SPSR regs
 
-Is this a guess or did you verify that against some schematics?
-
->  	};
->  
->  	gpio-keys {
-
-Assuming that bootargs still work,
-
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-I do wonder why this mechanism could not point to the same location as
-bootargs? ("dp-controller"?) The device does not even have screws for
-opening it, so accessing the serial port is highly theoretical.
-
-Regards,
-Andreas
+ hw/intc/arm_gic_kvm.c |   7 +++-
+ target-arm/cpu.h      |   5 +++
+ target-arm/kvm.c      |  40 ++++++++++++++++++
+ target-arm/kvm32.c    |   4 ++
+ target-arm/kvm64.c    | 111 +++++++++++++++++++++++++++++++++++++++++++++++---
+ target-arm/kvm_arm.h  |  18 ++++++++
+ 6 files changed, 178 insertions(+), 7 deletions(-)
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+2.3.2
