@@ -1,62 +1,41 @@
-From: rientjes@google.com (David Rientjes)
-Date: Mon, 16 Mar 2015 16:32:52 -0700 (PDT)
-Subject: [PATCH] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-In-Reply-To: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
-References: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
-Message-ID: <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 16:30:06 -0700
+Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
+In-Reply-To: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
+References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
+Message-ID: <20150316233005.GA2598@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Mar 2015, Tomasz Figa wrote:
+* Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
+> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
+> contradiction in it's dependencies.
+> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
+> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
+> enabled. These options inherit a dependency from an enclosing menu,
+> that requires ARCH_MULTIPLATFORM to be 'enabled'.
+> This is a contradiction and made this option also unavailable for
+> non-multiplatform configurations.
+> 
+> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
+> dependencies, the code related to that option is dead and can be
+> removed.
+> 
+> This (logical) defect has been found with the undertaker tool.
+> (https://undertaker.cs.fau.de)
+> 
+> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+> 
+> ---
+> Tony Lindgren suggested to remove the code since nobody complained for
+> a few years and Santosh Shilimkar agreed.
+> https://lkml.org/lkml/2015/2/25/449
+> ---
+> As far as I see, this should remove all the code related to
+> OMAP4_ERRATA_I688, I hope I didn't remove too much.
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 83cd5ac..f081e9e 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1145,18 +1145,31 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->  	}
->  
->  	/*
-> -	 * IOMMU can map any pages, so himem can also be used here
-> +	 * IOMMU can map any pages, so himem can also be used here.
-> +	 * We do not want OOM killer to be invoked as long as we can fall back
-> +	 * to single pages, so we use __GFP_NORETRY for positive orders.
->  	 */
-> -	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
-> +	gfp |= __GFP_NOWARN | __GFP_HIGHMEM | __GFP_NORETRY;
->  
->  	while (count) {
-> -		int j, order = __fls(count);
-> +		int j, order;
->  
-> -		pages[i] = alloc_pages(gfp, order);
-> -		while (!pages[i] && order)
-> -			pages[i] = alloc_pages(gfp, --order);
-> -		if (!pages[i])
-> -			goto error;
-> +		for (order = __fls(count); order; --order) {
-> +			/* Will not trigger OOM. */
-> +			pages[i] = alloc_pages(gfp, order);
-> +			if (pages[i])
-> +				break;
-> +		}
-> +
-> +		if (!pages[i]) {
-> +			/*
-> +			 * Fall back to single page allocation.
-> +			 * Might invoke OOM killer as last resort.
-> +			 */
-> +			pages[i] = alloc_pages(gfp & ~__GFP_NORETRY, 0);
-> +			if (!pages[i])
-> +				goto error;
-> +		}
->  
->  		if (order) {
->  			split_page(pages[i], order);
+Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
 
-I think this makes sense, but the problem is the unconditional setting and 
-clearing of __GFP_NORETRY.  Strictly speaking, gfp may already have 
-__GFP_NORETRY set when calling this function so it would be better to do 
-the loop with alloc_pages(gfp | __GFP_NORETRY, order) and then the 
-fallback as alloc_page(gfp).
+Regards,
+
+Tony
