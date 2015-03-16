@@ -1,61 +1,74 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 16 Mar 2015 03:12:45 -0500
-Subject: [Patch v5 0/2] Add Qualcomm ADM dmaengine driver
-Message-ID: <1426493567-24324-1-git-send-email-agross@codeaurora.org>
+Date: Mon, 16 Mar 2015 03:12:46 -0500
+Subject: [Patch v5 1/2] dt/bindings: qcom_adm: Fix channel specifiers
+In-Reply-To: <1426493567-24324-1-git-send-email-agross@codeaurora.org>
+References: <1426493567-24324-1-git-send-email-agross@codeaurora.org>
+Message-ID: <1426493567-24324-2-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set introduces the dmaengine driver for the Qualcomm Application
-Data Mover (ADM) DMA controller present on MSM8x60, APQ8064, and IPQ8064
-devices.
+This patch removes the crci information from the dma channel property.  At least
+one client device requires using more than one CRCI value for a channel.  This
+does not match the current binding and the crci information needs to be removed.
 
-The initial version of this driver will only support slave DMA operations
-between system memory and peripherals.  Flow control via the CRCI (client rate
-control interface) is supported and can be configured via device tree
-configuration.  Flow control usage is required for some peripheral devices.
+Instead, the client device will provide this information via other means.
 
-Changes from v4:
-  - Fixed copyright date
-  - Fixed error in EE offsets and usage
-  - Changed namespace for registers and fields to ADM specific naming
-  - Removed alloc_chan function
-  - Removed control function and fixed up terminate_all and slave_config
-  - Reworked descriptor processing code to make it more clean
-  - Moved to use of_dma_xlate_by_chan_id
-  - Fixed other small review comments
+Signed-off-by: Andy Gross <agross@codeaurora.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-Changes from v3:
-  - Remove .owner field
-
-Changes from v2:
-  - Removed extraneous achan variable from xlate function
-  - Reworked crci check in slave_sg function
-  - Added mux field to async_desc structure.
-  - Reworked dma start function to use crci and mux values directly from
-    structure.
-  - Added disable of clocks in probe error paths.
-  - Changed to use #define for fixed number of channels.
-
-Changes since v1:
-  - Fixed various review comments
-  - Fixed some descriptor programming issues.
-  - Added single descriptors to support sub burst length transactions.
-    Selection of single or box descriptors depends on the sg length and burst
-    size.
-  - Removed use of crci in the dmas property.  CRCI is now designated via the
-    slave_config structure and will be stored in slave_id.
-
-Andy Gross (2):
-  dt/bindings: qcom_adm: Fix channel specifiers
-  dmaengine: Add ADM driver
-
- Documentation/devicetree/bindings/dma/qcom_adm.txt |   16 +-
- drivers/dma/Kconfig                                |   10 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/qcom_adm.c                             |  896 ++++++++++++++++++++
- 4 files changed, 913 insertions(+), 10 deletions(-)
- create mode 100644 drivers/dma/qcom_adm.c
-
+diff --git a/Documentation/devicetree/bindings/dma/qcom_adm.txt b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+index 9bcab91..38d45f8 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_adm.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_adm.txt
+@@ -4,8 +4,7 @@ Required properties:
+ - compatible: must contain "qcom,adm" for IPQ/APQ8064 and MSM8960
+ - reg: Address range for DMA registers
+ - interrupts: Should contain one interrupt shared by all channels
+-- #dma-cells: must be <2>.  First cell denotes the channel number.  Second cell
+-  denotes CRCI (client rate control interface) flow control assignment.
++- #dma-cells: must be <1>.  First cell denotes the channel number.
+ - clocks: Should contain the core clock and interface clock.
+ - clock-names: Must contain "core" for the core clock and "iface" for the
+   interface clock.
+@@ -22,7 +21,7 @@ Example:
+ 			compatible = "qcom,adm";
+ 			reg = <0x18300000 0x100000>;
+ 			interrupts = <0 170 0>;
+-			#dma-cells = <2>;
++			#dma-cells = <1>;
+ 
+ 			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
+ 			clock-names = "core", "iface";
+@@ -35,15 +34,12 @@ Example:
+ 			qcom,ee = <0>;
+ 		};
+ 
+-DMA clients must use the format descripted in the dma.txt file, using a three
++DMA clients must use the format descripted in the dma.txt file, using a two
+ cell specifier for each channel.
+ 
+-Each dmas request consists of 3 cells:
++Each dmas request consists of two cells:
+  1. phandle pointing to the DMA controller
+  2. channel number
+- 3. CRCI assignment, if applicable.  If no CRCI flow control is required, use 0.
+-    The CRCI is used for flow control.  It identifies the peripheral device that
+-    is the source/destination for the transferred data.
+ 
+ Example:
+ 
+@@ -56,7 +52,7 @@ Example:
+ 
+ 		cs-gpios = <&qcom_pinmux 20 0>;
+ 
+-		dmas = <&adm_dma 6 9>,
+-			<&adm_dma 5 10>;
++		dmas = <&adm_dma 6>,
++			<&adm_dma 5>;
+ 		dma-names = "rx", "tx";
+ 	};
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
