@@ -1,78 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 Mar 2015 09:24:41 +0100
-Subject: [PATCH 8/9] mmmc: core: Keep PM domain powered during ->probe()
- of SDIO func driver
-In-Reply-To: <20150313161014.GR8656@n2100.arm.linux.org.uk>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <1426261429-31883-9-git-send-email-ulf.hansson@linaro.org>
- <20150313161014.GR8656@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFrLnpKGX6f+0s0JYCGRinGfJtEEAcp7VpRvKoo7ZNy3Qw@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 16 Mar 2015 09:32:42 +0100
+Subject: [PATCH] ARM: sunxi: DT: Add stdout-path property
+In-Reply-To: <55068E7C.4060400@redhat.com>
+References: <1426448851-32204-1-git-send-email-maxime.ripard@free-electrons.com>
+ <55068E7C.4060400@redhat.com>
+Message-ID: <CABxcv=kpGpZPUJ855eD5m033u4=t-8=fX6iLWkKudUTf2R7-tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 March 2015 at 17:10, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Mar 13, 2015 at 04:43:48PM +0100, Ulf Hansson wrote:
->> To sucessfully probe some devices their corresponding PM domains may
->> need to be powered.
+Hello Hans,
+
+On Mon, Mar 16, 2015 at 9:04 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> Hi,
+>
+> On 15-03-15 20:47, Maxime Ripard wrote:
 >>
->> Use the dev_pm_domain_get|put() APIs, to control the behavior of the PM
->> domain.
+>> Add UART aliases and stdout-path property for all the Allwinner boards so
+>> that
+>> we won't have to rely on the bootargs' console= value, while working with
+>> legacy bootloaders.
 >>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>  drivers/mmc/core/sdio_bus.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
+>> While we're at it, also remove the mentions of earlyprintk in the
+>> bootargs,
+>> that will remove our default bootargs entirely, and allow the kernel to
+>> boot on
+>> a system even if DEBUG_LL is configured for another system.
 >>
->> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
->> index 71357b8..0d89b4b 100644
->> --- a/drivers/mmc/core/sdio_bus.c
->> +++ b/drivers/mmc/core/sdio_bus.c
->> @@ -320,7 +320,14 @@ int sdio_add_func(struct sdio_func *func)
->>       if (ret)
->>               return ret;
->>
->> +     ret = dev_pm_domain_get(func->dev.pm_domain);
->> +     if (ret) {
->> +             dev_pm_domain_detach(&func->dev, false);
->> +             return ret;
->> +     }
->> +
->>       ret = device_add(&func->dev);
->> +     dev_pm_domain_put(func->dev.pm_domain);
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >
-> This is broken.  It assumes that the device will be probed in device_add().
-> That's not always the case.  Come on Ulf, I'm dismayed at you producing
-> bad and fragile patches like this.  You are the apparent maintainer for
-> several important subsystems, and you are putting yourself up for more,
-> yet you don't seem to know the basics about the kernel infrastructure.
-> That makes you dangerous.
 >
-> Look, device_add() adds the device to the list of available devices,
-> publishes it in sysfs, triggers a uevent, and tries to find a driver to
-> bind it to.
+> Erm, AFAIK stdout-path does not support aliases so you must put full paths
+> in there, see:
 >
-> If it doesn't find a driver already registered in the kernel, that could
-> be because the required driver is a module.  In that case, device_add()
-> will already have returned.
->
-> At some point later, the module will be loaded by user space, and that
-> will cause the list of devices to be scanned, looking for devices which
-> the newly registered driver can bind to.  With your code above, these
-> will _not_ result in the PM domain being "got" before probing.
+> http://git.denx.de/?p=u-boot.git;a=commitdiff;h=f3133962f469a8b6b9ba237ba670f0ca7c88a02e
 >
 
-Indeed this is broken, thank you for spotting this!
+I'm pretty sure it does now, at least I'm using it on an exynos5 board
+and OF_STDOUT_PATH is not defined in u-boot.
 
-For sure I know how the driver model works,  but I have mistakenly
-looked past this for the sdio_bus.
+I believe the issue you are referring too got fix by commit
+7dbe5849fb50 ("of: make sure of_alias is initialized before accessing
+it").
 
-Commit 397a0253527a (mmc: sdio: Convert to
-dev_pm_domain_attach|detach()), should not only have converted to the
-new APIs but also moved the calls into sdio_bus' ->probe() and
-->remove() callbacks.
-
-I will fix this, in one way or the other.
-
-Kind regards
-Uffe
+Best regards,
+Javier
