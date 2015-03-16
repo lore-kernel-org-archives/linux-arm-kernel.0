@@ -1,10 +1,10 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Mon, 16 Mar 2015 20:54:36 +0100
-Subject: [PATCH 26/35 linux-next] hwmon: constify of_device_id array
+Date: Mon, 16 Mar 2015 20:54:37 +0100
+Subject: [PATCH 27/35 linux-next] reset: sti: constify of_device_id array
 In-Reply-To: <1426535685-25996-1-git-send-email-fabf@skynet.be>
 References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
  <1426535685-25996-1-git-send-email-fabf@skynet.be>
-Message-ID: <1426535685-25996-5-git-send-email-fabf@skynet.be>
+Message-ID: <1426535685-25996-6-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,35 +13,49 @@ of_device_id is always used as const.
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- drivers/hwmon/pwm-fan.c  | 2 +-
- drivers/hwmon/vexpress.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/reset/sti/reset-stih407.c | 2 +-
+ drivers/reset/sti/reset-stih415.c | 2 +-
+ drivers/reset/sti/reset-stih416.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 4170728..31d793b 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -322,7 +322,7 @@ static int pwm_fan_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(pwm_fan_pm, pwm_fan_suspend, pwm_fan_resume);
- 
--static struct of_device_id of_pwm_fan_match[] = {
-+static const struct of_device_id of_pwm_fan_match[] = {
- 	{ .compatible = "pwm-fan", },
- 	{},
- };
-diff --git a/drivers/hwmon/vexpress.c b/drivers/hwmon/vexpress.c
-index cf1848b..8ba419d 100644
---- a/drivers/hwmon/vexpress.c
-+++ b/drivers/hwmon/vexpress.c
-@@ -193,7 +193,7 @@ static struct vexpress_hwmon_type vexpress_hwmon_energy = {
- 	},
+diff --git a/drivers/reset/sti/reset-stih407.c b/drivers/reset/sti/reset-stih407.c
+index d83db5d7..e250604 100644
+--- a/drivers/reset/sti/reset-stih407.c
++++ b/drivers/reset/sti/reset-stih407.c
+@@ -126,7 +126,7 @@ static const struct syscfg_reset_controller_data stih407_picophyreset_controller
+ 	.channels = stih407_picophyresets,
  };
  
--static struct of_device_id vexpress_hwmon_of_match[] = {
-+static const struct of_device_id vexpress_hwmon_of_match[] = {
- #if !defined(CONFIG_REGULATOR_VEXPRESS)
+-static struct of_device_id stih407_reset_match[] = {
++static const struct of_device_id stih407_reset_match[] = {
  	{
- 		.compatible = "arm,vexpress-volt",
+ 		.compatible = "st,stih407-powerdown",
+ 		.data = &stih407_powerdown_controller,
+diff --git a/drivers/reset/sti/reset-stih415.c b/drivers/reset/sti/reset-stih415.c
+index 8dad603..fd84238 100644
+--- a/drivers/reset/sti/reset-stih415.c
++++ b/drivers/reset/sti/reset-stih415.c
+@@ -89,7 +89,7 @@ static struct syscfg_reset_controller_data stih415_softreset_controller = {
+ 	.channels = stih415_softresets,
+ };
+ 
+-static struct of_device_id stih415_reset_match[] = {
++static const struct of_device_id stih415_reset_match[] = {
+ 	{ .compatible = "st,stih415-powerdown",
+ 	  .data = &stih415_powerdown_controller, },
+ 	{ .compatible = "st,stih415-softreset",
+diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
+index 79aed70..c7ccaed 100644
+--- a/drivers/reset/sti/reset-stih416.c
++++ b/drivers/reset/sti/reset-stih416.c
+@@ -120,7 +120,7 @@ static struct syscfg_reset_controller_data stih416_softreset_controller = {
+ 	.channels = stih416_softresets,
+ };
+ 
+-static struct of_device_id stih416_reset_match[] = {
++static const struct of_device_id stih416_reset_match[] = {
+ 	{ .compatible = "st,stih416-powerdown",
+ 	  .data = &stih416_powerdown_controller, },
+ 	{ .compatible = "st,stih416-softreset",
 -- 
 2.1.0
