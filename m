@@ -1,188 +1,68 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 16 Mar 2015 16:10:12 +0100
-Subject: [PATCH v2 1/3] iio: adc: vf610: use ADC clock within specification
-In-Reply-To: <1426518614-20201-1-git-send-email-stefan@agner.ch>
-References: <1426518614-20201-1-git-send-email-stefan@agner.ch>
-Message-ID: <1426518614-20201-2-git-send-email-stefan@agner.ch>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Mon, 16 Mar 2015 16:11:35 +0100
+Subject: [PATCH v2 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1426518695.26437.55.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Depending on conversion mode used, the ADC clock (ADCK) needs
-to be below a maximum frequency. According to Vybrid's data
-sheet this is 20MHz for the low power conversion mode.
+On Mon, 2015-03-16 at 15:20 +0100, Gabriel FERNANDEZ wrote:
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+ 
+> +config PCI_ST
+> +	bool "ST PCIe controller"
 
-The ADC clock is depending on input clock, which is the bus
-clock by default. Vybrid SoC are typically clocked at at 400MHz
-or 500MHz, which leads to 66MHz or 83MHz bus clock respectively.
-Hence, a divider of 8 is required to stay below the specified
-maximum clock of 20MHz.
+You add a bool Kconfig symbol. A week or two ago I saw some patches fly
+by that - I think - allowed PCIe controllers to be built modular.
 
-Due to the different bus clock speeds, the resulting sampling
-frequency is not static. Hence use the ADC clock and calculate
-the actual available sampling frequency dynamically.
+> +	depends on ARCH_STI || (ARM && COMPILE_TEST)
+> +	select PCIE_DW
+> +	help
+> +	  Enable PCIe controller support on ST Socs. This controller is based
+> +	  on Designware hardware and therefore the driver re-uses the
+> +	  Designware core functions to implement the driver.
 
-This fixes bogous values observed on some 500MHz clocked Vybrid
-SoC. The resulting value usually showed Bit 9 being stuck at 1,
-or 0, which lead to a value of +/-512.
+> --- a/drivers/pci/host/Makefile
+> +++ b/drivers/pci/host/Makefile
 
-Acked-by: Fugang Duan <B38611@freescale.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/iio/adc/vf610_adc.c | 91 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 61 insertions(+), 30 deletions(-)
+> +obj-$(CONFIG_PCI_ST) += pci-st.o
 
-diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-index 8ec353c..e63b8e7 100644
---- a/drivers/iio/adc/vf610_adc.c
-+++ b/drivers/iio/adc/vf610_adc.c
-@@ -141,9 +141,13 @@ struct vf610_adc {
- 	struct regulator *vref;
- 	struct vf610_adc_feature adc_feature;
- 
-+	u32 sample_freq_avail[5];
-+
- 	struct completion completion;
- };
- 
-+static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-+
- #define VF610_ADC_CHAN(_idx, _chan_type) {			\
- 	.type = (_chan_type),					\
- 	.indexed = 1,						\
-@@ -180,35 +184,47 @@ static const struct iio_chan_spec vf610_adc_iio_channels[] = {
- 	/* sentinel */
- };
- 
--/*
-- * ADC sample frequency, unit is ADCK cycles.
-- * ADC clk source is ipg clock, which is the same as bus clock.
-- *
-- * ADC conversion time = SFCAdder + AverageNum x (BCT + LSTAdder)
-- * SFCAdder: fixed to 6 ADCK cycles
-- * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
-- * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
-- * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
-- *
-- * By default, enable 12 bit resolution mode, clock source
-- * set to ipg clock, So get below frequency group:
-- */
--static const u32 vf610_sample_freq_avail[5] =
--{1941176, 559332, 286957, 145374, 73171};
-+static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
-+{
-+	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
-+	int i;
-+
-+	/*
-+	 * Calculate ADC sample frequencies
-+	 * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
-+	 * which is the same as bus clock.
-+	 *
-+	 * ADC conversion time = SFCAdder + AverageNum x (BCT + LSTAdder)
-+	 * SFCAdder: fixed to 6 ADCK cycles
-+	 * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
-+	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
-+	 * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
-+	 */
-+	adck_rate = ipg_rate / info->adc_feature.clk_div;
-+	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
-+		info->sample_freq_avail[i] =
-+			adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
-+}
- 
- static inline void vf610_adc_cfg_init(struct vf610_adc *info)
- {
-+	struct vf610_adc_feature *adc_feature = &info->adc_feature;
-+
- 	/* set default Configuration for ADC controller */
--	info->adc_feature.clk_sel = VF610_ADCIOC_BUSCLK_SET;
--	info->adc_feature.vol_ref = VF610_ADCIOC_VR_VREF_SET;
-+	adc_feature->clk_sel = VF610_ADCIOC_BUSCLK_SET;
-+	adc_feature->vol_ref = VF610_ADCIOC_VR_VREF_SET;
-+
-+	adc_feature->calibration = true;
-+	adc_feature->ovwren = true;
-+
-+	adc_feature->res_mode = 12;
-+	adc_feature->sample_rate = 1;
-+	adc_feature->lpm = true;
- 
--	info->adc_feature.calibration = true;
--	info->adc_feature.ovwren = true;
-+	/* Use a save ADCK which is below 20MHz on all devices */
-+	adc_feature->clk_div = 8;
- 
--	info->adc_feature.clk_div = 1;
--	info->adc_feature.res_mode = 12;
--	info->adc_feature.sample_rate = 1;
--	info->adc_feature.lpm = true;
-+	vf610_adc_calculate_rates(info);
- }
- 
- static void vf610_adc_cfg_post_set(struct vf610_adc *info)
-@@ -290,12 +306,10 @@ static void vf610_adc_cfg_set(struct vf610_adc *info)
- 
- 	cfg_data = readl(info->regs + VF610_REG_ADC_CFG);
- 
--	/* low power configuration */
- 	cfg_data &= ~VF610_ADC_ADLPC_EN;
- 	if (adc_feature->lpm)
- 		cfg_data |= VF610_ADC_ADLPC_EN;
- 
--	/* disable high speed */
- 	cfg_data &= ~VF610_ADC_ADHSC_EN;
- 
- 	writel(cfg_data, info->regs + VF610_REG_ADC_CFG);
-@@ -435,10 +449,27 @@ static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static IIO_CONST_ATTR_SAMP_FREQ_AVAIL("1941176, 559332, 286957, 145374, 73171");
-+static ssize_t vf610_show_samp_freq_avail(struct device *dev,
-+				struct device_attribute *attr, char *buf)
-+{
-+	struct vf610_adc *info = iio_priv(dev_to_iio_dev(dev));
-+	size_t len = 0;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(info->sample_freq_avail); i++)
-+		len += scnprintf(buf + len, PAGE_SIZE - len,
-+			"%u ", info->sample_freq_avail[i]);
-+
-+	/* replace trailing space by newline */
-+	buf[len - 1] = '\n';
-+
-+	return len;
-+}
-+
-+static IIO_DEV_ATTR_SAMP_FREQ_AVAIL(vf610_show_samp_freq_avail);
- 
- static struct attribute *vf610_attributes[] = {
--	&iio_const_attr_sampling_frequency_available.dev_attr.attr,
-+	&iio_dev_attr_sampling_frequency_available.dev_attr.attr,
- 	NULL
- };
- 
-@@ -502,7 +533,7 @@ static int vf610_read_raw(struct iio_dev *indio_dev,
- 		return IIO_VAL_FRACTIONAL_LOG2;
- 
- 	case IIO_CHAN_INFO_SAMP_FREQ:
--		*val = vf610_sample_freq_avail[info->adc_feature.sample_rate];
-+		*val = info->sample_freq_avail[info->adc_feature.sample_rate];
- 		*val2 = 0;
- 		return IIO_VAL_INT;
- 
-@@ -525,9 +556,9 @@ static int vf610_write_raw(struct iio_dev *indio_dev,
- 	switch (mask) {
- 		case IIO_CHAN_INFO_SAMP_FREQ:
- 			for (i = 0;
--				i < ARRAY_SIZE(vf610_sample_freq_avail);
-+				i < ARRAY_SIZE(info->sample_freq_avail);
- 				i++)
--				if (val == vf610_sample_freq_avail[i]) {
-+				if (val == info->sample_freq_avail[i]) {
- 					info->adc_feature.sample_rate = i;
- 					vf610_adc_sample_set(info);
- 					return 0;
--- 
-2.3.3
+If you keep that symbol bool this objectfile will never be part of a
+module.
+
+> diff --git a/drivers/pci/host/pci-st.c b/drivers/pci/host/pci-st.c
+> new file mode 100644
+> index 0000000..470000d
+> --- /dev/null
+> +++ b/drivers/pci/host/pci-st.c
+
+> +#include <linux/module.h>
+
+For built-in code this include is, probably, not needed.
+
+> +MODULE_DEVICE_TABLE(of, st_pcie_of_match);
+
+For built-in code that macro will always be preprocessed away.
+
+> +/* ST PCIe driver does not allow module unload */
+> +static int __init pcie_init(void)
+> +{
+> +	return platform_driver_probe(&st_pcie_driver, st_pcie_probe);
+> +}
+> +device_initcall(pcie_init);
+
+I think the module unload comment is a bit odd for built-in only code.
+
+> +MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
+> +MODULE_DESCRIPTION("PCI express Driver for ST SoCs");
+> +MODULE_LICENSE("GPL v2");
+
+These three macros will be, basically, always preprocessed away as long
+as this code can't be built to be modular.
+
+
+Paul Bolle
