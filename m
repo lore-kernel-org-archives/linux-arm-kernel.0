@@ -1,40 +1,41 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 15:04:29 -0700
-Subject: [PATCH v3 0/3] ARM: dts: add openpandora device support
-In-Reply-To: <1425072399-23152-1-git-send-email-marek@goldelico.com>
-References: <1425072399-23152-1-git-send-email-marek@goldelico.com>
-Message-ID: <20150316220429.GM12397@atomide.com>
+Date: Mon, 16 Mar 2015 15:08:38 -0700
+Subject: [PATCH v2 3/3] ARM: dts: AM4372: update hdq compatible property
+In-Reply-To: <1425293374-30878-4-git-send-email-vigneshr@ti.com>
+References: <1425293374-30878-1-git-send-email-vigneshr@ti.com>
+ <1425293374-30878-4-git-send-email-vigneshr@ti.com>
+Message-ID: <20150316220837.GN12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marek Belisko <marek@goldelico.com> [150227 13:30]:
-> changes from v2:
-> - fix missing PIN_INPUT for penirq node
-> - added Reviewed-by and Tested-by
+* Vignesh R <vigneshr@ti.com> [150302 02:53]:
+> This patch updates hdq node compatible property to "ti,am4372-hdq".
 > 
-> changes from v1:
-> - add new boards to makefile in patch 2,3 (don't add them
-> in separate commit together), fix gpmc issues (reported by Tony Lindgren)
-> 
-> - fix various issues reported by Grazvydas Ignotas
-> (drop internal pullups from pinmux as external are in place,
-> fix gpio buttons active state ...)
-> 
-> This series of patches adds initial device tree support for the
-> OpenPandora. The most important parts are working (display, keyboard,
-> touch, charging, fuel gauge, musb port, sd/mmc ports, leds, buttons).
-> Not yet supported are: usb host port, nubs, wifi, bluetooth, audio.
-> 
-> First patch add common dtsi file which is then used in 600mhz and 1ghz
-> variants of openpandora which support is added in patches 2 and 3.
-> 
-> H. Nikolaus Schaller (3):
->   ARM: dts: omap3-pandora: add common device tree
->   ARM: dts: omap3-pandora: add OMAP3530 600 MHz version
->   ARM: dts: omap3-pandora: add DM3730 1 GHz version
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Thanks everybody for doing this, applying into omap-for-v4.1/dt.
-
-Regards,
+Looks like this is safe to apply even with the driver changes pending
+as the driver is currently only parsing ti,omap3-1w property.
+So applying this patch into omap-for-v4.1/dt thanks.
 
 Tony
+
+> ---
+>  arch/arm/boot/dts/am4372.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> index 1943fc333e7c..ae0e8c15a6df 100644
+> --- a/arch/arm/boot/dts/am4372.dtsi
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -884,7 +884,7 @@
+>  		};
+>  
+>  		hdq: hdq at 48347000 {
+> -			compatible = "ti,am43xx-hdq";
+> +			compatible = "ti,am4372-hdq";
+>  			reg = <0x48347000 0x1000>;
+>  			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&func_12m_clk>;
+> -- 
+> 1.9.1
+> 
