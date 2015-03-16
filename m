@@ -1,173 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 16 Mar 2015 13:55:03 +0100
-Subject: [GIT PULL 5/5] arm/arm64: KVM: Keep elrsr/aisr in sync with software
- model
-In-Reply-To: <1426510503-27995-1-git-send-email-christoffer.dall@linaro.org>
-References: <1426510503-27995-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1426510503-27995-6-git-send-email-christoffer.dall@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Mar 2015 13:04:19 +0000
+Subject: Versatile Express randomly fails to boot - Versatile Express to
+ be removed from nightly testing
+In-Reply-To: <20150316093553.GF8656@n2100.arm.linux.org.uk>
+References: <20150315213330.GB8656@n2100.arm.linux.org.uk>
+ <20150316000438.GD8656@n2100.arm.linux.org.uk>
+ <20150316004239.GE8656@n2100.arm.linux.org.uk>
+ <20150316093553.GF8656@n2100.arm.linux.org.uk>
+Message-ID: <20150316130419.GI8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an interesting bug in the vgic code, which manifests itself
-when the KVM run loop has a signal pending or needs a vmid generation
-rollover after having disabled interrupts but before actually switching
-to the guest.
+On Mon, Mar 16, 2015 at 09:35:53AM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 16, 2015 at 12:42:39AM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Mar 16, 2015 at 12:04:38AM +0000, Russell King - ARM Linux wrote:
+> > > On Sun, Mar 15, 2015 at 09:33:30PM +0000, Russell King - ARM Linux wrote:
+> > > > I'm going to try a few other kernels to try and track down what's going
+> > > > on - whether something from arm-soc or my tree is responsible for this
+> > > > really weird behaviour.
+> > > 
+> > > Okay, this is weird - it seems that it's caused by the FIQ oops
+> > > dumping code/FIQ changes which I've carried for many months
+> > > unchanged in my tree.
+> > 
+> > More weirdness.  Progressing forwards through my development code
+> > showed that when I merged the patch I mentioned in the previous mail,
+> > things started to fail.
+> > 
+> > As I also mentioned, I'd drop that branch (two patches, one adding
+> > the IPI backtrace stuff and the second one updating the GIC to allow
+> > it to raise FIQs on suitably equipped platforms.)  I would have
+> > expected that to have worked, but it just failed after four boot
+> > iterations.  So either it's not the FIQ, or it is the FIQ code _and_
+> > also something else.  Or it has something to do with the placement
+> > of functions in the kernel.
+> > 
+> > I'll try more stuff tomorrow, working from where I presently am
+> > (which is basically last night's code minus the FIQ changes) by
+> > removing other changes to see what brings us back to a working
+> > system.
+> > 
+> > As I've already said - this is really weird because all of these
+> > changes were also tested against -rc1... those which weren't are:
+> > 
+> > mm: fold arch_randomize_brk into ARCH_HAS_ELF_RANDOMIZE
+> > mm: split ET_DYN ASLR from mmap ASLR
+> > mm: move randomize_et_dyn into ELF_ET_DYN_BASE
+> > mm: expose arch_mmap_rnd when available
+> > arm: factor out mmap ASLR into mmap_rnd
+> > 
+> > and a number of clkdev rework patches (to make it use clk_hw
+> > internally.)  Neither of these should be affecting it, but that's
+> > something I will be testing tomorrow.
+> 
+> Okay, reverting the ASLR changes and the clkdev changes annoyingly still
+> results in random failure.
 
-In this case, we flush the vgic as usual, but we sync back the vgic
-state and exit to userspace before entering the guest.  The consequence
-is that we will be syncing the list registers back to the software model
-using the GICH_ELRSR and GICH_EISR from the last execution of the guest,
-potentially overwriting a list register containing an interrupt.
+After ruling out ASLR and clkdev, I started progressively reverting other
+stuff in the build tree.  Eventually, I got down to reverting the L2C
+change I've been carrying since the L2C cleanups.
 
-This showed up during migration testing where we would capture a state
-where the VM has masked the arch timer but there were no interrupts,
-resulting in a hung test.
+With that lot reverted, which is slightly more than the previously known
+good test, it booted five times without issue.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reported-by: Alex Bennee <alex.bennee@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_vgic.h |  1 +
- virt/kvm/arm/vgic-v2.c |  8 ++++++++
- virt/kvm/arm/vgic-v3.c |  8 ++++++++
- virt/kvm/arm/vgic.c    | 16 ++++++++++++++++
- 4 files changed, 33 insertions(+)
+So, I thought I'd add that L2C change to the list of bad commits, and try
+omitting _just_ the L2C and FIQ changes... and it still fails - on the
+first test boot iteration.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 7c55dd5..66203b2 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -114,6 +114,7 @@ struct vgic_ops {
- 	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
-+	void	(*clear_eisr)(struct kvm_vcpu *vcpu);
- 	u32	(*get_interrupt_status)(const struct kvm_vcpu *vcpu);
- 	void	(*enable_underflow)(struct kvm_vcpu *vcpu);
- 	void	(*disable_underflow)(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index a0a7b5d..f9b9c7c 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -72,6 +72,8 @@ static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
- {
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
-+	else
-+		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr &= ~(1ULL << lr);
- }
- 
- static u64 vgic_v2_get_elrsr(const struct kvm_vcpu *vcpu)
-@@ -84,6 +86,11 @@ static u64 vgic_v2_get_eisr(const struct kvm_vcpu *vcpu)
- 	return vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr;
- }
- 
-+static void vgic_v2_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_eisr = 0;
-+}
-+
- static u32 vgic_v2_get_interrupt_status(const struct kvm_vcpu *vcpu)
- {
- 	u32 misr = vcpu->arch.vgic_cpu.vgic_v2.vgic_misr;
-@@ -148,6 +155,7 @@ static const struct vgic_ops vgic_v2_ops = {
- 	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
-+	.clear_eisr		= vgic_v2_clear_eisr,
- 	.get_interrupt_status	= vgic_v2_get_interrupt_status,
- 	.enable_underflow	= vgic_v2_enable_underflow,
- 	.disable_underflow	= vgic_v2_disable_underflow,
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 3a62d8a..dff0602 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -104,6 +104,8 @@ static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
- {
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
-+	else
-+		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr &= ~(1U << lr);
- }
- 
- static u64 vgic_v3_get_elrsr(const struct kvm_vcpu *vcpu)
-@@ -116,6 +118,11 @@ static u64 vgic_v3_get_eisr(const struct kvm_vcpu *vcpu)
- 	return vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr;
- }
- 
-+static void vgic_v3_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_eisr = 0;
-+}
-+
- static u32 vgic_v3_get_interrupt_status(const struct kvm_vcpu *vcpu)
- {
- 	u32 misr = vcpu->arch.vgic_cpu.vgic_v3.vgic_misr;
-@@ -192,6 +199,7 @@ static const struct vgic_ops vgic_v3_ops = {
- 	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v3_get_elrsr,
- 	.get_eisr		= vgic_v3_get_eisr,
-+	.clear_eisr		= vgic_v3_clear_eisr,
- 	.get_interrupt_status	= vgic_v3_get_interrupt_status,
- 	.enable_underflow	= vgic_v3_enable_underflow,
- 	.disable_underflow	= vgic_v3_disable_underflow,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 4b2c2e7..c9f60f5 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -883,6 +883,11 @@ static inline u64 vgic_get_eisr(struct kvm_vcpu *vcpu)
- 	return vgic_ops->get_eisr(vcpu);
- }
- 
-+static inline void vgic_clear_eisr(struct kvm_vcpu *vcpu)
-+{
-+	vgic_ops->clear_eisr(vcpu);
-+}
-+
- static inline u32 vgic_get_interrupt_status(struct kvm_vcpu *vcpu)
- {
- 	return vgic_ops->get_interrupt_status(vcpu);
-@@ -922,6 +927,7 @@ static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu)
- 	vgic_set_lr(vcpu, lr_nr, vlr);
- 	clear_bit(lr_nr, vgic_cpu->lr_used);
- 	vgic_cpu->vgic_irq_lr_map[irq] = LR_EMPTY;
-+	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
- 
- /*
-@@ -978,6 +984,7 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 			BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
- 			vlr.state |= LR_STATE_PENDING;
- 			vgic_set_lr(vcpu, lr, vlr);
-+			vgic_sync_lr_elrsr(vcpu, lr, vlr);
- 			return true;
- 		}
- 	}
-@@ -999,6 +1006,7 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
- 		vlr.state |= LR_EOI_INT;
- 
- 	vgic_set_lr(vcpu, lr, vlr);
-+	vgic_sync_lr_elrsr(vcpu, lr, vlr);
- 
- 	return true;
- }
-@@ -1136,6 +1144,14 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	if (status & INT_STATUS_UNDERFLOW)
- 		vgic_disable_underflow(vcpu);
- 
-+	/*
-+	 * In the next iterations of the vcpu loop, if we sync the vgic state
-+	 * after flushing it, but before entering the guest (this happens for
-+	 * pending signals and vmid rollovers), then make sure we don't pick
-+	 * up any old maintenance interrupts here.
-+	 */
-+	vgic_clear_eisr(vcpu);
-+
- 	return level_pending;
- }
- 
+I think I'm going to declare that this is all down to some obscure
+hardware problem with Versatile Express, which is tickled by the layout
+of the kernel against the cache, and take it out of the nightly system
+(it's pointless having unstable hardware being tested; random failures
+are completely meaningless.)
+
 -- 
-2.1.2.330.g565301e.dirty
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
