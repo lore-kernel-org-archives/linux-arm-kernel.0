@@ -1,114 +1,52 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 15:17:40 -0700
-Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
-In-Reply-To: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <20150316221740.GQ12397@atomide.com>
+Date: Mon, 16 Mar 2015 15:20:44 -0700
+Subject: [PATCH v2 0/2] ARM: devicetree: Remove unused ti,codec property
+In-Reply-To: <55068350.9080500@ti.com>
+References: <1426279237-15940-1-git-send-email-marek@goldelico.com>
+ <55068350.9080500@ti.com>
+Message-ID: <20150316222044.GR12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lad Prabhakar <prabhakar.csengg@gmail.com> [150312 16:38]:
-> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150316 00:16]:
+> On 03/13/2015 10:40 PM, Marek Belisko wrote:
+> > ti,codec in not parsed in omap-twl4030 sound driver. It's not necessary
+> > to specify this property in DT because ti,twl4030-audio which ti,codec
+> > was pointing to by phandle is mfd driver and device for ASoC ic created w/o
+> > any DT property (codec name is hardcoded in ASoC driver).
+> > 
+> > Please see reply [1] from Peter Ujfalusi.
 > 
-> this patch does the following:
-> 1: adds DT node for fixed oscillator.
-> 2: adds DT node entries for ov2659 sensor
-> 3: adds remote-endpoint entry for VPFE.
+> All:
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+Applying both into omap-for-v4.1/dt thanks.
+
+Tony 
+ 
+> > Changes from v1:
+> > - keep ti,codec property in Documentation as optional that the
+> > existing dtbs do not become noncompliant after the change
+> > 
+> > [1]: http://comments.gmane.org/gmane.linux.ports.arm.omap/124273
+> > 
+> > Marek Belisko (2):
+> >   ARM: dts: omap3: Remove all references to ti,codec property
+> >   Documentation: omap-twl4030: Move ti,codec property to optional
+> > 
+> >  Documentation/devicetree/bindings/sound/omap-twl4030.txt | 3 +--
+> >  arch/arm/boot/dts/omap3-beagle-xm.dts                    | 1 -
+> >  arch/arm/boot/dts/omap3-beagle.dts                       | 1 -
+> >  arch/arm/boot/dts/omap3-cm-t3x30.dtsi                    | 1 -
+> >  arch/arm/boot/dts/omap3-devkit8000.dts                   | 1 -
+> >  arch/arm/boot/dts/omap3-gta04.dtsi                       | 1 -
+> >  arch/arm/boot/dts/omap3-igep.dtsi                        | 1 -
+> >  arch/arm/boot/dts/omap3-lilly-a83x.dtsi                  | 1 -
+> >  arch/arm/boot/dts/omap3-overo-base.dtsi                  | 1 -
+> >  arch/arm/boot/dts/omap3-tao3530.dtsi                     | 1 -
+> >  10 files changed, 1 insertion(+), 11 deletions(-)
+> > 
 > 
-> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-
-Applying into omap-for-v4.1/dt thanks.
-
-Tony
-
-> ---
->  Note this patch depends on
->  https://patchwork.kernel.org/patch/6000161/
->  
->  arch/arm/boot/dts/am437x-gp-evm.dts | 42 +++++++++++++++++++++++++++++++++++--
->  1 file changed, 40 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-> index f84d971..195f452 100644
-> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-> @@ -106,6 +106,14 @@
->  			};
->  		};
->  	};
-> +
-> +	/* fixed 12MHz oscillator */
-> +	refclk: oscillator {
-> +		#clock-cells = <0>;
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <12000000>;
-> +	};
-> +
->  };
->  
->  &am43xx_pinmux {
-> @@ -404,6 +412,21 @@
->  			regulator-always-on;
->  		};
->  	};
-> +
-> +	ov2659 at 30 {
-> +		compatible = "ovti,ov2659";
-> +		reg = <0x30>;
-> +
-> +		clocks = <&refclk 0>;
-> +		clock-names = "xvclk";
-> +
-> +		port {
-> +			ov2659_0: endpoint {
-> +				remote-endpoint = <&vpfe1_ep>;
-> +				link-frequencies = /bits/ 64 <70000000>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -423,6 +446,21 @@
->  		touchscreen-size-x = <1024>;
->  		touchscreen-size-y = <600>;
->  	};
-> +
-> +	ov2659 at 30 {
-> +		compatible = "ovti,ov2659";
-> +		reg = <0x30>;
-> +
-> +		clocks = <&refclk 0>;
-> +		clock-names = "xvclk";
-> +
-> +		port {
-> +			ov2659_1: endpoint {
-> +				remote-endpoint = <&vpfe0_ep>;
-> +				link-frequencies = /bits/ 64 <70000000>;
-> +			};
-> +		};
-> +	};
->  };
->  
->  &epwmss0 {
-> @@ -626,7 +664,7 @@
->  
->  	port {
->  		vpfe0_ep: endpoint {
-> -			/* remote-endpoint = <&sensor>; add once we have it */
-> +			remote-endpoint = <&ov2659_1>;
->  			ti,am437x-vpfe-interface = <0>;
->  			bus-width = <8>;
->  			hsync-active = <0>;
-> @@ -643,7 +681,7 @@
->  
->  	port {
->  		vpfe1_ep: endpoint {
-> -			/* remote-endpoint = <&sensor>; add once we have it */
-> +			remote-endpoint = <&ov2659_0>;
->  			ti,am437x-vpfe-interface = <0>;
->  			bus-width = <8>;
->  			hsync-active = <0>;
 > -- 
-> 2.1.0
-> 
+> P?ter
