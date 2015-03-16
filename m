@@ -1,51 +1,61 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 16:19:35 -0700
-Subject: [PATCH v2] MAINTAINERS: add OMAP defconfigs under OMAP SUPPORT
-In-Reply-To: <1421705633-29056-1-git-send-email-balbi@ti.com>
-References: <1421705633-29056-1-git-send-email-balbi@ti.com>
-Message-ID: <20150316231934.GW12397@atomide.com>
+Date: Mon, 16 Mar 2015 16:22:01 -0700
+Subject: [PATCH] ARM: omap-device: add missed callback for suspend-to-disk
+In-Reply-To: <20150225155627.GP11056@atomide.com>
+References: <1424873630-6054-1-git-send-email-grygorii.strashko@linaro.org>
+ <20150225154445.GO11056@atomide.com> <54EDEFC9.606@ti.com>
+ <20150225155627.GP11056@atomide.com>
+Message-ID: <20150316232200.GX12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150119 14:18]:
-> omap2plus_defconfig and omap1_defconfig are also
-> part of the OMAP Support maintained, because of
-> that it's best to list them under OMAP SUPPORT on
-> MAINTAINERS so people know to Cc linux-omap when
-> patching them.
+* Tony Lindgren <tony@atomide.com> [150225 08:10]:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [150225 07:56]:
+> > On 02/25/2015 05:44 PM, Tony Lindgren wrote:
+> > >* grygorii.strashko at linaro.org <grygorii.strashko@linaro.org> [150225 06:17]:
+> > >>From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+> > >>
+> > >>Add missed callback needed for supporting suspend-to-disk (hibernation) mode.
+> > >
+> > >Is this needed as a fix for the -rc series or are there still
+> > >other missing dependencies?
+> > >
+> > 
+> > This one is not critical fix.
 > 
-> Reported-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> OK thanks for confirming that.
 
-Applying into omap-for-v4.1/fixes-not-urgent thanks.
-
-Tony
-
-> ---
+Applying into omap-for-v4.1/soc thanks.
+ 
+> Tony
 > 
-> Add omap1_defconfig too
+> > >>Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+> > >>---
+> > >>  arch/arm/mach-omap2/omap_device.c | 3 +++
+> > >>  1 file changed, 3 insertions(+)
+> > >>
+> > >>diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+> > >>index fcd2c9e..345e18e 100644
+> > >>--- a/arch/arm/mach-omap2/omap_device.c
+> > >>+++ b/arch/arm/mach-omap2/omap_device.c
+> > >>@@ -739,6 +739,9 @@ struct dev_pm_domain omap_device_pm_domain = {
+> > >>  		USE_PLATFORM_PM_SLEEP_OPS
+> > >>  		.suspend_noirq = _od_suspend_noirq,
+> > >>  		.resume_noirq = _od_resume_noirq,
+> > >>+		.freeze_noirq = _od_suspend_noirq,
+> > >>+		.thaw_noirq = _od_resume_noirq,
+> > >>+		.restore_noirq = _od_resume_noirq,
+> > >>  	}
+> > >>  };
+> > >>
+> > >>--
+> > >>1.9.1
+> > >>
+> > 
+> > regards,
+> > -grygorii
 > 
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 97de006f38f0..7423e9759187 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6783,6 +6783,8 @@ Q:	http://patchwork.kernel.org/project/linux-omap/list/
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
->  S:	Maintained
->  F:	arch/arm/*omap*/
-> +F:	arch/arm/configs/omap1_defconfig
-> +F:	arch/arm/configs/omap2plus_defconfig
->  F:	drivers/i2c/busses/i2c-omap.c
->  F:	drivers/irqchip/irq-omap-intc.c
->  F:	drivers/mfd/*omap*.c
-> -- 
-> 2.2.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
