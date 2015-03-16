@@ -1,223 +1,301 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 16 Mar 2015 23:44:37 +0100
-Subject: [PATCH 01/10] ARM: at91/pm: move the standby functions to pm.c
+Date: Mon, 16 Mar 2015 23:44:40 +0100
+Subject: [PATCH 04/10] ARM: at91: drop sam9_smc.c
 In-Reply-To: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426545886-19162-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426545886-19162-5-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The standby functions are now only used in pm.c, move them there.
-
-Also, they are not inlined as a pointer to those functions is passed to the
-cpuidle driver.
+sam9_smc.c has no users anymore, remove it along with both sam9_smc.h and
+mach/at91sam9_smc.h
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/pm.h | 92 -------------------------------------------------
- 2 files changed, 89 insertions(+), 92 deletions(-)
+ arch/arm/mach-at91/Makefile                    |   2 -
+ arch/arm/mach-at91/include/mach/at91sam9_smc.h |  98 ------------------
+ arch/arm/mach-at91/sam9_smc.c                  | 136 -------------------------
+ arch/arm/mach-at91/sam9_smc.h                  |  11 --
+ 4 files changed, 247 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9_smc.h
+ delete mode 100644 arch/arm/mach-at91/sam9_smc.c
+ delete mode 100644 arch/arm/mach-at91/sam9_smc.h
 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index f93a735ba327..5062699cbb12 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -222,6 +222,95 @@ static void at91_pm_set_standby(void (*at91_standby)(void))
- 		at91_cpuidle_device.dev.platform_data = at91_standby;
- }
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 06a4cefd33a0..3586d977e99d 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -6,8 +6,6 @@ asflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
  
-+/*
-+ * The AT91RM9200 goes into self-refresh mode with this command, and will
-+ * terminate self-refresh automatically on the next SDRAM access.
-+ *
-+ * Self-refresh mode is exited as soon as a memory access is made, but we don't
-+ * know for sure when that happens. However, we need to restore the low-power
-+ * mode if it was enabled before going idle. Restoring low-power mode while
-+ * still in self-refresh is "not recommended", but seems to work.
-+ */
-+static void at91rm9200_standby(void)
-+{
-+	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
-+
-+	asm volatile(
-+		"b    1f\n\t"
-+		".align    5\n\t"
-+		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
-+		"    str    %0, [%1, %2]\n\t"
-+		"    str    %3, [%1, %4]\n\t"
-+		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
-+		"    str    %5, [%1, %2]"
-+		:
-+		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
-+		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
-+		  "r" (lpr));
-+}
-+
-+/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-+ * remember.
-+ */
-+static void at91_ddr_standby(void)
-+{
-+	/* Those two values allow us to delay self-refresh activation
-+	 * to the maximum. */
-+	u32 lpr0, lpr1 = 0;
-+	u32 saved_lpr0, saved_lpr1 = 0;
-+
-+	if (at91_ramc_base[1]) {
-+		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
-+		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
-+		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
-+	}
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
-+	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
-+
-+	/* self-refresh mode now */
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
-+	if (at91_ramc_base[1])
-+		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
-+
-+	cpu_do_idle();
-+
-+	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
-+	if (at91_ramc_base[1])
-+		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
-+}
-+
-+/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-+ * remember.
-+ */
-+static void at91sam9_sdram_standby(void)
-+{
-+	u32 lpr0, lpr1 = 0;
-+	u32 saved_lpr0, saved_lpr1 = 0;
-+
-+	if (at91_ramc_base[1]) {
-+		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
-+		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
-+		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
-+	}
-+
-+	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
-+	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
-+	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
-+
-+	/* self-refresh mode now */
-+	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
-+	if (at91_ramc_base[1])
-+		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
-+
-+	cpu_do_idle();
-+
-+	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
-+	if (at91_ramc_base[1])
-+		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
-+}
-+
- static const struct of_device_id ramc_ids[] __initconst = {
- 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
- 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
-diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
-index dcacfa1ad3fa..3223967d3460 100644
---- a/arch/arm/mach-at91/pm.h
-+++ b/arch/arm/mach-at91/pm.h
-@@ -23,96 +23,4 @@
+ obj-y		:= soc.o
  
- #define	AT91_PM_SLOW_CLOCK	0x01
- 
+-obj-$(CONFIG_SOC_AT91SAM9)	+= sam9_smc.o
+-
+ # CPU-specific support
+ obj-$(CONFIG_SOC_AT91RM9200)	+= at91rm9200.o
+ obj-$(CONFIG_SOC_AT91SAM9)	+= at91sam9.o
+diff --git a/arch/arm/mach-at91/include/mach/at91sam9_smc.h b/arch/arm/mach-at91/include/mach/at91sam9_smc.h
+deleted file mode 100644
+index ff54a0ce90e3..000000000000
+--- a/arch/arm/mach-at91/include/mach/at91sam9_smc.h
++++ /dev/null
+@@ -1,98 +0,0 @@
 -/*
-- * The AT91RM9200 goes into self-refresh mode with this command, and will
-- * terminate self-refresh automatically on the next SDRAM access.
+- * arch/arm/mach-at91/include/mach/at91sam9_smc.h
 - *
-- * Self-refresh mode is exited as soon as a memory access is made, but we don't
-- * know for sure when that happens. However, we need to restore the low-power
-- * mode if it was enabled before going idle. Restoring low-power mode while
-- * still in self-refresh is "not recommended", but seems to work.
+- * Copyright (C) 2007 Andrew Victor
+- * Copyright (C) 2007 Atmel Corporation.
+- *
+- * Static Memory Controllers (SMC) - System peripherals registers.
+- * Based on AT91SAM9261 datasheet revision D.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
 - */
+-
+-#ifndef AT91SAM9_SMC_H
+-#define AT91SAM9_SMC_H
 -
 -#ifndef __ASSEMBLY__
--static inline void at91rm9200_standby(void)
--{
--	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
+-struct sam9_smc_config {
+-	/* Setup register */
+-	u8 ncs_read_setup;
+-	u8 nrd_setup;
+-	u8 ncs_write_setup;
+-	u8 nwe_setup;
 -
--	asm volatile(
--		"b    1f\n\t"
--		".align    5\n\t"
--		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
--		"    str    %0, [%1, %2]\n\t"
--		"    str    %3, [%1, %4]\n\t"
--		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
--		"    str    %5, [%1, %2]"
--		:
--		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
--		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
--		  "r" (lpr));
--}
+-	/* Pulse register */
+-	u8 ncs_read_pulse;
+-	u8 nrd_pulse;
+-	u8 ncs_write_pulse;
+-	u8 nwe_pulse;
 -
--/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-- * remember.
-- */
--static inline void at91_ddr_standby(void)
--{
--	/* Those two values allow us to delay self-refresh activation
--	 * to the maximum. */
--	u32 lpr0, lpr1 = 0;
--	u32 saved_lpr0, saved_lpr1 = 0;
+-	/* Cycle register */
+-	u16 read_cycle;
+-	u16 write_cycle;
 -
--	if (at91_ramc_base[1]) {
--		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
--		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
--		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
--	}
+-	/* Mode register */
+-	u32 mode;
+-	u8 tdf_cycles:4;
+-};
 -
--	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
--	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
--	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+-extern void sam9_smc_configure(int id, int cs, struct sam9_smc_config *config);
+-extern void sam9_smc_read(int id, int cs, struct sam9_smc_config *config);
+-extern void sam9_smc_read_mode(int id, int cs, struct sam9_smc_config *config);
+-extern void sam9_smc_write_mode(int id, int cs, struct sam9_smc_config *config);
+-#endif
 -
--	/* self-refresh mode now */
--	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
--	if (at91_ramc_base[1])
--		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+-#define AT91_SMC_SETUP		0x00				/* Setup Register for CS n */
+-#define		AT91_SMC_NWESETUP	(0x3f << 0)			/* NWE Setup Length */
+-#define			AT91_SMC_NWESETUP_(x)	((x) << 0)
+-#define		AT91_SMC_NCS_WRSETUP	(0x3f << 8)			/* NCS Setup Length in Write Access */
+-#define			AT91_SMC_NCS_WRSETUP_(x)	((x) << 8)
+-#define		AT91_SMC_NRDSETUP	(0x3f << 16)			/* NRD Setup Length */
+-#define			AT91_SMC_NRDSETUP_(x)	((x) << 16)
+-#define		AT91_SMC_NCS_RDSETUP	(0x3f << 24)			/* NCS Setup Length in Read Access */
+-#define			AT91_SMC_NCS_RDSETUP_(x)	((x) << 24)
 -
--	cpu_do_idle();
+-#define AT91_SMC_PULSE		0x04				/* Pulse Register for CS n */
+-#define		AT91_SMC_NWEPULSE	(0x7f <<  0)			/* NWE Pulse Length */
+-#define			AT91_SMC_NWEPULSE_(x)	((x) << 0)
+-#define		AT91_SMC_NCS_WRPULSE	(0x7f <<  8)			/* NCS Pulse Length in Write Access */
+-#define			AT91_SMC_NCS_WRPULSE_(x)((x) << 8)
+-#define		AT91_SMC_NRDPULSE	(0x7f << 16)			/* NRD Pulse Length */
+-#define			AT91_SMC_NRDPULSE_(x)	((x) << 16)
+-#define		AT91_SMC_NCS_RDPULSE	(0x7f << 24)			/* NCS Pulse Length in Read Access */
+-#define			AT91_SMC_NCS_RDPULSE_(x)((x) << 24)
 -
--	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
--	if (at91_ramc_base[1])
--		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
--}
+-#define AT91_SMC_CYCLE		0x08				/* Cycle Register for CS n */
+-#define		AT91_SMC_NWECYCLE	(0x1ff << 0 )			/* Total Write Cycle Length */
+-#define			AT91_SMC_NWECYCLE_(x)	((x) << 0)
+-#define		AT91_SMC_NRDCYCLE	(0x1ff << 16)			/* Total Read Cycle Length */
+-#define			AT91_SMC_NRDCYCLE_(x)	((x) << 16)
 -
--/* We manage both DDRAM/SDRAM controllers, we need more than one value to
-- * remember.
-- */
--static inline void at91sam9_sdram_standby(void)
--{
--	u32 lpr0, lpr1 = 0;
--	u32 saved_lpr0, saved_lpr1 = 0;
--
--	if (at91_ramc_base[1]) {
--		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
--		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
--		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
--	}
--
--	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
--	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
--	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
--
--	/* self-refresh mode now */
--	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
--	if (at91_ramc_base[1])
--		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
--
--	cpu_do_idle();
--
--	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
--	if (at91_ramc_base[1])
--		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
--}
+-#define AT91_SMC_MODE		0x0c				/* Mode Register for CS n */
+-#define		AT91_SMC_READMODE	(1 <<  0)			/* Read Mode */
+-#define		AT91_SMC_WRITEMODE	(1 <<  1)			/* Write Mode */
+-#define		AT91_SMC_EXNWMODE	(3 <<  4)			/* NWAIT Mode */
+-#define			AT91_SMC_EXNWMODE_DISABLE	(0 << 4)
+-#define			AT91_SMC_EXNWMODE_FROZEN	(2 << 4)
+-#define			AT91_SMC_EXNWMODE_READY		(3 << 4)
+-#define		AT91_SMC_BAT		(1 <<  8)			/* Byte Access Type */
+-#define			AT91_SMC_BAT_SELECT		(0 << 8)
+-#define			AT91_SMC_BAT_WRITE		(1 << 8)
+-#define		AT91_SMC_DBW		(3 << 12)			/* Data Bus Width */
+-#define			AT91_SMC_DBW_8			(0 << 12)
+-#define			AT91_SMC_DBW_16			(1 << 12)
+-#define			AT91_SMC_DBW_32			(2 << 12)
+-#define		AT91_SMC_TDF		(0xf << 16)			/* Data Float Time. */
+-#define			AT91_SMC_TDF_(x)		((x) << 16)
+-#define		AT91_SMC_TDFMODE	(1 << 20)			/* TDF Optimization - Enabled */
+-#define		AT91_SMC_PMEN		(1 << 24)			/* Page Mode Enabled */
+-#define		AT91_SMC_PS		(3 << 28)			/* Page Size */
+-#define			AT91_SMC_PS_4			(0 << 28)
+-#define			AT91_SMC_PS_8			(1 << 28)
+-#define			AT91_SMC_PS_16			(2 << 28)
+-#define			AT91_SMC_PS_32			(3 << 28)
 -
 -#endif
- #endif
+diff --git a/arch/arm/mach-at91/sam9_smc.c b/arch/arm/mach-at91/sam9_smc.c
+deleted file mode 100644
+index 826315af6d11..000000000000
+--- a/arch/arm/mach-at91/sam9_smc.c
++++ /dev/null
+@@ -1,136 +0,0 @@
+-/*
+- * linux/arch/arm/mach-at91/sam9_smc.c
+- *
+- * Copyright (C) 2008 Andrew Victor
+- * Copyright (C) 2011 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/module.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-
+-#include <mach/at91sam9_smc.h>
+-
+-#include "sam9_smc.h"
+-
+-
+-#define AT91_SMC_CS(id, n)	(smc_base_addr[id] + ((n) * 0x10))
+-
+-static void __iomem *smc_base_addr[2];
+-
+-static void sam9_smc_cs_write_mode(void __iomem *base,
+-					struct sam9_smc_config *config)
+-{
+-	__raw_writel(config->mode
+-		   | AT91_SMC_TDF_(config->tdf_cycles),
+-		   base + AT91_SMC_MODE);
+-}
+-
+-void sam9_smc_write_mode(int id, int cs,
+-					struct sam9_smc_config *config)
+-{
+-	sam9_smc_cs_write_mode(AT91_SMC_CS(id, cs), config);
+-}
+-EXPORT_SYMBOL_GPL(sam9_smc_write_mode);
+-
+-static void sam9_smc_cs_configure(void __iomem *base,
+-					struct sam9_smc_config *config)
+-{
+-
+-	/* Setup register */
+-	__raw_writel(AT91_SMC_NWESETUP_(config->nwe_setup)
+-		   | AT91_SMC_NCS_WRSETUP_(config->ncs_write_setup)
+-		   | AT91_SMC_NRDSETUP_(config->nrd_setup)
+-		   | AT91_SMC_NCS_RDSETUP_(config->ncs_read_setup),
+-		   base + AT91_SMC_SETUP);
+-
+-	/* Pulse register */
+-	__raw_writel(AT91_SMC_NWEPULSE_(config->nwe_pulse)
+-		   | AT91_SMC_NCS_WRPULSE_(config->ncs_write_pulse)
+-		   | AT91_SMC_NRDPULSE_(config->nrd_pulse)
+-		   | AT91_SMC_NCS_RDPULSE_(config->ncs_read_pulse),
+-		   base + AT91_SMC_PULSE);
+-
+-	/* Cycle register */
+-	__raw_writel(AT91_SMC_NWECYCLE_(config->write_cycle)
+-		   | AT91_SMC_NRDCYCLE_(config->read_cycle),
+-		   base + AT91_SMC_CYCLE);
+-
+-	/* Mode register */
+-	sam9_smc_cs_write_mode(base, config);
+-}
+-
+-void sam9_smc_configure(int id, int cs,
+-					struct sam9_smc_config *config)
+-{
+-	sam9_smc_cs_configure(AT91_SMC_CS(id, cs), config);
+-}
+-EXPORT_SYMBOL_GPL(sam9_smc_configure);
+-
+-static void sam9_smc_cs_read_mode(void __iomem *base,
+-					struct sam9_smc_config *config)
+-{
+-	u32 val = __raw_readl(base + AT91_SMC_MODE);
+-
+-	config->mode = (val & ~AT91_SMC_NWECYCLE);
+-	config->tdf_cycles = (val & AT91_SMC_NWECYCLE) >> 16 ;
+-}
+-
+-void sam9_smc_read_mode(int id, int cs,
+-					struct sam9_smc_config *config)
+-{
+-	sam9_smc_cs_read_mode(AT91_SMC_CS(id, cs), config);
+-}
+-EXPORT_SYMBOL_GPL(sam9_smc_read_mode);
+-
+-static void sam9_smc_cs_read(void __iomem *base,
+-					struct sam9_smc_config *config)
+-{
+-	u32 val;
+-
+-	/* Setup register */
+-	val = __raw_readl(base + AT91_SMC_SETUP);
+-
+-	config->nwe_setup = val & AT91_SMC_NWESETUP;
+-	config->ncs_write_setup = (val & AT91_SMC_NCS_WRSETUP) >> 8;
+-	config->nrd_setup = (val & AT91_SMC_NRDSETUP) >> 16;
+-	config->ncs_read_setup = (val & AT91_SMC_NCS_RDSETUP) >> 24;
+-
+-	/* Pulse register */
+-	val = __raw_readl(base + AT91_SMC_PULSE);
+-
+-	config->nwe_pulse = val & AT91_SMC_NWEPULSE;
+-	config->ncs_write_pulse = (val & AT91_SMC_NCS_WRPULSE) >> 8;
+-	config->nrd_pulse = (val & AT91_SMC_NRDPULSE) >> 16;
+-	config->ncs_read_pulse = (val & AT91_SMC_NCS_RDPULSE) >> 24;
+-
+-	/* Cycle register */
+-	val = __raw_readl(base + AT91_SMC_CYCLE);
+-
+-	config->write_cycle = val & AT91_SMC_NWECYCLE;
+-	config->read_cycle = (val & AT91_SMC_NRDCYCLE) >> 16;
+-
+-	/* Mode register */
+-	sam9_smc_cs_read_mode(base, config);
+-}
+-
+-void sam9_smc_read(int id, int cs, struct sam9_smc_config *config)
+-{
+-	sam9_smc_cs_read(AT91_SMC_CS(id, cs), config);
+-}
+-
+-void __init at91sam9_ioremap_smc(int id, u32 addr)
+-{
+-	if (id > 1) {
+-		pr_warn("%s: id > 2\n", __func__);
+-		return;
+-	}
+-	smc_base_addr[id] = ioremap(addr, 512);
+-	if (!smc_base_addr[id])
+-		pr_warn("Impossible to ioremap smc.%d 0x%x\n", id, addr);
+-}
+diff --git a/arch/arm/mach-at91/sam9_smc.h b/arch/arm/mach-at91/sam9_smc.h
+deleted file mode 100644
+index 3e52dcd4a59f..000000000000
+--- a/arch/arm/mach-at91/sam9_smc.h
++++ /dev/null
+@@ -1,11 +0,0 @@
+-/*
+- * linux/arch/arm/mach-at91/sam9_smc.
+- *
+- * Copyright (C) 2008 Andrew Victor
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-extern void __init at91sam9_ioremap_smc(int id, u32 addr);
 -- 
 2.1.0
