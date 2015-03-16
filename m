@@ -1,192 +1,223 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 16 Mar 2015 23:44:39 +0100
-Subject: [PATCH 03/10] ata: at91: use syscon to configure the smc
+Date: Mon, 16 Mar 2015 23:44:37 +0100
+Subject: [PATCH 01/10] ARM: at91/pm: move the standby functions to pm.c
 In-Reply-To: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1426545886-19162-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1426545886-19162-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use syscon/regmap to configure the smc. This allows to avoid using
-at91sam9_smc.h and to compile the driver in a multiplatform configuration.
+The standby functions are now only used in pm.c, move them there.
 
-The driver will still not probe until the proper DT bindings are added.
+Also, they are not inlined as a pointer to those functions is passed to the
+cpuidle driver.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/ata/Kconfig     |  1 -
- drivers/ata/pata_at91.c | 92 ++++++++++++++++++++++++++++++++++++++-----------
- 2 files changed, 71 insertions(+), 22 deletions(-)
+ arch/arm/mach-at91/pm.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/pm.h | 92 -------------------------------------------------
+ 2 files changed, 89 insertions(+), 92 deletions(-)
 
-diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
-index 5f601553b9b0..a3a13605a9c4 100644
---- a/drivers/ata/Kconfig
-+++ b/drivers/ata/Kconfig
-@@ -835,7 +835,6 @@ config PATA_AT32
- config PATA_AT91
- 	tristate "PATA support for AT91SAM9260"
- 	depends on ARM && SOC_AT91SAM9
--	depends on !ARCH_MULTIPLATFORM
- 	help
- 	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
- 
-diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
-index 9e85937d36a9..ace0a4de3449 100644
---- a/drivers/ata/pata_at91.c
-+++ b/drivers/ata/pata_at91.c
-@@ -24,11 +24,13 @@
- #include <linux/ata.h>
- #include <linux/clk.h>
- #include <linux/libata.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/atmel-smc.h>
- #include <linux/platform_device.h>
- #include <linux/ata_platform.h>
- #include <linux/platform_data/atmel.h>
-+#include <linux/regmap.h>
- 
--#include <mach/at91sam9_smc.h>
- #include <asm/gpio.h>
- 
- #define DRV_NAME		"pata_at91"
-@@ -57,6 +59,15 @@ struct smc_range {
- 	int max;
- };
- 
-+struct regmap *smc;
-+
-+struct at91sam9_smc_generic_fields {
-+	struct regmap_field *setup;
-+	struct regmap_field *pulse;
-+	struct regmap_field *cycle;
-+	struct regmap_field *mode;
-+} fields;
-+
- /**
-  * adjust_smc_value - adjust value for one of SMC registers.
-  * @value: adjusted value
-@@ -206,7 +217,6 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
- {
- 	int ret = 0;
- 	int use_iordy;
--	struct sam9_smc_config smc;
- 	unsigned int t6z;         /* data tristate time in ns */
- 	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
- 	unsigned int setup;       /* SMC Setup width in MCK ticks */
-@@ -244,19 +254,21 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
- 
- 	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
- 
--	/* SMC Setup Register */
--	smc.nwe_setup = smc.nrd_setup = setup;
--	smc.ncs_write_setup = smc.ncs_read_setup = 0;
--	/* SMC Pulse Register */
--	smc.nwe_pulse = smc.nrd_pulse = pulse;
--	smc.ncs_write_pulse = smc.ncs_read_pulse = cs_pulse;
--	/* SMC Cycle Register */
--	smc.write_cycle = smc.read_cycle = cycle;
--	/* SMC Mode Register*/
--	smc.tdf_cycles = tdf_cycles;
--	smc.mode = info->mode;
--
--	sam9_smc_configure(0, info->cs, &smc);
-+	regmap_fields_write(fields.setup, info->cs,
-+			    AT91SAM9_SMC_NRDSETUP(setup) |
-+			    AT91SAM9_SMC_NWESETUP(setup) |
-+			    AT91SAM9_SMC_NCS_NRDSETUP(0) |
-+			    AT91SAM9_SMC_NCS_WRSETUP(0));
-+	regmap_fields_write(fields.pulse, info->cs,
-+			    AT91SAM9_SMC_NRDPULSE(pulse) |
-+			    AT91SAM9_SMC_NWEPULSE(pulse) |
-+			    AT91SAM9_SMC_NCS_NRDPULSE(cs_pulse) |
-+			    AT91SAM9_SMC_NCS_WRPULSE(cs_pulse));
-+	regmap_fields_write(fields.cycle, info->cs,
-+			    AT91SAM9_SMC_NRDCYCLE(cycle) |
-+			    AT91SAM9_SMC_NWECYCLE(cycle));
-+	regmap_fields_write(fields.mode, info->cs, info->mode |
-+			    AT91_SMC_TDF_(tdf_cycles));
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index f93a735ba327..5062699cbb12 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -222,6 +222,95 @@ static void at91_pm_set_standby(void (*at91_standby)(void))
+ 		at91_cpuidle_device.dev.platform_data = at91_standby;
  }
  
- static void pata_at91_set_piomode(struct ata_port *ap, struct ata_device *adev)
-@@ -280,21 +292,21 @@ static unsigned int pata_at91_data_xfer_noirq(struct ata_device *dev,
- {
- 	struct at91_ide_info *info = dev->link->ap->host->private_data;
- 	unsigned int consumed;
-+	unsigned int mode;
- 	unsigned long flags;
--	struct sam9_smc_config smc;
- 
- 	local_irq_save(flags);
--	sam9_smc_read_mode(0, info->cs, &smc);
-+	regmap_fields_read(fields.mode, info->cs, &mode);
- 
- 	/* set 16bit mode before writing data */
--	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
--	sam9_smc_write_mode(0, info->cs, &smc);
-+	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
-+			    AT91_SMC_DBW_16);
- 
- 	consumed = ata_sff_data_xfer(dev, buf, buflen, rw);
- 
- 	/* restore 8bit mode after data is written */
--	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
--	sam9_smc_write_mode(0, info->cs, &smc);
-+	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
-+			    AT91_SMC_DBW_8);
- 
- 	local_irq_restore(flags);
- 	return consumed;
-@@ -312,6 +324,36 @@ static struct ata_port_operations pata_at91_port_ops = {
- 	.cable_detect	= ata_cable_40wire,
- };
- 
-+static int at91sam9_smc_fields_init(struct device *dev)
++/*
++ * The AT91RM9200 goes into self-refresh mode with this command, and will
++ * terminate self-refresh automatically on the next SDRAM access.
++ *
++ * Self-refresh mode is exited as soon as a memory access is made, but we don't
++ * know for sure when that happens. However, we need to restore the low-power
++ * mode if it was enabled before going idle. Restoring low-power mode while
++ * still in self-refresh is "not recommended", but seems to work.
++ */
++static void at91rm9200_standby(void)
 +{
-+	struct reg_field field = REG_FIELD(0, 0, 31);
++	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
 +
-+	field.id_size = 8;
-+	field.id_offset = AT91SAM9_SMC_GENERIC_BLK_SZ;
-+
-+	field.reg = AT91SAM9_SMC_SETUP(AT91SAM9_SMC_GENERIC);
-+	fields.setup = devm_regmap_field_alloc(dev, smc, field);
-+	if (IS_ERR(fields.setup))
-+		return PTR_ERR(fields.setup);
-+
-+	field.reg = AT91SAM9_SMC_PULSE(AT91SAM9_SMC_GENERIC);
-+	fields.pulse = devm_regmap_field_alloc(dev, smc, field);
-+	if (IS_ERR(fields.pulse))
-+		return PTR_ERR(fields.pulse);
-+
-+	field.reg = AT91SAM9_SMC_CYCLE(AT91SAM9_SMC_GENERIC);
-+	fields.cycle = devm_regmap_field_alloc(dev, smc, field);
-+	if (IS_ERR(fields.cycle))
-+		return PTR_ERR(fields.cycle);
-+
-+	field.reg = AT91SAM9_SMC_MODE(AT91SAM9_SMC_GENERIC);
-+	fields.mode = devm_regmap_field_alloc(dev, smc, field);
-+	if (IS_ERR(fields.mode))
-+		return PTR_ERR(fields.mode);
-+
-+	return 0;
++	asm volatile(
++		"b    1f\n\t"
++		".align    5\n\t"
++		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
++		"    str    %0, [%1, %2]\n\t"
++		"    str    %3, [%1, %4]\n\t"
++		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
++		"    str    %5, [%1, %2]"
++		:
++		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
++		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
++		  "r" (lpr));
 +}
 +
- static int pata_at91_probe(struct platform_device *pdev)
- {
- 	struct at91_cf_data *board = dev_get_platdata(&pdev->dev);
-@@ -341,6 +383,14 @@ static int pata_at91_probe(struct platform_device *pdev)
- 
- 	irq = board->irq_pin;
- 
-+	smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "atmel,smc");
-+	if (IS_ERR(smc))
-+		return PTR_ERR(smc);
++/* We manage both DDRAM/SDRAM controllers, we need more than one value to
++ * remember.
++ */
++static void at91_ddr_standby(void)
++{
++	/* Those two values allow us to delay self-refresh activation
++	 * to the maximum. */
++	u32 lpr0, lpr1 = 0;
++	u32 saved_lpr0, saved_lpr1 = 0;
 +
-+	ret = at91sam9_smc_fields_init(dev);
-+	if (ret < 0)
-+		return ret;
++	if (at91_ramc_base[1]) {
++		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
++		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
++		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
++	}
 +
- 	/* init ata host */
++	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
++	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
++	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
++
++	/* self-refresh mode now */
++	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
++	if (at91_ramc_base[1])
++		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
++
++	cpu_do_idle();
++
++	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
++	if (at91_ramc_base[1])
++		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
++}
++
++/* We manage both DDRAM/SDRAM controllers, we need more than one value to
++ * remember.
++ */
++static void at91sam9_sdram_standby(void)
++{
++	u32 lpr0, lpr1 = 0;
++	u32 saved_lpr0, saved_lpr1 = 0;
++
++	if (at91_ramc_base[1]) {
++		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
++		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
++		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++	}
++
++	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
++	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
++	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
++
++	/* self-refresh mode now */
++	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
++	if (at91_ramc_base[1])
++		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
++
++	cpu_do_idle();
++
++	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
++	if (at91_ramc_base[1])
++		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
++}
++
+ static const struct of_device_id ramc_ids[] __initconst = {
+ 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
+ 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index dcacfa1ad3fa..3223967d3460 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -23,96 +23,4 @@
  
- 	host = ata_host_alloc(dev, 1);
+ #define	AT91_PM_SLOW_CLOCK	0x01
+ 
+-/*
+- * The AT91RM9200 goes into self-refresh mode with this command, and will
+- * terminate self-refresh automatically on the next SDRAM access.
+- *
+- * Self-refresh mode is exited as soon as a memory access is made, but we don't
+- * know for sure when that happens. However, we need to restore the low-power
+- * mode if it was enabled before going idle. Restoring low-power mode while
+- * still in self-refresh is "not recommended", but seems to work.
+- */
+-
+-#ifndef __ASSEMBLY__
+-static inline void at91rm9200_standby(void)
+-{
+-	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
+-
+-	asm volatile(
+-		"b    1f\n\t"
+-		".align    5\n\t"
+-		"1:  mcr    p15, 0, %0, c7, c10, 4\n\t"
+-		"    str    %0, [%1, %2]\n\t"
+-		"    str    %3, [%1, %4]\n\t"
+-		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
+-		"    str    %5, [%1, %2]"
+-		:
+-		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
+-		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
+-		  "r" (lpr));
+-}
+-
+-/* We manage both DDRAM/SDRAM controllers, we need more than one value to
+- * remember.
+- */
+-static inline void at91_ddr_standby(void)
+-{
+-	/* Those two values allow us to delay self-refresh activation
+-	 * to the maximum. */
+-	u32 lpr0, lpr1 = 0;
+-	u32 saved_lpr0, saved_lpr1 = 0;
+-
+-	if (at91_ramc_base[1]) {
+-		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+-		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+-		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+-	}
+-
+-	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+-	lpr0 = saved_lpr0 & ~AT91_DDRSDRC_LPCB;
+-	lpr0 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
+-
+-	/* self-refresh mode now */
+-	at91_ramc_write(0, AT91_DDRSDRC_LPR, lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_DDRSDRC_LPR, lpr1);
+-
+-	cpu_do_idle();
+-
+-	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
+-}
+-
+-/* We manage both DDRAM/SDRAM controllers, we need more than one value to
+- * remember.
+- */
+-static inline void at91sam9_sdram_standby(void)
+-{
+-	u32 lpr0, lpr1 = 0;
+-	u32 saved_lpr0, saved_lpr1 = 0;
+-
+-	if (at91_ramc_base[1]) {
+-		saved_lpr1 = at91_ramc_read(1, AT91_SDRAMC_LPR);
+-		lpr1 = saved_lpr1 & ~AT91_SDRAMC_LPCB;
+-		lpr1 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+-	}
+-
+-	saved_lpr0 = at91_ramc_read(0, AT91_SDRAMC_LPR);
+-	lpr0 = saved_lpr0 & ~AT91_SDRAMC_LPCB;
+-	lpr0 |= AT91_SDRAMC_LPCB_SELF_REFRESH;
+-
+-	/* self-refresh mode now */
+-	at91_ramc_write(0, AT91_SDRAMC_LPR, lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_SDRAMC_LPR, lpr1);
+-
+-	cpu_do_idle();
+-
+-	at91_ramc_write(0, AT91_SDRAMC_LPR, saved_lpr0);
+-	if (at91_ramc_base[1])
+-		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+-}
+-
+-#endif
+ #endif
 -- 
 2.1.0
