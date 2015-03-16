@@ -1,54 +1,62 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 17 Mar 2015 00:30:37 +0100
-Subject: read_cpuid_id() in arch/arm/kernel/setup.c
-In-Reply-To: <55075673.5010600@free.fr>
-References: <55030A68.6070002@free.fr>
- <20150313161953.GS8656@n2100.arm.linux.org.uk> <550312BB.8020902@free.fr>
- <20150313164546.GV8656@n2100.arm.linux.org.uk> <5505C40C.1050001@free.fr>
- <550697FE.1020804@free.fr>
- <alpine.DEB.2.02.1503161641000.29420@utopia.booyaka.com>
- <55075673.5010600@free.fr>
-Message-ID: <5507679D.1080307@free.fr>
+From: rientjes@google.com (David Rientjes)
+Date: Mon, 16 Mar 2015 16:32:52 -0700 (PDT)
+Subject: [PATCH] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
+ allocations
+In-Reply-To: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
+References: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
+Message-ID: <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/03/2015 23:17, Mason wrote:
+On Mon, 16 Mar 2015, Tomasz Figa wrote:
 
-> Will post an (hopefully) improved commit message ASAP.
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 83cd5ac..f081e9e 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1145,18 +1145,31 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>  	}
+>  
+>  	/*
+> -	 * IOMMU can map any pages, so himem can also be used here
+> +	 * IOMMU can map any pages, so himem can also be used here.
+> +	 * We do not want OOM killer to be invoked as long as we can fall back
+> +	 * to single pages, so we use __GFP_NORETRY for positive orders.
+>  	 */
+> -	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+> +	gfp |= __GFP_NOWARN | __GFP_HIGHMEM | __GFP_NORETRY;
+>  
+>  	while (count) {
+> -		int j, order = __fls(count);
+> +		int j, order;
+>  
+> -		pages[i] = alloc_pages(gfp, order);
+> -		while (!pages[i] && order)
+> -			pages[i] = alloc_pages(gfp, --order);
+> -		if (!pages[i])
+> -			goto error;
+> +		for (order = __fls(count); order; --order) {
+> +			/* Will not trigger OOM. */
+> +			pages[i] = alloc_pages(gfp, order);
+> +			if (pages[i])
+> +				break;
+> +		}
+> +
+> +		if (!pages[i]) {
+> +			/*
+> +			 * Fall back to single page allocation.
+> +			 * Might invoke OOM killer as last resort.
+> +			 */
+> +			pages[i] = alloc_pages(gfp & ~__GFP_NORETRY, 0);
+> +			if (!pages[i])
+> +				goto error;
+> +		}
+>  
+>  		if (order) {
+>  			split_page(pages[i], order);
 
--- >8 --
-Date: Sun, 15 Mar 2015 17:59:53 +0100
-Subject: [PATCH] Use read_cpuid_ext() macro instead of inline asm
-
-Replace inline asm statement in __get_cpu_architecture() with equivalent macro
-invocation, i.e. read_cpuid_ext(CPUID_EXT_MMFR0);
-
-As an added bonus, this squashes a potential bug described by Paul Walmsley
-in commit 067e710b9a98 ("ARM: 7801/1: prevent gcc 4.5 from reordering extended
-CP15 reads above is_smp() test").
-
-Signed-off-by: Mason <slash.tmp@free.fr>
----
- arch/arm/kernel/setup.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index e55408e..1d60beb 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -246,12 +246,9 @@ static int __get_cpu_architecture(void)
- 		if (cpu_arch)
- 			cpu_arch += CPU_ARCH_ARMv3;
- 	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
--		unsigned int mmfr0;
--
- 		/* Revised CPUID format. Read the Memory Model Feature
- 		 * Register 0 and check for VMSAv7 or PMSAv7 */
--		asm("mrc	p15, 0, %0, c0, c1, 4"
--		    : "=r" (mmfr0));
-+		unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
- 		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
- 		    (mmfr0 & 0x000000f0) >= 0x00000030)
- 			cpu_arch = CPU_ARCH_ARMv7;
--- 
-2.3.2
+I think this makes sense, but the problem is the unconditional setting and 
+clearing of __GFP_NORETRY.  Strictly speaking, gfp may already have 
+__GFP_NORETRY set when calling this function so it would be better to do 
+the loop with alloc_pages(gfp | __GFP_NORETRY, order) and then the 
+fallback as alloc_page(gfp).
