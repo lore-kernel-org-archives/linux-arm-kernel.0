@@ -1,63 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Mar 2015 16:14:49 +0000
-Subject: [PATCH v2 0/2] ARM: /proc/cpuinfo: DT: Add support for Revision
-In-Reply-To: <20150316154409.GQ5264@atomide.com>
-References: <201502271645.58765@pali>
- <1425052528-18995-1-git-send-email-pali.rohar@gmail.com>
- <20150302112836.GA27317@amd> <20150316154409.GQ5264@atomide.com>
-Message-ID: <20150316161449.GJ8656@n2100.arm.linux.org.uk>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Mon, 16 Mar 2015 16:23:04 +0000
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+In-Reply-To: <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>
+ <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
+Message-ID: <20150316162304.GA35408@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 08:44:10AM -0700, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [150302 03:32]:
-> > On Fri 2015-02-27 16:55:26, Pali Roh?r wrote:
-> > > This patch adds support for DT "/revision" and convert ATAG_REVISION to DT.
-> > > 
-> > > Pali Roh?r (2):
-> > >   arm: devtree: Set system_rev from DT revision
-> > >   arm: boot: convert ATAG_REVISION to DT revision field
-> > 
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> 
-> Are these queued somewhere now? Sounds like this is the last pending
-> issue for n900 to use legacy user space with current mainline kernels,
-> so I'd like to get these in so we can get closer to making omap3 boot
-> in device tree only mode.
+On Mon, Mar 16, 2015 at 05:08:03PM +0100, Ard Biesheuvel wrote:
+> Have you tested this code with the tcrypt.ko module?
 
-Not that I know of.  As everyone is aware, patches need to be in my
-patch system if they want me to apply them - which would've been
-especially important as I was away from kernel stuff for a week at
-the start of March (for medical reasons) and I can't be expected to
-track the status of stuff which is buried behind 1000+ extra mails.
+I have not, but I can look into it.
 
-In any case, I'm currently not accepting /any/ patches into my tree at
-present; I'm chasing a horrid instability on one of my test platforms
-which is making it impossible to tell whether any particular change or
-changes in my tree is responsible or not for it.  It doesn't seem to be
-a hardware failure (if it was, I'd simply take the board out of the
-nightly test system.)
+> Did you talk to Andy about the license? I don't think this is
+> permissible for the kernel as-is.
 
-It's quite literally taking hours to figure out what's going on - I've
-been on this for about 12 hours now and still not much closer to knowing
-what's causing it (other than I know that -rc1 plus my queue seems to be
-fine, -rc3 plus my queue is definitely broken, -rc3 alone is fine.  So
-something I'm already carrying seems to be responsible, but each time I
-identify a particular patch and drop _just_ that change, I find that the
-problem is back when I try my queue minus the bad changes.  With a test
-cycle time of 20+ minutes (due to the number of boots required to make
-certain of a dependable result), this is /really/ slow progress.
+Unless I have misunderstood something, the license at the Cryptogams
+website includes an option to license the code under the GNU GPL.
 
-Right now, I can't be positively sure that /anything/ I have already
-merged isn't a factor in causing this problem, so I don't want to
-augment my tree with any additional patches which would upset my
-ability to move about in the tree, and get reproducable results from
-repeated testing.  To merge something else will probably mean I'll
-have to start again from the beginning and the last 12 hours spent
-testing will have been wasted.
+However, I can certainly contact Andy to clarify his intentions.
 
-Sorry.
+> This is broken on thumb-2, use adr instead
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> You can also implement SHA-224 using the same core transform, it's
+> just some trivial glue code.
+
+> Could you please rebase this onto Herbert's cryptodev tree and move
+> this to arch/arm/crypto/Kconfig?
+
+Thanks for the comments, I will submit a second version once we have
+a clarification on the license.
+
+Sami
