@@ -1,61 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 16:22:01 -0700
-Subject: [PATCH] ARM: omap-device: add missed callback for suspend-to-disk
-In-Reply-To: <20150225155627.GP11056@atomide.com>
-References: <1424873630-6054-1-git-send-email-grygorii.strashko@linaro.org>
- <20150225154445.GO11056@atomide.com> <54EDEFC9.606@ti.com>
- <20150225155627.GP11056@atomide.com>
-Message-ID: <20150316232200.GX12397@atomide.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 17 Mar 2015 00:30:37 +0100
+Subject: read_cpuid_id() in arch/arm/kernel/setup.c
+In-Reply-To: <55075673.5010600@free.fr>
+References: <55030A68.6070002@free.fr>
+ <20150313161953.GS8656@n2100.arm.linux.org.uk> <550312BB.8020902@free.fr>
+ <20150313164546.GV8656@n2100.arm.linux.org.uk> <5505C40C.1050001@free.fr>
+ <550697FE.1020804@free.fr>
+ <alpine.DEB.2.02.1503161641000.29420@utopia.booyaka.com>
+ <55075673.5010600@free.fr>
+Message-ID: <5507679D.1080307@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150225 08:10]:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [150225 07:56]:
-> > On 02/25/2015 05:44 PM, Tony Lindgren wrote:
-> > >* grygorii.strashko at linaro.org <grygorii.strashko@linaro.org> [150225 06:17]:
-> > >>From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> > >>
-> > >>Add missed callback needed for supporting suspend-to-disk (hibernation) mode.
-> > >
-> > >Is this needed as a fix for the -rc series or are there still
-> > >other missing dependencies?
-> > >
-> > 
-> > This one is not critical fix.
-> 
-> OK thanks for confirming that.
+On 16/03/2015 23:17, Mason wrote:
 
-Applying into omap-for-v4.1/soc thanks.
- 
-> Tony
-> 
-> > >>Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
-> > >>---
-> > >>  arch/arm/mach-omap2/omap_device.c | 3 +++
-> > >>  1 file changed, 3 insertions(+)
-> > >>
-> > >>diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> > >>index fcd2c9e..345e18e 100644
-> > >>--- a/arch/arm/mach-omap2/omap_device.c
-> > >>+++ b/arch/arm/mach-omap2/omap_device.c
-> > >>@@ -739,6 +739,9 @@ struct dev_pm_domain omap_device_pm_domain = {
-> > >>  		USE_PLATFORM_PM_SLEEP_OPS
-> > >>  		.suspend_noirq = _od_suspend_noirq,
-> > >>  		.resume_noirq = _od_resume_noirq,
-> > >>+		.freeze_noirq = _od_suspend_noirq,
-> > >>+		.thaw_noirq = _od_resume_noirq,
-> > >>+		.restore_noirq = _od_resume_noirq,
-> > >>  	}
-> > >>  };
-> > >>
-> > >>--
-> > >>1.9.1
-> > >>
-> > 
-> > regards,
-> > -grygorii
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Will post an (hopefully) improved commit message ASAP.
+
+-- >8 --
+Date: Sun, 15 Mar 2015 17:59:53 +0100
+Subject: [PATCH] Use read_cpuid_ext() macro instead of inline asm
+
+Replace inline asm statement in __get_cpu_architecture() with equivalent macro
+invocation, i.e. read_cpuid_ext(CPUID_EXT_MMFR0);
+
+As an added bonus, this squashes a potential bug described by Paul Walmsley
+in commit 067e710b9a98 ("ARM: 7801/1: prevent gcc 4.5 from reordering extended
+CP15 reads above is_smp() test").
+
+Signed-off-by: Mason <slash.tmp@free.fr>
+---
+ arch/arm/kernel/setup.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index e55408e..1d60beb 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -246,12 +246,9 @@ static int __get_cpu_architecture(void)
+ 		if (cpu_arch)
+ 			cpu_arch += CPU_ARCH_ARMv3;
+ 	} else if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
+-		unsigned int mmfr0;
+-
+ 		/* Revised CPUID format. Read the Memory Model Feature
+ 		 * Register 0 and check for VMSAv7 or PMSAv7 */
+-		asm("mrc	p15, 0, %0, c0, c1, 4"
+-		    : "=r" (mmfr0));
++		unsigned int mmfr0 = read_cpuid_ext(CPUID_EXT_MMFR0);
+ 		if ((mmfr0 & 0x0000000f) >= 0x00000003 ||
+ 		    (mmfr0 & 0x000000f0) >= 0x00000030)
+ 			cpu_arch = CPU_ARCH_ARMv7;
+-- 
+2.3.2
