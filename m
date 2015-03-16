@@ -1,125 +1,75 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Mon, 16 Mar 2015 23:01:56 +0530
-Subject: [PATCH v7 1/3] dmaengine: Add support for APM X-Gene SoC DMA
- engine driver
-In-Reply-To: <20150316162613.GO32683@intel.com>
-References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
- <1426158921-8987-2-git-send-email-rsahu@apm.com>
- <20150316092756.GH32683@intel.com>
- <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
- <20150316112730.GN32683@intel.com>
- <CAFd313yeXL2sd4qzh_-6iANQf=w0k4p_tXEmrk_QZ-baKgKG8Q@mail.gmail.com>
- <20150316162613.GO32683@intel.com>
-Message-ID: <CAFd313xG4EZdoS4vMxq4TW7v+xc_OEd3uC1R4LW3=Xs3+JzY9w@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Mar 2015 17:33:25 +0000
+Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
+In-Reply-To: <CAKv+Gu_-1XMcpobRt7tXCZaqWoszWLfJxgHBLaKuWchz87UnSA@mail.gmail.com>
+References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150316160948.GB18277@leverpostej>
+ <CAKv+Gu_-1XMcpobRt7tXCZaqWoszWLfJxgHBLaKuWchz87UnSA@mail.gmail.com>
+Message-ID: <20150316173324.GA21040@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+> >> - performance: we can align PHYS_OFFSET so that most of the linear mapping can
+> >>   be done using 512 MB or 1 GB blocks (depending on page size), instead of
+> >>   the more granular level that is currently unavoidable if Image cannot be
+> >>   loaded at base of RAM (since PHYS_OFFSET is tied to the start of the kernel
+> >>   Image).
+> >
+> > Isn't this gain somewhat offset by having to build the kernel as a PIE?
+> 
+> I don't think so. Note that this is not -fpic code, it's just the ld
+> option that dumps the reloc and dynsym tables into the output image.
+> The reloc penalty is boottime only.
 
-On Mon, Mar 16, 2015 at 9:56 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, Mar 16, 2015 at 05:24:34PM +0530, Rameshwar Sahu wrote:
->> >> >> +static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
->> >> >> +                                          struct list_head *list)
->> >> > do we really care about free order?
->> >>
->> >> Yes it start dellocation of descriptor by tail.
->> > and why by tail is not clear.
->> We can free allocated descriptor in forward order from head or in
->> reverse order, I just followed here fsldma.c driver.
->> Does this make sense ??
-> No, you have two APIs to free list. Why do you need two?
+Ah, ok.
 
-Yes, basically we have tow API to free list.
-xgene_dma_free_desc_list_reverse will call if any failure in
-allocation of memory from DMA pool in prep routines.
-Like e.g. in prep routing we have some descriptors allocated and still
-need to get descriptor to complete the DMA request and failure happen,
-so we need to free all allocated descriptor.
+> > I have a very strong suspicion that bootloaders in the wild don't zero
+> > x1-x3, and that given that we might not have a reliable mechanism for
+> > acquiring the offset.
+> >
+> 
+> OK, sounds about time to start complaining about that then.
 
->
->>
->>
->> >
->> >> > where are you mapping dma buffers?
->> >>
->> >>  I didn't get you here. Can you please explain me here what you mean.
->> >> As per my understanding client should map the dma buffer and give the
->> >> physical address and size to this callback prep routines.
->> > not for memcpy, that is true for slave transfers
->> >
->> > For mempcy the idea is that drivers will do buffer mapping
->>
->> Still I am clear here, why memcpy will do buffer mapping, I see other
->> drivers and also async_memcpy.c , they only map it and pass mapped
->> physical dma address to driver.
->>
->> Buffer mapping mean you here is dma_map_xxx ?? Am I correct.
-> Yes
+I guess so.
 
-I have confusion here, I don't see any driver dma buffer mapping in
-prep_dma_memcpy.
-Can you please clear me here if driver does this on behalf of client,
-like any example so that I can proceed further.
->
->>
->> >
->> >> > why are you calling this here, status check shouldnt do this...
->> >>
->> >> Okay, I will remove it.
->> >>
->> >>
->> >> >> +                     spin_unlock_bh(&chan->lock);
->> >> >> +                     return DMA_IN_PROGRESS;
->> >> > residue here is size of transacation.
->> >>
->> >> We can't calculate here residue size. We don't have any controller
->> >> register which will tell about remaining transaction size.
->> > Okay if you cant calculate residue why do we have this fn?
->>
->> So basically case here for me is completion of dma descriptor
->> submitted to hw is not same as order of submission to hw.
->> So scenario coming in multithread running :e.g. let's assume we have
->> submitted two descriptors first has cookie 1001 and second has 1002,
->> now 1002 is completed first, so updated last_completed_cookie as 1002
->> but not yer checked for dma_tx_status, and then first cookie completes
->> and update last_completed_cookie as 1001, now second transaction check
->> for tx_status and it get DMA_IN_PROGRESS, because
->> last_completed_cookie(1001) is less than second transaction's
->> cookie(1002).
->>
->> Due to this issue I am traversing that transaction in pending list and
->> running list, if not there means we are done.
->>
->> Does this make sense??
-> That only convinces me that there is something not so correct.
->
-> To help me understand pls let me know if below is fine:
-> - for a physical channel, do you submit multiple transactions?
+> >> Issues:
+> >> - Since AArch64 uses the ELF RELA format (where the addends are in the
+> >>   relocation table and not in the code), the relocations need to be applied even
+> >>   if the Image runs from the same offset it was linked at. It also means that
+> >>   some values that are produced by the linker (_kernel_size_le, etc) are missing
+> >>   from the binary. This will probably need a fixup step.
+> >> - The module area may be out of range, which needs to be worked around with
+> >>   module PLTs. This is straight forward but I haven't implemented it yet for
+> >>   arm64.
+> >> - The core extable is most likely broken, and would need to be changed to use
+> >>   relative offsets instead of absolute addresses.
+> >
+> > This sounds like it's going to be a big headache.
+> >
+> 
+> It's all manageable, really. The module PLT thing is something I
+> already implemented for 32-bit ARM here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305539.html
+> (only Russell couldn't be bothered to merge it)
+> 
+> The extable is already relative on x86, and the fixup step is some
+> straight forward ELF mangling on vmlinux before performing the
+> objcopy.
+> But yes, it's rather ugly.
 
-Yes
+Hmm. I'd be rather worried about the fixup step; I suspect that'll be
+fragile and rarely tested. Perhaps we could verify them at boot time?
 
-> - if yes, how does DMA deal with multiple transactions, how does it schedule
->   them?
+> > I'd rather see that we decouple the kernel (text/data) mapping from the
+> > linear mapping, with the former given a fixed VA independent of the PA
+> > of the kernel Image (which would still need to be at a 2M-aligned
+> > address + text_offset, and not straddling a 512M boundary).
+> >
+> 
+> Hmm, that's quite nice, actually, It also fixes the module range
+> problem, and for VA randomization we could move both regions together.
 
-So , basically we submit multiple descriptor to dma physical channel,
-and dma engine execute it one by one and give us completion callback.
-So in this way we expect callback on same order as submission order
-and it does also, no issue.
+Ah, good point. I hadn't consdiered modules all that much, but it sounds
+like it could work.
 
-But problem is with supporting p+q offload, here we have P
-functionality supports in dma physical channel 0 and Q functionality
-supports in dma physical channel 1. So for pq we need to submit two
-descriptor, one to channel 0 and second to channel1, in this case we
-can't expect the completion order, because channnel 0 can finish P
-before Q or vice versa, and we need to wait to complete both before
-calling client callback() and completing cookie.
-Second thing we submit memcpy and sg on same channel, and can complete
-before even though if it submitted after PQ.
-
->
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Mark.
