@@ -1,9 +1,9 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Mon, 16 Mar 2015 20:17:11 +0100
-Subject: [PATCH 05/35 linux-next] tty: constify of_device_id array
+Date: Mon, 16 Mar 2015 20:17:12 +0100
+Subject: [PATCH 06/35 linux-next] power: constify of_device_id array
 In-Reply-To: <1426533469-25458-1-git-send-email-fabf@skynet.be>
 References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
-Message-ID: <1426533469-25458-6-git-send-email-fabf@skynet.be>
+Message-ID: <1426533469-25458-7-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,212 +12,155 @@ of_device_id is always used as const.
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- drivers/tty/serial/apbuart.c                | 2 +-
- drivers/tty/serial/cpm_uart/cpm_uart_core.c | 2 +-
- drivers/tty/serial/fsl_lpuart.c             | 2 +-
- drivers/tty/serial/mpc52xx_uart.c           | 2 +-
- drivers/tty/serial/mxs-auart.c              | 2 +-
- drivers/tty/serial/of_serial.c              | 4 ++--
- drivers/tty/serial/pmac_zilog.c             | 2 +-
- drivers/tty/serial/pxa.c                    | 2 +-
- drivers/tty/serial/serial-tegra.c           | 2 +-
- drivers/tty/serial/sirfsoc_uart.c           | 2 +-
- drivers/tty/serial/st-asc.c                 | 2 +-
- drivers/tty/serial/uartlite.c               | 2 +-
- drivers/tty/serial/ucc_uart.c               | 2 +-
- drivers/tty/serial/xilinx_uartps.c          | 2 +-
- 14 files changed, 15 insertions(+), 15 deletions(-)
+ drivers/power/charger-manager.c         | 2 +-
+ drivers/power/reset/at91-poweroff.c     | 2 +-
+ drivers/power/reset/at91-reset.c        | 4 ++--
+ drivers/power/reset/hisi-reboot.c       | 2 +-
+ drivers/power/reset/keystone-reset.c    | 2 +-
+ drivers/power/reset/st-poweroff.c       | 2 +-
+ drivers/power/reset/syscon-reboot.c     | 2 +-
+ drivers/power/reset/vexpress-poweroff.c | 2 +-
+ drivers/power/reset/xgene-reboot.c      | 2 +-
+ drivers/power/tps65090-charger.c        | 2 +-
+ 10 files changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/tty/serial/apbuart.c b/drivers/tty/serial/apbuart.c
-index 4f0f95e..f3af317 100644
---- a/drivers/tty/serial/apbuart.c
-+++ b/drivers/tty/serial/apbuart.c
-@@ -572,7 +572,7 @@ static int apbuart_probe(struct platform_device *op)
+diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-manager.c
+index 14b0d85..bfd3842 100644
+--- a/drivers/power/charger-manager.c
++++ b/drivers/power/charger-manager.c
+@@ -1459,7 +1459,7 @@ static int cm_init_thermal_data(struct charger_manager *cm,
+ 	return ret;
+ }
+ 
+-static struct of_device_id charger_manager_match[] = {
++static const struct of_device_id charger_manager_match[] = {
+ 	{
+ 		.compatible = "charger-manager",
+ 	},
+diff --git a/drivers/power/reset/at91-poweroff.c b/drivers/power/reset/at91-poweroff.c
+index 4b72ea5..9847cfb 100644
+--- a/drivers/power/reset/at91-poweroff.c
++++ b/drivers/power/reset/at91-poweroff.c
+@@ -140,7 +140,7 @@ static int at91_poweroff_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static struct of_device_id apbuart_match[] = {
-+static const struct of_device_id apbuart_match[] = {
- 	{
- 	 .name = "GAISLER_APBUART",
- 	 },
-diff --git a/drivers/tty/serial/cpm_uart/cpm_uart_core.c b/drivers/tty/serial/cpm_uart/cpm_uart_core.c
-index fddb1fd..08431ad 100644
---- a/drivers/tty/serial/cpm_uart/cpm_uart_core.c
-+++ b/drivers/tty/serial/cpm_uart/cpm_uart_core.c
-@@ -1435,7 +1435,7 @@ static int cpm_uart_remove(struct platform_device *ofdev)
- 	return uart_remove_one_port(&cpm_reg, &pinfo->port);
+-static struct of_device_id at91_poweroff_of_match[] = {
++static const struct of_device_id at91_poweroff_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-shdwc", },
+ 	{ .compatible = "atmel,at91sam9rl-shdwc", },
+ 	{ .compatible = "atmel,at91sam9x5-shdwc", },
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 13584e2..68b1896 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -152,14 +152,14 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ 	pr_info("AT91: Starting after %s\n", reason);
  }
  
--static struct of_device_id cpm_uart_match[] = {
-+static const struct of_device_id cpm_uart_match[] = {
- 	{
- 		.compatible = "fsl,cpm1-smc-uart",
- 	},
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index b1893f3..946273a 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -257,7 +257,7 @@ struct lpuart_port {
- 	struct timer_list	lpuart_timer;
+-static struct of_device_id at91_ramc_of_match[] = {
++static const struct of_device_id at91_ramc_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-sdramc", },
+ 	{ .compatible = "atmel,at91sam9g45-ddramc", },
+ 	{ .compatible = "atmel,sama5d3-ddramc", },
+ 	{ /* sentinel */ }
  };
  
--static struct of_device_id lpuart_dt_ids[] = {
-+static const struct of_device_id lpuart_dt_ids[] = {
- 	{
- 		.compatible = "fsl,vf610-lpuart",
- 	},
-diff --git a/drivers/tty/serial/mpc52xx_uart.c b/drivers/tty/serial/mpc52xx_uart.c
-index 3308ef2..1589f17 100644
---- a/drivers/tty/serial/mpc52xx_uart.c
-+++ b/drivers/tty/serial/mpc52xx_uart.c
-@@ -1717,7 +1717,7 @@ static struct uart_driver mpc52xx_uart_driver = {
- /* OF Platform Driver                                                       */
- /* ======================================================================== */
+-static struct of_device_id at91_reset_of_match[] = {
++static const struct of_device_id at91_reset_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+ 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+ 	{ /* sentinel */ }
+diff --git a/drivers/power/reset/hisi-reboot.c b/drivers/power/reset/hisi-reboot.c
+index 5385460..9ab7f56 100644
+--- a/drivers/power/reset/hisi-reboot.c
++++ b/drivers/power/reset/hisi-reboot.c
+@@ -64,7 +64,7 @@ static int hisi_reboot_probe(struct platform_device *pdev)
+ 	return err;
+ }
  
--static struct of_device_id mpc52xx_uart_of_match[] = {
-+static const struct of_device_id mpc52xx_uart_of_match[] = {
- #ifdef CONFIG_PPC_MPC52xx
- 	{ .compatible = "fsl,mpc5200b-psc-uart", .data = &mpc5200b_psc_ops, },
- 	{ .compatible = "fsl,mpc5200-psc-uart", .data = &mpc52xx_psc_ops, },
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 20a863b..f7e5825 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -176,7 +176,7 @@ static struct platform_device_id mxs_auart_devtype[] = {
- };
- MODULE_DEVICE_TABLE(platform, mxs_auart_devtype);
- 
--static struct of_device_id mxs_auart_dt_ids[] = {
-+static const struct of_device_id mxs_auart_dt_ids[] = {
- 	{
- 		.compatible = "fsl,imx28-auart",
- 		.data = &mxs_auart_devtype[IMX28_AUART]
-diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
-index 33fb94f..d8c4eea 100644
---- a/drivers/tty/serial/of_serial.c
-+++ b/drivers/tty/serial/of_serial.c
-@@ -155,7 +155,7 @@ out:
- /*
-  * Try to register a serial port
-  */
--static struct of_device_id of_platform_serial_table[];
-+static const struct of_device_id of_platform_serial_table[];
- static int of_platform_serial_probe(struct platform_device *ofdev)
- {
- 	const struct of_device_id *match;
-@@ -320,7 +320,7 @@ static SIMPLE_DEV_PM_OPS(of_serial_pm_ops, of_serial_suspend, of_serial_resume);
- /*
-  * A few common types, add more as needed.
-  */
--static struct of_device_id of_platform_serial_table[] = {
-+static const struct of_device_id of_platform_serial_table[] = {
- 	{ .compatible = "ns8250",   .data = (void *)PORT_8250, },
- 	{ .compatible = "ns16450",  .data = (void *)PORT_16450, },
- 	{ .compatible = "ns16550a", .data = (void *)PORT_16550A, },
-diff --git a/drivers/tty/serial/pmac_zilog.c b/drivers/tty/serial/pmac_zilog.c
-index 8f51579..e156e39 100644
---- a/drivers/tty/serial/pmac_zilog.c
-+++ b/drivers/tty/serial/pmac_zilog.c
-@@ -1846,7 +1846,7 @@ static int __init pmz_register(void)
- 
- #ifdef CONFIG_PPC_PMAC
- 
--static struct of_device_id pmz_match[] = 
-+static const struct of_device_id pmz_match[] =
- {
- 	{
- 	.name		= "ch-a",
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index d5d0626..9becba6 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -824,7 +824,7 @@ static const struct dev_pm_ops serial_pxa_pm_ops = {
- };
- #endif
- 
--static struct of_device_id serial_pxa_dt_ids[] = {
-+static const struct of_device_id serial_pxa_dt_ids[] = {
- 	{ .compatible = "mrvl,pxa-uart", },
- 	{ .compatible = "mrvl,mmp-uart", },
+-static struct of_device_id hisi_reboot_of_match[] = {
++static const struct of_device_id hisi_reboot_of_match[] = {
+ 	{ .compatible = "hisilicon,sysctrl" },
  	{}
-diff --git a/drivers/tty/serial/serial-tegra.c b/drivers/tty/serial/serial-tegra.c
-index 48e6e41..1d5ea39 100644
---- a/drivers/tty/serial/serial-tegra.c
-+++ b/drivers/tty/serial/serial-tegra.c
-@@ -1251,7 +1251,7 @@ static struct tegra_uart_chip_data tegra30_uart_chip_data = {
- 	.support_clk_src_div		= true,
+ };
+diff --git a/drivers/power/reset/keystone-reset.c b/drivers/power/reset/keystone-reset.c
+index faedf16..c70f1bf 100644
+--- a/drivers/power/reset/keystone-reset.c
++++ b/drivers/power/reset/keystone-reset.c
+@@ -70,7 +70,7 @@ static struct notifier_block rsctrl_restart_nb = {
+ 	.priority = 128,
  };
  
--static struct of_device_id tegra_uart_of_match[] = {
-+static const struct of_device_id tegra_uart_of_match[] = {
- 	{
- 		.compatible	= "nvidia,tegra30-hsuart",
- 		.data		= &tegra30_uart_chip_data,
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index 27ed0e9..9de3eab 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -1269,7 +1269,7 @@ static struct uart_driver sirfsoc_uart_drv = {
- #endif
- };
- 
--static struct of_device_id sirfsoc_uart_ids[] = {
-+static const struct of_device_id sirfsoc_uart_ids[] = {
- 	{ .compatible = "sirf,prima2-uart", .data = &sirfsoc_uart,},
- 	{ .compatible = "sirf,atlas7-uart", .data = &sirfsoc_uart},
- 	{ .compatible = "sirf,prima2-usp-uart", .data = &sirfsoc_usp},
-diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index 712b03a..d625664 100644
---- a/drivers/tty/serial/st-asc.c
-+++ b/drivers/tty/serial/st-asc.c
-@@ -720,7 +720,7 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
- }
- 
- #ifdef CONFIG_OF
--static struct of_device_id asc_match[] = {
-+static const struct of_device_id asc_match[] = {
- 	{ .compatible = "st,asc", },
+-static struct of_device_id rsctrl_of_match[] = {
++static const struct of_device_id rsctrl_of_match[] = {
+ 	{.compatible = "ti,keystone-reset", },
  	{},
  };
-diff --git a/drivers/tty/serial/uartlite.c b/drivers/tty/serial/uartlite.c
-index 189f52e..708eead 100644
---- a/drivers/tty/serial/uartlite.c
-+++ b/drivers/tty/serial/uartlite.c
-@@ -622,7 +622,7 @@ static int ulite_release(struct device *dev)
+diff --git a/drivers/power/reset/st-poweroff.c b/drivers/power/reset/st-poweroff.c
+index 27383de..a488877 100644
+--- a/drivers/power/reset/st-poweroff.c
++++ b/drivers/power/reset/st-poweroff.c
+@@ -97,7 +97,7 @@ static struct notifier_block st_restart_nb = {
+ 	.priority = 192,
+ };
  
- #if defined(CONFIG_OF)
- /* Match table for of_platform binding */
--static struct of_device_id ulite_of_match[] = {
-+static const struct of_device_id ulite_of_match[] = {
- 	{ .compatible = "xlnx,opb-uartlite-1.00.b", },
- 	{ .compatible = "xlnx,xps-uartlite-1.00.a", },
+-static struct of_device_id st_reset_of_match[] = {
++static const struct of_device_id st_reset_of_match[] = {
+ 	{
+ 		.compatible = "st,stih415-restart",
+ 		.data = (void *)&stih415_reset,
+diff --git a/drivers/power/reset/syscon-reboot.c b/drivers/power/reset/syscon-reboot.c
+index c4049f4..d3c7d24 100644
+--- a/drivers/power/reset/syscon-reboot.c
++++ b/drivers/power/reset/syscon-reboot.c
+@@ -76,7 +76,7 @@ static int syscon_reboot_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
+-static struct of_device_id syscon_reboot_of_match[] = {
++static const struct of_device_id syscon_reboot_of_match[] = {
+ 	{ .compatible = "syscon-reboot" },
  	{}
-diff --git a/drivers/tty/serial/ucc_uart.c b/drivers/tty/serial/ucc_uart.c
-index 14d10fc..7d2532b 100644
---- a/drivers/tty/serial/ucc_uart.c
-+++ b/drivers/tty/serial/ucc_uart.c
-@@ -1473,7 +1473,7 @@ static int ucc_uart_remove(struct platform_device *ofdev)
+ };
+diff --git a/drivers/power/reset/vexpress-poweroff.c b/drivers/power/reset/vexpress-poweroff.c
+index be12d9b..6a9bf70 100644
+--- a/drivers/power/reset/vexpress-poweroff.c
++++ b/drivers/power/reset/vexpress-poweroff.c
+@@ -80,7 +80,7 @@ DEVICE_ATTR(active, S_IRUGO | S_IWUSR, vexpress_reset_active_show,
+ 
+ enum vexpress_reset_func { FUNC_RESET, FUNC_SHUTDOWN, FUNC_REBOOT };
+ 
+-static struct of_device_id vexpress_reset_of_match[] = {
++static const struct of_device_id vexpress_reset_of_match[] = {
+ 	{
+ 		.compatible = "arm,vexpress-reset",
+ 		.data = (void *)FUNC_RESET,
+diff --git a/drivers/power/reset/xgene-reboot.c b/drivers/power/reset/xgene-reboot.c
+index b0e5002..f07e93c 100644
+--- a/drivers/power/reset/xgene-reboot.c
++++ b/drivers/power/reset/xgene-reboot.c
+@@ -87,7 +87,7 @@ static int xgene_reboot_probe(struct platform_device *pdev)
+ 	return err;
+ }
+ 
+-static struct of_device_id xgene_reboot_of_match[] = {
++static const struct of_device_id xgene_reboot_of_match[] = {
+ 	{ .compatible = "apm,xgene-reboot" },
+ 	{}
+ };
+diff --git a/drivers/power/tps65090-charger.c b/drivers/power/tps65090-charger.c
+index 0f4e597..1c2edcd 100644
+--- a/drivers/power/tps65090-charger.c
++++ b/drivers/power/tps65090-charger.c
+@@ -344,7 +344,7 @@ static int tps65090_charger_remove(struct platform_device *pdev)
  	return 0;
  }
  
--static struct of_device_id ucc_uart_match[] = {
-+static const struct of_device_id ucc_uart_match[] = {
- 	{
- 		.type = "serial",
- 		.compatible = "ucc_uart",
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 8f9c543..09258de 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -1459,7 +1459,7 @@ static int cdns_uart_remove(struct platform_device *pdev)
- }
- 
- /* Match table for of_platform binding */
--static struct of_device_id cdns_uart_of_match[] = {
-+static const struct of_device_id cdns_uart_of_match[] = {
- 	{ .compatible = "xlnx,xuartps", },
- 	{ .compatible = "cdns,uart-r1p8", },
- 	{}
+-static struct of_device_id of_tps65090_charger_match[] = {
++static const struct of_device_id of_tps65090_charger_match[] = {
+ 	{ .compatible = "ti,tps65090-charger", },
+ 	{ /* end */ }
+ };
 -- 
 2.1.0
