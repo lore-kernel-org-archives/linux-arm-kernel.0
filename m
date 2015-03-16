@@ -1,90 +1,31 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 16 Mar 2015 17:31:54 -0400
-Subject: [RFC][PATCH] ring-buffer: Replace this_cpu_{read,write} with
- this_cpu_ptr()
-Message-ID: <20150316173154.537b80ee@gandalf.local.home>
+From: george.joseph@fairview5.com (George Joseph)
+Date: Mon, 16 Mar 2015 15:33:49 -0600
+Subject: [PATCH] dts: cubox: Map gpio-keys and pps-gpio to gpio3 8
+In-Reply-To: <20150316205004.GO8656@n2100.arm.linux.org.uk>
+References: <1426538201-7571-1-git-send-email-george.joseph@fairview5.com>
+ <20150316205004.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <CAHKv19CYD59Ssf6LMyh8K12_5tGLq+yX=sNXWyvU0fPo3JN57g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has come to my attention that this_cpu_read/write are horrible on
-architectures other than x86. Worse yet, they actually disable
-preemption or interrupts! This caused some unexpected tracing results
-on ARM.
+On Mon, Mar 16, 2015 at 2:50 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 16, 2015 at 02:36:41PM -0600, George Joseph wrote:
+>> The Cubox has a recessed button between the HDMI and RJ-45 connectors
+>> that wasn't mapped in the device tree.  Since the button is normally
+>> open and there's no external pull up/down, that pad (EIM_DA8) can be
+>> used for almost anything so I've mapped it to gpio-keys BTN_0 and
+>> pps-gpio.  Whichever driver claims it first wins.  If both drivers
+>> are build as modules, you can even switch between them at run time
+>> and the pinmux will adjust the pin configuration as required.
+>> If neither driver claims the gpio, it's still available in the normal
+>> gpio sysfs.
+>
+> I wonder why we want to have the PPS support in mainline, given that
+> you would need to solder to the board to make use of that.  I can see
+> the point of the gpio-keys going into mainline, but not the PPS bit.
+> That's more like a local hack.
+>
 
-   101.356868: preempt_count_add <-ring_buffer_lock_reserve
-   101.356870: preempt_count_sub <-ring_buffer_lock_reserve
-
-The ring_buffer_lock_reserve has recursion protection that requires
-accessing a per cpu variable. But since preempt_disable() is traced, it
-too got traced while accessing the variable that is suppose to prevent
-recursion like this.
-
-The generic version of this_cpu_read() and write() are:
-
-#define _this_cpu_generic_read(pcp)					\
-({	typeof(pcp) ret__;						\
-	preempt_disable();						\
-	ret__ = *this_cpu_ptr(&(pcp));					\
-	preempt_enable();						\
-	ret__;								\
-})
-
-#define _this_cpu_generic_to_op(pcp, val, op)				\
-do {									\
-	unsigned long flags;						\
-	raw_local_irq_save(flags);					\
-	*__this_cpu_ptr(&(pcp)) op val;					\
-	raw_local_irq_restore(flags);					\
-} while (0)
-
-
-Which is unacceptable for locations that know they are within preempt
-disabled or interrupt disabled locations.
-
-I may go and remove all this_cpu_read,write() calls from my code
-because of this.
-
-Cc: stable at vger.kernel.org
-Cc: Christoph Lameter <cl@linux.com>
-Reported-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
----
-diff --git a/kernel/trace/ring_buffer.c b/kernel/trace/ring_buffer.c
-index 5040d44fe5a3..be33c6093ca5 100644
---- a/kernel/trace/ring_buffer.c
-+++ b/kernel/trace/ring_buffer.c
-@@ -2679,7 +2679,11 @@ static DEFINE_PER_CPU(unsigned int, current_context);
- 
- static __always_inline int trace_recursive_lock(void)
- {
--	unsigned int val = this_cpu_read(current_context);
-+	/*
-+	 * We can not use this_cpu_read() and this_cpu_write() because
-+	 * the generic versions call preempt_disable()
-+	 */
-+	unsigned int val = *this_cpu_ptr(&current_context);
- 	int bit;
- 
- 	if (in_interrupt()) {
-@@ -2696,18 +2700,18 @@ static __always_inline int trace_recursive_lock(void)
- 		return 1;
- 
- 	val |= (1 << bit);
--	this_cpu_write(current_context, val);
-+	*this_cpu_ptr(&current_context) = val;
- 
- 	return 0;
- }
- 
- static __always_inline void trace_recursive_unlock(void)
- {
--	unsigned int val = this_cpu_read(current_context);
-+	unsigned int val = *this_cpu_ptr(&current_context);
- 
- 	val--;
- 	val &= this_cpu_read(current_context);
--	this_cpu_write(current_context, val);
-+	*this_cpu_ptr(&current_context) = val;
- }
- 
- #else
+Well, it was just one less thing I'd have to patch locally for so I
+took a chance. :)    I'll remove the pps bits and resubmit.
