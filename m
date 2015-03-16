@@ -1,36 +1,41 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Mon, 16 Mar 2015 08:50:31 +0200
-Subject: [PATCH v6 2/6] wl12xx: use frequency instead of enumerations for
- pdata clocks
-In-Reply-To: <3103538.jZ037SODdT@wuerfel> (Arnd Bergmann's message of "Sun, 15
- Mar 2015 13:08:54 +0100")
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <20150313150047.GI5264@atomide.com>
- <CAB3XZEcOytqpJ4pWoemLS3d+DCeA8C75MencDfGn_vhfEYrduw@mail.gmail.com>
- <3103538.jZ037SODdT@wuerfel>
-Message-ID: <87lhixphag.fsf@kamboji.qca.qualcomm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 16 Mar 2015 08:03:39 +0100
+Subject: [PATCH 3/5] clk: mediatek: Add basic clocks for Mediatek MT8135.
+In-Reply-To: <1426485311-31428-4-git-send-email-s.hauer@pengutronix.de>
+References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
+ <1426485311-31428-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150316070339.GA25487@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hello Sascha,
 
-> On Sunday 15 March 2015 10:43:35 Eliad Peller wrote:
->> 
->> > The other option would be to have the whole series in a immutable
->> > branch against v3.0-rc1 that can be merged into both wirelss tree
->> > and omap tree.
->> >
->> i think that could be easier.
->> 
->> or maybe you can just take them all through the omap tree? the wlcore
->> tree is not under active development, so i don't expect conflicts
->> there.
->
-> I'm fine with both these approaches.
+On Mon, Mar 16, 2015 at 06:55:09AM +0100, Sascha Hauer wrote:
+> +static const char *axi_parents[] __initconst = {
+> +	"clk26m",
+> +	"syspll_d3",
+> +	"syspll_d4",
+> +	"syspll_d6",
+> +	"univpll_d5",
+> +	"univpll2_d2",
+> +	"syspll_d3p5"
+> +};
+__initconst should only be used for const data, but this array isn't
+const. Only the strings the pointer in this array point to are constant.
 
-I prefer these going through the omap tree. Like Eliad said,
-drivers/net/wireless/ti does not get that many changes nowadays so the
-chances of this patchset conflicting with something is very small.
+So you have to use either
+
+	static const char *axi_parents[] __initdata = {
+
+or
+
+	static const char * const axi_parents[] __initconst = {
+
+.
+
+Best regards
+Uwe
 
 -- 
-Kalle Valo
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
