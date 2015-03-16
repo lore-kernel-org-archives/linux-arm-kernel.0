@@ -1,48 +1,39 @@
-From: Suravee.Suthikulpanit@amd.com (Suthikulpanit, Suravee)
-Date: Mon, 16 Mar 2015 05:07:49 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <55019423.3080506@codeaurora.org>
-Message-ID: <D12BCE95.15953%suravee.suthikulpanit@amd.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 16 Mar 2015 16:16:26 +1100
+Subject: linux-next: manual merge of the kdbus tree with the arm-soc tree
+Message-ID: <20150316161626.32e838f5@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
+Today's linux-next merge of the kdbus tree got a conflict in
+Documentation/Makefile between commit c6535e1e0361 ("Documentation:
+Remove ZBOOT MMC/SDHI utility and docs") from the arm-soc tree and
+commit 48480f8c402c ("kdbus: add documentation") from the kdbus tree.
 
-On 3/12/15, 08:26, "Timur Tabi" <timur@codeaurora.org> wrote:
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
->Hanjun Guo wrote:
->> This patch set already tested on multi platforms:
->>   - AMD Seattle board;
->>   - Cavium Thunder board;
->>   - Huawei D02 board;
->>   - Qualcomm ARM64 platform
->>
->> This version 10 patch set address some minor comments and collect ACKs
->>and
->> Reviewed-bys for v9:
->>
->>   - new Acks from Rafael, Olof, Grant, Lorenzo
->>   - new way to handle typdef phys_cpuid_t which suggested by Rafael,
->>     but no functional change
->>   - Remove if(!phys) for early ioremappings
->>   - Rework sleep function for ARM64
->>   - Introduce linux/acpi_irq.h to hold acpi_irq_init()
->>   - Disable ACPI if not HW_REDUCED_ACPI compliant
->>   - Remove the doc of why ACPI on ARM
->
->v10 retested and working as before, so ...
->
->	Tested-by: Timur Tabi <timur@codeaurora.org>
->
->for the whole patchset.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-
-Also retested on AMD Seattle.
-
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-
->
->-- 
->Sent by an employee of the Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the
->Code Aurora Forum, hosted by The Linux Foundation.
+diff --cc Documentation/Makefile
+index bc0548201755,5e3fde632d03..000000000000
+--- a/Documentation/Makefile
++++ b/Documentation/Makefile
+@@@ -1,4 -1,4 +1,4 @@@
+ -subdir-y := accounting arm auxdisplay blackfin connector \
+ +subdir-y := accounting auxdisplay blackfin connector \
+- 	filesystems filesystems ia64 laptops mic misc-devices \
++ 	filesystems filesystems ia64 kdbus laptops mic misc-devices \
+  	networking pcmcia prctl ptp spi timers vDSO video4linux \
+  	watchdog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150316/f0d34e84/attachment.sig>
