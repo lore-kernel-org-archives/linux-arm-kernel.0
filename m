@@ -1,47 +1,37 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 16 Mar 2015 09:16:32 +0200
-Subject: [PATCH v2 0/2] ARM: devicetree: Remove unused ti,codec property
-In-Reply-To: <1426279237-15940-1-git-send-email-marek@goldelico.com>
-References: <1426279237-15940-1-git-send-email-marek@goldelico.com>
-Message-ID: <55068350.9080500@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 16 Mar 2015 15:23:29 +0800
+Subject: [PATCH 05/10] ARM: zx: bring up the secondary core
+In-Reply-To: <2076674.uPo0q8sg2C@wuerfel>
+References: <1426333785-3952-1-git-send-email-jun.nie@linaro.org>
+ <1426333785-3952-6-git-send-email-jun.nie@linaro.org>
+ <2076674.uPo0q8sg2C@wuerfel>
+Message-ID: <20150316072327.GK20455@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2015 10:40 PM, Marek Belisko wrote:
-> ti,codec in not parsed in omap-twl4030 sound driver. It's not necessary
-> to specify this property in DT because ti,twl4030-audio which ti,codec
-> was pointing to by phandle is mfd driver and device for ASoC ic created w/o
-> any DT property (codec name is hardcoded in ASoC driver).
+On Sat, Mar 14, 2015 at 10:25:03PM +0100, Arnd Bergmann wrote:
+> On Saturday 14 March 2015 19:49:40 Jun Nie wrote:
+> > +
+> > +       /*
+> > +        * This is really belt and braces; we hold unintended secondary
+> > +        * CPUs in the holding pen until we're ready for them.  However,
+> > +        * since we haven't sent them a soft interrupt, they shouldn't
+> > +        * be there.
+> > +        */
+> > +       write_pen_release(cpu);
+> > +
+> > 
 > 
-> Please see reply [1] from Peter Ujfalusi.
+> Why do you need the holding pen on this platform? Is there a firmware
+> bug or just missing hardware support for proper SMP power management?
 
-All:
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Arnd,
 
-> 
-> Changes from v1:
-> - keep ti,codec property in Documentation as optional that the
-> existing dtbs do not become noncompliant after the change
-> 
-> [1]: http://comments.gmane.org/gmane.linux.ports.arm.omap/124273
-> 
-> Marek Belisko (2):
->   ARM: dts: omap3: Remove all references to ti,codec property
->   Documentation: omap-twl4030: Move ti,codec property to optional
-> 
->  Documentation/devicetree/bindings/sound/omap-twl4030.txt | 3 +--
->  arch/arm/boot/dts/omap3-beagle-xm.dts                    | 1 -
->  arch/arm/boot/dts/omap3-beagle.dts                       | 1 -
->  arch/arm/boot/dts/omap3-cm-t3x30.dtsi                    | 1 -
->  arch/arm/boot/dts/omap3-devkit8000.dts                   | 1 -
->  arch/arm/boot/dts/omap3-gta04.dtsi                       | 1 -
->  arch/arm/boot/dts/omap3-igep.dtsi                        | 1 -
->  arch/arm/boot/dts/omap3-lilly-a83x.dtsi                  | 1 -
->  arch/arm/boot/dts/omap3-overo-base.dtsi                  | 1 -
->  arch/arm/boot/dts/omap3-tao3530.dtsi                     | 1 -
->  10 files changed, 1 insertion(+), 11 deletions(-)
-> 
+As this is how things are handled in vendor's kernel, we thought the
+hardware might be lack of SMP power management.  But we will check with
+vendor to see if there is any level of hardware support for secondary
+core management, so that we can save the use of holding pen.
 
+Thanks for the comment.
 
--- 
-P?ter
+Shawn
