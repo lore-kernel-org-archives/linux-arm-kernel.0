@@ -1,78 +1,139 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Mar 2015 18:43:14 +0100
-Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
-In-Reply-To: <20150316173324.GA21040@leverpostej>
-References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150316160948.GB18277@leverpostej>
- <CAKv+Gu_-1XMcpobRt7tXCZaqWoszWLfJxgHBLaKuWchz87UnSA@mail.gmail.com>
- <20150316173324.GA21040@leverpostej>
-Message-ID: <AEDF43E0-1C4F-43DF-B8A2-BFF7836091E8@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 16 Mar 2015 17:47:46 +0000
+Subject: Versatile Express randomly fails to boot - Versatile Express
+ to be removed from nightly testing
+In-Reply-To: <20150316130419.GI8656@n2100.arm.linux.org.uk>
+References: <20150315213330.GB8656@n2100.arm.linux.org.uk>
+ <20150316000438.GD8656@n2100.arm.linux.org.uk>
+ <20150316004239.GE8656@n2100.arm.linux.org.uk>
+ <20150316093553.GF8656@n2100.arm.linux.org.uk>
+ <20150316130419.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <55071742.6000405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
-On 16 mrt. 2015, at 18:33, Mark Rutland <mark.rutland@arm.com> wrote:
+On 16/03/15 13:04, Russell King - ARM Linux wrote:
+> On Mon, Mar 16, 2015 at 09:35:53AM +0000, Russell King - ARM Linux wrote:
+>> On Mon, Mar 16, 2015 at 12:42:39AM +0000, Russell King - ARM Linux wrote:
+>>> On Mon, Mar 16, 2015 at 12:04:38AM +0000, Russell King - ARM Linux wrote:
+>>>> On Sun, Mar 15, 2015 at 09:33:30PM +0000, Russell King - ARM Linux wrote:
+>>>>> I'm going to try a few other kernels to try and track down what's going
+>>>>> on - whether something from arm-soc or my tree is responsible for this
+>>>>> really weird behaviour.
+>>>>
+>>>> Okay, this is weird - it seems that it's caused by the FIQ oops
+>>>> dumping code/FIQ changes which I've carried for many months
+>>>> unchanged in my tree.
+>>>
+>>> More weirdness.  Progressing forwards through my development code
+>>> showed that when I merged the patch I mentioned in the previous mail,
+>>> things started to fail.
+>>>
+>>> As I also mentioned, I'd drop that branch (two patches, one adding
+>>> the IPI backtrace stuff and the second one updating the GIC to allow
+>>> it to raise FIQs on suitably equipped platforms.)  I would have
+>>> expected that to have worked, but it just failed after four boot
+>>> iterations.  So either it's not the FIQ, or it is the FIQ code _and_
+>>> also something else.  Or it has something to do with the placement
+>>> of functions in the kernel.
+>>>
+>>> I'll try more stuff tomorrow, working from where I presently am
+>>> (which is basically last night's code minus the FIQ changes) by
+>>> removing other changes to see what brings us back to a working
+>>> system.
+>>>
+>>> As I've already said - this is really weird because all of these
+>>> changes were also tested against -rc1... those which weren't are:
+>>>
+>>> mm: fold arch_randomize_brk into ARCH_HAS_ELF_RANDOMIZE
+>>> mm: split ET_DYN ASLR from mmap ASLR
+>>> mm: move randomize_et_dyn into ELF_ET_DYN_BASE
+>>> mm: expose arch_mmap_rnd when available
+>>> arm: factor out mmap ASLR into mmap_rnd
+>>>
+>>> and a number of clkdev rework patches (to make it use clk_hw
+>>> internally.)  Neither of these should be affecting it, but that's
+>>> something I will be testing tomorrow.
+>>
+>> Okay, reverting the ASLR changes and the clkdev changes annoyingly still
+>> results in random failure.
+>
+> After ruling out ASLR and clkdev, I started progressively reverting other
+> stuff in the build tree.  Eventually, I got down to reverting the L2C
+> change I've been carrying since the L2C cleanups.
+>
+> With that lot reverted, which is slightly more than the previously known
+> good test, it booted five times without issue.
+>
+> So, I thought I'd add that L2C change to the list of bad commits, and try
+> omitting _just_ the L2C and FIQ changes... and it still fails - on the
+> first test boot iteration.
+>
+> I think I'm going to declare that this is all down to some obscure
+> hardware problem with Versatile Express, which is tickled by the layout
+> of the kernel against the cache, and take it out of the nightly system
+> (it's pointless having unstable hardware being tested; random failures
+> are completely meaningless.)
+>
 
->>>> - performance: we can align PHYS_OFFSET so that most of the linear mapping can
->>>>  be done using 512 MB or 1 GB blocks (depending on page size), instead of
->>>>  the more granular level that is currently unavoidable if Image cannot be
->>>>  loaded at base of RAM (since PHYS_OFFSET is tied to the start of the kernel
->>>>  Image).
->>> 
->>> Isn't this gain somewhat offset by having to build the kernel as a PIE?
->> 
->> I don't think so. Note that this is not -fpic code, it's just the ld
->> option that dumps the reloc and dynsym tables into the output image.
->> The reloc penalty is boottime only.
-> 
-> Ah, ok.
-> 
->>> I have a very strong suspicion that bootloaders in the wild don't zero
->>> x1-x3, and that given that we might not have a reliable mechanism for
->>> acquiring the offset.
->> 
->> OK, sounds about time to start complaining about that then.
-> 
-> I guess so.
-> 
->>>> Issues:
->>>> - Since AArch64 uses the ELF RELA format (where the addends are in the
->>>>  relocation table and not in the code), the relocations need to be applied even
->>>>  if the Image runs from the same offset it was linked at. It also means that
->>>>  some values that are produced by the linker (_kernel_size_le, etc) are missing
->>>>  from the binary. This will probably need a fixup step.
->>>> - The module area may be out of range, which needs to be worked around with
->>>>  module PLTs. This is straight forward but I haven't implemented it yet for
->>>>  arm64.
->>>> - The core extable is most likely broken, and would need to be changed to use
->>>>  relative offsets instead of absolute addresses.
->>> 
->>> This sounds like it's going to be a big headache.
->> 
->> It's all manageable, really. The module PLT thing is something I
->> already implemented for 32-bit ARM here:
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305539.html
->> (only Russell couldn't be bothered to merge it)
->> 
->> The extable is already relative on x86, and the fixup step is some
->> straight forward ELF mangling on vmlinux before performing the
->> objcopy.
->> But yes, it's rather ugly.
-> 
-> Hmm. I'd be rather worried about the fixup step; I suspect that'll be
-> fragile and rarely tested. Perhaps we could verify them at boot time?
+I was able to see exact behaviour on my VExpress setup with CA9X4 
+core-tile. Few observations from my side:
 
-It would essentially be __relocate_kernel() but executed at build time against vmlinux with a reloc offset of #0
+1. This issue can be reproduced even on v3.19
+2. As you suspected L2C, I tried disabling L2C and it seems to solve
+    the issue
+3. Since it's very random and enabling LL_DEBUG made it difficult to
+    reproduce the issue, I tried to dump the stack using DS5 debugger
+4. The stack is exactly same always both on v4.0-rc* and v3.19 kernel
+    and on multiple runs
+5. Connecting to h/w debugger, stopping and re-starting the CPUs,
+    solves the issue. It's helping CPUs to get out of __radix_tree_lookup
+    somehow
 
-> 
->>> I'd rather see that we decouple the kernel (text/data) mapping from the
->>> linear mapping, with the former given a fixed VA independent of the PA
->>> of the kernel Image (which would still need to be at a 2M-aligned
->>> address + text_offset, and not straddling a 512M boundary).
->> 
->> Hmm, that's quite nice, actually, It also fixes the module range
->> problem, and for VA randomization we could move both regions together.
-> 
-> Ah, good point. I hadn't consdiered modules all that much, but it sounds
-> like it could work.
-> 
+Stacktrace
+==========
+(sorry it's looks different from std. Linux backtrace as this one id 
+dump from DS5)
+
+CPU 0
+----
+#0 __radix_tree_lookup( root = <Value currently has no location>, index 
+= 16, nodep = (struct radix_tree_node**) 0x0, slotp = (void***) 0x0 ) at 
+radix-tree.c:517
+#1 generic_handle_irq( irq = 16 ) at irqdesc.c:349
+#2 __handle_domain_irq( domain = (struct irq_domain*) 0xBF004400, hwirq 
+= 16, lookup = <Value currently has no location>, regs = <Value 
+currently has no location> ) at irqdesc.c:391
+#3 __raw_readl( addr = <Value optimised away by compiler> ) at io.h:121
+#4 gic_handle_irq( regs = (struct pt_regs*) 0x805F1F40 ) at irq-gic.c:277
+#5 [__irq_svc+0x40]
+
+
+CPU1
+----
+#0 __radix_tree_lookup( root = <Value currently has no location>, index 
+= 16, nodep = (struct radix_tree_node**) 0x0, slotp = (void***) 0x0 ) at 
+radix-tree.c:517
+#1 __irq_get_desc_lock( irq = <Value currently has no location>, flags = 
+(long unsigned int*) 0xBF08BF94, bus = false, check = 3 ) at irqdesc.c:544
+#2 enable_percpu_irq( irq = 16, type = 0 ) at manage.c:1583
+#3 twd_timer_cpu_notify( self = <Value not available : Undefined value 
+in stack frame for register R0>, action = <Value currently has no 
+location>, hcpu = <Value not available : Undefined value in stack frame 
+for register R2> ) at smp_twd.c:322
+#4 notifier_call_chain( nl = <Value currently has no location>, val = 
+<Value not available : Undefined value in stack frame for register R1>, 
+v = <Value not available : Undefined value in stack frame for register 
+R2>, nr_to_call = <Value not available : Undefined value in stack frame 
+for register R3>, nr_calls = (int*) 0x0 ) at notifier.c:95
+#5 notifier_to_errno( ret = <Value currently has no location> ) at 
+notifier.h:179
+#6 cpu_notify( val = <Value currently has no location>, v = <Value 
+currently has no location> ) at cpu.c:234
+#7 secondary_start_kernel() at smp.c:367
+
+CPU2 & CPU3
+-----------
+Not booted yet, still waiting in bootloader
