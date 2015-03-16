@@ -1,102 +1,75 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 17 Mar 2015 00:15:48 +0100
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <5506C93C.704@linaro.org>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <2027737.r7gkxqZ3Xv@vostro.rjw.lan> <5506C93C.704@linaro.org>
-Message-ID: <5704037.pUGdJ0Q9hF@vostro.rjw.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 16:13:03 -0700
+Subject: [PATCH] ARM: OMAP1: PM: fix some build warnings on 1510-only
+ Kconfigs
+In-Reply-To: <54DC9DBB.4000601@gmail.com>
+References: <alpine.DEB.2.02.1502070020530.3767@utopia.booyaka.com>
+ <54D9CFBC.3070405@nvidia.com> <54D9E42C.7010105@gmail.com>
+ <alpine.DEB.2.02.1502110218090.3767@utopia.booyaka.com>
+ <20150211203757.GH2531@atomide.com>
+ <alpine.DEB.2.02.1502112056200.3767@utopia.booyaka.com>
+ <20150211211454.GJ2531@atomide.com> <54DC8DF7.1070302@gmail.com>
+ <54DC9DBB.4000601@gmail.com>
+Message-ID: <20150316231302.GU12397@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
-> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
-> > On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
-> >> From: Graeme Gregory <graeme.gregory@linaro.org>
+* Jon Hunter <jgchunter@gmail.com> [150212 04:37]:
+> 
+> On 02/12/2015 11:26 AM, Jon Hunter wrote:
+> > 
+> > On 02/11/2015 09:14 PM, Tony Lindgren wrote:
+> >> * Paul Walmsley <paul@pwsan.com> [150211 13:03]:
+> >>> On Wed, 11 Feb 2015, Tony Lindgren wrote:
+> >>>
+> >>>> * Paul Walmsley <paul@pwsan.com> [150210 18:28]:
+> >>>>> On Tue, 10 Feb 2015, Jon Hunter wrote:
+> >>>>>> On 07/02/2015 00:23, Paul Walmsley wrote:
+> >>>>>
+> >>>>>> Unfortunately, there is not a single TRM for the omap5910 but individual 
+> >>>>>> documents for each chapter in the original TRM. Check out the "OMAP5910 
+> >>>>>> Dual-Core Processor Timer Reference Guide" and possibly the "OMAP5910 
+> >>>>>> Dual-Core Processor Clock Generation and System Reset Management 
+> >>>>>> Reference Guide"
+> >>>>>>
+> >>>>>> The omap15xx/5910 did have a 32k timer but as you can see it appears it
+> >>>>>> was never supported by the kernel for this device (not sure why). I do
+> >>>>>> recall that there is some errata regarding the 32k timer, if you look at
+> >>>>>> the omap5910 errata document and search for 32k you should find it.
+> >>>>>
+> >>>>> OK thanks for the context.  I probably am not going to investigate adding 
+> >>>>> support for this timer on OMAP1510/5910 - am primarily trying to avoid 
+> >>>>> causing a regression on the existing platforms.
+> >>>>
+> >>>> At least I've never seen the 32KiHz timer registers in any 15xx
+> >>>> documentation. Jon are you sure you're not mixing up 5910 (15xx)
+> >>>> and 5912 (16xx)?
+> >>>
+> >>> It's documented in the OMAP5910 Timer Reference Guide (SPRU682A) Section 3 
+> >>> "32-kHz Timer", at the link Jon mentioned.  Have not checked the errata 
+> >>> that Jon mentioned though.
 > >>
-> >> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> >> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
-> >> for device power management, so introduce CONFIG_ACPI_GENERIC_SLEEP
-> >> and select it for x86 and ia64 only to make sleep functions available,
-> >> and also introduce stub function to allow other drivers to function
-> >> until S states are defined for ARM64.
+> >> Interesting. Looks like it's the same as on 16xx at 0xfffb9000.
+> >> AFAIK that never worked on 15xx. Or maybe the issue was that 15xx
+> >> is missing the constantly running 32KiHz counter making the timer
+> >> unusable from PM point of view as the clockevent alone is not enough.
 > >>
-> >> It will be no functional change for x86 and IA64.
+> >>> Regarding the patch: I'd suggest keeping the compilation warning fixes 
+> >>> (which was the original purpose of the patch) from anything that changes 
+> >>> the logic too much.   That way if there's an error in the patch that 
+> >>> changes the logic and it needs to be reverted, it won't also revert the 
+> >>> warning fixes.
 > >>
-> >> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> >> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> >> Acked-by: Robert Richter <rrichter@cavium.com>
-> >> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> >> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> ---
-> >>   arch/ia64/Kconfig       | 1 +
-> >>   arch/x86/Kconfig        | 1 +
-> >>   drivers/acpi/Kconfig    | 4 ++++
-> >>   drivers/acpi/Makefile   | 2 +-
-> >>   drivers/acpi/internal.h | 4 ++++
-> >>   5 files changed, 11 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> >> index 074e52b..e8728d7 100644
-> >> --- a/arch/ia64/Kconfig
-> >> +++ b/arch/ia64/Kconfig
-> >> @@ -10,6 +10,7 @@ config IA64
-> >>   	select ARCH_MIGHT_HAVE_PC_SERIO
-> >>   	select PCI if (!IA64_HP_SIM)
-> >>   	select ACPI if (!IA64_HP_SIM)
-> >> +	select ACPI_GENERIC_SLEEP if ACPI
-> >>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
-> >>   	select HAVE_UNSTABLE_SCHED_CLOCK
-> >>   	select HAVE_IDE
-> >> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> >> index b7d31ca..9804431 100644
-> >> --- a/arch/x86/Kconfig
-> >> +++ b/arch/x86/Kconfig
-> >> @@ -22,6 +22,7 @@ config X86_64
-> >>   ### Arch settings
-> >>   config X86
-> >>   	def_bool y
-> >> +	select ACPI_GENERIC_SLEEP if ACPI
-> >
-> > One more nit.  If you did
-> >
-> > +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
-> >
-> > here (and above for ia64), you'd avoid having to make ACPI_SLEEP
-> > depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+> >> Makes sense to me.
+> > 
+> > Yes that's fine with me as well, I don't wish to over complicate
+> > matters. I have a couple minor comments though and will respond to the
+> > latest patch rev.
 > 
-> In sleep.c,
-> 
-> #ifdef CONFIG_ACPI_SLEEP
-> acpi_target_system_state()
-> {
-> }
-> #endif
-> 
-> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
-> which one of them will be enabled on ARM64 so ACPI_SLEEP
-> will also enabled too.
-> 
-> So if we
-> 
-> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
-> 
-> and
-> 
-> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
-> 
-> it will lead to errors for acpi_target_system_state() that
-> is declared but not defined, so I will keep the code as
-> it is, what do you think?
+> Actually, nevermind the latest version is fine with me. Jon
 
-No, we need to hash this out.  Having two different Kconfig options meaning
-almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
+Applying the second version into omap-for-v4.1/fixes-not-urgent.
 
-Do you need ACPI_SLEEP on ARM64 at all?
+Regards,
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Tony
