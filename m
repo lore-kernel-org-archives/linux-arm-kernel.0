@@ -1,48 +1,78 @@
-From: andrey.konovalov@linaro.org (Andrey Konovalov)
-Date: Mon, 16 Mar 2015 20:38:43 +0300
-Subject: [PATCH] ARM: Exynos: Fix build error with thumb2
-Message-ID: <55071523.7060309@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Mar 2015 18:43:14 +0100
+Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
+In-Reply-To: <20150316173324.GA21040@leverpostej>
+References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150316160948.GB18277@leverpostej>
+ <CAKv+Gu_-1XMcpobRt7tXCZaqWoszWLfJxgHBLaKuWchz87UnSA@mail.gmail.com>
+ <20150316173324.GA21040@leverpostej>
+Message-ID: <AEDF43E0-1C4F-43DF-B8A2-BFF7836091E8@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add non-global symbols to avoid build failure in thumb2 mode.
 
-Exact the same issue and the fix as in [1]; just the variables are different.
+On 16 mrt. 2015, at 18:33, Mark Rutland <mark.rutland@arm.com> wrote:
 
-[1] http://lists.linaro.org/pipermail/linaro-kernel/2014-June/015227.html
+>>>> - performance: we can align PHYS_OFFSET so that most of the linear mapping can
+>>>>  be done using 512 MB or 1 GB blocks (depending on page size), instead of
+>>>>  the more granular level that is currently unavoidable if Image cannot be
+>>>>  loaded at base of RAM (since PHYS_OFFSET is tied to the start of the kernel
+>>>>  Image).
+>>> 
+>>> Isn't this gain somewhat offset by having to build the kernel as a PIE?
+>> 
+>> I don't think so. Note that this is not -fpic code, it's just the ld
+>> option that dumps the reloc and dynsym tables into the output image.
+>> The reloc penalty is boottime only.
+> 
+> Ah, ok.
+> 
+>>> I have a very strong suspicion that bootloaders in the wild don't zero
+>>> x1-x3, and that given that we might not have a reliable mechanism for
+>>> acquiring the offset.
+>> 
+>> OK, sounds about time to start complaining about that then.
+> 
+> I guess so.
+> 
+>>>> Issues:
+>>>> - Since AArch64 uses the ELF RELA format (where the addends are in the
+>>>>  relocation table and not in the code), the relocations need to be applied even
+>>>>  if the Image runs from the same offset it was linked at. It also means that
+>>>>  some values that are produced by the linker (_kernel_size_le, etc) are missing
+>>>>  from the binary. This will probably need a fixup step.
+>>>> - The module area may be out of range, which needs to be worked around with
+>>>>  module PLTs. This is straight forward but I haven't implemented it yet for
+>>>>  arm64.
+>>>> - The core extable is most likely broken, and would need to be changed to use
+>>>>  relative offsets instead of absolute addresses.
+>>> 
+>>> This sounds like it's going to be a big headache.
+>> 
+>> It's all manageable, really. The module PLT thing is something I
+>> already implemented for 32-bit ARM here:
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-November/305539.html
+>> (only Russell couldn't be bothered to merge it)
+>> 
+>> The extable is already relative on x86, and the fixup step is some
+>> straight forward ELF mangling on vmlinux before performing the
+>> objcopy.
+>> But yes, it's rather ugly.
+> 
+> Hmm. I'd be rather worried about the fixup step; I suspect that'll be
+> fragile and rarely tested. Perhaps we could verify them at boot time?
 
-Signed-off-by: Andrey Konovalov <andrey.konovalov@linaro.org>
----
-  arch/arm/mach-exynos/sleep.S | 6 ++++--
-  1 file changed, 4 insertions(+), 2 deletions(-)
+It would essentially be __relocate_kernel() but executed at build time against vmlinux with a reloc offset of #0
 
-diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
-index 31d2583..73f7fde 100644
---- a/arch/arm/mach-exynos/sleep.S
-+++ b/arch/arm/mach-exynos/sleep.S
-@@ -69,9 +69,9 @@ ENTRY(exynos_cpu_resume_ns)
-  	cmp	r0, r1
-  	bne	skip_cp15
-
--	adr	r0, cp15_save_power
-+	adr	r0, .Lcp15_save_power
-  	ldr	r1, [r0]
--	adr	r0, cp15_save_diag
-+	adr	r0, .Lcp15_save_diag
-  	ldr	r2, [r0]
-  	mov	r0, #SMC_CMD_C15RESUME
-  	dsb
-@@ -118,9 +118,11 @@ skip_l2x0:
-  skip_cp15:
-  	b	cpu_resume
-  ENDPROC(exynos_cpu_resume_ns)
-+.Lcp15_save_diag:
-  	.globl cp15_save_diag
-  cp15_save_diag:
-  	.long	0	@ cp15 diagnostic
-+.Lcp15_save_power:
-  	.globl cp15_save_power
-  cp15_save_power:
-  	.long	0	@ cp15 power control
--- 
-1.9.1
+> 
+>>> I'd rather see that we decouple the kernel (text/data) mapping from the
+>>> linear mapping, with the former given a fixed VA independent of the PA
+>>> of the kernel Image (which would still need to be at a 2M-aligned
+>>> address + text_offset, and not straddling a 512M boundary).
+>> 
+>> Hmm, that's quite nice, actually, It also fixes the module range
+>> problem, and for VA randomization we could move both regions together.
+> 
+> Ah, good point. I hadn't consdiered modules all that much, but it sounds
+> like it could work.
+> 
