@@ -1,128 +1,46 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 17 Mar 2015 11:12:42 +0900
-Subject: [PATCH V5 2/2] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <CAGOxZ53_TGay2ooTW22ZGPZ+yneqoXH6JEPZ=mMSYr1cpOhXWg@mail.gmail.com>
-References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
- <1422499318-13726-3-git-send-email-alim.akhtar@samsung.com>
- <54ED6D24.4000703@samsung.com>
- <CAGOxZ53_TGay2ooTW22ZGPZ+yneqoXH6JEPZ=mMSYr1cpOhXWg@mail.gmail.com>
-Message-ID: <07b501d06057$d9d7bc80$8d873580$@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 19:23:44 -0700
+Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
+In-Reply-To: <CA+V-a8uWqjze32ukOGonQAACByPmW6WDbpFrA9EFipnNJeD58A@mail.gmail.com>
+References: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20150316221740.GQ12397@atomide.com>
+ <CA+V-a8uWqjze32ukOGonQAACByPmW6WDbpFrA9EFipnNJeD58A@mail.gmail.com>
+Message-ID: <20150317022344.GB31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alim Akhtar wrote:
+* Lad, Prabhakar <prabhakar.csengg@gmail.com> [150316 18:20]:
+> Hi Tony,
 > 
-> Ping?
-> 
-Alim,
-
-Can you please re-send it based on latest my tree?
-It would be helpful for me ;)
-
-Thanks,
-Kukjin
-
-> On Wed, Feb 25, 2015 at 12:05 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> > Hi, Alim.
+> On Mon, Mar 16, 2015 at 10:17 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Lad Prabhakar <prabhakar.csengg@gmail.com> [150312 16:38]:
+> >> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+> >>
+> >> this patch does the following:
+> >> 1: adds DT node for fixed oscillator.
+> >> 2: adds DT node entries for ov2659 sensor
+> >> 3: adds remote-endpoint entry for VPFE.
+> >>
+> >> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 > >
-> > Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+> > Applying into omap-for-v4.1/dt thanks.
 > >
-> > Best Regards,
-> > Jaehoon Chung
-> >
-> > On 01/29/2015 11:41 AM, Alim Akhtar wrote:
-> >> From: Seungwon Jeon <tgih.jun@samsung.com>
-> >>
-> >> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-> >> and exynos5800-peach-pi boards.
-> >> This also adds RCLK GPIO line, this gpio should be in pull-down
-> >> state.
-> >> This also enables HS400 on peach-pi and this updates the clock frequency
-> >> to 800MHz to be set as input clock to controller.
-> >>
-> >> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> >> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> >> [Alim: addressed review comments]
-> >> ---
-> >>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
-> >>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
-> >>  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
-> >>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    7 +++++--
-> >>  4 files changed, 18 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-
-> pit.dts
-> >> index 9a050e1..f7a44a4 100644
-> >> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> >> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> >> @@ -569,8 +569,10 @@
-> >>       samsung,dw-mshc-ciu-div = <3>;
-> >>       samsung,dw-mshc-sdr-timing = <0 4>;
-> >>       samsung,dw-mshc-ddr-timing = <0 2>;
-> >> +     samsung,dw-mshc-hs400-timing = <0 2>;
-> >> +     samsung,read-strobe-delay = <90>;
-> >>       pinctrl-names = "default";
-> >> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> >> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
-> >>       bus-width = <8>;
-> >>  };
-> >>
-> >> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> >> index ba686e4..8b15316 100644
-> >> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> >> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> >> @@ -201,6 +201,13 @@
-> >>                       samsung,pin-drv = <3>;
-> >>               };
-> >>
-> >> +             sd0_rclk: sd0-rclk {
-> >> +                     samsung,pins = "gpc0-7";
-> >> +                     samsung,pin-function = <2>;
-> >> +                     samsung,pin-pud = <1>;
-> >> +                     samsung,pin-drv = <3>;
-> >> +             };
-> >> +
-> >>               sd1_cmd: sd1-cmd {
-> >>                       samsung,pins = "gpc1-1";
-> >>                       samsung,pin-function = <2>;
-> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> index 8be3d7b..2078a1f 100644
-> >> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> @@ -80,8 +80,10 @@
-> >>               samsung,dw-mshc-ciu-div = <3>;
-> >>               samsung,dw-mshc-sdr-timing = <0 4>;
-> >>               samsung,dw-mshc-ddr-timing = <0 2>;
-> >> +             samsung,dw-mshc-hs400-timing = <0 2>;
-> >> +             samsung,read-strobe-delay = <90>;
-> >>               pinctrl-names = "default";
-> >> -             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> >> +             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
-> >>               bus-width = <8>;
-> >>               cap-mmc-highspeed;
-> >>       };
-> >> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> >> index e8fdda8..96f0d61 100644
-> >> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> >> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> >> @@ -550,15 +550,18 @@
-> >>       num-slots = <1>;
-> >>       broken-cd;
-> >>       mmc-hs200-1_8v;
-> >> +     mmc-hs400-1_8v;
-> >>       cap-mmc-highspeed;
-> >>       non-removable;
-> >>       card-detect-delay = <200>;
-> >> -     clock-frequency = <400000000>;
-> >> +     clock-frequency = <800000000>;
-> >>       samsung,dw-mshc-ciu-div = <3>;
-> >>       samsung,dw-mshc-sdr-timing = <0 4>;
-> >>       samsung,dw-mshc-ddr-timing = <0 2>;
-> >> +     samsung,dw-mshc-hs400-timing = <0 2>;
-> >> +     samsung,read-strobe-delay = <90>;
-> >>       pinctrl-names = "default";
-> >> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
-> >> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
-> >>       bus-width = <8>;
-> >>  };
+> I would like to get this one in via media tree to avoid dependency
+> as I am still waiting for Acks from DT maintainers for the sensor
+> driver.
+
+OK dropping it.
+ 
+> If I can get your Ack on this I'll queue it up along with sensor
+> driver via media tree.
+
+Sorry the chances are too big for pointless merge conflicts with
+these files with constant patching going on.
+
+Please just resend this patch alone again to me later on once the
+driver changes are merged into Linux next and on their way to the
+mainline kernel.
+
+Regards,
+
+Tony
