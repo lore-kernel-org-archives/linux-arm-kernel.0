@@ -1,27 +1,90 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 17 Mar 2015 13:46:29 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
-Message-ID: <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Mar 2015 13:51:47 +0000
+Subject: [PATCH 1/3] arm64: merge __enable_mmu and __turn_mmu_on
+In-Reply-To: <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150317135147.GG23340@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Tue, Mar 17, 2015 at 10:11:12AM +0000, Ard Biesheuvel wrote:
+> Enabling of the MMU is split into two functions, with an align and
+> a branch in the middle. On arm64, the entire kernel Image is ID mapped
+> so this is really not necessary, and we can just merge it into a
+> single function.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S | 30 ++++++++----------------------
+>  1 file changed, 8 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 65c7de889c8c..fb912314d5e1 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -615,8 +615,13 @@ ENDPROC(__secondary_switched)
+>  #endif	/* CONFIG_SMP */
+>  
+>  /*
+> - * Setup common bits before finally enabling the MMU. Essentially this is just
+> - * loading the page table pointer and vector base registers.
+> + * Enable the MMU. This completely changes the structure of the visible memory
+> + * space. You will not be able to trace execution through this.
+> + *
+> + *  x0  = system control register
+> + *  x27 = *virtual* address to jump to upon completion
+> + *
+> + * other registers depend on the function called upon completion
+>   *
+>   * On entry to this code, x0 must contain the SCTLR_EL1 value for turning on
+>   * the MMU.
 
-> Besides, I think a multi-platform XIP (or nommu) kernel is possible, as long as XIP_PHYS_ADDR (or PHYS_OFFSET) is suitable for all platforms included
+Minor nit: it's a bit redundant to have both comments regarding the
+sctlr_el1.
 
-Possible...but...maybe pointless. If you're doing XIP, then most likely you've got a specific platform that you are trying to do as much as you can in as little (RAM) as possible.
+I'd recommed we drop/fold the 2nd comment into the first like:
 
-Was ARCH_MULTIPLATFORM really trying to fix some huge existing problem? Or was it more of a 'here's a cute thing we could do'?
-In my mind, an SoC by nature is used for specific embedded product and you could care less if the binary runs on anything else. Of course the range of SoCs that can run Linux now a days varies greatly, so I don't think you can put them all in the same category like ARCH_MULTIPLATFORM was trying to do.
+	x0  = SCTLR_EL1 value for turning on the MMU.
 
+Otherwise, this looks good.
 
-> Perhaps ARCH_MULTIPLATFORM should be replaced by ARCH_ARM_NEWWORLD almost everywhere, and (new) ARCH_MULTIPLATFORM should be reserved (if needed at all) to protect features that are not compatible with running on multiple machines?
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-That's not bad. I think it still comes down to if you want to build XIP, you don't care about ARCH_MULTIPLATFORM support, and the XIP_PHYS_ADDR (and PHYS_OFFSET) you need to use is device specific anyway.
+Mark.
 
-It also looks like a couple month ago someone also pointed out that just because the base core is the same, that doesn't mean all the erratas are the same, and ARCH_MULTIPLATFORM doesn't fit there as well.
-
-Chris
+> @@ -627,29 +632,10 @@ __enable_mmu:
+>  	msr	ttbr0_el1, x25			// load TTBR0
+>  	msr	ttbr1_el1, x26			// load TTBR1
+>  	isb
+> -	b	__turn_mmu_on
+> -ENDPROC(__enable_mmu)
+> -
+> -/*
+> - * Enable the MMU. This completely changes the structure of the visible memory
+> - * space. You will not be able to trace execution through this.
+> - *
+> - *  x0  = system control register
+> - *  x27 = *virtual* address to jump to upon completion
+> - *
+> - * other registers depend on the function called upon completion
+> - *
+> - * We align the entire function to the smallest power of two larger than it to
+> - * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
+> - * close to the end of a 512MB or 1GB block we might require an additional
+> - * table to map the entire function.
+> - */
+> -	.align	4
+> -__turn_mmu_on:
+>  	msr	sctlr_el1, x0
+>  	isb
+>  	br	x27
+> -ENDPROC(__turn_mmu_on)
+> +ENDPROC(__enable_mmu)
+>  
+>  /*
+>   * Calculate the start of physical memory.
+> -- 
+> 1.8.3.2
+> 
+> 
