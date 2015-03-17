@@ -1,41 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Mar 2015 18:05:17 +0000
-Subject: [PATCH 3/4 v4] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <5507A095.5090805@wwwdotorg.org>
-References: <1426213936-4139-1-git-send-email-eric@anholt.net>
- <1426213936-4139-3-git-send-email-eric@anholt.net>
- <5507A095.5090805@wwwdotorg.org>
-Message-ID: <20150317180517.GD3318@x1>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 18 Mar 2015 03:05:20 +0900
+Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
+In-Reply-To: <1426069765.30407.7.camel@AMDC1943>
+References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
+ <1426069765.30407.7.camel@AMDC1943>
+Message-ID: <55086CE0.6080905@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Mar 2015, Stephen Warren wrote:
-
-> On 03/12/2015 08:32 PM, Eric Anholt wrote:
-> > From: Lubomir Rintel <lkundrak@v3.sk>
-> > 
-> > Implement BCM2835 mailbox support as a device registered with the
-> > general purpose mailbox framework. Implementation based on commits by
-> > Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
-> > implementation.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
-> > [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
-> > 
-> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> > Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> > Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
-> > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
+On 03/11/15 19:29, Krzysztof Kozlowski wrote:
+> On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
+>> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
+>> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
+>> controller") the second suspend to RAM failed. First suspend worked fine
+>> but the next one hang just after powering down of secondary CPUs (system
+>> consumed energy as it would be running but was not responsive).
+>>
+>> The issue was caused by enabling delayed reset assertion for CPU0 just
+>> after issuing power down of cores. This was introduced for Exynos4 in
+>> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+>>
+>> The whole behavior is not well documented but after checking with vendor
+>> code this should be done like this (on Exynos4):
+>> 1. Enable delayed reset assertion when system is running (for all CPUs).
+>> 2. Disable delayed reset assertion before suspending the system.
+>>    This can be done after powering off secondary CPUs.
+>> 3. Re-enable the delayed reset assertion when system is resumed.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
+>> Cc: <stable@vger.kernel.org>
+>> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 > 
-> Acks often don't carry over when there are significant changes.
+> Dear Kukjin,
+> 
+> This patch was first sent on 3rd of February. It could enter before
+> opening 4.0 merge window. I did not receive any response from you in
+> that time.
+> 
+> So let me point next steps:
+> 1. The Exynos4412 suspend on 4.0 is broken and now this patch applies as
+> a fix.
+> 2. I resent it on 18th of February.
+> 3. I received tested-by from Bartlomiej and Chanwoo.
+> 4. Bartlomiej pinged you on 3rd March.
+> 
+> Still no response. If the patch does not look good then please share
+> your comments. I'll fix it.
+> If this patch looks good, why does it take so much time?
+> 
 
-Did I even Ack this?
+Please use another way something like check ARM core rather than use
+'soc_is_xxx()', as you know it is not acceptable now even it is just
+moving/modifying exist function though.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+And please make sure your updates don't hurt other exynos5 stuff. Any
+tests on exynos5 platforms would be helpful.
+
+And I don't think the fix should be sent to 'stable' because I can't see
+the 'add node for L2$ controller' in v3.19...looks applied from v4.0-rc...
+
+One more if you have any doubts, I'd like to ask you to contact S.LSI
+guys who have created the vendor codes not assume with the code because
+maybe the vendor code you mentioned cannot cover all exynos stuff I
+think. Then we could make more clear pm codes in mainline. To be honest
+I'm not a Power Management hardware guy so I don't know every regarding
+PM stuff in exynos SoCs, I can contact them easier though...I mean
+please don't assume any hardware behavior with just vendor code. Please
+ask, you have an access in Samsung intranet before posting something
+like this...Hope let's make a better fix together during -rc.
+
+Thanks,
+Kukjin
