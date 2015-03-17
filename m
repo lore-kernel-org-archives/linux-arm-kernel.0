@@ -1,82 +1,159 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Mar 2015 11:37:46 +0100
-Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <940EE988-03A4-4B1B-A168-959E367953A6@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-4-git-send-email-marek@goldelico.com>
- <20150316210532.GA11441@amd>
- <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
- <20150317084730.GA9761@amd>
- <940EE988-03A4-4B1B-A168-959E367953A6@goldelico.com>
-Message-ID: <20150317103746.GB3759@amd>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Tue, 17 Mar 2015 16:08:21 +0530
+Subject: [PATCH v7 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <20150317101953.GC32683@intel.com>
+References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+ <1426158921-8987-2-git-send-email-rsahu@apm.com>
+ <20150316092756.GH32683@intel.com>
+ <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
+ <20150316112730.GN32683@intel.com>
+ <CAFd313yeXL2sd4qzh_-6iANQf=w0k4p_tXEmrk_QZ-baKgKG8Q@mail.gmail.com>
+ <20150316162613.GO32683@intel.com>
+ <CAFd313xG4EZdoS4vMxq4TW7v+xc_OEd3uC1R4LW3=Xs3+JzY9w@mail.gmail.com>
+ <CAFd313zJHP2PbN=Xa48GRmyQ6EvH=3wrZPBngtsZ2djo4ka96A@mail.gmail.com>
+ <20150317101953.GC32683@intel.com>
+Message-ID: <CAFd313zqetJq1S8aXK4i_PCLK1RCAwkzoiYGUd_9YSYvwjA=iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Vinod,
 
-> >>> to introduce coefficients for temperature and discharge rate?
-> >> What do you mean? Nothing like that is used in current driver why do
-> >> we need to add it?
-> > 
-> > Well, conversion between Li-ion's voltage and state of charge at 0
-> > current is well known:
-> 
-> We can?t measure at 0 current since the OMAP is driven from battery
-> and charger and may also draw some mA?
+On Tue, Mar 17, 2015 at 3:49 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Mar 17, 2015 at 03:03:14PM +0530, Rameshwar Sahu wrote:
+>> Hi Vinod,
+>>
+>> On Mon, Mar 16, 2015 at 11:01 PM, Rameshwar Sahu <rsahu@apm.com> wrote:
+>> > Hi Vinod,
+>> >
+>> > On Mon, Mar 16, 2015 at 9:56 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> >> On Mon, Mar 16, 2015 at 05:24:34PM +0530, Rameshwar Sahu wrote:
+>> >>> >> >> +static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
+>> >>> >> >> +                                          struct list_head *list)
+>> >>> >> > do we really care about free order?
+>> >>> >>
+>> >>> >> Yes it start dellocation of descriptor by tail.
+>> >>> > and why by tail is not clear.
+>> >>> We can free allocated descriptor in forward order from head or in
+>> >>> reverse order, I just followed here fsldma.c driver.
+>> >>> Does this make sense ??
+>> >> No, you have two APIs to free list. Why do you need two?
+>> >
+>> > Yes, basically we have tow API to free list.
+>> > xgene_dma_free_desc_list_reverse will call if any failure in
+>> > allocation of memory from DMA pool in prep routines.
+>> > Like e.g. in prep routing we have some descriptors allocated and still
+>> > need to get descriptor to complete the DMA request and failure happen,
+>> > so we need to free all allocated descriptor.
+>> >
+>> >>
+>> >>>
+>> >>>
+>> >>> >
+>> >>> >> > where are you mapping dma buffers?
+>> >>> >>
+>> >>> >>  I didn't get you here. Can you please explain me here what you mean.
+>> >>> >> As per my understanding client should map the dma buffer and give the
+>> >>> >> physical address and size to this callback prep routines.
+>> >>> > not for memcpy, that is true for slave transfers
+>> >>> >
+>> >>> > For mempcy the idea is that drivers will do buffer mapping
+>> >>>
+>> >>> Still I am clear here, why memcpy will do buffer mapping, I see other
+>> >>> drivers and also async_memcpy.c , they only map it and pass mapped
+>> >>> physical dma address to driver.
+>> >>>
+>> >>> Buffer mapping mean you here is dma_map_xxx ?? Am I correct.
+>> >> Yes
+>> >
+>> > I have confusion here, I don't see any driver dma buffer mapping in
+>> > prep_dma_memcpy.
+>> > Can you please clear me here if driver does this on behalf of client,
+>> > like any example so that I can proceed further.
+>>
+>> Any comment here ??
+> The advise typically is that for memcpy the dma mapping should be done by
+> client. For now this is okay as we have precedence, let me check with Dan.
+>>
+>> >>
+>> >>>
+>> >>> >
+>> >>> >> > why are you calling this here, status check shouldnt do this...
+>> >>> >>
+>> >>> >> Okay, I will remove it.
+>> >>> >>
+>> >>> >>
+>> >>> >> >> +                     spin_unlock_bh(&chan->lock);
+>> >>> >> >> +                     return DMA_IN_PROGRESS;
+>> >>> >> > residue here is size of transacation.
+>> >>> >>
+>> >>> >> We can't calculate here residue size. We don't have any controller
+>> >>> >> register which will tell about remaining transaction size.
+>> >>> > Okay if you cant calculate residue why do we have this fn?
+>> >>>
+>> >>> So basically case here for me is completion of dma descriptor
+>> >>> submitted to hw is not same as order of submission to hw.
+>> >>> So scenario coming in multithread running :e.g. let's assume we have
+>> >>> submitted two descriptors first has cookie 1001 and second has 1002,
+>> >>> now 1002 is completed first, so updated last_completed_cookie as 1002
+>> >>> but not yer checked for dma_tx_status, and then first cookie completes
+>> >>> and update last_completed_cookie as 1001, now second transaction check
+>> >>> for tx_status and it get DMA_IN_PROGRESS, because
+>> >>> last_completed_cookie(1001) is less than second transaction's
+>> >>> cookie(1002).
+>> >>>
+>> >>> Due to this issue I am traversing that transaction in pending list and
+>> >>> running list, if not there means we are done.
+>> >>>
+>> >>> Does this make sense??
+>> >> That only convinces me that there is something not so correct.
+>> >>
+>> >> To help me understand pls let me know if below is fine:
+>> >> - for a physical channel, do you submit multiple transactions?
+>> >
+>> > Yes
+>> >
+>> >> - if yes, how does DMA deal with multiple transactions, how does it schedule
+>> >>   them?
+>> >
+>> > So , basically we submit multiple descriptor to dma physical channel,
+>> > and dma engine execute it one by one and give us completion callback.
+>> > So in this way we expect callback on same order as submission order
+>> > and it does also, no issue.
+>> >
+>> > But problem is with supporting p+q offload, here we have P
+>> > functionality supports in dma physical channel 0 and Q functionality
+>> > supports in dma physical channel 1. So for pq we need to submit two
+>> > descriptor, one to channel 0 and second to channel1, in this case we
+>> > can't expect the completion order, because channnel 0 can finish P
+>> > before Q or vice versa, and we need to wait to complete both before
+>> > calling client callback() and completing cookie.
+>> > Second thing we submit memcpy and sg on same channel, and can complete
+>> > before even though if it submitted after PQ.
+>>
+>> So our SoC dma engine hw design idea was to get more throughput while
+>> running two channel concurrent and calculating the P and Q together,
+>> but somehow now today we came to scenario where running P and Q on
+>> different channel causing hang to dmaengine, some hw bug, So now I am
+>> going to support P and Q generation in same channel, so above
+>> mentioned cookie status scenario will never come.
+>> I will send you the patch for review.
+> Okay, so I am going to expect the status callback will do as per API
+> expectations and these kinds of hacks will be absent in the code :)
 
-Yes, but you know how many mA you are taking just now. So if you knew
-the internal resistance, you could compute the voltage at 0
-current. (And it should also work during charging, as long as you know
-how much current is going in.)
-
-> >    def percent(m, v):
-> >    	u = 0.0387-(1.4523*(3.7835-v))
-> >        if u < 0:
-> >            return 0
-> >          return (0.1966+math.sqrt(u))*100
-> > 
-> > And there's not much to calibrate there, and it should become library
-> > helper function; there's no need to write it to every single dts.
-> > 
-> > The charge/discharge difference is due to internal battery resistance,
-> > and Ohm's law. (Then, you should not need different values for
-> > charging/discharging case.)
-> 
-> Yes, and that also depends on the board and battery type. So you always
-> need to specify some battery specific coefficient for that in the DT.
-
-Yes, and that coefficient should be internal battery resistance ;-).
-
-> We simply did choose a table, because calculating the right coefficients
-> is more complex and getting the table values can easily be done from
-> running one full charge-discharge-charge cycle.
-
-Well.. One set of coefficients would be kind of ok. But you are doing
-two, because it really depends on current, not charge/discharge. So
-why not do it right, for all currents...?
-
-> > With your aproach, you'll get lower percentage when phone is under
-> > load vs. idle. Taking internal resistance into account would give you
-> > more precise readings. (Attached, old patch for zaurus shows the
-> > needed computation).
-> 
-> This is why we have a charging and a discharging table to compensate
-> for this effect.
-
-Yes, but there's very different current during "idle" phone and during
-call (for example). So yes, you are compensating for different current
-during charge and discharge, but it is possible to do better.
-
-> > I guess this should go into library somewhere, because many machines
-> > need similar code.
-> 
-> Is a library easier to maintain and handle than just a set of table
-> values?
-
-I think so, yes, because otherwise you need a set of tables for each
-machine.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Yes, I will send patch ASAP for further review.
+>
+> --
+> ~Vinod
+>>
+>> Thanks,
+>> >
+>> >>
+>> >> --
+>> >> ~Vinod
+>> >> --
+>> >> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+>> >> the body of a message to majordomo at vger.kernel.org
+>> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> --
