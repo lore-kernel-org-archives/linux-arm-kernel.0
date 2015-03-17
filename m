@@ -1,40 +1,30 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 17 Mar 2015 08:19:20 -0700
-Subject: [PATCH v4 03/10] arm64: standardize mmap_rnd() usage
-In-Reply-To: <20150317144702.GN8399@arm.com>
-References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
- <1425503454-7531-4-git-send-email-keescook@chromium.org>
- <20150317144702.GN8399@arm.com>
-Message-ID: <CAGXu5jKHPL1V81wQ-gLAmGeMD9miM73X-QAL_RHbt+6hAEaAKg@mail.gmail.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Tue, 17 Mar 2015 15:21:20 +0000
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+In-Reply-To: <550843B4.8080903@openssl.org>
+References: <20150316154835.GA31336@google.com>
+ <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
+ <20150316162304.GA35408@google.com>
+ <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
+ <550843B4.8080903@openssl.org>
+Message-ID: <20150317152120.GA31053@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 7:47 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Mar 04, 2015 at 09:10:47PM +0000, Kees Cook wrote:
->> In preparation for splitting out ET_DYN ASLR, this refactors the use of
->> mmap_rnd() to be used similarly to arm and x86. This additionally enables
->> mmap ASLR on legacy mmap layouts, which appeared to be missing on arm64,
->> and was already supported on arm. Additionally removes a copy/pasted
->> declaration of an unused function.
->>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  arch/arm64/include/asm/elf.h |  1 -
->>  arch/arm64/mm/mmap.c         | 18 +++++++++++-------
->>  2 files changed, 11 insertions(+), 8 deletions(-)
->
-> Looks fine to me:
->
->   Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Do you want me to pick this up, or are you taking it along with the rest of
-> your series (it doesn't have any obvious dependencies to me)?
+On Tue, Mar 17, 2015 at 04:09:40PM +0100, Andy Polyakov wrote:
+> I have no problems with reusing assembly modules in kernel context.
 
-Thanks! Right now akpm is carrying it, since the series ends with
-changes that depend on all the per-arch refactoring.
+Awesome, thank you for clarifying this.
 
--Kees
+> I'd prefer if it can be arranged in way similar to bsaes-armv7 module,
+> i.e. we work together on shared copy of module that generates assembly
+> that can be then compiled for OpenSSL or kernel. Is it sensible?
 
--- 
-Kees Cook
-Chrome OS Security
+Sure, that sounds good to me.
+
+> BTW, why stop at SHA256? There is SHA512 and NEON SHA1...
+
+The kernel already has NEON SHA-1 and SHA-512, but for some reason is
+lacking SHA-256. I have not tested how they compare to yours though.
+
+Sami
