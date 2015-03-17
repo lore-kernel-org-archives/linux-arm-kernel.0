@@ -1,37 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 17 Mar 2015 13:53:34 +0100
-Subject: [PATCH] ARM: mvebu: clk: remove cpuclk resources overlapping
- coredivclk registers on Armada XP
-Message-ID: <1426596814-30758-1-git-send-email-gregory.clement@free-electrons.com>
+From: sricharan@codeaurora.org (sricharan at codeaurora.org)
+Date: Tue, 17 Mar 2015 13:10:32 -0000
+Subject: [PATCH 5/6] dts: msm8974: Add blsp2_bam dma node
+In-Reply-To: <550822A7.1010209@mm-sol.com>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+ <1426268992-19298-6-git-send-email-sricharan@codeaurora.org>
+ <550822A7.1010209@mm-sol.com>
+Message-ID: <c65027aa3f228387475c5284a9d377dc.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
+Hi,
 
-The resources of the cpuclk node are overlapping the one from
-coredivclk node. It was not noticed until now because the driver did a
-simple of_iomap and not a request_mem_region. This patch fixes it.
+> On 03/13/2015 07:49 PM, Sricharan R wrote:
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  arch/arm/boot/dts/qcom-msm8974.dtsi | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index e265ec1..3f648ae 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -247,5 +247,15 @@
+>>  			#address-cells = <1>;
+>>  			#size-cells = <0>;
+>>  		};
+>> +
+>> +		blsp2_dma: dma at f9944000 {
+>> +			compatible = "qcom,bam-v1.4.0";
+>> +			reg = <0xf9944000 0x19000>;
+>> +			interrupts = <0 239 0>;
+>
+> for completeness this should be:
+>
+> interrupts = <GIC_SPI 239 IRQ_TYPE_LEVEL_HIGH>;
+>
+Ok, will fix. Thanks
 
-[gregory.clement at free-electrons.com: add commit log and port to 4.0-rc]
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
----
- arch/arm/boot/dts/armada-xp.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 82917236a2fb..fdc2e5bdf459 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -149,7 +149,7 @@
- 			cpuclk: clock-complex at 18700 {
- 				#clock-cells = <1>;
- 				compatible = "marvell,armada-xp-cpu-clock";
--				reg = <0x18700 0xA0>, <0x1c054 0x10>;
-+				reg = <0x18700 0x24>, <0x1c054 0x10>;
- 				clocks = <&coreclk 1>;
- 			};
- 
 -- 
-2.1.0
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
