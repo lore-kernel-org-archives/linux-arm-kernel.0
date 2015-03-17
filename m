@@ -1,9 +1,9 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 17 Mar 2015 18:14:59 +0000
-Subject: [PATCH 2/3] arm64/pmu: Reject groups spanning multiple HW PMUs
+Date: Tue, 17 Mar 2015 18:15:00 +0000
+Subject: [PATCH 3/3] arm-cci: Reject groups spanning multiple HW PMUs
 In-Reply-To: <1426616100-31628-1-git-send-email-suzuki.poulose@arm.com>
 References: <1426616100-31628-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1426616100-31628-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1426616100-31628-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,62 +15,40 @@ performed after pmu::event_init() is called in perf_init_event(), and
 thus pmu::event_init() may be called with a group leader from a
 different HW PMU.
 
-The ARM64 PMU driver does not take this fact into account, and when
-validating groups assumes that it can call to_arm_pmu(event->pmu) for
-any HW event. When the event in question is from another HW PMU this is
-wrong, and results in dereferencing garbage.
+The CCI PMU driver does not take this fact into account, and assumes
+that the any other hardware event belongs to the CCI. There are two
+issues with it :
 
-This patch updates the ARM64 PMU driver to first test for and reject
-events from other PMUs, moving the to_arm_pmu and related logic after
-this test. Fixes a crash triggered by perf_fuzzer on Linux-4.0-rc2, with
-a CCI PMU present:
+1) It is wrong and we should reject such groups.
+2) Validation allocates an temporary idx for this non-cci event, which leads
+to wrong calculation of the counter availability, and eventually lesser
+number of events in the group.
 
-Bad mode in Synchronous Abort handler detected, code 0x86000006 -- IABT (current EL)
-CPU: 0 PID: 1371 Comm: perf_fuzzer Not tainted 3.19.0+ #249
-Hardware name: V2F-1XV7 Cortex-A53x2 SMM (DT)
-task: ffffffc07c73a280 ti: ffffffc07b0a0000 task.ti: ffffffc07b0a0000
-PC is at 0x0
-LR is at validate_event+0x90/0xa8
-pc : [<0000000000000000>] lr : [<ffffffc000090228>] pstate: 00000145
-sp : ffffffc07b0a3ba0
+This patch updates the CCI PMU driver to first test for and reject
+events from other PMUs, which is the right thing to do.
 
-[<          (null)>]           (null)
-[<ffffffc0000907d8>] armpmu_event_init+0x174/0x3cc
-[<ffffffc00015d870>] perf_try_init_event+0x34/0x70
-[<ffffffc000164094>] perf_init_event+0xe0/0x10c
-[<ffffffc000164348>] perf_event_alloc+0x288/0x358
-[<ffffffc000164c5c>] SyS_perf_event_open+0x464/0x98c
-Code: bad PC value
-
-Also cleans up the code to use the arm_pmu only when we know
-that we are dealing with an arm pmu event.
-
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Ziljstra <peterz@infradead.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/perf_event.c |   21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+ drivers/bus/arm-cci.c |   19 ++++++++++++++-----
+ 1 file changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 25a5308..68a7415 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -322,22 +322,31 @@ out:
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 84fd660..68ef6f2 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -660,12 +660,21 @@ static void cci_pmu_del(struct perf_event *event, int flags)
  }
  
  static int
--validate_event(struct pmu_hw_events *hw_events,
+-validate_event(struct cci_pmu_hw_events *hw_events,
 -	       struct perf_event *event)
-+validate_event(struct pmu *pmu, struct pmu_hw_events *hw_events,
-+				struct perf_event *event)
++validate_event(struct pmu *cci_pmu,
++               struct cci_pmu_hw_events *hw_events,
++               struct perf_event *event)
  {
--	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
-+	struct arm_pmu *armpmu;
- 	struct hw_perf_event fake_event = event->hw;
- 	struct pmu *leader_pmu = event->group_leader->pmu;
- 
  	if (is_software_event(event))
  		return 1;
  
@@ -79,22 +57,15 @@ index 25a5308..68a7415 100644
 +	 * core perf code won't check that the pmu->ctx == leader->ctx
 +	 * until after pmu->event_init(event).
 +	 */
-+	if (event->pmu != pmu)
++	if (event->pmu != cci_pmu)
 +		return 0;
 +
- 	if (event->pmu != leader_pmu || event->state < PERF_EVENT_STATE_OFF)
+ 	if (event->state < PERF_EVENT_STATE_OFF)
  		return 1;
  
- 	if (event->state == PERF_EVENT_STATE_OFF && !event->attr.enable_on_exec)
- 		return 1;
- 
-+	armpmu = to_arm_pmu(event->pmu);
- 	return armpmu->get_event_idx(hw_events, &fake_event) >= 0;
- }
- 
-@@ -355,15 +364,15 @@ validate_group(struct perf_event *event)
- 	memset(fake_used_mask, 0, sizeof(fake_used_mask));
- 	fake_pmu.used_mask = fake_used_mask;
+@@ -687,15 +696,15 @@ validate_group(struct perf_event *event)
+ 		.used_mask = CPU_BITS_NONE,
+ 	};
  
 -	if (!validate_event(&fake_pmu, leader))
 +	if (!validate_event(event->pmu, &fake_pmu, leader))
