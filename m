@@ -1,39 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Mar 2015 09:38:57 +0100
-Subject: [PATCH v5 2/2] ARM: dts: sun9i: optimus: Switch to phy core
- regulator bindings for usb phys
-In-Reply-To: <1426305437-15208-3-git-send-email-wens@csie.org>
-References: <1426305437-15208-1-git-send-email-wens@csie.org>
- <1426305437-15208-3-git-send-email-wens@csie.org>
-Message-ID: <20150317083857.GF4638@lukather>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 17 Mar 2015 01:32:21 -0700
+Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
+ address change
+In-Reply-To: <20150317083221.32662.14647.stgit@baseline>
+References: <20150317083221.32662.14647.stgit@baseline>
+Message-ID: <20150317083221.32662.96822.stgit@baseline>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 14, 2015 at 11:57:17AM +0800, Chen-Yu Tsai wrote:
-> Since the phy core already supports specifying a regulator to handle
-> during power up/down, it was decided to drop the regulator support
-> in the sun9i usb phy driver.
-> 
-> This patch switches the DT to the core bindings. This and the phy driver
-> would be in the same release and should not be a problem as far as DT
-> stability goes.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+For Tegra132 and later chips, we can now use the correct hardware base
+address for the Tegra AHB IP block in the DT data.  Update the DT binding
+documentation to reflect this change.
 
-It looks fine for me. I'll wait for Kishon approval before merging
-this patch.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Eduardo Valentin <edubezval@gmail.com>
+Cc: Hiroshi DOYU <hdoyu@nvidia.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+---
+ .../bindings/arm/tegra/nvidia,tegra20-ahb.txt      |   13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/112de53a/attachment-0001.sig>
+diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
+index 067c979..7692b4c 100644
+--- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
++++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
+@@ -2,10 +2,15 @@ NVIDIA Tegra AHB
+ 
+ Required properties:
+ - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
+-  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
+-  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
+-  tegra132, or tegra210.
+-- reg : Should contain 1 register ranges(address and length)
++  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and Tegra124, must
++  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra114
++  or tegra124.  For Tegra132, the compatible string must contain
++  "nvidia,tegra132-ahb".
++
++- reg : Should contain 1 register ranges(address and length).  On Tegra20,
++  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical base
++  address of the IP block must end in 0x04.  On DT files for later chips, the
++  actual hardware base address of the IP block should be used.
+ 
+ Example:
+ 	ahb: ahb at 6000c004 {
