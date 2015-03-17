@@ -1,95 +1,100 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 Mar 2015 17:15:48 +0100
-Subject: [PATCH 3/5] USB: atmel: update DT bindings documentation
+Date: Tue, 17 Mar 2015 17:15:46 +0100
+Subject: [PATCH 1/5] USB: ehci-atmel: rework clk handling
 In-Reply-To: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1426608950-31555-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1426608950-31555-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for the missing clocks, clock-names, reg and interrupts
-properties.
+The EHCI IP only needs the UTMI/UPLL (uclk) and the peripheral (iclk)
+clocks to work properly. Remove the useless system clock (fclk).
+
+Avoid calling set_rate on the fixed rate UTMI/IPLL clock and remove
+useless IS_ENABLED(CONFIG_COMMON_CLK) tests (all at91 platforms have been
+moved to the CCF).
+
+This patch also fixes a bug introduced by 3440ef1 (ARM: at91/dt: fix USB
+high-speed clock to select UTMI), which was leaving the usb clock
+uninitialized and preventing the OHCI driver from setting the usb clock
+rate to 48MHz.
+This bug was caused by several things:
+1/ usb clock drivers set the CLK_SET_RATE_GATE flag, which means the rate
+   cannot be changed once the clock is prepared
+2/ The EHCI driver was retrieving and preparing/enabling the uhpck
+   clock which was in turn preparing its parent clock (the usb clock),
+   thus preventing any rate change because of 1/
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- .../devicetree/bindings/usb/atmel-usb.txt          | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/usb/host/ehci-atmel.c | 30 +++++++++---------------------
+ 1 file changed, 9 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index e180d56..1be8d7a 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -5,6 +5,13 @@ OHCI
- Required properties:
-  - compatible: Should be "atmel,at91rm9200-ohci" for USB controllers
-    used in host mode.
-+ - reg: Address and length of the register set for the device
-+ - interrupts: Should contain ehci interrupt
-+ - clocks: Should reference the peripheral, host and system clocks
-+ - clock-names: Should contains two strings
-+		"ohci_clk" for the peripheral clock
-+		"hclk" for the host clock
-+		"uhpck" for the system clock
-  - num-ports: Number of ports.
-  - atmel,vbus-gpio: If present, specifies a gpio that needs to be
-    activated for the bus to be powered.
-@@ -14,6 +21,8 @@ Required properties:
- usb0: ohci at 00500000 {
- 	compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 	reg = <0x00500000 0x100000>;
-+	clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-+	clock-names = "ohci_clk", "hclk", "uhpck";
- 	interrupts = <20 4>;
- 	num-ports = <2>;
+diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
+index 663f790..be0964a 100644
+--- a/drivers/usb/host/ehci-atmel.c
++++ b/drivers/usb/host/ehci-atmel.c
+@@ -34,7 +34,6 @@ static const char hcd_name[] = "ehci-atmel";
+ 
+ struct atmel_ehci_priv {
+ 	struct clk *iclk;
+-	struct clk *fclk;
+ 	struct clk *uclk;
+ 	bool clocked;
  };
-@@ -23,11 +32,19 @@ EHCI
- Required properties:
-  - compatible: Should be "atmel,at91sam9g45-ehci" for USB controllers
-    used in host mode.
-+ - reg: Address and length of the register set for the device
-+ - interrupts: Should contain ehci interrupt
-+ - clocks: Should reference the peripheral and the UTMI clocks
-+ - clock-names: Should contains two strings
-+		"ehci_clk" for the peripheral clock
-+		"usb_clk" for the UTMI clock
+@@ -51,12 +50,9 @@ static void atmel_start_clock(struct atmel_ehci_priv *atmel_ehci)
+ {
+ 	if (atmel_ehci->clocked)
+ 		return;
+-	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		clk_set_rate(atmel_ehci->uclk, 48000000);
+-		clk_prepare_enable(atmel_ehci->uclk);
+-	}
++
++	clk_prepare_enable(atmel_ehci->uclk);
+ 	clk_prepare_enable(atmel_ehci->iclk);
+-	clk_prepare_enable(atmel_ehci->fclk);
+ 	atmel_ehci->clocked = true;
+ }
  
- usb1: ehci at 00800000 {
- 	compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
- 	reg = <0x00800000 0x100000>;
- 	interrupts = <22 4>;
-+	clocks = <&utmi>, <&uhphs_clk>;
-+	clock-names = "usb_clk", "ehci_clk";
- };
+@@ -64,10 +60,9 @@ static void atmel_stop_clock(struct atmel_ehci_priv *atmel_ehci)
+ {
+ 	if (!atmel_ehci->clocked)
+ 		return;
+-	clk_disable_unprepare(atmel_ehci->fclk);
++
+ 	clk_disable_unprepare(atmel_ehci->iclk);
+-	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-		clk_disable_unprepare(atmel_ehci->uclk);
++	clk_disable_unprepare(atmel_ehci->uclk);
+ 	atmel_ehci->clocked = false;
+ }
  
- AT91 USB device controller
-@@ -53,6 +70,8 @@ usb1: gadget at fffa4000 {
- 	compatible = "atmel,at91rm9200-udc";
- 	reg = <0xfffa4000 0x4000>;
- 	interrupts = <10 4>;
-+	clocks = <&udc_clk>, <&udpck>;
-+	clock-names = "pclk", "hclk";
- 	atmel,vbus-gpio = <&pioC 5 0>;
- };
+@@ -146,20 +141,13 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
+ 		retval = -ENOENT;
+ 		goto fail_request_resource;
+ 	}
+-	atmel_ehci->fclk = devm_clk_get(&pdev->dev, "uhpck");
+-	if (IS_ERR(atmel_ehci->fclk)) {
+-		dev_err(&pdev->dev, "Error getting function clock\n");
+-		retval = -ENOENT;
++
++	atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
++	if (IS_ERR(atmel_ehci->uclk)) {
++		dev_err(&pdev->dev, "failed to get uclk\n");
++		retval = PTR_ERR(atmel_ehci->uclk);
+ 		goto fail_request_resource;
+ 	}
+-	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
+-		if (IS_ERR(atmel_ehci->uclk)) {
+-			dev_err(&pdev->dev, "failed to get uclk\n");
+-			retval = PTR_ERR(atmel_ehci->uclk);
+-			goto fail_request_resource;
+-		}
+-	}
  
-@@ -65,6 +84,10 @@ Required properties:
- 	       "sama5d3-udc"
-  - reg: Address and length of the register set for the device
-  - interrupts: Should contain usba interrupt
-+ - clocks: Should reference the peripheral and host clocks
-+ - clock-names: Should contains two strings
-+		"pclk" for the peripheral clock
-+		"hclk" for the host clock
-  - ep childnode: To specify the number of endpoints and their properties.
- 
- Optional properties:
-@@ -86,6 +109,8 @@ usb2: gadget at fff78000 {
- 	reg = <0x00600000 0x80000
- 	       0xfff78000 0x400>;
- 	interrupts = <27 4 0>;
-+	clocks = <&utmi>, <&udphs_clk>;
-+	clock-names = "hclk", "pclk";
- 	atmel,vbus-gpio = <&pioB 19 0>;
- 
- 	ep0 {
+ 	ehci = hcd_to_ehci(hcd);
+ 	/* registers start at offset 0x0 */
 -- 
 1.9.1
