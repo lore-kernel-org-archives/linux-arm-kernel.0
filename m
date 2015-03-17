@@ -1,75 +1,110 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 18 Mar 2015 03:05:20 +0900
-Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <1426069765.30407.7.camel@AMDC1943>
-References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
- <1426069765.30407.7.camel@AMDC1943>
-Message-ID: <55086CE0.6080905@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Mar 2015 19:05:13 +0100
+Subject: [PATCH] arm64/crypto: issue aese/aesmc instructions in pairs
+Message-ID: <1426615513-28587-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/15 19:29, Krzysztof Kozlowski wrote:
-> On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
->> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
->> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
->> controller") the second suspend to RAM failed. First suspend worked fine
->> but the next one hang just after powering down of secondary CPUs (system
->> consumed energy as it would be running but was not responsive).
->>
->> The issue was caused by enabling delayed reset assertion for CPU0 just
->> after issuing power down of cores. This was introduced for Exynos4 in
->> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
->>
->> The whole behavior is not well documented but after checking with vendor
->> code this should be done like this (on Exynos4):
->> 1. Enable delayed reset assertion when system is running (for all CPUs).
->> 2. Disable delayed reset assertion before suspending the system.
->>    This can be done after powering off secondary CPUs.
->> 3. Re-enable the delayed reset assertion when system is resumed.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
->> Cc: <stable@vger.kernel.org>
->> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-> Dear Kukjin,
-> 
-> This patch was first sent on 3rd of February. It could enter before
-> opening 4.0 merge window. I did not receive any response from you in
-> that time.
-> 
-> So let me point next steps:
-> 1. The Exynos4412 suspend on 4.0 is broken and now this patch applies as
-> a fix.
-> 2. I resent it on 18th of February.
-> 3. I received tested-by from Bartlomiej and Chanwoo.
-> 4. Bartlomiej pinged you on 3rd March.
-> 
-> Still no response. If the patch does not look good then please share
-> your comments. I'll fix it.
-> If this patch looks good, why does it take so much time?
-> 
+This changes the AES core transform implementations to issue aese/aesmc
+(and aesd/aesimc) in pairs. This enables a micro-architectural optimization
+in recent Cortex-A5x cores that improves performance by 50-90%.
 
-Please use another way something like check ARM core rather than use
-'soc_is_xxx()', as you know it is not acceptable now even it is just
-moving/modifying exist function though.
+Measured performance in cycles per byte (Cortex-A57):
 
-And please make sure your updates don't hurt other exynos5 stuff. Any
-tests on exynos5 platforms would be helpful.
+                CBC enc         CBC dec         CTR
+  before        3.64            1.34            1.32
+  after         1.95            0.85            0.93
 
-And I don't think the fix should be sent to 'stable' because I can't see
-the 'add node for L2$ controller' in v3.19...looks applied from v4.0-rc...
+Note that this results in a ~5% performance decrease for older cores.
 
-One more if you have any doubts, I'd like to ask you to contact S.LSI
-guys who have created the vendor codes not assume with the code because
-maybe the vendor code you mentioned cannot cover all exynos stuff I
-think. Then we could make more clear pm codes in mainline. To be honest
-I'm not a Power Management hardware guy so I don't know every regarding
-PM stuff in exynos SoCs, I can contact them easier though...I mean
-please don't assume any hardware behavior with just vendor code. Please
-ask, you have an access in Samsung intranet before posting something
-like this...Hope let's make a better fix together during -rc.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-Thanks,
-Kukjin
+Will,
+
+This is the optimization you yourself mentioned to me about a year ago
+(or even longer perhaps?) Anyway, we have now been able to confirm it
+on a sample 'in the wild', (i.e., a Galaxy S6 phone)
+
+ arch/arm64/crypto/aes-ce-ccm-core.S | 12 ++++++------
+ arch/arm64/crypto/aes-ce.S          | 10 +++-------
+ 2 files changed, 9 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm64/crypto/aes-ce-ccm-core.S b/arch/arm64/crypto/aes-ce-ccm-core.S
+index 432e4841cd81..a2a7fbcacc14 100644
+--- a/arch/arm64/crypto/aes-ce-ccm-core.S
++++ b/arch/arm64/crypto/aes-ce-ccm-core.S
+@@ -101,19 +101,19 @@ ENTRY(ce_aes_ccm_final)
+ 0:	mov	v4.16b, v3.16b
+ 1:	ld1	{v5.2d}, [x2], #16		/* load next round key */
+ 	aese	v0.16b, v4.16b
+-	aese	v1.16b, v4.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v4.16b
+ 	aesmc	v1.16b, v1.16b
+ 2:	ld1	{v3.2d}, [x2], #16		/* load next round key */
+ 	aese	v0.16b, v5.16b
+-	aese	v1.16b, v5.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v5.16b
+ 	aesmc	v1.16b, v1.16b
+ 3:	ld1	{v4.2d}, [x2], #16		/* load next round key */
+ 	subs	w3, w3, #3
+ 	aese	v0.16b, v3.16b
+-	aese	v1.16b, v3.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v3.16b
+ 	aesmc	v1.16b, v1.16b
+ 	bpl	1b
+ 	aese	v0.16b, v4.16b
+@@ -146,19 +146,19 @@ ENDPROC(ce_aes_ccm_final)
+ 	ld1	{v5.2d}, [x10], #16		/* load 2nd round key */
+ 2:	/* inner loop: 3 rounds, 2x interleaved */
+ 	aese	v0.16b, v4.16b
+-	aese	v1.16b, v4.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v4.16b
+ 	aesmc	v1.16b, v1.16b
+ 3:	ld1	{v3.2d}, [x10], #16		/* load next round key */
+ 	aese	v0.16b, v5.16b
+-	aese	v1.16b, v5.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v5.16b
+ 	aesmc	v1.16b, v1.16b
+ 4:	ld1	{v4.2d}, [x10], #16		/* load next round key */
+ 	subs	w7, w7, #3
+ 	aese	v0.16b, v3.16b
+-	aese	v1.16b, v3.16b
+ 	aesmc	v0.16b, v0.16b
++	aese	v1.16b, v3.16b
+ 	aesmc	v1.16b, v1.16b
+ 	ld1	{v5.2d}, [x10], #16		/* load next round key */
+ 	bpl	2b
+diff --git a/arch/arm64/crypto/aes-ce.S b/arch/arm64/crypto/aes-ce.S
+index 685a18f731eb..78f3cfe92c08 100644
+--- a/arch/arm64/crypto/aes-ce.S
++++ b/arch/arm64/crypto/aes-ce.S
+@@ -45,18 +45,14 @@
+ 
+ 	.macro		do_enc_Nx, de, mc, k, i0, i1, i2, i3
+ 	aes\de		\i0\().16b, \k\().16b
+-	.ifnb		\i1
+-	aes\de		\i1\().16b, \k\().16b
+-	.ifnb		\i3
+-	aes\de		\i2\().16b, \k\().16b
+-	aes\de		\i3\().16b, \k\().16b
+-	.endif
+-	.endif
+ 	aes\mc		\i0\().16b, \i0\().16b
+ 	.ifnb		\i1
++	aes\de		\i1\().16b, \k\().16b
+ 	aes\mc		\i1\().16b, \i1\().16b
+ 	.ifnb		\i3
++	aes\de		\i2\().16b, \k\().16b
+ 	aes\mc		\i2\().16b, \i2\().16b
++	aes\de		\i3\().16b, \k\().16b
+ 	aes\mc		\i3\().16b, \i3\().16b
+ 	.endif
+ 	.endif
+-- 
+1.8.3.2
