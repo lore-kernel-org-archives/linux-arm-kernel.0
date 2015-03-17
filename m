@@ -1,68 +1,61 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 17 Mar 2015 10:52:37 +0100
-Subject: [PATCH 27/35 linux-next] reset: sti: constify of_device_id array
-In-Reply-To: <1426535685-25996-6-git-send-email-fabf@skynet.be>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535685-25996-1-git-send-email-fabf@skynet.be>
- <1426535685-25996-6-git-send-email-fabf@skynet.be>
-Message-ID: <1426585957.3709.0.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Mar 2015 10:51:43 +0100
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <54F5DD7C.1050804@linux.intel.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+ <54F4B8B9.4010204@free-electrons.com>
+ <20150303095924.GF4911@lukather> <54F5DD7C.1050804@linux.intel.com>
+Message-ID: <20150317095143.GG4638@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabian,
-
-Am Montag, den 16.03.2015, 20:54 +0100 schrieb Fabian Frederick:
-> of_device_id is always used as const.
-> (See driver.of_match_table and open firmware functions)
+On Tue, Mar 03, 2015 at 06:12:44PM +0200, Mathias Nyman wrote:
+> On 03.03.2015 11:59, Maxime Ripard wrote:
+> > On Mon, Mar 02, 2015 at 08:23:37PM +0100, Gregory CLEMENT wrote:
+> >> Hi Maxime,
+> >>
+> >> On 19/01/2015 14:01, Maxime Ripard wrote:
+> >>> The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+> >>> VBUS line. Enable the needed drivers to support this.
+> >>>
+> >>
+> >> it seems that this patch was not applied yet. Patch 1 is now in
+> >> linux-next and should be part of 4.0-rc. But what about patch 2?
+> > 
+> > IIRC, Greg or Matthias said that Matthias would look into these
+> > patches after the merge window.
+> > 
+> > It still didn't happen though.
+> > 
+> > Maxime
+> > 
 > 
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
-> ---
->  drivers/reset/sti/reset-stih407.c | 2 +-
->  drivers/reset/sti/reset-stih415.c | 2 +-
->  drivers/reset/sti/reset-stih416.c | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
+> Hi
 > 
-> diff --git a/drivers/reset/sti/reset-stih407.c b/drivers/reset/sti/reset-stih407.c
-> index d83db5d7..e250604 100644
-> --- a/drivers/reset/sti/reset-stih407.c
-> +++ b/drivers/reset/sti/reset-stih407.c
-> @@ -126,7 +126,7 @@ static const struct syscfg_reset_controller_data stih407_picophyreset_controller
->  	.channels = stih407_picophyresets,
->  };
->  
-> -static struct of_device_id stih407_reset_match[] = {
-> +static const struct of_device_id stih407_reset_match[] = {
->  	{
->  		.compatible = "st,stih407-powerdown",
->  		.data = &stih407_powerdown_controller,
-> diff --git a/drivers/reset/sti/reset-stih415.c b/drivers/reset/sti/reset-stih415.c
-> index 8dad603..fd84238 100644
-> --- a/drivers/reset/sti/reset-stih415.c
-> +++ b/drivers/reset/sti/reset-stih415.c
-> @@ -89,7 +89,7 @@ static struct syscfg_reset_controller_data stih415_softreset_controller = {
->  	.channels = stih415_softresets,
->  };
->  
-> -static struct of_device_id stih415_reset_match[] = {
-> +static const struct of_device_id stih415_reset_match[] = {
->  	{ .compatible = "st,stih415-powerdown",
->  	  .data = &stih415_powerdown_controller, },
->  	{ .compatible = "st,stih415-softreset",
-> diff --git a/drivers/reset/sti/reset-stih416.c b/drivers/reset/sti/reset-stih416.c
-> index 79aed70..c7ccaed 100644
-> --- a/drivers/reset/sti/reset-stih416.c
-> +++ b/drivers/reset/sti/reset-stih416.c
-> @@ -120,7 +120,7 @@ static struct syscfg_reset_controller_data stih416_softreset_controller = {
->  	.channels = stih416_softresets,
->  };
->  
-> -static struct of_device_id stih416_reset_match[] = {
-> +static const struct of_device_id stih416_reset_match[] = {
->  	{ .compatible = "st,stih416-powerdown",
->  	  .data = &stih416_powerdown_controller, },
->  	{ .compatible = "st,stih416-softreset",
+> I understood that you wanted the first fix patch in as soon as possible so 
+> I sent it forward to Greg, and it's now in his usb-linus branch.
+> 
+> The other two patches, 2/3 and 3/3 you said were "regual" patches (for usb-next?),
+> Andrew said he can take 3/3 and wondered if 2/3 and 3/3 need to go together?
+> 
+> It doesn't matter for me, I can take 2/3 if you like, but I'd prefer if someone
+> with more USB PHY insight could ack it first.
 
-Applied, thanks!
+There's been around two weeks, and we didn't have any additional
+reviews. How can we move forward on this?
 
-regards
-Philipp
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/aec4873c/attachment-0001.sig>
