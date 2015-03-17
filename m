@@ -1,63 +1,32 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 16 Mar 2015 20:14:02 -0500
-Subject: [PATCH 1/2] ARM: OMAP: dmtimer: check for pm_runtime_get_sync()
- failure
+Date: Mon, 16 Mar 2015 20:14:03 -0500
+Subject: [PATCH 2/2] ARM: OMAP: dmtimer: disable pm runtime on remove
 In-Reply-To: <1426554843-42641-1-git-send-email-s-anna@ti.com>
 References: <1426554843-42641-1-git-send-email-s-anna@ti.com>
-Message-ID: <1426554843-42641-2-git-send-email-s-anna@ti.com>
+Message-ID: <1426554843-42641-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current OMAP dmtimer probe does not check for the return
-status of pm_runtime_get_sync() before initializing the timer
-registers. Any timer with missing hwmod data would return a
-failure here, and the access of registers without enabling the
-clocks for the timer would trigger a l3_noc interrupt and a
-kernel boot hang. Add proper checking so that the probe would
-return a failure graciously without hanging the kernel boot.
+Disable the pm_runtime of the device upon remove. This is
+added to balance the pm_runtime_enable() invoked in the probe.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/plat-omap/dmtimer.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index db10169a08de..f32c74c0e1de 100644
+index f32c74c0e1de..8ca94d379bc3 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -799,6 +799,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	const struct of_device_id *match;
- 	const struct dmtimer_platform_data *pdata;
-+	int ret;
+@@ -910,6 +910,8 @@ static int omap_dm_timer_remove(struct platform_device *pdev)
+ 		}
+ 	spin_unlock_irqrestore(&dm_timer_lock, flags);
  
- 	match = of_match_device(of_match_ptr(omap_timer_match), dev);
- 	pdata = match ? match->data : dev->platform_data;
-@@ -860,7 +861,12 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	}
- 
- 	if (!timer->reserved) {
--		pm_runtime_get_sync(dev);
-+		ret = pm_runtime_get_sync(dev);
-+		if (ret < 0) {
-+			dev_err(dev, "%s: pm_runtime_get_sync failed!\n",
-+				__func__);
-+			goto err_get_sync;
-+		}
- 		__omap_dm_timer_init_regs(timer);
- 		pm_runtime_put(dev);
- 	}
-@@ -873,6 +879,11 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
- 	dev_dbg(dev, "Device Probed.\n");
- 
- 	return 0;
++	pm_runtime_disable(&pdev->dev);
 +
-+err_get_sync:
-+	pm_runtime_put_noidle(dev);
-+	pm_runtime_disable(dev);
-+	return ret;
+ 	return ret;
  }
  
- /**
 -- 
 2.3.2
