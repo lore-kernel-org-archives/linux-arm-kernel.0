@@ -1,88 +1,77 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Mar 2015 16:33:46 -0600
-Subject: [PATCH v16 06/11] ARM: dts: qcom: Add power-controller device node
- for 8084 Krait CPUs
+Date: Tue, 17 Mar 2015 16:33:48 -0600
+Subject: [PATCH v16 08/11] ARM: dts: qcom: Add idle states device nodes for
+ 8974/8074
 In-Reply-To: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
 References: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1426631631-56937-7-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1426631631-56937-9-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each Krait CPU in the QCOM 8084 SoC has an SAW power controller to
-regulate the power to the cpu and aide the core in entering idle states.
-Reference the SAW instance and associate the instance with the CPU core.
+Add ARM common idle states device bindings for cpuidle support for APQ
+8974/8074.
+
+Support Standalone power collapse (SPC) idle state (power down that does
+not affect any SoC idle states) for each cpu.
 
 Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1f130bc..71182bf 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -21,6 +21,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 5a41f44..1c28f0f 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -22,6 +22,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc0>;
-+			qcom,saw = <&saw0>;
+ 			qcom,saw = <&saw0>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		cpu at 1 {
-@@ -30,6 +31,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
+@@ -32,6 +33,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc1>;
-+			qcom,saw = <&saw1>;
+ 			qcom,saw = <&saw1>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		cpu at 2 {
-@@ -39,6 +41,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
+@@ -42,6 +44,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc2>;
-+			qcom,saw = <&saw2>;
+ 			qcom,saw = <&saw2>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		cpu at 3 {
-@@ -48,6 +51,7 @@
- 			enable-method = "qcom,kpss-acc-v2";
+@@ -52,6 +55,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc3>;
-+			qcom,saw = <&saw3>;
+ 			qcom,saw = <&saw3>;
++			cpu-idle-states = <&CPU_SPC>;
  		};
  
  		L2: l2-cache {
-@@ -144,7 +148,27 @@
- 			};
+@@ -59,6 +63,16 @@
+ 			cache-level = <2>;
+ 			qcom,saw = <&saw_l2>;
  		};
++
++		idle-states {
++			CPU_SPC: spc {
++				compatible = "qcom,idle-state-spc",
++						"arm,idle-state";
++				entry-latency-us = <150>;
++				exit-latency-us = <200>;
++				min-residency-us = <2000>;
++			};
++		};
+ 	};
  
--		saw_l2: regulator at f9012000 {
-+		saw0: power-controller at f9089000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw1: power-controller at f9099000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw2: power-controller at f90a9000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw3: power-controller at f90b9000 {
-+			compatible = "qcom,apq8084-saw2-v2.1-cpu";
-+			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw_l2: power-controller at f9012000 {
- 			compatible = "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
- 			regulator;
+ 	cpu-pmu {
 -- 
 2.1.0
