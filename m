@@ -1,66 +1,34 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Mar 2015 12:05:58 +0000
-Subject: Versatile Express randomly fails to boot - Versatile Express
- to be removed from nightly testing
-In-Reply-To: <20150316195255.GM8656@n2100.arm.linux.org.uk>
-References: <20150315213330.GB8656@n2100.arm.linux.org.uk>
- <20150316000438.GD8656@n2100.arm.linux.org.uk>
- <20150316004239.GE8656@n2100.arm.linux.org.uk>
- <20150316093553.GF8656@n2100.arm.linux.org.uk>
- <20150316130419.GI8656@n2100.arm.linux.org.uk> <55071742.6000405@arm.com>
- <20150316181634.GK8656@n2100.arm.linux.org.uk> <55072BF5.7030901@arm.com>
- <20150316195255.GM8656@n2100.arm.linux.org.uk>
-Message-ID: <550818A6.9020205@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Mar 2015 13:07:19 +0100
+Subject: [PATCH] pinctrl: dt: at91: new binding
+In-Reply-To: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdbNLE+VjhvSgsU4oqAc03ieCNyiLkUzbjEiu_LFof-Unw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Feb 26, 2015 at 10:34 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
+> +For each peripheral/bank we will descibe in a u32 if a pin can be
+> +configured in it by putting 1 to the pin bit (1 << pin)
 
-On 16/03/15 19:52, Russell King - ARM Linux wrote:
-> On Mon, Mar 16, 2015 at 07:16:05PM +0000, Sudeep Holla wrote:
->> On 16/03/15 18:16, Russell King - ARM Linux wrote:
+This seems to be describing driver intrinsics in the device tree, like
+how the hardware is routed on the inside and what it can do.
 
-[...]
+IMO that is driver territory, the driver should know these limitations
+and protest if you try to do something illegal.
 
-> If I had to guess, I'd say the reason it's stopped there (exactly on a
-> cache line boundary) is because both CPUs are waiting for an instruction
-> fetch to complete into its L1 I-cache, and for some reason, the L2
-> cache is not satisfying the request from either CPU.  The question of
-> course is... why not.
->
+Anyway as the AT91 maintainers seem to disagree I will allow some
+more time for discussion before merging the patch.
 
-As I had mentioned yesterday, I did compare the L2C settings between
-v3.18 and later kernel and found them to be *exactly same*.
+I can't really have one AT91 maintainer NACKing another, it doesn't
+matter that this is a separate driver, in my book the MAINTAINERS
+entry for AT91 as a whole overrides that so can you please find an
+agreement on how to handle this or I will stall the patch until
+you're in agreement.
 
-Since you suspected issues around instruction fetching, I tried playing
-around the tag and data ram latencies. After some experiments, I found
-that changing just the tag ram read latency to 2 cycles, the issue we
-are seeing goes away at-least on my setup. It will be good to see the
-behaviour on your setup with the patch below.
+ARM SoC maintainers input would be welcomed.
 
-The default value which bootmon is programming happens to be worst
-case scenario(8 cycles for all). Will recalls that it was changed to
-minimum value after graphics guys complained about performance.
-
-We need to check with h/w guys to get the correct optimal values for
-these latencies.
-
-Regards,
-Sudeep
-
---->8
-
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts 
-b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 23662b5a5e9d..030c90c1105d 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -172,7 +172,7 @@
-                 interrupts = <0 43 4>;
-                 cache-level = <2>;
-                 arm,data-latency = <1 1 1>;
--               arm,tag-latency = <1 1 1>;
-+               arm,tag-latency = <1 2 1>;
-         };
-
-         pmu {
+Yours,
+Linus Walleij
