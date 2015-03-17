@@ -1,34 +1,37 @@
-From: wens213@gmail.com (wens Tsai)
-Date: Tue, 17 Mar 2015 15:45:39 +0800
-Subject: Is cpufreq-dt safe without regulator support?
-Message-ID: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 17 Mar 2015 08:49:17 +0100
+Subject: [PATCH v2 4/5] PCI: designware: Add disable IO support
+In-Reply-To: <550718B4.5090406@linaro.org>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1426515635-9466-5-git-send-email-gabriel.fernandez@linaro.org>
+ <550718B4.5090406@linaro.org>
+Message-ID: <CAG374jCD05qXiMfCZOPFvaxYLgU75CR3Kiryxxxz1CzmgVOsjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Hi Srinivas,
 
-The sunxi platform added cpufreq support in 4.0.0-rc1 using
-the generic cpufreq-dt driver. One issue we've run into is
-the default OPPs we use include an overclocked/overvoltage
-setting.
+Yes, you are right.
 
-If the cpu is missing a regulator supply phandle, or the
-kernel is built without regulators, cpufreq can increase
-the clock rate without the needed voltage increase.
+Nevertheless i'll try the Kumar and Arnd 's request to not use DT to do that.
 
-The former issue can be resolved by providing a dummy
-regulator with the default voltage, effectively disabling
-cpufreq.
+BR
 
-The latter is possible. Without regulator support built-in,
-even a correct, complete DTS can still fail. Should I just
-remove the offending OPP? Still that does not fix the
-problem when we actually do want overclocking.
+Gabriel
 
-To summarize, should cpufreq-dt probe fail when regulator
-support isn't available? Should we differentiate between
-not having a regulator phandle vs no regulator support?
-
-
-Regards,
-ChenYu
+On 16 March 2015 at 18:53, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+>
+>
+> On 16/03/15 14:20, Gabriel FERNANDEZ wrote:
+>>
+>>   - bus-range: PCI bus numbers covered (it is recommended for new
+>> devicetrees to
+>>     specify this property, to keep backwards compatibility a range of
+>> 0x00-0xff
+>>     is assumed if not present)
+>> +- disable_io_support: set this property for PCIe host controller without
+>> IO
+>> +  port access
+>
+> Shouldn't dt properties use hyphens rather than under scores ?
