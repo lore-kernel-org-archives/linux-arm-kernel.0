@@ -1,58 +1,62 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 17 Mar 2015 11:13:51 +0800
-Subject: [PATCH v2 1/5] mmc: dt-bindings: add Mediatek MMC bindings
-In-Reply-To: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
-References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
-Message-ID: <1426562035-16709-2-git-send-email-chaotian.jing@mediatek.com>
+Date: Tue, 17 Mar 2015 11:13:50 +0800
+Subject: [PATCH v2 0/5] Add Mediatek MMC driver 
+Message-ID: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree binding of Mediatek MMC host
+This series enables MMC support on the MT8135/MT8173 platform.
+MT8135 has 5 MMC controllers and MT8173 has 4 MMC controllers.
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- Documentation/devicetree/bindings/mmc/mtk-sd.txt | 33 ++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+Changes base on Ulf's comment in HKG15:
+Remove useless #include and make it sorted
+Remove BIT(x), only use (1 << x)
+Remove useless structure
+Move all defines to begin of the code
+Remove useless defines
+Move PM/Runtime PM as an extra patch
+Remove "BUG()" in the code
+Take place core-power, io-power with mmc_regulator APIs
+Handle MMC_POWER_ON in set_ios
+Remove msdc_of_parse, call these methods in probe directly
+
+Chaotian Jing (3):
+  mmc: dt-bindings: add Mediatek MMC bindings
+  mmc: mediatek: Add Mediatek MMC driver
+  mmc: mediatek: Add PM support for MMC driver
+
+Eddie Huang (2):
+  arm64: mediatek: Add Mediatek MMC support in defconfig
+  arm64: dts: mediatek: Add MT8173 MMC dts
+
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   33 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  115 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   19 +-
+ arch/arm64/configs/defconfig                     |    1 +
+ drivers/mmc/host/Kconfig                         |    8 +
+ drivers/mmc/host/Makefile                        |    1 +
+ drivers/mmc/host/mtk-sd.c                        | 1504 ++++++++++++++++++++++
+ 7 files changed, 1680 insertions(+), 1 deletion(-)
  create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+ create mode 100644 drivers/mmc/host/mtk-sd.c
 
-diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-new file mode 100644
-index 0000000..ac43f77
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-@@ -0,0 +1,33 @@
-+* MTK MMC controller
-+
-+The MTK  MSDC can act as a MMC controller
-+to support MMC, SD, and SDIO types of memory cards.
-+
-+This file documents differences between the core properties in mmc.txt
-+and the properties used by the msdc driver.
-+
-+Required properties:
-+- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc".
-+- interrupts: Should contain MSDC interrupt number
-+- clocks: MSDC source clock
-+- clock-names: "source"
-+- pinctrl-names: should be "default", "state_uhs"
-+- pinctrl-0: should contain default/high speed pin ctrl
-+- pinctrl-1: should contain uhs mode pin ctrl
-+
-+Optional properties:
-+- vmmc-supply: power to the Core
-+- vqmmc-supply: power to the IO(for SD/SDIO)
-+
-+Examples:
-+mmc0: mmc at 11230000 {
-+	compatible = "mediatek,mt8173-mmc","mediatek,mt8135-mmc";
-+	reg = <0 0x11230000 0 0x108>;
-+	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
-+	vmmc-supply = <&mt6397_vemc_3v3_reg>;
-+	clocks = <&pericfg PERI_MSDC20_1_CK>;
-+	clock-names = "source";
-+	pinctrl-names = "default", "state_uhs";
-+	pinctrl-0 = <&mmc0_pins_default>;
-+	pinctrl-1 = <&mmc0_pins_uhs>;
-+};
--- 
-1.8.1.1.dirty
+
+Chaotian Jing (3):
+  mmc: dt-bindings: add Mediatek MMC bindings
+  mmc: mediatek: Add Mediatek MMC driver
+  mmc: mediatek: Add PM support for MMC driver
+
+Eddie Huang (2):
+  arm64: mediatek: Add Mediatek MMC support in defconfig
+  arm64: dts: mediatek: Add MT8173 MMC dts
+
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   33 +
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  115 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi         |   19 +-
+ arch/arm64/configs/defconfig                     |    1 +
+ drivers/mmc/host/Kconfig                         |    8 +
+ drivers/mmc/host/Makefile                        |    1 +
+ drivers/mmc/host/mtk-sd.c                        | 1504 ++++++++++++++++++++++
+ 7 files changed, 1680 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
+ create mode 100644 drivers/mmc/host/mtk-sd.c
