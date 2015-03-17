@@ -1,141 +1,58 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 17 Mar 2015 18:02:41 +0000
-Subject: [PATCH 09/12] KVM: arm/arm64: prepare GICv2 emulation to be
- handled by kvm_io_bus
-In-Reply-To: <20150314143044.GE10935@cbox>
-References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
- <1426263012-22935-10-git-send-email-andre.przywara@arm.com>
- <20150314143044.GE10935@cbox>
-Message-ID: <55086C41.9070209@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 17 Mar 2015 11:02:22 -0700
+Subject: [PATCH 2/5] ARM: Add Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <20150317172930.GY8399@arm.com>
+References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+ <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
+ <20150317172930.GY8399@arm.com>
+Message-ID: <55086C2E.3030700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej,
-
-On 14/03/15 14:30, Christoffer Dall wrote:
-> On Fri, Mar 13, 2015 at 04:10:09PM +0000, Andre Przywara wrote:
->> Using the framework provided by the recent vgic.c changes we register
->> a kvm_io_bus device when initializing the virtual GICv2.
+On 17/03/15 10:29, Will Deacon wrote:
+> On Sat, Mar 07, 2015 at 12:54:50AM +0000, Florian Fainelli wrote:
+>> This patch adds support for the Broadcom Brahma-B15 CPU readahead cache
+>> controller. This cache controller sits between the L2 and the memory bus
+>> and its purpose is to provide a friendler burst size towards the DDR
+>> interface than the native cache line size.
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/arm_vgic.h      |    1 +
->>  virt/kvm/arm/vgic-v2-emul.c |   13 +++++++++----
->>  virt/kvm/arm/vgic.c         |   16 ++++++++++++++++
->>  3 files changed, 26 insertions(+), 4 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 4bfc6a3..74a4ac4 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -245,6 +245,7 @@ struct vgic_dist {
->>  	unsigned long		*irq_pending_on_cpu;
->>  
->>  	struct vgic_vm_ops	vm_ops;
->> +	struct vgic_io_device	dist_iodev;
->>  };
->>  
->>  struct vgic_v2_cpu_if {
->> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
->> index 0defac6..6f685c9 100644
->> --- a/virt/kvm/arm/vgic-v2-emul.c
->> +++ b/virt/kvm/arm/vgic-v2-emul.c
->> @@ -490,6 +490,7 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
->>  static int vgic_v2_map_resources(struct kvm *kvm,
->>  				 const struct vgic_params *params)
->>  {
->> +	struct vgic_dist *dist = &kvm->arch.vgic;
->>  	int ret = 0;
->>  
->>  	if (!irqchip_in_kernel(kvm))
->> @@ -500,13 +501,17 @@ static int vgic_v2_map_resources(struct kvm *kvm,
->>  	if (vgic_ready(kvm))
->>  		goto out;
->>  
->> -	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
->> -	    IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_cpu_base)) {
->> +	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
->> +	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
->>  		kvm_err("Need to set vgic cpu and dist addresses first\n");
->>  		ret = -ENXIO;
->>  		goto out;
->>  	}
->>  
->> +	vgic_register_kvm_io_dev(kvm, dist->vgic_dist_base,
->> +				 KVM_VGIC_V2_DIST_SIZE,
->> +				 vgic_dist_ranges, -1, &dist->dist_iodev);
->> +
->>  	/*
->>  	 * Initialize the vgic if this hasn't already been done on demand by
->>  	 * accessing the vgic state from userspace.
->> @@ -517,7 +522,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
->>  		goto out;
->>  	}
->>  
->> -	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
->> +	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
->>  				    params->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
->>  				    true);
->>  	if (ret) {
->> @@ -525,7 +530,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
->>  		goto out;
->>  	}
->>  
->> -	kvm->arch.vgic.ready = true;
->> +	dist->ready = true;
->>  out:
->>  	if (ret)
->>  		kvm_vgic_destroy(kvm);
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 71389b8..b1dd717 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -908,6 +908,20 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
->>  	return 0;
->>  }
->>  
->> +static void vgic_unregister_kvm_io_dev(struct kvm *kvm)
->> +{
->> +	struct vgic_dist *dist = &kvm->arch.vgic;
->> +
->> +	if (!dist || !kvm->buses[KVM_MMIO_BUS])
->> +		return;
->> +
->> +	mutex_lock(&kvm->slots_lock);
->> +	if (dist->dist_iodev.dev.ops)
->> +		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
->> +					  &dist->dist_iodev.dev);
+>> The readahead cache is mostly transparent, except for
+>> flush_kern_cache_all, flush_kern_cache_louis and flush_icache_all, which
+>> is precisely what we are overriding here.
 > 
-> why are we only unregisttering the iodev when we have ops?
-
-Because vgic_unregister_kvm_io_dev() is called by kvm_vgic_destroy(),
-which we call on some occasions during vgic_init() when we encounter an
-error. There is quite a window of cases where the kvm_io_bus devices
-haven't been registered yet, so we shouldn't try to unregister them at
-this place. Using the .ops parameter seemed like an elegant way to
-detect this case.
-Does that make sense? Or have I missed something?
-
-Cheers,
-Andre.
-
+> I'm struggling to understand why you care about flush_kern_cache_louis
+> and flush_icache_all for a cache that sits the other side of the L2.
 > 
->> +	mutex_unlock(&kvm->slots_lock);
->> +}
->> +
->>  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
->>  {
->>  	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
->> @@ -1546,6 +1560,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
->>  	struct kvm_vcpu *vcpu;
->>  	int i;
->>  
->> +	vgic_unregister_kvm_io_dev(kvm);
->> +
->>  	kvm_for_each_vcpu(i, vcpu, kvm)
->>  		kvm_vgic_vcpu_destroy(vcpu);
->>  
->> -- 
->> 1.7.9.5
->>
-> 
+> Can you explain why we need to do anything in these cases, please?
+
+Let's try, as you may have read in the comment, all MVA-based cache
+maintenance operations are snooped by the RAC, so they are effectively
+"transparent" to software, all others are not.
+
+flush_kern_cache_louis() and flush_icache_all() both use ICALLIUS in the
+SMP case and ICIALLU in the UP case which were flagged as not being
+transparently handled.
+
+The concern is that, if you perform a L1 cache (data or instruction)
+flush (essentially an invalidate), this will also flush (invalidate)
+corresponding L2 cache lines, but the RAC has no way to be signaled that
+is should also invalidate its own RAC cache lines pertaining to that
+data, and RAC holds per-CPU "super" cache lines.
+
+In arch/arm/kernel/smp.c, all uses of flush_cache_louis() are for
+writing-back data, so the RAC is not an issue. In
+arch/arm/kernel/suspend.c, flush_cache_louis() is known not to guarantee
+a "clean" all the way to main memory, so __cpu_flush_dcache_area is used
+in conjunction. In arch/arm/mm/idmap.c and mmu.c, the use of
+flush_cache_louis() seems to be meant to see fresh data, not write-back,
+so not transparent to the RAC, is that right?
+
+It may very well be that we are super cautious here and that the only
+case to take care of is essentially flush_cache_all(), and nothing more.
+
+Would you suggestions on how to instrument/exercise whether we really
+need to deal with flush_cache_louis() and flush_icache_all()?
+
+Thanks!
+-- 
+Florian
