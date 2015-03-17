@@ -1,78 +1,39 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 17 Mar 2015 09:08:45 +0800
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <5704037.pUGdJ0Q9hF@vostro.rjw.lan>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <2027737.r7gkxqZ3Xv@vostro.rjw.lan> <5506C93C.704@linaro.org>
- <5704037.pUGdJ0Q9hF@vostro.rjw.lan>
-Message-ID: <55077E9D.50103@huawei.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 16 Mar 2015 20:14:01 -0500
+Subject: [PATCH 0/2] Couple of dmtimer fixes
+Message-ID: <1426554843-42641-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/17 7:15, Rafael J. Wysocki wrote:
-> On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
->> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
->>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
-[...]
->>>>
->>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
->>>> index 074e52b..e8728d7 100644
->>>> --- a/arch/ia64/Kconfig
->>>> +++ b/arch/ia64/Kconfig
->>>> @@ -10,6 +10,7 @@ config IA64
->>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
->>>>   	select PCI if (!IA64_HP_SIM)
->>>>   	select ACPI if (!IA64_HP_SIM)
->>>> +	select ACPI_GENERIC_SLEEP if ACPI
->>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
->>>>   	select HAVE_IDE
->>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
->>>> index b7d31ca..9804431 100644
->>>> --- a/arch/x86/Kconfig
->>>> +++ b/arch/x86/Kconfig
->>>> @@ -22,6 +22,7 @@ config X86_64
->>>>   ### Arch settings
->>>>   config X86
->>>>   	def_bool y
->>>> +	select ACPI_GENERIC_SLEEP if ACPI
->>> One more nit.  If you did
->>>
->>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
->>>
->>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
->>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
->> In sleep.c,
->>
->> #ifdef CONFIG_ACPI_SLEEP
->> acpi_target_system_state()
->> {
->> }
->> #endif
->>
->> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
->> which one of them will be enabled on ARM64 so ACPI_SLEEP
->> will also enabled too.
->>
->> So if we
->>
->> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
->>
->> and
->>
->> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
->>
->> it will lead to errors for acpi_target_system_state() that
->> is declared but not defined, so I will keep the code as
->> it is, what do you think?
-> No, we need to hash this out.  Having two different Kconfig options meaning
-> almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
->
-> Do you need ACPI_SLEEP on ARM64 at all?
+Hi Tony,
 
-No, at least for now we don't need it, the spec for sleep is not ready for
-ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
+Please find couple of non-urgent fixes to the OMAP dmtimer driver.
+The patches are based on 4.0-rc1.
 
-Thanks
-Hanjun
+The first patch is a fix for the issue I reported earlier on the
+DRA7 dmtimer hwmod patches [1]. DRA7 has timers 13 through 16 disabled
+in DT currently, and enabling any of them would cause a kernel hang.
+This fix properly checks the pm_runtime_get_sync() calls in the OMAP
+dmtimer driver irrespective of whether the hwmods are added or not.
+In the case that they are not added, the runtime_pm calls should return
+the value as returned from _od_fail_runtime_resume(), and the probe
+should bail out properly fixing the boot hang.
+
+Second patch is a minor fix that balances the pm_runtime_enable() call
+in probe with pm_runtime_disable() call in remove, so that the devices
+can be bound again properly after doing an unbind through sysfs.
+
+regards
+Suman
+
+[1] http://marc.info/?l=linux-omap&m=142653933112526&w=2
+
+Suman Anna (2):
+  ARM: OMAP: dmtimer: check for pm_runtime_get_sync() failure
+  ARM: OMAP: dmtimer: disable pm runtime on remove
+
+ arch/arm/plat-omap/dmtimer.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+-- 
+2.3.2
