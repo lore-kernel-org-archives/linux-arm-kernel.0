@@ -1,30 +1,72 @@
-From: r.schwebel@pengutronix.de (Robert Schwebel)
-Date: Tue, 17 Mar 2015 19:31:24 +0100
-Subject: [PATCH] ARM: vexpress: Add unified-cache Device Tree property
-Message-ID: <1426617084-1583-1-git-send-email-r.schwebel@pengutronix.de>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Tue, 17 Mar 2015 19:37:31 +0100
+Subject: [PATCH 00/16 linux-next] drivers/net: constify of_device_id array
+Message-ID: <1426617469-781-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this propergy, we get this boot warning:
+This small patchset adds const to of_device_id arrays in
+drivers/net branch.
 
-"L2C: device tree omits to specify unified cache"
+Fabian Frederick (16):
+  net: netcp: constify of_device_id array
+  Altera TSE: constify of_device_id array
+  net/fsl: constify of_device_id array
+  net: ethoc: constify of_device_id array
+  drivers: net: xgene: constify of_device_id array
+  net: ethernet: apple: constify of_device_id array
+  netdev: octeon_mgmt: constify of_device_id array
+  net: greth: constify of_device_id array
+  net: xilinx: constify of_device_id array
+  orinoco: constify of_device_id array
+  net: phy: constify of_device_id array
+  can: constify of_device_id array
+  IBM-EMAC: constify of_device_id array
+  ehea: constify of_device_id array
+  net: via-rhine: constify of_device_id array
+  via-velocity: constify of_device_id array
 
-Signed-off-by: Robert Schwebel <r.schwebel@pengutronix.de>
----
- arch/arm/boot/dts/vexpress-v2p-ca9.dts | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/can/cc770/cc770_platform.c                | 2 +-
+ drivers/net/can/grcan.c                               | 2 +-
+ drivers/net/can/mscan/mpc5xxx_can.c                   | 2 +-
+ drivers/net/can/sja1000/sja1000_platform.c            | 2 +-
+ drivers/net/can/xilinx_can.c                          | 2 +-
+ drivers/net/ethernet/aeroflex/greth.c                 | 2 +-
+ drivers/net/ethernet/altera/altera_tse_main.c         | 4 ++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c      | 2 +-
+ drivers/net/ethernet/apple/bmac.c                     | 2 +-
+ drivers/net/ethernet/apple/mace.c                     | 2 +-
+ drivers/net/ethernet/ethoc.c                          | 2 +-
+ drivers/net/ethernet/freescale/fec_mpc52xx.c          | 2 +-
+ drivers/net/ethernet/freescale/fec_mpc52xx_phy.c      | 2 +-
+ drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c | 4 ++--
+ drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c  | 2 +-
+ drivers/net/ethernet/freescale/fs_enet/mii-fec.c      | 4 ++--
+ drivers/net/ethernet/freescale/fsl_pq_mdio.c          | 2 +-
+ drivers/net/ethernet/freescale/gianfar.c              | 2 +-
+ drivers/net/ethernet/freescale/gianfar_ptp.c          | 2 +-
+ drivers/net/ethernet/freescale/ucc_geth.c             | 2 +-
+ drivers/net/ethernet/freescale/xgmac_mdio.c           | 2 +-
+ drivers/net/ethernet/ibm/ehea/ehea_main.c             | 4 ++--
+ drivers/net/ethernet/ibm/emac/core.c                  | 2 +-
+ drivers/net/ethernet/ibm/emac/mal.c                   | 2 +-
+ drivers/net/ethernet/ibm/emac/rgmii.c                 | 2 +-
+ drivers/net/ethernet/ibm/emac/tah.c                   | 2 +-
+ drivers/net/ethernet/ibm/emac/zmii.c                  | 2 +-
+ drivers/net/ethernet/octeon/octeon_mgmt.c             | 2 +-
+ drivers/net/ethernet/ti/netcp_core.c                  | 2 +-
+ drivers/net/ethernet/via/via-rhine.c                  | 2 +-
+ drivers/net/ethernet/via/via-velocity.c               | 2 +-
+ drivers/net/ethernet/xilinx/ll_temac_main.c           | 2 +-
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c     | 2 +-
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c         | 2 +-
+ drivers/net/phy/mdio-bcm-unimac.c                     | 2 +-
+ drivers/net/phy/mdio-gpio.c                           | 2 +-
+ drivers/net/phy/mdio-mux-gpio.c                       | 2 +-
+ drivers/net/phy/mdio-mux-mmioreg.c                    | 2 +-
+ drivers/net/phy/mdio-octeon.c                         | 2 +-
+ drivers/net/wireless/orinoco/airport.c                | 2 +-
+ 40 files changed, 44 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index 23662b5..a411274 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -170,6 +170,7 @@
- 		compatible = "arm,pl310-cache";
- 		reg = <0x1e00a000 0x1000>;
- 		interrupts = <0 43 4>;
-+		cache-unified;
- 		cache-level = <2>;
- 		arm,data-latency = <1 1 1>;
- 		arm,tag-latency = <1 1 1>;
 -- 
-2.1.4
+2.1.0
