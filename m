@@ -1,82 +1,44 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 17 Mar 2015 13:47:23 -0400
-Subject: [PATCH 3/3] arm64: enforce x1|x2|x3 == 0 upon kernel
- entry as per boot protocol
-In-Reply-To: <1426587074-22390-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426587074-22390-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <550868AB.7080303@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Mar 2015 10:45:29 -0700
+Subject: [PATCH 0/2] Couple of dmtimer fixes
+In-Reply-To: <1426554843-42641-1-git-send-email-s-anna@ti.com>
+References: <1426554843-42641-1-git-send-email-s-anna@ti.com>
+Message-ID: <20150317174529.GG31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 06:11 AM, Ard Biesheuvel wrote:
-> According to the arm64 boot protocol, registers x1 to x3 should be
-> zero upon kernel entry, and non-zero values are reserved for future
-> use. This future use is going to be problematic if we never enforce
-> the current rules, so start enforcing them now, by emitting a warning
-> if non-zero values are detected.
+* Suman Anna <s-anna@ti.com> [150316 18:14]:
+> Hi Tony,
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/head.S  |  8 ++++++++
->  arch/arm64/kernel/setup.c | 13 +++++++++++++
->  2 files changed, 21 insertions(+)
+> Please find couple of non-urgent fixes to the OMAP dmtimer driver.
+> The patches are based on 4.0-rc1.
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 1651c0fd50e6..fe5354eae069 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -231,6 +231,10 @@ section_table:
->  #endif
->  
->  ENTRY(stext)
-> +	adr	x8, boot_regs			// record the contents of
-> +	stp	x0, x1, [x8]			// x0 .. x3 at kernel entry
-> +	stp	x2, x3, [x8, #16]
-> +
->  	mov	x21, x0				// x21=FDT
->  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
->  	adrp	x24, KERNEL_START - TEXT_OFFSET	// x24=PHYS_OFFSET
-> @@ -251,6 +255,10 @@ ENTRY(stext)
->  	b	__cpu_setup			// initialise processor
->  ENDPROC(stext)
->  
-> +	.align	3
-> +ENTRY(boot_regs)
-> +	.skip	4 * 8				// x0 .. x3
-> +
->  /*
->   * Determine validity of the x21 FDT pointer.
->   * The dtb must be 8-byte aligned and live in the first 512M of memory.
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 6c5fb5aff325..2b81d0a907ce 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -532,3 +532,16 @@ const struct seq_operations cpuinfo_op = {
->  	.stop	= c_stop,
->  	.show	= c_show
->  };
-> +
-> +static int verify_boot_protocol(void)
-> +{
-> +	extern u64 boot_regs[];
-> +
-> +	if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
-> +		pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
-> +			boot_regs[1], boot_regs[2], boot_regs[3]);
-> +		pr_err("WARNING: your bootloader may fail to load newer kernels\n");
-
-pr_warn?
-
-> +	}
-> +	return 0;
-> +}
-> +late_initcall(verify_boot_protocol);
+> The first patch is a fix for the issue I reported earlier on the
+> DRA7 dmtimer hwmod patches [1]. DRA7 has timers 13 through 16 disabled
+> in DT currently, and enabling any of them would cause a kernel hang.
+> This fix properly checks the pm_runtime_get_sync() calls in the OMAP
+> dmtimer driver irrespective of whether the hwmods are added or not.
+> In the case that they are not added, the runtime_pm calls should return
+> the value as returned from _od_fail_runtime_resume(), and the probe
+> should bail out properly fixing the boot hang.
 > 
+> Second patch is a minor fix that balances the pm_runtime_enable() call
+> in probe with pm_runtime_disable() call in remove, so that the devices
+> can be bound again properly after doing an unbind through sysfs.
 
-Chris
+OK thanks applying both into omap-for-v4.0/fixes.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
+ 
+> [1] http://marc.info/?l=linux-omap&m=142653933112526&w=2
+> 
+> Suman Anna (2):
+>   ARM: OMAP: dmtimer: check for pm_runtime_get_sync() failure
+>   ARM: OMAP: dmtimer: disable pm runtime on remove
+> 
+>  arch/arm/plat-omap/dmtimer.c | 15 ++++++++++++++-
+>  1 file changed, 14 insertions(+), 1 deletion(-)
+> 
+> -- 
+> 2.3.2
+> 
