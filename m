@@ -1,47 +1,87 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 17 Mar 2015 14:55:42 +0000
-Subject: [PATCH] amba-pl011: simplify TX handling
-In-Reply-To: <20150317154248.1675cd4c@north>
-References: <1426547729-21255-1-git-send-email-moorray3@wp.pl>
- <20150317135844.GA3759@e103592.cambridge.arm.com>
- <20150317154248.1675cd4c@north>
-Message-ID: <5508406E.5060607@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Mar 2015 16:06:31 +0100
+Subject: [PATCH] ARM: shmobile: cpuidle: Remove the pointless default
+ driver
+In-Reply-To: <1426602892-17208-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1426602892-17208-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CAMuHMdX0xhLRswsQs6=kQVycQ7sZynMobHY0ySX+oMMPEg=79Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resent with LAKML address fixed]
-Hi Jakub,
+Hi Daniel,
 
-On 17/03/15 14:42, Jakub Kici?ski wrote:
-> On Tue, 17 Mar 2015 13:58:44 +0000, Dave P Martin wrote:
->> On Mon, Mar 16, 2015 at 11:15:29PM +0000, Jakub Kicinski wrote:
->>> From: Jakub Kicinski <kubakici@wp.pl>
+On Tue, Mar 17, 2015 at 3:34 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> The default idle driver uses one state with the WFI instruction.
+> The default idle routine invokes WFI when no cpuidle driver is present.
+>
+> The default cpuidle driver is pointless and does not give more than the
+> default idle routine and moreover it pulls all the mathematics tied with
+> the cpuidle governor for nothing, hence consuming more energy.
+>
+> Remove the default driver, the related code and register the driver directly.
 
-[ ... ]
->>
->> My update still keeps the softirq stuff.  I wanted to avoid adding
->> status polling inside the interrupt handler's core loop, due to
->> concerns about performance overhead: without the polling, the
->> writes to DR are fire-and-forget, whereas polling FR each time
->> involves a whole round-trip to the UART which may involve significant
->> extra time cost and/or IRQ disable latency; however.
->>
->> Your approach does mitigate some of the cost by only starting to
->> poll after count chars have been transmitted, and will typically
->> halve the number of IRQs taken -- which could lead to a net benefit.
->> It would be good to see some benchmarks to understand how much
->> difference it makes to performance.
-> 
-> I will *try* to come up with some figures but I don't have any
-> high-speed UARTs so my tests run at 115k tops.
+Thanks for your patch!
 
-Have you tried this?
-http://fw.hardijzer.nl/?p=138
+> [compiled only - no board - no test]
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/mach-shmobile/common.h    |  3 ---
+>  arch/arm/mach-shmobile/cpuidle.c   | 37 -------------------------------------
+>  arch/arm/mach-shmobile/pm-sh7372.c |  2 +-
+>  3 files changed, 1 insertion(+), 41 deletions(-)
+>
+> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+> index 309025e..29b3088 100644
+> --- a/arch/arm/mach-shmobile/common.h
+> +++ b/arch/arm/mach-shmobile/common.h
+> @@ -23,8 +23,6 @@ struct clk;
+>  extern int shmobile_clk_init(void);
+>  extern void shmobile_handle_irq_intc(struct pt_regs *);
+>  extern struct platform_suspend_ops shmobile_suspend_ops;
+> -struct cpuidle_driver;
+> -extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+>
+>  #ifdef CONFIG_SUSPEND
+>  int shmobile_suspend_init(void);
+> @@ -51,7 +49,6 @@ extern void __iomem *shmobile_scu_base;
+>  static inline void __init shmobile_init_late(void)
+>  {
+>         shmobile_suspend_init();
+> -       shmobile_cpuidle_init();
 
-This drives the RPi PL011 from a higher frequency clock, thus you can
-achieve much higher baud rates. Haven't tried this myself, but it looks
-reasonable and not too complicated. You need a matching speed at the
-other end, of course, AFAIK the FTDI USB chip can do this.
+Please remove the forward declaration and dummy for shmobile_cpuidle_init()
+above, too.
 
-Cheers,
-Andre.
+>         shmobile_cpufreq_init();
+>  }
+>
+> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+> index 0afeb5c..e69de29 100644
+> --- a/arch/arm/mach-shmobile/cpuidle.c
+> +++ b/arch/arm/mach-shmobile/cpuidle.c
+> @@ -1,37 +0,0 @@
+
+If you remove this file, you should remove its entry from
+arch/arm/mach-shmobile/Makefile, too.
+(did you use a config with CONFIG_CPU_IDLE=n?).
+
+> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+> index c0293ae..9f19052 100644
+> --- a/arch/arm/mach-shmobile/pm-sh7372.c
+> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+
+Support for sh7372 is scheduled for removal in v4.1, so this will become
+a no-op.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
