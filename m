@@ -1,71 +1,27 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Mar 2015 14:43:45 +0100
-Subject: [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
-In-Reply-To: <1426595474.24415.18.camel@mtksdaap41>
-References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
- <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
- <20150316153048.GC10068@pengutronix.de>
- <1426595474.24415.18.camel@mtksdaap41>
-Message-ID: <20150317134345.GG10068@pengutronix.de>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 17 Mar 2015 13:46:29 +0000
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+Message-ID: <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eddie,
+Hi Geert,
 
-On Tue, Mar 17, 2015 at 08:31:14PM +0800, Eddie Huang wrote:
-> On Mon, 2015-03-16 at 16:30 +0100, Uwe Kleine-K?nig wrote:
-> > On Wed, Jan 28, 2015 at 05:27:56PM +0800, Eddie Huang wrote:
-> > > [...]
-> > > +static u16 rtc_read(struct mt6397_rtc *rtc, u32 offset)
-> > rtc_read is a bad name for a driver. There are already 6 functions with
-> > this name in the kernel. Better use a unique prefix.
-> 
-> I will use prefix mtk_
-I would prefer a prefix that is unique to the driver. "mtk_" doesn't
-work to distinguish between the rtc and a (say) spi driver. What you
-want here is that if someone reports a bug on any mailinglist with a
-backtrace you are able to immediately see which driver is affected.
+> Besides, I think a multi-platform XIP (or nommu) kernel is possible, as long as XIP_PHYS_ADDR (or PHYS_OFFSET) is suitable for all platforms included
 
-> > > [...]
-> > > +static irqreturn_t rtc_irq_handler_thread(int irq, void *data)
-> > > +{
-> > > +	struct mt6397_rtc *rtc = data;
-> > > +	u16 irqsta, irqen;
-> > > +
-> > > +	mutex_lock(&rtc->lock);
-> > > +	irqsta = rtc_read(rtc, RTC_IRQ_STA);
-> > Do you really need to lock for a single read access?
-> 
-> I think this lock is necessary, because other thread may access rtc
-> register at the same time, for example, call mtk_rtc_set_alarm to modify
-> alarm time.
-That would be a valid reason if mtk_rtc_set_alarm touched that register
-twice in a single critical section and the handler must not read the
-value of the first write. Otherwise it should be fine, shouldn't it?
+Possible...but...maybe pointless. If you're doing XIP, then most likely you've got a specific platform that you are trying to do as much as you can in as little (RAM) as possible.
 
-> > > +static int mtk_rtc_set_time(struct device *dev, struct rtc_time *tm)
-> > > +{
-> > > +	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
-> > > +
-> > > +	tm->tm_year -= RTC_MIN_YEAR_OFFSET;
-> > > +	tm->tm_mon++;
-> > > +	mutex_lock(&rtc->lock);
-> > > +	rtc_write(rtc, RTC_TC_YEA, tm->tm_year);
-> > > +	rtc_write(rtc, RTC_TC_MTH, tm->tm_mon);
-> > > +	rtc_write(rtc, RTC_TC_DOM, tm->tm_mday);
-> > > +	rtc_write(rtc, RTC_TC_HOU, tm->tm_hour);
-> > > +	rtc_write(rtc, RTC_TC_MIN, tm->tm_min);
-> > > +	rtc_write(rtc, RTC_TC_SEC, tm->tm_sec);
-> > Is this racy? I.e. what happens if RTC_TC_SEC overflows just before you
-> > write to it but after you wrote RTC_TC_MIN?
-> 
-> register value will write to hardware after rtc_write_trigger, so the
-> racy condition not exist.
-Ah, it seems the hardware guys did their job. Nice.
+Was ARCH_MULTIPLATFORM really trying to fix some huge existing problem? Or was it more of a 'here's a cute thing we could do'?
+In my mind, an SoC by nature is used for specific embedded product and you could care less if the binary runs on anything else. Of course the range of SoCs that can run Linux now a days varies greatly, so I don't think you can put them all in the same category like ARCH_MULTIPLATFORM was trying to do.
 
-Best regards
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Perhaps ARCH_MULTIPLATFORM should be replaced by ARCH_ARM_NEWWORLD almost everywhere, and (new) ARCH_MULTIPLATFORM should be reserved (if needed at all) to protect features that are not compatible with running on multiple machines?
+
+That's not bad. I think it still comes down to if you want to build XIP, you don't care about ARCH_MULTIPLATFORM support, and the XIP_PHYS_ADDR (and PHYS_OFFSET) you need to use is device specific anyway.
+
+It also looks like a couple month ago someone also pointed out that just because the base core is the same, that doesn't mean all the erratas are the same, and ARCH_MULTIPLATFORM doesn't fit there as well.
+
+Chris
