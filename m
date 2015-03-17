@@ -1,42 +1,82 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 17 Mar 2015 10:51:13 +0900
-Subject: [PATCH 0/3] ARM: dts: Define stdout-patch for Exynos Chromebooks
-In-Reply-To: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <075601d06054$d94e6fa0$8beb4ee0$@kernel.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 17 Mar 2015 03:28:37 +0100
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <55077E9D.50103@huawei.com>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <5704037.pUGdJ0Q9hF@vostro.rjw.lan> <55077E9D.50103@huawei.com>
+Message-ID: <3737028.Ib0fKlgSkd@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Javier Martinez Canillas wrote:
+On Tuesday, March 17, 2015 09:08:45 AM Hanjun Guo wrote:
+> On 2015/3/17 7:15, Rafael J. Wysocki wrote:
+> > On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
+> >> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
+> >>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
+> [...]
+> >>>>
+> >>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> >>>> index 074e52b..e8728d7 100644
+> >>>> --- a/arch/ia64/Kconfig
+> >>>> +++ b/arch/ia64/Kconfig
+> >>>> @@ -10,6 +10,7 @@ config IA64
+> >>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
+> >>>>   	select PCI if (!IA64_HP_SIM)
+> >>>>   	select ACPI if (!IA64_HP_SIM)
+> >>>> +	select ACPI_GENERIC_SLEEP if ACPI
+> >>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+> >>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
+> >>>>   	select HAVE_IDE
+> >>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> >>>> index b7d31ca..9804431 100644
+> >>>> --- a/arch/x86/Kconfig
+> >>>> +++ b/arch/x86/Kconfig
+> >>>> @@ -22,6 +22,7 @@ config X86_64
+> >>>>   ### Arch settings
+> >>>>   config X86
+> >>>>   	def_bool y
+> >>>> +	select ACPI_GENERIC_SLEEP if ACPI
+> >>> One more nit.  If you did
+> >>>
+> >>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> >>>
+> >>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
+> >>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+> >> In sleep.c,
+> >>
+> >> #ifdef CONFIG_ACPI_SLEEP
+> >> acpi_target_system_state()
+> >> {
+> >> }
+> >> #endif
+> >>
+> >> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
+> >> which one of them will be enabled on ARM64 so ACPI_SLEEP
+> >> will also enabled too.
+> >>
+> >> So if we
+> >>
+> >> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> >>
+> >> and
+> >>
+> >> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+> >>
+> >> it will lead to errors for acpi_target_system_state() that
+> >> is declared but not defined, so I will keep the code as
+> >> it is, what do you think?
+> > No, we need to hash this out.  Having two different Kconfig options meaning
+> > almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
+> >
+> > Do you need ACPI_SLEEP on ARM64 at all?
 > 
-> The kernel can use as the default console a serial port if is defined
-> as stdout device in the Device Tree.
-> 
-> This allows a board to be booted without the need of having a console
-> parameter in the kernel command line.
-> 
-> This small series add a stdout-path property for Exynos5 Chromebooks and
-> is composed of the following patches:
-> 
-> Javier Martinez Canillas (3):
->   ARM: dts: Define stdout-path property for Peach boards
->   ARM: dts: Define stdout-path property for Snow board
->   ARM: dts: Define stdout-path property for Spring board
-> 
->  arch/arm/boot/dts/exynos5250-snow.dts      | 1 +
->  arch/arm/boot/dts/exynos5250-spring.dts    | 1 +
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 ++++
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 ++++
->  4 files changed, 10 insertions(+)
-> 
-+ Arnd
+> No, at least for now we don't need it, the spec for sleep is not ready for
+> ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
 
-Basically, I have no objection to add stdout-path property on board DT but I
-need to ask other ARM guys how they think about? Always I'm questioned what
-should be defined in bootloader before entering kernel and IMHO kernel can do
-it, it should be defined in bootloader though ;)
+Well, so what about selecting ACPI_SLEEP from the architectures that use it?
 
-Let's wait for other opinions...
 
-Thanks,
-Kukjin
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
