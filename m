@@ -1,31 +1,31 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Tue, 17 Mar 2015 15:10:33 +0100
-Subject: [PATCH v2 2/2] documentation: Fix pinctrl docs for Meson8b
-In-Reply-To: <CACRpkdYh8zMPw+8i+VL7Ftf8y63R+9CdPgNeBer-F6xOc6g85Q@mail.gmail.com>
-References: <1426064430-5826-1-git-send-email-carlo@caione.org>
- <1426064430-5826-3-git-send-email-carlo@caione.org>
- <CACRpkdYh8zMPw+8i+VL7Ftf8y63R+9CdPgNeBer-F6xOc6g85Q@mail.gmail.com>
-Message-ID: <CAOQ7t2aY9weoFsz3TTq=0=k_uauhfqTHHt-HHtHRXC1dnBMXeQ@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 17 Mar 2015 10:11:13 -0400
+Subject: [RFC][PATCH] ring-buffer: Replace this_cpu_{read,write} with
+ this_cpu_ptr()
+In-Reply-To: <20150317081341.0f9a8b4c@gandalf.local.home>
+References: <20150316173154.537b80ee@gandalf.local.home>
+ <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
+ <20150317081341.0f9a8b4c@gandalf.local.home>
+Message-ID: <20150317101113.32f5618a@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 12:50 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Wed, Mar 11, 2015 at 10:00 AM, Carlo Caione <carlo@caione.org> wrote:
->
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Add the compatible string for Meson8b in Meson pinctrl documentation.
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->
-> Change the subject of this patch. It is not a fix, it is new functionality.
->
-> Consider documenting that DIF stuff.
+On Tue, 17 Mar 2015 08:13:41 -0400
+Steven Rostedt <rostedt@goodmis.org> wrote:
 
-I'll do in v3.
+> > > I may go and remove all this_cpu_read,write() calls from my code
+> > > because of this.
+> > 
+> > You could do that with __this_cpo_* but not this_cpu_*(). Doing
+> > it to this_cpu_* would make the operations no longer per cpu atomic. If
+> > they do not need per cpu atomicity then you could have used __this_cpu_*
+> > instead. And  __this_cpu_* do not disable preemption or interrupts.
+> 
+> I do not need it to be atomic.
+
+I test this out with __this_cpu_* versions and see if that solves it
+too. If it does, I'll use that version instead.
 
 Thanks,
 
--- 
-Carlo Caione
+-- Steve
