@@ -1,26 +1,66 @@
-From: jack.sampson@pesquisehoteis.com.br (District Court)
-Date: Tue, 17 Mar 2015 16:06:55 -0300
-Subject: KERN, Notice to appear in Court #000889555
-Message-ID: <b5367de5014012b7b3b391c9a939cc6c@pesquisehoteis.com.br>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 17 Mar 2015 19:08:00 +0000
+Subject: [PATCH v4 4/5] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <20150317190458.GE26480@cbox>
+References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
+ <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA8hJTFeR63gJO9QX7nWuFktkehDzGmJjqhTBkTjw4=7Jw@mail.gmail.com>
+ <20150317190458.GE26480@cbox>
+Message-ID: <CAFEAcA-=mAu-T_JRk4cGjMzmgL61_aOWhWm9O-+fhOqVHd_F6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kern,
+On 17 March 2015 at 19:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Tue, Mar 17, 2015 at 04:18:16PM +0000, Peter Maydell wrote:
+>> Note that this code is implicitly relying on the
+>> ordering of register banks defined by the bank_number()
+>> function, which is a bit icky.
+>
+> right, I thought you wrote this code with some deeper intention of doing
+> it this way so I tried to stick with the general idea - but now I
+> actually looked at git blame and realized that you didn't even write it.
+>
+> Given all this churn around this, probably it's much cleaner to get rid
+> of the loop and have an explicit sync for each architecturally
+> implemented register, i.e. the SPSR_EL1 and the various mode-specific
+> AArch32 SPSR registers?
 
-You have to appear in the Court on the March 25.
-Please, prepare all the documents relating to the case and bring them to Court on the specified date.
-Note: If you do not come, the case will be heard in your absence.
+Yes, this seems like a good idea. I almost suggested it when
+I was writing out my review comments, in fact...
 
-The copy of Court Notice is attached to this email.
+>> >      for (i = 0; i < KVM_NR_SPSR; i++) {
+>> >          reg.id = AARCH64_CORE_REG(spsr[i]);
+>> > -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+>> > +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+>>
+>> Spaces again.
+>>
+>> >          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+>> >          if (ret) {
+>> >              return ret;
+>> >          }
+>> >      }
+>> >
+>> > +    el = arm_current_el(env);
+>> > +    if (el > 0) {
+>> > +        if (is_a64(env)) {
+>> > +            g_assert(el == 1);
+>> > +            /* KVM_SPSR_SVC holds the AARCH64 EL1 SPSR which QEMU
+>> > +             * keeps in bank 0 so copy it across. */
+>> > +            env->banked_spsr[0] = env->banked_spsr[1];
+>> > +            i = aarch64_banked_spsr_index(el);
+>>
+>> More workarounds for a bug we should just fix, I think.
+>>
+>
+> again, this is just for the loop above to be generic, and then fix
+> things up afterwards so that things work both for is_a64() and
+> !is_a64().
 
-Regards,
-Jack Sampson,
-District Clerk.
+But the only reason we're fixing anything up is that we're
+working around the bug. If we didn't have that bug and the
+QEMU definition of where SPSR_EL1's state lived correctly
+pointed at banked_spsr[1], then the only thing you'd need
+to do for syncing is copy the KVM SPSRs into banked_spsr[1..5].
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: Court_Notification_000889555.zip
-Type: application/zip
-Size: 3931 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/d3ebe42a/attachment.zip>
+-- PMM
