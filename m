@@ -1,54 +1,58 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 17 Mar 2015 00:04:15 -0500
-Subject: [Patch v4 2/2] dmaengine: Add ADM driver
-In-Reply-To: <11135b79b94477532e57f30b1ea3c715.squirrel@www.codeaurora.org>
-References: <1423719965-8156-1-git-send-email-agross@codeaurora.org>
- <1423719965-8156-3-git-send-email-agross@codeaurora.org>
- <20150313085745.GG32000@intel.com>
- <20150313220627.GB23640@qualcomm.com>
- <11135b79b94477532e57f30b1ea3c715.squirrel@www.codeaurora.org>
-Message-ID: <20150317050415.GB28722@qualcomm.com>
+From: aaron.lu@intel.com (Aaron Lu)
+Date: Tue, 17 Mar 2015 13:04:33 +0800
+Subject: [PATCH 7/9] mmc: core: Attach PM domain prior probing of SDIO
+ func driver
+In-Reply-To: <1426261429-31883-8-git-send-email-ulf.hansson@linaro.org>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <1426261429-31883-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <5507B5E1.6000208@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 08:15:26AM -0000, sricharan at codeaurora.org wrote:
-> Hi,
+On 03/13/2015 11:43 PM, Ulf Hansson wrote:
+> Align the behvaior to how other buses are handling attachment of PM
+> domains. Additionally, let's add error handling.
 > 
-> <snip>
-> >
-> >>
-> >> > +static int adm_get_blksize(unsigned int burst)
-> >> > +{
-> >> > +	int ret;
-> >> > +
-> >> > +	switch (burst) {
-> >> > +	case 16:
-> >> > +		ret = 0;
-> >> > +		break;
-> >> > +	case 32:
-> >> > +		ret = 1;
-> >> > +		break;
-> >> > +	case 64:
-> >> > +		ret = 2;
-> >> > +		break;
-> >> > +	case 128:
-> >> > +		ret = 3;
-> >> > +		break;
-> >> > +	case 192:
-> >> > +		ret = 4;
-> >> > +		break;
-> >> > +	case 256:
-> >> > +		ret = 5;
-> >> > +		break;
-> >> ffs(burst>>4) ?
-> >
-> > that should work nicely.  thanks.
-> >
->   Will not work for 192, 256 ?
+> Cc: Aaron Lu <aaron.lu@intel.com>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-you are right.  I'll have to separate those out into 2 more cases.  Good catch!
+Acked-by: Aaron Lu <aaron.lu@intel.com>
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+> 
+> For reference, this change has been discussed before.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/294278.html
+> 
+> ---
+>  drivers/mmc/core/sdio_bus.c | 14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/sdio_bus.c b/drivers/mmc/core/sdio_bus.c
+> index bee02e6..71357b8 100644
+> --- a/drivers/mmc/core/sdio_bus.c
+> +++ b/drivers/mmc/core/sdio_bus.c
+> @@ -315,13 +315,19 @@ int sdio_add_func(struct sdio_func *func)
+>  
+>  	sdio_set_of_node(func);
+>  	sdio_acpi_set_handle(func);
+> +
+> +	ret = dev_pm_domain_attach(&func->dev, false);
+> +	if (ret)
+> +		return ret;
+> +
+>  	ret = device_add(&func->dev);
+> -	if (ret == 0) {
+> -		sdio_func_set_present(func);
+> -		dev_pm_domain_attach(&func->dev, false);
+> +	if (ret) {
+> +		dev_pm_domain_detach(&func->dev, false);
+> +		return ret;
+>  	}
+>  
+> -	return ret;
+> +	sdio_func_set_present(func);
+> +	return 0;
+>  }
+>  
+>  /*
+> 
