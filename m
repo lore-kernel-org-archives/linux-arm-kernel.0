@@ -1,42 +1,140 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Mar 2015 16:33:51 -0600
-Subject: [PATCH v16 11/11] ARM: qcom: Update defconfig to enable cpuidle
-In-Reply-To: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-References: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1426631631-56937-12-git-send-email-lina.iyer@linaro.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 18 Mar 2015 04:56:28 +0530
+Subject: [PATCH V5 2/2] ARM: dts: Add HS400 support for exynos5420 and
+ exynos5800
+In-Reply-To: <07b501d06057$d9d7bc80$8d873580$@kernel.org>
+References: <1422499318-13726-1-git-send-email-alim.akhtar@samsung.com>
+ <1422499318-13726-3-git-send-email-alim.akhtar@samsung.com>
+ <54ED6D24.4000703@samsung.com>
+ <CAGOxZ53_TGay2ooTW22ZGPZ+yneqoXH6JEPZ=mMSYr1cpOhXWg@mail.gmail.com>
+ <07b501d06057$d9d7bc80$8d873580$@kernel.org>
+Message-ID: <CAGOxZ53OgKKZVS2qKsMw4cDxdkwG-8OER=8oPxTo9g-+qKHimQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update defconfig to allow cpuidle for QCOM cpus.
+Thanks Kukjin for looking into this.
+I will rebase on top of your for-next and send again.
 
-* Enable QCOM_PM
-* Enable ARM_QCOM_CPUIDLE
+On Tue, Mar 17, 2015 at 7:42 AM, Kukjin Kim <kgene@kernel.org> wrote:
+> Alim Akhtar wrote:
+>>
+>> Ping?
+>>
+> Alim,
+>
+> Can you please re-send it based on latest my tree?
+> It would be helpful for me ;)
+>
+> Thanks,
+> Kukjin
+>
+>> On Wed, Feb 25, 2015 at 12:05 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
+>> > Hi, Alim.
+>> >
+>> > Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> >
+>> > Best Regards,
+>> > Jaehoon Chung
+>> >
+>> > On 01/29/2015 11:41 AM, Alim Akhtar wrote:
+>> >> From: Seungwon Jeon <tgih.jun@samsung.com>
+>> >>
+>> >> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
+>> >> and exynos5800-peach-pi boards.
+>> >> This also adds RCLK GPIO line, this gpio should be in pull-down
+>> >> state.
+>> >> This also enables HS400 on peach-pi and this updates the clock frequency
+>> >> to 800MHz to be set as input clock to controller.
+>> >>
+>> >> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+>> >> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> >> [Alim: addressed review comments]
+>> >> ---
+>> >>  arch/arm/boot/dts/exynos5420-peach-pit.dts |    4 +++-
+>> >>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  |    7 +++++++
+>> >>  arch/arm/boot/dts/exynos5420-smdk5420.dts  |    4 +++-
+>> >>  arch/arm/boot/dts/exynos5800-peach-pi.dts  |    7 +++++--
+>> >>  4 files changed, 18 insertions(+), 4 deletions(-)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-
+>> pit.dts
+>> >> index 9a050e1..f7a44a4 100644
+>> >> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> >> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+>> >> @@ -569,8 +569,10 @@
+>> >>       samsung,dw-mshc-ciu-div = <3>;
+>> >>       samsung,dw-mshc-sdr-timing = <0 4>;
+>> >>       samsung,dw-mshc-ddr-timing = <0 2>;
+>> >> +     samsung,dw-mshc-hs400-timing = <0 2>;
+>> >> +     samsung,read-strobe-delay = <90>;
+>> >>       pinctrl-names = "default";
+>> >> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>> >> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>> >>       bus-width = <8>;
+>> >>  };
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>> >> index ba686e4..8b15316 100644
+>> >> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>> >> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+>> >> @@ -201,6 +201,13 @@
+>> >>                       samsung,pin-drv = <3>;
+>> >>               };
+>> >>
+>> >> +             sd0_rclk: sd0-rclk {
+>> >> +                     samsung,pins = "gpc0-7";
+>> >> +                     samsung,pin-function = <2>;
+>> >> +                     samsung,pin-pud = <1>;
+>> >> +                     samsung,pin-drv = <3>;
+>> >> +             };
+>> >> +
+>> >>               sd1_cmd: sd1-cmd {
+>> >>                       samsung,pins = "gpc1-1";
+>> >>                       samsung,pin-function = <2>;
+>> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> >> index 8be3d7b..2078a1f 100644
+>> >> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> >> @@ -80,8 +80,10 @@
+>> >>               samsung,dw-mshc-ciu-div = <3>;
+>> >>               samsung,dw-mshc-sdr-timing = <0 4>;
+>> >>               samsung,dw-mshc-ddr-timing = <0 2>;
+>> >> +             samsung,dw-mshc-hs400-timing = <0 2>;
+>> >> +             samsung,read-strobe-delay = <90>;
+>> >>               pinctrl-names = "default";
+>> >> -             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>> >> +             pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>> >>               bus-width = <8>;
+>> >>               cap-mmc-highspeed;
+>> >>       };
+>> >> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> >> index e8fdda8..96f0d61 100644
+>> >> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> >> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+>> >> @@ -550,15 +550,18 @@
+>> >>       num-slots = <1>;
+>> >>       broken-cd;
+>> >>       mmc-hs200-1_8v;
+>> >> +     mmc-hs400-1_8v;
+>> >>       cap-mmc-highspeed;
+>> >>       non-removable;
+>> >>       card-detect-delay = <200>;
+>> >> -     clock-frequency = <400000000>;
+>> >> +     clock-frequency = <800000000>;
+>> >>       samsung,dw-mshc-ciu-div = <3>;
+>> >>       samsung,dw-mshc-sdr-timing = <0 4>;
+>> >>       samsung,dw-mshc-ddr-timing = <0 2>;
+>> >> +     samsung,dw-mshc-hs400-timing = <0 2>;
+>> >> +     samsung,read-strobe-delay = <90>;
+>> >>       pinctrl-names = "default";
+>> >> -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8>;
+>> >> +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>> >>       bus-width = <8>;
+>> >>  };
+>
 
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- arch/arm/configs/qcom_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da33..56bda6b 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -30,6 +30,7 @@ CONFIG_CLEANCACHE=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_IDLE=y
-+CONFIG_ARM_QCOM_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-@@ -135,6 +136,7 @@ CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
- CONFIG_QCOM_GSBI=y
-+CONFIG_QCOM_PM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_IPQ_GCC_806X=y
+
 -- 
-2.1.0
+Regards,
+Alim
