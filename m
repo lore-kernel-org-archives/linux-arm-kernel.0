@@ -1,56 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Mar 2015 16:35:54 +0000
-Subject: [RFC PATCH 0/3] arm64: relocatable kernel proof of concept
-In-Reply-To: <CAKv+Gu_A=_d+2=25WCOhAZnxTHQAWY4QZ2eVgyu03aweJvKjPQ@mail.gmail.com>
-References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAGXu5jJB8jQm+FOqwWLaA1zYsVYs4gMrgmdUH1LUxnoOcZdDrw@mail.gmail.com>
- <CAKv+Gu_A=_d+2=25WCOhAZnxTHQAWY4QZ2eVgyu03aweJvKjPQ@mail.gmail.com>
-Message-ID: <20150317163554.GM23340@leverpostej>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Mar 2015 17:36:41 +0100
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <20150317163641.GM10068@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Possibly related to running with/detecting an offset, we need a way to
-> > communicate that kASLR is active through the compressed kernel to
-> > uncompressed kernel. x86 is going to be using x86's setup_data, but we
-> > may need to generalize this. (The reasoning here is that when kaslr is
-> > disabled at runtime, we should turn off other kernel ASLR, like module
-> > offset ASLR, without duplicating kernel command line parameter parsing
-> > -- which is what x86 is currently doing now.) Just examining the
-> > offset isn't sufficient because perhaps we got randomized to offset 0.
-> > :)
-> >
+Hello,
+
+On Tue, Mar 17, 2015 at 03:48:38AM +0000, Chris Brandt wrote:
+> I've been running XIP_KERNEL with linux-3.14 on a Renesas RZ/A1
+> (ARCH_R7S72100) for a while now (with some bug fixes of course) so I
+> thought I'd see if my fixes should be pushed back upstream.
 > 
-> There is no decompressor on arm64, just the core kernel Image. So if
-> an offset needs to be chosen before branching into the kernel proper,
-> it needs to be the bootloader that chooses it.
+> However, I see that all the Renesas parts are being moved to
+> ARCH_MULTIPLATFORM, which by means of arch/arm/Kconfig disallows
+> XIP_KERNEL.
+I think the problem is that there is no agreement on what
+"ARCH_MULTIPLATFORM" means.
 
-Agreed.
+On one hand it can mean "This platform is available to be selected for a
+kernel that supports several different architectures". That's why
+MACH_IMX31_DT depends on ARCH_MULTI_V6 and so ARCH_MULTIPLATFORM.
 
-Our equivalent to setup_data is the DT /chosen node, and I don't think
-we want to try parsing that before we've turned on the MMU.
+On the other hand we have things like: ARCH_MULTIPLATFORM selects
+ARM_PATCH_PHYS_VIRT. These are actually only necessary if you enable
+different machines that use different RAM offsets. XIP_KERNEL is in
+this category, too.
 
-However, for the UEFI boot case we could have the stub do something more
-intelligent and choose a random physical offset itself.
+Now add that you want to do compile testing with random configs. That
+means you must somehow describe the condition that allows enabling
+XIP_KERNEL. You either have maintain an ugly list which machines might
+be enabled together and which are mutually exclusive. Or you accept not
+to allow all configs that are technically possible and sensible and go
+for XIP_KERNEL depending on !ARCH_MULTIPLATFORM.
 
-> > You mention the linear mappings in "performance", which I worry may be
-> > at odds with kASLR? Can large mappings still be used even when we've
-> > got smaller alignment goals? Since you mention the "upper half of the
-> > virtual address range", I assume ARM is built using the -2GB
-> > addressing as used by x86, is that right? So it sounds like it would
-> > be similar entropy to x86.
-> >
-> 
-> I haven't quantified the performance gain, but it is arguably more
-> efficient to map RAM using 1 GB blocks than using 2 MB sections.
-> On the other part of the question, I really need to do more research
-> on what x86 implements in the first place before even trying to answer
-> it.
+So *technically* there is no reason to disallow selecting XIP_KERNEL for
+a multiplatform enabled SoC. But to implement the Kconfig logic to allow
+that without allowing broken configurations is hardly possible.
 
-That might not always be true, depending on the TLB implementation
-(though it's better to assume that it is, as it shouldn't result in a
-performance loss).
+Best regards
+Uwe
 
-Also, if you use DEBUG_RODATA the kernel won't be mapped with 1GB
-mappings after early boot anyway.
-
-Mark.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
