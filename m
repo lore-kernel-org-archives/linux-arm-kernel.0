@@ -1,68 +1,78 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 17 Mar 2015 11:57:00 -0500
-Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-In-Reply-To: <20150317163440.GC31346@atomide.com>
-References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
- <20150316233005.GA2598@atomide.com> <550855B7.3020905@oracle.com>
- <550856FF.9080702@ti.com> <20150317163440.GC31346@atomide.com>
-Message-ID: <CAGo_u6oHk9MXPGQv1rCpvW_oegzEzFTu3sZ_4j_6HFEivnXZXg@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 17 Mar 2015 17:57:47 +0100
+Subject: [PATCH v3 05/15] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <55022AC0.7090403@samsung.com>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-6-git-send-email-maxime.coquelin@st.com>
+ <55022AC0.7090403@samsung.com>
+Message-ID: <CALszF6AVKnSPzOhyBQaOnQJwo34gx-rwRdb3RgL_pDNaX1FpNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 11:34 AM, Tony Lindgren <tony@atomide.com> wrote:
->> On 03/17/2015 11:26 AM, santosh shilimkar wrote:
->> >
->> >
->> > On 3/16/2015 4:30 PM, Tony Lindgren wrote:
->> >> * Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
->> >>> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
->> >>> contradiction in it's dependencies.
->> >>> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
->> >>> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
->> >>> enabled. These options inherit a dependency from an enclosing menu,
->> >>> that requires ARCH_MULTIPLATFORM to be 'enabled'.
->> >>> This is a contradiction and made this option also unavailable for
->> >>> non-multiplatform configurations.
->> >>>
->> >>> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
->> >>> dependencies, the code related to that option is dead and can be
->> >>> removed.
->> >>>
->> >>> This (logical) defect has been found with the undertaker tool.
->> >>> (https://undertaker.cs.fau.de)
->> >>>
->> >>> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
->> >>>
->> >>> ---
->> >>> Tony Lindgren suggested to remove the code since nobody complained for
->> >>> a few years and Santosh Shilimkar agreed.
->> >>> https://lkml.org/lkml/2015/2/25/449
->> >>> ---
->> >>> As far as I see, this should remove all the code related to
->> >>> OMAP4_ERRATA_I688, I hope I didn't remove too much.
->> >>
->> >> Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
->> >>
->> > Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Hi Chanwoo,
+
+2015-03-13 1:09 GMT+01:00 Chanwoo Choi <cw00.choi@samsung.com>:
+> Hi Maxime,
+>
+> On 03/13/2015 06:55 AM, Maxime Coquelin wrote:
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 >>
->> We no longer need i688? I do understand the need to cleanup the macros
->> for multi-arch etc.. but loosing a bug workaround for a real silicon
->> bug is really an invitation for hard to debug issues IMHO.
+>> This adds documentation of device tree bindings for the
+>> STM32 reset controller.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  .../devicetree/bindings/reset/st,stm32-rcc.txt     | 102 +++++++++++++++++++++
+>>  1 file changed, 102 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> new file mode 100644
+>> index 0000000..962f961
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+<snip>
+
+>> + - can1: 281
+>> + - can2: 282
+>> + - pwr: 284
+>> + - dac: 285
+>> + - uart7: 286
+>> + - uart8: 287
+>> + - tim1: 288
+>> + - tim8: 289
+>> + - usart1: 292
+>> + - usart6: 293
+>> + - adc: 296
+>> + - sdio: 299
+>> + - spi1: 300
+>> + - spi4: 301
+>> + - syscfg: 302
+>> + - tim9: 304
+>> + - tim10: 305
+>> + - tim11: 306
+>> + - spi5: 308
+>> + - spi6: 309
+>> + - sai1: 310
+>> + - ltdc: 31
+>> +
+>>
 >
-> Well that code has not been selectable for a few years now. Naturally
-> we can add it back when it actually does something with multiarch.
+> Last line is un-necessary. When I applied this patch for test
+> "new blank line at EOF" happen.
+
+Thanks, that will be fixed in v4.
+
+Kind regards,
+Maxime
 >
-
-I suppose we are sure that downstream kernels that actually try stuff
-out never went ahead and enabled this.. we do have non multi-platform
-builds as well... I am just saying... having been around during the
-discovery of i688, I kinda know how much pain it takes to find the
-damn thing in the first place. a simple boot was not ever an easy
-enough test for it. I do suggest at least adding a print for omap4
-saying that i688 is disabled..
-
-
--- 
----
-Regards,
-Nishanth Menon
+> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+> @@ -99,4 +99,3 @@ List of indexes for STM32F429:
+>   - spi6: 309
+>   - sai1: 310
+>   - ltdc: 31
+> -
+>
+> Thanks,
+> Chanwoo Choi
+>
