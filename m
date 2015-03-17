@@ -1,46 +1,99 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Mar 2015 15:47:01 +0100
-Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
-In-Reply-To: <20150317104038.312e73d1@gandalf.local.home>
-References: <20150316173154.537b80ee@gandalf.local.home>
- <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
- <20150317081341.0f9a8b4c@gandalf.local.home>
- <20150317101113.32f5618a@gandalf.local.home>
- <20150317104038.312e73d1@gandalf.local.home>
-Message-ID: <20150317144701.GJ10068@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Mar 2015 15:55:45 +0100
+Subject: [PATCH] PCI: mvebu: add suspend/resume support
+Message-ID: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guten Morgen Steven,
+This commit implements suspend/resume support for the mvebu PCIe host
+driver. Without this commit, the system will panic at resume time when
+PCIe devices are connected.
 
-On Tue, Mar 17, 2015 at 10:40:38AM -0400, Steven Rostedt wrote:
->  static __always_inline void trace_recursive_unlock(void)
->  {
-> -	unsigned int val = this_cpu_read(current_context);
-> +	unsigned int val = __this_cpu_read(current_context);
-> +	unsigned int val2;
->  
-> -	val--;
-> -	val &= this_cpu_read(current_context);
-> -	this_cpu_write(current_context, val);
-> +	val2 = val - 1;
-> +	val &= val2;
-> +	__this_cpu_write(current_context, val);
-You could use:
+Note that we have to use the ->suspend_noirq() and ->resume_noirq()
+hooks, because at resume time, the PCI fixups are done at
+->resume_noirq() time, so the PCIe controller has to be ready at this
+point.
 
-	unsigned int val = __this_cpu_read(current_context);
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-	val = val & (val - 1);
-
-	__this_cpu_write(current_context, val);
-
-and save a few lines and still make it more readable (IMHO).
-
-BTW, this patch makes the additional lines in the trace disappear, so if
-you think that makes a Tested-by applicable, feel free to add it.
-
-Best regards
-Uwe
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 1309cfb..1ab8635 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -129,6 +129,7 @@ struct mvebu_pcie_port {
+ 	size_t memwin_size;
+ 	phys_addr_t iowin_base;
+ 	size_t iowin_size;
++	u32 saved_pcie_stat;
+ };
+ 
+ static inline void mvebu_writel(struct mvebu_pcie_port *port, u32 val, u32 reg)
+@@ -899,6 +900,35 @@ static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+ 		pcie->msi->dev = &pcie->pdev->dev;
+ }
+ 
++static int mvebu_pcie_suspend(struct device *dev)
++{
++	struct mvebu_pcie *pcie;
++	int i;
++
++	pcie = dev_get_drvdata(dev);
++	for (i = 0; i < pcie->nports; i++) {
++		struct mvebu_pcie_port *port = pcie->ports + i;
++		port->saved_pcie_stat = mvebu_readl(port, PCIE_STAT_OFF);
++	}
++
++	return 0;
++}
++
++static int mvebu_pcie_resume(struct device *dev)
++{
++	struct mvebu_pcie *pcie;
++	int i;
++
++	pcie = dev_get_drvdata(dev);
++	for (i = 0; i < pcie->nports; i++) {
++		struct mvebu_pcie_port *port = pcie->ports + i;
++		mvebu_writel(port, port->saved_pcie_stat, PCIE_STAT_OFF);
++		mvebu_pcie_setup_hw(port);
++	}
++
++	return 0;
++}
++
+ static int mvebu_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pcie *pcie;
+@@ -1056,6 +1086,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+ 	mvebu_pcie_msi_enable(pcie);
+ 	mvebu_pcie_enable(pcie);
+ 
++	platform_set_drvdata(pdev, pcie);
++
+ 	return 0;
+ }
+ 
+@@ -1068,12 +1100,18 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+ };
+ MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
+ 
++static struct dev_pm_ops mvebu_pcie_pm_ops = {
++	.suspend_noirq = mvebu_pcie_suspend,
++	.resume_noirq = mvebu_pcie_resume,
++};
++
+ static struct platform_driver mvebu_pcie_driver = {
+ 	.driver = {
+ 		.name = "mvebu-pcie",
+ 		.of_match_table = mvebu_pcie_of_match_table,
+ 		/* driver unloading/unbinding currently not supported */
+ 		.suppress_bind_attrs = true,
++		.pm = &mvebu_pcie_pm_ops,
+ 	},
+ 	.probe = mvebu_pcie_probe,
+ };
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.0
