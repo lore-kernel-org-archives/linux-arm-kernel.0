@@ -1,50 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Mar 2015 14:57:15 +0100
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
- <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 17 Mar 2015 14:59:13 +0100
+Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <CDA0FF88-2D00-46E0-828E-DD6F4FF4ADAF@goldelico.com>
+References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
+ <1423088075-10025-4-git-send-email-marek@goldelico.com>
+ <20150316210532.GA11441@amd>
+ <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
+ <20150317084730.GA9761@amd>
+ <940EE988-03A4-4B1B-A168-959E367953A6@goldelico.com>
+ <20150317103746.GB3759@amd>
+ <CDA0FF88-2D00-46E0-828E-DD6F4FF4ADAF@goldelico.com>
+Message-ID: <20150317135913.GA4034@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi!
 
-On Tue, Mar 17, 2015 at 2:46 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
->> Besides, I think a multi-platform XIP (or nommu) kernel is possible, as long as XIP_PHYS_ADDR (or PHYS_OFFSET) is suitable for all platforms included
->
-> Possible...but...maybe pointless. If you're doing XIP, then most likely you've got a specific platform that you are trying to do as much as you can in as little (RAM) as possible.
+> >>>>> to introduce coefficients for temperature and discharge rate?
+> >>>> What do you mean? Nothing like that is used in current driver why do
+> >>>> we need to add it?
+> >>> 
+> >>> Well, conversion between Li-ion's voltage and state of charge at 0
+> >>> current is well known:
+> >> 
+> >> We can?t measure at 0 current since the OMAP is driven from battery
+> >> and charger and may also draw some mA?
+> > 
+> > Yes, but you know how many mA you are taking just now. So if you knew
+> > the internal resistance, you could compute the voltage at 0
+> > current. (And it should also work during charging, as long as you know
+> > how much current is going in.)
+> 
+> As far as I understand the twl4030 charger and MADC it is not possible to
+> separate these values. It is only reporting the inflow from charger to
+> battery + system. So you don?t know how many mA are supplying the system
+> and how many mA are left over for charging.
+> 
+> You can only assume how much the system is drawing while running (something
+> between 50 and 600 mA but this depends on system activities, power state
+> of peripherald and e.g. backlight being switched on).
+> 
+> I think your basic assumption that we know any time how many mA the system
+> is taking is not given.
 
-Sure. For your real embedded device, you want a small kernel, without any cruft.
+So.. you won't be able to get exact value while charging, but you
+get one while discharging, which is what really matters...?
 
-> Was ARCH_MULTIPLATFORM really trying to fix some huge existing problem? Or was it more of a 'here's a cute thing we could do'?
-> In my mind, an SoC by nature is used for specific embedded product and you could care less if the binary runs on anything else. Of course the range of SoCs that can run Linux now a days varies greatly, so I don't think you can put them all in the same category like ARCH_MULTIPLATFORM was trying to do.
+> > Yes, and that coefficient should be internal battery resistance ;-).
+> 
+> But where do you know this value from to write it into a DT file?
+> Usually you can?t measure it easily and for some batteries you don?t have
+> a data sheet.
+> 
+> Contrary, the calibration curves can easily be measured on the device
+> (assuming that the charge level decreases/increases linearly over time
+> between Full and Empty).
 
-ARCH_MULTIPLATFORM (the multi-platform part) was also introduced to reduce the
-number of kernels you have to built. This matters not only for testing
-(increasing build coverage while reducing the number of kernels vs. the number
-of machines), but also for Linux distributions, who typically ship only a few
-kernels, but want to support as many machine types as possible.
-
->> Perhaps ARCH_MULTIPLATFORM should be replaced by ARCH_ARM_NEWWORLD almost everywhere, and (new) ARCH_MULTIPLATFORM should be reserved (if needed at all) to protect features that are not compatible with running on multiple machines?
->
-> That's not bad. I think it still comes down to if you want to build XIP, you don't care about ARCH_MULTIPLATFORM support, and the XIP_PHYS_ADDR (and PHYS_OFFSET) you need to use is device specific anyway.
-
-Now, to solve your problem: can you get it to work by dropping XIP_KERNEL's
-dependency on !ARCH_MULTIPLATFORM in arch/arm/Kconfig?
-
-> It also looks like a couple month ago someone also pointed out that just because the base core is the same, that doesn't mean all the erratas are the same, and ARCH_MULTIPLATFORM doesn't fit there as well.
-
-Possibly.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+If you can copy it from the data sheet, that's the easiest option. If
+not, you should be able to easily compute it from the charge/discharge
+curves or from measured voltage at different loads.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
