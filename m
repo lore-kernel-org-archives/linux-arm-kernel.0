@@ -1,49 +1,19 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 17 Mar 2015 14:26:57 -0500
-Subject: Is cpufreq-dt safe without regulator support?
-In-Reply-To: <1426616561.3392.3.camel@pengutronix.de>
-References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
- <1426616561.3392.3.camel@pengutronix.de>
-Message-ID: <CAGo_u6p6fiOuQ7zgebwisBx_wx3L_k3j+Hmw4=mqZZfR2DJNKg@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 17 Mar 2015 15:28:41 -0400 (EDT)
+Subject: [PATCH v1 0/3] drivers: net: xgene: Add second SGMII based 1G
+ interface
+In-Reply-To: <1426616833-9671-1-git-send-email-kchudgar@apm.com>
+References: <1426616833-9671-1-git-send-email-kchudgar@apm.com>
+Message-ID: <20150317.152841.370869744292443495.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 1:22 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Dienstag, den 17.03.2015, 15:45 +0800 schrieb wens Tsai:
->> Hi Viresh,
->>
->> The sunxi platform added cpufreq support in 4.0.0-rc1 using
->> the generic cpufreq-dt driver. One issue we've run into is
->> the default OPPs we use include an overclocked/overvoltage
->> setting.
->>
->> If the cpu is missing a regulator supply phandle, or the
->> kernel is built without regulators, cpufreq can increase
->> the clock rate without the needed voltage increase.
->>
->> The former issue can be resolved by providing a dummy
->> regulator with the default voltage, effectively disabling
->> cpufreq.
->>
->> The latter is possible. Without regulator support built-in,
->> even a correct, complete DTS can still fail. Should I just
->> remove the offending OPP? Still that does not fix the
->> problem when we actually do want overclocking.
->>
->> To summarize, should cpufreq-dt probe fail when regulator
->> support isn't available? Should we differentiate between
->> not having a regulator phandle vs no regulator support?
->>
-> If you have an OPP in the DTS that is not stable with the boot voltage
-> then you need to handle this case in you platform code by disabling this
-> OPP if no regulator support is built into the kernel.
->
-> You can look at the i.MX code to see how this can be done. It is used
-> there to disable an OPP depending on fuse settings.
+From: Keyur Chudgar <kchudgar@apm.com>
+Date: Tue, 17 Mar 2015 11:27:10 -0700
 
+> This patch adds support for second SGMII based 1G interface.
+>   
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-Something we want to do generically?
-
----
-Regards,
-Nishanth Menon
+Series applied to net-next, thanks.
