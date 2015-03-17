@@ -1,153 +1,273 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Tue, 17 Mar 2015 11:24:04 +0200
-Subject: [PATCH v5 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and evaluation
- board dts
-In-Reply-To: <1426262769-26758-1-git-send-email-galak@codeaurora.org>
-References: <1426262769-26758-1-git-send-email-galak@codeaurora.org>
-Message-ID: <5507F2B4.2000105@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 17 Mar 2015 10:27:03 +0100
+Subject: [PATCH 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
+In-Reply-To: <5508804.qPsCdhOgnd@vostro.rjw.lan>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <1566917.2Z45cAj17k@vostro.rjw.lan>
+ <CAPDyKFqpZn=URB3W5ZrW5msxdqoGzj9pdD-Z8bKk-OGnyLZvOA@mail.gmail.com>
+ <5508804.qPsCdhOgnd@vostro.rjw.lan>
+Message-ID: <CAPDyKFoVcZAc4FKkG_ywk6qrqrGMp=0aT+LGigWPiXg-TTi0CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/13/2015 06:06 PM, Kumar Gala wrote:
-> Add initial device tree support for Qualcomm MSM8916 SoC and MTP8916
-> evaluation board.  At the current time we only boot up a single processor.
-> 
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+On 17 March 2015 at 04:01, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, March 16, 2015 10:26:46 AM Ulf Hansson wrote:
+>> On 14 March 2015 at 02:31, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Friday, March 13, 2015 04:43:41 PM Ulf Hansson wrote:
+>> >> There may be more than one device in a PM domain which then will be
+>> >> probed at different points in time.
+>> >>
+>> >> Depending on timing and runtime PM support, in for the device related
+>> >> driver/subsystem, a PM domain may be advised to power off after a
+>> >> successful probe sequence.
+>> >>
+>> >> A general requirement for a device within a PM domain, is that the
+>> >> PM domain must stay powered during the probe sequence. To cope with
+>> >> such requirement, let's add the dev_pm_domain_get|put() APIs.
+>> >>
+>> >> These APIs are intended to be invoked from subsystem-level code and the
+>> >> calls between get/put needs to be balanced.
+>> >>
+>> >> dev_pm_domain_get(), tells the PM domain that it needs to increase a
+>> >> usage count and to keep supplying power. dev_pm_domain_put(), does the
+>> >> opposite.
+>> >>
+>> >> For a PM domain to support this feature, it must implement the optional
+>> >> ->get|put() callbacks.
+>> >>
+>> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>> >> ---
+>> >>  drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>> >>  include/linux/pm.h          |  2 ++
+>> >>  include/linux/pm_domain.h   |  4 ++++
+>> >>  3 files changed, 46 insertions(+)
+>> >>
+>> >> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
+>> >> index f32b802..99225af 100644
+>> >> --- a/drivers/base/power/common.c
+>> >> +++ b/drivers/base/power/common.c
+>> >> @@ -128,3 +128,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
+>> >>               dev->pm_domain->detach(dev, power_off);
+>> >>  }
+>> >>  EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
+>> >> +
+>> >> +/**
+>> >> + * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
+>> >> + * @domain: The PM domain to operate on.
+>> >> + *
+>> >> + * This function will not by itself increase the usage count, that's up to each
+>> >> + * PM domain implementation to support. Typically it should be invoked from
+>> >> + * subsystem level code prior drivers starts probing.
+>> >> + *
+>> >> + * Do note, it's optional to implement the ->get() callback for a PM domain.
+>> >> + *
+>> >> + * Returns 0 on successfully increased usage count or negative error code.
+>> >> + */
+>> >> +int dev_pm_domain_get(struct dev_pm_domain *domain)
+>> >> +{
+>> >> +     int ret = 0;
+>> >> +
+>> >> +     if (domain && domain->get)
+>> >> +             ret = domain->get(domain);
+>> >> +
+>> >> +     return ret;
+>> >> +}
+>> >> +EXPORT_SYMBOL_GPL(dev_pm_domain_get);
+>> >> +
+>> >> +/**
+>> >> + * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
+>> >> + * @domain: The PM domain to operate on.
+>> >> + *
+>> >> + * This function will not by itself decrease the usage count, that's up to each
+>> >> + * PM domain implementation to support. Typically it should be invoked from
+>> >> + * subsystem level code after drivers has finished probing.
+>> >> + *
+>> >> + * Do note, it's optional to implement the ->put() callback for a PM domain.
+>> >> + */
+>> >> +void dev_pm_domain_put(struct dev_pm_domain *domain)
+>> >> +{
+>> >> +     if (domain && domain->put)
+>> >> +             domain->put(domain);
+>> >> +}
+>> >> +EXPORT_SYMBOL_GPL(dev_pm_domain_put);
+>> >> diff --git a/include/linux/pm.h b/include/linux/pm.h
+>> >> index e2f1be6..e62330b 100644
+>> >> --- a/include/linux/pm.h
+>> >> +++ b/include/linux/pm.h
+>> >> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struct device *dev);
+>> >>  struct dev_pm_domain {
+>> >>       struct dev_pm_ops       ops;
+>> >>       void (*detach)(struct device *dev, bool power_off);
+>> >> +     int (*get)(struct dev_pm_domain *domain);
+>> >> +     void (*put)(struct dev_pm_domain *domain);
+>> >
+>> > I don't like these names.  They suggest that it's always going to be about
+>> > reference counting which doesn't have to be the case in principle.
+>>
+>> I am happy to change, you don't happen to have a proposal? :-)
+>>
+>> For genpd we already have these related APIs:
+>>
+>> pm_genpd_poweron()
+>> pm_genpd_name_poweron()
+>> pm_genpd_poweroff_unused()
+>>
+>> Theoretically we should be able to replace these with
+>> dev_pm_domain_get|put() or whatever we decide to name them to.
+>>
+>> >
+>> > Also what about calling these from the driver core, ie. really_probe()?
+>>
+>> I like that!
+>>
+>> That also implies moving the calls to dev_pm_domain_attach|detach()
+>> out of the buses and into the drivercore, since we need the PM domain
+>> to be attached before calling dev_pm_domain_get|put(). I assume that's
+>> what you also propose me to change, right?
+>
+> Not really.  I don't want to inflict the ACPI PM domain on every bus type
+> that may not be prepared for using it or even may not want to use it (like
+> PCI or PNP).  That applies to genpd too to some extent.
+>
+> So bus types need to be able to opt in for using "default" PM domains, but
+> at the same time if they do, the core is a better place to invoke the
+> callbacks.
+
+Okay!
+
+>
+> The patch below shows how that can be done.  For the bus types using
+> genpd or the ACPI PM domain today ->pm_domain_init and ->pm_domain_exit
+> may point to the routines initializing/detaching those (which also will help
+> to reduce code duplication somewhat) and that guarantees that the domains
+> will be attached to devices before probing and the core can do the ->pre_probe
+> and ->post_probe things for everybody.
+
+Overall, this seem like a very good idea!
+
+>
+> Rafael
+>
+>
 > ---
-> v5:
-> * killed use of skeleton, moved to addr/size cells both being 2
-> * Added serial alias in prep of being able to spec uart params
->   in chosen node
-> 
-> v4:
-> * Added chosen node so we dont need to spec everything for earlycon
-> * fixed up timer node to armv8, dropped clock-frequency
-> 
-> v3:
-> * Removed qcom,msm-id and qcom,board-id
-> * Added top level compat for "qcom,msm8916-mtp-smb1360"
-> 
-> v2:
-> * Updated to dropping CONFIG_ARCH_QCOM_MSM8916
-> * Updated to use qcom-ids.h
-> 
->  arch/arm64/boot/dts/Makefile              |   1 +
->  arch/arm64/boot/dts/qcom/Makefile         |   5 +
->  arch/arm64/boot/dts/qcom/msm8916-mtp.dts  |  21 ++++
->  arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi |  32 +++++
->  arch/arm64/boot/dts/qcom/msm8916.dtsi     | 195 ++++++++++++++++++++++++++++++
->  5 files changed, 254 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/qcom/Makefile
->  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dts
->  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
->  create mode 100644 arch/arm64/boot/dts/qcom/msm8916.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index e0350ca..8517f15 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -5,5 +5,6 @@ dts-dirs += cavium
->  dts-dirs += exynos
->  dts-dirs += freescale
->  dts-dirs += mediatek
-> +dts-dirs += qcom
->  
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-> new file mode 100644
-> index 0000000..360ec4c
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+>  drivers/base/bus.c     |   12 +++++++++++-
+>  drivers/base/dd.c      |    9 +++++++++
+>  include/linux/device.h |    3 +++
+>  include/linux/pm.h     |    2 ++
+>  4 files changed, 25 insertions(+), 1 deletion(-)
+>
+> Index: linux-pm/drivers/base/bus.c
+> ===================================================================
+> --- linux-pm.orig/drivers/base/bus.c
+> +++ linux-pm/drivers/base/bus.c
+> @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
+>         int error = 0;
+>
+>         if (bus) {
+> +               if (bus->pm_domain_init) {
+> +                       error = bus->pm_domain_init(dev);
+> +                       if (error)
+> +                               goto out_put;
+> +               }
+>                 pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
+>                 error = device_add_attrs(bus, dev);
+>                 if (error)
+> -                       goto out_put;
+> +                       goto out_pm_domain;
+>                 error = device_add_groups(dev, bus->dev_groups);
+>                 if (error)
+>                         goto out_groups;
+> @@ -534,6 +539,9 @@ out_groups:
+>         device_remove_groups(dev, bus->dev_groups);
+>  out_id:
+>         device_remove_attrs(bus, dev);
+> +out_pm_domain:
+> +       if (bus->pm_domain_exit)
+> +               bus->pm_domain_exit(dev);
+>  out_put:
+>         bus_put(dev->bus);
+>         return error;
+
+To make this work for bus_add_device(), we first need to change the
+registration procedure for genpd DT providers. Currently that's done
+when "PM domain drivers" invokes the __of_genpd_add_provider() API,
+from SoC specific code and from different init levels.
+
+We need to have the available gendp DT providers registered when the
+->pm_domain_init() callback is invoked.
+
+Besides the changes above, genpd also needs to deal with attached
+devices, but which don't have a corresponding driver bound. I believe
+we have some corner cases to fix around this as well.
+
+As an intermediate step, how about adding the similar code as above
+but into really_probe()? For the code in bus_remove_device() below, we
+could add that into __device_release_driver()?
+
+> @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
+>         device_remove_groups(dev, dev->bus->dev_groups);
+>         if (klist_node_attached(&dev->p->knode_bus))
+>                 klist_del(&dev->p->knode_bus);
+> +       if (bus->pm_domain_exit)
+> +               bus->pm_domain_exit(dev);
+>
+>         pr_debug("bus: '%s': remove device %s\n",
+>                  dev->bus->name, dev_name(dev));
+> Index: linux-pm/include/linux/device.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/device.h
+> +++ linux-pm/include/linux/device.h
+> @@ -123,6 +123,9 @@ struct bus_type {
+>         int (*suspend)(struct device *dev, pm_message_t state);
+>         int (*resume)(struct device *dev);
+>
+> +       int (*pm_domain_init)(struct device *dev);
+> +       void (*pm_domain_exit)(struct device *dev);
 > +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-> new file mode 100644
-> index 0000000..784ad92
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-> @@ -0,0 +1,21 @@
-> +/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-
-multi line comment rules
-
-> +*
-> +* This program is free software; you can redistribute it and/or modify
-> +* it under the terms of the GNU General Public License version 2 and
-> +* only version 2 as published by the Free Software Foundation.
-> +*
-> +* This program is distributed in the hope that it will be useful,
-> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
-> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> +* GNU General Public License for more details.
-> +*/
+>         const struct dev_pm_ops *pm;
+>
+>         const struct iommu_ops *iommu_ops;
+> Index: linux-pm/include/linux/pm.h
+> ===================================================================
+> --- linux-pm.orig/include/linux/pm.h
+> +++ linux-pm/include/linux/pm.h
+> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struc
+>  struct dev_pm_domain {
+>         struct dev_pm_ops       ops;
+>         void (*detach)(struct device *dev, bool power_off);
+> +       int (*pre_probe)(struct device *dev);
+> +       void (*post_probe)(struct device *dev);
+>  };
+>
+>  /*
+> Index: linux-pm/drivers/base/dd.c
+> ===================================================================
+> --- linux-pm.orig/drivers/base/dd.c
+> +++ linux-pm/drivers/base/dd.c
+> @@ -298,6 +298,12 @@ static int really_probe(struct device *d
+>                 goto probe_failed;
+>         }
+>
+> +       if (dev->pm_domain && dev->pm_domain->pre_probe) {
+> +               ret = dev->pm_domain->pre_probe(dev);
+> +               if (ret)
+> +                       goto probe_failed;
+> +       }
 > +
-> +/dts-v1/;
+>         if (dev->bus->probe) {
+>                 ret = dev->bus->probe(dev);
+>                 if (ret)
+> @@ -308,6 +314,9 @@ static int really_probe(struct device *d
+>                         goto probe_failed;
+>         }
+>
+> +       if (dev->pm_domain && dev->pm_domain->post_probe)
+> +               dev->pm_domain->post_probe(dev);
 > +
-> +#include "msm8916-mtp.dtsi"
-> +
-> +/ {
-> +	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
-> +	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
-> +			"qcom,msm8916", "qcom,mtp";
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
-> new file mode 100644
-> index 0000000..8dbb77f
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
-> @@ -0,0 +1,32 @@
-> +/* Copyright (c) 2014-2014, The Linux Foundation. All rights reserved.
+>         driver_bound(dev);
+>         ret = 1;
+>         pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
+>
 
-multi line comment rules and 2014-2015
-
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "msm8916.dtsi"
-> +
-> +/ {
-> +	aliases {
-> +		serial0 = &blsp1_uart2;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0";
-> +	};
-> +
-> +	soc {
-> +		serial at 78b0000 {
-> +			status = "okay";
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&blsp1_uart2_default>;
-> +			pinctrl-1 = <&blsp1_uart2_sleep>;
-> +		};
-> +	};
-
-Why don't describe this as:
-
-&blsp1_uart2 {
-	status = "okay";
-	pinctrl-names = xxxx;
-	....
-};
-
-it looks more readable and obvious. This is what the other boards doing
-as well.
-
-<snip>
-
--- 
-regards,
-Stan
+Kind regards
+Uffe
