@@ -1,34 +1,118 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 17 Mar 2015 12:00:00 +0100
-Subject: [PATCH 3/3] ARM: omap2plus_defconfig: Enable n900 modem as
- loadable modules
-In-Reply-To: <1426536003-7077-4-git-send-email-tony@atomide.com>
-References: <1426536003-7077-1-git-send-email-tony@atomide.com>
- <1426536003-7077-4-git-send-email-tony@atomide.com>
-Message-ID: <20150317110000.GA1115@earth>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 17 Mar 2015 12:01:59 +0100
+Subject: [PATCH 2/6] ARM: cpuidle: Add a cpuidle ops structure to be used
+ for DT
+In-Reply-To: <20150316181659.GA13335@red-moon>
+References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+ <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+ <20150316181659.GA13335@red-moon>
+Message-ID: <550809A7.3020600@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 03/16/2015 07:16 PM, Lorenzo Pieralisi wrote:
+> On Tue, Mar 03, 2015 at 12:29:33PM +0000, Daniel Lezcano wrote:
+>> The current state of the different cpuidle drivers is the different PM
+>
+> Nit: "The current state of cpuidle drivers is such that different ..."
 
-On Mon, Mar 16, 2015 at 01:00:03PM -0700, Tony Lindgren wrote:
-> Enable n900 modem as loadable modules.
+Ok.
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
+>> operations are passed via the platform_data using the platform driver
+>> paradigm.
+>>
+>> This approach allowed to split the low level PM code from the arch specific
+>> and the generic cpuidle code.
+>>
+>> Unfortunately there are complains about this approach as, in the context of the
+>
+> Nit: s/complains/complaints
 
-> [...]
-> +CONFIG_HSI_CHAR=m
-> [...]
+Ok.
 
-I think this one should be disabled by default. It's only needed by
-very few people (it exposes the hsi bus to userspace, like i2c-dev
-driver does for i2c).
+[ ... ]
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/28121816/attachment-0001.sig>
+>> @@ -27,4 +27,14 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>>    */
+>>   #define ARM_CPUIDLE_WFI_STATE ARM_CPUIDLE_WFI_STATE_PWR(UINT_MAX)
+>>
+>> +struct cpuidle_ops {
+>> +	const char *name;
+>> +	int (*suspend)(int cpu, unsigned long arg);
+>> +	int (*init)(struct device_node *, int cpu);
+>> +};
+>> +
+>> +extern int arm_cpuidle_suspend(int index);
+>> +
+>> +extern int arm_cpuidle_init(int cpu);
+>
+> idle_cpu_suspend()
+> idle_cpu_init()
+>
+> ?
+>
+> I am really not fussed about the naming.
+>
+> To make this and x86 driver name compliant (well, function signatures
+> are a bit different) we could use:
+>
+> arm_idle()
+> arm_idle_cpu_init()
+>
+> even though I think the arch prefix is useless.
+>
+> Side note: why is the x86 driver in drivers/idle ? To have another dir :) ?
+
+I believe it is there for historical reasons.
+
+[ ... ]
+
+>> +static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+>
+> That's because you want platform cpuidle_ops to be __initdata ?
+
+Yes.
+
+> It should not be a big overhead on arm32 to have a number of
+> structs equal to NR_CPUS, on arm64 it is the other way around
+> there are few cpu_ops, but number of CPUs can be high so it
+> is an array of pointers.
+>
+> I think it is ok to leave it as it is (or probably make cpuidle_ops
+> a single struct, I expect enable-method to be common across cpus).
+
+I prefer to keep per cpu because I am not sure of this assumption.
+
+[ ... ]
+
+>> +	cpuidle_ops[cpu] = *ops; /* structure copy */
+>
+> See above.
+>
+>> +
+>> +	pr_notice("cpuidle: enable-method property '%s'"
+>> +		  " found operations\n", ops->name);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +int __init arm_cpuidle_init(int cpu)
+>> +{
+>> +	int ret = -EOPNOTSUPP;
+>
+> Nit: You always assign ret, so there is no point in initializing it.
+
+Ok, I will fix it.
+
+Thanks for reviewing.
+
+   -- Daniel
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
