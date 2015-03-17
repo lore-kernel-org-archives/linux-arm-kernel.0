@@ -1,84 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Mar 2015 13:53:56 -0700
-Subject: [PATCH v7 0/6] wlcore: add device-tree support
-In-Reply-To: <1426696710-6891-1-git-send-email-eliad@wizery.com>
-References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
-Message-ID: <20150318205356.GW31346@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 17 Mar 2015 15:15:01 +0000
+Subject: [PATCH] PCI: mvebu: add suspend/resume support
+In-Reply-To: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150317151501.GC3368@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eliad Peller <eliad@wizery.com> [150318 09:39]:
-> Add device-tree support to the wlcore (wl12xx/wl18xx)
-> driver.
-> 
-> Update the current users to use the bindings instead
-> of pdata-quirks.
-> 
-> Finally, remove the deprecated wl12xx_platform_data
-> struct (along with the da850 board file code that
-> still uses it)
-> 
-> v7:
-> * rebase (v4.0-rc4)
-> * fix wlcore_spi compilation (remove platform data)
-> * additional minor changes in driver code
+Hey Thomas,
 
-Thanks for updating it, looks good to me now and still works
-for me.
+On Tue, Mar 17, 2015 at 03:55:45PM +0100, Thomas Petazzoni wrote:
+> This commit implements suspend/resume support for the mvebu PCIe host
+> driver. Without this commit, the system will panic at resume time when
+> PCIe devices are connected.
+> 
+> Note that we have to use the ->suspend_noirq() and ->resume_noirq()
+> hooks, because at resume time, the PCI fixups are done at
+> ->resume_noirq() time, so the PCIe controller has to be ready at this
+> point.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/pci/host/pci-mvebu.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 1309cfb..1ab8635 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -129,6 +129,7 @@ struct mvebu_pcie_port {
+>  	size_t memwin_size;
+>  	phys_addr_t iowin_base;
+>  	size_t iowin_size;
+> +	u32 saved_pcie_stat;
 
-Regards,
+nit:  It's already in the pcie port struct, why not just call it saved_state?
 
-Tony
- 
-> v6:
-> * Add Luca's patches to pass irq_trigger/freq
-> * Support wl12xx as well
-> * Update all relevant platforms
-> 
-> Eliad Peller (4):
->   dt: bindings: add TI's wilink wireless device
->   wlcore: add device-tree support
->   ARM: dts: add wl12xx/wl18xx bindings
->   wlcore: remove wl12xx_platform_data
-> 
-> Luciano Coelho (2):
->   wlcore: set irq_trigger in board files instead of hiding behind a
->     quirk
->   wl12xx: use frequency instead of enumerations for pdata clocks
-> 
->  .../devicetree/bindings/net/wireless/ti,wlcore.txt |  47 +++++++++
->  arch/arm/boot/dts/am335x-evmsk.dts                 |  11 ++
->  arch/arm/boot/dts/omap3-cm-t3517.dts               |  10 ++
->  arch/arm/boot/dts/omap3-cm-t3730.dts               |  10 ++
->  arch/arm/boot/dts/omap3-evm-common.dtsi            |  10 ++
->  arch/arm/boot/dts/omap3-igep0020-rev-f.dts         |   9 ++
->  arch/arm/boot/dts/omap3-igep0030-rev-g.dts         |   9 ++
->  arch/arm/boot/dts/omap3-zoom3.dts                  |  10 ++
->  arch/arm/boot/dts/omap4-panda-common.dtsi          |  10 ++
->  arch/arm/boot/dts/omap4-sdp.dts                    |  11 ++
->  arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  10 ++
->  arch/arm/mach-davinci/Kconfig                      |  11 --
->  arch/arm/mach-davinci/board-da850-evm.c            | 112 ---------------------
->  arch/arm/mach-omap2/pdata-quirks.c                 |  74 --------------
->  drivers/net/wireless/ti/wilink_platform_data.c     |  25 -----
->  drivers/net/wireless/ti/wl12xx/main.c              |  63 ++++++++++--
->  drivers/net/wireless/ti/wl12xx/wl12xx.h            |  28 ++++++
->  drivers/net/wireless/ti/wlcore/boot.c              |   1 -
->  drivers/net/wireless/ti/wlcore/debugfs.c           |   2 +-
->  drivers/net/wireless/ti/wlcore/main.c              |  31 +++---
->  drivers/net/wireless/ti/wlcore/sdio.c              |  63 ++++++++++--
->  drivers/net/wireless/ti/wlcore/spi.c               |   6 +-
->  drivers/net/wireless/ti/wlcore/wlcore.h            |   5 +-
->  drivers/net/wireless/ti/wlcore/wlcore_i.h          |   6 +-
->  include/linux/wl12xx.h                             |  49 ---------
->  25 files changed, 311 insertions(+), 312 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
-> 
-> -- 
-> 1.8.5.2.229.g4448466.dirty
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Either way,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
