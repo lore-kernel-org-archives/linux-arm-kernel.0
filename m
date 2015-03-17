@@ -1,36 +1,26 @@
-From: maj@jamers.net (Mark James)
-Date: Tue, 17 Mar 2015 21:35:23 +0000
-Subject: ARM: socfpga: dts: fix spi1 interrupt
-Message-ID: <55089E1B.7000600@jamers.net>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 17 Mar 2015 16:51:07 -0500
+Subject: [PATCH 0/4] Add Qualcomm ADM DMA support
+Message-ID: <1426629071-3541-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch set adds support for the Qualcomm ADM DMA controller that is present
+in the APQ8064, IPQ8064, MSM8660, and MSM8960.
 
-The socfpga.dtsi currently has the wrong interrupt number set for SPI master 1. Trying to use the master without this change results in the kernel boot process waiting forever for an interrupt that will never occur while attempting to probe any slave devices configured in the device tree as being under SPI master 1.
+Andy Gross (4):
+  ARM: DT: ipq8064: Add ADM device node
+  ARM: DT: apq8064: Add ADM device node
+  ARM: DT: msm8660: Add ADM device nodes
+  ARM: DT: msm8960: Add ADM device node
 
-The change works for the Cyclone V, and according to the Arria 5 handbook should be good there too.
+ arch/arm/boot/dts/qcom-apq8064.dtsi      |   21 +++++++++++++++
+ arch/arm/boot/dts/qcom-ipq8064-ap148.dts |    4 +++
+ arch/arm/boot/dts/qcom-ipq8064.dtsi      |   23 ++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8660.dtsi      |   42 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-msm8960.dtsi      |   21 +++++++++++++++
+ 5 files changed, 111 insertions(+)
 
-
-Signed-off-by: Mark James <maj@jamers.net>
-Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-
----
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 9d87609..d9176e6 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -660,7 +660,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0xfff01000 0x1000>;
--			interrupts = <0 156 4>;
-+			interrupts = <0 155 4>;
- 			num-cs = <4>;
- 			clocks = <&spi_m_clk>;
- 			status = "disabled";
 -- 
-2.1.0
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
