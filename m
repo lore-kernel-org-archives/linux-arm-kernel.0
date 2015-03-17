@@ -1,39 +1,63 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 16 Mar 2015 20:14:01 -0500
-Subject: [PATCH 0/2] Couple of dmtimer fixes
-Message-ID: <1426554843-42641-1-git-send-email-s-anna@ti.com>
+Date: Mon, 16 Mar 2015 20:14:02 -0500
+Subject: [PATCH 1/2] ARM: OMAP: dmtimer: check for pm_runtime_get_sync()
+ failure
+In-Reply-To: <1426554843-42641-1-git-send-email-s-anna@ti.com>
+References: <1426554843-42641-1-git-send-email-s-anna@ti.com>
+Message-ID: <1426554843-42641-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The current OMAP dmtimer probe does not check for the return
+status of pm_runtime_get_sync() before initializing the timer
+registers. Any timer with missing hwmod data would return a
+failure here, and the access of registers without enabling the
+clocks for the timer would trigger a l3_noc interrupt and a
+kernel boot hang. Add proper checking so that the probe would
+return a failure graciously without hanging the kernel boot.
 
-Please find couple of non-urgent fixes to the OMAP dmtimer driver.
-The patches are based on 4.0-rc1.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/plat-omap/dmtimer.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-The first patch is a fix for the issue I reported earlier on the
-DRA7 dmtimer hwmod patches [1]. DRA7 has timers 13 through 16 disabled
-in DT currently, and enabling any of them would cause a kernel hang.
-This fix properly checks the pm_runtime_get_sync() calls in the OMAP
-dmtimer driver irrespective of whether the hwmods are added or not.
-In the case that they are not added, the runtime_pm calls should return
-the value as returned from _od_fail_runtime_resume(), and the probe
-should bail out properly fixing the boot hang.
-
-Second patch is a minor fix that balances the pm_runtime_enable() call
-in probe with pm_runtime_disable() call in remove, so that the devices
-can be bound again properly after doing an unbind through sysfs.
-
-regards
-Suman
-
-[1] http://marc.info/?l=linux-omap&m=142653933112526&w=2
-
-Suman Anna (2):
-  ARM: OMAP: dmtimer: check for pm_runtime_get_sync() failure
-  ARM: OMAP: dmtimer: disable pm runtime on remove
-
- arch/arm/plat-omap/dmtimer.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+index db10169a08de..f32c74c0e1de 100644
+--- a/arch/arm/plat-omap/dmtimer.c
++++ b/arch/arm/plat-omap/dmtimer.c
+@@ -799,6 +799,7 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	const struct of_device_id *match;
+ 	const struct dmtimer_platform_data *pdata;
++	int ret;
+ 
+ 	match = of_match_device(of_match_ptr(omap_timer_match), dev);
+ 	pdata = match ? match->data : dev->platform_data;
+@@ -860,7 +861,12 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (!timer->reserved) {
+-		pm_runtime_get_sync(dev);
++		ret = pm_runtime_get_sync(dev);
++		if (ret < 0) {
++			dev_err(dev, "%s: pm_runtime_get_sync failed!\n",
++				__func__);
++			goto err_get_sync;
++		}
+ 		__omap_dm_timer_init_regs(timer);
+ 		pm_runtime_put(dev);
+ 	}
+@@ -873,6 +879,11 @@ static int omap_dm_timer_probe(struct platform_device *pdev)
+ 	dev_dbg(dev, "Device Probed.\n");
+ 
+ 	return 0;
++
++err_get_sync:
++	pm_runtime_put_noidle(dev);
++	pm_runtime_disable(dev);
++	return ret;
+ }
+ 
+ /**
 -- 
 2.3.2
