@@ -1,200 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 17 Mar 2015 12:50:05 +0000
-Subject: [PATCH v10 18/21] ARM64 / ACPI: Select
- ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64
-In-Reply-To: <5506BF89.9040703@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-19-git-send-email-hanjun.guo@linaro.org>
- <20150312182151.GA3867@red-moon> <5502596D.6020901@huawei.com>
- <20150313110421.GA5229@red-moon> <5506BF89.9040703@linaro.org>
-Message-ID: <20150317125005.GC14984@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 17 Mar 2015 13:53:34 +0100
+Subject: [PATCH] ARM: mvebu: clk: remove cpuclk resources overlapping
+ coredivclk registers on Armada XP
+Message-ID: <1426596814-30758-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 11:33:29AM +0000, Hanjun Guo wrote:
+From: Nadav Haklai <nadavh@marvell.com>
 
-[...]
+The resources of the cpuclk node are overlapping the one from
+coredivclk node. It was not noticed until now because the driver did a
+simple of_iomap and not a request_mem_region. This patch fixes it.
 
-> > Patch rewritten, here below, please have a look, test it and rework
-> > bits as needed, I added comments where I thought they were needed but
-> > please add to that if you feel it is worth it.
-> >
-> > It should be easy to split, let me know if you want an incremental
-> > version.
-> 
-> This one is much better, pretty fine to me, thanks!
-> 
-> I assume that this patch is cleanup patch on top of ARM64 ACPI
-> core patches, right?
+[gregory.clement at free-electrons.com: add commit log and port to 4.0-rc]
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+---
+ arch/arm/boot/dts/armada-xp.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Well, it is a clean-up patch on top of your series, I can split it
-in the respective patches and send you the patches in your series
-updated with this code.
-
-Thanks,
-Lorenzo
-
-> 
-> Thanks
-> Hanjun
-> 
-> >
-> > Thanks !
-> > Lorenzo
-> >
-> > ---
-> >   arch/arm64/kernel/acpi.c | 103 +++++++++++++++++++++++++++++++----------------
-> >   1 file changed, 69 insertions(+), 34 deletions(-)
-> >
-> > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> > index 5819ef7..e5ee4d4 100644
-> > --- a/arch/arm64/kernel/acpi.c
-> > +++ b/arch/arm64/kernel/acpi.c
-> > @@ -291,43 +291,60 @@ void acpi_unregister_gsi(u32 gsi)
-> >   }
-> >   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-> >
-> > -static int __init acpi_parse_fadt(struct acpi_table_header *table)
-> > +/*
-> > + * acpi_fadt_sanity_check() - Check FADT presence and carry out sanity
-> > + *			      checks on it
-> > + *
-> > + * Return 0 on success,  <0 on failure
-> > + */
-> > +static int __init acpi_fadt_sanity_check(void)
-> >   {
-> > -	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
-> > +	struct acpi_table_header *table;
-> > +	struct acpi_table_fadt *fadt;
-> > +	acpi_status status;
-> > +	acpi_size tbl_size;
-> > +	int ret = 0;
-> > +
-> > +	/*
-> > +	 * FADT is required on arm64; retrieve it to check its presence
-> > +	 * and carry out revision and ACPI HW reduced compliancy tests
-> > +	 */
-> > +	status = acpi_get_table_with_size(ACPI_SIG_FADT, 0, &table, &tbl_size);
-> > +	if (ACPI_FAILURE(status)) {
-> > +		const char *msg = acpi_format_exception(status);
-> > +
-> > +		pr_err("Failed to get FADT table, %s\n", msg);
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	fadt = (struct acpi_table_fadt *)table;
-> >
-> >   	/*
-> >   	 * Revision in table header is the FADT Major revision, and there
-> >   	 * is a minor revision of FADT which was introduced by ACPI 5.1,
-> >   	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
-> > -	 * boot protocol configuration data, or we will disable ACPI.
-> > +	 * boot protocol configuration data.
-> >   	 */
-> > -	if (table->revision > 5 ||
-> > -	    (table->revision == 5 && fadt->minor_revision >= 1)) {
-> > -		if (!acpi_gbl_reduced_hardware) {
-> > -			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
-> > -			goto disable_acpi;
-> > -		}
-> > -
-> > -		/*
-> > -		 * ACPI 5.1 only has two explicit methods to boot up SMP,
-> > -		 * PSCI and Parking protocol, but the Parking protocol is
-> > -		 * only specified for ARMv7 now, so make PSCI as the only
-> > -		 * way for the SMP boot protocol before some updates for
-> > -		 * the Parking protocol spec.
-> > -		 */
-> > -		if (acpi_psci_present())
-> > -			return 0;
-> > -
-> > -		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
-> > -		return -EOPNOTSUPP;
-> > +	if (table->revision < 5 ||
-> > +	   (table->revision == 5 && fadt->minor_revision < 1)) {
-> > +		pr_err("Unsupported FADT revision %d.%d, should be 5.1+\n",
-> > +		       table->revision, fadt->minor_revision);
-> > +		ret = -EINVAL;
-> > +		goto out;
-> >   	}
-> >
-> > -	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
-> > -		table->revision, fadt->minor_revision);
-> > +	if (!(fadt->flags & ACPI_FADT_HW_REDUCED)) {
-> > +		pr_err("FADT not ACPI hardware reduced compliant\n");
-> > +		ret = -EINVAL;
-> > +	}
-> >
-> > -disable_acpi:
-> > -	disable_acpi();
-> > -	return -EINVAL;
-> > +out:
-> > +	/*
-> > +	 * acpi_get_table_with_size() creates FADT table mapping that
-> > +	 * should be released after parsing and before resuming boot
-> > +	 */
-> > +	early_acpi_os_unmap_memory((char *)table, tbl_size);
-> > +	return ret;
-> >   }
-> >
-> >   /*
-> > @@ -335,12 +352,17 @@ disable_acpi:
-> >    *	1. find RSDP and get its address, and then find XSDT
-> >    *	2. extract all tables and checksums them all
-> >    *	3. check ACPI FADT revision
-> > + *	4. check ACPI FADT HW reduced flag
-> >    *
-> >    * We can parse ACPI boot-time tables such as MADT after
-> >    * this function is called.
-> > + *
-> > + * ACPI is enabled on return if ACPI tables initialized and sanity checks
-> > + * passed, disabled otherwise
-> >    */
-> >   void __init acpi_boot_table_init(void)
-> >   {
-> > +
-> >   	/*
-> >   	 * Enable ACPI instead of device tree unless
-> >   	 * - ACPI has been disabled explicitly (acpi=off), or
-> > @@ -351,19 +373,32 @@ void __init acpi_boot_table_init(void)
-> >   	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> >   		return;
-> >
-> > +	/*
-> > +	 * ACPI is disabled at this point. Enable it in order to parse
-> > +	 * the ACPI tables and carry out sanity checks
-> > +	 */
-> >   	enable_acpi();
-> >
-> >   	/* Initialize the ACPI boot-time table parser. */
-> >   	if (acpi_table_init()) {
-> > -		disable_acpi();
-> > -		return;
-> > +		pr_err("Failed to init ACPI tables\n");
-> > +		goto init_failed;
-> >   	}
-> >
-> > -	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
-> > -		/* disable ACPI if no FADT is found */
-> > -		disable_acpi();
-> > -		pr_err("Can't find FADT\n");
-> > -	}
-> > +	/*
-> > +	 * Check FADT presence and carry out FADT sanity checks
-> > +	 */
-> > +	if (acpi_fadt_sanity_check() < 0)
-> > +		goto init_failed;
-> > +
-> > +	/*
-> > +	 * ACPI tables initialized and FADT sanity checks passed, leave
-> > +	 * ACPI enabled and carry on booting
-> > +	 */
-> > +	return;
-> > +
-> > +init_failed:
-> > +	disable_acpi();
-> >   }
-> >
-> >   void __init acpi_gic_init(void)
-> >
-> 
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 82917236a2fb..fdc2e5bdf459 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -149,7 +149,7 @@
+ 			cpuclk: clock-complex at 18700 {
+ 				#clock-cells = <1>;
+ 				compatible = "marvell,armada-xp-cpu-clock";
+-				reg = <0x18700 0xA0>, <0x1c054 0x10>;
++				reg = <0x18700 0x24>, <0x1c054 0x10>;
+ 				clocks = <&coreclk 1>;
+ 			};
+ 
+-- 
+2.1.0
