@@ -1,37 +1,66 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 17 Mar 2015 15:50:37 +0000
-Subject: [PATCH v4 5/5] target-arm: cpu.h document why env->spsr exists
-In-Reply-To: <1426503716-13931-6-git-send-email-alex.bennee@linaro.org>
-References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
- <1426503716-13931-6-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA97OF2rMPNew8kiJrWBC+f=70c=G-pAC5tiYnEx6r6AYA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Mar 2015 16:51:40 +0100
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+In-Reply-To: <550843B4.8080903@openssl.org>
+References: <20150316154835.GA31336@google.com>
+ <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
+ <20150316162304.GA35408@google.com>
+ <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
+ <550843B4.8080903@openssl.org>
+Message-ID: <CAKv+Gu_TK7BX5V-WD-L0tzTz6SoSfpUOjxboTawiAeRi=MbQ=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 March 2015 at 11:01, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> I was getting very confused about the duplication of state so wanted to
-> make it explicit.
+On 17 March 2015 at 16:09, Andy Polyakov <appro@openssl.org> wrote:
+> Hi,
 >
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>>>> Have you tested this code with the tcrypt.ko module?
+>>>
+>>> I have not, but I can look into it.
+>>>
+>>>> Did you talk to Andy about the license? I don't think this is
+>>>> permissible for the kernel as-is.
+>>>
+>>> Unless I have misunderstood something, the license at the Cryptogams
+>>> website includes an option to license the code under the GNU GPL.
+>>>
+>>> However, I can certainly contact Andy to clarify his intentions.
 >
-> diff --git a/target-arm/cpu.h b/target-arm/cpu.h
-> index 083211c..6dc1799 100644
-> --- a/target-arm/cpu.h
-> +++ b/target-arm/cpu.h
-> @@ -155,6 +155,11 @@ typedef struct CPUARMState {
->         This contains all the other bits.  Use cpsr_{read,write} to access
->         the whole CPSR.  */
->      uint32_t uncached_cpsr;
-> +    /* The spsr is a alias for spsr_elN where N is the current
-> +     * exception level.
+> I have no problems with reusing assembly modules in kernel context. The
+> whole idea behind cryptogams initiative was exactly to reuse code in
+> different contexts. But I'd prefer if it's more of cooperative effort,
+> when we help each other to improve code, test on and tune for more
+> platforms single developer might have access to, cross-report problems,
+> etc. For this reason I'd prefer if it can be arranged in way similar to
+> bsaes-armv7 module, i.e. we work together on shared copy of module that
+> generates assembly that can be then compiled for OpenSSL or kernel. Is
 
-I could have sworn I'd commented about this in an earlier
-version. It's not an alias for spsr_elN, because on AArch32 there are
-multiple SPSRs at EL1; it is the current SPSR, and
-the SPSRs for other modes are stored in banked_spsr[].
+Yes, that is what I thought.
 
-    /* SPSR for current mode. */
+@Sami, this also means we should integrate the .pl file and the
+generated .S. Please have a look at how I integrated Andy's
+bsaes-armv7.pl module.
 
-would do IMHO (matching the comment for env->regs[].)
+> it sensible? BTW, why stop at SHA256? There is SHA512 and NEON SHA1...
+>
+> As for practicalities. In order to spare brain capacity for list
+> subscribers, it would probably be appropriate to work out details such
+> as naming of entry points in smaller group and present result when it's
+> ready to go and tests. I'll start by looking at Thumb-ification...
+>
 
--- PMM
+@Andy: the core code builds without problems, but for Thumb2 there are
+some trivial changes to apply:
+- '.code 32' needs to be made conditional
+- use adr instead of pc arithmetic for the address of K256
+- bic cannot use r13 as input/output, so it needs to go via another register
+- some conditional instructions need 'it' instructions added (not
+strictly necessary for the kernel, because it passes
+-mimplicit-it-thumb on the assembler command line, but nice for
+completeness)
+(see patch in other reply)
+
+I am happy to test and/or review stuff as well.
+
+Thanks,
+Ard.
