@@ -1,99 +1,177 @@
-From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
-Date: Tue, 17 Mar 2015 17:07:07 +0000
-Subject: Question about aarch64 ILP32 ABI changes
-In-Reply-To: <55029CC6.2050306@huawei.com>
-References: <55029CC6.2050306@huawei.com>
-Message-ID: <CY1PR0701MB124480C7DEE49D7A85D553189E030@CY1PR0701MB1244.namprd07.prod.outlook.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 17 Mar 2015 18:13:48 +0100
+Subject: [PATCH v3 05/15] dt-bindings: Document the STM32 reset bindings
+In-Reply-To: <1426236654.3083.19.camel@pengutronix.de>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-6-git-send-email-maxime.coquelin@st.com>
+ <1426236654.3083.19.camel@pengutronix.de>
+Message-ID: <CALszF6DDvjy6-5kzQ3B4JiNocTZPoFdMTvFqii0diTm2kC96xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My answers below.  Note I am using a stupid mail client for this reply which does not do proper quoting.
+Hi Philipp,
 
------Original Message-----
-From: Bamvor Jian Zhang [mailto:bamvor.zhangjian at huawei.com] 
-Sent: Friday, March 13, 2015 1:16 AM
-To: Catalin Marinas; Andrew Pinski
-Cc: linux-arm-kernel at lists.infradead.org; hongjiu.lu at intel.com; Bintian; Dingtianhong; zhangjian
-Subject: Question about aarch64 ILP32 ABI changes
+2015-03-13 9:50 GMT+01:00 Philipp Zabel <p.zabel@pengutronix.de>:
+> Hi Maxime,
+>
+> Am Donnerstag, den 12.03.2015, 22:55 +0100 schrieb Maxime Coquelin:
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> This adds documentation of device tree bindings for the
+>> STM32 reset controller.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> ---
+>>  .../devicetree/bindings/reset/st,stm32-rcc.txt     | 102 +++++++++++++++++++++
+>>  1 file changed, 102 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> new file mode 100644
+>> index 0000000..962f961
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+>> @@ -0,0 +1,102 @@
+>> +STMicroelectronics STM32 Peripheral Reset Controller
+>> +====================================================
+>> +
+>> +The RCC IP is both a reset and a clock controller. This documentation only
+>> +document the reset part.
+>> +
+>> +Please also refer to reset.txt in this directory for common reset
+>> +controller binding usage.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "st,stm32-rcc"
+>> +- reg: should be register base and length as documented in the
+>> +  datasheet
+>> +- #reset-cells: 1, see below
+>> +
+>> +example:
+>> +
+>> +rcc: reset at 40023800 {
+>> +     #reset-cells = <1>;
+>> +     compatible = "st,stm32-rcc";
+>> +     reg = <0x40023800 0x400>;
+>> +};
+>> +
+>> +Specifying softreset control of devices
+>> +=======================================
+>> +
+>> +Device nodes should specify the reset channel required in their "resets"
+>> +property, containing a phandle to the reset device node and an index specifying
+>> +which channel to use.
+>
+> Using a single value as index is ok, but it should be documented how
+> this corresponds to the register and bit offsets in the reference
+> manual.
+> Maybe add a comment that the index is in fact the register offset / 4 *
+> 32 + bit offset in that register and that not all registers are
+> dedicated to the rest controller? Otherwise it is confusing (to me at
+> least) that the indices start at some arbitrary value.
+
+I agree to better document it. Are you ok with:
+
+The index is the bit number within the RCC registers bank, starting from RCC
+base address.
+It is calculated as: index = register_offset / 4 * 32 + bit_offset.
+Where bit_offset is the bit offset within the register.
+For example, for CRC reset:
+  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
 
 
-Hi,
+>
+>> +example:
+>> +
+>> +     timer2 {
+>> +             resets                  = <&rcc 256>;
+>> +     };
+>> +
+>> +List of indexes for STM32F429:
+>
+> "List of valid indices", to point out that any other index is invalid?
 
-I am testing Andrew ILP32 patches[ilp32 v3 patch] through LTP testsuite.
-Most of the testcases are passed. Some testcases are failed because of LTP issue while the other testcases are failed because ILP32 ABI is difference from arm 32bit.
+Right, it will be changed in v4.
 
-So, how should we deal with it? It would be fixed in kernel/glibc or in application. Fix it in application may hurt the ABI compatabilities.
+>
+>> + - gpioa: 128
+>
+> I had to look at the RM0090 Reference manual V8.0, Chapter 6, "Reset and
+> clock control for STM32F42xx and STM32F43xxx (RCC)" to see that the
+> reset registers indeed start at 0x10 (RCC_AHB1RSTR), ...
+>
+>> + - gpiob: 129
+>> + - gpioc: 130
+>> + - gpiod: 131
+>> + - gpioe: 132
+>> + - gpiof: 133
+>> + - gpiog: 134
+>> + - gpioh: 135
+>> + - gpioi: 136
+>> + - gpioj: 137
+>> + - gpiok: 138
+>> + - crc: 140
+>> + - dma1: 149
+>> + - dma2: 150
+>> + - dma2d: 151
+>> + - ethmac: 153
+>> + - otghs: 157
+>> + - dcmi: 160
+>> + - cryp: 164
+>> + - hash: 165
+>> + - rng: 166
+>> + - otgfs: 167
+>> + - fmc: 192
+>> + - tim2: 256
+>> + - tim3: 257
+>> + - tim4: 258
+>> + - tim5: 259
+>> + - tim6: 260
+>> + - tim7: 261
+>> + - tim12: 262
+>> + - tim13: 263
+>> + - tim14: 264
+>> + - wwdg: 267
+>> + - spi2: 270
+>> + - spi3: 271
+>> + - uart2: 273
+>> + - uart3: 274
+>> + - uart4: 275
+>> + - uart5: 276
+>> + - i2c1: 277
+>> + - i2c2: 278
+>> + - i2c3: 279
+>> + - can1: 281
+>> + - can2: 282
+>> + - pwr: 284
+>> + - dac: 285
+>> + - uart7: 286
+>> + - uart8: 287
+>> + - tim1: 288
+>> + - tim8: 289
+>> + - usart1: 292
+>> + - usart6: 293
+>> + - adc: 296
+>> + - sdio: 299
+>> + - spi1: 300
+>> + - spi4: 301
+>> + - syscfg: 302
+>> + - tim9: 304
+>> + - tim10: 305
+>> + - tim11: 306
+>> + - spi5: 308
+>> + - spi6: 309
+>> + - sai1: 310
+>> + - ltdc: 31
+>
+> That last one should say "ltdc: 314", right?
+Thanks for catching this!
+Just fixed it, it will be in v4.
 
-[Andrew] See https://sourceware.org/ml/libc-alpha/2015-03/msg00572.html which is the same report of this bug.
-[Andrew]
-[Andrew] Thanks,
-[Andrew] Andrew Pinski
+Kind regards,
+Maxime
 
-1.  ABI changes in msgrcv and msgsnd
-    In current ILP32 ABI, msgsnd and msgrcv is 64bit syscall. I guess it is because the msgctl must be 64bit syscall after time_t is defined as 64bit. This will lead to the issue when application define the msgbuf struct. Such struct usually defined out of glibc and kernel, because application may need the difference size of msgbuf.mtext.
-
-    If the msgsnd and msgrcv remain 64bit syscall, the header in application may like this:
-
-```
-    #ifdef __ILP32
-        typedef long long _mtype;
-    #else
-        typedef long _mtype;
-    #endif
-    typedef struct mbuf {          /* a generic message structure */
-        _mtype mtype;
-        char mtext[MSGSIZE + 1];  /* add 1 here so the message can be 1024   */
-    } MSGBUF;                        /* characters long with a '\0' termination */
-```
-
-    Compare with above change in application, there is another way to sovle this issue: map msgsnd and msgrcv to compat syscall (base on Andrew patch [ilp32 syscall table]).
-
-```
-    diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
-    index 8c68d28..00d4f65 100644
-    --- a/arch/arm64/kernel/sys_ilp32.c
-    +++ b/arch/arm64/kernel/sys_ilp32.c
-    @@ -132,6 +132,11 @@ asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes,
-      */
-     #define sys_mq_notify          ilp32_sys_mq_notify
-
-    +/*
-    + * msgsnd, msgrcv
-    + */
-    +#define sys_msgrcv              compat_sys_msgrcv
-    +#define sys_msgsnd              compat_sys_msgsnd
-
-     /*
-      * sigaltstack needs some special handling as the ```
-
-    From our perspective, life may be earier if the code of applcation is same between ilp32 and arm 32bit.
-
-2.  ABI changes around off_t.
-    Current ILP32 abi define off_t as 64bit long which make only one register is needed when pass offset from userspace to kernel. At the same time, it lead to some corner case failure, e.g. ftest02. It failed bacause the compiler treat the negative number as 32bit integer while the off_t is 64bit integer which make the kernel treat the 32bit negative integer as 64bit position integer.
-
-    This will be ok if force a cast in application code:
-```
-    diff --git a/testcases/kernel/fs/ftest/ftest02.c b/testcases/kernel/fs/ftest/ftest02.c
-    index 35cc0d8..472887e 100644
-    --- a/testcases/kernel/fs/ftest/ftest02.c
-    +++ b/testcases/kernel/fs/ftest/ftest02.c
-    @@ -269,7 +269,7 @@ static void crfile(int me, int count)
-            val = write(fd, crmsg, sizeof(crmsg) - 1);
-            warn(val, "write", 0);
-
-    -       val = lseek(fd, -(sizeof(crmsg) - 1), 1);
-    +       val = lseek(fd, -(off_t)(sizeof(crmsg) - 1), 1);
-            warn(val, "lseek", 0);
-
-            val = read(fd, buf, sizeof(crmsg) - 1); ```
-
-cc'd H J Lu, I appreciate some suggestions if x32 encounter the similar issue.
-
-BTW, six month past after previous round review, is there any plan about when will the community would like to ack these series patches?
-
-regards
-
-bamvor
-
-[ilp32 v3 patch] (https://lkml.org/lkml/2014/9/3/704)
-[ilp32 syscall table] (https://lkml.org/lkml/2014/9/3/725)
+>
+> regards
+> Philipp
+>
