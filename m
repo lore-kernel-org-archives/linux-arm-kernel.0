@@ -1,87 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Mar 2015 16:06:31 +0100
-Subject: [PATCH] ARM: shmobile: cpuidle: Remove the pointless default
- driver
-In-Reply-To: <1426602892-17208-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1426602892-17208-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CAMuHMdX0xhLRswsQs6=kQVycQ7sZynMobHY0ySX+oMMPEg=79Q@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 17 Mar 2015 11:07:50 -0400
+Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
+In-Reply-To: <20150317144701.GJ10068@pengutronix.de>
+References: <20150316173154.537b80ee@gandalf.local.home>
+ <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
+ <20150317081341.0f9a8b4c@gandalf.local.home>
+ <20150317101113.32f5618a@gandalf.local.home>
+ <20150317104038.312e73d1@gandalf.local.home>
+ <20150317144701.GJ10068@pengutronix.de>
+Message-ID: <20150317110750.2a0e2b73@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Tue, 17 Mar 2015 15:47:01 +0100
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-On Tue, Mar 17, 2015 at 3:34 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> The default idle driver uses one state with the WFI instruction.
-> The default idle routine invokes WFI when no cpuidle driver is present.
->
-> The default cpuidle driver is pointless and does not give more than the
-> default idle routine and moreover it pulls all the mathematics tied with
-> the cpuidle governor for nothing, hence consuming more energy.
->
-> Remove the default driver, the related code and register the driver directly.
+> Guten Morgen Steven,
+> 
+> On Tue, Mar 17, 2015 at 10:40:38AM -0400, Steven Rostedt wrote:
+> >  static __always_inline void trace_recursive_unlock(void)
+> >  {
+> > -	unsigned int val = this_cpu_read(current_context);
+> > +	unsigned int val = __this_cpu_read(current_context);
+> > +	unsigned int val2;
+> >  
+> > -	val--;
+> > -	val &= this_cpu_read(current_context);
+> > -	this_cpu_write(current_context, val);
+> > +	val2 = val - 1;
+> > +	val &= val2;
+> > +	__this_cpu_write(current_context, val);
+> You could use:
+> 
+> 	unsigned int val = __this_cpu_read(current_context);
+> 
+> 	val = val & (val - 1);
+> 
+> 	__this_cpu_write(current_context, val);
+> 
+> and save a few lines and still make it more readable (IMHO).
 
-Thanks for your patch!
+Me too. My version came from looking at too much assembly, and val2
+just happened to be another register in my mind.
 
-> [compiled only - no board - no test]
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  arch/arm/mach-shmobile/common.h    |  3 ---
->  arch/arm/mach-shmobile/cpuidle.c   | 37 -------------------------------------
->  arch/arm/mach-shmobile/pm-sh7372.c |  2 +-
->  3 files changed, 1 insertion(+), 41 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
-> index 309025e..29b3088 100644
-> --- a/arch/arm/mach-shmobile/common.h
-> +++ b/arch/arm/mach-shmobile/common.h
-> @@ -23,8 +23,6 @@ struct clk;
->  extern int shmobile_clk_init(void);
->  extern void shmobile_handle_irq_intc(struct pt_regs *);
->  extern struct platform_suspend_ops shmobile_suspend_ops;
-> -struct cpuidle_driver;
-> -extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
->
->  #ifdef CONFIG_SUSPEND
->  int shmobile_suspend_init(void);
-> @@ -51,7 +49,6 @@ extern void __iomem *shmobile_scu_base;
->  static inline void __init shmobile_init_late(void)
->  {
->         shmobile_suspend_init();
-> -       shmobile_cpuidle_init();
+> 
+> BTW, this patch makes the additional lines in the trace disappear, so if
+> you think that makes a Tested-by applicable, feel free to add it.
 
-Please remove the forward declaration and dummy for shmobile_cpuidle_init()
-above, too.
+OK, will do. Thanks.
 
->         shmobile_cpufreq_init();
->  }
->
-> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
-> index 0afeb5c..e69de29 100644
-> --- a/arch/arm/mach-shmobile/cpuidle.c
-> +++ b/arch/arm/mach-shmobile/cpuidle.c
-> @@ -1,37 +0,0 @@
+Christoph, you happy with this version?
 
-If you remove this file, you should remove its entry from
-arch/arm/mach-shmobile/Makefile, too.
-(did you use a config with CONFIG_CPU_IDLE=n?).
-
-> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
-> index c0293ae..9f19052 100644
-> --- a/arch/arm/mach-shmobile/pm-sh7372.c
-> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
-
-Support for sh7372 is scheduled for removal in v4.1, so this will become
-a no-op.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- Steve
