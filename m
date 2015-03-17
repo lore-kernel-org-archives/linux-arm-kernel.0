@@ -1,32 +1,71 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 16 Mar 2015 20:14:03 -0500
-Subject: [PATCH 2/2] ARM: OMAP: dmtimer: disable pm runtime on remove
-In-Reply-To: <1426554843-42641-1-git-send-email-s-anna@ti.com>
-References: <1426554843-42641-1-git-send-email-s-anna@ti.com>
-Message-ID: <1426554843-42641-3-git-send-email-s-anna@ti.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 17 Mar 2015 10:19:50 +0900
+Subject: [PATCH] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
+ allocations
+In-Reply-To: <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
+References: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
+ <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
+Message-ID: <CAAFQd5CYRXYT_oCwNQdpoy+3B1n0a5qypieX1f+3TGGDZS+-bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the pm_runtime of the device upon remove. This is
-added to balance the pm_runtime_enable() invoked in the probe.
+Hi David,
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/plat-omap/dmtimer.c | 2 ++
- 1 file changed, 2 insertions(+)
+On Tue, Mar 17, 2015 at 8:32 AM, David Rientjes <rientjes@google.com> wrote:
+> On Mon, 16 Mar 2015, Tomasz Figa wrote:
+>
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index 83cd5ac..f081e9e 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -1145,18 +1145,31 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>>       }
+>>
+>>       /*
+>> -      * IOMMU can map any pages, so himem can also be used here
+>> +      * IOMMU can map any pages, so himem can also be used here.
+>> +      * We do not want OOM killer to be invoked as long as we can fall back
+>> +      * to single pages, so we use __GFP_NORETRY for positive orders.
+>>        */
+>> -     gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+>> +     gfp |= __GFP_NOWARN | __GFP_HIGHMEM | __GFP_NORETRY;
+>>
+>>       while (count) {
+>> -             int j, order = __fls(count);
+>> +             int j, order;
+>>
+>> -             pages[i] = alloc_pages(gfp, order);
+>> -             while (!pages[i] && order)
+>> -                     pages[i] = alloc_pages(gfp, --order);
+>> -             if (!pages[i])
+>> -                     goto error;
+>> +             for (order = __fls(count); order; --order) {
+>> +                     /* Will not trigger OOM. */
+>> +                     pages[i] = alloc_pages(gfp, order);
+>> +                     if (pages[i])
+>> +                             break;
+>> +             }
+>> +
+>> +             if (!pages[i]) {
+>> +                     /*
+>> +                      * Fall back to single page allocation.
+>> +                      * Might invoke OOM killer as last resort.
+>> +                      */
+>> +                     pages[i] = alloc_pages(gfp & ~__GFP_NORETRY, 0);
+>> +                     if (!pages[i])
+>> +                             goto error;
+>> +             }
+>>
+>>               if (order) {
+>>                       split_page(pages[i], order);
+>
+> I think this makes sense, but the problem is the unconditional setting and
+> clearing of __GFP_NORETRY.  Strictly speaking, gfp may already have
+> __GFP_NORETRY set when calling this function so it would be better to do
+> the loop with alloc_pages(gfp | __GFP_NORETRY, order) and then the
+> fallback as alloc_page(gfp).
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index f32c74c0e1de..8ca94d379bc3 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -910,6 +910,8 @@ static int omap_dm_timer_remove(struct platform_device *pdev)
- 		}
- 	spin_unlock_irqrestore(&dm_timer_lock, flags);
- 
-+	pm_runtime_disable(&pdev->dev);
-+
- 	return ret;
- }
- 
--- 
-2.3.2
+Good point. I'll change it to that in next version.
+
+Best regards,
+Tomasz
