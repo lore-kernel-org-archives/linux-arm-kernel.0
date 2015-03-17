@@ -1,33 +1,33 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 17 Mar 2015 16:51:11 -0500
-Subject: [PATCH 4/4] ARM: DT: msm8960: Add ADM device node
+Date: Tue, 17 Mar 2015 16:51:09 -0500
+Subject: [PATCH 2/4] ARM: DT: apq8064: Add ADM device node
 In-Reply-To: <1426629071-3541-1-git-send-email-agross@codeaurora.org>
 References: <1426629071-3541-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1426629071-3541-5-git-send-email-agross@codeaurora.org>
+Message-ID: <1426629071-3541-3-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the ADM DMA on the MSM8960 SOC
+This patch adds support for the ADM DMA on the APQ8064 SOC.
 
 Signed-off-by: Andy Gross <agross@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8960.dtsi |   21 +++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi |   21 +++++++++++++++++++++
  1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index e1b0d5c..1b7c4c4 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -4,6 +4,7 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index b3154c0..0f24334 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -2,6 +2,7 @@
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "skeleton.dtsi"
  #include <dt-bindings/clock/qcom,gcc-msm8960.h>
 +#include <dt-bindings/reset/qcom,gcc-msm8960.h>
+ #include <dt-bindings/clock/qcom,mmcc-msm8960.h>
  #include <dt-bindings/soc/qcom,gsbi.h>
- 
- / {
-@@ -238,5 +239,25 @@
- 				vmmc-supply = <&vsdcc_fixed>;
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -349,5 +350,25 @@
+ 				pinctrl-0 = <&sdc4_gpios>;
  			};
  		};
 +
