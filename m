@@ -1,43 +1,64 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Tue, 17 Mar 2015 13:28:39 +0800
-Subject: [PATCH 2/2] ARM: dts: ls1021: Add qDMA node
-In-Reply-To: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
-References: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1426570119-8634-2-git-send-email-yao.yuan@freescale.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 17 Mar 2015 00:46:10 -0500
+Subject: [Patch v6 0/2] Add Qualcomm ADM dmaengine driver
+Message-ID: <1426571172-9711-1-git-send-email-agross@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This patch set introduces the dmaengine driver for the Qualcomm Application
+Data Mover (ADM) DMA controller present on MSM8x60, APQ8064, and IPQ8064
+devices.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 491480f..1a81b89 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -383,6 +383,22 @@
- 				 <&platform_clk 1>;
- 		};
- 
-+		qdma: qdma at 8390000 {
-+			compatible = "fsl,ls1021a-qdma";
-+			reg = <0x0 0x8390000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "qdma-controller", "qdma-queue";
-+			status-sizes = <64>;
-+			channels = <8>;
-+			queues = <2>;
-+			queue-sizes = <256 256>;
-+			queue-group = <0 1>;
-+			queue-weight = <0 0>;
-+			default-queue = <0>;
-+			big-endian;
-+		};
-+
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
+The initial version of this driver will only support slave DMA operations
+between system memory and peripherals.  Flow control via the CRCI (client rate
+control interface) is supported and can be configured via device tree
+configuration.  Flow control usage is required for some peripheral devices.
+
+Changes from v5:
+  - Fix erroneous adm_get_blksize for values of 192 and 256.
+
+Changes from v4:
+  - Fixed copyright date
+  - Fixed error in EE offsets and usage
+  - Changed namespace for registers and fields to ADM specific naming
+  - Removed alloc_chan function
+  - Removed control function and fixed up terminate_all and slave_config
+  - Reworked descriptor processing code to make it more clean
+  - Moved to use of_dma_xlate_by_chan_id
+  - Fixed other small review comments
+
+Changes from v3:
+  - Remove .owner field
+
+Changes from v2:
+  - Removed extraneous achan variable from xlate function
+  - Reworked crci check in slave_sg function
+  - Added mux field to async_desc structure.
+  - Reworked dma start function to use crci and mux values directly from
+    structure.
+  - Added disable of clocks in probe error paths.
+  - Changed to use #define for fixed number of channels.
+
+Changes since v1:
+  - Fixed various review comments
+  - Fixed some descriptor programming issues.
+  - Added single descriptors to support sub burst length transactions.
+    Selection of single or box descriptors depends on the sg length and burst
+    size.
+  - Removed use of crci in the dmas property.  CRCI is now designated via the
+    slave_config structure and will be stored in slave_id.
+
+Andy Gross (2):
+  dt/bindings: qcom_adm: Fix channel specifiers
+  dmaengine: Add ADM driver
+
+ Documentation/devicetree/bindings/dma/qcom_adm.txt |   16 +-
+ drivers/dma/Kconfig                                |   10 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/qcom_adm.c                             |  900 ++++++++++++++++++++
+ 4 files changed, 917 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/dma/qcom_adm.c
+
 -- 
-2.1.0.27.g96db324
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
