@@ -1,92 +1,50 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Mar 2015 16:45:29 +0800
-Subject: sunxi: cpufreq-dt usage causes schedule_delayed_work to execute
- sooner?
-In-Reply-To: <20150317083716.GD4638@lukather>
-References: <55073A9E.3070600@redhat.com>
- <CAGb2v66V0rOpz+GgdOSb52NZGgb36OcXCTpHV2SOyKT3QmQ1JQ@mail.gmail.com>
- <20150317083716.GD4638@lukather>
-Message-ID: <CAGb2v67P7sLoedBvo9gekj9B38UjjmxwsZU4WM+oDMRDeB=UYw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 17 Mar 2015 14:17:19 +0530
+Subject: Is cpufreq-dt safe without regulator support?
+In-Reply-To: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+Message-ID: <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 4:37 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Mar 17, 2015 at 10:39:04AM +0800, Chen-Yu Tsai wrote:
->> Hi Hans,
->>
->> On Tue, Mar 17, 2015 at 4:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
->> > Hi ChenYu, Maxime,
->> >
->> > For the sunxi musb code I've been writing uses schedule_delayed_work in a
->> > few places,
->> > while looking at debugging printk-s in dmesg I noticed that the time stamps
->> > between
->> > scheduling the work and executing it are of.
->> >
->> > If I build a kernel without cpufreq-dt or do:
->> >
->> > echo performance > scaling_governor
->> >
->> > The problem goes away.
->> >
->> > I've done some debugging and the problem is not the actual timing of the
->> > code, the timestamps in the dmesg output are wrong, very wrong even
->> > here are 2 messages where I plugged in a cable, then waited 10 seconds
->> > using a clock with a second hand to count them of, then unplugged:
->> >
->> >
->> > [  635.006201] musb vbus 0 -> 1
->> > [  637.877098] musb vbus 1 -> 0
->> >
->> > This is after doing:
->> >
->> > echo powersave > scaling_governor
->> >
->> > So it seems that the clocksource used by printk to generate timestamps
->> > goes slower as we scale down cpufreq, not good (tm).
->> >
->> > This:
->> >
->> > [root at localhost clocksource0]# cat available_clocksource
->> > arch_sys_counter timer hstimer
->> > [root at localhost clocksource0]# echo timer > current_clocksource
->> > [  725.728887] Switched to clocksource timer
->> >
->> > Does not help.
->> >
->> > I believe that the "sched_clock_register(sun5i_timer_sched_read, 32, rate);"
->> > call in drivers/clocksource/timer-sun5i.c is the culprit, it seems this ends
->> > up overriding the sched_clock_register call in
->> > drivers/clocksource/arm_arch_timer.c which likely does not suffer from
->> > cpufreq
->> > issues, and is faster (part of the cpucore) then using the hstimer anyways.
->> >
->> > Note I've not tested yet if disabling the hstimer fixes things, but I
->> > believe
->> > it will. Note that the hstimer will likewise be a bad clockevent source too,
->> > this can be fixed by registering a cpufreq notifier and calling
->> > clockevents_update_freq
->> > whenever the cpufreq, and thus the hstimer clkrate changes.
->> >
->> > Alternatively we could simply remove the driver altogether since the kernel
->> > prefers the sun4i_tick eventsource anyways.
->>
->> Maxime has a series of patches to fix this:
->>
->>     https://lkml.org/lkml/2015/1/11/52
->>
->> Another thing we could do is mux AHB to PLL6 on sun5+i.
->> I have a clock driver patch somewhere...
->
-> That wouldn't really fix things.
->
-> If we reparent the clock during the boot, it will very likely be after
-> the timer has been registered. The slowdown won't be dynamic depending
-> on the cpu frequency, but it would still be there.
+On 17 March 2015 at 13:15, wens Tsai <wens213@gmail.com> wrote:
+> The sunxi platform added cpufreq support in 4.0.0-rc1 using
+> the generic cpufreq-dt driver. One issue we've run into is
+> the default OPPs we use include an overclocked/overvoltage
+> setting.
 
-Not if we reparent as part of the clock register process, using
-the "assigned clock parents and rates" bindings. Though I think
-someone was against that.
+There is a feature for that in cpufreq, in case you don't know, "boost"..
 
-ChenYu
+> If the cpu is missing a regulator supply phandle, or the
+> kernel is built without regulators, cpufreq can increase
+> the clock rate without the needed voltage increase.
+
+Right.
+
+> The former issue can be resolved by providing a dummy
+> regulator with the default voltage, effectively disabling
+> cpufreq.
+
+How ? CPUFreq will try to change both volt and freq. Volt
+wouldn't change as its a dummy regulator, but freq would
+still be changed..
+
+> The latter is possible. Without regulator support built-in,
+> even a correct, complete DTS can still fail. Should I just
+> remove the offending OPP? Still that does not fix the
+> problem when we actually do want overclocking.
+>
+> To summarize, should cpufreq-dt probe fail when regulator
+> support isn't available? Should we differentiate between
+
+No. We can have regulator support enabled but no regulator
+for a CPU. And so the current state of code looks fine.
+
+> not having a regulator phandle vs no regulator support?
+
+What I couldn't understand is, why would you miss the regulator
+phandle in dts? Or not compile regulator support?
+
+In case you want cpufreq-dt to be disabled if regulators aren't
+compiled in, then what you should do is, don't create the platform
+device required for probing cpufreq-dt driver.
