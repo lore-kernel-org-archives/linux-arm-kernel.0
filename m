@@ -1,23 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Mar 2015 11:28:07 +0100
-Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
-In-Reply-To: <20150312091427.GA4329@piout.net>
+Date: Tue, 17 Mar 2015 11:36:20 +0100
+Subject: [PATCH 3/5] leds: syscon: instantiate from platform device
+In-Reply-To: <1425375148-4369-4-git-send-email-linus.walleij@linaro.org>
 References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
- <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
- <20150312091427.GA4329@piout.net>
-Message-ID: <CACRpkdacQ-MR+Sziu-TQXWr+1UCtBphZ5eNSWbJ2ZpCnH+o9JA@mail.gmail.com>
+ <1425375148-4369-4-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbV_cS2_FVRQU5yd553aPaqyiYqs5gKOSz3ATcaq0+5BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 10:14 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
+On Tue, Mar 3, 2015 at 10:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-> As part of the system timer cleanup, I'll actually be needing that
-> patch. Is it scheduled for inclusion or should I use "simple-bus" in the
-> meantime?
+> Currently syscon LEDs will traverse the device tree looking for syscon devices
+> and if found, traverse any subnodes of these to identify matching children
+> and from there instantiate LED class devices.
+>
+> This is not a good use of the Linux device model. Instead we have converted the
+> device trees to add the "simple-mfd" property to the MFD nexi spawning syscon
+> LEDs so that these will appear as platform devices in the system and we can
+> use the proper device probing mechanism.
+>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Bryan: if you're OK with it, please ACK this patch so we can funnel it through
+> ARM SoC with the rest of the patches in this series.
 
-No replies to the thread so I will send a pull request to ARM SoC cleanup
-branch.
+Bryan, ping.
 
 Yours,
 Linus Walleij
