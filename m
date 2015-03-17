@@ -1,94 +1,131 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 17 Mar 2015 16:24:09 +0100
-Subject: [PATCH v2 RESEND] MAINTAINERS: Add dts entries for some of the
- Marvell SoCs
-In-Reply-To: <1424974723-17429-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1424974723-17429-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55084719.1090504@free-electrons.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 17 Mar 2015 16:25:12 +0100
+Subject: [PATCH V2] ARM: shmobile: cpuidle: Remove the pointless default driver
+Message-ID: <1426605912-28032-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The default idle driver uses one state with the WFI instruction.
+The default idle routine invokes WFI when no cpuidle driver is present.
 
+The default cpuidle driver is pointless and does not give more than the
+default idle routine and moreover it pulls all the mathematics tied with
+the cpuidle governor for nothing, hence consuming more energy.
 
-On 26/02/2015 19:18, Gregory CLEMENT wrote:
-> Since many releases, the modifications of the mvebu and berlin device
-> tree files are merged through the mvebu subsystem. This patch makes it
-> official in order to help the contributors using the get_maintainer.pl
-> to find the accurate peoples.
-> 
-> In the same time, updated the mvebu description which now includes the
-> kirkwood SoCs and new Armada SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> Hi Olof and Arnd,
-> 
-> would you mind taking this patch in arm-soc?
-> 
+Remove the default driver, the related code and register the driver directly.
 
-I think you missed this patch because you applied the other one pretty quickly
-and this one was done with the same aim: allowing people to find us more easily.
+[compiled only - no board - no test]
 
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-shmobile/Makefile    |  1 -
+ arch/arm/mach-shmobile/common.h    |  9 ---------
+ arch/arm/mach-shmobile/cpuidle.c   | 37 -------------------------------------
+ arch/arm/mach-shmobile/pm-sh7372.c |  2 +-
+ 4 files changed, 1 insertion(+), 48 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/cpuidle.c
 
-Thanks,
-
-Gregory
-
-
-
-> Thanks!
-> 
-> 
->  MAINTAINERS | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index ddc5a8cf9a8a..40c96e6209b9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1168,7 +1168,7 @@ ARM/MAGICIAN MACHINE SUPPORT
->  M:	Philipp Zabel <philipp.zabel@gmail.com>
->  S:	Maintained
->  
-> -ARM/Marvell Armada 370 and Armada XP SOC support
-> +ARM/Marvell Kirkwood and Armada 370, 375, 38x, XP SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
->  M:	Andrew Lunn <andrew@lunn.ch>
->  M:	Gregory Clement <gregory.clement@free-electrons.com>
-> @@ -1177,12 +1177,15 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-mvebu/
->  F:	drivers/rtc/armada38x-rtc
-> +F:	arch/arm/boot/dts/armada*
-> +F:	arch/arm/boot/dts/kirkwood*
->  
->  ARM/Marvell Berlin SoC support
->  M:	Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-berlin/
-> +F:	arch/arm/boot/dts/berlin*
->  
->  ARM/Marvell Dove/MV78xx0/Orion SOC support
->  M:	Jason Cooper <jason@lakedaemon.net>
-> @@ -1194,6 +1197,8 @@ F:	arch/arm/mach-dove/
->  F:	arch/arm/mach-mv78xx0/
->  F:	arch/arm/mach-orion5x/
->  F:	arch/arm/plat-orion/
-> +F:	arch/arm/boot/dts/dove*
-> +F:	arch/arm/boot/dts/orion5x*
->  
->  ARM/Orion SoC/Technologic Systems TS-78xx platform support
->  M:	Alexander Clouter <alex@digriz.org.uk>
-> 
-
-
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index d53996e..c604296 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -46,7 +46,6 @@ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ 
+ # PM objects
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
+-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_PM_RCAR)		+= pm-rcar.o
+ obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
+diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
+index 309025e..1dc0971 100644
+--- a/arch/arm/mach-shmobile/common.h
++++ b/arch/arm/mach-shmobile/common.h
+@@ -23,8 +23,6 @@ struct clk;
+ extern int shmobile_clk_init(void);
+ extern void shmobile_handle_irq_intc(struct pt_regs *);
+ extern struct platform_suspend_ops shmobile_suspend_ops;
+-struct cpuidle_driver;
+-extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
+ 
+ #ifdef CONFIG_SUSPEND
+ int shmobile_suspend_init(void);
+@@ -34,12 +32,6 @@ static inline int shmobile_suspend_init(void) { return 0; }
+ static inline void shmobile_smp_apmu_suspend_init(void) { }
+ #endif
+ 
+-#ifdef CONFIG_CPU_IDLE
+-int shmobile_cpuidle_init(void);
+-#else
+-static inline int shmobile_cpuidle_init(void) { return 0; }
+-#endif
+-
+ #ifdef CONFIG_CPU_FREQ
+ int shmobile_cpufreq_init(void);
+ #else
+@@ -51,7 +43,6 @@ extern void __iomem *shmobile_scu_base;
+ static inline void __init shmobile_init_late(void)
+ {
+ 	shmobile_suspend_init();
+-	shmobile_cpuidle_init();
+ 	shmobile_cpufreq_init();
+ }
+ 
+diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
+deleted file mode 100644
+index 0afeb5c..0000000
+--- a/arch/arm/mach-shmobile/cpuidle.c
++++ /dev/null
+@@ -1,37 +0,0 @@
+-/*
+- * CPUIdle support code for SH-Mobile ARM
+- *
+- *  Copyright (C) 2011 Magnus Damm
+- *
+- * This file is subject to the terms and conditions of the GNU General Public
+- * License.  See the file "COPYING" in the main directory of this archive
+- * for more details.
+- */
+-
+-#include <linux/pm.h>
+-#include <linux/cpuidle.h>
+-#include <linux/suspend.h>
+-#include <linux/module.h>
+-#include <linux/err.h>
+-#include <asm/cpuidle.h>
+-#include <asm/io.h>
+-
+-static struct cpuidle_driver shmobile_cpuidle_default_driver = {
+-	.name			= "shmobile_cpuidle",
+-	.owner			= THIS_MODULE,
+-	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+-	.safe_state_index	= 0, /* C1 */
+-	.state_count		= 1,
+-};
+-
+-static struct cpuidle_driver *cpuidle_drv = &shmobile_cpuidle_default_driver;
+-
+-void __init shmobile_cpuidle_set_driver(struct cpuidle_driver *drv)
+-{
+-	cpuidle_drv = drv;
+-}
+-
+-int __init shmobile_cpuidle_init(void)
+-{
+-	return cpuidle_register(cpuidle_drv, NULL);
+-}
+diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+index c0293ae..9f19052 100644
+--- a/arch/arm/mach-shmobile/pm-sh7372.c
++++ b/arch/arm/mach-shmobile/pm-sh7372.c
+@@ -462,7 +462,7 @@ static struct cpuidle_driver sh7372_cpuidle_driver = {
+ 
+ static void __init sh7372_cpuidle_init(void)
+ {
+-	shmobile_cpuidle_set_driver(&sh7372_cpuidle_driver);
++	return cpuidle_register(cpuidle_drv, NULL);
+ }
+ #else
+ static void __init sh7372_cpuidle_init(void) {}
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
