@@ -1,53 +1,70 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 17 Mar 2015 14:31:10 +0800
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <5507C2C2.1090509@redhat.com>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <3737028.Ib0fKlgSkd@vostro.rjw.lan> <5507933F.2020203@huawei.com>
- <10995588.scpoK3KRg2@vostro.rjw.lan> <5507A91A.1090206@huawei.com>
- <5507C2C2.1090509@redhat.com>
-Message-ID: <5507CA2E.3040600@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Mar 2015 07:56:02 +0100
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+In-Reply-To: <20150316162304.GA35408@google.com>
+References: <20150316154835.GA31336@google.com>
+ <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
+ <20150316162304.GA35408@google.com>
+Message-ID: <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/17 13:59, Jon Masters wrote:
-> On 03/17/2015 12:10 AM, Hanjun Guo wrote:
->> On 2015/3/17 11:23, Rafael J. Wysocki wrote:
->>> On Tuesday, March 17, 2015 10:36:47 AM Hanjun Guo wrote:
->>> Well, almost.  There is one problem with that, becuase sleep.c contains code
->>> outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
->>> off ACPI platforms.
->>>
->>> I guess you don't want that code on ARM too, right?
->> Yes, you are right.
->>> Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
->> Sorry, I can't fully understand your intention here, could you please
->> explain it more?
->>
->> Let me guess a little bit. Do you mean use ACPI_REDUCED_HARDWARE_ONLY for
->> powering off ACPI platforms? if so, I guess it's not a good idea, ACPI spec
->> only says that S4BIOS is not supported on HW-reduced ACPI platforms, S5
->> has no such limitation, if I miss something here, please let me know.
-> If helpful to the discussion, current SBBR (Server Base Boot
-> Requirements[0]) design guidance is that for power off itself, we will
-> prefer calling an EFI Runtime Service (that will preferentially call an
-> PSCI - ARM Power State Coordination Interface - Secure Monitor Call (SMC
-> - think SMI-like) internally to perform the shutdown/reboot) for the
-> action of powering off or resetting 64-bit ARM SBBR platforms.
-
-Agreed, PSCI is the prefer method for power off on ARM64 I think.
-
+On 16 March 2015 at 17:23, Sami Tolvanen <samitolvanen@google.com> wrote:
+> On Mon, Mar 16, 2015 at 05:08:03PM +0100, Ard Biesheuvel wrote:
+>> Have you tested this code with the tcrypt.ko module?
 >
-> Therefore if the alternative of an ACPI-based power off solution were
-> not initially supported, I don't think it would have much practical
-> impact, and it could be addressed after the initial support merged.
+> I have not, but I can look into it.
+>
+>> Did you talk to Andy about the license? I don't think this is
+>> permissible for the kernel as-is.
+>
+> Unless I have misunderstood something, the license at the Cryptogams
+> website includes an option to license the code under the GNU GPL.
+>
+> However, I can certainly contact Andy to clarify his intentions.
+>
+>> This is broken on thumb-2, use adr instead
+>
+>> You can also implement SHA-224 using the same core transform, it's
+>> just some trivial glue code.
+>
+>> Could you please rebase this onto Herbert's cryptodev tree and move
+>> this to arch/arm/crypto/Kconfig?
+>
+> Thanks for the comments, I will submit a second version once we have
+> a clarification on the license.
+>
 
-I agree. Actually we already removed ACPI power off code for ARM64
-in v9 and v10 regardless the ACPI sepc statement about S5, I just want to
-confirm with Rafael that how to use ACPI_REDUCED_HARDWARE_ONLY properly
-to do the same thing as we do in v10 (patch - ACPI / sleep: Introduce
-CONFIG_ACPI_GENERIC_SLEEP), or if we have some other way to do that :)
+I have tested your code with a Thumb2 kernel. With this patch folded,
+it builds and passes the tcrypt.ko test for me
 
-Thanks
-Hanjun
+--- a/arch/arm/crypto/sha256-armv7-neon.S
++++ b/arch/arm/crypto/sha256-armv7-neon.S
+@@ -10,7 +10,6 @@
+ #include <linux/linkage.h>
+
+ .text
+-.code   32
+ .fpu neon
+
+ .type  K256,%object
+@@ -44,15 +43,15 @@ ENTRY(sha256_transform_neon)
+         *      %r1: data
+         *      %r2: nblks
+         */
+-       sub     r3,pc,#8                @ sha256_transform_neon
+        add     r2,r1,r2,lsl#6  @ len to point at the end of inp
+
+        stmdb   sp!,{r4-r12,lr}
+
+        mov     r12,sp
+-       sub     sp,sp,#16*4+16          @ alloca
+-       sub     r14,r3,#256+32  @ K256
+-       bic     sp,sp,#15               @ align for 128-bit stores
++       sub     r14,sp,#16*4+16         @ alloca
++       bic     r14,r14,#15             @ align for 128-bit stores
++       mov     sp,r14
++       adr     r14,K256
+
+        vld1.8          {q0},[r1]!
+        vld1.8          {q1},[r1]!
