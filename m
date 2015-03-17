@@ -1,34 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Mar 2015 11:38:54 +0100
-Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
-In-Reply-To: <CACRpkdacQ-MR+Sziu-TQXWr+1UCtBphZ5eNSWbJ2ZpCnH+o9JA@mail.gmail.com>
-References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
- <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
- <20150312091427.GA4329@piout.net>
- <CACRpkdacQ-MR+Sziu-TQXWr+1UCtBphZ5eNSWbJ2ZpCnH+o9JA@mail.gmail.com>
-Message-ID: <CACRpkdYptEuJYsSGJqmnDrewDcafzx5tqa8E+FC7BETon7X9fQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Mar 2015 10:38:29 +0000
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+Message-ID: <20150317103829.GA28806@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 11:28 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Thu, Mar 12, 2015 at 10:14 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
->
->> As part of the system timer cleanup, I'll actually be needing that
->> patch. Is it scheduled for inclusion or should I use "simple-bus" in the
->> meantime?
->
-> No replies to the thread so I will send a pull request to ARM SoC cleanup
-> branch.
+On Tue, Mar 17, 2015 at 11:23:33AM +0100, Ulf Hansson wrote:
+> On 16 March 2015 at 16:12, Doug Anderson <dianders@chromium.org> wrote:
 
-Ah well I had some pending changes requested by Lee. Once Lee
-ACK it for MFD and (hopefully) Bryan pitches in for LEDs, I'll post
-a pull request.
+> > * Try to set the voltage to exactly 1,200,000 uV (1.2V).
+> > * If you can't get 1.2V exactly, a tolerance ("tol") of 100,000 uV
+> > (.1V) is OK.
+> > * In other words, 1.1V - 1.3V are OK, but aim for 1.2V
 
-BTW: Alexandre: your ACK or Reviewed-by would be appreciated ;)
+> So what happens in the case when 1.3V and 1.1V, but not 1.2V. Which
+> value will be used? Is that algorithm defined by the regulator core or
+> does it depend per regulator implementation?
 
-Antione: if you're also using this, pls provide your ACK on the series.
-
-Yours,
-Linus Walleij
+It's done in the core.  It first tries to hit the target voltage to the
+maximum (picking the lowest voltage in that range) then tries to pick
+the lowest voltage to the target, though that's an implementation detail
+and we really should be trying to get as close as possible to the
+target.  We don't do that yet because it can be expensive to work out so
+we do the current thing which is cheap and mostly good enough.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/16382021/attachment.sig>
