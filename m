@@ -1,26 +1,62 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 17 Mar 2015 12:18:20 -0500
-Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-In-Reply-To: <20150317171000.GD31346@atomide.com>
-References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
- <20150316233005.GA2598@atomide.com> <550855B7.3020905@oracle.com>
- <550856FF.9080702@ti.com> <20150317163440.GC31346@atomide.com>
- <CAGo_u6oHk9MXPGQv1rCpvW_oegzEzFTu3sZ_4j_6HFEivnXZXg@mail.gmail.com>
- <20150317171000.GD31346@atomide.com>
-Message-ID: <CAGo_u6rNj=k0cYx1G_v2eFHcf0sHY++bUz0uM6PfiRXbc2chqg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Mar 2015 17:18:22 +0000
+Subject: [PATCH 0/6] make memtest a generic kernel feature
+In-Reply-To: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20150317171822.GW8399@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 12:10 PM, Tony Lindgren <tony@atomide.com> wrote:
->
->
-> Yes that's a good point and adding a printk is a good idea. Care to
-> crank out a separate patch for that?
+On Mon, Mar 09, 2015 at 10:27:04AM +0000, Vladimir Murzin wrote:
+> Memtest is a simple feature which fills the memory with a given set of
+> patterns and validates memory contents, if bad memory regions is detected it
+> reserves them via memblock API. Since memblock API is widely used by other
+> architectures this feature can be enabled outside of x86 world.
+> 
+> This patch set promotes memtest to live under generic mm umbrella and enables
+> memtest feature for arm/arm64.
+> 
+> It was reported that this patch set was useful for tracking down an issue with
+> some errant DMA on an arm64 platform.
+> 
+> Since it touches x86 and mm bits it'd be great to get ACK/NAK for these bits.
 
+Is your intention for akpm to merge this? I don't mind how it goes upstream,
+but that seems like a sensible route to me.
 
-had hoped to have it part of this patch - does'nt that make more sense?
+Will
 
--- 
----
-Regards,
-Nishanth Menon
+> Changelog:
+> 
+>     RFC -> v1
+>         - updated kernel-parameters.txt for memtest entry
+>         - updated number of test patterns in Kconfig menu
+>         - added Acked/Tested tags for arm64 bits
+>         - rebased on v4.0-rc3
+> 
+> Vladimir Murzin (6):
+>   mm: move memtest under /mm
+>   memtest: use phys_addr_t for physical addresses
+>   arm64: add support for memtest
+>   arm: add support for memtest
+>   Kconfig: memtest: update number of test patterns up to 17
+>   Documentation: update arch list in the 'memtest' entry
+> 
+>  Documentation/kernel-parameters.txt |    2 +-
+>  arch/arm/mm/init.c                  |    3 +
+>  arch/arm64/mm/init.c                |    2 +
+>  arch/x86/Kconfig                    |   11 ----
+>  arch/x86/include/asm/e820.h         |    8 ---
+>  arch/x86/mm/Makefile                |    2 -
+>  arch/x86/mm/memtest.c               |  118 -----------------------------------
+>  include/linux/memblock.h            |    8 +++
+>  lib/Kconfig.debug                   |   11 ++++
+>  mm/Makefile                         |    1 +
+>  mm/memtest.c                        |  118 +++++++++++++++++++++++++++++++++++
+>  11 files changed, 144 insertions(+), 140 deletions(-)
+>  delete mode 100644 arch/x86/mm/memtest.c
+>  create mode 100644 mm/memtest.c
+> 
+> -- 
+> 1.7.9.5
+> 
