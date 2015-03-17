@@ -1,78 +1,68 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 17 Mar 2015 17:57:47 +0100
-Subject: [PATCH v3 05/15] dt-bindings: Document the STM32 reset bindings
-In-Reply-To: <55022AC0.7090403@samsung.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-6-git-send-email-maxime.coquelin@st.com>
- <55022AC0.7090403@samsung.com>
-Message-ID: <CALszF6AVKnSPzOhyBQaOnQJwo34gx-rwRdb3RgL_pDNaX1FpNg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Mar 2015 18:00:04 +0100
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <5508578D.607@linux.intel.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+ <54F4B8B9.4010204@free-electrons.com>
+ <20150303095924.GF4911@lukather> <54F5DD7C.1050804@linux.intel.com>
+ <20150317095143.GG4638@lukather> <5508578D.607@linux.intel.com>
+Message-ID: <20150317170004.GK4638@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Tue, Mar 17, 2015 at 06:34:21PM +0200, Mathias Nyman wrote:
+> On 17.03.2015 11:51, Maxime Ripard wrote:
+> > On Tue, Mar 03, 2015 at 06:12:44PM +0200, Mathias Nyman wrote:
+> >> On 03.03.2015 11:59, Maxime Ripard wrote:
+> >>> On Mon, Mar 02, 2015 at 08:23:37PM +0100, Gregory CLEMENT wrote:
+> >>>> Hi Maxime,
+> >>>>
+> >>>> On 19/01/2015 14:01, Maxime Ripard wrote:
+> >>>>> The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+> >>>>> VBUS line. Enable the needed drivers to support this.
+> >>>>>
+> >>>>
+> >>>> it seems that this patch was not applied yet. Patch 1 is now in
+> >>>> linux-next and should be part of 4.0-rc. But what about patch 2?
+> >>>
+> >>> IIRC, Greg or Matthias said that Matthias would look into these
+> >>> patches after the merge window.
+> >>>
+> >>> It still didn't happen though.
+> >>>
+> >>> Maxime
+> >>>
+> >>
+> >> Hi
+> >>
+> >> I understood that you wanted the first fix patch in as soon as possible so 
+> >> I sent it forward to Greg, and it's now in his usb-linus branch.
+> >>
+> >> The other two patches, 2/3 and 3/3 you said were "regual" patches (for usb-next?),
+> >> Andrew said he can take 3/3 and wondered if 2/3 and 3/3 need to go together?
+> >>
+> >> It doesn't matter for me, I can take 2/3 if you like, but I'd prefer if someone
+> >> with more USB PHY insight could ack it first.
+> > 
+> > There's been around two weeks, and we didn't have any additional
+> > reviews. How can we move forward on this?
+> > 
+> 
+> Added to my for-usb-next branch and sent forward to Greg (a second a go)
 
-2015-03-13 1:09 GMT+01:00 Chanwoo Choi <cw00.choi@samsung.com>:
-> Hi Maxime,
->
-> On 03/13/2015 06:55 AM, Maxime Coquelin wrote:
->> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->> This adds documentation of device tree bindings for the
->> STM32 reset controller.
->>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> ---
->>  .../devicetree/bindings/reset/st,stm32-rcc.txt     | 102 +++++++++++++++++++++
->>  1 file changed, 102 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
->> new file mode 100644
->> index 0000000..962f961
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-<snip>
+Great, thanks!
 
->> + - can1: 281
->> + - can2: 282
->> + - pwr: 284
->> + - dac: 285
->> + - uart7: 286
->> + - uart8: 287
->> + - tim1: 288
->> + - tim8: 289
->> + - usart1: 292
->> + - usart6: 293
->> + - adc: 296
->> + - sdio: 299
->> + - spi1: 300
->> + - spi4: 301
->> + - syscfg: 302
->> + - tim9: 304
->> + - tim10: 305
->> + - tim11: 306
->> + - spi5: 308
->> + - spi6: 309
->> + - sai1: 310
->> + - ltdc: 31
->> +
->>
->
-> Last line is un-necessary. When I applied this patch for test
-> "new blank line at EOF" happen.
-
-Thanks, that will be fixed in v4.
-
-Kind regards,
 Maxime
->
-> +++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
-> @@ -99,4 +99,3 @@ List of indexes for STM32F429:
->   - spi6: 309
->   - sai1: 310
->   - ltdc: 31
-> -
->
-> Thanks,
-> Chanwoo Choi
->
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/59c3bd41/attachment.sig>
