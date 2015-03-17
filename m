@@ -1,25 +1,57 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 17 Mar 2015 16:37:49 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <20150317162831.GB8656@n2100.arm.linux.org.uk>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
- <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
- <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
- <20150317162831.GB8656@n2100.arm.linux.org.uk>
-Message-ID: <HK2PR06MB0561681457FA1AE36384052B8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Mar 2015 09:34:40 -0700
+Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
+In-Reply-To: <550856FF.9080702@ti.com>
+References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
+ <20150316233005.GA2598@atomide.com> <550855B7.3020905@oracle.com>
+ <550856FF.9080702@ti.com>
+Message-ID: <20150317163440.GC31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > DEBUG_LL=y may help you here. It's easier than doing a post-mortem 
-> > analysis on __log_buf from U-Boot.
-> > As we still have anti-social platforms, you best remove all non-SCIF 
-> > default addresses from the DEBUG_UART_PHYS section in arch/arm/Kconfig.debug though.
+* Nishanth Menon <nm@ti.com> [150317 09:32]:
+> On 03/17/2015 11:26 AM, santosh shilimkar wrote:
+> > 
+> > 
+> > On 3/16/2015 4:30 PM, Tony Lindgren wrote:
+> >> * Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
+> >>> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
+> >>> contradiction in it's dependencies.
+> >>> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
+> >>> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
+> >>> enabled. These options inherit a dependency from an enclosing menu,
+> >>> that requires ARCH_MULTIPLATFORM to be 'enabled'.
+> >>> This is a contradiction and made this option also unavailable for
+> >>> non-multiplatform configurations.
+> >>>
+> >>> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
+> >>> dependencies, the code related to that option is dead and can be
+> >>> removed.
+> >>>
+> >>> This (logical) defect has been found with the undertaker tool.
+> >>> (https://undertaker.cs.fau.de)
+> >>>
+> >>> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+> >>>
+> >>> ---
+> >>> Tony Lindgren suggested to remove the code since nobody complained for
+> >>> a few years and Santosh Shilimkar agreed.
+> >>> https://lkml.org/lkml/2015/2/25/449
+> >>> ---
+> >>> As far as I see, this should remove all the code related to
+> >>> OMAP4_ERRATA_I688, I hope I didn't remove too much.
+> >>
+> >> Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
+> >>
+> > Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 > 
-> Or enter the appropriate address directly, which is what's intended in the long term.  Having zillions of defaults in Kconfig is not that much better from what we had before...
+> We no longer need i688? I do understand the need to cleanup the macros
+> for multi-arch etc.. but loosing a bug workaround for a real silicon
+> bug is really an invitation for hard to debug issues IMHO.
 
-I would say having to manually enter an address is acceptable for debugging (in my opinion)
+Well that code has not been selectable for a few years now. Naturally
+we can add it back when it actually does something with multiarch.
 
-Chris
+Regards,
+
+Tony
