@@ -1,216 +1,141 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 17 Mar 2015 16:37:39 +0530
-Subject: [PATCH v5] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
-References: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
-Message-ID: <20150317110739.GE32683@intel.com>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Tue, 17 Mar 2015 12:14:11 +0100
+Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <20150317103746.GB3759@amd>
+References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
+ <1423088075-10025-4-git-send-email-marek@goldelico.com>
+ <20150316210532.GA11441@amd>
+ <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
+ <20150317084730.GA9761@amd>
+ <940EE988-03A4-4B1B-A168-959E367953A6@goldelico.com>
+ <20150317103746.GB3759@amd>
+Message-ID: <CDA0FF88-2D00-46E0-828E-DD6F4FF4ADAF@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 02, 2015 at 11:25:11PM +0530, Kedareswara rao Appana wrote:
-> This is the driver for the AXI Direct Memory Access (AXI DMA)
-> core, which is a soft Xilinx IP core that provides high-
-> bandwidth direct memory access between memory and AXI4-Stream
-> type target peripherals.
+Hi Pavel,
+
+Am 17.03.2015 um 11:37 schrieb Pavel Machek <pavel@ucw.cz>:
+
+> Hi!
 > 
-> Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> This patch is rebased on top of dma: xilinx-dma: move header file
-> to common location.
-but not on slave-dma next some API update is required..
+>>>>> to introduce coefficients for temperature and discharge rate?
+>>>> What do you mean? Nothing like that is used in current driver why do
+>>>> we need to add it?
+>>> 
+>>> Well, conversion between Li-ion's voltage and state of charge at 0
+>>> current is well known:
+>> 
+>> We can?t measure at 0 current since the OMAP is driven from battery
+>> and charger and may also draw some mA?
+> 
+> Yes, but you know how many mA you are taking just now. So if you knew
+> the internal resistance, you could compute the voltage at 0
+> current. (And it should also work during charging, as long as you know
+> how much current is going in.)
 
+As far as I understand the twl4030 charger and MADC it is not possible to
+separate these values. It is only reporting the inflow from charger to
+battery + system. So you don?t know how many mA are supplying the system
+and how many mA are left over for charging.
 
-> +/*
-> + * DMA driver for Xilinx DMA Engine
-> + *
-> + * Copyright (C) 2010 - 2014 Xilinx, Inc. All rights reserved.
-2015?
+You can only assume how much the system is drawing while running (something
+between 50 and 600 mA but this depends on system activities, power state
+of peripherald and e.g. backlight being switched on).
 
-> +static struct xilinx_dma_tx_descriptor *
-> +xilinx_dma_alloc_tx_descriptor(struct xilinx_dma_chan *chan)
-> +{
-> +	struct xilinx_dma_tx_descriptor *desc;
-> +	unsigned long flags;
-> +
-> +	if (chan->allocated_desc)
-> +		return chan->allocated_desc;
-> +
-> +	desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-GFP_NOWAIT
+I think your basic assumption that we know any time how many mA the system
+is taking is not given.
 
-> +static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
-> +					    dma_cookie_t cookie,
-> +					    struct dma_tx_state *txstate)
-> +{
-> +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> +	enum dma_status ret;
-> +	unsigned long flags;
-> +
-> +	ret = dma_cookie_status(dchan, cookie, txstate);
-> +	if (ret != DMA_COMPLETE) {
-txstate can be null
+> 
+>>>   def percent(m, v):
+>>>   	u = 0.0387-(1.4523*(3.7835-v))
+>>>       if u < 0:
+>>>           return 0
+>>>         return (0.1966+math.sqrt(u))*100
+>>> 
+>>> And there's not much to calibrate there, and it should become library
+>>> helper function; there's no need to write it to every single dts.
+>>> 
+>>> The charge/discharge difference is due to internal battery resistance,
+>>> and Ohm's law. (Then, you should not need different values for
+>>> charging/discharging case.)
+>> 
+>> Yes, and that also depends on the board and battery type. So you always
+>> need to specify some battery specific coefficient for that in the DT.
+> 
+> Yes, and that coefficient should be internal battery resistance ;-).
 
-> +		spin_lock_irqsave(&chan->lock, flags);
-> +		dma_set_residue(txstate, chan->residue);
-the queried descriptor may not be submitted to HW. Also the expectations are
-that you will read current value from HW and calculate residue
+But where do you know this value from to write it into a DT file?
+Usually you can?t measure it easily and for some batteries you don?t have
+a data sheet.
 
-> +static int xilinx_dma_device_slave_caps(struct dma_chan *dchan,
-> +					struct dma_slave_caps *caps)
-> +{
-> +	caps->directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
-> +	caps->cmd_terminate = true;
-> +	caps->residue_granularity = DMA_RESIDUE_GRANULARITY_SEGMENT;
-> +
-> +	return 0;
-> +}
-this is based on older API, pls update
+Contrary, the calibration curves can easily be measured on the device
+(assuming that the charge level decreases/increases linearly over time
+between Full and Empty).
 
+I tend to make software easy to use for the user (developer of a board support
+package) of a driver, not theoretically correct or mathematically elegant.
 
-> +static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
-> +{
-> +	struct xilinx_dma_tx_descriptor *desc;
-> +	struct xilinx_dma_tx_segment *segment, *next;
-> +	struct xilinx_dma_desc_hw *hw;
-> +	unsigned long flags;
-> +	u32 residue = 0;
-> +
-> +	spin_lock_irqsave(&chan->lock, flags);
-> +
-> +	desc = chan->active_desc;
-> +	if (!desc) {
-> +		dev_dbg(chan->dev, "no running descriptors\n");
-> +		goto out_unlock;
-> +	}
-> +
-> +	if (chan->has_sg) {
-> +		list_for_each_entry_safe(segment, next, &desc->segments, node) {
-> +			hw = &segment->hw;
-> +			residue += (hw->control - hw->status) &
-> +				   XILINX_DMA_MAX_TRANS_LEN;
-> +		}
-why are we calculating residue here?
-> +	}
-> +
-> +	chan->residue = residue;
-and this is used in status call, so completely wrong!
+> 
+>> We simply did choose a table, because calculating the right coefficients
+>> is more complex and getting the table values can easily be done from
+>> running one full charge-discharge-charge cycle.
+> 
+> Well.. One set of coefficients would be kind of ok. But you are doing
+> two, because it really depends on current, not charge/discharge. So
+> why not do it right, for all currents??
 
-> +static dma_cookie_t xilinx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
-> +{
-> +	struct xilinx_dma_tx_descriptor *desc = to_dma_tx_descriptor(tx);
-> +	struct xilinx_dma_chan *chan = to_xilinx_chan(tx->chan);
-> +	dma_cookie_t cookie;
-> +	unsigned long flags;
-> +	int err;
-> +
-> +	if (chan->err) {
-> +		/*
-> +		 * If reset fails, need to hard reset the system.
-> +		 * Channel is no longer functional
-> +		 */
-> +		err = xilinx_dma_reset(chan);
-> +		if (err < 0)
-> +			return err;
-> +	}
-> +
-> +	spin_lock_irqsave(&chan->lock, flags);
-> +
-> +	cookie = dma_cookie_assign(tx);
-> +
-> +	/* Append the transaction to the pending transactions queue. */
-> +	list_add_tail(&desc->node, &chan->pending_list);
-> +
-> +	/* Free the allocated desc */
-> +	chan->allocated_desc = NULL;
-this bit is confusing, can you explain what is going on?
+Because the right solution for all these issues is to use a fuel gauge chip
+(bq27xxx).
 
-> +static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
-> +	struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
-> +	enum dma_transfer_direction direction, unsigned long flags,
-> +	void *context)
-> +{
-> +	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> +	struct xilinx_dma_tx_descriptor *desc;
-> +	struct xilinx_dma_tx_segment *segment;
-> +	struct xilinx_dma_desc_hw *hw;
-> +	u32 *app_w = (u32 *)context;
-> +	struct scatterlist *sg;
-> +	size_t copy, sg_used;
-> +	int i;
-> +
-> +	if (!is_slave_direction(direction))
-> +		return NULL;
-> +
-> +	/* Allocate a transaction descriptor. */
-> +	desc = xilinx_dma_alloc_tx_descriptor(chan);
-> +	if (!desc)
-> +		return NULL;
-> +
-> +	desc->direction = direction;
-> +	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
-> +	desc->async_tx.tx_submit = xilinx_dma_tx_submit;
-> +	desc->async_tx.cookie = 0;
-?
+This driver is just for systems where the hardware designer did forget
+(or did not want to spend money) for such a chip, but user space
+expects some /sys/class/power_supply indication (e.g. Android/Replicant).
 
-> +	async_tx_ack(&desc->async_tx);
-why?
+The missing optimal precision is something we can live with.
 
-> +
-> +	/* Build transactions using information in the scatter gather list */
-> +	for_each_sg(sgl, sg, sg_len, i) {
-> +		sg_used = 0;
-> +
-> +		/* Loop until the entire scatterlist entry is used */
-> +		while (sg_used < sg_dma_len(sg)) {
-> +
-> +			/* Get a free segment */
-> +			segment = xilinx_dma_alloc_tx_segment(chan);
-> +			if (!segment)
-> +				goto error;
-> +
-> +			/*
-> +			 * Calculate the maximum number of bytes to transfer,
-> +			 * making sure it is less than the hw limit
-> +			 */
-> +			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-> +				     XILINX_DMA_MAX_TRANS_LEN);
-> +			hw = &segment->hw;
-> +
-> +			/* Fill in the descriptor */
-> +			hw->buf_addr = sg_dma_address(sg) + sg_used;
-> +
-> +			hw->control = copy;
-> +
-> +			if (direction == DMA_MEM_TO_DEV) {
-> +				if (app_w)
-> +					memcpy(hw->app, app_w, sizeof(u32) *
-> +					       XILINX_DMA_NUM_APP_WORDS);
-> +
-> +				/*
-> +				 * For the first DMA_MEM_TO_DEV transfer,
-> +				 * set SOP
-> +				 */
-> +				if (!i)
-> +					hw->control |= XILINX_DMA_BD_SOP;
-> +			}
-no else?
+> 
+>>> With your aproach, you'll get lower percentage when phone is under
+>>> load vs. idle. Taking internal resistance into account would give you
+>>> more precise readings. (Attached, old patch for zaurus shows the
+>>> needed computation).
+>> 
+>> This is why we have a charging and a discharging table to compensate
+>> for this effect.
+> 
+> Yes, but there's very different current during "idle" phone and during
+> call (for example). So yes, you are compensating for different current
+> during charge and discharge, but it is possible to do better.
 
-> +static int xilinx_dma_remove(struct platform_device *pdev)
-> +{
-> +	struct xilinx_dma_device *xdev = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	of_dma_controller_free(pdev->dev.of_node);
-> +	dma_async_device_unregister(&xdev->common);
-> +
-> +	for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
-> +		if (xdev->chan[i])
-> +			xilinx_dma_chan_remove(xdev->chan[i]);
-> +
-at this point your irq is active and tasklet cna still be scheduled
+I am not convinced that it can be really done better, considering the
+limitations of the twl4030 circuits, and I doubt that it is worth the efforts
+of doing it better.
 
+> 
+>>> I guess this should go into library somewhere, because many machines
+>>> need similar code.
+>> 
+>> Is a library easier to maintain and handle than just a set of table
+>> values?
+> 
+> I think so, yes, because otherwise you need a set of tables for each
+> machine.
 
--- 
-~Vinod
+Yes, but what is the problem? We have different device trees for each
+machine anyways. And as soon as they differ in battery characteristics
+the coefficients for your calculation have to be defined for each machine.
+
+So someone has to write in some DT values (difficult to understand
+and derive coefficients or two simple mapping tables).
+
+To me it looks as if you want to make it a 100% solution while I am happy
+with the 80% solution, which already exists as a platform data driver and
+just want to get it back into DT based boards.
+
+So I would suggest that Mareks patches to make the platform data
+driver DT compatible are applied first, and you are invited to submit a
+technically better solution for testing on real hardware.
+
+BR,
+Nikolaus
