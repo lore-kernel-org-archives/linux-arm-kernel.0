@@ -1,66 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Mar 2015 14:59:13 +0100
-Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <CDA0FF88-2D00-46E0-828E-DD6F4FF4ADAF@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-4-git-send-email-marek@goldelico.com>
- <20150316210532.GA11441@amd>
- <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
- <20150317084730.GA9761@amd>
- <940EE988-03A4-4B1B-A168-959E367953A6@goldelico.com>
- <20150317103746.GB3759@amd>
- <CDA0FF88-2D00-46E0-828E-DD6F4FF4ADAF@goldelico.com>
-Message-ID: <20150317135913.GA4034@amd>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 17 Mar 2015 15:30:04 +0100
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <20150317123536.GB14984@red-moon>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <10995588.scpoK3KRg2@vostro.rjw.lan> <20150317123536.GB14984@red-moon>
+Message-ID: <2398042.a98hWjBeFo@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >>>>> to introduce coefficients for temperature and discharge rate?
-> >>>> What do you mean? Nothing like that is used in current driver why do
-> >>>> we need to add it?
-> >>> 
-> >>> Well, conversion between Li-ion's voltage and state of charge at 0
-> >>> current is well known:
-> >> 
-> >> We can?t measure at 0 current since the OMAP is driven from battery
-> >> and charger and may also draw some mA?
+On Tuesday, March 17, 2015 12:35:36 PM Lorenzo Pieralisi wrote:
+> On Tue, Mar 17, 2015 at 03:23:11AM +0000, Rafael J. Wysocki wrote:
+> 
+> [...]
+> 
+> > > Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
+> > > 
+> > > +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
+> > > 
+> > > as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
+> > > we doing so)?
 > > 
-> > Yes, but you know how many mA you are taking just now. So if you knew
-> > the internal resistance, you could compute the voltage at 0
-> > current. (And it should also work during charging, as long as you know
-> > how much current is going in.)
+> > Well, almost.  There is one problem with that, becuase sleep.c contains code
+> > outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
+> > off ACPI platforms.
+> > 
+> > I guess you don't want that code on ARM too, right?
+> > 
+> > Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
+> > only arch setting it at least for the time being, is that correct?
 > 
-> As far as I understand the twl4030 charger and MADC it is not possible to
-> separate these values. It is only reporting the inflow from charger to
-> battery + system. So you don?t know how many mA are supplying the system
-> and how many mA are left over for charging.
+> HW reduced only platforms are still required to support sleep
+> states that on arm64 are totally meaningless at present, so I do
+> not think ACPI_REDUCED_HARDWARE_ONLY will cut it.
 > 
-> You can only assume how much the system is drawing while running (something
-> between 50 and 600 mA but this depends on system activities, power state
-> of peripherald and e.g. backlight being switched on).
+> Factoring out power_off methods from sleep.c ? I know, it is not nicer
+> since you split the S-states management in multiple files.
 > 
-> I think your basic assumption that we know any time how many mA the system
-> is taking is not given.
+> Side note: is the acpi_suspend() function in sleep.c used in the kernel ?
 
-So.. you won't be able to get exact value while charging, but you
-get one while discharging, which is what really matters...?
+No, it isn't.  I've just sent a patch to drop it.
 
-> > Yes, and that coefficient should be internal battery resistance ;-).
-> 
-> But where do you know this value from to write it into a DT file?
-> Usually you can?t measure it easily and for some batteries you don?t have
-> a data sheet.
-> 
-> Contrary, the calibration curves can easily be measured on the device
-> (assuming that the charge level decreases/increases linearly over time
-> between Full and Empty).
 
-If you can copy it from the data sheet, that's the easiest option. If
-not, you should be able to easily compute it from the charge/discharge
-curves or from measured voltage at different loads.
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
