@@ -1,53 +1,52 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 17 Mar 2015 11:31:59 -0500
-Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-In-Reply-To: <550855B7.3020905@oracle.com>
-References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
- <20150316233005.GA2598@atomide.com> <550855B7.3020905@oracle.com>
-Message-ID: <550856FF.9080702@ti.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Tue, 17 Mar 2015 18:34:21 +0200
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <20150317095143.GG4638@lukather>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+ <54F4B8B9.4010204@free-electrons.com> <20150303095924.GF4911@lukather>
+ <54F5DD7C.1050804@linux.intel.com> <20150317095143.GG4638@lukather>
+Message-ID: <5508578D.607@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 11:26 AM, santosh shilimkar wrote:
-> 
-> 
-> On 3/16/2015 4:30 PM, Tony Lindgren wrote:
->> * Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
->>> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
->>> contradiction in it's dependencies.
->>> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
->>> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
->>> enabled. These options inherit a dependency from an enclosing menu,
->>> that requires ARCH_MULTIPLATFORM to be 'enabled'.
->>> This is a contradiction and made this option also unavailable for
->>> non-multiplatform configurations.
+On 17.03.2015 11:51, Maxime Ripard wrote:
+> On Tue, Mar 03, 2015 at 06:12:44PM +0200, Mathias Nyman wrote:
+>> On 03.03.2015 11:59, Maxime Ripard wrote:
+>>> On Mon, Mar 02, 2015 at 08:23:37PM +0100, Gregory CLEMENT wrote:
+>>>> Hi Maxime,
+>>>>
+>>>> On 19/01/2015 14:01, Maxime Ripard wrote:
+>>>>> The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+>>>>> VBUS line. Enable the needed drivers to support this.
+>>>>>
+>>>>
+>>>> it seems that this patch was not applied yet. Patch 1 is now in
+>>>> linux-next and should be part of 4.0-rc. But what about patch 2?
 >>>
->>> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
->>> dependencies, the code related to that option is dead and can be
->>> removed.
+>>> IIRC, Greg or Matthias said that Matthias would look into these
+>>> patches after the merge window.
 >>>
->>> This (logical) defect has been found with the undertaker tool.
->>> (https://undertaker.cs.fau.de)
+>>> It still didn't happen though.
 >>>
->>> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
+>>> Maxime
 >>>
->>> ---
->>> Tony Lindgren suggested to remove the code since nobody complained for
->>> a few years and Santosh Shilimkar agreed.
->>> https://lkml.org/lkml/2015/2/25/449
->>> ---
->>> As far as I see, this should remove all the code related to
->>> OMAP4_ERRATA_I688, I hope I didn't remove too much.
 >>
->> Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
+>> Hi
 >>
-> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+>> I understood that you wanted the first fix patch in as soon as possible so 
+>> I sent it forward to Greg, and it's now in his usb-linus branch.
+>>
+>> The other two patches, 2/3 and 3/3 you said were "regual" patches (for usb-next?),
+>> Andrew said he can take 3/3 and wondered if 2/3 and 3/3 need to go together?
+>>
+>> It doesn't matter for me, I can take 2/3 if you like, but I'd prefer if someone
+>> with more USB PHY insight could ack it first.
+> 
+> There's been around two weeks, and we didn't have any additional
+> reviews. How can we move forward on this?
+> 
 
-We no longer need i688? I do understand the need to cleanup the macros
-for multi-arch etc.. but loosing a bug workaround for a real silicon
-bug is really an invitation for hard to debug issues IMHO.
+Added to my for-usb-next branch and sent forward to Greg (a second a go)
 
-
--- 
-Regards,
-Nishanth Menon
+-Mathias
