@@ -1,9 +1,10 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Tue, 17 Mar 2015 19:37:40 +0100
-Subject: [PATCH 09/16 linux-next] net: xilinx: constify of_device_id array
-In-Reply-To: <1426617469-781-1-git-send-email-fabf@skynet.be>
+Date: Tue, 17 Mar 2015 19:40:24 +0100
+Subject: [PATCH 12/16 linux-next] can: constify of_device_id array
+In-Reply-To: <1426617628-937-1-git-send-email-fabf@skynet.be>
 References: <1426617469-781-1-git-send-email-fabf@skynet.be>
-Message-ID: <1426617469-781-10-git-send-email-fabf@skynet.be>
+ <1426617628-937-1-git-send-email-fabf@skynet.be>
+Message-ID: <1426617628-937-3-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +13,77 @@ of_device_id is always used as const.
 
 Signed-off-by: Fabian Frederick <fabf@skynet.be>
 ---
- drivers/net/ethernet/xilinx/ll_temac_main.c       | 2 +-
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 +-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/net/can/cc770/cc770_platform.c     | 2 +-
+ drivers/net/can/grcan.c                    | 2 +-
+ drivers/net/can/mscan/mpc5xxx_can.c        | 2 +-
+ drivers/net/can/sja1000/sja1000_platform.c | 2 +-
+ drivers/net/can/xilinx_can.c               | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-index dbcbf0c..690a4c3 100644
---- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-+++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-@@ -1157,7 +1157,7 @@ static int temac_of_remove(struct platform_device *op)
+diff --git a/drivers/net/can/cc770/cc770_platform.c b/drivers/net/can/cc770/cc770_platform.c
+index b1e8851..866e5e1 100644
+--- a/drivers/net/can/cc770/cc770_platform.c
++++ b/drivers/net/can/cc770/cc770_platform.c
+@@ -254,7 +254,7 @@ static int cc770_platform_remove(struct platform_device *pdev)
  	return 0;
  }
  
--static struct of_device_id temac_of_match[] = {
-+static const struct of_device_id temac_of_match[] = {
- 	{ .compatible = "xlnx,xps-ll-temac-1.01.b", },
- 	{ .compatible = "xlnx,xps-ll-temac-2.00.a", },
- 	{ .compatible = "xlnx,xps-ll-temac-2.02.a", },
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index a6d2860..28b7e7d 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -48,7 +48,7 @@
- #define AXIENET_REGS_N		32
+-static struct of_device_id cc770_platform_table[] = {
++static const struct of_device_id cc770_platform_table[] = {
+ 	{.compatible = "bosch,cc770"}, /* CC770 from Bosch */
+ 	{.compatible = "intc,82527"},  /* AN82527 from Intel CP */
+ 	{},
+diff --git a/drivers/net/can/grcan.c b/drivers/net/can/grcan.c
+index fed1bbd..e3d7e22 100644
+--- a/drivers/net/can/grcan.c
++++ b/drivers/net/can/grcan.c
+@@ -1725,7 +1725,7 @@ static int grcan_remove(struct platform_device *ofdev)
+ 	return 0;
+ }
  
- /* Match table for of_platform binding */
--static struct of_device_id axienet_of_match[] = {
-+static const struct of_device_id axienet_of_match[] = {
- 	{ .compatible = "xlnx,axi-ethernet-1.00.a", },
- 	{ .compatible = "xlnx,axi-ethernet-1.01.a", },
- 	{ .compatible = "xlnx,axi-ethernet-2.01.a", },
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 9d4ce38..2111b91 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1231,7 +1231,7 @@ static struct net_device_ops xemaclite_netdev_ops = {
+-static struct of_device_id grcan_match[] = {
++static const struct of_device_id grcan_match[] = {
+ 	{.name = "GAISLER_GRCAN"},
+ 	{.name = "01_03d"},
+ 	{.name = "GAISLER_GRHCAN"},
+diff --git a/drivers/net/can/mscan/mpc5xxx_can.c b/drivers/net/can/mscan/mpc5xxx_can.c
+index ad024e6..c7427bd 100644
+--- a/drivers/net/can/mscan/mpc5xxx_can.c
++++ b/drivers/net/can/mscan/mpc5xxx_can.c
+@@ -43,7 +43,7 @@ struct mpc5xxx_can_data {
  };
  
+ #ifdef CONFIG_PPC_MPC52xx
+-static struct of_device_id mpc52xx_cdm_ids[] = {
++static const struct of_device_id mpc52xx_cdm_ids[] = {
+ 	{ .compatible = "fsl,mpc5200-cdm", },
+ 	{}
+ };
+diff --git a/drivers/net/can/sja1000/sja1000_platform.c b/drivers/net/can/sja1000/sja1000_platform.c
+index 9311525..0552ed4 100644
+--- a/drivers/net/can/sja1000/sja1000_platform.c
++++ b/drivers/net/can/sja1000/sja1000_platform.c
+@@ -242,7 +242,7 @@ static int sp_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct of_device_id sp_of_table[] = {
++static const struct of_device_id sp_of_table[] = {
+ 	{.compatible = "nxp,sja1000"},
+ 	{},
+ };
+diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+index 6c67643..6bddfe0 100644
+--- a/drivers/net/can/xilinx_can.c
++++ b/drivers/net/can/xilinx_can.c
+@@ -1185,7 +1185,7 @@ static int xcan_remove(struct platform_device *pdev)
+ }
+ 
  /* Match table for OF platform binding */
--static struct of_device_id xemaclite_of_match[] = {
-+static const struct of_device_id xemaclite_of_match[] = {
- 	{ .compatible = "xlnx,opb-ethernetlite-1.01.a", },
- 	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
- 	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
+-static struct of_device_id xcan_of_match[] = {
++static const struct of_device_id xcan_of_match[] = {
+ 	{ .compatible = "xlnx,zynq-can-1.0", },
+ 	{ .compatible = "xlnx,axi-can-1.00.a", },
+ 	{ /* end of list */ },
 -- 
 2.1.0
