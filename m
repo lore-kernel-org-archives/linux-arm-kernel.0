@@ -1,40 +1,58 @@
-From: appro@openssl.org (Andy Polyakov)
-Date: Tue, 17 Mar 2015 16:09:40 +0100
-Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
-In-Reply-To: <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
-References: <20150316154835.GA31336@google.com>	<CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>	<20150316162304.GA35408@google.com>
- <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
-Message-ID: <550843B4.8080903@openssl.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Mar 2015 15:14:24 +0000
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <1425903103.13300.29.camel@mhfsdcap03>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+ <20150306105821.GE22377@arm.com>
+ <1425903103.13300.29.camel@mhfsdcap03>
+Message-ID: <20150317151424.GQ8399@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Mar 09, 2015 at 12:11:43PM +0000, Yong Wu wrote:
+> On Fri, 2015-03-06 at 10:58 +0000, Will Deacon wrote:
+> > On Fri, Mar 06, 2015 at 10:48:17AM +0000, yong.wu at mediatek.com wrote:
+> > > From: Yong Wu <yong.wu@mediatek.com>
+> > > 
+> > > This patch adds support for mediatek m4u (MultiMedia Memory Management Unit).
+> > > Currently this only supports m4u gen 2 with 2 levels of page table on mt8173.
+> > 
+> > [...]
+> > 
+> > > +/* 2 level pagetable: pgd -> pte */
+> > > +#define F_PTE_TYPE_GET(regval)  (regval & 0x3)
+> > > +#define F_PTE_TYPE_LARGE         BIT(0)
+> > > +#define F_PTE_TYPE_SMALL         BIT(1)
+> > > +#define F_PTE_B_BIT              BIT(2)
+> > > +#define F_PTE_C_BIT              BIT(3)
+> > > +#define F_PTE_BIT32_BIT          BIT(9)
+> > > +#define F_PTE_S_BIT              BIT(10)
+> > > +#define F_PTE_NG_BIT             BIT(11)
+> > > +#define F_PTE_PA_LARGE_MSK            (~0UL << 16)
+> > > +#define F_PTE_PA_LARGE_GET(regval)    ((regval >> 16) & 0xffff)
+> > > +#define F_PTE_PA_SMALL_MSK            (~0UL << 12)
+> > > +#define F_PTE_PA_SMALL_GET(regval)    ((regval >> 12) & (~0))
+> > > +#define F_PTE_TYPE_IS_LARGE_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
+> > > +                                       F_PTE_TYPE_LARGE)
+> > > +#define F_PTE_TYPE_IS_SMALL_PAGE(pte) ((imu_pte_val(pte) & 0x3) == \
+> > > +                                       F_PTE_TYPE_SMALL)
+> > 
+> > This looks like the ARM short-descriptor format to me. Could you please
+> > add a new page table format to the io-pgtable code, so that other IOMMU
+> > drivers can make use of this? I know there was some interest in using
+> > short descriptor for the ARM SMMU, for example.
+>     Currently I not familiar with the io-pgtable,I may need some time
+> for it and the ARM short-descriptor. 
 
->>> Have you tested this code with the tcrypt.ko module?
->>
->> I have not, but I can look into it.
->>
->>> Did you talk to Andy about the license? I don't think this is
->>> permissible for the kernel as-is.
->>
->> Unless I have misunderstood something, the license at the Cryptogams
->> website includes an option to license the code under the GNU GPL.
->>
->> However, I can certainly contact Andy to clarify his intentions.
+Well, you can read the LPAE version I wrote in io-pgtable-arm.c for some
+inspiration (it's used by arm-smmu.c and ipmmu-vmsa.c).
 
-I have no problems with reusing assembly modules in kernel context. The
-whole idea behind cryptogams initiative was exactly to reuse code in
-different contexts. But I'd prefer if it's more of cooperative effort,
-when we help each other to improve code, test on and tune for more
-platforms single developer might have access to, cross-report problems,
-etc. For this reason I'd prefer if it can be arranged in way similar to
-bsaes-armv7 module, i.e. we work together on shared copy of module that
-generates assembly that can be then compiled for OpenSSL or kernel. Is
-it sensible? BTW, why stop at SHA256? There is SHA512 and NEON SHA1...
+>     And there are some difference between mediatek's pagetable with the
+> standard short-descriptor, like bit 9. we use it for the dram over 4GB.
+> Then how should we do if there are some difference. 
 
-As for practicalities. In order to spare brain capacity for list
-subscribers, it would probably be appropriate to work out details such
-as naming of entry points in smaller group and present result when it's
-ready to go and tests. I'll start by looking at Thumb-ification...
+That can easily be handled using a quirk (see, for example,
+IO_PGTABLE_QUIRK_ARM_NS).
 
-Cheers.
+Will
