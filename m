@@ -1,32 +1,39 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 17 Mar 2015 13:29:01 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <20150317102623.GS8656@n2100.arm.linux.org.uk>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20150317102623.GS8656@n2100.arm.linux.org.uk>
-Message-ID: <HK2PR06MB056127B8977A6F0FC1EF61E58A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Mar 2015 13:43:35 +0000
+Subject: [PATCH 6/9] ARM: dt: dove: add Dove PMU DT entry to dove.dtsi
+In-Reply-To: <55072092.9040207@free-electrons.com>
+References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
+ <E1YW7tB-0003mM-1L@rmk-PC.arm.linux.org.uk>
+ <55072092.9040207@free-electrons.com>
+Message-ID: <20150317134335.GV8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  While I can see that reasoning, in part in this instance that was due to XIP not seeming to have many users (and its only users were old platforms...
+On Mon, Mar 16, 2015 at 07:27:30PM +0100, Gregory CLEMENT wrote:
+> > +			pmu: power-management at d0000 {
+> > +				compatible = "marvell,dove-pmu";
+> > +				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
+> 
+> Here you overlap some other nodes such as the thermal one (from 0xd001c
+> to 0xd0028), the clock gate one (from 0xd0038 to 0xd003c), the gpio one,
+> the pinctrl one ...
 
-I would say XIP has just been waiting for the right part to come alone. The ARCH_R7S72100 has 10MB of internal RAM and can execute directly from external Quad-SPI flash (no DDR, no NOR).
-I also dusted off the Advanced XIP File System (AXFS) so now userland uses as little RAM as possible as well.
+Yes, I'm well aware of that, but here's the thing...
 
-> We've run into the need a few times now to allow a SoC family converted to multiplatform to also be chosen using the previous non-multiplatform behaviour.
+I'm describing the hardware here.
 
-If Linux only ran on PCs, then maybe this wouldn't be such an issue. But with Linux on an SoC, you can (and should) get creative with what you are making. ARCH_MULTIPLATFORM seems to suppress that.
+The real problem is that Dove (etc) went down the path of breaking up
+the PMU device into multiple smaller devices each specifying a sub-set
+of the register range.  By doing that, Dove moved away from describing
+the hardware - instead, we've described the Linux _implementation_ with
+its separate (sub-)devices - its the implementation's choice that we'd
+break up the PMU into these separate devices, almost to the point of
+specifying each individual register.
 
-> What I believe is that rather than ripping out the old platform choices, we should have augmented them with the multiplatform support instead
+What could be done to work around this oversight is to mvoe these
+devices beneath the PMU node, which IMHO makes complete sense as these
+are sub-devices of the PMU/PMC rather than separate devices.
 
-Agreed.
-
-> One thing which the whole multiplatform/DT project has taught me though is that the above approach is virtually always wrong
-
-The one nice thing DT does is clean up and consolidate the mundane stuff in the board file, but that didn't mean I wanted you to take the board file completely away from me.
-
-> That can be worked around with a progressive approach to converting this stuff in a way that ensures we gain the new symbols in people's defconfigs before we switch things around.
-
-Since either way this sounds like a long process, and I still want to see if I can get XIP working with the latest kernel, will you accept patches on something that can't be built with the current architecture?
- 
-Chris
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
