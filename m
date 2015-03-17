@@ -1,50 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Mar 2015 06:27:19 +0100
-Subject: [PATCH 0/3] ARM: dts: Define stdout-patch for Exynos Chromebooks
-In-Reply-To: <075601d06054$d94e6fa0$8beb4ee0$@kernel.org>
-References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
- <075601d06054$d94e6fa0$8beb4ee0$@kernel.org>
-Message-ID: <2791862.CZRe5DtPad@wuerfel>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Tue, 17 Mar 2015 13:26:12 +0800
+Subject: [PATCH 2/2] ARM: dts: ls1021: Add qDMA node
+Message-ID: <1426569972-8553-2-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 March 2015 10:51:13 Kukjin Kim wrote:
-> Javier Martinez Canillas wrote:
-> > 
-> > The kernel can use as the default console a serial port if is defined
-> > as stdout device in the Device Tree.
-> > 
-> > This allows a board to be booted without the need of having a console
-> > parameter in the kernel command line.
-> > 
-> > This small series add a stdout-path property for Exynos5 Chromebooks and
-> > is composed of the following patches:
-> > 
-> > Javier Martinez Canillas (3):
-> >   ARM: dts: Define stdout-path property for Peach boards
-> >   ARM: dts: Define stdout-path property for Snow board
-> >   ARM: dts: Define stdout-path property for Spring board
-> > 
-> >  arch/arm/boot/dts/exynos5250-snow.dts      | 1 +
-> >  arch/arm/boot/dts/exynos5250-spring.dts    | 1 +
-> >  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 ++++
-> >  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 ++++
-> >  4 files changed, 10 insertions(+)
-> > 
-> + Arnd
-> 
-> Basically, I have no objection to add stdout-path property on board DT but I
-> need to ask other ARM guys how they think about? Always I'm questioned what
-> should be defined in bootloader before entering kernel and IMHO kernel can do
-> it, it should be defined in bootloader though 
-> 
-> Let's wait for other opinions...
-> 
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-We're trying to do this on all machines now so we can replace
-debug_ll with earlycon for any normal use case aside from early
-early boot debugging.
-
-Please merge this patch set.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 491480f..1a81b89 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -383,6 +383,22 @@
+ 				 <&platform_clk 1>;
+ 		};
+ 
++		qdma: qdma at 8390000 {
++			compatible = "fsl,ls1021a-qdma";
++			reg = <0x0 0x8390000 0x0 0x10000>;
++			interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
++					<GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "qdma-controller", "qdma-queue";
++			status-sizes = <64>;
++			channels = <8>;
++			queues = <2>;
++			queue-sizes = <256 256>;
++			queue-group = <0 1>;
++			queue-weight = <0 0>;
++			default-queue = <0>;
++			big-endian;
++		};
++
+ 		mdio0: mdio at 2d24000 {
+ 			compatible = "gianfar";
+ 			device_type = "mdio";
+-- 
+2.1.0.27.g96db324
