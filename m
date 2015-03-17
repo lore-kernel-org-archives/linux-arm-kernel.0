@@ -1,38 +1,147 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Mar 2015 10:38:29 +0000
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
-Message-ID: <20150317103829.GA28806@sirena.org.uk>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Tue, 17 Mar 2015 11:46:28 +0100
+Subject: PM: knowing the system state in the device callback
+In-Reply-To: <20150317093815.360a8e79@bbrezillon>
+References: <20150316191742.GI4560@piout.net>
+ <20150316205245.1b66bbea@bbrezillon>
+ <20150316203252.GA3821@gradator.net>
+ <20150317093815.360a8e79@bbrezillon>
+Message-ID: <20150317104627.GA4895@gradator.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 11:23:33AM +0100, Ulf Hansson wrote:
-> On 16 March 2015 at 16:12, Doug Anderson <dianders@chromium.org> wrote:
+Hi,
 
-> > * Try to set the voltage to exactly 1,200,000 uV (1.2V).
-> > * If you can't get 1.2V exactly, a tolerance ("tol") of 100,000 uV
-> > (.1V) is OK.
-> > * In other words, 1.1V - 1.3V are OK, but aim for 1.2V
+On Tue, Mar 17, 2015 at 09:38:15AM +0100, Boris Brezillon wrote:
+> On Mon, 16 Mar 2015 21:32:52 +0100
+> Sylvain Rochet <sylvain.rochet@finsecur.com> wrote:
+> > On Mon, Mar 16, 2015 at 08:52:45PM +0100, Boris Brezillon wrote:
+> > > On Mon, 16 Mar 2015 20:17:42 +0100
+> > > Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> > > > 
+> > > > I'm trying to get rid of at91_suspend_entering_slow_clock() which is
+> > > > exposing the platform suspend_state_t to the devices. From what I
+> > > > understand, whenever suspend_state_t is PM_SUSPEND_MEM or
+> > > > PM_SUSPEND_STANDBY, the pm_message_t passed to the device driver is
+> > > > always PM_EVENT_SUSPEND.
+> > > > 
+> > > > The requirement is to know whether we are going to cut the master clock
+> > > > and in that case, avoid calling enable_irq_wake() because we will not be
+> > > > able to wakeup from the device.
+> > > 
+> > > Actually the master clock is never switched off, we're only changing
+> > > its source (from PLLA to slow clk) which in turn changes its rate.
+> > 
+> > That's more or less the same, the master clock set to 32k is unusable 
+> > for almost all devices. I guess all except some very simple devices like 
+> > GPIO, AIC and PM controller.
+> 
+> Okay, I thought suspend-to-ram was only implying putting the SDRAM chip
+> in self-refresh, and stopping everything that can be stopped.
 
-> So what happens in the case when 1.3V and 1.1V, but not 1.2V. Which
-> value will be used? Is that algorithm defined by the regulator core or
-> does it depend per regulator implementation?
+That's the standby target. What we have currently in linux-next for AT91 
+is:
 
-It's done in the core.  It first tries to hit the target voltage to the
-maximum (picking the lowest voltage in that range) then tries to pick
-the lowest voltage to the target, though that's an implementation detail
-and we really should be trying to get as close as possible to the
-target.  We don't do that yet because it can be expensive to work out so
-we do the current thing which is cheap and mostly good enough.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/16382021/attachment.sig>
+mem target: all PLL stopped, master clock switched slow clock(32k),
+            self-refresh, "all" drivers forced suspend even if wake-up
+            flag is set, wait-for-interrupt
+
+standby target: fast clocks active(PLL A, USB PLL), self-refresh,
+                "all" drivers suspended but wake-up flag is respected
+                (e.g. USB controller is NOT suspended if wake-up flag is set),
+                wait-for-interrupt
+
+
+> In the existing code we're actually forcing the switch to the slow
+> clock even if some devices marked as wakeup sources need a fast master
+> clock.
+
+Yes, in this case we currently discard the wakeup flag, this is bad.
+
+
+> > And, to reduce a bit more the memory 
+> > consumption we can switch of to the 32k RC and not OSC (I do!), which is 
+> > ?10% off, that's way too much for UART.
+> 
+> Hm, I think we should stay focus on the mainline code for now, but I
+> understand your concern.
+
+This is what mainline is doing, at least on SAMA5D3 ;-)
+
+
+> > Also, if standby target is chosen, we are able to wake up on USB Host 
+> > wake-up events, which needs the USB PLL to be running. If mem target is 
+> > chosen we are going to switch off the USB PLL because we are going to 
+> > switch off the PLL source, the master clock, in this case we most ensure 
+> > all USB drivers switches off their controller (this is what my USBA and 
+> > EHCI/OHCI PM series did).
+> 
+> Well, IMO we should never guess what the user want to do (and that's
+> what we're currently doing in the existing code).
+> If someone marked the USB controller as a wakeup source, then we should
+> keep the USB device active even when entering suspend-to-ram mode.
+> If this mean consuming more power when USB is a wakeup source, then
+> it should be fine, because in the end it's the user who chooses which
+> device should be a wakeup source (through sysfs), and if he really
+> wants to consume less, he can decide to disable wakeup on USB events.
+> In the other, letting the user think the system can wakeup on USB while
+> it actually can't is a bit broken.
+
+I mostly agree. In my opinion we should just abort the mem target 
+suspend if some peripherals have wake-up bit set and need the master 
+clock (or USB PLL, or PLL B, or any clock divider/multiplier from master 
+clock) to do wake up. We are actually more or less doing that using the 
+at91_pm_verify_clocks() function.
+
+
+> > > The fact that we're disabling PLLA is not really related to
+> > > suspend-to-ram mode (we could leave the master clock unchanged and
+> > > still put the SDRAM chip in self-refresh mode).
+> > 
+> > This is what we do in standby target.
+> 
+> Ok, thanks for the pointer. I though standy mode was just some kind of
+> cpuidle with a few devices disables (thanks to the PM ops implemented
+> in each drivers), but apparently I was wrong.
+
+Yes, the only difference between standby and mem target is the switch to 
+slow clock mode.
+
+
+> > > The problem here is that we need some kind of notifier infrastructure
+> > > that would be called before the master clock source is switched to slow
+> > > clock. This notifier must be written in asm so that it can be called
+> > > from the asm code executed from SRAM (the SDRAM chip is placed in self
+> > > refresh before switching to slow clock).
+> > 
+> > I don't think that's possible, some drivers needs to know the master 
+> > clock is going to be switched off (USB).
+> 
+> Yep, you're right again.
+> 
+> Here is another approach thought about:
+> 1/ use clock constraints in device drivers to forbid any change on the
+>    main clock
+> 2/ remove this constraint when suspend is called if the device is not
+>    tagged as a wakeup source, or keep it if it is.
+> 3/ call a 'clk_test_rate' function in PM code to check if we can
+>    switch to a 32kHz clk (clk_test_rate(mck, 32768)).
+>    This clk_test_rate does not exist, but it would validate all mck
+>    users constraint, returning an error code if the constraints does
+>    not allow such a rate or 0 on success.
+> 
+> This is just an idea.
+> Maybe exposing the current suspend state and testing its value in each
+> driver is more appropriate,
+
+Well, I don't know if it's more appropriate or not, but testing the 
+suspend state is much much simpler than adding a clk_test_rate() :-)
+
+
+> but from a user point of view, I find it weird to silently ignore the 
+> wakeup configuration on some devices when entering suspend-to-ram.
+
+I agree that's weird.
+
+
+Sylvain	
