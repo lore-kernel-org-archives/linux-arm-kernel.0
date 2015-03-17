@@ -1,97 +1,58 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 17 Mar 2015 04:23:11 +0100
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <5507933F.2020203@huawei.com>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <3737028.Ib0fKlgSkd@vostro.rjw.lan> <5507933F.2020203@huawei.com>
-Message-ID: <10995588.scpoK3KRg2@vostro.rjw.lan>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Tue, 17 Mar 2015 11:13:51 +0800
+Subject: [PATCH v2 1/5] mmc: dt-bindings: add Mediatek MMC bindings
+In-Reply-To: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1426562035-16709-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1426562035-16709-2-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 17, 2015 10:36:47 AM Hanjun Guo wrote:
-> On 2015/3/17 10:28, Rafael J. Wysocki wrote:
-> > On Tuesday, March 17, 2015 09:08:45 AM Hanjun Guo wrote:
-> >> On 2015/3/17 7:15, Rafael J. Wysocki wrote:
-> >>> On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
-> >>>> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
-> >>>>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
-> >> [...]
-> >>>>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> >>>>>> index 074e52b..e8728d7 100644
-> >>>>>> --- a/arch/ia64/Kconfig
-> >>>>>> +++ b/arch/ia64/Kconfig
-> >>>>>> @@ -10,6 +10,7 @@ config IA64
-> >>>>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
-> >>>>>>   	select PCI if (!IA64_HP_SIM)
-> >>>>>>   	select ACPI if (!IA64_HP_SIM)
-> >>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
-> >>>>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
-> >>>>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
-> >>>>>>   	select HAVE_IDE
-> >>>>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> >>>>>> index b7d31ca..9804431 100644
-> >>>>>> --- a/arch/x86/Kconfig
-> >>>>>> +++ b/arch/x86/Kconfig
-> >>>>>> @@ -22,6 +22,7 @@ config X86_64
-> >>>>>>   ### Arch settings
-> >>>>>>   config X86
-> >>>>>>   	def_bool y
-> >>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
-> >>>>> One more nit.  If you did
-> >>>>>
-> >>>>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
-> >>>>>
-> >>>>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
-> >>>>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
-> >>>> In sleep.c,
-> >>>>
-> >>>> #ifdef CONFIG_ACPI_SLEEP
-> >>>> acpi_target_system_state()
-> >>>> {
-> >>>> }
-> >>>> #endif
-> >>>>
-> >>>> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
-> >>>> which one of them will be enabled on ARM64 so ACPI_SLEEP
-> >>>> will also enabled too.
-> >>>>
-> >>>> So if we
-> >>>>
-> >>>> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
-> >>>>
-> >>>> and
-> >>>>
-> >>>> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
-> >>>>
-> >>>> it will lead to errors for acpi_target_system_state() that
-> >>>> is declared but not defined, so I will keep the code as
-> >>>> it is, what do you think?
-> >>> No, we need to hash this out.  Having two different Kconfig options meaning
-> >>> almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
-> >>>
-> >>> Do you need ACPI_SLEEP on ARM64 at all?
-> >> No, at least for now we don't need it, the spec for sleep is not ready for
-> >> ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
-> > Well, so what about selecting ACPI_SLEEP from the architectures that use it?
-> 
-> Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
-> 
-> +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
-> 
-> as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
-> we doing so)?
+Document the device-tree binding of Mediatek MMC host
 
-Well, almost.  There is one problem with that, becuase sleep.c contains code
-outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
-off ACPI platforms.
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 33 ++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mtk-sd.txt
 
-I guess you don't want that code on ARM too, right?
-
-Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
-only arch setting it at least for the time being, is that correct?
-
-
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+new file mode 100644
+index 0000000..ac43f77
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -0,0 +1,33 @@
++* MTK MMC controller
++
++The MTK  MSDC can act as a MMC controller
++to support MMC, SD, and SDIO types of memory cards.
++
++This file documents differences between the core properties in mmc.txt
++and the properties used by the msdc driver.
++
++Required properties:
++- compatible: Should be "mediatek,mt8173-mmc","mediatek,mt8135-mmc".
++- interrupts: Should contain MSDC interrupt number
++- clocks: MSDC source clock
++- clock-names: "source"
++- pinctrl-names: should be "default", "state_uhs"
++- pinctrl-0: should contain default/high speed pin ctrl
++- pinctrl-1: should contain uhs mode pin ctrl
++
++Optional properties:
++- vmmc-supply: power to the Core
++- vqmmc-supply: power to the IO(for SD/SDIO)
++
++Examples:
++mmc0: mmc at 11230000 {
++	compatible = "mediatek,mt8173-mmc","mediatek,mt8135-mmc";
++	reg = <0 0x11230000 0 0x108>;
++	interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
++	vmmc-supply = <&mt6397_vemc_3v3_reg>;
++	clocks = <&pericfg PERI_MSDC20_1_CK>;
++	clock-names = "source";
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&mmc0_pins_default>;
++	pinctrl-1 = <&mmc0_pins_uhs>;
++};
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.8.1.1.dirty
