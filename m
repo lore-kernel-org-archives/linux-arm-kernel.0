@@ -1,50 +1,76 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 17 Mar 2015 14:17:19 +0530
-Subject: Is cpufreq-dt safe without regulator support?
-In-Reply-To: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
-References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
-Message-ID: <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 17 Mar 2015 09:47:30 +0100
+Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
+References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
+ <1423088075-10025-4-git-send-email-marek@goldelico.com>
+ <20150316210532.GA11441@amd>
+ <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
+Message-ID: <20150317084730.GA9761@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2015 at 13:15, wens Tsai <wens213@gmail.com> wrote:
-> The sunxi platform added cpufreq support in 4.0.0-rc1 using
-> the generic cpufreq-dt driver. One issue we've run into is
-> the default OPPs we use include an overclocked/overvoltage
-> setting.
+Hi!
 
-There is a feature for that in cpufreq, in case you don't know, "boost"..
+> >> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> >> new file mode 100644
+> >> index 0000000..bb3580c
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> >> @@ -0,0 +1,43 @@
+> >> +twl4030_madc_battery
+> >> +
+> >> +Required properties:
+> >> + - compatible : "ti,twl4030-madc-battery"
+> >> + - capacity-uah : battery capacity in uAh
+> >
+> > Could we make it capacity-uAh ?
+> This name was suggested by Mark Rutland [1] and naming convention
+> should be all lowercase. There exists already bindings
+> without uppercase (e.g. ti,bb-uamp) so I would keep it consistent.
 
-> If the cpu is missing a regulator supply phandle, or the
-> kernel is built without regulators, cpufreq can increase
-> the clock rate without the needed voltage increase.
+Messing up SI units due to "convention" is _stupid_. Don't do it.
 
-Right.
+> > to introduce coefficients for temperature and discharge rate?
+> What do you mean? Nothing like that is used in current driver why do
+> we need to add it?
 
-> The former issue can be resolved by providing a dummy
-> regulator with the default voltage, effectively disabling
-> cpufreq.
+Well, conversion between Li-ion's voltage and state of charge at 0
+current is well known:
 
-How ? CPUFreq will try to change both volt and freq. Volt
-wouldn't change as its a dummy regulator, but freq would
-still be changed..
+    def percent(m, v):
+    	u = 0.0387-(1.4523*(3.7835-v))
+        if u < 0:
+            return 0
+          return (0.1966+math.sqrt(u))*100
 
-> The latter is possible. Without regulator support built-in,
-> even a correct, complete DTS can still fail. Should I just
-> remove the offending OPP? Still that does not fix the
-> problem when we actually do want overclocking.
->
-> To summarize, should cpufreq-dt probe fail when regulator
-> support isn't available? Should we differentiate between
+And there's not much to calibrate there, and it should become library
+helper function; there's no need to write it to every single dts.
 
-No. We can have regulator support enabled but no regulator
-for a CPU. And so the current state of code looks fine.
+The charge/discharge difference is due to internal battery resistance,
+and Ohm's law. (Then, you should not need different values for
+charging/discharging case.)
 
-> not having a regulator phandle vs no regulator support?
+With your aproach, you'll get lower percentage when phone is under
+load vs. idle. Taking internal resistance into account would give you
+more precise readings. (Attached, old patch for zaurus shows the
+needed computation).
 
-What I couldn't understand is, why would you miss the regulator
-phandle in dts? Or not compile regulator support?
+And if you wanted even more precise readings... internal resistance
+depends on temperature.
 
-In case you want cpufreq-dt to be disabled if regulators aren't
-compiled in, then what you should do is, don't create the platform
-device required for probing cpufreq-dt driver.
+I guess this should go into library somewhere, because many machines
+need similar code.
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: zbattery.10.diff
+Type: text/x-diff
+Size: 15807 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/debefd99/attachment.bin>
