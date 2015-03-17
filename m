@@ -1,44 +1,25 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 17 Mar 2015 09:06:59 +0100
-Subject: [STLinux Kernel] [PATCH] phy: stih41x-usb: Fixup
- stih41x_usb_phy_power_on failure path
-In-Reply-To: <1426552741.6645.1.camel@phoenix>
-References: <1426552741.6645.1.camel@phoenix>
-Message-ID: <5507E0A3.2080500@st.com>
+Date: Tue, 17 Mar 2015 09:10:37 +0100
+Subject: [PATCH 05/35 linux-next] tty: constify of_device_id array
+In-Reply-To: <1426533469-25458-6-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426533469-25458-6-git-send-email-fabf@skynet.be>
+Message-ID: <5507E17D.2050701@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel
+Hi Fabian
 
-On 03/17/2015 01:39 AM, Axel Lin wrote:
-> If stih41x_usb_phy_power_on() fails, we need to call clk_disable_unprepare()
-> before return error. This is to ensure we have balanced clk_enable/disable
-> calls.
+On 03/16/2015 08:17 PM, Fabian Frederick wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
 >
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
 > ---
->   drivers/phy/phy-stih41x-usb.c | 8 ++++++--
->   1 file changed, 6 insertions(+), 2 deletions(-)
+....
+>   drivers/tty/serial/st-asc.c                 | 2 +-
 >
-> diff --git a/drivers/phy/phy-stih41x-usb.c b/drivers/phy/phy-stih41x-usb.c
-> index a603801..c093b47 100644
-> --- a/drivers/phy/phy-stih41x-usb.c
-> +++ b/drivers/phy/phy-stih41x-usb.c
-> @@ -87,8 +87,12 @@ static int stih41x_usb_phy_power_on(struct phy *phy)
->   		return ret;
->   	}
->   
-> -	return regmap_update_bits(phy_dev->regmap, phy_dev->cfg->syscfg,
-> -			phy_dev->cfg->oscok, phy_dev->cfg->oscok);
-> +	ret = regmap_update_bits(phy_dev->regmap, phy_dev->cfg->syscfg,
-> +				 phy_dev->cfg->oscok, phy_dev->cfg->oscok);
-> +	if (ret)
-> +		clk_disable_unprepare(phy_dev->clk);
-> +
-> +	return ret;
->   }
->   
->   static int stih41x_usb_phy_power_off(struct phy *phy)
+For this driver
 
 Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
