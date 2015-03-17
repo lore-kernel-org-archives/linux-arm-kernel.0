@@ -1,70 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Mar 2015 07:56:02 +0100
-Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
-In-Reply-To: <20150316162304.GA35408@google.com>
-References: <20150316154835.GA31336@google.com>
- <CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>
- <20150316162304.GA35408@google.com>
-Message-ID: <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
+From: eliad@wizery.com (Eliad Peller)
+Date: Tue, 17 Mar 2015 08:58:50 +0200
+Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
+In-Reply-To: <20150316182426.GW5264@atomide.com>
+References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
+ <20150313151301.GJ5264@atomide.com>
+ <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
+ <2070859.WcMooC33YH@wuerfel> <20150316152939.GP5264@atomide.com>
+ <20150316182536.GA16829@earth> <20150316182426.GW5264@atomide.com>
+Message-ID: <CAB3XZEdtmCDnHLW_JpmPXu2rgg8RNkOvPaUfoijmL_UsG93_Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 March 2015 at 17:23, Sami Tolvanen <samitolvanen@google.com> wrote:
-> On Mon, Mar 16, 2015 at 05:08:03PM +0100, Ard Biesheuvel wrote:
->> Have you tested this code with the tcrypt.ko module?
+On Mon, Mar 16, 2015 at 8:24 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Sebastian Reichel <sre@ring0.de> [150316 11:26]:
+>> Hi,
+>>
+>> On Mon, Mar 16, 2015 at 08:29:39AM -0700, Tony Lindgren wrote:
+>> > * Arnd Bergmann <arnd@arndb.de> [150315 05:10]:
+>> > > On Sunday 15 March 2015 10:50:42 Eliad Peller wrote:
+>> > > > yeah, i missed it :/
+>> > > >
+>> > > > looks like there's no platform that defines platform data for it.
+>> > > > i'll replace the dev_get_platdata() with a function that only parses
+>> > > > the clock-frequency properties (the irq is taken in this case from the
+>> > > > spi_device).
+>> > > > (or maybe i should just drop it, as no one actually uses it?)
+>> > >
+>> > > I don't think we should drop the driver, but dropping the platform_data
+>> > > support sounds reasonable. New users of this driver should all be using
+>> > > DT, and if there is a good reason to use platform_data, it's easily
+>> > > put back.
+>> >
+>> > Well we have n8x0 and n900 using the spi driver. For those, n8x0 boot
+>> > all in dts mode, but n900 still also boots in legacy mode. It seems the
+>> > board-rx51-peripherals.c only passes the power_gpio though, so that
+>> > should be easy to keep around.
+>> >
+>> > We should keep things still working for n900 in legacy mode until the
+>> > pending regressions with device tree based booting have been cleared
+>> > for at least one merge cycle. I believe the last pending issues is the
+>> > support for ATAG_REVISION in device tree mode as posted by Pali.
+>>
+>> mh by migrating to newer gpiod interface platform data is no longer
+>> needed (instead the boardfile would need a gpiod_lookup_table). That
+>> way all of the dirty code is in the board file and will be removed
+>> once the time comes. See for example rx51_fmtx_gpios_table.
+>>
+>> Note: This is independent of wl12xx changes, since N900 uses wl1251.
 >
-> I have not, but I can look into it.
+> Oh sorry yes sounds like that's different platform data then. In that
+> case I see no reasons to drop the platform data for wl12xx.
 >
->> Did you talk to Andy about the license? I don't think this is
->> permissible for the kernel as-is.
->
-> Unless I have misunderstood something, the license at the Cryptogams
-> website includes an option to license the code under the GNU GPL.
->
-> However, I can certainly contact Andy to clarify his intentions.
->
->> This is broken on thumb-2, use adr instead
->
->> You can also implement SHA-224 using the same core transform, it's
->> just some trivial glue code.
->
->> Could you please rebase this onto Herbert's cryptodev tree and move
->> this to arch/arm/crypto/Kconfig?
->
-> Thanks for the comments, I will submit a second version once we have
-> a clarification on the license.
->
+great.
+so i'll drop the relevant wlcore_spi platform data code, and rebase
+the patches on top of v4.0-rc4 (probably tomorrow).
 
-I have tested your code with a Thumb2 kernel. With this patch folded,
-it builds and passes the tcrypt.ko test for me
-
---- a/arch/arm/crypto/sha256-armv7-neon.S
-+++ b/arch/arm/crypto/sha256-armv7-neon.S
-@@ -10,7 +10,6 @@
- #include <linux/linkage.h>
-
- .text
--.code   32
- .fpu neon
-
- .type  K256,%object
-@@ -44,15 +43,15 @@ ENTRY(sha256_transform_neon)
-         *      %r1: data
-         *      %r2: nblks
-         */
--       sub     r3,pc,#8                @ sha256_transform_neon
-        add     r2,r1,r2,lsl#6  @ len to point at the end of inp
-
-        stmdb   sp!,{r4-r12,lr}
-
-        mov     r12,sp
--       sub     sp,sp,#16*4+16          @ alloca
--       sub     r14,r3,#256+32  @ K256
--       bic     sp,sp,#15               @ align for 128-bit stores
-+       sub     r14,sp,#16*4+16         @ alloca
-+       bic     r14,r14,#15             @ align for 128-bit stores
-+       mov     sp,r14
-+       adr     r14,K256
-
-        vld1.8          {q0},[r1]!
-        vld1.8          {q1},[r1]!
+Eliad.
