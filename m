@@ -1,35 +1,43 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 18 Mar 2015 01:33:12 +0900
-Subject: [PATCH] ARM: dts: Update lid and power pin-functions for
- exynos5250-spring
-In-Reply-To: <5506EEBA.6050509@suse.de>
-References: <1424276245-7028-1-git-send-email-afaerber@suse.de>
- <54E5CDB7.6050002@collabora.co.uk> <5506EEBA.6050509@suse.de>
-Message-ID: <55085748.8050905@kernel.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 17 Mar 2015 17:33:54 +0100
+Subject: [PATCH] ARM: mvebu: Conform L2CC node with ePAPR specification by
+ adding cache-level
+Message-ID: <1426610034-4204-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/15 23:54, Andreas F?rber wrote:
-> Kukjin,
-> 
-> Am 19.02.2015 um 12:49 schrieb Javier Martinez Canillas:
->> Hello Andreas,
->>
->> On 02/18/2015 05:17 PM, Andreas F?rber wrote:
->>> Configure the pins in external interrupt mode, as done for Snow in
->>> e5e5c6d14e39 ("ARM: dts: Add power and lid GPIO keys pinctrl for
->>> exynos5250-snow").
->>>
->>> Reported-by: Kukjin Kim <kgene@kernel.org>
->>> Suggested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->>> Fixes: 53dd4138bb0a ("ARM: dts: Add exynos5250-spring device tree")
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> Ping?
-> 
-Thanks, applied.
+For L2 cache controller node, cache-level property is mandatory. Let's
+add it to Armada 370 and Armada XP device tree.
 
-- Kukjin
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370.dtsi | 1 +
+ arch/arm/boot/dts/armada-xp.dtsi  | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index 27397f151def..b38bfa03d3bf 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -129,6 +129,7 @@
+ 				compatible = "marvell,aurora-outer-cache";
+ 				reg = <0x08000 0x1000>;
+ 				cache-id-part = <0x100>;
++				cache-level = <2>;
+ 				cache-unified;
+ 				wt-override;
+ 			};
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 82917236a2fb..9806046dde1e 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -78,6 +78,7 @@
+ 				compatible = "marvell,aurora-system-cache";
+ 				reg = <0x08000 0x1000>;
+ 				cache-id-part = <0x100>;
++				cache-level = <2>;
+ 				cache-unified;
+ 				wt-override;
+ 			};
+-- 
+2.1.0
