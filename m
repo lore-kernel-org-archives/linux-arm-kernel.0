@@ -1,26 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Mar 2015 17:29:30 +0000
-Subject: [PATCH 2/5] ARM: Add Broadcom Brahma-B15 readahead cache support
-In-Reply-To: <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
-References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
- <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150317172930.GY8399@arm.com>
+Date: Tue, 17 Mar 2015 17:31:11 +0000
+Subject: [PATCH 0/6] make memtest a generic kernel feature
+In-Reply-To: <5508625F.6060600@arm.com>
+References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
+ <20150317171822.GW8399@arm.com> <5508625F.6060600@arm.com>
+Message-ID: <20150317173111.GA8399@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 07, 2015 at 12:54:50AM +0000, Florian Fainelli wrote:
-> This patch adds support for the Broadcom Brahma-B15 CPU readahead cache
-> controller. This cache controller sits between the L2 and the memory bus
-> and its purpose is to provide a friendler burst size towards the DDR
-> interface than the native cache line size.
+On Tue, Mar 17, 2015 at 05:20:31PM +0000, Vladimir Murzin wrote:
+> On 17/03/15 17:18, Will Deacon wrote:
+> > On Mon, Mar 09, 2015 at 10:27:04AM +0000, Vladimir Murzin wrote:
+> >> Memtest is a simple feature which fills the memory with a given set of
+> >> patterns and validates memory contents, if bad memory regions is detected it
+> >> reserves them via memblock API. Since memblock API is widely used by other
+> >> architectures this feature can be enabled outside of x86 world.
+> >>
+> >> This patch set promotes memtest to live under generic mm umbrella and enables
+> >> memtest feature for arm/arm64.
+> >>
+> >> It was reported that this patch set was useful for tracking down an issue with
+> >> some errant DMA on an arm64 platform.
+> >>
+> >> Since it touches x86 and mm bits it'd be great to get ACK/NAK for these bits.
+> > 
+> > Is your intention for akpm to merge this? I don't mind how it goes upstream,
+> > but that seems like a sensible route to me.
+> > 
 > 
-> The readahead cache is mostly transparent, except for
-> flush_kern_cache_all, flush_kern_cache_louis and flush_icache_all, which
-> is precisely what we are overriding here.
+> It is already in -mm tree.
 
-I'm struggling to understand why you care about flush_kern_cache_louis
-and flush_icache_all for a cache that sits the other side of the L2.
-
-Can you explain why we need to do anything in these cases, please?
+Cracking, I missed the memo somehow.
 
 Will
