@@ -1,80 +1,101 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Tue, 17 Mar 2015 16:51:10 -0500
-Subject: [PATCH 3/4] ARM: DT: msm8660: Add ADM device nodes
-In-Reply-To: <1426629071-3541-1-git-send-email-agross@codeaurora.org>
-References: <1426629071-3541-1-git-send-email-agross@codeaurora.org>
-Message-ID: <1426629071-3541-4-git-send-email-agross@codeaurora.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 17 Mar 2015 16:33:41 -0600
+Subject: [PATCH v16 01/11] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
+References: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1426631631-56937-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the ADM DMA on the MSM8660 SOC
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
+Some architectures have some cpus which does not support idle states or
+may be ready to do idle states only when the platform dependencies are
+probed.
+
+Let the underlying low level code return -ENOSYS when it is not possible
+to set an idle state at this time.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+[Minor clean ups]
 ---
- arch/arm/boot/dts/qcom-msm8660.dtsi |   42 +++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ drivers/cpuidle/cpuidle-arm.c | 39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 0affd61..8043c12 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -4,7 +4,9 @@
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 1c94b88..e176469 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -17,6 +17,9 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/slab.h>
++#include <linux/device.h>
++#include <linux/cpu.h>
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/qcom,gcc-msm8660.h>
-+#include <dt-bindings/reset/qcom,gcc-msm8660.h>
- #include <dt-bindings/soc/qcom,gsbi.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <asm/cpuidle.h>
  
- / {
- 	model = "Qualcomm MSM8660";
-@@ -196,6 +198,46 @@
- 				vmmc-supply = <&vsdcc_fixed>;
- 			};
- 		};
-+
-+		adm_dma0: dma at 18320000 {
-+			compatible = "qcom,adm";
-+			reg = <0x18320000 0x100000>;
-+			interrupts = <GIC_SPI 171 IRQ_TYPE_NONE>;
-+			#dma-cells = <1>;
-+
-+			clocks = <&gcc ADM0_CLK>, <&gcc ADM0_PBUS_CLK>;
-+			clock-names = "core", "iface";
-+
-+			resets = <&gcc ADM0_RESET>,
-+				 <&gcc ADM0_PBUS_RESET>,
-+				 <&gcc ADM0_C0_RESET>,
-+				 <&gcc ADM0_C1_RESET>,
-+				 <&gcc ADM0_C2_RESET>;
-+			reset-names = "clk", "pbus", "c0", "c1", "c2";
-+			qcom,ee = <1>;
-+
-+			status = "disabled";
-+		};
-+
-+		adm_dma1: dma at 18420000 {
-+			compatible = "qcom,adm";
-+			reg = <0x18420000 0xE0000>;
-+			interrupts = <GIC_SPI 167 IRQ_TYPE_NONE>;
-+			#dma-cells = <1>;
-+
-+			clocks = <&gcc ADM1_CLK>, <&gcc ADM1_PBUS_CLK>;
-+			clock-names = "core", "iface";
-+
-+			resets = <&gcc ADM1_RESET>,
-+				 <&gcc ADM1_PBUS_RESET>,
-+				 <&gcc ADM1_C0_RESET>,
-+				 <&gcc ADM1_C1_RESET>,
-+				 <&gcc ADM1_C2_RESET>;
-+			reset-names = "clk", "pbus", "c0", "c1", "c2";
-+			qcom,ee = <1>;
-+
-+			status = "disabled";
-+		};
- 	};
+@@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
+ static int __init arm_idle_init(void)
+ {
+ 	int cpu, ret;
++	struct cpuidle_device *dev;
+ 	struct cpuidle_driver *drv = &arm_idle_driver;
  
- };
+ 	/*
+@@ -105,18 +109,49 @@ static int __init arm_idle_init(void)
+ 	if (ret <= 0)
+ 		return ret ? : -ENODEV;
+ 
++
++	ret = cpuidle_register_driver(drv);
++	if (ret) {
++		pr_err("Failed to register cpuidle driver\n");
++		return ret;
++	}
++
+ 	/*
+ 	 * Call arch CPU operations in order to initialize
+ 	 * idle states suspend back-end specific data
+ 	 */
+ 	for_each_possible_cpu(cpu) {
+ 		ret = arm_cpuidle_init(cpu);
++
++		/*
++		 * -ENOSYS: Either the platform driver shall register
++		 * a cpuidle device for this cpu, or there are no
++		 * supported idle states.
++		 */
++		if (ret == -ENOSYS)
++			continue;
++
+ 		if (ret) {
+-			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
++			pr_err("CPU %d failed to init idle CPU ops, err=%d\n",
++					cpu, ret);
+ 			return ret;
+ 		}
++
++		dev = devm_kzalloc(get_cpu_device(cpu), sizeof(*dev),
++				GFP_KERNEL);
++		if (!dev)
++			return -ENOMEM;
++
++		dev->cpu = cpu;
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("Failed to register cpuidle device for CPU %d, err=%d\n",
++			       cpu, ret);
++			kfree(dev);
++			continue;
++		}
+ 	}
+ 
+-	return cpuidle_register(drv, NULL);
++	return ret;
+ }
+ device_initcall(arm_idle_init);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+2.1.0
