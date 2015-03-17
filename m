@@ -1,140 +1,92 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 17 Mar 2015 01:32:21 -0700
-Subject: [PATCHv2 1/3] amba: tegra-ahb: fix register offsets in the macros
-In-Reply-To: <20150317083221.32662.14647.stgit@baseline>
-References: <20150317083221.32662.14647.stgit@baseline>
-Message-ID: <20150317083221.32662.81507.stgit@baseline>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Mar 2015 16:45:29 +0800
+Subject: sunxi: cpufreq-dt usage causes schedule_delayed_work to execute
+ sooner?
+In-Reply-To: <20150317083716.GD4638@lukather>
+References: <55073A9E.3070600@redhat.com>
+ <CAGb2v66V0rOpz+GgdOSb52NZGgb36OcXCTpHV2SOyKT3QmQ1JQ@mail.gmail.com>
+ <20150317083716.GD4638@lukather>
+Message-ID: <CAGb2v67P7sLoedBvo9gekj9B38UjjmxwsZU4WM+oDMRDeB=UYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From a hardware SoC integration point of view, the offsets of the
-Tegra AHB registers that are currently defined in tegra-ahb.c macros
-are all off by four bytes.  Similarly, the starting address of this IP
-block in our existing DT files is also off by four bytes.  Since we
-attempt to make old DT files forward-compatible with newer kernels, we
-cannot fix the IP block base address in old DT data.  However, we can
-fix the offsets in the driver so that they are correct with respect to
-the hardware, which is what this patch does.  And a subsequent patch
-will allow the offset to be removed for DT 'compatible' strings used
-in future DT files for newer Tegra chips that the kernel does not yet
-support.
+On Tue, Mar 17, 2015 at 4:37 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Mar 17, 2015 at 10:39:04AM +0800, Chen-Yu Tsai wrote:
+>> Hi Hans,
+>>
+>> On Tue, Mar 17, 2015 at 4:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> > Hi ChenYu, Maxime,
+>> >
+>> > For the sunxi musb code I've been writing uses schedule_delayed_work in a
+>> > few places,
+>> > while looking at debugging printk-s in dmesg I noticed that the time stamps
+>> > between
+>> > scheduling the work and executing it are of.
+>> >
+>> > If I build a kernel without cpufreq-dt or do:
+>> >
+>> > echo performance > scaling_governor
+>> >
+>> > The problem goes away.
+>> >
+>> > I've done some debugging and the problem is not the actual timing of the
+>> > code, the timestamps in the dmesg output are wrong, very wrong even
+>> > here are 2 messages where I plugged in a cable, then waited 10 seconds
+>> > using a clock with a second hand to count them of, then unplugged:
+>> >
+>> >
+>> > [  635.006201] musb vbus 0 -> 1
+>> > [  637.877098] musb vbus 1 -> 0
+>> >
+>> > This is after doing:
+>> >
+>> > echo powersave > scaling_governor
+>> >
+>> > So it seems that the clocksource used by printk to generate timestamps
+>> > goes slower as we scale down cpufreq, not good (tm).
+>> >
+>> > This:
+>> >
+>> > [root at localhost clocksource0]# cat available_clocksource
+>> > arch_sys_counter timer hstimer
+>> > [root at localhost clocksource0]# echo timer > current_clocksource
+>> > [  725.728887] Switched to clocksource timer
+>> >
+>> > Does not help.
+>> >
+>> > I believe that the "sched_clock_register(sun5i_timer_sched_read, 32, rate);"
+>> > call in drivers/clocksource/timer-sun5i.c is the culprit, it seems this ends
+>> > up overriding the sched_clock_register call in
+>> > drivers/clocksource/arm_arch_timer.c which likely does not suffer from
+>> > cpufreq
+>> > issues, and is faster (part of the cpucore) then using the hstimer anyways.
+>> >
+>> > Note I've not tested yet if disabling the hstimer fixes things, but I
+>> > believe
+>> > it will. Note that the hstimer will likewise be a bad clockevent source too,
+>> > this can be fixed by registering a cpufreq notifier and calling
+>> > clockevents_update_freq
+>> > whenever the cpufreq, and thus the hstimer clkrate changes.
+>> >
+>> > Alternatively we could simply remove the driver altogether since the kernel
+>> > prefers the sun4i_tick eventsource anyways.
+>>
+>> Maxime has a series of patches to fix this:
+>>
+>>     https://lkml.org/lkml/2015/1/11/52
+>>
+>> Another thing we could do is mux AHB to PLL6 on sun5+i.
+>> I have a clock driver patch somewhere...
+>
+> That wouldn't really fix things.
+>
+> If we reparent the clock during the boot, it will very likely be after
+> the timer has been registered. The slowdown won't be dynamic depending
+> on the cpu frequency, but it would still be there.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Paul Walmsley <pwalmsley@nvidia.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Hiroshi DOYU <hdoyu@nvidia.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-kernel at vger.kernel.org
----
- drivers/amba/tegra-ahb.c |   63 +++++++++++++++++++++++-----------------------
- 1 file changed, 32 insertions(+), 31 deletions(-)
+Not if we reparent as part of the clock register process, using
+the "assigned clock parents and rates" bindings. Though I think
+someone was against that.
 
-diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-index c6dc354..30759a5 100644
---- a/drivers/amba/tegra-ahb.c
-+++ b/drivers/amba/tegra-ahb.c
-@@ -25,49 +25,50 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/of.h>
- 
- #include <soc/tegra/ahb.h>
- 
- #define DRV_NAME "tegra-ahb"
- 
--#define AHB_ARBITRATION_DISABLE		0x00
--#define AHB_ARBITRATION_PRIORITY_CTRL	0x04
-+#define AHB_ARBITRATION_DISABLE		0x04
-+#define AHB_ARBITRATION_PRIORITY_CTRL	0x08
- #define   AHB_PRIORITY_WEIGHT(x)	(((x) & 0x7) << 29)
- #define   PRIORITY_SELECT_USB BIT(6)
- #define   PRIORITY_SELECT_USB2 BIT(18)
- #define   PRIORITY_SELECT_USB3 BIT(17)
- 
--#define AHB_GIZMO_AHB_MEM		0x0c
-+#define AHB_GIZMO_AHB_MEM		0x10
- #define   ENB_FAST_REARBITRATE BIT(2)
- #define   DONT_SPLIT_AHB_WR     BIT(7)
- 
--#define AHB_GIZMO_APB_DMA		0x10
--#define AHB_GIZMO_IDE			0x18
--#define AHB_GIZMO_USB			0x1c
--#define AHB_GIZMO_AHB_XBAR_BRIDGE	0x20
--#define AHB_GIZMO_CPU_AHB_BRIDGE	0x24
--#define AHB_GIZMO_COP_AHB_BRIDGE	0x28
--#define AHB_GIZMO_XBAR_APB_CTLR		0x2c
--#define AHB_GIZMO_VCP_AHB_BRIDGE	0x30
--#define AHB_GIZMO_NAND			0x3c
--#define AHB_GIZMO_SDMMC4		0x44
--#define AHB_GIZMO_XIO			0x48
--#define AHB_GIZMO_BSEV			0x60
--#define AHB_GIZMO_BSEA			0x70
--#define AHB_GIZMO_NOR			0x74
--#define AHB_GIZMO_USB2			0x78
--#define AHB_GIZMO_USB3			0x7c
-+#define AHB_GIZMO_APB_DMA		0x14
-+#define AHB_GIZMO_IDE			0x1c
-+#define AHB_GIZMO_USB			0x20
-+#define AHB_GIZMO_AHB_XBAR_BRIDGE	0x24
-+#define AHB_GIZMO_CPU_AHB_BRIDGE	0x28
-+#define AHB_GIZMO_COP_AHB_BRIDGE	0x2c
-+#define AHB_GIZMO_XBAR_APB_CTLR		0x30
-+#define AHB_GIZMO_VCP_AHB_BRIDGE	0x34
-+#define AHB_GIZMO_NAND			0x40
-+#define AHB_GIZMO_SDMMC4		0x48
-+#define AHB_GIZMO_XIO			0x4c
-+#define AHB_GIZMO_BSEV			0x64
-+#define AHB_GIZMO_BSEA			0x74
-+#define AHB_GIZMO_NOR			0x78
-+#define AHB_GIZMO_USB2			0x7c
-+#define AHB_GIZMO_USB3			0x80
- #define   IMMEDIATE	BIT(18)
- 
--#define AHB_GIZMO_SDMMC1		0x80
--#define AHB_GIZMO_SDMMC2		0x84
--#define AHB_GIZMO_SDMMC3		0x88
--#define AHB_MEM_PREFETCH_CFG_X		0xd8
--#define AHB_ARBITRATION_XBAR_CTRL	0xdc
--#define AHB_MEM_PREFETCH_CFG3		0xe0
--#define AHB_MEM_PREFETCH_CFG4		0xe4
--#define AHB_MEM_PREFETCH_CFG1		0xec
--#define AHB_MEM_PREFETCH_CFG2		0xf0
-+#define AHB_GIZMO_SDMMC1		0x84
-+#define AHB_GIZMO_SDMMC2		0x88
-+#define AHB_GIZMO_SDMMC3		0x8c
-+#define AHB_MEM_PREFETCH_CFG_X		0xdc
-+#define AHB_ARBITRATION_XBAR_CTRL	0xe0
-+#define AHB_MEM_PREFETCH_CFG3		0xe4
-+#define AHB_MEM_PREFETCH_CFG4		0xe8
-+#define AHB_MEM_PREFETCH_CFG1		0xf0
-+#define AHB_MEM_PREFETCH_CFG2		0xf4
- #define   PREFETCH_ENB	BIT(31)
- #define   MST_ID(x)	(((x) & 0x1f) << 26)
- #define   AHBDMA_MST_ID	MST_ID(5)
-@@ -77,7 +78,7 @@
- #define   ADDR_BNDRY(x)	(((x) & 0xf) << 21)
- #define   INACTIVITY_TIMEOUT(x)	(((x) & 0xffff) << 0)
- 
--#define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xf8
-+#define AHB_ARBITRATION_AHB_MEM_WRQUE_MST_ID	0xfc
- 
- #define AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE BIT(17)
- 
-@@ -123,12 +124,12 @@ struct tegra_ahb {
- 
- static inline u32 gizmo_readl(struct tegra_ahb *ahb, u32 offset)
- {
--	return readl(ahb->regs + offset);
-+	return readl(ahb->regs - 4 + offset);
- }
- 
- static inline void gizmo_writel(struct tegra_ahb *ahb, u32 value, u32 offset)
- {
--	writel(value, ahb->regs + offset);
-+	writel(value, ahb->regs - 4 + offset);
- }
- 
- #ifdef CONFIG_TEGRA_IOMMU_SMMU
+ChenYu
