@@ -1,81 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 16 Mar 2015 19:28:59 -0500
-Subject: [PATCH 05/10] dt-bindings: add Marvell PMU documentation
-In-Reply-To: <E1YWSNA-0006G9-Rr@rmk-PC.arm.linux.org.uk>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <E1YWSNA-0006G9-Rr@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAL_JsqLYjp+q0F6cpKrWy4H7pm+xkVwnSjbqeGrX=OLFTGmDtg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 Mar 2015 17:25:08 -0700
+Subject: [PATCH 0/3] Remove few inactive omap3 legacy board-*.c files
+Message-ID: <1426551911-17356-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 11:23 AM, Russell King
-<rmk+kernel@arm.linux.org.uk> wrote:
-> Add the required DT binding documentation for the Marvell PMU driver.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi all,
 
-Acked-by: Rob Herring <robh@kernel.org>
+I'm hoping to get the status of the remaining omap3 legacy board-*.c
+files into a known state.
 
-> ---
->  Documentation/devicetree/bindings/soc/dove/pmu.txt | 49 ++++++++++++++++++++++
->  1 file changed, 49 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/dove/pmu.txt
->
-> diff --git a/Documentation/devicetree/bindings/soc/dove/pmu.txt b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> new file mode 100644
-> index 000000000000..25d988e7ec35
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> @@ -0,0 +1,49 @@
-> +Device Tree bindings for Marvell PMU
-> +
-> +Required properties:
-> + - compatible: value should be "marvell,dove-pmu".
-> + - reg: two base addresses and sizes of the PM controller and PMU.
-> + - interrupts: single interrupt number for the PMU interrupt
-> + - interrupt-controller: must be specified as the PMU itself is an
-> +    interrupt controller.
-> + - #interrupt-cells: must be 1.
-> + - #reset-cells: must be 1.
-> +
-> +Optional properties:
-> + - None
-> +
-> +Power domain descriptions are listed as child nodes of the power management
-> +node.  Each domain has the following properties:
-> +
-> +Required properties:
-> + - #power-domain-cells: must be 0.
-> +
-> +Optional properties:
-> + - marvell,pmu_pwr_mask: specifies the mask value for PMU power register
-> + - marvell,pmu_iso_mask: specifies the mask value for PMU isolation register
-> + - resets: points to the reset manager (PMU node) and reset index.
-> +
-> +Example:
-> +
-> +       pmu: power-management at d0000 {
-> +               compatible = "marvell,dove-pmu";
-> +               reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
-> +               interrupts = <33>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               #reset-cells = <1>;
-> +
-> +               vpu_domain: vpu-domain {
-> +                       #power-domain-cells = <0>;
-> +                       marvell,pmu_pwr_mask = <0x00000008>;
-> +                       marvell,pmu_iso_mask = <0x00000001>;
-> +                       resets = <&pmu 16>;
-> +               };
-> +
-> +               gpu_domain: gpu-domain {
-> +                       #power-domain-cells = <0>;
-> +                       marvell,pmu_pwr_mask = <0x00000004>;
-> +                       marvell,pmu_iso_mask = <0x00000002>;
-> +                       resets = <&pmu 18>;
-> +               };
-> +       };
-> --
-> 1.8.3.1
->
+And I figured the best way to do that is by removing few of them that
+I think are all inactive. If you are using these, please yell now!
+
+The reason for trying to remove them now is that I don't want any
+suprises with missing .dts files later on when we remove the
+remaining omap3 legacy booting support.
+
+For now, we can just simply revert these patches as needed until we
+have the related .dts files done. After we've dropped the remaining
+omap3 legacy booting support in a few merge cycles, reverting will
+be much harder.
+
+Regards,
+
+Tony
+
+
+Tony Lindgren (3):
+  ARM: OMAP3: Remove legacy support for EMA-Tech Stalker board
+  ARM: OMAP3: Remove legacy support for devkit8000
+  ARM: OMAP2+: Remove legacy support for omap3 TouchBook
+
+ arch/arm/mach-omap2/Kconfig                |  18 -
+ arch/arm/mach-omap2/Makefile               |   4 -
+ arch/arm/mach-omap2/board-devkit8000.c     | 654 -----------------------------
+ arch/arm/mach-omap2/board-omap3stalker.c   | 433 -------------------
+ arch/arm/mach-omap2/board-omap3touchbook.c | 395 -----------------
+ 5 files changed, 1504 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-devkit8000.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3stalker.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3touchbook.c
+
+-- 
+2.1.4
