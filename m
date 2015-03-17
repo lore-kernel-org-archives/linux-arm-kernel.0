@@ -1,21 +1,31 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 17 Mar 2015 20:32:35 +0300
-Subject: [PATCH] rtc: at91rm9200: double locking bug in
- at91_rtc_interrupt()
-In-Reply-To: <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20150315104837.GC20691@mwanda>
- <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150317173235.GM10964@mwanda>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Mar 2015 10:32:44 -0700
+Subject: [PATCH 3/3] ARM: omap2plus_defconfig: Enable n900 modem as
+ loadable modules
+In-Reply-To: <20150317110000.GA1115@earth>
+References: <1426536003-7077-1-git-send-email-tony@atomide.com>
+ <1426536003-7077-4-git-send-email-tony@atomide.com>
+ <20150317110000.GA1115@earth>
+Message-ID: <20150317173243.GF31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 04:38:10PM +0100, Nicolas Ferre wrote:
-> Reported-also-by: David Dueck <davidcdueck@googlemail.com>
+* Sebastian Reichel <sre@kernel.org> [150317 04:00]:
+> Hi Tony,
+> 
+> On Mon, Mar 16, 2015 at 01:00:03PM -0700, Tony Lindgren wrote:
+> > Enable n900 modem as loadable modules.
+> 
+> Acked-By: Sebastian Reichel <sre@kernel.org>
+> 
+> > [...]
+> > +CONFIG_HSI_CHAR=m
+> > [...]
+> 
+> I think this one should be disabled by default. It's only needed by
+> very few people (it exposes the hsi bus to userspace, like i2c-dev
+> driver does for i2c).
 
-The point of tags is that you collect them by doing:
-`git log | grep Reported-by: | sort | uniq -c | sort -rn` to see if you
-are the winner.  It gives me an unfair advantage if you get creative
-with David's tag.
+OK will disable thanks.
 
-regards,
-dan carpenter
+Tony
