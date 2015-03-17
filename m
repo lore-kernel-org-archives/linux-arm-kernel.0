@@ -1,38 +1,27 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 18 Mar 2015 01:27:49 +0900
-Subject: [PATCH] ARM: dts: Update exynos5250-spring with mmc node changes
-In-Reply-To: <5506EEF9.7080100@suse.de>
-References: <1424275812-6797-1-git-send-email-afaerber@suse.de>
- <54E5CD2E.9070608@collabora.co.uk> <5506EEF9.7080100@suse.de>
-Message-ID: <55085605.2000001@kernel.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Mar 2015 16:28:31 +0000
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+ <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
+ <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
+Message-ID: <20150317162831.GB8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16/15 23:55, Andreas F?rber wrote:
-> Am 19.02.2015 um 12:46 schrieb Javier Martinez Canillas:
->> Hello Andreas,
->>
-Hi,
+On Tue, Mar 17, 2015 at 05:20:01PM +0100, Geert Uytterhoeven wrote:
+> DEBUG_LL=y may help you here. It's easier than doing a post-mortem analysis
+> on __log_buf from U-Boot.
+> As we still have anti-social platforms, you best remove all non-SCIF default
+> addresses from the DEBUG_UART_PHYS section in arch/arm/Kconfig.debug though.
 
->> On 02/18/2015 05:10 PM, Andreas F?rber wrote:
->>> Resolve a merge conflict with mmc refactoring aaa25a5a33cb ("ARM: dts:
->>> unuse the slot-node and deprecate the supports-highspeed for dw-mmc in
->>> exynos") by dropping the slot at 0 nodes, moving its bus-width property to
->>> the mmc node and replacing supports-highspeed with cap-{mmc,sd}-highspeed,
->>> matching exynos5250-snow.
->>>
->>> Cc: Jaehoon Chung <jh80.chung@samsung.com>
->>> Fixes: 53dd4138bb0a ("ARM: dts: Add exynos5250-spring device tree")
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  arch/arm/boot/dts/exynos5250-spring.dts | 16 ++++------------
->>>  1 file changed, 4 insertions(+), 12 deletions(-)
->>>
->>
->> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> 
-> Ping!
-> 
-Thanks, applied with 'Cc: <stable@vger.kernel.org> [3.19+]'
+Or enter the appropriate address directly, which is what's intended in
+the long term.  Having zillions of defaults in Kconfig is not that much
+better from what we had before...
 
-- Kukjin
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
