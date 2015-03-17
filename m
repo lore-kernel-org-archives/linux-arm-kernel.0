@@ -1,77 +1,86 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Mar 2015 10:39:04 +0800
-Subject: sunxi: cpufreq-dt usage causes schedule_delayed_work to execute
- sooner?
-In-Reply-To: <55073A9E.3070600@redhat.com>
-References: <55073A9E.3070600@redhat.com>
-Message-ID: <CAGb2v66V0rOpz+GgdOSb52NZGgb36OcXCTpHV2SOyKT3QmQ1JQ@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 17 Mar 2015 10:36:47 +0800
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <3737028.Ib0fKlgSkd@vostro.rjw.lan>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <5704037.pUGdJ0Q9hF@vostro.rjw.lan> <55077E9D.50103@huawei.com>
+ <3737028.Ib0fKlgSkd@vostro.rjw.lan>
+Message-ID: <5507933F.2020203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On 2015/3/17 10:28, Rafael J. Wysocki wrote:
+> On Tuesday, March 17, 2015 09:08:45 AM Hanjun Guo wrote:
+>> On 2015/3/17 7:15, Rafael J. Wysocki wrote:
+>>> On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
+>>>> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
+>>>>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
+>> [...]
+>>>>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+>>>>>> index 074e52b..e8728d7 100644
+>>>>>> --- a/arch/ia64/Kconfig
+>>>>>> +++ b/arch/ia64/Kconfig
+>>>>>> @@ -10,6 +10,7 @@ config IA64
+>>>>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
+>>>>>>   	select PCI if (!IA64_HP_SIM)
+>>>>>>   	select ACPI if (!IA64_HP_SIM)
+>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
+>>>>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+>>>>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
+>>>>>>   	select HAVE_IDE
+>>>>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+>>>>>> index b7d31ca..9804431 100644
+>>>>>> --- a/arch/x86/Kconfig
+>>>>>> +++ b/arch/x86/Kconfig
+>>>>>> @@ -22,6 +22,7 @@ config X86_64
+>>>>>>   ### Arch settings
+>>>>>>   config X86
+>>>>>>   	def_bool y
+>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
+>>>>> One more nit.  If you did
+>>>>>
+>>>>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+>>>>>
+>>>>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
+>>>>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+>>>> In sleep.c,
+>>>>
+>>>> #ifdef CONFIG_ACPI_SLEEP
+>>>> acpi_target_system_state()
+>>>> {
+>>>> }
+>>>> #endif
+>>>>
+>>>> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
+>>>> which one of them will be enabled on ARM64 so ACPI_SLEEP
+>>>> will also enabled too.
+>>>>
+>>>> So if we
+>>>>
+>>>> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+>>>>
+>>>> and
+>>>>
+>>>> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+>>>>
+>>>> it will lead to errors for acpi_target_system_state() that
+>>>> is declared but not defined, so I will keep the code as
+>>>> it is, what do you think?
+>>> No, we need to hash this out.  Having two different Kconfig options meaning
+>>> almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
+>>>
+>>> Do you need ACPI_SLEEP on ARM64 at all?
+>> No, at least for now we don't need it, the spec for sleep is not ready for
+>> ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
+> Well, so what about selecting ACPI_SLEEP from the architectures that use it?
 
-On Tue, Mar 17, 2015 at 4:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> Hi ChenYu, Maxime,
->
-> For the sunxi musb code I've been writing uses schedule_delayed_work in a
-> few places,
-> while looking at debugging printk-s in dmesg I noticed that the time stamps
-> between
-> scheduling the work and executing it are of.
->
-> If I build a kernel without cpufreq-dt or do:
->
-> echo performance > scaling_governor
->
-> The problem goes away.
->
-> I've done some debugging and the problem is not the actual timing of the
-> code, the timestamps in the dmesg output are wrong, very wrong even
-> here are 2 messages where I plugged in a cable, then waited 10 seconds
-> using a clock with a second hand to count them of, then unplugged:
->
->
-> [  635.006201] musb vbus 0 -> 1
-> [  637.877098] musb vbus 1 -> 0
->
-> This is after doing:
->
-> echo powersave > scaling_governor
->
-> So it seems that the clocksource used by printk to generate timestamps
-> goes slower as we scale down cpufreq, not good (tm).
->
-> This:
->
-> [root at localhost clocksource0]# cat available_clocksource
-> arch_sys_counter timer hstimer
-> [root at localhost clocksource0]# echo timer > current_clocksource
-> [  725.728887] Switched to clocksource timer
->
-> Does not help.
->
-> I believe that the "sched_clock_register(sun5i_timer_sched_read, 32, rate);"
-> call in drivers/clocksource/timer-sun5i.c is the culprit, it seems this ends
-> up overriding the sched_clock_register call in
-> drivers/clocksource/arm_arch_timer.c which likely does not suffer from
-> cpufreq
-> issues, and is faster (part of the cpucore) then using the hstimer anyways.
->
-> Note I've not tested yet if disabling the hstimer fixes things, but I
-> believe
-> it will. Note that the hstimer will likewise be a bad clockevent source too,
-> this can be fixed by registering a cpufreq notifier and calling
-> clockevents_update_freq
-> whenever the cpufreq, and thus the hstimer clkrate changes.
->
-> Alternatively we could simply remove the driver altogether since the kernel
-> prefers the sun4i_tick eventsource anyways.
+Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
 
-Maxime has a series of patches to fix this:
++acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
 
-    https://lkml.org/lkml/2015/1/11/52
+as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
+we doing so)?
 
-Another thing we could do is mux AHB to PLL6 on sun5+i.
-I have a clock driver patch somewhere...
-
-ChenYu
+Thanks
+Hanjun
