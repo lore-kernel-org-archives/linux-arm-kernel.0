@@ -1,71 +1,128 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 17 Mar 2015 10:19:50 +0900
-Subject: [PATCH] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-In-Reply-To: <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
-References: <1426493525-25502-1-git-send-email-tfiga@chromium.org>
- <alpine.DEB.2.10.1503161631290.20956@chino.kir.corp.google.com>
-Message-ID: <CAAFQd5CYRXYT_oCwNQdpoy+3B1n0a5qypieX1f+3TGGDZS+-bw@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
+Date: Tue, 17 Mar 2015 01:20:04 +0000
+Subject: [PATCH] ARM: dts: am437x-gp-evm: add DT nodes for ov2659 sensor
+In-Reply-To: <20150316221740.GQ12397@atomide.com>
+References: <1426203501-32115-1-git-send-email-prabhakar.csengg@gmail.com>
+ <20150316221740.GQ12397@atomide.com>
+Message-ID: <CA+V-a8uWqjze32ukOGonQAACByPmW6WDbpFrA9EFipnNJeD58A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Tony,
 
-On Tue, Mar 17, 2015 at 8:32 AM, David Rientjes <rientjes@google.com> wrote:
-> On Mon, 16 Mar 2015, Tomasz Figa wrote:
+On Mon, Mar 16, 2015 at 10:17 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Lad Prabhakar <prabhakar.csengg@gmail.com> [150312 16:38]:
+>> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
+>>
+>> this patch does the following:
+>> 1: adds DT node for fixed oscillator.
+>> 2: adds DT node entries for ov2659 sensor
+>> 3: adds remote-endpoint entry for VPFE.
+>>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 >
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index 83cd5ac..f081e9e 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -1145,18 +1145,31 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->>       }
+> Applying into omap-for-v4.1/dt thanks.
+>
+I would like to get this one in via media tree to avoid dependency
+as I am still waiting for Acks from DT maintainers for the sensor
+driver.
+
+If I can get your Ack on this I'll queue it up along with sensor
+driver via media tree.
+
+Cheers,
+--Prabhakar Lad
+
+> Tony
+>
+>> ---
+>>  Note this patch depends on
+>>  https://patchwork.kernel.org/patch/6000161/
 >>
->>       /*
->> -      * IOMMU can map any pages, so himem can also be used here
->> +      * IOMMU can map any pages, so himem can also be used here.
->> +      * We do not want OOM killer to be invoked as long as we can fall back
->> +      * to single pages, so we use __GFP_NORETRY for positive orders.
->>        */
->> -     gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
->> +     gfp |= __GFP_NOWARN | __GFP_HIGHMEM | __GFP_NORETRY;
+>>  arch/arm/boot/dts/am437x-gp-evm.dts | 42 +++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 40 insertions(+), 2 deletions(-)
 >>
->>       while (count) {
->> -             int j, order = __fls(count);
->> +             int j, order;
->>
->> -             pages[i] = alloc_pages(gfp, order);
->> -             while (!pages[i] && order)
->> -                     pages[i] = alloc_pages(gfp, --order);
->> -             if (!pages[i])
->> -                     goto error;
->> +             for (order = __fls(count); order; --order) {
->> +                     /* Will not trigger OOM. */
->> +                     pages[i] = alloc_pages(gfp, order);
->> +                     if (pages[i])
->> +                             break;
->> +             }
+>> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+>> index f84d971..195f452 100644
+>> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+>> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+>> @@ -106,6 +106,14 @@
+>>                       };
+>>               };
+>>       };
 >> +
->> +             if (!pages[i]) {
->> +                     /*
->> +                      * Fall back to single page allocation.
->> +                      * Might invoke OOM killer as last resort.
->> +                      */
->> +                     pages[i] = alloc_pages(gfp & ~__GFP_NORETRY, 0);
->> +                     if (!pages[i])
->> +                             goto error;
->> +             }
+>> +     /* fixed 12MHz oscillator */
+>> +     refclk: oscillator {
+>> +             #clock-cells = <0>;
+>> +             compatible = "fixed-clock";
+>> +             clock-frequency = <12000000>;
+>> +     };
+>> +
+>>  };
 >>
->>               if (order) {
->>                       split_page(pages[i], order);
->
-> I think this makes sense, but the problem is the unconditional setting and
-> clearing of __GFP_NORETRY.  Strictly speaking, gfp may already have
-> __GFP_NORETRY set when calling this function so it would be better to do
-> the loop with alloc_pages(gfp | __GFP_NORETRY, order) and then the
-> fallback as alloc_page(gfp).
-
-Good point. I'll change it to that in next version.
-
-Best regards,
-Tomasz
+>>  &am43xx_pinmux {
+>> @@ -404,6 +412,21 @@
+>>                       regulator-always-on;
+>>               };
+>>       };
+>> +
+>> +     ov2659 at 30 {
+>> +             compatible = "ovti,ov2659";
+>> +             reg = <0x30>;
+>> +
+>> +             clocks = <&refclk 0>;
+>> +             clock-names = "xvclk";
+>> +
+>> +             port {
+>> +                     ov2659_0: endpoint {
+>> +                             remote-endpoint = <&vpfe1_ep>;
+>> +                             link-frequencies = /bits/ 64 <70000000>;
+>> +                     };
+>> +             };
+>> +     };
+>>  };
+>>
+>>  &i2c1 {
+>> @@ -423,6 +446,21 @@
+>>               touchscreen-size-x = <1024>;
+>>               touchscreen-size-y = <600>;
+>>       };
+>> +
+>> +     ov2659 at 30 {
+>> +             compatible = "ovti,ov2659";
+>> +             reg = <0x30>;
+>> +
+>> +             clocks = <&refclk 0>;
+>> +             clock-names = "xvclk";
+>> +
+>> +             port {
+>> +                     ov2659_1: endpoint {
+>> +                             remote-endpoint = <&vpfe0_ep>;
+>> +                             link-frequencies = /bits/ 64 <70000000>;
+>> +                     };
+>> +             };
+>> +     };
+>>  };
+>>
+>>  &epwmss0 {
+>> @@ -626,7 +664,7 @@
+>>
+>>       port {
+>>               vpfe0_ep: endpoint {
+>> -                     /* remote-endpoint = <&sensor>; add once we have it */
+>> +                     remote-endpoint = <&ov2659_1>;
+>>                       ti,am437x-vpfe-interface = <0>;
+>>                       bus-width = <8>;
+>>                       hsync-active = <0>;
+>> @@ -643,7 +681,7 @@
+>>
+>>       port {
+>>               vpfe1_ep: endpoint {
+>> -                     /* remote-endpoint = <&sensor>; add once we have it */
+>> +                     remote-endpoint = <&ov2659_0>;
+>>                       ti,am437x-vpfe-interface = <0>;
+>>                       bus-width = <8>;
+>>                       hsync-active = <0>;
+>> --
+>> 2.1.0
+>>
