@@ -1,45 +1,44 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 17 Mar 2015 18:39:33 +0100
-Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <1426239683.5304.59.camel@x220>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
- <1426239683.5304.59.camel@x220>
-Message-ID: <CALszF6BdgwDQgK_mefCJm9zaDGAfhjh1GYCtJp4awgVb0Es4fA@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 17 Mar 2015 13:39:50 -0400
+Subject: [PATCH 1/3] arm64: merge __enable_mmu and __turn_mmu_on
+In-Reply-To: <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <550866E6.5050901@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-13 10:41 GMT+01:00 Paul Bolle <pebolle@tiscali.nl>:
-> Just a license nit, I'm afraid.
-Not a problem, it is not the last round anyway.
+On 03/17/2015 06:11 AM, Ard Biesheuvel wrote:
+> Enabling of the MMU is split into two functions, with an align and
+> a branch in the middle. On arm64, the entire kernel Image is ID mapped
+> so this is really not necessary, and we can just merge it into a
+> single function.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S | 30 ++++++++----------------------
+>  1 file changed, 8 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 65c7de889c8c..fb912314d5e1 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -615,8 +615,13 @@ ENDPROC(__secondary_switched)
+>  #endif	/* CONFIG_SMP */
+>  
+>  /*
+> - * Setup common bits before finally enabling the MMU. Essentially this is just
+> - * loading the page table pointer and vector base registers.
+> + * Enable the MMU. This completely changes the structure of the visible memory
+> + * space. You will not be able to trace execution through this.
 
->
-> On Thu, 2015-03-12 at 22:55 +0100, Maxime Coquelin wrote:
->> --- /dev/null
->> +++ b/drivers/tty/serial/stm32-usart.c
->> @@ -0,0 +1,695 @@
->> +/*
->> + * Copyright (C) Maxime Coquelin 2015
->> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
->> + * License terms:  GNU General Public License (GPL), version 2
->> + *
->> + * Inspired by st-asc.c from STMicroelectronics (c)
->> + */
->
-> This states the license is GPL v2.
->
->> +MODULE_LICENSE("GPL");
->
-> And
->     MODULE_LICENSE("GPL v2");
->
-> would match that statement.
+I don't understand the last sentence. I recall being able to read and
+eventually understand simulator instruction traces of this code. Is the
+sentence referring to the Embedded Trace Macrocell or something?
 
-Right, it will be fixed in the v4.
+Chris
 
-Thanks,
-Maxime
->
->
-> Paul Bolle
->
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
