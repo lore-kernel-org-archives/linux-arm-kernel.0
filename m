@@ -1,74 +1,47 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Tue, 17 Mar 2015 12:48:33 +0200
-Subject: [PATCH v2 1/3] ARM: dts: qcom: Add SPMI PMIC Arbiter nodes for
- APQ8084 and MSM8974
-In-Reply-To: <1426589315-16847-1-git-send-email-iivanov@mm-sol.com>
-References: <1426589315-16847-1-git-send-email-iivanov@mm-sol.com>
-Message-ID: <1426589315-16847-2-git-send-email-iivanov@mm-sol.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Mar 2015 11:50:42 +0100
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPMI PMIC Arbiter configuration nodes for APQ8084 and MSM8974.
+Hi Chris,
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Reviewed-by: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Ivan T. Ivanov <iivanov@mm-sol.com>
----
- arch/arm/boot/dts/qcom-apq8084.dtsi | 16 ++++++++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi | 16 ++++++++++++++++
- 2 files changed, 32 insertions(+)
+On Tue, Mar 17, 2015 at 4:48 AM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> I've been running XIP_KERNEL with linux-3.14 on a Renesas RZ/A1 (ARCH_R7S72100) for a while now (with some bug fixes of course) so I thought I'd see if my fixes should be pushed back upstream.
+>
+> However, I see that all the Renesas parts are being moved to ARCH_MULTIPLATFORM, which by means of arch/arm/Kconfig disallows XIP_KERNEL.
+>
+> Looking back through the mailing list archives I see that there was some discussion on this, but never really a conclusion.
+>
+> So my question is basically: What is the correct configuration to use XIP_KERNEL with a Renesas SoC? Is the idea that I need to go carve up my own config and do everything outside the normal tree from here on out?
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1f130bc..dbedf64 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -226,5 +226,21 @@
- 			clock-names = "core", "iface";
- 			status = "disabled";
- 		};
-+
-+		spmi_bus: spmi at fc4cf000 {
-+			compatible = "qcom,spmi-pmic-arb";
-+			reg-names = "core", "intr", "cnfg";
-+			reg = <0xfc4cf000 0x1000>,
-+			      <0xfc4cb000 0x1000>,
-+			      <0xfc4ca000 0x1000>;
-+			interrupt-names = "periph_irq";
-+			interrupts = <0 190 0>;
-+			qcom,ee = <0>;
-+			qcom,channel = <0>;
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+			interrupt-controller;
-+			#interrupt-cells = <4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec1..2d11641 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -247,5 +247,21 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 		};
-+
-+		spmi_bus: spmi at fc4cf000 {
-+			compatible = "qcom,spmi-pmic-arb";
-+			reg-names = "core", "intr", "cnfg";
-+			reg = <0xfc4cf000 0x1000>,
-+			      <0xfc4cb000 0x1000>,
-+			      <0xfc4ca000 0x1000>;
-+			interrupt-names = "periph_irq";
-+			interrupts = <0 190 0>;
-+			qcom,ee = <0>;
-+			qcom,channel = <0>;
-+			#address-cells = <2>;
-+			#size-cells = <0>;
-+			interrupt-controller;
-+			#interrupt-cells = <4>;
-+		};
- 	};
- };
+The issue you're facing is that ARCH_MULTIPLATFORM actually means two things:
+  1. Use modern infrastructure (e.g. DT, CCF, GPIOLIB, ...) instead of board
+     files with platform devices,
+  2. Allow to build a single kernel that supports multiple SoC families and/or
+     boards.
+
+The first thing is not incompatible with XIP_KERNEL (AFAIK), the second is
+(or rather, may be?).
+
+Perhaps ARCH_MULTIPLATFORM should be replaced by ARCH_ARM_NEWWORLD
+almost everywhere, and (new) ARCH_MULTIPLATFORM should be reserved
+(if needed at all) to protect features that are not compatible with running on
+multiple machines?
+
+Besides, I think a multi-platform XIP (or nommu) kernel is possible, as long
+as XIP_PHYS_ADDR (or PHYS_OFFSET) is suitable for all platforms included.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
 --
-1.9.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
