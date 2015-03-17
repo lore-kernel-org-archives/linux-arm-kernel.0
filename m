@@ -1,87 +1,141 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 17 Mar 2015 19:56:47 +0200
-Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <CALszF6BWuUYRh+3rWnSQLApkAHA5dQXw=6x6D_evRtb+5B_ukA@mail.gmail.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
- <CAHp75Vd7+oLiLLuyocYh95TebtocWrRho6xNjuSUt8fYGp8npg@mail.gmail.com>
- <CALszF6BWuUYRh+3rWnSQLApkAHA5dQXw=6x6D_evRtb+5B_ukA@mail.gmail.com>
-Message-ID: <CAHp75Vdf6=z1d5+eYJ+QGTko9kkZf-oPfoWaf8FRoTdqcdWxjw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 17 Mar 2015 18:02:41 +0000
+Subject: [PATCH 09/12] KVM: arm/arm64: prepare GICv2 emulation to be
+ handled by kvm_io_bus
+In-Reply-To: <20150314143044.GE10935@cbox>
+References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+ <1426263012-22935-10-git-send-email-andre.przywara@arm.com>
+ <20150314143044.GE10935@cbox>
+Message-ID: <55086C41.9070209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 7:32 PM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
-> 2015-03-13 15:19 GMT+01:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
+Hej,
 
->>> +static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
->>> +                           struct ktermios *old)
->>> +{
->>> +       unsigned int baud;
->>> +       u32 usardiv, mantissa, fraction;
->>> +       tcflag_t cflag;
->>> +       u32 cr1, cr2, cr3;
->>> +       unsigned long flags;
->>> +
->>> +       baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
->>> +       cflag = termios->c_cflag;
->>> +
->>> +       spin_lock_irqsave(&port->lock, flags);
->>> +
->>> +       /* Stop serial port and reset value */
->>> +       writel_relaxed(0, port->membase + USART_CR1);
->>> +
->>> +       cr1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE | USART_CR1_RXNEIE;
->>> +
->>> +       if (cflag & CSTOPB)
->>> +               cr2 = USART_CR2_STOP_2B;
->>> +
->>> +       if (cflag & PARENB) {
->>> +               cr1 |= USART_CR1_PCE;
->>> +               if ((cflag & CSIZE) == CS8)
->>> +                       cr1 |= USART_CR1_M;
->>> +       }
->>> +
->>> +       if (cflag & PARODD)
->>> +               cr1 |= USART_CR1_PS;
->>> +
->>> +       if (cflag & CRTSCTS)
->>> +               cr3 = USART_CR3_RTSE | USART_CR3_CTSE;
->>> +
->>> +       usardiv = (port->uartclk * 25) / (baud * 4);
->>> +       mantissa = (usardiv / 100) << USART_BRR_DIV_M_SHIFT;
->>> +       fraction = DIV_ROUND_CLOSEST((usardiv % 100) * 16, 100);
->>> +       if (fraction & ~USART_BRR_DIV_F_MASK) {
->>> +               fraction = 0;
->>> +               mantissa += (1 << USART_BRR_DIV_M_SHIFT);
->>> +       }
+On 14/03/15 14:30, Christoffer Dall wrote:
+> On Fri, Mar 13, 2015 at 04:10:09PM +0000, Andre Przywara wrote:
+>> Using the framework provided by the recent vgic.c changes we register
+>> a kvm_io_bus device when initializing the virtual GICv2.
 >>
->> So, it's a fractional divider. right? Could it be then fractional
->> divider clock in this first place (see
->> drivers/clk/clk-fractional-divider.c)?
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h      |    1 +
+>>  virt/kvm/arm/vgic-v2-emul.c |   13 +++++++++----
+>>  virt/kvm/arm/vgic.c         |   16 ++++++++++++++++
+>>  3 files changed, 26 insertions(+), 4 deletions(-)
 >>
->
-> I'm not sure it makes sense to represent this baudrate divider within
-> the UART IP as a clock.
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index 4bfc6a3..74a4ac4 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -245,6 +245,7 @@ struct vgic_dist {
+>>  	unsigned long		*irq_pending_on_cpu;
+>>  
+>>  	struct vgic_vm_ops	vm_ops;
+>> +	struct vgic_io_device	dist_iodev;
+>>  };
+>>  
+>>  struct vgic_v2_cpu_if {
+>> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+>> index 0defac6..6f685c9 100644
+>> --- a/virt/kvm/arm/vgic-v2-emul.c
+>> +++ b/virt/kvm/arm/vgic-v2-emul.c
+>> @@ -490,6 +490,7 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+>>  static int vgic_v2_map_resources(struct kvm *kvm,
+>>  				 const struct vgic_params *params)
+>>  {
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>>  	int ret = 0;
+>>  
+>>  	if (!irqchip_in_kernel(kvm))
+>> @@ -500,13 +501,17 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+>>  	if (vgic_ready(kvm))
+>>  		goto out;
+>>  
+>> -	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+>> -	    IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_cpu_base)) {
+>> +	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
+>> +	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
+>>  		kvm_err("Need to set vgic cpu and dist addresses first\n");
+>>  		ret = -ENXIO;
+>>  		goto out;
+>>  	}
+>>  
+>> +	vgic_register_kvm_io_dev(kvm, dist->vgic_dist_base,
+>> +				 KVM_VGIC_V2_DIST_SIZE,
+>> +				 vgic_dist_ranges, -1, &dist->dist_iodev);
+>> +
+>>  	/*
+>>  	 * Initialize the vgic if this hasn't already been done on demand by
+>>  	 * accessing the vgic state from userspace.
+>> @@ -517,7 +522,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+>>  		goto out;
+>>  	}
+>>  
+>> -	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
+>> +	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+>>  				    params->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
+>>  				    true);
+>>  	if (ret) {
+>> @@ -525,7 +530,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+>>  		goto out;
+>>  	}
+>>  
+>> -	kvm->arch.vgic.ready = true;
+>> +	dist->ready = true;
+>>  out:
+>>  	if (ret)
+>>  		kvm_vgic_destroy(kvm);
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 71389b8..b1dd717 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -908,6 +908,20 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
+>>  	return 0;
+>>  }
+>>  
+>> +static void vgic_unregister_kvm_io_dev(struct kvm *kvm)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +
+>> +	if (!dist || !kvm->buses[KVM_MMIO_BUS])
+>> +		return;
+>> +
+>> +	mutex_lock(&kvm->slots_lock);
+>> +	if (dist->dist_iodev.dev.ops)
+>> +		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+>> +					  &dist->dist_iodev.dev);
+> 
+> why are we only unregisttering the iodev when we have ops?
 
-You have it already. I mean it should be fractional divider clock.
+Because vgic_unregister_kvm_io_dev() is called by kvm_vgic_destroy(),
+which we call on some occasions during vgic_init() when we encounter an
+error. There is quite a window of cases where the kvm_io_bus devices
+haven't been registered yet, so we shouldn't try to unregister them at
+this place. Using the .ops parameter seemed like an elegant way to
+detect this case.
+Does that make sense? Or have I missed something?
 
-stm32port->clk = devm_clk_get(&pdev->dev, NULL);
-+
-+       if (WARN_ON(IS_ERR(stm32port->clk)))
-+               return -EINVAL;
-+
-+       /* ensure that clk rate is correct by enabling the clk */
-+       clk_prepare_enable(stm32port->clk);
-+       stm32port->port.uartclk = clk_get_rate(stm32port->clk);
+Cheers,
+Andre.
 
-> What would be the gain?
-
-Remove custom implementation of the calculations. It will be just one
-line to refresh the baud rate. I think we have a lot of duplicates
-here and there in the kernel. It would be nice not to bring another
-one.
-
--- 
-With Best Regards,
-Andy Shevchenko
+> 
+>> +	mutex_unlock(&kvm->slots_lock);
+>> +}
+>> +
+>>  static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+>>  {
+>>  	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+>> @@ -1546,6 +1560,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+>>  	struct kvm_vcpu *vcpu;
+>>  	int i;
+>>  
+>> +	vgic_unregister_kvm_io_dev(kvm);
+>> +
+>>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>>  		kvm_vgic_vcpu_destroy(vcpu);
+>>  
+>> -- 
+>> 1.7.9.5
+>>
+> 
