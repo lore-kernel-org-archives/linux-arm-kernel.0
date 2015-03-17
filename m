@@ -1,110 +1,67 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 17 Mar 2015 11:42:14 +0000
-Subject: [PATCH v2 2/5] PCI: st: Add Device Tree bindings for sti pcie
-In-Reply-To: <1426515635-9466-3-git-send-email-gabriel.fernandez@linaro.org>
-References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
- <1426515635-9466-3-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <20150317114213.GH27081@e106497-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Mar 2015 12:49:11 +0100
+Subject: [PATCH v2 1/2] pinctrl: Add support for Meson8b
+In-Reply-To: <1426064430-5826-2-git-send-email-carlo@caione.org>
+References: <1426064430-5826-1-git-send-email-carlo@caione.org>
+ <1426064430-5826-2-git-send-email-carlo@caione.org>
+Message-ID: <CACRpkday9fO9mSr03qSy0jT1bG+Vu9qE6FUd8eZqxdnicuBTYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriel,
+On Wed, Mar 11, 2015 at 10:00 AM, Carlo Caione <carlo@caione.org> wrote:
 
-On Mon, Mar 16, 2015 at 02:20:32PM +0000, Gabriel FERNANDEZ wrote:
-> sti pcie is built around a Synopsis Designware PCIe IP.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> ---
->  Documentation/devicetree/bindings/pci/st-pcie.txt | 54 +++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> This patch adds support for the AmLogic Meson8b SoC.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+
+(...)
+
+> diff --git a/include/dt-bindings/gpio/meson8b-gpio.h b/include/dt-bindings/gpio/meson8b-gpio.h
 > new file mode 100644
-> index 0000000..94aae2d
+> index 0000000..0d6b7f1
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
-> @@ -0,0 +1,54 @@
-> +STMicroelectronics STi PCIe controller
-> +
-> +This PCIe host controller is based on the Synopsis Designware PCIe IP
-> +and thus inherits all the common properties defined in designware-pcie.txt.
-> +
-> +Required properties:
-> + - compatible: "st,stih407-pcie"
-> + - reg: base address and length of the pcie controller, mem-window address
-> +   and length available to the controller.
-> + - interrupts: A list of interrupt outputs of the controller. Must contain an
-> +   entry for each entry in the interrupt-names property.
-> + - interrupt-names: Should be "msi". STi interrupt that is asserted when an
-> +   MSI is received.
-> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
-> +   offset for IP configuration.
-> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
-> +   Associated names must be "powerdown" and "softreset".
-> + - phys, phy-names: the phandle for the PHY device.
-> +   Associated name must be "pcie"
-> +
-> +Optional properties:
-> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
-> +
-> +Example:
-> +
-> +pcie0: pcie at 9b00000 {
-> +	compatible = "st,stih407-pcie", "snps,dw-pcie";
-> +	device_type = "pci";
-> +	reg = <0x09b00000 0x4000>,	/* dbi cntrl registers */
-> +	      <0x2fff0000 0x00010000>,	/* configuration space */
-> +	      <0x40000000 0x80000000>;	/* lmi mem window */
-> +	reg-names = "dbi", "config", "mem-window";
-> +	st,syscfg = <&syscfg_core 0xd8 0xe0>;
-> +	#address-cells = <3>;
-> +	#size-cells = <2>;
-> +	ranges = <0x00000800 0 0x2fff0000 0x2fff0000 0 0x00010000   /* configuration space */
+> +++ b/include/dt-bindings/gpio/meson8b-gpio.h
 
-Unless you are trying to support some legacy code please remove the configuration space from the ranges.
-There is no resource type associated with config space and the generic parser will give you back an
-invalid resource type. The other reason for that is that if you really claim to be ECAM compliant by
-adding the config space here you need way more than 64K of space.
+Why is this not in <dt-bindings/pinctrl/*> ?
 
-Best regards,
-Liviu
-
-> +		  0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
-> +	num-lanes = <1>;
-> +	interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-names = "msi";
-> +	#interrupt-cells = <1>;
-> +	interrupt-map-mask = <0 0 0 7>;
-> +	interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
-> +			<0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
-> +			<0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
-> +			<0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
+> @@ -0,0 +1,31 @@
+> +/*
+> + * GPIO definitions for Amlogic Meson8b SoCs
+> + *
+> + * Copyright (C) 2015 Endless Mobile, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * version 2 as published by the Free Software Foundation.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +	resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
-> +		 <&softreset STIH407_PCIE0_SOFTRESET>;
-> +	reset-names = "powerdown",
-> +		      "softreset";
-> +	phys = <&phy_port0 PHY_TYPE_PCIE>;
-> +	phy-names = "pcie";
-> +};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +#ifndef _DT_BINDINGS_MESON8B_GPIO_H
+> +#define _DT_BINDINGS_MESON8B_GPIO_H
+> +
+> +#include <dt-bindings/gpio/meson8-gpio.h>
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Why is this file including itself?
+
+> +
+> +#define DIF_0_P                0
+> +#define DIF_0_N                1
+> +#define DIF_1_P                2
+> +#define DIF_1_N                3
+> +#define DIF_2_P                4
+> +#define DIF_2_N                5
+> +#define DIF_3_P                6
+> +#define DIF_3_N                7
+> +#define DIF_4_P                8
+> +#define DIF_4_N                9
+
+Moreover, *what* is this DIF stuff and why is there no binding
+document for it?
+
+Yours,
+Linus Walleij
