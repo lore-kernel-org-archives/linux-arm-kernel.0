@@ -1,47 +1,184 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 17 Mar 2015 12:04:13 -0700
-Subject: [PATCH 3/4 v4] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <20150317180517.GD3318@x1>
-References: <1426213936-4139-1-git-send-email-eric@anholt.net>
- <1426213936-4139-3-git-send-email-eric@anholt.net>
- <5507A095.5090805@wwwdotorg.org> <20150317180517.GD3318@x1>
-Message-ID: <87zj7bla36.fsf@eliezer.anholt.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 17 Mar 2015 20:04:58 +0100
+Subject: [PATCH v4 4/5] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <CAFEAcA8hJTFeR63gJO9QX7nWuFktkehDzGmJjqhTBkTjw4=7Jw@mail.gmail.com>
+References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
+ <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+ <CAFEAcA8hJTFeR63gJO9QX7nWuFktkehDzGmJjqhTBkTjw4=7Jw@mail.gmail.com>
+Message-ID: <20150317190458.GE26480@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee Jones <lee.jones@linaro.org> writes:
+On Tue, Mar 17, 2015 at 04:18:16PM +0000, Peter Maydell wrote:
+> On 16 March 2015 at 11:01, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> > From: Christoffer Dall <christoffer.dall@linaro.org>
+> >
+> > The current code was negatively indexing the cpu state array and not
+> > synchronizing banked spsr register state with the current mode's spsr
+> > state, causing occasional failures with migration.
+> >
+> > Some munging is done to take care of the aarch64 mapping and also to
+> > ensure the most current value of the spsr is updated to the banked
+> > registers (relevant for KVM<->TCG migration).
+> >
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> >
+> > ---
+> > v2 (ajb)
+> >   - minor tweaks and clarifications
+> > v3
+> >   - Use the correct bank index function for setting/getting env->spsr
+> >   - only deal with spsrs in elevated exception levels
+> > v4
+> >  - try and make commentary clearer
+> >  - ensure env->banked_spsr[0] = env->spsr before we sync
+> >
+> > diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> > index 8fd0c8d..7ddb1b1 100644
+> > --- a/target-arm/kvm64.c
+> > +++ b/target-arm/kvm64.c
+> > @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+> >      uint64_t val;
+> >      int i;
+> >      int ret;
+> > +    unsigned int el;
+> >
+> >      ARMCPU *cpu = ARM_CPU(cs);
+> >      CPUARMState *env = &cpu->env;
+> > @@ -206,9 +207,29 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+> >          return ret;
+> >      }
+> >
+> > +    /* Saved Program State Registers
+> > +     *
+> > +     * Before we restore from the banked_spsr[] array we need to
+> > +     * ensure that any modifications to env->spsr are correctly
+> > +     * reflected and map aarch64 exception levels if required.
+> 
+> "AArch64". Not entirely sure what the "map exception levels"
+> is saying.
+> 
+> > +     */
+> > +    el = arm_current_el(env);
+> > +    if (el > 0) {
+> > +        if (is_a64(env)) {
+> > +            g_assert(el == 1);
+> > +            env->banked_spsr[0] = env->spsr;
+> 
+> If we're in AArch64 mode then I don't believe
+> env->spsr has valid content at this point. The live
+> copy is in env->banked_sprsr[] for all cases.
+> 
 
-> On Mon, 16 Mar 2015, Stephen Warren wrote:
->
->> On 03/12/2015 08:32 PM, Eric Anholt wrote:
->> > From: Lubomir Rintel <lkundrak@v3.sk>
->> > 
->> > Implement BCM2835 mailbox support as a device registered with the
->> > general purpose mailbox framework. Implementation based on commits by
->> > Lubomir Rintel [1], Suman Anna and Jassi Brar [2] on which to base the
->> > implementation.
->> > 
->> > [1] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-April/000528.html
->> > [2] http://lists.infradead.org/pipermail/linux-rpi-kernel/2013-May/000546.html
->> > 
->> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
->> > Signed-off-by: Craig McGeachie <slapdau@yahoo.com.au>
->> > Signed-off-by: Suman Anna <s-anna@ti.com>
->> > Signed-off-by: Jassi Brar <jassisinghbrar@gmail.com>
->> > Signed-off-by: Eric Anholt <eric@anholt.net>
->> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
->> > Acked-by: Lee Jones <lee.jones@linaro.org>
->> 
->> Acks often don't carry over when there are significant changes.
->
-> Did I even Ack this?
+ah, ok, so we can just get rid of that one.
 
-Yeah, I don't see any record of it, looks like I misread the mail
-thread.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150317/68198f4c/attachment.sig>
+> > +            /* QEMUs AARCH64 EL1 SPSR is in bank 0, so map it to
+> > +             * KVM_SPSR_SVC for syncing to KVM */
+> 
+> "QEMU's" and "AArch64", but this is just a bug in our
+> implementation -- the mapping between AArch64 SPSR_EL1
+> and AArch32 SPSR_svc is architecturally mandated.
+> We should be using banked_spsr[1] for our regdef for
+> SPSR_EL1 in helper.c.
+> 
+> Also the "*/" should be on its own line.
+> 
+> > +            env->banked_spsr[1] = env->banked_spsr[0];
+> 
+> What is going on here? Architecturally, AArch64 SPSR_EL1
+> is mapped to AArch32 SPSR_svc, which is env->banked_spsr[1].
+> env->banked_spsr[0] would be the SPSR for USR and SYS, except
+> they don't have an SPSR (you cannot take exceptions into them).
+> I think QEMU just has a banked_spsr[0] for convenience of
+> implementation and it should never actually be used.
+> Is this code just working around the QEMU SPSR_EL1 bug?
+> 
+
+no, the idea was just to let the loop below just work.  We accomplish
+this by taking the AArch64 spsr (which is stored in banked_spsr[0]) and
+copying it into banked_spsr[1], which is not used in AArch64 and we can
+do the QEMU's spsr are indexed at kvm-index + 1.
+
+
+
+> > +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> > +            env->banked_spsr[i] = env->spsr;
+> > +        }
+> > +    }
+> > +
+> >      for (i = 0; i < KVM_NR_SPSR; i++) {
+> >          reg.id = AARCH64_CORE_REG(spsr[i]);
+> > -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> > +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+> 
+> Coding style demands spaces around the "+" operator.
+> 
+> Note that this code is implicitly relying on the
+> ordering of register banks defined by the bank_number()
+> function, which is a bit icky.
+
+right, I thought you wrote this code with some deeper intention of doing
+it this way so I tried to stick with the general idea - but now I
+actually looked at git blame and realized that you didn't even write it.
+
+Given all this churn around this, probably it's much cleaner to get rid
+of the loop and have an explicit sync for each architecturally
+implemented register, i.e. the SPSR_EL1 and the various mode-specific
+AArch32 SPSR registers?
+
+> 
+> >          ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+> >          if (ret) {
+> >              return ret;
+> > @@ -254,6 +275,7 @@ int kvm_arch_get_registers(CPUState *cs)
+> >      struct kvm_one_reg reg;
+> >      uint64_t val;
+> >      uint32_t fpr;
+> > +    unsigned int el;
+> >      int i;
+> >      int ret;
+> >
+> > @@ -326,15 +348,34 @@ int kvm_arch_get_registers(CPUState *cs)
+> >          return ret;
+> >      }
+> >
+> > +    /* Fetch the SPSR registers
+> > +     *
+> > +     * KVM has an array of state indexed for all the possible aarch32
+> > +     * privilege levels. These map onto QEMUs aarch32 banks 1 - 4.
+> 
+> QEMU's. AArch32. Also, you mean "1 - 5".
+> 
+> > +     */
+> >      for (i = 0; i < KVM_NR_SPSR; i++) {
+> >          reg.id = AARCH64_CORE_REG(spsr[i]);
+> > -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> > +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+> 
+> Spaces again.
+> 
+> >          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+> >          if (ret) {
+> >              return ret;
+> >          }
+> >      }
+> >
+> > +    el = arm_current_el(env);
+> > +    if (el > 0) {
+> > +        if (is_a64(env)) {
+> > +            g_assert(el == 1);
+> > +            /* KVM_SPSR_SVC holds the AARCH64 EL1 SPSR which QEMU
+> > +             * keeps in bank 0 so copy it across. */
+> > +            env->banked_spsr[0] = env->banked_spsr[1];
+> > +            i = aarch64_banked_spsr_index(el);
+> 
+> More workarounds for a bug we should just fix, I think.
+> 
+
+again, this is just for the loop above to be generic, and then fix
+things up afterwards so that things work both for is_a64() and
+!is_a64().
+
+Thanks,
+-Christoffer
