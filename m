@@ -1,66 +1,49 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 17 Mar 2015 19:08:00 +0000
-Subject: [PATCH v4 4/5] target-arm: kvm64 fix save/restore of SPSR regs
-In-Reply-To: <20150317190458.GE26480@cbox>
-References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
- <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
- <CAFEAcA8hJTFeR63gJO9QX7nWuFktkehDzGmJjqhTBkTjw4=7Jw@mail.gmail.com>
- <20150317190458.GE26480@cbox>
-Message-ID: <CAFEAcA-=mAu-T_JRk4cGjMzmgL61_aOWhWm9O-+fhOqVHd_F6w@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 17 Mar 2015 14:26:57 -0500
+Subject: Is cpufreq-dt safe without regulator support?
+In-Reply-To: <1426616561.3392.3.camel@pengutronix.de>
+References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+ <1426616561.3392.3.camel@pengutronix.de>
+Message-ID: <CAGo_u6p6fiOuQ7zgebwisBx_wx3L_k3j+Hmw4=mqZZfR2DJNKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2015 at 19:04, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Tue, Mar 17, 2015 at 04:18:16PM +0000, Peter Maydell wrote:
->> Note that this code is implicitly relying on the
->> ordering of register banks defined by the bank_number()
->> function, which is a bit icky.
+On Tue, Mar 17, 2015 at 1:22 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 17.03.2015, 15:45 +0800 schrieb wens Tsai:
+>> Hi Viresh,
+>>
+>> The sunxi platform added cpufreq support in 4.0.0-rc1 using
+>> the generic cpufreq-dt driver. One issue we've run into is
+>> the default OPPs we use include an overclocked/overvoltage
+>> setting.
+>>
+>> If the cpu is missing a regulator supply phandle, or the
+>> kernel is built without regulators, cpufreq can increase
+>> the clock rate without the needed voltage increase.
+>>
+>> The former issue can be resolved by providing a dummy
+>> regulator with the default voltage, effectively disabling
+>> cpufreq.
+>>
+>> The latter is possible. Without regulator support built-in,
+>> even a correct, complete DTS can still fail. Should I just
+>> remove the offending OPP? Still that does not fix the
+>> problem when we actually do want overclocking.
+>>
+>> To summarize, should cpufreq-dt probe fail when regulator
+>> support isn't available? Should we differentiate between
+>> not having a regulator phandle vs no regulator support?
+>>
+> If you have an OPP in the DTS that is not stable with the boot voltage
+> then you need to handle this case in you platform code by disabling this
+> OPP if no regulator support is built into the kernel.
 >
-> right, I thought you wrote this code with some deeper intention of doing
-> it this way so I tried to stick with the general idea - but now I
-> actually looked at git blame and realized that you didn't even write it.
->
-> Given all this churn around this, probably it's much cleaner to get rid
-> of the loop and have an explicit sync for each architecturally
-> implemented register, i.e. the SPSR_EL1 and the various mode-specific
-> AArch32 SPSR registers?
+> You can look at the i.MX code to see how this can be done. It is used
+> there to disable an OPP depending on fuse settings.
 
-Yes, this seems like a good idea. I almost suggested it when
-I was writing out my review comments, in fact...
 
->> >      for (i = 0; i < KVM_NR_SPSR; i++) {
->> >          reg.id = AARCH64_CORE_REG(spsr[i]);
->> > -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
->> > +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
->>
->> Spaces again.
->>
->> >          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
->> >          if (ret) {
->> >              return ret;
->> >          }
->> >      }
->> >
->> > +    el = arm_current_el(env);
->> > +    if (el > 0) {
->> > +        if (is_a64(env)) {
->> > +            g_assert(el == 1);
->> > +            /* KVM_SPSR_SVC holds the AARCH64 EL1 SPSR which QEMU
->> > +             * keeps in bank 0 so copy it across. */
->> > +            env->banked_spsr[0] = env->banked_spsr[1];
->> > +            i = aarch64_banked_spsr_index(el);
->>
->> More workarounds for a bug we should just fix, I think.
->>
->
-> again, this is just for the loop above to be generic, and then fix
-> things up afterwards so that things work both for is_a64() and
-> !is_a64().
+Something we want to do generically?
 
-But the only reason we're fixing anything up is that we're
-working around the bug. If we didn't have that bug and the
-QEMU definition of where SPSR_EL1's state lived correctly
-pointed at banked_spsr[1], then the only thing you'd need
-to do for syncing is copy the KVM SPSRs into banked_spsr[1..5].
-
--- PMM
+---
+Regards,
+Nishanth Menon
