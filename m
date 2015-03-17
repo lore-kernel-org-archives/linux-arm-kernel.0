@@ -1,90 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Mar 2015 13:51:47 +0000
-Subject: [PATCH 1/3] arm64: merge __enable_mmu and __turn_mmu_on
-In-Reply-To: <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150317135147.GG23340@leverpostej>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Mar 2015 14:54:31 +0100
+Subject: [PATCH 3/5] clk: mediatek: Add basic clocks for Mediatek MT8135.
+In-Reply-To: <20150317094738.GF4927@pengutronix.de>
+References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
+ <1426485311-31428-4-git-send-email-s.hauer@pengutronix.de>
+ <20150316070339.GA25487@pengutronix.de>
+ <20150317094738.GF4927@pengutronix.de>
+Message-ID: <20150317135431.GH10068@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 10:11:12AM +0000, Ard Biesheuvel wrote:
-> Enabling of the MMU is split into two functions, with an align and
-> a branch in the middle. On arm64, the entire kernel Image is ID mapped
-> so this is really not necessary, and we can just merge it into a
-> single function.
+Hello Sascha,
+
+On Tue, Mar 17, 2015 at 10:47:38AM +0100, Sascha Hauer wrote:
+> On Mon, Mar 16, 2015 at 08:03:39AM +0100, Uwe Kleine-K?nig wrote:
+> > On Mon, Mar 16, 2015 at 06:55:09AM +0100, Sascha Hauer wrote:
+> > > +static const char *axi_parents[] __initconst = {
+> > > +	"clk26m",
+> > > +	"syspll_d3",
+> > > +	"syspll_d4",
+> > > +	"syspll_d6",
+> > > +	"univpll_d5",
+> > > +	"univpll2_d2",
+> > > +	"syspll_d3p5"
+> > > +};
+> > __initconst should only be used for const data, but this array isn't
+> > const. Only the strings the pointer in this array point to are constant.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/head.S | 30 ++++++++----------------------
->  1 file changed, 8 insertions(+), 22 deletions(-)
+> That may be true, but the way it's currently done compiles through
+> without warnings with CONFIG_DEBUG_SECTION_MISMATCH enabled.
+CONFIG_DEBUG_SECTION_MISMATCH doesn't catch this type of error.
+
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 65c7de889c8c..fb912314d5e1 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -615,8 +615,13 @@ ENDPROC(__secondary_switched)
->  #endif	/* CONFIG_SMP */
->  
->  /*
-> - * Setup common bits before finally enabling the MMU. Essentially this is just
-> - * loading the page table pointer and vector base registers.
-> + * Enable the MMU. This completely changes the structure of the visible memory
-> + * space. You will not be able to trace execution through this.
-> + *
-> + *  x0  = system control register
-> + *  x27 = *virtual* address to jump to upon completion
-> + *
-> + * other registers depend on the function called upon completion
->   *
->   * On entry to this code, x0 must contain the SCTLR_EL1 value for turning on
->   * the MMU.
-
-Minor nit: it's a bit redundant to have both comments regarding the
-sctlr_el1.
-
-I'd recommed we drop/fold the 2nd comment into the first like:
-
-	x0  = SCTLR_EL1 value for turning on the MMU.
-
-Otherwise, this looks good.
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> @@ -627,29 +632,10 @@ __enable_mmu:
->  	msr	ttbr0_el1, x25			// load TTBR0
->  	msr	ttbr1_el1, x26			// load TTBR1
->  	isb
-> -	b	__turn_mmu_on
-> -ENDPROC(__enable_mmu)
-> -
-> -/*
-> - * Enable the MMU. This completely changes the structure of the visible memory
-> - * space. You will not be able to trace execution through this.
-> - *
-> - *  x0  = system control register
-> - *  x27 = *virtual* address to jump to upon completion
-> - *
-> - * other registers depend on the function called upon completion
-> - *
-> - * We align the entire function to the smallest power of two larger than it to
-> - * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
-> - * close to the end of a 512MB or 1GB block we might require an additional
-> - * table to map the entire function.
-> - */
-> -	.align	4
-> -__turn_mmu_on:
->  	msr	sctlr_el1, x0
->  	isb
->  	br	x27
-> -ENDPROC(__turn_mmu_on)
-> +ENDPROC(__enable_mmu)
->  
->  /*
->   * Calculate the start of physical memory.
-> -- 
-> 1.8.3.2
+> > 
+> > So you have to use either
+> > 
+> > 	static const char *axi_parents[] __initdata = {
 > 
+> This results in:
 > 
+> drivers/clk/mediatek/clk-mt8173.c:515:20: error: i2s3_b_ck_parents causes a section type conflict with infra_clks
+>  static const char *i2s3_b_ck_parents[] __initdata = {
+The compiler catches if a single section contains both modifiable and
+constant data. The linker doesn't seem to check anything here. So you
+have to do it consistently per compilation unit. (I'm not aware of any
+problems if you do it consistently wrong in a compilation unit, but
+better do it consistently right :-)
+I'm sure getting it right isn't that hard, so IMHO this should be fixed
+before your patch is applied.
+
+> which can be avoided with static const char * const axi_parents[] __initdata
+This should be __initconst (to do it consistently right).
+
+> > or
+> > 
+> > 	static const char * const axi_parents[] __initconst = {
+> 
+> Which results in:
+> 
+> drivers/clk/mediatek/clk-mt8173.c:568:2: warning: initialization discards 'const' qualifier from pointer target type
+>   MUX_GATE(TOP_HDCP_24M_SEL, "hdcp_24m_sel", hdcp_24m_parents, 0x00d0, 16, 2, 23),
+> 
+> With the following patch this can also be resolved. Until this is merged
+> (or I have the OK from Mike to add this in front of this series) I
+> prefer to keep it like it is at the moment.
+I remember trying something like that some time ago, but without
+success. I didn't modify clk-composite.c but still I would be surprised
+if it were that easy.
+
+(The result were commits like 4a043d79dc2d and 145047de9940.)
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
