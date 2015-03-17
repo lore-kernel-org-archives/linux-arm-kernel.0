@@ -1,31 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Mar 2015 14:47:02 +0000
-Subject: [PATCH v4 03/10] arm64: standardize mmap_rnd() usage
-In-Reply-To: <1425503454-7531-4-git-send-email-keescook@chromium.org>
-References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
- <1425503454-7531-4-git-send-email-keescook@chromium.org>
-Message-ID: <20150317144702.GN8399@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 17 Mar 2015 15:47:01 +0100
+Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
+In-Reply-To: <20150317104038.312e73d1@gandalf.local.home>
+References: <20150316173154.537b80ee@gandalf.local.home>
+ <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
+ <20150317081341.0f9a8b4c@gandalf.local.home>
+ <20150317101113.32f5618a@gandalf.local.home>
+ <20150317104038.312e73d1@gandalf.local.home>
+Message-ID: <20150317144701.GJ10068@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 04, 2015 at 09:10:47PM +0000, Kees Cook wrote:
-> In preparation for splitting out ET_DYN ASLR, this refactors the use of
-> mmap_rnd() to be used similarly to arm and x86. This additionally enables
-> mmap ASLR on legacy mmap layouts, which appeared to be missing on arm64,
-> and was already supported on arm. Additionally removes a copy/pasted
-> declaration of an unused function.
-> 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm64/include/asm/elf.h |  1 -
->  arch/arm64/mm/mmap.c         | 18 +++++++++++-------
->  2 files changed, 11 insertions(+), 8 deletions(-)
+Guten Morgen Steven,
 
-Looks fine to me:
+On Tue, Mar 17, 2015 at 10:40:38AM -0400, Steven Rostedt wrote:
+>  static __always_inline void trace_recursive_unlock(void)
+>  {
+> -	unsigned int val = this_cpu_read(current_context);
+> +	unsigned int val = __this_cpu_read(current_context);
+> +	unsigned int val2;
+>  
+> -	val--;
+> -	val &= this_cpu_read(current_context);
+> -	this_cpu_write(current_context, val);
+> +	val2 = val - 1;
+> +	val &= val2;
+> +	__this_cpu_write(current_context, val);
+You could use:
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+	unsigned int val = __this_cpu_read(current_context);
 
-Do you want me to pick this up, or are you taking it along with the rest of
-your series (it doesn't have any obvious dependencies to me)?
+	val = val & (val - 1);
 
-Will
+	__this_cpu_write(current_context, val);
+
+and save a few lines and still make it more readable (IMHO).
+
+BTW, this patch makes the additional lines in the trace disappear, so if
+you think that makes a Tested-by applicable, feel free to add it.
+
+Best regards
+Uwe
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
