@@ -1,47 +1,41 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 17 Mar 2015 15:30:04 +0100
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <20150317123536.GB14984@red-moon>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <10995588.scpoK3KRg2@vostro.rjw.lan> <20150317123536.GB14984@red-moon>
-Message-ID: <2398042.a98hWjBeFo@vostro.rjw.lan>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Tue, 17 Mar 2015 14:05:30 +0000
+Subject: [Xen-devel] [PATCH v6 07/30] PCI: Pass PCI domain number
+ combined with root bus number
+In-Reply-To: <5507B88D.1020300@caviumnetworks.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-8-git-send-email-wangyijing@huawei.com>
+ <5507B88D.1020300@caviumnetworks.com>
+Message-ID: <1426601130.18247.238.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 17, 2015 12:35:36 PM Lorenzo Pieralisi wrote:
-> On Tue, Mar 17, 2015 at 03:23:11AM +0000, Rafael J. Wysocki wrote:
-> 
-> [...]
-> 
-> > > Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
-> > > 
-> > > +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
-> > > 
-> > > as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
-> > > we doing so)?
-> > 
-> > Well, almost.  There is one problem with that, becuase sleep.c contains code
-> > outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
-> > off ACPI platforms.
-> > 
-> > I guess you don't want that code on ARM too, right?
-> > 
-> > Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
-> > only arch setting it at least for the time being, is that correct?
-> 
-> HW reduced only platforms are still required to support sleep
-> states that on arm64 are totally meaningless at present, so I do
-> not think ACPI_REDUCED_HARDWARE_ONLY will cut it.
-> 
-> Factoring out power_off methods from sleep.c ? I know, it is not nicer
-> since you split the S-states management in multiple files.
-> 
-> Side note: is the acpi_suspend() function in sleep.c used in the kernel ?
+On Tue, 2015-03-17 at 10:45 +0530, Manish Jaggi wrote:
+> On Monday 09 March 2015 08:04 AM, Yijing Wang wrote:
+> > Now we could pass PCI domain combined with bus number
+> > in u32 argu. Because in arm/arm64, PCI domain number
+> > is assigned by pci_bus_assign_domain_nr(). So we leave
+> > pci_scan_root_bus() and pci_create_root_bus() in arm/arm64
+> > unchanged. A new function pci_host_assign_domain_nr()
+> > will be introduced for arm/arm64 to assign domain number
+> > in later patch.
+> Hi,
+> I think these changes might not be required. We have made very few 
+> changes in the xen-pcifront to support PCI passthrough in arm64.
+> As per xen architecture for a domU only a single pci virtual bus is 
+> created and all passthrough devices are attached to it.
 
-No, it isn't.  I've just sent a patch to drop it.
+I guess you are only talking about the changes to xen-pcifront.c?
+Otherwise you are ignoring the dom0 case which is exposed to the real
+set of PCI root complexes and anyway I'm not sure how "not needed for
+Xen domU" translates into not required, since it is clearly required for
+other systems.
 
+Strictly speaking the Xen pciif protocol does support multiple buses,
+it's just that the tools, and perhaps kernels, have not yet felt any
+need to actually make use of that.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+There doesn't seem to be any harm in updating pcifront to follow this
+generic API change.
+
+Ian.
