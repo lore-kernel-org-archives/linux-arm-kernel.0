@@ -1,160 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Mar 2015 11:11:13 +0100
-Subject: [PATCH 2/3] arm64: remove __calc_phys_offset
-In-Reply-To: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426587074-22390-3-git-send-email-ard.biesheuvel@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 17 Mar 2015 11:14:33 +0100
+Subject: [PATCH 1/2] dt-bindings: ARM: Mediatek: document binding for the PMIC
+ wrapper
+In-Reply-To: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
+References: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1426587274-7810-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the function __calc_phys_offset and all open coded
-virtual to physical address translations using the offset kept
-in x28.
+This adds documentation for the PMIC wrapper unit found on Mediatek
+SoCs. Currently support are the MT8135 and MT8173 SoCs, but the PMIC
+wrapper can also be found on MT6xxx and possibly other SoCs.
 
-Instead, just use absolute or PC-relative symbol references as
-appropriate when referring to virtual or physical addresses,
-respectively.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm64/kernel/head.S | 49 ++++++++++++------------------------------------
- 1 file changed, 12 insertions(+), 37 deletions(-)
+ .../devicetree/bindings/soc/mediatek/pwrap.txt     | 58 ++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index fb912314d5e1..1651c0fd50e6 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -36,8 +36,6 @@
- #include <asm/page.h>
- #include <asm/virt.h>
- 
--#define KERNEL_RAM_VADDR	(PAGE_OFFSET + TEXT_OFFSET)
--
- #if (TEXT_OFFSET & 0xfff) != 0
- #error TEXT_OFFSET must be at least 4KB aligned
- #elif (PAGE_OFFSET & 0x1fffff) != 0
-@@ -46,13 +44,6 @@
- #error TEXT_OFFSET must be less than 2MB
- #endif
- 
--	.macro	pgtbl, ttb0, ttb1, virt_to_phys
--	ldr	\ttb1, =swapper_pg_dir
--	ldr	\ttb0, =idmap_pg_dir
--	add	\ttb1, \ttb1, \virt_to_phys
--	add	\ttb0, \ttb0, \virt_to_phys
--	.endm
--
- #ifdef CONFIG_ARM64_64K_PAGES
- #define BLOCK_SHIFT	PAGE_SHIFT
- #define BLOCK_SIZE	PAGE_SIZE
-@@ -63,7 +54,7 @@
- #define TABLE_SHIFT	PUD_SHIFT
- #endif
- 
--#define KERNEL_START	KERNEL_RAM_VADDR
-+#define KERNEL_START	_text
- #define KERNEL_END	_end
- 
- /*
-@@ -242,7 +233,7 @@ section_table:
- ENTRY(stext)
- 	mov	x21, x0				// x21=FDT
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
--	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-+	adrp	x24, KERNEL_START - TEXT_OFFSET	// x24=PHYS_OFFSET
- 	bl	set_cpu_boot_mode_flag
- 
- 	bl	__vet_fdt
-@@ -343,7 +334,8 @@ ENDPROC(__vet_fdt)
-  *   - pgd entry for fixed mappings (TTBR1)
-  */
- __create_page_tables:
--	pgtbl	x25, x26, x28			// idmap_pg_dir and swapper_pg_dir addresses
-+	adrp    x25, idmap_pg_dir
-+	adrp    x26, swapper_pg_dir
- 	mov	x27, lr
- 
- 	/*
-@@ -372,12 +364,10 @@ __create_page_tables:
- 	 * Create the identity mapping.
- 	 */
- 	mov	x0, x25				// idmap_pg_dir
--	ldr	x3, =KERNEL_START
--	add	x3, x3, x28			// __pa(KERNEL_START)
-+	adrp	x3, KERNEL_START		// __pa(KERNEL_START)
- 	create_pgd_entry x0, x3, x5, x6
--	ldr	x6, =KERNEL_END
- 	mov	x5, x3				// __pa(KERNEL_START)
--	add	x6, x6, x28			// __pa(KERNEL_END)
-+	adr_l	x6, KERNEL_END			// __pa(KERNEL_END)
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-@@ -386,7 +376,7 @@ __create_page_tables:
- 	mov	x0, x26				// swapper_pg_dir
- 	mov	x5, #PAGE_OFFSET
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	x6, =KERNEL_END
-+	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
- 	mov	x3, x24				// phys offset
- 	create_block_map x0, x7, x3, x5, x6
- 
-@@ -538,8 +528,7 @@ ENDPROC(el2_setup)
-  * in x20. See arch/arm64/include/asm/virt.h for more info.
-  */
- ENTRY(set_cpu_boot_mode_flag)
--	ldr	x1, =__boot_cpu_mode		// Compute __boot_cpu_mode
--	add	x1, x1, x28
-+	adr_l	x1, __boot_cpu_mode
- 	cmp	w20, #BOOT_CPU_MODE_EL2
- 	b.ne	1f
- 	add	x1, x1, #4
-@@ -570,7 +559,7 @@ ENTRY(__boot_cpu_mode)
- 	 */
- ENTRY(secondary_holding_pen)
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
--	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-+	adrp	x24, KERNEL_START - TEXT_OFFSET	// x24=PHYS_OFFSET
- 	bl	set_cpu_boot_mode_flag
- 	mrs	x0, mpidr_el1
- 	ldr     x1, =MPIDR_HWID_BITMASK
-@@ -589,7 +578,7 @@ ENDPROC(secondary_holding_pen)
- 	 */
- ENTRY(secondary_entry)
- 	bl	el2_setup			// Drop to EL1
--	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-+	adrp	x24, KERNEL_START - TEXT_OFFSET	// x24=PHYS_OFFSET
- 	bl	set_cpu_boot_mode_flag
- 	b	secondary_startup
- ENDPROC(secondary_entry)
-@@ -598,7 +587,8 @@ ENTRY(secondary_startup)
- 	/*
- 	 * Common entry point for secondary CPUs.
- 	 */
--	pgtbl	x25, x26, x28			// x25=TTBR0, x26=TTBR1
-+	adrp    x25, idmap_pg_dir
-+	adrp    x26, swapper_pg_dir
- 	bl	__cpu_setup			// initialise processor
- 
- 	ldr	x21, =secondary_data
-@@ -636,18 +626,3 @@ __enable_mmu:
- 	isb
- 	br	x27
- ENDPROC(__enable_mmu)
--
--/*
-- * Calculate the start of physical memory.
-- */
--__calc_phys_offset:
--	adr	x0, 1f
--	ldp	x1, x2, [x0]
--	sub	x28, x0, x1			// x28 = PHYS_OFFSET - PAGE_OFFSET
--	add	x24, x2, x28			// x24 = PHYS_OFFSET
--	ret
--ENDPROC(__calc_phys_offset)
--
--	.align 3
--1:	.quad	.
--	.quad	PAGE_OFFSET
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+new file mode 100644
+index 0000000..ddeb5b6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/pwrap.txt
+@@ -0,0 +1,58 @@
++MediaTek PMIC Wrapper Driver
++
++This document describes the binding for the MediaTek PMIC wrapper.
++
++On MediaTek SoCs the PMIC is connected via SPI. The SPI master interface
++is not directly visible to the CPU, but only through the PMIC wrapper
++inside the SoC. The communication between the SoC and the PMIC can
++optionally be encrypted. Also a non standard Dual IO SPI mode can be
++used to increase speed.
++
++IP Pairing
++
++on MT8135 the pins of some SoC internal peripherals can be on the PMIC.
++The signals of these pins are routed over the SPI bus using the pwrap
++bridge. In the binding description below the properties needed for bridging
++are marked with "IP Pairing". These are optional on SoCs which do not support
++IP Pairing
++
++Required properties in pwrap device node.
++- compatible:
++	"mediatek,mt8135-pwrap" for MT8135 SoCs
++	"mediatek,mt8173-pwrap" for MT8173 SoCs
++- interrupts: IRQ for pwrap in SOC
++- reg-names: Must include the following entries:
++  "pwrap": Main registers base
++  "pwrap-bridge": bridge base (IP Pairing)
++- reg: Must contain an entry for each entry in reg-names.
++- reset-names: Must include the following entries:
++  "pwrap"
++  "pwrap-bridge" (IP Pairing)
++- resets: Must contain an entry for each entry in reset-names.
++- clock-names: Must include the following entries:
++  "spi": SPI bus clock
++  "wrap": Main module clock
++- clocks: Must contain an entry for each entry in clock-names.
++
++Optional properities:
++- pmic: Mediatek PMIC MFD is the child device of pwrap
++  See the following for child node definitions:
++  Documentation/devicetree/bindings/mfd/mt6397.txt
++
++Example:
++	pwrap: pwrap at 1000f000 {
++		compatible = "mediatek,mt8135-pwrap";
++		reg = <0 0x1000f000 0 0x1000>,
++			<0 0x11017000 0 0x1000>;
++		reg-names = "pwrap", "pwrap-bridge";
++		interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
++		resets = <&infracfg MT8135_INFRA_PMIC_WRAP_RST>,
++				<&pericfg MT8135_PERI_PWRAP_BRIDGE_SW_RST>;
++		reset-names = "pwrap", "pwrap-bridge";
++		clocks = <&clk26m>, <&clk26m>;
++		clock-names = "spi", "wrap";
++
++		pmic {
++			compatible = "mediatek,mt6397";
++		};
++	};
 -- 
-1.8.3.2
+2.1.4
