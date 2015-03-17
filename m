@@ -1,42 +1,37 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 17 Mar 2015 12:35:36 +0000
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <10995588.scpoK3KRg2@vostro.rjw.lan>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <3737028.Ib0fKlgSkd@vostro.rjw.lan> <5507933F.2020203@huawei.com>
- <10995588.scpoK3KRg2@vostro.rjw.lan>
-Message-ID: <20150317123536.GB14984@red-moon>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 17 Mar 2015 12:35:41 +0000
+Subject: [PATCH] arm64: juno: Fix misleading name of UART reference clock
+Message-ID: <1426595741-6213-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 03:23:11AM +0000, Rafael J. Wysocki wrote:
+The UART reference clock speed is 7273.8 kHz, not 72738 kHz.
 
-[...]
+Dots aren't usually used in node names even though ePAPR permits
+them.  However, this can easily be avoided by expressing the
+frequency in Hz, not kHz.
 
-> > Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
-> > 
-> > +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
-> > 
-> > as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
-> > we doing so)?
-> 
-> Well, almost.  There is one problem with that, becuase sleep.c contains code
-> outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
-> off ACPI platforms.
-> 
-> I guess you don't want that code on ARM too, right?
-> 
-> Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
-> only arch setting it at least for the time being, is that correct?
+This patch changes the name to refclk7273800hz, reflecting the
+actual clock speed.
 
-HW reduced only platforms are still required to support sleep
-states that on arm64 are totally meaningless at present, so I do
-not think ACPI_REDUCED_HARDWARE_ONLY will cut it.
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Factoring out power_off methods from sleep.c ? I know, it is not nicer
-since you split the S-states management in multiple files.
-
-Side note: is the acpi_suspend() function in sleep.c used in the kernel ?
-
-Lorenzo
+diff --git a/arch/arm64/boot/dts/arm/juno-clocks.dtsi b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+index ea2b566..c9b89ef 100644
+--- a/arch/arm64/boot/dts/arm/juno-clocks.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+@@ -8,7 +8,7 @@
+  */
+ 
+ 	/* SoC fixed clocks */
+-	soc_uartclk: refclk72738khz {
++	soc_uartclk: refclk7273800hz {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+ 		clock-frequency = <7273800>;
+-- 
+1.7.10.4
