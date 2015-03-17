@@ -1,41 +1,110 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Tue, 17 Mar 2015 14:05:30 +0000
-Subject: [Xen-devel] [PATCH v6 07/30] PCI: Pass PCI domain number
- combined with root bus number
-In-Reply-To: <5507B88D.1020300@caviumnetworks.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-8-git-send-email-wangyijing@huawei.com>
- <5507B88D.1020300@caviumnetworks.com>
-Message-ID: <1426601130.18247.238.camel@citrix.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 17 Mar 2015 15:33:30 +0100
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <5507A91A.1090206@huawei.com>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <10995588.scpoK3KRg2@vostro.rjw.lan> <5507A91A.1090206@huawei.com>
+Message-ID: <16235723.xVJ1Rfp9tM@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-17 at 10:45 +0530, Manish Jaggi wrote:
-> On Monday 09 March 2015 08:04 AM, Yijing Wang wrote:
-> > Now we could pass PCI domain combined with bus number
-> > in u32 argu. Because in arm/arm64, PCI domain number
-> > is assigned by pci_bus_assign_domain_nr(). So we leave
-> > pci_scan_root_bus() and pci_create_root_bus() in arm/arm64
-> > unchanged. A new function pci_host_assign_domain_nr()
-> > will be introduced for arm/arm64 to assign domain number
-> > in later patch.
-> Hi,
-> I think these changes might not be required. We have made very few 
-> changes in the xen-pcifront to support PCI passthrough in arm64.
-> As per xen architecture for a domU only a single pci virtual bus is 
-> created and all passthrough devices are attached to it.
+On Tuesday, March 17, 2015 12:10:02 PM Hanjun Guo wrote:
+> On 2015/3/17 11:23, Rafael J. Wysocki wrote:
+> > On Tuesday, March 17, 2015 10:36:47 AM Hanjun Guo wrote:
+> >> On 2015/3/17 10:28, Rafael J. Wysocki wrote:
+> >>> On Tuesday, March 17, 2015 09:08:45 AM Hanjun Guo wrote:
+> >>>> On 2015/3/17 7:15, Rafael J. Wysocki wrote:
+> >>>>> On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
+> >>>>>> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
+> >>>>>>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
+> >>>> [...]
+> >>>>>>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> >>>>>>>> index 074e52b..e8728d7 100644
+> >>>>>>>> --- a/arch/ia64/Kconfig
+> >>>>>>>> +++ b/arch/ia64/Kconfig
+> >>>>>>>> @@ -10,6 +10,7 @@ config IA64
+> >>>>>>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
+> >>>>>>>>   	select PCI if (!IA64_HP_SIM)
+> >>>>>>>>   	select ACPI if (!IA64_HP_SIM)
+> >>>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
+> >>>>>>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+> >>>>>>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
+> >>>>>>>>   	select HAVE_IDE
+> >>>>>>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> >>>>>>>> index b7d31ca..9804431 100644
+> >>>>>>>> --- a/arch/x86/Kconfig
+> >>>>>>>> +++ b/arch/x86/Kconfig
+> >>>>>>>> @@ -22,6 +22,7 @@ config X86_64
+> >>>>>>>>   ### Arch settings
+> >>>>>>>>   config X86
+> >>>>>>>>   	def_bool y
+> >>>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
+> >>>>>>> One more nit.  If you did
+> >>>>>>>
+> >>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> >>>>>>>
+> >>>>>>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
+> >>>>>>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
+> >>>>>> In sleep.c,
+> >>>>>>
+> >>>>>> #ifdef CONFIG_ACPI_SLEEP
+> >>>>>> acpi_target_system_state()
+> >>>>>> {
+> >>>>>> }
+> >>>>>> #endif
+> >>>>>>
+> >>>>>> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
+> >>>>>> which one of them will be enabled on ARM64 so ACPI_SLEEP
+> >>>>>> will also enabled too.
+> >>>>>>
+> >>>>>> So if we
+> >>>>>>
+> >>>>>> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
+> >>>>>>
+> >>>>>> and
+> >>>>>>
+> >>>>>> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
+> >>>>>>
+> >>>>>> it will lead to errors for acpi_target_system_state() that
+> >>>>>> is declared but not defined, so I will keep the code as
+> >>>>>> it is, what do you think?
+> >>>>> No, we need to hash this out.  Having two different Kconfig options meaning
+> >>>>> almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
+> >>>>>
+> >>>>> Do you need ACPI_SLEEP on ARM64 at all?
+> >>>> No, at least for now we don't need it, the spec for sleep is not ready for
+> >>>> ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
+> >>> Well, so what about selecting ACPI_SLEEP from the architectures that use it?
+> >> Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
+> >>
+> >> +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
+> >>
+> >> as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
+> >> we doing so)?
+> > Well, almost.  There is one problem with that, becuase sleep.c contains code
+> > outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
+> > off ACPI platforms.
+> >
+> > I guess you don't want that code on ARM too, right?
+> 
+> Yes, you are right.
+> 
+> >
+> > Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
+> 
+> Sorry, I can't fully understand your intention here, could you please
+> explain it more?
+> 
+> Let me guess a little bit. Do you mean use ACPI_REDUCED_HARDWARE_ONLY for
+> powering off ACPI platforms? if so, I guess it's not a good idea, ACPI spec
+> only says that S4BIOS is not supported on HW-reduced ACPI platforms, S5
+> has no such limitation, if I miss something here, please let me know.
 
-I guess you are only talking about the changes to xen-pcifront.c?
-Otherwise you are ignoring the dom0 case which is exposed to the real
-set of PCI root complexes and anyway I'm not sure how "not needed for
-Xen domU" translates into not required, since it is clearly required for
-other systems.
+OK, so in your current patch, please replace ACPI_GENERIC_SLEEP with
+ACPI_SYSTEM_POWER_STATES_SUPPORT and all should be clear.
 
-Strictly speaking the Xen pciif protocol does support multiple buses,
-it's just that the tools, and perhaps kernels, have not yet felt any
-need to actually make use of that.
 
-There doesn't seem to be any harm in updating pcifront to follow this
-generic API change.
-
-Ian.
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
