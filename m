@@ -1,58 +1,221 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Tue, 17 Mar 2015 08:58:50 +0200
-Subject: [PATCH v6 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <20150316182426.GW5264@atomide.com>
-References: <1426162154-8716-1-git-send-email-eliad@wizery.com>
- <20150313151301.GJ5264@atomide.com>
- <CAB3XZEdFMQexA69JEuw=VnqsNOEkWAM0+oWWmt6DaN9+hZ+vdw@mail.gmail.com>
- <2070859.WcMooC33YH@wuerfel> <20150316152939.GP5264@atomide.com>
- <20150316182536.GA16829@earth> <20150316182426.GW5264@atomide.com>
-Message-ID: <CAB3XZEdtmCDnHLW_JpmPXu2rgg8RNkOvPaUfoijmL_UsG93_Gg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Mar 2015 08:01:10 +0100
+Subject: [RFC PATCH 1/3] arm64: head.S: replace early literals with
+ constant immediates
+In-Reply-To: <20150316171427.GC18277@leverpostej>
+References: <1426519423-28263-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426519423-28263-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150316171427.GC18277@leverpostej>
+Message-ID: <CAKv+Gu-uDUOn1mHSYpvZG-9M15Rftg8JyEb24BW6uVvZR7vFjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 8:24 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Sebastian Reichel <sre@ring0.de> [150316 11:26]:
->> Hi,
->>
->> On Mon, Mar 16, 2015 at 08:29:39AM -0700, Tony Lindgren wrote:
->> > * Arnd Bergmann <arnd@arndb.de> [150315 05:10]:
->> > > On Sunday 15 March 2015 10:50:42 Eliad Peller wrote:
->> > > > yeah, i missed it :/
->> > > >
->> > > > looks like there's no platform that defines platform data for it.
->> > > > i'll replace the dev_get_platdata() with a function that only parses
->> > > > the clock-frequency properties (the irq is taken in this case from the
->> > > > spi_device).
->> > > > (or maybe i should just drop it, as no one actually uses it?)
->> > >
->> > > I don't think we should drop the driver, but dropping the platform_data
->> > > support sounds reasonable. New users of this driver should all be using
->> > > DT, and if there is a good reason to use platform_data, it's easily
->> > > put back.
->> >
->> > Well we have n8x0 and n900 using the spi driver. For those, n8x0 boot
->> > all in dts mode, but n900 still also boots in legacy mode. It seems the
->> > board-rx51-peripherals.c only passes the power_gpio though, so that
->> > should be easy to keep around.
->> >
->> > We should keep things still working for n900 in legacy mode until the
->> > pending regressions with device tree based booting have been cleared
->> > for at least one merge cycle. I believe the last pending issues is the
->> > support for ATAG_REVISION in device tree mode as posted by Pali.
->>
->> mh by migrating to newer gpiod interface platform data is no longer
->> needed (instead the boardfile would need a gpiod_lookup_table). That
->> way all of the dirty code is in the board file and will be removed
->> once the time comes. See for example rx51_fmtx_gpios_table.
->>
->> Note: This is independent of wl12xx changes, since N900 uses wl1251.
+On 16 March 2015 at 18:14, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
 >
-> Oh sorry yes sounds like that's different platform data then. In that
-> case I see no reasons to drop the platform data for wl12xx.
+> On Mon, Mar 16, 2015 at 03:23:41PM +0000, Ard Biesheuvel wrote:
+>> In preparation of making the kernel relocatable, replace literal
+>> symbol references with immediate constants. This is necessary, as
+>> the literals will not be populated with meaningful values until
+>> after the relocation code has executed.
 >
-great.
-so i'll drop the relevant wlcore_spi platform data code, and rebase
-the patches on top of v4.0-rc4 (probably tomorrow).
+> The majority of these changes look like nice cleanups/simplifications
+> regardless of whether the kernel is relocatable, so I like most of the
+> patch.
+>
 
-Eliad.
+OK. I can clean it up and add it to the head.S spring cleaning series.
+
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi-entry.S |  2 +-
+>>  arch/arm64/kernel/head.S      | 36 +++++++++++++++---------------------
+>>  2 files changed, 16 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+>> index 8ce9b0577442..f78e6a1de825 100644
+>> --- a/arch/arm64/kernel/efi-entry.S
+>> +++ b/arch/arm64/kernel/efi-entry.S
+>> @@ -61,7 +61,7 @@ ENTRY(efi_stub_entry)
+>>        */
+>>       mov     x20, x0         // DTB address
+>>       ldr     x0, [sp, #16]   // relocated _text address
+>> -     ldr     x21, =stext_offset
+>> +     movz    x21, #:abs_g0:stext_offset
+>
+> This looks a little scary. Why do we need to use a movz with a special
+> relocation rather than a simple mov? As far as I can see mov has
+> sufficient range.
+>
+
+stext_offset is an external symbol supplied by the linker, so you need
+a relocation one way or the other, and
+plain mov doesn't have those.
+
+>>       add     x21, x0, x21
+>>
+>>       /*
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 9c856f2aa7a5..1ea3cd2aba34 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -46,11 +46,9 @@
+>>  #error TEXT_OFFSET must be less than 2MB
+>>  #endif
+>>
+>> -     .macro  pgtbl, ttb0, ttb1, virt_to_phys
+>> -     ldr     \ttb1, =swapper_pg_dir
+>> -     ldr     \ttb0, =idmap_pg_dir
+>> -     add     \ttb1, \ttb1, \virt_to_phys
+>> -     add     \ttb0, \ttb0, \virt_to_phys
+>> +     .macro  pgtbl, ttb0, ttb1
+>> +     adrp    \ttb1, swapper_pg_dir
+>> +     adrp    \ttb0, idmap_pg_dir
+>>       .endm
+>
+> I reckon we should just kill pgtbl and use adrp inline in both of the
+> callsites. That way we can also get rid of the comment in each case,
+> beacuse the assembly itself will document which register gets which
+> table address.
+>
+
+Agreed.
+
+>>  #ifdef CONFIG_ARM64_64K_PAGES
+>> @@ -63,7 +61,7 @@
+>>  #define TABLE_SHIFT  PUD_SHIFT
+>>  #endif
+>>
+>> -#define KERNEL_START KERNEL_RAM_VADDR
+>> +#define KERNEL_START _text
+>
+> We can kill the KERNEL_RAM_VADDR definition too, I believe. It's only
+> used here.
+>
+
+I am using it in __calc_phys_offset, but there it is probably better
+to opencode it as (PAGE_OFFSET + TEXT_OFFSET) for clarity.
+
+>>  #define KERNEL_END   _end
+>>
+>>  /*
+>> @@ -322,7 +320,7 @@ ENDPROC(stext)
+>>   *     been enabled
+>>   */
+>>  __create_page_tables:
+>> -     pgtbl   x25, x26, x28                   // idmap_pg_dir and swapper_pg_dir addresses
+>> +     pgtbl   x25, x26                        // idmap_pg_dir and swapper_pg_dir addresses
+>
+> Here we could just have:
+>
+>         adrp    x25, idmap_pg_dir
+>         adrp    x26, swapper_pg_dir
+>
+>>       mov     x27, lr
+>>
+>>       /*
+>> @@ -351,8 +349,7 @@ __create_page_tables:
+>>        * Create the identity mapping.
+>>        */
+>>       mov     x0, x25                         // idmap_pg_dir
+>> -     ldr     x3, =KERNEL_START
+>> -     add     x3, x3, x28                     // __pa(KERNEL_START)
+>> +     adr_l   x3, KERNEL_START                // __pa(KERNEL_START)
+>>
+>>  #ifndef CONFIG_ARM64_VA_BITS_48
+>>  #define EXTRA_SHIFT  (PGDIR_SHIFT + PAGE_SHIFT - 3)
+>> @@ -391,9 +388,8 @@ __create_page_tables:
+>>  #endif
+>>
+>>       create_pgd_entry x0, x3, x5, x6
+>> -     ldr     x6, =KERNEL_END
+>>       mov     x5, x3                          // __pa(KERNEL_START)
+>> -     add     x6, x6, x28                     // __pa(KERNEL_END)
+>> +     adr_l   x6, KERNEL_END                  // __pa(KERNEL_END)
+>>       create_block_map x0, x7, x3, x5, x6
+>>
+>>       /*
+>> @@ -402,8 +398,10 @@ __create_page_tables:
+>>       mov     x0, x26                         // swapper_pg_dir
+>>       mov     x5, #PAGE_OFFSET
+>>       create_pgd_entry x0, x5, x3, x6
+>> -     ldr     x6, =KERNEL_END
+>> +     adr_l   x6, KERNEL_END
+>>       mov     x3, x24                         // phys offset
+>> +     sub     x6, x6, x3                      // kernel memsize
+>> +     add     x6, x6, x5                      // __va(KERNEL_END)
+>
+> I'm not sure on this; it makes it consistent with the rest w.r.t. using
+> adr* but it's now a little harder to read :/
+>
+
+Yes, but 'ldr x6, =XX' is going to return 0 until the relocation code
+has executed.
+
+>>       create_block_map x0, x7, x3, x5, x6
+>>
+>>       /*
+>> @@ -538,8 +536,7 @@ ENDPROC(el2_setup)
+>>   * in x20. See arch/arm64/include/asm/virt.h for more info.
+>>   */
+>>  ENTRY(set_cpu_boot_mode_flag)
+>> -     ldr     x1, =__boot_cpu_mode            // Compute __boot_cpu_mode
+>> -     add     x1, x1, x28
+>> +     adr_l   x1, __boot_cpu_mode             // Compute __boot_cpu_mode
+>
+> The comment seems redundant now (and arguably was before). I think it's
+> a distraction we can drop.
+>
+
+ok
+
+>>       cmp     w20, #BOOT_CPU_MODE_EL2
+>>       b.ne    1f
+>>       add     x1, x1, #4
+>> @@ -598,7 +595,7 @@ ENTRY(secondary_startup)
+>>       /*
+>>        * Common entry point for secondary CPUs.
+>>        */
+>> -     pgtbl   x25, x26, x28                   // x25=TTBR0, x26=TTBR1
+>> +     pgtbl   x25, x26                        // x25=TTBR0, x26=TTBR1
+>
+> As mentioned above, I think this is clearer as:
+>
+>         adrp    x25, idmap_pg_dir
+>         adrp    x26, swapper_pg_dir
+>
+>>       bl      __cpu_setup                     // initialise processor
+>>
+>>       ldr     x21, =secondary_data
+>> @@ -655,17 +652,14 @@ ENDPROC(__turn_mmu_on)
+>>   * Calculate the start of physical memory.
+>>   */
+>>  __calc_phys_offset:
+>> -     adr     x0, 1f
+>> -     ldp     x1, x2, [x0]
+>> +     adrp    x0, KERNEL_START                // __pa(KERNEL_START)
+>> +     ldr     x1, =KERNEL_RAM_VADDR           // __va(KERNEL_START)
+>> +     mov     x2, PAGE_OFFSET
+>
+> Missing '#' on the PAGE_OFFSET immediate.
+>
+
+yep
+
+
+>>       sub     x28, x0, x1                     // x28 = PHYS_OFFSET - PAGE_OFFSET
+>>       add     x24, x2, x28                    // x24 = PHYS_OFFSET
+>>       ret
+>>  ENDPROC(__calc_phys_offset)
+>>
+>> -     .align 3
+>> -1:   .quad   .
+>> -     .quad   PAGE_OFFSET
+>> -
+>>  /*
+>>   * Exception handling. Something went wrong and we can't proceed. We ought to
+>>   * tell the user, but since we don't have any guarantee that we're even
+>> --
+>> 1.8.3.2
+>>
+>>
