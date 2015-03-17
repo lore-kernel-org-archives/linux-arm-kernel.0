@@ -1,41 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 16 Mar 2015 16:30:06 -0700
-Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-In-Reply-To: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
-References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
-Message-ID: <20150316233005.GA2598@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Mar 2015 00:10:56 +0000
+Subject: [PATCH 2/5] ARM: Add Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <55074935.9020805@gmail.com>
+References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+ <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
+ <20150316210251.GP8656@n2100.arm.linux.org.uk>
+ <55074935.9020805@gmail.com>
+Message-ID: <20150317001056.GR8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
-> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
-> contradiction in it's dependencies.
-> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
-> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
-> enabled. These options inherit a dependency from an enclosing menu,
-> that requires ARCH_MULTIPLATFORM to be 'enabled'.
-> This is a contradiction and made this option also unavailable for
-> non-multiplatform configurations.
+On Mon, Mar 16, 2015 at 02:20:53PM -0700, Florian Fainelli wrote:
+> On 16/03/15 14:02, Russell King - ARM Linux wrote:
+> > On Fri, Mar 06, 2015 at 04:54:50PM -0800, Florian Fainelli wrote:
+> >> This patch adds support for the Broadcom Brahma-B15 CPU readahead cache
+> >> controller. This cache controller sits between the L2 and the memory bus
+> >> and its purpose is to provide a friendler burst size towards the DDR
+> >> interface than the native cache line size.
+> >>
+> >> The readahead cache is mostly transparent, except for
+> >> flush_kern_cache_all, flush_kern_cache_louis and flush_icache_all, which
+> >> is precisely what we are overriding here.
+> >>
+> >> The readahead cache only intercepts reads, not writes, as such, some
+> >> data can remain stale in any of its buffers, such that we need to flush
+> >> it, which is an operation that needs to happen in a particular order:
+> >>
+> >> - disable the readahead cache
+> >> - flush it
+> >> - call the appropriate cache-v7.S function
+> >> - re-enable
+> >>
+> >> This patch tries to minimize the impact to the cache-v7.S file by only
+> >> providing a stub in case CONFIG_CACHE_B15_RAC is enabled (default for
+> >> ARCH_BRCMSTB since it is the current user).
+> >>
+> >> Signed-off-by: Alamy Liu <alamyliu@broadcom.com>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
 > 
-> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
-> dependencies, the code related to that option is dead and can be
-> removed.
+> [snip]
 > 
-> This (logical) defect has been found with the undertaker tool.
-> (https://undertaker.cs.fau.de)
+> >> +/* Bitmask to enable instruction and data prefetching with a 256-bytes stride */
+> >> +#define RAC_DATA_INST_EN_MASK		(1 << RACPREFINST_SHIFT | \
+> >> +					 RACENPREF_MASK << RACENINST_SHIFT | \
+> >> +					 1 << RACPREFDATA_SHIFT | \
+> >> +					 RACENPREF_MASK << RACENDATA_SHIFT)
+> >> +
+> >> +#define RAC_ENABLED			(1 << 0)
+> > 
+> > 					BIT(0) ?
+> > 
+> > However, you don't use RAC_ENABLED as a bitmask, but a bit index, so
+> > shouldn't this be zero?
 > 
-> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
-> 
-> ---
-> Tony Lindgren suggested to remove the code since nobody complained for
-> a few years and Santosh Shilimkar agreed.
-> https://lkml.org/lkml/2015/2/25/449
-> ---
-> As far as I see, this should remove all the code related to
-> OMAP4_ERRATA_I688, I hope I didn't remove too much.
+> In subsequent patches we have a need for distinguishing RAC_ENABLED from
+> RAC_SUSPENDED, so that's the primary reason for using it as a bitmask
+> (could make that clear somewhere).
 
-Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
+However, test_bit() etc take a bit _number_ not a bit _mask_.  So:
 
-Regards,
+Passing in 1 << 0 will test bit 1 rather than bit 0.
+Passing in 1 << 1 will test bit 2 rather than bit 1.
+Passing in 1 << 2 will test bit 4 rather than bit 2.
+Passing in 1 << 3 will test bit 8 rather than bit 3.
+etc.
 
-Tony
+This is not what you wanted.  Either use a mask directly, or use
+test_bit() with a bit number etc.  Don't try and do both together. :)
+
+> > What happens when the system goes down (eg, for kexec?)  Does the RAC
+> > need to be disabled for that?
+> 
+> Per boot convention, I would say so, yes, since this is another level of
+> instruction and data cache, we should turn it off. Can we register some
+> sort of notifier specifically for kexec?
+
+The code at present doesn't expect there to be platform specific caches,
+so that probably isn't catered for yet.  I mentioned the point to raise
+the issue that there's an oversight here.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
