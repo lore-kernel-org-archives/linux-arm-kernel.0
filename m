@@ -1,56 +1,40 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 17 Mar 2015 16:09:19 +0100
-Subject: [PATCH 6/9] ARM: dt: dove: add Dove PMU DT entry to dove.dtsi
-In-Reply-To: <20150317134335.GV8656@n2100.arm.linux.org.uk>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <E1YW7tB-0003mM-1L@rmk-PC.arm.linux.org.uk>
- <55072092.9040207@free-electrons.com>
- <20150317134335.GV8656@n2100.arm.linux.org.uk>
-Message-ID: <5508439F.4000507@gmail.com>
+From: appro@openssl.org (Andy Polyakov)
+Date: Tue, 17 Mar 2015 16:09:40 +0100
+Subject: [PATCH] arm: crypto: Add NEON optimized SHA-256
+In-Reply-To: <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>	<CAKv+Gu8+oQ13j61X6x70baJXOpEiM2L+vK=KgK1JG12sy5KMsg@mail.gmail.com>	<20150316162304.GA35408@google.com>
+ <CAKv+Gu8fmBYwfrMKRqhA5KhU1HNjMP1cLtpmgCmp78R4CUw3fg@mail.gmail.com>
+Message-ID: <550843B4.8080903@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 02:43 PM, Russell King - ARM Linux wrote:
-> On Mon, Mar 16, 2015 at 07:27:30PM +0100, Gregory CLEMENT wrote:
->>> +			pmu: power-management at d0000 {
->>> +				compatible = "marvell,dove-pmu";
->>> +				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
+Hi,
+
+>>> Have you tested this code with the tcrypt.ko module?
 >>
->> Here you overlap some other nodes such as the thermal one (from 0xd001c
->> to 0xd0028), the clock gate one (from 0xd0038 to 0xd003c), the gpio one,
->> the pinctrl one ...
->
-> Yes, I'm well aware of that, but here's the thing...
->
-> I'm describing the hardware here.
->
-> The real problem is that Dove (etc) went down the path of breaking up
-> the PMU device into multiple smaller devices each specifying a sub-set
-> of the register range.  By doing that, Dove moved away from describing
+>> I have not, but I can look into it.
+>>
+>>> Did you talk to Andy about the license? I don't think this is
+>>> permissible for the kernel as-is.
+>>
+>> Unless I have misunderstood something, the license at the Cryptogams
+>> website includes an option to license the code under the GNU GPL.
+>>
+>> However, I can certainly contact Andy to clarify his intentions.
 
-Russell,
+I have no problems with reusing assembly modules in kernel context. The
+whole idea behind cryptogams initiative was exactly to reuse code in
+different contexts. But I'd prefer if it's more of cooperative effort,
+when we help each other to improve code, test on and tune for more
+platforms single developer might have access to, cross-report problems,
+etc. For this reason I'd prefer if it can be arranged in way similar to
+bsaes-armv7 module, i.e. we work together on shared copy of module that
+generates assembly that can be then compiled for OpenSSL or kernel. Is
+it sensible? BTW, why stop at SHA256? There is SHA512 and NEON SHA1...
 
-I totally agree that from today's point-of-view having a single pmu
-node with sub-nodes would have been the better approach.
+As for practicalities. In order to spare brain capacity for list
+subscribers, it would probably be appropriate to work out details such
+as naming of entry points in smaller group and present result when it's
+ready to go and tests. I'll start by looking at Thumb-ification...
 
-> the hardware - instead, we've described the Linux _implementation_ with
-> its separate (sub-)devices - its the implementation's choice that we'd
-> break up the PMU into these separate devices, almost to the point of
-> specifying each individual register.
->
-> What could be done to work around this oversight is to mvoe these
-> devices beneath the PMU node, which IMHO makes complete sense as these
-> are sub-devices of the PMU/PMC rather than separate devices.
-
-If we do this, we should have a look at syscon and potentially also
-simple-mfd which will allow us to share the registers and register
-platform_devices for the sub-nodes.
-
-The current pmu power/reset/irq can still use the extra locking
-and directly access MMIO registers - but for the others we should
-really look into using regmaps.
-
-The only thing here is that power domain descriptions are also encoded
-as direct sub-nodes of the pmu node, right?
-
-Sebastian
+Cheers.
