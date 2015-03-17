@@ -1,132 +1,53 @@
-From: lho@apm.com (Loc Ho)
-Date: Tue, 17 Mar 2015 00:30:21 -0600
-Subject: [PATCH v6 5/5] arm64: Add APM X-Gene SoC EDAC DTS entries
-In-Reply-To: <1426573821-1937-5-git-send-email-lho@apm.com>
-References: <1426573821-1937-1-git-send-email-lho@apm.com>
- <1426573821-1937-2-git-send-email-lho@apm.com>
- <1426573821-1937-3-git-send-email-lho@apm.com>
- <1426573821-1937-4-git-send-email-lho@apm.com>
- <1426573821-1937-5-git-send-email-lho@apm.com>
-Message-ID: <1426573821-1937-6-git-send-email-lho@apm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 17 Mar 2015 14:31:10 +0800
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <5507C2C2.1090509@redhat.com>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <3737028.Ib0fKlgSkd@vostro.rjw.lan> <5507933F.2020203@huawei.com>
+ <10995588.scpoK3KRg2@vostro.rjw.lan> <5507A91A.1090206@huawei.com>
+ <5507C2C2.1090509@redhat.com>
+Message-ID: <5507CA2E.3040600@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds APM X-Gene SoC EDAC DTS entries.
+On 2015/3/17 13:59, Jon Masters wrote:
+> On 03/17/2015 12:10 AM, Hanjun Guo wrote:
+>> On 2015/3/17 11:23, Rafael J. Wysocki wrote:
+>>> On Tuesday, March 17, 2015 10:36:47 AM Hanjun Guo wrote:
+>>> Well, almost.  There is one problem with that, becuase sleep.c contains code
+>>> outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
+>>> off ACPI platforms.
+>>>
+>>> I guess you don't want that code on ARM too, right?
+>> Yes, you are right.
+>>> Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
+>> Sorry, I can't fully understand your intention here, could you please
+>> explain it more?
+>>
+>> Let me guess a little bit. Do you mean use ACPI_REDUCED_HARDWARE_ONLY for
+>> powering off ACPI platforms? if so, I guess it's not a good idea, ACPI spec
+>> only says that S4BIOS is not supported on HW-reduced ACPI platforms, S5
+>> has no such limitation, if I miss something here, please let me know.
+> If helpful to the discussion, current SBBR (Server Base Boot
+> Requirements[0]) design guidance is that for power off itself, we will
+> prefer calling an EFI Runtime Service (that will preferentially call an
+> PSCI - ARM Power State Coordination Interface - Secure Monitor Call (SMC
+> - think SMI-like) internally to perform the shutdown/reboot) for the
+> action of powering off or resetting 64-bit ARM SBBR platforms.
 
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   98 ++++++++++++++++++++++++++++++++
- 1 files changed, 98 insertions(+), 0 deletions(-)
+Agreed, PSCI is the prefer method for power off on ARM64 I think.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index a857794..c7b028f 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -354,6 +354,104 @@
- 			};
- 		};
+>
+> Therefore if the alternative of an ACPI-based power off solution were
+> not initially supported, I don't think it would have much practical
+> impact, and it could be addressed after the initial support merged.
 
-+		edacmc0: edacmc0 at 7e800000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e800000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc1: edacmc1 at 7e840000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e840000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc2: edacmc2 at 7e880000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e880000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacmc3: edacmc3 at 7e8c0000 {
-+			compatible = "apm,xgene-edac-mc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e200000 0x0 0x1000>,
-+			      <0x0 0x7e700000 0x0 0x1000>,
-+			      <0x0 0x7e720000 0x0 0x1000>,
-+			      <0x0 0x7e8c0000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd0: edacpmd0 at 7c000000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c000000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd1: edacpmd1 at 7c200000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c200000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd2: edacpmd2 at 7c400000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c400000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacpmd3: edacpmd3 at 7c600000 {
-+			compatible = "apm,xgene-edac-pmd";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7c600000 0x0 0x200000>,
-+			      <0x0 0x1054a000 0x0 0x10>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacl3: edacl3 at 7e600000 {
-+			compatible = "apm,xgene-edac-l3";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e600000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>;
-+		};
-+
-+		edacsoc: edacsoc at 7e930000 {
-+			compatible = "apm,xgene-edac-soc";
-+			reg = <0x0 0x78800000 0x0 0x1000>,
-+			      <0x0 0x7e930000 0x0 0x1000>,
-+			      <0x0 0x7e000000 0x0 0x1000>;
-+			interrupts = <0x0 0x20 0x4>,
-+				     <0x0 0x21 0x4>,
-+				     <0x0 0x27 0x4>;
-+		};
-+
- 		pcie0: pcie at 1f2b0000 {
- 			status = "disabled";
- 			device_type = "pci";
---
-1.7.1
+I agree. Actually we already removed ACPI power off code for ARM64
+in v9 and v10 regardless the ACPI sepc statement about S5, I just want to
+confirm with Rafael that how to use ACPI_REDUCED_HARDWARE_ONLY properly
+to do the same thing as we do in v10 (patch - ACPI / sleep: Introduce
+CONFIG_ACPI_GENERIC_SLEEP), or if we have some other way to do that :)
+
+Thanks
+Hanjun
