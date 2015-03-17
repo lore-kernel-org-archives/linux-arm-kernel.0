@@ -1,31 +1,16 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 17 Mar 2015 19:56:44 +0100
-Subject: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
-In-Reply-To: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
-References: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1426618604.15575.3.camel@x220>
+From: davem@redhat.com (David Miller)
+Date: Tue, 17 Mar 2015 15:00:45 -0400 (EDT)
+Subject: [PATCH 00/16 linux-next] drivers/net: constify of_device_id array
+In-Reply-To: <1426617469-781-1-git-send-email-fabf@skynet.be>
+References: <1426617469-781-1-git-send-email-fabf@skynet.be>
+Message-ID: <20150317.150045.2177571124929326883.davem@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a license nit.
+From: Fabian Frederick <fabf@skynet.be>
+Date: Tue, 17 Mar 2015 19:37:31 +0100
 
-On Tue, 2015-03-17 at 13:28 +0800, Yuan Yao wrote:
-> --- /dev/null
-> +++ b/drivers/dma/fsl-qdma.c
+> This small patchset adds const to of_device_id arrays in
+> drivers/net branch.
 
-> + * This program is free software; you can redistribute  it and/or modify it
-> + * under  the terms of  the GNU General  Public License as published by the
-> + * Free Software Foundation;  either version 2 of the  License, or (at your
-> + * option) any later version.
-
-This states the license is GPL v2 or later.
-
-> +MODULE_LICENSE("GPL v2");
-
-And
-    MODULE_LICENSE("GPL");
-
-would match that statement.
-
-
-Paul Bolle
+Series applied, thanks.
