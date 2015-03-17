@@ -1,89 +1,69 @@
 From: lho@apm.com (Loc Ho)
-Date: Tue, 17 Mar 2015 00:30:16 -0600
-Subject: [PATCH v6 0/4] edac: Add APM X-Gene SoC EDAC driver
-Message-ID: <1426573821-1937-1-git-send-email-lho@apm.com>
+Date: Tue, 17 Mar 2015 00:30:17 -0600
+Subject: [PATCH v6 1/5] arm64: Enable EDAC on ARM64
+In-Reply-To: <1426573821-1937-1-git-send-email-lho@apm.com>
+References: <1426573821-1937-1-git-send-email-lho@apm.com>
+Message-ID: <1426573821-1937-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the APM X-Gene SoC EDAC driver for DT.
+Add an stub atomic_scrub and enable EDAC for arm64.
 
-v6:
-* Rebase to 4.0.0-rc3
-* Add memory scrub stub function and enable ARM64 EDAC support patch
-* Add bit definition defines for L2RTOS registers
-* Remove un-necessary clearing of all L1/L2 software generated registers
-* Remove wrong notification of LSU un-correctable error
-* Change L2 reporting of un-correcable error to correctable error
-* Change clearing of the L2C L2RTO registers
-* Add support for L2 HW version 1 and version 2 or above
-* Add support for L3 HW version 1 and version 2 or above
-
-v5:
-* Rebase to 3.17.rc1 (next)
-* Update binding documentation for additional SoC node binding resource
-* Enable MCU correctable and uncorrectable interrupts if not enabled by
-  firmware
-* Enable top level interrupt only after all MCU registered. Otherwise,
-  error interrupt will never get cleared by the corresponding MCU.
-* Remove clearing of L1 and L2 errors during initialization time. Otherwise,
-  they will not be captured between firmware booting and error configuration.
-* Add capture and clearing SoC register bus errors
-* Add register bus resource to SoC DT node
-
-v4:
-* Fix PMD l1/l2 error reading address due to wrong variable type
-* Fix clearing of software generated and HW errors for l1/l2
-
-v3:
-* Update binding documentation for PMD DT node and exampples
-* Add binding documentation for SoC DT node
-* Change MC, PMD, and L3C driver error injection to use debugfs
-* Add missing IRQ for MC correctable error (code and DT)
-* Use true/false where appropriate instead 1/0
-* Add bit definition for L1 MMUESR register and fully decode this error
-* Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
-* Add check for disabled PMD (code and DT)
-* Switch to edac_printk instead pr_err
-* Some minor comments update
-
-v2:
-* Add EDAC entry in MAINTAINERS for APM EDAC driver
-* Remove the MC scrub patch
-* Remove the word 'Caches' from Kconfig
-* Change all MASK defines to use BIT(x)
-* Update comment or remove them
-* Wrap error injection code around CONFIG_EDAC_DEBUG
-* Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
-* Change all function XXX_hw_init to XXX_hw_ctl
-* Fix typo 'activie'
-* Move calling function edac_mc_alloc after resource retrieval
-* Check for NULL on platform_get_resource return if reference directly
-* Add documentation for struct xgene_edac_pmd_ctx
-* Move L1 and L2 check out of function xgene_edac_pmd_check to its own
-  functions
-* Use for loop for configure each CPU of an PMD
-* Replace /2 by >> 1
-* Remove unnecessary comment on edac_device_add_device failure
-* Make mem_err_ip static const
-* Unwind EDAC register correctly if failed
+Signed-off-by: Loc Ho <lho@apm.com>
 ---
-Loc Ho (5):
-  arm64: Enable EDAC on ARM64
-  MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
-  Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
-    binding
-  edac: Add APM X-Gene SoC EDAC driver
-  arm64: Add APM X-Gene SoC EDAC DTS entries
-
- .../devicetree/bindings/edac/apm-xgene-edac.txt    |   82 +
- MAINTAINERS                                        |    8 +
- arch/arm64/Kconfig                                 |    1 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |   98 +
- arch/arm64/include/asm/edac.h                      |   31 +
- drivers/edac/Kconfig                               |    9 +-
- drivers/edac/Makefile                              |    1 +
- drivers/edac/xgene_edac.c                          | 2183 ++++++++++++++++++++
- 8 files changed, 2412 insertions(+), 1 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+ arch/arm64/Kconfig            |    1 +
+ arch/arm64/include/asm/edac.h |   31 +++++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 0 deletions(-)
  create mode 100644 arch/arm64/include/asm/edac.h
- create mode 100644 drivers/edac/xgene_edac.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e80cd74..d9c342a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -20,6 +20,7 @@ config ARM64
+ 	select BUILDTIME_EXTABLE_SORT
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
++	select EDAC_SUPPORT
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select DCACHE_WORD_ACCESS
+ 	select GENERIC_ALLOCATOR
+diff --git a/arch/arm64/include/asm/edac.h b/arch/arm64/include/asm/edac.h
+new file mode 100644
+index 0000000..1cedba6
+--- /dev/null
++++ b/arch/arm64/include/asm/edac.h
+@@ -0,0 +1,31 @@
++/*
++ * ARM64 EDAC Header File
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef ASM_EDAC_H
++#define ASM_EDAC_H
++
++/*
++ * ECC atomic, DMA, SMP and interrupt safe scrub function.
++ * Implements the per arch atomic_scrub() that EDAC use for software
++ * ECC scrubbing.  It reads memory and then writes back the original
++ * value, allowing the hardware to detect and correct memory errors.
++ */
++static inline void atomic_scrub(void *va, u32 size)
++{
++	/* Stub function for now until an ARM64 HW has a way to test it. */
++}
++
++#endif
++
+--
+1.7.1
