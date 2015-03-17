@@ -1,15 +1,14 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Mar 2015 16:33:49 -0600
-Subject: [PATCH v16 09/11] ARM: dts: qcom: Add idle states device nodes for
- 8084
+Date: Tue, 17 Mar 2015 16:33:50 -0600
+Subject: [PATCH v16 10/11] ARM: dts: qcom: Add idle state device nodes for 8064
 In-Reply-To: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
 References: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1426631631-56937-10-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1426631631-56937-11-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARM common idle states device bindings for cpuidle support for APQ
-8084.
+Add ARM common idle state device bindings for cpuidle support for APQ
+8064.
 
 Support Standalone power collapse (SPC) idle state (power down that does not
 affect any SoC idle states) for each cpu.
@@ -17,14 +16,14 @@ affect any SoC idle states) for each cpu.
 Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8084.dtsi | 14 ++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 14 ++++++++++++++
  1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 71182bf..6126d47 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -22,6 +22,7 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 9fd24bc..592e985 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -23,6 +23,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc0>;
  			qcom,saw = <&saw0>;
@@ -32,7 +31,7 @@ index 71182bf..6126d47 100644
  		};
  
  		cpu at 1 {
-@@ -32,6 +33,7 @@
+@@ -33,6 +34,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc1>;
  			qcom,saw = <&saw1>;
@@ -40,7 +39,7 @@ index 71182bf..6126d47 100644
  		};
  
  		cpu at 2 {
-@@ -42,6 +44,7 @@
+@@ -43,6 +45,7 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc2>;
  			qcom,saw = <&saw2>;
@@ -48,7 +47,7 @@ index 71182bf..6126d47 100644
  		};
  
  		cpu at 3 {
-@@ -52,6 +55,7 @@
+@@ -53,12 +56,23 @@
  			next-level-cache = <&L2>;
  			qcom,acc = <&acc3>;
  			qcom,saw = <&saw3>;
@@ -56,18 +55,17 @@ index 71182bf..6126d47 100644
  		};
  
  		L2: l2-cache {
-@@ -59,6 +63,16 @@
+ 			compatible = "cache";
  			cache-level = <2>;
- 			qcom,saw = <&saw_l2>;
  		};
 +
 +		idle-states {
 +			CPU_SPC: spc {
 +				compatible = "qcom,idle-state-spc",
 +						"arm,idle-state";
-+				entry-latency-us = <150>;
-+				exit-latency-us = <200>;
-+				min-residency-us = <2000>;
++				entry-latency-us = <400>;
++				exit-latency-us = <900>;
++				min-residency-us = <3000>;
 +			};
 +		};
  	};
