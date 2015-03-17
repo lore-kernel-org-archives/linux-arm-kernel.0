@@ -1,72 +1,60 @@
 From: fabf@skynet.be (Fabian Frederick)
-Date: Tue, 17 Mar 2015 19:37:31 +0100
-Subject: [PATCH 00/16 linux-next] drivers/net: constify of_device_id array
-Message-ID: <1426617469-781-1-git-send-email-fabf@skynet.be>
+Date: Tue, 17 Mar 2015 19:37:40 +0100
+Subject: [PATCH 09/16 linux-next] net: xilinx: constify of_device_id array
+In-Reply-To: <1426617469-781-1-git-send-email-fabf@skynet.be>
+References: <1426617469-781-1-git-send-email-fabf@skynet.be>
+Message-ID: <1426617469-781-10-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This small patchset adds const to of_device_id arrays in
-drivers/net branch.
+of_device_id is always used as const.
+(See driver.of_match_table and open firmware functions)
 
-Fabian Frederick (16):
-  net: netcp: constify of_device_id array
-  Altera TSE: constify of_device_id array
-  net/fsl: constify of_device_id array
-  net: ethoc: constify of_device_id array
-  drivers: net: xgene: constify of_device_id array
-  net: ethernet: apple: constify of_device_id array
-  netdev: octeon_mgmt: constify of_device_id array
-  net: greth: constify of_device_id array
-  net: xilinx: constify of_device_id array
-  orinoco: constify of_device_id array
-  net: phy: constify of_device_id array
-  can: constify of_device_id array
-  IBM-EMAC: constify of_device_id array
-  ehea: constify of_device_id array
-  net: via-rhine: constify of_device_id array
-  via-velocity: constify of_device_id array
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+ drivers/net/ethernet/xilinx/ll_temac_main.c       | 2 +-
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 +-
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
- drivers/net/can/cc770/cc770_platform.c                | 2 +-
- drivers/net/can/grcan.c                               | 2 +-
- drivers/net/can/mscan/mpc5xxx_can.c                   | 2 +-
- drivers/net/can/sja1000/sja1000_platform.c            | 2 +-
- drivers/net/can/xilinx_can.c                          | 2 +-
- drivers/net/ethernet/aeroflex/greth.c                 | 2 +-
- drivers/net/ethernet/altera/altera_tse_main.c         | 4 ++--
- drivers/net/ethernet/apm/xgene/xgene_enet_main.c      | 2 +-
- drivers/net/ethernet/apple/bmac.c                     | 2 +-
- drivers/net/ethernet/apple/mace.c                     | 2 +-
- drivers/net/ethernet/ethoc.c                          | 2 +-
- drivers/net/ethernet/freescale/fec_mpc52xx.c          | 2 +-
- drivers/net/ethernet/freescale/fec_mpc52xx_phy.c      | 2 +-
- drivers/net/ethernet/freescale/fs_enet/fs_enet-main.c | 4 ++--
- drivers/net/ethernet/freescale/fs_enet/mii-bitbang.c  | 2 +-
- drivers/net/ethernet/freescale/fs_enet/mii-fec.c      | 4 ++--
- drivers/net/ethernet/freescale/fsl_pq_mdio.c          | 2 +-
- drivers/net/ethernet/freescale/gianfar.c              | 2 +-
- drivers/net/ethernet/freescale/gianfar_ptp.c          | 2 +-
- drivers/net/ethernet/freescale/ucc_geth.c             | 2 +-
- drivers/net/ethernet/freescale/xgmac_mdio.c           | 2 +-
- drivers/net/ethernet/ibm/ehea/ehea_main.c             | 4 ++--
- drivers/net/ethernet/ibm/emac/core.c                  | 2 +-
- drivers/net/ethernet/ibm/emac/mal.c                   | 2 +-
- drivers/net/ethernet/ibm/emac/rgmii.c                 | 2 +-
- drivers/net/ethernet/ibm/emac/tah.c                   | 2 +-
- drivers/net/ethernet/ibm/emac/zmii.c                  | 2 +-
- drivers/net/ethernet/octeon/octeon_mgmt.c             | 2 +-
- drivers/net/ethernet/ti/netcp_core.c                  | 2 +-
- drivers/net/ethernet/via/via-rhine.c                  | 2 +-
- drivers/net/ethernet/via/via-velocity.c               | 2 +-
- drivers/net/ethernet/xilinx/ll_temac_main.c           | 2 +-
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c     | 2 +-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c         | 2 +-
- drivers/net/phy/mdio-bcm-unimac.c                     | 2 +-
- drivers/net/phy/mdio-gpio.c                           | 2 +-
- drivers/net/phy/mdio-mux-gpio.c                       | 2 +-
- drivers/net/phy/mdio-mux-mmioreg.c                    | 2 +-
- drivers/net/phy/mdio-octeon.c                         | 2 +-
- drivers/net/wireless/orinoco/airport.c                | 2 +-
- 40 files changed, 44 insertions(+), 44 deletions(-)
-
+diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+index dbcbf0c..690a4c3 100644
+--- a/drivers/net/ethernet/xilinx/ll_temac_main.c
++++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+@@ -1157,7 +1157,7 @@ static int temac_of_remove(struct platform_device *op)
+ 	return 0;
+ }
+ 
+-static struct of_device_id temac_of_match[] = {
++static const struct of_device_id temac_of_match[] = {
+ 	{ .compatible = "xlnx,xps-ll-temac-1.01.b", },
+ 	{ .compatible = "xlnx,xps-ll-temac-2.00.a", },
+ 	{ .compatible = "xlnx,xps-ll-temac-2.02.a", },
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index a6d2860..28b7e7d 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -48,7 +48,7 @@
+ #define AXIENET_REGS_N		32
+ 
+ /* Match table for of_platform binding */
+-static struct of_device_id axienet_of_match[] = {
++static const struct of_device_id axienet_of_match[] = {
+ 	{ .compatible = "xlnx,axi-ethernet-1.00.a", },
+ 	{ .compatible = "xlnx,axi-ethernet-1.01.a", },
+ 	{ .compatible = "xlnx,axi-ethernet-2.01.a", },
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 9d4ce38..2111b91 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -1231,7 +1231,7 @@ static struct net_device_ops xemaclite_netdev_ops = {
+ };
+ 
+ /* Match table for OF platform binding */
+-static struct of_device_id xemaclite_of_match[] = {
++static const struct of_device_id xemaclite_of_match[] = {
+ 	{ .compatible = "xlnx,opb-ethernetlite-1.01.a", },
+ 	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
+ 	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
 -- 
 2.1.0
