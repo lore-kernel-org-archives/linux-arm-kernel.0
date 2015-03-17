@@ -1,54 +1,72 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 18 Mar 2015 00:28:04 +0900
-Subject: [PATCH 0/3] ARM: dts: Define stdout-patch for Exynos Chromebooks
-In-Reply-To: <2791862.CZRe5DtPad@wuerfel>
-References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>
- <075601d06054$d94e6fa0$8beb4ee0$@kernel.org> <2791862.CZRe5DtPad@wuerfel>
-Message-ID: <55084804.8000108@kernel.org>
+Date: Wed, 18 Mar 2015 00:29:12 +0900
+Subject: [PATCH 3/3] ARM: dts: Define stdout-path property for Spring board
+In-Reply-To: <CABxcv=mmr-WWXY7-KUJe-3EP8FHRBzv-SabJma9VwGRPiHio3Q@mail.gmail.com>
+References: <1426501710-24177-1-git-send-email-javier.martinez@collabora.co.uk>	<1426501710-24177-4-git-send-email-javier.martinez@collabora.co.uk>	<5506B908.1060007@suse.de>
+ <CABxcv=mmr-WWXY7-KUJe-3EP8FHRBzv-SabJma9VwGRPiHio3Q@mail.gmail.com>
+Message-ID: <55084848.1000207@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/15 14:27, Arnd Bergmann wrote:
-> On Tuesday 17 March 2015 10:51:13 Kukjin Kim wrote:
->> Javier Martinez Canillas wrote:
+On 03/16/15 20:28, Javier Martinez Canillas wrote:
+> Hello Andreas,
+> 
+Hi,
+
+>>> index f02775487cd4..b9ec763a5602 100644
+>>> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+>>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+>>> @@ -25,6 +25,7 @@
 >>>
->>> The kernel can use as the default console a serial port if is defined
->>> as stdout device in the Device Tree.
->>>
->>> This allows a board to be booted without the need of having a console
->>> parameter in the kernel command line.
->>>
->>> This small series add a stdout-path property for Exynos5 Chromebooks and
->>> is composed of the following patches:
->>>
->>> Javier Martinez Canillas (3):
->>>   ARM: dts: Define stdout-path property for Peach boards
->>>   ARM: dts: Define stdout-path property for Snow board
->>>   ARM: dts: Define stdout-path property for Spring board
->>>
->>>  arch/arm/boot/dts/exynos5250-snow.dts      | 1 +
->>>  arch/arm/boot/dts/exynos5250-spring.dts    | 1 +
->>>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 ++++
->>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 4 ++++
->>>  4 files changed, 10 insertions(+)
->>>
->> + Arnd
+>>>       chosen {
+>>>               bootargs = "console=tty1";
+>>> +             stdout-path = "serial3:115200n8";
 >>
->> Basically, I have no objection to add stdout-path property on board DT but I
->> need to ask other ARM guys how they think about? Always I'm questioned what
->> should be defined in bootloader before entering kernel and IMHO kernel can do
->> it, it should be defined in bootloader though 
->>
->> Let's wait for other opinions...
+>> Is this a guess or did you verify that against some schematics?
 >>
 > 
-> We're trying to do this on all machines now so we can replace
-> debug_ll with earlycon for any normal use case aside from early
-> early boot debugging.
+> I don't have access to the Spring schematics but it is based on what
+> is defined in the vendor u-boot for Spring [0].
 > 
-> Please merge this patch set.
+> There isn't a Spring specific configuration file but only a
+> chromeos_daisy.h which is shared by Snow, Spring and Kate (not yet in
+> mainline):
 > 
-OK, got it. Applied.
+> #define CONFIG_DIRECT_BOOTARGS \
+> "console=ttySAC3," STRINGIFY(CONFIG_BAUDRATE) " debug earlyprintk"
+> 
+> So I assumed that all daisy-based Chromebooks use the same UART for debug.
+> 
+>>>       };
+>>>
+>>>       gpio-keys {
+>>
+>> Assuming that bootargs still work,
+>>
+> 
+> Yes, the semantics are not changed. The std-out property is only used
+> as a default if no console= parameter is passed so if you already are
+> passing one in your bootloader or using the one defined in the /chosen
+> bootargs by enabling CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND, that
+> will be used instead of std-out.
+> 
+>> Reviewed-by: Andreas F?rber <afaerber@suse.de>
+>>
+>> I do wonder why this mechanism could not point to the same location as
+>> bootargs? ("dp-controller"?) The device does not even have screws for
+> 
+> I did wonder the same indeed but I don't know if you can use a display
+> as std-out or only works for serial consoles.
+> 
+>> opening it, so accessing the serial port is highly theoretical.
+>>
+> 
+> I see, in that case I think we could just drop this patch if is not
+> possible to have a serial console even with some soldering like is the
+> case in Snow, Peach Pit and Peach Pi.
+> 
+I've applied this whole series so if you guys find any problem on this,
+please let me know ;)
 
 Thanks,
 Kukjin
