@@ -1,63 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Mar 2015 11:01:42 +0100
-Subject: [PATCH v3 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <9A1B178A-2751-4864-94B5-FCDCDA2E3875@goldelico.com>
-References: <1423088075-10025-1-git-send-email-marek@goldelico.com>
- <1423088075-10025-4-git-send-email-marek@goldelico.com>
- <20150316210532.GA11441@amd>
- <CAAfyv34vnRY=TAyx4+7s1SW7rVE7CFh9z+OOcCsbCx63y9aVog@mail.gmail.com>
- <20150317084730.GA9761@amd>
- <9A1B178A-2751-4864-94B5-FCDCDA2E3875@goldelico.com>
-Message-ID: <20150317100142.GA3759@amd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Mar 2015 11:11:11 +0100
+Subject: [PATCH 0/3] more arm64 early boot stuff
+Message-ID: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-03-17 10:07:12, Dr. H. Nikolaus Schaller wrote:
-> 
-> Am 17.03.2015 um 09:47 schrieb Pavel Machek <pavel@ucw.cz>:
-> 
-> > Hi!
-> > 
-> >>>> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> >>>> new file mode 100644
-> >>>> index 0000000..bb3580c
-> >>>> --- /dev/null
-> >>>> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
-> >>>> @@ -0,0 +1,43 @@
-> >>>> +twl4030_madc_battery
-> >>>> +
-> >>>> +Required properties:
-> >>>> + - compatible : "ti,twl4030-madc-battery"
-> >>>> + - capacity-uah : battery capacity in uAh
-> >>> 
-> >>> Could we make it capacity-uAh ?
-> >> This name was suggested by Mark Rutland [1] and naming convention
-> >> should be all lowercase. There exists already bindings
-> >> without uppercase (e.g. ti,bb-uamp) so I would keep it consistent.
-> > 
-> > Messing up SI units due to "convention" is _stupid_. Don't do it.
-> > 
-> >>> to introduce coefficients for temperature and discharge rate?
-> >> What do you mean? Nothing like that is used in current driver why do
-> >> we need to add it?
-> > 
-> > Well, conversion between Li-ion's voltage and state of charge at 0
-> > current is well known:
-> > 
-> >    def percent(m, v):
-> >    	u = 0.0387-(1.4523*(3.7835-v))
-> >        if u < 0:
-> >            return 0
-> >          return (0.1966+math.sqrt(u))*100
-> 
-> I forgot to ask: does the kernel have a sqrt() function?
+This is a bit like washing your car: you make one clean spot, and you have
+to go and wash the whole thing ...
 
-This could be good enough.
+Anyway, this is another couple of proposed improvements for head.S
 
-https://www.kernel.org/pub/linux/kernel/people/akpm/patches/2.6/2.6.0/2.6.0-mm1/broken-out/fix-sqrt.patch
+Patch #1 removes the unnecessary split and branch of the MMU enable code.
 
-									Pavel
+Patch #2 is based on the kernel relocation preparatory patch that I sent
+yesterday, but reworked into something coherent, i.e., replace the open coded
+virt_to_phys() calculations with absolute/relative symbol references, as
+appropriate
+
+Patch #3 adds code to warn when x1 .. x3 are not all zero as the boot protocol
+stipulates. This is to ensure the 'future use' these are reserved for can ever
+become a reality.
+
+Ard Biesheuvel (3):
+  arm64: merge __enable_mmu and __turn_mmu_on
+  arm64: remove __calc_phys_offset
+  arm64: enforce x1|x2|x3 == 0 upon kernel entry as per boot protocol
+
+ arch/arm64/kernel/head.S  | 87 +++++++++++++++--------------------------------
+ arch/arm64/kernel/setup.c | 13 +++++++
+ 2 files changed, 41 insertions(+), 59 deletions(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.3.2
