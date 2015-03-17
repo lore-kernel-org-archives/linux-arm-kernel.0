@@ -1,96 +1,40 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 17 Mar 2015 16:18:37 +0100
-Subject: [PATCH] ARM: shmobile: cpuidle: Remove the pointless default
- driver
-In-Reply-To: <CAMuHMdX0xhLRswsQs6=kQVycQ7sZynMobHY0ySX+oMMPEg=79Q@mail.gmail.com>
-References: <1426602892-17208-1-git-send-email-daniel.lezcano@linaro.org>
- <CAMuHMdX0xhLRswsQs6=kQVycQ7sZynMobHY0ySX+oMMPEg=79Q@mail.gmail.com>
-Message-ID: <550845CD.3090704@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 17 Mar 2015 08:19:20 -0700
+Subject: [PATCH v4 03/10] arm64: standardize mmap_rnd() usage
+In-Reply-To: <20150317144702.GN8399@arm.com>
+References: <1425503454-7531-1-git-send-email-keescook@chromium.org>
+ <1425503454-7531-4-git-send-email-keescook@chromium.org>
+ <20150317144702.GN8399@arm.com>
+Message-ID: <CAGXu5jKHPL1V81wQ-gLAmGeMD9miM73X-QAL_RHbt+6hAEaAKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 04:06 PM, Geert Uytterhoeven wrote:
-> Hi Daniel,
->
-> On Tue, Mar 17, 2015 at 3:34 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> The default idle driver uses one state with the WFI instruction.
->> The default idle routine invokes WFI when no cpuidle driver is present.
+On Tue, Mar 17, 2015 at 7:47 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Mar 04, 2015 at 09:10:47PM +0000, Kees Cook wrote:
+>> In preparation for splitting out ET_DYN ASLR, this refactors the use of
+>> mmap_rnd() to be used similarly to arm and x86. This additionally enables
+>> mmap ASLR on legacy mmap layouts, which appeared to be missing on arm64,
+>> and was already supported on arm. Additionally removes a copy/pasted
+>> declaration of an unused function.
 >>
->> The default cpuidle driver is pointless and does not give more than the
->> default idle routine and moreover it pulls all the mathematics tied with
->> the cpuidle governor for nothing, hence consuming more energy.
->>
->> Remove the default driver, the related code and register the driver directly.
->
-> Thanks for your patch!
->
->> [compiled only - no board - no test]
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
 >> ---
->>   arch/arm/mach-shmobile/common.h    |  3 ---
->>   arch/arm/mach-shmobile/cpuidle.c   | 37 -------------------------------------
->>   arch/arm/mach-shmobile/pm-sh7372.c |  2 +-
->>   3 files changed, 1 insertion(+), 41 deletions(-)
->>
->> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
->> index 309025e..29b3088 100644
->> --- a/arch/arm/mach-shmobile/common.h
->> +++ b/arch/arm/mach-shmobile/common.h
->> @@ -23,8 +23,6 @@ struct clk;
->>   extern int shmobile_clk_init(void);
->>   extern void shmobile_handle_irq_intc(struct pt_regs *);
->>   extern struct platform_suspend_ops shmobile_suspend_ops;
->> -struct cpuidle_driver;
->> -extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
->>
->>   #ifdef CONFIG_SUSPEND
->>   int shmobile_suspend_init(void);
->> @@ -51,7 +49,6 @@ extern void __iomem *shmobile_scu_base;
->>   static inline void __init shmobile_init_late(void)
->>   {
->>          shmobile_suspend_init();
->> -       shmobile_cpuidle_init();
+>>  arch/arm64/include/asm/elf.h |  1 -
+>>  arch/arm64/mm/mmap.c         | 18 +++++++++++-------
+>>  2 files changed, 11 insertions(+), 8 deletions(-)
 >
-> Please remove the forward declaration and dummy for shmobile_cpuidle_init()
-> above, too.
-
-Ah, yeah. I thought I did it.
-
->>          shmobile_cpufreq_init();
->>   }
->>
->> diff --git a/arch/arm/mach-shmobile/cpuidle.c b/arch/arm/mach-shmobile/cpuidle.c
->> index 0afeb5c..e69de29 100644
->> --- a/arch/arm/mach-shmobile/cpuidle.c
->> +++ b/arch/arm/mach-shmobile/cpuidle.c
->> @@ -1,37 +0,0 @@
+> Looks fine to me:
 >
-> If you remove this file, you should remove its entry from
-> arch/arm/mach-shmobile/Makefile, too.
-> (did you use a config with CONFIG_CPU_IDLE=n?).
-
-Yeah, but I have an empty file still around, this is why it was not 
-catched. Thanks for pointing this.
-
->> diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
->> index c0293ae..9f19052 100644
->> --- a/arch/arm/mach-shmobile/pm-sh7372.c
->> +++ b/arch/arm/mach-shmobile/pm-sh7372.c
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 >
-> Support for sh7372 is scheduled for removal in v4.1, so this will become
-> a no-op.
+> Do you want me to pick this up, or are you taking it along with the rest of
+> your series (it doesn't have any obvious dependencies to me)?
 
-Cool. So everything will be self contained in this file then.
+Thanks! Right now akpm is carrying it, since the series ends with
+changes that depend on all the per-arch refactoring.
 
-Thanks for the review.
-
-   -- Daniel
+-Kees
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Kees Cook
+Chrome OS Security
