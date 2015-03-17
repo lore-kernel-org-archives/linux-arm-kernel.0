@@ -1,75 +1,153 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 17 Mar 2015 10:10:54 +0100
-Subject: [PATCH v2 0/7] ARM: mvebu: Enable perf support
-In-Reply-To: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1425379400-4346-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5507EF9E.2050105@free-electrons.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Tue, 17 Mar 2015 11:24:04 +0200
+Subject: [PATCH v5 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and evaluation
+ board dts
+In-Reply-To: <1426262769-26758-1-git-send-email-galak@codeaurora.org>
+References: <1426262769-26758-1-git-send-email-galak@codeaurora.org>
+Message-ID: <5507F2B4.2000105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 03/13/2015 06:06 PM, Kumar Gala wrote:
+> Add initial device tree support for Qualcomm MSM8916 SoC and MTP8916
+> evaluation board.  At the current time we only boot up a single processor.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> ---
+> v5:
+> * killed use of skeleton, moved to addr/size cells both being 2
+> * Added serial alias in prep of being able to spec uart params
+>   in chosen node
+> 
+> v4:
+> * Added chosen node so we dont need to spec everything for earlycon
+> * fixed up timer node to armv8, dropped clock-frequency
+> 
+> v3:
+> * Removed qcom,msm-id and qcom,board-id
+> * Added top level compat for "qcom,msm8916-mtp-smb1360"
+> 
+> v2:
+> * Updated to dropping CONFIG_ARCH_QCOM_MSM8916
+> * Updated to use qcom-ids.h
+> 
+>  arch/arm64/boot/dts/Makefile              |   1 +
+>  arch/arm64/boot/dts/qcom/Makefile         |   5 +
+>  arch/arm64/boot/dts/qcom/msm8916-mtp.dts  |  21 ++++
+>  arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi |  32 +++++
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi     | 195 ++++++++++++++++++++++++++++++
+>  5 files changed, 254 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/Makefile
+>  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dts
+>  create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+>  create mode 100644 arch/arm64/boot/dts/qcom/msm8916.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index e0350ca..8517f15 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -5,5 +5,6 @@ dts-dirs += cavium
+>  dts-dirs += exynos
+>  dts-dirs += freescale
+>  dts-dirs += mediatek
+> +dts-dirs += qcom
+>  
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+> new file mode 100644
+> index 0000000..360ec4c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/Makefile
+> @@ -0,0 +1,5 @@
+> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
+> +
+> +always		:= $(dtb-y)
+> +subdir-y	:= $(dts-dirs)
+> +clean-files	:= *.dtb
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
+> new file mode 100644
+> index 0000000..784ad92
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
+> @@ -0,0 +1,21 @@
+> +/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
 
+multi line comment rules
 
-On 03/03/2015 11:43, Maxime Ripard wrote:
-> Hi,
-> 
-> This patch enables the performance monitoring unit found on the Armada
-> 370, 375, 38x and XP, in order to gain hardware-assisted tracing using
-> perf.
-> 
-> Due to the way the interrupts are implemented in these SoCs, it
-> required some additions to the interrupt controller in order to unmask
-> the PMU interrupts.
-> 
-> While doing so, we reworked the way the PPI are supported, in order to
-> make the driver both easier to read and to extend.
-> 
-> This has been tested on an Armada XP and an Armada 385, and this serie
-> depends on the patch "irqchip: armada: Fix chained per-cpu interrupts"
-> sent previously.
-> 
-> Thanks!
-> Maxime
-> 
-> Changes from v1:
->   - Dropped the mask/unmask refactoring
->   - Rebased on top of the v2 of the chained PPI fix
-> 
-> Ezequiel Garcia (5):
->   irqchip: armada-370-xp: Initialize per cpu registers when CONFIG_SMP=N
->   irqchip: armada-370-xp: Introduce a is_percpu_irq() helper for
->     readability
->   ARM: mvebu: Enable Performance Monitor Unit on Armada 375 SoC
->   ARM: mvebu: Enable Performance Monitor Unit on Armada 380/385 SoC
->   ARM: mvebu: Enable perf support in mvebu_v7_defconfig
-> 
-> Maxime Ripard (2):
->   irqchip: armada-370-xp: Enable the PMU interrupts
->   ARM: mvebu: Enable Performance Monitor Unit on Armada XP/370 SoCs
-> 
->  arch/arm/boot/dts/armada-370-xp.dtsi |  5 ++
->  arch/arm/boot/dts/armada-375.dtsi    |  5 ++
->  arch/arm/boot/dts/armada-38x.dtsi    |  5 ++
->  arch/arm/configs/mvebu_v7_defconfig  |  1 +
->  drivers/irqchip/irq-armada-370-xp.c  | 88 +++++++++++++++++++++++-------------
->  5 files changed, 73 insertions(+), 31 deletions(-)
-> 
+> +*
+> +* This program is free software; you can redistribute it and/or modify
+> +* it under the terms of the GNU General Public License version 2 and
+> +* only version 2 as published by the Free Software Foundation.
+> +*
+> +* This program is distributed in the hope that it will be useful,
+> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
+> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> +* GNU General Public License for more details.
+> +*/
+> +
+> +/dts-v1/;
+> +
+> +#include "msm8916-mtp.dtsi"
+> +
+> +/ {
+> +	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
+> +	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
+> +			"qcom,msm8916", "qcom,mtp";
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+> new file mode 100644
+> index 0000000..8dbb77f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
+> @@ -0,0 +1,32 @@
+> +/* Copyright (c) 2014-2014, The Linux Foundation. All rights reserved.
 
+multi line comment rules and 2014-2015
 
-Now that patches 1-3 have been applied and are also in linux-next, I applied
-patches 4-6 to mvebu/dt and pacth 7 to mvebu/defconfig
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include "msm8916.dtsi"
+> +
+> +/ {
+> +	aliases {
+> +		serial0 = &blsp1_uart2;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0";
+> +	};
+> +
+> +	soc {
+> +		serial at 78b0000 {
+> +			status = "okay";
+> +			pinctrl-names = "default", "sleep";
+> +			pinctrl-0 = <&blsp1_uart2_default>;
+> +			pinctrl-1 = <&blsp1_uart2_sleep>;
+> +		};
+> +	};
 
-I also checked that having only patches 4 to 7 without the 3 first ones
-didn't break the build or didn't make the kernel crash.
+Why don't describe this as:
 
+&blsp1_uart2 {
+	status = "okay";
+	pinctrl-names = xxxx;
+	....
+};
 
-Thanks,
+it looks more readable and obvious. This is what the other boards doing
+as well.
 
-Gregory
-
+<snip>
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+regards,
+Stan
