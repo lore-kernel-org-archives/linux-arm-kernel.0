@@ -1,44 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 17 Mar 2015 16:38:10 +0100
-Subject: [PATCH] rtc: at91rm9200: double locking bug in at91_rtc_interrupt()
-In-Reply-To: <20150315104837.GC20691@mwanda>
-References: <20150315104837.GC20691@mwanda>
-Message-ID: <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 17 Mar 2015 15:50:37 +0000
+Subject: [PATCH v4 5/5] target-arm: cpu.h document why env->spsr exists
+In-Reply-To: <1426503716-13931-6-git-send-email-alex.bennee@linaro.org>
+References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
+ <1426503716-13931-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA97OF2rMPNew8kiJrWBC+f=70c=G-pAC5tiYnEx6r6AYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dan Carpenter <dan.carpenter@oracle.com>
+On 16 March 2015 at 11:01, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> I was getting very confused about the duplication of state so wanted to
+> make it explicit.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> diff --git a/target-arm/cpu.h b/target-arm/cpu.h
+> index 083211c..6dc1799 100644
+> --- a/target-arm/cpu.h
+> +++ b/target-arm/cpu.h
+> @@ -155,6 +155,11 @@ typedef struct CPUARMState {
+>         This contains all the other bits.  Use cpsr_{read,write} to access
+>         the whole CPSR.  */
+>      uint32_t uncached_cpsr;
+> +    /* The spsr is a alias for spsr_elN where N is the current
+> +     * exception level.
 
-There is a typo here so we deadlock.
+I could have sworn I'd commented about this in an earlier
+version. It's not an alias for spsr_elN, because on AArch32 there are
+multiple SPSRs at EL1; it is the current SPSR, and
+the SPSRs for other modes are stored in banked_spsr[].
 
-Fixes: dd1f1f391dd7 ('rtc: at91rm9200: rework wakeup and interrupt handling')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-also-by: David Dueck <davidcdueck@googlemail.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi Andrew,
+    /* SPSR for current mode. */
 
-Can you please take care of this fix for 4.0?
-If you fee that I'd better take it myself please tell me.
+would do IMHO (matching the comment for env->regs[].)
 
-Thanks, bye.
-
- drivers/rtc/rtc-at91rm9200.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index b4f7744f6751..b283a1a573b3 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -324,7 +324,7 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
- 
- 		ret = IRQ_HANDLED;
- 	}
--	spin_lock(&suspended_lock);
-+	spin_unlock(&suspended_lock);
- 
- 	return ret;
- }
--- 
-2.1.3
+-- PMM
