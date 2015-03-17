@@ -1,48 +1,25 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Mar 2015 17:36:41 +0100
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 17 Mar 2015 16:37:49 +0000
 Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+In-Reply-To: <20150317162831.GB8656@n2100.arm.linux.org.uk>
 References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <20150317163641.GM10068@pengutronix.de>
+ <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+ <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
+ <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
+ <20150317162831.GB8656@n2100.arm.linux.org.uk>
+Message-ID: <HK2PR06MB0561681457FA1AE36384052B8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Mar 17, 2015 at 03:48:38AM +0000, Chris Brandt wrote:
-> I've been running XIP_KERNEL with linux-3.14 on a Renesas RZ/A1
-> (ARCH_R7S72100) for a while now (with some bug fixes of course) so I
-> thought I'd see if my fixes should be pushed back upstream.
+> > DEBUG_LL=y may help you here. It's easier than doing a post-mortem 
+> > analysis on __log_buf from U-Boot.
+> > As we still have anti-social platforms, you best remove all non-SCIF 
+> > default addresses from the DEBUG_UART_PHYS section in arch/arm/Kconfig.debug though.
 > 
-> However, I see that all the Renesas parts are being moved to
-> ARCH_MULTIPLATFORM, which by means of arch/arm/Kconfig disallows
-> XIP_KERNEL.
-I think the problem is that there is no agreement on what
-"ARCH_MULTIPLATFORM" means.
+> Or enter the appropriate address directly, which is what's intended in the long term.  Having zillions of defaults in Kconfig is not that much better from what we had before...
 
-On one hand it can mean "This platform is available to be selected for a
-kernel that supports several different architectures". That's why
-MACH_IMX31_DT depends on ARCH_MULTI_V6 and so ARCH_MULTIPLATFORM.
+I would say having to manually enter an address is acceptable for debugging (in my opinion)
 
-On the other hand we have things like: ARCH_MULTIPLATFORM selects
-ARM_PATCH_PHYS_VIRT. These are actually only necessary if you enable
-different machines that use different RAM offsets. XIP_KERNEL is in
-this category, too.
-
-Now add that you want to do compile testing with random configs. That
-means you must somehow describe the condition that allows enabling
-XIP_KERNEL. You either have maintain an ugly list which machines might
-be enabled together and which are mutually exclusive. Or you accept not
-to allow all configs that are technically possible and sensible and go
-for XIP_KERNEL depending on !ARCH_MULTIPLATFORM.
-
-So *technically* there is no reason to disallow selecting XIP_KERNEL for
-a multiplatform enabled SoC. But to implement the Kconfig logic to allow
-that without allowing broken configurations is hardly possible.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Chris
