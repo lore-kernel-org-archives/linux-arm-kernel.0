@@ -1,57 +1,42 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 17 Mar 2015 13:27:49 +0100
-Subject: PM: knowing the system state in the device callback
-In-Reply-To: <20150316191742.GI4560@piout.net>
-References: <20150316191742.GI4560@piout.net>
-Message-ID: <55081DC5.3090403@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 17 Mar 2015 12:35:36 +0000
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_GENERIC_SLEEP
+In-Reply-To: <10995588.scpoK3KRg2@vostro.rjw.lan>
+References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
+ <3737028.Ib0fKlgSkd@vostro.rjw.lan> <5507933F.2020203@huawei.com>
+ <10995588.scpoK3KRg2@vostro.rjw.lan>
+Message-ID: <20150317123536.GB14984@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 17, 2015 at 03:23:11AM +0000, Rafael J. Wysocki wrote:
 
+[...]
 
-On 16/03/2015 20:17, Alexandre Belloni wrote:
-> Hi,
+> > Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
+> > 
+> > +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
+> > 
+> > as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
+> > we doing so)?
 > 
-> I'm trying to get rid of at91_suspend_entering_slow_clock() which is
-> exposing the platform suspend_state_t to the devices. From what I
-> understand, whenever suspend_state_t is PM_SUSPEND_MEM or
-> PM_SUSPEND_STANDBY, the pm_message_t passed to the device driver is
-> always PM_EVENT_SUSPEND.
+> Well, almost.  There is one problem with that, becuase sleep.c contains code
+> outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
+> off ACPI platforms.
 > 
-> The requirement is to know whether we are going to cut the master clock
-> and in that case, avoid calling enable_irq_wake() because we will not be
-> able to wakeup from the device.
+> I guess you don't want that code on ARM too, right?
 > 
-> Is there a better way to do that? Or should I implement a similar
-> function in the pm core (which I guess would already be there if
-> really needed)?
+> Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
+> only arch setting it at least for the time being, is that correct?
 
-I am interesting by this topic because I am working on adding standby
-support for the mvebu SoCs (or at least some of them). In suspend to
-ram, the SoC is completely shutdown, whereas in standby it will remain
-powered. So for standby we need to do extra steps such as switching off
-the SerDes. Initially I though that I could use the PM_SUSPEND_STANDBY
-but as pointed by Alexandre it is not this event which is sent to the
-drivers.
+HW reduced only platforms are still required to support sleep
+states that on arm64 are totally meaningless at present, so I do
+not think ACPI_REDUCED_HARDWARE_ONLY will cut it.
 
-With the current code, it seems that the specific work for standby is
-done at machine level, how could you also doing it at device level?
+Factoring out power_off methods from sleep.c ? I know, it is not nicer
+since you split the S-states management in multiple files.
 
+Side note: is the acpi_suspend() function in sleep.c used in the kernel ?
 
-Thanks,
-
-Gregory
-
-
-
-> 
-> Regards,
-> 
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lorenzo
