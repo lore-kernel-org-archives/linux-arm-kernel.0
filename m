@@ -1,78 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Mar 2015 14:54:31 +0100
-Subject: [PATCH 3/5] clk: mediatek: Add basic clocks for Mediatek MT8135.
-In-Reply-To: <20150317094738.GF4927@pengutronix.de>
-References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
- <1426485311-31428-4-git-send-email-s.hauer@pengutronix.de>
- <20150316070339.GA25487@pengutronix.de>
- <20150317094738.GF4927@pengutronix.de>
-Message-ID: <20150317135431.GH10068@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 17 Mar 2015 14:57:15 +0100
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+ <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
+Hi Chris,
 
-On Tue, Mar 17, 2015 at 10:47:38AM +0100, Sascha Hauer wrote:
-> On Mon, Mar 16, 2015 at 08:03:39AM +0100, Uwe Kleine-K?nig wrote:
-> > On Mon, Mar 16, 2015 at 06:55:09AM +0100, Sascha Hauer wrote:
-> > > +static const char *axi_parents[] __initconst = {
-> > > +	"clk26m",
-> > > +	"syspll_d3",
-> > > +	"syspll_d4",
-> > > +	"syspll_d6",
-> > > +	"univpll_d5",
-> > > +	"univpll2_d2",
-> > > +	"syspll_d3p5"
-> > > +};
-> > __initconst should only be used for const data, but this array isn't
-> > const. Only the strings the pointer in this array point to are constant.
-> 
-> That may be true, but the way it's currently done compiles through
-> without warnings with CONFIG_DEBUG_SECTION_MISMATCH enabled.
-CONFIG_DEBUG_SECTION_MISMATCH doesn't catch this type of error.
+On Tue, Mar 17, 2015 at 2:46 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+>> Besides, I think a multi-platform XIP (or nommu) kernel is possible, as long as XIP_PHYS_ADDR (or PHYS_OFFSET) is suitable for all platforms included
+>
+> Possible...but...maybe pointless. If you're doing XIP, then most likely you've got a specific platform that you are trying to do as much as you can in as little (RAM) as possible.
 
-> 
-> > 
-> > So you have to use either
-> > 
-> > 	static const char *axi_parents[] __initdata = {
-> 
-> This results in:
-> 
-> drivers/clk/mediatek/clk-mt8173.c:515:20: error: i2s3_b_ck_parents causes a section type conflict with infra_clks
->  static const char *i2s3_b_ck_parents[] __initdata = {
-The compiler catches if a single section contains both modifiable and
-constant data. The linker doesn't seem to check anything here. So you
-have to do it consistently per compilation unit. (I'm not aware of any
-problems if you do it consistently wrong in a compilation unit, but
-better do it consistently right :-)
-I'm sure getting it right isn't that hard, so IMHO this should be fixed
-before your patch is applied.
+Sure. For your real embedded device, you want a small kernel, without any cruft.
 
-> which can be avoided with static const char * const axi_parents[] __initdata
-This should be __initconst (to do it consistently right).
+> Was ARCH_MULTIPLATFORM really trying to fix some huge existing problem? Or was it more of a 'here's a cute thing we could do'?
+> In my mind, an SoC by nature is used for specific embedded product and you could care less if the binary runs on anything else. Of course the range of SoCs that can run Linux now a days varies greatly, so I don't think you can put them all in the same category like ARCH_MULTIPLATFORM was trying to do.
 
-> > or
-> > 
-> > 	static const char * const axi_parents[] __initconst = {
-> 
-> Which results in:
-> 
-> drivers/clk/mediatek/clk-mt8173.c:568:2: warning: initialization discards 'const' qualifier from pointer target type
->   MUX_GATE(TOP_HDCP_24M_SEL, "hdcp_24m_sel", hdcp_24m_parents, 0x00d0, 16, 2, 23),
-> 
-> With the following patch this can also be resolved. Until this is merged
-> (or I have the OK from Mike to add this in front of this series) I
-> prefer to keep it like it is at the moment.
-I remember trying something like that some time ago, but without
-success. I didn't modify clk-composite.c but still I would be surprised
-if it were that easy.
+ARCH_MULTIPLATFORM (the multi-platform part) was also introduced to reduce the
+number of kernels you have to built. This matters not only for testing
+(increasing build coverage while reducing the number of kernels vs. the number
+of machines), but also for Linux distributions, who typically ship only a few
+kernels, but want to support as many machine types as possible.
 
-(The result were commits like 4a043d79dc2d and 145047de9940.)
+>> Perhaps ARCH_MULTIPLATFORM should be replaced by ARCH_ARM_NEWWORLD almost everywhere, and (new) ARCH_MULTIPLATFORM should be reserved (if needed at all) to protect features that are not compatible with running on multiple machines?
+>
+> That's not bad. I think it still comes down to if you want to build XIP, you don't care about ARCH_MULTIPLATFORM support, and the XIP_PHYS_ADDR (and PHYS_OFFSET) you need to use is device specific anyway.
 
-Best regards
-Uwe
+Now, to solve your problem: can you get it to work by dropping XIP_KERNEL's
+dependency on !ARCH_MULTIPLATFORM in arch/arm/Kconfig?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> It also looks like a couple month ago someone also pointed out that just because the base core is the same, that doesn't mean all the erratas are the same, and ARCH_MULTIPLATFORM doesn't fit there as well.
+
+Possibly.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
