@@ -1,62 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Mar 2015 15:36:57 +0000
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <550818A6.9020205@arm.com>
-References: <20150315213330.GB8656@n2100.arm.linux.org.uk>
- <20150316000438.GD8656@n2100.arm.linux.org.uk>
- <20150316004239.GE8656@n2100.arm.linux.org.uk>
- <20150316093553.GF8656@n2100.arm.linux.org.uk>
- <20150316130419.GI8656@n2100.arm.linux.org.uk>
- <55071742.6000405@arm.com>
- <20150316181634.GK8656@n2100.arm.linux.org.uk>
- <55072BF5.7030901@arm.com>
- <20150316195255.GM8656@n2100.arm.linux.org.uk>
- <550818A6.9020205@arm.com>
-Message-ID: <20150317153657.GY8656@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Mar 2015 16:38:10 +0100
+Subject: [PATCH] rtc: at91rm9200: double locking bug in at91_rtc_interrupt()
+In-Reply-To: <20150315104837.GC20691@mwanda>
+References: <20150315104837.GC20691@mwanda>
+Message-ID: <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 12:05:58PM +0000, Sudeep Holla wrote:
-> As I had mentioned yesterday, I did compare the L2C settings between
-> v3.18 and later kernel and found them to be *exactly same*.
-> 
-> Since you suspected issues around instruction fetching, I tried playing
-> around the tag and data ram latencies. After some experiments, I found
-> that changing just the tag ram read latency to 2 cycles, the issue we
-> are seeing goes away at-least on my setup. It will be good to see the
-> behaviour on your setup with the patch below.
-> 
-> The default value which bootmon is programming happens to be worst
-> case scenario(8 cycles for all). Will recalls that it was changed to
-> minimum value after graphics guys complained about performance.
-> 
-> We need to check with h/w guys to get the correct optimal values for
-> these latencies.
-> 
-> Regards,
-> Sudeep
-> 
-> --->8
-> 
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index 23662b5a5e9d..030c90c1105d 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -172,7 +172,7 @@
->                 interrupts = <0 43 4>;
->                 cache-level = <2>;
->                 arm,data-latency = <1 1 1>;
-> -               arm,tag-latency = <1 1 1>;
-> +               arm,tag-latency = <1 2 1>;
+From: Dan Carpenter <dan.carpenter@oracle.com>
 
-I've tried <1 2 1> and <1 8 1> here, I don't see any difference.  My test
-build fails on the first boot attempt for each.
+There is a typo here so we deadlock.
 
-I notice you're only changing the write latency here.  Is that correct?
-You mention read latency above.
+Fixes: dd1f1f391dd7 ('rtc: at91rm9200: rework wakeup and interrupt handling')
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-also-by: David Dueck <davidcdueck@googlemail.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi Andrew,
 
+Can you please take care of this fix for 4.0?
+If you fee that I'd better take it myself please tell me.
+
+Thanks, bye.
+
+ drivers/rtc/rtc-at91rm9200.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+index b4f7744f6751..b283a1a573b3 100644
+--- a/drivers/rtc/rtc-at91rm9200.c
++++ b/drivers/rtc/rtc-at91rm9200.c
+@@ -324,7 +324,7 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
+ 
+ 		ret = IRQ_HANDLED;
+ 	}
+-	spin_lock(&suspended_lock);
++	spin_unlock(&suspended_lock);
+ 
+ 	return ret;
+ }
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
