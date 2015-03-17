@@ -1,273 +1,142 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 17 Mar 2015 10:27:03 +0100
-Subject: [PATCH 1/9] PM / Domains: Add dev_pm_domain_get|put() APIs
-In-Reply-To: <5508804.qPsCdhOgnd@vostro.rjw.lan>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <1566917.2Z45cAj17k@vostro.rjw.lan>
- <CAPDyKFqpZn=URB3W5ZrW5msxdqoGzj9pdD-Z8bKk-OGnyLZvOA@mail.gmail.com>
- <5508804.qPsCdhOgnd@vostro.rjw.lan>
-Message-ID: <CAPDyKFoVcZAc4FKkG_ywk6qrqrGMp=0aT+LGigWPiXg-TTi0CA@mail.gmail.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Tue, 17 Mar 2015 15:03:14 +0530
+Subject: [PATCH v7 1/3] dmaengine: Add support for APM X-Gene SoC DMA
+ engine driver
+In-Reply-To: <CAFd313xG4EZdoS4vMxq4TW7v+xc_OEd3uC1R4LW3=Xs3+JzY9w@mail.gmail.com>
+References: <1426158921-8987-1-git-send-email-rsahu@apm.com>
+ <1426158921-8987-2-git-send-email-rsahu@apm.com>
+ <20150316092756.GH32683@intel.com>
+ <CAFd313y3avndJ_jDbOSWsbBOYapto_HpDUa+eR7Qy2FO2qLDYg@mail.gmail.com>
+ <20150316112730.GN32683@intel.com>
+ <CAFd313yeXL2sd4qzh_-6iANQf=w0k4p_tXEmrk_QZ-baKgKG8Q@mail.gmail.com>
+ <20150316162613.GO32683@intel.com>
+ <CAFd313xG4EZdoS4vMxq4TW7v+xc_OEd3uC1R4LW3=Xs3+JzY9w@mail.gmail.com>
+Message-ID: <CAFd313zJHP2PbN=Xa48GRmyQ6EvH=3wrZPBngtsZ2djo4ka96A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2015 at 04:01, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Monday, March 16, 2015 10:26:46 AM Ulf Hansson wrote:
->> On 14 March 2015 at 02:31, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> > On Friday, March 13, 2015 04:43:41 PM Ulf Hansson wrote:
->> >> There may be more than one device in a PM domain which then will be
->> >> probed at different points in time.
->> >>
->> >> Depending on timing and runtime PM support, in for the device related
->> >> driver/subsystem, a PM domain may be advised to power off after a
->> >> successful probe sequence.
->> >>
->> >> A general requirement for a device within a PM domain, is that the
->> >> PM domain must stay powered during the probe sequence. To cope with
->> >> such requirement, let's add the dev_pm_domain_get|put() APIs.
->> >>
->> >> These APIs are intended to be invoked from subsystem-level code and the
->> >> calls between get/put needs to be balanced.
->> >>
->> >> dev_pm_domain_get(), tells the PM domain that it needs to increase a
->> >> usage count and to keep supplying power. dev_pm_domain_put(), does the
->> >> opposite.
->> >>
->> >> For a PM domain to support this feature, it must implement the optional
->> >> ->get|put() callbacks.
->> >>
->> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->> >> ---
->> >>  drivers/base/power/common.c | 40 ++++++++++++++++++++++++++++++++++++++++
->> >>  include/linux/pm.h          |  2 ++
->> >>  include/linux/pm_domain.h   |  4 ++++
->> >>  3 files changed, 46 insertions(+)
->> >>
->> >> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
->> >> index f32b802..99225af 100644
->> >> --- a/drivers/base/power/common.c
->> >> +++ b/drivers/base/power/common.c
->> >> @@ -128,3 +128,43 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
->> >>               dev->pm_domain->detach(dev, power_off);
->> >>  }
->> >>  EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
->> >> +
->> >> +/**
->> >> + * dev_pm_domain_get - Increase usage count to keep a PM domain powered.
->> >> + * @domain: The PM domain to operate on.
->> >> + *
->> >> + * This function will not by itself increase the usage count, that's up to each
->> >> + * PM domain implementation to support. Typically it should be invoked from
->> >> + * subsystem level code prior drivers starts probing.
->> >> + *
->> >> + * Do note, it's optional to implement the ->get() callback for a PM domain.
->> >> + *
->> >> + * Returns 0 on successfully increased usage count or negative error code.
->> >> + */
->> >> +int dev_pm_domain_get(struct dev_pm_domain *domain)
->> >> +{
->> >> +     int ret = 0;
->> >> +
->> >> +     if (domain && domain->get)
->> >> +             ret = domain->get(domain);
->> >> +
->> >> +     return ret;
->> >> +}
->> >> +EXPORT_SYMBOL_GPL(dev_pm_domain_get);
->> >> +
->> >> +/**
->> >> + * dev_pm_domain_put - Decrease usage count to allow a PM domain to power off.
->> >> + * @domain: The PM domain to operate on.
->> >> + *
->> >> + * This function will not by itself decrease the usage count, that's up to each
->> >> + * PM domain implementation to support. Typically it should be invoked from
->> >> + * subsystem level code after drivers has finished probing.
->> >> + *
->> >> + * Do note, it's optional to implement the ->put() callback for a PM domain.
->> >> + */
->> >> +void dev_pm_domain_put(struct dev_pm_domain *domain)
->> >> +{
->> >> +     if (domain && domain->put)
->> >> +             domain->put(domain);
->> >> +}
->> >> +EXPORT_SYMBOL_GPL(dev_pm_domain_put);
->> >> diff --git a/include/linux/pm.h b/include/linux/pm.h
->> >> index e2f1be6..e62330b 100644
->> >> --- a/include/linux/pm.h
->> >> +++ b/include/linux/pm.h
->> >> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struct device *dev);
->> >>  struct dev_pm_domain {
->> >>       struct dev_pm_ops       ops;
->> >>       void (*detach)(struct device *dev, bool power_off);
->> >> +     int (*get)(struct dev_pm_domain *domain);
->> >> +     void (*put)(struct dev_pm_domain *domain);
->> >
->> > I don't like these names.  They suggest that it's always going to be about
->> > reference counting which doesn't have to be the case in principle.
+Hi Vinod,
+
+On Mon, Mar 16, 2015 at 11:01 PM, Rameshwar Sahu <rsahu@apm.com> wrote:
+> Hi Vinod,
+>
+> On Mon, Mar 16, 2015 at 9:56 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+>> On Mon, Mar 16, 2015 at 05:24:34PM +0530, Rameshwar Sahu wrote:
+>>> >> >> +static void xgene_dma_free_desc_list_reverse(struct xgene_dma_chan *chan,
+>>> >> >> +                                          struct list_head *list)
+>>> >> > do we really care about free order?
+>>> >>
+>>> >> Yes it start dellocation of descriptor by tail.
+>>> > and why by tail is not clear.
+>>> We can free allocated descriptor in forward order from head or in
+>>> reverse order, I just followed here fsldma.c driver.
+>>> Does this make sense ??
+>> No, you have two APIs to free list. Why do you need two?
+>
+> Yes, basically we have tow API to free list.
+> xgene_dma_free_desc_list_reverse will call if any failure in
+> allocation of memory from DMA pool in prep routines.
+> Like e.g. in prep routing we have some descriptors allocated and still
+> need to get descriptor to complete the DMA request and failure happen,
+> so we need to free all allocated descriptor.
+>
 >>
->> I am happy to change, you don't happen to have a proposal? :-)
+>>>
+>>>
+>>> >
+>>> >> > where are you mapping dma buffers?
+>>> >>
+>>> >>  I didn't get you here. Can you please explain me here what you mean.
+>>> >> As per my understanding client should map the dma buffer and give the
+>>> >> physical address and size to this callback prep routines.
+>>> > not for memcpy, that is true for slave transfers
+>>> >
+>>> > For mempcy the idea is that drivers will do buffer mapping
+>>>
+>>> Still I am clear here, why memcpy will do buffer mapping, I see other
+>>> drivers and also async_memcpy.c , they only map it and pass mapped
+>>> physical dma address to driver.
+>>>
+>>> Buffer mapping mean you here is dma_map_xxx ?? Am I correct.
+>> Yes
+>
+> I have confusion here, I don't see any driver dma buffer mapping in
+> prep_dma_memcpy.
+> Can you please clear me here if driver does this on behalf of client,
+> like any example so that I can proceed further.
+
+Any comment here ??
+
 >>
->> For genpd we already have these related APIs:
+>>>
+>>> >
+>>> >> > why are you calling this here, status check shouldnt do this...
+>>> >>
+>>> >> Okay, I will remove it.
+>>> >>
+>>> >>
+>>> >> >> +                     spin_unlock_bh(&chan->lock);
+>>> >> >> +                     return DMA_IN_PROGRESS;
+>>> >> > residue here is size of transacation.
+>>> >>
+>>> >> We can't calculate here residue size. We don't have any controller
+>>> >> register which will tell about remaining transaction size.
+>>> > Okay if you cant calculate residue why do we have this fn?
+>>>
+>>> So basically case here for me is completion of dma descriptor
+>>> submitted to hw is not same as order of submission to hw.
+>>> So scenario coming in multithread running :e.g. let's assume we have
+>>> submitted two descriptors first has cookie 1001 and second has 1002,
+>>> now 1002 is completed first, so updated last_completed_cookie as 1002
+>>> but not yer checked for dma_tx_status, and then first cookie completes
+>>> and update last_completed_cookie as 1001, now second transaction check
+>>> for tx_status and it get DMA_IN_PROGRESS, because
+>>> last_completed_cookie(1001) is less than second transaction's
+>>> cookie(1002).
+>>>
+>>> Due to this issue I am traversing that transaction in pending list and
+>>> running list, if not there means we are done.
+>>>
+>>> Does this make sense??
+>> That only convinces me that there is something not so correct.
 >>
->> pm_genpd_poweron()
->> pm_genpd_name_poweron()
->> pm_genpd_poweroff_unused()
+>> To help me understand pls let me know if below is fine:
+>> - for a physical channel, do you submit multiple transactions?
+>
+> Yes
+>
+>> - if yes, how does DMA deal with multiple transactions, how does it schedule
+>>   them?
+>
+> So , basically we submit multiple descriptor to dma physical channel,
+> and dma engine execute it one by one and give us completion callback.
+> So in this way we expect callback on same order as submission order
+> and it does also, no issue.
+>
+> But problem is with supporting p+q offload, here we have P
+> functionality supports in dma physical channel 0 and Q functionality
+> supports in dma physical channel 1. So for pq we need to submit two
+> descriptor, one to channel 0 and second to channel1, in this case we
+> can't expect the completion order, because channnel 0 can finish P
+> before Q or vice versa, and we need to wait to complete both before
+> calling client callback() and completing cookie.
+> Second thing we submit memcpy and sg on same channel, and can complete
+> before even though if it submitted after PQ.
+
+So our SoC dma engine hw design idea was to get more throughput while
+running two channel concurrent and calculating the P and Q together,
+but somehow now today we came to scenario where running P and Q on
+different channel causing hang to dmaengine, some hw bug, So now I am
+going to support P and Q generation in same channel, so above
+mentioned cookie status scenario will never come.
+I will send you the patch for review.
+
+Thanks,
+>
 >>
->> Theoretically we should be able to replace these with
->> dev_pm_domain_get|put() or whatever we decide to name them to.
->>
->> >
->> > Also what about calling these from the driver core, ie. really_probe()?
->>
->> I like that!
->>
->> That also implies moving the calls to dev_pm_domain_attach|detach()
->> out of the buses and into the drivercore, since we need the PM domain
->> to be attached before calling dev_pm_domain_get|put(). I assume that's
->> what you also propose me to change, right?
->
-> Not really.  I don't want to inflict the ACPI PM domain on every bus type
-> that may not be prepared for using it or even may not want to use it (like
-> PCI or PNP).  That applies to genpd too to some extent.
->
-> So bus types need to be able to opt in for using "default" PM domains, but
-> at the same time if they do, the core is a better place to invoke the
-> callbacks.
-
-Okay!
-
->
-> The patch below shows how that can be done.  For the bus types using
-> genpd or the ACPI PM domain today ->pm_domain_init and ->pm_domain_exit
-> may point to the routines initializing/detaching those (which also will help
-> to reduce code duplication somewhat) and that guarantees that the domains
-> will be attached to devices before probing and the core can do the ->pre_probe
-> and ->post_probe things for everybody.
-
-Overall, this seem like a very good idea!
-
->
-> Rafael
->
->
-> ---
->  drivers/base/bus.c     |   12 +++++++++++-
->  drivers/base/dd.c      |    9 +++++++++
->  include/linux/device.h |    3 +++
->  include/linux/pm.h     |    2 ++
->  4 files changed, 25 insertions(+), 1 deletion(-)
->
-> Index: linux-pm/drivers/base/bus.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/bus.c
-> +++ linux-pm/drivers/base/bus.c
-> @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
->         int error = 0;
->
->         if (bus) {
-> +               if (bus->pm_domain_init) {
-> +                       error = bus->pm_domain_init(dev);
-> +                       if (error)
-> +                               goto out_put;
-> +               }
->                 pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
->                 error = device_add_attrs(bus, dev);
->                 if (error)
-> -                       goto out_put;
-> +                       goto out_pm_domain;
->                 error = device_add_groups(dev, bus->dev_groups);
->                 if (error)
->                         goto out_groups;
-> @@ -534,6 +539,9 @@ out_groups:
->         device_remove_groups(dev, bus->dev_groups);
->  out_id:
->         device_remove_attrs(bus, dev);
-> +out_pm_domain:
-> +       if (bus->pm_domain_exit)
-> +               bus->pm_domain_exit(dev);
->  out_put:
->         bus_put(dev->bus);
->         return error;
-
-To make this work for bus_add_device(), we first need to change the
-registration procedure for genpd DT providers. Currently that's done
-when "PM domain drivers" invokes the __of_genpd_add_provider() API,
-from SoC specific code and from different init levels.
-
-We need to have the available gendp DT providers registered when the
-->pm_domain_init() callback is invoked.
-
-Besides the changes above, genpd also needs to deal with attached
-devices, but which don't have a corresponding driver bound. I believe
-we have some corner cases to fix around this as well.
-
-As an intermediate step, how about adding the similar code as above
-but into really_probe()? For the code in bus_remove_device() below, we
-could add that into __device_release_driver()?
-
-> @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
->         device_remove_groups(dev, dev->bus->dev_groups);
->         if (klist_node_attached(&dev->p->knode_bus))
->                 klist_del(&dev->p->knode_bus);
-> +       if (bus->pm_domain_exit)
-> +               bus->pm_domain_exit(dev);
->
->         pr_debug("bus: '%s': remove device %s\n",
->                  dev->bus->name, dev_name(dev));
-> Index: linux-pm/include/linux/device.h
-> ===================================================================
-> --- linux-pm.orig/include/linux/device.h
-> +++ linux-pm/include/linux/device.h
-> @@ -123,6 +123,9 @@ struct bus_type {
->         int (*suspend)(struct device *dev, pm_message_t state);
->         int (*resume)(struct device *dev);
->
-> +       int (*pm_domain_init)(struct device *dev);
-> +       void (*pm_domain_exit)(struct device *dev);
-> +
->         const struct dev_pm_ops *pm;
->
->         const struct iommu_ops *iommu_ops;
-> Index: linux-pm/include/linux/pm.h
-> ===================================================================
-> --- linux-pm.orig/include/linux/pm.h
-> +++ linux-pm/include/linux/pm.h
-> @@ -607,6 +607,8 @@ extern void dev_pm_put_subsys_data(struc
->  struct dev_pm_domain {
->         struct dev_pm_ops       ops;
->         void (*detach)(struct device *dev, bool power_off);
-> +       int (*pre_probe)(struct device *dev);
-> +       void (*post_probe)(struct device *dev);
->  };
->
->  /*
-> Index: linux-pm/drivers/base/dd.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/dd.c
-> +++ linux-pm/drivers/base/dd.c
-> @@ -298,6 +298,12 @@ static int really_probe(struct device *d
->                 goto probe_failed;
->         }
->
-> +       if (dev->pm_domain && dev->pm_domain->pre_probe) {
-> +               ret = dev->pm_domain->pre_probe(dev);
-> +               if (ret)
-> +                       goto probe_failed;
-> +       }
-> +
->         if (dev->bus->probe) {
->                 ret = dev->bus->probe(dev);
->                 if (ret)
-> @@ -308,6 +314,9 @@ static int really_probe(struct device *d
->                         goto probe_failed;
->         }
->
-> +       if (dev->pm_domain && dev->pm_domain->post_probe)
-> +               dev->pm_domain->post_probe(dev);
-> +
->         driver_bound(dev);
->         ret = 1;
->         pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
->
-
-Kind regards
-Uffe
+>> --
+>> ~Vinod
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
