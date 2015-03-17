@@ -1,35 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Mar 2015 17:31:11 +0000
-Subject: [PATCH 0/6] make memtest a generic kernel feature
-In-Reply-To: <5508625F.6060600@arm.com>
-References: <1425896830-19705-1-git-send-email-vladimir.murzin@arm.com>
- <20150317171822.GW8399@arm.com> <5508625F.6060600@arm.com>
-Message-ID: <20150317173111.GA8399@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Mar 2015 10:27:37 -0700
+Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
+In-Reply-To: <CAGo_u6rNj=k0cYx1G_v2eFHcf0sHY++bUz0uM6PfiRXbc2chqg@mail.gmail.com>
+References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
+ <20150316233005.GA2598@atomide.com> <550855B7.3020905@oracle.com>
+ <550856FF.9080702@ti.com> <20150317163440.GC31346@atomide.com>
+ <CAGo_u6oHk9MXPGQv1rCpvW_oegzEzFTu3sZ_4j_6HFEivnXZXg@mail.gmail.com>
+ <20150317171000.GD31346@atomide.com>
+ <CAGo_u6rNj=k0cYx1G_v2eFHcf0sHY++bUz0uM6PfiRXbc2chqg@mail.gmail.com>
+Message-ID: <20150317172737.GE31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 05:20:31PM +0000, Vladimir Murzin wrote:
-> On 17/03/15 17:18, Will Deacon wrote:
-> > On Mon, Mar 09, 2015 at 10:27:04AM +0000, Vladimir Murzin wrote:
-> >> Memtest is a simple feature which fills the memory with a given set of
-> >> patterns and validates memory contents, if bad memory regions is detected it
-> >> reserves them via memblock API. Since memblock API is widely used by other
-> >> architectures this feature can be enabled outside of x86 world.
-> >>
-> >> This patch set promotes memtest to live under generic mm umbrella and enables
-> >> memtest feature for arm/arm64.
-> >>
-> >> It was reported that this patch set was useful for tracking down an issue with
-> >> some errant DMA on an arm64 platform.
-> >>
-> >> Since it touches x86 and mm bits it'd be great to get ACK/NAK for these bits.
-> > 
-> > Is your intention for akpm to merge this? I don't mind how it goes upstream,
-> > but that seems like a sensible route to me.
-> > 
+* Nishanth Menon <nm@ti.com> [150317 10:18]:
+> On Tue, Mar 17, 2015 at 12:10 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> >
+> > Yes that's a good point and adding a printk is a good idea. Care to
+> > crank out a separate patch for that?
 > 
-> It is already in -mm tree.
+> 
+> had hoped to have it part of this patch - does'nt that make more sense?
 
-Cracking, I missed the memo somehow.
+Hmm well this patch removes code that's been dead for a few years.. I'd
+rather keep this as clean up, then merge what you're suggesting as a
+separate non-critical patch as that we could already do without removing
+this code.
 
-Will
+Regards,
+
+Tony
