@@ -1,160 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 17 Mar 2015 10:47:38 +0100
-Subject: [PATCH 3/5] clk: mediatek: Add basic clocks for Mediatek MT8135.
-In-Reply-To: <20150316070339.GA25487@pengutronix.de>
-References: <1426485311-31428-1-git-send-email-s.hauer@pengutronix.de>
- <1426485311-31428-4-git-send-email-s.hauer@pengutronix.de>
- <20150316070339.GA25487@pengutronix.de>
-Message-ID: <20150317094738.GF4927@pengutronix.de>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 17 Mar 2015 10:49:05 +0100
+Subject: [PATCH 33/35 linux-next] mmc: constify of_device_id array
+In-Reply-To: <1426535949-26107-2-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-2-git-send-email-fabf@skynet.be>
+Message-ID: <CAPDyKFodW1zgrQ-sd5TPO_rCa_-tm95JkwCWiGX4BCUSFqPHdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 08:03:39AM +0100, Uwe Kleine-K?nig wrote:
-> Hello Sascha,
-> 
-> On Mon, Mar 16, 2015 at 06:55:09AM +0100, Sascha Hauer wrote:
-> > +static const char *axi_parents[] __initconst = {
-> > +	"clk26m",
-> > +	"syspll_d3",
-> > +	"syspll_d4",
-> > +	"syspll_d6",
-> > +	"univpll_d5",
-> > +	"univpll2_d2",
-> > +	"syspll_d3p5"
-> > +};
-> __initconst should only be used for const data, but this array isn't
-> const. Only the strings the pointer in this array point to are constant.
+On 16 March 2015 at 20:59, Fabian Frederick <fabf@skynet.be> wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
+>
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
 
-That may be true, but the way it's currently done compiles through
-without warnings with CONFIG_DEBUG_SECTION_MISMATCH enabled.
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-> 
-> So you have to use either
-> 
-> 	static const char *axi_parents[] __initdata = {
-
-This results in:
-
-drivers/clk/mediatek/clk-mt8173.c:515:20: error: i2s3_b_ck_parents causes a section type conflict with infra_clks
- static const char *i2s3_b_ck_parents[] __initdata = {
-
-which can be avoided with static const char * const axi_parents[] __initdata
-
-> 
-> or
-> 
-> 	static const char * const axi_parents[] __initconst = {
-
-Which results in:
-
-drivers/clk/mediatek/clk-mt8173.c:568:2: warning: initialization discards 'const' qualifier from pointer target type
-  MUX_GATE(TOP_HDCP_24M_SEL, "hdcp_24m_sel", hdcp_24m_parents, 0x00d0, 16, 2, 23),
-
-With the following patch this can also be resolved. Until this is merged
-(or I have the OK from Mike to add this in front of this series) I
-prefer to keep it like it is at the moment.
-
-(BTW I compile tested this with ARM multi_v7_defconfig, no additional
-warnings are introduced with this patch)
-
-Sascha
-
--------------------------------8<-----------------------------------
-
->From 49f76867545d2f402c9684bb26339054b2151977 Mon Sep 17 00:00:00 2001
-From: Sascha Hauer <s.hauer@pengutronix.de>
-Date: Tue, 17 Mar 2015 10:43:41 +0100
-Subject: [PATCH] clk: make initialization arrays const char * const *
-
-Not only the initialization arrays should be const, but also the
-strings inside the arrays. This allows users to put the parent_name
-arrays into __initdata or __initconst.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/clk/clk-composite.c  | 2 +-
- drivers/clk/clk-mux.c        | 4 ++--
- include/linux/clk-provider.h | 8 ++++----
- 3 files changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 956b7e5..077f4c714 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -188,7 +188,7 @@ static void clk_composite_disable(struct clk_hw *hw)
- }
- 
- struct clk *clk_register_composite(struct device *dev, const char *name,
--			const char **parent_names, int num_parents,
-+			const char * const *parent_names, int num_parents,
- 			struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 			struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 			struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 69a094c..1fa2a8d 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -114,7 +114,7 @@ const struct clk_ops clk_mux_ro_ops = {
- EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
- 
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
- {
-@@ -166,7 +166,7 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- EXPORT_SYMBOL_GPL(clk_register_mux_table);
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock)
- {
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5591ea7..3bdae71 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -209,7 +209,7 @@ struct clk_ops {
- struct clk_init_data {
- 	const char		*name;
- 	const struct clk_ops	*ops;
--	const char		**parent_names;
-+	const char * const	*parent_names;
- 	u8			num_parents;
- 	unsigned long		flags;
- };
-@@ -426,12 +426,12 @@ extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
- 
- struct clk *clk_register_mux(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
- 		u8 clk_mux_flags, spinlock_t *lock);
- 
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
--		const char **parent_names, u8 num_parents, unsigned long flags,
-+		const char * const *parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
- 		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
- 
-@@ -518,7 +518,7 @@ struct clk_composite {
- };
- 
- struct clk *clk_register_composite(struct device *dev, const char *name,
--		const char **parent_names, int num_parents,
-+		const char * const *parent_names, int num_parents,
- 		struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
- 		struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
- 		struct clk_hw *gate_hw, const struct clk_ops *gate_ops,
--- 
-2.1.4
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  drivers/mmc/host/mmc_spi.c   | 2 +-
+>  drivers/mmc/host/wmt-sdmmc.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
+> index e4a0754..ae19d83 100644
+> --- a/drivers/mmc/host/mmc_spi.c
+> +++ b/drivers/mmc/host/mmc_spi.c
+> @@ -1507,7 +1507,7 @@ static int mmc_spi_remove(struct spi_device *spi)
+>         return 0;
+>  }
+>
+> -static struct of_device_id mmc_spi_of_match_table[] = {
+> +static const struct of_device_id mmc_spi_of_match_table[] = {
+>         { .compatible = "mmc-spi-slot", },
+>         {},
+>  };
+> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+> index dd2e1aa..5af0055 100644
+> --- a/drivers/mmc/host/wmt-sdmmc.c
+> +++ b/drivers/mmc/host/wmt-sdmmc.c
+> @@ -744,7 +744,7 @@ static struct wmt_mci_caps wm8505_caps = {
+>         .max_blk_size = 2048,
+>  };
+>
+> -static struct of_device_id wmt_mci_dt_ids[] = {
+> +static const struct of_device_id wmt_mci_dt_ids[] = {
+>         { .compatible = "wm,wm8505-sdhc", .data = &wm8505_caps },
+>         { /* Sentinel */ },
+>  };
+> --
+> 2.1.0
+>
