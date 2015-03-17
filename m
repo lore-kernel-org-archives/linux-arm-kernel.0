@@ -1,100 +1,166 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 Mar 2015 17:15:46 +0100
-Subject: [PATCH 1/5] USB: ehci-atmel: rework clk handling
+Date: Tue, 17 Mar 2015 17:15:50 +0100
+Subject: [PATCH 5/5] ARM: at91/dt: remove useless usb clock
 In-Reply-To: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1426608950-31555-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1426608950-31555-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EHCI IP only needs the UTMI/UPLL (uclk) and the peripheral (iclk)
-clocks to work properly. Remove the useless system clock (fclk).
-
-Avoid calling set_rate on the fixed rate UTMI/IPLL clock and remove
-useless IS_ENABLED(CONFIG_COMMON_CLK) tests (all at91 platforms have been
-moved to the CCF).
-
-This patch also fixes a bug introduced by 3440ef1 (ARM: at91/dt: fix USB
-high-speed clock to select UTMI), which was leaving the usb clock
-uninitialized and preventing the OHCI driver from setting the usb clock
-rate to 48MHz.
-This bug was caused by several things:
-1/ usb clock drivers set the CLK_SET_RATE_GATE flag, which means the rate
-   cannot be changed once the clock is prepared
-2/ The EHCI driver was retrieving and preparing/enabling the uhpck
-   clock which was in turn preparing its parent clock (the usb clock),
-   thus preventing any rate change because of 1/
+The ohci driver now calls clk_set_rate on the uhpck clock (which forwards
+set_rate requests to its parent: the usb clock).
+Remove useless references to usb clocks from ohci definitions.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/usb/host/ehci-atmel.c | 30 +++++++++---------------------
- 1 file changed, 9 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/at91rm9200.dtsi  | 4 ++--
+ arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9261.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9263.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9g45.dtsi | 4 ++--
+ arch/arm/boot/dts/at91sam9n12.dtsi | 5 ++---
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++--
+ arch/arm/boot/dts/sama5d3.dtsi     | 5 ++---
+ arch/arm/boot/dts/sama5d4.dtsi     | 5 ++---
+ 9 files changed, 18 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 663f790..be0964a 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -34,7 +34,6 @@ static const char hcd_name[] = "ehci-atmel";
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 21c2b50..31892a1 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -936,8 +936,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00300000 0x100000>;
+ 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&ohci_clk>, <&ohci_clk>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&ohci_clk>, <&ohci_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index e7f0a4a..2dabe77 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -1008,8 +1008,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&ohci_clk>, <&ohci_clk>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&ohci_clk>, <&ohci_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index d55fdf2..db811f9 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -75,8 +75,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&ohci_clk>, <&hclk0>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&ohci_clk>, <&hclk0>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
  
- struct atmel_ehci_priv {
- 	struct clk *iclk;
--	struct clk *fclk;
- 	struct clk *uclk;
- 	bool clocked;
- };
-@@ -51,12 +50,9 @@ static void atmel_start_clock(struct atmel_ehci_priv *atmel_ehci)
- {
- 	if (atmel_ehci->clocked)
- 		return;
--	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		clk_set_rate(atmel_ehci->uclk, 48000000);
--		clk_prepare_enable(atmel_ehci->uclk);
--	}
-+
-+	clk_prepare_enable(atmel_ehci->uclk);
- 	clk_prepare_enable(atmel_ehci->iclk);
--	clk_prepare_enable(atmel_ehci->fclk);
- 	atmel_ehci->clocked = true;
- }
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index fce301c..aa981cd 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -1010,8 +1010,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00a00000 0x100000>;
+ 			interrupts = <29 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&ohci_clk>, <&ohci_clk>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&ohci_clk>, <&ohci_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index a5895f3..644570e 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -1291,8 +1291,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00700000 0x100000>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
  
-@@ -64,10 +60,9 @@ static void atmel_stop_clock(struct atmel_ehci_priv *atmel_ehci)
- {
- 	if (!atmel_ehci->clocked)
- 		return;
--	clk_disable_unprepare(atmel_ehci->fclk);
-+
- 	clk_disable_unprepare(atmel_ehci->iclk);
--	if (IS_ENABLED(CONFIG_COMMON_CLK))
--		clk_disable_unprepare(atmel_ehci->uclk);
-+	clk_disable_unprepare(atmel_ehci->uclk);
- 	atmel_ehci->clocked = false;
- }
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index 0c53a37..8d4200d 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -940,9 +940,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x00100000>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+-				 <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 9a74a90..dab8bf9 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -1176,8 +1176,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00600000 0x100000>;
+ 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
  
-@@ -146,20 +141,13 @@ static int ehci_atmel_drv_probe(struct platform_device *pdev)
- 		retval = -ENOENT;
- 		goto fail_request_resource;
- 	}
--	atmel_ehci->fclk = devm_clk_get(&pdev->dev, "uhpck");
--	if (IS_ERR(atmel_ehci->fclk)) {
--		dev_err(&pdev->dev, "Error getting function clock\n");
--		retval = -ENOENT;
-+
-+	atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
-+	if (IS_ERR(atmel_ehci->uclk)) {
-+		dev_err(&pdev->dev, "failed to get uclk\n");
-+		retval = PTR_ERR(atmel_ehci->uclk);
- 		goto fail_request_resource;
- 	}
--	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
--		atmel_ehci->uclk = devm_clk_get(&pdev->dev, "usb_clk");
--		if (IS_ERR(atmel_ehci->uclk)) {
--			dev_err(&pdev->dev, "failed to get uclk\n");
--			retval = PTR_ERR(atmel_ehci->uclk);
--			goto fail_request_resource;
--		}
--	}
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index a266a39..b1ded48 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -1405,9 +1405,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00600000 0x100000>;
+ 			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+-				 <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
  
- 	ehci = hcd_to_ehci(hcd);
- 	/* registers start at offset 0x0 */
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 4bfe7c1..8b16d6a 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -250,9 +250,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <46 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&usb>, <&uhphs_clk>, <&uhphs_clk>,
+-				 <&uhpck>;
+-			clock-names = "usb_clk", "ohci_clk", "hclk", "uhpck";
++			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.9.1
