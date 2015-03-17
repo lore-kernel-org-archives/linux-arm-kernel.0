@@ -1,17 +1,22 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 17 Mar 2015 03:48:38 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-Message-ID: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Mar 2015 20:55:35 -0700
+Subject: [PATCH 26/35 linux-next] hwmon: constify of_device_id array
+In-Reply-To: <1426535685-25996-5-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-5-git-send-email-fabf@skynet.be>
+Message-ID: <5507A5B7.5020704@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been running XIP_KERNEL with linux-3.14 on a Renesas RZ/A1 (ARCH_R7S72100) for a while now (with some bug fixes of course) so I thought I'd see if my fixes should be pushed back upstream.
+On 03/16/2015 12:54 PM, Fabian Frederick wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
+>
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
 
-However, I see that all the Renesas parts are being moved to ARCH_MULTIPLATFORM, which by means of arch/arm/Kconfig disallows XIP_KERNEL.
-
-Looking back through the mailing list archives I see that there was some discussion on this, but never really a conclusion.
-
-So my question is basically: What is the correct configuration to use XIP_KERNEL with a Renesas SoC? Is the idea that I need to go carve up my own config and do everything outside the normal tree from here on out?
+Applied to hwmon-next.
 
 Thanks,
-Chris
+Guenter
