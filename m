@@ -1,44 +1,26 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 17 Mar 2015 19:54:20 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable HDMI support
-In-Reply-To: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
-References: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Mar 2015 18:54:49 +0000
+Subject: [PATCHv3 0/5] arm-cci400: PMU monitoring support on ARM64
+In-Reply-To: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
+References: <1426000735-14375-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20150317185449.GF8399@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+On Tue, Mar 10, 2015 at 03:18:50PM +0000, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
+> 
+> This series enables the PMU monitoring support for CCI400 on ARM64.
+> The existing CCI400 driver code is a mix of PMU driver and the MCPM
+> driver code. The MCPM driver is only used on ARM(32) and contains
+> arm32 assembly and hence can't be built on ARM64. This patch splits
+> the code to
+> 
+>  - ARM_CCI400_PORT_CTRL driver - depends on ARM && V7
+>  - ARM_CCI400_PMU driver
 
-On Fri, Feb 6, 2015 at 6:42 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-> Many Exynos boards have an HDMI port so enable Exynos DRM HDMI support.
->
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> ---
->
-> Exynos DRM HDMI has some issues that were fixed by Andrzej's [0] series.
-> So now is safe to HDMI support for Exynos boards.
->
-> [0]: https://lkml.org/lkml/2015/2/5/265
->
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 70e5d0bdb4e4..e44da52e5223 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -120,6 +120,7 @@ CONFIG_REGULATOR_S2MPS11=y
->  CONFIG_REGULATOR_S5M8767=y
->  CONFIG_REGULATOR_TPS65090=y
->  CONFIG_DRM=y
-> +CONFIG_DRM_EXYNOS_HDMI=y
->  CONFIG_DRM_BRIDGE=y
->  CONFIG_DRM_PTN3460=y
->  CONFIG_DRM_PS8622=y
-> --
+If you repost this with acks added and my feedback addressed, then I'm
+happy to put together a branch for arm-soc along with your other CCI PMU
+fix for event validation.
 
-It seems you missed this patch when picking the exynos_defconfig patches.
-
-Best regards,
-Javier
+Will
