@@ -1,144 +1,168 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 17 Mar 2015 21:48:15 +0530
-Subject: [PATCH] i2c: cadence: Handling Slave monitor mode
-Message-ID: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 17 Mar 2015 16:18:16 +0000
+Subject: [PATCH v4 4/5] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+References: <1426503716-13931-1-git-send-email-alex.bennee@linaro.org>
+ <1426503716-13931-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA8hJTFeR63gJO9QX7nWuFktkehDzGmJjqhTBkTjw4=7Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In slave monitor mode, the I2C interface is set up as a master and
-continues to attempt a transfer to a particular slave until the
-slave device responds with an ACK.
+On 16 March 2015 at 11:01, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> The current code was negatively indexing the cpu state array and not
+> synchronizing banked spsr register state with the current mode's spsr
+> state, causing occasional failures with migration.
+>
+> Some munging is done to take care of the aarch64 mapping and also to
+> ensure the most current value of the spsr is updated to the banked
+> registers (relevant for KVM<->TCG migration).
+>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> ---
+> v2 (ajb)
+>   - minor tweaks and clarifications
+> v3
+>   - Use the correct bank index function for setting/getting env->spsr
+>   - only deal with spsrs in elevated exception levels
+> v4
+>  - try and make commentary clearer
+>  - ensure env->banked_spsr[0] = env->spsr before we sync
+>
+> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> index 8fd0c8d..7ddb1b1 100644
+> --- a/target-arm/kvm64.c
+> +++ b/target-arm/kvm64.c
+> @@ -140,6 +140,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>      uint64_t val;
+>      int i;
+>      int ret;
+> +    unsigned int el;
+>
+>      ARMCPU *cpu = ARM_CPU(cs);
+>      CPUARMState *env = &cpu->env;
+> @@ -206,9 +207,29 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          return ret;
+>      }
+>
+> +    /* Saved Program State Registers
+> +     *
+> +     * Before we restore from the banked_spsr[] array we need to
+> +     * ensure that any modifications to env->spsr are correctly
+> +     * reflected and map aarch64 exception levels if required.
 
-Added this feature for zero length transfers enable the controller
-for slave monitor interrupt and get the status. Disable the slave
-monitor mode feature upon successful handling.
+"AArch64". Not entirely sure what the "map exception levels"
+is saying.
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-Acked-by: Harini Katakam <harinik@xilinx.com>
----
- drivers/i2c/busses/i2c-cadence.c | 69 ++++++++++++++++++++++++++++++++++++----
- 1 file changed, 62 insertions(+), 7 deletions(-)
+> +     */
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            env->banked_spsr[0] = env->spsr;
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 7d7a14c..6bac2cb 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -25,11 +25,13 @@
- #define CDNS_I2C_DATA_OFFSET		0x0C /* I2C Data Register, RW */
- #define CDNS_I2C_ISR_OFFSET		0x10 /* IRQ Status Register, RW */
- #define CDNS_I2C_XFER_SIZE_OFFSET	0x14 /* Transfer Size Register, RW */
-+#define CDNS_I2C_SLV_PAUSE_OFFSET	0x18 /* Transfer Size Register, RW */
- #define CDNS_I2C_TIME_OUT_OFFSET	0x1C /* Time Out Register, RW */
- #define CDNS_I2C_IER_OFFSET		0x24 /* IRQ Enable Register, WO */
- #define CDNS_I2C_IDR_OFFSET		0x28 /* IRQ Disable Register, WO */
- 
- /* Control Register Bit mask definitions */
-+#define CDNS_I2C_CR_SLVMON		BIT(5) /* Slave monitor mode bit */
- #define CDNS_I2C_CR_HOLD		BIT(4) /* Hold Bus bit */
- #define CDNS_I2C_CR_ACK_EN		BIT(3)
- #define CDNS_I2C_CR_NEA			BIT(2)
-@@ -310,6 +312,23 @@ static irqreturn_t cdns_i2c_isr(int irq, void *ptr)
- 		status = IRQ_HANDLED;
- 	}
- 
-+	/* Handling Slave monitor mode interrupt */
-+	if (isr_status & CDNS_I2C_IXR_SLV_RDY) {
-+		unsigned int ctrl_reg;
-+		/* Read control register */
-+		ctrl_reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
-+
-+		/* Disable slave monitor mode */
-+		ctrl_reg &= ~CDNS_I2C_CR_SLVMON;
-+		cdns_i2c_writereg(ctrl_reg, CDNS_I2C_CR_OFFSET);
-+
-+		/* Clear interrupt flag for slvmon mode */
-+		cdns_i2c_writereg(CDNS_I2C_IXR_SLV_RDY, CDNS_I2C_IDR_OFFSET);
-+
-+		done_flag = 1;
-+		status = IRQ_HANDLED;
-+	}
-+
- 	/* Update the status for errors */
- 	id->err_status = isr_status & CDNS_I2C_IXR_ERR_INTR_MASK;
- 	if (id->err_status)
-@@ -444,6 +463,40 @@ static void cdns_i2c_msend(struct cdns_i2c *id)
- }
- 
- /**
-+ * cdns_i2c_slvmon - Handling Slav monitor mode feature
-+ * @id:		pointer to the i2c device
-+ */
-+static void cdns_i2c_slvmon(struct cdns_i2c *id)
-+{
-+	unsigned int ctrl_reg;
-+	unsigned int isr_status;
-+
-+	id->p_recv_buf = NULL;
-+	id->p_send_buf = id->p_msg->buf;
-+	id->send_count = id->p_msg->len;
-+
-+	/* Clear the interrupts in interrupt status register. */
-+	isr_status = cdns_i2c_readreg(CDNS_I2C_ISR_OFFSET);
-+	cdns_i2c_writereg(isr_status, CDNS_I2C_ISR_OFFSET);
-+
-+	/* Enable slvmon control reg */
-+	ctrl_reg = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
-+	ctrl_reg |=  CDNS_I2C_CR_MS | CDNS_I2C_CR_NEA | CDNS_I2C_CR_SLVMON
-+			| CDNS_I2C_CR_CLR_FIFO;
-+	ctrl_reg &= ~(CDNS_I2C_CR_RW);
-+	cdns_i2c_writereg(ctrl_reg, CDNS_I2C_CR_OFFSET);
-+
-+	/* Initialize slvmon reg */
-+	cdns_i2c_writereg(0xF, CDNS_I2C_SLV_PAUSE_OFFSET);
-+
-+	/* Set the slave address to start the slave address transmission */
-+	cdns_i2c_writereg(id->p_msg->addr, CDNS_I2C_ADDR_OFFSET);
-+
-+	/* Setup slvmon interrupt flag */
-+	cdns_i2c_writereg(CDNS_I2C_IXR_SLV_RDY, CDNS_I2C_IER_OFFSET);
-+}
-+
-+/**
-  * cdns_i2c_master_reset - Reset the interface
-  * @adap:	pointer to the i2c adapter driver instance
-  *
-@@ -459,7 +512,7 @@ static void cdns_i2c_master_reset(struct i2c_adapter *adap)
- 	cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK, CDNS_I2C_IDR_OFFSET);
- 	/* Clear the hold bit and fifos */
- 	regval = cdns_i2c_readreg(CDNS_I2C_CR_OFFSET);
--	regval &= ~CDNS_I2C_CR_HOLD;
-+	regval &= ~(CDNS_I2C_CR_HOLD | CDNS_I2C_CR_SLVMON);
- 	regval |= CDNS_I2C_CR_CLR_FIFO;
- 	cdns_i2c_writereg(regval, CDNS_I2C_CR_OFFSET);
- 	/* Update the transfercount register to zero */
-@@ -493,9 +546,11 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
- 			cdns_i2c_writereg(reg | CDNS_I2C_CR_NEA,
- 					CDNS_I2C_CR_OFFSET);
- 	}
--
--	/* Check for the R/W flag on each msg */
--	if (msg->flags & I2C_M_RD)
-+	/* Check for zero lenght - Slave monitor mode */
-+	if (msg->len == 0)
-+		cdns_i2c_slvmon(id);
-+	 /* Check for the R/W flag on each msg */
-+	else if (msg->flags & I2C_M_RD)
- 		cdns_i2c_mrecv(id);
- 	else
- 		cdns_i2c_msend(id);
-@@ -535,10 +590,10 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 	int ret, count;
- 	u32 reg;
- 	struct cdns_i2c *id = adap->algo_data;
--
- 	/* Check if the bus is free */
--	if (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA)
--		return -EAGAIN;
-+	if (msgs->len)
-+		if (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA)
-+			return -EAGAIN;
- 
- 	/*
- 	 * Set the flag to one when multiple messages are to be
--- 
-2.1.2
+If we're in AArch64 mode then I don't believe
+env->spsr has valid content at this point. The live
+copy is in env->banked_sprsr[] for all cases.
+
+> +            /* QEMUs AARCH64 EL1 SPSR is in bank 0, so map it to
+> +             * KVM_SPSR_SVC for syncing to KVM */
+
+"QEMU's" and "AArch64", but this is just a bug in our
+implementation -- the mapping between AArch64 SPSR_EL1
+and AArch32 SPSR_svc is architecturally mandated.
+We should be using banked_spsr[1] for our regdef for
+SPSR_EL1 in helper.c.
+
+Also the "*/" should be on its own line.
+
+> +            env->banked_spsr[1] = env->banked_spsr[0];
+
+What is going on here? Architecturally, AArch64 SPSR_EL1
+is mapped to AArch32 SPSR_svc, which is env->banked_spsr[1].
+env->banked_spsr[0] would be the SPSR for USR and SYS, except
+they don't have an SPSR (you cannot take exceptions into them).
+I think QEMU just has a banked_spsr[0] for convenience of
+implementation and it should never actually be used.
+Is this code just working around the QEMU SPSR_EL1 bug?
+
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> +            env->banked_spsr[i] = env->spsr;
+> +        }
+> +    }
+> +
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+
+Coding style demands spaces around the "+" operator.
+
+Note that this code is implicitly relying on the
+ordering of register banks defined by the bank_number()
+function, which is a bit icky.
+
+>          ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+> @@ -254,6 +275,7 @@ int kvm_arch_get_registers(CPUState *cs)
+>      struct kvm_one_reg reg;
+>      uint64_t val;
+>      uint32_t fpr;
+> +    unsigned int el;
+>      int i;
+>      int ret;
+>
+> @@ -326,15 +348,34 @@ int kvm_arch_get_registers(CPUState *cs)
+>          return ret;
+>      }
+>
+> +    /* Fetch the SPSR registers
+> +     *
+> +     * KVM has an array of state indexed for all the possible aarch32
+> +     * privilege levels. These map onto QEMUs aarch32 banks 1 - 4.
+
+QEMU's. AArch32. Also, you mean "1 - 5".
+
+> +     */
+>      for (i = 0; i < KVM_NR_SPSR; i++) {
+>          reg.id = AARCH64_CORE_REG(spsr[i]);
+> -        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
+> +        reg.addr = (uintptr_t) &env->banked_spsr[i+1];
+
+Spaces again.
+
+>          ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+>          if (ret) {
+>              return ret;
+>          }
+>      }
+>
+> +    el = arm_current_el(env);
+> +    if (el > 0) {
+> +        if (is_a64(env)) {
+> +            g_assert(el == 1);
+> +            /* KVM_SPSR_SVC holds the AARCH64 EL1 SPSR which QEMU
+> +             * keeps in bank 0 so copy it across. */
+> +            env->banked_spsr[0] = env->banked_spsr[1];
+> +            i = aarch64_banked_spsr_index(el);
+
+More workarounds for a bug we should just fix, I think.
+
+> +        } else {
+> +            i = bank_number(env->uncached_cpsr & CPSR_M);
+> +        }
+> +        env->spsr = env->banked_spsr[i];
+> +    }
+> +
+>      /* Advanced SIMD and FP registers */
+>      for (i = 0; i < 32; i++) {
+>          reg.id = AARCH64_SIMD_CORE_REG(fp_regs.vregs[i]);
+> --
+> 2.3.2
+
+thanks
+-- PMM
