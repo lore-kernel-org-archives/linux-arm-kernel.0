@@ -1,43 +1,38 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 17 Mar 2015 09:26:31 -0700
-Subject: [PATCH] ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-In-Reply-To: <20150316233005.GA2598@atomide.com>
-References: <1424889867-8980-1-git-send-email-stefan.hengelein@fau.de>
- <20150316233005.GA2598@atomide.com>
-Message-ID: <550855B7.3020905@oracle.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Wed, 18 Mar 2015 01:27:49 +0900
+Subject: [PATCH] ARM: dts: Update exynos5250-spring with mmc node changes
+In-Reply-To: <5506EEF9.7080100@suse.de>
+References: <1424275812-6797-1-git-send-email-afaerber@suse.de>
+ <54E5CD2E.9070608@collabora.co.uk> <5506EEF9.7080100@suse.de>
+Message-ID: <55085605.2000001@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/16/15 23:55, Andreas F?rber wrote:
+> Am 19.02.2015 um 12:46 schrieb Javier Martinez Canillas:
+>> Hello Andreas,
+>>
+Hi,
 
+>> On 02/18/2015 05:10 PM, Andreas F?rber wrote:
+>>> Resolve a merge conflict with mmc refactoring aaa25a5a33cb ("ARM: dts:
+>>> unuse the slot-node and deprecate the supports-highspeed for dw-mmc in
+>>> exynos") by dropping the slot at 0 nodes, moving its bus-width property to
+>>> the mmc node and replacing supports-highspeed with cap-{mmc,sd}-highspeed,
+>>> matching exynos5250-snow.
+>>>
+>>> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+>>> Fixes: 53dd4138bb0a ("ARM: dts: Add exynos5250-spring device tree")
+>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5250-spring.dts | 16 ++++------------
+>>>  1 file changed, 4 insertions(+), 12 deletions(-)
+>>>
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+> Ping!
+> 
+Thanks, applied with 'Cc: <stable@vger.kernel.org> [3.19+]'
 
-On 3/16/2015 4:30 PM, Tony Lindgren wrote:
-> * Stefan Hengelein <stefan.hengelein@fau.de> [150225 10:48]:
->> The Kconfig-Option OMAP4_ERRATA_I688 is never visible due to a
->> contradiction in it's dependencies.
->> The option requires ARCH_MULTIPLATFORM to be 'disabled'. However, an
->> enclosing menu requires either ARCH_MULTI_V6 or ARCH_MULTI_V7 to be
->> enabled. These options inherit a dependency from an enclosing menu,
->> that requires ARCH_MULTIPLATFORM to be 'enabled'.
->> This is a contradiction and made this option also unavailable for
->> non-multiplatform configurations.
->>
->> Since there are no selects on OMAP4_ERRATA_I688, which would ignore
->> dependencies, the code related to that option is dead and can be
->> removed.
->>
->> This (logical) defect has been found with the undertaker tool.
->> (https://undertaker.cs.fau.de)
->>
->> Signed-off-by: Stefan Hengelein <stefan.hengelein@fau.de>
->>
->> ---
->> Tony Lindgren suggested to remove the code since nobody complained for
->> a few years and Santosh Shilimkar agreed.
->> https://lkml.org/lkml/2015/2/25/449
->> ---
->> As far as I see, this should remove all the code related to
->> OMAP4_ERRATA_I688, I hope I didn't remove too much.
->
-> Seems to boot fine, so applying into omap-for-v4.1/fixes-not-urgent.
->
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+- Kukjin
