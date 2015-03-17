@@ -1,41 +1,73 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 Mar 2015 17:15:45 +0100
-Subject: [PATCH 0/5] USB: atmel: rework clock handling
-Message-ID: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Tue, 17 Mar 2015 17:15:47 +0100
+Subject: [PATCH 2/5] USB: host: ohci-at91: remove useless uclk clock
+In-Reply-To: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1426608950-31555-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1426608950-31555-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Now that the system clock driver is forwarding set_rate request to the
+parent clock, we can safely call clk_set_rate on the system clk and get
+rid of the uclk field.
 
-This series reworks clock handling in atmel USB host drivers, and while
-doing so fixes a regression introduced by 3440ef1 (ARM: at91/dt: fix USB
-high-speed clock to select UTMI).
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/usb/host/ohci-at91.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
-Best Regards,
-
-Boris
-
-Boris Brezillon (5):
-  USB: ehci-atmel: rework clk handling
-  USB: host: ohci-at91: remove useless uclk clock
-  USB: atmel: update DT bindings documentation
-  ARM: at91/dt: remove useless uhpck clock references from ehci
-    defintions
-  ARM: at91/dt: remove useless usb clock
-
- .../devicetree/bindings/usb/atmel-usb.txt          | 25 ++++++++++++++++++
- arch/arm/boot/dts/at91rm9200.dtsi                  |  4 +--
- arch/arm/boot/dts/at91sam9260.dtsi                 |  4 +--
- arch/arm/boot/dts/at91sam9261.dtsi                 |  4 +--
- arch/arm/boot/dts/at91sam9263.dtsi                 |  4 +--
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  8 +++---
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  5 ++--
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  8 +++---
- arch/arm/boot/dts/sama5d3.dtsi                     |  9 +++----
- arch/arm/boot/dts/sama5d4.dtsi                     |  9 +++----
- drivers/usb/host/ehci-atmel.c                      | 30 +++++++---------------
- drivers/usb/host/ohci-at91.c                       | 18 +++----------
- 12 files changed, 63 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index 7cce85a..15df00c 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -39,7 +39,6 @@
+ struct ohci_at91_priv {
+ 	struct clk *iclk;
+ 	struct clk *fclk;
+-	struct clk *uclk;
+ 	struct clk *hclk;
+ 	bool clocked;
+ 	bool wakeup;		/* Saved wake-up state for resume */
+@@ -64,10 +63,8 @@ static void at91_start_clock(struct ohci_at91_priv *ohci_at91)
+ {
+ 	if (ohci_at91->clocked)
+ 		return;
+-	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		clk_set_rate(ohci_at91->uclk, 48000000);
+-		clk_prepare_enable(ohci_at91->uclk);
+-	}
++
++	clk_set_rate(ohci_at91->fclk, 48000000);
+ 	clk_prepare_enable(ohci_at91->hclk);
+ 	clk_prepare_enable(ohci_at91->iclk);
+ 	clk_prepare_enable(ohci_at91->fclk);
+@@ -78,11 +75,10 @@ static void at91_stop_clock(struct ohci_at91_priv *ohci_at91)
+ {
+ 	if (!ohci_at91->clocked)
+ 		return;
++
+ 	clk_disable_unprepare(ohci_at91->fclk);
+ 	clk_disable_unprepare(ohci_at91->iclk);
+ 	clk_disable_unprepare(ohci_at91->hclk);
+-	if (IS_ENABLED(CONFIG_COMMON_CLK))
+-		clk_disable_unprepare(ohci_at91->uclk);
+ 	ohci_at91->clocked = false;
+ }
+ 
+@@ -191,14 +187,6 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
+ 		retval = PTR_ERR(ohci_at91->hclk);
+ 		goto err;
+ 	}
+-	if (IS_ENABLED(CONFIG_COMMON_CLK)) {
+-		ohci_at91->uclk = devm_clk_get(dev, "usb_clk");
+-		if (IS_ERR(ohci_at91->uclk)) {
+-			dev_err(dev, "failed to get uclk\n");
+-			retval = PTR_ERR(ohci_at91->uclk);
+-			goto err;
+-		}
+-	}
+ 
+ 	board = hcd->self.controller->platform_data;
+ 	ohci = hcd_to_ohci(hcd);
 -- 
 1.9.1
