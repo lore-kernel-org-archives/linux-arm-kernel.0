@@ -1,161 +1,99 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Tue, 17 Mar 2015 12:07:02 -0500
-Subject: [PATCH v5 2/4] arm64: dts: Add Qualcomm MSM8916 SoC and
- evaluation board dts
-In-Reply-To: <5507F2B4.2000105@linaro.org>
-References: <1426262769-26758-1-git-send-email-galak@codeaurora.org>
- <5507F2B4.2000105@linaro.org>
-Message-ID: <7BF42995-431A-4D01-A1E9-F6274BE1C0FA@codeaurora.org>
+From: Andrew.Pinski@caviumnetworks.com (Pinski, Andrew)
+Date: Tue, 17 Mar 2015 17:07:07 +0000
+Subject: Question about aarch64 ILP32 ABI changes
+In-Reply-To: <55029CC6.2050306@huawei.com>
+References: <55029CC6.2050306@huawei.com>
+Message-ID: <CY1PR0701MB124480C7DEE49D7A85D553189E030@CY1PR0701MB1244.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+My answers below.  Note I am using a stupid mail client for this reply which does not do proper quoting.
 
-On Mar 17, 2015, at 4:24 AM, Stanimir Varbanov <stanimir.varbanov@linaro.org> wrote:
+-----Original Message-----
+From: Bamvor Jian Zhang [mailto:bamvor.zhangjian at huawei.com] 
+Sent: Friday, March 13, 2015 1:16 AM
+To: Catalin Marinas; Andrew Pinski
+Cc: linux-arm-kernel at lists.infradead.org; hongjiu.lu at intel.com; Bintian; Dingtianhong; zhangjian
+Subject: Question about aarch64 ILP32 ABI changes
 
-> On 03/13/2015 06:06 PM, Kumar Gala wrote:
->> Add initial device tree support for Qualcomm MSM8916 SoC and MTP8916
->> evaluation board.  At the current time we only boot up a single processor.
->> 
->> Signed-off-by: Kumar Gala <galak@codeaurora.org>
->> ---
->> v5:
->> * killed use of skeleton, moved to addr/size cells both being 2
->> * Added serial alias in prep of being able to spec uart params
->>  in chosen node
->> 
->> v4:
->> * Added chosen node so we dont need to spec everything for earlycon
->> * fixed up timer node to armv8, dropped clock-frequency
->> 
->> v3:
->> * Removed qcom,msm-id and qcom,board-id
->> * Added top level compat for "qcom,msm8916-mtp-smb1360"
->> 
->> v2:
->> * Updated to dropping CONFIG_ARCH_QCOM_MSM8916
->> * Updated to use qcom-ids.h
->> 
->> arch/arm64/boot/dts/Makefile              |   1 +
->> arch/arm64/boot/dts/qcom/Makefile         |   5 +
->> arch/arm64/boot/dts/qcom/msm8916-mtp.dts  |  21 ++++
->> arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi |  32 +++++
->> arch/arm64/boot/dts/qcom/msm8916.dtsi     | 195 ++++++++++++++++++++++++++++++
->> 5 files changed, 254 insertions(+)
->> create mode 100644 arch/arm64/boot/dts/qcom/Makefile
->> create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dts
->> create mode 100644 arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
->> create mode 100644 arch/arm64/boot/dts/qcom/msm8916.dtsi
->> 
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index e0350ca..8517f15 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -5,5 +5,6 @@ dts-dirs += cavium
->> dts-dirs += exynos
->> dts-dirs += freescale
->> dts-dirs += mediatek
->> +dts-dirs += qcom
->> 
->> subdir-y	:= $(dts-dirs)
->> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
->> new file mode 100644
->> index 0000000..360ec4c
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/Makefile
->> @@ -0,0 +1,5 @@
->> +dtb-$(CONFIG_ARCH_QCOM)	+= msm8916-mtp.dtb
->> +
->> +always		:= $(dtb-y)
->> +subdir-y	:= $(dts-dirs)
->> +clean-files	:= *.dtb
->> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
->> new file mode 100644
->> index 0000000..784ad92
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
->> @@ -0,0 +1,21 @@
->> +/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
-> 
-> multi line comment rules
-> 
->> +*
->> +* This program is free software; you can redistribute it and/or modify
->> +* it under the terms of the GNU General Public License version 2 and
->> +* only version 2 as published by the Free Software Foundation.
->> +*
->> +* This program is distributed in the hope that it will be useful,
->> +* but WITHOUT ANY WARRANTY; without even the implied warranty of
->> +* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> +* GNU General Public License for more details.
->> +*/
->> +
->> +/dts-v1/;
->> +
->> +#include "msm8916-mtp.dtsi"
->> +
->> +/ {
->> +	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
->> +	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
->> +			"qcom,msm8916", "qcom,mtp";
->> +};
->> diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
->> new file mode 100644
->> index 0000000..8dbb77f
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi
->> @@ -0,0 +1,32 @@
->> +/* Copyright (c) 2014-2014, The Linux Foundation. All rights reserved.
-> 
-> multi line comment rules and 2014-2015
-> 
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include "msm8916.dtsi"
->> +
->> +/ {
->> +	aliases {
->> +		serial0 = &blsp1_uart2;
->> +	};
->> +
->> +	chosen {
->> +		stdout-path = "serial0";
->> +	};
->> +
->> +	soc {
->> +		serial at 78b0000 {
->> +			status = "okay";
->> +			pinctrl-names = "default", "sleep";
->> +			pinctrl-0 = <&blsp1_uart2_default>;
->> +			pinctrl-1 = <&blsp1_uart2_sleep>;
->> +		};
->> +	};
-> 
-> Why don't describe this as:
-> 
-> &blsp1_uart2 {
-> 	status = "okay";
-> 	pinctrl-names = xxxx;
-> 	....
-> };
-> 
-> it looks more readable and obvious. This is what the other boards doing
-> as well.
 
-I find the way it is more explicit and obvious, plus it works for cases that don?t have a label associated with them.
+Hi,
 
-I?ll fixup the multiline comment issues.
+I am testing Andrew ILP32 patches[ilp32 v3 patch] through LTP testsuite.
+Most of the testcases are passed. Some testcases are failed because of LTP issue while the other testcases are failed because ILP32 ABI is difference from arm 32bit.
 
-- k
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+So, how should we deal with it? It would be fixed in kernel/glibc or in application. Fix it in application may hurt the ABI compatabilities.
+
+[Andrew] See https://sourceware.org/ml/libc-alpha/2015-03/msg00572.html which is the same report of this bug.
+[Andrew]
+[Andrew] Thanks,
+[Andrew] Andrew Pinski
+
+1.  ABI changes in msgrcv and msgsnd
+    In current ILP32 ABI, msgsnd and msgrcv is 64bit syscall. I guess it is because the msgctl must be 64bit syscall after time_t is defined as 64bit. This will lead to the issue when application define the msgbuf struct. Such struct usually defined out of glibc and kernel, because application may need the difference size of msgbuf.mtext.
+
+    If the msgsnd and msgrcv remain 64bit syscall, the header in application may like this:
+
+```
+    #ifdef __ILP32
+        typedef long long _mtype;
+    #else
+        typedef long _mtype;
+    #endif
+    typedef struct mbuf {          /* a generic message structure */
+        _mtype mtype;
+        char mtext[MSGSIZE + 1];  /* add 1 here so the message can be 1024   */
+    } MSGBUF;                        /* characters long with a '\0' termination */
+```
+
+    Compare with above change in application, there is another way to sovle this issue: map msgsnd and msgrcv to compat syscall (base on Andrew patch [ilp32 syscall table]).
+
+```
+    diff --git a/arch/arm64/kernel/sys_ilp32.c b/arch/arm64/kernel/sys_ilp32.c
+    index 8c68d28..00d4f65 100644
+    --- a/arch/arm64/kernel/sys_ilp32.c
+    +++ b/arch/arm64/kernel/sys_ilp32.c
+    @@ -132,6 +132,11 @@ asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes,
+      */
+     #define sys_mq_notify          ilp32_sys_mq_notify
+
+    +/*
+    + * msgsnd, msgrcv
+    + */
+    +#define sys_msgrcv              compat_sys_msgrcv
+    +#define sys_msgsnd              compat_sys_msgsnd
+
+     /*
+      * sigaltstack needs some special handling as the ```
+
+    From our perspective, life may be earier if the code of applcation is same between ilp32 and arm 32bit.
+
+2.  ABI changes around off_t.
+    Current ILP32 abi define off_t as 64bit long which make only one register is needed when pass offset from userspace to kernel. At the same time, it lead to some corner case failure, e.g. ftest02. It failed bacause the compiler treat the negative number as 32bit integer while the off_t is 64bit integer which make the kernel treat the 32bit negative integer as 64bit position integer.
+
+    This will be ok if force a cast in application code:
+```
+    diff --git a/testcases/kernel/fs/ftest/ftest02.c b/testcases/kernel/fs/ftest/ftest02.c
+    index 35cc0d8..472887e 100644
+    --- a/testcases/kernel/fs/ftest/ftest02.c
+    +++ b/testcases/kernel/fs/ftest/ftest02.c
+    @@ -269,7 +269,7 @@ static void crfile(int me, int count)
+            val = write(fd, crmsg, sizeof(crmsg) - 1);
+            warn(val, "write", 0);
+
+    -       val = lseek(fd, -(sizeof(crmsg) - 1), 1);
+    +       val = lseek(fd, -(off_t)(sizeof(crmsg) - 1), 1);
+            warn(val, "lseek", 0);
+
+            val = read(fd, buf, sizeof(crmsg) - 1); ```
+
+cc'd H J Lu, I appreciate some suggestions if x32 encounter the similar issue.
+
+BTW, six month past after previous round review, is there any plan about when will the community would like to ack these series patches?
+
+regards
+
+bamvor
+
+[ilp32 v3 patch] (https://lkml.org/lkml/2014/9/3/704)
+[ilp32 syscall table] (https://lkml.org/lkml/2014/9/3/725)
