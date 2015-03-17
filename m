@@ -1,101 +1,83 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Mar 2015 16:33:41 -0600
-Subject: [PATCH v16 01/11] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-References: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1426631631-56937-2-git-send-email-lina.iyer@linaro.org>
+Date: Tue, 17 Mar 2015 16:33:40 -0600
+Subject: [PATCH v16 00/11] ARM: qcom: cpuidle support for 8064, 8074, 8084
+Message-ID: <1426631631-56937-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Hi,
 
-Some architectures have some cpus which does not support idle states or
-may be ready to do idle states only when the platform dependencies are
-probed.
+This patchset is based on common cpuidle driver for ARM and cpuidle_ops changes
+by Daniel Lezcano [1]. The cpuidle driver supports ARM architecture clockgating
+(WFI) and the cpu power state (SPC) for the QCOM cpus.
 
-Let the underlying low level code return -ENOSYS when it is not possible
-to set an idle state at this time.
+Changes since v15:
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg64700.html
+- Clean up cpuidle-arm.c to use devm_kzalloc and print error codes.
+- Remove qcom,idle-state-stby as a DT mode, instead use the ARM WFI defined in
+  ARM cpuidle driver for clock gating/standby modes. The platform driver will
+  default to standby for all cpus after executing any low power state. This allows
+  us to be completely compatible with generic ARM cpuidle driver and not send out
+  cpu_pm notifications that are sent out for all 'platform states'.
+- Cleaned up comments around setting SPM states.
+- Platform idle state (SPC) starts at index 1, previous patch was overwritting
+  ARM WFI state, which is mandated to be default state at index 0. 
+- Removed duplicate cpu_pm_enter() and cpu_pm_exit() callbacks.
+- Re-introduce ARM_QCOM_CPUIDLE defconfig item to enable/disable QCOM cpuidle
+  support.
+- Update documentation on standby state to indicate that this state is no longer
+  defined in the DT.
+- Remove unused qcom,saw2-v1.* compatibles from documentation.
+- Rebased on top of SCM changes that were pulled in Kumar's 'soc' branch [2].
+- Removed Reviewed-by tags from DT patches due to change in idle states.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-[Minor clean ups]
----
- drivers/cpuidle/cpuidle-arm.c | 39 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 2 deletions(-)
+Changes since v14:
+- Support for cpuidle_ops
+- SPM probe changes to register cpuidle
+- Rebase on top of 4.0-rc1
+- Remove SCM patches from series. Rebased on top of Kumar's tree
+- Removed cpuidle-qcom.c in favor of ARM generic cpuidle driver
+- Included Daniel's change for supporting creating cpuidle devices by platform
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 1c94b88..e176469 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -17,6 +17,9 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/slab.h>
-+#include <linux/device.h>
-+#include <linux/cpu.h>
- 
- #include <asm/cpuidle.h>
- 
-@@ -93,6 +96,7 @@ static const struct of_device_id arm_idle_state_match[] __initconst = {
- static int __init arm_idle_init(void)
- {
- 	int cpu, ret;
-+	struct cpuidle_device *dev;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
- 
- 	/*
-@@ -105,18 +109,49 @@ static int __init arm_idle_init(void)
- 	if (ret <= 0)
- 		return ret ? : -ENODEV;
- 
-+
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("Failed to register cpuidle driver\n");
-+		return ret;
-+	}
-+
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
- 		ret = arm_cpuidle_init(cpu);
-+
-+		/*
-+		 * -ENOSYS: Either the platform driver shall register
-+		 * a cpuidle device for this cpu, or there are no
-+		 * supported idle states.
-+		 */
-+		if (ret == -ENOSYS)
-+			continue;
-+
- 		if (ret) {
--			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
-+			pr_err("CPU %d failed to init idle CPU ops, err=%d\n",
-+					cpu, ret);
- 			return ret;
- 		}
-+
-+		dev = devm_kzalloc(get_cpu_device(cpu), sizeof(*dev),
-+				GFP_KERNEL);
-+		if (!dev)
-+			return -ENOMEM;
-+
-+		dev->cpu = cpu;
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("Failed to register cpuidle device for CPU %d, err=%d\n",
-+			       cpu, ret);
-+			kfree(dev);
-+			continue;
-+		}
- 	}
- 
--	return cpuidle_register(drv, NULL);
-+	return ret;
- }
- device_initcall(arm_idle_init);
+Tested on: 8074, 8084.
+
+Thanks,
+Lina
+
+[1]. https://lkml.org/lkml/2015/3/3/271
+[2]. https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg847249.html
+
+Daniel Lezcano (1):
+  ARM: cpuidle: Register per cpuidle device
+
+Lina Iyer (10):
+  ARM: qcom: Add Subsystem Power Manager (SPM) driver
+  ARM: cpuidle: qcom: Add documentation for qcom cpuidle states
+  ARM: cpuidle: Add cpuidle support for QCOM cpus
+  ARM: dts: qcom: Add power-controller device node for 8074 Krait CPUs
+  ARM: dts: qcom: Add power-controller device node for 8084 Krait CPUs
+  ARM: dts: qcom: Update power-controller device node for 8064 Krait
+    CPUs
+  ARM: dts: qcom: Add idle states device nodes for 8974/8074
+  ARM: dts: qcom: Add idle states device nodes for 8084
+  ARM: dts: qcom: Add idle state device nodes for 8064
+  ARM: qcom: Update defconfig to enable cpuidle
+
+ .../bindings/arm/msm/qcom,idle-state.txt           |  84 +++++
+ .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  29 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  30 +-
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |  40 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  40 +-
+ arch/arm/configs/qcom_defconfig                    |   2 +
+ arch/arm/include/asm/cpuidle_ops.h                 |   5 +
+ drivers/cpuidle/Kconfig.arm                        |   7 +
+ drivers/cpuidle/cpuidle-arm.c                      |  39 +-
+ drivers/soc/qcom/Kconfig                           |   7 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/spm.c                             | 408 +++++++++++++++++++++
+ 12 files changed, 674 insertions(+), 18 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+ create mode 100644 drivers/soc/qcom/spm.c
+
 -- 
 2.1.0
