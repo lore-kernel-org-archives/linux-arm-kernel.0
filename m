@@ -1,43 +1,96 @@
-From: sricharan@codeaurora.org (sricharan at codeaurora.org)
-Date: Tue, 17 Mar 2015 13:10:32 -0000
-Subject: [PATCH 5/6] dts: msm8974: Add blsp2_bam dma node
-In-Reply-To: <550822A7.1010209@mm-sol.com>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-6-git-send-email-sricharan@codeaurora.org>
- <550822A7.1010209@mm-sol.com>
-Message-ID: <c65027aa3f228387475c5284a9d377dc.squirrel@www.codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Mar 2015 13:25:31 +0000
+Subject: [PATCH 3/3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
+ per boot protocol
+In-Reply-To: <1426587074-22390-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426587074-22390-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150317132531.GD23340@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Mar 17, 2015 at 10:11:14AM +0000, Ard Biesheuvel wrote:
+> According to the arm64 boot protocol, registers x1 to x3 should be
+> zero upon kernel entry, and non-zero values are reserved for future
+> use. This future use is going to be problematic if we never enforce
+> the current rules, so start enforcing them now, by emitting a warning
+> if non-zero values are detected.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S  |  8 ++++++++
+>  arch/arm64/kernel/setup.c | 13 +++++++++++++
+>  2 files changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 1651c0fd50e6..fe5354eae069 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -231,6 +231,10 @@ section_table:
+>  #endif
+>  
+>  ENTRY(stext)
+> +	adr	x8, boot_regs			// record the contents of
+> +	stp	x0, x1, [x8]			// x0 .. x3 at kernel entry
+> +	stp	x2, x3, [x8, #16]
 
-> On 03/13/2015 07:49 PM, Sricharan R wrote:
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  arch/arm/boot/dts/qcom-msm8974.dtsi | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> index e265ec1..3f648ae 100644
->> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
->> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
->> @@ -247,5 +247,15 @@
->>  			#address-cells = <1>;
->>  			#size-cells = <0>;
->>  		};
->> +
->> +		blsp2_dma: dma at f9944000 {
->> +			compatible = "qcom,bam-v1.4.0";
->> +			reg = <0xf9944000 0x19000>;
->> +			interrupts = <0 239 0>;
->
-> for completeness this should be:
->
-> interrupts = <GIC_SPI 239 IRQ_TYPE_LEVEL_HIGH>;
->
-Ok, will fix. Thanks
+These accesses will be non-cacheable, but the caches could have clean
+entries for this PA range.
 
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Without an invalidate between the writes and reads, we might see stale
+values (the other option is to preserve the registers across enabling
+the MMU).
+
+> +
+>  	mov	x21, x0				// x21=FDT
+>  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+>  	adrp	x24, KERNEL_START - TEXT_OFFSET	// x24=PHYS_OFFSET
+> @@ -251,6 +255,10 @@ ENTRY(stext)
+>  	b	__cpu_setup			// initialise processor
+>  ENDPROC(stext)
+>  
+> +	.align	3
+> +ENTRY(boot_regs)
+> +	.skip	4 * 8				// x0 .. x3
+
+Can't we can drop this here...
+
+> +
+>  /*
+>   * Determine validity of the x21 FDT pointer.
+>   * The dtb must be 8-byte aligned and live in the first 512M of memory.
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 6c5fb5aff325..2b81d0a907ce 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -532,3 +532,16 @@ const struct seq_operations cpuinfo_op = {
+>  	.stop	= c_stop,
+>  	.show	= c_show
+>  };
+
+... and here have
+
+u64 boot_regs[4];
+
+Using adrp + lo12 to address the symbol?
+
+> +
+> +static int verify_boot_protocol(void)
+> +{
+> +	extern u64 boot_regs[];
+> +
+> +	if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
+> +		pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
+> +			boot_regs[1], boot_regs[2], boot_regs[3]);
+> +		pr_err("WARNING: your bootloader may fail to load newer kernels\n");
+> +	}
+> +	return 0;
+> +}
+> +late_initcall(verify_boot_protocol);
+
+I think it would be nicer to plumb this into setup_arch rather than an
+initcall. That way the warning will be at a consistent, prominent
+location in the log.
+
+Thanks,
+Mark.
