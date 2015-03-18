@@ -1,58 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Mar 2015 19:58:15 +0100
-Subject: [PATCH v2 6/8] asm-generic: introduce .text.fixup input section
-In-Reply-To: <1426248452-4773-7-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426248452-4773-7-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <201503181958.15752.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Mar 2015 19:05:09 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150318190509.GM10863@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 March 2015, Ard Biesheuvel wrote:
-> This introduces a new .text.fixup input section that gets emitted
-> together with the .text section for each input object file.
-> 
-> Note that
-> 
->   *(.text)
->   *(.text.fixup)
-> 
-> is not the same as
-> 
->   *(.text .text.fixup)
-> 
-> and we are looking for the latter, to ensure that fixup snippets that
-> are assembled into a separate section in the object file do not end
-> up out of range for the relative branch instructions it contains if
-> the .text section itself grows very large.
-> 
-> This helps prevent linker failures on large ARM kernels.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hanjun,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
+> This patch set already tested on multi platforms:
+>  - AMD Seattle board;
+>  - Cavium Thunder board;
+>  - Huawei D02 board;
+>  - Qualcomm ARM64 platform
+> 
+> This version 10 patch set address some minor comments and collect ACKs and
+> Reviewed-bys for v9:
+> 
+>  - new Acks from Rafael, Olof, Grant, Lorenzo
+>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
+>    but no functional change
+>  - Remove if(!phys) for early ioremappings
+>  - Rework sleep function for ARM64
+>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
+>  - Disable ACPI if not HW_REDUCED_ACPI compliant
+>  - Remove the doc of why ACPI on ARM
 
-Let's merge this together with the other patches rather than using 
-the asm-generic git.
+So I've had a look at the current state of this series and I think there
+are a few immediate things left to do:
 
-> ---
->  include/asm-generic/vmlinux.lds.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-> index ac78910d7416..463231d5bfc7 100644
-> --- a/include/asm-generic/vmlinux.lds.h
-> +++ b/include/asm-generic/vmlinux.lds.h
-> @@ -401,7 +401,7 @@
->  #define TEXT_TEXT							\
->  		ALIGN_FUNCTION();					\
->  		*(.text.hot)						\
-> -		*(.text)						\
-> +		*(.text .text.fixup)					\
->  		*(.ref.text)						\
->  	MEM_KEEP(init.text)						\
->  	MEM_KEEP(exit.text)						\
-> -- 
-> 1.8.3.2
-> 
-> 
+  (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
+      Catalin
+
+  (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
+      so I'm assuming there will be additional patches from them that are
+      required.
+
+  (3) I have an open comment about moving the IRQ domain code into the
+      core, which I'd like to see addressed.
+
+  (4) We need an ack from Daniel on the arch-timer patch
+
+If you can get that in place, I'm not opposed to putting this into
+linux-next ahead of the firmware summit in San Jose next week. Note that
+this is not a commitment for 4.1, since I'm keen to see the outcomes of
+next week before setting anything in stone.
+
+Also, there's no need to repost patches if you're just adding Acks. I
+think I'm up to speed with those on my local branch and the Tested-by
+party is starting to look a little silly.
+
+Will
