@@ -1,87 +1,72 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Mar 2015 15:55:25 +0100
-Subject: [PATCH v5 6/8] arm64: merge __enable_mmu and __turn_mmu_on
+Date: Wed, 18 Mar 2015 15:55:27 +0100
+Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
+ boot protocol
 In-Reply-To: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1426690527-14258-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling of the MMU is split into two functions, with an align and
-a branch in the middle. On arm64, the entire kernel Image is ID mapped
-so this is really not necessary, and we can just merge it into a
-single function.
+According to the arm64 boot protocol, registers x1 to x3 should be
+zero upon kernel entry, and non-zero values are reserved for future
+use. This future use is going to be problematic if we never enforce
+the current rules, so start enforcing them now, by emitting a warning
+if non-zero values are detected.
 
-Also replaces an open coded adrp/add reference to __enable_mmu with
-adr_l.
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 33 +++++++--------------------------
- 1 file changed, 7 insertions(+), 26 deletions(-)
+ arch/arm64/kernel/head.S  |  4 ++++
+ arch/arm64/kernel/setup.c | 15 +++++++++++++++
+ 2 files changed, 19 insertions(+)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 65c7de889c8c..9a2554558e5b 100644
+index a0fbd99efb89..8636c3cef006 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -255,8 +255,7 @@ ENTRY(stext)
- 	 */
- 	ldr	x27, =__mmap_switched		// address to jump to after
- 						// MMU has been enabled
--	adrp	lr, __enable_mmu		// return (PIC) address
--	add	lr, lr, #:lo12:__enable_mmu
-+	adr_l	lr, __enable_mmu		// return (PIC) address
- 	b	__cpu_setup			// initialise processor
- ENDPROC(stext)
+@@ -233,6 +233,10 @@ section_table:
+ #endif
  
-@@ -615,11 +614,12 @@ ENDPROC(__secondary_switched)
- #endif	/* CONFIG_SMP */
+ ENTRY(stext)
++	adr_l	x8, boot_regs			// record the contents of
++	stp	x0, x1, [x8]			// x0 .. x3 at kernel entry
++	stp	x2, x3, [x8, #16]
++
+ 	mov	x21, x0				// x21=FDT
+ 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+ 	adrp	x24, __PHYS_OFFSET
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 6c5fb5aff325..2d5cae2de679 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -114,6 +114,11 @@ void __init early_print(const char *str, ...)
+ 	printk("%s", buf);
+ }
  
- /*
-- * Setup common bits before finally enabling the MMU. Essentially this is just
-- * loading the page table pointer and vector base registers.
-+ * Enable the MMU.
-  *
-- * On entry to this code, x0 must contain the SCTLR_EL1 value for turning on
-- * the MMU.
-+ *  x0  = SCTLR_EL1 value for turning on the MMU.
-+ *  x27 = *virtual* address to jump to upon completion
-+ *
-+ * other registers depend on the function called upon completion
-  */
- __enable_mmu:
- 	ldr	x5, =vectors
-@@ -627,29 +627,10 @@ __enable_mmu:
- 	msr	ttbr0_el1, x25			// load TTBR0
- 	msr	ttbr1_el1, x26			// load TTBR1
- 	isb
--	b	__turn_mmu_on
--ENDPROC(__enable_mmu)
--
--/*
-- * Enable the MMU. This completely changes the structure of the visible memory
-- * space. You will not be able to trace execution through this.
-- *
-- *  x0  = system control register
-- *  x27 = *virtual* address to jump to upon completion
-- *
-- * other registers depend on the function called upon completion
-- *
-- * We align the entire function to the smallest power of two larger than it to
-- * ensure it fits within a single block map entry. Otherwise were PHYS_OFFSET
-- * close to the end of a 512MB or 1GB block we might require an additional
-- * table to map the entire function.
-- */
--	.align	4
--__turn_mmu_on:
- 	msr	sctlr_el1, x0
- 	isb
- 	br	x27
--ENDPROC(__turn_mmu_on)
-+ENDPROC(__enable_mmu)
++/*
++ * The recorded values of x0 .. x3 upon kernel entry.
++ */
++u64 __read_mostly boot_regs[4];
++
+ void __init smp_setup_processor_id(void)
+ {
+ 	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+@@ -387,6 +392,16 @@ void __init setup_arch(char **cmdline_p)
+ 	conswitchp = &dummy_con;
+ #endif
+ #endif
++	/*
++	 * boot_regs[] is written by the boot CPU with the caches off, so we
++	 * need to ensure that we read the value from main memory
++	 */
++	__flush_dcache_area(boot_regs, sizeof(boot_regs));
++	if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
++		pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
++			boot_regs[1], boot_regs[2], boot_regs[3]);
++		pr_err("WARNING: your bootloader may fail to load newer kernels\n");
++	}
+ }
  
- /*
-  * Calculate the start of physical memory.
+ static int __init arm64_device_init(void)
 -- 
 1.8.3.2
