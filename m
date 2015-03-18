@@ -1,29 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 10:57:29 +0100
-Subject: [PATCH] pinctrl: sun4i: GPIOs configured as irq must be set to
- input before reading
-In-Reply-To: <1425849237-30182-1-git-send-email-hdegoede@redhat.com>
-References: <1425849237-30182-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkda0OLPcScdKxG7NH4ChTU+p61VzHiMBBqBagppr4L9YjA@mail.gmail.com>
+Date: Wed, 18 Mar 2015 10:59:10 +0100
+Subject: [PATCH -next] pinctrl: mediatek: Fix include directive
+In-Reply-To: <1426089920-24818-1-git-send-email-linux@roeck-us.net>
+References: <1426089920-24818-1-git-send-email-linux@roeck-us.net>
+Message-ID: <CACRpkdbfqCUPY_vqpif7jtdxy5E9Ei_XWojunJQ3ONpRKe1Lng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 8, 2015 at 10:13 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Wed, Mar 11, 2015 at 5:05 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-> On sun4i-a10, when GPIOs are configured as external interrupt the value for
-> them in the data register does not seem to get updated, so set their mux to
-> input (and restore afterwards) when reading the pin.
+> Fix the following build failure:
 >
-> Missed edges seem to be buffered, so this does not introduce a race
-> condition.
+> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
+> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error:
+>         pinctrl-mtk-common.h: No such file or directory
 >
-> I've also tested this on sun5i-a13 and sun7i-a20 and those do not seem to
-> be affected, the input value representation in the data register does seem
-> to correctly get updated to the actual pin value while in irq mode there.
+> seen when building arm:multi_v7_defconfig.
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Fixes: 94097d89c145 ("pinctrl: mediatek: Add Pinctrl/GPIO driver for mt8135.")
+> Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-Patch applied for fixes with Maxime's ACK.
+Patch applied with Paul's Review tag, sorry for lagging
+behind on mail :(
 
 Yours,
 Linus Walleij
