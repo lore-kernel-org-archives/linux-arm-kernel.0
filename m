@@ -1,67 +1,15 @@
-From: wens213@gmail.com (wens Tsai)
-Date: Wed, 18 Mar 2015 09:40:06 +0800
-Subject: Is cpufreq-dt safe without regulator support?
-In-Reply-To: <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
-References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
- <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
-Message-ID: <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 17 Mar 2015 19:43:27 -0600
+Subject: [PATCH] ARM: bcm2835: fix i2c0 node name
+In-Reply-To: <665eba5450334476bb2b4220293b6a97271a6dad.1426622528.git.baruch@tkos.co.il>
+References: <665eba5450334476bb2b4220293b6a97271a6dad.1426622528.git.baruch@tkos.co.il>
+Message-ID: <5508D83F.9090405@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 4:47 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 17 March 2015 at 13:15, wens Tsai <wens213@gmail.com> wrote:
->> The sunxi platform added cpufreq support in 4.0.0-rc1 using
->> the generic cpufreq-dt driver. One issue we've run into is
->> the default OPPs we use include an overclocked/overvoltage
->> setting.
->
-> There is a feature for that in cpufreq, in case you don't know, "boost"..
+On 03/17/2015 02:02 PM, Baruch Siach wrote:
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-I do now. Though cpufreq-dt and the OPP bindings don't
-support this. Any chance the next version of OPP bindings will?
+A brief description of why this is a fix might be useful.
 
->> If the cpu is missing a regulator supply phandle, or the
->> kernel is built without regulators, cpufreq can increase
->> the clock rate without the needed voltage increase.
->
-> Right.
->
->> The former issue can be resolved by providing a dummy
->> regulator with the default voltage, effectively disabling
->> cpufreq.
->
-> How ? CPUFreq will try to change both volt and freq. Volt
-> wouldn't change as its a dummy regulator, but freq would
-> still be changed..
-
-I suppose this is the desired behavior. I'm fine with it then.
-
->> The latter is possible. Without regulator support built-in,
->> even a correct, complete DTS can still fail. Should I just
->> remove the offending OPP? Still that does not fix the
->> problem when we actually do want overclocking.
->>
->> To summarize, should cpufreq-dt probe fail when regulator
->> support isn't available? Should we differentiate between
->
-> No. We can have regulator support enabled but no regulator
-> for a CPU. And so the current state of code looks fine.
->
->> not having a regulator phandle vs no regulator support?
->
-> What I couldn't understand is, why would you miss the regulator
-> phandle in dts? Or not compile regulator support?
-
-I admit it is partly bad execution on my part. I added the OPPs
-to the .dtsi files, but only the regulators to a handful of boards
-that I have. All the other boards do not have a regulator phandle.
-
-> In case you want cpufreq-dt to be disabled if regulators aren't
-> compiled in, then what you should do is, don't create the platform
-> device required for probing cpufreq-dt driver.
-
-Thanks for the suggestion. I'll add if(IS_ENABLED()) around it.
-I can also check for the regulator phandle here.
-
-Regards
-ChenYu
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
