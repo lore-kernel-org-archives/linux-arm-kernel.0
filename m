@@ -1,71 +1,83 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Mar 2015 09:23:54 +0530
-Subject: Is cpufreq-dt safe without regulator support?
-In-Reply-To: <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
-References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
- <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
- <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
-Message-ID: <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 18 Mar 2015 09:32:53 +0530
+Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
+References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
+ <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
+ <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
+ <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
+Message-ID: <CAFpQJXWL-NM+WndfB5pLj6TmdVngACR9YCr_ahaUTqAO3DaX1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2015 at 07:10, wens Tsai <wens213@gmail.com> wrote:
-> On Tue, Mar 17, 2015 at 4:47 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> On 17 March 2015 at 13:15, wens Tsai <wens213@gmail.com> wrote:
->>> The sunxi platform added cpufreq support in 4.0.0-rc1 using
->>> the generic cpufreq-dt driver. One issue we've run into is
->>> the default OPPs we use include an overclocked/overvoltage
->>> setting.
->>
->> There is a feature for that in cpufreq, in case you don't know, "boost"..
->
-> I do now. Though cpufreq-dt and the OPP bindings don't
-> support this. Any chance the next version of OPP bindings will?
+Hi Catalin, Will, Mark, Arnd
 
-Yes, it is part of the new bindings already..
-
->>> If the cpu is missing a regulator supply phandle, or the
->>> kernel is built without regulators, cpufreq can increase
->>> the clock rate without the needed voltage increase.
->>
->> Right.
->>
->>> The former issue can be resolved by providing a dummy
->>> regulator with the default voltage, effectively disabling
->>> cpufreq.
->>
->> How ? CPUFreq will try to change both volt and freq. Volt
->> wouldn't change as its a dummy regulator, but freq would
->> still be changed..
+On Tue, Mar 10, 2015 at 2:12 PM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> Ping?
 >
-> I suppose this is the desired behavior. I'm fine with it then.
->
->>> The latter is possible. Without regulator support built-in,
->>> even a correct, complete DTS can still fail. Should I just
->>> remove the offending OPP? Still that does not fix the
->>> problem when we actually do want overclocking.
+> On Tue, Feb 24, 2015 at 2:22 PM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+>> Hi Arnd,
+>>
+>> On Fri, Jan 23, 2015 at 6:07 PM, Ganapatrao Kulkarni
+>> <gpkulkarni@gmail.com> wrote:
+>>> Hi Arnd,
 >>>
->>> To summarize, should cpufreq-dt probe fail when regulator
->>> support isn't available? Should we differentiate between
+>>> On Thu, Jan 22, 2015 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
+>>>>>
+>>>>> This seems wrong still: The clusters and cores do not have unique
+>>>>> numbers. I believe the code will not work correctly, and it won't
+>>>>> be compliant with the binding from patch 2.
+>>>>>
+>>>>> I think the right way here would be to use
+>>>>>
+>>>>>         arm,associativity = <0 2 47>;
+>>>>>
+>>>>> for cpu at 20f, and
+>>>>>
+>>>>>         arm,associativity = <1 3 48>;
+>>>>>
+>>>>> for cpu at 10000. Your previous version used the numbers from
+>>>>> the reg property, which should be fine as well if that helps:
+>>>>>
+>>>>>
+>>>>>         arm,associativity = <0x0 0x200 0x20f>;
+>>>>>
+>>>>>         arm,associativity = <0x10000 0x10000 0x10000>;
+>>>>>
+>>>>> which should have the same effect as above, as long as the code
+>>>>> can handle the numbers not being consecutive.
+>>>>>
+>>>>>
+>>>>
+>>>> Upon further consideration, I think your patch is correct after
+>>>> all, but let me check again on PowerPC machines.
+>>> i have removed, board id which was in previous patch, to keep the
+>>> associativity aligned to mpidr, ie. socket,cluster id and core id.
+>>> both previous and current mappings holds good for our design.
+>>> our topology is 2 sockets(aff2=0and 1) , each having 3
+>>> clusters(aff1=0to2)and each cluster having 16 cores(aff0:0to15)
+>>> in associativity property, for our case, only first id(socket id) is
+>>> mapped to numa, others are mentioned only to describe the topology.
+>>>>
+>>>>         Arnd
+>> any further comments, how we go about these patches?
+>> please suggest.
 >>
->> No. We can have regulator support enabled but no regulator
->> for a CPU. And so the current state of code looks fine.
+>>> thanks
+>>> Ganapat
 >>
->>> not having a regulator phandle vs no regulator support?
->>
->> What I couldn't understand is, why would you miss the regulator
->> phandle in dts? Or not compile regulator support?
->
-> I admit it is partly bad execution on my part. I added the OPPs
-> to the .dtsi files, but only the regulators to a handful of boards
-> that I have. All the other boards do not have a regulator phandle.
->
->> In case you want cpufreq-dt to be disabled if regulators aren't
->> compiled in, then what you should do is, don't create the platform
->> device required for probing cpufreq-dt driver.
->
-> Thanks for the suggestion. I'll add if(IS_ENABLED()) around it.
-> I can also check for the regulator phandle here.
+>> thanks
+>> Ganapat
 
-I think the right thing to do is move the OPP bindings to the .dts
-files instead and get rid of all the hacks you are planning to add.
+Please suggest how we go about these patches.
+please share your review comments, if any changes needs to be done.
+
+
+thanks
+Ganapat
