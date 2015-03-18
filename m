@@ -1,45 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 17 Mar 2015 15:15:01 +0000
-Subject: [PATCH] PCI: mvebu: add suspend/resume support
-In-Reply-To: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150317151501.GC3368@io.lakedaemon.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 18 Mar 2015 22:07:30 +0100
+Subject: [PATCH 2/2] i2c: driver for the Conexant Digicolor I2C controller
+In-Reply-To: <a106023efa9fd648f46021cd063437df798528de.1424092804.git.baruch@tkos.co.il>
+References: <7da767503ac6085c10fbd1953ffd36621b8bf0c5.1424092804.git.baruch@tkos.co.il>
+ <a106023efa9fd648f46021cd063437df798528de.1424092804.git.baruch@tkos.co.il>
+Message-ID: <20150318210730.GA12960@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thomas,
+Hi,
 
-On Tue, Mar 17, 2015 at 03:55:45PM +0100, Thomas Petazzoni wrote:
-> This commit implements suspend/resume support for the mvebu PCIe host
-> driver. Without this commit, the system will panic at resume time when
-> PCIe devices are connected.
+On Mon, Feb 16, 2015 at 03:20:04PM +0200, Baruch Siach wrote:
+> This commit adds a driver for the I2C master controller on the CX92755 SoC. The
+> CX92755 is one SoC in the Conexant Digicolor series. This driver should support
+> other SoCs from that series.
 > 
-> Note that we have to use the ->suspend_noirq() and ->resume_noirq()
-> hooks, because at resume time, the PCI fixups are done at
-> ->resume_noirq() time, so the PCIe controller has to be ready at this
-> point.
+> Only 7bit slave addresses are currently supported.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/pci/host/pci-mvebu.c | 38 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 38 insertions(+)
+> Tested on the Equinox CX92755 EVK, using i2c-tools utilities to read and write
+> the on-chip (sic) audio codec.
 > 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 1309cfb..1ab8635 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -129,6 +129,7 @@ struct mvebu_pcie_port {
->  	size_t memwin_size;
->  	phys_addr_t iowin_base;
->  	size_t iowin_size;
-> +	u32 saved_pcie_stat;
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-nit:  It's already in the pcie port struct, why not just call it saved_state?
+Looks mostly good.
 
-Either way,
+> +static u32 dc_i2c_func(struct i2c_adapter *adap)
+> +{
+> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+> +}
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+You probably want to advertise I2C_FUNC_NOSTART here, too?
 
-thx,
+And if you could rebase to something after 4.0-rc1, that would be much
+appreciated.
 
-Jason.
+Thanks,
+
+   Wolfram
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/c07b258b/attachment.sig>
