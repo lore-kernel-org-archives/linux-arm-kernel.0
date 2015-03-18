@@ -1,50 +1,133 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 18 Mar 2015 11:27:28 +0100
-Subject: [PATCH] spi: trigger trace event for message-done before
- mesg->complete
-Message-ID: <1426674448-8246-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 18 Mar 2015 11:29:39 +0100
+Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
+In-Reply-To: <1426669047.29565.9.camel@AMDC1943>
+References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
+ <55086CE0.6080905@kernel.org> <1426669047.29565.9.camel@AMDC1943>
+Message-ID: <1949810.qILnBKuAJP@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With spidev the mesg->complete callback points to spidev_complete.
-Calling this unblocks spidev_sync and so spidev_sync_write finishes. As
-the struct spi_message just read is a local variable in
-spidev_sync_write and recording the trace event accesses this message
-the recording is better done first. The same can happen for
-spidev_sync_read.
 
-This fixes an oops observed on a 3.14-rt system with spidev activity
-after
+Hi,
 
-	echo 1 > /sys/kernel/debug/tracing/events/spi/enable
+On Wednesday, March 18, 2015 09:57:27 AM Krzysztof Kozlowski wrote:
+> On ?ro, 2015-03-18 at 03:05 +0900, Kukjin Kim wrote:
+> > On 03/11/15 19:29, Krzysztof Kozlowski wrote:
+> > > On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
+> > >> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
+> > >> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
+> > >> controller") the second suspend to RAM failed. First suspend worked fine
+> > >> but the next one hang just after powering down of secondary CPUs (system
+> > >> consumed energy as it would be running but was not responsive).
+> > >>
+> > >> The issue was caused by enabling delayed reset assertion for CPU0 just
+> > >> after issuing power down of cores. This was introduced for Exynos4 in
+> > >> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+> > >>
+> > >> The whole behavior is not well documented but after checking with vendor
+> > >> code this should be done like this (on Exynos4):
+> > >> 1. Enable delayed reset assertion when system is running (for all CPUs).
+> > >> 2. Disable delayed reset assertion before suspending the system.
+> > >>    This can be done after powering off secondary CPUs.
+> > >> 3. Re-enable the delayed reset assertion when system is resumed.
+> > >>
+> > >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > >> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
+> > >> Cc: <stable@vger.kernel.org>
+> > >> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > > 
+> > > Dear Kukjin,
+> > > 
+> > > This patch was first sent on 3rd of February. It could enter before
+> > > opening 4.0 merge window. I did not receive any response from you in
+> > > that time.
+> > > 
+> > > So let me point next steps:
+> > > 1. The Exynos4412 suspend on 4.0 is broken and now this patch applies as
+> > > a fix.
+> > > 2. I resent it on 18th of February.
+> > > 3. I received tested-by from Bartlomiej and Chanwoo.
+> > > 4. Bartlomiej pinged you on 3rd March.
+> > > 
+> > > Still no response. If the patch does not look good then please share
+> > > your comments. I'll fix it.
+> > > If this patch looks good, why does it take so much time?
+> > > 
+> > 
+> > Please use another way something like check ARM core rather than use
+> > 'soc_is_xxx()', as you know it is not acceptable now even it is just
+> > moving/modifying exist function though.
 
-.
+Kukjin, could you please explain why 'soc_is_xxx()' usage inside
+arch/arm/mach-exynos/ code is not acceptable?  I know that it should
+not be used outisde of this directory because of multiplatform support
+but what is wrong with using it for arch/arm/mach-exynos/ code?
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/spi/spi.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+I'm also not sure if -rc4 is a desirable time to be doing such changes
+(especially given that the patch in question is moving an existing code,
+not adding new 'soc_is_xxx()' users).
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 6d3b9b76c80b..df577518b770 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -994,13 +994,14 @@ void spi_finalize_current_message(struct spi_master *master)
- 				"failed to unprepare message: %d\n", ret);
- 		}
- 	}
-+
-+	trace_spi_message_done(mesg);
-+
- 	master->cur_msg_prepared = false;
- 
- 	mesg->state = NULL;
- 	if (mesg->complete)
- 		mesg->complete(mesg->context);
--
--	trace_spi_message_done(mesg);
- }
- EXPORT_SYMBOL_GPL(spi_finalize_current_message);
- 
--- 
-2.1.4
+[ Moreover of_machine_is_compatible() can be sometimes harmful as could
+  have been seen in commit ca489c58ef0b81 ("ARM: EXYNOS: Don't use LDREX
+  and STREX after disabling cache coherency" fix. ]
+
+> Probably of_machine_is_compatible() could be used here but such change
+> should be done in separate patch. This is fix for wrong usage of
+> use_delayed_assertion so it should not mix with other changes in the
+> code. This fixes one thing at a time. Fixing many things in one patch
+> often leads to new errors or difficulties in debugging.
+> 
+> I can prepare a separate patch for changing this to
+> of_machine_is_compatible().
+
+IMHO this would be the best solution if there is an agreement on
+'soc_is_xxx()' removal.
+
+> > 
+> > And please make sure your updates don't hurt other exynos5 stuff. Any
+> > tests on exynos5 platforms would be helpful.
+
+The patch is quite obvious and only affects Exynos4 SoCs.  Extra testing
+on Exynos5 SoCs won't hurt but they should not be required for merge.
+
+> > And I don't think the fix should be sent to 'stable' because I can't see
+> > the 'add node for L2$ controller' in v3.19...looks applied from v4.0-rc...
+> 
+> You're right. git-describe gave me 3.19-rc1 but this was tag for the
+> specific commit, not for merge-commit. The stable can be removed if this
+> comes during this RC-cycle.
+
+Yes, the stable tag was a mistake and should be removed.
+
+> > One more if you have any doubts, I'd like to ask you to contact S.LSI
+> > guys who have created the vendor codes not assume with the code because
+> > maybe the vendor code you mentioned cannot cover all exynos stuff I
+> > think. Then we could make more clear pm codes in mainline. To be honest
+> > I'm not a Power Management hardware guy so I don't know every regarding
+> > PM stuff in exynos SoCs, I can contact them easier though...I mean
+> > please don't assume any hardware behavior with just vendor code. Please
+> > ask, you have an access in Samsung intranet before posting something
+> > like this...Hope let's make a better fix together during -rc.
+
+FWIW I think that -rc4 is too late to be doing 'perfect patch' (we've waited
+for 6 weeks on any feedback on this patch from you).  The current solution is
+quite simple and has been tested to fix the regression without introducing
+other problems.
+
+> As you probably know I work in completely different company within
+> Samsung Electronics than System LSI. I don't have access to the LSI
+> intranet. I don't have access to guys from LSI. I'll try contacting them
+> through my HQ partners.
+> 
+> Thanks for feedback!
+> 
+> Best regards,
+> Krzysztof
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
