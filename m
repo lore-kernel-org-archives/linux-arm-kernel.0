@@ -1,31 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Mar 2015 11:21:32 +0100
-Subject: [PATCH 1/3] ARM: dts: sun8i: Enable ARM architected timer on A23
-In-Reply-To: <1426649042-30547-2-git-send-email-wens@csie.org>
-References: <1426649042-30547-1-git-send-email-wens@csie.org>
- <1426649042-30547-2-git-send-email-wens@csie.org>
-Message-ID: <20150318102132.GO4638@lukather>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 18 Mar 2015 10:25:27 +0000
+Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
+ <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+Message-ID: <55095297.5060605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 11:24:00AM +0800, Chen-Yu Tsai wrote:
-> The A23 SoC has the architected timer, but the existing firmware from
-> Allwinner does not set CNTFRQ at all.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Vincent,
 
-Applied, thanks!
+Forgot couple of things earlier:
 
-Maxime
+On 04/03/15 11:01, Vincent Yang wrote:
+> From: Jassi Brar <jaswinder.singh@linaro.org>
+>
+> Add driver for the ARM Primecell Message-Handling-Unit(MHU) controller.
+>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
+> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
+> ---
+>   .../devicetree/bindings/mailbox/arm-mhu.txt        |  43 +++++
+>   drivers/mailbox/Kconfig                            |   9 +
+>   drivers/mailbox/Makefile                           |   2 +
+>   drivers/mailbox/arm_mhu.c                          | 195 +++++++++++++++++++++
+>   4 files changed, 249 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>   create mode 100644 drivers/mailbox/arm_mhu.c
+>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/592adb36/attachment.sig>
+[...]
+
+> +static int mhu_send_data(struct mbox_chan *chan, void *data)
+> +{
+> +	struct mhu_link *mlink = chan->con_priv;
+> +	u32 *arg = data;
+> +
+
+Arnd doesn't like this and had suggestions in some other thread.
+
+> +	writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mhu_startup(struct mbox_chan *chan)
+> +{
+> +	struct mhu_link *mlink = chan->con_priv;
+> +	u32 val;
+> +	int ret;
+> +
+> +	val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+> +	writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
+> +
+> +	ret = request_irq(mlink->irq, mhu_rx_interrupt,
+> +			  IRQF_SHARED, "mhu_link", chan);
+
+Any reason we can't move this to probe and have {en,dis}able_irq here if
+needed. I has seen it was too heavy to have these especially when
+sending small packets.
+
+Regards,
+Sudeep
