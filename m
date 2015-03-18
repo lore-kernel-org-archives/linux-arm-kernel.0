@@ -1,28 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 13:07:22 +0100
-Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due to
- missing include file
-In-Reply-To: <1426143074.26140.0.camel@phoenix>
-References: <1426143074.26140.0.camel@phoenix>
-Message-ID: <CACRpkdbqh8XD2ci9VXChahWfhSr_uVAPLjGYrg9AAwDo-+zTRA@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Mar 2015 12:08:02 +0000
+Subject: [PATCH 2/3] arm64: remove __calc_phys_offset
+In-Reply-To: <CAKv+Gu9BcOP7LUgsguXV9KYJqk4iUNC_WhJhRHFFHgNmV3nFQQ@mail.gmail.com>
+References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426587074-22390-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150317144625.GH23340@leverpostej>
+ <CAKv+Gu9BcOP7LUgsguXV9KYJqk4iUNC_WhJhRHFFHgNmV3nFQQ@mail.gmail.com>
+Message-ID: <20150318120802.GA19624@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 7:51 AM, Axel Lin <axel.lin@ingics.com> wrote:
+> >> -     bl      __calc_phys_offset              // x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+> >> +     adrp    x24, KERNEL_START - TEXT_OFFSET // x24=PHYS_OFFSET
+> >
+> > Neat!
+> >
+> > Perhaps we could have:
+> >
+> > #define PHYS_OFFSET     (KERNEL_START - TEXT_OFFSET)
+> >
+> > Which would make the all the PHYS_OFFSET calculations self-documenting.
+> > It shouldn't clash with the asm/memory.h definition because that's in an
+> > #ifndef __ASSEMBLY__ block.
+> >
+> 
+> I will use __PHYS_OFFSET instead, to prevent confusion.
+> 
+> Btw, I will drop the secondary 'adrp x24, __PHYS_OFFSET' lines
+> completely, as the secondary boot path never refers to x24.
 
-> Fix below build error:
->   CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
-> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
-> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
-> compilation terminated.
-> make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
-> make[2]: *** [drivers/pinctrl/mediatek] Error 2
-> make[1]: *** [drivers/pinctrl] Error 2
-> make: *** [drivers] Error 2
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Sounds good to me on both counts.
 
-Patch applied. Partially, since Guenther already fixed one oneliner.
-
-Yours,
-Linus Walleij
+Mark.
