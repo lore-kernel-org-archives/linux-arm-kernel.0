@@ -1,93 +1,77 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Mar 2015 19:16:26 +0100
-Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
- per boot protocol
-In-Reply-To: <20150318181315.GH19814@leverpostej>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Mar 2015 18:23:55 +0000
+Subject: [PATCH v5 0/8] arm64: head.S cleanup
+In-Reply-To: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
- <20150318181315.GH19814@leverpostej>
-Message-ID: <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
+Message-ID: <20150318182352.GI19814@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2015 at 19:13, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Mar 18, 2015 at 02:55:27PM +0000, Ard Biesheuvel wrote:
->> According to the arm64 boot protocol, registers x1 to x3 should be
->> zero upon kernel entry, and non-zero values are reserved for future
->> use. This future use is going to be problematic if we never enforce
->> the current rules, so start enforcing them now, by emitting a warning
->> if non-zero values are detected.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/head.S  |  4 ++++
->>  arch/arm64/kernel/setup.c | 15 +++++++++++++++
->>  2 files changed, 19 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index a0fbd99efb89..8636c3cef006 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -233,6 +233,10 @@ section_table:
->>  #endif
->>
->>  ENTRY(stext)
->> +     adr_l   x8, boot_regs                   // record the contents of
->> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
->> +     stp     x2, x3, [x8, #16]
->
-> I think we should have a dc ivac here as we do for
-> set_cpu_boot_mode_flag.
->
-> That avoids a potential issue with boot_regs sharing a cacheline with
-> data we write with the MMU on -- using __flush_dcache_area will result
-> in a civac, so we could write back dirty data atop of the boot_regs if
-> there were clean entries in the cache when we did the non-cacheable
-> write.
->
+On Wed, Mar 18, 2015 at 02:55:19PM +0000, Ard Biesheuvel wrote:
+> This some janitorial work on head.S, just stuff I noticed when making
+> changes to it for other reasons.
+> 
+> This still needs acks on patches #2, #5 and #8
 
-Hmm, I wondered about that.
+I've given each patch of the series series a spin on Juno (using
+EFI+PSCI) and a model (using the bootwwapper + spin-table). For patches
+1-7 the code looks sane, I see no build regressions on defconfig, and
+everything works, so for those feel free to add:
 
-Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
->> +
->>       mov     x21, x0                         // x21=FDT
->>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>       adrp    x24, __PHYS_OFFSET
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 6c5fb5aff325..2d5cae2de679 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -114,6 +114,11 @@ void __init early_print(const char *str, ...)
->>       printk("%s", buf);
->>  }
->>
->> +/*
->> + * The recorded values of x0 .. x3 upon kernel entry.
->> + */
->> +u64 __read_mostly boot_regs[4];
->> +
->>  void __init smp_setup_processor_id(void)
->>  {
->>       u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> @@ -387,6 +392,16 @@ void __init setup_arch(char **cmdline_p)
->>       conswitchp = &dummy_con;
->>  #endif
->>  #endif
->> +     /*
->> +      * boot_regs[] is written by the boot CPU with the caches off, so we
->> +      * need to ensure that we read the value from main memory
->> +      */
->> +     __flush_dcache_area(boot_regs, sizeof(boot_regs));
->> +     if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
->> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
->> +                     boot_regs[1], boot_regs[2], boot_regs[3]);
->> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
->> +     }
->>  }
->>
->>  static int __init arm64_device_init(void)
->> --
->> 1.8.3.2
->>
->>
+I have some comments against patch 8 that will need to be fixed up, so
+I'll provide tags for that separately.
+
+Mark.
+
+> 
+> Changes since v4:
+> - included Marc Zyngier's struct cpu_table removal patch
+> - dropped __lookup_processor_type_data patch now that Marc has nuked the
+>   whole thing
+> - added patch to merge __enable_mmu() and __turn_mmu_on() into a single
+>   function, as there is no need for funky trampoline stuff when you have
+>   two non-overlapping TTBRs
+> - added patch to remove __calc_phys_offset and use PC-relative references or
+>   absolute (linker generated) references as appropriate
+> - added patch to complain when x1/x2/x3 are non-zero, which helps ensure that
+>   we will ever be able to use them for anything
+> - added R-b's
+> 
+> Changes since v3:
+> - added similar patch for secondary_holding_pen_release
+> - fixed bug in patch #1 (ldr_l)
+> 
+> Changes since v2:
+> - added separate patch to add macros for adrp/add, adrp/ldr and adrp/str
+> - added R-b's
+> 
+> Ard Biesheuvel (7):
+>   arm64: add macros for common adrp usages
+>   arm64: remove processor_id
+>   arm64: remove __switch_data object from head.S
+>   arm64: use PC-relative reference for secondary_holding_pen_release
+>   arm64: merge __enable_mmu and __turn_mmu_on
+>   arm64: remove __calc_phys_offset
+>   arm64: enforce x1|x2|x3 == 0 upon kernel entry as per boot protocol
+> 
+> Marc Zyngier (1):
+>   arm64: Get rid of struct cpu_table
+> 
+>  arch/arm64/include/asm/assembler.h |  29 ++++++
+>  arch/arm64/include/asm/cputable.h  |  30 ------
+>  arch/arm64/kernel/Makefile         |   2 +-
+>  arch/arm64/kernel/asm-offsets.c    |   4 -
+>  arch/arm64/kernel/cputable.c       |  33 ------
+>  arch/arm64/kernel/head.S           | 203 +++++++------------------------------
+>  arch/arm64/kernel/setup.c          |  34 +++----
+>  7 files changed, 83 insertions(+), 252 deletions(-)
+>  delete mode 100644 arch/arm64/include/asm/cputable.h
+>  delete mode 100644 arch/arm64/kernel/cputable.c
+> 
+> -- 
+> 1.8.3.2
+> 
+> 
