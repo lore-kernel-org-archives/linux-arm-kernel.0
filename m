@@ -1,99 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 11:21:37 +0100
-Subject: [PATCH] pinmux: allow exlusive pin allocation among GPIO and
- peripheral funtions via flag strict in struct pinctrl_desc
-In-Reply-To: <1426154203-11551-1-git-send-email-sonic.adi@gmail.com>
-References: <1426154203-11551-1-git-send-email-sonic.adi@gmail.com>
-Message-ID: <CACRpkdZ-wmZRHR1eTwhaNYcot=T4GVX2spm80hv8Makw99bowQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Mar 2015 11:20:17 +0100
+Subject: Is cpufreq-dt safe without regulator support?
+In-Reply-To: <CAKohponKrwm47YQ0oRjYo9tMBu4gkOvi8fTWCuaWA1SNbT0b9g@mail.gmail.com>
+References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+ <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
+ <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
+ <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
+ <20150318100336.GM4638@lukather>
+ <CAKohponKrwm47YQ0oRjYo9tMBu4gkOvi8fTWCuaWA1SNbT0b9g@mail.gmail.com>
+Message-ID: <20150318102017.GN4638@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 10:56 AM, Sonic Zhang <sonic.adi@gmail.com> wrote:
+On Wed, Mar 18, 2015 at 03:41:36PM +0530, Viresh Kumar wrote:
+> On 18 March 2015 at 15:33, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Another solution would be to have the safe OPPs in the DTSI, and the
+> > one that requires some PMIC support in the board DTS.
+> 
+> Yes .dtsi and .dts files do get merged, but I don't think that will
+> happen in case
+> of OPPs as well. As we are talking about a single field with any array of OPP
+> pairs.
 
-> From: Sonic Zhang <sonic.zhang@analog.com>
->
-> The blackfin pinmux and gpio controller doesn't allow user to set up 1 pin
-> for both GPIO and peripheral function. So, add flag strict in struct pinctrl
-> to check both gpio_owner and mux_owner before approving the pin request.
->
-> Signed-off-by: Sonic Zhang <sonic.zhang@analog.com>
+Sorry, what I meant was to redefine the whole OPPs set in the DTS,
+overriding the one in the DTSI.
 
-Nice!
+That would add some duplication, but still far less than what you
+first suggested in our case.
 
-But mention in the commit that ADI2 is also patched to use
-this.
+Maxime
 
-Do we have other candidates for strict GPIO/mux separation?
-What do people on the lists say?
-
-> +++ b/drivers/pinctrl/pinmux.c
-> @@ -99,24 +99,25 @@ static int pin_request(struct pinctrl_dev *pctldev,
->         dev_dbg(pctldev->dev, "request pin %d (%s) for %s\n",
->                 pin, desc->name, owner);
->
-> +       if ((gpio_range || pctldev->desc->strict) && desc->gpio_owner) {
-
-So either we find a range map or we are strict and there is also a
-previous owner of the pin.
-
-Is this correct? I think we should *always* find a range to request
-a pin.
-
-I think you should just leave this if()-statement alone and insert
-some new stuff inside the lower else()-clause.
-
-
-> +               dev_err(pctldev->dev,
-> +                       "pin %s already requested by %s; cannot claim for %s\n",
-> +                       desc->name, desc->gpio_owner, owner);
-> +               goto out;
-> +       }
-> +
-> +       if ((!gpio_range || pctldev->desc->strict) &&
-> +           desc->mux_usecount && strcmp(desc->mux_owner, owner)) {
-> +               dev_err(pctldev->dev,
-> +                       "pin %s already requested by %s; cannot claim for %s\n",
-> +                       desc->name, desc->mux_owner, owner);
-> +               goto out;
-> +       }
-
-This is wrong.
-
-If the function is entered with gpio_range != NULL it is a request
-for a single GPIO line, else it is regular muxing.
-
-Keep the else() clause, just also include an explicit check
-to see if desc->gpio_owner is set, and in that case, if we
-are also strict, bail out.
-
-else { /* No gpio_range */
-   if (pctldev->desc->strict && desc->gpio_owner) {
-      err "already used for GPIO..."
-   }
-
-> +
->         if (gpio_range) {
-
-So just keep the whole thing inside if (gpio_range).
-
->                 desc->mux_usecount++;
->                 if (desc->mux_usecount > 1)
->                         return 0;
-> diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-> index 66e4697..ca6c99c0 100644
-> --- a/include/linux/pinctrl/pinctrl.h
-> +++ b/include/linux/pinctrl/pinctrl.h
-> @@ -132,6 +132,7 @@ struct pinctrl_desc {
->         const struct pinctrl_ops *pctlops;
->         const struct pinmux_ops *pmxops;
->         const struct pinconf_ops *confops;
-> +       bool strict;
-
-Also update the kerneldoc above this struct.
-
-Also update examples and text in
-Documentation/pinctrl.txt
-so it is clear when to use this option and what it means.
-
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/4bd1ef80/attachment.sig>
