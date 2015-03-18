@@ -1,116 +1,209 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 18 Mar 2015 16:50:23 +0530
-Subject: [PATCH v7] ARM: dts: Add HS400 support for exynos5420 and exynos5800
-Message-ID: <1426677623-30532-1-git-send-email-alim.akhtar@samsung.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Wed, 18 Mar 2015 19:22:29 +0800
+Subject: [PATCH 2/5] iommu/mediatek: Add mt8173 IOMMU driver
+In-Reply-To: <CAAFQd5ASywTX7P9L8cogBbBTra0W1=oVxeWfK5=K7L+SR2xaFA@mail.gmail.com>
+References: <1425638900-24989-1-git-send-email-yong.wu@mediatek.com>
+ <1425638900-24989-3-git-send-email-yong.wu@mediatek.com>
+ <CAAFQd5ASywTX7P9L8cogBbBTra0W1=oVxeWfK5=K7L+SR2xaFA@mail.gmail.com>
+Message-ID: <1426677749.22581.38.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Seungwon Jeon <tgih.jun@samsung.com>
+Hi Tomasz,
+   Thanks very much for your review. please help check below.
+The others I will fix in the next version.
 
-HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-and exynos5800-peach-pi boards.
-This also adds RCLK GPIO line, this gpio should be in pull-down
-state.
-This also enables HS400 on peach-pi and this updates the clock frequency
-to 800MHz to be set as input clock to controller.
+Hi Robin,
+   There are some place I would like you can have a look and give me
+some suggestion.
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-[Alim: addressed review comments]
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
----
-Changes in V7:
-	 Add back bus1 pin, which was removed during rebase in v6
-         as rightly pointed out by Javier[1].
+On Wed, 2015-03-11 at 19:53 +0900, Tomasz Figa wrote:
+> Hi,
+> 
+> Please find next part of my comments inline.
+> 
+> On Fri, Mar 6, 2015 at 7:48 PM,  <yong.wu@mediatek.com> wrote:
+> 
+> [snip]
+> 
+> > +/*
+> > + * pimudev is a global var for dma_alloc_coherent.
+> > + * It is not accepatable, we will delete it if "domain_alloc" is enabled
+> 
+> It looks like we indeed need to use dma_alloc_coherent() and we don't
+> have a good way to pass the device pointer to domain_init callback.
+> 
+> If you don't expect SoCs in the nearest future to have multiple M4U
+> blocks, then I guess this global variable could stay, after changing
+> the comment into an explanation why it's correct. Also it should be
+> moved to the top of the file, below #include directives, as this is
+> where usually global variables are located.
+@Robin,
+     We have merged this patch[0] in order to delete the global var, But
+it seems that your patch of "arm64:IOMMU" isn't based on it right row.
+it will build fail.
 
-Changes in V6:
-	Rebased on kukjin's for-next branch[0] 
-	(commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
+[0]:http://lists.linuxfoundation.org/pipermail/iommu/2015-January/011939.html
 
-[0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-[1]: http://www.spinics.net/lists/arm-kernel/msg406618.html
-
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
- arch/arm/boot/dts/exynos5420-smdk5420.dts  | 5 ++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
- 4 files changed, 19 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index 3f4e2fe..0788d08 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -699,8 +699,10 @@
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
-+	samsung,dw-mshc-hs400-timing = <0 2>;
-+	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index ba686e4..8b15316 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -201,6 +201,13 @@
- 			samsung,pin-drv = <3>;
- 		};
- 
-+		sd0_rclk: sd0-rclk {
-+			samsung,pins = "gpc0-7";
-+			samsung,pin-function = <2>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <3>;
-+		};
-+
- 		sd1_cmd: sd1-cmd {
- 			samsung,pins = "gpc1-1";
- 			samsung,pin-function = <2>;
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 7a56852..9103f23 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -80,8 +80,11 @@
- 		samsung,dw-mshc-ciu-div = <3>;
- 		samsung,dw-mshc-sdr-timing = <0 4>;
- 		samsung,dw-mshc-ddr-timing = <0 2>;
-+		samsung,dw-mshc-hs400-timing = <0 2>;
-+		samsung,read-strobe-delay = <90>;
- 		pinctrl-names = "default";
--		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8
-+			     &sd0_rclk>;
- 		bus-width = <8>;
- 		cap-mmc-highspeed;
- 	};
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index c833bac..412f41d 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -654,15 +654,18 @@
- 	num-slots = <1>;
- 	broken-cd;
- 	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
- 	cap-mmc-highspeed;
- 	non-removable;
- 	card-detect-delay = <200>;
--	clock-frequency = <400000000>;
-+	clock-frequency = <800000000>;
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
-+	samsung,dw-mshc-hs400-timing = <0 2>;
-+	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
--- 
-1.9.1
+> > + */
+> > +static struct device *pimudev;
+> > +
+[snip]
+> > +
+> > +static int mtk_iommu_attach_device(struct iommu_domain *domain,
+> > +                                  struct device *dev)
+> > +{
+> > +       unsigned long flags;
+> > +       struct mtk_iommu_domain *priv = domain->priv;
+> > +       struct mtk_iommu_info *piommu = priv->piommuinfo;
+> > +       struct of_phandle_args out_args = {0};
+> > +       struct device *imudev;
+> > +       unsigned int i = 0;
+> > +
+> > +       if (!piommu)
+> 
+> Could you explain when this can happen?
+	If we call arch_setup_dma_ops to create a iommu domain,
+it will enter iommu_dma_attach_device, then enter here. At that time, we
+don't add the private data to this "struct iommu_domain *".
+@Robin, Could this be improved?
+> 
+> > +               goto imudev;
+> 
+> return 0;
+> 
+> > +       else
+> 
+> No else needed.
+> 
+> > +               imudev = piommu->dev;
+> > +
+> > +       spin_lock_irqsave(&priv->portlock, flags);
+> 
+> What is protected by this spinlock?
+	We will write a register of the local arbiter while config port. If
+some modules are in the same local arbiter, it may be overwrite. so I
+add it here.
+> 
+> > +
+> > +       while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+> > +                                          "#iommu-cells", i, &out_args)) {
+> > +               if (1 == out_args.args_count) {
+> 
+> Can we be sure that this is actually referring to our IOMMU?
+> 
+> Maybe this should be rewritten to
+> 
+> if (out_args.np != imudev->of_node)
+>         continue;
+> if (out_args.args_count != 1) {
+>         dev_err(imudev, "invalid #iommu-cells property for IOMMU %s\n",
+> 
+> }
+> 
+> > +                       unsigned int portid = out_args.args[0];
+> > +
+> > +                       dev_dbg(dev, "iommu add port:%d\n", portid);
+> 
+> imudev should be used here instead of dev.
+> 
+> > +
+> > +                       mtk_iommu_config_port(piommu, portid);
+> > +
+> > +                       if (i == 0)
+> > +                               dev->archdata.dma_ops =
+> > +                                       piommu->dev->archdata.dma_ops;
+> 
+> Shouldn't this be set automatically by IOMMU or DMA mapping core?
+@Robin, 
+     In the original "arm_iommu_attach_device" of arm/mm, it will call
+set_dma_ops to add iommu_ops for each iommu device.
+But iommu_dma_attach_device don't help this, so I have to add it here.
+Could this be improved?
+> 
+> > +               }
+> > +               i++;
+> > +       }
+> > +
+> > +       spin_unlock_irqrestore(&priv->portlock, flags);
+> > +
+> > +imudev:
+> > +       return 0;
+> > +}
+> > +
+> > +static void mtk_iommu_detach_device(struct iommu_domain *domain,
+> > +                                   struct device *dev)
+> > +{
+> 
+> No hardware (de)configuration or clean-up necessary?
+I will add it. Actually we design like this:If a device have attached to
+iommu domain, it won't detach from it.
+> 
+> > +}
+> > +
+[snip]
+> 
+> > +
+> > +       piommu->protect_va = devm_kmalloc(piommu->dev, MTK_PROTECT_PA_ALIGN*2,
+> 
+> style: Operators like * should have space on both sides.
+> 
+> > +                                         GFP_KERNEL);
+> 
+> Shouldn't dma_alloc_coherent() be used for this?
+     We don't care the data in it. I think they are the same. Could you
+help tell me why dma_alloc_coherent may be better.
+> 
+> > +       if (!piommu->protect_va)
+> > +               goto protect_err;
+> 
+> Please return -ENOMEM here directly, as there is nothing to clean up
+> in this case.
+> 
+[snip]
+> 
+> > +               dev_err(piommu->dev, "IRQ request %d failed\n",
+> > +                       piommu->irq);
+> > +               goto hw_err;
+> > +       }
+> > +
+> > +       iommu_set_fault_handler(domain, mtk_iommu_fault_handler, piommu);
+> 
+> I don't see any other drivers doing this. Isn't this for upper layers,
+> so that they can set their own generic fault handlers?
+     I think that this function is related with the iommu domain, we
+have only one multimedia iommu domain. so I add it after the iommu
+domain are created.
+> 
+> > +
+> > +       dev_set_drvdata(piommu->dev, piommu);
+> 
+> This should be set before allowing the interrupt to fire. In other
+> words, the driver should be fully set up at the time of enabling the
+> IRQ.
+> 
+> > +
+> > +       return 0;
+> 
+> style: Missing blank line.
+> 
+> > +hw_err:
+> > +       arch_teardown_dma_ops(piommu->dev);
+> > +pte_err:
+> > +       kmem_cache_destroy(piommu->m4u_pte_kmem);
+> > +protect_err:
+> > +       dev_err(piommu->dev, "probe error\n");
+> 
+> Please replace this with specific messages for all errors (in case the
+> called function doesn't already print one like kmalloc and friends).
+> 
+> > +       return 0;
+> 
+> Returning 0, which means success, doesn't look like a good idea for
+> signalling a failure. Please return the correct error code as received
+> from function that errors out if possible.
+> 
+> End of part 3.
+> 
+> Best regards,
+> Tomasz
