@@ -1,90 +1,44 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 18 Mar 2015 16:06:35 +0100
-Subject: [PATCH v10 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
- if ACPI is enabled on ARM64
-In-Reply-To: <20150318091820.GB2846@red-moon>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <5506BF89.9040703@linaro.org> <20150318091820.GB2846@red-moon>
-Message-ID: <18318670.U16Joq6nSS@vostro.rjw.lan>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 18 Mar 2015 16:43:45 +0200
+Subject: [PATCHv4 00/35] ARM: OMAP2+: PRCM / SCM cleanups against 4.0-rc1
+Message-ID: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 18, 2015 09:18:20 AM Lorenzo Pieralisi wrote:
-> On Mon, Mar 16, 2015 at 11:33:29AM +0000, Hanjun Guo wrote:
-> > On 2015?03?13? 19:04, Lorenzo Pieralisi wrote:
-> > > On Fri, Mar 13, 2015 at 03:28:45AM +0000, Hanjun Guo wrote:
-> > >
-> > > [...]
-> > >
-> > >>>   /*
-> > >>>    * acpi_boot_table_init() called from setup_arch(), always.
-> > >>>    *	1. find RSDP and get its address, and then find XSDT
-> > >>>    *	2. extract all tables and checksums them all
-> > >>>    *	3. check ACPI FADT revision
-> > >>> + *	4. check ACPI FADT HW reduced flag
-> > >>>    *
-> > >>>    * We can parse ACPI boot-time tables such as MADT after
-> > >>>    * this function is called.
-> > >>>    */
-> > >>>   void __init acpi_boot_table_init(void)
-> > >>>   {
-> > >>> +	struct acpi_table_header *table;
-> > >>> +	struct acpi_table_fadt *fadt;
-> > >>> +	acpi_status status;
-> > >>> +	acpi_size tbl_size;
-> > >>> +
-> > >>>   	/*
-> > >>>   	 * Enable ACPI instead of device tree unless
-> > >>>   	 * - ACPI has been disabled explicitly (acpi=off), or
-> > >>> @@ -351,19 +318,52 @@ void __init acpi_boot_table_init(void)
-> > >>>   	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> > >>>   		return;
-> > >>>
-> > >>> -	enable_acpi();
-> > >>> -
-> > >>>   	/* Initialize the ACPI boot-time table parser. */
-> > >>>   	if (acpi_table_init()) {
-> > >>
-> > >> Since we disable ACPI in default, it is a bit strange for me to init all
-> > >> the ACPI tables and parse FADT when ACPI is disabled, could you
-> > >> put some comments here to clarify the purpose? other than that, it is looks
-> > >> good to me.
-> > >
-> > > Ok, the purpose was to make things simpler, but I think that given
-> > > current code it is not 100% safe to init ACPI tables with
-> > > acpi_disabled == 1.
-> > >
-> > > To me having to enable ACPI to parse the tables and check *if* ACPI tables
-> > > are there is a bit crazy, but I agree with you that given current code
-> > > it is safer.
-> > >
-> > > Patch rewritten, here below, please have a look, test it and rework
-> > > bits as needed, I added comments where I thought they were needed but
-> > > please add to that if you feel it is worth it.
-> > >
-> > > It should be easy to split, let me know if you want an incremental
-> > > version.
-> > 
-> > This one is much better, pretty fine to me, thanks!
-> > 
-> > I assume that this patch is cleanup patch on top of ARM64 ACPI
-> > core patches, right?
-> 
-> For the records, I created a branch with my patch split over some
-> of your patches, even though I think to make things simpler it is best
-> to apply it as a single patch on top of your series,
+Hi,
 
-I agree.  In particular, the patches that have already been reviewed and
-ACKed won't need to be reviewed again this way which seems to be crucially
-important to me.
+Changes in this set compared to v3:
 
-> I will prepare the commit log for the single patch version too.
+- Changed the SCM module DT node layout based on comments from Tony;
+  basically the wkup / core are split into their own nodes now. This
+  applies for omap3, omap4, omap5 and dra7, rest of the SoCs have their
+  control module integrated as one instance (Patch 26, 30, 33, 34)
+- Changed the tisyscon node name to scm_conf. This name is more
+  descriptive for the purpose being used, scm_conf was already used
+  as an alias (Patch 24, 25, 27, 29)
+- Rest of the patches have no changes compared to v3.
 
-Thanks!
+Testing done:
+- am335x-evm      : boot
+- am335x-evmsk    : boot
+- am3517-evm      : boot
+- am43x-epos-evm  : boot
+- am437x-gp-evm   : boot
+- omap3-beagle-xm : boot
+- omap3-beagle    : boot, suspend-resume (ret/off), cpuidle (ret/off)
+- am335x-boneblack: boot
+- am335x-bone     : boot
+- dra7xx-evm      : boot
+- omap3-n900      : boot
+- omap5-uevm      : boot
+- omap4-panda-es  : boot, suspend-resume (ret), cpuidle (ret)
+- omap4-panda     : boot
+- omap2430-sdp    : boot
+- omap3430-sdp    : boot
+- omap4-sdp-es23plus: boot
 
-Hanjun, please add this one to the series when ready.
+Test branch pushed at:
+- tree: https://github.com/t-kristo/linux-pm.git
+- branch: 4.0-rc1-prcm-cleanup-v4
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+-Tero
