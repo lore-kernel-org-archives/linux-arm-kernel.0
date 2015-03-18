@@ -1,110 +1,39 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 18 Mar 2015 08:38:38 +0530
-Subject: [PATCH v6] ARM: dts: Add HS400 support for exynos5420 and exynos5800
-Message-ID: <1426648118-20790-1-git-send-email-alim.akhtar@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Mar 2015 11:23:59 +0800
+Subject: [PATCH 0/3] ARM: sun8i: Add SMP and arch-timer support for A23
+Message-ID: <1426649042-30547-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Seungwon Jeon <tgih.jun@samsung.com>
+Hi Maxime,
 
-HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-and exynos5800-peach-pi boards.
-This also adds RCLK GPIO line, this gpio should be in pull-down
-state.
-This also enables HS400 on peach-pi and this updates the clock frequency
-to 800MHz to be set as input clock to controller.
+This series adds support for SMP and arch-timer for the
+A23. This follows our discussion from yesterday about
+getting arch-timer support for sun8i and sun9i. I will
+post a separate patch for sun9i-a80.
 
-Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-[Alim: addressed review comments]
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
----
-Changes in V6:
-	Rebased on kukjin's for-next branch[0] 
-	(commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
+I know some people would like to see arch-timer and SMP
+supported with PSCI, but work on this has been slow. So
+in the mean time, I thought I'd just post what SMP code
+I have.
 
-[0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+Feel free to just merge the first patch if you think SMP
+can wait.
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
- arch/arm/boot/dts/exynos5420-smdk5420.dts  | 4 +++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
- 4 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index d0ee55f..e158861 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -695,8 +695,10 @@
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
-+	samsung,dw-mshc-hs400-timing = <0 2>;
-+	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index ba686e4..8b15316 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -201,6 +201,13 @@
- 			samsung,pin-drv = <3>;
- 		};
- 
-+		sd0_rclk: sd0-rclk {
-+			samsung,pins = "gpc0-7";
-+			samsung,pin-function = <2>;
-+			samsung,pin-pud = <1>;
-+			samsung,pin-drv = <3>;
-+		};
-+
- 		sd1_cmd: sd1-cmd {
- 			samsung,pins = "gpc1-1";
- 			samsung,pin-function = <2>;
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 7a56852..de5e41e 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -80,8 +80,10 @@
- 		samsung,dw-mshc-ciu-div = <3>;
- 		samsung,dw-mshc-sdr-timing = <0 4>;
- 		samsung,dw-mshc-ddr-timing = <0 2>;
-+		samsung,dw-mshc-hs400-timing = <0 2>;
-+		samsung,read-strobe-delay = <90>;
- 		pinctrl-names = "default";
--		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 		bus-width = <8>;
- 		cap-mmc-highspeed;
- 	};
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 7ea1d66..2e84613 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -650,15 +650,18 @@
- 	num-slots = <1>;
- 	broken-cd;
- 	mmc-hs200-1_8v;
-+	mmc-hs400-1_8v;
- 	cap-mmc-highspeed;
- 	non-removable;
- 	card-detect-delay = <200>;
--	clock-frequency = <400000000>;
-+	clock-frequency = <800000000>;
- 	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
- 	samsung,dw-mshc-ddr-timing = <0 2>;
-+	samsung,dw-mshc-hs400-timing = <0 2>;
-+	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
- 	bus-width = <8>;
- };
- 
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (3):
+  ARM: dts: sun8i: Enable ARM architected timer on A23
+  ARM: sun8i: Add SMP support for the Allwinner A23
+  ARM: sun8i: dt: Enable A23 SMP support
+
+ Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+ arch/arm/boot/dts/sun8i-a23.dtsi               | 16 ++++++
+ arch/arm/mach-sunxi/platsmp.c                  | 69 ++++++++++++++++++++++++++
+ 3 files changed, 86 insertions(+)
+
 -- 
-1.9.1
+2.1.4
