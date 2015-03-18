@@ -1,88 +1,106 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Mar 2015 08:49:53 +0100
-Subject: [PATCH 3/3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
- boot protocol
-In-Reply-To: <550868AB.7080303@codeaurora.org>
-References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426587074-22390-4-git-send-email-ard.biesheuvel@linaro.org>
- <550868AB.7080303@codeaurora.org>
-Message-ID: <CAKv+Gu-sUaftz4g7N7mHCcPrBbxk44-+2Hrh57ZyHioitVeXoQ@mail.gmail.com>
+Date: Wed, 18 Mar 2015 08:54:34 +0100
+Subject: [PATCH v2 0/8] ARM kernel size fixes
+In-Reply-To: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9Ah4A75xd3zQF=7gHD8VzfmYezpeiXpkd+SWWrgrD6+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2015 at 18:47, Christopher Covington <cov@codeaurora.org> wrote:
-> On 03/17/2015 06:11 AM, Ard Biesheuvel wrote:
->> According to the arm64 boot protocol, registers x1 to x3 should be
->> zero upon kernel entry, and non-zero values are reserved for future
->> use. This future use is going to be problematic if we never enforce
->> the current rules, so start enforcing them now, by emitting a warning
->> if non-zero values are detected.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/head.S  |  8 ++++++++
->>  arch/arm64/kernel/setup.c | 13 +++++++++++++
->>  2 files changed, 21 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 1651c0fd50e6..fe5354eae069 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -231,6 +231,10 @@ section_table:
->>  #endif
->>
->>  ENTRY(stext)
->> +     adr     x8, boot_regs                   // record the contents of
->> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
->> +     stp     x2, x3, [x8, #16]
->> +
->>       mov     x21, x0                         // x21=FDT
->>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>       adrp    x24, KERNEL_START - TEXT_OFFSET // x24=PHYS_OFFSET
->> @@ -251,6 +255,10 @@ ENTRY(stext)
->>       b       __cpu_setup                     // initialise processor
->>  ENDPROC(stext)
->>
->> +     .align  3
->> +ENTRY(boot_regs)
->> +     .skip   4 * 8                           // x0 .. x3
->> +
->>  /*
->>   * Determine validity of the x21 FDT pointer.
->>   * The dtb must be 8-byte aligned and live in the first 512M of memory.
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 6c5fb5aff325..2b81d0a907ce 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -532,3 +532,16 @@ const struct seq_operations cpuinfo_op = {
->>       .stop   = c_stop,
->>       .show   = c_show
->>  };
->> +
->> +static int verify_boot_protocol(void)
->> +{
->> +     extern u64 boot_regs[];
->> +
->> +     if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
->> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
->> +                     boot_regs[1], boot_regs[2], boot_regs[3]);
->> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
+On 13 March 2015 at 13:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series is a suggested approach to preventing linker failures on large
+> kernels. It is somewhat unpolished, and posted for comments/testing primarily.
 >
-> pr_warn?
+> The issues were found and reported by Arnd Bergmann, and these patches are
+> loosely based on his initial approach to work around them.
+>
+> Changes since v1:
+> - Updated PROCINFO patch (#1) to refer to the base of the struct by name, and
+>   simplify the calling code (rmk)
+> - Updated b_far/bl_far patch (#3) to remove ARM/THUMB alternatives and use a
+>   conditionally defined PC_BIAS instead. Also added b_abs/bl_abs versions,
+>   which can only be used for absolute branches but can be implemented in fewer
+>   instructions. Added conditional branch support as well.
+> - introduce (#6) and use (#7) the .text.fixup input section which gets emitted
+>   after each .text section for each .o
+> - added patch #8 that allows the kallsyms data to be moved to .data
 >
 
-Semantically more correct, perhaps, but pr_err() should be slightly
-noisier, which is preferred here imo
+I put the following ones in the patch tracker:
 
->> +     }
->> +     return 0;
->> +}
->> +late_initcall(verify_boot_protocol);
->>
+>   ARM: replace PROCINFO embedded branch with relative offset
+>   ARM: add macro to perform far branches (b/bl)
+>   ARM: use bl_far to call __hyp_stub_install_secondary from the .data
+>     section
+>   ARM: move the .idmap.text section closer to .head.text
+
+Arnd, may I have your ack on these if you think this approach is ok?
+
+>   asm-generic: introduce .text.fixup input section
+>   ARM: keep .text and .fixup regions together
+
+This one can be dropped and/or deferred. I don't need it to build
+Arnd's dotconfig-from-hell successfully, and there is a KVM patch
+under review that touches the same part of the linker script.
+
+>   ARM: move HYP text to end of .text section
+
+This one has not been discussed at all, so let's defer for now
+
+>   kallsyms: allow kallsyms data to reside in the .data section
 >
-> Chris
+
+Regards,
+Ard.
+
+
+>  arch/arm/Kconfig                      |  1 +
+>  arch/arm/include/asm/assembler.h      | 83 +++++++++++++++++++++++++++++++++++
+>  arch/arm/include/asm/futex.h          |  2 +-
+>  arch/arm/include/asm/uaccess.h        | 10 ++---
+>  arch/arm/include/asm/word-at-a-time.h |  2 +-
+>  arch/arm/kernel/entry-armv.S          |  2 +-
+>  arch/arm/kernel/head.S                | 14 +++---
+>  arch/arm/kernel/sleep.S               |  2 +-
+>  arch/arm/kernel/swp_emulate.c         |  2 +-
+>  arch/arm/kernel/vmlinux.lds.S         | 15 ++++---
+>  arch/arm/kvm/init.S                   |  5 +--
+>  arch/arm/kvm/interrupts.S             |  4 +-
+>  arch/arm/lib/clear_user.S             |  2 +-
+>  arch/arm/lib/copy_to_user.S           |  2 +-
+>  arch/arm/lib/csumpartialcopyuser.S    |  2 +-
+>  arch/arm/mm/alignment.c               |  6 +--
+>  arch/arm/mm/proc-arm1020.S            |  4 +-
+>  arch/arm/mm/proc-arm1020e.S           |  4 +-
+>  arch/arm/mm/proc-arm1022.S            |  4 +-
+>  arch/arm/mm/proc-arm1026.S            |  4 +-
+>  arch/arm/mm/proc-arm720.S             |  4 +-
+>  arch/arm/mm/proc-arm740.S             |  4 +-
+>  arch/arm/mm/proc-arm7tdmi.S           |  4 +-
+>  arch/arm/mm/proc-arm920.S             |  4 +-
+>  arch/arm/mm/proc-arm922.S             |  4 +-
+>  arch/arm/mm/proc-arm925.S             |  4 +-
+>  arch/arm/mm/proc-arm926.S             |  4 +-
+>  arch/arm/mm/proc-arm940.S             |  4 +-
+>  arch/arm/mm/proc-arm946.S             |  4 +-
+>  arch/arm/mm/proc-arm9tdmi.S           |  4 +-
+>  arch/arm/mm/proc-fa526.S              |  4 +-
+>  arch/arm/mm/proc-feroceon.S           |  5 ++-
+>  arch/arm/mm/proc-macros.S             |  4 ++
+>  arch/arm/mm/proc-mohawk.S             |  4 +-
+>  arch/arm/mm/proc-sa110.S              |  4 +-
+>  arch/arm/mm/proc-sa1100.S             |  4 +-
+>  arch/arm/mm/proc-v6.S                 |  4 +-
+>  arch/arm/mm/proc-v7.S                 | 28 ++++++------
+>  arch/arm/mm/proc-v7m.S                |  4 +-
+>  arch/arm/mm/proc-xsc3.S               |  4 +-
+>  arch/arm/mm/proc-xscale.S             |  4 +-
+>  arch/arm/nwfpe/entry.S                |  2 +-
+>  include/asm-generic/vmlinux.lds.h     | 14 +++++-
+>  init/Kconfig                          |  4 ++
+>  scripts/kallsyms.c                    |  2 +-
+>  45 files changed, 200 insertions(+), 101 deletions(-)
 >
 > --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> 1.8.3.2
+>
