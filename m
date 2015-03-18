@@ -1,51 +1,123 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 18 Mar 2015 09:17:34 +0900
-Subject: [PATCH v7 7/9] arm64: dts: exynos: Add I2S dt node for Exynos5433 SoC
+Date: Wed, 18 Mar 2015 09:17:35 +0900
+Subject: [PATCH v7 8/9] arm64: dts: exynos: Add TMU sensor dt node for
+ Exynos5433 SoC
 In-Reply-To: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
 References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1426637856-3730-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1426637856-3730-9-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Inha Song <ideal.song@samsung.com>
+This patch adds the TMU (Thermal Management Unit) sensor devicetree node for
+Exynos5433. The Exynos5433 includes the five temperature sensors as following:
+- two temperature sensor for Cortex-A57 (ATLAS)
+- one temperature sensor for Cortex-A53 (APOLLO)
+- one temperature sensor for G3D IP
+- one temperature sensor for ISP IP
 
-This patch adds I2S device tree node for Exynos5433 SoC.
-In Exynos5433 SoC, I2S0 is used for audio interface.
-
-Signed-off-by: Inha Song <ideal.song@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
+Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     | 22 +++++++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 55 ++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
 
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+new file mode 100644
+index 0000000..396e60f
+--- /dev/null
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+@@ -0,0 +1,22 @@
++/*
++ * Device tree sources for Exynos5433 TMU sensor configuration
++ *
++ * Copyright (c) 2015 Chanwoo Choi <cw00.choi@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <dt-bindings/thermal/thermal_exynos.h>
++
++#thermal-sensor-cells = <0>;
++samsung,tmu_gain = <8>;
++samsung,tmu_reference_voltage = <16>;
++samsung,tmu_noise_cancel_mode = <4>;
++samsung,tmu_efuse_value = <75>;
++samsung,tmu_min_efuse_value = <40>;
++samsung,tmu_max_efuse_value = <150>;
++samsung,tmu_first_point_trim = <25>;
++samsung,tmu_second_point_trim = <85>;
++samsung,tmu_default_temp_offset = <50>;
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 1155205..f6ae71c 100644
+index f6ae71c..1fe0c23 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -475,6 +475,23 @@
+@@ -836,6 +836,61 @@
  			status = "disabled";
  		};
  
-+		i2s0: i2s0 at 11440000 {
-+			compatible = "samsung,exynos7-i2s";
-+			reg = <0x11440000 0x100>;
-+			dmas = <&adma 0 &adma 2>;
-+			dma-names = "tx", "rx";
-+			interrupts = <0 70 0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&cmu_aud CLK_PCLK_AUD_I2S>,
-+				 <&cmu_aud CLK_SCLK_AUD_I2S>,
-+				 <&cmu_aud CLK_SCLK_I2S_BCLK>;
-+			clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2s0_bus>;
++		tmu_atlas0: tmu at 10060000 {
++			compatible = "samsung,exynos5433-tmu";
++			reg = <0x10060000 0x200>;
++			interrupts = <0 95 0>;
++			clocks = <&cmu_peris CLK_PCLK_TMU0_APBIF>,
++				 <&cmu_peris CLK_SCLK_TMU0>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos5433-tmu-sensor-conf.dtsi"
 +			status = "disabled";
 +		};
 +
- 		pinctrl_alive: pinctrl at 10580000 {
- 			compatible = "samsung,exynos5433-pinctrl";
- 			reg = <0x10580000 0x1000>;
++		tmu_atlas1: tmu at 10068000 {
++			compatible = "samsung,exynos5433-tmu";
++			reg = <0x10068000 0x200>;
++			interrupts = <0 96 0>;
++			clocks = <&cmu_peris CLK_PCLK_TMU0_APBIF>,
++				 <&cmu_peris CLK_SCLK_TMU0>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos5433-tmu-sensor-conf.dtsi"
++			status = "disabled";
++		};
++
++		tmu_g3d: tmu at 10070000 {
++			compatible = "samsung,exynos5433-tmu";
++			reg = <0x10070000 0x200>;
++			interrupts = <0 99 0>;
++			clocks = <&cmu_peris CLK_PCLK_TMU1_APBIF>,
++				 <&cmu_peris CLK_SCLK_TMU1>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos5433-tmu-sensor-conf.dtsi"
++			status = "disabled";
++		};
++
++		tmu_apollo: tmu at 10078000 {
++			compatible = "samsung,exynos5433-tmu";
++			reg = <0x10078000 0x200>;
++			interrupts = <0 115 0>;
++			clocks = <&cmu_peris CLK_PCLK_TMU1_APBIF>,
++				 <&cmu_peris CLK_SCLK_TMU1>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos5433-tmu-sensor-conf.dtsi"
++			status = "disabled";
++		};
++
++		tmu_isp: tmu at 1007c000 {
++			compatible = "samsung,exynos5433-tmu";
++			reg = <0x1007c000 0x200>;
++			interrupts = <0 94 0>;
++			clocks = <&cmu_peris CLK_PCLK_TMU1_APBIF>,
++				 <&cmu_peris CLK_SCLK_TMU1>;
++			clock-names = "tmu_apbif", "tmu_sclk";
++			#include "exynos5433-tmu-sensor-conf.dtsi"
++			status = "disabled";
++		};
++
+ 		pmu_system_controller: system-controller at 105c0000 {
+ 			compatible = "samsung,exynos5433-pmu", "syscon";
+ 			reg = <0x105c0000 0x5008>;
 -- 
 1.8.5.5
