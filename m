@@ -1,79 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Mar 2015 09:25:29 -0700
-Subject: [PATCH 3/4] ARM: dts: Add cppi41 support for dm816x MUSB
-In-Reply-To: <20150318144035.GB1116@saruman.tx.rr.com>
-References: <1426637961-4197-1-git-send-email-tony@atomide.com>
- <1426637961-4197-4-git-send-email-tony@atomide.com>
- <20150318003121.GA12911@saruman.tx.rr.com>
- <20150318011836.GK31346@atomide.com>
- <20150318144035.GB1116@saruman.tx.rr.com>
-Message-ID: <20150318162528.GO31346@atomide.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 18 Mar 2015 17:35:06 +0100
+Subject: [STLinux Kernel] [PATCH 6/6] pinctrl: st: Display pin's function
+ when printing pinctrl debug information
+In-Reply-To: <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
+References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
+ <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <5509A93A.5080202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [150318 07:41]:
-> On Tue, Mar 17, 2015 at 06:18:37PM -0700, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [150317 17:32]:
-> > > Hi,
-> > > 
-> > > On Tue, Mar 17, 2015 at 05:19:20PM -0700, Tony Lindgren wrote:
-> > > > Looks like we have cppi41 on dm816x just like on am335x.
-> > > > 
-> > > > Cc: Bin Liu <binmlist@gmail.com>
-> > > > Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> > > > Cc: Felipe Balbi <balbi@ti.com>
-> > > > Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-> > > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > Any logs available ? Any throughput improvements with DMA ?
-> > 
-> > So far I only logged with the debug option on. I can do some
-> > test runs with your for-next branch to a USB mass storage device
-> > if you prefer that, or got some other test in mind?
-> 
-> mass storage should be fine, just wanna know if you're getting
-> acceptable throughput.
+Hi Lee,
 
-No luck with your current merge branch with DMA right now, it's
-producing an error both on bbb and dm816x:
-
-"musb-hdrc musb-hdrc.0.auto: Need DT for the DMA engine." 
-
-So here are some test results against -rc4.
-
-CONFIG_MUSB_PIO_ONLY
-
-Copy a 10MB file to /dev/sda right after a reboot:
-
-# time /bin/sh -c 'cp filler /mnt/ && sync'
-real    0m2.480s
-user    0m0.000s
-sys     0m0.320s
-
-Run hdparm a few times:
-
-# hdparm -t /dev/sda
-
-/dev/sda:
- Timing buffered disk reads:  34 MB in  3.16 seconds =  10.75 MB/sec
+On 03/18/2015 11:51 AM, Lee Jones wrote:
+> Great for easily determining which mode a pin is operating in.
+> This patch was particularly helpful when debugging a recent GPIO/
+> Pinctrl disparity issue.
+>
+> Before:
+>      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+>        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
+>               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+>
+> After [GPIO]:
+>      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+>        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] GPIO
+>               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+>
+> After [Alt]:
+>      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+>        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] Alt Fn 2
+>               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/pinctrl/pinctrl-st.c | 12 +++++++++++-
+>   1 file changed, 11 insertions(+), 1 deletion(-)
+A couple of comments below.
+Once fixed, you can add my:
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
 
-CONFIG_USB_TI_CPPI41_DMA
 
-Copy a 10MB file to /dev/sda right after a reboot:
+>
+> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> index 1cda40e..d5b2ffa 100644
+> --- a/drivers/pinctrl/pinctrl-st.c
+> +++ b/drivers/pinctrl/pinctrl-st.c
+> @@ -1058,18 +1058,28 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
+>   {
+>   	struct st_pio_control *pc;
+>   	unsigned long config;
+> +	unsigned int function;
+>   	int offset = st_gpio_pin(pin_id);
+> +	char f[64];
+64 bytes is way too big here
+>   
+>   	mutex_unlock(&pctldev->mutex);
+>   	pc = st_get_pio_control(pctldev, pin_id);
+>   	st_pinconf_get(pctldev, pin_id, &config);
+>   	mutex_lock(&pctldev->mutex);
+> -	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
+> +
+> +	function = st_pctl_get_pin_function(pc, offset);
+> +	if (function)
+> +		sprintf(f, "Alt Fn %d", function);
+Please use snprintf.
 
-# time /bin/sh -c 'cp filler /mnt/ && sync'
-real    0m2.095s
-user    0m0.000s
-sys     0m0.310s
+> +	else
+> +		sprintf(f, "GPIO");
+> +
+> +	seq_printf(s, "[OE:%d,PU:%ld,OD:%ld]\t%s\n"
+>   		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
+>   		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
+>   		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
+>   		ST_PINCONF_UNPACK_PU(config),
+>   		ST_PINCONF_UNPACK_OD(config),
+> +		f,
+>   		ST_PINCONF_UNPACK_RT(config),
+>   		ST_PINCONF_UNPACK_RT_INVERTCLK(config),
+>   		ST_PINCONF_UNPACK_RT_CLKNOTDATA(config),
 
-Run hdparm a few times:
-
-# hdparm -t /dev/sda
-
-/dev/sda:
- Timing buffered disk reads:  52 MB in  3.07 seconds =  16.94 MB/sec
-
-Regards,
-
-Tony
+Thanks,
+Maxime
