@@ -1,34 +1,31 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Mar 2015 12:08:02 +0000
-Subject: [PATCH 2/3] arm64: remove __calc_phys_offset
-In-Reply-To: <CAKv+Gu9BcOP7LUgsguXV9KYJqk4iUNC_WhJhRHFFHgNmV3nFQQ@mail.gmail.com>
+Date: Wed, 18 Mar 2015 12:09:24 +0000
+Subject: [PATCH 1/3] arm64: merge __enable_mmu and __turn_mmu_on
+In-Reply-To: <CAKv+Gu8vCjLnyBAcEfucFAj7KqB3qmfKvjowNRoG1dWXoFjYsQ@mail.gmail.com>
 References: <1426587074-22390-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426587074-22390-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150317144625.GH23340@leverpostej>
- <CAKv+Gu9BcOP7LUgsguXV9KYJqk4iUNC_WhJhRHFFHgNmV3nFQQ@mail.gmail.com>
-Message-ID: <20150318120802.GA19624@leverpostej>
+ <1426587074-22390-2-git-send-email-ard.biesheuvel@linaro.org>
+ <550866E6.5050901@codeaurora.org>
+ <CAKv+Gu8vCjLnyBAcEfucFAj7KqB3qmfKvjowNRoG1dWXoFjYsQ@mail.gmail.com>
+Message-ID: <20150318120924.GB19624@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> -     bl      __calc_phys_offset              // x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-> >> +     adrp    x24, KERNEL_START - TEXT_OFFSET // x24=PHYS_OFFSET
+> >> - * Setup common bits before finally enabling the MMU. Essentially this is just
+> >> - * loading the page table pointer and vector base registers.
+> >> + * Enable the MMU. This completely changes the structure of the visible memory
+> >> + * space. You will not be able to trace execution through this.
 > >
-> > Neat!
-> >
-> > Perhaps we could have:
-> >
-> > #define PHYS_OFFSET     (KERNEL_START - TEXT_OFFSET)
-> >
-> > Which would make the all the PHYS_OFFSET calculations self-documenting.
-> > It shouldn't clash with the asm/memory.h definition because that's in an
-> > #ifndef __ASSEMBLY__ block.
+> > I don't understand the last sentence. I recall being able to read and
+> > eventually understand simulator instruction traces of this code. Is the
+> > sentence referring to the Embedded Trace Macrocell or something?
 > >
 > 
-> I will use __PHYS_OFFSET instead, to prevent confusion.
-> 
-> Btw, I will drop the secondary 'adrp x24, __PHYS_OFFSET' lines
-> completely, as the secondary boot path never refers to x24.
+> I guess the comment is a bit stale: it was inherited from the ARM
+> version, where older platforms only have a single TTBR register, and
+> switching address spaces is a bit more involved. On arm64, however,
+> there are always two TTBR registers at EL1, and the address spaced
+> they represent can never overlap, so there it isn't such a big deal.
 
-Sounds good to me on both counts.
+Indeed. Feel free to drop it if you want.
 
 Mark.
