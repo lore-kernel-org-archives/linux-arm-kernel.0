@@ -1,73 +1,178 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Mar 2015 20:55:03 +0100
-Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
- per boot protocol
-In-Reply-To: <20150318185737.GJ19814@leverpostej>
-References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
- <20150318181315.GH19814@leverpostej>
- <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
- <CAKv+Gu_f=e4UG1GmtFh7j8fvq67v94VA=FwgaxHV5rECx0Wf=Q@mail.gmail.com>
- <20150318185737.GJ19814@leverpostej>
-Message-ID: <CAKv+Gu-PX4cPz=yuFeRUbB3COc7jRvGuCYR7h_xLVuUv7A9CfA@mail.gmail.com>
+Date: Wed, 18 Mar 2015 21:07:09 +0100
+Subject: [PATCH v10 08/21] ARM64 / ACPI: Introduce early_param "acpi=" to
+ enable/disable ACPI
+In-Reply-To: <20150318113549.GC2846@red-moon>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-9-git-send-email-hanjun.guo@linaro.org>
+ <20150318113549.GC2846@red-moon>
+Message-ID: <CAKv+Gu9wkh+J18cm1Mt4-Up5b3VA4-qeLtHcc+UD44DHbqABtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2015 at 19:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Mar 18, 2015 at 06:46:11PM +0000, Ard Biesheuvel wrote:
->> On 18 March 2015 at 19:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 18 March 2015 at 19:13, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> On Wed, Mar 18, 2015 at 02:55:27PM +0000, Ard Biesheuvel wrote:
->> >>> According to the arm64 boot protocol, registers x1 to x3 should be
->> >>> zero upon kernel entry, and non-zero values are reserved for future
->> >>> use. This future use is going to be problematic if we never enforce
->> >>> the current rules, so start enforcing them now, by emitting a warning
->> >>> if non-zero values are detected.
->> >>>
->> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >>> ---
->> >>>  arch/arm64/kernel/head.S  |  4 ++++
->> >>>  arch/arm64/kernel/setup.c | 15 +++++++++++++++
->> >>>  2 files changed, 19 insertions(+)
->> >>>
->> >>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> >>> index a0fbd99efb89..8636c3cef006 100644
->> >>> --- a/arch/arm64/kernel/head.S
->> >>> +++ b/arch/arm64/kernel/head.S
->> >>> @@ -233,6 +233,10 @@ section_table:
->> >>>  #endif
->> >>>
->> >>>  ENTRY(stext)
->> >>> +     adr_l   x8, boot_regs                   // record the contents of
->> >>> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
->> >>> +     stp     x2, x3, [x8, #16]
->> >>
->> >> I think we should have a dc ivac here as we do for
->> >> set_cpu_boot_mode_flag.
->> >>
->> >> That avoids a potential issue with boot_regs sharing a cacheline with
->> >> data we write with the MMU on -- using __flush_dcache_area will result
->> >> in a civac, so we could write back dirty data atop of the boot_regs if
->> >> there were clean entries in the cache when we did the non-cacheable
->> >> write.
->> >>
->> >
->> > Hmm, I wondered about that.
->> >
->> > Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
->> >
+On 18 March 2015 at 12:35, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Mar 11, 2015 at 12:39:34PM +0000, Hanjun Guo wrote:
+>> From: Al Stone <al.stone@linaro.org>
 >>
->> Never mind, it's easier just to do the invalidate right after, and I
->> can drop the flush before the access.
+>> This implements the following policy to decide whether ACPI should
+>> be used to boot the system:
+>> - acpi=off: ACPI will not be used to boot the system, even if there is
+>>   no alternative available (e.g., device tree is empty)
+>> - acpi=force: only ACPI will be used to boot the system; if that fails,
+>>   there will be no fallback to alternative methods (such as device tree)
 >
-> Yup.
+> I think this comment is stale. acpi=force enables ACPI and tries to
+> init the ACPI tables without even checking DT, but it does fall back to
+> DT if ACPI table init fails (by disabling ACPI and unflattening the
+> FDT).
 >
-> Annoyingly the minimum cache line size seems to be a word (given the
-> defnition of CTR.DminLine), which means you need a few dc ivac
-> instructions to be architecturally correct.
+> Am I wrong ?
 >
 
-But that applies to cpu_boot_mode as well then?
+No, you're right. But I would suggest that we fix the code, not the comment.
 
-I will add a call to __inval_cache_range() right after recording the
-initial values, that should do the right thing regarding llinesize
+I think we are all in agreement on the policy, we only need to make
+disable_acpi() conditional on whether acpi_param_force is set
+
+
+>> - otherwise, ACPI will be used as a fallback if the device tree turns out
+>>   to lack a platform description; the heuristic to decide this is whether
+>>   /chosen is the only node present at depth 1
+>>
+>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>> CC: Will Deacon <will.deacon@arm.com>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Acked-by: Olof Johansson <olof@lixom.net>
+>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>> Tested-by: Timur Tabi <timur@codeaurora.org>
+>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  Documentation/kernel-parameters.txt |  3 ++-
+>>  arch/arm64/include/asm/acpi.h       |  7 +++++
+>>  arch/arm64/kernel/acpi.c            | 52 +++++++++++++++++++++++++++++++++----
+>>  3 files changed, 56 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>> index bfcb1a6..d6c35a7 100644
+>> --- a/Documentation/kernel-parameters.txt
+>> +++ b/Documentation/kernel-parameters.txt
+>> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+>>  bytes respectively. Such letter suffixes can also be entirely omitted.
+>>
+>>
+>> -     acpi=           [HW,ACPI,X86]
+>> +     acpi=           [HW,ACPI,X86,ARM64]
+>>                       Advanced Configuration and Power Interface
+>>                       Format: { force | off | strict | noirq | rsdt }
+>>                       force -- enable ACPI if default was off
+>> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>                               strictly ACPI specification compliant.
+>>                       rsdt -- prefer RSDT over (default) XSDT
+>>                       copy_dsdt -- copy DSDT to memory
+>> +                     For ARM64, ONLY "acpi=off" or "acpi=force" are available
+>>
+>>                       See also Documentation/power/runtime_pm.txt, pci=noacpi
+>>
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 40e0924..c5a9b97 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -39,6 +39,13 @@ static inline void disable_acpi(void)
+>>       acpi_noirq = 1;
+>>  }
+>>
+>> +static inline void enable_acpi(void)
+>> +{
+>> +     acpi_disabled = 0;
+>> +     acpi_pci_disabled = 0;
+>> +     acpi_noirq = 0;
+>> +}
+>> +
+>>  /*
+>>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>>   * with this check the ACPI core will not override the CPU index
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index 7abac24..2269e30 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -22,15 +22,49 @@
+>>  #include <linux/irq.h>
+>>  #include <linux/irqdomain.h>
+>>  #include <linux/memblock.h>
+>> +#include <linux/of_fdt.h>
+>>  #include <linux/smp.h>
+>>
+>> -int acpi_noirq;                      /* skip ACPI IRQ initialization */
+>> -int acpi_disabled;
+>> +int acpi_noirq = 1;          /* skip ACPI IRQ initialization */
+>> +int acpi_disabled = 1;
+>>  EXPORT_SYMBOL(acpi_disabled);
+>>
+>> -int acpi_pci_disabled;               /* skip ACPI PCI scan and IRQ initialization */
+>> +int acpi_pci_disabled = 1;   /* skip ACPI PCI scan and IRQ initialization */
+>>  EXPORT_SYMBOL(acpi_pci_disabled);
+>>
+>> +static bool param_acpi_off __initdata;
+>> +static bool param_acpi_force __initdata;
+>> +
+>> +static int __init parse_acpi(char *arg)
+>> +{
+>> +     if (!arg)
+>> +             return -EINVAL;
+>> +
+>> +     /* "acpi=off" disables both ACPI table parsing and interpreter */
+>> +     if (strcmp(arg, "off") == 0)
+>> +             param_acpi_off = true;
+>> +     else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+>> +             param_acpi_force = true;
+>> +     else
+>> +             return -EINVAL; /* Core will print when we return error */
+>> +
+>> +     return 0;
+>> +}
+>> +early_param("acpi", parse_acpi);
+>> +
+>> +static int __init dt_scan_depth1_nodes(unsigned long node,
+>> +                                    const char *uname, int depth,
+>> +                                    void *data)
+>> +{
+>> +     /*
+>> +      * Return 1 as soon as we encounter a node at depth 1 that is
+>> +      * not the /chosen node.
+>> +      */
+>> +     if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>> +             return 1;
+>> +     return 0;
+>> +}
+>> +
+>>  /*
+>>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>   * or early_memremap() should be called here to for ACPI table mapping.
+>> @@ -83,10 +117,18 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>   */
+>>  void __init acpi_boot_table_init(void)
+>>  {
+>> -     /* If acpi_disabled, bail out */
+>> -     if (acpi_disabled)
+>> +     /*
+>> +      * Enable ACPI instead of device tree unless
+>> +      * - ACPI has been disabled explicitly (acpi=off), or
+>> +      * - the device tree is not empty (it has more than just a /chosen node)
+>> +      *   and ACPI has not been force enabled (acpi=force)
+>> +      */
+>> +     if (param_acpi_off ||
+>> +         (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>               return;
+>>
+>> +     enable_acpi();
+>> +
+>>       /* Initialize the ACPI boot-time table parser. */
+>>       if (acpi_table_init()) {
+>>               disable_acpi();
+>> --
+>> 1.9.1
+>>
+>>
