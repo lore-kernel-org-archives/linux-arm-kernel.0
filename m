@@ -1,73 +1,80 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 18 Mar 2015 15:53:02 +0000
-Subject: [PATCH 03/13] ARM: at91: use readl/writel relaxed instead of __raw
- for big endian
+Date: Wed, 18 Mar 2015 15:53:03 +0000
+Subject: [PATCH 04/13] ARM: at91: setup.c: use endian agnostic IO functions
 In-Reply-To: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1426693992-31163-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1426693992-31163-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for low-level uart debug when the system is running in
-big endian mode by changing to use the readl_relaxed and writel_relaxed
-calls instead of the __raw variants.
+Use the endian agnostic IO accessors in setup.c to avoid issues if
+running on an big endian capable cpu
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+--
+CC: Andrew Victor <linux@maxim.org.za>
+CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 ---
- arch/arm/mach-at91/include/mach/uncompress.h | 12 ++++++------
+ arch/arm/mach-at91/setup.c | 12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/uncompress.h b/arch/arm/mach-at91/include/mach/uncompress.h
-index 4ebb609..596696b 100644
---- a/arch/arm/mach-at91/include/mach/uncompress.h
-+++ b/arch/arm/mach-at91/include/mach/uncompress.h
-@@ -112,7 +112,7 @@ static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 4e58bc9..7bf81fd 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -46,7 +46,7 @@ static void __init soc_detect(u32 dbgu_base)
  {
  	u32 cidr, socid;
  
--	cidr = __raw_readl(dbgu_base + AT91_DBGU_CIDR);
-+	cidr = readl_relaxed(dbgu_base + AT91_DBGU_CIDR);
+-	cidr = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
++	cidr = readl_relaxed(AT91_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
  	socid = cidr & ~AT91_CIDR_VERSION;
  
  	switch (socid) {
-@@ -140,7 +140,7 @@ static inline const u32* decomp_soc_detect(void __iomem *dbgu_base)
- 		return uarts_sam9x5;
+@@ -96,7 +96,7 @@ static void __init soc_detect(u32 dbgu_base)
+ 		break;
  
  	case ARCH_ID_SAMA5:
--		cidr = __raw_readl(dbgu_base + AT91_DBGU_EXID);
-+		cidr = readl_relaxed(dbgu_base + AT91_DBGU_EXID);
- 		if (cidr & ARCH_EXID_SAMA5D3)
- 			return uarts_sama5d3;
- 		else if (cidr & ARCH_EXID_SAMA5D4)
-@@ -180,7 +180,7 @@ static inline void arch_decomp_setup(void)
- 		/* physical address */
- 		at91_uart = (void __iomem *)usarts[i];
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
++		at91_soc_initdata.exid = readl_relaxed(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+ 		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+ 			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+ 		}
+@@ -121,7 +121,7 @@ static void __init soc_detect(u32 dbgu_base)
  
--		if (__raw_readl(at91_uart + ATMEL_US_BRGR))
-+		if (readl_relaxed(at91_uart + ATMEL_US_BRGR))
- 			return;
- 		i++;
- 	} while (usarts[i]);
-@@ -200,9 +200,9 @@ static void putc(int c)
- 	if (!at91_uart)
- 		return;
+ 	/* sub version of soc */
+ 	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
++		at91_soc_initdata.exid = readl_relaxed(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
  
--	while (!(__raw_readl(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXRDY))
-+	while (!(readl_relaxed(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXRDY))
- 		barrier();
--	__raw_writel(c, at91_uart + ATMEL_US_THR);
-+	writel_relaxed(c, at91_uart + ATMEL_US_THR);
- }
+ 	if (at91_soc_initdata.type == AT91_SOC_SAM9G45) {
+ 		switch (at91_soc_initdata.exid) {
+@@ -183,12 +183,12 @@ static void __init alt_soc_detect(u32 dbgu_base)
+ 	u32 cidr, socid;
  
- static inline void flush(void)
-@@ -211,7 +211,7 @@ static inline void flush(void)
- 		return;
+ 	/* SoC ID */
+-	cidr = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
++	cidr = readl_relaxed(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
+ 	socid = cidr & ~AT91_CIDR_VERSION;
  
- 	/* wait for transmission to complete */
--	while (!(__raw_readl(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXEMPTY))
-+	while (!(readl_relaxed(at91_uart + ATMEL_US_CSR) & ATMEL_US_TXEMPTY))
- 		barrier();
- }
+ 	switch (socid) {
+ 	case ARCH_ID_SAMA5:
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
++		at91_soc_initdata.exid = readl_relaxed(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+ 		if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D3) {
+ 			at91_soc_initdata.type = AT91_SOC_SAMA5D3;
+ 		} else if (at91_soc_initdata.exid & ARCH_EXID_SAMA5D4) {
+@@ -204,7 +204,7 @@ static void __init alt_soc_detect(u32 dbgu_base)
  
+ 	/* sub version of soc */
+ 	if (!at91_soc_initdata.exid)
+-		at91_soc_initdata.exid = __raw_readl(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
++		at91_soc_initdata.exid = readl_relaxed(AT91_ALT_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
+ 
+ 	if (at91_soc_initdata.type == AT91_SOC_SAMA5D4) {
+ 		switch (at91_soc_initdata.exid) {
 -- 
 2.1.4
