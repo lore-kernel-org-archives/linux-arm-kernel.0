@@ -1,45 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 10:51:34 +0000
-Subject: [PATCH 1/6] ARM: STi: DT: STiH407: Fix retime pin mask for PIO5 and
- PIO35
+Date: Wed, 18 Mar 2015 10:51:35 +0000
+Subject: [PATCH 2/6] pinctrl: st: Introduce a 'get pin function' call
 In-Reply-To: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
 References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426675899-19882-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1426675899-19882-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
+This call fetches the numerical function value a specified pin is
+currently operating in.  Function zero is more often than not the
+GPIO function.  Greater than zero values represent an alternative
+function.  You'd need to either look those up in the Device Tree
+sources or the Programmer's Manual.
 
-This will avoid programming the retime registers when not implemented
-
-- PIO5  : no retime registers assigned to pins 6 and 7
-- PIO35 : pin 7 is reserved so no retime register assigned to it
-
-Signed-off-by: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pinctrl/pinctrl-st.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 402844c..0a754f2 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -104,6 +104,7 @@
- 				#interrupt-cells = <2>;
- 				reg = <0x5000 0x100>;
- 				st,bank-name = "PIO5";
-+				st,retime-pin-mask = <0x3f>;
- 			};
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 9e5ec00..5362e45 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -460,6 +460,20 @@ static void st_pctl_set_function(struct st_pio_control *pc,
+ 	regmap_field_write(alt, val);
+ }
  
- 			rc {
-@@ -519,6 +520,7 @@
- 				#interrupt-cells = <2>;
- 				reg = <0x5000 0x100>;
- 				st,bank-name = "PIO35";
-+				st,retime-pin-mask = <0x7f>;
- 			};
- 
- 			i2c4 {
++static unsigned int st_pctl_get_pin_function(struct st_pio_control *pc, int pin)
++{
++	struct regmap_field *alt = pc->alt;
++	unsigned int val;
++	int offset = pin * 4;
++
++	if (!alt)
++		return 0;
++
++	regmap_field_read(alt, &val);
++
++	return (val >> offset) & 0xf;
++}
++
+ static unsigned long st_pinconf_delay_to_bit(unsigned int delay,
+ 	const struct st_pctl_data *data, unsigned long config)
+ {
 -- 
 1.9.1
