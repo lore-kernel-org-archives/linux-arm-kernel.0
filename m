@@ -1,72 +1,131 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 18 Mar 2015 14:20:24 +0000
-Subject: [RFC PATCH 3/7] irqchip: gic-v3: Reset BPR during initialization
+Date: Wed, 18 Mar 2015 14:20:27 +0000
+Subject: [RFC PATCH 6/7] arm64: irqflags: Automatically identify I bit
+ mis-management
 In-Reply-To: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
 References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1426688428-3150-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1426688428-3150-7-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when running on FVP, CPU 0 boots up with its BPR changed from
-the reset value. This renders it impossible to (preemptively) prioritize
-interrupts on CPU 0.
+This is self-test code to identify circumstances where the I bit is
+set by hardware but no software exists to copy its state to the PMR.
 
-This is harmless on normal systems but prevents preemption by NMIs on
-systems with CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS enabled.
+I don't really expect this patch to be retained much after the RFC stage.
+However I have included it in this RFC series to document the testing I
+have done and to allow further testing under different workloads.
 
-Many thanks to Andrew Thoelke for suggesting the BPR as having the
-potential to harm preemption.
-
-Suggested-by: Andrew Thoelke <andrew.thoelke@arm.com>
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- drivers/irqchip/irq-gic-v3.c       | 13 +++++++++++++
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- 2 files changed, 15 insertions(+)
+ arch/arm64/include/asm/irqflags.h | 29 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/irq.c           |  6 ++++++
+ 2 files changed, 35 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index fd8850def1b8..32533650494c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -120,6 +120,11 @@ static void __maybe_unused gic_write_pmr(u64 val)
- 	asm volatile("msr_s " __stringify(ICC_PMR_EL1) ", %0" : : "r" (val));
- }
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 7b6866022f82..89be5f830857 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -18,6 +18,7 @@
  
-+static void __maybe_unused gic_write_bpr1(u64 val)
+ #ifdef __KERNEL__
+ 
++#include <asm/bug.h>
+ #include <asm/ptrace.h>
+ 
+ #ifndef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+@@ -90,6 +91,23 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ 
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
++extern bool enable_i_bit_check;
++
++static inline void check_for_i_bit(void)
 +{
-+	asm volatile("msr_s " __stringify(ICC_BPR1_EL1) ", %0" : : "r" (val));
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS_SELF_TEST
++	unsigned long psr;
++
++	if (enable_i_bit_check) {
++		asm volatile("mrs %0, daif" : "=r"(psr));
++		if (psr & PSR_I_BIT) {
++			enable_i_bit_check = false;
++			WARN(true, "I bit is set: %08lx\n", psr);
++		}
++	}
++#endif
 +}
 +
- static void __maybe_unused gic_write_ctlr(u64 val)
+ /*
+  * CPU interrupt mask handling.
+  */
+@@ -97,6 +115,8 @@ static inline unsigned long arch_local_irq_save(void)
  {
- 	asm volatile("msr_s " __stringify(ICC_CTLR_EL1) ", %0" : : "r" (val));
-@@ -383,6 +388,14 @@ static void gic_cpu_sys_reg_init(void)
- 	/* Set priority mask register */
- 	gic_write_pmr(DEFAULT_PMR_VALUE);
+ 	unsigned long flags, masked = ICC_PMR_EL1_MASKED;
  
-+	/*
-+	 * On FVP, CPU 0 arrives in the kernel with its BPR changed from the
-+	 * reset value (and the value is large enough to prevent pre-emptive
-+	 * interrupts from working at all). Writing a zero to BPR restores the
-+	 * reset value.
-+	 */
-+	gic_write_bpr1(0);
++	check_for_i_bit();
 +
- 	/* EOI deactivates interrupt too (mode 0) */
- 	gic_write_ctlr(ICC_CTLR_EL1_EOImode_drop_dir);
+ 	asm volatile(
+ 		"// arch_local_irq_save\n"
+ 		"mrs_s  %0, " __stringify(ICC_PMR_EL1) "\n"
+@@ -113,6 +133,8 @@ static inline void arch_local_irq_enable(void)
+ {
+ 	unsigned long unmasked = ICC_PMR_EL1_UNMASKED;
  
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 781974afff9f..79d6645897e6 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -270,6 +270,8 @@
- #define ICH_VMCR_PMR_SHIFT		24
- #define ICH_VMCR_PMR_MASK		(0xffUL << ICH_VMCR_PMR_SHIFT)
++	check_for_i_bit();
++
+ 	asm volatile(
+ 		"// arch_local_irq_enable\n"
+ 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0\n"
+@@ -126,6 +148,8 @@ static inline void arch_local_irq_disable(void)
+ {
+ 	unsigned long masked = ICC_PMR_EL1_MASKED;
  
-+#define ICC_BPR0_EL1			sys_reg(3, 0, 12, 8, 3)
-+#define ICC_BPR1_EL1			sys_reg(3, 0, 12, 12, 3)
- #define ICC_EOIR1_EL1			sys_reg(3, 0, 12, 12, 1)
- #define ICC_IAR1_EL1			sys_reg(3, 0, 12, 12, 0)
- #define ICC_SGI1R_EL1			sys_reg(3, 0, 12, 11, 5)
++	check_for_i_bit();
++
+ 	asm volatile(
+ 		"// arch_local_irq_disable\n"
+ 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0\n"
+@@ -142,6 +166,8 @@ static inline unsigned long arch_local_save_flags(void)
+ {
+ 	unsigned long flags;
+ 
++	check_for_i_bit();
++
+ 	asm volatile(
+ 		"// arch_local_save_flags\n"
+ 		"mrs_s  %0, " __stringify(ICC_PMR_EL1) "\n"
+@@ -157,6 +183,8 @@ static inline unsigned long arch_local_save_flags(void)
+  */
+ static inline void arch_local_irq_restore(unsigned long flags)
+ {
++	check_for_i_bit();
++
+ 	asm volatile(
+ 		"// arch_local_irq_restore\n"
+ 		"msr_s  " __stringify(ICC_PMR_EL1) ",%0\n"
+@@ -168,6 +196,7 @@ static inline void arch_local_irq_restore(unsigned long flags)
+ 
+ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
++	check_for_i_bit();
+ 	return !(flags & ICC_PMR_EL1_G_BIT);
+ }
+ 
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 240b75c0e94f..7d68193af26c 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -31,6 +31,12 @@
+ 
+ unsigned long irq_err_count;
+ 
++#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS_SELF_TEST
++/* enable_i_bit_check is declared in asm/irqflags.h */
++bool enable_i_bit_check = true;
++EXPORT_SYMBOL(enable_i_bit_check);
++#endif
++
+ int arch_show_interrupts(struct seq_file *p, int prec)
+ {
+ #ifdef CONFIG_SMP
 -- 
 2.1.0
