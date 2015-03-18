@@ -1,58 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 02:30:54 +0100
-Subject: [PATCH 1/2] pinctrl: bindings: pinctrl: Add support for TI's
- IODelay configuration
-In-Reply-To: <54FF38F3.2030703@ti.com>
-References: <1425427237-11511-1-git-send-email-nm@ti.com>
- <1425427237-11511-2-git-send-email-nm@ti.com>
- <CACRpkdaLEPzBywMnMrteboK7Q4su8PoB0wjnGvVpgUJ=2czVxQ@mail.gmail.com>
- <20150310153321.GO5264@atomide.com> <54FF28F5.4040707@ti.com>
- <20150310173115.GS5264@atomide.com> <54FF38F3.2030703@ti.com>
-Message-ID: <CACRpkdZ1faucps07jaT9kOyviC+Sw6gPkbF=cAGCUj+DiaEgTA@mail.gmail.com>
+Date: Wed, 18 Mar 2015 02:39:21 +0100
+Subject: [PATCH v6 6/8] pinctrl: cygnus: add gpio/pinconf driver
+In-Reply-To: <CACRpkdZbxTyYWpxWCmdN8a7p+MjcUo6UxEwfgStPWsNzf4NZ=g@mail.gmail.com>
+References: <1425933902-20652-1-git-send-email-rjui@broadcom.com>
+ <1425933902-20652-7-git-send-email-rjui@broadcom.com>
+ <CACRpkdZ1ErfikdF41aANTM-7LE6AExizHtCZTq1_TTxwYjeSQA@mail.gmail.com>
+ <54FF306C.7020407@broadcom.com>
+ <CACRpkdZbxTyYWpxWCmdN8a7p+MjcUo6UxEwfgStPWsNzf4NZ=g@mail.gmail.com>
+Message-ID: <CACRpkdYhMw36xrqptbd8b7KpkVyrZMW_nkxQTPcGkQvt3z3w=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 7:33 PM, Nishanth Menon <nm@ti.com> wrote:
-> On 03/10/2015 12:31 PM, Tony Lindgren wrote:
+On Wed, Mar 11, 2015 at 10:15 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Mar 10, 2015 at 6:57 PM, Ray Jui <rjui@broadcom.com> wrote:
+>> On 3/10/2015 3:20 AM, Linus Walleij wrote:
+>>> On Mon, Mar 9, 2015 at 9:45 PM, Ray Jui <rjui@broadcom.com> wrote:
+>>>
+>>>> This adds the initial support of the Broadcom Cygnus GPIO/PINCONF driver
+>>>> that supports all 3 GPIO controllers on Cygnus including the ASIU GPIO
+>>>> controller, the chipCommonG GPIO controller, and the always-on GPIO
+>>>> controller. Basic PINCONF configurations such as bias pull up/down, and
+>>>> drive strength are also supported in this driver.
+>>>>
+>>>> Pins from the ASIU GPIO controller can be individually muxed to GPIO
+>>>> function, through interaction with the Cygnus IOMUX controller
+>>>>
+>>>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>>> Tested-by: Dmitry Torokhov <dtor@chromium.org>
+>>>
+>>> Patch applied! But please look at this:
+>>>
+>>>> +#include <linux/gpio.h>
+>>>
+>>> Doesn't just #include <linux/gpio/driver.h> work?
+>>>
+>>
+>> I think I need linux/gpio.h for gpiochip_add_pin_range and some related
+>> APIs.
+>
+> OK you're right ... I need to fix this.
 
->> Yes except I'd make use of some kind of #pinctrl-cells here just like
->> interrupt controller has #interrupt-cells. Then you can have the values
->> seprate and the controller knows what to do with them based on the
->> compatible flag and #pinctrl-cells.
->
-> Something like the following I suppose, where pinctrl-cells is optional?
->
-> dra7_pmx_core: pinmux at 4a003400 {
->         compatible = "ti,dra7-padconf", "pinctrl-single";
->         reg = <0x4a003400 0x0464>;
->         #address-cells = <1>;
->         #size-cells = <0>;
->         #interrupt-cells = <1>;
->         interrupt-controller;
->         pinctrl-single,register-width = <32>;
->         pinctrl-single,function-mask = <0x3fffffff>;
-> };
->
-> dra7_iodelay_core: padconf at 4844a000 {
->         compatible = "ti,dra7-iodelay";
->         reg = <0x4844a000 0x0d1c>;
->         #address-cells = <1>;
->         #size-cells = <0>;
->         #pinctrl-cells = <2>;
-> };
->
-> Linus,
->
-> I hope you are ok with the above?
-
-Hm depends on where the documentation hits I guess?
-
-Such a generic cell count property has to be to the generic
-pinctrl-bindings.txt document if I read it right.
-
-Overall I guess this will be acceptable but you really need to
-reuse some more code between this driver and pinctrl-single.c
-if I read it right.
+I sent a patch fixing this now... hope it will work.
 
 Yours,
 Linus Walleij
