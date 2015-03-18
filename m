@@ -1,59 +1,119 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 18 Mar 2015 09:09:50 +0100
-Subject: ARM: socfpga: dts: fix spi1 interrupt
-In-Reply-To: <55089E1B.7000600@jamers.net>
-References: <55089E1B.7000600@jamers.net>
-Message-ID: <20150318080950.GB10862@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 18 Mar 2015 09:13:27 +0100
+Subject: [PATCH 2/6] ARM: cpuidle: Add a cpuidle ops structure to be used
+ for DT
+In-Reply-To: <5508D160.6090205@codeaurora.org>
+References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+ <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+ <55075453.2070503@codeaurora.org> <20150317112905.GA14984@red-moon>
+ <5508D160.6090205@codeaurora.org>
+Message-ID: <550933A7.9030401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 03/18/2015 02:14 AM, Stephen Boyd wrote:
+> On 03/17/15 04:29, Lorenzo Pieralisi wrote:
+>> On Mon, Mar 16, 2015 at 10:08:19PM +0000, Stephen Boyd wrote:
+>>> On 03/03/15 04:29, Daniel Lezcano wrote:
+>>>> The code is optimized to use the __init section intensively in order to reduce
+>>>> the memory footprint after the driver is initialized and unify the function
+>>>> names with ARM64.
+>>>>
+>>>> In order to prevent multiple declarations and the specific cpuidle ops to be
+>>>> spread across the different headers, a mechanism, similar to the cgroup subsys,
+>>>> has been introduced.
+>>>>
+>>>> A new platform willing to add its cpuidle ops must add an entry in the file
+>>>> cpuidle_ops.h in the current form:
+>>>>
+>>>>   #if IS_ENABLED(CONFIG_ARM_FOO_CPUIDLE)
+>>>>   CPUIDLE_OPS(foo)
+>>>>   #endif
+>>>>
+>>>> ... and use the variable name in the specific low level code:
+>>>>
+>>>> struct cpuidle_ops foo_cpuidle_ops;
+>>>>
+>>>> The CPUIDLE_OPS macro will be processed in different way in the cpuidle.c file,
+>>>> thus allowing to keep untouched the arm cpuidle core code in the future when
+>>>> a new platform is added.
+>>> [...]
+>>>> diff --git a/arch/arm/include/asm/cpuidle_ops.h b/arch/arm/include/asm/cpuidle_ops.h
+>>>> new file mode 100644
+>>>> index 0000000..be0a612
+>>>> --- /dev/null
+>>>> +++ b/arch/arm/include/asm/cpuidle_ops.h
+>>>> @@ -0,0 +1,3 @@
+>>>> +/*
+>>>> + * List of cpuidle operations
+>>>> + */
+>>>> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+>>>> index 45969f8..25e9789c 100644
+>>>> --- a/arch/arm/kernel/cpuidle.c
+>>>> +++ b/arch/arm/kernel/cpuidle.c
+>>>> @@ -10,8 +10,29 @@
+>>>>    */
+>>>>
+>>>>   #include <linux/cpuidle.h>
+>>>> +#include <linux/of.h>
+>>>> +#include <linux/of_device.h>
+>>>>   #include <asm/cpuidle.h>
+>>>>
+>>>> +#define CPUIDLE_OPS(__x) extern struct cpuidle_ops __x ## _cpuidle_ops;
+>>>> +#include <asm/cpuidle_ops.h>
+>>>> +#undef CPUIDLE_OPS
+>>>> +
+>>>> +#define CPUIDLE_OPS(__x) __x ## _cpuidle_ops_id,
+>>>> +enum cpuidle_ops_id {
+>>>> +#include <asm/cpuidle_ops.h>
+>>>> +        CPUIDLE_OPS_COUNT,
+>>>> +};
+>>>> +#undef CPUIDLE_OPS
+>>>> +
+>>>> +#define CPUIDLE_OPS(__x) [__x ## _cpuidle_ops_id ] = &__x ## _cpuidle_ops,
+>>>> +static struct cpuidle_ops *supported_cpuidle_ops[] __initconst = {
+>>>> +#include <asm/cpuidle_ops.h>
+>>>> +};
+>>>> +#undef CPUIDLE_OPS
+>>>> +
+>>>> +static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+>>> Is there any reason why we aren't putting these structures into a linker
+>>> section like we do for the smp operations structures?
+>> I think it can be done with an OF_TABLE, it is a bit of shame cpuidle_ops
+>> should work on UP too otherwise they could have been merged in
+>> smp_ops to create cpu_ops, like arm64 does.
+>
+> We should merge the two and remove the SMP dependency on arm32.
 
-On Tue, Mar 17, 2015 at 09:35:23PM +0000, Mark James wrote:
-> Hello,
-> 
-> The socfpga.dtsi currently has the wrong interrupt number set for SPI master 1. Trying to use the master without this change results in the kernel boot process waiting forever for an interrupt that will never occur while attempting to probe any slave devices configured in the device tree as being under SPI master 1.
-> 
-> The change works for the Cyclone V, and according to the Arria 5 handbook should be good there too.
-> 
-> 
-> Signed-off-by: Mark James <maj@jamers.net>
-> Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> 
-> ---
->  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> index 9d87609..d9176e6 100644
-> --- a/arch/arm/boot/dts/socfpga.dtsi
-> +++ b/arch/arm/boot/dts/socfpga.dtsi
-> @@ -660,7 +660,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  			reg = <0xfff01000 0x1000>;
-> -			interrupts = <0 156 4>;
-> +			interrupts = <0 155 4>;
->  			num-cs = <4>;
->  			clocks = <&spi_m_clk>;
->  			status = "disabled";
+I will be happy to do that but right now it would be nice to keep 
+focused on bringing the cpuidle ops first, even if we have a bit of code 
+duplicated, in order to unblock the cpuidle drivers awaiting for this 
+code to be merged.
 
-Thanks for sending the patch to the mainline list.
-One little nitpick about the patchformat though:
+>>> The nice thing about using the linker is it makes it clearer at the
+>>> location where we define the structure that it's actually used by
+>>> something. Right now the structures are defined non-static in a file and
+>>> then we have to know that a CPUIDLE_OPS() define has been made in
+>>> another architecture specific asm header file so that this macro magic
+>>> works. The commit text says something about multiple declarations and
+>>> ops spread across header files, which shouldn't apply if we're using the
+>>> linker to find these ops and merge them into an array we can iterate over.
+>> It makes sense, see above for UP vs SMP. I wonder if we can't find
+>> something to overcome the UP limitation nicely, the init code in
+>> arch/arm/kernel/devtree.c is identical for smp_ops and cpuidle_ops,
+>> apart from the CONFIG_SMP ifdeffery.
+>
+> It should be possible to replace the arm32 smp_operations structure with
+> something like the arm64 cpu_operations structure. Yes we would have to
+> drop the SMP dependency, but that will be ok. It would require some work
+> to make arm32 and arm64 the same, but for these purposes that isn't
+> really required as long as we can put the cpu idle hook there.
+>
 
-Please add linebreaks after 70-75 characters for readability. And remove the
-"Hello,\n\n" otherwise this would land in the final git commit, where it
-doesn't belong.
-For reference have a look at Documentation/SubmittingPatches in the kernel
-tree.
-
-Maybe Dinh can fix this up, otherwise he will tell you what to do.
-
-Thanks,
-Steffen
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
