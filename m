@@ -1,106 +1,128 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 18 Mar 2015 19:46:11 +0100
-Subject: [PATCH V2 7/8] ARM: cpuidle: Register per cpuidle device
+Date: Wed, 18 Mar 2015 19:46:09 +0100
+Subject: [PATCH V2 5/8] ARM64: cpuidle: Remove arm64 reference
 In-Reply-To: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426704372-20406-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1426704372-20406-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures have some cpus which does not support idle states.
-
-Let the underlying low level code to return -ENOSYS when it is not
-possible to set an idle state.
+In the next patch, this driver will be common across ARM/ARM64. Remove all refs
+to ARM64 as it will be shared with ARM32.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Acked-by: Rob Herring <robherring2@gmail.com>
 ---
- drivers/cpuidle/cpuidle-arm.c | 45 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 43 insertions(+), 2 deletions(-)
+ drivers/cpuidle/cpuidle-arm64.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 1c94b88..0682ed0 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -17,11 +17,14 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/slab.h>
+diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+index 6ef291c7..1c94b88 100644
+--- a/drivers/cpuidle/cpuidle-arm64.c
++++ b/drivers/cpuidle/cpuidle-arm64.c
+@@ -1,5 +1,5 @@
+ /*
+- * ARM64 generic CPU idle driver.
++ * ARM/ARM64 generic CPU idle driver.
+  *
+  * Copyright (C) 2014 ARM Ltd.
+  * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+@@ -9,7 +9,7 @@
+  * published by the Free Software Foundation.
+  */
  
- #include <asm/cpuidle.h>
+-#define pr_fmt(fmt) "CPUidle arm64: " fmt
++#define pr_fmt(fmt) "CPUidle arm: " fmt
  
+ #include <linux/cpuidle.h>
+ #include <linux/cpumask.h>
+@@ -23,7 +23,7 @@
  #include "dt_idle_states.h"
  
-+static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
-+
  /*
-  * arm_enter_idle_state - Programs CPU to enter the specified state
+- * arm64_enter_idle_state - Programs CPU to enter the specified state
++ * arm_enter_idle_state - Programs CPU to enter the specified state
   *
-@@ -94,6 +97,7 @@ static int __init arm_idle_init(void)
+  * dev: cpuidle device
+  * drv: cpuidle driver
+@@ -32,8 +32,8 @@
+  * Called from the CPUidle framework to program the device to the
+  * specified target state selected by the governor.
+  */
+-static int arm64_enter_idle_state(struct cpuidle_device *dev,
+-				  struct cpuidle_driver *drv, int idx)
++static int arm_enter_idle_state(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv, int idx)
+ {
+ 	int ret;
+ 
+@@ -57,8 +57,8 @@ static int arm64_enter_idle_state(struct cpuidle_device *dev,
+ 	return ret ? -1 : idx;
+ }
+ 
+-static struct cpuidle_driver arm64_idle_driver = {
+-	.name = "arm64_idle",
++static struct cpuidle_driver arm_idle_driver = {
++	.name = "arm_idle",
+ 	.owner = THIS_MODULE,
+ 	/*
+ 	 * State at index 0 is standby wfi and considered standard
+@@ -68,32 +68,32 @@ static struct cpuidle_driver arm64_idle_driver = {
+ 	 * handler for idle state index 0.
+ 	 */
+ 	.states[0] = {
+-		.enter                  = arm64_enter_idle_state,
++		.enter                  = arm_enter_idle_state,
+ 		.exit_latency           = 1,
+ 		.target_residency       = 1,
+ 		.power_usage		= UINT_MAX,
+ 		.name                   = "WFI",
+-		.desc                   = "ARM64 WFI",
++		.desc                   = "ARM WFI",
+ 	}
+ };
+ 
+-static const struct of_device_id arm64_idle_state_match[] __initconst = {
++static const struct of_device_id arm_idle_state_match[] __initconst = {
+ 	{ .compatible = "arm,idle-state",
+-	  .data = arm64_enter_idle_state },
++	  .data = arm_enter_idle_state },
+ 	{ },
+ };
+ 
+ /*
+- * arm64_idle_init
++ * arm_idle_init
+  *
+- * Registers the arm64 specific cpuidle driver with the cpuidle
++ * Registers the arm specific cpuidle driver with the cpuidle
+  * framework. It relies on core code to parse the idle states
+  * and initialize them using driver data structures accordingly.
+  */
+-static int __init arm64_idle_init(void)
++static int __init arm_idle_init(void)
  {
  	int cpu, ret;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
-+	struct cpuidle_device *dev;
+-	struct cpuidle_driver *drv = &arm64_idle_driver;
++	struct cpuidle_driver *drv = &arm_idle_driver;
  
  	/*
  	 * Initialize idle states data, starting at index 1.
-@@ -105,18 +109,55 @@ static int __init arm_idle_init(void)
+@@ -101,7 +101,7 @@ static int __init arm64_idle_init(void)
+ 	 * let the driver initialization fail accordingly since there is no
+ 	 * reason to initialize the idle driver if only wfi is supported.
+ 	 */
+-	ret = dt_init_idle_driver(drv, arm64_idle_state_match, 1);
++	ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
  	if (ret <= 0)
  		return ret ? : -ENODEV;
  
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("Failed to register cpuidle driver\n");
-+		return ret;
-+	}
-+
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
- 		ret = arm_cpuidle_init(cpu);
-+
-+		/* This cpu does not support any idle states */
-+		if (ret == -ENOSYS)
-+			continue;
-+
- 		if (ret) {
- 			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
--			return ret;
-+			goto out_fail;
-+		}
-+
-+		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+		if (!dev) {
-+			pr_err("Failed to allocate cpuidle device\n");
-+			goto out_fail;
-+		}
-+
-+		dev->cpu = cpu;
-+		per_cpu(cpuidle_arm_dev, cpu) = dev;
-+
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("Failed to register cpuidle device for CPU %d\n",
-+			       cpu);
-+			kfree(dev);
-+			goto out_fail;
- 		}
- 	}
-+out:
-+	return ret;
+@@ -119,4 +119,4 @@ static int __init arm64_idle_init(void)
  
--	return cpuidle_register(drv, NULL);
-+out_fail:
-+	for (cpu--; cpu <= 0; cpu--) {
-+		dev = per_cpu(cpuidle_arm_dev, cpu);
-+		cpuidle_unregister_device(dev);
-+		kfree(dev);
-+	}
-+	cpuidle_unregister_driver(drv);
-+	goto out;
+ 	return cpuidle_register(drv, NULL);
  }
- device_initcall(arm_idle_init);
+-device_initcall(arm64_idle_init);
++device_initcall(arm_idle_init);
 -- 
 1.9.1
