@@ -1,53 +1,38 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 18 Mar 2015 20:16:00 +0100
-Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
-In-Reply-To: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
-References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Mar 2015 18:37:18 +0100
+Subject: [PATCH v5 2/2] ARM: dts: sun9i: optimus: Switch to phy core
+ regulator bindings for usb phys
+In-Reply-To: <1426305437-15208-3-git-send-email-wens@csie.org>
+References: <1426305437-15208-1-git-send-email-wens@csie.org>
+ <1426305437-15208-3-git-send-email-wens@csie.org>
+Message-ID: <20150318173718.GT4638@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
-disabled causes:
+On Sat, Mar 14, 2015 at 11:57:17AM +0800, Chen-Yu Tsai wrote:
+> Since the phy core already supports specifying a regulator to handle
+> during power up/down, it was decided to drop the regulator support
+> in the sun9i usb phy driver.
+> 
+> This patch switches the DT to the core bindings. This and the phy driver
+> would be in the same release and should not be a problem as far as DT
+> stability goes.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-    Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
+Applied with Kishon's Acked By
 
-Currently, the GIC driver cannot enable its module clock for several
-reasons:
-  - It does not use a platform device, so Runtime PM is not an option,
-  - gic_of_init() runs before any clocks are registered, so it cannot
-    explicitly enable the clock,
-  - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
-    doesn't support deferred probing.
+Thanks!
+Maxime
 
-Hence we have to keep on relying on the boot loader for enabling the
-module clock.
-
-To prevent the module clock from being disabled when the CCF core thinks
-it is unused, and thus causing a system lock-up, add a quirk to the MSTP
-clock driver to make sure the module clock is never disabled.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/clk/shmobile/clk-mstp.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-index 2d2fe773ac8168f9..742af84735a07450 100644
---- a/drivers/clk/shmobile/clk-mstp.c
-+++ b/drivers/clk/shmobile/clk-mstp.c
-@@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
- 	unsigned int i;
- 	u32 value;
- 
-+	/* INTC-SYS is the module clock of the GIC, and must not be disabled */
-+	if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
-+		pr_debug("MSTP %pC skipping disable\n", hw->clk);
-+		return 0;
-+	}
-+
- 	spin_lock_irqsave(&group->lock, flags);
- 
- 	value = clk_readl(group->smstpcr);
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/760277b9/attachment.sig>
