@@ -1,222 +1,194 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 18 Mar 2015 19:46:05 +0100
-Subject: [PATCH V2 1/8] ARM: cpuidle: Remove duplicate header inclusion
+Date: Wed, 18 Mar 2015 19:46:06 +0100
+Subject: [PATCH V2 2/8] ARM: cpuidle: Add a cpuidle ops structure to be used
+ for DT
 In-Reply-To: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426704372-20406-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1426704372-20406-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_do_idle() function is always used by the cpuidle drivers.
+The current state of the different cpuidle drivers is the different PM
+operations are passed via the platform_data using the platform driver
+paradigm.
 
-That led to have each driver including cpuidle.h and proc-fns.h, they are
-always paired. That makes a lot of duplicate headers inclusion. Instead of
-including both in each .c file, move the proc-fns.h header inclusion in the
-cpuidle.h header file directly, so we can save some line of code.
+This approach allowed to split the low level PM code from the arch specific
+and the generic cpuidle code.
+
+Unfortunately there are complaints about this approach as, in the context of the
+single kernel image, we have multiple drivers loaded in memory for nothing and
+the platform driver is not adequate for cpuidle.
+
+This patch provides a common interface via cpuidle ops for all new cpuidle
+driver and a definition for the device tree.
+
+It will allow with the next patches to a have a common definition with ARM64
+and share the same cpuidle driver.
+
+The code is optimized to use the __init section intensively in order to reduce
+the memory footprint after the driver is initialized and unify the function
+names with ARM64.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Acked-by: Kevin Hilman <khilman@linaro.org>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Rob Herring <robherring2@gmail.com>
 ---
- arch/arm/include/asm/cpuidle.h        | 2 ++
- arch/arm/kernel/cpuidle.c             | 2 +-
- arch/arm/mach-davinci/cpuidle.c       | 1 -
- arch/arm/mach-imx/cpuidle-imx6q.c     | 1 -
- arch/arm/mach-imx/cpuidle-imx6sl.c    | 1 -
- arch/arm/mach-imx/cpuidle-imx6sx.c    | 1 -
- arch/arm/mach-omap2/cpuidle44xx.c     | 1 -
- arch/arm/mach-s3c64xx/cpuidle.c       | 2 +-
- arch/arm/mach-tegra/cpuidle-tegra20.c | 1 -
- arch/arm/mach-tegra/cpuidle-tegra30.c | 1 -
- drivers/cpuidle/cpuidle-at91.c        | 1 -
- drivers/cpuidle/cpuidle-exynos.c      | 1 -
- drivers/cpuidle/cpuidle-kirkwood.c    | 1 -
- drivers/cpuidle/cpuidle-ux500.c       | 1 -
- drivers/cpuidle/cpuidle-zynq.c        | 1 -
- 15 files changed, 4 insertions(+), 14 deletions(-)
+ arch/arm/include/asm/cpuidle.h    | 19 +++++++++++
+ arch/arm/kernel/cpuidle.c         | 72 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/cpuidle.h  |  5 ++-
+ include/asm-generic/vmlinux.lds.h |  2 ++
+ 4 files changed, 97 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index af319ac..348dc81 100644
+index 348dc81..1851e9d 100644
 --- a/arch/arm/include/asm/cpuidle.h
 +++ b/arch/arm/include/asm/cpuidle.h
-@@ -1,6 +1,8 @@
- #ifndef __ASM_ARM_CPUIDLE_H
- #define __ASM_ARM_CPUIDLE_H
+@@ -27,4 +27,23 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+  */
+ #define ARM_CPUIDLE_WFI_STATE ARM_CPUIDLE_WFI_STATE_PWR(UINT_MAX)
  
-+#include <asm/proc-fns.h>
++struct cpuidle_ops {
++	int (*suspend)(int cpu, unsigned long arg);
++	int (*init)(struct device_node *, int cpu);
++};
 +
- #ifdef CONFIG_CPU_IDLE
- extern int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- 		struct cpuidle_driver *drv, int index);
++struct of_cpuidle_method {
++	const char *method;
++	struct cpuidle_ops *ops;
++};
++
++#define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)			\
++	static const struct of_cpuidle_method __cpuidle_method_of_table_##name \
++	__used __section(__cpuidle_method_of_table)			\
++	= { .method = _method, .ops = _ops }
++
++extern int arm_cpuidle_suspend(int index);
++
++extern int arm_cpuidle_init(int cpu);
++
+ #endif
 diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 89545f6..45969f8 100644
+index 45969f8..7b42a40 100644
 --- a/arch/arm/kernel/cpuidle.c
 +++ b/arch/arm/kernel/cpuidle.c
-@@ -10,7 +10,7 @@
+@@ -10,8 +10,17 @@
   */
  
  #include <linux/cpuidle.h>
--#include <asm/proc-fns.h>
-+#include <asm/cpuidle.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <asm/cpuidle.h>
  
++extern struct of_cpuidle_method __cpuidle_method_of_table[];
++
++static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
++	__used __section(__cpuidle_method_of_table_end);
++
++static struct cpuidle_ops cpuidle_ops[NR_CPUS];
++
  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
  		struct cpuidle_driver *drv, int index)
-diff --git a/arch/arm/mach-davinci/cpuidle.c b/arch/arm/mach-davinci/cpuidle.c
-index e365c1b..306ebc5 100644
---- a/arch/arm/mach-davinci/cpuidle.c
-+++ b/arch/arm/mach-davinci/cpuidle.c
-@@ -17,7 +17,6 @@
- #include <linux/cpuidle.h>
- #include <linux/io.h>
- #include <linux/export.h>
--#include <asm/proc-fns.h>
- #include <asm/cpuidle.h>
+ {
+@@ -19,3 +28,66 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
  
- #include <mach/cpuidle.h>
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index d76d086..8e21ccc 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -9,7 +9,6 @@
- #include <linux/cpuidle.h>
- #include <linux/module.h>
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
+ 	return index;
+ }
++
++int arm_cpuidle_suspend(int index)
++{
++	int ret = -EOPNOTSUPP;
++	int cpu = smp_processor_id();
++
++	if (cpuidle_ops[cpu].suspend)
++		ret = cpuidle_ops[cpu].suspend(cpu, index);
++
++	return ret;
++}
++
++static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
++{
++	struct of_cpuidle_method *m = __cpuidle_method_of_table;
++
++	for (; m->method; m++)
++		if (!strcmp(m->method, method))
++			return m->ops;
++
++	return NULL;
++}
++
++static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
++{
++	const char *enable_method;
++	struct cpuidle_ops *ops;
++
++	enable_method = of_get_property(dn, "enable-method", NULL);
++	if (!enable_method)
++		return -ENOENT;
++
++	ops = arm_cpuidle_get_ops(enable_method);
++	if (!ops) {
++		pr_warn("%s: unsupported enable-method property: %s\n",
++			dn->full_name, enable_method);
++		return -EOPNOTSUPP;
++	}
++
++	cpuidle_ops[cpu] = *ops; /* structure copy */
++
++	pr_notice("cpuidle: enable-method property '%s'"
++		  " found operations\n", enable_method);
++
++	return 0;
++}
++
++int __init arm_cpuidle_init(int cpu)
++{
++	int ret = -EOPNOTSUPP;
++	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
++
++	if (!cpu_node)
++		return -ENODEV;
++
++	ret = arm_cpuidle_read_ops(cpu_node, cpu);
++	if (!ret && cpuidle_ops[cpu].init)
++		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
++
++	of_node_put(cpu_node);
++
++	return ret;
++}
+diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+index c60643f..460a38b 100644
+--- a/arch/arm64/include/asm/cpuidle.h
++++ b/arch/arm64/include/asm/cpuidle.h
+@@ -17,5 +17,8 @@ static inline int cpu_suspend(unsigned long arg)
+ 	return -EOPNOTSUPP;
+ }
+ #endif
+-
++static inline int arm_cpuidle_suspend(int index)
++{
++	return cpu_suspend(index);
++}
+ #endif
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index ac78910..91c0930 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -167,6 +167,7 @@
+ #define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
+ #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
+ #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
++#define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
+ #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
  
- #include "common.h"
- #include "cpuidle.h"
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sl.c b/arch/arm/mach-imx/cpuidle-imx6sl.c
-index 7d92e65..5742a9f 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sl.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sl.c
-@@ -9,7 +9,6 @@
- #include <linux/cpuidle.h>
- #include <linux/module.h>
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- 
- #include "common.h"
- #include "cpuidle.h"
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-index 5a36722..2c9f1a8 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-@@ -10,7 +10,6 @@
- #include <linux/cpu_pm.h>
- #include <linux/module.h>
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- #include <asm/suspend.h>
- 
- #include "common.h"
-diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
-index 01e398a..7622dbb 100644
---- a/arch/arm/mach-omap2/cpuidle44xx.c
-+++ b/arch/arm/mach-omap2/cpuidle44xx.c
-@@ -17,7 +17,6 @@
- #include <linux/clockchips.h>
- 
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- 
- #include "common.h"
- #include "pm.h"
-diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-index 2eb0724..93aa8cb 100644
---- a/arch/arm/mach-s3c64xx/cpuidle.c
-+++ b/arch/arm/mach-s3c64xx/cpuidle.c
-@@ -16,7 +16,7 @@
- #include <linux/export.h>
- #include <linux/time.h>
- 
--#include <asm/proc-fns.h>
-+#include <asm/cpuidle.h>
- 
- #include <mach/map.h>
- 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index 4f25a7c..e22b0d9 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -27,7 +27,6 @@
- #include <linux/module.h>
- 
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
- 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index f8815ed..a2400ab4 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -27,7 +27,6 @@
- #include <linux/module.h>
- 
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
- 
-diff --git a/drivers/cpuidle/cpuidle-at91.c b/drivers/cpuidle/cpuidle-at91.c
-index aae7bfc..f2446c7 100644
---- a/drivers/cpuidle/cpuidle-at91.c
-+++ b/drivers/cpuidle/cpuidle-at91.c
-@@ -19,7 +19,6 @@
- #include <linux/cpuidle.h>
- #include <linux/io.h>
- #include <linux/export.h>
--#include <asm/proc-fns.h>
- #include <asm/cpuidle.h>
- 
- #define AT91_MAX_STATES	2
-diff --git a/drivers/cpuidle/cpuidle-exynos.c b/drivers/cpuidle/cpuidle-exynos.c
-index 26f5f29..0c06ea2 100644
---- a/drivers/cpuidle/cpuidle-exynos.c
-+++ b/drivers/cpuidle/cpuidle-exynos.c
-@@ -19,7 +19,6 @@
- #include <linux/of.h>
- #include <linux/platform_data/cpuidle-exynos.h>
- 
--#include <asm/proc-fns.h>
- #include <asm/suspend.h>
- #include <asm/cpuidle.h>
- 
-diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-index cea0a6c..d23d8f4 100644
---- a/drivers/cpuidle/cpuidle-kirkwood.c
-+++ b/drivers/cpuidle/cpuidle-kirkwood.c
-@@ -21,7 +21,6 @@
- #include <linux/cpuidle.h>
- #include <linux/io.h>
- #include <linux/export.h>
--#include <asm/proc-fns.h>
- #include <asm/cpuidle.h>
- 
- #define KIRKWOOD_MAX_STATES	2
-diff --git a/drivers/cpuidle/cpuidle-ux500.c b/drivers/cpuidle/cpuidle-ux500.c
-index 66f81e4..8bf895c 100644
---- a/drivers/cpuidle/cpuidle-ux500.c
-+++ b/drivers/cpuidle/cpuidle-ux500.c
-@@ -19,7 +19,6 @@
- #include <linux/platform_device.h>
- 
- #include <asm/cpuidle.h>
--#include <asm/proc-fns.h>
- 
- static atomic_t master = ATOMIC_INIT(0);
- static DEFINE_SPINLOCK(master_lock);
-diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
-index 002b8c9..543292b 100644
---- a/drivers/cpuidle/cpuidle-zynq.c
-+++ b/drivers/cpuidle/cpuidle-zynq.c
-@@ -28,7 +28,6 @@
- #include <linux/init.h>
- #include <linux/cpuidle.h>
- #include <linux/platform_device.h>
--#include <asm/proc-fns.h>
- #include <asm/cpuidle.h>
- 
- #define ZYNQ_MAX_STATES		2
+ #define KERNEL_DTB()							\
+@@ -501,6 +502,7 @@
+ 	CLKSRC_OF_TABLES()						\
+ 	IOMMU_OF_TABLES()						\
+ 	CPU_METHOD_OF_TABLES()						\
++	CPUIDLE_METHOD_OF_TABLES()					\
+ 	KERNEL_DTB()							\
+ 	IRQCHIP_OF_MATCH_TABLE()					\
+ 	EARLYCON_OF_TABLES()
 -- 
 1.9.1
