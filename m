@@ -1,66 +1,40 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 18 Mar 2015 07:50:10 +0100
-Subject: [PATCH 09/16 linux-next] net: xilinx: constify of_device_id array
-In-Reply-To: <1426617469-781-10-git-send-email-fabf@skynet.be>
-References: <1426617469-781-1-git-send-email-fabf@skynet.be>
- <1426617469-781-10-git-send-email-fabf@skynet.be>
-Message-ID: <BY2FFO11FD004365A4A4A7796DC551DCFE2000@BY2FFO11FD004.protection.gbl>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 18 Mar 2015 12:29:43 +0530
+Subject: [PATCH v2 3/4] cpufreq: mediatek: add Mediatek cpufreq driver
+In-Reply-To: <CALx668U7EoiMB8D0Num5w9oC0zZkC55uKaSOLrrBhKnLXUtoOQ@mail.gmail.com>
+References: <1425458956-20665-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1425458956-20665-4-git-send-email-pi-cheng.chen@linaro.org>
+ <CAKohpo=c2t4_2hdPP-vQM7xewK5SXaHBGNA9PhvTwDv3++pSTg@mail.gmail.com>
+ <CALx668VypyWbVuph0ir0SRt4kqASvYzwBuyc_r5tFeoHi+HieA@mail.gmail.com>
+ <CAKohpomxXTP6NdPoSmB=eq2sFqqgskS5vYtDNAT6a0VL5K6dCg@mail.gmail.com>
+ <CALx668VFRdeWcK_gKhJrJehnaH5uDpA0m2OfHLqPVUq8oocXaw@mail.gmail.com>
+ <CAKohpokT7fSniPGX2BfM61AtMoMCxEP8WDtbZ34bozUXscEWyg@mail.gmail.com>
+ <20150311105307.GW28806@sirena.org.uk>
+ <CAKohpom4riOhzc3hK8B2tiSwGx0zG96C7QNeQB0yZaPMd_OpLw@mail.gmail.com>
+ <20150311124555.GB28806@sirena.org.uk>
+ <CAKohpok=8vU6Nr21n49MHoyk=REEMkuibVk9L+0L7uLnFj==AQ@mail.gmail.com>
+ <CALx668U7EoiMB8D0Num5w9oC0zZkC55uKaSOLrrBhKnLXUtoOQ@mail.gmail.com>
+Message-ID: <CAKohpon8kXzfeKUUwrRhuei0cY9iVbMHfBjDwXW=M2SAYHdtYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 07:37 PM, Fabian Frederick wrote:
-> of_device_id is always used as const.
-> (See driver.of_match_table and open firmware functions)
-> 
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
-> ---
->  drivers/net/ethernet/xilinx/ll_temac_main.c       | 2 +-
->  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 +-
->  drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> index dbcbf0c..690a4c3 100644
-> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
-> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
-> @@ -1157,7 +1157,7 @@ static int temac_of_remove(struct platform_device *op)
->  	return 0;
->  }
->  
-> -static struct of_device_id temac_of_match[] = {
-> +static const struct of_device_id temac_of_match[] = {
->  	{ .compatible = "xlnx,xps-ll-temac-1.01.b", },
->  	{ .compatible = "xlnx,xps-ll-temac-2.00.a", },
->  	{ .compatible = "xlnx,xps-ll-temac-2.02.a", },
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> index a6d2860..28b7e7d 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-> @@ -48,7 +48,7 @@
->  #define AXIENET_REGS_N		32
->  
->  /* Match table for of_platform binding */
-> -static struct of_device_id axienet_of_match[] = {
-> +static const struct of_device_id axienet_of_match[] = {
->  	{ .compatible = "xlnx,axi-ethernet-1.00.a", },
->  	{ .compatible = "xlnx,axi-ethernet-1.01.a", },
->  	{ .compatible = "xlnx,axi-ethernet-2.01.a", },
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> index 9d4ce38..2111b91 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> @@ -1231,7 +1231,7 @@ static struct net_device_ops xemaclite_netdev_ops = {
->  };
->  
->  /* Match table for OF platform binding */
-> -static struct of_device_id xemaclite_of_match[] = {
-> +static const struct of_device_id xemaclite_of_match[] = {
->  	{ .compatible = "xlnx,opb-ethernetlite-1.01.a", },
->  	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
->  	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
-> 
+On 12 March 2015 at 16:45, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> The voltages of the two regulators need to be always under a limitation:
+> 100mV < Vsram - Vproc < 200mV
+> For now, I just calculate the OPPs of Vsram from OPPs of Vproc.
+>
+> Another thing I should mention, if the voltage difference of two adjacent
+> OPPs is greater than 100mV, we need to set the regulator to some
+> voltages which are not in OPP table considering the limitation above.
+> I think that will make it more difficult to model such flow in a generic
+> framework.
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Actually the problem is that OPP tables are insufficient for such cases,
+and we are adding work-arounds to fix that. Though it will get fixed
+with the new bindings we are adding.
 
-Thanks,
-Michal
+I am confused on what we should be doing here. Even if you write
+your own driver, you will be abusing DT with incorrect information.
+
+Even if you go around adding a new driver, I would like you to fallback
+to cpufreq-dt ones the new OPP bindings are in place.
