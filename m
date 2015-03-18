@@ -1,65 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 16:51:16 +0000
-Subject: [STLinux Kernel] [PATCH 2/6] pinctrl: st: Introduce a 'get pin
- function' call
-In-Reply-To: <5509AAAB.8090906@st.com>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-3-git-send-email-lee.jones@linaro.org>
- <5509AAAB.8090906@st.com>
-Message-ID: <20150318165116.GR3318@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Mar 2015 16:52:01 +0000
+Subject: [PATCH v10 09/21] ARM64 / ACPI: If we chose to boot from acpi
+ then disable FDT
+In-Reply-To: <1426077587-1561-10-git-send-email-hanjun.guo@linaro.org>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-10-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150318165200.GA3421@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Mar 2015, Maxime Coquelin wrote:
-
+On Wed, Mar 11, 2015 at 08:39:35PM +0800, Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
 > 
+> If the early boot methods of acpi are happy that we have valid ACPI
+> tables and acpi=force has been passed, then do not unflat devicetree
+> effectively disabling further hardware probing from DT.
 > 
-> On 03/18/2015 11:51 AM, Lee Jones wrote:
-> >This call fetches the numerical function value a specified pin is
-> >currently operating in.  Function zero is more often than not the
-> >GPIO function.  Greater than zero values represent an alternative
-> >function.  You'd need to either look those up in the Device Tree
-> >sources or the Programmer's Manual.
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  drivers/pinctrl/pinctrl-st.c | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> >
-> >diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> >index 9e5ec00..5362e45 100644
-> >--- a/drivers/pinctrl/pinctrl-st.c
-> >+++ b/drivers/pinctrl/pinctrl-st.c
-> >@@ -460,6 +460,20 @@ static void st_pctl_set_function(struct st_pio_control *pc,
-> >  	regmap_field_write(alt, val);
-> >  }
-> >+static unsigned int st_pctl_get_pin_function(struct st_pio_control *pc, int pin)
-> >+{
-> >+	struct regmap_field *alt = pc->alt;
-> >+	unsigned int val;
-> >+	int offset = pin * 4;
-> >+
-> >+	if (!alt)
-> >+		return 0;
-> Shouldn't we print something if alt is NULL?
-> Else we can think we are on alternate 0.
-
-That is the assumption that I've made.  Is there isn't an alt, then a
-pin can only be on Alt-0.  Have I made the incorrect assumption here?
-
-> >+
-> >+	regmap_field_read(alt, &val);
-> >+
-> >+	return (val >> offset) & 0xf;
-> >+}
-> >+
-> >  static unsigned long st_pinconf_delay_to_bit(unsigned int delay,
-> >  	const struct st_pctl_data *data, unsigned long config)
-> >  {
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/setup.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 4f1a014..e8c7000 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -390,7 +390,8 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	early_ioremap_reset();
+>  
+> -	unflatten_device_tree();
+> +	if (acpi_disabled)
+> +		unflatten_device_tree();
+
+Lorenzo commented on the previous patch that acpi=force still allows the
+fall back to DT. I guess you may want something like:
+
+	if (acpi_disabled && !param_acpi_force)
+		unflatten_device_tree();
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
