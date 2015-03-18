@@ -1,59 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Mar 2015 20:24:30 +0000
-Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
- per boot protocol
-In-Reply-To: <CAKv+Gu-PX4cPz=yuFeRUbB3COc7jRvGuCYR7h_xLVuUv7A9CfA@mail.gmail.com>
-References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
- <20150318181315.GH19814@leverpostej>
- <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
- <CAKv+Gu_f=e4UG1GmtFh7j8fvq67v94VA=FwgaxHV5rECx0Wf=Q@mail.gmail.com>
- <20150318185737.GJ19814@leverpostej>
- <CAKv+Gu-PX4cPz=yuFeRUbB3COc7jRvGuCYR7h_xLVuUv7A9CfA@mail.gmail.com>
-Message-ID: <20150318202430.GA17417@leverpostej>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Wed, 18 Mar 2015 21:26:09 +0100
+Subject: [PATCH] amba-pl011: simplify TX handling
+In-Reply-To: <20150318174157.GD3549@e103592.cambridge.arm.com>
+References: <20150317163200.GE3759@e103592.cambridge.arm.com>
+ <20150318004255.538fd48e@north>
+ <20150318174157.GD3549@e103592.cambridge.arm.com>
+Message-ID: <20150318212609.4d4f61a6@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> >>>  ENTRY(stext)
-> >> >>> +     adr_l   x8, boot_regs                   // record the contents of
-> >> >>> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
-> >> >>> +     stp     x2, x3, [x8, #16]
-> >> >>
-> >> >> I think we should have a dc ivac here as we do for
-> >> >> set_cpu_boot_mode_flag.
-> >> >>
-> >> >> That avoids a potential issue with boot_regs sharing a cacheline with
-> >> >> data we write with the MMU on -- using __flush_dcache_area will result
-> >> >> in a civac, so we could write back dirty data atop of the boot_regs if
-> >> >> there were clean entries in the cache when we did the non-cacheable
-> >> >> write.
-> >> >>
-> >> >
-> >> > Hmm, I wondered about that.
-> >> >
-> >> > Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
-> >> >
-> >>
-> >> Never mind, it's easier just to do the invalidate right after, and I
-> >> can drop the flush before the access.
-> >
-> > Yup.
-> >
-> > Annoyingly the minimum cache line size seems to be a word (given the
-> > defnition of CTR.DminLine), which means you need a few dc ivac
-> > instructions to be architecturally correct.
-> >
+On Wed, 18 Mar 2015 17:41:57 +0000, Dave P Martin wrote:
+> > This is exactly what I did:
+> > # stty -F /dev/ttyAMA0 115200 -onlcr
+> > # cat 1MB_text_file > /dev/ttyAMA0
+> > ^C
+> > Now AMA0 is dead.  If I waited until the whole file was written,
+> > everything was fine.  This was 100% reproducible and I later checked
+> > that on .shutdown() the FIFO was full (no IRQ pending yet).  Initially I
+> > tried to play around with CR programming on .shutdown() but it didn't
+> > change anything (according to Broadcom docs one should be very careful
+> > not to touch CR while UART is busy).
 > 
-> But that applies to cpu_boot_mode as well then?
+> Interesting... I missed this because the systemd issue that got me
+> started on this only shows up of the console is on the PL011.  Once
+> a shell is running on ttyAMA0, the port is always open, so the effects
+> of shutting down and restarting the pl011 are not seen.
+> 
+> I'm actually suspicious of the correct behaviour here.  serial_core
+> waits for the UART to drain via uart_wait_until_sent(), but there are
+> some oddities:
+> 
+>  * The wait is abandoned early if there is a pending signal.  This
+>    means that some output already sent to the kernel via write() is
+>    is simply lost.  This feels a bit odd -- for all other I/O I can
+>    think of, write() does not guarantee that the data has reached
+>    its destination, but on return it usually does guarantee that the
+>    data _will_ reach its destination (except for unrecoverable I/O
+>    errors).
+> 
+>    This behaviour does mean that pl011_shutdown() is invoked with
+>    a non-empty FIFO if the only process with the port open is killed
+>    by a signal while output is pending, causing the hangup.
+> 
+>  * uart_wait_until_sent()'s timeout calculations aim to wait for
+>    no longer than it takes the FIFO to drain.  However, this function
+>    can get called when the serial_core xmit queue for the port is
+>    very non-empty -- meaning that the FIFO continues to be topped
+>    up for some time.  This can cause more data to be lost.
 
-It writes a single word, so it happens to be safe.
-
-> I will add a call to __inval_cache_range() right after recording the
-> initial values, that should do the right thing regarding llinesize
-
-That works, with one caveat: you'll need a dmb sy between the writes and
-the call -- dc instructions by VA only hazard against normal cacheable
-accesses, and __inval_cache_range assumes the caches are on and so
-doesn't have a dmb prior to the dc instructions.
-
-Mark.
+I confess that the way serial_core works is not very intuitive for me
+either, I can only add to your list.  For instance I observed
+that .start_tx() called eight times during the initial load.  Why?
+Obviously the first one fills up the FIFO and the subsequent just waste
+CPU time.  I remember looking at the serial_core and it seemed like the
+repeated calls must be coming from the higher layers... Admittedly I was
+too lazy to just add a dump_stack() and see for myself ;)
