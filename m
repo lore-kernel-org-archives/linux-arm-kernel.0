@@ -1,111 +1,179 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 18 Mar 2015 14:20:21 +0000
-Subject: [RFC PATCH 0/7] Pseudo-NMI for arm64 using ICC_PMR_EL1 (GICv3)
-Message-ID: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
+Date: Wed, 18 Mar 2015 14:20:22 +0000
+Subject: [RFC PATCH 1/7] serial: Emulate break using control characters
+In-Reply-To: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
+References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1426688428-3150-2-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset provides a pseudo-NMI for arm64 kernels by reimplementing
-the irqflags macros to modify the GIC PMR (the priority mask register is
-accessible as a system register on GICv3 and later) rather than the
-PSR. The pseudo-NMI changes are support by a prototype implementation of
-arch_trigger_all_cpu_backtrace that allows the new code to be exercised.
+Currently the magic SysRq functions can accessed by sending a break on
+the serial port. Unfortunately some networked serial proxies make it
+difficult to send a break meaning SysRq functions cannot be used. This
+patch provides a workaround by allowing the (fairly unlikely) sequence
+of ^B^R^K characters to emulate a real break.
 
-In addition to the arm64 changes I've bundled in a few patches from
-other patchsets to make the patchset self-contained. Of particular note
-of the serial break emulation patch which allows ^B^R^K to be used
-instead of a serial break to trigger SysRq-L (FVP UART sockets don't
-seem to support serial breaks). This makes it easy to run
-arch_trigger_all_cpu_backtrace from an IRQ handler (i.e. somewhere with
-interrupts masked so we are forced to preempt and take the NMI).
+This approach is very nearly as robust as normal sysrq/break handling
+because all trigger recognition happens during interrupt handling. Only
+major difference is that to emulate a break we must enter the ISR four
+times (instead of twice) and manage an extra byte of state.
 
-The code works-for-me (tm) but there are currently some pretty serious
-limitations.
+No means is provided to escape the trigger sequence (and pass ^B^R^K to
+the underlying process) however the sequence is proved reasonably pretty
+collision resistant in practice. The most significant consequence is
+that ^B and ^B^R are delayed until a new character is observed.
 
- 1. Exercised only on the foundation model with gicv3 support. It has
-    not been exercised on real silicon or even on the more advanced
-    ARM models.
+The most significant collision I am aware of is with emacs-like
+backward-char bindings (^B) because the character movement will become
+lumpy (two characters every two key presses rather than one character
+per key press). Arrow keys or ^B^B^F provide workarounds.
 
- 2. It has been written without any documentation describing GICv3
-    architecture (which has not yet been released by ARM). I've been
-    guessing about the behaviour based on the ARMv8 and GICv2
-    architecture specs. The code works on the foundation model but
-    I cannot check that it conforms architecturally.
+Special note for tmux users:
+  tmux defaults to using ^B as its escape character but does not have a
+  default binding for ^B^R. Likewise tmux had no visual indicator
+  showing the beginning of break sequence meaning delayed the delivery
+  of ^B is not observable. Thus serial break emulation does not interfere
+  with the use of tmux's default key bindings.
 
- 3. Requires GICv3+ hardware together with firmware support to enable
-    GICv3 features at EL3. If CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS is
-    enabled the kernel will not boot on older hardware. It will be hard
-    to diagnose because we will crash very early in the boot (i.e.
-    before the call to start_kernel). Auto-detection might be possible
-    but the performance and code size cost of adding conditional code to
-    the irqflags macros probably makes it impractical. As such it may
-    never be possible to remove this limitation (although it might be
-    possible to find a way to survive long enough to panic and show the
-    results on the console).
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+---
+ include/linux/serial_core.h | 83 +++++++++++++++++++++++++++++++++++----------
+ lib/Kconfig.debug           | 15 ++++++++
+ 2 files changed, 80 insertions(+), 18 deletions(-)
 
- 4. No benchmarking (see #1 above). Unlike the PSR, updates to the PMR
-    do not self synchronize which requires me to sprinkle isb
-    instructions fairly liberally. I've been told the cost of isb varies
-    from almost-free (A53) to somewhat costly (A57) thus we export this
-    code to reduce kernel performance. However this needs to be
-    quantified and I am currently unable to do this. I'd really like to
-    but don't have any suitable hardware.
-
- 5. There is no code in el1_irq to detect NMI and switch from IRQ to NMI
-    handling. This means all the irq handling machinary is re-entered in
-    order to handle the NMI. This not safe and deadlocks are likely.
-    This is a severe limitation although, in this proof-of-concept
-    work, NMI can only be triggered by SysRq-L or severe kernel damage.
-    This means we just about get away with it for simple test (lockdep
-    detects that we are doing wrong and shows a backtrace). This is
-    definitely the first thing that needs to be tackled to take this
-    code further.
-
-Note also that alternative approaches to implementing a pseudo-NMI on
-arm64 are possible but only through runtime cooperation with other
-software components in the system, potentially both those running at EL3
-and at secure EL1. I should like to explore these options in future but,
-as far as I know, this is the only sane way to provide NMI-like features
-whilst being implementable entirely in non-secure EL1[1]
-
-[1] Except for a single register write to ICC_SRE_EL3 by the EL3
-    firmware (and already implemented by ARM trusted firmware).
-
-
-Daniel Thompson (7):
-  serial: Emulate break using control characters
-  printk: Simple implementation for NMI backtracing
-  irqchip: gic-v3: Reset BPR during initialization
-  arm64: irqflags: Reorder the fiq & async macros
-  arm64: irqflags: Use ICC sysregs to implement IRQ masking
-  arm64: irqflags: Automatically identify I bit mis-management
-  arm64: Add support for on-demand backtrace of other CPUs
-
- arch/arm64/Kconfig                   |  16 ++++
- arch/arm64/include/asm/assembler.h   |  72 +++++++++++++++--
- arch/arm64/include/asm/hardirq.h     |   2 +-
- arch/arm64/include/asm/irq.h         |   5 ++
- arch/arm64/include/asm/irqflags.h    | 130 ++++++++++++++++++++++++++++--
- arch/arm64/include/asm/ptrace.h      |  10 +++
- arch/arm64/include/asm/smp.h         |   4 +
- arch/arm64/include/uapi/asm/ptrace.h |   8 ++
- arch/arm64/kernel/entry.S            |  70 ++++++++++++++---
- arch/arm64/kernel/head.S             |  27 +++++++
- arch/arm64/kernel/irq.c              |   6 ++
- arch/arm64/kernel/smp.c              |  70 +++++++++++++++++
- arch/arm64/mm/cache.S                |   4 +-
- arch/arm64/mm/proc.S                 |  19 +++++
- drivers/irqchip/irq-gic-v3.c         |  70 ++++++++++++++++-
- include/linux/irqchip/arm-gic-v3.h   |   6 +-
- include/linux/irqchip/arm-gic.h      |   2 +-
- include/linux/printk.h               |  20 +++++
- include/linux/serial_core.h          |  83 +++++++++++++++-----
- init/Kconfig                         |   3 +
- kernel/printk/Makefile               |   1 +
- kernel/printk/nmi_backtrace.c        | 148 +++++++++++++++++++++++++++++++++++
- lib/Kconfig.debug                    |  15 ++++
- 23 files changed, 746 insertions(+), 45 deletions(-)
- create mode 100644 kernel/printk/nmi_backtrace.c
-
---
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index cf9c2ce9479d..56f8e3daf42c 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -160,6 +160,9 @@ struct uart_port {
+ 	struct console		*cons;			/* struct console, if any */
+ #if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(SUPPORT_SYSRQ)
+ 	unsigned long		sysrq;			/* sysrq timeout */
++#ifdef CONFIG_MAGIC_SYSRQ_BREAK_EMULATION
++	char                    sysrq_emul;             /* emulation state */
++#endif
+ #endif
+ 
+ 	/* flags must be updated while holding port mutex */
+@@ -420,24 +423,6 @@ extern void uart_handle_cts_change(struct uart_port *uport,
+ extern void uart_insert_char(struct uart_port *port, unsigned int status,
+ 		 unsigned int overrun, unsigned int ch, unsigned int flag);
+ 
+-#ifdef SUPPORT_SYSRQ
+-static inline int
+-uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
+-{
+-	if (port->sysrq) {
+-		if (ch && time_before(jiffies, port->sysrq)) {
+-			handle_sysrq(ch);
+-			port->sysrq = 0;
+-			return 1;
+-		}
+-		port->sysrq = 0;
+-	}
+-	return 0;
+-}
+-#else
+-#define uart_handle_sysrq_char(port,ch) ({ (void)port; 0; })
+-#endif
+-
+ /*
+  * We do the SysRQ and SAK checking like this...
+  */
+@@ -462,6 +447,68 @@ static inline int uart_handle_break(struct uart_port *port)
+ 	return 0;
+ }
+ 
++#if defined(SUPPORT_SYSRQ) && defined(CONFIG_MAGIC_SYSRQ_BREAK_EMULATION)
++/*
++ * Emulate a break if we are the serial console and receive ^B, ^R, ^K.
++ */
++static inline int
++uart_handle_sysrq_break_emulation(struct uart_port *port, unsigned int ch)
++{
++	const unsigned int ctrlb = 'B' & 31;
++	const unsigned int ctrlr = 'R' & 31;
++	const unsigned int ctrlk = 'K' & 31;
++
++	if (uart_console(port)) {
++		if ((port->sysrq_emul == 0 && ch == ctrlb) ||
++		    (port->sysrq_emul == ctrlb && ch == ctrlr)) {
++			/* for either of the first two trigger characters
++			 * update the state variable and move on.
++			 */
++			port->sysrq_emul = ch;
++			return 1;
++		} else if (port->sysrq_emul == ctrlr && ch == ctrlk &&
++			   uart_handle_break(port)) {
++			/* the break has already been emulated whilst
++			 * evaluating the condition, tidy up and move on
++			 */
++			port->sysrq_emul = 0;
++			return 1;
++		}
++	}
++
++	if (port->sysrq_emul) {
++		/* received a partial (false) trigger, tidy up and move on */
++		uart_insert_char(port, 0, 0, ctrlb, TTY_NORMAL);
++		if (port->sysrq_emul == ctrlr)
++			uart_insert_char(port, 0, 0, ctrlr, TTY_NORMAL);
++		port->sysrq_emul = 0;
++	}
++
++	return 0;
++}
++#else
++#define uart_handle_sysrq_break_emulation(port, ch) ({ (void)port; 0; })
++#endif
++
++#ifdef SUPPORT_SYSRQ
++static inline int
++uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
++{
++	if (port->sysrq) {
++		if (ch && time_before(jiffies, port->sysrq)) {
++			handle_sysrq(ch);
++			port->sysrq = 0;
++			return 1;
++		}
++		port->sysrq = 0;
++	}
++
++	return uart_handle_sysrq_break_emulation(port, ch);
++}
++#else
++#define uart_handle_sysrq_char(port, ch) ({ (void)port; 0; })
++#endif
++
+ /*
+  *	UART_ENABLE_MS - determine if port should enable modem status irqs
+  */
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index c2d51af327bc..3f54e85c27d2 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -372,6 +372,21 @@ config MAGIC_SYSRQ_DEFAULT_ENABLE
+ 	  This may be set to 1 or 0 to enable or disable them all, or
+ 	  to a bitmask as described in Documentation/sysrq.txt.
+ 
++config MAGIC_SYSRQ_BREAK_EMULATION
++	bool "Enable magic SysRq serial break emulation"
++	depends on MAGIC_SYSRQ && SERIAL_CORE_CONSOLE
++	default n
++	help
++	  If you say Y here, then you can use the character sequence ^B^R^K
++	  to simulate a BREAK on the serial console. This is useful if for
++	  some reason you cannot send a BREAK to your console's serial port.
++	  For example, if you have a serial device server that cannot
++	  send a BREAK. Enabling this feature can delay the delivery of
++	  characters to the TTY because the ^B and a subsequent ^R will be
++	  delayed until we know what the next character is.
++
++	  If unsure, say N.
++
+ config DEBUG_KERNEL
+ 	bool "Kernel debugging"
+ 	help
+-- 
 2.1.0
