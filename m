@@ -1,75 +1,139 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Mar 2015 11:03:36 +0100
-Subject: Is cpufreq-dt safe without regulator support?
-In-Reply-To: <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
-References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
- <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
- <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
- <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
-Message-ID: <20150318100336.GM4638@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Mar 2015 11:07:17 +0100
+Subject: [PATCH v2 3/8] ARM: add macro to perform far branches (b/bl)
+In-Reply-To: <1426248452-4773-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426248452-4773-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426248452-4773-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9cU_cgD4AgndKKiFsCjkUyB9MKyP3kieZAY7y4t9kofw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 09:23:54AM +0530, Viresh Kumar wrote:
-> >>> If the cpu is missing a regulator supply phandle, or the
-> >>> kernel is built without regulators, cpufreq can increase
-> >>> the clock rate without the needed voltage increase.
-> >>
-> >> Right.
-> >>
-> >>> The former issue can be resolved by providing a dummy
-> >>> regulator with the default voltage, effectively disabling
-> >>> cpufreq.
-> >>
-> >> How ? CPUFreq will try to change both volt and freq. Volt
-> >> wouldn't change as its a dummy regulator, but freq would
-> >> still be changed..
-> >
-> > I suppose this is the desired behavior. I'm fine with it then.
-> >
-> >>> The latter is possible. Without regulator support built-in,
-> >>> even a correct, complete DTS can still fail. Should I just
-> >>> remove the offending OPP? Still that does not fix the
-> >>> problem when we actually do want overclocking.
-> >>>
-> >>> To summarize, should cpufreq-dt probe fail when regulator
-> >>> support isn't available? Should we differentiate between
-> >>
-> >> No. We can have regulator support enabled but no regulator
-> >> for a CPU. And so the current state of code looks fine.
-> >>
-> >>> not having a regulator phandle vs no regulator support?
-> >>
-> >> What I couldn't understand is, why would you miss the regulator
-> >> phandle in dts? Or not compile regulator support?
-> >
-> > I admit it is partly bad execution on my part. I added the OPPs
-> > to the .dtsi files, but only the regulators to a handful of boards
-> > that I have. All the other boards do not have a regulator phandle.
-> >
-> >> In case you want cpufreq-dt to be disabled if regulators aren't
-> >> compiled in, then what you should do is, don't create the platform
-> >> device required for probing cpufreq-dt driver.
-> >
-> > Thanks for the suggestion. I'll add if(IS_ENABLED()) around it.
-> > I can also check for the regulator phandle here.
-> 
-> I think the right thing to do is move the OPP bindings to the .dts
-> files instead and get rid of all the hacks you are planning to add.
+On 13 March 2015 at 13:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> These macros execute PC-relative branches, but with a larger
+> reach than the 24 bits that are available in the b and bl opcodes.
+>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/assembler.h | 83 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 83 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index f67fd3afebdf..2e7f55194782 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -88,6 +88,17 @@
+>  #endif
+>
+>  /*
+> + * The program counter is always ahead of the address of the currently
+> + * executing instruction by PC_BIAS bytes, whose value differs depending
+> + * on the execution mode.
+> + */
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +#define PC_BIAS                4
+> +#else
+> +#define PC_BIAS                8
+> +#endif
+> +
+> +/*
+>   * Enable and disable interrupts
+>   */
+>  #if __LINUX_ARM_ARCH__ >= 6
+> @@ -108,6 +119,78 @@
+>         .endm
+>  #endif
+>
+> +       /*
+> +        * Macros to emit relative conditional branches that may exceed the
+> +        * range of the 24-bit immediate of the ordinary b/bl instructions.
+> +        * NOTE: this doesn't work with locally defined symbols, as they
+> +        * lack the ARM/Thumb annotation (even if they are annotated as
+> +        * functions)
+> +        */
+> +       .macro  b_far, target, tmpreg, c=
+> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
+> +       movt\c  \tmpreg, #:upper16:(\target - (8888f + PC_BIAS))
+> +       movw\c  \tmpreg, #:lower16:(\target - (8888f + PC_BIAS))
+> +8888:  add\c   pc, pc, \tmpreg
+> +#else
+> +       ldr\c   \tmpreg, 8889f
+> +8888:  add\c   pc, pc, \tmpreg
+> +       .ifnb   \c
+> +       b       8890f
+> +       .endif
+> +8889:  .long   \target - (8888b + PC_BIAS)
+> +8890:
+> +#endif
+> +       .endm
 
-Another solution would be to have the safe OPPs in the DTSI, and the
-one that requires some PMIC support in the board DTS.
+Actually, I have found something better:
 
-Maxime
+add\c \tmpreg, pc, #:pc_g0_nc:\target - PC_BIAS
+add\c \tmpreg, \tmpreg, #:pc_g1_nc:\target - PC_BIAS + 4
+add\c pc, \tmpreg, #:pc_g2:\target - PC_BIAS + 8
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/deb480d3/attachment.sig>
+This uses a PC-relative group relocation to split the offset into
+12-bit chunks and poke them into the add instructions
+This way, we don't need the literal at all.
+
+Note that add with pc as destination is ARM-only, so we should
+probably retain the v7 movw/movt regardless
+
+
+> +
+> +       .macro  bl_far, target, c=
+> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
+> +       movt\c  ip, #:upper16:(\target - (8887f + PC_BIAS))
+> +       movw\c  ip, #:lower16:(\target - (8887f + PC_BIAS))
+> +8887:  add\c   ip, ip, pc
+> +       blx\c   ip
+> +#else
+> +       adr\c   lr, 8887f
+> +       b_far   \target, ip, \c
+> +8887:
+> +#endif
+> +       .endm
+> +
+> +       /*
+> +        * Macros to emit absolute conditional branches: these are preferred
+> +        * over the far variants above because they use fewer instructions
+> +        * and/or use implicit literals that the assembler can group together
+> +        * to optimize cache utilization. However, they can only be used to
+> +        * call functions at their link time address, which rules out early boot
+> +        * code that executes with the MMU off.
+> +        * The v7 variant uses a movt/movw pair to prevent potential D-cache
+> +        * stalls on the literal, so using these macros is preferred over using
+> +        * 'ldr pc, =XXX' directly (unless no scratch register is available)
+> +        * NOTE: this doesn't work with locally defined symbols, as they
+> +        * lack the ARM/Thumb annotation (even if they are annotated as
+> +        * functions)
+> +        */
+> +       .macro  b_abs, target, tmpreg, c=
+> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
+> +       movt\c  \tmpreg, #:upper16:\target
+> +       movw\c  \tmpreg, #:lower16:\target
+> +       bx\c    \tmpreg
+> +#else
+> +       ldr\c   pc, =\target
+> +#endif
+> +       .endm
+> +
+> +       .macro  bl_abs, target, c=
+> +#if defined(CONFIG_CPU_32v7) || defined(CONFIG_CPU_32v7M)
+> +       movt\c  lr, #:upper16:\target
+> +       movw\c  lr, #:lower16:\target
+> +       blx\c   lr
+> +#else
+> +       adr\c   lr, BSYM(8886f)
+> +       ldr\c   pc, =\target
+> +8886:
+> +#endif
+> +       .endm
+> +
+>         .macro asm_trace_hardirqs_off
+>  #if defined(CONFIG_TRACE_IRQFLAGS)
+>         stmdb   sp!, {r0-r3, ip, lr}
+> --
+> 1.8.3.2
+>
