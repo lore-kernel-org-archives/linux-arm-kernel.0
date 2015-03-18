@@ -1,46 +1,161 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Mar 2015 22:07:30 +0100
-Subject: [PATCH 2/2] i2c: driver for the Conexant Digicolor I2C controller
-In-Reply-To: <a106023efa9fd648f46021cd063437df798528de.1424092804.git.baruch@tkos.co.il>
-References: <7da767503ac6085c10fbd1953ffd36621b8bf0c5.1424092804.git.baruch@tkos.co.il>
- <a106023efa9fd648f46021cd063437df798528de.1424092804.git.baruch@tkos.co.il>
-Message-ID: <20150318210730.GA12960@katana>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Mar 2015 14:30:01 -0700
+Subject: [PATCHv4 30/35] ARM: dts: omap4: add system control module node
+In-Reply-To: <1426689860-17537-31-git-send-email-t-kristo@ti.com>
+References: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
+ <1426689860-17537-31-git-send-email-t-kristo@ti.com>
+Message-ID: <20150318213000.GX31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+* Tero Kristo <t-kristo@ti.com> [150318 07:45]:
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> @@ -167,36 +167,65 @@
+> +		scm: scm at 4a002000 {
+> +			compatible = "ti,omap4-ctrl", "simple-bus";
+> +			reg = <0x4a002000 0x1000>,
+> +			      <0x4a100000 0x1000>;
+> +			#address-cells = <2>;
+> +			#size-cells = <1>;
+> +			ranges = <0 0 0x4a002000 0x1000>,
+> +				 <1 0 0x4a100000 0x1000>;
 
-On Mon, Feb 16, 2015 at 03:20:04PM +0200, Baruch Siach wrote:
-> This commit adds a driver for the I2C master controller on the CX92755 SoC. The
-> CX92755 is one SoC in the Conexant Digicolor series. This driver should support
-> other SoCs from that series.
-> 
-> Only 7bit slave addresses are currently supported.
-> 
-> Tested on the Equinox CX92755 EVK, using i2c-tools utilities to read and write
-> the on-chip (sic) audio codec.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Oops I still have a bit of an issue with this, sorry I should have
+been more clear last time.
 
-Looks mostly good.
+Now it's hard to figure out which children belong to l4_cfg and which
+ones to l4_wkup. I suggest we set them up as completely separate blocks
+as that's what they are.
 
-> +static u32 dc_i2c_func(struct i2c_adapter *adap)
-> +{
-> +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
-> +}
+Below is an example of what I think things should look like for omap4,
+maybe take a look at that and see if that makes sense for you?
 
-You probably want to advertise I2C_FUNC_NOSTART here, too?
+It may need to be patched in separate parts to keep the patches readable
+though :)
 
-And if you could rebase to something after 4.0-rc1, that would be much
-appreciated.
+Regards,
 
-Thanks,
+Tony
 
-   Wolfram
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/c07b258b/attachment.sig>
+
+	ocp {
+		...
+
+		l4_cfg: l4 at 4a000000 {
+			compatible = "ti,omap4-l4-cfg", "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 0x4a000000 0x1000000>;
+
+			cm1: cm1 at 4000 {
+				compatible = "ti,omap4-cm1";
+				reg = <0x4000 0x2000>;
+
+				cm1_clocks: clocks {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
+
+				cm1_clockdomains: clockdomains {
+				};
+			};
+
+			cm2: cm2 at 8000 {
+				compatible = "ti,omap4-cm2";
+				reg = <0x8000 0x3000>;
+
+				cm2_clocks: clocks {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
+
+				cm2_clockdomains: clockdomains {
+				};
+			};
+
+			omap4_pmx_core: pinmux at 100040 {
+				compatible = "ti,omap4-padconf", "pinctrl-single";
+				reg = <0x100040 0x0196>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				#interrupt-cells = <1>;
+				interrupt-controller;
+				pinctrl-single,register-width = <16>;
+				pinctrl-single,function-mask = <0x7fff>;
+			};
+
+			omap4_padconf_global: tisyscon at 1005a0 {
+				compatible = "syscon";
+				reg = <0x1005a0 0x170>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				pbias_regulator: pbias_regulator {
+					compatible = "ti,pbias-omap";
+					reg = <0x60 0x4>;
+					syscon = <&omap4_padconf_global>;
+					pbias_mmc_reg: pbias_mmc_omap4 {
+						regulator-name = "pbias_mmc_omap4";
+						regulator-min-microvolt = <1800000>;
+						regulator-max-microvolt = <3000000>;
+					};
+				};
+			};
+		};
+
+		l4_wkup: l4 at 4a300000 {
+			compatible = "ti,omap4-l4-wkup", "simple-bus";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 0x4a300000 0x40000>;
+
+			counter32k: counter at 4000 {
+				compatible = "ti,omap-counter32k";
+				reg = <0x4000 0x20>;
+				ti,hwmods = "counter_32k";
+			};
+
+			prm: prm at 6000 {
+				compatible = "ti,omap4-prm";
+				reg = <0x6000 0x3000>;
+				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+
+				prm_clocks: clocks {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
+
+				prm_clockdomains: clockdomains {
+				};
+			};
+
+			scrm: scrm at a000 {
+				compatible = "ti,omap4-scrm";
+				reg = <0xa000 0x2000>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0 0xa000 0x2000>;
+
+				scrm_clocks: clocks {
+					#address-cells = <1>;
+					#size-cells = <0>;
+				};
+
+				scrm_clockdomains: clockdomains {
+				};
+			};
+
+			omap4_pmx_wkup: pinmux at 1e040 {
+				compatible = "ti,omap4-padconf", "pinctrl-single";
+				reg = <0x1e040 0x0038>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+				#interrupt-cells = <1>;
+				interrupt-controller;
+				pinctrl-single,register-width = <16>;
+				pinctrl-single,function-mask = <0x7fff>;
+			};
+		};
+		...
+	};
