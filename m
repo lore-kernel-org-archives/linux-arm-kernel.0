@@ -1,27 +1,29 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 18 Mar 2015 11:36:35 +0000
-Subject: [PATCH] spi: trigger trace event for message-done before
- mesg->complete
-In-Reply-To: <1426674448-8246-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1426674448-8246-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150318113635.GB2869@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Mar 2015 17:10:44 +0530
+Subject: [RESEND 0/7] ARM: davinci: McASP related cleanups and fixes
+In-Reply-To: <55015C86.2010803@ti.com>
+References: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
+ <55015C86.2010803@ti.com>
+Message-ID: <5509643C.5090406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 11:27:28AM +0100, Uwe Kleine-K?nig wrote:
-> With spidev the mesg->complete callback points to spidev_complete.
-> Calling this unblocks spidev_sync and so spidev_sync_write finishes. As
-> the struct spi_message just read is a local variable in
-> spidev_sync_write and recording the trace event accesses this message
-> the recording is better done first. The same can happen for
-> spidev_sync_read.
+On Thursday 12 March 2015 02:59 PM, Sekhar Nori wrote:
+> Hi Peter,
+> 
+> On Thursday 12 March 2015 01:36 PM, Peter Ujfalusi wrote:
+>> Hi,
+>>
+>> V1 was sent back in 10th of February [1], so resending it rebased on current
+>> linux-next.
+>>
+>> Clean up series of McASP device creation for da8xx and dm646x DMSoCs.
+> 
+> All applied. Will send out the pull request soon after a bit of testing.
 
-Applied, thanks.  I'm a bit suspicious that the changelog talks only
-about spidev though...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/bc861a72/attachment.sig>
+Tested audio recording and playback on DA850 EVM both with legacy boot
+and DT boot. Works great. DaVinci clock code needs a fix though. Will
+send out that too.
+
+Thanks,
+Sekhar
