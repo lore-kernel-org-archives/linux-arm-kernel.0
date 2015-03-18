@@ -1,115 +1,66 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 18 Mar 2015 14:46:51 +0800
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
-Message-ID: <1426661211-14272-1-git-send-email-hanjun.guo@linaro.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 18 Mar 2015 07:50:10 +0100
+Subject: [PATCH 09/16 linux-next] net: xilinx: constify of_device_id array
+In-Reply-To: <1426617469-781-10-git-send-email-fabf@skynet.be>
+References: <1426617469-781-1-git-send-email-fabf@skynet.be>
+ <1426617469-781-10-git-send-email-fabf@skynet.be>
+Message-ID: <BY2FFO11FD004365A4A4A7796DC551DCFE2000@BY2FFO11FD004.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Graeme Gregory <graeme.gregory@linaro.org>
+On 03/17/2015 07:37 PM, Fabian Frederick wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
+> 
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
+>  drivers/net/ethernet/xilinx/ll_temac_main.c       | 2 +-
+>  drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 2 +-
+>  drivers/net/ethernet/xilinx/xilinx_emaclite.c     | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/xilinx/ll_temac_main.c b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> index dbcbf0c..690a4c3 100644
+> --- a/drivers/net/ethernet/xilinx/ll_temac_main.c
+> +++ b/drivers/net/ethernet/xilinx/ll_temac_main.c
+> @@ -1157,7 +1157,7 @@ static int temac_of_remove(struct platform_device *op)
+>  	return 0;
+>  }
+>  
+> -static struct of_device_id temac_of_match[] = {
+> +static const struct of_device_id temac_of_match[] = {
+>  	{ .compatible = "xlnx,xps-ll-temac-1.01.b", },
+>  	{ .compatible = "xlnx,xps-ll-temac-2.00.a", },
+>  	{ .compatible = "xlnx,xps-ll-temac-2.02.a", },
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> index a6d2860..28b7e7d 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+> @@ -48,7 +48,7 @@
+>  #define AXIENET_REGS_N		32
+>  
+>  /* Match table for of_platform binding */
+> -static struct of_device_id axienet_of_match[] = {
+> +static const struct of_device_id axienet_of_match[] = {
+>  	{ .compatible = "xlnx,axi-ethernet-1.00.a", },
+>  	{ .compatible = "xlnx,axi-ethernet-1.01.a", },
+>  	{ .compatible = "xlnx,axi-ethernet-2.01.a", },
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> index 9d4ce38..2111b91 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> @@ -1231,7 +1231,7 @@ static struct net_device_ops xemaclite_netdev_ops = {
+>  };
+>  
+>  /* Match table for OF platform binding */
+> -static struct of_device_id xemaclite_of_match[] = {
+> +static const struct of_device_id xemaclite_of_match[] = {
+>  	{ .compatible = "xlnx,opb-ethernetlite-1.01.a", },
+>  	{ .compatible = "xlnx,opb-ethernetlite-1.01.b", },
+>  	{ .compatible = "xlnx,xps-ethernetlite-1.00.a", },
+> 
 
-ACPI 5.1 does not currently support S states for ARM64 hardware but
-ACPI code will call acpi_target_system_state() and acpi_sleep_init()
-for device power management, so introduce
-CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT and select it for x86 and
-ia64 only to make sleep functions available, and also introduce stub
-function to allow other drivers to function until S states are defined
-for ARM64.
+Acked-by: Michal Simek <michal.simek@xilinx.com>
 
-It will be no functional change for x86 and IA64.
-
-Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
-Hi Lorenzo,
-
-Since this patch only updated the config name with no fucntion
-change, I assume your ACK still apply, if not, please let me
-know.
-
-Thanks
-Hanjun
----
- arch/ia64/Kconfig       | 1 +
- arch/x86/Kconfig        | 1 +
- drivers/acpi/Kconfig    | 4 ++++
- drivers/acpi/Makefile   | 2 +-
- drivers/acpi/internal.h | 4 ++++
- 5 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 074e52b..cc3414f 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -10,6 +10,7 @@ config IA64
- 	select ARCH_MIGHT_HAVE_PC_SERIO
- 	select PCI if (!IA64_HP_SIM)
- 	select ACPI if (!IA64_HP_SIM)
-+	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select HAVE_UNSTABLE_SCHED_CLOCK
- 	select HAVE_IDE
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index b7d31ca..c3ea9f9 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -22,6 +22,7 @@ config X86_64
- ### Arch settings
- config X86
- 	def_bool y
-+	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
- 	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
- 	select ARCH_HAS_FAST_MULTIPLIER
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index e6c3ddd..a726381 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
- config ARCH_MIGHT_HAVE_ACPI_PDC
- 	bool
- 
-+config ACPI_SYSTEM_POWER_STATES_SUPPORT
-+	bool
-+
- config ACPI_SLEEP
- 	bool
- 	depends on SUSPEND || HIBERNATION
-+	depends on ACPI_SYSTEM_POWER_STATES_SUPPORT
- 	default y
- 
- config ACPI_PROCFS_POWER
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 623b117..db153c6 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -23,7 +23,7 @@ acpi-y				+= nvs.o
- 
- # Power management related files
- acpi-y				+= wakeup.o
--acpi-y				+= sleep.o
-+acpi-$(CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT) += sleep.o
- acpi-y				+= device_pm.o
- acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
- 
-diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-index 56b321a..ba4a61e 100644
---- a/drivers/acpi/internal.h
-+++ b/drivers/acpi/internal.h
-@@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
- /*--------------------------------------------------------------------------
-                                   Suspend/Resume
-   -------------------------------------------------------------------------- */
-+#ifdef CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
- extern int acpi_sleep_init(void);
-+#else
-+static inline int acpi_sleep_init(void) { return -ENXIO; }
-+#endif
- 
- #ifdef CONFIG_ACPI_SLEEP
- int acpi_sleep_proc_init(void);
--- 
-1.9.1
+Thanks,
+Michal
