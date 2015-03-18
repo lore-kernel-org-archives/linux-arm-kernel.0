@@ -1,52 +1,29 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 Mar 2015 12:41:00 +0000
-Subject: [PATCHv3] mm: Don't offset memmap for flatmem
-In-Reply-To: <1426291715-16242-1-git-send-email-lauraa@codeaurora.org>
-References: <1426291715-16242-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <5509725C.8020508@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 18 Mar 2015 13:46:31 +0100
+Subject: [PATCH 1/2] of: base: add function to get highest id of an alias
+ stem
+In-Reply-To: <1426177093-26820-2-git-send-email-wsa@the-dreams.de>
+References: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
+ <1426177093-26820-2-git-send-email-wsa@the-dreams.de>
+Message-ID: <20150318124631.GB3580@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 12, 2015 at 05:17:58PM +0100, Wolfram Sang wrote:
+> I2C supports adding adapters using either a dynamic or fixed id. The
+> latter is provided by aliases in the DT case. To prevent id collisions
+> of those two types, install this function which gives us the highest
+> fixed id, so we can then let the dynamically created ones come after
+> this highest number.
+> 
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
+Applied to for-next, thanks!
 
-On 14/03/15 00:08, Laura Abbott wrote:
-> Srinivas Kandagatla reported bad page messages when trying to
-> remove the bottom 2MB on an ARM based IFC6410 board
->
-> BUG: Bad page state in process swapper  pfn:fffa8
-> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
-> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
-> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-> bad because of flags:
-> flags: 0x200041(locked|active|mlocked)
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
-> Hardware name: Qualcomm (Flattened Device Tree)
-> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
-> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
-> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
-> [<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
-> [<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
-> [<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
-> [<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
-> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
-> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
-> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
-> Disabling lock debugging due to kernel taint
->
-> Removing the lower 2MB made the start of the lowmem zone to no longer
-> be page block aligned. IFC6410 uses CONFIG_FLATMEM where
-> alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
-> will offset for unaligned nodes with the assumption the pfn/page
-> translation functions will account for the offset. The functions for
-> CONFIG_FLATMEM do not offset however, resulting in overrunning
-> the memmap array. Just use the allocated memmap without any offset
-> when running with CONFIG_FLATMEM to avoid the overrun.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-
-
---srini
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/7355ea45/attachment.sig>
