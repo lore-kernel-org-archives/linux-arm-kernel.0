@@ -1,88 +1,106 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 18 Mar 2015 18:26:14 +0530
-Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <55094BEF.9060006@arm.com>
-References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
- <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
- <55094BEF.9060006@arm.com>
-Message-ID: <CABb+yY2woK6qWbrgPGRBRXJqJdf=1HxE_-Am-SY1_Uf_dNgTew@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 Mar 2015 14:10:31 +0100
+Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
+ Exynos3250
+In-Reply-To: <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
+ <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAJKOXPe3P0mO-WuufAwF_tB6P=kfr-ORyQ6pa2pRnvjytCuHZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 3:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> Hi Vincent,
+2015-03-18 13:51 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> CPU1 hotplug may hang when AFTR is used.  Fix it by:
+> - setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
+>   exynos_cpu_power_up()
+> - not clearing reserved bits of ARM_COREx_CONFIGURATION register in
+>   exynos_cpu_power_down()
+> - waiting while an undocumented register 0x0908 becomes non-zero in
+>   exynos_core_restart()
+> - using dsb_sev() instead of IPI in exynos_boot_secondary() on
+>   Exynos3250
 >
-> I see that this driver is queued but most of my earlier comments were
-> not addressed.
->
-Some of your comments have been addressed as changes and some as replies.
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
+>  arch/arm/mach-exynos/regs-pmu.h |  2 ++
+>  2 files changed, 22 insertions(+), 3 deletions(-)
 
-> *No ACK from DT binding maintainers too*.
->
-Yeah it would have been great to have some ack. It has been many
-months now, but I see its not uncommon for bindings go in via
-maintainers. I assume folks find it just normal.
 
+Looks good (except one nit below) and this also fixes hotplug issues
+during resume from S2R:
+$ echo mem > /sys/power/state
+[  156.517266] Disabling non-boot CPUs ...
+[  156.517781] IRQ18 no longer affine to CPU1
+[  156.518043] CPU1: shutdown
+[  156.544718] Enabling non-boot CPUs ...
+[  156.554925] CPU1: Software reset
+[  158.552631] CPU1: failed to come online
+[  158.552753] Error taking CPU1 up: -5
 
->> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->> @@ -0,0 +1,43 @@
->> +ARM MHU Mailbox Driver
->> +======================
->> +
->> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
->> +3 independent channels/links to communicate with remote processor(s).
->> + MHU links are hardwired on a platform. A link raises interrupt for any
->
->
-> As I had mentioned before it's just one implementation, the IP had
-> provision bi-directional interrupts and the binding *has to consider*
-> that instead of having to workaround that later.
->
-I will reply in yet another way.... the spec I have don't mention that
-(and it makes sense) and your platform doesn't do that either. I would
-have had to do something about it, had there been such a weird setup,
-but there's none known.
+Reviewed and tested on Rinato (Gear 2/Exynos 3250) board:
 
- So let us please avoid getting into bikeshedding discussion yet
-again. Otherwise almost every binding is broken because there could
-always be some platform that does weird things with irqs.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
->> +The last channel is specified to be a 'Secure' resource, hence can't be
->> +used by Linux running NS.
->
-> Correct so drop the support for secure channel until the first user
-> comes up.
->
-In your last post you said:
-  "Sorry my statement was not clear, I wanted to ask you to add that info
-to the binding."
-  Not that it makes sense to say the obvious, I added it just to
-address your comment.
+One comment below...
 
-> I am worried it might generate abort if someone tries to
-> access it in ARM64 which always runs in non-secure.
 >
-Abort should have happened years ago if someone _tries_ to access a
-secure resource from non-secure mode ;)
-How do you protect such people from "trying to" dereference NULL
-pointers?  (you made me repeat Nth time).
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index d2e9f12..ebd135b 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>   */
+>  void exynos_cpu_power_down(int cpu)
+>  {
+> +       u32 core_conf;
+> +
+>         if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
+>                 /*
+>                  * Bypass power down for CPU0 during suspend. Check for
+> @@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
+>                 if (!(val & S5P_CORE_LOCAL_PWR_EN))
+>                         return;
+>         }
+> -       pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> +
+> +       core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> +       core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
+> +       pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>  }
+>
+>  /**
+> @@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
+>   */
+>  void exynos_cpu_power_up(int cpu)
+>  {
+> -       pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> +       u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
+> +
+> +       if (soc_is_exynos3250())
+> +               core_conf |= S5P_CORE_AUTOWAKEUP_EN;
+> +
+> +       pmu_raw_writel(core_conf,
+>                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>  }
+>
+> @@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
+>         if (!of_machine_is_compatible("samsung,exynos3250"))
+>                 return;
+>
+> +       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> +               udelay(10);
+> +       udelay(10);
 
->> +
->> +static struct amba_id mhu_ids[] = {
->> +       {
->> +               .id     = 0x1bb098,
->
->
-> As I mentioned couple of times this is broken. Please refer my earlier mail
-> for details. You are skipping a field to compare which incorrect.
-> You are just trying to get it working with existing AMBA driver without any
-> changes matching the IDs partially.
->
-I did not miss your last mail. Let me try to reply in even simpler
-terms... PID[0,3] identification is fine grained enough. If/when we
-have some platform with non-ARM MHU, we could catch that in this
-driver. Most likely even then the reg-map won't change drastically, if
-at all. So we could ignore the PID4, otherwise we check PID4 in this
-driver and adapt the behavior.
+We really need to start documenting this. Please add short description
+why this SPARE2 check is here and who uses it. Without documenting
+this behavior future generations won't be able to debug this stuff.
+Imagine replacing sboot with uboot by someone...
 
--Jassi
+Best regards,
+Krzysztof
