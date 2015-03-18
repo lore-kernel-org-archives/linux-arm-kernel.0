@@ -1,34 +1,84 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Mar 2015 10:47:34 +0000
-Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <CAFpQJXWzhn=sFKOdbPGXGfQNr5outJodTH72RoC1VVYqt8jmdQ@mail.gmail.com>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
- <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
- <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
- <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
- <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
- <CAFpQJXWL-NM+WndfB5pLj6TmdVngACR9YCr_ahaUTqAO3DaX1g@mail.gmail.com>
- <20150318100004.GC18951@arm.com>
- <CAFpQJXWzhn=sFKOdbPGXGfQNr5outJodTH72RoC1VVYqt8jmdQ@mail.gmail.com>
-Message-ID: <20150318104734.GG18951@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 18 Mar 2015 11:47:51 +0100
+Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
+In-Reply-To: <1426672064.30793.3.camel@AMDC1943>
+References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
+ <1426669047.29565.9.camel@AMDC1943> <1426672064.30793.3.camel@AMDC1943>
+Message-ID: <17192323.C79bdPNvX5@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 10:39:43AM +0000, Ganapatrao Kulkarni wrote:
-> On Wed, Mar 18, 2015 at 3:30 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Wed, Mar 18, 2015 at 04:02:53AM +0000, Ganapatrao Kulkarni wrote:
-> >> Please suggest how we go about these patches.
-> >> please share your review comments, if any changes needs to be done.
-> >
-> > I can take the Kconfig patch if you send a version that applies cleanly.
-> > As for the rest, you need an ack from a DT maintainer on the bindings
-> > before anything else can get merged.
-> i will send you Kconfig patch (i.e increase NR_CPUS range to 2-4096)
-> separately after rebasing to
-> linux-next, is that ok?
 
-Just base against -rc4 and I'll fix any conflicts that arise.
+Hi,
 
-Will
+On Wednesday, March 18, 2015 10:47:44 AM Krzysztof Kozlowski wrote:
+> On ?ro, 2015-03-18 at 09:57 +0100, Krzysztof Kozlowski wrote:
+> > On ?ro, 2015-03-18 at 03:05 +0900, Kukjin Kim wrote:
+> > > On 03/11/15 19:29, Krzysztof Kozlowski wrote:
+> > > > On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
+> > > >> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
+> > > >> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
+> > > >> controller") the second suspend to RAM failed. First suspend worked fine
+> > > >> but the next one hang just after powering down of secondary CPUs (system
+> > > >> consumed energy as it would be running but was not responsive).
+> > > >>
+> > > >> The issue was caused by enabling delayed reset assertion for CPU0 just
+> > > >> after issuing power down of cores. This was introduced for Exynos4 in
+> > > >> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
+> > > >>
+> > > >> The whole behavior is not well documented but after checking with vendor
+> > > >> code this should be done like this (on Exynos4):
+> > > >> 1. Enable delayed reset assertion when system is running (for all CPUs).
+> > > >> 2. Disable delayed reset assertion before suspending the system.
+> > > >>    This can be done after powering off secondary CPUs.
+> > > >> 3. Re-enable the delayed reset assertion when system is resumed.
+> > > >>
+> > > >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > >> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
+> > > >> Cc: <stable@vger.kernel.org>
+> > > >> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> (...)
+> 
+> > 
+> > > 
+> > > And please make sure your updates don't hurt other exynos5 stuff. Any
+> > > tests on exynos5 platforms would be helpful.
+> > > 
+> > > And I don't think the fix should be sent to 'stable' because I can't see
+> > > the 'add node for L2$ controller' in v3.19...looks applied from v4.0-rc...
+> > 
+> > You're right. git-describe gave me 3.19-rc1 but this was tag for the
+> > specific commit, not for merge-commit. The stable can be removed if this
+> > comes during this RC-cycle.
+> 
+> Actually the "fixes" tag is for commit introducing wrong usage of
+> "use_delayed_reset_assertion" which was merged for 3.19. Although
+> mentioned bug (failed second to RAM) is observable only after enabling
+> L2 cache, the fix is for original commit.
+
+IMHO "fixes" tag should be for "L2 cache" commit not for "use delayed reset
+assertion" one.  Without L2 cache being enabled the delayed reset assertion
+code worked fine (even though in theory it was wrong).
+
+> I have also other proposal: what about reverting the commit 13cfa6c4f7fa
+> ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")? It will
+> introduce minor issue (CPU idle clock down will stop to work after CPU
+> hot unplug) but the main problem with suspend to RAM will be fixed.
+
+Please don't do that.  We should not replace one regression with the
+other one.  If you want to revert something it would be better to revert
+the patch adding L2 cache nodes for Exynos4 SoCs for now.  However we
+should not be reverting anything IMO.
+
+The regression fix patch is simple and is working.  I would really prefer
+to have it applied now (to fix suspend and cpuidle v4.0-rc1 regressions
+finally and not keep code broken for months as we do now).  We can always
+revisit it to something more 'perfect' later when we have more data.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
