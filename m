@@ -1,32 +1,68 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 18 Mar 2015 17:36:56 +0100
-Subject: [STLinux Kernel] [PATCH 1/6] ARM: STi: DT: STiH407: Fix retime
- pin mask for PIO5 and PIO35
-In-Reply-To: <1426675899-19882-2-git-send-email-lee.jones@linaro.org>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <5509A9A8.5090206@st.com>
+From: eliad@wizery.com (Eliad Peller)
+Date: Wed, 18 Mar 2015 18:38:24 +0200
+Subject: [PATCH v7 0/6] wlcore: add device-tree support
+Message-ID: <1426696710-6891-1-git-send-email-eliad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add device-tree support to the wlcore (wl12xx/wl18xx)
+driver.
 
+Update the current users to use the bindings instead
+of pdata-quirks.
 
-On 03/18/2015 11:51 AM, Lee Jones wrote:
-> From: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
->
-> This will avoid programming the retime registers when not implemented
->
-> - PIO5  : no retime registers assigned to pins 6 and 7
-> - PIO35 : pin 7 is reserved so no retime register assigned to it
->
-> Signed-off-by: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   arch/arm/boot/dts/stih407-pinctrl.dtsi | 2 ++
->   1 file changed, 2 insertions(+)
->
+Finally, remove the deprecated wl12xx_platform_data
+struct (along with the da850 board file code that
+still uses it)
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+v7:
+* rebase (v4.0-rc4)
+* fix wlcore_spi compilation (remove platform data)
+* additional minor changes in driver code
 
-Thanks,
-Maxime
+v6:
+* Add Luca's patches to pass irq_trigger/freq
+* Support wl12xx as well
+* Update all relevant platforms
+
+Eliad Peller (4):
+  dt: bindings: add TI's wilink wireless device
+  wlcore: add device-tree support
+  ARM: dts: add wl12xx/wl18xx bindings
+  wlcore: remove wl12xx_platform_data
+
+Luciano Coelho (2):
+  wlcore: set irq_trigger in board files instead of hiding behind a
+    quirk
+  wl12xx: use frequency instead of enumerations for pdata clocks
+
+ .../devicetree/bindings/net/wireless/ti,wlcore.txt |  47 +++++++++
+ arch/arm/boot/dts/am335x-evmsk.dts                 |  11 ++
+ arch/arm/boot/dts/omap3-cm-t3517.dts               |  10 ++
+ arch/arm/boot/dts/omap3-cm-t3730.dts               |  10 ++
+ arch/arm/boot/dts/omap3-evm-common.dtsi            |  10 ++
+ arch/arm/boot/dts/omap3-igep0020-rev-f.dts         |   9 ++
+ arch/arm/boot/dts/omap3-igep0030-rev-g.dts         |   9 ++
+ arch/arm/boot/dts/omap3-zoom3.dts                  |  10 ++
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |  10 ++
+ arch/arm/boot/dts/omap4-sdp.dts                    |  11 ++
+ arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  10 ++
+ arch/arm/mach-davinci/Kconfig                      |  11 --
+ arch/arm/mach-davinci/board-da850-evm.c            | 112 ---------------------
+ arch/arm/mach-omap2/pdata-quirks.c                 |  74 --------------
+ drivers/net/wireless/ti/wilink_platform_data.c     |  25 -----
+ drivers/net/wireless/ti/wl12xx/main.c              |  63 ++++++++++--
+ drivers/net/wireless/ti/wl12xx/wl12xx.h            |  28 ++++++
+ drivers/net/wireless/ti/wlcore/boot.c              |   1 -
+ drivers/net/wireless/ti/wlcore/debugfs.c           |   2 +-
+ drivers/net/wireless/ti/wlcore/main.c              |  31 +++---
+ drivers/net/wireless/ti/wlcore/sdio.c              |  63 ++++++++++--
+ drivers/net/wireless/ti/wlcore/spi.c               |   6 +-
+ drivers/net/wireless/ti/wlcore/wlcore.h            |   5 +-
+ drivers/net/wireless/ti/wlcore/wlcore_i.h          |   6 +-
+ include/linux/wl12xx.h                             |  49 ---------
+ 25 files changed, 311 insertions(+), 312 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
+
+-- 
+1.8.5.2.229.g4448466.dirty
