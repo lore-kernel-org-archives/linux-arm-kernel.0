@@ -1,106 +1,80 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Mar 2015 14:10:31 +0100
-Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
- Exynos3250
-In-Reply-To: <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
- <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CAJKOXPe3P0mO-WuufAwF_tB6P=kfr-ORyQ6pa2pRnvjytCuHZg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Mar 2015 13:12:26 +0000
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
+Message-ID: <20150318131226.GM3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-18 13:51 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> CPU1 hotplug may hang when AFTR is used.  Fix it by:
-> - setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
->   exynos_cpu_power_up()
-> - not clearing reserved bits of ARM_COREx_CONFIGURATION register in
->   exynos_cpu_power_down()
-> - waiting while an undocumented register 0x0908 becomes non-zero in
->   exynos_core_restart()
-> - using dsb_sev() instead of IPI in exynos_boot_secondary() on
->   Exynos3250
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
->  arch/arm/mach-exynos/regs-pmu.h |  2 ++
->  2 files changed, 22 insertions(+), 3 deletions(-)
+On Wed, 04 Mar 2015, Jassi Brar wrote:
+> On 3 March 2015 at 16:11, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > ---
+> >  drivers/mailbox/Kconfig       |   7 +
+> >  drivers/mailbox/Makefile      |   2 +
+> >  drivers/mailbox/mailbox-sti.c | 664 ++++++++++++++++++++++++++++++++++++++++++
+> >  include/linux/mailbox_sti.h   | 128 ++++++++
 
+[...]
 
-Looks good (except one nit below) and this also fixes hotplug issues
-during resume from S2R:
-$ echo mem > /sys/power/state
-[  156.517266] Disabling non-boot CPUs ...
-[  156.517781] IRQ18 no longer affine to CPU1
-[  156.518043] CPU1: shutdown
-[  156.544718] Enabling non-boot CPUs ...
-[  156.554925] CPU1: Software reset
-[  158.552631] CPU1: failed to come online
-[  158.552753] Error taking CPU1 up: -5
+> > +static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
+> > +{
+> > +       struct sti_mbox_dev_data *mbox = chan->con_priv;
+> > +       struct sti_mbox_data *md = &mbox->mdata;
+> > +       struct sti_mbox_device *mdev = mbox->parent;
+> > +       struct sti_mbox_attribute *p = mdev->cfg;
+> > +       void __iomem *base;
+> > +
+> > +       dev_info(mdev->dev, "Using Mbox (%x) %s: channel (%d)\n",
+> > +                mdev->id, mdev->name, mbox->chan_id);
+> > +
+> > +       base = mdev->mbox_reg_base + (p->num_inst * mbox->tx_inst);
+> > +
+> > +       if ((!data) || (!sti_mbox_chan_is_tx(mbox)))
+> >
+> nit: too much protection.
 
-Reviewed and tested on Rinato (Gear 2/Exynos 3250) board:
+What makes you think that?
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+[...]
 
-One comment below...
+> > +                       mbox->irq = irq_create_mapping(mbinst->irq_domain,
+> > +                                                      mbox->rx_id);
+> >
+> simply assigning same IRQ to all controller DT nodes and using
+> IRQF_SHARED for the common handler, wouldn't work?
 
->
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index d2e9f12..ebd135b 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->   */
->  void exynos_cpu_power_down(int cpu)
->  {
-> +       u32 core_conf;
-> +
->         if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
->                 /*
->                  * Bypass power down for CPU0 during suspend. Check for
-> @@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
->                 if (!(val & S5P_CORE_LOCAL_PWR_EN))
->                         return;
->         }
-> -       pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +
-> +       core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +       core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
-> +       pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->  }
->
->  /**
-> @@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
->   */
->  void exynos_cpu_power_up(int cpu)
->  {
-> -       pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> +       u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
-> +
-> +       if (soc_is_exynos3250())
-> +               core_conf |= S5P_CORE_AUTOWAKEUP_EN;
-> +
-> +       pmu_raw_writel(core_conf,
->                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->  }
->
-> @@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
->         if (!of_machine_is_compatible("samsung,exynos3250"))
->                 return;
->
-> +       while (!pmu_raw_readl(S5P_PMU_SPARE2))
-> +               udelay(10);
-> +       udelay(10);
+I do have intentions to simplify this driver somewhat, but that will
+take some time as it will require a great deal of consultation and
+testing from the ST side.  This is the current internal implementation
+which is used in the wild and has been fully tested.  If you'll allow
+me to conduct my adaptions subsequently we can have full history and a
+possible reversion plan if anything untoward take place i.e. I mess
+something up.
 
-We really need to start documenting this. Please add short description
-why this SPARE2 check is here and who uses it. Without documenting
-this behavior future generations won't be able to debug this stuff.
-Imagine replacing sboot with uboot by someone...
+[...]
 
-Best regards,
-Krzysztof
+> > + * struct sti_mbox_msg - sti mailbox message description
+> > + * @dsize:             data payload size
+> > + * @pdata:             message data payload
+> > + */
+> > +struct sti_mbox_msg {
+> > +       u32             dsize;
+> > +       u8              *pdata;
+> > +};
+> >
+> There isn't any client driver in this patchset to tell exactly, but it
+> seems the header could be split into one shared between mailbox
+> clients and provider and another internal to client/provider ?
+
+I believe only the above will be required by the client.  Seems silly
+to create a client specific header just for that, don't you think?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
