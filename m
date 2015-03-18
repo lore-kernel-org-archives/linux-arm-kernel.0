@@ -1,51 +1,28 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 18 Mar 2015 02:20:10 +0100
-Subject: [PATCH] rtc: at91rm9200: double locking bug in
- at91_rtc_interrupt()
-In-Reply-To: <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20150315104837.GC20691@mwanda>
- <1426606690-18947-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <3693407.VZtvM8ii87@vostro.rjw.lan>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 18 Mar 2015 12:03:47 +1100
+Subject: linux-next: manual merge of the slave-dma tree with the arm-soc tree
+Message-ID: <20150318120347.21288162@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 17, 2015 04:38:10 PM Nicolas Ferre wrote:
-> From: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> There is a typo here so we deadlock.
-> 
-> Fixes: dd1f1f391dd7 ('rtc: at91rm9200: rework wakeup and interrupt handling')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-also-by: David Dueck <davidcdueck@googlemail.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Hi Andrew,
-> 
-> Can you please take care of this fix for 4.0?
-> If you fee that I'd better take it myself please tell me.
+Hi Vinod,
 
-The commit being fixed went in through my tree, so I'll take this one if that's
-not a problem.
+Today's linux-next merge of the slave-dma tree got a conflict in
+arch/arm/mach-shmobile/board-mackerel.c between commit a521422ea4ae
+("ARM: shmobile: mackerel: Remove Legacy C board code") from the
+arm-soc tree and commit c078c62a7528 ("mmc: sh_mobile_sdhi: remove
+sh_mobile_sdhi_info v2") from the slave-dma tree.
 
->  drivers/rtc/rtc-at91rm9200.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-> index b4f7744f6751..b283a1a573b3 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -324,7 +324,7 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
->  
->  		ret = IRQ_HANDLED;
->  	}
-> -	spin_lock(&suspended_lock);
-> +	spin_unlock(&suspended_lock);
->  
->  	return ret;
->  }
-> 
+I fixed it up (the former removed the file, so I did that) and can
+carry the fix as necessary (no action is required).
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/ff5833ce/attachment.sig>
