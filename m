@@ -1,47 +1,36 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 18 Mar 2015 11:35:30 +0100
-Subject: [PATCH v2 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <55093C12.7070004@st.com>
-References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
- <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
- <1426518695.26437.55.camel@x220> <55093C12.7070004@st.com>
-Message-ID: <1426674930.2649.50.camel@tiscali.nl>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 18 Mar 2015 16:05:59 +0530
+Subject: Is cpufreq-dt safe without regulator support?
+In-Reply-To: <20150318102017.GN4638@lukather>
+References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+ <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
+ <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
+ <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
+ <20150318100336.GM4638@lukather>
+ <CAKohponKrwm47YQ0oRjYo9tMBu4gkOvi8fTWCuaWA1SNbT0b9g@mail.gmail.com>
+ <20150318102017.GN4638@lukather>
+Message-ID: <CAKohpokWjsG2pOAFvqRggBuOGdo1Pi5hss4sUVBa25eNpoqKJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrice,
+On 18 March 2015 at 15:50, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Sorry, what I meant was to redefine the whole OPPs set in the DTS,
+> overriding the one in the DTSI.
+>
+> That would add some duplication, but still far less than what you
+> first suggested in our case.
 
-Fabrice Gasnier schreef op wo 18-03-2015 om 09:49 [+0100]:
-> On 03/16/2015 04:11 PM, Paul Bolle wrote:
-> >> +config PCI_ST
-> >> +	bool "ST PCIe controller"
-> > You add a bool Kconfig symbol. A week or two ago I saw some patches fly
-> > by that - I think - allowed PCIe controllers to be built modular.
-> 
-> Thanks for your review.
-> 
-> Are you talking about "PCI: Export symbols of PCI functions" patch, that 
-> is part of a series
-> named "pci: iproc: Add Broadcom iProc PCIe support" ?
+Okay, I wasn't aware of the fact that we can override entries this way.
+But still it doesn't look right to me from readability point of view.
 
-Yes, that is the series I was thinking about. (I made you search lkml,
-and that was a bit rude. But you found the patch anyhow.)
+It would be very easy for people to confuse when they will see two
+similar entries of OPP tables, one in dtsi and other one in dts.
 
-> This controller doesn't look like to be based on pcie-designware core 
-> driver.
-> Other vendors that are using "pcie-designware" core driver are also make 
-> it bool.
-> The current core driver doesn't support module loading/unloading as I 
-> see it.
-> If this is required, I also think this should be part of another patchset.
-> 
-> What do you think ?
+Its okay if duplication is there, atleast its readable.
 
-I wouldn't know whether your driver might work as a loadable module, but
-other people reading this surely will. But if it can't work as a module
-you should drop all the module related macros etc. I spotted. Because
-then they serve no purpose.
+Over that, all this mess will get fixed up with the new OPP bindings,
+which are currently under discussion over lists.
 
-
-Paul Bolle
+--
+viresh
