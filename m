@@ -1,46 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Mar 2015 11:01:14 +0000
-Subject: [PATCH v3] ARM: advertise availability of v8 Crypto instructions
-In-Reply-To: <1425974088-15591-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1425974088-15591-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150318110114.GE8656@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Mar 2015 11:01:21 +0000
+Subject: [PATCH v4 0/3] genirq: Saving/restoring the irqchip state of an irq
+ line
+Message-ID: <1426676484-21812-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 10, 2015 at 08:54:48AM +0100, Ard Biesheuvel wrote:
-> @@ -393,6 +393,37 @@ static void __init cpuid_init_hwcaps(void)
->  	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
->  	if (vmsa >= 5)
->  		elf_hwcap |= HWCAP_LPAE;
-> +
-> +	/*
-> +	 * ID_ISAR5 contains 4-bit wide signed feature blocks.
-> +	 * The blocks we test below represent incremental functionality
-> +	 * for non-negative values. Negative values are reserved.
-> +	 */
-> +	features = read_cpuid_ext(ID_ISAR5);
-> +	block = (features >> 4) & 0xf;
+Despite Linux offering a rather fine grained control over the life
+cycle of an interrupt, there is a few cases where it would be very
+useful to snapshot (or even set) the internal state of the interrupt
+controller for a given interrupt line:
 
-Okay, what I'd like to see is something like:
+- With KVM, a device shared between VMs must have its whole context
+  switched, and that includes the interrupt line state. KVM/arm is
+  moving to using this.
+- Some GPIO controllers seem to require peeking into the interrupt
+  controller they are connected to to report their internal state.
 
-	block = cpuid_feature_extract_field(features, 4);
+Instead of letting people facing this situation doing horrible
+(controller specific) hacks in their code, let's offer a couple of new
+entry points that allow a few attributes to be read and set.
 
-with this in cputype.h:
+Of course, this is a very dangerous thing to do if you don't know what
+you doing, and I wouldn't expect most drivers to use this. But this
+can also be a life saver at times.
 
-static inline int cpuid_feature_extract_field(u32 features, unsigned int field)
-{
-	int feature = (features >> field) & 15;
+This patch series implement said API, and adds support for this to the
+two main ARM interrupt controllers (GIC and GICv3). Available at:
 
-	/* feature registers are signed values */
-	if (feature > 8)
-		feature -= 16;
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/irqchip_state
 
-	return feature;
-}
+This has been fairly heavily tested with KVM on ARM, which makes use
+of this feature to context switch the timer interrupt (see the last
+three patch in the above branch).
 
-We can then use proper signed tests in the code - and convert all tests
-to use this helper.
+Thanks,
+
+	M.
+
+* From v3 [3]
+- Rebased on top of 4.0-rc4
+
+* From v2 [2]:
+- Rebased on top of 3.19-rc3
+- Fixed irq_set_irqchip_state return value
+
+* From v1 [1]:
+- Rebased on top of 3.18-rc7 + tip/irq/irqdomain-arm
+- Now deals with stacked domains
+- Changed the API to be less ambiguous (after review by tglx)
+- Added IRQCHIP_STATE_LINE_LEVEL (as requested by Bjorn Anderson)
+
+[1] https://lkml.org/lkml/2014/10/25/134
+[2] https://lkml.org/lkml/2014/12/3/612
+[3] http://lkml.iu.edu/hypermail/linux/kernel/1501.0/03473.html
+
+Marc Zyngier (3):
+  genirq: Allow the irqchip state of an IRQ to be save/restored
+  irqchip: GIC: Add support for irq_{get,set}_irqchip_state
+  irqchip: GICv3: Add support for irq_{get,set}_irqchip_state
+
+ drivers/irqchip/irq-gic-v3.c | 83 +++++++++++++++++++++++++++++++++-------
+ drivers/irqchip/irq-gic.c    | 69 +++++++++++++++++++++++++++++++--
+ include/linux/interrupt.h    | 14 +++++++
+ include/linux/irq.h          |  6 +++
+ kernel/irq/manage.c          | 91 ++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 246 insertions(+), 17 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
