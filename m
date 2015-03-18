@@ -1,29 +1,30 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Wed, 18 Mar 2015 19:00:17 +0300
-Subject: [PATCH] ARM: tegra: support big-endian kernel
-Message-ID: <1426694461-7170-1-git-send-email-digetx@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 18 Mar 2015 17:02:59 +0100
+Subject: [PATCH] ARM: mvebu: clk: remove cpuclk resources overlapping
+ coredivclk registers on Armada XP
+In-Reply-To: <1426596814-30758-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1426596814-30758-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150318170259.07ad25e5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, after making drivers and arch code aware of big-endian CPU mode, NVIDIA
-Tegra SoC supports big-endian kernel across all generations. Enable it in Kconfig.
+Dear Gregory CLEMENT,
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
- arch/arm/mach-tegra/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+On Tue, 17 Mar 2015 13:53:34 +0100, Gregory CLEMENT wrote:
+> From: Nadav Haklai <nadavh@marvell.com>
+> 
+> The resources of the cpuclk node are overlapping the one from
+> coredivclk node. It was not noticed until now because the driver did a
+> simple of_iomap and not a request_mem_region. This patch fixes it.
+> 
+> [gregory.clement at free-electrons.com: add commit log and port to 4.0-rc]
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
+> Signed-off-by: Nadav Haklai <nadavh@marvell.com>
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5d1a318..927f6b3 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -2,6 +2,7 @@ menuconfig ARCH_TEGRA
- 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select CLKSRC_MMIO
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
 -- 
-2.3.2
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
