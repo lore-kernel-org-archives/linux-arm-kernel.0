@@ -1,133 +1,113 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
 Date: Wed, 18 Mar 2015 11:29:39 +0100
-Subject: [PATCH v2] ARM: EXYNOS: Fix failed second suspend on Exynos4
-In-Reply-To: <1426669047.29565.9.camel@AMDC1943>
-References: <1426069206-13667-1-git-send-email-k.kozlowski@samsung.com>
- <55086CE0.6080905@kernel.org> <1426669047.29565.9.camel@AMDC1943>
-Message-ID: <1949810.qILnBKuAJP@amdc1032>
+Subject: [PATCH 2/3] ARM: sun8i: Add SMP support for the Allwinner A23
+In-Reply-To: <1426649042-30547-3-git-send-email-wens@csie.org>
+References: <1426649042-30547-1-git-send-email-wens@csie.org>
+ <1426649042-30547-3-git-send-email-wens@csie.org>
+Message-ID: <20150318102939.GP4638@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Wednesday, March 18, 2015 09:57:27 AM Krzysztof Kozlowski wrote:
-> On ?ro, 2015-03-18 at 03:05 +0900, Kukjin Kim wrote:
-> > On 03/11/15 19:29, Krzysztof Kozlowski wrote:
-> > > On ?ro, 2015-03-11 at 11:20 +0100, Krzysztof Kozlowski wrote:
-> > >> On Exynos4412 boards (Trats2, Odroid U3) after enabling L2 cache in
-> > >> 56b60b8bce4a ("ARM: 8265/1: dts: exynos4: Add nodes for L2 cache
-> > >> controller") the second suspend to RAM failed. First suspend worked fine
-> > >> but the next one hang just after powering down of secondary CPUs (system
-> > >> consumed energy as it would be running but was not responsive).
-> > >>
-> > >> The issue was caused by enabling delayed reset assertion for CPU0 just
-> > >> after issuing power down of cores. This was introduced for Exynos4 in
-> > >> 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off").
-> > >>
-> > >> The whole behavior is not well documented but after checking with vendor
-> > >> code this should be done like this (on Exynos4):
-> > >> 1. Enable delayed reset assertion when system is running (for all CPUs).
-> > >> 2. Disable delayed reset assertion before suspending the system.
-> > >>    This can be done after powering off secondary CPUs.
-> > >> 3. Re-enable the delayed reset assertion when system is resumed.
-> > >>
-> > >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > >> Fixes: 13cfa6c4f7fa ("ARM: EXYNOS: Fix CPU idle clock down after CPU off")
-> > >> Cc: <stable@vger.kernel.org>
-> > >> Tested-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > > 
-> > > Dear Kukjin,
-> > > 
-> > > This patch was first sent on 3rd of February. It could enter before
-> > > opening 4.0 merge window. I did not receive any response from you in
-> > > that time.
-> > > 
-> > > So let me point next steps:
-> > > 1. The Exynos4412 suspend on 4.0 is broken and now this patch applies as
-> > > a fix.
-> > > 2. I resent it on 18th of February.
-> > > 3. I received tested-by from Bartlomiej and Chanwoo.
-> > > 4. Bartlomiej pinged you on 3rd March.
-> > > 
-> > > Still no response. If the patch does not look good then please share
-> > > your comments. I'll fix it.
-> > > If this patch looks good, why does it take so much time?
-> > > 
-> > 
-> > Please use another way something like check ARM core rather than use
-> > 'soc_is_xxx()', as you know it is not acceptable now even it is just
-> > moving/modifying exist function though.
-
-Kukjin, could you please explain why 'soc_is_xxx()' usage inside
-arch/arm/mach-exynos/ code is not acceptable?  I know that it should
-not be used outisde of this directory because of multiplatform support
-but what is wrong with using it for arch/arm/mach-exynos/ code?
-
-I'm also not sure if -rc4 is a desirable time to be doing such changes
-(especially given that the patch in question is moving an existing code,
-not adding new 'soc_is_xxx()' users).
-
-[ Moreover of_machine_is_compatible() can be sometimes harmful as could
-  have been seen in commit ca489c58ef0b81 ("ARM: EXYNOS: Don't use LDREX
-  and STREX after disabling cache coherency" fix. ]
-
-> Probably of_machine_is_compatible() could be used here but such change
-> should be done in separate patch. This is fix for wrong usage of
-> use_delayed_assertion so it should not mix with other changes in the
-> code. This fixes one thing at a time. Fixing many things in one patch
-> often leads to new errors or difficulties in debugging.
+On Wed, Mar 18, 2015 at 11:24:01AM +0800, Chen-Yu Tsai wrote:
+> The A23 is a dual Cortex-A7. Add the logic to use the IPs used to
+> control the CPU configuration and the CPU power so that we can
+> bring up secondary CPUs at boot.
 > 
-> I can prepare a separate patch for changing this to
-> of_machine_is_compatible().
-
-IMHO this would be the best solution if there is an agreement on
-'soc_is_xxx()' removal.
-
-> > 
-> > And please make sure your updates don't hurt other exynos5 stuff. Any
-> > tests on exynos5 platforms would be helpful.
-
-The patch is quite obvious and only affects Exynos4 SoCs.  Extra testing
-on Exynos5 SoCs won't hurt but they should not be required for merge.
-
-> > And I don't think the fix should be sent to 'stable' because I can't see
-> > the 'add node for L2$ controller' in v3.19...looks applied from v4.0-rc...
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 > 
-> You're right. git-describe gave me 3.19-rc1 but this was tag for the
-> specific commit, not for merge-commit. The stable can be removed if this
-> comes during this RC-cycle.
-
-Yes, the stable tag was a mistake and should be removed.
-
-> > One more if you have any doubts, I'd like to ask you to contact S.LSI
-> > guys who have created the vendor codes not assume with the code because
-> > maybe the vendor code you mentioned cannot cover all exynos stuff I
-> > think. Then we could make more clear pm codes in mainline. To be honest
-> > I'm not a Power Management hardware guy so I don't know every regarding
-> > PM stuff in exynos SoCs, I can contact them easier though...I mean
-> > please don't assume any hardware behavior with just vendor code. Please
-> > ask, you have an access in Samsung intranet before posting something
-> > like this...Hope let's make a better fix together during -rc.
-
-FWIW I think that -rc4 is too late to be doing 'perfect patch' (we've waited
-for 6 weeks on any feedback on this patch from you).  The current solution is
-quite simple and has been tested to fix the regression without introducing
-other problems.
-
-> As you probably know I work in completely different company within
-> Samsung Electronics than System LSI. I don't have access to the LSI
-> intranet. I don't have access to guys from LSI. I'll try contacting them
-> through my HQ partners.
+> We can't use of_io_request_and_map() here, as it will conflict
+> with PRCM, and leave us without a serial console.
 > 
-> Thanks for feedback!
+> I think a proper way to solve this would be a syscon device or
+> something like the mfd-simple device posted by Arnd.
 > 
-> Best regards,
-> Krzysztof
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt |  1 +
+>  arch/arm/mach-sunxi/platsmp.c                  | 69 ++++++++++++++++++++++++++
+>  2 files changed, 70 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index 8b9e0a95de31..40202d85b132 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -188,6 +188,7 @@ nodes to be present and contain the properties described below.
+>  			# On ARM 32-bit systems this property is optional and
+>  			  can be one of:
+>  			    "allwinner,sun6i-a31"
+> +			    "allwinner,sun8i-a23"
+>  			    "arm,psci"
+>  			    "brcm,brahma-b15"
+>  			    "marvell,armada-375-smp"
+> diff --git a/arch/arm/mach-sunxi/platsmp.c b/arch/arm/mach-sunxi/platsmp.c
+> index 587b0468efcc..e8483ec79d67 100644
+> --- a/arch/arm/mach-sunxi/platsmp.c
+> +++ b/arch/arm/mach-sunxi/platsmp.c
+> @@ -121,3 +121,72 @@ static struct smp_operations sun6i_smp_ops __initdata = {
+>  	.smp_boot_secondary	= sun6i_smp_boot_secondary,
+>  };
+>  CPU_METHOD_OF_DECLARE(sun6i_a31_smp, "allwinner,sun6i-a31", &sun6i_smp_ops);
+> +
+> +static void __init sun8i_smp_prepare_cpus(unsigned int max_cpus)
+> +{
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "allwinner,sun8i-a23-prcm");
+> +	if (!node) {
+> +		pr_err("Missing A23 PRCM node in the device tree\n");
+> +		return;
+> +	}
+> +
+> +	prcm_membase = of_iomap(node, 0);
+> +	if (!prcm_membase) {
+> +		pr_err("Couldn't map A23 PRCM registers\n");
+> +		return;
+> +	}
+> +
+> +	node = of_find_compatible_node(NULL, NULL,
+> +				       "allwinner,sun8i-a23-cpuconfig");
+> +	if (!node) {
+> +		pr_err("Missing A23 CPU config node in the device tree\n");
+> +		return;
+> +	}
+> +
+> +	cpucfg_membase = of_iomap(node, 0);
+> +	if (!cpucfg_membase)
+> +		pr_err("Couldn't map A23 CPU config registers\n");
+> +
+> +}
+> +
+> +static int sun8i_smp_boot_secondary(unsigned int cpu,
+> +				    struct task_struct *idle)
+> +{
+> +	u32 reg;
+> +
+> +	if (!(prcm_membase && cpucfg_membase))
+> +		return -EFAULT;
+> +
+> +	spin_lock(&cpu_lock);
+> +
+> +	/* Set CPU boot address */
+> +	writel(virt_to_phys(secondary_startup),
+> +	       cpucfg_membase + CPUCFG_PRIVATE0_REG);
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+One question I couldn't find any answer to is that does the SMP bit is
+set in secondary_startup?
+
+I couldn't find where it was set, but it still looks like the right
+thing to do, so I would expect the code to do that.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/6e94c991/attachment.sig>
