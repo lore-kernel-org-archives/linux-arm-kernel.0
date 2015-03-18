@@ -1,274 +1,79 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 18 Mar 2015 09:17:36 +0900
-Subject: [PATCH v7 9/9] arm64: dts: exynos: Add thermal-zones dt node for
- Exynos5433 SoC
+Date: Wed, 18 Mar 2015 09:17:29 +0900
+Subject: [PATCH v7 2/9] arm64: dts: exynos: Add MSHC dt node for Exynos5433
 In-Reply-To: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
 References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1426637856-3730-10-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1426637856-3730-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the thermal-zones devicetree node for Exynos5433 SoC.
-The thermal-zones has five thermal-zones and then each thermal-zone contains
-each thermal-sensor to monitor the temperature of own IP. The {atlas0|apollo}_
-thermal zone have the eight trip-points for interrupt method to detect the
-over-temperature.
+From: Jaehoon Chung <jh80.chung@samsung.com>
+
+This patch adds MSHC (Mobile Storage Host Controller) dt node for Exynos5433
+SoC. MSHC is an interface between the system the SD/MMC card.
 
 Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
-Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 231 +++++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi     |   1 +
- 2 files changed, 232 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 38 ++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-new file mode 100644
-index 0000000..7ff7b0e
---- /dev/null
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-@@ -0,0 +1,231 @@
-+/*
-+ * Device tree sources for Exynos5433 thermal zone
-+ *
-+ * Copyright (c) 2015 Chanwoo Choi <cw00.choi@samsung.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <dt-bindings/thermal/thermal.h>
-+
-+/ {
-+thermal-zones {
-+	atlas0_thermal: atlas0-thermal {
-+		thermal-sensors = <&tmu_atlas0>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			atlas0_alert_0: atlas0-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_1: atlas0-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_2: atlas0-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_3: atlas0-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_4: atlas0-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_5: atlas0-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas0_alert_6: atlas0-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	atlas1_thermal: atlas1-thermal {
-+		thermal-sensors = <&tmu_atlas1>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			atlas1_alert_0: atlas1-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_1: atlas1-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_2: atlas1-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_3: atlas1-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_4: atlas1-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_5: atlas1-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			atlas1_alert_6: atlas1-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	g3d_thermal: g3d-thermal {
-+		thermal-sensors = <&tmu_g3d>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			g3d_alert_0: g3d-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_1: g3d-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_2: g3d-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_3: g3d-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_4: g3d-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_5: g3d-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			g3d_alert_6: g3d-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+
-+	};
-+
-+	apollo_thermal: apollo-thermal {
-+		thermal-sensors = <&tmu_apollo>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			apollo_alert_0: apollo-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_1: apollo-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_2: apollo-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_3: apollo-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_4: apollo-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_5: apollo-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			apollo_alert_6: apollo-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+
-+	isp_thermal: isp-thermal {
-+		thermal-sensors = <&tmu_isp>;
-+		polling-delay-passive = <0>;
-+		polling-delay = <0>;
-+		trips {
-+			isp_alert_0: isp-alert-0 {
-+				temperature = <80000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_1: isp-alert-1 {
-+				temperature = <85000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_2: isp-alert-2 {
-+				temperature = <90000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_3: isp-alert-3 {
-+				temperature = <95000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_4: isp-alert-4 {
-+				temperature = <100000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_5: isp-alert-5 {
-+				temperature = <105000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+			isp_alert_6: isp-alert-6 {
-+				temperature = <110000>;	/* millicelsius */
-+				hysteresis = <10000>;	/* millicelsius */
-+				type = "active";
-+			};
-+		};
-+	};
-+};
-+};
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index 1fe0c23..faea1c6 100644
+index 125feba..8367915 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -928,3 +928,4 @@
- };
+@@ -655,6 +655,44 @@
+ 			status = "disabled";
+ 		};
  
- #include "exynos5433-pinctrl.dtsi"
-+#include "exynos5433-tmu.dtsi"
++		mshc_0: mshc at 15540000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 225 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15540000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC0>,
++				 <&cmu_fsys CLK_SCLK_MMC0>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
++		mshc_1: mshc at 15550000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 226 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15550000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC1>,
++				 <&cmu_fsys CLK_SCLK_MMC1>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
++
++		mshc_2: mshc at 15560000 {
++			compatible = "samsung,exynos7-dw-mshc-smu";
++			interrupts = <0 227 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x15560000 0x2000>;
++			clocks = <&cmu_fsys CLK_ACLK_MMC2>,
++				 <&cmu_fsys CLK_SCLK_MMC2>;
++			clock-names = "biu", "ciu";
++			fifo-depth = <0x40>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	timer {
 -- 
 1.8.5.5
