@@ -1,34 +1,53 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 Mar 2015 12:26:43 +0000
-Subject: [PATCH 1/2] DT: arm64: msm8916: add all SPI DT nodes
-In-Reply-To: <1426609532-11996-1-git-send-email-stanimir.varbanov@linaro.org>
-References: <1426609532-11996-1-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <55096F03.9060101@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 18 Mar 2015 13:28:54 +0100
+Subject: [PATCH 1/5] USB: ehci-atmel: rework clk handling
+In-Reply-To: <55095E86.1060201@atmel.com>
+References: <Pine.LNX.4.44L0.1503171459310.1061-100000@iolanthe.rowland.org>
+ <55095E86.1060201@atmel.com>
+Message-ID: <20150318122854.GA18070@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Mar 18, 2015 at 12:16:22PM +0100, Nicolas Ferre wrote:
+> Le 17/03/2015 20:01, Alan Stern a ?crit :
+> > On Tue, 17 Mar 2015, Boris Brezillon wrote:
+> > 
+> >> The EHCI IP only needs the UTMI/UPLL (uclk) and the peripheral (iclk)
+> >> clocks to work properly. Remove the useless system clock (fclk).
+> >>
+> >> Avoid calling set_rate on the fixed rate UTMI/IPLL clock and remove
+> >> useless IS_ENABLED(CONFIG_COMMON_CLK) tests (all at91 platforms have been
+> >> moved to the CCF).
+> >>
+> >> This patch also fixes a bug introduced by 3440ef1 (ARM: at91/dt: fix USB
+> >> high-speed clock to select UTMI), which was leaving the usb clock
+> >> uninitialized and preventing the OHCI driver from setting the usb clock
+> >> rate to 48MHz.
+> >> This bug was caused by several things:
+> >> 1/ usb clock drivers set the CLK_SET_RATE_GATE flag, which means the rate
+> >>    cannot be changed once the clock is prepared
+> >> 2/ The EHCI driver was retrieving and preparing/enabling the uhpck
+> >>    clock which was in turn preparing its parent clock (the usb clock),
+> >>    thus preventing any rate change because of 1/
+> >>
+> >> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> and:
+> Fixes: 3440ef169100 ("ARM: at91/dt: fix USB high-speed clock to select UTMI")
+> 
+> Alan, Greg,
+> 
+> Can you please take this patch (only this patch 1/5 of the series) as a fix 
+> for the 4.0-rc? It would solve the issue that we see on at91sam9x5/at91sam9n12.
+> I'll take care of the rest of the series for 4.1.
+> 
+> If you want me to take it of to re-send the patch, tell me.
 
+I'll queue it up now, thanks.  You can take the rest of the series :)
 
-On 17/03/15 16:25, Stanimir Varbanov wrote:
-> +
-> +			spi4_sleep: spi4_sleep {
-> +				pinmux {
-> +					function = "gpio";
-> +					pins = "gpio12", "gpio13", "gpio14", "gpio15";
-> +	
-....
+thanks,
 
-> +
-> +			spi5_sleep: spi4_sleep {
-Will result in Duplicate node name error for "spi4_sleep"
-
-> +				pinmux {
-> +					function = "gpio";
-> +					pins = "gpio16", "gpio17", "gpio18", "gpio19";
-> +				};
-> +				pinconf {
-> +					pins = "gpio16", "gpio17", "gpio18", "gpio19";
-> +					drive-strength = <2>;
-> +					bias-pull-down;
-> +				};
-> +			};
+greg k-h
