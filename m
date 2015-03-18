@@ -1,32 +1,84 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 18 Mar 2015 13:58:54 -0700
-Subject: Setting reboot type at run time for ARM
-In-Reply-To: <5508CBD0.5060508@gmail.com>
-References: <5508A047.7060308@broadcom.com> <5508CBD0.5060508@gmail.com>
-Message-ID: <5509E70E.7060907@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Mar 2015 13:53:56 -0700
+Subject: [PATCH v7 0/6] wlcore: add device-tree support
+In-Reply-To: <1426696710-6891-1-git-send-email-eliad@wizery.com>
+References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
+Message-ID: <20150318205356.GW31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Eliad Peller <eliad@wizery.com> [150318 09:39]:
+> Add device-tree support to the wlcore (wl12xx/wl18xx)
+> driver.
+> 
+> Update the current users to use the bindings instead
+> of pdata-quirks.
+> 
+> Finally, remove the deprecated wl12xx_platform_data
+> struct (along with the da850 board file code that
+> still uses it)
+> 
+> v7:
+> * rebase (v4.0-rc4)
+> * fix wlcore_spi compilation (remove platform data)
+> * additional minor changes in driver code
 
-On 15-03-17 05:50 PM, Florian Fainelli wrote:
-> On 17/03/15 14:44, Arun Ramamurthy wrote:
->> Hello
->>
->> I would like to specify a reset type just before issuing the reboot
->> command in the kernel. I know the kernel command line parameter can be
->> set as "reboot=w" to indicate warm reset but I want to be able to decide
->> this at run time before issuing a reboot command. What would be the best
->> way to implement this? Modify the reboot command
->> to accept a parameter or is there a standard hook I can use?
->
-> If you use the reboot(2) system call you can already specify a large
-> number of options, for options that are currently not supported by
-> coreutils' reboot or busybox's reboot, you could probably provide a
-> shell script wrapper which calls into either your own reboot
-> implementation or the regular one, would that work?
->
-Thanks Florian. After looking at the sys call documentation, i can see 
-that it passes an argument to the kernel_restart function if I use 
-LINUX_REBOOT_CMD_RESTART2 as the cmd. However as you mentioned the 
-coreutils reboot or busybox's reboot do not support these options so I 
-will write a shell script to wrap the system call.
+Thanks for updating it, looks good to me now and still works
+for me.
+
+Regards,
+
+Tony
+ 
+> v6:
+> * Add Luca's patches to pass irq_trigger/freq
+> * Support wl12xx as well
+> * Update all relevant platforms
+> 
+> Eliad Peller (4):
+>   dt: bindings: add TI's wilink wireless device
+>   wlcore: add device-tree support
+>   ARM: dts: add wl12xx/wl18xx bindings
+>   wlcore: remove wl12xx_platform_data
+> 
+> Luciano Coelho (2):
+>   wlcore: set irq_trigger in board files instead of hiding behind a
+>     quirk
+>   wl12xx: use frequency instead of enumerations for pdata clocks
+> 
+>  .../devicetree/bindings/net/wireless/ti,wlcore.txt |  47 +++++++++
+>  arch/arm/boot/dts/am335x-evmsk.dts                 |  11 ++
+>  arch/arm/boot/dts/omap3-cm-t3517.dts               |  10 ++
+>  arch/arm/boot/dts/omap3-cm-t3730.dts               |  10 ++
+>  arch/arm/boot/dts/omap3-evm-common.dtsi            |  10 ++
+>  arch/arm/boot/dts/omap3-igep0020-rev-f.dts         |   9 ++
+>  arch/arm/boot/dts/omap3-igep0030-rev-g.dts         |   9 ++
+>  arch/arm/boot/dts/omap3-zoom3.dts                  |  10 ++
+>  arch/arm/boot/dts/omap4-panda-common.dtsi          |  10 ++
+>  arch/arm/boot/dts/omap4-sdp.dts                    |  11 ++
+>  arch/arm/boot/dts/omap4-var-som-om44-wlan.dtsi     |  10 ++
+>  arch/arm/mach-davinci/Kconfig                      |  11 --
+>  arch/arm/mach-davinci/board-da850-evm.c            | 112 ---------------------
+>  arch/arm/mach-omap2/pdata-quirks.c                 |  74 --------------
+>  drivers/net/wireless/ti/wilink_platform_data.c     |  25 -----
+>  drivers/net/wireless/ti/wl12xx/main.c              |  63 ++++++++++--
+>  drivers/net/wireless/ti/wl12xx/wl12xx.h            |  28 ++++++
+>  drivers/net/wireless/ti/wlcore/boot.c              |   1 -
+>  drivers/net/wireless/ti/wlcore/debugfs.c           |   2 +-
+>  drivers/net/wireless/ti/wlcore/main.c              |  31 +++---
+>  drivers/net/wireless/ti/wlcore/sdio.c              |  63 ++++++++++--
+>  drivers/net/wireless/ti/wlcore/spi.c               |   6 +-
+>  drivers/net/wireless/ti/wlcore/wlcore.h            |   5 +-
+>  drivers/net/wireless/ti/wlcore/wlcore_i.h          |   6 +-
+>  include/linux/wl12xx.h                             |  49 ---------
+>  25 files changed, 311 insertions(+), 312 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/wireless/ti,wlcore.txt
+> 
+> -- 
+> 1.8.5.2.229.g4448466.dirty
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
