@@ -1,61 +1,87 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 10:51:38 +0000
-Subject: [PATCH 5/6] pinctrl: st: Show correct pin direction -- even when in
- GPIO mode
-In-Reply-To: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426675899-19882-6-git-send-email-lee.jones@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 18 Mar 2015 11:59:41 +0100
+Subject: [PATCH v2 3/3] ARM: mvebu: armada-385-ap: Enable USB3 port
+In-Reply-To: <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+References: <1421672474-2945-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1421672474-2945-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <55095A9D.3050207@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now ST's pinconf_dbg_show() call-back has displayed the PIO
-alternate function direction, which is only relevant if a pin is
-operating in an alternate function mode i.e not GPIO mode.  If a
-pin is in GPIO mode its direction is both set and status is
-obtained by a completely different/unrelated bunch of registers.
+Hi Maxime, Jason, Andrew, Sebastian, Greg, Felipe, Mathias,
 
-This change ensures that the correct pin direction is shown, even
-if a pin is operating in GPIO mode.
+On 19/01/2015 14:01, Maxime Ripard wrote:
+> The Armada 385 AP board has a USB3 port exposed that uses a GPIO to drive the
+> VBUS line. Enable the needed drivers to support this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/pinctrl/pinctrl-st.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+applied on mvebu/dt
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 52a4377..1cda40e 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -206,6 +206,9 @@
- #define gpio_chip_to_bank(chip) \
- 		container_of(chip, struct st_gpio_bank, gpio_chip)
- 
-+#define pc_to_bank(pc) \
-+		container_of(pc, struct st_gpio_bank, pc)
-+
- enum st_retime_style {
- 	st_retime_style_none,
- 	st_retime_style_packed,
-@@ -1053,15 +1056,18 @@ static int st_pinconf_get(struct pinctrl_dev *pctldev,
- static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- 				   struct seq_file *s, unsigned pin_id)
- {
-+	struct st_pio_control *pc;
- 	unsigned long config;
-+	int offset = st_gpio_pin(pin_id);
- 
- 	mutex_unlock(&pctldev->mutex);
-+	pc = st_get_pio_control(pctldev, pin_id);
- 	st_pinconf_get(pctldev, pin_id, &config);
- 	mutex_lock(&pctldev->mutex);
- 	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
- 		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
- 		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
--		ST_PINCONF_UNPACK_OE(config),
-+		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
- 		ST_PINCONF_UNPACK_PU(config),
- 		ST_PINCONF_UNPACK_OD(config),
- 		ST_PINCONF_UNPACK_RT(config),
+Thanks,
+
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-385-db-ap.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
+> index 3a51531eb37b..b891b4c897f5 100644
+> --- a/arch/arm/boot/dts/armada-385-db-ap.dts
+> +++ b/arch/arm/boot/dts/armada-385-db-ap.dts
+> @@ -98,6 +98,13 @@
+>  				status = "okay";
+>  			};
+>  
+> +			pinctrl at 18000 {
+> +				xhci0_vbus_pins: xhci0-vbus-pins {
+> +					marvell,pins = "mpp44";
+> +					marvell,function = "gpio";
+> +				};
+> +			};
+> +
+>  			ethernet at 30000 {
+>  				status = "okay";
+>  				phy = <&phy2>;
+> @@ -122,6 +129,11 @@
+>  				phy = <&phy0>;
+>  				phy-mode = "rgmii-id";
+>  			};
+> +
+> +			usb3 at f0000 {
+> +				status = "okay";
+> +				usb-phy = <&usb3_phy>;
+> +			};
+>  		};
+>  
+>  		pcie-controller {
+> @@ -147,4 +159,20 @@
+>  			};
+>  		};
+>  	};
+> +
+> +	usb3_phy: usb3_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&reg_xhci0_vbus>;
+> +	};
+> +
+> +	reg_xhci0_vbus: xhci0-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&xhci0_vbus_pins>;
+> +		regulator-name = "xhci0-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+> +	};
+>  };
+> 
+
+
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
