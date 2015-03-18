@@ -1,61 +1,58 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Mar 2015 09:06:03 +0200
-Subject: [PATCHv3 08/35] clk: ti: fix ti_clk_get_reg_addr error handling
-In-Reply-To: <20150317183808.GI31346@atomide.com>
-References: <1424891085-10392-1-git-send-email-t-kristo@ti.com>
- <1424891085-10392-9-git-send-email-t-kristo@ti.com>
- <20150306191821.11109.2610@quantum> <20150317183808.GI31346@atomide.com>
-Message-ID: <550923DB.2020503@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Mar 2015 07:30:45 +0000
+Subject: [PATCH v2 1/3] mfd: provide RTC resource in MT6397 MFD
+In-Reply-To: <1426657537-41414-2-git-send-email-eddie.huang@mediatek.com>
+References: <1426657537-41414-1-git-send-email-eddie.huang@mediatek.com>
+ <1426657537-41414-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150318073045.GE3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2015 08:38 PM, Tony Lindgren wrote:
-> * Mike Turquette <mturquette@linaro.org> [150306 11:18]:
->> Quoting Tero Kristo (2015-02-25 11:04:18)
->>> There is a case where NULL can be a valid return value for
->>> ti_clk_get_reg_addr, specifically the case where both the provider index
->>> and register offsets are zero. In this case, the current error checking
->>> against a NULL pointer will fail. Thus, change the API to return a
->>> ERR_PTR value in an error case, and change all the users of this API to
->>> check against IS_ERR instead.
->>>
->>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>> Cc: Michael Turquette <mturquette@linaro.org>
->>
->> Looks good to me.
-> ...
->
->>> ---
->>>   drivers/clk/ti/apll.c      |    5 +++--
->>>   drivers/clk/ti/autoidle.c  |    2 +-
->>>   drivers/clk/ti/clk.c       |    7 ++++---
->>>   drivers/clk/ti/divider.c   |    4 ++--
->>>   drivers/clk/ti/dpll.c      |    6 +++---
->>>   drivers/clk/ti/gate.c      |    4 ++--
->>>   drivers/clk/ti/interface.c |    2 +-
->>>   drivers/clk/ti/mux.c       |    4 ++--
->>>   8 files changed, 18 insertions(+), 16 deletions(-)
->
-> Can this patch be queued separately by Mike or is there some
-> dependency to this series?
+On Wed, 18 Mar 2015, Eddie Huang wrote:
 
-Without this patch, patch #10 in the set causes a boot failure on omap3, 
-because the specific NULL value is returned for iva2_ck and the clock 
-register fails. This in turn breaks hwmod registration because iva2_ck 
-is missing.
+> Provide MT6397 RTC interrupt, base address, and register in
+> MT6397 MFD.
+> 
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  drivers/mfd/mt6397-core.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index b61c4eb..ef431d8 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -21,9 +21,24 @@
+>  #include <linux/mfd/mt6397/core.h>
+>  #include <linux/mfd/mt6397/registers.h>
+>  
+> +static const struct resource mt6397_rtc_resources[] = {
+> +	{
+> +		.start = 0xe000,
+> +		.end   = 0xe03e,
 
-I would just queue this patch as part of this series to avoid any trouble.
+I'd like to see these defined please.
 
->
-> Other than wondering about the above and the dts related comments,
-> this series works for me with PM tests.
+> +		.flags  = IORESOURCE_MEM,
+> +	},
+> +	{
+> +		.start = MT6397_IRQ_RTC,
+> +		.end   = MT6397_IRQ_RTC,
+> +		.flags  = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+>  static const struct mfd_cell mt6397_devs[] = {
+>  	{
+>  		.name = "mt6397-rtc",
+> +		.num_resources = ARRAY_SIZE(mt6397_rtc_resources),
+> +		.resources = mt6397_rtc_resources,
+>  		.of_compatible = "mediatek,mt6397-rtc",
+>  	}, {
+>  		.name = "mt6397-regulator",
 
-I hope to post a series with the dts related comments fixed later today.
-
--Tero
-
->
-> Regards,
->
-> Tony
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
