@@ -1,36 +1,18 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 18 Mar 2015 17:45:08 +0100
-Subject: [STLinux Kernel] [PATCH 5/6] pinctrl: st: Show correct pin
- direction -- even when in GPIO mode
-In-Reply-To: <1426675899-19882-6-git-send-email-lee.jones@linaro.org>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <5509AB94.8040100@st.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 18 Mar 2015 22:13:38 +0530
+Subject: [PATCH 08/35 linux-next] dma: constify of_device_id array
+In-Reply-To: <1426533469-25458-9-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426533469-25458-9-git-send-email-fabf@skynet.be>
+Message-ID: <20150318164338.GP32683@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Mar 16, 2015 at 08:17:14PM +0100, Fabian Frederick wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
+> 
+Applied, thanks
 
-
-On 03/18/2015 11:51 AM, Lee Jones wrote:
-> Until now ST's pinconf_dbg_show() call-back has displayed the PIO
-> alternate function direction, which is only relevant if a pin is
-> operating in an alternate function mode i.e not GPIO mode.  If a
-> pin is in GPIO mode its direction is both set and status is
-> obtained by a completely different/unrelated bunch of registers.
->
-> This change ensures that the correct pin direction is shown, even
-> if a pin is operating in GPIO mode.
->
-> Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/pinctrl/pinctrl-st.c | 8 +++++++-
->   1 file changed, 7 insertions(+), 1 deletion(-)
->
->
-
-
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks,
-Maxime
+-- 
+~Vinod
