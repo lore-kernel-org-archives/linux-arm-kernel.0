@@ -1,84 +1,50 @@
-From: vincent.cw.yang@gmail.com (Vincent Yang)
-Date: Wed, 18 Mar 2015 14:44:30 +0900
-Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
-Message-ID: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 18 Mar 2015 13:45:34 +0800
+Subject: [PATCH v2 0/3] Add Mediatek SoC RTC driver 
+Message-ID: <1426657537-41414-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+RTC is one submodule of Mediatek MT6397 PMIC chip[1]. This series 
+support RTC driver that work with Mediatek SoC like MT8135, MT8173.
+It implements second counter and also provide alarm function.
 
-Please consider pulling in these patches for series of Fujitsu SoC
-based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
+This series base on 4.0-rc1, and Sascha's PMIC mfd patch[2]. Test ok 
+on MT8173 platform.
 
-The MHU driver is already queued in Mailbox tree.
+[1] https://lkml.org/lkml/2015/1/23/325
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324985.html
 
-Thanks,
+Change in v2:
+1. Move RTC address and interrupt to mt6397-core.c, and register 
+   these resource in mfd_cell.
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/323239.html
+2. Remove dt-binding document due to register resouce in mfd_cell, not from 
+   device tree.
+3. Update MAINTAINER file to add Mediatek RTC mainainter.
+4. Add prefix mtk_ to some internal functions.
+5. Fix racy condition
+6. Check return value of regmap_read and regmap_write
+7. Remove some unnecessary register readback, clear, then write.
+8. Add disable alarm in mtk_rtc_set_alarm function
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+v1:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/320424.html
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Eddie Huang (2):
+  mfd: provide RTC resource in MT6397 MFD
+  MAINTAINERS: add Mediatek RTC driver
 
-are available in the git repository at:
+Tianping Fang (1):
+  rtc: mediatek: Add MT6397 RTC driver
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-s7x-arch-pull
+ MAINTAINERS               |   7 +
+ drivers/mfd/mt6397-core.c |  15 ++
+ drivers/rtc/Kconfig       |  10 +
+ drivers/rtc/Makefile      |   1 +
+ drivers/rtc/rtc-mt6397.c  | 454 ++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 487 insertions(+)
+ create mode 100644 drivers/rtc/rtc-mt6397.c
 
-for you to fetch changes up to 9cf417fee0bbea9296791fa9a15ab289307bb26a:
-
-  ARM: MB86S7x: Add configs (2015-03-17 11:22:40 +0530)
-
-----------------------------------------------------------------
-Jassi Brar (6):
-      ARM: Add platform support for Fujitsu MB86S7X SoCs
-      ARM: MB86S7X: Add MCPM support
-      clk: Add clock driver for mb86s7x
-      dt: mb86s7x: add dt files for MB86S7x evbs
-      of: add Fujitsu vendor prefix
-      ARM: MB86S7x: Add configs
-
- Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
- .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
- .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   7 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +
- arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
- arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
- arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
- arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
- arch/arm/boot/dts/mb86s7x.dtsi                     | 142 ++++++
- arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
- arch/arm/configs/multi_v7_defconfig                |   5 +
- arch/arm/mach-mb86s7x/Kconfig                      |  19 +
- arch/arm/mach-mb86s7x/Makefile                     |   3 +
- arch/arm/mach-mb86s7x/board.c                      |  23 +
- arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
- arch/arm/mach-mb86s7x/smc.S                        |  27 ++
- drivers/clk/Makefile                               |   1 +
- drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
- drivers/soc/Makefile                               |   1 +
- drivers/soc/mb86s7x/Makefile                       |   4 +
- drivers/soc/mb86s7x/scb_mhu.c                      | 529 +++++++++++++++++++++
- include/soc/mb86s7x/scb_mhu.h                      | 103 ++++
- 26 files changed, 2131 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
- create mode 100644
-Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
- create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
- create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
- create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
- create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
- create mode 100644 arch/arm/configs/fujitsu_defconfig
- create mode 100644 arch/arm/mach-mb86s7x/Kconfig
- create mode 100644 arch/arm/mach-mb86s7x/Makefile
- create mode 100644 arch/arm/mach-mb86s7x/board.c
- create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
- create mode 100644 arch/arm/mach-mb86s7x/smc.S
- create mode 100644 drivers/clk/clk-mb86s7x.c
- create mode 100644 drivers/soc/mb86s7x/Makefile
- create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
- create mode 100644 include/soc/mb86s7x/scb_mhu.h
+-- 
+1.8.1.1.dirty
