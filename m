@@ -1,62 +1,106 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 17:21:18 +0000
-Subject: [PATCH v2 5/6] pinctrl: st: Show correct pin direction -- even when
- in GPIO mode
+Date: Wed, 18 Mar 2015 17:21:17 +0000
+Subject: [PATCH v2 4/6] pinctrl: st: Supply a GPIO get_direction() call-back
 In-Reply-To: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
 References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426699279-9258-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1426699279-9258-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now ST's pinconf_dbg_show() call-back has displayed the PIO
-alternate function direction, which is only relevant if a pin is
-operating in an alternate function mode i.e not GPIO mode.  If a
-pin is in GPIO mode its direction is both set and status is
-obtained by a completely different/unrelated bunch of registers.
+ST's hardware differentiates between GPIO mode and Pinctrl alternate
+functions.  When a pin is in GPIO mode, there are dedicated registers
+to set and obtain direction status.  However, If a pin's alternate
+function is in use then the direction is set and status is derived
+from a bunch of syscon registers.  The issue is; until now there was
+a lack of parity between the two.
 
-This change ensures that the correct pin direction is shown, even
-if a pin is operating in GPIO mode.
+For example:
+
+Catting the two following information sources could result in
+conflicting information (output has been snipped for simplicity):
+
+ $ cat /sys/kernel/debug/gpio
+  GPIOs 32-39, platform/961f080.pin-controller-sbc, PIO4:
+   gpio-33  (?                   ) out hi
+
+ $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+  pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
+         [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+
+In this example GPIO-33 is a GPIO controlled LED, which is set for
+output, as you'd expect.  However, when the same information is
+drafted from Pinctrl, it clearly states that OE (Output Enable) is
+not set i.e. the pin is set for input.  This is because OE normally
+only represents alternate functions and has no bearing on how the
+pin operates when in Alt-0 (GPIO mode).
+
+This patch changes the current semantics and provides a parity link
+between the two subsystems.  The get_direction() call-back firstly
+determines which function a pin is operating in, then uses the
+appropriate helpers for that mode.
 
 Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pinctrl/pinctrl-st.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/pinctrl/pinctrl-st.c | 31 ++++++++++++++++++++++++++++++-
+ 1 file changed, 30 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 52a4377..1cda40e 100644
+index 10ad19c..52a4377 100644
 --- a/drivers/pinctrl/pinctrl-st.c
 +++ b/drivers/pinctrl/pinctrl-st.c
-@@ -206,6 +206,9 @@
+@@ -206,7 +206,6 @@
  #define gpio_chip_to_bank(chip) \
  		container_of(chip, struct st_gpio_bank, gpio_chip)
  
-+#define pc_to_bank(pc) \
-+		container_of(pc, struct st_gpio_bank, pc)
-+
+-
  enum st_retime_style {
  	st_retime_style_none,
  	st_retime_style_packed,
-@@ -1053,15 +1056,18 @@ static int st_pinconf_get(struct pinctrl_dev *pctldev,
- static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- 				   struct seq_file *s, unsigned pin_id)
- {
-+	struct st_pio_control *pc;
- 	unsigned long config;
-+	int offset = st_gpio_pin(pin_id);
+@@ -781,6 +780,35 @@ static int st_gpio_direction_output(struct gpio_chip *chip,
+ 	return 0;
+ }
  
- 	mutex_unlock(&pctldev->mutex);
-+	pc = st_get_pio_control(pctldev, pin_id);
- 	st_pinconf_get(pctldev, pin_id, &config);
- 	mutex_lock(&pctldev->mutex);
- 	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
- 		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
- 		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
--		ST_PINCONF_UNPACK_OE(config),
-+		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
- 		ST_PINCONF_UNPACK_PU(config),
- 		ST_PINCONF_UNPACK_OD(config),
- 		ST_PINCONF_UNPACK_RT(config),
++static int st_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct st_gpio_bank *bank = gpio_chip_to_bank(chip);
++	struct st_pio_control pc = bank->pc;
++	unsigned long config;
++	unsigned int direction = 0;
++	unsigned int function;
++	unsigned int value;
++	int i = 0;
++
++	/* Alternate function direction is handled by Pinctrl */
++	function = st_pctl_get_pin_function(&pc, offset);
++	if (function) {
++		st_pinconf_get_direction(&pc, offset, &config);
++		return !ST_PINCONF_UNPACK_OE(config);
++	}
++
++	/*
++	 * GPIO direction is handled differently
++	 * - See st_gpio_direction() above for an explanation
++	 */
++	for (i = 0; i <= 2; i++) {
++		value = readl(bank->base + REG_PIO_PC(i));
++		direction |= ((value >> offset) & 0x1) << i;
++	}
++
++	return (direction == ST_GPIO_DIRECTION_IN);
++}
++
+ static int st_gpio_xlate(struct gpio_chip *gc,
+ 			const struct of_phandle_args *gpiospec, u32 *flags)
+ {
+@@ -1452,6 +1480,7 @@ static struct gpio_chip st_gpio_template = {
+ 	.set			= st_gpio_set,
+ 	.direction_input	= st_gpio_direction_input,
+ 	.direction_output	= st_gpio_direction_output,
++	.get_direction		= st_gpio_get_direction,
+ 	.ngpio			= ST_GPIO_PINS_PER_BANK,
+ 	.of_gpio_n_cells	= 1,
+ 	.of_xlate		= st_gpio_xlate,
 -- 
 1.9.1
