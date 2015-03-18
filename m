@@ -1,60 +1,84 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 17 Mar 2015 22:45:22 -0700
-Subject: [PATCH v6 6/6] clk: cygnus: remove Cygnus dummy clock binding
-In-Reply-To: <1426657522-2473-1-git-send-email-rjui@broadcom.com>
-References: <1426657522-2473-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1426657522-2473-7-git-send-email-rjui@broadcom.com>
+From: vincent.cw.yang@gmail.com (Vincent Yang)
+Date: Wed, 18 Mar 2015 14:44:30 +0900
+Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
+Message-ID: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove old Cygnus dummy clock binding document, as it's replaced by
-Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+Hi Arnd and Olof,
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
----
- .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 --------------------
- 1 file changed, 34 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+Please consider pulling in these patches for series of Fujitsu SoC
+based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
 
-diff --git a/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt b/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-deleted file mode 100644
-index 00d26ed..0000000
---- a/Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
-+++ /dev/null
-@@ -1,34 +0,0 @@
--Broadcom Cygnus Clocks
--
--This binding uses the common clock binding:
--Documentation/devicetree/bindings/clock/clock-bindings.txt
--
--Currently various "fixed" clocks are declared for peripheral drivers that use
--the common clock framework to reference their core clocks. Proper support of
--these clocks will be added later
--
--Device tree example:
--
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		osc: oscillator {
--			compatible = "fixed-clock";
--			#clock-cells = <1>;
--			clock-frequency = <25000000>;
--		};
--
--		apb_clk: apb_clk {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <1000000000>;
--		};
--
--		periph_clk: periph_clk {
--			compatible = "fixed-clock";
--			#clock-cells = <0>;
--			clock-frequency = <500000000>;
--		};
--	};
--- 
-1.7.9.5
+The MHU driver is already queued in Mailbox tree.
+
+Thanks,
+
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+s7x-arch-pull
+
+for you to fetch changes up to 9cf417fee0bbea9296791fa9a15ab289307bb26a:
+
+  ARM: MB86S7x: Add configs (2015-03-17 11:22:40 +0530)
+
+----------------------------------------------------------------
+Jassi Brar (6):
+      ARM: Add platform support for Fujitsu MB86S7X SoCs
+      ARM: MB86S7X: Add MCPM support
+      clk: Add clock driver for mb86s7x
+      dt: mb86s7x: add dt files for MB86S7x evbs
+      of: add Fujitsu vendor prefix
+      ARM: MB86S7x: Add configs
+
+ Documentation/devicetree/bindings/arm/mb86s7x.txt  |   8 +
+ .../bindings/clock/fujitsu,mb86s70-crg11.txt       |  26 +
+ .../devicetree/bindings/soc/mb86s7x/scb_mhu.txt    |  35 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   7 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/mb86s70.dtsi                     |  91 ++++
+ arch/arm/boot/dts/mb86s70eb.dts                    |  57 +++
+ arch/arm/boot/dts/mb86s73.dtsi                     |  63 +++
+ arch/arm/boot/dts/mb86s73eb.dts                    |  44 ++
+ arch/arm/boot/dts/mb86s7x.dtsi                     | 142 ++++++
+ arch/arm/configs/fujitsu_defconfig                 | 232 +++++++++
+ arch/arm/configs/multi_v7_defconfig                |   5 +
+ arch/arm/mach-mb86s7x/Kconfig                      |  19 +
+ arch/arm/mach-mb86s7x/Makefile                     |   3 +
+ arch/arm/mach-mb86s7x/board.c                      |  23 +
+ arch/arm/mach-mb86s7x/mcpm.c                       | 318 +++++++++++++
+ arch/arm/mach-mb86s7x/smc.S                        |  27 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-mb86s7x.c                          | 386 +++++++++++++++
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/mb86s7x/Makefile                       |   4 +
+ drivers/soc/mb86s7x/scb_mhu.c                      | 529 +++++++++++++++++++++
+ include/soc/mb86s7x/scb_mhu.h                      | 103 ++++
+ 26 files changed, 2131 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mb86s7x.txt
+ create mode 100644
+Documentation/devicetree/bindings/clock/fujitsu,mb86s70-crg11.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/mb86s7x/scb_mhu.txt
+ create mode 100644 arch/arm/boot/dts/mb86s70.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s70eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s73.dtsi
+ create mode 100644 arch/arm/boot/dts/mb86s73eb.dts
+ create mode 100644 arch/arm/boot/dts/mb86s7x.dtsi
+ create mode 100644 arch/arm/configs/fujitsu_defconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Kconfig
+ create mode 100644 arch/arm/mach-mb86s7x/Makefile
+ create mode 100644 arch/arm/mach-mb86s7x/board.c
+ create mode 100644 arch/arm/mach-mb86s7x/mcpm.c
+ create mode 100644 arch/arm/mach-mb86s7x/smc.S
+ create mode 100644 drivers/clk/clk-mb86s7x.c
+ create mode 100644 drivers/soc/mb86s7x/Makefile
+ create mode 100644 drivers/soc/mb86s7x/scb_mhu.c
+ create mode 100644 include/soc/mb86s7x/scb_mhu.h
