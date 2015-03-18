@@ -1,128 +1,100 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Mar 2015 18:41:14 +0000
-Subject: [PATCH v10 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
- register device's gsi
-In-Reply-To: <1426077587-1561-16-git-send-email-hanjun.guo@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <1426077587-1561-16-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150318184114.GL10863@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 Mar 2015 19:46:11 +0100
+Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
+ per boot protocol
+In-Reply-To: <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
+References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
+ <20150318181315.GH19814@leverpostej>
+ <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
+Message-ID: <CAKv+Gu_f=e4UG1GmtFh7j8fvq67v94VA=FwgaxHV5rECx0Wf=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 11, 2015 at 12:39:41PM +0000, Hanjun Guo wrote:
-> Introduce ACPI_IRQ_MODEL_GIC which is needed for ARM64 as GIC is
-> used, and then register device's gsi with the core IRQ subsystem.
-> 
-> acpi_register_gsi() is similar to DT based irq_of_parse_and_map(),
-> since gsi is unique in the system, so use hwirq number directly
-> for the mapping.
-> 
-> We are going to implement stacked domains when GICv2m, GICv3, ITS
-> support are added.
-> 
-> CC: Marc Zyngier <marc.zyngier@arm.com>
-> Originally-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
-> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Tested-by: Yijing Wang <wangyijing@huawei.com>
-> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-> Tested-by: Jon Masters <jcm@redhat.com>
-> Tested-by: Timur Tabi <timur@codeaurora.org>
-> Tested-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Robert Richter <rrichter@cavium.com>
-> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/acpi.c | 73 ++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/bus.c       |  3 ++
->  include/linux/acpi.h     |  1 +
->  3 files changed, 77 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index c9203c0..dec6f8a 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -76,6 +76,12 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->  }
->  
->  /*
-> + * Since we're on ARM, the default interrupt routing model
-> + * clearly has to be GIC.
-> + */
-> +enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-> +
-> +/*
->   * __acpi_map_table() will be called before page_init(), so early_ioremap()
->   * or early_memremap() should be called here to for ACPI table mapping.
->   */
-> @@ -218,6 +224,73 @@ void __init acpi_init_cpus(void)
->  	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
->  }
->  
-> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
-> +{
-> +	*irq = irq_find_mapping(NULL, gsi);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
-> +
-> +/*
-> + * success: return IRQ number (>0)
-> + * failure: return =< 0
-> + */
-> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
-> +{
-> +	unsigned int irq;
-> +	unsigned int irq_type;
-> +
-> +	/*
-> +	 * ACPI have no bindings to indicate SPI or PPI, so we
-> +	 * use different mappings from DT in ACPI.
-> +	 *
-> +	 * For FDT
-> +	 * PPI interrupt: in the range [0, 15];
-> +	 * SPI interrupt: in the range [0, 987];
-> +	 *
-> +	 * For ACPI, GSI should be unique so using
-> +	 * the hwirq directly for the mapping:
-> +	 * PPI interrupt: in the range [16, 31];
-> +	 * SPI interrupt: in the range [32, 1019];
-> +	 */
-> +
-> +	if (trigger == ACPI_EDGE_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_LOW)
-> +		irq_type = IRQ_TYPE_EDGE_FALLING;
-> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_HIGH)
-> +		irq_type = IRQ_TYPE_EDGE_RISING;
-> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_LOW)
-> +		irq_type = IRQ_TYPE_LEVEL_LOW;
-> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
-> +				polarity == ACPI_ACTIVE_HIGH)
-> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
-> +	else
-> +		irq_type = IRQ_TYPE_NONE;
-> +
-> +	/*
-> +	 * Since only one GIC is supported in ACPI 5.0, we can
-> +	 * create mapping refer to the default domain
-> +	 */
-> +	irq = irq_create_mapping(NULL, gsi);
-> +	if (!irq)
-> +		return irq;
-> +
-> +	/* Set irq type if specified and different than the current one */
-> +	if (irq_type != IRQ_TYPE_NONE &&
-> +		irq_type != irq_get_trigger_type(irq))
-> +		irq_set_irq_type(irq, irq_type);
-> +	return irq;
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+On 18 March 2015 at 19:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 18 March 2015 at 19:13, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Mar 18, 2015 at 02:55:27PM +0000, Ard Biesheuvel wrote:
+>>> According to the arm64 boot protocol, registers x1 to x3 should be
+>>> zero upon kernel entry, and non-zero values are reserved for future
+>>> use. This future use is going to be problematic if we never enforce
+>>> the current rules, so start enforcing them now, by emitting a warning
+>>> if non-zero values are detected.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  arch/arm64/kernel/head.S  |  4 ++++
+>>>  arch/arm64/kernel/setup.c | 15 +++++++++++++++
+>>>  2 files changed, 19 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>> index a0fbd99efb89..8636c3cef006 100644
+>>> --- a/arch/arm64/kernel/head.S
+>>> +++ b/arch/arm64/kernel/head.S
+>>> @@ -233,6 +233,10 @@ section_table:
+>>>  #endif
+>>>
+>>>  ENTRY(stext)
+>>> +     adr_l   x8, boot_regs                   // record the contents of
+>>> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
+>>> +     stp     x2, x3, [x8, #16]
+>>
+>> I think we should have a dc ivac here as we do for
+>> set_cpu_boot_mode_flag.
+>>
+>> That avoids a potential issue with boot_regs sharing a cacheline with
+>> data we write with the MMU on -- using __flush_dcache_area will result
+>> in a civac, so we could write back dirty data atop of the boot_regs if
+>> there were clean entries in the cache when we did the non-cacheable
+>> write.
+>>
+>
+> Hmm, I wondered about that.
+>
+> Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
+>
 
-I see you've still got this buried in the arch code. Is there any plan to
-move it out, as I moaned about this in the last version of the series and
-nothing seems to have changed?
+Never mind, it's easier just to do the invalidate right after, and I
+can drop the flush before the access.
 
-Will
+
+>>> +
+>>>       mov     x21, x0                         // x21=FDT
+>>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
+>>>       adrp    x24, __PHYS_OFFSET
+>>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>>> index 6c5fb5aff325..2d5cae2de679 100644
+>>> --- a/arch/arm64/kernel/setup.c
+>>> +++ b/arch/arm64/kernel/setup.c
+>>> @@ -114,6 +114,11 @@ void __init early_print(const char *str, ...)
+>>>       printk("%s", buf);
+>>>  }
+>>>
+>>> +/*
+>>> + * The recorded values of x0 .. x3 upon kernel entry.
+>>> + */
+>>> +u64 __read_mostly boot_regs[4];
+>>> +
+>>>  void __init smp_setup_processor_id(void)
+>>>  {
+>>>       u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+>>> @@ -387,6 +392,16 @@ void __init setup_arch(char **cmdline_p)
+>>>       conswitchp = &dummy_con;
+>>>  #endif
+>>>  #endif
+>>> +     /*
+>>> +      * boot_regs[] is written by the boot CPU with the caches off, so we
+>>> +      * need to ensure that we read the value from main memory
+>>> +      */
+>>> +     __flush_dcache_area(boot_regs, sizeof(boot_regs));
+>>> +     if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
+>>> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
+>>> +                     boot_regs[1], boot_regs[2], boot_regs[3]);
+>>> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
+>>> +     }
+>>>  }
+>>>
+>>>  static int __init arm64_device_init(void)
+>>> --
+>>> 1.8.3.2
+>>>
+>>>
