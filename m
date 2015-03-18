@@ -1,57 +1,66 @@
-From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
-Date: Wed, 18 Mar 2015 21:26:09 +0100
-Subject: [PATCH] amba-pl011: simplify TX handling
-In-Reply-To: <20150318174157.GD3549@e103592.cambridge.arm.com>
-References: <20150317163200.GE3759@e103592.cambridge.arm.com>
- <20150318004255.538fd48e@north>
- <20150318174157.GD3549@e103592.cambridge.arm.com>
-Message-ID: <20150318212609.4d4f61a6@north>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Mar 2015 13:23:53 -0700
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <5509D3BD.6030004@linaro.org>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com>
+ <5509A998.2080509@ti.com> <20150318165706.GQ31346@atomide.com>
+ <5509D3BD.6030004@linaro.org>
+Message-ID: <20150318202353.GU31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Mar 2015 17:41:57 +0000, Dave P Martin wrote:
-> > This is exactly what I did:
-> > # stty -F /dev/ttyAMA0 115200 -onlcr
-> > # cat 1MB_text_file > /dev/ttyAMA0
-> > ^C
-> > Now AMA0 is dead.  If I waited until the whole file was written,
-> > everything was fine.  This was 100% reproducible and I later checked
-> > that on .shutdown() the FIFO was full (no IRQ pending yet).  Initially I
-> > tried to play around with CR programming on .shutdown() but it didn't
-> > change anything (according to Broadcom docs one should be very careful
-> > not to touch CR while UART is busy).
+* Grygorii.Strashko at linaro.org <grygorii.strashko@linaro.org> [150318 12:36]:
+> On 03/18/2015 06:57 PM, Tony Lindgren wrote:
+> > * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
+> >> As I can see Patch 1 from this series was merged in 4.0-rc4,
+> >> but this patch wasn't. As result, I can see below warning all the time during boot now:
+> >>
+> >> [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
+> >   
+> > OK. Is this needed as a fix for the v4.0-rc series, or can this wait
+> > for v4.1?
 > 
-> Interesting... I missed this because the systemd issue that got me
-> started on this only shows up of the console is on the PL011.  Once
-> a shell is running on ttyAMA0, the port is always open, so the effects
-> of shutting down and restarting the pl011 are not seen.
-> 
-> I'm actually suspicious of the correct behaviour here.  serial_core
-> waits for the UART to drain via uart_wait_until_sent(), but there are
-> some oddities:
-> 
->  * The wait is abandoned early if there is a pending signal.  This
->    means that some output already sent to the kernel via write() is
->    is simply lost.  This feels a bit odd -- for all other I/O I can
->    think of, write() does not guarantee that the data has reached
->    its destination, but on return it usually does guarantee that the
->    data _will_ reach its destination (except for unrecoverable I/O
->    errors).
-> 
->    This behaviour does mean that pl011_shutdown() is invoked with
->    a non-empty FIFO if the only process with the port open is killed
->    by a signal while output is pending, causing the hangup.
-> 
->  * uart_wait_until_sent()'s timeout calculations aim to wait for
->    no longer than it takes the FIFO to drain.  However, this function
->    can get called when the serial_core xmit queue for the port is
->    very non-empty -- meaning that the FIFO continues to be topped
->    up for some time.  This can cause more data to be lost.
+> I think, Yes. These two patches should go all together, because they are
+> interrelated.
 
-I confess that the way serial_core works is not very intuitive for me
-either, I can only add to your list.  For instance I observed
-that .start_tx() called eight times during the initial load.  Why?
-Obviously the first one fills up the FIFO and the subsequent just waste
-CPU time.  I remember looking at the serial_core and it seemed like the
-repeated calls must be coming from the higher layers... Admittedly I was
-too lazy to just add a dump_stack() and see for myself ;)
+OK applying into omap-for-v4.0/fixes thanks.
+
+Tony
+ 
+> >> On 02/20/2015 10:51 AM, Kishon Vijay Abraham I wrote:
+> >>> Now that we don't have hwmod entry for pcie PHY remove the
+> >>> ti,hwmod property from PCIE PHY's
+> >>>
+> >>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>> ---
+> >>>    arch/arm/boot/dts/dra7.dtsi |    2 --
+> >>>    1 file changed, 2 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> >>> index 5827fed..18a904d 100644
+> >>> --- a/arch/arm/boot/dts/dra7.dtsi
+> >>> +++ b/arch/arm/boot/dts/dra7.dtsi
+> >>> @@ -1111,7 +1111,6 @@
+> >>>    					      "wkupclk", "refclk",
+> >>>    					      "div-clk", "phy-div";
+> >>>    				#phy-cells = <0>;
+> >>> -				ti,hwmods = "pcie1-phy";
+> >>>    			};
+> >>>    
+> >>>    			pcie2_phy: pciephy at 4a095000 {
+> >>> @@ -1130,7 +1129,6 @@
+> >>>    					      "wkupclk", "refclk",
+> >>>    					      "div-clk", "phy-div";
+> >>>    				#phy-cells = <0>;
+> >>> -				ti,hwmods = "pcie2-phy";
+> >>>    				status = "disabled";
+> >>>    			};
+> >>>    		};
+> >>>
+> >>
+> 
+> 
+> -- 
+> regards,
+> -grygorii
