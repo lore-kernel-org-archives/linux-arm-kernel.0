@@ -1,83 +1,88 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 18 Mar 2015 09:32:53 +0530
-Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
- Thunder SoC in 2 Node topology.
-In-Reply-To: <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
-References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
- <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
- <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
- <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
- <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
-Message-ID: <CAFpQJXWL-NM+WndfB5pLj6TmdVngACR9YCr_ahaUTqAO3DaX1g@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 17 Mar 2015 22:45:16 -0700
+Subject: [PATCH v6 0/6] Add common clock support for Broadcom iProc
+ architecture
+Message-ID: <1426657522-2473-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Will, Mark, Arnd
+This patchset contains the initial common clock support for Broadcom's iProc
+family of SoCs. The iProc clock architecture comprises of various PLLs, e.g.,
+ARMPLL, GENPLL, LCPLL0, MIPIPLL, and etc. An onboard crystal serves as the
+basic reference clock for these PLLs. Each PLL may have several leaf clocks.
+One special group of clocks is the ASIU clocks, which are dervied directly
+from the crystal reference clock.
 
-On Tue, Mar 10, 2015 at 2:12 PM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> Ping?
->
-> On Tue, Feb 24, 2015 at 2:22 PM, Ganapatrao Kulkarni
-> <gpkulkarni@gmail.com> wrote:
->> Hi Arnd,
->>
->> On Fri, Jan 23, 2015 at 6:07 PM, Ganapatrao Kulkarni
->> <gpkulkarni@gmail.com> wrote:
->>> Hi Arnd,
->>>
->>> On Thu, Jan 22, 2015 at 11:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>> On Thursday 22 January 2015 17:47:13 Arnd Bergmann wrote:
->>>>>
->>>>> This seems wrong still: The clusters and cores do not have unique
->>>>> numbers. I believe the code will not work correctly, and it won't
->>>>> be compliant with the binding from patch 2.
->>>>>
->>>>> I think the right way here would be to use
->>>>>
->>>>>         arm,associativity = <0 2 47>;
->>>>>
->>>>> for cpu at 20f, and
->>>>>
->>>>>         arm,associativity = <1 3 48>;
->>>>>
->>>>> for cpu at 10000. Your previous version used the numbers from
->>>>> the reg property, which should be fine as well if that helps:
->>>>>
->>>>>
->>>>>         arm,associativity = <0x0 0x200 0x20f>;
->>>>>
->>>>>         arm,associativity = <0x10000 0x10000 0x10000>;
->>>>>
->>>>> which should have the same effect as above, as long as the code
->>>>> can handle the numbers not being consecutive.
->>>>>
->>>>>
->>>>
->>>> Upon further consideration, I think your patch is correct after
->>>> all, but let me check again on PowerPC machines.
->>> i have removed, board id which was in previous patch, to keep the
->>> associativity aligned to mpidr, ie. socket,cluster id and core id.
->>> both previous and current mappings holds good for our design.
->>> our topology is 2 sockets(aff2=0and 1) , each having 3
->>> clusters(aff1=0to2)and each cluster having 16 cores(aff0:0to15)
->>> in associativity property, for our case, only first id(socket id) is
->>> mapped to numa, others are mentioned only to describe the topology.
->>>>
->>>>         Arnd
->> any further comments, how we go about these patches?
->> please suggest.
->>
->>> thanks
->>> Ganapat
->>
->> thanks
->> Ganapat
+This patchset also contains the basic clock support for the Broadcom Cygnus
+SoC, which implements the iProc clock architecture
 
-Please suggest how we go about these patches.
-please share your review comments, if any changes needs to be done.
+Changes from v5:
+ - Rebase to v4.0-rc4
+ - Drop of_clk_get_parent_rate helper function from the clock framework
+ - Get rid of custom "clock-frequency" support in iProc PLL code. Instead, add
+   standard clock set_rate and round_rate support and make use of DT properties
+   "assigned-clocks" and "assigned-clock-rates" to initialize PLL to the
+   desired rate when registering to the clock framework
+ - Add SW workaround for ASIC bug on MIPI PLL to always read back the same
+   register following a write transaction, to ensure value is written to the
+   correct register
 
+Changes from v4:
+ - Add of_clk_get_parent_rate helper function into the clock framework
+ - Switch to use of_clk_get_parent_rate in the iProc PLL clock driver
 
-thanks
-Ganapat
+Changes from v3:
+ - Fix incorrect use of passing in of_clk_src_onecell_get when adding ARM PLL
+   and other iProc PLLs as clock provider. These PLLs have zero cells in DT and
+   thefore of_clk_src_simple_get should be used instead
+ - Rename Cygnus MIPI PLL Channel 2 clock from BCM_CYGNUS_MIPIPLL_CH2_UNUSED
+   to BCM_CYGNUS_MIPIPLL_CH2_V3D, since a 3D graphic rendering engine has been
+   integrated into Cygnus revision B0 and has its core clock running off
+   MIPI PLL Channel 2
+ - Changed default MIPI PLL VCO frequency from 1.75 GHz to 2.1 GHz. This allows
+   us to derive 300 MHz V3D clock from channel 2 through the post divisor
+
+Changes from v2:
+ - Re-arrange Cygnus clock/pll init functions so each init function is right
+   next to its clock table
+ - Removed #defines for number of clocks in Cygnus. Have the number of clocks
+   automatically determined based on array size of the clock table
+
+Changes from v1:
+ - Separate drivers/clk/Makefile change for drivers/clk/bcm out to a standalone patch
+
+Ray Jui (6):
+  clk: iproc: define Broadcom iProc clock binding
+  clk: iproc: add initial common clock support
+  clk: Change bcm clocks build dependency
+  clk: cygnus: add clock support for Broadcom Cygnus
+  ARM: dts: enable clock support for Broadcom Cygnus
+  clk: cygnus: remove Cygnus dummy clock binding
+
+ .../devicetree/bindings/clock/bcm-cygnus-clock.txt |   34 --
+ .../bindings/clock/brcm,iproc-clocks.txt           |  171 +++++++
+ arch/arm/boot/dts/bcm-cygnus-clock.dtsi            |  112 ++++-
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |    2 +-
+ drivers/clk/Makefile                               |    2 +-
+ drivers/clk/bcm/Kconfig                            |    9 +
+ drivers/clk/bcm/Makefile                           |    2 +
+ drivers/clk/bcm/clk-cygnus.c                       |  284 ++++++++++++
+ drivers/clk/bcm/clk-iproc-armpll.c                 |  282 +++++++++++
+ drivers/clk/bcm/clk-iproc-asiu.c                   |  275 +++++++++++
+ drivers/clk/bcm/clk-iproc-clk.c                    |  244 ++++++++++
+ drivers/clk/bcm/clk-iproc-pll.c                    |  490 ++++++++++++++++++++
+ drivers/clk/bcm/clk-iproc.h                        |  164 +++++++
+ include/dt-bindings/clock/bcm-cygnus.h             |   65 +++
+ 14 files changed, 2075 insertions(+), 61 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/bcm-cygnus-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/brcm,iproc-clocks.txt
+ create mode 100644 drivers/clk/bcm/clk-cygnus.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-armpll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-asiu.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-clk.c
+ create mode 100644 drivers/clk/bcm/clk-iproc-pll.c
+ create mode 100644 drivers/clk/bcm/clk-iproc.h
+ create mode 100644 include/dt-bindings/clock/bcm-cygnus.h
+
+-- 
+1.7.9.5
