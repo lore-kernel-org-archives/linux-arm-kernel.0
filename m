@@ -1,71 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 17:21:19 +0000
-Subject: [PATCH v2 6/6] pinctrl: st: Display pin's function when printing
- pinctrl debug information
-In-Reply-To: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426699279-9258-7-git-send-email-lee.jones@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 Mar 2015 18:30:34 +0100
+Subject: [PATCH] ARM: EXYNOS: Handle of_find_device_by_node and kstrdup
+ failures
+In-Reply-To: <1424792562.6775.3.camel@AMDC1943>
+References: <1422984529-17729-1-git-send-email-k.kozlowski@samsung.com>
+ <1424792562.6775.3.camel@AMDC1943>
+Message-ID: <CAJKOXPdWdEx7uhy10EesE0ddTuVY09Fh7RTYkCcemEOGSB-ctQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Great for easily determining which mode a pin is operating in.
-This patch was particularly helpful when debugging a recent GPIO/
-Pinctrl disparity issue.
+2015-02-24 16:42 GMT+01:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> On wto, 2015-02-03 at 18:28 +0100, Krzysztof Kozlowski wrote:
+>> Prevent possible NULL pointer dereference of pointer returned by
+>> of_find_device_by_node(). Handle this by skipping such power domain.
+>>
+>> Additionally fail the init on kstrdup() failure. Such case is actually
+>> not fatal because the name for power domain allocated by kstrdup() is
+>> used only in printk. Still as a precaution handle this as an error
+>> condition.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+> Hi Kukjin,
+>
+> What is the status of this patch and the "ARM: EXYNOS: Handle of
+> of_iomap() failure". The latter should be in your tree but I cannot find
+> it.
+>
+> Best regards,
+> Krzysztof
 
-Before:
-    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
-             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+Hi Kukjin,
 
-After [GPIO]:
-    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] GPIO
-             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+You haven't applied this and the "ARM: EXYNOS: Handle of of_iomap()
+failure" yet. Any comments?
 
-After [Alt]:
-    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] Alt Fn 2
-             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
-
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/pinctrl/pinctrl-st.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 1cda40e..b80ccc7 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -1058,18 +1058,28 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- {
- 	struct st_pio_control *pc;
- 	unsigned long config;
-+	unsigned int function;
- 	int offset = st_gpio_pin(pin_id);
-+	char f[16];
- 
- 	mutex_unlock(&pctldev->mutex);
- 	pc = st_get_pio_control(pctldev, pin_id);
- 	st_pinconf_get(pctldev, pin_id, &config);
- 	mutex_lock(&pctldev->mutex);
--	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
-+
-+	function = st_pctl_get_pin_function(pc, offset);
-+	if (function)
-+		snprintf(f, 10, "Alt Fn %d", function);
-+	else
-+		snprintf(f, 5, "GPIO");
-+
-+	seq_printf(s, "[OE:%d,PU:%ld,OD:%ld]\t%s\n"
- 		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
- 		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
- 		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
- 		ST_PINCONF_UNPACK_PU(config),
- 		ST_PINCONF_UNPACK_OD(config),
-+		f,
- 		ST_PINCONF_UNPACK_RT(config),
- 		ST_PINCONF_UNPACK_RT_INVERTCLK(config),
- 		ST_PINCONF_UNPACK_RT_CLKNOTDATA(config),
--- 
-1.9.1
+Best regards,
+Krzysztof
