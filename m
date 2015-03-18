@@ -1,123 +1,61 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 18 Mar 2015 19:46:12 +0100
-Subject: [PATCH V2 8/8] ARM: cpuidle: Change function name to be consistent
- with x86
-In-Reply-To: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426704372-20406-9-git-send-email-daniel.lezcano@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Mar 2015 18:52:01 +0000
+Subject: [PATCH v2 1/4] PCI: X-Gene: Add the APM X-Gene v1 PCIe MSI/MSIX
+ termination driver
+In-Reply-To: <CADaLNDn0V8F27Yu1-j8H0Dw2t-Ac04TZcbtsg++ALdB4orXrUQ@mail.gmail.com>
+References: <cover.1425497218.git.dhdang@apm.com>
+ <ca98e05f8a8dabdc6cc5b6e8c3ce50cf4e900fac.1425497218.git.dhdang@apm.com>
+ <5509BE7C.1000901@arm.com>
+ <CADaLNDn0V8F27Yu1-j8H0Dw2t-Ac04TZcbtsg++ALdB4orXrUQ@mail.gmail.com>
+Message-ID: <5509C951.30402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the functions name:
- arm_cpuidle_suspend => arm_idle
- arm_cpuidle_init    => arm_idle_cpu_init
+On 18/03/15 18:29, Duc Dang wrote:
+> On Wed, Mar 18, 2015 at 11:05 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 04/03/15 19:39, Duc Dang wrote:
+>>> X-Gene v1 SOC supports total 2688 MSI/MSIX vectors coalesced into
+>>> 16 HW IRQ lines.
+>>>
+>>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>>> Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>>
+>> I just had a quick look at this, and this seems to be going in the exact
+>> opposite direction compared to what we now have on arm64, where we move
+>> away from using struct msi_controller for most thing, and implement PCI
+>> MSI/MSIX in a generic way, using MSI domains.
+>>
+>> I suggest you have a look at how GICv2m and GICv3 ITS implement the MSI
+>> support. You can also have a look at what I did for the Tegra MSI
+>> controller in this patch:
+>>
+>> https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/kill-msi-controller&id=83b3602fcee7972b9d549ed729b56ec28de16081
+>>
+>> Eventually, the plan is to kill msi_controller entirely, so introducing
+>> new drivers that rely on it is not something I'm eager to see.
+> 
+> Thanks, Marc.
+> 
+>  X-Gene 1 MSI is handled by separate MSI controller block, so its
+> driver implementation is different from GICv2m and GICv3. I will refer
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/include/asm/cpuidle.h   | 4 ++--
- arch/arm/kernel/cpuidle.c        | 4 ++--
- arch/arm64/include/asm/cpuidle.h | 6 +++---
- arch/arm64/kernel/cpuidle.c      | 2 +-
- drivers/cpuidle/cpuidle-arm.c    | 4 ++--
- 5 files changed, 10 insertions(+), 10 deletions(-)
+It will certainly be different in the sense that you won't use a stacked
+domain on top of the GIC. But what I want to see is the use of a generic
+pci_msi_domain on top of an irq_domain, just like we have on v2m and v3.
+Thomas has also been vocal enough about that in the past, and x86 is
+going down that road as well.
 
-diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index 1851e9d..7968948 100644
---- a/arch/arm/include/asm/cpuidle.h
-+++ b/arch/arm/include/asm/cpuidle.h
-@@ -42,8 +42,8 @@ struct of_cpuidle_method {
- 	__used __section(__cpuidle_method_of_table)			\
- 	= { .method = _method, .ops = _ops }
- 
--extern int arm_cpuidle_suspend(int index);
-+extern int arm_idle(int index);
- 
--extern int arm_cpuidle_init(int cpu);
-+extern int arm_idle_cpu_init(int cpu);
- 
- #endif
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 7b42a40..05a2c3e 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -29,7 +29,7 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- 	return index;
- }
- 
--int arm_cpuidle_suspend(int index)
-+int arm_idle(int index)
- {
- 	int ret = -EOPNOTSUPP;
- 	int cpu = smp_processor_id();
-@@ -75,7 +75,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- 	return 0;
- }
- 
--int __init arm_cpuidle_init(int cpu)
-+int __init arm_idle_cpu_init(int cpu)
- {
- 	int ret = -EOPNOTSUPP;
- 	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-index 141b2fc..e9c0dc4e 100644
---- a/arch/arm64/include/asm/cpuidle.h
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -4,10 +4,10 @@
- #include <asm/proc-fns.h>
- 
- #ifdef CONFIG_CPU_IDLE
--extern int arm_cpuidle_init(unsigned int cpu);
-+extern int arm_idle_cpu_init(unsigned int cpu);
- extern int cpu_suspend(unsigned long arg);
- #else
--static inline int arm_cpuidle_init(unsigned int cpu)
-+static inline int arm_idle_cpu_init(unsigned int cpu)
- {
- 	return -EOPNOTSUPP;
- }
-@@ -17,7 +17,7 @@ static inline int cpu_suspend(unsigned long arg)
- 	return -EOPNOTSUPP;
- }
- #endif
--static inline int arm_cpuidle_suspend(int index)
-+static inline int arm_idle(int index)
- {
- 	return cpu_suspend(index);
- }
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index a78143a..b6b4fcf 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -15,7 +15,7 @@
- #include <asm/cpuidle.h>
- #include <asm/cpu_ops.h>
- 
--int arm_cpuidle_init(unsigned int cpu)
-+int arm_idle_cpu_init(unsigned int cpu)
- {
- 	int ret = -EOPNOTSUPP;
- 	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 0682ed0..cd8c32f 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -52,7 +52,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
- 		 * call the CPU ops suspend protocol with idle index as a
- 		 * parameter.
- 		 */
--		arm_cpuidle_suspend(idx);
-+		arm_idle(idx);
- 
- 		cpu_pm_exit();
- 	}
-@@ -120,7 +120,7 @@ static int __init arm_idle_init(void)
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
--		ret = arm_cpuidle_init(cpu);
-+		ret = arm_idle_cpu_init(cpu);
- 
- 		/* This cpu does not support any idle states */
- 		if (ret == -ENOSYS)
+> to what you did for Tegra MSI, but I don't see your latest changes in
+> 4.0-rc4. Is the change you made for Tegra MSI going to mainline soon?
+
+Not yet. As you can see in this branch, this relies on some other
+cleanups. But you can already convert most of your driver and put it in
+the shape that matches what we have for v2m and v3. Once the required
+cleanups are in, I'll remove the last traces of msi_controller myself if
+necessary.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
