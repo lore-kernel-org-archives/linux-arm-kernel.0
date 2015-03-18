@@ -1,60 +1,62 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 17:21:16 +0000
-Subject: [PATCH v2 3/6] pinctrl: st: Move st_get_pio_control() further up the
- source file
+Date: Wed, 18 Mar 2015 17:21:18 +0000
+Subject: [PATCH v2 5/6] pinctrl: st: Show correct pin direction -- even when
+ in GPIO mode
 In-Reply-To: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
 References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426699279-9258-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1426699279-9258-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-st_get_pio_control() will be used by subsequent calls which are
-to be located above its original position.  This is required to
-prevent the need for an unnecessary forward-declaration/prototype.
+Until now ST's pinconf_dbg_show() call-back has displayed the PIO
+alternate function direction, which is only relevant if a pin is
+operating in an alternate function mode i.e not GPIO mode.  If a
+pin is in GPIO mode its direction is both set and status is
+obtained by a completely different/unrelated bunch of registers.
 
+This change ensures that the correct pin direction is shown, even
+if a pin is operating in GPIO mode.
+
+Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
 Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pinctrl/pinctrl-st.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/pinctrl/pinctrl-st.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 5362e45..10ad19c 100644
+index 52a4377..1cda40e 100644
 --- a/drivers/pinctrl/pinctrl-st.c
 +++ b/drivers/pinctrl/pinctrl-st.c
-@@ -398,6 +398,16 @@ static const struct st_pctl_data stih407_flashdata = {
- 	.rt = 100,
- };
+@@ -206,6 +206,9 @@
+ #define gpio_chip_to_bank(chip) \
+ 		container_of(chip, struct st_gpio_bank, gpio_chip)
  
-+static struct st_pio_control *st_get_pio_control(
-+			struct pinctrl_dev *pctldev, int pin)
-+{
-+	struct pinctrl_gpio_range *range =
-+			 pinctrl_find_gpio_range_from_pin(pctldev, pin);
-+	struct st_gpio_bank *bank = gpio_range_to_bank(range);
++#define pc_to_bank(pc) \
++		container_of(pc, struct st_gpio_bank, pc)
 +
-+	return &bank->pc;
-+}
-+
- /* Low level functions.. */
- static inline int st_gpio_bank(int gpio)
+ enum st_retime_style {
+ 	st_retime_style_none,
+ 	st_retime_style_packed,
+@@ -1053,15 +1056,18 @@ static int st_pinconf_get(struct pinctrl_dev *pctldev,
+ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
+ 				   struct seq_file *s, unsigned pin_id)
  {
-@@ -918,16 +928,6 @@ static int st_pmx_get_groups(struct pinctrl_dev *pctldev,
- 	return 0;
- }
++	struct st_pio_control *pc;
+ 	unsigned long config;
++	int offset = st_gpio_pin(pin_id);
  
--static struct st_pio_control *st_get_pio_control(
--			struct pinctrl_dev *pctldev, int pin)
--{
--	struct pinctrl_gpio_range *range =
--			 pinctrl_find_gpio_range_from_pin(pctldev, pin);
--	struct st_gpio_bank *bank = gpio_range_to_bank(range);
--
--	return &bank->pc;
--}
--
- static int st_pmx_set_mux(struct pinctrl_dev *pctldev, unsigned fselector,
- 			unsigned group)
- {
+ 	mutex_unlock(&pctldev->mutex);
++	pc = st_get_pio_control(pctldev, pin_id);
+ 	st_pinconf_get(pctldev, pin_id, &config);
+ 	mutex_lock(&pctldev->mutex);
+ 	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
+ 		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
+ 		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
+-		ST_PINCONF_UNPACK_OE(config),
++		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
+ 		ST_PINCONF_UNPACK_PU(config),
+ 		ST_PINCONF_UNPACK_OD(config),
+ 		ST_PINCONF_UNPACK_RT(config),
 -- 
 1.9.1
