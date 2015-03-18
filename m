@@ -1,84 +1,96 @@
-From: howard.chen@linaro.org (Howard Chen)
-Date: Wed, 18 Mar 2015 14:00:32 +0800
-Subject: [RFC] ARM: dts: mt8173: Add psci-0.2 cpuidle support
-Message-ID: <1426658432-29333-1-git-send-email-howard.chen@linaro.org>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 18 Mar 2015 07:27:19 +0100
+Subject: [PATCH v6 0/8] Add support for Tegra Activity Monitor
+In-Reply-To: <78905871.274971426655422042.JavaMail.weblogic@epmlwas07d>
+References: <78905871.274971426655422042.JavaMail.weblogic@epmlwas07d>
+Message-ID: <CAAObsKDWuGatDaX2a8AqXDMayd0uJAUCLLdRYUmef1Oh=kvd3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add device tree for psci-0.2 on mt8173 platform
-add device tree for cupidle-arm64 on mt8173 platform
+On 18 March 2015 at 06:10, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+>> Hello,
+>>
+>> something happened during the last cycle and an old version of the devfreq
+>> driver was merged.
+>>
+>> This thread contains patches that bring it up to date to the last submitted
+>> version and also incorporates the feedback that that version received, plus
+>> some other small fixes and improvements that came up during rebase and
+>> testing.
+>>
+>> These patches implement support for setting the rate of the EMC clock based on
+>> stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+>> memory accesses (among others).
+>>
+>> It depends on the following in-flight patches:
+>>
+>> * EMC driver: http://thread.gmane.org/gmane.linux.kernel/1907035
+>> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1897078
+>>
+>> I have pushed a branch here for testing:
+>>
+>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v6
+>>
+>> Regards,
+>>
+>> Tomeu
+>>
+>> Tomeu Vizoso (8):
+>>   of: Add binding for NVIDIA Tegra ACTMON node
+>>   PM / devfreq: tegra: Update to v5 of the submitted patches
+>>   clk: tegra: Have EMC clock implement determine_rate()
+>>   PM / devfreq: tegra: Use clock rate constraints
+>>   PM / devfreq: tegra: remove operating-points
+>>   PM / devfreq: tegra: Set drvdata before enabling the irq
+>>   PM / devfreq: tegra: Enable interrupts after resuming the devfreq
+>>     monitor
+>>   ARM: tegra: Add Tegra124 ACTMON support
+>
+> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> for all PM / devfreq patches (2, 4, 5, 6, 7)
+> And merged in for-rc tree with a little modification.
 
-Signed-off-by: Howard Chen <howard.chen@linaro.org>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 30 ++++++++++++++++++++++++++----
- 1 file changed, 26 insertions(+), 4 deletions(-)
+Thanks. Though that's fine with me, I was wondering if Mikko or
+Alexandre would have any comments on the changes, even if they are
+small regarding what they already reviewed.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 8554ec3..96dff1e 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -48,6 +48,8 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53";
- 			reg = <0x000>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu1: cpu at 1 {
-@@ -55,6 +57,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x001>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu2: cpu at 100 {
-@@ -62,6 +65,7 @@
- 			compatible = "arm,cortex-a57";
- 			reg = <0x100>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
- 
- 		cpu3: cpu at 101 {
-@@ -69,15 +73,33 @@
- 			compatible = "arm,cortex-a57";
- 			reg = <0x101>;
- 			enable-method = "psci";
-+			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
- 		};
-+
-+		idle-states {
-+			entry-method = "arm,psci-0.2";
-+
-+			CPU_SLEEP_0_0: cpu-sleep-0-0 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0010000>;
-+				entry-latency-us = <600>;
-+				exit-latency-us = <600>;
-+				min-residency-us = <1200>;
-+			};
-+
-+			CLUSTER_SLEEP_0: cluster-sleep-0 {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1010000>;
-+				entry-latency-us = <800>;
-+				exit-latency-us = <1000>;
-+				min-residency-us = <2000>;
-+				wakeup-latency-us = <1000>;
-+			};
- 	};
- 
- 	psci {
--		compatible = "arm,psci";
-+		compatible = "arm,psci-0.2";
- 		method = "smc";
--		cpu_suspend   = <0x84000001>;
--		cpu_off	      = <0x84000002>;
--		cpu_on	      = <0x84000003>;
- 	};
- 
- 	uart_clk: dummy26m {
--- 
-1.9.1
+> In the patch 2/8, I would like to add "const" in Line 748.
+> Would it be fine with you?
+
+Yes, thanks, that's fine.
+
+Regards,
+
+Tomeu
+
+> (You may look at: https://git.kernel.org/cgit/linux/kernel/git/mzx/devfreq.git/log/?h=for-rc )
+>
+>
+> The diff after applying all 2/8 to 7/8 will be:
+>
+> diff --git a/drivers/devfreq/tegra-devfreq.c b/drivers/devfreq/tegra-devfreq.c
+> index 0d1edd5..8e633a6 100644
+> --- a/drivers/devfreq/tegra-devfreq.c
+> +++ b/drivers/devfreq/tegra-devfreq.c
+> @@ -740,7 +740,7 @@ static int tegra_devfreq_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> -static struct of_device_id tegra_devfreq_of_match[] = {
+> +static const struct of_device_id tegra_devfreq_of_match[] = {
+>         { .compatible = "nvidia,tegra124-actmon" },
+>         { },
+>  };
+>
+>
+>>
+>>  .../devicetree/bindings/arm/tegra/actmon.txt       |  28 ++
+>>  arch/arm/boot/dts/tegra124.dtsi                    |  11 +
+>>  drivers/clk/tegra/clk-emc.c                        |  19 +-
+>>  drivers/devfreq/tegra-devfreq.c                    | 480 +++++++++++----------
+>>  4 files changed, 316 insertions(+), 222 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/tegra/actmon.txt
+>>
+>> --
+>> 2.1.0
+>>
