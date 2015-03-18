@@ -1,62 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 13:17:22 +0000
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <3926609.Ff6LCkuuMX@wuerfel>
- <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
-Message-ID: <20150318131722.GN3318@x1>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 18 Mar 2015 18:49:48 +0530
+Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <55095297.5060605@arm.com>
+References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
+ <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+ <55095297.5060605@arm.com>
+Message-ID: <CABb+yY0qRSocL-ePosUzszAh4X6161ve8_qUq4VizbLWMAmMCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Mar 2015, Jassi Brar wrote:
+On Wed, Mar 18, 2015 at 3:55 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>> +static int mhu_send_data(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct mhu_link *mlink = chan->con_priv;
+>> +       u32 *arg = data;
+>
+> Arnd doesn't like this and had suggestions in some other thread.
+>
+No, Arnd suggested doing it this way. And another platform's driver
+was made to do this way.
 
-> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
-> >> +
-> >> +/*
-> >> + * struct sti_mbox_msg - sti mailbox message description
-> >> + * @dsize:             data payload size
-> >> + * @pdata:             message data payload
-> >> + */
-> >> +struct sti_mbox_msg {
-> >> +       u32             dsize;
-> >> +       u8              *pdata;
-> >> +};
-> >
-> > As mentioned in another thread, we may just want to add a 'size'
-> > argument to the message send function, and a default helper for
-> > messages with size of 32 bits.
-> >
-> Case-a) 'size' is a member of the payload structure itself
->     The extra 'size' argument would only be used for sanity check.
->     This driver seems so. Lee, can you not do without 'dsize'?
-> 
-> Case-b) 'size' is not a member of payload structure:
->      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
->             Here the size argument is redundant.
-> 
->      b2)  payload length varies
->             This case is highly unlikely because there would be no way
-> for remote to know how many bytes to read as the payload. Not to mean
-> we can't do without the 'size' argument.
-> 
-> Your opinion has huge weight, but I would like to be enlightened
-> before agreeing.
+>> +       writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +static int mhu_startup(struct mbox_chan *chan)
+>> +{
+>> +       struct mhu_link *mlink = chan->con_priv;
+>> +       u32 val;
+>> +       int ret;
+>> +
+>> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
+>> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
+>> +
+>> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
+>> +                         IRQF_SHARED, "mhu_link", chan);
+>
+>
+> Any reason we can't move this to probe and have {en,dis}able_irq here if
+> needed. I has seen it was too heavy to have these especially when
+> sending small packets.
+>
+I see you used to do memcpy in irq-handler
+https://git.linaro.org/landing-teams/working/arm/kernel.git/blob/HEAD:/drivers/mailbox/arm_mhu.c
+perhaps you were using your old driver?
 
-Let's simplify this.
+If you use this new driver, and send packets so often that
+request-release irq has effect, maybe should hold the mailbox
+reference for lifetime. I remember suggesting you that already and I
+remember you said that's how it was.
 
-If you want to have varying length payloads, you have to carry the
-size in the payload.  If you wish to force fixed size payloads, then
-you may do without a size segment.
-
-Do you really want to force all users of Mailbox to use fixed size
-payloads?  That sounds daft to me, as we have no idea how the payload
-is being used by the remote processor.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Jassi
