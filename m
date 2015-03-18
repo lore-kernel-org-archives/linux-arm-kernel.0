@@ -1,158 +1,47 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Wed, 18 Mar 2015 07:15:09 -0700
-Subject: [PATCH 32/35 linux-next] clk: constify of_device_id array
-In-Reply-To: <1426535949-26107-1-git-send-email-fabf@skynet.be>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-1-git-send-email-fabf@skynet.be>
-Message-ID: <20150318141509.7930.28419@quantum>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 18 Mar 2015 15:16:45 +0100
+Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
+ Exynos3250
+In-Reply-To: <1426685545.23982.2.camel@AMDC1943>
+References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
+ <3449559.PngGo6WKuq@amdc1032> <1426685545.23982.2.camel@AMDC1943>
+Message-ID: <5511908.Xj1ZIW6HbI@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Fabian Frederick (2015-03-16 12:59:06)
-> of_device_id is always used as const.
-> (See driver.of_match_table and open firmware functions)
+On Wednesday, March 18, 2015 02:32:25 PM Krzysztof Kozlowski wrote:
+> On ?ro, 2015-03-18 at 14:23 +0100, Bartlomiej Zolnierkiewicz wrote:
+> > Hi,
+> > 
+> > On Wednesday, March 18, 2015 02:10:31 PM Krzysztof Kozlowski wrote:
+> > > 2015-03-18 13:51 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> > > >
+> > > > +       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> > > > +               udelay(10);
+> > > > +       udelay(10);
+> > > 
+> > > We really need to start documenting this. Please add short description
+> > > why this SPARE2 check is here and who uses it. Without documenting
+> > > this behavior future generations won't be able to debug this stuff.
+> > > Imagine replacing sboot with uboot by someone...
+> > 
+> > I've already planned to do this for this code and for coupled cpuidle
+> > use of SPARE2 as well.  However I would really prefer to do it in
+> > an incremental patch if there are no other issues with this patchset.
 > 
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> OK, please do so in incremental patch. Usage of various memory regions
 
-Acked-by: Michael Turquette <mturquette@linaro.org>
+OK.
 
-> ---
->  drivers/clk/clk-palmas.c                 | 2 +-
->  drivers/clk/st/clkgen-fsyn.c             | 2 +-
->  drivers/clk/st/clkgen-mux.c              | 8 ++++----
->  drivers/clk/st/clkgen-pll.c              | 4 ++--
->  drivers/clk/ti/clk-dra7-atl.c            | 2 +-
->  drivers/clk/ti/clockdomain.c             | 2 +-
->  drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
->  7 files changed, 11 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
-> index 8d45992..45a535a 100644
-> --- a/drivers/clk/clk-palmas.c
-> +++ b/drivers/clk/clk-palmas.c
-> @@ -161,7 +161,7 @@ static struct palmas_clks_of_match_data palmas_of_clk32kgaudio = {
->         },
->  };
->  
-> -static struct of_device_id palmas_clks_of_match[] = {
-> +static const struct of_device_id palmas_clks_of_match[] = {
->         {
->                 .compatible = "ti,palmas-clk32kg",
->                 .data = &palmas_of_clk32kg,
-> diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-> index af94ed8..a917c4c 100644
-> --- a/drivers/clk/st/clkgen-fsyn.c
-> +++ b/drivers/clk/st/clkgen-fsyn.c
-> @@ -1057,7 +1057,7 @@ static struct clk * __init st_clk_register_quadfs_fsynth(
->         return clk;
->  }
->  
-> -static struct of_device_id quadfs_of_match[] = {
-> +static const struct of_device_id quadfs_of_match[] = {
->         {
->                 .compatible = "st,stih416-quadfs216",
->                 .data = &st_fs216c65_416
-> diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-> index 9a15ec3..fdcff10 100644
-> --- a/drivers/clk/st/clkgen-mux.c
-> +++ b/drivers/clk/st/clkgen-mux.c
-> @@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
->         .fb_start_bit_idx = 24,
->  };
->  
-> -static struct of_device_id clkgena_divmux_of_match[] = {
-> +static const struct of_device_id clkgena_divmux_of_match[] = {
->         {
->                 .compatible = "st,clkgena-divmux-c65-hs",
->                 .data = &st_divmux_c65hs,
-> @@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
->         .table = prediv_table16,
->  };
->  
-> -static struct of_device_id clkgena_prediv_of_match[] = {
-> +static const struct of_device_id clkgena_prediv_of_match[] = {
->         { .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
->         { .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
->         {}
-> @@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
->         .width = 2,
->  };
->  
-> -static struct of_device_id mux_of_match[] = {
-> +static const struct of_device_id mux_of_match[] = {
->         {
->                 .compatible = "st,stih416-clkgenc-vcc-hd",
->                 .data = &clkgen_mux_c_vcc_hd_416,
-> @@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
->         .lock = &clkgenf_lock,
->  };
->  
-> -static struct of_device_id vcc_of_match[] = {
-> +static const struct of_device_id vcc_of_match[] = {
->         { .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
->         { .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
->         {}
-> diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-> index 29769d7..d204ba8 100644
-> --- a/drivers/clk/st/clkgen-pll.c
-> +++ b/drivers/clk/st/clkgen-pll.c
-> @@ -593,7 +593,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
->         return clk;
->  }
->  
-> -static struct of_device_id c32_pll_of_match[] = {
-> +static const struct of_device_id c32_pll_of_match[] = {
->         {
->                 .compatible = "st,plls-c32-a1x-0",
->                 .data = &st_pll3200c32_a1x_0,
-> @@ -708,7 +708,7 @@ err:
->  }
->  CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
->  
-> -static struct of_device_id c32_gpu_pll_of_match[] = {
-> +static const struct of_device_id c32_gpu_pll_of_match[] = {
->         {
->                 .compatible = "st,stih415-gpu-pll-c32",
->                 .data = &st_pll1200c32_gpu_415,
-> diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
-> index 59bb4b3..d86bc46 100644
-> --- a/drivers/clk/ti/clk-dra7-atl.c
-> +++ b/drivers/clk/ti/clk-dra7-atl.c
-> @@ -294,7 +294,7 @@ static int of_dra7_atl_clk_remove(struct platform_device *pdev)
->         return 0;
->  }
->  
-> -static struct of_device_id of_dra7_atl_clk_match_tbl[] = {
-> +static const struct of_device_id of_dra7_atl_clk_match_tbl[] = {
->         { .compatible = "ti,dra7-atl", },
->         {},
->  };
-> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-> index b4c5fac..35fe108 100644
-> --- a/drivers/clk/ti/clockdomain.c
-> +++ b/drivers/clk/ti/clockdomain.c
-> @@ -52,7 +52,7 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
->         }
->  }
->  
-> -static struct of_device_id ti_clkdm_match_table[] __initdata = {
-> +static const struct of_device_id ti_clkdm_match_table[] __initconst = {
->         { .compatible = "ti,clockdomain" },
->         { }
->  };
-> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
-> index 765f1e0..89c0609 100644
-> --- a/drivers/clk/versatile/clk-vexpress-osc.c
-> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
-> @@ -110,7 +110,7 @@ static int vexpress_osc_probe(struct platform_device *pdev)
->         return 0;
->  }
->  
-> -static struct of_device_id vexpress_osc_of_match[] = {
-> +static const struct of_device_id vexpress_osc_of_match[] = {
->         { .compatible = "arm,vexpress-osc", },
->         {}
->  };
-> -- 
-> 2.1.0
-> 
+> of sysram also should be documented. In patch 2 you add usage of 0x28 +
+> 4*cpu. The various sysrams regions are spread over different files...
+
+I completely agree that there should be some Documentation file with
+the SYSRAM layout.  I'll do it later unless someone beats me to it (please
+also add this to our internal TODO list of open issues, thanks!).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
