@@ -1,108 +1,110 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 18 Mar 2015 09:56:43 +0800
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_GENERIC_SLEEP
-In-Reply-To: <16235723.xVJ1Rfp9tM@vostro.rjw.lan>
-References: <1426234469-6434-1-git-send-email-hanjun.guo@linaro.org>
- <10995588.scpoK3KRg2@vostro.rjw.lan> <5507A91A.1090206@huawei.com>
- <16235723.xVJ1Rfp9tM@vostro.rjw.lan>
-Message-ID: <5508DB5B.2060600@huawei.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Wed, 18 Mar 2015 08:38:38 +0530
+Subject: [PATCH v6] ARM: dts: Add HS400 support for exynos5420 and exynos5800
+Message-ID: <1426648118-20790-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/17 22:33, Rafael J. Wysocki wrote:
-> On Tuesday, March 17, 2015 12:10:02 PM Hanjun Guo wrote:
->> On 2015/3/17 11:23, Rafael J. Wysocki wrote:
->>> On Tuesday, March 17, 2015 10:36:47 AM Hanjun Guo wrote:
->>>> On 2015/3/17 10:28, Rafael J. Wysocki wrote:
->>>>> On Tuesday, March 17, 2015 09:08:45 AM Hanjun Guo wrote:
->>>>>> On 2015/3/17 7:15, Rafael J. Wysocki wrote:
->>>>>>> On Monday, March 16, 2015 08:14:52 PM Hanjun Guo wrote:
->>>>>>>> On 2015?03?14? 05:49, Rafael J. Wysocki wrote:
->>>>>>>>> On Friday, March 13, 2015 04:14:29 PM Hanjun Guo wrote:
->>>>>> [...]
->>>>>>>>>> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
->>>>>>>>>> index 074e52b..e8728d7 100644
->>>>>>>>>> --- a/arch/ia64/Kconfig
->>>>>>>>>> +++ b/arch/ia64/Kconfig
->>>>>>>>>> @@ -10,6 +10,7 @@ config IA64
->>>>>>>>>>   	select ARCH_MIGHT_HAVE_PC_SERIO
->>>>>>>>>>   	select PCI if (!IA64_HP_SIM)
->>>>>>>>>>   	select ACPI if (!IA64_HP_SIM)
->>>>>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
->>>>>>>>>>   	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->>>>>>>>>>   	select HAVE_UNSTABLE_SCHED_CLOCK
->>>>>>>>>>   	select HAVE_IDE
->>>>>>>>>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
->>>>>>>>>> index b7d31ca..9804431 100644
->>>>>>>>>> --- a/arch/x86/Kconfig
->>>>>>>>>> +++ b/arch/x86/Kconfig
->>>>>>>>>> @@ -22,6 +22,7 @@ config X86_64
->>>>>>>>>>   ### Arch settings
->>>>>>>>>>   config X86
->>>>>>>>>>   	def_bool y
->>>>>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI
->>>>>>>>> One more nit.  If you did
->>>>>>>>>
->>>>>>>>> +	select ACPI_GENERIC_SLEEP if ACPI_SLEEP
->>>>>>>>>
->>>>>>>>> here (and above for ia64), you'd avoid having to make ACPI_SLEEP
->>>>>>>>> depend on ACPI_GENERIC_SLEEP which goes somewhat backwards.
->>>>>>>> In sleep.c,
->>>>>>>>
->>>>>>>> #ifdef CONFIG_ACPI_SLEEP
->>>>>>>> acpi_target_system_state()
->>>>>>>> {
->>>>>>>> }
->>>>>>>> #endif
->>>>>>>>
->>>>>>>> and CONFIG_ACPI_SLEEP depends on SUSPEND || HIBERNATION,
->>>>>>>> which one of them will be enabled on ARM64 so ACPI_SLEEP
->>>>>>>> will also enabled too.
->>>>>>>>
->>>>>>>> So if we
->>>>>>>>
->>>>>>>> +select ACPI_GENERIC_SLEEP if ACPI_SLEEP
->>>>>>>>
->>>>>>>> and
->>>>>>>>
->>>>>>>> +acpi-$(CONFIG_ACPI_GENERIC_SLEEP) += sleep.o
->>>>>>>>
->>>>>>>> it will lead to errors for acpi_target_system_state() that
->>>>>>>> is declared but not defined, so I will keep the code as
->>>>>>>> it is, what do you think?
->>>>>>> No, we need to hash this out.  Having two different Kconfig options meaning
->>>>>>> almost the same thing (ACPI_SLEEP and ACPI_GENERIC_SLEEP) is beyond ugly.
->>>>>>>
->>>>>>> Do you need ACPI_SLEEP on ARM64 at all?
->>>>>> No, at least for now we don't need it, the spec for sleep is not ready for
->>>>>> ARM64 arch, so ACPI_SLEEP will not work at all on ARM64.
->>>>> Well, so what about selecting ACPI_SLEEP from the architectures that use it?
->>>> Do you mean remove CONFIG_ACPI_GENERIC_SLEEP and
->>>>
->>>> +acpi-$(CONFIG_ACPI_SLEEP) += sleep.o
->>>>
->>>> as well (also need to remove duplicate #ifdef CONFIG_ACPI_SLEEP in sleep.c if
->>>> we doing so)?
->>> Well, almost.  There is one problem with that, becuase sleep.c contains code
->>> outside of the ACPI_SLEEP-dependent blocks.  That code is used for powering
->>> off ACPI platforms.
->>>
->>> I guess you don't want that code on ARM too, right?
->> Yes, you are right.
->>
->>> Perhaps we can use ACPI_REDUCED_HARDWARE_ONLY for that?  ARM64 will be the
->> Sorry, I can't fully understand your intention here, could you please
->> explain it more?
->>
->> Let me guess a little bit. Do you mean use ACPI_REDUCED_HARDWARE_ONLY for
->> powering off ACPI platforms? if so, I guess it's not a good idea, ACPI spec
->> only says that S4BIOS is not supported on HW-reduced ACPI platforms, S5
->> has no such limitation, if I miss something here, please let me know.
-> OK, so in your current patch, please replace ACPI_GENERIC_SLEEP with
-> ACPI_SYSTEM_POWER_STATES_SUPPORT and all should be clear.
+From: Seungwon Jeon <tgih.jun@samsung.com>
 
-OK, I will send a updated patch.
+HS400 timing values are added for SMDK5420, exynos5420-peach-pit
+and exynos5800-peach-pi boards.
+This also adds RCLK GPIO line, this gpio should be in pull-down
+state.
+This also enables HS400 on peach-pi and this updates the clock frequency
+to 800MHz to be set as input clock to controller.
 
-Thanks
-Hanjun
+Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+[Alim: addressed review comments]
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+Changes in V6:
+	Rebased on kukjin's for-next branch[0] 
+	(commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
+
+[0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
+ arch/arm/boot/dts/exynos5420-smdk5420.dts  | 4 +++-
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
+ 4 files changed, 18 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index d0ee55f..e158861 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -695,8 +695,10 @@
+ 	samsung,dw-mshc-ciu-div = <3>;
+ 	samsung,dw-mshc-sdr-timing = <0 4>;
+ 	samsung,dw-mshc-ddr-timing = <0 2>;
++	samsung,dw-mshc-hs400-timing = <0 2>;
++	samsung,read-strobe-delay = <90>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
++	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+ 	bus-width = <8>;
+ };
+ 
+diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+index ba686e4..8b15316 100644
+--- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+@@ -201,6 +201,13 @@
+ 			samsung,pin-drv = <3>;
+ 		};
+ 
++		sd0_rclk: sd0-rclk {
++			samsung,pins = "gpc0-7";
++			samsung,pin-function = <2>;
++			samsung,pin-pud = <1>;
++			samsung,pin-drv = <3>;
++		};
++
+ 		sd1_cmd: sd1-cmd {
+ 			samsung,pins = "gpc1-1";
+ 			samsung,pin-function = <2>;
+diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+index 7a56852..de5e41e 100644
+--- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
++++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+@@ -80,8 +80,10 @@
+ 		samsung,dw-mshc-ciu-div = <3>;
+ 		samsung,dw-mshc-sdr-timing = <0 4>;
+ 		samsung,dw-mshc-ddr-timing = <0 2>;
++		samsung,dw-mshc-hs400-timing = <0 2>;
++		samsung,read-strobe-delay = <90>;
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
++		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+ 		bus-width = <8>;
+ 		cap-mmc-highspeed;
+ 	};
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 7ea1d66..2e84613 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -650,15 +650,18 @@
+ 	num-slots = <1>;
+ 	broken-cd;
+ 	mmc-hs200-1_8v;
++	mmc-hs400-1_8v;
+ 	cap-mmc-highspeed;
+ 	non-removable;
+ 	card-detect-delay = <200>;
+-	clock-frequency = <400000000>;
++	clock-frequency = <800000000>;
+ 	samsung,dw-mshc-ciu-div = <3>;
+ 	samsung,dw-mshc-sdr-timing = <0 4>;
+ 	samsung,dw-mshc-ddr-timing = <0 2>;
++	samsung,dw-mshc-hs400-timing = <0 2>;
++	samsung,read-strobe-delay = <90>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
++	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+ 	bus-width = <8>;
+ };
+ 
+-- 
+1.9.1
