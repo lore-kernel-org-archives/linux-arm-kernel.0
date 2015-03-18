@@ -1,39 +1,101 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 18 Mar 2015 15:53:00 +0000
-Subject: [PATCH 01/13] ARM: at91: Add big endian configuration for ATSAMA5D
- devices
+Date: Wed, 18 Mar 2015 15:53:01 +0000
+Subject: [PATCH 02/13] tty: serial: atmel: fix big-endian on ARMv7 devices
 In-Reply-To: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1426693992-31163-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1426693992-31163-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ATSAMA5D devices are based on Cortex-A5 which should work in big
-endian configuration. Add ARCH_SUPPORTS_BIG_ENDIAN if these SoCs are
-configured so we can run the system big endian.
+Add support for using this driver on ARMv7 devices configured for
+big endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
-CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-CC: Andrew Victor <linux@maxim.org.za>
 CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-CC: Jean-Christophe Plagniol-Villard
-CC: Russell King <linux@arm.linux.org.uk>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC: Jiri Slaby <jslaby@suse.cz>
+CC: linux-serial at vger.kernel.org
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 ---
- arch/arm/mach-at91/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/atmel_serial.c | 62 ++++++++++++++++++++++-----------------
+ 1 file changed, 35 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index c74a443..05212fb 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -18,6 +18,7 @@ config HAVE_AT91_H32MX
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 4e959c4..40ef95f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -88,36 +88,44 @@ static void atmel_stop_rx(struct uart_port *port);
  
- config SOC_SAMA5
- 	bool
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ATMEL_AIC5_IRQ
- 	select COMMON_CLK_AT91
- 	select CPU_V7
+ #define ATMEL_ISR_PASS_LIMIT	256
+ 
++#ifdef CONFIG_AVR32
++#define __atserial_writel	__raw_writel
++#define __atserial_readl	__raw_readl
++#else
++#define __atserial_writel	writel_relaxed
++#define __atserial_readl	readl_relaxed
++#endif
++
+ /* UART registers. CR is write-only, hence no GET macro */
+-#define UART_PUT_CR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_CR)
+-#define UART_GET_MR(port)	__raw_readl((port)->membase + ATMEL_US_MR)
+-#define UART_PUT_MR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_MR)
+-#define UART_PUT_IER(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_IER)
+-#define UART_PUT_IDR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_IDR)
+-#define UART_GET_IMR(port)	__raw_readl((port)->membase + ATMEL_US_IMR)
+-#define UART_GET_CSR(port)	__raw_readl((port)->membase + ATMEL_US_CSR)
+-#define UART_GET_CHAR(port)	__raw_readl((port)->membase + ATMEL_US_RHR)
+-#define UART_PUT_CHAR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_THR)
+-#define UART_GET_BRGR(port)	__raw_readl((port)->membase + ATMEL_US_BRGR)
+-#define UART_PUT_BRGR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_BRGR)
+-#define UART_PUT_RTOR(port,v)	__raw_writel(v, (port)->membase + ATMEL_US_RTOR)
+-#define UART_PUT_TTGR(port, v)	__raw_writel(v, (port)->membase + ATMEL_US_TTGR)
+-#define UART_GET_IP_NAME(port)	__raw_readl((port)->membase + ATMEL_US_NAME)
+-#define UART_GET_IP_VERSION(port) __raw_readl((port)->membase + ATMEL_US_VERSION)
++#define UART_PUT_CR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_CR)
++#define UART_GET_MR(port)	__atserial_readl((port)->membase + ATMEL_US_MR)
++#define UART_PUT_MR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_MR)
++#define UART_PUT_IER(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_IER)
++#define UART_PUT_IDR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_IDR)
++#define UART_GET_IMR(port)	__atserial_readl((port)->membase + ATMEL_US_IMR)
++#define UART_GET_CSR(port)	__atserial_readl((port)->membase + ATMEL_US_CSR)
++#define UART_GET_CHAR(port)	__atserial_readl((port)->membase + ATMEL_US_RHR)
++#define UART_PUT_CHAR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_THR)
++#define UART_GET_BRGR(port)	__atserial_readl((port)->membase + ATMEL_US_BRGR)
++#define UART_PUT_BRGR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_BRGR)
++#define UART_PUT_RTOR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_US_RTOR)
++#define UART_PUT_TTGR(port, v)	__atserial_writel(v, (port)->membase + ATMEL_US_TTGR)
++#define UART_GET_IP_NAME(port)	__atserial_readl((port)->membase + ATMEL_US_NAME)
++#define UART_GET_IP_VERSION(port) __atserial_readl((port)->membase + ATMEL_US_VERSION)
+ 
+  /* PDC registers */
+-#define UART_PUT_PTCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_PTCR)
+-#define UART_GET_PTSR(port)	__raw_readl((port)->membase + ATMEL_PDC_PTSR)
+-
+-#define UART_PUT_RPR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_RPR)
+-#define UART_GET_RPR(port)	__raw_readl((port)->membase + ATMEL_PDC_RPR)
+-#define UART_PUT_RCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_RCR)
+-#define UART_PUT_RNPR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_RNPR)
+-#define UART_PUT_RNCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_RNCR)
+-
+-#define UART_PUT_TPR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_TPR)
+-#define UART_PUT_TCR(port,v)	__raw_writel(v, (port)->membase + ATMEL_PDC_TCR)
+-#define UART_GET_TCR(port)	__raw_readl((port)->membase + ATMEL_PDC_TCR)
++#define UART_PUT_PTCR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_PTCR)
++#define UART_GET_PTSR(port)	__atserial_readl((port)->membase + ATMEL_PDC_PTSR)
++
++#define UART_PUT_RPR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_RPR)
++#define UART_GET_RPR(port)	__atserial_readl((port)->membase + ATMEL_PDC_RPR)
++#define UART_PUT_RCR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_RCR)
++#define UART_PUT_RNPR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_RNPR)
++#define UART_PUT_RNCR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_RNCR)
++
++#define UART_PUT_TPR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_TPR)
++#define UART_PUT_TCR(port,v)	__atserial_writel(v, (port)->membase + ATMEL_PDC_TCR)
++#define UART_GET_TCR(port)	__atserial_readl((port)->membase + ATMEL_PDC_TCR)
+ 
+ struct atmel_dma_buffer {
+ 	unsigned char	*buf;
 -- 
 2.1.4
