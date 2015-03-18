@@ -1,53 +1,51 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 18 Mar 2015 14:04:50 -0400
-Subject: [PATCH RFC/RFT 3/6] ARM: vexpress: DCSCB: tighten CPU validity
- assertion
-In-Reply-To: <1426701893-25589-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1426701893-25589-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1426701893-25589-4-git-send-email-nicolas.pitre@linaro.org>
+Date: Wed, 18 Mar 2015 14:04:47 -0400
+Subject: [PATCH RFC/RFT 0/6] MCPM refactoring and major backend simplification
+Message-ID: <1426701893-25589-1-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the cpu argument validity check uses a hardcoded limit of 4.
-The DCSCB configuration data provides the actual number of CPUs and
-we already use it elsewhere.  Let's improve the cpu argument validity
-check by using that information instead.
+After 3 years in the field and new platforms using MCPM, it is time to
+look at what can be improved.  It has become obvious that most backends
+are reimplementing the same overall code structure which ought to be better
+abstracted into the core code.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
----
- arch/arm/mach-vexpress/dcscb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Things can be simplified greatly by moving all the locking handling to the
+core code, leaving machine specific backend only with simple and straight
+forward small operations performed under lock protection. It will no longer
+be necessary for backend authors to know about all the MCPM subtleties for
+their code to be "right". The low-level MCPM locking primitives could also
+become private to the MCPM core which is a plus for maintenance.
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 30b993399e..12c74734cd 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -54,7 +54,7 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 	unsigned int all_mask;
- 
- 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
--	if (cpu >= 4 || cluster >= 2)
-+	if (cluster >= 2 || !(cpumask & dcscb_allcpus_mask[cluster]))
- 		return -EINVAL;
- 
- 	all_mask = dcscb_allcpus_mask[cluster];
-@@ -105,7 +105,7 @@ static void dcscb_power_down(void)
- 	cpumask = (1 << cpu);
- 
- 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
--	BUG_ON(cpu >= 4 || cluster >= 2);
-+	BUG_ON(cluster >= 2 || !(cpumask & dcscb_allcpus_mask[cluster]));
- 
- 	all_mask = dcscb_allcpus_mask[cluster];
- 
-@@ -189,7 +189,7 @@ static void __init dcscb_usage_count_init(void)
- 	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
- 
- 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
--	BUG_ON(cpu >= 4 || cluster >= 2);
-+	BUG_ON(cluster >= 2 || !((1 << cpu) & dcscb_allcpus_mask[cluster]));
- 	dcscb_use_count[cpu][cluster] = 1;
- }
- 
--- 
-2.1.0
+The diffstat also shows a clear benefit.  Despite the addition of new
+documentation, the number of removed lines is significant, especially for
+backend code.
+
+To avoid a flag day, the new scheme is introduced in parallel to the
+existing backend interface. I would like for this series to hit mainline
+during the next merge window, and those new backends also queued for the
+next merge window could be merged in parallel even if they are not
+converted yet. Then, during the next cycle those backends could be
+converted over and the backward compatibility removed.
+
+The hisi04 backend, though, is instead converted to raw SMP operations
+as it currently doesn't benefit from MCPM at all and doesn't fit well
+with the new backend structure.
+
+This series can also be obtained from the following Git repository:
+
+	http://git.linaro.org/people/nicolas.pitre/linux.git mcpm
+
+Everything was compile tested, however runtime testing only happened
+on TC2.  Reviews and test results are appreciated.
+
+ arch/arm/common/mcpm_entry.c       | 202 +++++++++++++++++----
+ arch/arm/include/asm/mcpm.h        |  65 ++++++-
+ arch/arm/mach-exynos/mcpm-exynos.c | 246 ++++++--------------------
+ arch/arm/mach-hisi/platmcpm.c      | 127 +++++---------
+ arch/arm/mach-vexpress/dcscb.c     | 197 +++++++--------------
+ arch/arm/mach-vexpress/tc2_pm.c    | 291 +++++++++----------------------
+ 6 files changed, 474 insertions(+), 654 deletions(-)
+
+
+Nicolas
