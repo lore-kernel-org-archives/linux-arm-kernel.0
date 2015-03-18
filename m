@@ -1,38 +1,46 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 17:21:13 +0000
-Subject: [PATCH v2 0/6] pinctrl: st: Fix disparity between Pinctrl & GPIO in
- /sysfs
-Message-ID: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 18 Mar 2015 17:21:14 +0000
+Subject: [PATCH v2 1/6] ARM: STi: DT: STiH407: Fix retime pin mask for PIO5
+ and PIO35
+In-Reply-To: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
+References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1426699279-9258-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 2:
-  Fixed up Maxime's review comments
-    - Reduce size of char array
-    - Use snprintf()
-  Applied Maxime's Acks 
+From: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
 
-ST's hardware differentiates between GPIO mode and Pinctrl alternate
-functions.  When a pin is in GPIO mode, there are dedicated registers
-to set and obtain direction status.  However, If a pin's alternate
-function is in use then the direction is set and status is derived
-from a bunch of syscon registers.  The issue is; until now there was
-a lack of parity between the two.
+This will avoid programming the retime registers when not implemented
 
-Karim BEN BELGACEM (1):
-  ARM: STi: DT: STiH407: Fix retime pin mask for PIO5 and PIO35
+- PIO5  : no retime registers assigned to pins 6 and 7
+- PIO35 : pin 7 is reserved so no retime register assigned to it
 
-Lee Jones (5):
-  pinctrl: st: Introduce a 'get pin function' call
-  pinctrl: st: Move st_get_pio_control() further up the source file
-  pinctrl: st: Supply a GPIO get_direction() call-back
-  pinctrl: st: Show correct pin direction -- even when in GPIO mode
-  pinctrl: st: Display pin's function when printing pinctrl debug
-    information
+Signed-off-by: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
- arch/arm/boot/dts/stih407-pinctrl.dtsi |  2 +
- drivers/pinctrl/pinctrl-st.c           | 83 +++++++++++++++++++++++++++++-----
- 2 files changed, 73 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 402844c..0a754f2 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -104,6 +104,7 @@
+ 				#interrupt-cells = <2>;
+ 				reg = <0x5000 0x100>;
+ 				st,bank-name = "PIO5";
++				st,retime-pin-mask = <0x3f>;
+ 			};
+ 
+ 			rc {
+@@ -519,6 +520,7 @@
+ 				#interrupt-cells = <2>;
+ 				reg = <0x5000 0x100>;
+ 				st,bank-name = "PIO35";
++				st,retime-pin-mask = <0x7f>;
+ 			};
+ 
+ 			i2c4 {
 -- 
 1.9.1
