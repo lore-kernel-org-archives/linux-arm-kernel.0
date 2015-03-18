@@ -1,154 +1,124 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 18 Mar 2015 14:08:35 +0000
-Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <CABb+yY2woK6qWbrgPGRBRXJqJdf=1HxE_-Am-SY1_Uf_dNgTew@mail.gmail.com>
-References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>	<1425466884-30648-1-git-send-email-vincent.yang@socionext.com>	<55094BEF.9060006@arm.com>
- <CABb+yY2woK6qWbrgPGRBRXJqJdf=1HxE_-Am-SY1_Uf_dNgTew@mail.gmail.com>
-Message-ID: <550986E3.8030605@arm.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 18 Mar 2015 15:36:01 +0100
+Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
+ CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
+In-Reply-To: <1426661211-14272-1-git-send-email-hanjun.guo@linaro.org>
+References: <1426661211-14272-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <356700098.jFZbVDoYAQ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday, March 18, 2015 02:46:51 PM Hanjun Guo wrote:
+> From: Graeme Gregory <graeme.gregory@linaro.org>
+> 
+> ACPI 5.1 does not currently support S states for ARM64 hardware but
+> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
+> for device power management, so introduce
+> CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT and select it for x86 and
+> ia64 only to make sleep functions available, and also introduce stub
+> function to allow other drivers to function until S states are defined
+> for ARM64.
+> 
+> It will be no functional change for x86 and IA64.
+> 
+> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-On 18/03/15 12:56, Jassi Brar wrote:
-> On Wed, Mar 18, 2015 at 3:27 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Vincent,
->>
->> I see that this driver is queued but most of my earlier comments were
->> not addressed.
->>
-> Some of your comments have been addressed as changes and some as replies.
->
->> *No ACK from DT binding maintainers too*.
->>
-> Yeah it would have been great to have some ack. It has been many
-> months now, but I see its not uncommon for bindings go in via
-> maintainers. I assume folks find it just normal.
->
+> ---
+> Hi Lorenzo,
+> 
+> Since this patch only updated the config name with no fucntion
+> change, I assume your ACK still apply, if not, please let me
+> know.
+> 
+> Thanks
+> Hanjun
+> ---
+>  arch/ia64/Kconfig       | 1 +
+>  arch/x86/Kconfig        | 1 +
+>  drivers/acpi/Kconfig    | 4 ++++
+>  drivers/acpi/Makefile   | 2 +-
+>  drivers/acpi/internal.h | 4 ++++
+>  5 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> index 074e52b..cc3414f 100644
+> --- a/arch/ia64/Kconfig
+> +++ b/arch/ia64/Kconfig
+> @@ -10,6 +10,7 @@ config IA64
+>  	select ARCH_MIGHT_HAVE_PC_SERIO
+>  	select PCI if (!IA64_HP_SIM)
+>  	select ACPI if (!IA64_HP_SIM)
+> +	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
+>  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+>  	select HAVE_UNSTABLE_SCHED_CLOCK
+>  	select HAVE_IDE
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index b7d31ca..c3ea9f9 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -22,6 +22,7 @@ config X86_64
+>  ### Arch settings
+>  config X86
+>  	def_bool y
+> +	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
+>  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
+>  	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
+>  	select ARCH_HAS_FAST_MULTIPLIER
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index e6c3ddd..a726381 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
+>  config ARCH_MIGHT_HAVE_ACPI_PDC
+>  	bool
+>  
+> +config ACPI_SYSTEM_POWER_STATES_SUPPORT
+> +	bool
+> +
+>  config ACPI_SLEEP
+>  	bool
+>  	depends on SUSPEND || HIBERNATION
+> +	depends on ACPI_SYSTEM_POWER_STATES_SUPPORT
+>  	default y
+>  
+>  config ACPI_PROCFS_POWER
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 623b117..db153c6 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -23,7 +23,7 @@ acpi-y				+= nvs.o
+>  
+>  # Power management related files
+>  acpi-y				+= wakeup.o
+> -acpi-y				+= sleep.o
+> +acpi-$(CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT) += sleep.o
+>  acpi-y				+= device_pm.o
+>  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
+>  
+> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+> index 56b321a..ba4a61e 100644
+> --- a/drivers/acpi/internal.h
+> +++ b/drivers/acpi/internal.h
+> @@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
+>  /*--------------------------------------------------------------------------
+>                                    Suspend/Resume
+>    -------------------------------------------------------------------------- */
+> +#ifdef CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
+>  extern int acpi_sleep_init(void);
+> +#else
+> +static inline int acpi_sleep_init(void) { return -ENXIO; }
+> +#endif
+>  
+>  #ifdef CONFIG_ACPI_SLEEP
+>  int acpi_sleep_proc_init(void);
+> 
 
-OK, but I have one concern in the binding as mentioned previous and
-again as below.
-
->>> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
->>> @@ -0,0 +1,43 @@
->>> +ARM MHU Mailbox Driver
->>> +======================
->>> +
->>> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
->>> +3 independent channels/links to communicate with remote processor(s).
->>> + MHU links are hardwired on a platform. A link raises interrupt for any
->>
->>
->> As I had mentioned before it's just one implementation, the IP had
->> provision bi-directional interrupts and the binding *has to consider*
->> that instead of having to workaround that later.
->>
-> I will reply in yet another way.... the spec I have don't mention that
-> (and it makes sense) and your platform doesn't do that either. I would
-> have had to do something about it, had there been such a weird setup,
-> but there's none known.
->
-
-Not just weird setup, even extending Tx support with this binding is not
-straight forward.
-
-Simple example:
-Today you have:
-		interrupts = <0 36 4>, /* LP-NonSecure */
-			     <0 35 4>, /* HP-NonSecure */
-			     <0 37 4>; /* Secure */
-
-I don't want to specify Secure IRQ on my platform, which should be fine.
-In future a variant of that platform gets Tx interrupts, then I will add
-something like below:
-		interrupts = <0 36 4>, /* LP-NonSecure Rx */
-			     <0 35 4>, /* HP-NonSecure Rx */
-			     <0 39 4>, /* LP-NonSecure Tx */
-			     <0 38 4>, /* HP-NonSecure Tx */
-
-Now how will we handle this ?
-
-I am just suggesting to use interrupt-names so that we don't depend on
-ordering in DT implicitly from first by fixing the binding.
-
->   So let us please avoid getting into bikeshedding discussion yet
-> again. Otherwise almost every binding is broken because there could
-> always be some platform that does weird things with irqs.
->
-
-Sorry I don't buy that given that using interrupt-names simplifies
-things and also helps to hand any such cases.
-
->>> +The last channel is specified to be a 'Secure' resource, hence can't be
->>> +used by Linux running NS.
->>
->> Correct so drop the support for secure channel until the first user
->> comes up.
->>
-> In your last post you said:
->    "Sorry my statement was not clear, I wanted to ask you to add that info
-> to the binding."
->    Not that it makes sense to say the obvious, I added it just to
-> address your comment.
->
->> I am worried it might generate abort if someone tries to
->> access it in ARM64 which always runs in non-secure.
->>
-> Abort should have happened years ago if someone _tries_ to access a
-> secure resource from non-secure mode ;)
-> How do you protect such people from "trying to" dereference NULL
-> pointers?  (you made me repeat Nth time).
->
-
-When the general practice everywhere in the kernel is to avoid secure
-accesses *unless and until absolutely necessary*, I don't understand
-*why exactly we need the exception here* ? I am OK if you add that
-justification with the first user of that channel. We have seen several
-cases/issues around that and I am just looking for a strong reason to
-add secure channel support here.
-
->>> +
->>> +static struct amba_id mhu_ids[] = {
->>> +       {
->>> +               .id     = 0x1bb098,
->>
->>
->> As I mentioned couple of times this is broken. Please refer my earlier mail
->> for details. You are skipping a field to compare which incorrect.
->> You are just trying to get it working with existing AMBA driver without any
->> changes matching the IDs partially.
->>
-> I did not miss your last mail. Let me try to reply in even simpler
-> terms... PID[0,3] identification is fine grained enough. If/when we
-> have some platform with non-ARM MHU, we could catch that in this
-> driver. Most likely even then the reg-map won't change drastically, if
-> at all. So we could ignore the PID4, otherwise we check PID4 in this
-> driver and adapt the behavior.
-
-I am just looking for ARM MHU implementation, not any non-ARM MHU.
-If look at the MHU spec[1], excerpts below:
-
-PID_4 Register
-
-[31:8]	-	Reserved. Read as zero.
-[7:4]	SIZE	Indicates the log2 of the number of 4KB blocks that the 
-interface occupies. Set to 0x0.
-[3:0]	DES_2	JEP106 continuation code that identifies the designer. Set 
-to 0x4 for ARM.
-
-PID_1 Register
-
-[31:8]	-	Reserved. Read as zero.
-[7:4]	DES_0	Bits [3:0] of the JEP Identity. Set to 0xB for ARM.
-[3:0]	PART_1	Bits [11:8] of the part number. Set to 0x0.
-
-Now by skipping PID4 DES_2 part, you are not comparing the designer
-correctly. It may be OK to fix in the driver as you mentioned.
-Not sure if it's better to fix AMBA, or just don't use AMBA for
-IP with JEP106 code. I don't have any strong opinion there.
-
-Regards,
-Sudeep
-
-[1] 
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0515b/CHDBFACE.html#id5278622
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
