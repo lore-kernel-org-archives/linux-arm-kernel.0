@@ -1,10 +1,10 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 18 Mar 2015 20:16:04 +0100
-Subject: [PATCH/RFC 5/5] ARM: shmobile: r8a7794: Add INTC-SYS clock to device
+Date: Wed, 18 Mar 2015 20:16:01 +0100
+Subject: [PATCH/RFC 2/5] ARM: shmobile: r8a73a4: Add INTC-SYS clock to device
  tree
 In-Reply-To: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
 References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1426706164-28309-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1426706164-28309-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,47 +16,56 @@ Runtime PM.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 7 ++++---
- include/dt-bindings/clock/r8a7794-clock.h | 1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a73a4.dtsi            | 11 +++++++----
+ include/dt-bindings/clock/r8a73a4-clock.h |  1 +
+ 2 files changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 01cf54f70501e8c2..5667d284a3f0af92 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -48,6 +48,7 @@
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 7ee22a41c6c97488..76618a911b9a4e7a 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -443,6 +443,7 @@
  			<0 0xf1004000 0 0x2000>,
  			<0 0xf1006000 0 0x2000>;
- 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&mstp4_clks R8A7794_CLK_INTC_SYS>;
+ 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		clocks = <&mstp4_clks R8A73A4_CLK_INTC_SYS>;
  	};
  
- 	cmt0: timer at ffca0000 {
-@@ -629,10 +630,10 @@
+ 	bsc: bus at fec10000 {
+@@ -726,16 +727,18 @@
  		mstp4_clks: mstp4_clks at e6150140 {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
  			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
--			clocks = <&cp_clk>;
-+			clocks = <&cp_clk>, <&zs_clk>;
+-			clocks = <&main_div2_clk>, <&main_div2_clk>,
++			clocks = <&main_div2_clk>, <&cpg_clocks R8A73A4_CLK_ZS>,
++				 <&main_div2_clk>,
+ 				 <&cpg_clocks R8A73A4_CLK_HP>,
+ 				 <&cpg_clocks R8A73A4_CLK_HP>;
  			#clock-cells = <1>;
--			clock-indices = <R8A7794_CLK_IRQC>;
--			clock-output-names = "irqc";
-+			clock-indices = <R8A7794_CLK_IRQC R8A7794_CLK_INTC_SYS>;
-+			clock-output-names = "irqc", "intc-sys";
+ 			clock-indices = <
+-				R8A73A4_CLK_IRQC R8A73A4_CLK_IIC5
+-				R8A73A4_CLK_IIC4 R8A73A4_CLK_IIC3
++				R8A73A4_CLK_IRQC R8A73A4_CLK_INTC_SYS
++				R8A73A4_CLK_IIC5 R8A73A4_CLK_IIC4
++				R8A73A4_CLK_IIC3
+ 			>;
+ 			clock-output-names =
+-				"irqc", "iic5", "iic4", "iic3";
++				"irqc", "intc-sys", "iic5", "iic4", "iic3";
  		};
- 		mstp7_clks: mstp7_clks at e615014c {
- 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 09da38a58776b403..3ea8cea7d3e79d87 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -62,6 +62,7 @@
- 
- /* MSTP4 */
- #define R8A7794_CLK_IRQC		7
-+#define R8A7794_CLK_INTC_SYS		8
+ 		mstp5_clks: mstp5_clks at e6150144 {
+ 			compatible = "renesas,r8a73a4-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a73a4-clock.h b/include/dt-bindings/clock/r8a73a4-clock.h
+index dd11ecdf837e8e65..4b36681572570c15 100644
+--- a/include/dt-bindings/clock/r8a73a4-clock.h
++++ b/include/dt-bindings/clock/r8a73a4-clock.h
+@@ -54,6 +54,7 @@
+ #define R8A73A4_CLK_IIC3	11
+ #define R8A73A4_CLK_IIC4	10
+ #define R8A73A4_CLK_IIC5	9
++#define R8A73A4_CLK_INTC_SYS	8
+ #define R8A73A4_CLK_IRQC	7
  
  /* MSTP5 */
- #define R8A7794_CLK_THERMAL		22
 -- 
 1.9.1
