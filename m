@@ -1,86 +1,62 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 18 Mar 2015 20:12:13 +0100
-Subject: [PATCH RFC 2/3] ARM: sun7i: Add A20 SRAM and SRAM controller
-In-Reply-To: <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
- <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5509CE0D.7000904@redhat.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Wed, 18 Mar 2015 20:16:04 +0100
+Subject: [PATCH/RFC 5/5] ARM: shmobile: r8a7794: Add INTC-SYS clock to device
+ tree
+In-Reply-To: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
+References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1426706164-28309-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Link the ARM GIC to the INTC-SYS module clock, so it can be power
+managed using that clock in the future.
 
-On 12-03-15 14:13, Maxime Ripard wrote:
-> The A20 has a few SRAM that can be mapped either to a device or to the CPU,
-> with the mapping being controlled by an SRAM controller.
->
-> Since most of the time these SRAM won't be accessible by the CPU, we can't use
-> the mmio-sram driver and compatible.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->   arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++++++++++++++++-
->   1 file changed, 30 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index a1ebd80e6f24..a249828a1df5 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -522,12 +522,41 @@
->   		};
->   	};
->
-> -	soc at 01c00000 {
-> +	soc {
+Note that currently the GIC driver doesn't support module clocks nor
+Runtime PM.
 
-Please do not do this, this changes devicetree paths used by
-u-boot, see:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a7794.dtsi            | 7 ++++---
+ include/dt-bindings/clock/r8a7794-clock.h | 1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-http://git.denx.de/?p=u-boot.git;a=blob;f=include/configs/sunxi-common.h#l232
-
-Other then that this sets looks good to me, I'm giving it a test-spin
-now.
-
-Regards,
-
-Hans
-
-
->   		compatible = "simple-bus";
->   		#address-cells = <1>;
->   		#size-cells = <1>;
->   		ranges;
->
-> +		sram at 00000000 {
-> +			compatible = "allwinner,sun4i-a10-sram";
-> +			reg = <0x00000000 0x4000>;
-> +			allwinner,sram-name = "A1";
-> +		};
-> +
-> +		sram at 00004000 {
-> +			compatible = "allwinner,sun4i-a10-sram";
-> +			reg = <0x00004000 0x4000>;
-> +			allwinner,sram-name = "A2";
-> +		};
-> +
-> +		sram at 00008000 {
-> +			compatible = "allwinner,sun4i-a10-sram";
-> +			reg = <0x00008000 0x4000>;
-> +			allwinner,sram-name = "A3-A4";
-> +		};
-> +
-> +		sram at 00010000 {
-> +			compatible = "allwinner,sun4i-a10-sram";
-> +			reg = <0x00010000 0x1000>;
-> +			allwinner,sram-name = "D";
-> +		};
-> +
-> +		sram-controller at 01c00000 {
-> +			compatible = "allwinner,sun7i-a20-sram-controller";
-> +			reg = <0x01c00000 0x30>;
-> +		};
-> +
->   		nmi_intc: interrupt-controller at 01c00030 {
->   			compatible = "allwinner,sun7i-a20-sc-nmi";
->   			interrupt-controller;
->
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 01cf54f70501e8c2..5667d284a3f0af92 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -48,6 +48,7 @@
+ 			<0 0xf1004000 0 0x2000>,
+ 			<0 0xf1006000 0 0x2000>;
+ 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
++		clocks = <&mstp4_clks R8A7794_CLK_INTC_SYS>;
+ 	};
+ 
+ 	cmt0: timer at ffca0000 {
+@@ -629,10 +630,10 @@
+ 		mstp4_clks: mstp4_clks at e6150140 {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
+-			clocks = <&cp_clk>;
++			clocks = <&cp_clk>, <&zs_clk>;
+ 			#clock-cells = <1>;
+-			clock-indices = <R8A7794_CLK_IRQC>;
+-			clock-output-names = "irqc";
++			clock-indices = <R8A7794_CLK_IRQC R8A7794_CLK_INTC_SYS>;
++			clock-output-names = "irqc", "intc-sys";
+ 		};
+ 		mstp7_clks: mstp7_clks at e615014c {
+ 			compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index 09da38a58776b403..3ea8cea7d3e79d87 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -62,6 +62,7 @@
+ 
+ /* MSTP4 */
+ #define R8A7794_CLK_IRQC		7
++#define R8A7794_CLK_INTC_SYS		8
+ 
+ /* MSTP5 */
+ #define R8A7794_CLK_THERMAL		22
+-- 
+1.9.1
