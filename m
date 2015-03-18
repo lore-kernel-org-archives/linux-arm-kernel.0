@@ -1,74 +1,50 @@
 From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Wed, 18 Mar 2015 19:17:36 +0530
-Subject: [PATCH v8 3/3] Documentation: dma: Add documentation for the APM
- X-Gene SoC DMA device DTS binding
-In-Reply-To: <1426686456-15536-1-git-send-email-rsahu@apm.com>
-References: <1426686456-15536-1-git-send-email-rsahu@apm.com>
-Message-ID: <1426686456-15536-4-git-send-email-rsahu@apm.com>
+Date: Wed, 18 Mar 2015 19:17:33 +0530
+Subject: [PATCH v8 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
+Message-ID: <1426686456-15536-1-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for the APM X-Gene SoC DMA device DTS binding
+This patch set implements the APM X-Gene SoC DMA driver support to offload
+the DMA operations such as memory copy(memcpy), scatter gather memory copy,
+raid5 xor and raid6 p+q.
+
+v8 changes:
+	1. Fixed macro namespace issues.
+	2. Fixed tx status check issues.
+v7 changes:
+	1. Added raid5 xor offload support.
+	2. Added raid6 p+q offload support.
+v6 changes:
+	1. Maintained sw queue for pending, running, and completed
+	   requests. Used link list as queue.
+	2. Fixed issue_pending and tx_submit routines.
+	3. Fixed prep_dma routines.
+	4. Fixed free_irqs.
+
+v5 changes:
+	1. Minor changes in coding style.
+	2. Added DMA_CTRL_ACK flag initialization
+v4 changes:
+	1. Fixed dma-ranges property on DTS.
 
 Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- .../devicetree/bindings/dma/apm-xgene-dma.txt      | 47 ++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+Rameshwar Prasad Sahu (3):
+  dmaengine: Add support for APM X-Gene SoC DMA engine driver
+  arm64: dts: Add APM X-Gene SoC DMA device and DMA clock DTS nodes
+  Documentation: dma: Add documentation for the APM X-Gene SoC DMA
+    device DTS binding
 
-diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-new file mode 100644
-index 0000000..d305876
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-@@ -0,0 +1,47 @@
-+Applied Micro X-Gene SoC DMA nodes
-+
-+DMA nodes are defined to describe on-chip DMA interfaces in
-+APM X-Gene SoC.
-+
-+Required properties for DMA interfaces:
-+- compatible: Should be "apm,xgene-dma".
-+- device_type: set to "dma".
-+- reg: Address and length of the register set for the device.
-+  It contains the information of registers in the following order:
-+  1st - DMA control and status register address space.
-+  2nd - Descriptor ring control and status register address space.
-+  3rd - Descriptor ring command register address space.
-+  4th - Soc efuse register address space.
-+- interrupts: DMA has 5 interrupts sources. 1st interrupt is
-+  DMA error reporting interrupt. 2nd, 3rd, 4th and 5th interrupts
-+  are completion interrupts for each DMA channels.
-+- clocks: Reference to the clock entry.
-+
-+Optional properties:
-+- dma-coherent : Present if dma operations are coherent
-+
-+Example:
-+	dmaclk: dmaclk at 1f27c000 {
-+		compatible = "apm,xgene-device-clock";
-+		#clock-cells = <1>;
-+		clocks = <&socplldiv2 0>;
-+		reg = <0x0 0x1f27c000 0x0 0x1000>;
-+		reg-names = "csr-reg";
-+		clock-output-names = "dmaclk";
-+	};
-+
-+	dma: dma at 1f270000 {
-+			compatible = "apm,xgene-storm-dma";
-+			device_type = "dma";
-+			reg = <0x0 0x1f270000 0x0 0x10000>,
-+			      <0x0 0x1f200000 0x0 0x10000>,
-+			      <0x0 0x1b008000 0x0 0x2000>,
-+			      <0x0 0x1054a000 0x0 0x100>;
-+			interrupts = <0x0 0x82 0x4>,
-+				     <0x0 0xb8 0x4>,
-+				     <0x0 0xb9 0x4>,
-+				     <0x0 0xba 0x4>,
-+				     <0x0 0xbb 0x4>;
-+			dma-coherent;
-+			clocks = <&dmaclk 0>;
-+	};
+ .../devicetree/bindings/dma/apm-xgene-dma.txt      |   47 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   26 +
+ drivers/dma/Kconfig                                |    8 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/xgene-dma.c                            | 2090 ++++++++++++++++++++
+ 5 files changed, 2172 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+ create mode 100755 drivers/dma/xgene-dma.c
+
 --
 1.8.2.1
