@@ -1,35 +1,29 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 18 Mar 2015 17:00:53 +0100
-Subject: [PATCH v4 4/4] ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250
- SoC
-In-Reply-To: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1426694453-3242-5-git-send-email-b.zolnierkie@samsung.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Wed, 18 Mar 2015 19:00:17 +0300
+Subject: [PATCH] ARM: tegra: support big-endian kernel
+Message-ID: <1426694461-7170-1-git-send-email-digetx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register cpuidle platform device on Exynos3250 SoC allowing EXYNOS
-cpuidle driver usage on this SoC.
+Now, after making drivers and arch code aware of big-endian CPU mode, NVIDIA
+Tegra SoC supports big-endian kernel across all generations. Enable it in Kconfig.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
 ---
- arch/arm/mach-exynos/exynos.c | 1 +
+ arch/arm/mach-tegra/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index 4031a96..a140872 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -219,6 +219,7 @@ static void __init exynos_dt_machine_init(void)
- 	    of_machine_is_compatible("samsung,exynos4212") ||
- 	    (of_machine_is_compatible("samsung,exynos4412") &&
- 	     of_machine_is_compatible("samsung,trats2")) ||
-+	    of_machine_is_compatible("samsung,exynos3250") ||
- 	    of_machine_is_compatible("samsung,exynos5250"))
- 		platform_device_register(&exynos_cpuidle);
- 
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 5d1a318..927f6b3 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -2,6 +2,7 @@ menuconfig ARCH_TEGRA
+ 	bool "NVIDIA Tegra" if ARCH_MULTI_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_SUPPORTS_TRUSTED_FOUNDATIONS
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select CLKSRC_MMIO
 -- 
-1.8.2.3
+2.3.2
