@@ -1,29 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Mar 2015 11:30:04 +0100
-Subject: [PATCH] ARM: dts: sun9i: Enable ARM architected timer on A80
-In-Reply-To: <1426665628-32014-1-git-send-email-wens@csie.org>
-References: <1426665628-32014-1-git-send-email-wens@csie.org>
-Message-ID: <20150318103004.GQ4638@lukather>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 18 Mar 2015 11:35:30 +0100
+Subject: [PATCH v2 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <55093C12.7070004@st.com>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
+ <1426518695.26437.55.camel@x220> <55093C12.7070004@st.com>
+Message-ID: <1426674930.2649.50.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 04:00:28PM +0800, Chen-Yu Tsai wrote:
-> The A80 SoC has the architected timer, but the existing firmware from
-> Allwinner does not set CNTFRQ at all.
+Hi Fabrice,
+
+Fabrice Gasnier schreef op wo 18-03-2015 om 09:49 [+0100]:
+> On 03/16/2015 04:11 PM, Paul Bolle wrote:
+> >> +config PCI_ST
+> >> +	bool "ST PCIe controller"
+> > You add a bool Kconfig symbol. A week or two ago I saw some patches fly
+> > by that - I think - allowed PCIe controllers to be built modular.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Thanks for your review.
+> 
+> Are you talking about "PCI: Export symbols of PCI functions" patch, that 
+> is part of a series
+> named "pci: iproc: Add Broadcom iProc PCIe support" ?
 
-Merged, thanks!
-Maxime
+Yes, that is the series I was thinking about. (I made you search lkml,
+and that was a bit rude. But you found the patch anyhow.)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/36f01c9a/attachment.sig>
+> This controller doesn't look like to be based on pcie-designware core 
+> driver.
+> Other vendors that are using "pcie-designware" core driver are also make 
+> it bool.
+> The current core driver doesn't support module loading/unloading as I 
+> see it.
+> If this is required, I also think this should be part of another patchset.
+> 
+> What do you think ?
+
+I wouldn't know whether your driver might work as a loadable module, but
+other people reading this surely will. But if it can't work as a module
+you should drop all the module related macros etc. I spotted. Because
+then they serve no purpose.
+
+
+Paul Bolle
