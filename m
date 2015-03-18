@@ -1,81 +1,71 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 18 Mar 2015 11:27:40 +0800
-Subject: [PATCH 2/2] rtc: mediatek: Add MT63xx RTC driver
-In-Reply-To: <20150317134345.GG10068@pengutronix.de>
-References: <1422437276-41334-1-git-send-email-eddie.huang@mediatek.com>
- <1422437276-41334-3-git-send-email-eddie.huang@mediatek.com>
- <20150316153048.GC10068@pengutronix.de>
- <1426595474.24415.18.camel@mtksdaap41>
- <20150317134345.GG10068@pengutronix.de>
-Message-ID: <1426649260.3662.5.camel@mtksdaap41>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 18 Mar 2015 09:23:54 +0530
+Subject: Is cpufreq-dt safe without regulator support?
+In-Reply-To: <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
+References: <CAGb2v679W_NqG2d597tV9W-5ROZRTH-K542fofA_UbREDjfBhg@mail.gmail.com>
+ <CAKohponnp3WgFO4nDwGwTYE9_mxzX5ttjA-Xi-9YJ7grjNcymQ@mail.gmail.com>
+ <CAGb2v65z8hGdPqeW9DVa41PtMe6n8-=Gkw-YDu4mFiCbvvGT4A@mail.gmail.com>
+Message-ID: <CAKohpomy6HkGYTm5KzjrWkk-RgipVkeHfoM1hLz9oAcZSWHcdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On 18 March 2015 at 07:10, wens Tsai <wens213@gmail.com> wrote:
+> On Tue, Mar 17, 2015 at 4:47 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> On 17 March 2015 at 13:15, wens Tsai <wens213@gmail.com> wrote:
+>>> The sunxi platform added cpufreq support in 4.0.0-rc1 using
+>>> the generic cpufreq-dt driver. One issue we've run into is
+>>> the default OPPs we use include an overclocked/overvoltage
+>>> setting.
+>>
+>> There is a feature for that in cpufreq, in case you don't know, "boost"..
+>
+> I do now. Though cpufreq-dt and the OPP bindings don't
+> support this. Any chance the next version of OPP bindings will?
 
-On Tue, 2015-03-17 at 14:43 +0100, Uwe Kleine-K?nig wrote:
-> Hello Eddie,
-> 
-> On Tue, Mar 17, 2015 at 08:31:14PM +0800, Eddie Huang wrote:
-> > On Mon, 2015-03-16 at 16:30 +0100, Uwe Kleine-K?nig wrote:
-> > > On Wed, Jan 28, 2015 at 05:27:56PM +0800, Eddie Huang wrote:
-> > > > [...]
-> > > > +static u16 rtc_read(struct mt6397_rtc *rtc, u32 offset)
-> > > rtc_read is a bad name for a driver. There are already 6 functions with
-> > > this name in the kernel. Better use a unique prefix.
-> > 
-> > I will use prefix mtk_
-> I would prefer a prefix that is unique to the driver. "mtk_" doesn't
-> work to distinguish between the rtc and a (say) spi driver. What you
-> want here is that if someone reports a bug on any mailinglist with a
-> backtrace you are able to immediately see which driver is affected.
-> 
+Yes, it is part of the new bindings already..
 
-My meaning is mtk_rtc_read, mtk_rtc_write.
+>>> If the cpu is missing a regulator supply phandle, or the
+>>> kernel is built without regulators, cpufreq can increase
+>>> the clock rate without the needed voltage increase.
+>>
+>> Right.
+>>
+>>> The former issue can be resolved by providing a dummy
+>>> regulator with the default voltage, effectively disabling
+>>> cpufreq.
+>>
+>> How ? CPUFreq will try to change both volt and freq. Volt
+>> wouldn't change as its a dummy regulator, but freq would
+>> still be changed..
+>
+> I suppose this is the desired behavior. I'm fine with it then.
+>
+>>> The latter is possible. Without regulator support built-in,
+>>> even a correct, complete DTS can still fail. Should I just
+>>> remove the offending OPP? Still that does not fix the
+>>> problem when we actually do want overclocking.
+>>>
+>>> To summarize, should cpufreq-dt probe fail when regulator
+>>> support isn't available? Should we differentiate between
+>>
+>> No. We can have regulator support enabled but no regulator
+>> for a CPU. And so the current state of code looks fine.
+>>
+>>> not having a regulator phandle vs no regulator support?
+>>
+>> What I couldn't understand is, why would you miss the regulator
+>> phandle in dts? Or not compile regulator support?
+>
+> I admit it is partly bad execution on my part. I added the OPPs
+> to the .dtsi files, but only the regulators to a handful of boards
+> that I have. All the other boards do not have a regulator phandle.
+>
+>> In case you want cpufreq-dt to be disabled if regulators aren't
+>> compiled in, then what you should do is, don't create the platform
+>> device required for probing cpufreq-dt driver.
+>
+> Thanks for the suggestion. I'll add if(IS_ENABLED()) around it.
+> I can also check for the regulator phandle here.
 
-> > > > [...]
-> > > > +static irqreturn_t rtc_irq_handler_thread(int irq, void *data)
-> > > > +{
-> > > > +	struct mt6397_rtc *rtc = data;
-> > > > +	u16 irqsta, irqen;
-> > > > +
-> > > > +	mutex_lock(&rtc->lock);
-> > > > +	irqsta = rtc_read(rtc, RTC_IRQ_STA);
-> > > Do you really need to lock for a single read access?
-> > 
-> > I think this lock is necessary, because other thread may access rtc
-> > register at the same time, for example, call mtk_rtc_set_alarm to modify
-> > alarm time.
-> That would be a valid reason if mtk_rtc_set_alarm touched that register
-> twice in a single critical section and the handler must not read the
-> value of the first write. Otherwise it should be fine, shouldn't it?
-> 
-
-My original though is if disable alarm in mtk_rtc_set_alarm function,
-RTC_IRQ_STA may be affected, this is why I add mutex. After checking
-with designer, RTC_IRQ_STA will not be affected. I will remove the
-mutex.
-
-> > > > +static int mtk_rtc_set_time(struct device *dev, struct rtc_time *tm)
-> > > > +{
-> > > > +	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
-> > > > +
-> > > > +	tm->tm_year -= RTC_MIN_YEAR_OFFSET;
-> > > > +	tm->tm_mon++;
-> > > > +	mutex_lock(&rtc->lock);
-> > > > +	rtc_write(rtc, RTC_TC_YEA, tm->tm_year);
-> > > > +	rtc_write(rtc, RTC_TC_MTH, tm->tm_mon);
-> > > > +	rtc_write(rtc, RTC_TC_DOM, tm->tm_mday);
-> > > > +	rtc_write(rtc, RTC_TC_HOU, tm->tm_hour);
-> > > > +	rtc_write(rtc, RTC_TC_MIN, tm->tm_min);
-> > > > +	rtc_write(rtc, RTC_TC_SEC, tm->tm_sec);
-> > > Is this racy? I.e. what happens if RTC_TC_SEC overflows just before you
-> > > write to it but after you wrote RTC_TC_MIN?
-> > 
-> > register value will write to hardware after rtc_write_trigger, so the
-> > racy condition not exist.
-> Ah, it seems the hardware guys did their job. Nice.
-> 
-> Best regards
-> Uwe
-> 
+I think the right thing to do is move the OPP bindings to the .dts
+files instead and get rid of all the hacks you are planning to add.
