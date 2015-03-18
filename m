@@ -1,31 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 18 Mar 2015 14:32:26 +0100
-Subject: [PATCH] spi: trigger trace event for message-done before
- mesg->complete
-In-Reply-To: <20150318113635.GB2869@sirena.org.uk>
-References: <1426674448-8246-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150318113635.GB2869@sirena.org.uk>
-Message-ID: <20150318133226.GR10068@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 Mar 2015 14:32:25 +0100
+Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
+ Exynos3250
+In-Reply-To: <3449559.PngGo6WKuq@amdc1032>
+References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
+ <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
+ <CAJKOXPe3P0mO-WuufAwF_tB6P=kfr-ORyQ6pa2pRnvjytCuHZg@mail.gmail.com>
+ <3449559.PngGo6WKuq@amdc1032>
+Message-ID: <1426685545.23982.2.camel@AMDC1943>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 11:36:35AM +0000, Mark Brown wrote:
-> On Wed, Mar 18, 2015 at 11:27:28AM +0100, Uwe Kleine-K?nig wrote:
-> > With spidev the mesg->complete callback points to spidev_complete.
-> > Calling this unblocks spidev_sync and so spidev_sync_write finishes. As
-> > the struct spi_message just read is a local variable in
-> > spidev_sync_write and recording the trace event accesses this message
-> > the recording is better done first. The same can happen for
-> > spidev_sync_read.
+On ?ro, 2015-03-18 at 14:23 +0100, Bartlomiej Zolnierkiewicz wrote:
+> Hi,
 > 
-> Applied, thanks.  I'm a bit suspicious that the changelog talks only
-> about spidev though...
-That's my workflow. Maybe the important thing here is also that I use
--rt?!
+> On Wednesday, March 18, 2015 02:10:31 PM Krzysztof Kozlowski wrote:
+> > 2015-03-18 13:51 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> > >
+> > > +       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> > > +               udelay(10);
+> > > +       udelay(10);
+> > 
+> > We really need to start documenting this. Please add short description
+> > why this SPARE2 check is here and who uses it. Without documenting
+> > this behavior future generations won't be able to debug this stuff.
+> > Imagine replacing sboot with uboot by someone...
+> 
+> I've already planned to do this for this code and for coupled cpuidle
+> use of SPARE2 as well.  However I would really prefer to do it in
+> an incremental patch if there are no other issues with this patchset.
 
-Best regards
-Uwe
+OK, please do so in incremental patch. Usage of various memory regions
+of sysram also should be documented. In patch 2 you add usage of 0x28 +
+4*cpu. The various sysrams regions are spread over different files...
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Krzysztof
