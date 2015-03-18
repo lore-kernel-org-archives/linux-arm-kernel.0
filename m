@@ -1,58 +1,57 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 18 Mar 2015 18:00:04 +0100
-Subject: [STLinux Kernel] [PATCH 2/6] pinctrl: st: Introduce a 'get pin
- function' call
-In-Reply-To: <20150318165116.GR3318@x1>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-3-git-send-email-lee.jones@linaro.org>
- <5509AAAB.8090906@st.com> <20150318165116.GR3318@x1>
-Message-ID: <5509AF14.1060200@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Mar 2015 09:57:06 -0700
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <5509A998.2080509@ti.com>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com>
+ <5509A998.2080509@ti.com>
+Message-ID: <20150318165706.GQ31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
+> Hi Tony,
+> 
+> As I can see Patch 1 from this series was merged in 4.0-rc4,
+> but this patch wasn't. As result, I can see below warning all the time during boot now:
+> 
+> [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
+ 
+OK. Is this needed as a fix for the v4.0-rc series, or can this wait
+for v4.1?
 
+Regards,
 
-On 03/18/2015 05:51 PM, Lee Jones wrote:
-> On Wed, 18 Mar 2015, Maxime Coquelin wrote:
->
->>
->> On 03/18/2015 11:51 AM, Lee Jones wrote:
->>> This call fetches the numerical function value a specified pin is
->>> currently operating in.  Function zero is more often than not the
->>> GPIO function.  Greater than zero values represent an alternative
->>> function.  You'd need to either look those up in the Device Tree
->>> sources or the Programmer's Manual.
->>>
->>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>> ---
->>>   drivers/pinctrl/pinctrl-st.c | 14 ++++++++++++++
->>>   1 file changed, 14 insertions(+)
->>>
->>> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
->>> index 9e5ec00..5362e45 100644
->>> --- a/drivers/pinctrl/pinctrl-st.c
->>> +++ b/drivers/pinctrl/pinctrl-st.c
->>> @@ -460,6 +460,20 @@ static void st_pctl_set_function(struct st_pio_control *pc,
->>>   	regmap_field_write(alt, val);
->>>   }
->>> +static unsigned int st_pctl_get_pin_function(struct st_pio_control *pc, int pin)
->>> +{
->>> +	struct regmap_field *alt = pc->alt;
->>> +	unsigned int val;
->>> +	int offset = pin * 4;
->>> +
->>> +	if (!alt)
->>> +		return 0;
->> Shouldn't we print something if alt is NULL?
->> Else we can think we are on alternate 0.
-> That is the assumption that I've made.  Is there isn't an alt, then a
-> pin can only be on Alt-0.  Have I made the incorrect assumption here?
-Just re-checked the code, and yes you are right.
-No alt here means alt field of struct st_pctl_data is -1, which in turn 
-means the register is not available.
-
-You can forget my remark, and add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-Thanks,
-Maxime
+Tony
+ 
+> On 02/20/2015 10:51 AM, Kishon Vijay Abraham I wrote:
+> > Now that we don't have hwmod entry for pcie PHY remove the
+> > ti,hwmod property from PCIE PHY's
+> > 
+> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > ---
+> >   arch/arm/boot/dts/dra7.dtsi |    2 --
+> >   1 file changed, 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> > index 5827fed..18a904d 100644
+> > --- a/arch/arm/boot/dts/dra7.dtsi
+> > +++ b/arch/arm/boot/dts/dra7.dtsi
+> > @@ -1111,7 +1111,6 @@
+> >   					      "wkupclk", "refclk",
+> >   					      "div-clk", "phy-div";
+> >   				#phy-cells = <0>;
+> > -				ti,hwmods = "pcie1-phy";
+> >   			};
+> >   
+> >   			pcie2_phy: pciephy at 4a095000 {
+> > @@ -1130,7 +1129,6 @@
+> >   					      "wkupclk", "refclk",
+> >   					      "div-clk", "phy-div";
+> >   				#phy-cells = <0>;
+> > -				ti,hwmods = "pcie2-phy";
+> >   				status = "disabled";
+> >   			};
+> >   		};
+> > 
+> 
