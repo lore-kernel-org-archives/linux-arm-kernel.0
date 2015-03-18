@@ -1,28 +1,42 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 18 Mar 2015 12:03:47 +1100
-Subject: linux-next: manual merge of the slave-dma tree with the arm-soc tree
-Message-ID: <20150318120347.21288162@canb.auug.org.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Mar 2015 02:06:03 +0100
+Subject: [PATCH] pinctrl: at91: move lock/unlock_as_irq calls into
+ request/release resources methods
+In-Reply-To: <54FEAC8F.1040206@atmel.com>
+References: <1423419822-6258-1-git-send-email-boris.brezillon@free-electrons.com>
+ <CACRpkdazTt+_9m-iWEee2gJy4MQ+QNo3Rb2JY9hVSSXK2-dJRw@mail.gmail.com>
+ <54FEAC8F.1040206@atmel.com>
+Message-ID: <CACRpkdbS1sYR9D8iBjnKUt3Urv5VXn3axR5OddPQOVhxvh7GAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Tue, Mar 10, 2015 at 9:34 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Le 09/03/2015 17:14, Linus Walleij a ?crit :
+>> On Sun, Feb 8, 2015 at 7:23 PM, Boris Brezillon
+>> <boris.brezillon@free-electrons.com> wrote:
+>>
+>>> The gpiochip_lock_as_irq call can fail and return an error, while the
+>>> irq_startup is not expected to fail (returns an unsigned int which is not
+>>> checked by irq core code).
+>>>
+>>> irq_request/release_resources functions have been created to address this
+>>> problem.
+>>>
+>>> Move gpiochip_lock/unlock_as_irq calls into
+>>> irq_request/release_resources functions to prevent using a gpio as an irq
+>>> if the gpiochip_lock_as_irq call failed.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>
+>> Patch applied with all the ACKs.
+>
+> Hi Linus,
+>
+> As suggested earlier, do you think it can be scheduled for the 4.0-rc
+> phase as a "fix"?
 
-Today's linux-next merge of the slave-dma tree got a conflict in
-arch/arm/mach-shmobile/board-mackerel.c between commit a521422ea4ae
-("ARM: shmobile: mackerel: Remove Legacy C board code") from the
-arm-soc tree and commit c078c62a7528 ("mmc: sh_mobile_sdhi: remove
-sh_mobile_sdhi_info v2") from the slave-dma tree.
+OK argh had to rebase my tree to get the patch out of the devel
+branch but what can I do.
 
-I fixed it up (the former removed the file, so I did that) and can
-carry the fix as necessary (no action is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/ff5833ce/attachment.sig>
+Yours,
+Linus Walleij
