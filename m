@@ -1,46 +1,43 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 18 Mar 2015 15:53:08 +0000
-Subject: [PATCH 09/13] spi: atmel: use endian agnostic IO
+Date: Wed, 18 Mar 2015 15:53:04 +0000
+Subject: [PATCH 05/13] ARM: at91: debug: fix debug in big endian mode
 In-Reply-To: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1426693992-31163-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the endian agnositc IO functions instead of the __raw ones for when
-the driver is in use on big-endian systems.
+Add appropriate endian swaps for when the CPU is in big endian
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
-CC: Nicolas Ferre <nicolas.ferre@atmel.com> (supporter:ATMEL SPI DRIVER)
-CC: Mark Brown <broonie@kernel.org> (maintainer:SPI SUBSYSTEM)
-CC: linux-spi at vger.kernel.org (open list:SPI SUBSYSTEM)
+CC: Andrew Victor <linux@maxim.org.za>
+CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+CC: Russell King <linux@arm.linux.org.uk>
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 ---
- drivers/spi/spi-atmel.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/include/debug/at91.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 06de340..a2f40b1 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -180,11 +180,17 @@
- 	  | SPI_BF(name, value))
+diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+index c3c45e6..0217f8d 100644
+--- a/arch/arm/include/debug/at91.S
++++ b/arch/arm/include/debug/at91.S
+@@ -40,12 +40,14 @@
  
- /* Register access macros */
-+#ifdef CONFIG_AVR32
- #define spi_readl(port, reg) \
- 	__raw_readl((port)->regs + SPI_##reg)
- #define spi_writel(port, reg, value) \
- 	__raw_writel((value), (port)->regs + SPI_##reg)
--
-+#else
-+#define spi_readl(port, reg) \
-+	readl_relaxed((port)->regs + SPI_##reg)
-+#define spi_writel(port, reg, value) \
-+	writel_relaxed((value), (port)->regs + SPI_##reg)
-+#endif
- /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-  * cache operations; better heuristics consider wordsize and bitrate.
-  */
+ 	.macro	waituart,rd,rx
+ 1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
++ARM_BE8(rev	\rd, \rd)
+ 	tst	\rd, #AT91_DBGU_TXRDY			@ DBGU_TXRDY = 1 when ready to transmit
+ 	beq	1001b
+ 	.endm
+ 
+ 	.macro	busyuart,rd,rx
+ 1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
++ARM_BE8(rev	\rd, \rd)
+ 	tst	\rd, #AT91_DBGU_TXEMPTY			@ DBGU_TXEMPTY = 1 when transmission complete
+ 	beq	1001b
+ 	.endm
 -- 
 2.1.4
