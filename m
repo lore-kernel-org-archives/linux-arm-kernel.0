@@ -1,49 +1,103 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Wed, 18 Mar 2015 13:15:39 +0100
-Subject: [PATCHv3] mm: Don't offset memmap for flatmem
-In-Reply-To: <1426291715-16242-1-git-send-email-lauraa@codeaurora.org>
-References: <1426291715-16242-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <55096C6B.4010603@suse.cz>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Mar 2015 12:16:05 +0000
+Subject: [RFC] ARM: dts: mt8173: Add psci-0.2 cpuidle support
+In-Reply-To: <1426658432-29333-1-git-send-email-howard.chen@linaro.org>
+References: <1426658432-29333-1-git-send-email-howard.chen@linaro.org>
+Message-ID: <20150318121604.GC19624@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/2015 01:08 AM, Laura Abbott wrote:
-> Srinivas Kandagatla reported bad page messages when trying to
-> remove the bottom 2MB on an ARM based IFC6410 board
->
-> BUG: Bad page state in process swapper  pfn:fffa8
-> page:ef7fb500 count:0 mapcount:0 mapping:  (null) index:0x0
-> flags: 0x96640253(locked|error|dirty|active|arch_1|reclaim|mlocked)
-> page dumped because: PAGE_FLAGS_CHECK_AT_FREE flag(s) set
-> bad because of flags:
-> flags: 0x200041(locked|active|mlocked)
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 3.19.0-rc3-00007-g412f9ba-dirty #816
-> Hardware name: Qualcomm (Flattened Device Tree)
-> [<c0218280>] (unwind_backtrace) from [<c0212be8>] (show_stack+0x20/0x24)
-> [<c0212be8>] (show_stack) from [<c0af7124>] (dump_stack+0x80/0x9c)
-> [<c0af7124>] (dump_stack) from [<c0301570>] (bad_page+0xc8/0x128)
-> [<c0301570>] (bad_page) from [<c03018a8>] (free_pages_prepare+0x168/0x1e0)
-> [<c03018a8>] (free_pages_prepare) from [<c030369c>] (free_hot_cold_page+0x3c/0x174)
-> [<c030369c>] (free_hot_cold_page) from [<c0303828>] (__free_pages+0x54/0x58)
-> [<c0303828>] (__free_pages) from [<c030395c>] (free_highmem_page+0x38/0x88)
-> [<c030395c>] (free_highmem_page) from [<c0f62d5c>] (mem_init+0x240/0x430)
-> [<c0f62d5c>] (mem_init) from [<c0f5db3c>] (start_kernel+0x1e4/0x3c8)
-> [<c0f5db3c>] (start_kernel) from [<80208074>] (0x80208074)
-> Disabling lock debugging due to kernel taint
->
-> Removing the lower 2MB made the start of the lowmem zone to no longer
-> be page block aligned. IFC6410 uses CONFIG_FLATMEM where
-> alloc_node_mem_map allocates memory for the mem_map. alloc_node_mem_map
-> will offset for unaligned nodes with the assumption the pfn/page
-> translation functions will account for the offset. The functions for
-> CONFIG_FLATMEM do not offset however, resulting in overrunning
-> the memmap array. Just use the allocated memmap without any offset
-> when running with CONFIG_FLATMEM to avoid the overrun.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Hi,
 
-Acked-by: Vlastimil Babka <vbabka@suse.cz>
+On Wed, Mar 18, 2015 at 06:00:32AM +0000, Howard Chen wrote:
+> add device tree for psci-0.2 on mt8173 platform
 
-Thanks.
+Are all the other mandatory PSCI 0.2 components implemented and working?
+
+e.g. is MIGRATE_INFO_TYPE present, do SYSTEM_{OFF,RESET} work?
+
+If they're not present and working, we can't describe this as having
+PSCI 0.2.
+
+Also, what FW does this require the system to have?
+
+Mark.
+
+> add device tree for cupidle-arm64 on mt8173 platform
+> 
+> Signed-off-by: Howard Chen <howard.chen@linaro.org>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 30 ++++++++++++++++++++++++++----
+>  1 file changed, 26 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 8554ec3..96dff1e 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -48,6 +48,8 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a53";
+>  			reg = <0x000>;
+> +			enable-method = "psci";
+> +			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		cpu1: cpu at 1 {
+> @@ -55,6 +57,7 @@
+>  			compatible = "arm,cortex-a53";
+>  			reg = <0x001>;
+>  			enable-method = "psci";
+> +			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		cpu2: cpu at 100 {
+> @@ -62,6 +65,7 @@
+>  			compatible = "arm,cortex-a57";
+>  			reg = <0x100>;
+>  			enable-method = "psci";
+> +			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		cpu3: cpu at 101 {
+> @@ -69,15 +73,33 @@
+>  			compatible = "arm,cortex-a57";
+>  			reg = <0x101>;
+>  			enable-method = "psci";
+> +			cpu-idle-states = <&CPU_SLEEP_0_0 &CLUSTER_SLEEP_0>;
+>  		};
+> +
+> +		idle-states {
+> +			entry-method = "arm,psci-0.2";
+> +
+> +			CPU_SLEEP_0_0: cpu-sleep-0-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				entry-latency-us = <600>;
+> +				exit-latency-us = <600>;
+> +				min-residency-us = <1200>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				entry-latency-us = <800>;
+> +				exit-latency-us = <1000>;
+> +				min-residency-us = <2000>;
+> +				wakeup-latency-us = <1000>;
+> +			};
+>  	};
+>  
+>  	psci {
+> -		compatible = "arm,psci";
+> +		compatible = "arm,psci-0.2";
+>  		method = "smc";
+> -		cpu_suspend   = <0x84000001>;
+> -		cpu_off	      = <0x84000002>;
+> -		cpu_on	      = <0x84000003>;
+>  	};
+>  
+>  	uart_clk: dummy26m {
+> -- 
+> 1.9.1
+> 
+> 
