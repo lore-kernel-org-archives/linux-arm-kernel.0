@@ -1,61 +1,38 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 18 Mar 2015 11:39:19 +0100
-Subject: [PATCH v6] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <1426648118-20790-1-git-send-email-alim.akhtar@samsung.com>
-References: <1426648118-20790-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CABxcv=mbfPS92a19NAF85zRPvzyriHqdRzHzXOBACoQG_Kn_iw@mail.gmail.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 18 Mar 2015 16:09:43 +0530
+Subject: [RFC PATCH v4 3/4] arm64:thunder: Add initial dts for Cavium's
+ Thunder SoC in 2 Node topology.
+In-Reply-To: <20150318100004.GC18951@arm.com>
+References: <1421924755-26029-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1421924755-26029-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <2882934.brFyhkGPyE@wuerfel> <1885509.Z0Gm3e3FlX@wuerfel>
+ <CAFpQJXUvux+b9hYx_ZY-1hor0HRFFgh=e4vCYyJiDHrDC9Y=tQ@mail.gmail.com>
+ <CAFpQJXXkXatxRcfpA1DjuuiUf3vup3DV+dACyGxT=TDkrO8rNQ@mail.gmail.com>
+ <CAFpQJXVc5c=YRLw3uS5RiSR13veo_SUiM-aV6hf+diQuWxdfYQ@mail.gmail.com>
+ <CAFpQJXWL-NM+WndfB5pLj6TmdVngACR9YCr_ahaUTqAO3DaX1g@mail.gmail.com>
+ <20150318100004.GC18951@arm.com>
+Message-ID: <CAFpQJXWzhn=sFKOdbPGXGfQNr5outJodTH72RoC1VVYqt8jmdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alim,
+Thanks Will.
 
-On Wed, Mar 18, 2015 at 4:08 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> From: Seungwon Jeon <tgih.jun@samsung.com>
+On Wed, Mar 18, 2015 at 3:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Mar 18, 2015 at 04:02:53AM +0000, Ganapatrao Kulkarni wrote:
+>> Hi Catalin, Will, Mark, Arnd
 >
-> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-> and exynos5800-peach-pi boards.
-> This also adds RCLK GPIO line, this gpio should be in pull-down
-> state.
-> This also enables HS400 on peach-pi and this updates the clock frequency
-> to 800MHz to be set as input clock to controller.
+> [...]
 >
-> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> [Alim: addressed review comments]
-> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> ---
-> Changes in V6:
->         Rebased on kukjin's for-next branch[0]
->         (commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
+>> Please suggest how we go about these patches.
+>> please share your review comments, if any changes needs to be done.
 >
-> [0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> I can take the Kconfig patch if you send a version that applies cleanly.
+> As for the rest, you need an ack from a DT maintainer on the bindings
+> before anything else can get merged.
+i will send you Kconfig patch (i.e increase NR_CPUS range to 2-4096)
+separately after rebasing to
+linux-next, is that ok?
 >
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
->  arch/arm/boot/dts/exynos5420-smdk5420.dts  | 4 +++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
->  4 files changed, 18 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index d0ee55f..e158861 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -695,8 +695,10 @@
->         samsung,dw-mshc-ciu-div = <3>;
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
-> +       samsung,dw-mshc-hs400-timing = <0 2>;
-> +       samsung,read-strobe-delay = <90>;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus4 &sd0_bus8 &sd0_rclk>;
-
-Why are you removing the sd0_bus1 pinctrl here? Same comment for the
-other boards.
-
-This will cause a regression if the XMMCnDATA[0] pad was not mux'ed as
-SD_n_DATA[0] by the bootloader.
-
-Best regards,
-Javier
+> Will
+thanks
+Ganapat
