@@ -1,32 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 13:02:50 +0100
-Subject: [PATCH 02/12] gpio: Remove gpio-msm-v1 driver
-In-Reply-To: <1426270185-19510-3-git-send-email-sboyd@codeaurora.org>
-References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
- <1426270185-19510-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CACRpkdZD4=aZPh91o=eNDRtp=HO-BkWpkLX7CvwOD6UgZOqa=Q@mail.gmail.com>
+Date: Wed, 18 Mar 2015 13:07:22 +0100
+Subject: [PATCH] pinctrl: mediatek: mt8135/mt8173: Fix build error due to
+ missing include file
+In-Reply-To: <1426143074.26140.0.camel@phoenix>
+References: <1426143074.26140.0.camel@phoenix>
+Message-ID: <CACRpkdbqh8XD2ci9VXChahWfhSr_uVAPLjGYrg9AAwDo-+zTRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 7:09 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Thu, Mar 12, 2015 at 7:51 AM, Axel Lin <axel.lin@ingics.com> wrote:
 
-> This driver is orphaned now that mach-msm has been removed.
-> Delete it.
+> Fix below build error:
+>   CC      drivers/pinctrl/mediatek/pinctrl-mt8135.o
+> In file included from drivers/pinctrl/mediatek/pinctrl-mt8135.c:24:0:
+> drivers/pinctrl/mediatek/pinctrl-mtk-mt8135.h:19:32: fatal error: pinctrl-mtk-common.h: No such file or directory
+> compilation terminated.
+> make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mt8135.o] Error 1
+> make[2]: *** [drivers/pinctrl/mediatek] Error 2
+> make[1]: *** [drivers/pinctrl] Error 2
+> make: *** [drivers] Error 2
 >
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> This can be acked and go through arm-soc or applied directly to gpio tree.
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-This would collide with Arnds multiplatform patches.
-
-If you coordinate with Arnd and agree:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Patch applied. Partially, since Guenther already fixed one oneliner.
 
 Yours,
 Linus Walleij
