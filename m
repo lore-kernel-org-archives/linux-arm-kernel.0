@@ -1,59 +1,70 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 10:51:36 +0000
-Subject: [PATCH 3/6] pinctrl: st: Move st_get_pio_control() further up the
- source file
+Date: Wed, 18 Mar 2015 10:51:39 +0000
+Subject: [PATCH 6/6] pinctrl: st: Display pin's function when printing pinctrl
+ debug information
 In-Reply-To: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
 References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1426675899-19882-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-st_get_pio_control() will be used by subsequent calls which are
-to be located above its original position.  This is required to
-prevent the need for an unnecessary forward-declaration/prototype.
+Great for easily determining which mode a pin is operating in.
+This patch was particularly helpful when debugging a recent GPIO/
+Pinctrl disparity issue.
+
+Before:
+    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
+             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+
+After [GPIO]:
+    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] GPIO
+             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+
+After [Alt]:
+    $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+      pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] Alt Fn 2
+             [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pinctrl/pinctrl-st.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/pinctrl/pinctrl-st.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 5362e45..10ad19c 100644
+index 1cda40e..d5b2ffa 100644
 --- a/drivers/pinctrl/pinctrl-st.c
 +++ b/drivers/pinctrl/pinctrl-st.c
-@@ -398,6 +398,16 @@ static const struct st_pctl_data stih407_flashdata = {
- 	.rt = 100,
- };
- 
-+static struct st_pio_control *st_get_pio_control(
-+			struct pinctrl_dev *pctldev, int pin)
-+{
-+	struct pinctrl_gpio_range *range =
-+			 pinctrl_find_gpio_range_from_pin(pctldev, pin);
-+	struct st_gpio_bank *bank = gpio_range_to_bank(range);
-+
-+	return &bank->pc;
-+}
-+
- /* Low level functions.. */
- static inline int st_gpio_bank(int gpio)
+@@ -1058,18 +1058,28 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
  {
-@@ -918,16 +928,6 @@ static int st_pmx_get_groups(struct pinctrl_dev *pctldev,
- 	return 0;
- }
+ 	struct st_pio_control *pc;
+ 	unsigned long config;
++	unsigned int function;
+ 	int offset = st_gpio_pin(pin_id);
++	char f[64];
  
--static struct st_pio_control *st_get_pio_control(
--			struct pinctrl_dev *pctldev, int pin)
--{
--	struct pinctrl_gpio_range *range =
--			 pinctrl_find_gpio_range_from_pin(pctldev, pin);
--	struct st_gpio_bank *bank = gpio_range_to_bank(range);
--
--	return &bank->pc;
--}
--
- static int st_pmx_set_mux(struct pinctrl_dev *pctldev, unsigned fselector,
- 			unsigned group)
- {
+ 	mutex_unlock(&pctldev->mutex);
+ 	pc = st_get_pio_control(pctldev, pin_id);
+ 	st_pinconf_get(pctldev, pin_id, &config);
+ 	mutex_lock(&pctldev->mutex);
+-	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
++
++	function = st_pctl_get_pin_function(pc, offset);
++	if (function)
++		sprintf(f, "Alt Fn %d", function);
++	else
++		sprintf(f, "GPIO");
++
++	seq_printf(s, "[OE:%d,PU:%ld,OD:%ld]\t%s\n"
+ 		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
+ 		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
+ 		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
+ 		ST_PINCONF_UNPACK_PU(config),
+ 		ST_PINCONF_UNPACK_OD(config),
++		f,
+ 		ST_PINCONF_UNPACK_RT(config),
+ 		ST_PINCONF_UNPACK_RT_INVERTCLK(config),
+ 		ST_PINCONF_UNPACK_RT_CLKNOTDATA(config),
 -- 
 1.9.1
