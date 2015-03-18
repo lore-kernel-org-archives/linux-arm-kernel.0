@@ -1,84 +1,48 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 18 Mar 2015 17:35:06 +0100
-Subject: [STLinux Kernel] [PATCH 6/6] pinctrl: st: Display pin's function
- when printing pinctrl debug information
-In-Reply-To: <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <5509A93A.5080202@st.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 18 Mar 2015 18:36:40 +0200
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <1424422274-27946-2-git-send-email-kishon@ti.com>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com>
+Message-ID: <5509A998.2080509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Tony,
 
-On 03/18/2015 11:51 AM, Lee Jones wrote:
-> Great for easily determining which mode a pin is operating in.
-> This patch was particularly helpful when debugging a recent GPIO/
-> Pinctrl disparity issue.
->
-> Before:
->      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
->        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
->               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
->
-> After [GPIO]:
->      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
->        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] GPIO
->               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
->
-> After [Alt]:
->      $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
->        pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] Alt Fn 2
->               [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+As I can see Patch 1 from this series was merged in 4.0-rc4,
+but this patch wasn't. As result, I can see below warning all the time during boot now:
+
+[    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
+ 
+
+On 02/20/2015 10:51 AM, Kishon Vijay Abraham I wrote:
+> Now that we don't have hwmod entry for pcie PHY remove the
+> ti,hwmod property from PCIE PHY's
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->   drivers/pinctrl/pinctrl-st.c | 12 +++++++++++-
->   1 file changed, 11 insertions(+), 1 deletion(-)
-A couple of comments below.
-Once fixed, you can add my:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-
-
-
->
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 1cda40e..d5b2ffa 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1058,18 +1058,28 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
->   {
->   	struct st_pio_control *pc;
->   	unsigned long config;
-> +	unsigned int function;
->   	int offset = st_gpio_pin(pin_id);
-> +	char f[64];
-64 bytes is way too big here
+>   arch/arm/boot/dts/dra7.dtsi |    2 --
+>   1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 5827fed..18a904d 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1111,7 +1111,6 @@
+>   					      "wkupclk", "refclk",
+>   					      "div-clk", "phy-div";
+>   				#phy-cells = <0>;
+> -				ti,hwmods = "pcie1-phy";
+>   			};
 >   
->   	mutex_unlock(&pctldev->mutex);
->   	pc = st_get_pio_control(pctldev, pin_id);
->   	st_pinconf_get(pctldev, pin_id, &config);
->   	mutex_lock(&pctldev->mutex);
-> -	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
-> +
-> +	function = st_pctl_get_pin_function(pc, offset);
-> +	if (function)
-> +		sprintf(f, "Alt Fn %d", function);
-Please use snprintf.
-
-> +	else
-> +		sprintf(f, "GPIO");
-> +
-> +	seq_printf(s, "[OE:%d,PU:%ld,OD:%ld]\t%s\n"
->   		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
->   		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
->   		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
->   		ST_PINCONF_UNPACK_PU(config),
->   		ST_PINCONF_UNPACK_OD(config),
-> +		f,
->   		ST_PINCONF_UNPACK_RT(config),
->   		ST_PINCONF_UNPACK_RT_INVERTCLK(config),
->   		ST_PINCONF_UNPACK_RT_CLKNOTDATA(config),
-
-Thanks,
-Maxime
+>   			pcie2_phy: pciephy at 4a095000 {
+> @@ -1130,7 +1129,6 @@
+>   					      "wkupclk", "refclk",
+>   					      "div-clk", "phy-div";
+>   				#phy-cells = <0>;
+> -				ti,hwmods = "pcie2-phy";
+>   				status = "disabled";
+>   			};
+>   		};
+> 
