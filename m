@@ -1,40 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Mar 2015 17:19:21 -0700
-Subject: [PATCH 4/4] ARM: dts: Remove PIN_INPUT for dm816x McSPI
+Date: Tue, 17 Mar 2015 17:19:19 -0700
+Subject: [PATCH 2/4] ARM: dts: Fix typo for dm816x usb0_pins
 In-Reply-To: <1426637961-4197-1-git-send-email-tony@atomide.com>
 References: <1426637961-4197-1-git-send-email-tony@atomide.com>
-Message-ID: <1426637961-4197-5-git-send-email-tony@atomide.com>
+Message-ID: <1426637961-4197-3-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On dm816x we have no PIN_INPUT vs PIN_OUTPUT configuration, there
-are just pulls. Let's remove the bogus flags.
+Commit a54879a00859 ("ARM: dts: Fix USB dts configuration for dm816x")
+attempted to fix the USB features introduced by commit 7800064ba507
+("ARM: dts: Add basic dm816x device tree configuration") but obviously
+I did not read the dmesg as more USB issues still keep trickling in.
+
+It should be usb1_pins instead not usb0_pins for the second interface
+to avoid warnings from pinctrl framework.
 
 Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Cc: Felipe Balbi <balbi@ti.com>
 Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/dm8168-evm.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/dm8168-evm.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dm8168-evm.dts b/arch/arm/boot/dts/dm8168-evm.dts
-index b520a8b..169a855 100644
+index afe678f..b520a8b 100644
 --- a/arch/arm/boot/dts/dm8168-evm.dts
 +++ b/arch/arm/boot/dts/dm8168-evm.dts
-@@ -29,10 +29,10 @@
- &dm816x_pinmux {
- 	mcspi1_pins: pinmux_mcspi1_pins {
+@@ -52,13 +52,13 @@
+ 
+ 	usb0_pins: pinmux_usb0_pins {
  		pinctrl-single,pins = <
--			DM816X_IOPAD(0x0a94, PIN_INPUT | MUX_MODE0)	/* SPI_SCLK */
--			DM816X_IOPAD(0x0a98, PIN_OUTPUT | MUX_MODE0)	/* SPI_SCS0 */
--			DM816X_IOPAD(0x0aa8, PIN_INPUT | MUX_MODE0)	/* SPI_D0 */
--			DM816X_IOPAD(0x0aac, PIN_INPUT | MUX_MODE0)	/* SPI_D1 */
-+			DM816X_IOPAD(0x0a94, MUX_MODE0)			/* SPI_SCLK */
-+			DM816X_IOPAD(0x0a98, MUX_MODE0)			/* SPI_SCS0 */
-+			DM816X_IOPAD(0x0aa8, MUX_MODE0)			/* SPI_D0 */
-+			DM816X_IOPAD(0x0aac, MUX_MODE0)			/* SPI_D1 */
+-			DM816X_IOPAD(0x0d00, MUX_MODE0)			/* USB0_DRVVBUS */
++			DM816X_IOPAD(0x0d04, MUX_MODE0)			/* USB0_DRVVBUS */
  		>;
  	};
  
+-	usb1_pins: pinmux_usb0_pins {
++	usb1_pins: pinmux_usb1_pins {
+ 		pinctrl-single,pins = <
+-			DM816X_IOPAD(0x0d04, MUX_MODE0)			/* USB1_DRVVBUS */
++			DM816X_IOPAD(0x0d08, MUX_MODE0)			/* USB1_DRVVBUS */
+ 		>;
+ 	};
+ };
 -- 
 2.1.4
