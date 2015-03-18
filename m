@@ -1,98 +1,57 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Wed, 18 Mar 2015 21:39:13 +0200
-Subject: [PATCH v2] leds: fix hibernation on arm when gpio-led used with
- CPU led trigger
-In-Reply-To: <54ECA2E3.8060401@linaro.org>
-References: <1423147024-4744-1-git-send-email-grygorii.strashko@linaro.org>
- <54ECA2E3.8060401@linaro.org>
-Message-ID: <5509D461.3090703@linaro.org>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Wed, 18 Mar 2015 15:39:26 -0400
+Subject: [PATCH 1/5] USB: ehci-atmel: rework clk handling
+In-Reply-To: <20150318122854.GA18070@kroah.com>
+References: <Pine.LNX.4.44L0.1503171459310.1061-100000@iolanthe.rowland.org>
+ <55095E86.1060201@atmel.com> <20150318122854.GA18070@kroah.com>
+Message-ID: <5509D46E.2020409@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-
-On 02/24/2015 06:12 PM, Grygorii.Strashko at linaro.org wrote:
-> On 02/05/2015 04:37 PM, grygorii.strashko at linaro.org wrote:
->> From: Grygorii Strashko <Grygorii.Strashko@linaro.org>
+On 15-03-18 08:28 AM, Greg Kroah-Hartman wrote:
+> On Wed, Mar 18, 2015 at 12:16:22PM +0100, Nicolas Ferre wrote:
+>> Le 17/03/2015 20:01, Alan Stern a ?crit :
+>>> On Tue, 17 Mar 2015, Boris Brezillon wrote:
+>>>
+>>>> The EHCI IP only needs the UTMI/UPLL (uclk) and the peripheral (iclk)
+>>>> clocks to work properly. Remove the useless system clock (fclk).
+>>>>
+>>>> Avoid calling set_rate on the fixed rate UTMI/IPLL clock and remove
+>>>> useless IS_ENABLED(CONFIG_COMMON_CLK) tests (all at91 platforms have been
+>>>> moved to the CCF).
+>>>>
+>>>> This patch also fixes a bug introduced by 3440ef1 (ARM: at91/dt: fix USB
+>>>> high-speed clock to select UTMI), which was leaving the usb clock
+>>>> uninitialized and preventing the OHCI driver from setting the usb clock
+>>>> rate to 48MHz.
+>>>> This bug was caused by several things:
+>>>> 1/ usb clock drivers set the CLK_SET_RATE_GATE flag, which means the rate
+>>>>     cannot be changed once the clock is prepared
+>>>> 2/ The EHCI driver was retrieving and preparing/enabling the uhpck
+>>>>     clock which was in turn preparing its parent clock (the usb clock),
+>>>>     thus preventing any rate change because of 1/
+>>>>
+>>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>>
+>>> Acked-by: Alan Stern <stern@rowland.harvard.edu>
 >>
->> Setting a dev_pm_ops suspend/resume pair of callbacks but not a set of
->> hibernation callbacks means those pm functions will not be
->> called upon hibernation - that leads to system crash on ARM during
->> freezing if gpio-led is used in combination with CPU led trigger.
->> It may happen after freeze_noirq stage (GPIO is suspended)
->> and before syscore_suspend stage (CPU led trigger is suspended)
->> - usually when disable_nonboot_cpus() is called.
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> and:
+>> Fixes: 3440ef169100 ("ARM: at91/dt: fix USB high-speed clock to select UTMI")
 >>
->> Log:
->>     PM: noirq freeze of devices complete after 1.425 msecs
->>     Disabling non-boot CPUs ...
->>       ^ system may crash or stuck here with message (TI AM572x)
+>> Alan, Greg,
 >>
->>     WARNING: CPU: 0 PID: 3100 at drivers/bus/omap_l3_noc.c:148 l3_interrupt_handler+0x22c/0x370()
->>     44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER1_P3 (Idle): Data Access in Supervisor mode during Functional access
+>> Can you please take this patch (only this patch 1/5 of the series) as a fix
+>> for the 4.0-rc? It would solve the issue that we see on at91sam9x5/at91sam9n12.
+>> I'll take care of the rest of the series for 4.1.
 >>
->>     CPU1: shutdown
->>       ^ or here
->>
->> Fix this by using SIMPLE_DEV_PM_OPS, which appropriately
->> assigns the suspend and hibernation callbacks and move
->> led_suspend/led_resume under CONFIG_PM_SLEEP to avoid
->> build warnings.
->>
->> Signed-off-by: Grygorii Strashko <Grygorii.Strashko@linaro.org>
->> ---
->> This patch actually fixes commit:
->>    73e1ab4 "leds: Convert led class driver from legacy pm ops to dev_pm_ops"
->>
-On 02/24/2015 06:12 PM, Grygorii.Strashko at linaro.org wrote:
->> Changes in v2:
->> - fixed compile time warnings when !CONFIG_PM_SLEEP
->> - updated commit message
->>
->> v1:
->> - https://lkml.org/lkml/2015/2/2/476
->>
->>    drivers/leds/led-class.c | 7 +++----
->>    1 file changed, 3 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
->> index dbeebac..5033e0d 100644
->> --- a/drivers/leds/led-class.c
->> +++ b/drivers/leds/led-class.c
->> @@ -183,6 +183,7 @@ void led_classdev_resume(struct led_classdev *led_cdev)
->>    }
->>    EXPORT_SYMBOL_GPL(led_classdev_resume);
->>
->> +#ifdef CONFIG_PM_SLEEP
->>    static int led_suspend(struct device *dev)
->>    {
->>    	struct led_classdev *led_cdev = dev_get_drvdata(dev);
->> @@ -202,11 +203,9 @@ static int led_resume(struct device *dev)
->>
->>    	return 0;
->>    }
->> +#endif
->>
->> -static const struct dev_pm_ops leds_class_dev_pm_ops = {
->> -	.suspend        = led_suspend,
->> -	.resume         = led_resume,
->> -};
->> +static SIMPLE_DEV_PM_OPS(leds_class_dev_pm_ops, led_suspend, led_resume);
->>
->>    /**
->>     * led_classdev_register - register a new object of led_classdev class.
->>
+>> If you want me to take it of to re-send the patch, tell me.
 >
-> Could you pay attention on this patch, pls? It fixes a real issue for me.
->
-> Actually, I'd like to note that it fixes regression introduced by commit
-> 73e1ab41a80d36207e8ea7cc2c9897afdeeef387
-> "leds: Convert led class driver from legacy pm ops to dev_pm_ops" from
-> Shuah Khan <shuah.kh@samsung.com> (Jun 20 2013).
->
+> I'll queue it up now, thanks.  You can take the rest of the series :)
 
-Gentle reminder. Any comments on this?
+Hi,
+I reported this error to Nicolas based on tests with
+lk 4.0-rc4. With the same USB WiFi dongle and platform
+this patch fixes my problem.
 
--- 
-regards,
--grygorii
+Tested-by: Douglas Gilbert <dgilbert@interlog.com>
