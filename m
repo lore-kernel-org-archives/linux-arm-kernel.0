@@ -1,100 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Mar 2015 19:46:11 +0100
-Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
- per boot protocol
-In-Reply-To: <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
-References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
- <20150318181315.GH19814@leverpostej>
- <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
-Message-ID: <CAKv+Gu_f=e4UG1GmtFh7j8fvq67v94VA=FwgaxHV5rECx0Wf=Q@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 18 Mar 2015 19:46:04 +0100
+Subject: [PATCH V2 0/8] ARM: cpuidle: Unify the ARM64/ARM DT approach
+Message-ID: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 March 2015 at 19:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 18 March 2015 at 19:13, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Wed, Mar 18, 2015 at 02:55:27PM +0000, Ard Biesheuvel wrote:
->>> According to the arm64 boot protocol, registers x1 to x3 should be
->>> zero upon kernel entry, and non-zero values are reserved for future
->>> use. This future use is going to be problematic if we never enforce
->>> the current rules, so start enforcing them now, by emitting a warning
->>> if non-zero values are detected.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm64/kernel/head.S  |  4 ++++
->>>  arch/arm64/kernel/setup.c | 15 +++++++++++++++
->>>  2 files changed, 19 insertions(+)
->>>
->>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->>> index a0fbd99efb89..8636c3cef006 100644
->>> --- a/arch/arm64/kernel/head.S
->>> +++ b/arch/arm64/kernel/head.S
->>> @@ -233,6 +233,10 @@ section_table:
->>>  #endif
->>>
->>>  ENTRY(stext)
->>> +     adr_l   x8, boot_regs                   // record the contents of
->>> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
->>> +     stp     x2, x3, [x8, #16]
->>
->> I think we should have a dc ivac here as we do for
->> set_cpu_boot_mode_flag.
->>
->> That avoids a potential issue with boot_regs sharing a cacheline with
->> data we write with the MMU on -- using __flush_dcache_area will result
->> in a civac, so we could write back dirty data atop of the boot_regs if
->> there were clean entries in the cache when we did the non-cacheable
->> write.
->>
->
-> Hmm, I wondered about that.
->
-> Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
->
+There is a big number of cpuidle drivers for the ARM architecture.
 
-Never mind, it's easier just to do the invalidate right after, and I
-can drop the flush before the access.
+These drivers have been cleaned up and grouped into the drivers/cpuidle
+directory to keep track of the changes more easily and ensure the code
+is following the same scheme across the drivers.
 
+That had the benefit of simplifying the code and factor out a lot of common
+parts. Beside that, as the drivers belong to the 'drivers' directory, we had
+to split the arch specific bits and the generic code in order to keep
+everything self contained. The platform driver paradigm was used for this
+purpose.
 
->>> +
->>>       mov     x21, x0                         // x21=FDT
->>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>>       adrp    x24, __PHYS_OFFSET
->>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->>> index 6c5fb5aff325..2d5cae2de679 100644
->>> --- a/arch/arm64/kernel/setup.c
->>> +++ b/arch/arm64/kernel/setup.c
->>> @@ -114,6 +114,11 @@ void __init early_print(const char *str, ...)
->>>       printk("%s", buf);
->>>  }
->>>
->>> +/*
->>> + * The recorded values of x0 .. x3 upon kernel entry.
->>> + */
->>> +u64 __read_mostly boot_regs[4];
->>> +
->>>  void __init smp_setup_processor_id(void)
->>>  {
->>>       u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->>> @@ -387,6 +392,16 @@ void __init setup_arch(char **cmdline_p)
->>>       conswitchp = &dummy_con;
->>>  #endif
->>>  #endif
->>> +     /*
->>> +      * boot_regs[] is written by the boot CPU with the caches off, so we
->>> +      * need to ensure that we read the value from main memory
->>> +      */
->>> +     __flush_dcache_area(boot_regs, sizeof(boot_regs));
->>> +     if (boot_regs[1] || boot_regs[2] || boot_regs[3]) {
->>> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
->>> +                     boot_regs[1], boot_regs[2], boot_regs[3]);
->>> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
->>> +     }
->>>  }
->>>
->>>  static int __init arm64_device_init(void)
->>> --
->>> 1.8.3.2
->>>
->>>
+Unfortunately, this approach is now no longer accepted and a different solution
+must be provided to reach the same goal: one example is the Qualcomm cpuidle
+driver upstreaming attempt.
+
+In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
+
+The DT definition provides an 'enable-method' to specify one of the cpu
+operations (PSCI, ...).
+
+This patchset unify this driver with ARM32, using the same DT definition.
+
+Thanks with this patchset we can use the 'enable-method' to specify a cpu
+operations, hence get rid of the platform driver approach and go further in the
+cpuidle driver flexibility via the DT.
+
+Changelog:
+
+ V2:
+	* Fixed some nits in the comments
+	* Added a patch to change the name of the functions
+	* Added per cpu device registration patch
+
+Daniel Lezcano (8):
+  ARM: cpuidle: Remove duplicate header inclusion
+  ARM: cpuidle: Add a cpuidle ops structure to be used for DT
+  ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
+  ARM64: cpuidle: Rename cpu_init_idle to a common function name
+  ARM64: cpuidle: Remove arm64 reference
+  ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
+  ARM: cpuidle: Register per cpuidle device
+  ARM: cpuidle: Change function name to be consistent with x86
+
+ arch/arm/include/asm/cpuidle.h                     | 21 ++++++
+ arch/arm/kernel/cpuidle.c                          | 74 ++++++++++++++++++-
+ arch/arm/mach-davinci/cpuidle.c                    |  1 -
+ arch/arm/mach-imx/cpuidle-imx6q.c                  |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sl.c                 |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sx.c                 |  1 -
+ arch/arm/mach-omap2/cpuidle44xx.c                  |  1 -
+ arch/arm/mach-s3c64xx/cpuidle.c                    |  2 +-
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |  1 -
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |  1 -
+ arch/arm64/include/asm/cpuidle.h                   |  9 ++-
+ arch/arm64/kernel/cpuidle.c                        |  2 +-
+ drivers/cpuidle/Kconfig                            |  7 +-
+ drivers/cpuidle/Kconfig.arm                        | 10 +++
+ drivers/cpuidle/Kconfig.arm64                      | 13 ----
+ drivers/cpuidle/Makefile                           |  5 +-
+ drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} | 83 ++++++++++++++++------
+ drivers/cpuidle/cpuidle-at91.c                     |  1 -
+ drivers/cpuidle/cpuidle-exynos.c                   |  1 -
+ drivers/cpuidle/cpuidle-kirkwood.c                 |  1 -
+ drivers/cpuidle/cpuidle-ux500.c                    |  1 -
+ drivers/cpuidle/cpuidle-zynq.c                     |  1 -
+ include/asm-generic/vmlinux.lds.h                  |  2 +
+ 23 files changed, 178 insertions(+), 62 deletions(-)
+ delete mode 100644 drivers/cpuidle/Kconfig.arm64
+ rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (56%)
+
+-- 
+1.9.1
