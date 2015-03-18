@@ -1,38 +1,54 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Mar 2015 13:46:53 +0100
-Subject: [PATCH 2/2] i2c: busses with dynamic ids should start after
- fixed ids for DT
-In-Reply-To: <1426177093-26820-3-git-send-email-wsa@the-dreams.de>
-References: <1426177093-26820-1-git-send-email-wsa@the-dreams.de>
- <1426177093-26820-3-git-send-email-wsa@the-dreams.de>
-Message-ID: <20150318124653.GC3580@katana>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 18 Mar 2015 13:51:49 +0100
+Subject: [PATCH v3 0/4] ARM: EXYNOS: cpuidle: add AFTR mode support for
+ Exynos3250
+Message-ID: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 12, 2015 at 05:17:59PM +0100, Wolfram Sang wrote:
-> Make sure dynamic ids do not interfere with fixed ones and let them
-> start after the highest fixed id. This patch might cause different
-> bus-numbers for dynamic ids, however it fixes a bug. Assume:
-> 
-> - fixed id0 defers probe
-> - fixed id1 succeeds and registers a muxed bus with dynamic id
-> - muxed bus gets id0
-> - fixed id0 wants to probe again, but its fixed id is gone now
-> - fixed id0 probe fails
-> 
-> With this patch, the fixed ids are always reserved in the DT case.
-> For legacy board init, we already have a mechanism like this in
-> i2c_register_board_info().
-> 
-> Reported-by: Bob Feretich <bob.feretich@rafresearch.com>
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Hi,
 
-Fixed the checkpatch warning and applied to for-next, thanks!
+This patch series adds support for AFTR idle mode on boards with
+Exynos3250 SoC and allows EXYNOS cpuidle driver usage on these
+boards.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/5a8ad23e/attachment-0001.sig>
+It has been tested on Samsung Rinato board (Gear 2).
+
+Depends on:
+- for-next branch (commit: 77105c882ba6) of linux-samsung.git
+  kernel tree
+
+Changes since v2:
+- rebased on top of for-next branch (commit: 77105c882ba6) of
+  linux-samsung.git kernel tree
+
+Changes since v1:
+- rebased on top of for-next branch (commit: ce275c369a0b) of
+  linux-samsung.git kernel tree
+- fixed lockup on hotplug by using dsb_sev() instead of IPI in
+  exynos_boot_secondary() on Exynos3250
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
+
+
+Bartlomiej Zolnierkiewicz (4):
+  ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on Exynos3250
+  ARM: EXYNOS: add code for setting/clearing boot flag
+  ARM: EXYNOS: cpuidle: add AFTR mode support for Exynos3250
+  ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250 SoC
+
+ arch/arm/mach-exynos/common.h   |  6 ++++++
+ arch/arm/mach-exynos/exynos.c   | 26 ++++++++++++++++++++++++++
+ arch/arm/mach-exynos/firmware.c |  8 +++++++-
+ arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
+ arch/arm/mach-exynos/pm.c       | 12 +++++++++++-
+ arch/arm/mach-exynos/regs-pmu.h |  3 +++
+ arch/arm/mach-exynos/smc.h      |  9 +++++++++
+ 7 files changed, 82 insertions(+), 5 deletions(-)
+
+-- 
+1.8.2.3
