@@ -1,103 +1,97 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Mar 2015 16:54:25 +0000
-Subject: [STLinux Kernel] [PATCH 6/6] pinctrl: st: Display pin's function
- when printing pinctrl debug information
-In-Reply-To: <5509A93A.5080202@st.com>
-References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
- <1426675899-19882-7-git-send-email-lee.jones@linaro.org>
- <5509A93A.5080202@st.com>
-Message-ID: <20150318165425.GS3318@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Mar 2015 16:55:06 +0000
+Subject: [PATCH v6 0/4] irqchip: move away from gic_arch_extn.irq_set_wake
+In-Reply-To: <CAMuHMdXQZGSE7JdBsy=-ERp7wjTpkN63RNcDcRkYriyn+O4pyw@mail.gmail.com>
+References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
+ <CAMuHMdXQZGSE7JdBsy=-ERp7wjTpkN63RNcDcRkYriyn+O4pyw@mail.gmail.com>
+Message-ID: <5509ADEA.1090604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Mar 2015, Maxime Coquelin wrote:
-
-> Hi Lee,
+On 18/03/15 15:30, Geert Uytterhoeven wrote:
+> Hi Marc,
 > 
-> On 03/18/2015 11:51 AM, Lee Jones wrote:
-> >Great for easily determining which mode a pin is operating in.
-> >This patch was particularly helpful when debugging a recent GPIO/
-> >Pinctrl disparity issue.
-> >
-> >Before:
-> >     $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-> >       pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
-> >              [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
-> >
-> >After [GPIO]:
-> >     $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-> >       pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] GPIO
-> >              [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
-> >
-> >After [Alt]:
-> >     $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
-> >       pin 33 (PIO4[1]):[OE:0,PU:0,OD:0] Alt Fn 2
-> >              [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
-> >
-> >Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >---
-> >  drivers/pinctrl/pinctrl-st.c | 12 +++++++++++-
-> >  1 file changed, 11 insertions(+), 1 deletion(-)
-> A couple of comments below.
-> Once fixed, you can add my:
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> On Wed, Mar 11, 2015 at 4:45 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> This series is extracted from [4], which is trying to remove all
+>> traces of gic_arch_extn from the tree. As some maintainers are more
+>> responsive than others (understatement of the year...), I've decided
+>> to split it per sub-arch, and get it moving, at least partially.
+>>
+>> This small set of patches slightly modifies some of the least
+>> offending platforms, by providing a much limited hook into the GIC
+>> driver.
 > 
+>> Marc Zyngier (4):
+>>   irqchip: gic: add an entry point to set up irqchip flags
+>>   ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
+>>   ARM: ux500: switch from gic_arch_extn to gic_set_irqchip_flags
+>>   ARM: zynq: switch from gic_arch_extn to gic_set_irqchip_flags
 > 
+> As I'm feeling the need to add gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE)
+> for more shmobile SoCs (which implies populating mach_desc.init_irq()
+> again, and also calling irqchip_init() explicitly), I'm wondering if it
+> wouldn't be better to just initialize "gic_chip.flags = IRQCHIP_SKIP_SET_WAKE"
+> unconditionally?
+> Currently the GIC driver doesn't have to do anything special to support
+> wake-up, but support for that may be added one day.
+
+It is unlikely we'll ever add this support, because the GIC doesn't not
+have that capability in HW (wake-up is not even part of the
+architecture). This is why wake up is always left to some other
+interrupt controller.
+
+> Every driver that wants to implements wake-up properly should call
+> irq_set_irq_wake() or {en,dis}able_irq_wake() to inform the upstream interrupt
+> controller. However, with GIC, that gives (except on sh73a0, r8a7779,
+> ux500, and zynq) annoying warning messages during resume:
 > 
-> >
-> >diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> >index 1cda40e..d5b2ffa 100644
-> >--- a/drivers/pinctrl/pinctrl-st.c
-> >+++ b/drivers/pinctrl/pinctrl-st.c
-> >@@ -1058,18 +1058,28 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
-> >  {
-> >  	struct st_pio_control *pc;
-> >  	unsigned long config;
-> >+	unsigned int function;
-> >  	int offset = st_gpio_pin(pin_id);
-> >+	char f[64];
-> 64 bytes is way too big here
-
-Ah yes, this is legacy from when the message was much larger.
-
-Initially, it was "WARN: Pin in GPIO mode -- this status is invalid"
-
-But this incarnation is much nicer I thought.
-
-Good spot.  Will fix.
-
-> >  	mutex_unlock(&pctldev->mutex);
-> >  	pc = st_get_pio_control(pctldev, pin_id);
-> >  	st_pinconf_get(pctldev, pin_id, &config);
-> >  	mutex_lock(&pctldev->mutex);
-> >-	seq_printf(s, "[OE:%ld,PU:%ld,OD:%ld]\n"
-> >+
-> >+	function = st_pctl_get_pin_function(pc, offset);
-> >+	if (function)
-> >+		sprintf(f, "Alt Fn %d", function);
-> Please use snprintf.
-
-Of course.  Will fix.
-
-> >+	else
-> >+		sprintf(f, "GPIO");
-> >+
-> >+	seq_printf(s, "[OE:%d,PU:%ld,OD:%ld]\t%s\n"
-> >  		"\t\t[retime:%ld,invclk:%ld,clknotdat:%ld,"
-> >  		"de:%ld,rt-clk:%ld,rt-delay:%ld]",
-> >  		!st_gpio_get_direction(&pc_to_bank(pc)->gpio_chip, offset),
-> >  		ST_PINCONF_UNPACK_PU(config),
-> >  		ST_PINCONF_UNPACK_OD(config),
-> >+		f,
-> >  		ST_PINCONF_UNPACK_RT(config),
-> >  		ST_PINCONF_UNPACK_RT_INVERTCLK(config),
-> >  		ST_PINCONF_UNPACK_RT_CLKNOTDATA(config),
+>     WARNING: CPU: 1 PID: 1341 at kernel/irq/manage.c:540
+> irq_set_irq_wake+0x9c/0xf8()
+>     Unbalanced IRQ 26 wake disable
 > 
-> Thanks,
-> Maxime
+> I guess I could just leave out the call to irq_set_irq_wake() in my GPIO driver,
+> as it works fine without, but that doesn't look correct to me.
+> 
+> What do you think?
+
+At the moment, your approach will work, but only because we have another
+bug, as described here:
+
+http://lkml.iu.edu/hypermail/linux/kernel/1501.1/04757.html
+
+Fixing this bug means we will propagate the flag to be visible at the
+top level of the controller hierarchy, which will cause any
+irq_set_irq_wake() request to be ignored. Probably not what people have
+mind.
+
+Only the platform code knows the topology of the system, unfortunately.
+
+When it comes to the message you describe above, I'd blame the driver:
+irq_set_irq_wake() does return -ENXIO when there is no irq_set_wake
+method. The driver should definitely test this, avoid doing a wake
+disable if the enable has failed.
+
+Thanks,
+
+	M.
+
+> Thanks!
+> 
+> See also "[PATCH resend 2/2] [RFC] genirq: Set IRQCHIP_SKIP_SET_WAKE for
+> no_irq_chip and dummy_irq_chip" (https://lkml.org/lkml/2015/1/12/506).
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
