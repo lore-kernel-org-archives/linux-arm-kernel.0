@@ -1,61 +1,57 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 18 Mar 2015 17:43:43 +0100
-Subject: [GIT PULL 2/2] ARM: rockchip: dts changes for 4.1
-In-Reply-To: <2684132.lK2CyBin0M@diego>
-References: <2684132.lK2CyBin0M@diego>
-Message-ID: <2772656.J2ocM9VFb6@diego>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 18 Mar 2015 17:43:53 +0100
+Subject: [STLinux Kernel] [PATCH 4/6] pinctrl: st: Supply a GPIO
+ get_direction() call-back
+In-Reply-To: <1426675899-19882-5-git-send-email-lee.jones@linaro.org>
+References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
+ <1426675899-19882-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <5509AB49.8040806@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
-
-some new peripherals, a new board and adding pmic supplies, please pull
 
 
-Thanks
-Heiko
+On 03/18/2015 11:51 AM, Lee Jones wrote:
+> ST's hardware differentiates between GPIO mode and Pinctrl alternate
+> functions.  When a pin is in GPIO mode, there are dedicated registers
+> to set and obtain direction status.  However, If a pin's alternate
+> function is in use then the direction is set and status is derived
+> from a bunch of syscon registers.  The issue is; until now there was
+> a lack of parity between the two.
+>
+> For example:
+>
+> Catting the two following information sources could result in
+> conflicting information (output has been snipped for simplicity):
+>
+>   $ cat /sys/kernel/debug/gpio
+>    GPIOs 32-39, platform/961f080.pin-controller-sbc, PIO4:
+>     gpio-33  (?                   ) out hi
+>
+>   $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
+>    pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
+>           [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
+>
+> In this example GPIO-33 is a GPIO controlled LED, which is set for
+> output, as you'd expect.  However, when the same information is
+> drafted from Pinctrl, it clearly states that OE (Output Enable) is
+> not set i.e. the pin is set for input.  This is because OE normally
+> only represents alternate functions and has no bearing on how the
+> pin operates when in Alt-0 (GPIO mode).
+>
+> This patch changes the current semantics and provides a parity link
+> between the two subsystems.  The get_direction() call-back firstly
+> determines which function a pin is operating in, then uses the
+> appropriate helpers for that mode.
+>
+> Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/pinctrl/pinctrl-st.c | 31 ++++++++++++++++++++++++++++++-
+>   1 file changed, 30 insertions(+), 1 deletion(-)
+>
 
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.1-rockchip-dts1
-
-for you to fetch changes up to 91d5cb737287642b75e47790a28a43cd0efd80cb:
-
-  ARM: dts: rockchip: complete rk3288-evb pmic supplies (2015-03-13 00:07:39 +0100)
-
-----------------------------------------------------------------
-This adds and enables the usbphy nodes on the rk3288 boards and enables
-the gmac on the firefly board. A new board the Popmetal-rk3288 is also
-added. And finally the pmic supplies for act8846 based boards are added,
-as the act8865/act8846 driver gained supply handling in the regulator tree.
-
-----------------------------------------------------------------
-Andy Yan (2):
-      dt-bindings: add root compatible property for PopMetal board
-      ARM: dts: add rk3288 PopMetal board
-
-Heiko Stuebner (4):
-      ARM: dts: rockchip: enable usbphy on rk3288-firefly
-      ARM: dts: rockchip: enable gmac on rk3288-firefly
-      ARM: dts: rockchip: add input supplies for the act8846 on Radxa Rock
-      ARM: dts: rockchip: complete rk3288-evb pmic supplies
-
-Yunzhi Li (2):
-      ARM: dts: rockchip: add rk3288 usb PHY
-      ARM: dts: rockchip: Enable usb PHY on rk3288-evb board
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
- arch/arm/boot/dts/rk3188-radxarock.dts             |  16 +
- arch/arm/boot/dts/rk3288-evb-act8846.dts           |  10 +
- arch/arm/boot/dts/rk3288-evb-rk808.dts             |   7 +
- arch/arm/boot/dts/rk3288-evb.dtsi                  |  13 +
- arch/arm/boot/dts/rk3288-firefly.dtsi              |  20 +
- arch/arm/boot/dts/rk3288-popmetal.dts              | 447 +++++++++++++++++++++
- arch/arm/boot/dts/rk3288.dtsi                      |  35 ++
- 8 files changed, 552 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-popmetal.dts
+Thanks,
+Maxime
