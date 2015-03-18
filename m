@@ -1,179 +1,239 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 18 Mar 2015 14:20:22 +0000
-Subject: [RFC PATCH 1/7] serial: Emulate break using control characters
+Date: Wed, 18 Mar 2015 14:20:23 +0000
+Subject: [RFC PATCH 2/7] printk: Simple implementation for NMI backtracing
 In-Reply-To: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
 References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1426688428-3150-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1426688428-3150-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the magic SysRq functions can accessed by sending a break on
-the serial port. Unfortunately some networked serial proxies make it
-difficult to send a break meaning SysRq functions cannot be used. This
-patch provides a workaround by allowing the (fairly unlikely) sequence
-of ^B^R^K characters to emulate a real break.
+Currently there is a quite a pile of code sitting in
+arch/x86/kernel/apic/hw_nmi.c to support safe all-cpu backtracing from NMI.
+The code is inaccessible to backtrace implementations for other
+architectures, which is a shame because they would probably like to be
+safe too.
 
-This approach is very nearly as robust as normal sysrq/break handling
-because all trigger recognition happens during interrupt handling. Only
-major difference is that to emulate a break we must enter the ISR four
-times (instead of twice) and manage an extra byte of state.
+Copy this code into printk, reworking it a little as we do so to make
+it easier to exploit as library code.
 
-No means is provided to escape the trigger sequence (and pass ^B^R^K to
-the underlying process) however the sequence is proved reasonably pretty
-collision resistant in practice. The most significant consequence is
-that ^B and ^B^R are delayed until a new character is observed.
-
-The most significant collision I am aware of is with emacs-like
-backward-char bindings (^B) because the character movement will become
-lumpy (two characters every two key presses rather than one character
-per key press). Arrow keys or ^B^B^F provide workarounds.
-
-Special note for tmux users:
-  tmux defaults to using ^B as its escape character but does not have a
-  default binding for ^B^R. Likewise tmux had no visual indicator
-  showing the beginning of break sequence meaning delayed the delivery
-  of ^B is not observable. Thus serial break emulation does not interfere
-  with the use of tmux's default key bindings.
+We'll port the x86 NMI backtrace logic to it in a later patch.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Cc: Steven Rostedt <rostedt@goodmis.org>
 ---
- include/linux/serial_core.h | 83 +++++++++++++++++++++++++++++++++++----------
- lib/Kconfig.debug           | 15 ++++++++
- 2 files changed, 80 insertions(+), 18 deletions(-)
+ include/linux/printk.h        |  20 ++++++
+ init/Kconfig                  |   3 +
+ kernel/printk/Makefile        |   1 +
+ kernel/printk/nmi_backtrace.c | 148 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 172 insertions(+)
+ create mode 100644 kernel/printk/nmi_backtrace.c
 
-diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-index cf9c2ce9479d..56f8e3daf42c 100644
---- a/include/linux/serial_core.h
-+++ b/include/linux/serial_core.h
-@@ -160,6 +160,9 @@ struct uart_port {
- 	struct console		*cons;			/* struct console, if any */
- #if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(SUPPORT_SYSRQ)
- 	unsigned long		sysrq;			/* sysrq timeout */
-+#ifdef CONFIG_MAGIC_SYSRQ_BREAK_EMULATION
-+	char                    sysrq_emul;             /* emulation state */
-+#endif
+diff --git a/include/linux/printk.h b/include/linux/printk.h
+index baa3f97d8ce8..44bb85ad1f62 100644
+--- a/include/linux/printk.h
++++ b/include/linux/printk.h
+@@ -228,6 +228,26 @@ static inline void show_regs_print_info(const char *log_lvl)
+ }
  #endif
  
- 	/* flags must be updated while holding port mutex */
-@@ -420,24 +423,6 @@ extern void uart_handle_cts_change(struct uart_port *uport,
- extern void uart_insert_char(struct uart_port *port, unsigned int status,
- 		 unsigned int overrun, unsigned int ch, unsigned int flag);
- 
--#ifdef SUPPORT_SYSRQ
--static inline int
--uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
--{
--	if (port->sysrq) {
--		if (ch && time_before(jiffies, port->sysrq)) {
--			handle_sysrq(ch);
--			port->sysrq = 0;
--			return 1;
--		}
--		port->sysrq = 0;
--	}
--	return 0;
--}
--#else
--#define uart_handle_sysrq_char(port,ch) ({ (void)port; 0; })
--#endif
--
- /*
-  * We do the SysRQ and SAK checking like this...
-  */
-@@ -462,6 +447,68 @@ static inline int uart_handle_break(struct uart_port *port)
- 	return 0;
- }
- 
-+#if defined(SUPPORT_SYSRQ) && defined(CONFIG_MAGIC_SYSRQ_BREAK_EMULATION)
++#ifdef CONFIG_PRINTK_NMI_BACKTRACE
 +/*
-+ * Emulate a break if we are the serial console and receive ^B, ^R, ^K.
++ * printk_nmi_backtrace_prepare/complete are called to prepare the
++ * system for some or all cores to issue trace from NMI.
++ * printk_nmi_backtrace_complete will print buffered output and cannot
++ * (safely) be called from NMI.
 + */
-+static inline int
-+uart_handle_sysrq_break_emulation(struct uart_port *port, unsigned int ch)
++extern int printk_nmi_backtrace_prepare(void);
++extern void printk_nmi_backtrace_complete(void);
++
++/*
++ * printk_nmi_backtrace_this_cpu_begin/end are used divert/restore printk
++ * on this cpu. The result is the output of printk() (by this CPU) will be
++ * stored in temporary buffers for later printing by
++ * printk_nmi_backtrace_complete.
++ */
++extern void printk_nmi_backtrace_this_cpu_begin(void);
++extern void printk_nmi_backtrace_this_cpu_end(void);
++#endif
++
+ extern asmlinkage void dump_stack(void) __cold;
+ 
+ #ifndef pr_fmt
+diff --git a/init/Kconfig b/init/Kconfig
+index f5dbc6d4261b..0107e9b4d2cf 100644
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -1421,6 +1421,9 @@ config PRINTK
+ 	  very difficult to diagnose system problems, saying N here is
+ 	  strongly discouraged.
+ 
++config PRINTK_NMI_BACKTRACE
++	bool
++
+ config BUG
+ 	bool "BUG() support" if EXPERT
+ 	default y
+diff --git a/kernel/printk/Makefile b/kernel/printk/Makefile
+index 85405bdcf2b3..1849b001384a 100644
+--- a/kernel/printk/Makefile
++++ b/kernel/printk/Makefile
+@@ -1,2 +1,3 @@
+ obj-y	= printk.o
++obj-$(CONFIG_PRINTK_NMI_BACKTRACE)	+= nmi_backtrace.o
+ obj-$(CONFIG_A11Y_BRAILLE_CONSOLE)	+= braille.o
+diff --git a/kernel/printk/nmi_backtrace.c b/kernel/printk/nmi_backtrace.c
+new file mode 100644
+index 000000000000..e9a06929c4f3
+--- /dev/null
++++ b/kernel/printk/nmi_backtrace.c
+@@ -0,0 +1,148 @@
++#include <linux/kernel.h>
++#include <linux/seq_buf.h>
++
++#define NMI_BUF_SIZE		4096
++
++struct nmi_seq_buf {
++	unsigned char		buffer[NMI_BUF_SIZE];
++	struct seq_buf		seq;
++};
++
++/* Safe printing in NMI context */
++static DEFINE_PER_CPU(struct nmi_seq_buf, nmi_print_seq);
++
++static DEFINE_PER_CPU(printk_func_t, nmi_print_saved_print_func);
++
++/* "in progress" flag of NMI printing */
++static unsigned long nmi_print_flag;
++
++static int __init printk_nmi_backtrace_init(void)
 +{
-+	const unsigned int ctrlb = 'B' & 31;
-+	const unsigned int ctrlr = 'R' & 31;
-+	const unsigned int ctrlk = 'K' & 31;
++	struct nmi_seq_buf *s;
++	int cpu;
 +
-+	if (uart_console(port)) {
-+		if ((port->sysrq_emul == 0 && ch == ctrlb) ||
-+		    (port->sysrq_emul == ctrlb && ch == ctrlr)) {
-+			/* for either of the first two trigger characters
-+			 * update the state variable and move on.
-+			 */
-+			port->sysrq_emul = ch;
-+			return 1;
-+		} else if (port->sysrq_emul == ctrlr && ch == ctrlk &&
-+			   uart_handle_break(port)) {
-+			/* the break has already been emulated whilst
-+			 * evaluating the condition, tidy up and move on
-+			 */
-+			port->sysrq_emul = 0;
-+			return 1;
-+		}
-+	}
-+
-+	if (port->sysrq_emul) {
-+		/* received a partial (false) trigger, tidy up and move on */
-+		uart_insert_char(port, 0, 0, ctrlb, TTY_NORMAL);
-+		if (port->sysrq_emul == ctrlr)
-+			uart_insert_char(port, 0, 0, ctrlr, TTY_NORMAL);
-+		port->sysrq_emul = 0;
++	for_each_possible_cpu(cpu) {
++		s = &per_cpu(nmi_print_seq, cpu);
++		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
 +	}
 +
 +	return 0;
 +}
-+#else
-+#define uart_handle_sysrq_break_emulation(port, ch) ({ (void)port; 0; })
-+#endif
++pure_initcall(printk_nmi_backtrace_init);
 +
-+#ifdef SUPPORT_SYSRQ
-+static inline int
-+uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
++/*
++ * It is not safe to call printk() directly from NMI handlers.
++ * It may be fine if the NMI detected a lock up and we have no choice
++ * but to do so, but doing a NMI on all other CPUs to get a back trace
++ * can be done with a sysrq-l. We don't want that to lock up, which
++ * can happen if the NMI interrupts a printk in progress.
++ *
++ * Instead, we redirect the vprintk() to this nmi_vprintk() that writes
++ * the content into a per cpu seq_buf buffer. Then when the NMIs are
++ * all done, we can safely dump the contents of the seq_buf to a printk()
++ * from a non NMI context.
++ *
++ * This is not a generic printk() implementation and must be used with
++ * great care. In particular there is a static limit on the quantity of
++ * data that may be emitted during NMI, only one client can be active at
++ * one time (arbitrated by the return value of printk_nmi_begin() and
++ * it is required that something at task or interrupt context be scheduled
++ * to issue the output.
++ */
++static int nmi_vprintk(const char *fmt, va_list args)
 +{
-+	if (port->sysrq) {
-+		if (ch && time_before(jiffies, port->sysrq)) {
-+			handle_sysrq(ch);
-+			port->sysrq = 0;
-+			return 1;
-+		}
-+		port->sysrq = 0;
++	struct nmi_seq_buf *s = this_cpu_ptr(&nmi_print_seq);
++	unsigned int len = seq_buf_used(&s->seq);
++
++	seq_buf_vprintf(&s->seq, fmt, args);
++	return seq_buf_used(&s->seq) - len;
++}
++
++/*
++ * Reserve the NMI printk mechanism. Return an error if some other component
++ * is already using it.
++ */
++int printk_nmi_backtrace_prepare(void)
++{
++	if (test_and_set_bit(0, &nmi_print_flag)) {
++		/*
++		 * If something is already using the NMI print facility we
++		 * can't allow a second one...
++		 */
++		return -EBUSY;
 +	}
 +
-+	return uart_handle_sysrq_break_emulation(port, ch);
++	return 0;
 +}
-+#else
-+#define uart_handle_sysrq_char(port, ch) ({ (void)port; 0; })
-+#endif
 +
- /*
-  *	UART_ENABLE_MS - determine if port should enable modem status irqs
-  */
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index c2d51af327bc..3f54e85c27d2 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -372,6 +372,21 @@ config MAGIC_SYSRQ_DEFAULT_ENABLE
- 	  This may be set to 1 or 0 to enable or disable them all, or
- 	  to a bitmask as described in Documentation/sysrq.txt.
- 
-+config MAGIC_SYSRQ_BREAK_EMULATION
-+	bool "Enable magic SysRq serial break emulation"
-+	depends on MAGIC_SYSRQ && SERIAL_CORE_CONSOLE
-+	default n
-+	help
-+	  If you say Y here, then you can use the character sequence ^B^R^K
-+	  to simulate a BREAK on the serial console. This is useful if for
-+	  some reason you cannot send a BREAK to your console's serial port.
-+	  For example, if you have a serial device server that cannot
-+	  send a BREAK. Enabling this feature can delay the delivery of
-+	  characters to the TTY because the ^B and a subsequent ^R will be
-+	  delayed until we know what the next character is.
++static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
++{
++	const char *buf = s->buffer + start;
 +
-+	  If unsure, say N.
++	printk("%.*s", (end - start) + 1, buf);
++}
 +
- config DEBUG_KERNEL
- 	bool "Kernel debugging"
- 	help
++void printk_nmi_backtrace_complete(void)
++{
++	struct nmi_seq_buf *s;
++	int len, cpu, i, last_i;
++
++	/*
++	 * Now that all the NMIs have triggered, we can dump out their
++	 * back traces safely to the console.
++	 */
++	for_each_possible_cpu(cpu) {
++		s = &per_cpu(nmi_print_seq, cpu);
++		last_i = 0;
++
++		len = seq_buf_used(&s->seq);
++		if (!len)
++			continue;
++
++		/* Print line by line. */
++		for (i = 0; i < len; i++) {
++			if (s->buffer[i] == '\n') {
++				print_seq_line(s, last_i, i);
++				last_i = i + 1;
++			}
++		}
++		/* Check if there was a partial line. */
++		if (last_i < len) {
++			print_seq_line(s, last_i, len - 1);
++			pr_cont("\n");
++		}
++
++		/* Wipe out the buffer ready for the next time around. */
++		seq_buf_clear(&s->seq);
++	}
++
++	clear_bit(0, &nmi_print_flag);
++	smp_mb__after_atomic();
++}
++
++void printk_nmi_backtrace_this_cpu_begin(void)
++{
++	/*
++	 * Detect double-begins and report them. This code is unsafe (because
++	 * it will print from NMI) but things are pretty badly damaged if the
++	 * NMI re-enters and is somehow granted permission to use NMI printk,
++	 * so how much worse can it get? Also since this code interferes with
++	 * the operation of printk it is unlikely that any consequential
++	 * failures will be able to log anything making this our last
++	 * opportunity to tell anyone that something is wrong.
++	 */
++	if (this_cpu_read(nmi_print_saved_print_func)) {
++		this_cpu_write(printk_func,
++			       this_cpu_read(nmi_print_saved_print_func));
++		BUG();
++	}
++
++	this_cpu_write(nmi_print_saved_print_func, this_cpu_read(printk_func));
++	this_cpu_write(printk_func, nmi_vprintk);
++}
++
++void printk_nmi_backtrace_this_cpu_end(void)
++{
++	this_cpu_write(printk_func, this_cpu_read(nmi_print_saved_print_func));
++	this_cpu_write(nmi_print_saved_print_func, NULL);
++}
 -- 
 2.1.0
