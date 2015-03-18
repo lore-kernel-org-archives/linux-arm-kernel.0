@@ -1,64 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 18 Mar 2015 16:30:31 +0100
-Subject: [PATCH v6 0/4] irqchip: move away from gic_arch_extn.irq_set_wake
-In-Reply-To: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
-References: <1426088737-15817-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CAMuHMdXQZGSE7JdBsy=-ERp7wjTpkN63RNcDcRkYriyn+O4pyw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 18 Mar 2015 15:34:21 +0000
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <3926609.Ff6LCkuuMX@wuerfel>
+ <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
+ <20150318131722.GN3318@x1>
+ <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
+Message-ID: <20150318153421.GP3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, 18 Mar 2015, Jassi Brar wrote:
 
-On Wed, Mar 11, 2015 at 4:45 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> This series is extracted from [4], which is trying to remove all
-> traces of gic_arch_extn from the tree. As some maintainers are more
-> responsive than others (understatement of the year...), I've decided
-> to split it per sub-arch, and get it moving, at least partially.
->
-> This small set of patches slightly modifies some of the least
-> offending platforms, by providing a much limited hook into the GIC
-> driver.
+> On Wed, Mar 18, 2015 at 6:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 03 Mar 2015, Jassi Brar wrote:
+> >
+> >> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
+> >> >> +
+> >> >> +/*
+> >> >> + * struct sti_mbox_msg - sti mailbox message description
+> >> >> + * @dsize:             data payload size
+> >> >> + * @pdata:             message data payload
+> >> >> + */
+> >> >> +struct sti_mbox_msg {
+> >> >> +       u32             dsize;
+> >> >> +       u8              *pdata;
+> >> >> +};
+> >> >
+> >> > As mentioned in another thread, we may just want to add a 'size'
+> >> > argument to the message send function, and a default helper for
+> >> > messages with size of 32 bits.
+> >> >
+> >> Case-a) 'size' is a member of the payload structure itself
+> >>     The extra 'size' argument would only be used for sanity check.
+> >>     This driver seems so. Lee, can you not do without 'dsize'?
+> >>
+> >> Case-b) 'size' is not a member of payload structure:
+> >>      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
+> >>             Here the size argument is redundant.
+> >>
+> >>      b2)  payload length varies
+> >>             This case is highly unlikely because there would be no way
+> >> for remote to know how many bytes to read as the payload. Not to mean
+> >> we can't do without the 'size' argument.
+> >>
+> >> Your opinion has huge weight, but I would like to be enlightened
+> >> before agreeing.
+> >
+> > Let's simplify this.
+> >
+> > If you want to have varying length payloads, you have to carry the
+> > size in the payload.  If you wish to force fixed size payloads, then
+> > you may do without a size segment.
+> >
+> > Do you really want to force all users of Mailbox to use fixed size
+> > payloads?
+> >
+> No. I only observed the fact that every known mailbox controller
+> driver already has a way to figure out the payload length because
+> either the protocol uses fixed length payloads or has the 'size' field
+> in every payload.
+> I am yet to see a platform that uses both, then the 'size' argument
+> will be helpful but still not necessary.
 
-> Marc Zyngier (4):
->   irqchip: gic: add an entry point to set up irqchip flags
->   ARM: shmobile: remove use of gic_arch_extn.irq_set_wake
->   ARM: ux500: switch from gic_arch_extn to gic_set_irqchip_flags
->   ARM: zynq: switch from gic_arch_extn to gic_set_irqchip_flags
+I see.  So your real concern is that controllers shouldn't have two
+means of obtaining size.  Restricting messages to be fixed size sounds
+very, well, restrictive.  So we either need to represent the size as
+part of the payload or insist on a message-end delimiter.
 
-As I'm feeling the need to add gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE)
-for more shmobile SoCs (which implies populating mach_desc.init_irq()
-again, and also calling irqchip_init() explicitly), I'm wondering if it
-wouldn't be better to just initialize "gic_chip.flags = IRQCHIP_SKIP_SET_WAKE"
-unconditionally?
-Currently the GIC driver doesn't have to do anything special to support
-wake-up, but support for that may be added one day.
+Arnd's idea of placing the message size as part of the send_message()
+call is fine, but it's still going to end up in the payload isn't it?
+Or else the recipient isn't going to know the length.  And what about
+receiving?  Again, it'll need to be contained, or we won't know how
+big the message the co-proc is trying to send.
 
-Every driver that wants to implements wake-up properly should call
-irq_set_irq_wake() or {en,dis}able_irq_wake() to inform the upstream interrupt
-controller. However, with GIC, that gives (except on sh73a0, r8a7779,
-ux500, and zynq) annoying warning messages during resume:
-
-    WARNING: CPU: 1 PID: 1341 at kernel/irq/manage.c:540
-irq_set_irq_wake+0x9c/0xf8()
-    Unbalanced IRQ 26 wake disable
-
-I guess I could just leave out the call to irq_set_irq_wake() in my GPIO driver,
-as it works fine without, but that doesn't look correct to me.
-
-What do you think?
-
-Thanks!
-
-See also "[PATCH resend 2/2] [RFC] genirq: Set IRQCHIP_SKIP_SET_WAKE for
-no_irq_chip and dummy_irq_chip" (https://lkml.org/lkml/2015/1/12/506).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
