@@ -1,9 +1,9 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Mar 2015 16:44:18 +0200
-Subject: [PATCHv4 33/35] ARM: dts: omap5: add system control module node
+Date: Wed, 18 Mar 2015 16:44:19 +0200
+Subject: [PATCHv4 34/35] ARM: dts: dra7: add system control module node
 In-Reply-To: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
 References: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426689860-17537-34-git-send-email-t-kristo@ti.com>
+Message-ID: <1426689860-17537-35-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,27 +14,27 @@ for scm_conf area is also added.
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
  .../devicetree/bindings/arm/omap/ctrl.txt          |    2 +
- arch/arm/boot/dts/omap5.dtsi                       |   82 +++++++++++++-------
- 2 files changed, 58 insertions(+), 26 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi                        |   73 +++++++++++++-------
+ 2 files changed, 50 insertions(+), 25 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-index 8f2b481..e132026 100644
+index e132026..16915c2 100644
 --- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
 +++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
-@@ -22,6 +22,8 @@ Required properties:
- 		"ti,omap3-scrm-wkup"
- 		"ti,omap4-ctrl"
+@@ -24,6 +24,8 @@ Required properties:
  		"ti,omap4-ctrl-wkup"
-+		"ti,omap5-ctrl"
-+		"ti,omap5-ctrl-wkup"
+ 		"ti,omap5-ctrl"
+ 		"ti,omap5-ctrl-wkup"
++		"ti,dra7-ctrl"
++		"ti,dra7-ctrl-wkup"
  - reg:		Contains Control Module register address range
  		(base address and length)
  
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b321fdf..ad665bb 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -182,36 +182,66 @@
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5827fed..f294ad5 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -203,26 +203,60 @@
  			};
  		};
  
@@ -42,84 +42,56 @@ index b321fdf..ad665bb 100644
 -			compatible = "ti,omap-counter32k";
 -			reg = <0x4ae04000 0x40>;
 -			ti,hwmods = "counter_32k";
--		};
 +		scm: scm at 4a002000 {
-+			compatible = "ti,omap5-ctrl", "simple-bus";
-+			reg = <0x4a002000 0x800>,
-+			      <0x4a002800 0x800>;
++			compatible = "ti,dra7-ctrl", "simple-bus";
++			reg = <0x4a002000 0x1400>,
++			      <0x4a003400 0x600>;
 +			#address-cells = <2>;
 +			#size-cells = <1>;
-+			ranges = <0 0 0x4a002000 0x800>,
-+				 <1 0 0x4a002800 0x800>;
- 
--		omap5_pmx_core: pinmux at 4a002840 {
--			compatible = "ti,omap5-padconf", "pinctrl-single";
--			reg = <0x4a002840 0x01b6>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
++			ranges = <0 0 0x4a002000 0x1400>,
++				 <1 0 0x4a003400 0x600>;
++
 +			scm_conf: scm_conf at 0,0 {
 +				compatible = "syscon";
-+				reg = <0 0x0 0x800>;
++				reg = <0 0x0 0x1400>;
 +				#address-cells = <1>;
 +				#size-cells = <1>;
 +			};
 +
-+			omap5_pmx_core: pinmux at 1,40 {
-+				compatible = "ti,omap5-padconf",
++			dra7_pmx_core: pinmux at 1,0 {
++				compatible = "ti,dra7-padconf",
 +					     "pinctrl-single";
-+				reg = <1 0x40 0x01b6>;
++				reg = <1 0x0 0x0464>;
 +				#address-cells = <1>;
 +				#size-cells = <0>;
 +				#interrupt-cells = <1>;
 +				interrupt-controller;
-+				pinctrl-single,register-width = <16>;
-+				pinctrl-single,function-mask = <0x7fff>;
-+			};
-+
-+			omap5_padconf_global: omap5_padconf_global at 1,5a0 {
-+				compatible = "syscon";
-+				reg = <1 0x5a0 0xec>;
-+			};
- 		};
--		omap5_pmx_wkup: pinmux at 4ae0c840 {
--			compatible = "ti,omap5-padconf", "pinctrl-single";
--			reg = <0x4ae0c840 0x0038>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0x7fff>;
-+
-+		scm_wkup: scm_wkup at 4ae0c000 {
-+			compatible = "ti,omap5-ctrl-wkup", "simple-bus";
-+			reg = <0x4ae0c000 0x800>,
-+			      <0x4ae0c800 0x800>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			ranges = <0 0 0x4ae0c000 0x800>,
-+				 <1 0 0x4ae0c800 0x800>;
-+
-+			omap5_pmx_wkup: pinmux at 1,40 {
-+				compatible = "ti,omap5-padconf",
-+					     "pinctrl-single";
-+				reg = <1 0x40 0x0038>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
-+				pinctrl-single,register-width = <16>;
-+				pinctrl-single,function-mask = <0x7fff>;
++				pinctrl-single,register-width = <32>;
++				pinctrl-single,function-mask = <0x3fffffff>;
 +			};
  		};
  
--		omap5_padconf_global: tisyscon at 4a002da0 {
+-		dra7_ctrl_core: ctrl_core at 4a002000 {
 -			compatible = "syscon";
--			reg = <0x4A002da0 0xec>;
+-			reg = <0x4a002000 0x6d0>;
++		scm_wkup: scm_wkup at 4ae0c000 {
++			compatible = "ti,dra7-ctrl-wkup", "simple-bus";
++			reg = <0x4ae0c000 0x600>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4ae0c000 0x600>;
++
++			scm_wkup_conf: scm_wkup_conf at 0 {
++				compatible = "syscon";
++				reg = <0x0 0x600>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++			};
+ 		};
+ 
+-		dra7_ctrl_general: tisyscon at 4a002e00 {
+-			compatible = "syscon";
+-			reg = <0x4a002e00 0x7c>;
 +		counter32k: counter at 4ae04000 {
 +			compatible = "ti,omap-counter32k";
 +			reg = <0x4ae04000 0x40>;
@@ -127,5 +99,49 @@ index b321fdf..ad665bb 100644
  		};
  
  		pbias_regulator: pbias_regulator {
+ 			compatible = "ti,pbias-omap";
+-			reg = <0 0x4>;
+-			syscon = <&dra7_ctrl_general>;
++			reg = <0xe00 0x4>;
++			syscon = <&scm_conf>;
+ 			pbias_mmc_reg: pbias_mmc_omap5 {
+ 				regulator-name = "pbias_mmc_omap5";
+ 				regulator-min-microvolt = <1800000>;
+@@ -230,17 +264,6 @@
+ 			};
+ 		};
+ 
+-		dra7_pmx_core: pinmux at 4a003400 {
+-			compatible = "ti,dra7-padconf", "pinctrl-single";
+-			reg = <0x4a003400 0x0464>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <32>;
+-			pinctrl-single,function-mask = <0x3fffffff>;
+-		};
+-
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+@@ -1410,7 +1433,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan1";
+ 			reg = <0x4ae3c000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 0>;
++			syscon-raminit = <&scm_conf 0x558 0>;
+ 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&dcan1_sys_clk_mux>;
+ 			status = "disabled";
+@@ -1420,7 +1443,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan2";
+ 			reg = <0x48480000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 1>;
++			syscon-raminit = <&scm_conf 0x558 1>;
+ 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&sys_clkin1>;
+ 			status = "disabled";
 -- 
 1.7.9.5
