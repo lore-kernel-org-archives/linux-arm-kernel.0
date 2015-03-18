@@ -1,43 +1,32 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 18 Mar 2015 21:31:51 +0100
-Subject: [PATCH v3 4/5] i2c: davinci: use bus recovery infrastructure
-In-Reply-To: <1417448047-15236-5-git-send-email-grygorii.strashko@ti.com>
-References: <1417448047-15236-1-git-send-email-grygorii.strashko@ti.com>
- <1417448047-15236-5-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20150318203151.GA12072@katana>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Wed, 18 Mar 2015 13:58:54 -0700
+Subject: Setting reboot type at run time for ARM
+In-Reply-To: <5508CBD0.5060508@gmail.com>
+References: <5508A047.7060308@broadcom.com> <5508CBD0.5060508@gmail.com>
+Message-ID: <5509E70E.7060907@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-so, the bus recovery patches look fine to me in general.
-
-It is only this one question left which I always had with bus recovery.
-Maybe you guys can join me thinking about it.
-
-> @@ -376,8 +366,7 @@ i2c_davinci_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg, int stop)
->  						      dev->adapter.timeout);
->  	if (r == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
-> -		davinci_i2c_recover_bus(dev);
-> -		i2c_davinci_init(dev);
-> +		i2c_recover_bus(adap);
->  		dev->buf_len = 0;
->  		return -ETIMEDOUT;
-
-The I2C specs say in 3.1.16 that the recovery procedure should be used
-when SDA is stuck low. So, I do wonder if we should apply the recovery
-after a timeout. Stuck SDA might be one reason for timeout, but there
-may be others...
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150318/fe06be70/attachment.sig>
+On 15-03-17 05:50 PM, Florian Fainelli wrote:
+> On 17/03/15 14:44, Arun Ramamurthy wrote:
+>> Hello
+>>
+>> I would like to specify a reset type just before issuing the reboot
+>> command in the kernel. I know the kernel command line parameter can be
+>> set as "reboot=w" to indicate warm reset but I want to be able to decide
+>> this at run time before issuing a reboot command. What would be the best
+>> way to implement this? Modify the reboot command
+>> to accept a parameter or is there a standard hook I can use?
+>
+> If you use the reboot(2) system call you can already specify a large
+> number of options, for options that are currently not supported by
+> coreutils' reboot or busybox's reboot, you could probably provide a
+> shell script wrapper which calls into either your own reboot
+> implementation or the regular one, would that work?
+>
+Thanks Florian. After looking at the sys call documentation, i can see 
+that it passes an argument to the kernel_restart function if I use 
+LINUX_REBOOT_CMD_RESTART2 as the cmd. However as you mentioned the 
+coreutils reboot or busybox's reboot do not support these options so I 
+will write a shell script to wrap the system call.
