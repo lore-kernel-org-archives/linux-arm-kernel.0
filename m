@@ -1,114 +1,34 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 18 Mar 2015 13:51:50 +0100
-Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
- Exynos3250
+Date: Wed, 18 Mar 2015 13:51:53 +0100
+Subject: [PATCH v3 4/4] ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250
+ SoC
 In-Reply-To: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1426683113-31209-5-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU1 hotplug may hang when AFTR is used.  Fix it by:
-- setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
-  exynos_cpu_power_up()
-- not clearing reserved bits of ARM_COREx_CONFIGURATION register in
-  exynos_cpu_power_down()
-- waiting while an undocumented register 0x0908 becomes non-zero in
-  exynos_core_restart()
-- using dsb_sev() instead of IPI in exynos_boot_secondary() on
-  Exynos3250
+Register cpuidle platform device on Exynos3250 SoC allowing EXYNOS
+cpuidle driver usage on this SoC.
 
 Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
- arch/arm/mach-exynos/regs-pmu.h |  2 ++
- 2 files changed, 22 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/exynos.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index d2e9f12..ebd135b 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-  */
- void exynos_cpu_power_down(int cpu)
- {
-+	u32 core_conf;
-+
- 	if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
- 		/*
- 		 * Bypass power down for CPU0 during suspend. Check for
-@@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
- 		if (!(val & S5P_CORE_LOCAL_PWR_EN))
- 			return;
- 	}
--	pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+
-+	core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-+	core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
-+	pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
- }
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 90ed2e5..204f0e6 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -244,6 +244,7 @@ static void __init exynos_dt_machine_init(void)
+ 	    of_machine_is_compatible("samsung,exynos4212") ||
+ 	    (of_machine_is_compatible("samsung,exynos4412") &&
+ 	     of_machine_is_compatible("samsung,trats2")) ||
++	    of_machine_is_compatible("samsung,exynos3250") ||
+ 	    of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
  
- /**
-@@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
-  */
- void exynos_cpu_power_up(int cpu)
- {
--	pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
-+	u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
-+
-+	if (soc_is_exynos3250())
-+		core_conf |= S5P_CORE_AUTOWAKEUP_EN;
-+
-+	pmu_raw_writel(core_conf,
- 			EXYNOS_ARM_CORE_CONFIGURATION(cpu));
- }
- 
-@@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
- 	if (!of_machine_is_compatible("samsung,exynos3250"))
- 		return;
- 
-+	while (!pmu_raw_readl(S5P_PMU_SPARE2))
-+		udelay(10);
-+	udelay(10);
-+
- 	val = pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
- 	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
- 	pmu_raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
-@@ -346,7 +360,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- 		call_firmware_op(cpu_boot, core_id);
- 
--		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+		if (soc_is_exynos3250())
-+			dsb_sev();
-+		else
-+			arch_send_wakeup_ipi_mask(cpumask_of(cpu));
- 
- 		if (pen_release == -1)
- 			break;
-diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-index eb461e1..84ddce1 100644
---- a/arch/arm/mach-exynos/regs-pmu.h
-+++ b/arch/arm/mach-exynos/regs-pmu.h
-@@ -49,6 +49,7 @@
- #define S5P_INFORM5				0x0814
- #define S5P_INFORM6				0x0818
- #define S5P_INFORM7				0x081C
-+#define S5P_PMU_SPARE2				0x0908
- #define S5P_PMU_SPARE3				0x090C
- 
- #define EXYNOS_IROM_DATA2			0x0988
-@@ -182,6 +183,7 @@
- 
- #define S5P_CORE_LOCAL_PWR_EN			0x3
- #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
-+#define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
- 
- /* Only for EXYNOS4210 */
- #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
 -- 
 1.8.2.3
