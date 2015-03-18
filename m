@@ -1,62 +1,53 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 18 Mar 2015 20:16:03 +0100
-Subject: [PATCH/RFC 4/5] ARM: shmobile: r8a7791: Add INTC-SYS clock to device
- tree
+Date: Wed, 18 Mar 2015 20:16:00 +0100
+Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
 In-Reply-To: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
 References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1426706164-28309-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Link the ARM GIC to the INTC-SYS module clock, so it can be power
-managed using that clock in the future.
+INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
+disabled causes:
 
-Note that currently the GIC driver doesn't support module clocks nor
-Runtime PM.
+    Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
+
+Currently, the GIC driver cannot enable its module clock for several
+reasons:
+  - It does not use a platform device, so Runtime PM is not an option,
+  - gic_of_init() runs before any clocks are registered, so it cannot
+    explicitly enable the clock,
+  - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
+    doesn't support deferred probing.
+
+Hence we have to keep on relying on the boot loader for enabling the
+module clock.
+
+To prevent the module clock from being disabled when the CCF core thinks
+it is unused, and thus causing a system lock-up, add a quirk to the MSTP
+clock driver to make sure the module clock is never disabled.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi            | 7 ++++---
- include/dt-bindings/clock/r8a7791-clock.h | 1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/clk/shmobile/clk-mstp.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 20ab7668088493b9..9191acce98a6eeb2 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -79,6 +79,7 @@
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
- 		interrupts = <1 9 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		clocks = <&mstp4_clks R8A7791_CLK_INTC_SYS>;
- 	};
+diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+index 2d2fe773ac8168f9..742af84735a07450 100644
+--- a/drivers/clk/shmobile/clk-mstp.c
++++ b/drivers/clk/shmobile/clk-mstp.c
+@@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
+ 	unsigned int i;
+ 	u32 value;
  
- 	gpio0: gpio at e6050000 {
-@@ -1164,10 +1165,10 @@
- 		mstp4_clks: mstp4_clks at e6150140 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
--			clocks = <&cp_clk>;
-+			clocks = <&cp_clk>, <&zs_clk>;
- 			#clock-cells = <1>;
--			clock-indices = <R8A7791_CLK_IRQC>;
--			clock-output-names = "irqc";
-+			clock-indices = <R8A7791_CLK_IRQC R8A7791_CLK_INTC_SYS>;
-+			clock-output-names = "irqc", "intc-sys";
- 		};
- 		mstp5_clks: mstp5_clks at e6150144 {
- 			compatible = "renesas,r8a7791-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 402268384b99093c..102b47a797116dce 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -72,6 +72,7 @@
++	/* INTC-SYS is the module clock of the GIC, and must not be disabled */
++	if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
++		pr_debug("MSTP %pC skipping disable\n", hw->clk);
++		return 0;
++	}
++
+ 	spin_lock_irqsave(&group->lock, flags);
  
- /* MSTP4 */
- #define R8A7791_CLK_IRQC		7
-+#define R8A7791_CLK_INTC_SYS		8
- 
- /* MSTP5 */
- #define R8A7791_CLK_AUDIO_DMAC1		1
+ 	value = clk_readl(group->smstpcr);
 -- 
 1.9.1
