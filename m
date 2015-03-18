@@ -1,71 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Mar 2015 17:28:57 +0530
-Subject: [RESEND 6/7] ARM: davinci: irqs: Correct McASP1 TX interrupt
- definition for DM646x
-In-Reply-To: <1426147591-31764-7-git-send-email-peter.ujfalusi@ti.com>
-References: <1426147591-31764-1-git-send-email-peter.ujfalusi@ti.com>
- <1426147591-31764-7-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <55096881.9040506@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Mar 2015 13:01:06 +0100
+Subject: [PATCH v3] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
+In-Reply-To: <1426257652-16779-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
+ <1426257652-16779-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CACRpkdZyhgRDVAiX3UCpCqxQUeSU2a3ktUbVNnStsrXkR7zT-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 March 2015 01:36 PM, Peter Ujfalusi wrote:
-> McASP1 TX interrupt is 30, not 32 on DM646x DMSoC
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Fri, Mar 13, 2015 at 3:40 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
 
-Okay, sparse spotted an error uncovered by this patch. I think it 
-will be good to fix that as well here. Updated patch attached.
+> Hi Linus,
+>
+> Yet another version. Changed based on Arnd's suggestion to make config
+> options for PINCTRL_MT8135 & PINCTRL_MT8173 more consist. This is based
+> on mtk-staging in your tree. If you think this is OK, please applied or
+> squash this into previous change. Thanks.
+>
+> Old patch can be found at:
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000057.html
+>
+> Joe.C
+>
+> 8<-------------------------------------------------------
+> ARM64 maintainer doesn't want to add MACH_* for each SoC.
+> Adjust mt8173 pinctrl kconfig entry so user can manually select it.
+>
+> Also make PINCTRL_MT8135 selectable when COMPILE_TEST is enabled.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-Thanks,
-Sekhar
+This last version of the patch applied.
 
----8<---
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Date: Thu, 12 Mar 2015 10:06:30 +0200
-Subject: [PATCH] ARM: davinci: irqs: Correct McASP1 TX interrupt definition
- for DM646x
-
-McASP1 TX interrupt is 30, not 32 on DM646x DMSoC.
-
-While at it remove the bogus AEMIF interrupt entry from
-dm646x_default_priorities[]. AEMIF interrupt on DM6467 is
-60 not 30 and the entry for the correct interrupt number
-is already present in the same table.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-[nsekhar at ti.com: remove bogus entry from dm646x_default_priorities[]]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/dm646x.c            |    1 -
- arch/arm/mach-davinci/include/mach/irqs.h |    2 +-
- 2 files changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index d2a2619aee81..58769eddd3c3 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -493,7 +493,6 @@ static u8 dm646x_default_priorities[DAVINCI_N_AINTC_IRQ] = {
- 	[IRQ_DM646X_EMACMISCINT]        = 7,
- 	[IRQ_DM646X_MCASP0TXINT]        = 7,
- 	[IRQ_DM646X_MCASP0RXINT]        = 7,
--	[IRQ_AEMIFINT]                  = 7,
- 	[IRQ_DM646X_RESERVED_3]         = 7,
- 	[IRQ_DM646X_MCASP1TXINT]        = 7,    /* clockevent */
- 	[IRQ_TINT0_TINT34]              = 7,    /* clocksource */
-diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
-index 354af71798dc..edb2ca62321a 100644
---- a/arch/arm/mach-davinci/include/mach/irqs.h
-+++ b/arch/arm/mach-davinci/include/mach/irqs.h
-@@ -129,8 +129,8 @@
- #define IRQ_DM646X_EMACMISCINT  27
- #define IRQ_DM646X_MCASP0TXINT  28
- #define IRQ_DM646X_MCASP0RXINT  29
-+#define IRQ_DM646X_MCASP1TXINT  30
- #define IRQ_DM646X_RESERVED_3   31
--#define IRQ_DM646X_MCASP1TXINT  32
- #define IRQ_DM646X_VLQINT       38
- #define IRQ_DM646X_UARTINT2     42
- #define IRQ_DM646X_SPINT0       43
--- 
-1.7.10.1
+Yours,
+Linus Walleij
