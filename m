@@ -1,48 +1,120 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 18 Mar 2015 14:23:18 +0100
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <20150318123012.GA3580@katana>
-References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150318123012.GA3580@katana>
-Message-ID: <55097C46.9010605@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 18 Mar 2015 14:23:35 +0100
+Subject: [PATCH v3 1/4] ARM: EXYNOS: fix CPU1 hotplug for AFTR mode on
+ Exynos3250
+In-Reply-To: <CAJKOXPe3P0mO-WuufAwF_tB6P=kfr-ORyQ6pa2pRnvjytCuHZg@mail.gmail.com>
+References: <1426683113-31209-1-git-send-email-b.zolnierkie@samsung.com>
+ <1426683113-31209-2-git-send-email-b.zolnierkie@samsung.com>
+ <CAJKOXPe3P0mO-WuufAwF_tB6P=kfr-ORyQ6pa2pRnvjytCuHZg@mail.gmail.com>
+Message-ID: <3449559.PngGo6WKuq@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.03.2015 13:30, Wolfram Sang wrote:
-> On Mon, Mar 09, 2015 at 01:21:05PM +0100, Sebastian Hesselbarth wrote:
->> I2C mux pinctrl driver currently determines the number of sub-busses by
->> counting available pinctrl-names. Unfortunately, this requires each
->> incarnation of the devicetree node with different available sub-busses
->> to be rewritten.
->>
->> This patch reworks i2c-mux-pinctrl driver to count the number of
->> available sub-nodes instead. The rework should be compatible to the old
->> way of probing for sub-busses and additionally allows to disable unused
->> sub-busses with standard DT property status = "disabled".
->
-> Not sure about this change. With DYNAMIC_OF these days, you can't rely
-> that 'disabled' stays disabled all the time. My gut feeling tells me
-> that people will want to use this someday.
 
-Possible. But this change just makes i2c-mux-pinctrl honor status
-property at all. There is no functional change except it now allows
-you to disable any of the sub-busses.
+Hi,
 
-I agree that this driver still does not cope well with DYNAMIC_OF but
-neither did the former implementation. How about we settle this driver
-to this implementation now and wait for any maniac that wants to use it
-the way you are suggesting above?
+On Wednesday, March 18, 2015 02:10:31 PM Krzysztof Kozlowski wrote:
+> 2015-03-18 13:51 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> > CPU1 hotplug may hang when AFTR is used.  Fix it by:
+> > - setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
+> >   exynos_cpu_power_up()
+> > - not clearing reserved bits of ARM_COREx_CONFIGURATION register in
+> >   exynos_cpu_power_down()
+> > - waiting while an undocumented register 0x0908 becomes non-zero in
+> >   exynos_core_restart()
+> > - using dsb_sev() instead of IPI in exynos_boot_secondary() on
+> >   Exynos3250
+> >
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
+> >  arch/arm/mach-exynos/regs-pmu.h |  2 ++
+> >  2 files changed, 22 insertions(+), 3 deletions(-)
+> 
+> 
+> Looks good (except one nit below) and this also fixes hotplug issues
+> during resume from S2R:
+> $ echo mem > /sys/power/state
+> [  156.517266] Disabling non-boot CPUs ...
+> [  156.517781] IRQ18 no longer affine to CPU1
+> [  156.518043] CPU1: shutdown
+> [  156.544718] Enabling non-boot CPUs ...
+> [  156.554925] CPU1: Software reset
+> [  158.552631] CPU1: failed to come online
+> [  158.552753] Error taking CPU1 up: -5
+> 
+> Reviewed and tested on Rinato (Gear 2/Exynos 3250) board:
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-The other option would be to leave the driver as is - but at least on
-Dove where the muxing-options are not used often, it will always create
-4 i2c-busses (controller plus the three muxing options) on any board
-even though the pins are not accessible at all. I think that will just
-create massive confusion from the user point-of-view?
+Thank you!
 
-BTW, I have received a patchwork update notification - it may be
-unrelated but I prefer the Dove dts/dtsi changes to go through mvebu
-tree.
+> One comment below...
+> 
+> >
+> > diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> > index d2e9f12..ebd135b 100644
+> > --- a/arch/arm/mach-exynos/platsmp.c
+> > +++ b/arch/arm/mach-exynos/platsmp.c
+> > @@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+> >   */
+> >  void exynos_cpu_power_down(int cpu)
+> >  {
+> > +       u32 core_conf;
+> > +
+> >         if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
+> >                 /*
+> >                  * Bypass power down for CPU0 during suspend. Check for
+> > @@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
+> >                 if (!(val & S5P_CORE_LOCAL_PWR_EN))
+> >                         return;
+> >         }
+> > -       pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> > +
+> > +       core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> > +       core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
+> > +       pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> >  }
+> >
+> >  /**
+> > @@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
+> >   */
+> >  void exynos_cpu_power_up(int cpu)
+> >  {
+> > -       pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> > +       u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
+> > +
+> > +       if (soc_is_exynos3250())
+> > +               core_conf |= S5P_CORE_AUTOWAKEUP_EN;
+> > +
+> > +       pmu_raw_writel(core_conf,
+> >                         EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> >  }
+> >
+> > @@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
+> >         if (!of_machine_is_compatible("samsung,exynos3250"))
+> >                 return;
+> >
+> > +       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> > +               udelay(10);
+> > +       udelay(10);
+> 
+> We really need to start documenting this. Please add short description
+> why this SPARE2 check is here and who uses it. Without documenting
+> this behavior future generations won't be able to debug this stuff.
+> Imagine replacing sboot with uboot by someone...
 
-Sebastian
+I've already planned to do this for this code and for coupled cpuidle
+use of SPARE2 as well.  However I would really prefer to do it in
+an incremental patch if there are no other issues with this patchset.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
