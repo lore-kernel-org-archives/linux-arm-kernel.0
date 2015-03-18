@@ -1,36 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Mar 2015 13:01:06 +0100
-Subject: [PATCH v3] pinctrl: mediatek: Adjust mt8173 pinctrl kconfig
-In-Reply-To: <1426257652-16779-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1425623091-30478-2-git-send-email-yingjoe.chen@mediatek.com>
- <1426257652-16779-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <CACRpkdZyhgRDVAiX3UCpCqxQUeSU2a3ktUbVNnStsrXkR7zT-g@mail.gmail.com>
+Date: Wed, 18 Mar 2015 13:02:50 +0100
+Subject: [PATCH 02/12] gpio: Remove gpio-msm-v1 driver
+In-Reply-To: <1426270185-19510-3-git-send-email-sboyd@codeaurora.org>
+References: <1426270185-19510-1-git-send-email-sboyd@codeaurora.org>
+ <1426270185-19510-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <CACRpkdZD4=aZPh91o=eNDRtp=HO-BkWpkLX7CvwOD6UgZOqa=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 3:40 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+On Fri, Mar 13, 2015 at 7:09 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-> Hi Linus,
+> This driver is orphaned now that mach-msm has been removed.
+> Delete it.
 >
-> Yet another version. Changed based on Arnd's suggestion to make config
-> options for PINCTRL_MT8135 & PINCTRL_MT8173 more consist. This is based
-> on mtk-staging in your tree. If you think this is OK, please applied or
-> squash this into previous change. Thanks.
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 >
-> Old patch can be found at:
-> http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000057.html
->
-> Joe.C
->
-> 8<-------------------------------------------------------
-> ARM64 maintainer doesn't want to add MACH_* for each SoC.
-> Adjust mt8173 pinctrl kconfig entry so user can manually select it.
->
-> Also make PINCTRL_MT8135 selectable when COMPILE_TEST is enabled.
->
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> This can be acked and go through arm-soc or applied directly to gpio tree.
 
-This last version of the patch applied.
+This would collide with Arnds multiplatform patches.
+
+If you coordinate with Arnd and agree:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
