@@ -1,124 +1,158 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 18 Mar 2015 15:36:01 +0100
-Subject: [update][PATCH v10 06/21] ACPI / sleep: Introduce
- CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
-In-Reply-To: <1426661211-14272-1-git-send-email-hanjun.guo@linaro.org>
-References: <1426661211-14272-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <356700098.jFZbVDoYAQ@vostro.rjw.lan>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 18 Mar 2015 07:15:09 -0700
+Subject: [PATCH 32/35 linux-next] clk: constify of_device_id array
+In-Reply-To: <1426535949-26107-1-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-1-git-send-email-fabf@skynet.be>
+Message-ID: <20150318141509.7930.28419@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, March 18, 2015 02:46:51 PM Hanjun Guo wrote:
-> From: Graeme Gregory <graeme.gregory@linaro.org>
+Quoting Fabian Frederick (2015-03-16 12:59:06)
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
 > 
-> ACPI 5.1 does not currently support S states for ARM64 hardware but
-> ACPI code will call acpi_target_system_state() and acpi_sleep_init()
-> for device power management, so introduce
-> CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT and select it for x86 and
-> ia64 only to make sleep functions available, and also introduce stub
-> function to allow other drivers to function until S states are defined
-> for ARM64.
-> 
-> It will be no functional change for x86 and IA64.
-> 
-> Suggested-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Acked-by: Michael Turquette <mturquette@linaro.org>
 
 > ---
-> Hi Lorenzo,
+>  drivers/clk/clk-palmas.c                 | 2 +-
+>  drivers/clk/st/clkgen-fsyn.c             | 2 +-
+>  drivers/clk/st/clkgen-mux.c              | 8 ++++----
+>  drivers/clk/st/clkgen-pll.c              | 4 ++--
+>  drivers/clk/ti/clk-dra7-atl.c            | 2 +-
+>  drivers/clk/ti/clockdomain.c             | 2 +-
+>  drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
+>  7 files changed, 11 insertions(+), 11 deletions(-)
 > 
-> Since this patch only updated the config name with no fucntion
-> change, I assume your ACK still apply, if not, please let me
-> know.
+> diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
+> index 8d45992..45a535a 100644
+> --- a/drivers/clk/clk-palmas.c
+> +++ b/drivers/clk/clk-palmas.c
+> @@ -161,7 +161,7 @@ static struct palmas_clks_of_match_data palmas_of_clk32kgaudio = {
+>         },
+>  };
+>  
+> -static struct of_device_id palmas_clks_of_match[] = {
+> +static const struct of_device_id palmas_clks_of_match[] = {
+>         {
+>                 .compatible = "ti,palmas-clk32kg",
+>                 .data = &palmas_of_clk32kg,
+> diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+> index af94ed8..a917c4c 100644
+> --- a/drivers/clk/st/clkgen-fsyn.c
+> +++ b/drivers/clk/st/clkgen-fsyn.c
+> @@ -1057,7 +1057,7 @@ static struct clk * __init st_clk_register_quadfs_fsynth(
+>         return clk;
+>  }
+>  
+> -static struct of_device_id quadfs_of_match[] = {
+> +static const struct of_device_id quadfs_of_match[] = {
+>         {
+>                 .compatible = "st,stih416-quadfs216",
+>                 .data = &st_fs216c65_416
+> diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+> index 9a15ec3..fdcff10 100644
+> --- a/drivers/clk/st/clkgen-mux.c
+> +++ b/drivers/clk/st/clkgen-mux.c
+> @@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
+>         .fb_start_bit_idx = 24,
+>  };
+>  
+> -static struct of_device_id clkgena_divmux_of_match[] = {
+> +static const struct of_device_id clkgena_divmux_of_match[] = {
+>         {
+>                 .compatible = "st,clkgena-divmux-c65-hs",
+>                 .data = &st_divmux_c65hs,
+> @@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
+>         .table = prediv_table16,
+>  };
+>  
+> -static struct of_device_id clkgena_prediv_of_match[] = {
+> +static const struct of_device_id clkgena_prediv_of_match[] = {
+>         { .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
+>         { .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
+>         {}
+> @@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
+>         .width = 2,
+>  };
+>  
+> -static struct of_device_id mux_of_match[] = {
+> +static const struct of_device_id mux_of_match[] = {
+>         {
+>                 .compatible = "st,stih416-clkgenc-vcc-hd",
+>                 .data = &clkgen_mux_c_vcc_hd_416,
+> @@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
+>         .lock = &clkgenf_lock,
+>  };
+>  
+> -static struct of_device_id vcc_of_match[] = {
+> +static const struct of_device_id vcc_of_match[] = {
+>         { .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
+>         { .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
+>         {}
+> diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+> index 29769d7..d204ba8 100644
+> --- a/drivers/clk/st/clkgen-pll.c
+> +++ b/drivers/clk/st/clkgen-pll.c
+> @@ -593,7 +593,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
+>         return clk;
+>  }
+>  
+> -static struct of_device_id c32_pll_of_match[] = {
+> +static const struct of_device_id c32_pll_of_match[] = {
+>         {
+>                 .compatible = "st,plls-c32-a1x-0",
+>                 .data = &st_pll3200c32_a1x_0,
+> @@ -708,7 +708,7 @@ err:
+>  }
+>  CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
+>  
+> -static struct of_device_id c32_gpu_pll_of_match[] = {
+> +static const struct of_device_id c32_gpu_pll_of_match[] = {
+>         {
+>                 .compatible = "st,stih415-gpu-pll-c32",
+>                 .data = &st_pll1200c32_gpu_415,
+> diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
+> index 59bb4b3..d86bc46 100644
+> --- a/drivers/clk/ti/clk-dra7-atl.c
+> +++ b/drivers/clk/ti/clk-dra7-atl.c
+> @@ -294,7 +294,7 @@ static int of_dra7_atl_clk_remove(struct platform_device *pdev)
+>         return 0;
+>  }
+>  
+> -static struct of_device_id of_dra7_atl_clk_match_tbl[] = {
+> +static const struct of_device_id of_dra7_atl_clk_match_tbl[] = {
+>         { .compatible = "ti,dra7-atl", },
+>         {},
+>  };
+> diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+> index b4c5fac..35fe108 100644
+> --- a/drivers/clk/ti/clockdomain.c
+> +++ b/drivers/clk/ti/clockdomain.c
+> @@ -52,7 +52,7 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
+>         }
+>  }
+>  
+> -static struct of_device_id ti_clkdm_match_table[] __initdata = {
+> +static const struct of_device_id ti_clkdm_match_table[] __initconst = {
+>         { .compatible = "ti,clockdomain" },
+>         { }
+>  };
+> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+> index 765f1e0..89c0609 100644
+> --- a/drivers/clk/versatile/clk-vexpress-osc.c
+> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
+> @@ -110,7 +110,7 @@ static int vexpress_osc_probe(struct platform_device *pdev)
+>         return 0;
+>  }
+>  
+> -static struct of_device_id vexpress_osc_of_match[] = {
+> +static const struct of_device_id vexpress_osc_of_match[] = {
+>         { .compatible = "arm,vexpress-osc", },
+>         {}
+>  };
+> -- 
+> 2.1.0
 > 
-> Thanks
-> Hanjun
-> ---
->  arch/ia64/Kconfig       | 1 +
->  arch/x86/Kconfig        | 1 +
->  drivers/acpi/Kconfig    | 4 ++++
->  drivers/acpi/Makefile   | 2 +-
->  drivers/acpi/internal.h | 4 ++++
->  5 files changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index 074e52b..cc3414f 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -10,6 +10,7 @@ config IA64
->  	select ARCH_MIGHT_HAVE_PC_SERIO
->  	select PCI if (!IA64_HP_SIM)
->  	select ACPI if (!IA64_HP_SIM)
-> +	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
->  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->  	select HAVE_UNSTABLE_SCHED_CLOCK
->  	select HAVE_IDE
-> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-> index b7d31ca..c3ea9f9 100644
-> --- a/arch/x86/Kconfig
-> +++ b/arch/x86/Kconfig
-> @@ -22,6 +22,7 @@ config X86_64
->  ### Arch settings
->  config X86
->  	def_bool y
-> +	select ACPI_SYSTEM_POWER_STATES_SUPPORT if ACPI
->  	select ARCH_MIGHT_HAVE_ACPI_PDC if ACPI
->  	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
->  	select ARCH_HAS_FAST_MULTIPLIER
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index e6c3ddd..a726381 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -48,9 +48,13 @@ config ACPI_LEGACY_TABLES_LOOKUP
->  config ARCH_MIGHT_HAVE_ACPI_PDC
->  	bool
->  
-> +config ACPI_SYSTEM_POWER_STATES_SUPPORT
-> +	bool
-> +
->  config ACPI_SLEEP
->  	bool
->  	depends on SUSPEND || HIBERNATION
-> +	depends on ACPI_SYSTEM_POWER_STATES_SUPPORT
->  	default y
->  
->  config ACPI_PROCFS_POWER
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 623b117..db153c6 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -23,7 +23,7 @@ acpi-y				+= nvs.o
->  
->  # Power management related files
->  acpi-y				+= wakeup.o
-> -acpi-y				+= sleep.o
-> +acpi-$(CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT) += sleep.o
->  acpi-y				+= device_pm.o
->  acpi-$(CONFIG_ACPI_SLEEP)	+= proc.o
->  
-> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
-> index 56b321a..ba4a61e 100644
-> --- a/drivers/acpi/internal.h
-> +++ b/drivers/acpi/internal.h
-> @@ -161,7 +161,11 @@ void acpi_ec_remove_query_handler(struct acpi_ec *ec, u8 query_bit);
->  /*--------------------------------------------------------------------------
->                                    Suspend/Resume
->    -------------------------------------------------------------------------- */
-> +#ifdef CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
->  extern int acpi_sleep_init(void);
-> +#else
-> +static inline int acpi_sleep_init(void) { return -ENXIO; }
-> +#endif
->  
->  #ifdef CONFIG_ACPI_SLEEP
->  int acpi_sleep_proc_init(void);
-> 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
