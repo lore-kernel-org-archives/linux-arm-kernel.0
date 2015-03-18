@@ -1,74 +1,69 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Mar 2015 16:44:14 +0200
-Subject: [PATCHv4 29/35] ARM: dts: am4372: merge control module features under
+Date: Wed, 18 Mar 2015 16:44:12 +0200
+Subject: [PATCHv4 27/35] ARM: dts: am33xx: merge control module features under
  scrm node
 In-Reply-To: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
 References: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426689860-17537-30-git-send-email-t-kristo@ti.com>
+Message-ID: <1426689860-17537-28-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch moves all the control module related features under scrm
-node. scm_conf area is provided to support syscon, and also the clocks
+node. scm_conf area is changed to use syscon, and also the clocks
 are moved under scm_conf area.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi |   48 +++++++++++++++++++++++------------------
- 1 file changed, 27 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/am33xx.dtsi |   48 ++++++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 1943fc3..f41b82a 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -57,22 +57,6 @@
- 		cache-level = <2>;
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index acd3705..b30e238 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -83,20 +83,6 @@
+ 		};
  	};
  
--	am43xx_control_module: control_module at 4a002000 {
+-	am33xx_control_module: control_module at 4a002000 {
 -		compatible = "syscon";
--		reg = <0x44e10000 0x7f4>;
+-		reg = <0x44e10000 0x7fc>;
 -	};
 -
--	am43xx_pinmux: pinmux at 44e10800 {
--		compatible = "ti,am437-padconf", "pinctrl-single";
--		reg = <0x44e10800 0x31c>;
+-	am33xx_pinmux: pinmux at 44e10800 {
+-		compatible = "pinctrl-single";
+-		reg = <0x44e10800 0x0238>;
 -		#address-cells = <1>;
 -		#size-cells = <0>;
--		#interrupt-cells = <1>;
--		interrupt-controller;
 -		pinctrl-single,register-width = <32>;
--		pinctrl-single,function-mask = <0xffffffff>;
+-		pinctrl-single,function-mask = <0x7f>;
 -	};
 -
- 	ocp {
- 		compatible = "ti,am4372-l3-noc", "simple-bus";
- 		#address-cells = <1>;
-@@ -98,12 +82,34 @@
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex. Since
+@@ -125,21 +111,35 @@
  		};
  
  		scrm: scrm at 44e10000 {
--			compatible = "ti,am4-scrm";
--			reg = <0x44e10000 0x2000>;
-+			compatible = "ti,am4-scrm", "simple-bus";
-+			reg = <0x44e10000 0x1000>;
+-			compatible = "ti,am3-scrm";
++			compatible = "ti,am3-scrm", "simple-bus";
+ 			reg = <0x44e10000 0x2000>;
 +			#address-cells = <1>;
 +			#size-cells = <1>;
-+			ranges = <0 0x44e10000 0x1000>;
++			ranges = <0 0x44e10000 0x2000>;
  
 -			scrm_clocks: clocks {
-+			am43xx_pinmux: pinmux at 800 {
-+				compatible = "ti,am437-padconf",
-+					     "pinctrl-single";
-+				reg = <0x800 0x31c>;
++			am33xx_pinmux: pinmux at 800 {
++				compatible = "pinctrl-single";
++				reg = <0x800 0x238>;
  				#address-cells = <1>;
  				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+				interrupt-controller;
 +				pinctrl-single,register-width = <32>;
-+				pinctrl-single,function-mask = <0xffffffff>;
-+			};
-+
++				pinctrl-single,function-mask = <0x7f>;
+ 			};
+ 
+-			scrm_clockdomains: clockdomains {
 +			scm_conf: scm_conf at 0 {
 +				compatible = "syscon";
 +				reg = <0x0 0x7fc>;
@@ -80,25 +75,42 @@ index 1943fc3..f41b82a 100644
 +					#size-cells = <0>;
 +				};
  			};
+-		};
  
- 			scrm_clockdomains: clockdomains {
-@@ -933,7 +939,7 @@
+-		cm: syscon at 44e10000 {
+-			compatible = "ti,am33xx-controlmodule", "syscon";
+-			reg = <0x44e10000 0x800>;
++			scrm_clockdomains: clockdomains {
++			};
+ 		};
+ 
+ 		intc: interrupt-controller at 48200000 {
+@@ -350,7 +350,7 @@
+ 			reg = <0x481cc000 0x2000>;
  			clocks = <&dcan0_fck>;
  			clock-names = "fck";
- 			reg = <0x481cc000 0x2000>;
--			syscon-raminit = <&am43xx_control_module 0x644 0>;
+-			syscon-raminit = <&am33xx_control_module 0x644 0>;
 +			syscon-raminit = <&scm_conf 0x644 0>;
- 			interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupts = <52>;
  			status = "disabled";
  		};
-@@ -944,7 +950,7 @@
+@@ -361,7 +361,7 @@
+ 			reg = <0x481d0000 0x2000>;
  			clocks = <&dcan1_fck>;
  			clock-names = "fck";
- 			reg = <0x481d0000 0x2000>;
--			syscon-raminit = <&am43xx_control_module 0x644 1>;
+-			syscon-raminit = <&am33xx_control_module 0x644 1>;
 +			syscon-raminit = <&scm_conf 0x644 1>;
- 			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupts = <55>;
  			status = "disabled";
  		};
+@@ -720,7 +720,7 @@
+ 			 */
+ 			interrupts = <40 41 42 43>;
+ 			ranges;
+-			syscon = <&cm>;
++			syscon = <&scm_conf>;
+ 			status = "disabled";
+ 
+ 			davinci_mdio: mdio at 4a101000 {
 -- 
 1.7.9.5
