@@ -1,55 +1,48 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 18 Mar 2015 18:49:48 +0530
-Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <55095297.5060605@arm.com>
-References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
- <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
- <55095297.5060605@arm.com>
-Message-ID: <CABb+yY0qRSocL-ePosUzszAh4X6161ve8_qUq4VizbLWMAmMCQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 18 Mar 2015 14:23:18 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <20150318123012.GA3580@katana>
+References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150318123012.GA3580@katana>
+Message-ID: <55097C46.9010605@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 3:55 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On 18.03.2015 13:30, Wolfram Sang wrote:
+> On Mon, Mar 09, 2015 at 01:21:05PM +0100, Sebastian Hesselbarth wrote:
+>> I2C mux pinctrl driver currently determines the number of sub-busses by
+>> counting available pinctrl-names. Unfortunately, this requires each
+>> incarnation of the devicetree node with different available sub-busses
+>> to be rewritten.
+>>
+>> This patch reworks i2c-mux-pinctrl driver to count the number of
+>> available sub-nodes instead. The rework should be compatible to the old
+>> way of probing for sub-busses and additionally allows to disable unused
+>> sub-busses with standard DT property status = "disabled".
 >
->> +static int mhu_send_data(struct mbox_chan *chan, void *data)
->> +{
->> +       struct mhu_link *mlink = chan->con_priv;
->> +       u32 *arg = data;
->
-> Arnd doesn't like this and had suggestions in some other thread.
->
-No, Arnd suggested doing it this way. And another platform's driver
-was made to do this way.
+> Not sure about this change. With DYNAMIC_OF these days, you can't rely
+> that 'disabled' stays disabled all the time. My gut feeling tells me
+> that people will want to use this someday.
 
->> +       writel_relaxed(*arg, mlink->tx_reg + INTR_SET_OFS);
->> +
->> +       return 0;
->> +}
->> +
->> +static int mhu_startup(struct mbox_chan *chan)
->> +{
->> +       struct mhu_link *mlink = chan->con_priv;
->> +       u32 val;
->> +       int ret;
->> +
->> +       val = readl_relaxed(mlink->tx_reg + INTR_STAT_OFS);
->> +       writel_relaxed(val, mlink->tx_reg + INTR_CLR_OFS);
->> +
->> +       ret = request_irq(mlink->irq, mhu_rx_interrupt,
->> +                         IRQF_SHARED, "mhu_link", chan);
->
->
-> Any reason we can't move this to probe and have {en,dis}able_irq here if
-> needed. I has seen it was too heavy to have these especially when
-> sending small packets.
->
-I see you used to do memcpy in irq-handler
-https://git.linaro.org/landing-teams/working/arm/kernel.git/blob/HEAD:/drivers/mailbox/arm_mhu.c
-perhaps you were using your old driver?
+Possible. But this change just makes i2c-mux-pinctrl honor status
+property at all. There is no functional change except it now allows
+you to disable any of the sub-busses.
 
-If you use this new driver, and send packets so often that
-request-release irq has effect, maybe should hold the mailbox
-reference for lifetime. I remember suggesting you that already and I
-remember you said that's how it was.
+I agree that this driver still does not cope well with DYNAMIC_OF but
+neither did the former implementation. How about we settle this driver
+to this implementation now and wait for any maniac that wants to use it
+the way you are suggesting above?
 
--Jassi
+The other option would be to leave the driver as is - but at least on
+Dove where the muxing-options are not used often, it will always create
+4 i2c-busses (controller plus the three muxing options) on any board
+even though the pins are not accessible at all. I think that will just
+create massive confusion from the user point-of-view?
+
+BTW, I have received a patchwork update notification - it may be
+unrelated but I prefer the Dove dts/dtsi changes to go through mvebu
+tree.
+
+Sebastian
