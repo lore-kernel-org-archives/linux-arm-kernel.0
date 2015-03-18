@@ -1,48 +1,32 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 18 Mar 2015 18:36:40 +0200
-Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
-In-Reply-To: <1424422274-27946-2-git-send-email-kishon@ti.com>
-References: <1424422274-27946-1-git-send-email-kishon@ti.com>
- <1424422274-27946-2-git-send-email-kishon@ti.com>
-Message-ID: <5509A998.2080509@ti.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 18 Mar 2015 17:36:56 +0100
+Subject: [STLinux Kernel] [PATCH 1/6] ARM: STi: DT: STiH407: Fix retime
+ pin mask for PIO5 and PIO35
+In-Reply-To: <1426675899-19882-2-git-send-email-lee.jones@linaro.org>
+References: <1426675899-19882-1-git-send-email-lee.jones@linaro.org>
+ <1426675899-19882-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <5509A9A8.5090206@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
 
-As I can see Patch 1 from this series was merged in 4.0-rc4,
-but this patch wasn't. As result, I can see below warning all the time during boot now:
 
-[    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
- 
-
-On 02/20/2015 10:51 AM, Kishon Vijay Abraham I wrote:
-> Now that we don't have hwmod entry for pcie PHY remove the
-> ti,hwmod property from PCIE PHY's
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+On 03/18/2015 11:51 AM, Lee Jones wrote:
+> From: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
+>
+> This will avoid programming the retime registers when not implemented
+>
+> - PIO5  : no retime registers assigned to pins 6 and 7
+> - PIO35 : pin 7 is reserved so no retime register assigned to it
+>
+> Signed-off-by: Karim BEN BELGACEM <karim.ben-belgacem@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->   arch/arm/boot/dts/dra7.dtsi |    2 --
->   1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 5827fed..18a904d 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -1111,7 +1111,6 @@
->   					      "wkupclk", "refclk",
->   					      "div-clk", "phy-div";
->   				#phy-cells = <0>;
-> -				ti,hwmods = "pcie1-phy";
->   			};
->   
->   			pcie2_phy: pciephy at 4a095000 {
-> @@ -1130,7 +1129,6 @@
->   					      "wkupclk", "refclk",
->   					      "div-clk", "phy-div";
->   				#phy-cells = <0>;
-> -				ti,hwmods = "pcie2-phy";
->   				status = "disabled";
->   			};
->   		};
-> 
+>   arch/arm/boot/dts/stih407-pinctrl.dtsi | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+
+Thanks,
+Maxime
