@@ -1,219 +1,212 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 18 Mar 2015 16:44:10 +0200
-Subject: [PATCHv4 25/35] ARM: dts: omap24xx: merge control module features
- under scrm node
+Date: Wed, 18 Mar 2015 16:44:09 +0200
+Subject: [PATCHv4 24/35] ARM: OMAP2+: control: add syscon support for register
+ accesses
 In-Reply-To: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
 References: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426689860-17537-26-git-send-email-t-kristo@ti.com>
+Message-ID: <1426689860-17537-25-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves all the control module related features under scrm node.
-scm_conf area is changed to use syscon, and also the clocks are moved
-under scm_conf area.
+Control module driver needs to support syscon for register accesses, as
+the DT hierarchy for control module driver is going to be changed. All
+the control module related features will be moved under control module
+node, including clocks, pinctrl, and generic configuration register
+access. Temporary iomap is still provided very early in the boot for
+access while syscon is not yet ready.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/omap2420.dtsi        |   33 +++++++++++++++++---------
- arch/arm/boot/dts/omap2430-clocks.dtsi |    6 ++---
- arch/arm/boot/dts/omap2430.dtsi        |   40 ++++++++++++++++++--------------
- arch/arm/boot/dts/omap24xx-clocks.dtsi |    4 ++--
- arch/arm/mach-omap2/control.c          |    7 +++++-
- 5 files changed, 56 insertions(+), 34 deletions(-)
+ arch/arm/mach-omap2/control.c |  101 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 84 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index e2b2e93..49bc2ee 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -28,12 +28,32 @@
- 		};
- 
- 		scrm: scrm at 48000000 {
--			compatible = "ti,omap2-scrm";
-+			compatible = "ti,omap2-scrm", "simple-bus";
- 			reg = <0x48000000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x48000000 0x1000>;
- 
--			scrm_clocks: clocks {
-+			omap2420_pmx: pinmux at 30 {
-+				compatible = "ti,omap2420-padconf",
-+					     "pinctrl-single";
-+				reg = <0x30 0x0113>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-single,register-width = <8>;
-+				pinctrl-single,function-mask = <0x3f>;
-+			};
-+
-+			scm_conf: scm_conf at 270 {
-+				compatible = "syscon";
-+				reg = <0x270 0x100>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+
-+				scrm_clocks: clocks {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+				};
- 			};
- 
- 			scrm_clockdomains: clockdomains {
-@@ -46,15 +66,6 @@
- 			ti,hwmods = "counter_32k";
- 		};
- 
--		omap2420_pmx: pinmux at 48000030 {
--			compatible = "ti,omap2420-padconf", "pinctrl-single";
--			reg = <0x48000030 0x0113>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			pinctrl-single,register-width = <8>;
--			pinctrl-single,function-mask = <0x3f>;
--		};
--
- 		gpio1: gpio at 48018000 {
- 			compatible = "ti,omap2-gpio";
- 			reg = <0x48018000 0x200>;
-diff --git a/arch/arm/boot/dts/omap2430-clocks.dtsi b/arch/arm/boot/dts/omap2430-clocks.dtsi
-index 805f75d..cb4b229 100644
---- a/arch/arm/boot/dts/omap2430-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap2430-clocks.dtsi
-@@ -13,7 +13,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
--		reg = <0x02e8>;
-+		reg = <0x78>;
- 	};
- 
- 	mcbsp3_fck: mcbsp3_fck {
-@@ -27,7 +27,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
- 		ti,bit-shift = <2>;
--		reg = <0x02e8>;
-+		reg = <0x78>;
- 	};
- 
- 	mcbsp4_fck: mcbsp4_fck {
-@@ -41,7 +41,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
- 		ti,bit-shift = <4>;
--		reg = <0x02e8>;
-+		reg = <0x78>;
- 	};
- 
- 	mcbsp5_fck: mcbsp5_fck {
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 0dc8de2..e06d7eb 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -28,12 +28,32 @@
- 		};
- 
- 		scrm: scrm at 49002000 {
--			compatible = "ti,omap2-scrm";
-+			compatible = "ti,omap2-scrm", "simple-bus";
- 			reg = <0x49002000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x49000000 0x1000>;
- 
--			scrm_clocks: clocks {
-+			omap2430_pmx: pinmux at 30 {
-+				compatible = "ti,omap2430-padconf",
-+					     "pinctrl-single";
-+				reg = <0x30 0x0154>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				pinctrl-single,register-width = <8>;
-+				pinctrl-single,function-mask = <0x3f>;
-+			};
-+
-+			scm_conf: scm_conf at 270 {
-+				compatible = "syscon";
-+				reg = <0x270 0x240>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+
-+				scrm_clocks: clocks {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+				};
- 			};
- 
- 			scrm_clockdomains: clockdomains {
-@@ -46,24 +66,10 @@
- 			ti,hwmods = "counter_32k";
- 		};
- 
--		omap2430_pmx: pinmux at 49002030 {
--			compatible = "ti,omap2430-padconf", "pinctrl-single";
--			reg = <0x49002030 0x0154>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			pinctrl-single,register-width = <8>;
--			pinctrl-single,function-mask = <0x3f>;
--		};
--
--		omap2_scm_general: tisyscon at 49002270 {
--			compatible = "syscon";
--			reg = <0x49002270 0x240>;
--		};
--
- 		pbias_regulator: pbias_regulator {
- 			compatible = "ti,pbias-omap";
- 			reg = <0x230 0x4>;
--			syscon = <&omap2_scm_general>;
-+			syscon = <&scm_conf>;
- 			pbias_mmc_reg: pbias_mmc_omap2430 {
- 				regulator-name = "pbias_mmc_omap2430";
- 				regulator-min-microvolt = <1800000>;
-diff --git a/arch/arm/boot/dts/omap24xx-clocks.dtsi b/arch/arm/boot/dts/omap24xx-clocks.dtsi
-index a1365ca..a078b55 100644
---- a/arch/arm/boot/dts/omap24xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap24xx-clocks.dtsi
-@@ -13,7 +13,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
- 		ti,bit-shift = <2>;
--		reg = <0x0274>;
-+		reg = <0x4>;
- 	};
- 
- 	mcbsp1_fck: mcbsp1_fck {
-@@ -27,7 +27,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&func_96m_ck>, <&mcbsp_clks>;
- 		ti,bit-shift = <6>;
--		reg = <0x0274>;
-+		reg = <0x4>;
- 	};
- 
- 	mcbsp2_fck: mcbsp2_fck {
 diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index edc0f26..5359bc3 100644
+index a9aee85..edc0f26 100644
 --- a/arch/arm/mach-omap2/control.c
 +++ b/arch/arm/mach-omap2/control.c
-@@ -661,10 +661,15 @@ static struct control_init_data ctrl_data = {
- 	.index = TI_CLKM_CTRL,
+@@ -15,6 +15,8 @@
+ #include <linux/kernel.h>
+ #include <linux/io.h>
+ #include <linux/of_address.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
+ 
+ #include "soc.h"
+ #include "iomap.h"
+@@ -33,7 +35,9 @@
+ #define PADCONF_SAVE_DONE		0x1
+ 
+ static void __iomem *omap2_ctrl_base;
++static s16 omap2_ctrl_offset;
+ static void __iomem *omap4_ctrl_pad_base;
++static struct regmap *omap2_ctrl_syscon;
+ 
+ #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
+ struct omap3_scratchpad {
+@@ -135,7 +139,6 @@ struct omap3_control_regs {
+ static struct omap3_control_regs control_context;
+ #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+ 
+-#define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
+ #define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
+ 
+ void __init omap2_set_globals_control(void __iomem *ctrl,
+@@ -147,32 +150,72 @@ void __init omap2_set_globals_control(void __iomem *ctrl,
+ 
+ u8 omap_ctrl_readb(u16 offset)
+ {
+-	return readb_relaxed(OMAP_CTRL_REGADDR(offset));
++	u32 val;
++	u8 byte_offset = offset & 0x3;
++
++	val = omap_ctrl_readl(offset);
++
++	return (val >> (byte_offset * 8)) & 0xff;
+ }
+ 
+ u16 omap_ctrl_readw(u16 offset)
+ {
+-	return readw_relaxed(OMAP_CTRL_REGADDR(offset));
++	u32 val;
++	u16 byte_offset = offset & 0x2;
++
++	val = omap_ctrl_readl(offset);
++
++	return (val >> (byte_offset * 8)) & 0xffff;
+ }
+ 
+ u32 omap_ctrl_readl(u16 offset)
+ {
+-	return readl_relaxed(OMAP_CTRL_REGADDR(offset));
++	u32 val;
++
++	offset &= 0xfffc;
++	if (!omap2_ctrl_syscon)
++		val = readl_relaxed(omap2_ctrl_base + offset);
++	else
++		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
++			    &val);
++
++	return val;
+ }
+ 
+ void omap_ctrl_writeb(u8 val, u16 offset)
+ {
+-	writeb_relaxed(val, OMAP_CTRL_REGADDR(offset));
++	u32 tmp;
++	u8 byte_offset = offset & 0x3;
++
++	tmp = omap_ctrl_readl(offset);
++
++	tmp &= 0xffffffff ^ (0xff << (byte_offset * 8));
++	tmp |= val << (byte_offset * 8);
++
++	omap_ctrl_writel(tmp, offset);
+ }
+ 
+ void omap_ctrl_writew(u16 val, u16 offset)
+ {
+-	writew_relaxed(val, OMAP_CTRL_REGADDR(offset));
++	u32 tmp;
++	u8 byte_offset = offset & 0x2;
++
++	tmp = omap_ctrl_readl(offset);
++
++	tmp &= 0xffffffff ^ (0xffff << (byte_offset * 8));
++	tmp |= val << (byte_offset * 8);
++
++	omap_ctrl_writel(tmp, offset);
+ }
+ 
+ void omap_ctrl_writel(u32 val, u16 offset)
+ {
+-	writel_relaxed(val, OMAP_CTRL_REGADDR(offset));
++	offset &= 0xfffc;
++	if (!omap2_ctrl_syscon)
++		writel_relaxed(val, omap2_ctrl_base + offset);
++	else
++		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
++			     val);
+ }
+ 
+ /*
+@@ -611,7 +654,7 @@ void __init omap3_ctrl_init(void)
+ 
+ struct control_init_data {
+ 	int index;
+-	void __iomem *mem;
++	s16 offset;
  };
  
-+static const struct control_init_data omap2_ctrl_data = {
-+	.index = TI_CLKM_CTRL,
-+	.offset = -OMAP2_CONTROL_GENERAL,
-+};
+ static struct control_init_data ctrl_data = {
+@@ -638,17 +681,15 @@ int __init omap2_control_base_init(void)
+ 	struct device_node *np;
+ 	const struct of_device_id *match;
+ 	struct control_init_data *data;
+-	void __iomem *mem;
+ 
+ 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
+ 		data = (struct control_init_data *)match->data;
+ 
+-		mem = of_iomap(np, 0);
+-		if (!mem)
++		omap2_ctrl_base = of_iomap(np, 0);
++		if (!omap2_ctrl_base)
+ 			return -ENOMEM;
+ 
+-		omap2_ctrl_base = mem;
+-		data->mem = mem;
++		omap2_ctrl_offset = data->offset;
+ 	}
+ 
+ 	return 0;
+@@ -662,17 +703,43 @@ int __init omap2_control_base_init(void)
+  */
+ int __init omap_control_init(void)
+ {
+-	struct device_node *np;
++	struct device_node *np, *scm_conf;
+ 	const struct of_device_id *match;
+ 	const struct omap_prcm_init_data *data;
+ 	int ret;
++	struct regmap *syscon;
+ 
+ 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
+ 		data = match->data;
+ 
+-		ret = omap2_clk_provider_init(np, data->index, NULL, data->mem);
+-		if (ret)
+-			return ret;
++		/*
++		 * Check if we have scm_conf node, if yes, use this to
++		 * access clock registers.
++		 */
++		scm_conf = of_get_child_by_name(np, "scm_conf");
 +
- static const struct of_device_id omap_scrm_dt_match_table[] = {
- 	{ .compatible = "ti,am3-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,am4-scrm", .data = &ctrl_data },
--	{ .compatible = "ti,omap2-scrm", .data = &ctrl_data },
-+	{ .compatible = "ti,omap2-scrm", .data = &omap2_ctrl_data },
- 	{ .compatible = "ti,omap3-scrm", .data = &ctrl_data },
- 	{ }
- };
++		if (scm_conf) {
++			syscon = syscon_node_to_regmap(scm_conf);
++
++			if (IS_ERR(syscon))
++				return PTR_ERR(syscon);
++
++			omap2_ctrl_syscon = syscon;
++
++			ret = omap2_clk_provider_init(scm_conf, data->index,
++						      syscon, NULL);
++			if (ret)
++				return ret;
++
++			iounmap(omap2_ctrl_base);
++			omap2_ctrl_base = NULL;
++		} else {
++			/* No scm_conf found, direct access */
++			ret = omap2_clk_provider_init(np, data->index, NULL,
++						      omap2_ctrl_base);
++			if (ret)
++				return ret;
++		}
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.9.5
