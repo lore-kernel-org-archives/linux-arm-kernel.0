@@ -1,75 +1,50 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 19 Mar 2015 13:44:57 -0700
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <20150319193225.GH8656@n2100.arm.linux.org.uk>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
- <CAL_Jsq+sPkZtreQ0sp8KXpkUVpFy=Yh9dr249u8uyoa8yksjmg@mail.gmail.com>
- <20150319184139.GG8656@n2100.arm.linux.org.uk> <550B1D16.7000108@gmail.com>
- <20150319193225.GH8656@n2100.arm.linux.org.uk>
-Message-ID: <550B3549.1030808@gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 19 Mar 2015 15:49:29 -0500
+Subject: [PATCH v2 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX
+ termination driver
+In-Reply-To: <CADaLND=+Aq-zgMWE6vnn1kt1g2iz1k-AxMj4--kejF-q=f=bfg@mail.gmail.com>
+References: <1678162.2PJ2o1jRen@wuerfel> <cover.1425497218.git.dhdang@apm.com>
+ <CADaLND=+Aq-zgMWE6vnn1kt1g2iz1k-AxMj4--kejF-q=f=bfg@mail.gmail.com>
+Message-ID: <20150319204929.GH26935@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/19/2015 12:32 PM, Russell King - ARM Linux wrote:
-> On Thu, Mar 19, 2015 at 12:01:42PM -0700, Frank Rowand wrote:
->> On 3/19/2015 11:41 AM, Russell King - ARM Linux wrote:
->> What???  Why would we ever accept code that tested the dtb version
->> instead of the compatible strings and properties in device nodes?
->> The dtb version is a meaningless number just like the kernel version
->> number in /proc/version is a meaningless number.  It starts at 1 (and
->> can be reset to 1 anytime the person controlling the build environment
->> chooses to for any random reason).  The dtb version number only makes
->> sense in a local context to check which build of an object actually
->> got onto the target.
+[+cc Marc]
+
+On Wed, Mar 18, 2015 at 10:43:10AM -0700, Duc Dang wrote:
+> On Wed, Mar 4, 2015 at 11:39 AM, Duc Dang <dhdang@apm.com> wrote:
+> > This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+> > APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+> > to GIC V2M specification for MSI Termination.
+> >
+> > There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+> > block supports 2688 MSI termination ports coalesced into 16 physical HW IRQ lines
+> > and shared across all 5 PCIe ports.
+> >
+> > v2 changes:
+> >         1. Use msi_controller structure
+> >         2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+> >
+> >  .../devicetree/bindings/pci/xgene-pci-msi.txt      |  61 ++++
+> >  MAINTAINERS                                        |   8 +
+> >  arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 ++
+> >  drivers/pci/host/Kconfig                           |   4 +
+> >  drivers/pci/host/Makefile                          |   1 +
+> >  drivers/pci/host/pci-xgene-msi.c                   | 393 +++++++++++++++++++++
+> >  drivers/pci/host/pci-xgene.c                       |  25 ++
+> >  7 files changed, 519 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+> >  create mode 100644 drivers/pci/host/pci-xgene-msi.c
+> >
+> > --
+> > 1.9.1
+> >
+> Hi Bjorn, Arnd, and All,
 > 
-> I think you need to learn a lesson here.  I rotfled at your "just like
-> the kernel version number" comment, because we already have code in the
-> kernel to map 3.x and 4.x kernels to a 2.60.x number because userspace
-> breaks with 3.x and 4.x version numbers.
+> Did you have a chance to take a look at this v2 patch set for X-Gene 1
+> MSI support?
 
-I am aware of that and totally agree that it is on point.
+Marc had some comments, and as far as I can tell, you haven't addressed
+them yet.  Am I mistaken?
 
-> 
-> I'm quite sure that someone made the exact same argument about kernel
-> version numbers that you're making above about versioning dtb stuff.
-> 
-> At the end of the day, if userspace starts abusing an API that we've
-> provided in good faith, and we change something such as the version
-> information which results in userspace breaking - even if userspace is
-> doing something that's wrong according to how we've defined it, it's
-> still our problem to fix.  No userspace regressions when upgrading.
-> That's the rule.
-
-And I totally agree with that.
-
-> 
-> Don't bother trying to argue against this - you can't.  We will not accept
-> any argument (no matter how valid) which will result in userspace breaking
-> upon an upgrade.
-
-No argument.  But I am not arguing for that.
-
-> 
-> You must be *absolutely* *sure* that you want to export this information,
-> and that you are absolutely happy with the consequences which would occur
-> should userspace then start using this information in a way which you did
-> not intend, which could very well block you from ever being able to change
-> the version number from a prescribed "this version number makes userspace
-> work" value.
-
-I understand the concern you are expressing.  And I agree it is an issue to
-be concerned about and not dismissed.  But I also think that the concern is
-mis-characterizing the "DTB version".  To pick on the example in patch 0,
-an analogous Linux version is "#5" (not "4.0.0"):
-
-   Linux version 4.0.0-rc4-dirty (frank at buildhost) (gcc version 4.6.x-google 20120106 (prerelease) (GCC) ) #5 SMP PREEMPT Wed Mar 18 20:04:48 PDT 2015
-
-and the proposed DTB version is "#4":
-
-   DTB version 4.0.0-rc4-dirty (frank at buildhost) (DTC 1.4.0-dirty) #4 Wed Mar 18 20:04:11 PDT 2015
-
-I don't think the concern holds for "#5" and "#4".
-
-I will concede that there is something unique in the proposed DTB version -
-the source code system commit version number (in this example "4.0.0-rc4-dirty"
-from git).
+Bjorn
