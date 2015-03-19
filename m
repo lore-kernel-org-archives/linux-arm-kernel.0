@@ -1,132 +1,116 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Mar 2015 15:21:14 +0100
-Subject: [PATCH] driver core / PM: Add callbacks for PM domain
- initialization/cleanup
-In-Reply-To: <20150319132907.GA3707@kroah.com>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <2317791.ICLpdqLgyu@vostro.rjw.lan> <20150319132907.GA3707@kroah.com>
-Message-ID: <3533423.QQDErEmeTO@vostro.rjw.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Mar 2015 13:59:33 +0000
+Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as alternative
+ instruction
+In-Reply-To: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
+References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 19, 2015 02:29:07 PM Greg Kroah-Hartman wrote:
-> On Wed, Mar 18, 2015 at 04:02:11PM +0100, Rafael J. Wysocki wrote:
-> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > 
-> > If PM domains are in use, it may be necessary to prepare the code
-> > handling a PM domain for driver probing.  For example, in some
-> > cases device drivers rely on the ability to power on the devices
-> > with the help of the IO runtime PM framework and the PM domain
-> > code needs to be ready for that.  Also, if that code has not been
-> > fully initialized yet, the driver probing should be deferred.
-> > 
-> > Moreover, after the probing is complete, it may be necessary to
-> > put the PM domain in question into the state reflecting the current
-> > needs of the devices in it, for example, to prevent power from being
-> > drawn in vain.
-> > 
-> > For these reasons, introduce new PM domain callbacks, ->activate
-> > and ->sync, called, respectively, before probing for a device
-> > driver and after the probing has been completed.
-> > 
-> > That is not sufficient, however, because the device's PM domain
-> > pointer has to be populated for the ->activate callback to be
-> > executed, so setting it in bus type ->probe callback routines
-> > would be too late.  Also, there are bus types where PM domains
-> > are not used at all and the core should not attempt to set the
-> > pm_domain pointer for the devices on those buses.
-> > 
-> > To overcome that difficulty, introduce two new bus type
-> > callbacks, ->init and ->release, called by bus_add_device() and
-> > bus_remove_device(), respectively.  That will allow ->init to
-> > be used to populate the pm_domain pointer for the bus types
-> > that want to do that and ->release will be useful for any
-> > cleanup that may be necessary after removing a device that
-> > was part of a PM domain.
-> > 
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> > 
-> > It occured to me that we might want to ->sync regardless of whether or
-> > not the probing had been succenssful, so I changed the code in
-> > really_probe() along these lines.  Please let me know if that's
-> > not OK.
-> > 
-> > ---
-> >  drivers/base/bus.c     |   12 +++++++++++-
-> >  drivers/base/dd.c      |   20 ++++++++++++++------
-> >  include/linux/device.h |    5 +++++
-> >  include/linux/pm.h     |    6 ++++++
-> >  4 files changed, 36 insertions(+), 7 deletions(-)
-> > 
-> > Index: linux-pm/drivers/base/bus.c
-> > ===================================================================
-> > --- linux-pm.orig/drivers/base/bus.c
-> > +++ linux-pm/drivers/base/bus.c
-> > @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
-> >  	int error = 0;
-> >  
-> >  	if (bus) {
-> > +		if (bus->init) {
-> > +			error = bus->init(dev);
-> > +			if (error)
-> > +				goto out_put;
-> > +		}
-> 
-> This doesn't make sense to me.  A bus just called bus_add_device, it can
-> do whatever it wanted to right before calling this function, no need for
-> another callback.
+Since all immediate branches are PC-relative on Aarch64, these
+instructions cannot be used as an alternative with the simplistic
+approach we currently have (the immediate has been computed from
+the .altinstr_replacement section, and end-up being completely off
+if we insert it directly).
 
-The only caller of bus_add_device() is device_add().
+This patch handles the b and bl instructions in a different way,
+using the insn framework to recompute the immediate, and generate
+the right displacement.
 
-What do you mean by "bus just called bus_add_device"?  Do you think that
-the pm_domain pointer should be populated before calling device_add()?
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 53 insertions(+), 2 deletions(-)
 
-That wouldn't work for the ACPI PM domain at least, because ACPI companions
-are generally added during device_add() and we arguably cannot point a
-device to the ACPI PM domain before its ACPI companion is set.
-
-> >  		pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
-> >  		error = device_add_attrs(bus, dev);
-> >  		if (error)
-> > -			goto out_put;
-> > +			goto out_release;
-> >  		error = device_add_groups(dev, bus->dev_groups);
-> >  		if (error)
-> >  			goto out_groups;
-> > @@ -534,6 +539,9 @@ out_groups:
-> >  	device_remove_groups(dev, bus->dev_groups);
-> >  out_id:
-> >  	device_remove_attrs(bus, dev);
-> > +out_release:
-> > +	if (bus->release)
-> > +		bus->release(dev);
-> 
-> >  out_put:
-> >  	bus_put(dev->bus);
-> >  	return error;
-> > @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
-> >  	device_remove_groups(dev, dev->bus->dev_groups);
-> >  	if (klist_node_attached(&dev->p->knode_bus))
-> >  		klist_del(&dev->p->knode_bus);
-> > +	if (bus->release)
-> > +		bus->release(dev);
-> 
-> Same with release(), this happens when a bus wants to remove a device,
-> it controls this, why have a callback right away?  These both shouldn't
-> be needed.
-
-This is for symmetry with bus_add_device() and please see the argument there.
-
-> sorry if I missed this before, I hadn't noticed these callbacks in
-> previous patches but I wasn't paying much attention.
-
-No, they were not present before.
-
-There are two alternatives to them.  One is to do PM domain attach/detach in
-the bus type's ->probe and ->remove, but that's suboptimal, because it is
-then carried out every time a driver is probed/removed for a device.  The
-other one would be to have each interested bus type register a bus type
-notifier for itself, but that would be rather ugly, wouldn't it?
-
-Rafael
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index ad7821d..ac13c58 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -24,6 +24,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
++#include <asm/insn.h>
+ #include <linux/stop_machine.h>
+ 
+ extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+@@ -33,6 +34,48 @@ struct alt_region {
+ 	struct alt_instr *end;
+ };
+ 
++/*
++ * Decode the imm field of a b/bl instruction, and return the byte
++ * offset as a signed value (so it can be used when computing a new
++ * branch target).
++ */
++static s32 get_branch_offset(u32 insn)
++{
++	s32 imm = aarch64_insn_decode_immediate(AARCH64_INSN_IMM_26, insn);
++
++	/* sign-extend the immediate before turning it into a byte offset */
++	return (imm << 6) >> 4;
++}
++
++static u32 get_alt_insn(u8 *insnptr, u8 *altinsnptr)
++{
++	u32 insn;
++
++	aarch64_insn_read(altinsnptr, &insn);
++
++	/* Stop the world on instructions we don't support... */
++	BUG_ON(aarch64_insn_is_cbz(insn));
++	BUG_ON(aarch64_insn_is_cbnz(insn));
++	BUG_ON(aarch64_insn_is_bcond(insn));
++	/* ... and there is probably more. */
++
++	if (aarch64_insn_is_b(insn) || aarch64_insn_is_bl(insn)) {
++		enum aarch64_insn_branch_type type;
++		unsigned long target;
++
++		if (aarch64_insn_is_b(insn))
++			type = AARCH64_INSN_BRANCH_NOLINK;
++		else
++			type = AARCH64_INSN_BRANCH_LINK;
++
++		target = (unsigned long)altinsnptr + get_branch_offset(insn);
++		insn = aarch64_insn_gen_branch_imm((unsigned long)insnptr,
++						   target, type);
++	}
++
++	return insn;
++}
++
+ static int __apply_alternatives(void *alt_region)
+ {
+ 	struct alt_instr *alt;
+@@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
+ 	u8 *origptr, *replptr;
+ 
+ 	for (alt = region->begin; alt < region->end; alt++) {
++		u32 insn;
++		int i;
++
+ 		if (!cpus_have_cap(alt->cpufeature))
+ 			continue;
+ 
+-		BUG_ON(alt->alt_len > alt->orig_len);
++		BUG_ON(alt->alt_len != alt->orig_len);
+ 
+ 		pr_info_once("patching kernel code\n");
+ 
+ 		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
+ 		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
+-		memcpy(origptr, replptr, alt->alt_len);
++
++		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
++			insn = get_alt_insn(origptr + i, replptr + i);
++			*(u32 *)(origptr + i) = insn;
++		}
++
+ 		flush_icache_range((uintptr_t)origptr,
+ 				   (uintptr_t)(origptr + alt->alt_len));
+ 	}
+-- 
+2.1.4
