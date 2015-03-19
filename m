@@ -1,89 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Mar 2015 13:49:10 +0000
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550A4382.4030209@gmail.com>
-References: <550A42AC.8060104@gmail.com>
- <550A4382.4030209@gmail.com>
-Message-ID: <20150319134910.GF18473@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 19 Mar 2015 14:54:15 +0100
+Subject: [PATCH] ARM: smp_scu: enable coherent speculative linefills
+Message-ID: <1426773255-23349-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 03:33:22AM +0000, Frank Rowand wrote:
-> From: Frank Rowand <frank.rowand@sonymobile.com>
-> 
-> Add /chosen/dtb-node binding.
+According to the ARM TRM, about the SCU Control Register, bit 3
+(Speculative linefills enable) :
 
-Why? It doesn't matter what the cover says, the commit message should
-have a rationale.
+  When set, coherent linefill requests are sent speculatively to the
+  PL310 in parallel with the tag lookup. If the tag lookup misses, the
+  confirmed linefill is sent to the PL310 and gets Rdata earlier
+  because the data request was already initiated by the speculative
+  request. This feature works only if the PL310 is present in the
+  design.
 
-Who needs this information, and when do they need it?
+This feature may improve the overall system performance.
 
-Why is the existing information insufficient?
+Since the public ARM web site only documents Cortex-A9 revisions r2p0
+and later, we err on the safe side and only enable this bit on >= r2p0
+platforms, like the standby bit.
 
-> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
-> ---
->  Documentation/devicetree/bindings/chosen.txt |   37 +++++++++++
-> 
-> Index: b/Documentation/devicetree/bindings/chosen.txt
-> ===================================================================
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -46,6 +46,43 @@ on PowerPC "stdout" if "stdout-path" is
->  should only use the "stdout-path" property.
->  
->  
-> +dtb-info node
-> +----------------
-> +
-> +Information that describes where the device tree blob (DTB) came from and the
-> +environment it was created in.
-> +
-> +This node is normally created by including arch/arm/boot/dts/skeleton.dtsi,
-> +which includes include/dt-bindings/version.dtsi.
-> +
-> +Properties:
-> +
-> +version
-> +	The version of the DTB.  This is analagous to the linux kernel version.
-> +
-> +	This is a format free field intended for human consumption.  User space
-> +	programs should not have any expections about this property.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/kernel/smp_scu.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-I doubt that this would stay the case for long were this property added.
-
-> +	The DTB number in this property is incremented each time a make that
-> +	creates one or more DTBs is invoked.  If the make creates multiple
-> +	DTBs then this number is only incremented once.
-> +
-> +	The DTB number is stored in file .version_dtb.
-
-This is irrelevant to the binding, and as you mention above, you can
-make no expectations about this property.
-
-I'm not sure I see the point in adding a property which is not
-well-defined and not guarnateed to be in any way stable.
-
-> +
-> +version-linux
-> +	The version of the linux kernel most recently built in the source
-> +	control system that contains the source used to build the DTB.
-> +
-> +	The linux kernel version number is not incremented for a make that
-> +	creates a DTB.
-
-...so if I build a DTB outside of a linux source tree I don't get to
-describe that?
-
-> +dtb-path
-> +	The build directory relative path of the DTB.
-> +
-> +dts-path
-> +	The absolute path of the .dts file compiled to create the DTB.
-
-Why do you need the DTB path?
-
-Why do these differ w.r.t. absolute/relative?
-
-Why would you _ever_ need an absolute path!?
-
-Mark.
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 72f9241..227bb86 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -18,6 +18,7 @@
+ 
+ #define SCU_CTRL		0x00
+ #define SCU_ENABLE		(1 << 0)
++#define SCU_SPEC_LINEFILL	(1 << 3)
+ #define SCU_STANDBY_ENABLE	(1 << 5)
+ #define SCU_CONFIG		0x04
+ #define SCU_CPU_STATUS		0x08
+@@ -57,10 +58,13 @@ void scu_enable(void __iomem *scu_base)
+ 
+ 	scu_ctrl |= SCU_ENABLE;
+ 
+-	/* Cortex-A9 earlier than r2p0 has no standby bit in SCU */
++	/*
++	 * Cortex-A9 earlier than r2p0 has no standby / speculative
++	 * line fills bits in SCU
++	 */
+ 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090 &&
+ 	    (read_cpuid_id() & 0x00f0000f) >= 0x00200000)
+-		scu_ctrl |= SCU_STANDBY_ENABLE;
++		scu_ctrl |= SCU_STANDBY_ENABLE | SCU_SPEC_LINEFILL;
+ 
+ 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
+ 
+-- 
+2.1.0
