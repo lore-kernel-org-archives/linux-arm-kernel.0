@@ -1,497 +1,179 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Mar 2015 15:55:50 +0100
-Subject: [RFC v5 12/13] KVM: kvm-vfio: generic forwarding control
-In-Reply-To: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-References: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1426776951-24901-13-git-send-email-eric.auger@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Mar 2015 16:24:06 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <20150319141223.GC7046@kroah.com>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <3533423.QQDErEmeTO@vostro.rjw.lan> <20150319141223.GC7046@kroah.com>
+Message-ID: <1700349.gRPeASEtHx@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a new KVM_DEV_VFIO_DEVICE group.
+On Thursday, March 19, 2015 03:12:23 PM Greg Kroah-Hartman wrote:
+> On Thu, Mar 19, 2015 at 03:21:14PM +0100, Rafael J. Wysocki wrote:
+> > On Thursday, March 19, 2015 02:29:07 PM Greg Kroah-Hartman wrote:
+> > > On Wed, Mar 18, 2015 at 04:02:11PM +0100, Rafael J. Wysocki wrote:
+> > > > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > > > 
+> > > > If PM domains are in use, it may be necessary to prepare the code
+> > > > handling a PM domain for driver probing.  For example, in some
+> > > > cases device drivers rely on the ability to power on the devices
+> > > > with the help of the IO runtime PM framework and the PM domain
+> > > > code needs to be ready for that.  Also, if that code has not been
+> > > > fully initialized yet, the driver probing should be deferred.
+> > > > 
+> > > > Moreover, after the probing is complete, it may be necessary to
+> > > > put the PM domain in question into the state reflecting the current
+> > > > needs of the devices in it, for example, to prevent power from being
+> > > > drawn in vain.
+> > > > 
+> > > > For these reasons, introduce new PM domain callbacks, ->activate
+> > > > and ->sync, called, respectively, before probing for a device
+> > > > driver and after the probing has been completed.
+> > > > 
+> > > > That is not sufficient, however, because the device's PM domain
+> > > > pointer has to be populated for the ->activate callback to be
+> > > > executed, so setting it in bus type ->probe callback routines
+> > > > would be too late.  Also, there are bus types where PM domains
+> > > > are not used at all and the core should not attempt to set the
+> > > > pm_domain pointer for the devices on those buses.
+> > > > 
+> > > > To overcome that difficulty, introduce two new bus type
+> > > > callbacks, ->init and ->release, called by bus_add_device() and
+> > > > bus_remove_device(), respectively.  That will allow ->init to
+> > > > be used to populate the pm_domain pointer for the bus types
+> > > > that want to do that and ->release will be useful for any
+> > > > cleanup that may be necessary after removing a device that
+> > > > was part of a PM domain.
+> > > > 
+> > > > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > > > ---
+> > > > 
+> > > > It occured to me that we might want to ->sync regardless of whether or
+> > > > not the probing had been succenssful, so I changed the code in
+> > > > really_probe() along these lines.  Please let me know if that's
+> > > > not OK.
+> > > > 
+> > > > ---
+> > > >  drivers/base/bus.c     |   12 +++++++++++-
+> > > >  drivers/base/dd.c      |   20 ++++++++++++++------
+> > > >  include/linux/device.h |    5 +++++
+> > > >  include/linux/pm.h     |    6 ++++++
+> > > >  4 files changed, 36 insertions(+), 7 deletions(-)
+> > > > 
+> > > > Index: linux-pm/drivers/base/bus.c
+> > > > ===================================================================
+> > > > --- linux-pm.orig/drivers/base/bus.c
+> > > > +++ linux-pm/drivers/base/bus.c
+> > > > @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
+> > > >  	int error = 0;
+> > > >  
+> > > >  	if (bus) {
+> > > > +		if (bus->init) {
+> > > > +			error = bus->init(dev);
+> > > > +			if (error)
+> > > > +				goto out_put;
+> > > > +		}
+> > > 
+> > > This doesn't make sense to me.  A bus just called bus_add_device, it can
+> > > do whatever it wanted to right before calling this function, no need for
+> > > another callback.
+> > 
+> > The only caller of bus_add_device() is device_add().
+> > 
+> > What do you mean by "bus just called bus_add_device"?  Do you think that
+> > the pm_domain pointer should be populated before calling device_add()?
+> 
+> If it's needed, sure.  The bus itself (i.e. PCI, USB, etc.) just called
+> device_add() which calls bus_add_device(), so it could set up the
+> pm_domain pointer as it knows what is up for this device.
 
-This is a new control channel which enables KVM to cooperate with
-viable VFIO devices.
+It doesn't work exactly like that.  PCI, for one, doesn't know whether or not
+it is going to use ACPI with this particular device when it is calling
+device_add().  That only turns out during device_add(), when platform_notify()
+is called from device_add().  Fortunately, that doesn't matter for the ACPI
+PM domain.
 
-The patch introduces 2 attributes for this group:
-KVM_DEV_VFIO_DEVICE_FORWARD_IRQ, KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
-Their purpose is to turn a VFIO device IRQ into a forwarded IRQ and
- respectively unset the feature.
+For bus types that know upfront whether or not they are going to use ACPI
+with the device in question, we could hook the device up to the ACPI PM domain
+before device_add() is called.  The removal part could just be covered with the
+PM domain's ->detach callback I suppose.  I'm not sure if all bus types using
+the ACPI PM domain fall into this category, so I'll need to double check
 
-The generic part introduced here interact with VFIO, genirq, KVM while
-the architecture specific part mostly takes care of the virtual interrupt
-controller programming.
+However, there still is the generic PM domains framework that has grown DT
+support and I'm not sure if we can hook that up to devices before device_add()
+is called for them.
 
-Architecture specific implementation is enabled when
-__KVM_HAVE_ARCH_KVM_VFIO_FORWARD is set. When not set those
-functions are void.
+Ulf, what do you think?
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> > That wouldn't work for the ACPI PM domain at least, because ACPI companions
+> > are generally added during device_add() and we arguably cannot point a
+> > device to the ACPI PM domain before its ACPI companion is set.
+> 
+> I don't understand, what is not set up at device_add() time that is
+> somehow set up at bus_add_device() time?  Our number of callbacks seems
+> to be getting deep and messy :)
+>
+> What happens in device_pm_add(dev); in device_add()?
 
----
+Nothing particularly interesting.  It just adds the device to the list used by
+system suspend/resume.
 
-v3 -> v4:
-- use new kvm_vfio_dev_irq struct
-- improve error handling according to Alex comments
-- full rework or generic/arch specific split to accomodate for
-  unforward that never fails
-- kvm_vfio_get_vfio_device and kvm_vfio_put_vfio_device removed from
-  that patch file and introduced before (since also used by Feng)
-- guard kvm_vfio_control_irq_forward call with
-  __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
+> > > >  		pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
+> > > >  		error = device_add_attrs(bus, dev);
+> > > >  		if (error)
+> > > > -			goto out_put;
+> > > > +			goto out_release;
+> > > >  		error = device_add_groups(dev, bus->dev_groups);
+> > > >  		if (error)
+> > > >  			goto out_groups;
+> > > > @@ -534,6 +539,9 @@ out_groups:
+> > > >  	device_remove_groups(dev, bus->dev_groups);
+> > > >  out_id:
+> > > >  	device_remove_attrs(bus, dev);
+> > > > +out_release:
+> > > > +	if (bus->release)
+> > > > +		bus->release(dev);
+> > > 
+> > > >  out_put:
+> > > >  	bus_put(dev->bus);
+> > > >  	return error;
+> > > > @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
+> > > >  	device_remove_groups(dev, dev->bus->dev_groups);
+> > > >  	if (klist_node_attached(&dev->p->knode_bus))
+> > > >  		klist_del(&dev->p->knode_bus);
+> > > > +	if (bus->release)
+> > > > +		bus->release(dev);
+> > > 
+> > > Same with release(), this happens when a bus wants to remove a device,
+> > > it controls this, why have a callback right away?  These both shouldn't
+> > > be needed.
+> > 
+> > This is for symmetry with bus_add_device() and please see the argument there.
+> > 
+> > > sorry if I missed this before, I hadn't noticed these callbacks in
+> > > previous patches but I wasn't paying much attention.
+> > 
+> > No, they were not present before.
+> > 
+> > There are two alternatives to them.  One is to do PM domain attach/detach in
+> > the bus type's ->probe and ->remove, but that's suboptimal, because it is
+> > then carried out every time a driver is probed/removed for a device.  The
+> > other one would be to have each interested bus type register a bus type
+> > notifier for itself, but that would be rather ugly, wouldn't it?
+> 
+> This seems really messy, and you are adding more complexity, isn't there
+> some other easier way to do it with all of the different callbacks and
+> notifications we have today?
 
-v2 -> v3:
-- add API comments in kvm_host.h
-- improve the commit message
-- create a private kvm_vfio_fwd_irq struct
-- fwd_irq_action replaced by a bool and removal of VFIO_IRQ_CLEANUP. This
-  latter action will be handled in vgic.
-- add a vfio_device handle argument to kvm_arch_set_fwd_state. The goal is
-  to move platform specific stuff in architecture specific code.
-- kvm_arch_set_fwd_state renamed into kvm_arch_vfio_set_forward
-- increment the ref counter each time we do an IRQ forwarding and decrement
-  this latter each time one IRQ forward is unset. Simplifies the whole
-  ref counting.
-- simplification of list handling: create, search, removal
+Well, we've explored multiple alternatives already and none of them has
+turned out to be particularly attractive.  I guess we need to explore some
+more of them, then. :-)
 
-v1 -> v2:
-- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-- original patch file separated into 2 parts: generic part moved in vfio.c
-  and ARM specific part(kvm_arch_set_fwd_state)
----
- include/linux/kvm_host.h |  47 +++++++
- virt/kvm/vfio.c          | 311 ++++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 355 insertions(+), 3 deletions(-)
+For one, I wouldn't consider adding more callbacks if I saw a clean way
+forward without them.
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index f4e1829..8f17f87 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -1042,6 +1042,15 @@ struct kvm_device_ops {
- 		      unsigned long arg);
- };
- 
-+/* internal self-contained structure describing a forwarded IRQ */
-+struct kvm_fwd_irq {
-+	struct kvm *kvm; /* VM to inject the GSI into */
-+	struct vfio_device *vdev; /* vfio device the IRQ belongs to */
-+	__u32 index; /* VFIO device IRQ index */
-+	__u32 subindex; /* VFIO device IRQ subindex */
-+	__u32 gsi; /* gsi, ie. virtual IRQ number */
-+};
-+
- void kvm_device_get(struct kvm_device *dev);
- void kvm_device_put(struct kvm_device *dev);
- struct kvm_device *kvm_device_from_filp(struct file *filp);
-@@ -1065,6 +1074,44 @@ inline void kvm_arch_resume_guest(struct kvm *kvm) {}
- 
- #endif
- 
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+/**
-+ * kvm_arch_set_forward - Sets forwarding for a given IRQ
-+ *
-+ * @kvm: handle to the VM
-+ * @host_irq: physical IRQ number
-+ * @guest_irq: virtual IRQ number
-+ * returns 0 on success, < 0 on failure
-+ */
-+int kvm_arch_set_forward(struct kvm *kvm,
-+			 unsigned int host_irq, unsigned int guest_irq);
-+
-+/**
-+ * kvm_arch_unset_forward - Unsets forwarding for a given IRQ
-+ *
-+ * @kvm: handle to the VM
-+ * @host_irq: physical IRQ number
-+ * @guest_irq: virtual IRQ number
-+ * @active: returns whether the IRQ is active
-+ */
-+void kvm_arch_unset_forward(struct kvm *kvm,
-+			    unsigned int host_irq,
-+			    unsigned int guest_irq,
-+			    bool *active);
-+
-+#else
-+static inline int kvm_arch_set_forward(struct kvm *kvm,
-+				       unsigned int host_irq,
-+				       unsigned int guest_irq)
-+{
-+	return -ENOENT;
-+}
-+static inline void kvm_arch_unset_forward(struct kvm *kvm,
-+					  unsigned int host_irq,
-+					  unsigned int guest_irq,
-+					  bool *active) {}
-+#endif
-+
- #ifdef CONFIG_HAVE_KVM_CPU_RELAX_INTERCEPT
- 
- static inline void kvm_vcpu_set_in_spin_loop(struct kvm_vcpu *vcpu, bool val)
-diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-index c995e51..4847597 100644
---- a/virt/kvm/vfio.c
-+++ b/virt/kvm/vfio.c
-@@ -19,14 +19,30 @@
- #include <linux/uaccess.h>
- #include <linux/vfio.h>
- #include "vfio.h"
-+#include <linux/platform_device.h>
-+#include <linux/irq.h>
-+#include <linux/spinlock.h>
-+#include <linux/interrupt.h>
-+#include <linux/delay.h>
-+
-+#define DEBUG_FORWARD
-+#define DEBUG_UNFORWARD
- 
- struct kvm_vfio_group {
- 	struct list_head node;
- 	struct vfio_group *vfio_group;
- };
- 
-+/* private linkable kvm_fwd_irq struct */
-+struct kvm_vfio_fwd_irq_node {
-+	struct list_head link;
-+	struct kvm_fwd_irq fwd_irq;
-+};
-+
- struct kvm_vfio {
- 	struct list_head group_list;
-+	/* list of registered VFIO forwarded IRQs */
-+	struct list_head fwd_node_list;
- 	struct mutex lock;
- 	bool noncoherent;
- };
-@@ -320,12 +336,293 @@ static int kvm_vfio_set_group(struct kvm_device *dev, long attr, u64 arg)
- 	return -ENXIO;
- }
- 
-+/**
-+ * kvm_vfio_find_fwd_irq - checks whether a forwarded IRQ already is
-+ * registered in the list of forwarded IRQs
-+ *
-+ * @kv: handle to the kvm-vfio device
-+ * @fwd: handle to the forwarded irq struct
-+ * In the positive returns the handle to its node in the kvm-vfio
-+ * forwarded IRQ list, returns NULL otherwise.
-+ * Must be called with kv->lock hold.
-+ */
-+static struct kvm_vfio_fwd_irq_node *kvm_vfio_find_fwd_irq(
-+				struct kvm_vfio *kv,
-+				struct kvm_fwd_irq *fwd)
-+{
-+	struct kvm_vfio_fwd_irq_node *node;
-+
-+	list_for_each_entry(node, &kv->fwd_node_list, link) {
-+		if ((node->fwd_irq.index == fwd->index) &&
-+		    (node->fwd_irq.subindex == fwd->subindex) &&
-+		    (node->fwd_irq.vdev == fwd->vdev))
-+			return node;
-+	}
-+	return NULL;
-+}
-+/**
-+ * kvm_vfio_register_fwd_irq - Allocates, populates and registers a
-+ * forwarded IRQ
-+ *
-+ * @kv: handle to the kvm-vfio device
-+ * @fwd: handle to the forwarded irq struct
-+ * In case of success returns a handle to the new list node,
-+ * NULL otherwise.
-+ * Must be called with kv->lock hold.
-+ */
-+static struct kvm_vfio_fwd_irq_node *kvm_vfio_register_fwd_irq(
-+				struct kvm_vfio *kv,
-+				struct kvm_fwd_irq *fwd)
-+{
-+	struct kvm_vfio_fwd_irq_node *node;
-+
-+	node = kmalloc(sizeof(*node), GFP_KERNEL);
-+	if (!node)
-+		return ERR_PTR(-ENOMEM);
-+
-+	node->fwd_irq = *fwd;
-+
-+	list_add(&node->link, &kv->fwd_node_list);
-+
-+	return node;
-+}
-+
-+/**
-+ * kvm_vfio_unregister_fwd_irq - unregisters and frees a forwarded IRQ
-+ *
-+ * @node: handle to the node struct
-+ * Must be called with kv->lock hold.
-+ */
-+static void kvm_vfio_unregister_fwd_irq(struct kvm_vfio_fwd_irq_node *node)
-+{
-+	list_del(&node->link);
-+	kvm_vfio_put_vfio_device(node->fwd_irq.vdev);
-+	kfree(node);
-+}
-+
-+static int kvm_vfio_platform_get_irq(struct vfio_device *vdev, int index)
-+{
-+	int hwirq;
-+	struct platform_device *platdev;
-+	struct device *dev = kvm_vfio_external_base_device(vdev);
-+
-+	if (dev->bus == &platform_bus_type) {
-+		platdev = to_platform_device(dev);
-+		hwirq = platform_get_irq(platdev, index);
-+		return hwirq;
-+	} else
-+		return -EINVAL;
-+}
-+
-+/**
-+ * kvm_vfio_set_forward - turns a VFIO device IRQ into a forwarded IRQ
-+ * @kv: handle to the kvm-vfio device
-+ * @fd: file descriptor of the vfio device the IRQ belongs to
-+ * @fwd: handle to the forwarded irq struct
-+ *
-+ * Registers and turns an IRQ as forwarded. The operation only is allowed
-+ * if the IRQ is not in progress (active at interrupt controller level or
-+ * auto-masked by the handler). In case the user-space masked the IRQ,
-+ * the operation will fail too.
-+ * returns:
-+ * -EAGAIN if the IRQ is in progress or VFIO masked
-+ * -EEXIST if the IRQ is already registered as forwarded
-+ * -ENOMEM on memory shortage
-+ */
-+static int kvm_vfio_set_forward(struct kvm_vfio *kv, int fd,
-+				struct kvm_fwd_irq *fwd)
-+{
-+	int ret = -EAGAIN;
-+	struct kvm_vfio_fwd_irq_node *node;
-+	struct vfio_platform_device *vpdev = vfio_device_data(fwd->vdev);
-+	int index = fwd->index;
-+	int host_irq = kvm_vfio_platform_get_irq(fwd->vdev, fwd->index);
-+	bool active;
-+
-+	kvm_arch_halt_guest(fwd->kvm);
-+
-+	disable_irq(host_irq);
-+
-+	active = kvm_vfio_external_is_active(vpdev, index);
-+
-+	if (active)
-+		goto out;
-+
-+	node = kvm_vfio_register_fwd_irq(kv, fwd);
-+	if (IS_ERR(node)) {
-+		ret = PTR_ERR(node);
-+		goto out;
-+	}
-+
-+	kvm_vfio_external_set_automasked(vpdev, index, false);
-+
-+	ret = kvm_arch_set_forward(fwd->kvm, host_irq, fwd->gsi);
-+
-+out:
-+	enable_irq(host_irq);
-+
-+	kvm_arch_resume_guest(fwd->kvm);
-+
-+	return ret;
-+}
-+
-+/**
-+ * kvm_vfio_unset_forward - Sets a VFIO device IRQ as non forwarded
-+ * @kv: handle to the kvm-vfio device
-+ * @node: handle to the node to unset
-+ *
-+ * Calls the architecture specific implementation of set_forward and
-+ * unregisters the IRQ from the forwarded IRQ list.
-+ */
-+static void kvm_vfio_unset_forward(struct kvm_vfio *kv,
-+				   struct kvm_vfio_fwd_irq_node *node)
-+{
-+	struct kvm_fwd_irq fwd = node->fwd_irq;
-+	int host_irq = kvm_vfio_platform_get_irq(fwd.vdev, fwd.index);
-+	int index = fwd.index;
-+	struct vfio_platform_device *vpdev = vfio_device_data(fwd.vdev);
-+	bool active = false;
-+
-+	kvm_arch_halt_guest(fwd.kvm);
-+
-+	disable_irq(host_irq);
-+
-+	kvm_arch_unset_forward(fwd.kvm, host_irq, fwd.gsi, &active);
-+
-+	if (active)
-+		kvm_vfio_external_mask(vpdev, index);
-+
-+	kvm_vfio_external_set_automasked(vpdev, index, true);
-+	enable_irq(host_irq);
-+
-+	kvm_arch_resume_guest(fwd.kvm);
-+
-+	kvm_vfio_unregister_fwd_irq(node);
-+}
-+
-+static int kvm_vfio_control_irq_forward(struct kvm_device *kdev, long attr,
-+					int32_t __user *argp)
-+{
-+	struct kvm_vfio_dev_irq user_fwd_irq;
-+	struct kvm_fwd_irq fwd;
-+	struct vfio_device *vdev;
-+	struct kvm_vfio *kv = kdev->private;
-+	struct kvm_vfio_fwd_irq_node *node;
-+	unsigned long minsz;
-+	int ret = 0;
-+	u32 *gsi = NULL;
-+	size_t size;
-+
-+	minsz = offsetofend(struct kvm_vfio_dev_irq, count);
-+
-+	if (copy_from_user(&user_fwd_irq, argp, minsz))
-+		return -EFAULT;
-+
-+	if (user_fwd_irq.argsz < minsz)
-+		return -EINVAL;
-+
-+	vdev = kvm_vfio_get_vfio_device(user_fwd_irq.fd);
-+	if (IS_ERR(vdev))
-+		return PTR_ERR(vdev);
-+
-+	ret = kvm_vfio_platform_get_irq(vdev, user_fwd_irq.index);
-+	if (ret < 0)
-+		goto error;
-+
-+	size = sizeof(__u32);
-+	if (user_fwd_irq.argsz - minsz < size) {
-+		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	gsi = memdup_user((void __user *)((unsigned long)argp + minsz), size);
-+	if (IS_ERR(gsi)) {
-+		ret = PTR_ERR(gsi);
-+		goto error;
-+	}
-+
-+	fwd.vdev =  vdev;
-+	fwd.kvm =  kdev->kvm;
-+	fwd.index = user_fwd_irq.index;
-+	fwd.subindex = 0;
-+	fwd.gsi = *gsi;
-+
-+	node = kvm_vfio_find_fwd_irq(kv, &fwd);
-+
-+	switch (attr) {
-+	case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:
-+		if (node) {
-+			ret = -EEXIST;
-+			goto error;
-+		}
-+		mutex_lock(&kv->lock);
-+		ret = kvm_vfio_set_forward(kv, user_fwd_irq.fd, &fwd);
-+		mutex_unlock(&kv->lock);
-+		break;
-+	case KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ:
-+		if (!node) {
-+			ret = -ENOENT;
-+			goto error;
-+		}
-+		mutex_lock(&kv->lock);
-+		kvm_vfio_unset_forward(kv, node);
-+		mutex_unlock(&kv->lock);
-+		kvm_vfio_put_vfio_device(vdev);
-+		ret = 0;
-+		break;
-+	}
-+
-+	kfree(gsi);
-+error:
-+	if (ret < 0)
-+		kvm_vfio_put_vfio_device(vdev);
-+	return ret;
-+}
-+
-+static int kvm_vfio_set_device(struct kvm_device *kdev, long attr, u64 arg)
-+{
-+	int32_t __user *argp = (int32_t __user *)(unsigned long)arg;
-+	int ret;
-+
-+	switch (attr) {
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+	case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:
-+	case KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ:
-+		ret = kvm_vfio_control_irq_forward(kdev, attr, argp);
-+		break;
-+#endif
-+	default:
-+		ret = -ENXIO;
-+	}
-+	return ret;
-+}
-+
-+/**
-+ * kvm_vfio_clean_fwd_irq - Unset forwarding state of all
-+ * registered forwarded IRQs and free their list nodes.
-+ * @kv: kvm-vfio device
-+ *
-+ * Loop on all registered device/IRQ combos, reset the non forwarded state,
-+ * void the lists and release the reference
-+ */
-+static int kvm_vfio_clean_fwd_irq(struct kvm_vfio *kv)
-+{
-+	struct kvm_vfio_fwd_irq_node *node, *tmp;
-+
-+	list_for_each_entry_safe(node, tmp, &kv->fwd_node_list, link) {
-+		kvm_vfio_unset_forward(kv, node);
-+	}
-+	return 0;
-+}
-+
- static int kvm_vfio_set_attr(struct kvm_device *dev,
- 			     struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
- 	case KVM_DEV_VFIO_GROUP:
- 		return kvm_vfio_set_group(dev, attr->attr, attr->addr);
-+	case KVM_DEV_VFIO_DEVICE:
-+		return kvm_vfio_set_device(dev, attr->attr, attr->addr);
- 	}
- 
- 	return -ENXIO;
-@@ -341,10 +638,17 @@ static int kvm_vfio_has_attr(struct kvm_device *dev,
- 		case KVM_DEV_VFIO_GROUP_DEL:
- 			return 0;
- 		}
--
- 		break;
-+#ifdef __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
-+	case KVM_DEV_VFIO_DEVICE:
-+		switch (attr->attr) {
-+		case KVM_DEV_VFIO_DEVICE_FORWARD_IRQ:
-+		case KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ:
-+			return 0;
-+		}
-+		break;
-+#endif
- 	}
--
- 	return -ENXIO;
- }
- 
-@@ -358,7 +662,7 @@ static void kvm_vfio_destroy(struct kvm_device *dev)
- 		list_del(&kvg->node);
- 		kfree(kvg);
- 	}
--
-+	kvm_vfio_clean_fwd_irq(kv);
- 	kvm_vfio_update_coherency(dev);
- 
- 	kfree(kv);
-@@ -390,6 +694,7 @@ static int kvm_vfio_create(struct kvm_device *dev, u32 type)
- 		return -ENOMEM;
- 
- 	INIT_LIST_HEAD(&kv->group_list);
-+	INIT_LIST_HEAD(&kv->fwd_node_list);
- 	mutex_init(&kv->lock);
- 
- 	dev->private = kv;
+
 -- 
-1.9.1
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
