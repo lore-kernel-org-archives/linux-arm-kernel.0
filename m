@@ -1,128 +1,94 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Mar 2015 18:54:53 +0000
-Subject: [PATCH] arm64: dts: Fix GIC reg sizes for APM X-Gene
-In-Reply-To: <CANFfpkQF-8Kzq-UoP=xLpkTafGn6ScyiEb6oCs-Lxygb+ummLA@mail.gmail.com>
-References: <1422342206-4750-1-git-send-email-psawargaonkar@apm.com>	<CAL_JsqJQcuX2cp50oHod-QAbhdMg48TaRP+gLGEO2kbFnQ3B+A@mail.gmail.com>	<20150219190348.GB24460@cbox>	<CAL_JsqLcBOC+AnVe7oATjg2g6Fz2vqwacu8QzS4tXMaxxOP_Xg@mail.gmail.com>	<20150223120744.GA5609@cbox>	<CAL_JsqJ6E+05psDCXS7k74Mz-DgSEroQ2ODpe2Bp2_50fL3imA@mail.gmail.com>
- <CANFfpkQF-8Kzq-UoP=xLpkTafGn6ScyiEb6oCs-Lxygb+ummLA@mail.gmail.com>
-Message-ID: <550B1B7D.50309@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 Mar 2015 19:56:37 +0100
+Subject: [RFC] pinmux: group and function definitions in the device tree
+In-Reply-To: <20150319153950.GC30114@odux.rfo.atmel.com>
+References: <20150319153950.GC30114@odux.rfo.atmel.com>
+Message-ID: <20150319185637.GV4927@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/15 06:34, Pranavkumar Sawargaonkar wrote:
-> Hi Rob,
+On Thu, Mar 19, 2015 at 04:39:50PM +0100, Ludovic Desroches wrote:
+> Hi,
 > 
-> On Mon, Feb 23, 2015 at 10:09 PM, Rob Herring <robherring2@gmail.com> wrote:
->> On Mon, Feb 23, 2015 at 6:07 AM, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->>> On Sat, Feb 21, 2015 at 03:56:17PM -0600, Rob Herring wrote:
->>>> On Thu, Feb 19, 2015 at 1:03 PM, Christoffer Dall
->>>> <christoffer.dall@linaro.org> wrote:
->>>>> On Thu, Feb 19, 2015 at 12:23:15PM -0600, Rob Herring wrote:
->>>>>> On Tue, Jan 27, 2015 at 1:03 AM, Pranavkumar Sawargaonkar
->>>>>> <psawargaonkar@apm.com> wrote:
->>>>>>> In APM X-Gene, GIC register space is 64K aligned while the sizes mentioned
->>>>>>> in the dt are 4K aligned. This breaks KVM when kernel is built with 64K page
->>>>>>> size due to size alignment checking in vgic driver for VCPU Control and
->>>>>>> VCPU register.
->>>>>>>
->>>>>>> This patch corrects the sizes to be inline with the hardware spec.
->>>>>>
->>>>>> This does not make sense. The GIC regions are still only 4 or 8KB and
->>>>>> the h/w description should reflect that. For implementations using
->>>>>> gic-400 and the addressing decode trick, the rest of the register
->>>>>> range is also not safe to access given it is multiple mapped. Also,
->>>>>> this wastes virtual space, but I guess we don't care on 64-bit.
->>>>>>
->>>>>> KVM should be fixed to only check base address alignment. Size
->>>>>> alignment does not matter (if it does, then you need to fix all
->>>>>> register blocks).
->>>>>>
->>>>> It matters if you want to ensure that the 64K page you are assigning to
->>>>> a guest for the GIC virtual CPU interface contains only GIC virtual CPU
->>>>> mappings, and not other random stuff that the guest is not allowed to
->>>>> touch.
->>>>
->>>> Good point.
->>>>
->>>>> How else should this be enforced?
->>>>
->>>> Rely on correct h/w design? You'll have to repeat this every time you
->>>> want to do pass-thru of a device.
->>>>
->>>> What do you do if 64K mapping is not supported? Fallback to emulation
->>>> of the CPU interface?
->>>
->>> Agree with Peter on these two points.
->>>
->>>>
->>>> Are there other DTSs that need to be fixed?
->>>>
->>> Not sure really, AMD Seattle works with 64K pages IIRC.
->>
->> Well, looks we have been inconsistent here:
->>
->> arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-           reg = <0x0
->> 0xe1110000 0 0x1000>,
->> arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
->> 0xe112f000 0 0x2000>,
->> arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
->> 0xe1140000 0 0x10000>,
->> arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi-                 <0x0
->> 0xe1160000 0 0x10000>;
->>
->> arch/arm64/boot/dts/arm/juno.dts-               reg = <0x0 0x2c010000 0 0x1000>,
->> arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c02f000 0 0x2000>,
->> arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c04f000 0 0x2000>,
->> arch/arm64/boot/dts/arm/juno.dts-                     <0x0 0x2c06f000 0 0x2000>;
->>
->> If we are going to use 64K sizes, can we have some consistency here
->> please. Which ranges really need 64KB sizes? It should only be the
->> VCPU interface. right? Why does XGene need 128K? If XGene is doing
->> address swizzling, then the CPU and VCPU base addresses are wrong.
->> Seattle is also wrong for the VCPU, but no one has noticed because we
->> don't use the DIR register IIRC.
->>
->> XGene should also add an "arm,gic-400" compatible string or something
->> XGene specific if in fact it is not GIC-400.
+> I would like to start a discussion about pinmuxing and device tree bindings.
 > 
-> X-Gene has gic-400 as an interrupt controller.
-> Only thing is GIC pages are mapped at 64K boundary (with 64K page size)
-> Hence CPU, VCPU interfaces has a size of 128K (2GIC pages)
-> Regarding GICC_DIR, yes there is a problem which needs to be solved
-> since the first page size is 64K.
-> In XEN we already have a small fix to access GICC_DIR with 64K page
-> offset instead of standard 4K.
-> I remember a small discussion in this regard in past
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2014-June/266468.html)
-> which was deferred at that time.
-> Once this patch is accepted we can post RFC patch to address GICC_DIR
-> and discuss further.
+> I am currently writing a new pinmuxing driver using the generic pinconf.
+> My main concern is about defining functions and which pins belong to a
+> group.
+> 
+> At the moment, it seems that most drivers using the generic pinconf
+> define this stuff in a static way. The pinctrl-at91 driver covers many
+> devices, the new one should do the same for new Atmel devices. Having
+> the group and function definitions in the driver could involve a huge
+> file...
+> I am not sure it is a good thing to embed all these information into a
+> single zImage...
+> 
+> How can we achieved this? I was thinking about something like this:
+> 
+> pinctrl at fc06a000 {
+> 
+> 	[...]
+> 
+> 	pinctrl_defs {
+> 		mci0 {
+> 			mci0_ioset0_1bit_grp {
+> 				at91,pins = <68 69 70>;
+> 				at91,mux = <2>;
+> 			};
+> 
+> 			mci0_ioset0_4bit_grp {
+> 				at91,pins = <68 69 70 71 72 73>;
+> 				at91,mux = <2>;
+> 			};
+> 
+> 			mci0_ioset0_8bit_grp {
+> 				at91,pins = <68 69 70 71 72 73 74 75 76 77>;
+> 				at91,mux = <2>;
+> 			};
+> 		};
+> 	};
 
-I've had a look at my X-Gene board, and noticed the following thing:
+Why are different groups here? Do you want to put them into the dtsi?
+This would mean you have to carry a lot of groups in each dtsi from
+which only a small fraction is used. We did that on i.MX but no longer
+do this since the dtbs get very big.
 
-Mustang# md.l 0x78020000 0x10
-78020000: 000001e7 00000080 00000002 000003ff    ................
-78020010: 00000000 000000ff 000003ff 00000003    ................
-78020020: 000003ff 00000000 000003ff 00000000    ................
-78020030: 00000000 00000000 00000000 00000000    ................
-Mustang# md.l 0x7802f000 0x10
-7802f000: 000001e7 00000080 00000002 000003ff    ................
-7802f010: 00000000 000000ff 000003ff 00000003    ................
-7802f020: 000003ff 00000000 000003ff 00000000    ................
-7802f030: 00000000 00000000 00000000 00000000    ................
+> 
+> 	pinctrl_mci0_default: mci0_default {
+> 		mux {
+> 			function = "mci0";
+> 			groups = &mci0_ioset0_8bit_grp;
+> 		};
+> 
+> 		conf {
+> 			groups = &mci0_ioset0_8bit_grp;
+> 			bias-pullup;
+> 		};
+> 	};
+> };
+> 
+> - A subnode for these definitions in order to not parse the whole
+>   pinctrl node to retrieve groups and functions.
+> - Using node names as function and group names.
+> - Can we get generic properties to define the groups? Of course a 'pins'
+>   property is mandatory. In my case I will need an extra one to tell the
+>   controller how to mux the pins (a same pin can have up to 7 muxing
+>   possibilities).
 
-Notice a pattern? Yes, X-Gene is aliasing the GICC region over the 64k
-page, repeated 16 times, as it should.
+Did you have a look at the RFC I sent for these kind of controllers [1] and
+the final result for the Mediatek driver currently in Linux-next [2]?.
 
-So either the DT is fixed to show GICC and GICV at offset 0xf000 (and we
-don't support 64k pages with it), or we extend the binding to present an
-offset inside the 128K region.
+The binding has both the config and the pins in a single node and thus
+is very compact.
 
-My preference goes of course to the latter, because for once we seem to
-have something designed as expected.
+Sascha
 
-Rob, what do you think?
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/296491.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318452.html
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
