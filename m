@@ -1,41 +1,55 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 19 Mar 2015 11:12:52 +0100
-Subject: [PATCH] ARM: mvebu: Conform L2CC node with ePAPR specification
- by adding cache-level
-In-Reply-To: <20150318171217.101ae9b0@free-electrons.com>
-References: <1426610034-4204-1-git-send-email-gregory.clement@free-electrons.com>
- <20150318171217.101ae9b0@free-electrons.com>
-Message-ID: <550AA124.40605@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Mar 2015 10:17:27 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <550A4BFD.4070804@huawei.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
+Message-ID: <20150319101727.GC24556@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/2015 17:12, Thomas Petazzoni wrote:
-> Dear Gregory CLEMENT,
+On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
+> On 2015/3/19 3:05, Will Deacon wrote:
+> > Hanjun,
 > 
-> On Tue, 17 Mar 2015 17:33:54 +0100, Gregory CLEMENT wrote:
->> For L2 cache controller node, cache-level property is mandatory. Let's
->> add it to Armada 370 and Armada XP device tree.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Hi Will,
 > 
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-
-applied on mvebu/dt with Thomas tag
-
-Thanks,
-
-Gregory
-
+> >
+> > On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
+> >> This patch set already tested on multi platforms:
+> >>  - AMD Seattle board;
+> >>  - Cavium Thunder board;
+> >>  - Huawei D02 board;
+> >>  - Qualcomm ARM64 platform
+> >>
+> >> This version 10 patch set address some minor comments and collect ACKs and
+> >> Reviewed-bys for v9:
+> >>
+> >>  - new Acks from Rafael, Olof, Grant, Lorenzo
+> >>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
+> >>    but no functional change
+> >>  - Remove if(!phys) for early ioremappings
+> >>  - Rework sleep function for ARM64
+> >>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
+> >>  - Disable ACPI if not HW_REDUCED_ACPI compliant
+> >>  - Remove the doc of why ACPI on ARM
+> > So I've had a look at the current state of this series and I think there
+> > are a few immediate things left to do:
+> >
+> >   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
+> >       Catalin
 > 
-> Thanks,
+> Sure, it will be done after the confirmation with Ard.
 > 
-> Thomas
+> >
+> >   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
+> >       so I'm assuming there will be additional patches from them that are
+> >       required.
 > 
+> Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
 
+Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
+I am working on it, I do not think it should be a blocking point, patch
+coming asap on top of your series.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lorenzo
