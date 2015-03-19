@@ -1,103 +1,89 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 19 Mar 2015 12:00:02 +0100
-Subject: [PATCH v2 2/2] i2c: driver for the Conexant Digicolor I2C
- controller
-In-Reply-To: <866aada336ddbeec18749a1c301ab9b365baadde.1426758858.git.baruch@tkos.co.il>
-References: <844001df525b3073e50cbd95f357c0eb9912a394.1426758858.git.baruch@tkos.co.il>
- <866aada336ddbeec18749a1c301ab9b365baadde.1426758858.git.baruch@tkos.co.il>
-Message-ID: <20150319110002.GD914@katana>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Mar 2015 12:00:52 +0100
+Subject: [PATCH v3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per boot
+ protocol
+In-Reply-To: <20150319104100.GB18473@leverpostej>
+References: <20150319104100.GB18473@leverpostej>
+Message-ID: <1426762852-13699-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 11:54:18AM +0200, Baruch Siach wrote:
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
-> v2:
->    * Address the comment of Wolfram Sang:
->     - Advertise the I2C_FUNC_NOSTART capability
->     - Rebase on v4.0-rc1
+According to the arm64 boot protocol, registers x1 to x3 should be
+zero upon kernel entry, and non-zero values are reserved for future
+use. This future use is going to be problematic if we never enforce
+the current rules, so start enforcing them now, by emitting a warning
+if non-zero values are detected.
 
-Please fix:
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/head.S  | 19 ++++++++++++++++++-
+ arch/arm64/kernel/setup.c | 10 ++++++++++
+ 2 files changed, 28 insertions(+), 1 deletion(-)
 
-Applying: i2c: driver for the Conexant Digicolor I2C controller
-    CHECKPATCH
-...
-
-ERROR: code indent should use tabs where possible
-#119: FILE: drivers/i2c/busses/i2c-digicolor.c:68:
-+        STATE_IDLE,$
-
-WARNING: please, no spaces at the start of a line
-#119: FILE: drivers/i2c/busses/i2c-digicolor.c:68:
-+        STATE_IDLE,$
-
-ERROR: code indent should use tabs where possible
-#120: FILE: drivers/i2c/busses/i2c-digicolor.c:69:
-+        STATE_START,$
-
-WARNING: please, no spaces at the start of a line
-#120: FILE: drivers/i2c/busses/i2c-digicolor.c:69:
-+        STATE_START,$
-
-ERROR: code indent should use tabs where possible
-#121: FILE: drivers/i2c/busses/i2c-digicolor.c:70:
-+        STATE_ADDR,$
-
-WARNING: please, no spaces at the start of a line
-#121: FILE: drivers/i2c/busses/i2c-digicolor.c:70:
-+        STATE_ADDR,$
-
-ERROR: code indent should use tabs where possible
-#122: FILE: drivers/i2c/busses/i2c-digicolor.c:71:
-+        STATE_WRITE,$
-
-WARNING: please, no spaces at the start of a line
-#122: FILE: drivers/i2c/busses/i2c-digicolor.c:71:
-+        STATE_WRITE,$
-
-ERROR: code indent should use tabs where possible
-#123: FILE: drivers/i2c/busses/i2c-digicolor.c:72:
-+        STATE_READ,$
-
-WARNING: please, no spaces at the start of a line
-#123: FILE: drivers/i2c/busses/i2c-digicolor.c:72:
-+        STATE_READ,$
-
-ERROR: code indent should use tabs where possible
-#124: FILE: drivers/i2c/busses/i2c-digicolor.c:73:
-+        STATE_STOP,$
-
-WARNING: please, no spaces at the start of a line
-#124: FILE: drivers/i2c/busses/i2c-digicolor.c:73:
-+        STATE_STOP,$
-
-CHECK: spaces preferred around that '+' (ctx:VxV)
-#160: FILE: drivers/i2c/busses/i2c-digicolor.c:109:
-+	bool last = (i2c->msgbuf_ptr+1 == i2c->msg->len);
- 	                            ^
-
-WARNING: Missing a blank line after declarations
-#161: FILE: drivers/i2c/busses/i2c-digicolor.c:110:
-+	bool last = (i2c->msgbuf_ptr+1 == i2c->msg->len);
-+	dc_i2c_cmd(i2c, last ? II_CMD_GET_NOACK : II_CMD_GET_ACK);
-
-CHECK: Logical continuations should be on the previous line
-#226: FILE: drivers/i2c/busses/i2c-digicolor.c:175:
-+	if (cmd_status == II_CMD_STATUS_ACK_BAD
-+	    || cmd_status == II_CMD_STATUS_ABORT) {
-
-CHECK: spaces preferred around that '-' (ctx:VxV)
-#329: FILE: drivers/i2c/busses/i2c-digicolor.c:278:
-+	writeb_relaxed(clocktime-1, i2c->regs + II_CLOCKTIME);
- 	                        ^
-
-There are more checkpatch warnings I don't care about much.
-You can decide about them.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/2ee17fd3/attachment.sig>
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index f5ac337f9598..1fdf42041f42 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -233,7 +233,7 @@ section_table:
+ #endif
+ 
+ ENTRY(stext)
+-	mov	x21, x0				// x21=FDT
++	bl	preserve_boot_args
+ 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+ 	adrp	x24, __PHYS_OFFSET
+ 	bl	set_cpu_boot_mode_flag
+@@ -253,6 +253,23 @@ ENTRY(stext)
+ ENDPROC(stext)
+ 
+ /*
++ * Preserve the arguments passed by the bootloader in x0 .. x3
++ */
++preserve_boot_args:
++	mov	x21, x0				// x21=FDT
++
++	adr_l	x0, boot_args			// record the contents of
++	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
++	stp	x2, x3, [x0, #16]
++
++	dmb	sy				// needed before dc ivac with
++						// MMU off
++
++	add	x1, x0, #0x20			// 4 x 8 bytes
++	b	__inval_cache_range		// tail call
++ENDPROC(preserve_boot_args)
++
++/*
+  * Determine validity of the x21 FDT pointer.
+  * The dtb must be 8-byte aligned and live in the first 512M of memory.
+  */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 1783b38cf4c0..2f384019b201 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -115,6 +115,11 @@ void __init early_print(const char *str, ...)
+ 	printk("%s", buf);
+ }
+ 
++/*
++ * The recorded values of x0 .. x3 upon kernel entry.
++ */
++u64 __cacheline_aligned boot_args[4];
++
+ void __init smp_setup_processor_id(void)
+ {
+ 	u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+@@ -412,6 +417,11 @@ void __init setup_arch(char **cmdline_p)
+ 	conswitchp = &dummy_con;
+ #endif
+ #endif
++	if (boot_args[1] || boot_args[2] || boot_args[3]) {
++		pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
++			boot_args[1], boot_args[2], boot_args[3]);
++		pr_err("WARNING: your bootloader may fail to load newer kernels\n");
++	}
+ }
+ 
+ static int __init arm64_device_init(void)
+-- 
+1.8.3.2
