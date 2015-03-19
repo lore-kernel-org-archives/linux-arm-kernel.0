@@ -1,96 +1,68 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 19 Mar 2015 11:30:47 +0100
-Subject: [PATCH] pinctrl: mvebu: add suspend/resume support to Armada XP
- pinctrl driver
-Message-ID: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 19 Mar 2015 11:32:16 +0100
+Subject: [PATCH] usb: ehci-orion: add more constants for register values
+Message-ID: <1426761136-4118-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds suspend/resume support to the Armada XP pinctrl
-driver, by simply saving and restoring the MPP registers.
+This commit adds new register values for the USB_CMD and USB_MODE
+registers, which allows to avoid the usage of a number of magic values
+in orion_usb_phy_v1_setup().
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c | 40 +++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/usb/host/ehci-orion.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-index fc33761..d191c3a 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-@@ -34,6 +34,7 @@
- #include "pinctrl-mvebu.h"
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index f6eafec..0feca8a 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -29,7 +29,13 @@
+ #define wrl(off, val)	writel_relaxed((val), hcd->regs + (off))
  
- static void __iomem *mpp_base;
-+static u32 *mpp_saved_regs;
+ #define USB_CMD			0x140
++#define   USB_CMD_RUN           BIT(0)
++#define   USB_CMD_RESET         BIT(1)
+ #define USB_MODE		0x1a8
++#define   USB_MODE_MASK         GENMASK(1, 0)
++#define   USB_MODE_DEVICE       0x2
++#define   USB_MODE_HOST         0x3
++#define   USB_MODE_SDIS         BIT(4)
+ #define USB_CAUSE		0x310
+ #define USB_MASK		0x314
+ #define USB_WINDOW_CTRL(i)	(0x320 + ((i) << 4))
+@@ -69,8 +75,8 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
+ 	/*
+ 	 * Reset controller
+ 	 */
+-	wrl(USB_CMD, rdl(USB_CMD) | 0x2);
+-	while (rdl(USB_CMD) & 0x2);
++	wrl(USB_CMD, rdl(USB_CMD) | USB_CMD_RESET);
++	while (rdl(USB_CMD) & USB_CMD_RESET);
  
- static int armada_xp_mpp_ctrl_get(unsigned pid, unsigned long *config)
- {
-@@ -406,12 +407,42 @@ static struct pinctrl_gpio_range mv78460_mpp_gpio_ranges[] = {
- 	MPP_GPIO_RANGE(2,  64, 64,  3),
- };
+ 	/*
+ 	 * GL# USB-10: Set IPG for non start of frame packets
+@@ -112,16 +118,16 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
+ 	/*
+ 	 * Stop and reset controller
+ 	 */
+-	wrl(USB_CMD, rdl(USB_CMD) & ~0x1);
+-	wrl(USB_CMD, rdl(USB_CMD) | 0x2);
+-	while (rdl(USB_CMD) & 0x2);
++	wrl(USB_CMD, rdl(USB_CMD) & ~USB_CMD_RUN);
++	wrl(USB_CMD, rdl(USB_CMD) | USB_CMD_RESET);
++	while (rdl(USB_CMD) & USB_CMD_RESET);
  
-+static int armada_xp_pinctrl_suspend(struct platform_device *pdev,
-+				     pm_message_t state)
-+{
-+	struct mvebu_pinctrl_soc_info *soc =
-+		platform_get_drvdata(pdev);
-+	int i, nregs;
-+
-+	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
-+
-+	for (i = 0; i < nregs; i++)
-+		mpp_saved_regs[i] = readl(mpp_base + i * 4);
-+
-+	return 0;
-+}
-+
-+static int armada_xp_pinctrl_resume(struct platform_device *pdev)
-+{
-+	struct mvebu_pinctrl_soc_info *soc =
-+		platform_get_drvdata(pdev);
-+	int i, nregs;
-+
-+	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
-+
-+	for (i = 0; i < nregs; i++)
-+		writel(mpp_saved_regs[i], mpp_base + i * 4);
-+
-+	return 0;
-+}
-+
- static int armada_xp_pinctrl_probe(struct platform_device *pdev)
- {
- 	struct mvebu_pinctrl_soc_info *soc = &armada_xp_pinctrl_info;
- 	const struct of_device_id *match =
- 		of_match_device(armada_xp_pinctrl_of_match, &pdev->dev);
- 	struct resource *res;
-+	int nregs;
+ 	/*
+ 	 * GL# USB-5 Streaming disable REG_USB_MODE[4]=1
+ 	 * TBD: This need to be done after each reset!
+ 	 * GL# USB-4 Setup USB Host mode
+ 	 */
+-	wrl(USB_MODE, 0x13);
++	wrl(USB_MODE, USB_MODE_SDIS | USB_MODE_HOST);
+ }
  
- 	if (!match)
- 		return -ENODEV;
-@@ -459,6 +490,13 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
-+	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
-+
-+	mpp_saved_regs = devm_kmalloc(&pdev->dev, nregs * sizeof(u32),
-+				      GFP_KERNEL);
-+	if (!mpp_saved_regs)
-+		return -ENOMEM;
-+
- 	pdev->dev.platform_data = soc;
- 
- 	return mvebu_pinctrl_probe(pdev);
-@@ -476,6 +514,8 @@ static struct platform_driver armada_xp_pinctrl_driver = {
- 	},
- 	.probe = armada_xp_pinctrl_probe,
- 	.remove = armada_xp_pinctrl_remove,
-+	.suspend = armada_xp_pinctrl_suspend,
-+	.resume = armada_xp_pinctrl_resume,
- };
- 
- module_platform_driver(armada_xp_pinctrl_driver);
+ static void
 -- 
 2.1.0
