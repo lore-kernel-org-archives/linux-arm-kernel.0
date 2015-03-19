@@ -1,81 +1,74 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 19 Mar 2015 15:55:28 +0000
-Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
-In-Reply-To: <20150319154435.GC25967@leverpostej>
-References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
- <20150319154435.GC25967@leverpostej>
-Message-ID: <CAPvkgC2ntPrTVKi_WxHcMHqV2Rt9KZR9u-oUqVHNH8+1=nnnDg@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 19 Mar 2015 08:58:58 -0700
+Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller and
+ PHY
+In-Reply-To: <550AB40C.8060607@cogentembedded.com>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
+ <550AB40C.8060607@cogentembedded.com>
+Message-ID: <20150319155858.GB19571@brian-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2015 at 15:44, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Steve,
->
+Hi Sergei,
 
-Hey Mark,
+On Thu, Mar 19, 2015 at 02:33:32PM +0300, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 3/19/2015 4:23 AM, Brian Norris wrote:
+> 
+> >Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> >---
+> >Light dependency on:
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
+> >for the surrounding text.
+> 
+> >  arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> 
+> >diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
+> >index 9eaeac8dce1b..7a7c4d8c2afe 100644
+> >--- a/arch/arm/boot/dts/bcm7445.dtsi
+> >+++ b/arch/arm/boot/dts/bcm7445.dtsi
+> >@@ -108,6 +108,42 @@
+> >  			brcm,int-map-mask = <0x25c>, <0x7000000>;
+> >  			brcm,int-fwd-mask = <0x70000>;
+> >  		};
+> >+
+> >+		sata at f045a000 {
+> 
+>    Hm, why the <unit-address> part of the name doesn't correspond to the
+> "reg" prop?
 
-> Thanks for putting this together!
->
-> On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
->> this_cpu operations were implemented for arm64 in:
->>  5284e1b arm64: xchg: Implement cmpxchg_double
->>  f97fc81 arm64: percpu: Implement this_cpu operations
->>
->> Unfortunately, it is possible for pre-emption to take place between
->> address generation and data access. This can lead to cases where data
->> is being manipulated by this_cpu for a different CPU than it was
->> called on. Which effectively breaks the spec.
->>
->> This patch disables pre-emption for the this_cpu operations
->> guaranteeing that address generation and data manipulation.
->
-> Shouldn't that last sentence end with "occur on the same CPU", or
-> something like that?
+Whoops. This .dtsi file is confusing, since none of the Broadcom DTS's I deal
+with have the 'ranges' property building in an 0xf0000000 offset in the
+/rdb node. All our DTS's give absolute register addresses, not relative.
+This discrepancy is a copy-and-paste where I fixed the functional aspect
+(the 'reg' property) but overlooked the cosmetic (the name /
+unit-address).
 
-Gah! Yes it should, thank you.
+We considered just reworking the /rdb node so that it drops the
+0xf0000000 offset, in order to be more consistent and to avoid
+"mistakes" like this. I could either do that (and use 0xf045a000 in both
+places) or just fix the unit address you pointed out.
 
->
+> >+			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
+> >+			reg-names = "ahci", "top-ctrl";
+> >+			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
+> >+			interrupts = <GIC_SPI 30 0>;
+> >+			#address-cells = <1>;
+> >+			#size-cells = <0>;
 > [...]
->
->> +/*
->> + * Modules aren't allowed to use preempt_enable_no_resched, and it is
->> + * undef'ed. If we are unable to use preempt_enable_no_resched, then
->> + * fallback to the standard preempt_enable.
->> + */
->> +#ifdef preempt_enable_no_resched
->> +#define __pcp_preempt_enable()       preempt_enable_no_resched()
->> +#else
->> +#define __pcp_preempt_enable()       preempt_enable()
->> +#endif /* preempt_enable_no_resched */
->
-> I think it would be worth mentioning in the comment why we want to use
-> preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
-> sequences where we want to have as few retries as possible).
+> >+		sata_phy: sata-phy at f0458100 {
+> 
+>    Same question here...
 
-Good point, I'll add something.
+Same answer :)
 
+> >+			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
+> >+			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
+> [...]
 
->
-> Other than those points, the patch looks good to me, feel free to add:
->
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Thanks for the review.
 
-Thanks!
-
->
-> It's a shame there don't seem to be any this_cpu_* self-tests; I've
-> booted a kernel with this applied, but I didn't have anything that
-> exploded without this, so I'd feel uneasy giving a Tested-by.
-
-There is the percpu_test module, I ran this and it appeared to pass.
-Also, I ran the traditional hackbench tests.
-
-Thanks Mark, I'll send out a V2 shortly with the amended commit log
-and expanded comment.
-
-Cheers,
--- 
-Steve
-
->
-> Mark.
+Brian
