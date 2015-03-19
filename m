@@ -1,85 +1,86 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 19 Mar 2015 17:13:54 +0100
-Subject: [PATCH] ata: sata_mv: add proper definitions for LP_PHY_CTL
- register values
-In-Reply-To: <1426772197-17908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1426772197-17908-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150319161354.GH1509@kw.sim.vm.gnt>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Mar 2015 09:10:34 -0700
+Subject: [PATCHv4 00/35] ARM: OMAP2+: PRCM / SCM cleanups against 4.0-rc1
+In-Reply-To: <550A7F3D.3090602@ti.com>
+References: <1426689860-17537-1-git-send-email-t-kristo@ti.com>
+ <20150318220702.GA31346@atomide.com> <550A7F3D.3090602@ti.com>
+Message-ID: <20150319161034.GF31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 02:36:37PM +0100, Thomas Petazzoni wrote:
-> Commit 9013d64e661fc ("ata: sata_mv: fix disk hotplug for Armada
-> 370/XP SoCs") added some manipulation of the LP_PHY_CTL register, but
-> using magic values. This commit changes the code to use proper
-> definitions for the LP_PHY_CTL register, which allows to document what
-> the different bits are doing.
+* Tero Kristo <t-kristo@ti.com> [150319 00:48]:
+> On 03/19/2015 12:07 AM, Tony Lindgren wrote:
+> >
+> >But for dm8168-evm, it fails early on, see below.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Hi Thomas,
-
-The patch looks fine to me.
-
-Acked-by: Simon Guinot <simon.guinot@sequanux.org>
-
-Thanks,
-
-Simon
-
-> ---
->  drivers/ata/sata_mv.c | 20 ++++++++++++++++----
->  1 file changed, 16 insertions(+), 4 deletions(-)
+> Yea seems I forgot to add dm81x support properly. Try this diff:
 > 
-> diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-> index f8c33e3..0281785 100644
-> --- a/drivers/ata/sata_mv.c
-> +++ b/drivers/ata/sata_mv.c
-> @@ -306,6 +306,11 @@ enum {
->  	MV5_PHY_CTL		= 0x0C,
->  	SATA_IFCFG		= 0x050,
->  	LP_PHY_CTL		= 0x058,
-> +	LP_PHY_CTL_PIN_PU_PLL   = (1 << 0),
-> +	LP_PHY_CTL_PIN_PU_RX    = (1 << 1),
-> +	LP_PHY_CTL_PIN_PU_TX    = (1 << 2),
-> +	LP_PHY_CTL_GEN_TX_3G    = (1 << 5),
-> +	LP_PHY_CTL_GEN_RX_3G    = (1 << 9),
->  
->  	MV_M2_PREAMP_MASK	= 0x7e0,
->  
-> @@ -1391,10 +1396,17 @@ static int mv_scr_write(struct ata_link *link, unsigned int sc_reg_in, u32 val)
->  				/*
->  				 * Set PHY speed according to SControl speed.
->  				 */
-> -				if ((val & 0xf0) == 0x10)
-> -					writelfl(0x7, lp_phy_addr);
-> -				else
-> -					writelfl(0x227, lp_phy_addr);
-> +				u32 lp_phy_val =
-> +					LP_PHY_CTL_PIN_PU_PLL |
-> +					LP_PHY_CTL_PIN_PU_RX  |
-> +					LP_PHY_CTL_PIN_PU_TX;
-> +
-> +				if ((val & 0xf0) != 0x10)
-> +					lp_phy_val |=
-> +						LP_PHY_CTL_GEN_TX_3G |
-> +						LP_PHY_CTL_GEN_RX_3G;
-> +
-> +				writelfl(lp_phy_val, lp_phy_addr);
->  			}
->  		}
->  		writelfl(val, addr);
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-ide" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/7b42322a/attachment.sig>
+> diff --git a/arch/arm/mach-omap2/cm_common.c
+> b/arch/arm/mach-omap2/cm_common.c
+> index 2582651..23559aa 100644
+> --- a/arch/arm/mach-omap2/cm_common.c
+> +++ b/arch/arm/mach-omap2/cm_common.c
+> @@ -271,6 +271,8 @@ static const struct of_device_id
+> omap_cm_dt_match_table[] __initconst = {
+>  	{ .compatible = "ti,dra7-cm-core", .data = &cm2_data },
+>  	{ .compatible = "ti,am3-prcm", .data = &am3_prcm_data },
+>  	{ .compatible = "ti,am4-prcm", .data = &am4_prcm_data },
+> +	{ .compatible = "ti,dm814-prcm", .data = &am3_prcm_data },
+> +	{ .compatible = "ti,dm816-prcm", .data = &am3_prcm_data },
+>  	{ }
+>  };
+
+Boots a bit further now with that, but then produces:
+
+...
+[    0.278020] omap_hwmod: tptc0 using broken dt data from edma
+[    0.284133] omap_hwmod: tptc1 using broken dt data from edma
+[    0.290207] omap_hwmod: tptc2 using broken dt data from edma
+[    0.296307] omap_hwmod: tptc3 using broken dt data from edma
+[    0.305359] clocksource jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.317206] pinctrl core: initialized pinctrl subsystem
+[    0.339667] NET: Registered protocol family 16
+[    0.349174] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[    0.358130] cpuidle: using governor ladder
+[    0.362433] cpuidle: using governor menu
+[    0.366948] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[    0.375364] pgd = c0004000
+[    0.378223] [00000040] *pgd=00000000
+[    0.381983] Internal error: Oops: 5 [#1] SMP ARM
+[    0.386803] Modules linked in:
+[    0.390026] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.0.0-rc4-next-20150318-00040-gc5b9bf4-dirty #305
+[    0.399743] Hardware name: Generic ti816x (Flattened Device Tree)
+[    0.406078] task: ed894b80 ti: ed896000 task.ti: ed896000
+[    0.411704] PC is at omap_ctrl_readl+0x48/0x58
+[    0.416347] LR is at omap_type.part.0+0x7c/0xd8
+[    0.421078] pc : [<c0023d60>]    lr : [<c0023bd4>]    psr: 60000113
+[    0.421078] sp : ed897eb0  ip : 00000000  fp : c089f574
+[    0.433022] r10: c0850598  r9 : c089f588  r8 : 00000000
+[    0.438466] r7 : c08537ac  r6 : ed902c00  r5 : 00000000  r4 : c094f03c
+[    0.445246] r3 : 00000040  r2 : c094ebcc  r1 : 00000000  r0 : 00000040
+[    0.452025] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+[    0.459605] Control: 10c5387d  Table: 80004019  DAC: 00000015
+[    0.465581] Process swapper/0 (pid: 1, stack limit = 0xed896218)
+[    0.471825] Stack: (0xed897eb0 to 0xed898000)
+[    0.476379] 7ea0:                                     c08c4540 c085ea18 c089df40 00000000
+[    0.484854] 7ec0: 00000000 ed902c00 c08537ac c085a208 c089df40 c08a6500 c08b04c4 c0862fdc
+[    0.493327] 7ee0: c089df40 c08c1e30 c08c1e30 c0862c78 c089df40 c08537c8 00000000 c0008b84
+[    0.501801] 7f00: ed894b80 c08fc494 00000000 ed894b80 ed895100 00000004 00000006 00000000
+[    0.510278] 7f20: 00000000 c008a2bc c0850598 ef7fc9d0 ef7fc9cb c005c784 c076c0a0 ef7fc9da
+[    0.518753] 7f40: 00000003 00000003 00000000 c08b5f18 c08b5f20 00000003 c094e780 00000093
+[    0.527226] 7f60: c094e780 c0850598 c089f574 c0850ea0 00000003 00000003 c0850598 ffffffff
+[    0.535699] 7f80: 00000000 00000000 c05d2ca8 00000000 00000000 00000000 00000000 00000000
+[    0.544174] 7fa0: 00000000 c05d2cb0 00000000 c000e910 00000000 00000000 00000000 00000000
+[    0.552649] 7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    0.561122] 7fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 ffffffff
+[    0.569598] [<c0023d60>] (omap_ctrl_readl) from [<00000000>] (  (null))
+[    0.576471] Code: e28dd00c e49df004 e5921000 e0813003 (e5930000) 
+[    0.582860] ---[ end trace 00a172dd2625b740 ]---
+[    0.587757] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[    0.587757] 
+[    0.597310] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[    0.597310] 
+
+Regards,
+
+Tony
