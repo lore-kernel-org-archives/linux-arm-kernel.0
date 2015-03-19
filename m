@@ -1,150 +1,138 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 19 Mar 2015 18:02:16 +0100
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller
- and PHY
-In-Reply-To: <20150319155358.GA19571@brian-ubuntu>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
- <550AAEA1.5080301@redhat.com> <20150319155358.GA19571@brian-ubuntu>
-Message-ID: <550B0118.3040104@redhat.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 19 Mar 2015 10:02:51 -0700
+Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
+In-Reply-To: <20150319134910.GF18473@leverpostej>
+References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
+ <20150319134910.GF18473@leverpostej>
+Message-ID: <550B013B.1060002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 19-03-15 16:53, Brian Norris wrote:
-> Hi Hans,
->
-> Thanks for the review.
->
-> On Thu, Mar 19, 2015 at 12:10:25PM +0100, Hans de Goede wrote:
->> On 19-03-15 02:23, Brian Norris wrote:
->>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
->>> ---
->>> Light dependency on:
->>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
->>> for the surrounding text.
->>>
->>>   arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->>>   1 file changed, 36 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
->>> index 9eaeac8dce1b..7a7c4d8c2afe 100644
->>> --- a/arch/arm/boot/dts/bcm7445.dtsi
->>> +++ b/arch/arm/boot/dts/bcm7445.dtsi
->>> @@ -108,6 +108,42 @@
->>>   			brcm,int-map-mask = <0x25c>, <0x7000000>;
->>>   			brcm,int-fwd-mask = <0x70000>;
->>>   		};
->>> +
->>> +		sata at f045a000 {
->>> +			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
->>> +			reg-names = "ahci", "top-ctrl";
->>> +			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
+On 3/19/2015 6:49 AM, Mark Rutland wrote:
+> On Thu, Mar 19, 2015 at 03:33:22AM +0000, Frank Rowand wrote:
+>> From: Frank Rowand <frank.rowand@sonymobile.com>
 >>
->> Why not simply drop the second register range here, and the minimal top-ctrl
->> poking you need in the phy driver's phy_init function ?
->
-> I agree it's a little ugly, but your recommended solution will not work.
->
-> The 'top-ctrl' register range includes several SATA functionalities,
-> some of which are required for the PHY and some of which are definitely
-> required for the SATA driver.
+>> Add /chosen/dtb-node binding.
+> 
+> Why? It doesn't matter what the cover says, the commit message should
+> have a rationale.
+> 
+> Who needs this information, and when do they need it?
+> 
+> Why is the existing information insufficient?
 
-I see, but the phy driver is required for the SATA driver anyways,
-and since the BUS_CTRL setting seems to be static it might just as
-well be set by the phy driver. The phy driver also poking some
-common sata glue bits like this busctrl register is not unheard of,
-esp. when these glue bits are in the phy register range.
+Will update and add better information.
 
-> We have:
->
-> 0x00   VERSION
-> 0x04   BUS_CTRL
-> 0x08   TP_CTRL
-> 0x0C   PHY_CTRL_1
-> 0x10   PHY_CTRL_2
-> 0x14   PHY_CTRL_3
-> 0x18   PHY_CTRL_4
-> 0x1C   TP_OUT
-> 0x20   CLIENT_INIT_CTRL
->
-> We *definitely* need the BUS_CTRL register in the SATA driver, since it
-> controls the endianness of the AHCI register set as well as a few other
-> important bits we may use in the future.
-
-Are these bits non static, e.g. something which you may want to change at
-another time then init/shutdown/suspend/resume ? If they are static I still
-think this all clearly belongs in the phy driver, since this looks a lot
-like it is a single hardware block.
-
-If otoh these other bits may need runtime poking for e.g. sata error recovery,
-then I can understand why you want the bus ctrl register in the sata driver,
-but in that case it should only be mapped by the sata driver, and the phy driver
-register ranges should not cover it.
-
-> So we can't just "drop" the
-> "minimal poking" and expect things to work, just because that makes the
-> device tree look nicer :)
-
-I was not suggesting to drop it I was suggesting moving the poke to phy_init,
-and given the registermap you've shown above I still think that this belongs
-more in the phy driver then anywhere else.
-
-> The problem is what to do with the PHY_CTRL registers that are kept in
-> the middle of the block. These really belong as part of the PHY
-> power-on/power-off control sequence (i.e., PHY driver).
->
-> Do you have any better suggestions that don't involve dropping the
-> BUS_CTRL register from the SATA driver?
-
-Nope, if you really believe that the bus-ctrl register should be part of
-the sata driver, then please just split the register ranges at a per register
-level, to remove the overlap + the hack of not claiming the resource on one side.
-
->> This avoids the weird / ugly register overlap with the phy driver, and I think you
->> can then just use the ahci_platform driver unmodified.
+> 
+>> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+>> ---
+>>  Documentation/devicetree/bindings/chosen.txt |   37 +++++++++++
 >>
->>> +			interrupts = <GIC_SPI 30 0>;
->>> +			#address-cells = <1>;
->>> +			#size-cells = <0>;
->>> +
->>> +			sata0: sata-port at 0 {
->>> +				reg = <0>;
->>> +				phys = <&sata_phy 0>;
->>> +			};
->>> +
->>> +			sata1: sata-port at 1 {
->>> +				reg = <1>;
->>> +				phys = <&sata_phy 1>;
->>> +			};
->>> +		};
->>> +
->>> +		sata_phy: sata-phy at f0458100 {
->>> +			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
->>> +			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
->>
->> Why not simply use: reg = <0x458000 0x2000>, to me it seems that what you should
->> really be using here.
->
-> 0x458000 to 0x45800f and 0x458080 to 0x4580af belong to a debug
-> interrupt controller, which handles bus error handling. It's currently
-> unused, and it definitely doesn't belong here.
->
-> The 'phy' register range is actually documented as two sets of identical
-> registers:
->
-> 0x458100 - 0x458fff  Port0 SATA PHY registers
-> 0x459100 - 0x459fff  Port1 SATA PHY registers
->
-> with a hole between them. I definitely don't want to do the combining
-> that you suggested, but I could probably split them apart if that really
-> helps...
+>> Index: b/Documentation/devicetree/bindings/chosen.txt
+>> ===================================================================
+>> --- a/Documentation/devicetree/bindings/chosen.txt
+>> +++ b/Documentation/devicetree/bindings/chosen.txt
+>> @@ -46,6 +46,43 @@ on PowerPC "stdout" if "stdout-path" is
+>>  should only use the "stdout-path" property.
+>>  
+>>  
+>> +dtb-info node
+>> +----------------
+>> +
+>> +Information that describes where the device tree blob (DTB) came from and the
+>> +environment it was created in.
+>> +
+>> +This node is normally created by including arch/arm/boot/dts/skeleton.dtsi,
+>> +which includes include/dt-bindings/version.dtsi.
+>> +
+>> +Properties:
+>> +
+>> +version
+>> +	The version of the DTB.  This is analagous to the linux kernel version.
+>> +
+>> +	This is a format free field intended for human consumption.  User space
+>> +	programs should not have any expections about this property.
+> 
+> I doubt that this would stay the case for long were this property added.
+> 
+>> +	The DTB number in this property is incremented each time a make that
+>> +	creates one or more DTBs is invoked.  If the make creates multiple
+>> +	DTBs then this number is only incremented once.
+>> +
+>> +	The DTB number is stored in file .version_dtb.
+> 
+> This is irrelevant to the binding, and as you mention above, you can
+> make no expectations about this property.
 
-If this is the documented register range, then I think that splitting them makes
-sense, and assuming that the init code for both ports is the same it may
-even make for cleaner code.
+OK, I'll remove the reference to .version_dtb.
 
-Regards,
+> 
+> I'm not sure I see the point in adding a property which is not
+> well-defined and not guarnateed to be in any way stable.
 
-Hans
+This binding is kind of an odd ball to me.  It is clearly _not_ describing
+hardware, which is really the central point of the dtb.  But the chosen
+node is allowed to cover policy things like the boot command line.
+
+So I would encourage a slightly unusual mind set when reviewing this
+binding (not that I really know what that mind set is!).
+
+The answer to the specific question of why add a "not well-defined"
+binding is the same answer as to why have a kernel version string.
+There was a proposal to remove the kernel version string and that
+was quickly dropped.
+
+I should have written more about why this is useful.
+
+This binding provides the provenance of the DTB.  What source (and
+version of the source) and version of the compiler (dtc) was used
+to make the DTB.
+
+If I want to debug DTB related issues, read the source that was used
+to create the DTB, or slightly modify the DTB - where is the source
+and what is the version of it in the source control system.
+
+When building and installing a DTB, did the version that I wanted to
+install on the target actually get on the target.
+
+> 
+>> +
+>> +version-linux
+>> +	The version of the linux kernel most recently built in the source
+>> +	control system that contains the source used to build the DTB.
+>> +
+>> +	The linux kernel version number is not incremented for a make that
+>> +	creates a DTB.
+> 
+> ...so if I build a DTB outside of a linux source tree I don't get to
+> describe that?
+
+I will make the name more generic.
+
+> 
+>> +dtb-path
+>> +	The build directory relative path of the DTB.
+>> +
+>> +dts-path
+>> +	The absolute path of the .dts file compiled to create the DTB.
+> 
+> Why do you need the DTB path?
+
+Paranoia.  Even if not probable, one could build different DTBs from
+the same .dts.
+
+> 
+> Why do these differ w.r.t. absolute/relative?
+
+Those are the forms of the path that are present in the build
+system.  If there is a good reason to change one of them to the
+other form, I could add the extra complexity to massage the path.
+
+> 
+> Why would you _ever_ need an absolute path!?
+
+The absolute path tells you which source repository contained the source.
+
+> 
+> Mark.
+> 
