@@ -1,89 +1,36 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 19 Mar 2015 18:48:10 +0000
-Subject: [RFC PATCH 2/7] printk: Simple implementation for NMI backtracing
-In-Reply-To: <20150319183037.GT23123@twins.programming.kicks-ass.net>
-References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
- <1426688428-3150-3-git-send-email-daniel.thompson@linaro.org>
- <20150319133958.4821493e@gandalf.local.home>
- <20150319183037.GT23123@twins.programming.kicks-ass.net>
-Message-ID: <550B19EA.6000202@linaro.org>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 19 Mar 2015 13:45:19 -0500
+Subject: [GIT PULL] SoCFPGA late fix for v4.0
+Message-ID: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/15 18:30, Peter Zijlstra wrote:
-> On Thu, Mar 19, 2015 at 01:39:58PM -0400, Steven Rostedt wrote:
->>> +void printk_nmi_backtrace_complete(void)
->>> +{
->>> +	struct nmi_seq_buf *s;
->>> +	int len, cpu, i, last_i;
->>> +
->>> +	/*
->>> +	 * Now that all the NMIs have triggered, we can dump out their
->>> +	 * back traces safely to the console.
->>> +	 */
->>> +	for_each_possible_cpu(cpu) {
->>> +		s = &per_cpu(nmi_print_seq, cpu);
->>> +		last_i = 0;
->>> +
->>> +		len = seq_buf_used(&s->seq);
->>> +		if (!len)
->>> +			continue;
->>> +
->>> +		/* Print line by line. */
->>> +		for (i = 0; i < len; i++) {
->>> +			if (s->buffer[i] == '\n') {
->>> +				print_seq_line(s, last_i, i);
->>> +				last_i = i + 1;
->>> +			}
->>> +		}
->>> +		/* Check if there was a partial line. */
->>> +		if (last_i < len) {
->>> +			print_seq_line(s, last_i, len - 1);
->>> +			pr_cont("\n");
->>> +		}
->>> +
->>> +		/* Wipe out the buffer ready for the next time around. */
->>> +		seq_buf_clear(&s->seq);
->>> +	}
->>> +
->>> +	clear_bit(0, &nmi_print_flag);
->>> +	smp_mb__after_atomic();
->>
->> Is this really necessary. What is the mb synchronizing?
->>
->> [ Added Peter Zijlstra to confirm it's not needed ]
->
-> It surely looks suspect; and it lacks a comment, which is a clear sign
-> its buggy.
->
-> Now it if tries to order the accesses to the seqbuf againt the clearing
-> of the bit one would have expected a _before_ barrier, not an _after_.
+Hi Arnd, Kevin and Olof,
 
-It's nothing to do with the seqbuf since I added the seqbuf code myself 
-but the barrier was already in the code that I copied from.
+Please pull this 1 patch that fixes SPI. If it's too late for v4.0, then
+this patch can go in for v4.1.
 
-In the mainline code today it looks like this as part of the x86 code 
-(note that call to put_cpu() in my patchset but it lives in the arch/ 
-specific code rather than the generic code):
+Thanks,
 
-:                 /* Check if there was a partial line. */
-:                 if (last_i < len) {
-:                         print_seq_line(s, last_i, len - 1);
-:                         pr_cont("\n");
-:                 }
-:         }
-:
-:         clear_bit(0, &backtrace_flag);
-:         smp_mb__after_atomic();
-:         put_cpu();
-: }
+The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
 
-The barrier was not intended to have anything to do with put_cpu() 
-either though since the barrier was added before put_cpu() arrived:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=554ec063982752e9a569ab9189eeffa3d96731b2
+  Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
 
-There's nothing in the commit comment explaining the barrier and I 
-really can't see what it is for.
+are available in the git repository at:
 
+  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fix_for_v4.0_2
 
-Daniel.
+for you to fetch changes up to 1ac31de744202a3a14601170a57f155b4a8d2c21:
+
+  ARM: socfpga: dts: fix spi1 interrupt (2015-03-19 10:51:15 -0500)
+
+----------------------------------------------------------------
+Late fix for v4.0 on the SoCFPGA platform:
+- Fix interrupt number for SPI1 interface
+
+----------------------------------------------------------------
+Mark James (1):
+      ARM: socfpga: dts: fix spi1 interrupt
+
+ arch/arm/boot/dts/socfpga.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
