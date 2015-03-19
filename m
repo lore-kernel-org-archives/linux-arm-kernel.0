@@ -1,83 +1,128 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Mar 2015 10:54:42 -0600
-Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
- address change
-In-Reply-To: <alpine.DEB.2.02.1503191601520.9480@utopia.booyaka.com>
-References: <20150317083221.32662.14647.stgit@baseline>
- <20150317083221.32662.96822.stgit@baseline>
- <20150317103806.GU8656@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
- <550AEE6B.5080301@wwwdotorg.org>
- <alpine.DEB.2.02.1503191601520.9480@utopia.booyaka.com>
-Message-ID: <550AFF52.6070503@wwwdotorg.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 19 Mar 2015 10:00:16 -0700
+Subject: [PATCH 2/2] mfd: tc3589x: enforce device-tree only mode
+In-Reply-To: <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
+References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
+ <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150319170016.GI30732@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 10:17 AM, Paul Walmsley wrote:
-> On Thu, 19 Mar 2015, Stephen Warren wrote:
->
->> On 03/19/2015 09:26 AM, Paul Walmsley wrote:
->>> On Tue, 17 Mar 2015, Russell King - ARM Linux wrote:
->>>
->>>> On Tue, Mar 17, 2015 at 01:32:21AM -0700, Paul Walmsley wrote:
->>>>>    Required properties:
->>>>>    - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
->>>>> -  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
->>>>> -  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
->>>>> -  tegra132, or tegra210.
->>>>> -- reg : Should contain 1 register ranges(address and length)
->>>>> +  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and
->>>>> Tegra124, must
->>>>> +  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is
->>>>> tegra114
->>>>> +  or tegra124.  For Tegra132, the compatible string must contain
->>>>> +  "nvidia,tegra132-ahb".
->>>>> +
->>>>> +- reg : Should contain 1 register ranges(address and length).  On
->>>>> Tegra20,
->>>>> +  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical
->>>>> base
->>>>> +  address of the IP block must end in 0x04.  On DT files for later
->>>>> chips, the
->>>>> +  actual hardware base address of the IP block should be used.
->>>>
->>>> You could check that in the driver.  If you can check it in the driver,
->>>> you can also decide to ignore it if it were offset by 0x04 (possibly
->>>> printing a warning.)  That opens up the ability to fix the older Tegra
->>>> DT files going forward while still remaining compatible with existing
->>>> DT files, and avoiding the need for a complex note about this.
->>>
->>> That's fine, I'll do that and drop this patch.
->>
->> Don't we still want to update the DT binding documentation to state what the
->> preferred base address (or at least set of legal base addresses) is/are?
->
-> As far as I know, the DT binding documents are intended to be a
-> reference for IP block integration data like base addresses.  At least,
-> that is not how they've been used in the past, in the cases that I'm
-> familiar with.
->
-> I can see some marginal utility in changing the base address in the
-> example.  But since the worst possible outcome of using the old address is
-> a warning message at boot, that margin seems quite small indeed.  Anyone
-> who would blindly use the base address from the example to create a DT
-> file for a new Tegra SoC isn't doing it correctly.
+On Thu, Mar 19, 2015 at 03:52:45PM +0100, Linus Walleij wrote:
+> All systems using the TC3589x multifunction expander uses
+> devicetree, so don't clutter the place with a lot of
+> and assume it is there.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/gpio/Kconfig                    | 1 +
+>  drivers/gpio/gpio-tc3589x.c             | 3 ---
+>  drivers/input/keyboard/tc3589x-keypad.c | 9 ---------
 
-The binding document is supposed to say what value the reg property 
-should have. If we require some unusual offset in the reg property (i.e. 
-something other than what the HW documentation describes as the module 
-base address), that ought to be documented. We do have this situation 
-for this module at present, although the documentation unfortunately 
-doesn't explicitly call this out even though the example alludes to it.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-I do think we should at least fix the example so it isn't confusing and 
-inconsistent with expected practice. We could either switch the example 
-to Tegra210 so we only provide the best example going forward, or have 
-separate examples for Tegra20/210 to highlight the difference.
+>  drivers/mfd/Kconfig                     | 1 +
+>  drivers/mfd/tc3589x.c                   | 9 ---------
+>  5 files changed, 2 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index c1e2ca3d9a51..dc1aaa83a347 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -669,6 +669,7 @@ config GPIO_STP_XWAY
+>  config GPIO_TC3589X
+>  	bool "TC3589X GPIOs"
+>  	depends on MFD_TC3589X
+> +	depends on OF_GPIO
+>  	select GPIOLIB_IRQCHIP
+>  	help
+>  	  This enables support for the GPIOs found on the TC3589X
+> diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
+> index 11aed2671065..31b244cffabb 100644
+> --- a/drivers/gpio/gpio-tc3589x.c
+> +++ b/drivers/gpio/gpio-tc3589x.c
+> @@ -260,10 +260,7 @@ static int tc3589x_gpio_probe(struct platform_device *pdev)
+>  	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
+>  	tc3589x_gpio->chip.dev = &pdev->dev;
+>  	tc3589x_gpio->chip.base = -1;
+> -
+> -#ifdef CONFIG_OF_GPIO
+>  	tc3589x_gpio->chip.of_node = np;
+> -#endif
+>  
+>  	/* Bring the GPIO module out of reset */
+>  	ret = tc3589x_set_bits(tc3589x, TC3589x_RSTCTRL,
+> diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
+> index 0ccc7de9b59d..08e62e6aeb1b 100644
+> --- a/drivers/input/keyboard/tc3589x-keypad.c
+> +++ b/drivers/input/keyboard/tc3589x-keypad.c
+> @@ -318,7 +318,6 @@ static void tc3589x_keypad_close(struct input_dev *input)
+>  	tc3589x_keypad_disable(keypad);
+>  }
+>  
+> -#ifdef CONFIG_OF
+>  static const struct tc3589x_keypad_platform_data *
+>  tc3589x_keypad_of_probe(struct device *dev)
+>  {
+> @@ -368,14 +367,6 @@ tc3589x_keypad_of_probe(struct device *dev)
+>  
+>  	return plat;
+>  }
+> -#else
+> -static inline const struct tc3589x_keypad_platform_data *
+> -tc3589x_keypad_of_probe(struct device *dev)
+> -{
+> -	return ERR_PTR(-ENODEV);
+> -}
+> -#endif
+> -
+>  
+>  static int tc3589x_keypad_probe(struct platform_device *pdev)
+>  {
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 38356e39adba..476e63745742 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1210,6 +1210,7 @@ config MFD_TIMBERDALE
+>  config MFD_TC3589X
+>  	bool "Toshiba TC35892 and variants"
+>  	depends on I2C=y
+> +	depends on OF
+>  	select MFD_CORE
+>  	help
+>  	  Support for the Toshiba TC35892 and variants I/O Expander.
+> diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
+> index aacb3720065c..cf356395c9e9 100644
+> --- a/drivers/mfd/tc3589x.c
+> +++ b/drivers/mfd/tc3589x.c
+> @@ -318,7 +318,6 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
+>  	return ret;
+>  }
+>  
+> -#ifdef CONFIG_OF
+>  static const struct of_device_id tc3589x_match[] = {
+>  	/* Legacy compatible string */
+>  	{ .compatible = "tc3589x", .data = (void *) TC3589X_UNKNOWN },
+> @@ -359,14 +358,6 @@ tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
+>  
+>  	return pdata;
+>  }
+> -#else
+> -static inline struct tc3589x_platform_data *
+> -tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
+> -{
+> -	dev_err(dev, "no device tree support\n");
+> -	return ERR_PTR(-ENODEV);
+> -}
+> -#endif
+>  
+>  static int tc3589x_probe(struct i2c_client *i2c,
+>  				   const struct i2c_device_id *id)
+> -- 
+> 1.9.3
+> 
 
-We should also add documentation that Chips before Tegra210 (or 
-Tegra132?) *require* the extra offset. Any code or DT written to the 
-existing (admittedly slightly implicit) binding needs to continue to 
-work, so we should document this unusual requirement, even if we enhance 
-the Linux driver to accept either mode of operation. Other OSs and old 
-versions of Linux will still need the exception for older SoCs.
+-- 
+Dmitry
