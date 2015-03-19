@@ -1,131 +1,136 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Mar 2015 15:55:45 +0100
-Subject: [RFC v5 07/13] KVM: kvm-vfio: wrappers to VFIO external API device
- helpers
+Date: Thu, 19 Mar 2015 15:55:49 +0100
+Subject: [RFC v5 11/13] kvm: arm/arm64: implement kvm_arch_halt_guest and
+ kvm_arch_resume_guest
 In-Reply-To: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
 References: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1426776951-24901-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <1426776951-24901-12-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide wrapper functions that allow KVM-VFIO device code to
-interact with a vfio device:
-- kvm_vfio_device_get_external_user gets a handle to a struct
-  vfio_device from the vfio device file descriptor and increments
-  its reference counter,
-- kvm_vfio_device_put_external_user decrements the reference counter
-  to a vfio device,
-- kvm_vfio_external_base_device returns a handle to the struct device
-  of the vfio device.
+This patch defines __KVM_HAVE_ARCH_HALT_GUEST and implements
+kvm_arch_halt_guest and kvm_arch_resume_guest for ARM.
 
-Also kvm_vfio_get_vfio_device and kvm_vfio_put_vfio_device helpers
-are introduced.
+On halt, the guest is forced to exit and prevented from being
+re-entered.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v3 -> v4:
-- wrappers are no more exposed in kvm_host and become kvm/vfio.c static
-  functions
-- added kvm_vfio_get_vfio_device/kvm_vfio_put_vfio_device in that
-  patch file
-
-v2 -> v3:
-- reword the commit message and title
-
-v1 -> v2:
-- kvm_vfio_external_get_base_device renamed into
-  kvm_vfio_external_base_device
-- kvm_vfio_external_get_type removed
+v4 -> v5: add arm64 support
+- also defines __KVM_HAVE_ARCH_HALT_GUEST for arm64
+- add pause field
 ---
- virt/kvm/vfio.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+ arch/arm/include/asm/kvm_host.h   |  4 ++++
+ arch/arm/kvm/arm.c                | 32 +++++++++++++++++++++++++++++---
+ arch/arm64/include/asm/kvm_host.h |  4 ++++
+ 3 files changed, 37 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/vfio.c b/virt/kvm/vfio.c
-index 620e37f..80a45e4 100644
---- a/virt/kvm/vfio.c
-+++ b/virt/kvm/vfio.c
-@@ -60,6 +60,80 @@ static void kvm_vfio_group_put_external_user(struct vfio_group *vfio_group)
- 	symbol_put(vfio_group_put_external_user);
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 79a919c..b829f93 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -28,6 +28,7 @@
+ #include <kvm/arm_arch_timer.h>
+ 
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
++#define __KVM_HAVE_ARCH_HALT_GUEST
+ 
+ #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+@@ -132,6 +133,9 @@ struct kvm_vcpu_arch {
+ 	/* vcpu power-off state */
+ 	bool power_off;
+ 
++	/* Don't run the guest */
++	bool pause;
++
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 08e12dc..ebc0b55 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -454,11 +454,36 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
+ 	return vgic_initialized(kvm);
  }
  
-+static struct vfio_device *kvm_vfio_device_get_external_user(struct file *filep)
++void kvm_arch_halt_guest(struct kvm *kvm)
 +{
-+	struct vfio_device *vdev;
-+	struct vfio_device *(*fn)(struct file *);
++	int i;
++	struct kvm_vcpu *vcpu;
 +
-+	fn = symbol_get(vfio_device_get_external_user);
-+	if (!fn)
-+		return ERR_PTR(-EINVAL);
-+
-+	vdev = fn(filep);
-+
-+	symbol_put(vfio_device_get_external_user);
-+
-+	return vdev;
++	kvm_for_each_vcpu(i, vcpu, kvm)
++		vcpu->arch.pause = true;
++	force_vm_exit(cpu_all_mask);
 +}
 +
-+static void kvm_vfio_device_put_external_user(struct vfio_device *vdev)
++void kvm_arch_resume_guest(struct kvm *kvm)
 +{
-+	void (*fn)(struct vfio_device *);
++	int i;
++	struct kvm_vcpu *vcpu;
 +
-+	fn = symbol_get(vfio_device_put_external_user);
-+	if (!fn)
-+		return;
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
 +
-+	fn(vdev);
-+
-+	symbol_put(vfio_device_put_external_user);
++		vcpu->arch.pause = false;
++		wake_up_interruptible(wq);
++	}
 +}
 +
-+static struct device *kvm_vfio_external_base_device(struct vfio_device *vdev)
-+{
-+	struct device *(*fn)(struct vfio_device *);
-+	struct device *dev;
 +
-+	fn = symbol_get(vfio_external_base_device);
-+	if (!fn)
-+		return NULL;
-+
-+	dev = fn(vdev);
-+
-+	symbol_put(vfio_external_base_device);
-+
-+	return dev;
-+}
-+
-+/**
-+ * kvm_vfio_get_vfio_device - Returns a handle to a vfio-device
-+ *
-+ * Checks it is a valid vfio device and increments its reference counter
-+ * @fd: file descriptor of the vfio platform device
-+ */
-+static struct vfio_device *kvm_vfio_get_vfio_device(int fd)
-+{
-+	struct fd f = fdget(fd);
-+	struct vfio_device *vdev;
-+
-+	if (!f.file)
-+		return ERR_PTR(-EINVAL);
-+	vdev = kvm_vfio_device_get_external_user(f.file);
-+	fdput(f);
-+	return vdev;
-+}
-+
-+/**
-+ * kvm_vfio_put_vfio_device: decrements the reference counter of the
-+ * vfio platform * device
-+ *
-+ * @vdev: vfio_device handle to release
-+ */
-+static void kvm_vfio_put_vfio_device(struct vfio_device *vdev)
-+{
-+	kvm_vfio_device_put_external_user(vdev);
-+}
-+
- static bool kvm_vfio_group_is_coherent(struct vfio_group *vfio_group)
+ static void vcpu_pause(struct kvm_vcpu *vcpu)
  {
- 	long (*fn)(struct vfio_group *, unsigned long);
+ 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+ 
+-	wait_event_interruptible(*wq, !vcpu->arch.power_off);
++	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
++				       (!vcpu->arch.pause)));
+ }
+ 
+ static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+@@ -508,7 +533,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		update_vttbr(vcpu->kvm);
+ 
+-		if (vcpu->arch.power_off)
++		if (vcpu->arch.power_off || vcpu->arch.pause)
+ 			vcpu_pause(vcpu);
+ 
+ 		kvm_vgic_flush_hwstate(vcpu);
+@@ -526,7 +551,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			run->exit_reason = KVM_EXIT_INTR;
+ 		}
+ 
+-		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
++		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
++		    vcpu->arch.pause) {
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			local_irq_enable();
+ 			kvm_timer_finish_sync(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index a713b0c..ffcc698 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_mmio.h>
+ 
+ #define __KVM_HAVE_ARCH_INTC_INITIALIZED
++#define __KVM_HAVE_ARCH_HALT_GUEST
+ 
+ #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+@@ -125,6 +126,9 @@ struct kvm_vcpu_arch {
+ 	/* vcpu power-off state */
+ 	bool power_off;
+ 
++	/* Don't run the guest */
++	bool pause;
++
+ 	/* IO related fields */
+ 	struct kvm_decode mmio_decode;
+ 
 -- 
 1.9.1
