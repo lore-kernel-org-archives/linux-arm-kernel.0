@@ -1,43 +1,143 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Mar 2015 09:42:35 -0600
-Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
- address change
-In-Reply-To: <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
-References: <20150317083221.32662.14647.stgit@baseline>
- <20150317083221.32662.96822.stgit@baseline>
- <20150317103806.GU8656@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
-Message-ID: <550AEE6B.5080301@wwwdotorg.org>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 19 Mar 2015 09:42:47 -0600
+Subject: [PATCH V2 7/8] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <550AEC3C.5090200@linaro.org>
+References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
+ <1426704372-20406-8-git-send-email-daniel.lezcano@linaro.org>
+ <20150319153112.GA589@linaro.org> <550AEC3C.5090200@linaro.org>
+Message-ID: <20150319154247.GB589@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 09:26 AM, Paul Walmsley wrote:
-> On Tue, 17 Mar 2015, Russell King - ARM Linux wrote:
->
->> On Tue, Mar 17, 2015 at 01:32:21AM -0700, Paul Walmsley wrote:
->>>   Required properties:
->>>   - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
->>> -  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
->>> -  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
->>> -  tegra132, or tegra210.
->>> -- reg : Should contain 1 register ranges(address and length)
->>> +  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and Tegra124, must
->>> +  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra114
->>> +  or tegra124.  For Tegra132, the compatible string must contain
->>> +  "nvidia,tegra132-ahb".
->>> +
->>> +- reg : Should contain 1 register ranges(address and length).  On Tegra20,
->>> +  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical base
->>> +  address of the IP block must end in 0x04.  On DT files for later chips, the
->>> +  actual hardware base address of the IP block should be used.
+On Thu, Mar 19 2015 at 09:33 -0600, Daniel Lezcano wrote:
+>On 03/19/2015 04:31 PM, Lina Iyer wrote:
+>>On Wed, Mar 18 2015 at 12:46 -0600, Daniel Lezcano wrote:
+>>>Some architectures have some cpus which does not support idle states.
+>>>
+>>>Let the underlying low level code to return -ENOSYS when it is not
+>>>possible to set an idle state.
+>>>
+>>>Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>---
+>>>drivers/cpuidle/cpuidle-arm.c | 45
+>>>+++++++++++++++++++++++++++++++++++++++++--
+>>>1 file changed, 43 insertions(+), 2 deletions(-)
+>>>
+>>>diff --git a/drivers/cpuidle/cpuidle-arm.c
+>>>b/drivers/cpuidle/cpuidle-arm.c
+>>>index 1c94b88..0682ed0 100644
+>>>--- a/drivers/cpuidle/cpuidle-arm.c
+>>>+++ b/drivers/cpuidle/cpuidle-arm.c
+>>>@@ -17,11 +17,14 @@
+>>>#include <linux/kernel.h>
+>>>#include <linux/module.h>
+>>>#include <linux/of.h>
+>>>+#include <linux/slab.h>
+>>>
+>>>#include <asm/cpuidle.h>
+>>>
+>>>#include "dt_idle_states.h"
+>>>
+>>>+static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
 >>
->> You could check that in the driver.  If you can check it in the driver,
->> you can also decide to ignore it if it were offset by 0x04 (possibly
->> printing a warning.)  That opens up the ability to fix the older Tegra
->> DT files going forward while still remaining compatible with existing
->> DT files, and avoiding the need for a complex note about this.
+>>Is a per-cpu variable needed? There seems to be no per-cpu access, other
+>>than at init.
 >
-> That's fine, I'll do that and drop this patch.
+>:)
+>
+>Actually it is the cpuidle framework which is using the per cpu variable.
+>
 
-Don't we still want to update the DT binding documentation to state what 
-the preferred base address (or at least set of legal base addresses) is/are?
+But this is static pointer, I can see that struct cpuidle_device * being
+used by cpuidle framework.
+
+It gets stored here?
+
+DEFINE_PER_CPU(struct cpuidle_device *, cpuidle_devices);
+
+But we dont need to save it here, for in this file, there is no per-cpu
+access, other than when the registration fails.
+
+
+>>>+
+>>>/*
+>>> * arm_enter_idle_state - Programs CPU to enter the specified state
+>>> *
+>>>@@ -94,6 +97,7 @@ static int __init arm_idle_init(void)
+>>>{
+>>>    int cpu, ret;
+>>>    struct cpuidle_driver *drv = &arm_idle_driver;
+>>>+    struct cpuidle_device *dev;
+>>>
+>>>    /*
+>>>     * Initialize idle states data, starting at index 1.
+>>>@@ -105,18 +109,55 @@ static int __init arm_idle_init(void)
+>>>    if (ret <= 0)
+>>>        return ret ? : -ENODEV;
+>>>
+>>>+    ret = cpuidle_register_driver(drv);
+>>>+    if (ret) {
+>>>+        pr_err("Failed to register cpuidle driver\n");
+>>>+        return ret;
+>>>+    }
+>>>+
+>>>    /*
+>>>     * Call arch CPU operations in order to initialize
+>>>     * idle states suspend back-end specific data
+>>>     */
+>>>    for_each_possible_cpu(cpu) {
+>>>        ret = arm_cpuidle_init(cpu);
+>>>+
+>>>+        /* This cpu does not support any idle states */
+>>>+        if (ret == -ENOSYS)
+>>>+            continue;
+>>>+
+>>>        if (ret) {
+>>>            pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+>>>-            return ret;
+>>>+            goto out_fail;
+>>>+        }
+>>>+
+>>>+        dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>>>+        if (!dev) {
+>>>+            pr_err("Failed to allocate cpuidle device\n");
+>>>+            goto out_fail;
+>>>+        }
+>>>+
+>>>+        dev->cpu = cpu;
+>>>+        per_cpu(cpuidle_arm_dev, cpu) = dev;
+>>>+
+>>>+        ret = cpuidle_register_device(dev);
+>>>+        if (ret) {
+>>>+            pr_err("Failed to register cpuidle device for CPU %d\n",
+>>>+                   cpu);
+>>>+            kfree(dev);
+>>>+            goto out_fail;
+>>>        }
+>>>    }
+>>>+out:
+>>>+    return ret;
+>>>
+>>>-    return cpuidle_register(drv, NULL);
+>>>+out_fail:
+>>>+    for (cpu--; cpu <= 0; cpu--) {
+>>>+        dev = per_cpu(cpuidle_arm_dev, cpu);
+>>>+        cpuidle_unregister_device(dev);
+>>>+        kfree(dev);
+>>>+    }
+>>>+    cpuidle_unregister_driver(drv);
+>>>+    goto out;
+>>>}
+>>>device_initcall(arm_idle_init);
+>>>--
+>>>1.9.1
+>>>
+>
+>
+>-- 
+> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter |
+><http://www.linaro.org/linaro-blog/> Blog
+>
