@@ -1,100 +1,70 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 19 Mar 2015 15:01:13 +0100
-Subject: [PATCH v3 1/2] ARM: zynq: use restart_handler mechanism for slcr
- reset
-In-Reply-To: <1426772033-29277-1-git-send-email-joshc@ni.com>
-References: <BN1BFFO11FD008F29B247339CE49EAEA6AE2010@BN1BFFO11FD008.protection.gbl>
- <1426772033-29277-1-git-send-email-joshc@ni.com>
-Message-ID: <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 19 Mar 2015 15:01:07 +0100
+Subject: [PATCH v2] usb: ehci-orion: add more constants for register values
+Message-ID: <1426773667-29488-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 02:33 PM, Josh Cartwright wrote:
-> By making use of the restart_handler chain mechanism, the SLCR-based
-> reset mechanism can be prioritized amongst other mechanisms available on
-> a particular board.
-> 
-> Choose a default high-ish priority of 192 for this restart mechanism.
-> 
-> Signed-off-by: Josh Cartwright <joshc@ni.com>
-> ---
-> v2 -> v3: Don't drop the kerneldoc
-> v1 -> v2: Also drop zynq_slcr_system_reset prototype from common.h
->  arch/arm/mach-zynq/common.c |  6 ------
->  arch/arm/mach-zynq/common.h |  1 -
->  arch/arm/mach-zynq/slcr.c   | 15 +++++++++++++--
->  3 files changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 58ef2a7..616d584 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -190,11 +190,6 @@ static void __init zynq_irq_init(void)
->  	irqchip_init();
->  }
->  
-> -static void zynq_system_reset(enum reboot_mode mode, const char *cmd)
-> -{
-> -	zynq_slcr_system_reset();
-> -}
-> -
->  static const char * const zynq_dt_match[] = {
->  	"xlnx,zynq-7000",
->  	NULL
-> @@ -212,5 +207,4 @@ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
->  	.init_time	= zynq_timer_init,
->  	.dt_compat	= zynq_dt_match,
->  	.reserve	= zynq_memory_init,
-> -	.restart	= zynq_system_reset,
->  MACHINE_END
-> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> index 382c60e..f2f0bf2 100644
-> --- a/arch/arm/mach-zynq/common.h
-> +++ b/arch/arm/mach-zynq/common.h
-> @@ -21,7 +21,6 @@ void zynq_secondary_startup(void);
->  
->  extern int zynq_slcr_init(void);
->  extern int zynq_early_slcr_init(void);
-> -extern void zynq_slcr_system_reset(void);
->  extern void zynq_slcr_cpu_stop(int cpu);
->  extern void zynq_slcr_cpu_start(int cpu);
->  extern bool zynq_slcr_cpu_state_read(int cpu);
-> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> index c3c24fd8..fa4c796 100644
-> --- a/arch/arm/mach-zynq/slcr.c
-> +++ b/arch/arm/mach-zynq/slcr.c
-> @@ -15,6 +15,7 @@
->   */
->  
->  #include <linux/io.h>
-> +#include <linux/reboot.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/of_address.h>
->  #include <linux/regmap.h>
-> @@ -92,9 +93,11 @@ u32 zynq_slcr_get_device_id(void)
->  }
->  
->  /**
-> - * zynq_slcr_system_reset - Reset the entire system.
-> + * zynq_slcr_system_restart - Restart the entire system.
->   */
-> -void zynq_slcr_system_reset(void)
-> +static
-> +int zynq_slcr_system_restart(struct notifier_block *nb,
-> +			     unsigned long action, void *data)
+This commit adds new register values for the USB_CMD and USB_MODE
+registers, which allows to avoid the usage of a number of magic values
+in orion_usb_phy_v1_setup().
 
-This doesn't look right to me.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes since v1: use tabs instead of spaces for alignment.
 
-[linux]$ ./scripts/kernel-doc -man -v arch/arm/mach-zynq/slcr.c >/dev/null
-Info(arch/arm/mach-zynq/slcr.c:42): Scanning doc for zynq_slcr_write
-Info(arch/arm/mach-zynq/slcr.c:55): Scanning doc for zynq_slcr_read
-Info(arch/arm/mach-zynq/slcr.c:68): Scanning doc for zynq_slcr_unlock
-Info(arch/arm/mach-zynq/slcr.c:80): Scanning doc for zynq_slcr_get_device_id
-Info(arch/arm/mach-zynq/slcr.c:96): Scanning doc for zynq_slcr_system_restart
-Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'nb'
-Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'action'
-Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'data'
-Warning(arch/arm/mach-zynq/slcr.c:101): No description found for return value of 'zynq_slcr_system_restart'
+drivers/usb/host/ehci-orion.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-Thanks,
-Michal
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index f6eafec..bfcbb9a 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -29,7 +29,13 @@
+ #define wrl(off, val)	writel_relaxed((val), hcd->regs + (off))
+ 
+ #define USB_CMD			0x140
++#define   USB_CMD_RUN		BIT(0)
++#define   USB_CMD_RESET		BIT(1)
+ #define USB_MODE		0x1a8
++#define   USB_MODE_MASK		GENMASK(1, 0)
++#define   USB_MODE_DEVICE	0x2
++#define   USB_MODE_HOST		0x3
++#define   USB_MODE_SDIS		BIT(4)
+ #define USB_CAUSE		0x310
+ #define USB_MASK		0x314
+ #define USB_WINDOW_CTRL(i)	(0x320 + ((i) << 4))
+@@ -69,8 +75,8 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
+ 	/*
+ 	 * Reset controller
+ 	 */
+-	wrl(USB_CMD, rdl(USB_CMD) | 0x2);
+-	while (rdl(USB_CMD) & 0x2);
++	wrl(USB_CMD, rdl(USB_CMD) | USB_CMD_RESET);
++	while (rdl(USB_CMD) & USB_CMD_RESET);
+ 
+ 	/*
+ 	 * GL# USB-10: Set IPG for non start of frame packets
+@@ -112,16 +118,16 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
+ 	/*
+ 	 * Stop and reset controller
+ 	 */
+-	wrl(USB_CMD, rdl(USB_CMD) & ~0x1);
+-	wrl(USB_CMD, rdl(USB_CMD) | 0x2);
+-	while (rdl(USB_CMD) & 0x2);
++	wrl(USB_CMD, rdl(USB_CMD) & ~USB_CMD_RUN);
++	wrl(USB_CMD, rdl(USB_CMD) | USB_CMD_RESET);
++	while (rdl(USB_CMD) & USB_CMD_RESET);
+ 
+ 	/*
+ 	 * GL# USB-5 Streaming disable REG_USB_MODE[4]=1
+ 	 * TBD: This need to be done after each reset!
+ 	 * GL# USB-4 Setup USB Host mode
+ 	 */
+-	wrl(USB_MODE, 0x13);
++	wrl(USB_MODE, USB_MODE_SDIS | USB_MODE_HOST);
+ }
+ 
+ static void
+-- 
+2.1.0
