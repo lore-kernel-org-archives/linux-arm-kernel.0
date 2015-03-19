@@ -1,43 +1,60 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 19 Mar 2015 21:52:53 +0100
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <20150319160208.GF7657@katana>
-References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
- <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
- <20150319100944.GA914@katana> <550AEF9D.6090307@wwwdotorg.org>
- <20150319160208.GF7657@katana>
-Message-ID: <550B3725.10209@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Mar 2015 13:49:23 -0700
+Subject: [GIT PULL] omap fixes for v4.0-rc cycle
+Message-ID: <20150319204922.GV5140@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.03.2015 17:02, Wolfram Sang wrote:
->> Perhaps better would be to have a mux-specific function to iterate over a
->> mux's child nodes and instantiate buses for those. That function would check
->> whether each bus node was disabled or not. That'd isolate the special case
->> into the place where it was relevant.
->
-> ... so I wonder what you think about putting the
-> of_device_is_available() check into i2c_add_mux_adapter() once the
-> reg-property and chan_id have been matched?
->
+The following changes since commit 5b7610f235627878617648a99dd1442997f1c889:
 
-Ok, I see what you mean. I had a look at the place in question and
-wonder what to return from i2c_add_mux_adapter() in the disabled
-case so that i2c-mux-pinctrl is still happy with the returned value.
+  ARM: OMAP2+: Fix wl12xx on dm3730-evm with mainline u-boot (2015-03-06 10:37:34 -0800)
 
-I guess what you want to have is that i2c_add_adapter() is not called
-for the disabled case, right?
+are available in the git repository at:
 
-Is the i2c_adapter struct prepared in i2c_mux_add_adapter() still valid
-if i2c_add_adapter() is not called?
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-v4.0-rc4
 
-Sorry, I am not too deep into i2c subsystem, I just reworked i2c-mux-
-pinctrl to make it work on Dove. If you are fine with giving me some
-guidance how you prefer to have it done, I can try to free some spare
-time. Unfortunately there is already little of it, so please don't
-expect a quick tested patch.
+for you to fetch changes up to 599c376c49323127c9bdbb0fa61a3d4743819bc2:
 
-Sebastian
+  ARM: dts: Fix gpio interrupts for dm816x (2015-03-18 13:41:34 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps for the -rc cycle:
+
+- Fix a device tree based booting vs legacy booting regression for
+  omap3 crypto hardware by adding the missing DMA channels.
+
+- Fix /sys/bus/soc/devices/soc0/family for am33xx devices.
+
+- Fix two timer issues that can cause hangs if the timer related
+  hwmod data is missing like it often initially is for new SoCs.
+
+- Remove pcie hwmods entry from dts as that causes runtime PM to
+  fail for the PHYs.
+
+- A paper bag type dts configuration fix for dm816x GPIO
+  interrupts that I just noticed. This is most of the changes
+  diffstat wise, but as it's a basic feature for connecting
+  devices and things work otherwise, it should be fixed.
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (1):
+      ARM: dts: dra7: remove ti,hwmod property from pcie phy
+
+Pali Roh?r (1):
+      ARM: dts: omap3: Add missing dmas for crypto
+
+Suman Anna (3):
+      ARM: OMAP2+: Fix socbus family info for AM33xx devices
+      ARM: OMAP: dmtimer: check for pm_runtime_get_sync() failure
+      ARM: OMAP: dmtimer: disable pm runtime on remove
+
+Tony Lindgren (1):
+      ARM: dts: Fix gpio interrupts for dm816x
+
+ arch/arm/boot/dts/dm8168-evm.dts | 19 +++++++++++++++++++
+ arch/arm/boot/dts/dm816x.dtsi    | 18 ++++++++++++++----
+ arch/arm/boot/dts/dra7.dtsi      |  2 --
+ arch/arm/boot/dts/omap3.dtsi     |  4 ++++
+ arch/arm/mach-omap2/id.c         |  2 ++
+ arch/arm/plat-omap/dmtimer.c     | 15 ++++++++++++++-
+ 6 files changed, 53 insertions(+), 7 deletions(-)
