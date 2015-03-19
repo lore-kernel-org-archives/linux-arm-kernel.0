@@ -1,71 +1,43 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 19 Mar 2015 10:37:08 -0700
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550A4382.4030209@gmail.com>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
-Message-ID: <550B0944.6080203@gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 19 Mar 2015 17:38:41 +0000
+Subject: [UPDATED] [PATCH 3/5] arm-cci: Get rid of secure transactions
+ for PMU driver
+In-Reply-To: <20150319173252.GC10153@leverpostej>
+References: <1426000735-14375-4-git-send-email-suzuki.poulose@arm.com>
+ <1426585901-19137-1-git-send-email-suzuki.poulose@arm.com>
+ <20150319173252.GC10153@leverpostej>
+Message-ID: <550B09A1.4020801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/18/2015 8:33 PM, Frank Rowand wrote:
-> From: Frank Rowand <frank.rowand@sonymobile.com>
-> 
-> Add /chosen/dtb-node binding.
-> 
-> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
-> ---
->  Documentation/devicetree/bindings/chosen.txt |   37 +++++++++++
-> 
-> Index: b/Documentation/devicetree/bindings/chosen.txt
-> ===================================================================
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -46,6 +46,43 @@ on PowerPC "stdout" if "stdout-path" is
->  should only use the "stdout-path" property.
->  
->  
-> +dtb-info node
-> +----------------
-> +
-> +Information that describes where the device tree blob (DTB) came from and the
-> +environment it was created in.
 
-I left out optional vs required.  The next version will state that the dtb-info
-node and each separate property within it are optional.
 
-> +
-> +This node is normally created by including arch/arm/boot/dts/skeleton.dtsi,
-> +which includes include/dt-bindings/version.dtsi.
-> +
-> +Properties:
-> +
-> +version
-> +	The version of the DTB.  This is analagous to the linux kernel version.
-> +
-> +	This is a format free field intended for human consumption.  User space
-> +	programs should not have any expections about this property.
-> +
-> +	The DTB number in this property is incremented each time a make that
-> +	creates one or more DTBs is invoked.  If the make creates multiple
-> +	DTBs then this number is only incremented once.
-> +
-> +	The DTB number is stored in file .version_dtb.
-> +
-> +version-linux
-> +	The version of the linux kernel most recently built in the source
-> +	control system that contains the source used to build the DTB.
-> +
-> +	The linux kernel version number is not incremented for a make that
-> +	creates a DTB.
-> +
-> +dtb-path
-> +	The build directory relative path of the DTB.
-> +
-> +dts-path
-> +	The absolute path of the .dts file compiled to create the DTB.
-> +
-> +
->  Properties documented in other bindings
->  ---------------------------------------
->  #address-cells                          video/simple-framebuffer-sunxi.txt
-> 
+On 19/03/15 17:32, Mark Rutland wrote:
+> One more thing:
+>
+>> @@ -883,7 +894,11 @@ static inline const struct cci_pmu_model *get_cci_model(struct platform_device *
+>>   							pdev->dev.of_node);
+>>   	if (!match)
+>>   		return NULL;
+>> +	if (match->data)
+>> +		return match->data;
+>>
+>> +	dev_warn(&pdev->dev, "DEPRECATED compatible property,"
+>> +			 "requires secure access to CCI registers");
+>>   	return probe_cci_model(pdev);
+>>   }
+>
+> Before the probe, could we please have:
+>
+> 	if (!IS_ENABLED(CONFIG_ARM))
+> 		return -EINVAL;
+>
+> On arm64 we require a model-specific string, and we shouldn't go
+> touching secure-only registers.
+>
+
+IIUC platform_has_secure_cci_access always return false for ARM64
+preventing any secure access. No ?
+
+Regards,
+Sudeep
