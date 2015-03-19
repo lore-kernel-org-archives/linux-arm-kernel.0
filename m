@@ -1,128 +1,150 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 19 Mar 2015 10:00:16 -0700
-Subject: [PATCH 2/2] mfd: tc3589x: enforce device-tree only mode
-In-Reply-To: <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150319170016.GI30732@dtor-ws>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 19 Mar 2015 18:02:16 +0100
+Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller
+ and PHY
+In-Reply-To: <20150319155358.GA19571@brian-ubuntu>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
+ <550AAEA1.5080301@redhat.com> <20150319155358.GA19571@brian-ubuntu>
+Message-ID: <550B0118.3040104@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 03:52:45PM +0100, Linus Walleij wrote:
-> All systems using the TC3589x multifunction expander uses
-> devicetree, so don't clutter the place with a lot of
-> and assume it is there.
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/gpio/Kconfig                    | 1 +
->  drivers/gpio/gpio-tc3589x.c             | 3 ---
->  drivers/input/keyboard/tc3589x-keypad.c | 9 ---------
+Hi,
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+On 19-03-15 16:53, Brian Norris wrote:
+> Hi Hans,
+>
+> Thanks for the review.
+>
+> On Thu, Mar 19, 2015 at 12:10:25PM +0100, Hans de Goede wrote:
+>> On 19-03-15 02:23, Brian Norris wrote:
+>>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+>>> ---
+>>> Light dependency on:
+>>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
+>>> for the surrounding text.
+>>>
+>>>   arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 36 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
+>>> index 9eaeac8dce1b..7a7c4d8c2afe 100644
+>>> --- a/arch/arm/boot/dts/bcm7445.dtsi
+>>> +++ b/arch/arm/boot/dts/bcm7445.dtsi
+>>> @@ -108,6 +108,42 @@
+>>>   			brcm,int-map-mask = <0x25c>, <0x7000000>;
+>>>   			brcm,int-fwd-mask = <0x70000>;
+>>>   		};
+>>> +
+>>> +		sata at f045a000 {
+>>> +			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
+>>> +			reg-names = "ahci", "top-ctrl";
+>>> +			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
+>>
+>> Why not simply drop the second register range here, and the minimal top-ctrl
+>> poking you need in the phy driver's phy_init function ?
+>
+> I agree it's a little ugly, but your recommended solution will not work.
+>
+> The 'top-ctrl' register range includes several SATA functionalities,
+> some of which are required for the PHY and some of which are definitely
+> required for the SATA driver.
 
->  drivers/mfd/Kconfig                     | 1 +
->  drivers/mfd/tc3589x.c                   | 9 ---------
->  5 files changed, 2 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index c1e2ca3d9a51..dc1aaa83a347 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -669,6 +669,7 @@ config GPIO_STP_XWAY
->  config GPIO_TC3589X
->  	bool "TC3589X GPIOs"
->  	depends on MFD_TC3589X
-> +	depends on OF_GPIO
->  	select GPIOLIB_IRQCHIP
->  	help
->  	  This enables support for the GPIOs found on the TC3589X
-> diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
-> index 11aed2671065..31b244cffabb 100644
-> --- a/drivers/gpio/gpio-tc3589x.c
-> +++ b/drivers/gpio/gpio-tc3589x.c
-> @@ -260,10 +260,7 @@ static int tc3589x_gpio_probe(struct platform_device *pdev)
->  	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
->  	tc3589x_gpio->chip.dev = &pdev->dev;
->  	tc3589x_gpio->chip.base = -1;
-> -
-> -#ifdef CONFIG_OF_GPIO
->  	tc3589x_gpio->chip.of_node = np;
-> -#endif
->  
->  	/* Bring the GPIO module out of reset */
->  	ret = tc3589x_set_bits(tc3589x, TC3589x_RSTCTRL,
-> diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
-> index 0ccc7de9b59d..08e62e6aeb1b 100644
-> --- a/drivers/input/keyboard/tc3589x-keypad.c
-> +++ b/drivers/input/keyboard/tc3589x-keypad.c
-> @@ -318,7 +318,6 @@ static void tc3589x_keypad_close(struct input_dev *input)
->  	tc3589x_keypad_disable(keypad);
->  }
->  
-> -#ifdef CONFIG_OF
->  static const struct tc3589x_keypad_platform_data *
->  tc3589x_keypad_of_probe(struct device *dev)
->  {
-> @@ -368,14 +367,6 @@ tc3589x_keypad_of_probe(struct device *dev)
->  
->  	return plat;
->  }
-> -#else
-> -static inline const struct tc3589x_keypad_platform_data *
-> -tc3589x_keypad_of_probe(struct device *dev)
-> -{
-> -	return ERR_PTR(-ENODEV);
-> -}
-> -#endif
-> -
->  
->  static int tc3589x_keypad_probe(struct platform_device *pdev)
->  {
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 38356e39adba..476e63745742 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1210,6 +1210,7 @@ config MFD_TIMBERDALE
->  config MFD_TC3589X
->  	bool "Toshiba TC35892 and variants"
->  	depends on I2C=y
-> +	depends on OF
->  	select MFD_CORE
->  	help
->  	  Support for the Toshiba TC35892 and variants I/O Expander.
-> diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-> index aacb3720065c..cf356395c9e9 100644
-> --- a/drivers/mfd/tc3589x.c
-> +++ b/drivers/mfd/tc3589x.c
-> @@ -318,7 +318,6 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
->  	return ret;
->  }
->  
-> -#ifdef CONFIG_OF
->  static const struct of_device_id tc3589x_match[] = {
->  	/* Legacy compatible string */
->  	{ .compatible = "tc3589x", .data = (void *) TC3589X_UNKNOWN },
-> @@ -359,14 +358,6 @@ tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
->  
->  	return pdata;
->  }
-> -#else
-> -static inline struct tc3589x_platform_data *
-> -tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
-> -{
-> -	dev_err(dev, "no device tree support\n");
-> -	return ERR_PTR(-ENODEV);
-> -}
-> -#endif
->  
->  static int tc3589x_probe(struct i2c_client *i2c,
->  				   const struct i2c_device_id *id)
-> -- 
-> 1.9.3
-> 
+I see, but the phy driver is required for the SATA driver anyways,
+and since the BUS_CTRL setting seems to be static it might just as
+well be set by the phy driver. The phy driver also poking some
+common sata glue bits like this busctrl register is not unheard of,
+esp. when these glue bits are in the phy register range.
 
--- 
-Dmitry
+> We have:
+>
+> 0x00   VERSION
+> 0x04   BUS_CTRL
+> 0x08   TP_CTRL
+> 0x0C   PHY_CTRL_1
+> 0x10   PHY_CTRL_2
+> 0x14   PHY_CTRL_3
+> 0x18   PHY_CTRL_4
+> 0x1C   TP_OUT
+> 0x20   CLIENT_INIT_CTRL
+>
+> We *definitely* need the BUS_CTRL register in the SATA driver, since it
+> controls the endianness of the AHCI register set as well as a few other
+> important bits we may use in the future.
+
+Are these bits non static, e.g. something which you may want to change at
+another time then init/shutdown/suspend/resume ? If they are static I still
+think this all clearly belongs in the phy driver, since this looks a lot
+like it is a single hardware block.
+
+If otoh these other bits may need runtime poking for e.g. sata error recovery,
+then I can understand why you want the bus ctrl register in the sata driver,
+but in that case it should only be mapped by the sata driver, and the phy driver
+register ranges should not cover it.
+
+> So we can't just "drop" the
+> "minimal poking" and expect things to work, just because that makes the
+> device tree look nicer :)
+
+I was not suggesting to drop it I was suggesting moving the poke to phy_init,
+and given the registermap you've shown above I still think that this belongs
+more in the phy driver then anywhere else.
+
+> The problem is what to do with the PHY_CTRL registers that are kept in
+> the middle of the block. These really belong as part of the PHY
+> power-on/power-off control sequence (i.e., PHY driver).
+>
+> Do you have any better suggestions that don't involve dropping the
+> BUS_CTRL register from the SATA driver?
+
+Nope, if you really believe that the bus-ctrl register should be part of
+the sata driver, then please just split the register ranges at a per register
+level, to remove the overlap + the hack of not claiming the resource on one side.
+
+>> This avoids the weird / ugly register overlap with the phy driver, and I think you
+>> can then just use the ahci_platform driver unmodified.
+>>
+>>> +			interrupts = <GIC_SPI 30 0>;
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <0>;
+>>> +
+>>> +			sata0: sata-port at 0 {
+>>> +				reg = <0>;
+>>> +				phys = <&sata_phy 0>;
+>>> +			};
+>>> +
+>>> +			sata1: sata-port at 1 {
+>>> +				reg = <1>;
+>>> +				phys = <&sata_phy 1>;
+>>> +			};
+>>> +		};
+>>> +
+>>> +		sata_phy: sata-phy at f0458100 {
+>>> +			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
+>>> +			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
+>>
+>> Why not simply use: reg = <0x458000 0x2000>, to me it seems that what you should
+>> really be using here.
+>
+> 0x458000 to 0x45800f and 0x458080 to 0x4580af belong to a debug
+> interrupt controller, which handles bus error handling. It's currently
+> unused, and it definitely doesn't belong here.
+>
+> The 'phy' register range is actually documented as two sets of identical
+> registers:
+>
+> 0x458100 - 0x458fff  Port0 SATA PHY registers
+> 0x459100 - 0x459fff  Port1 SATA PHY registers
+>
+> with a hole between them. I definitely don't want to do the combining
+> that you suggested, but I could probably split them apart if that really
+> helps...
+
+If this is the documented register range, then I think that splitting them makes
+sense, and assuming that the init code for both ports is the same it may
+even make for cleaner code.
+
+Regards,
+
+Hans
