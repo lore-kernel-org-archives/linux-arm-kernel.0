@@ -1,54 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Mar 2015 09:03:02 -0700
-Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
-In-Reply-To: <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
-References: <1424422274-27946-1-git-send-email-kishon@ti.com>
- <1424422274-27946-2-git-send-email-kishon@ti.com>
- <5509A998.2080509@ti.com> <20150318165706.GQ31346@atomide.com>
- <5509D3BD.6030004@linaro.org>
- <alpine.DEB.2.02.1503191455020.9480@utopia.booyaka.com>
- <550AEDA1.50109@linaro.org>
- <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
-Message-ID: <20150319160301.GE31346@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Mar 2015 16:11:44 +0000
+Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <20150319160008.GA4751@arm.com>
+References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
+ <20150319154435.GC25967@leverpostej>
+ <20150319160008.GA4751@arm.com>
+Message-ID: <20150319161143.GE25967@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150319 08:46]:
-> On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
-> 
-> > On 03/19/2015 04:55 PM, Paul Walmsley wrote:
-> > > On Wed, 18 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+On Thu, Mar 19, 2015 at 04:00:09PM +0000, Will Deacon wrote:
+> On Thu, Mar 19, 2015 at 03:44:36PM +0000, Mark Rutland wrote:
+> > On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
+> > > this_cpu operations were implemented for arm64 in:
+> > >  5284e1b arm64: xchg: Implement cmpxchg_double
+> > >  f97fc81 arm64: percpu: Implement this_cpu operations
 > > > 
-> > > > On 03/18/2015 06:57 PM, Tony Lindgren wrote:
-> > > > > * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
-> > > > > > As I can see Patch 1 from this series was merged in 4.0-rc4,
-> > > > > > but this patch wasn't. As result, I can see below warning all the time
-> > > > > > during boot now:
-> > > > > > 
-> > > > > > [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod
-> > > > > > 'pcie1-phy'
-> > > > > 
-> > > > > OK. Is this needed as a fix for the v4.0-rc series, or can this wait
-> > > > > for v4.1?
-> > > > 
-> > > > I think, Yes. These two patches should go all together, because they are
-> > > > interrelated.
+> > > Unfortunately, it is possible for pre-emption to take place between
+> > > address generation and data access. This can lead to cases where data
+> > > is being manipulated by this_cpu for a different CPU than it was
+> > > called on. Which effectively breaks the spec.
 > > > 
-> > > Does the warning result in a functional problem, or is it just a warning?
-> > > 
+> > > This patch disables pre-emption for the this_cpu operations
+> > > guaranteeing that address generation and data manipulation.
 > > 
-> > PCE1 PHY device is not registered any more.
+> > Shouldn't that last sentence end with "occur on the same CPU", or
+> > something like that?
+> > 
+> > [...]
+> > 
+> > > +/*
+> > > + * Modules aren't allowed to use preempt_enable_no_resched, and it is
+> > > + * undef'ed. If we are unable to use preempt_enable_no_resched, then
+> > > + * fallback to the standard preempt_enable.
+> > > + */
+> > > +#ifdef preempt_enable_no_resched
+> > > +#define __pcp_preempt_enable()	preempt_enable_no_resched()
+> > > +#else
+> > > +#define __pcp_preempt_enable()	preempt_enable()
+> > > +#endif /* preempt_enable_no_resched */
+> > 
+> > I think it would be worth mentioning in the comment why we want to use
+> > preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
+> > sequences where we want to have as few retries as possible).
 > 
-> How does the second patch fix that?
+> Hmm, I'm not sure I agree with that. In the interest of throughput, I can
+> understand that you want to minimise the retries but since preempt kernels
+> are all about minimising latency then actually scheduling when a cmpxchg
+> loop fail sounds pretty ideal to me.
 
-It seems it should be just a warning fix if the pciephy hwmod entries
-are now gone?
+I'm on about scheduling at the end of the read, before the cmpxchg. It's
+basically asking for another thread to make the read stale (and hence
+the cmpxchg is very likely to fail).
 
-Anyways, I'm planning to send a pull request for  omap-for-v4.0/fixes
-today. Please let me know ASAP if the $subject patch should be dropped,
-otherwise I'll send it as it fixes a boot time warning and is already
-applied.
+Scheduling after the cmpxchg is fine.
 
-Regards,
-
-Tony
+Mark.
