@@ -1,125 +1,89 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Mar 2015 15:55:42 +0100
-Subject: [RFC v5 04/13] KVM: kvm-vfio: User API for IRQ forwarding
+Date: Thu, 19 Mar 2015 15:55:43 +0100
+Subject: [RFC v5 05/13] VFIO: external user API for interaction with vfio
+ devices
 In-Reply-To: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
 References: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1426776951-24901-5-git-send-email-eric.auger@linaro.org>
+Message-ID: <1426776951-24901-6-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds and documents a new KVM_DEV_VFIO_DEVICE group
-and 2 device attributes: KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
-KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. The purpose is to be able
-to set a VFIO device IRQ as forwarded or not forwarded.
-the command takes as argument a handle to a new struct named
-kvm_vfio_dev_irq.
+The VFIO external user API is enriched with 3 new functions that
+allows a kernel user external to VFIO to retrieve some information
+from a VFIO device.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+- vfio_device_get_external_user enables to get a vfio device from
+  its fd and increments its reference counter
+- vfio_device_put_external_user decrements the reference counter
+- vfio_external_base_device returns a handle to the struct device
 
 ---
 
 v3 -> v4:
-- rename kvm_arch_forwarded_irq into kvm_vfio_dev_irq
-- some rewording in commit message
-- document forwarding restrictions and remove unforwarding ones
+- change the commit title
 
 v2 -> v3:
-- rework vfio kvm device documentation
-- reword commit message and title
-- add subindex in kvm_arch_forwarded_irq to be closer to VFIO API
-- forwarding state can only be changed with VFIO IRQ signaling is off
+- reword the commit message
 
 v1 -> v2:
-- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
-  to include/uapi/linux/kvm.h
-  also irq_index renamed into index and guest_irq renamed into gsi
-- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
----
- Documentation/virtual/kvm/devices/vfio.txt | 34 ++++++++++++++++++++++++------
- include/uapi/linux/kvm.h                   | 12 +++++++++++
- 2 files changed, 40 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/vfio.txt b/Documentation/virtual/kvm/devices/vfio.txt
-index ef51740..6186e6d 100644
---- a/Documentation/virtual/kvm/devices/vfio.txt
-+++ b/Documentation/virtual/kvm/devices/vfio.txt
-@@ -4,15 +4,20 @@ VFIO virtual device
- Device types supported:
-   KVM_DEV_TYPE_VFIO
+- vfio_external_get_base_device renamed into vfio_external_base_device
+- vfio_external_get_type removed
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio.c  | 24 ++++++++++++++++++++++++
+ include/linux/vfio.h |  3 +++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+index 23ba12a..33ae8c5 100644
+--- a/drivers/vfio/vfio.c
++++ b/drivers/vfio/vfio.c
+@@ -1490,6 +1490,30 @@ void vfio_group_put_external_user(struct vfio_group *group)
+ }
+ EXPORT_SYMBOL_GPL(vfio_group_put_external_user);
  
--Only one VFIO instance may be created per VM.  The created device
--tracks VFIO groups in use by the VM and features of those groups
--important to the correctness and acceleration of the VM.  As groups
--are enabled and disabled for use by the VM, KVM should be updated
--about their presence.  When registered with KVM, a reference to the
--VFIO-group is held by KVM.
-+Only one VFIO instance may be created per VM.
++struct vfio_device *vfio_device_get_external_user(struct file *filep)
++{
++	struct vfio_device *vdev = filep->private_data;
 +
-+The created device tracks VFIO groups in use by the VM and features
-+of those groups important to the correctness and acceleration of
-+the VM.  As groups are enabled and disabled for use by the VM, KVM
-+should be updated about their presence.  When registered with KVM,
-+a reference to the VFIO-group is held by KVM.
++	if (filep->f_op != &vfio_device_fops)
++		return ERR_PTR(-EINVAL);
 +
-+The device also enables to control some IRQ settings of VFIO devices:
-+forwarding/posting.
++	vfio_device_get(vdev);
++	return vdev;
++}
++EXPORT_SYMBOL_GPL(vfio_device_get_external_user);
++
++void vfio_device_put_external_user(struct vfio_device *vdev)
++{
++	vfio_device_put(vdev);
++}
++EXPORT_SYMBOL_GPL(vfio_device_put_external_user);
++
++struct device *vfio_external_base_device(struct vfio_device *vdev)
++{
++	return vdev->dev;
++}
++EXPORT_SYMBOL_GPL(vfio_external_base_device);
++
+ int vfio_external_user_iommu_id(struct vfio_group *group)
+ {
+ 	return iommu_group_id(group->iommu_group);
+diff --git a/include/linux/vfio.h b/include/linux/vfio.h
+index 683b514..b18c38f 100644
+--- a/include/linux/vfio.h
++++ b/include/linux/vfio.h
+@@ -101,6 +101,9 @@ extern void vfio_group_put_external_user(struct vfio_group *group);
+ extern int vfio_external_user_iommu_id(struct vfio_group *group);
+ extern long vfio_external_check_extension(struct vfio_group *group,
+ 					  unsigned long arg);
++extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
++extern void vfio_device_put_external_user(struct vfio_device *vdev);
++extern struct device *vfio_external_base_device(struct vfio_device *vdev);
  
- Groups:
-   KVM_DEV_VFIO_GROUP
-+  KVM_DEV_VFIO_DEVICE
- 
- KVM_DEV_VFIO_GROUP attributes:
-   KVM_DEV_VFIO_GROUP_ADD: Add a VFIO group to VFIO-KVM device tracking
-@@ -20,3 +25,20 @@ KVM_DEV_VFIO_GROUP attributes:
- 
- For each, kvm_device_attr.addr points to an int32_t file descriptor
- for the VFIO group.
-+
-+KVM_DEV_VFIO_DEVICE attributes:
-+  KVM_DEV_VFIO_DEVICE_FORWARD_IRQ: set a VFIO device IRQ as forwarded
-+  KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ: set a VFIO device IRQ as not forwarded
-+
-+For each, kvm_device_attr.addr points to a kvm_vfio_dev_irq struct.
-+
-+When forwarded, a physical IRQ is completed by the guest and not by the
-+host. This requires HW support in the interrupt controller.
-+
-+Forwarding can only be set when the corresponding VFIO IRQ is not masked
-+(would it be through VFIO_DEVICE_SET_IRQS command or as a consequence of this
-+IRQ being currently handled) or active at interrupt controller level.
-+In such a situation, -EAGAIN is returned. It is advised to to set the
-+forwarding before the VFIO signaling is set up, this avoids trial and errors.
-+
-+Unforwarding can happen at any time.
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 8055706..1b78dd3 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -945,6 +945,9 @@ struct kvm_device_attr {
- #define  KVM_DEV_VFIO_GROUP			1
- #define   KVM_DEV_VFIO_GROUP_ADD			1
- #define   KVM_DEV_VFIO_GROUP_DEL			2
-+#define  KVM_DEV_VFIO_DEVICE			2
-+#define   KVM_DEV_VFIO_DEVICE_FORWARD_IRQ			1
-+#define   KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ			2
- 
- enum kvm_device_type {
- 	KVM_DEV_TYPE_FSL_MPIC_20	= 1,
-@@ -964,6 +967,15 @@ enum kvm_device_type {
- 	KVM_DEV_TYPE_MAX,
- };
- 
-+struct kvm_vfio_dev_irq {
-+	__u32	argsz;		/* structure length */
-+	__u32	fd;		/* file descriptor of the VFIO device */
-+	__u32	index;		/* VFIO device IRQ index */
-+	__u32	start;		/* start of subindex range */
-+	__u32	count;		/* size of subindex range */
-+	__u32	gsi[];		/* gsi, ie. virtual IRQ number */
-+};
-+
- /*
-  * ioctls for VM fds
-  */
+ struct pci_dev;
+ #ifdef CONFIG_EEH
 -- 
 1.9.1
