@@ -1,134 +1,96 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 19 Mar 2015 08:53:58 -0700
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller and
- PHY
-In-Reply-To: <550AAEA1.5080301@redhat.com>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
- <550AAEA1.5080301@redhat.com>
-Message-ID: <20150319155358.GA19571@brian-ubuntu>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Mar 2015 17:18:34 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <CAPDyKFo8YNpnriaAcLnEJ8tLZ+G68N_fyfOAYoEjBPHP=wyWbQ@mail.gmail.com>
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <356697065.8Z1o4ApA72@vostro.rjw.lan>
+ <CAPDyKFo8YNpnriaAcLnEJ8tLZ+G68N_fyfOAYoEjBPHP=wyWbQ@mail.gmail.com>
+Message-ID: <3998390.WErrfO4Yno@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-Thanks for the review.
-
-On Thu, Mar 19, 2015 at 12:10:25PM +0100, Hans de Goede wrote:
-> On 19-03-15 02:23, Brian Norris wrote:
-> >Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> >---
-> >Light dependency on:
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
-> >for the surrounding text.
+On Thursday, March 19, 2015 04:48:22 PM Ulf Hansson wrote:
+> On 19 March 2015 at 17:04, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Thursday, March 19, 2015 04:37:26 PM Ulf Hansson wrote:
+> >> On 19 March 2015 at 16:44, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> >> > On Thursday, March 19, 2015 03:45:07 PM Ulf Hansson wrote:
+> >> >> On 19 March 2015 at 15:20, Alan Stern <stern@rowland.harvard.edu> wrote:
+> >> >> > On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
+> >> >> >
+> >> >> >> > This doesn't make sense to me.  A bus just called bus_add_device, it can
+> >> >> >> > do whatever it wanted to right before calling this function, no need for
+> >> >> >> > another callback.
+> >> >> >>
+> >> >> >> The only caller of bus_add_device() is device_add().
+> >> >> >>
+> >> >> >> What do you mean by "bus just called bus_add_device"?  Do you think that
+> >> >> >> the pm_domain pointer should be populated before calling device_add()?
+> >> >> >>
+> >> >> >> That wouldn't work for the ACPI PM domain at least, because ACPI companions
+> >> >> >> are generally added during device_add() and we arguably cannot point a
+> >> >> >> device to the ACPI PM domain before its ACPI companion is set.
+> >> >> >
+> >> >> >
+> >> >> >> There are two alternatives to them.  One is to do PM domain attach/detach in
+> >> >> >> the bus type's ->probe and ->remove, but that's suboptimal, because it is
+> >> >> >> then carried out every time a driver is probed/removed for a device.  The
+> >> >> >> other one would be to have each interested bus type register a bus type
+> >> >> >> notifier for itself, but that would be rather ugly, wouldn't it?
+> >> >> >
+> >> >> > Driver probing and removal is not a hot path.  Successful probes
+> >> >> > usually occur only once for each device.  I don't know how many
+> >> >> > unsuccessful probes there are on average, but probably not many.
+> >> >> >
+> >> >> > Doing the PM domain attach/detach in ->probe and ->remove makes sense
+> >> >> > to me.
+> >> >>
+> >> >> Let me elaborate a bit on the current approach, with PM domain
+> >> >> attach/detach in ->probe() and ->remove(). This comes with the
+> >> >> following limitations.
+> >> >>
+> >> >> 1) If the device gets probed earlier than the PM domain has been
+> >> >> initialized, we can't return -EPROBE_DEFER since we just don't know
+> >> >> anything about the PM domain yet.
+> >> >>
+> >> >> 2) The PM domain won't be able to operate on a device without having a
+> >> >> driver bound to it, since the device's PM domain pointer is removed at
+> >> >> ->remove().
+> >> >>
+> >> >> Perhaps Rafael want to add something to these? I don't know whether we
+> >> >> think it's okay to keep these limitations or not.
+> >> >
+> >> > There are arguments both ways as you can see.
+> >> >
+> >> > At this point, the most straightforward approach would be to apply the Russell's
+> >> > patch adding the ->sync callback alone.
+> >> >
+> >> > I will then need the ->activate callback for another use case (a PM domain that
+> >> > may not be ready for the device to be probed), but in that case I actually know
+> >> > that the pm_domain pointer is populated at the really_probe() time.
+> >>
+> >> Then, how about adding only the ->sync() and ->activate() callback in
+> >> one patch - and invoke them from really_probe()? That's seems to fit
+> >> both our short and long term approach.
+> >>
+> >> Genpd may then implement the ->sync() callback, which is similar to
+> >> Russell's patch, except that it will now cover all buses and not just
+> >> the platform bus as it where before.
 > >
-> >  arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 36 insertions(+)
+> > OK
 > >
-> >diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-> >index 9eaeac8dce1b..7a7c4d8c2afe 100644
-> >--- a/arch/arm/boot/dts/bcm7445.dtsi
-> >+++ b/arch/arm/boot/dts/bcm7445.dtsi
-> >@@ -108,6 +108,42 @@
-> >  			brcm,int-map-mask = <0x25c>, <0x7000000>;
-> >  			brcm,int-fwd-mask = <0x70000>;
-> >  		};
-> >+
-> >+		sata at f045a000 {
-> >+			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-> >+			reg-names = "ahci", "top-ctrl";
-> >+			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
+> > So do we need to do ->sync at the driver removal time too?  I guess we do?
 > 
-> Why not simply drop the second register range here, and the minimal top-ctrl
-> poking you need in the phy driver's phy_init function ?
-
-I agree it's a little ugly, but your recommended solution will not work.
-
-The 'top-ctrl' register range includes several SATA functionalities,
-some of which are required for the PHY and some of which are definitely
-required for the SATA driver. We have:
-
-0x00   VERSION
-0x04   BUS_CTRL
-0x08   TP_CTRL
-0x0C   PHY_CTRL_1
-0x10   PHY_CTRL_2
-0x14   PHY_CTRL_3
-0x18   PHY_CTRL_4
-0x1C   TP_OUT
-0x20   CLIENT_INIT_CTRL
-
-We *definitely* need the BUS_CTRL register in the SATA driver, since it
-controls the endianness of the AHCI register set as well as a few other
-important bits we may use in the future. So we can't just "drop" the
-"minimal poking" and expect things to work, just because that makes the
-device tree look nicer :)
-
-The problem is what to do with the PHY_CTRL registers that are kept in
-the middle of the block. These really belong as part of the PHY
-power-on/power-off control sequence (i.e., PHY driver).
-
-Do you have any better suggestions that don't involve dropping the
-BUS_CTRL register from the SATA driver?
-
-> This avoids the weird / ugly register overlap with the phy driver, and I think you
-> can then just use the ahci_platform driver unmodified.
+> For genpd, it will currently not matter since the device will be
+> detached from its PM domain before that ->sync() would be called.
 > 
-> >+			interrupts = <GIC_SPI 30 0>;
-> >+			#address-cells = <1>;
-> >+			#size-cells = <0>;
-> >+
-> >+			sata0: sata-port at 0 {
-> >+				reg = <0>;
-> >+				phys = <&sata_phy 0>;
-> >+			};
-> >+
-> >+			sata1: sata-port at 1 {
-> >+				reg = <1>;
-> >+				phys = <&sata_phy 1>;
-> >+			};
-> >+		};
-> >+
-> >+		sata_phy: sata-phy at f0458100 {
-> >+			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
-> >+			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
-> 
-> Why not simply use: reg = <0x458000 0x2000>, to me it seems that what you should
-> really be using here.
+> Though, to prepare for the "long term" solution we could decide to add it...
 
-0x458000 to 0x45800f and 0x458080 to 0x4580af belong to a debug
-interrupt controller, which handles bus error handling. It's currently
-unused, and it definitely doesn't belong here.
+OK, at that time.
 
-The 'phy' register range is actually documented as two sets of identical
-registers:
+Fine, I'll send an update, then.
 
-0x458100 - 0x458fff  Port0 SATA PHY registers
-0x459100 - 0x459fff  Port1 SATA PHY registers
 
-with a hole between them. I definitely don't want to do the combining
-that you suggested, but I could probably split them apart if that really
-helps...
-
-(BTW, I realized I have my math wrong, and each port has length 0xf00,
-not 0xe00. So the range I posted should actually be <0x458100 0x1f00>.)
-
-> >+			reg-names = "phy", "port-ctrl";
-> >+			#phy-cells = <1>;
-> >+			#address-cells = <0x1>;
-> >+			#size-cells = <0x0>;
-> >+
-> >+			sata-phy at 0 {
-> >+				reg = <0>;
-> >+			};
-> >+
-> >+			sata-phy at 1 {
-> >+				reg = <1>;
-> >+			};
-> >+		};
-> >  	};
-> >
-> >  	smpboot {
-> >
-
-Brian
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
