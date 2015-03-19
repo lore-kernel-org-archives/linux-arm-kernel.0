@@ -1,136 +1,51 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Mar 2015 22:51:37 +0100
-Subject: [PATCH v2] driver core / PM: Add PM domain callbacks for device
- setup/cleanup
-In-Reply-To: <5975784.LhOHuiUKGO@vostro.rjw.lan>
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <3998390.WErrfO4Yno@vostro.rjw.lan> <5975784.LhOHuiUKGO@vostro.rjw.lan>
-Message-ID: <1810625.BTgaNclHRk@vostro.rjw.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Mar 2015 14:25:06 -0700
+Subject: [PATCH v7 5/6] ARM: dts: add wl12xx/wl18xx bindings
+In-Reply-To: <CAB3XZEfpD7YkwdU7OJJaNFy=MnYVY3-fOVxkA48Vu01LzU0GFg@mail.gmail.com>
+References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
+ <1426696710-6891-6-git-send-email-eliad@wizery.com>
+ <550AD7C1.2030405@gmail.com>
+ <CAB3XZEfpD7YkwdU7OJJaNFy=MnYVY3-fOVxkA48Vu01LzU0GFg@mail.gmail.com>
+Message-ID: <20150319212505.GN31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Subject: driver core / PM: Add PM domain callbacks for device setup/cleanup
-
-If PM domains are in use, it may be necessary to prepare the code
-handling a PM domain for driver probing.  For example, in some
-cases device drivers rely on the ability to power on the devices
-with the help of the IO runtime PM framework and the PM domain
-code needs to be ready for that.  Also, if that code has not been
-fully initialized yet, the driver probing should be deferred.
-
-Moreover, after the probing is complete, it may be necessary to
-put the PM domain in question into the state reflecting the current
-needs of the devices in it, for example, so that power is not drawn
-in vain.  The same should be done after removing a driver from
-a device, as the PM domain state may need to be changed to reflect
-the new situation.
-
-For these reasons, introduce new PM domain callbacks, ->activate
-and ->sync, called, respectively, before probing for a device
-driver and after the probing has been completed or the driver
-has been removed.
-
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
-> ---
+* Eliad Peller <eliad@wizery.com> [150319 07:43]:
+> hi Pontus,
 > 
-> This is an update without the additional bus type callbacks.  This should
-> be suffucient at this point for the use cases we have.
-> 
-> I've decided to also call ->sync on driver removal as that is consistent
-> with what happens for failing probe.
-> 
-> ---
+> On Thu, Mar 19, 2015 at 4:05 PM, Pontus Fuchs <pontus.fuchs@gmail.com> wrote:
+> > On 2015-03-18 17:38, Eliad Peller wrote:
+> >>
+> >> Replace all the pdata-quirks for setting wl12xx/wl18xx
+> >> platform data with proper DT definitions.
+> >>
+> >> Signed-off-by: Eliad Peller <eliad@wizery.com>
+> >> Acked-by: Javier Martinez Canillas <javier@dowhile0.org>
+> >> Acked-by: Enric Balletbo i Serra <eballetbo@gmail.com>
+> >> Tested-by: Tony Lindgren <tony@atomide.com>
+> >> ---
+> >> v7: rebase
+> >>
+> >>   arch/arm/boot/dts/am335x-evmsk.dts             | 11 ++++
+> >>   arch/arm/boot/dts/omap3-cm-t3517.dts           | 10 ++++
+> >>   arch/arm/boot/dts/omap3-cm-t3730.dts           | 10 ++++
+> >>   arch/arm/boot/dts/omap3-evm-common.dtsi        | 10 ++++
+> >>   arch/arm/boot/dts/omap3-igep0020-rev-f.dts     |  9 ++++
+> >>   arch/arm/boot/dts/omap3-igep0030-rev-g.dts     |  9 ++++
+> >>   arch/arm/boot/dts/omap3-zoom3.dts              | 10 ++++
+> >>   arch/arm/boot/dts/omap4-panda-common.dtsi      | 10 ++++
+> >
+> >
+> > Hi Eliad,
+> >
+> > Tested OK (boot, scan, join, ping) on Pandaboard ES.
+> >
+> thanks for testing it!
 
-One more update.
+Great. As suggested by Kalle, I'll apply all these into
+omap-for-v4.1/wl12xx branch and send a pull request for
+the arm-soc probably on Friday if no issues are found.
 
-I've realized that in the PM domain's ->sync callback is called after
-clearing the device's driver field (in the failed probe or driver removal
-case) rather than before it, that could be used to distinguish between the
-two cases (successful probe vs no driver), so I reworked the patch accordingly.
+Regards,
 
----
- drivers/base/dd.c  |   16 ++++++++++++++++
- include/linux/pm.h |    6 ++++++
- 2 files changed, 22 insertions(+)
-
-Index: linux-pm/include/linux/pm.h
-===================================================================
---- linux-pm.orig/include/linux/pm.h
-+++ linux-pm/include/linux/pm.h
-@@ -603,10 +603,16 @@ extern void dev_pm_put_subsys_data(struc
-  * Power domains provide callbacks that are executed during system suspend,
-  * hibernation, system resume and during runtime PM transitions along with
-  * subsystem-level and driver-level callbacks.
-+ *
-+ * @detach: Called when removing a device from the domain.
-+ * @activate: Called before executing probe routines for bus types and drivers.
-+ * @sync: Called after driver probe and removal.
-  */
- struct dev_pm_domain {
- 	struct dev_pm_ops	ops;
- 	void (*detach)(struct device *dev, bool power_off);
-+	int (*activate)(struct device *dev);
-+	void (*sync)(struct device *dev);
- };
- 
- /*
-Index: linux-pm/drivers/base/dd.c
-===================================================================
---- linux-pm.orig/drivers/base/dd.c
-+++ linux-pm/drivers/base/dd.c
-@@ -279,6 +279,7 @@ static int really_probe(struct device *d
- {
- 	int ret = 0;
- 	int local_trigger_count = atomic_read(&deferred_trigger_count);
-+	struct dev_pm_domain *pm_domain = dev->pm_domain;
- 
- 	atomic_inc(&probe_count);
- 	pr_debug("bus: '%s': %s: probing driver %s with device %s\n",
-@@ -298,6 +299,12 @@ static int really_probe(struct device *d
- 		goto probe_failed;
- 	}
- 
-+	if (pm_domain && pm_domain->activate) {
-+		ret = pm_domain->activate(dev);
-+		if (ret)
-+			goto probe_failed;
-+	}
-+
- 	if (dev->bus->probe) {
- 		ret = dev->bus->probe(dev);
- 		if (ret)
-@@ -308,6 +315,9 @@ static int really_probe(struct device *d
- 			goto probe_failed;
- 	}
- 
-+	if (pm_domain && pm_domain->sync)
-+		pm_domain->sync(dev);
-+
- 	driver_bound(dev);
- 	ret = 1;
- 	pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
-@@ -319,6 +329,8 @@ probe_failed:
- 	driver_sysfs_remove(dev);
- 	dev->driver = NULL;
- 	dev_set_drvdata(dev, NULL);
-+	if (pm_domain && pm_domain->sync)
-+		pm_domain->sync(dev);
- 
- 	if (ret == -EPROBE_DEFER) {
- 		/* Driver requested deferred probing */
-@@ -522,9 +534,13 @@ static void __device_release_driver(stru
- 			dev->bus->remove(dev);
- 		else if (drv->remove)
- 			drv->remove(dev);
-+
- 		devres_release_all(dev);
- 		dev->driver = NULL;
- 		dev_set_drvdata(dev, NULL);
-+		if (dev->pm_domain && dev->pm_domain->sync)
-+			dev->pm_domain->sync(dev);
-+
- 		klist_remove(&dev->p->knode_driver);
- 		if (dev->bus)
- 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+Tony
