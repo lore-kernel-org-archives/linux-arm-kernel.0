@@ -1,71 +1,74 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 19 Mar 2015 10:02:24 -0500
-Subject: [PATCH - v7] of: Move of_dma_configure() to device.c to help
- re-use
-In-Reply-To: <54F63BA1.8030708@ti.com>
-References: <1425333548-8802-1-git-send-email-m-karicheri2@ti.com>
- <CAErSpo7MsxgVZyhpijRzVN7mVNcbN7M4A4W-UKaNs4AnmGrB6g@mail.gmail.com>
- <54F5F59C.5000603@ti.com>
- <CAErSpo5gPVqRrzZ3LbWvLRchr6SjxN0eve62dTJamfz+=O882Q@mail.gmail.com>
- <54F63BA1.8030708@ti.com>
-Message-ID: <20150319150224.GB26935@google.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Mar 2015 16:44:25 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <CAPDyKFqmSoKEfbtowk1h0USf4LcJvH1qVYgqkh7VFc7iekyaNQ@mail.gmail.com>
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <Pine.LNX.4.44L0.1503191017590.1135-100000@iolanthe.rowland.org>
+ <CAPDyKFqmSoKEfbtowk1h0USf4LcJvH1qVYgqkh7VFc7iekyaNQ@mail.gmail.com>
+Message-ID: <2137701.iWHrxeTcxg@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 05:54:25PM -0500, Murali Karicheri wrote:
-> On 03/03/2015 03:53 PM, Bjorn Helgaas wrote:
-> >[+cc linux-pci]
+On Thursday, March 19, 2015 03:45:07 PM Ulf Hansson wrote:
+> On 19 March 2015 at 15:20, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
 > >
-> >On Tue, Mar 3, 2015 at 11:55 AM, Murali Karicheri<m-karicheri2@ti.com>  wrote:
-> >>On 03/02/2015 10:43 PM, Bjorn Helgaas wrote:
-> >>>
-> >>>On Mon, Mar 2, 2015 at 3:59 PM, Murali Karicheri<m-karicheri2@ti.com>
-> >>>wrote:
-> >>>>
-> >>>>Move of_dma_configure() to device.c so it can be re-used for PCI devices
-> >>>>to
-> >>>>obtain DMA configuration from DT.  Also add a second argument so that for
-> >>>>PCI, the DT node of root bus host bridge can be used to obtain the DMA
-> >>>>configuration for the slave PCI device.
-> >>>>
-> >>>>Tested-by: Suravee Suthikulpanit<Suravee.Suthikulpanit@amd.com>   (AMD
-> >>>>Seattle)
-> >>>>Signed-off-by: Murali Karicheri<m-karicheri2@ti.com>
-> >>>>Signed-off-by: Bjorn Helgaas<bhelgaas@google.com>
-> >>>>Reviewed-by: Catalin Marinas<catalin.marinas@arm.com>
-> >>>>Acked-by: Will Deacon<will.deacon@arm.com>
-> >>>>CC: Joerg Roedel<joro@8bytes.org>
-> >>>>CC: Grant Likely<grant.likely@linaro.org>
-> >>>>CC: Rob Herring<robh+dt@kernel.org>
-> >>>>CC: Russell King<linux@arm.linux.org.uk>
-> >>>>CC: Arnd Bergmann<arnd@arndb.de>
-> >>>>---
-> >>>>   - Based on the existing patch applied to arm-pci/pci/iommu for pci next
-> >>>>(Bjorn)
-> >>>>   - Fixed the build issue reported on ARCH=x86_64
-> >>>
-> >>>
-> >>>Hi Murali,
-> >>>
-> >>>Can you please repost the entire series with fixed patches?  It's
-> >>>easier for me to reapply the whole thing at once than it is to keep
-> >>>track of and fiddle with individual patches.
-> >>>
-> >>>Bjorn
+> >> > This doesn't make sense to me.  A bus just called bus_add_device, it can
+> >> > do whatever it wanted to right before calling this function, no need for
+> >> > another callback.
 > >>
-> >>Bjorn,
+> >> The only caller of bus_add_device() is device_add().
 > >>
-> >>Ok. I have just posted v8 of the series including all patches.
+> >> What do you mean by "bus just called bus_add_device"?  Do you think that
+> >> the pm_domain pointer should be populated before calling device_add()?
+> >>
+> >> That wouldn't work for the ACPI PM domain at least, because ACPI companions
+> >> are generally added during device_add() and we arguably cannot point a
+> >> device to the ACPI PM domain before its ACPI companion is set.
 > >
-> >Thanks, I put them on a pci/murali-v8 branch for now.  I'm assuming
-> >you want them to go through my tree.  In the cover letter, you
-> >mentioned the "arm-pci iommu branch", so if that means you want them
-> >via an ARM tree instead of mine, just let me know.  I assume the build
-> >will be clean and I'll rename it back to pci/iommu.
+> >
+> >> There are two alternatives to them.  One is to do PM domain attach/detach in
+> >> the bus type's ->probe and ->remove, but that's suboptimal, because it is
+> >> then carried out every time a driver is probed/removed for a device.  The
+> >> other one would be to have each interested bus type register a bus type
+> >> notifier for itself, but that would be rather ugly, wouldn't it?
+> >
+> > Driver probing and removal is not a hot path.  Successful probes
+> > usually occur only once for each device.  I don't know how many
+> > unsuccessful probes there are on average, but probably not many.
+> >
+> > Doing the PM domain attach/detach in ->probe and ->remove makes sense
+> > to me.
 > 
-> My bad. It should have beem pci/iommu. My remote was named arm-pci
-> and hence the confusion. Please apply it to the pci/iommu branch.
+> Let me elaborate a bit on the current approach, with PM domain
+> attach/detach in ->probe() and ->remove(). This comes with the
+> following limitations.
+> 
+> 1) If the device gets probed earlier than the PM domain has been
+> initialized, we can't return -EPROBE_DEFER since we just don't know
+> anything about the PM domain yet.
+> 
+> 2) The PM domain won't be able to operate on a device without having a
+> driver bound to it, since the device's PM domain pointer is removed at
+> ->remove().
+> 
+> Perhaps Rafael want to add something to these? I don't know whether we
+> think it's okay to keep these limitations or not.
 
-Applied to pci/iommu for v4.1, thanks!
+There are arguments both ways as you can see.
 
-Bjorn
+At this point, the most straightforward approach would be to apply the Russell's
+patch adding the ->sync callback alone.
+
+I will then need the ->activate callback for another use case (a PM domain that
+may not be ready for the device to be probed), but in that case I actually know
+that the pm_domain pointer is populated at the really_probe() time.
+
+Going forward we may want to move the attach/detach operations for genpd and
+the ACPI PM domain out of bus type ->probe, but I think that can wait.
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
