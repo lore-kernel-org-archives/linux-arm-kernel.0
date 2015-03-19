@@ -1,110 +1,132 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 19 Mar 2015 14:55:38 +0100
-Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <CAHp75Vdf6=z1d5+eYJ+QGTko9kkZf-oPfoWaf8FRoTdqcdWxjw@mail.gmail.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
- <CAHp75Vd7+oLiLLuyocYh95TebtocWrRho6xNjuSUt8fYGp8npg@mail.gmail.com>
- <CALszF6BWuUYRh+3rWnSQLApkAHA5dQXw=6x6D_evRtb+5B_ukA@mail.gmail.com>
- <CAHp75Vdf6=z1d5+eYJ+QGTko9kkZf-oPfoWaf8FRoTdqcdWxjw@mail.gmail.com>
-Message-ID: <CALszF6A5Zu7i0hxSLTS-nfOAXmd0__jLjB=fHxK93Ex5Vbi9LA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 19 Mar 2015 15:21:14 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <20150319132907.GA3707@kroah.com>
+References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
+ <2317791.ICLpdqLgyu@vostro.rjw.lan> <20150319132907.GA3707@kroah.com>
+Message-ID: <3533423.QQDErEmeTO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-17 18:56 GMT+01:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
-> On Tue, Mar 17, 2015 at 7:32 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> 2015-03-13 15:19 GMT+01:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
->
->>>> +static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
->>>> +                           struct ktermios *old)
->>>> +{
->>>> +       unsigned int baud;
->>>> +       u32 usardiv, mantissa, fraction;
->>>> +       tcflag_t cflag;
->>>> +       u32 cr1, cr2, cr3;
->>>> +       unsigned long flags;
->>>> +
->>>> +       baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
->>>> +       cflag = termios->c_cflag;
->>>> +
->>>> +       spin_lock_irqsave(&port->lock, flags);
->>>> +
->>>> +       /* Stop serial port and reset value */
->>>> +       writel_relaxed(0, port->membase + USART_CR1);
->>>> +
->>>> +       cr1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE | USART_CR1_RXNEIE;
->>>> +
->>>> +       if (cflag & CSTOPB)
->>>> +               cr2 = USART_CR2_STOP_2B;
->>>> +
->>>> +       if (cflag & PARENB) {
->>>> +               cr1 |= USART_CR1_PCE;
->>>> +               if ((cflag & CSIZE) == CS8)
->>>> +                       cr1 |= USART_CR1_M;
->>>> +       }
->>>> +
->>>> +       if (cflag & PARODD)
->>>> +               cr1 |= USART_CR1_PS;
->>>> +
->>>> +       if (cflag & CRTSCTS)
->>>> +               cr3 = USART_CR3_RTSE | USART_CR3_CTSE;
->>>> +
->>>> +       usardiv = (port->uartclk * 25) / (baud * 4);
->>>> +       mantissa = (usardiv / 100) << USART_BRR_DIV_M_SHIFT;
->>>> +       fraction = DIV_ROUND_CLOSEST((usardiv % 100) * 16, 100);
->>>> +       if (fraction & ~USART_BRR_DIV_F_MASK) {
->>>> +               fraction = 0;
->>>> +               mantissa += (1 << USART_BRR_DIV_M_SHIFT);
->>>> +       }
->>>
->>> So, it's a fractional divider. right? Could it be then fractional
->>> divider clock in this first place (see
->>> drivers/clk/clk-fractional-divider.c)?
->>>
->>
->> I'm not sure it makes sense to represent this baudrate divider within
->> the UART IP as a clock.
->
-> You have it already. I mean it should be fractional divider clock.
->
-> stm32port->clk = devm_clk_get(&pdev->dev, NULL);
-> +
-> +       if (WARN_ON(IS_ERR(stm32port->clk)))
-> +               return -EINVAL;
-> +
-> +       /* ensure that clk rate is correct by enabling the clk */
-> +       clk_prepare_enable(stm32port->clk);
-> +       stm32port->port.uartclk = clk_get_rate(stm32port->clk);
+On Thursday, March 19, 2015 02:29:07 PM Greg Kroah-Hartman wrote:
+> On Wed, Mar 18, 2015 at 04:02:11PM +0100, Rafael J. Wysocki wrote:
+> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > 
+> > If PM domains are in use, it may be necessary to prepare the code
+> > handling a PM domain for driver probing.  For example, in some
+> > cases device drivers rely on the ability to power on the devices
+> > with the help of the IO runtime PM framework and the PM domain
+> > code needs to be ready for that.  Also, if that code has not been
+> > fully initialized yet, the driver probing should be deferred.
+> > 
+> > Moreover, after the probing is complete, it may be necessary to
+> > put the PM domain in question into the state reflecting the current
+> > needs of the devices in it, for example, to prevent power from being
+> > drawn in vain.
+> > 
+> > For these reasons, introduce new PM domain callbacks, ->activate
+> > and ->sync, called, respectively, before probing for a device
+> > driver and after the probing has been completed.
+> > 
+> > That is not sufficient, however, because the device's PM domain
+> > pointer has to be populated for the ->activate callback to be
+> > executed, so setting it in bus type ->probe callback routines
+> > would be too late.  Also, there are bus types where PM domains
+> > are not used at all and the core should not attempt to set the
+> > pm_domain pointer for the devices on those buses.
+> > 
+> > To overcome that difficulty, introduce two new bus type
+> > callbacks, ->init and ->release, called by bus_add_device() and
+> > bus_remove_device(), respectively.  That will allow ->init to
+> > be used to populate the pm_domain pointer for the bus types
+> > that want to do that and ->release will be useful for any
+> > cleanup that may be necessary after removing a device that
+> > was part of a PM domain.
+> > 
+> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> > ---
+> > 
+> > It occured to me that we might want to ->sync regardless of whether or
+> > not the probing had been succenssful, so I changed the code in
+> > really_probe() along these lines.  Please let me know if that's
+> > not OK.
+> > 
+> > ---
+> >  drivers/base/bus.c     |   12 +++++++++++-
+> >  drivers/base/dd.c      |   20 ++++++++++++++------
+> >  include/linux/device.h |    5 +++++
+> >  include/linux/pm.h     |    6 ++++++
+> >  4 files changed, 36 insertions(+), 7 deletions(-)
+> > 
+> > Index: linux-pm/drivers/base/bus.c
+> > ===================================================================
+> > --- linux-pm.orig/drivers/base/bus.c
+> > +++ linux-pm/drivers/base/bus.c
+> > @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
+> >  	int error = 0;
+> >  
+> >  	if (bus) {
+> > +		if (bus->init) {
+> > +			error = bus->init(dev);
+> > +			if (error)
+> > +				goto out_put;
+> > +		}
+> 
+> This doesn't make sense to me.  A bus just called bus_add_device, it can
+> do whatever it wanted to right before calling this function, no need for
+> another callback.
 
-No I don't have it already.
-The clock I get here is coming from outside the IP, so this driver is
-a clock consumer.
-If I follow your advice, this driver will become both the clock
-provider and the only clock consumer of this clock.
-I think this is something that should be avoided.
+The only caller of bus_add_device() is device_add().
 
-Also, it would require to add another clock in between (a by-16 fixed
-divider), because the formula is:
-baud = fck / (16 * usart_div)
+What do you mean by "bus just called bus_add_device"?  Do you think that
+the pm_domain pointer should be populated before calling device_add()?
 
-Finally, representing this as a clock is not really matching the
-reality, because we are generating a baud rate, not a frequency.
+That wouldn't work for the ACPI PM domain at least, because ACPI companions
+are generally added during device_add() and we arguably cannot point a
+device to the ACPI PM domain before its ACPI companion is set.
 
-Really, I would prefer keeping this fractional divider as it is
-implemented today.
+> >  		pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
+> >  		error = device_add_attrs(bus, dev);
+> >  		if (error)
+> > -			goto out_put;
+> > +			goto out_release;
+> >  		error = device_add_groups(dev, bus->dev_groups);
+> >  		if (error)
+> >  			goto out_groups;
+> > @@ -534,6 +539,9 @@ out_groups:
+> >  	device_remove_groups(dev, bus->dev_groups);
+> >  out_id:
+> >  	device_remove_attrs(bus, dev);
+> > +out_release:
+> > +	if (bus->release)
+> > +		bus->release(dev);
+> 
+> >  out_put:
+> >  	bus_put(dev->bus);
+> >  	return error;
+> > @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
+> >  	device_remove_groups(dev, dev->bus->dev_groups);
+> >  	if (klist_node_attached(&dev->p->knode_bus))
+> >  		klist_del(&dev->p->knode_bus);
+> > +	if (bus->release)
+> > +		bus->release(dev);
+> 
+> Same with release(), this happens when a bus wants to remove a device,
+> it controls this, why have a callback right away?  These both shouldn't
+> be needed.
 
-Kind regards,
-Maxime
+This is for symmetry with bus_add_device() and please see the argument there.
 
->
->> What would be the gain?
->
-> Remove custom implementation of the calculations. It will be just one
-> line to refresh the baud rate. I think we have a lot of duplicates
-> here and there in the kernel. It would be nice not to bring another
-> one.
->
-> --
-> With Best Regards,
-> Andy Shevchenko
+> sorry if I missed this before, I hadn't noticed these callbacks in
+> previous patches but I wasn't paying much attention.
+
+No, they were not present before.
+
+There are two alternatives to them.  One is to do PM domain attach/detach in
+the bus type's ->probe and ->remove, but that's suboptimal, because it is
+then carried out every time a driver is probed/removed for a device.  The
+other one would be to have each interested bus type register a bus type
+notifier for itself, but that would be rather ugly, wouldn't it?
+
+Rafael
