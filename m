@@ -1,23 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 19 Mar 2015 09:35:04 -0700
-Subject: [PATCH 2/2] ARM: dts: brcmstb: add IRQ0 controller
-In-Reply-To: <1426725092-16392-2-git-send-email-computersforpeace@gmail.com>
-References: <1426725092-16392-1-git-send-email-computersforpeace@gmail.com>
- <1426725092-16392-2-git-send-email-computersforpeace@gmail.com>
-Message-ID: <550AFAB8.9060307@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 19 Mar 2015 16:36:33 +0000 (UTC)
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <20150319160301.GE31346@atomide.com>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com> <5509A998.2080509@ti.com>
+ <20150318165706.GQ31346@atomide.com> <5509D3BD.6030004@linaro.org>
+ <alpine.DEB.2.02.1503191455020.9480@utopia.booyaka.com>
+ <550AEDA1.50109@linaro.org>
+ <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
+ <20150319160301.GE31346@atomide.com>
+Message-ID: <alpine.DEB.2.02.1503191635100.9480@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/15 17:31, Brian Norris wrote:
-> This L2 controller handles multiplexing a few different interrupts. We
-> also need it for configuring the interrupt forwarding masks for the
-> UART.
-> 
-> With this, we can *now* boot BCM7445 to a prompt using the upstream
-> kernel + DTB.
-> 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+On Thu, 19 Mar 2015, Tony Lindgren wrote:
 
-Applied to devicetree/next, thanks!
--- 
-Florian
+> * Paul Walmsley <paul@pwsan.com> [150319 08:46]:
+> > On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> > 
+> > > On 03/19/2015 04:55 PM, Paul Walmsley wrote:
+> > > > On Wed, 18 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> > > > 
+> > > > > On 03/18/2015 06:57 PM, Tony Lindgren wrote:
+> > > > > > * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
+> > > > > > > As I can see Patch 1 from this series was merged in 4.0-rc4,
+> > > > > > > but this patch wasn't. As result, I can see below warning all the time
+> > > > > > > during boot now:
+> > > > > > > 
+> > > > > > > [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod
+> > > > > > > 'pcie1-phy'
+> > > > > > 
+> > > > > > OK. Is this needed as a fix for the v4.0-rc series, or can this wait
+> > > > > > for v4.1?
+> > > > > 
+> > > > > I think, Yes. These two patches should go all together, because they are
+> > > > > interrelated.
+> > > > 
+> > > > Does the warning result in a functional problem, or is it just a warning?
+> > > > 
+> > > 
+> > > PCE1 PHY device is not registered any more.
+> > 
+> > How does the second patch fix that?
+> 
+> It seems it should be just a warning fix if the pciephy hwmod entries
+> are now gone?
+> 
+> Anyways, I'm planning to send a pull request for  omap-for-v4.0/fixes
+> today. Please let me know ASAP if the $subject patch should be dropped,
+> otherwise I'll send it as it fixes a boot time warning and is already
+> applied.
+
+If you want to send it up as a fix, that's fine with me.  But I don't see 
+how that second patch will cause any changes in device registration, as 
+stated.
+
+
+- Paul
