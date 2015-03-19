@@ -1,216 +1,79 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Mar 2015 13:59:34 +0000
-Subject: [PATCH 3/5] arm64: Extract feature parsing code from cpu_errata.c
+Date: Thu, 19 Mar 2015 13:59:35 +0000
+Subject: [PATCH 4/5] arm64: alternative: Introduce feature for GICv3 CPU
+ interface
 In-Reply-To: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
 References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1426773576-14062-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1426773576-14062-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we detect more architectural features at runtime, it makes
-sense to reuse the existing framework whilst avoiding to call
-a feature an erratum...
+Add a new item to the feature set (ARM64_HAS_SYSREG_GIC_CPUIF)
+to indicate that we have a system register GIC CPU interface
 
-This patch extract the core capability parsing, moves it into
-a new file (cpufeature.c), and let the CPU errata detection code
-use it.
+This will help KVM switching to alternative instruction patching.
 
 Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 15 ++++++++++++
- arch/arm64/kernel/Makefile          |  2 +-
- arch/arm64/kernel/cpu_errata.c      | 36 ++++------------------------
- arch/arm64/kernel/cpufeature.c      | 47 +++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpuinfo.c         |  1 +
- 5 files changed, 68 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm64/kernel/cpufeature.c
+ arch/arm64/include/asm/cpufeature.h |  8 +++++++-
+ arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b6c16d5..6ae35d1 100644
+index 6ae35d1..d9e57b5 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -28,6 +28,18 @@
+@@ -23,8 +23,9 @@
+ 
+ #define ARM64_WORKAROUND_CLEAN_CACHE		0
+ #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
++#define ARM64_HAS_SYSREG_GIC_CPUIF		2
+ 
+-#define ARM64_NCAPS				2
++#define ARM64_NCAPS				3
  
  #ifndef __ASSEMBLY__
  
-+struct arm64_cpu_capabilities {
-+	const char *desc;
-+	u16 capability;
-+	bool (*matches)(const struct arm64_cpu_capabilities *);
-+	union {
-+		struct {	/* To be used for erratum handling only */
-+			u32 midr_model;
-+			u32 midr_range_min, midr_range_max;
+@@ -37,6 +38,11 @@ struct arm64_cpu_capabilities {
+ 			u32 midr_model;
+ 			u32 midr_range_min, midr_range_max;
+ 		};
++
++		struct {	/* Feature register checking */
++			u64 register_mask;
++			u64 register_value;
 +		};
-+	};
-+};
-+
- extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+ 	};
+ };
  
- static inline bool cpu_have_feature(unsigned int num)
-@@ -51,7 +63,10 @@ static inline void cpus_set_cap(unsigned int num)
- 		__set_bit(num, cpu_hwcaps);
- }
- 
-+void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+			    const char *info);
- void check_local_cpu_errata(void);
-+void check_local_cpu_features(void);
- bool cpu_supports_mixed_endian_el0(void);
- bool system_supports_mixed_endian_el0(void);
- 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index d5e7074..b12e15b 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -17,7 +17,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
- 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
--			   alternative.o cacheinfo.o
-+			   cpufeature.o alternative.o cacheinfo.o
- 
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index fa62637..a66f4fa 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -16,8 +16,6 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
--#define pr_fmt(fmt) "alternatives: " fmt
--
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-@@ -26,27 +24,11 @@
- #define MIDR_CORTEX_A53 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
- #define MIDR_CORTEX_A57 MIDR_CPU_PART(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
- 
--/*
-- * Add a struct or another datatype to the union below if you need
-- * different means to detect an affected CPU.
-- */
--struct arm64_cpu_capabilities {
--	const char *desc;
--	u16 capability;
--	bool (*is_affected)(struct arm64_cpu_capabilities *);
--	union {
--		struct {
--			u32 midr_model;
--			u32 midr_range_min, midr_range_max;
--		};
--	};
--};
--
- #define CPU_MODEL_MASK (MIDR_IMPLEMENTOR_MASK | MIDR_PARTNUM_MASK | \
- 			MIDR_ARCHITECTURE_MASK)
- 
- static bool __maybe_unused
--is_affected_midr_range(struct arm64_cpu_capabilities *entry)
-+is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
- {
- 	u32 midr = read_cpuid_id();
- 
-@@ -59,12 +41,12 @@ is_affected_midr_range(struct arm64_cpu_capabilities *entry)
- }
- 
- #define MIDR_RANGE(model, min, max) \
--	.is_affected = is_affected_midr_range, \
-+	.matches = is_affected_midr_range, \
- 	.midr_model = model, \
- 	.midr_range_min = min, \
- 	.midr_range_max = max
- 
--struct arm64_cpu_capabilities arm64_errata[] = {
-+const struct arm64_cpu_capabilities arm64_errata[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
- 	defined(CONFIG_ARM64_ERRATUM_824069)
-@@ -97,15 +79,5 @@ struct arm64_cpu_capabilities arm64_errata[] = {
- 
- void check_local_cpu_errata(void)
- {
--	struct arm64_cpu_capabilities *cpus = arm64_errata;
--	int i;
--
--	for (i = 0; cpus[i].desc; i++) {
--		if (!cpus[i].is_affected(&cpus[i]))
--			continue;
--
--		if (!cpus_have_cap(cpus[i].capability))
--			pr_info("enabling workaround for %s\n", cpus[i].desc);
--		cpus_set_cap(cpus[i].capability);
--	}
-+	check_cpu_capabilities(arm64_errata, "enabling workaround for");
- }
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-new file mode 100644
-index 0000000..3d9967e
---- /dev/null
+index 3d9967e..b0bea2b3 100644
+--- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -0,0 +1,47 @@
-+/*
-+ * Contains CPU feature definitions
-+ *
-+ * Copyright (C) 2015 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#define pr_fmt(fmt) "alternatives: " fmt
-+
-+#include <linux/types.h>
-+#include <asm/cpu.h>
-+#include <asm/cpufeature.h>
-+
-+static const struct arm64_cpu_capabilities arm64_features[] = {
-+	{},
-+};
-+
-+void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-+			    const char *info)
-+{
-+	int i;
-+
-+	for (i = 0; caps[i].desc; i++) {
-+		if (!caps[i].matches(&caps[i]))
-+			continue;
-+
-+		if (!cpus_have_cap(caps[i].capability))
-+			pr_info("%s %s\n", info, caps[i].desc);
-+		cpus_set_cap(caps[i].capability);
-+	}
-+}
-+
-+void check_local_cpu_features(void)
-+{
-+	check_cpu_capabilities(arm64_features, "detected feature");
-+}
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 9298556..75d5a86 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -236,6 +236,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	cpuinfo_detect_icache_policy(info);
+@@ -22,7 +22,23 @@
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
  
- 	check_local_cpu_errata();
-+	check_local_cpu_features();
- 	update_cpu_features(info);
- }
++static bool
++has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
++{
++	u64 val;
++
++	val = read_cpuid(id_aa64pfr0_el1);
++	return (val & entry->register_mask) == entry->register_value;
++}
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
++	{
++		.desc = "system register GIC CPU interface",
++		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
++		.matches = has_id_aa64pfr0_feature,
++		.register_mask = (0xf << 24),
++		.register_value = (1 << 24),
++	},
+ 	{},
+ };
  
 -- 
 2.1.4
