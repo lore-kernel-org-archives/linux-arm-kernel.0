@@ -1,41 +1,89 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 19 Mar 2015 18:46:59 +0000 (UTC)
-Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
- address change
-In-Reply-To: <550B155E.9050308@wwwdotorg.org>
-References: <20150317083221.32662.14647.stgit@baseline>
- <20150317083221.32662.96822.stgit@baseline>
- <20150317103806.GU8656@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
- <550AEE6B.5080301@wwwdotorg.org>
- <alpine.DEB.2.02.1503191601520.9480@utopia.booyaka.com>
- <550AFF52.6070503@wwwdotorg.org>
- <alpine.DEB.2.02.1503191706340.9480@utopia.booyaka.com>
- <550B155E.9050308@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1503191845060.9480@utopia.booyaka.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 19 Mar 2015 18:48:10 +0000
+Subject: [RFC PATCH 2/7] printk: Simple implementation for NMI backtracing
+In-Reply-To: <20150319183037.GT23123@twins.programming.kicks-ass.net>
+References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
+ <1426688428-3150-3-git-send-email-daniel.thompson@linaro.org>
+ <20150319133958.4821493e@gandalf.local.home>
+ <20150319183037.GT23123@twins.programming.kicks-ass.net>
+Message-ID: <550B19EA.6000202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Stephen Warren wrote:
+On 19/03/15 18:30, Peter Zijlstra wrote:
+> On Thu, Mar 19, 2015 at 01:39:58PM -0400, Steven Rostedt wrote:
+>>> +void printk_nmi_backtrace_complete(void)
+>>> +{
+>>> +	struct nmi_seq_buf *s;
+>>> +	int len, cpu, i, last_i;
+>>> +
+>>> +	/*
+>>> +	 * Now that all the NMIs have triggered, we can dump out their
+>>> +	 * back traces safely to the console.
+>>> +	 */
+>>> +	for_each_possible_cpu(cpu) {
+>>> +		s = &per_cpu(nmi_print_seq, cpu);
+>>> +		last_i = 0;
+>>> +
+>>> +		len = seq_buf_used(&s->seq);
+>>> +		if (!len)
+>>> +			continue;
+>>> +
+>>> +		/* Print line by line. */
+>>> +		for (i = 0; i < len; i++) {
+>>> +			if (s->buffer[i] == '\n') {
+>>> +				print_seq_line(s, last_i, i);
+>>> +				last_i = i + 1;
+>>> +			}
+>>> +		}
+>>> +		/* Check if there was a partial line. */
+>>> +		if (last_i < len) {
+>>> +			print_seq_line(s, last_i, len - 1);
+>>> +			pr_cont("\n");
+>>> +		}
+>>> +
+>>> +		/* Wipe out the buffer ready for the next time around. */
+>>> +		seq_buf_clear(&s->seq);
+>>> +	}
+>>> +
+>>> +	clear_bit(0, &nmi_print_flag);
+>>> +	smp_mb__after_atomic();
+>>
+>> Is this really necessary. What is the mb synchronizing?
+>>
+>> [ Added Peter Zijlstra to confirm it's not needed ]
+>
+> It surely looks suspect; and it lacks a comment, which is a clear sign
+> its buggy.
+>
+> Now it if tries to order the accesses to the seqbuf againt the clearing
+> of the bit one would have expected a _before_ barrier, not an _after_.
 
-> We should not document Linux 4.1 as the cut-off. DT bindings are supposed to
-> be OS agnostic. While it's practically unlikely, it is entirely possible for
-> some other OS to have already implemented support for this binding, and the
-> current binding is an ABI. We have no control over if/when any non-Linux code
-> is updated to add support for a 0-based offset for existing SoCs, and
-> certainly no versions of Linux or any other OS can be updated retro-actively
-> except perhaps a few linux-stable versions. We can however write the binding
-> in such a way as support for new SoCs requires the new 0-based address, since
-> there is no binding specification for those new chips yet, and the time when
-> you add the new binding documentation is the first time any OS could possibly
-> add conformant support for it.
-> 
-> In summary, I believe the binding document must state that T20/30/114/124
-> require the offset of 4 in reg value, and newer chips require no offset in the
-> reg value. We can still always accept either in the Linux kernel going forward
-> based on the principle of being lenient re: input data.
+It's nothing to do with the seqbuf since I added the seqbuf code myself 
+but the barrier was already in the code that I copied from.
 
-That's fine.  I'll send a patch for that.
+In the mainline code today it looks like this as part of the x86 code 
+(note that call to put_cpu() in my patchset but it lives in the arch/ 
+specific code rather than the generic code):
+
+:                 /* Check if there was a partial line. */
+:                 if (last_i < len) {
+:                         print_seq_line(s, last_i, len - 1);
+:                         pr_cont("\n");
+:                 }
+:         }
+:
+:         clear_bit(0, &backtrace_flag);
+:         smp_mb__after_atomic();
+:         put_cpu();
+: }
+
+The barrier was not intended to have anything to do with put_cpu() 
+either though since the barrier was added before put_cpu() arrived:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=554ec063982752e9a569ab9189eeffa3d96731b2
+
+There's nothing in the commit comment explaining the barrier and I 
+really can't see what it is for.
 
 
-- Paul
+Daniel.
