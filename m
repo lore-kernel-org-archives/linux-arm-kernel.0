@@ -1,62 +1,43 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 19 Mar 2015 10:02:17 +0100
-Subject: [rtc-linux] [PATCH 08/13] rtc: at91rm9200: make IO endian agnostic
-In-Reply-To: <1426693992-31163-9-git-send-email-ben.dooks@codethink.co.uk>
+Date: Thu, 19 Mar 2015 10:03:35 +0100
+Subject: [PATCH 01/13] ARM: at91: Add big endian configuration for
+ ATSAMA5D devices
+In-Reply-To: <1426693992-31163-2-git-send-email-ben.dooks@codethink.co.uk>
 References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <1426693992-31163-9-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20150319090217.GG14457@ns203013.ovh.net>
+ <1426693992-31163-2-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20150319090335.GH14457@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 15:53 Wed 18 Mar     , Ben Dooks wrote:
-> Change the __raw IO calls to readl/write_relaxed which makes the driver
-> endian agnostic to run properly on big endian systems.
+> The ATSAMA5D devices are based on Cortex-A5 which should work in big
+> endian configuration. Add ARCH_SUPPORTS_BIG_ENDIAN if these SoCs are
+> configured so we can run the system big endian.
 > 
 > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > --
-> CC: Alessandro Zummo <a.zummo@towertech.it>
-> CC: rtc-linux at googlegroups.com
-> CC: linux-arm-kernel at lists.infradead.org
+> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 > CC: Andrew Victor <linux@maxim.org.za>
 > CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> CC: Jean-Christophe Plagniol-Villard
+missing e-mail
+> CC: Russell King <linux@arm.linux.org.uk>
 > ---
->  drivers/rtc/rtc-at91rm9200.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/mach-at91/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-> index b4f7744..4106abc 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -37,9 +37,9 @@
->  #include "rtc-at91rm9200.h"
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index c74a443..05212fb 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -18,6 +18,7 @@ config HAVE_AT91_H32MX
 >  
->  #define at91_rtc_read(field) \
-> -	__raw_readl(at91_rtc_regs + field)
-> +	readl_relaxed(at91_rtc_regs + field)
->  #define at91_rtc_write(field, val) \
-> -	__raw_writel((val), at91_rtc_regs + field)
-> +	writel_relaxed((val), at91_rtc_regs + field)
-
-I'm not against it but the SoC using it are Little only
-
+>  config SOC_SAMA5
+>  	bool
+> +	select ARCH_SUPPORTS_BIG_ENDIAN
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+on the whole patch serie
 
 Best Regards,
 J.
->  
->  #define AT91_RTC_EPOCH		1900UL	/* just like arch/arm/common/rtctime.c */
->  
-> -- 
-> 2.1.4
-> 
-> -- 
-> -- 
-> You received this message because you are subscribed to "rtc-linux".
-> Membership options at http://groups.google.com/group/rtc-linux .
-> Please read http://groups.google.com/group/rtc-linux/web/checklist
-> before submitting a driver.
-> --- 
-> You received this message because you are subscribed to the Google Groups "rtc-linux" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to rtc-linux+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
