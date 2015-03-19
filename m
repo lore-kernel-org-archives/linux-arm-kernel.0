@@ -1,25 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Mar 2015 00:56:19 +0000
-Subject: [PATCH 09/13] spi: atmel: use endian agnostic IO
-In-Reply-To: <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20150319005619.GL2869@sirena.org.uk>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 18 Mar 2015 18:09:05 -0700
+Subject: [PATCH] MAINTAINERS: add brcmstb regex
+Message-ID: <1426727345-5838-1-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 03:53:08PM +0000, Ben Dooks wrote:
-> Use the endian agnositc IO functions instead of the __raw ones for when
-> the driver is in use on big-endian systems.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+This could probably consolidate a few file listings. And it satisfies
+the spirit of the highly annoying [1] checkpatch warning for every new
+file, though it sadly won't quash it.
 
-I'm not CCed on either the cover letter or the rest of the series: are
-there any dependencies here or is it safe to apply this by itself?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/a4961eae/attachment-0001.sig>
+[1] https://lkml.org/lkml/2014/12/17/24
+
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0e1abe8cc684..52a1cf7cd18a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2179,6 +2179,7 @@ S:	Maintained
+ F:	arch/arm/mach-bcm/*brcmstb*
+ F:	arch/arm/boot/dts/bcm7*.dts*
+ F:	drivers/bus/brcmstb_gisb.c
++N:	brcmstb
+ 
+ BROADCOM BMIPS MIPS ARCHITECTURE
+ M:	Kevin Cernekee <cernekee@gmail.com>
+-- 
+1.9.1
