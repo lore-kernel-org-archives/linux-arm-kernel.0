@@ -1,169 +1,196 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Mar 2015 11:15:24 +0900
-Subject: [PATCH 6/6] ARM: shmobile: r8a7791: sound enables Audio DMAC entry on
- DTSI
-In-Reply-To: <cover.1426731062.git.horms+renesas@verge.net.au>
-References: <cover.1426731062.git.horms+renesas@verge.net.au>
-Message-ID: <63573339e7698503bfeaef3bb0c444ffc98e45a0.1426731062.git.horms+renesas@verge.net.au>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 19 Mar 2015 10:30:09 +0800
+Subject: [PATCH v10 08/21] ARM64 / ACPI: Introduce early_param "acpi="
+ to enable/disable ACPI
+In-Reply-To: <CAKv+Gu9wkh+J18cm1Mt4-Up5b3VA4-qeLtHcc+UD44DHbqABtQ@mail.gmail.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>	<1426077587-1561-9-git-send-email-hanjun.guo@linaro.org>	<20150318113549.GC2846@red-moon>
+ <CAKv+Gu9wkh+J18cm1Mt4-Up5b3VA4-qeLtHcc+UD44DHbqABtQ@mail.gmail.com>
+Message-ID: <550A34B1.1050004@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On 2015/3/19 4:07, Ard Biesheuvel wrote:
+> On 18 March 2015 at 12:35, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> On Wed, Mar 11, 2015 at 12:39:34PM +0000, Hanjun Guo wrote:
+>>> From: Al Stone <al.stone@linaro.org>
+>>>
+>>> This implements the following policy to decide whether ACPI should
+>>> be used to boot the system:
+>>> - acpi=off: ACPI will not be used to boot the system, even if there is
+>>>   no alternative available (e.g., device tree is empty)
+>>> - acpi=force: only ACPI will be used to boot the system; if that fails,
+>>>   there will be no fallback to alternative methods (such as device tree)
+>> I think this comment is stale. acpi=force enables ACPI and tries to
+>> init the ACPI tables without even checking DT, but it does fall back to
+>> DT if ACPI table init fails (by disabling ACPI and unflattening the
+>> FDT).
+>>
+>> Am I wrong ?
+>>
+> No, you're right. But I would suggest that we fix the code, not the comment.
 
-This patch adds Audio DMAC (= rcar-dmac) entry for sound
+I agree. If user pass "acpi=force", I think it means ACPI only, so if
+ACPI fails, we can just not going to boot the system.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 130 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 108 insertions(+), 22 deletions(-)
+>
+> I think we are all in agreement on the policy, we only need to make
+> disable_acpi() conditional on whether acpi_param_force is set
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index a697b94..4696062 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1524,34 +1524,120 @@
- 		status = "disabled";
- 
- 		rcar_sound,dvc {
--			dvc0: dvc at 0 { };
--			dvc1: dvc at 1 { };
-+			dvc0: dvc at 0 {
-+				dmas = <&audma0 0xbc>;
-+				dma-names = "tx";
-+			};
-+			dvc1: dvc at 1 {
-+				dmas = <&audma0 0xbe>;
-+				dma-names = "tx";
-+			};
- 		};
- 
- 		rcar_sound,src {
--			src0: src at 0 { interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>; };
--			src1: src at 1 { interrupts = <0 353 IRQ_TYPE_LEVEL_HIGH>; };
--			src2: src at 2 { interrupts = <0 354 IRQ_TYPE_LEVEL_HIGH>; };
--			src3: src at 3 { interrupts = <0 355 IRQ_TYPE_LEVEL_HIGH>; };
--			src4: src at 4 { interrupts = <0 356 IRQ_TYPE_LEVEL_HIGH>; };
--			src5: src at 5 { interrupts = <0 357 IRQ_TYPE_LEVEL_HIGH>; };
--			src6: src at 6 { interrupts = <0 358 IRQ_TYPE_LEVEL_HIGH>; };
--			src7: src at 7 { interrupts = <0 359 IRQ_TYPE_LEVEL_HIGH>; };
--			src8: src at 8 { interrupts = <0 360 IRQ_TYPE_LEVEL_HIGH>; };
--			src9: src at 9 { interrupts = <0 361 IRQ_TYPE_LEVEL_HIGH>; };
-+			src0: src at 0 {
-+				interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x85>, <&audma1 0x9a>;
-+				dma-names = "rx", "tx";
-+			};
-+			src1: src at 1 {
-+				interrupts = <0 353 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x87>, <&audma1 0x9c>;
-+				dma-names = "rx", "tx";
-+			};
-+			src2: src at 2 {
-+				interrupts = <0 354 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x89>, <&audma1 0x9e>;
-+				dma-names = "rx", "tx";
-+			};
-+			src3: src at 3 {
-+				interrupts = <0 355 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x8b>, <&audma1 0xa0>;
-+				dma-names = "rx", "tx";
-+			};
-+			src4: src at 4 {
-+				interrupts = <0 356 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x8d>, <&audma1 0xb0>;
-+				dma-names = "rx", "tx";
-+			};
-+			src5: src at 5 {
-+				interrupts = <0 357 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x8f>, <&audma1 0xb2>;
-+				dma-names = "rx", "tx";
-+			};
-+			src6: src at 6 {
-+				interrupts = <0 358 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x91>, <&audma1 0xb4>;
-+				dma-names = "rx", "tx";
-+			};
-+			src7: src at 7 {
-+				interrupts = <0 359 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x93>, <&audma1 0xb6>;
-+				dma-names = "rx", "tx";
-+			};
-+			src8: src at 8 {
-+				interrupts = <0 360 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x95>, <&audma1 0xb8>;
-+				dma-names = "rx", "tx";
-+			};
-+			src9: src at 9 {
-+				interrupts = <0 361 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x97>, <&audma1 0xba>;
-+				dma-names = "rx", "tx";
-+			};
- 		};
- 
- 		rcar_sound,ssi {
--			ssi0: ssi at 0 { interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi1: ssi at 1 { interrupts = <0 371 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi2: ssi at 2 { interrupts = <0 372 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi3: ssi at 3 { interrupts = <0 373 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi4: ssi at 4 { interrupts = <0 374 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi5: ssi at 5 { interrupts = <0 375 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi6: ssi at 6 { interrupts = <0 376 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi7: ssi at 7 { interrupts = <0 377 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi8: ssi at 8 { interrupts = <0 378 IRQ_TYPE_LEVEL_HIGH>; };
--			ssi9: ssi at 9 { interrupts = <0 379 IRQ_TYPE_LEVEL_HIGH>; };
-+			ssi0: ssi at 0 {
-+				interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x01>, <&audma1 0x02>, <&audma0 0x15>, <&audma1 0x16>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi1: ssi at 1 {
-+				 interrupts = <0 371 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x03>, <&audma1 0x04>, <&audma0 0x49>, <&audma1 0x4a>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi2: ssi at 2 {
-+				interrupts = <0 372 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x05>, <&audma1 0x06>, <&audma0 0x63>, <&audma1 0x64>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi3: ssi at 3 {
-+				interrupts = <0 373 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x07>, <&audma1 0x08>, <&audma0 0x6f>, <&audma1 0x70>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi4: ssi at 4 {
-+				interrupts = <0 374 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x09>, <&audma1 0x0a>, <&audma0 0x71>, <&audma1 0x72>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi5: ssi at 5 {
-+				interrupts = <0 375 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x0b>, <&audma1 0x0c>, <&audma0 0x73>, <&audma1 0x74>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi6: ssi at 6 {
-+				interrupts = <0 376 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x0d>, <&audma1 0x0e>, <&audma0 0x75>, <&audma1 0x76>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi7: ssi at 7 {
-+				interrupts = <0 377 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x0f>, <&audma1 0x10>, <&audma0 0x79>, <&audma1 0x7a>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi8: ssi at 8 {
-+				interrupts = <0 378 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x11>, <&audma1 0x12>, <&audma0 0x7b>, <&audma1 0x7c>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
-+			ssi9: ssi at 9 {
-+				interrupts = <0 379 IRQ_TYPE_LEVEL_HIGH>;
-+				dmas = <&audma0 0x13>, <&audma1 0x14>, <&audma0 0x7d>, <&audma1 0x7e>;
-+				dma-names = "rx", "tx", "rxu", "txu";
-+			};
- 		};
- 	};
- };
--- 
-2.1.4
+I prefer Catalin's suggestion, just not to unflatten the device tree,
+what do you think?
+
+If it is ok, I will add a fix patch on top of this patch set.
+
+Thanks
+Hanjun
+
+>
+>
+>>> - otherwise, ACPI will be used as a fallback if the device tree turns out
+>>>   to lack a platform description; the heuristic to decide this is whether
+>>>   /chosen is the only node present at depth 1
+>>>
+>>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>>> CC: Will Deacon <will.deacon@arm.com>
+>>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+>>> Acked-by: Olof Johansson <olof@lixom.net>
+>>> Acked-by: Grant Likely <grant.likely@linaro.org>
+>>> Tested-by: Timur Tabi <timur@codeaurora.org>
+>>> Signed-off-by: Al Stone <al.stone@linaro.org>
+>>> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>>  Documentation/kernel-parameters.txt |  3 ++-
+>>>  arch/arm64/include/asm/acpi.h       |  7 +++++
+>>>  arch/arm64/kernel/acpi.c            | 52 +++++++++++++++++++++++++++++++++----
+>>>  3 files changed, 56 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>>> index bfcb1a6..d6c35a7 100644
+>>> --- a/Documentation/kernel-parameters.txt
+>>> +++ b/Documentation/kernel-parameters.txt
+>>> @@ -165,7 +165,7 @@ multipliers 'Kilo', 'Mega', and 'Giga', equalling 2^10, 2^20, and 2^30
+>>>  bytes respectively. Such letter suffixes can also be entirely omitted.
+>>>
+>>>
+>>> -     acpi=           [HW,ACPI,X86]
+>>> +     acpi=           [HW,ACPI,X86,ARM64]
+>>>                       Advanced Configuration and Power Interface
+>>>                       Format: { force | off | strict | noirq | rsdt }
+>>>                       force -- enable ACPI if default was off
+>>> @@ -175,6 +175,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>>                               strictly ACPI specification compliant.
+>>>                       rsdt -- prefer RSDT over (default) XSDT
+>>>                       copy_dsdt -- copy DSDT to memory
+>>> +                     For ARM64, ONLY "acpi=off" or "acpi=force" are available
+>>>
+>>>                       See also Documentation/power/runtime_pm.txt, pci=noacpi
+>>>
+>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>>> index 40e0924..c5a9b97 100644
+>>> --- a/arch/arm64/include/asm/acpi.h
+>>> +++ b/arch/arm64/include/asm/acpi.h
+>>> @@ -39,6 +39,13 @@ static inline void disable_acpi(void)
+>>>       acpi_noirq = 1;
+>>>  }
+>>>
+>>> +static inline void enable_acpi(void)
+>>> +{
+>>> +     acpi_disabled = 0;
+>>> +     acpi_pci_disabled = 0;
+>>> +     acpi_noirq = 0;
+>>> +}
+>>> +
+>>>  /*
+>>>   * It's used from ACPI core in kdump to boot UP system with SMP kernel,
+>>>   * with this check the ACPI core will not override the CPU index
+>>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>> index 7abac24..2269e30 100644
+>>> --- a/arch/arm64/kernel/acpi.c
+>>> +++ b/arch/arm64/kernel/acpi.c
+>>> @@ -22,15 +22,49 @@
+>>>  #include <linux/irq.h>
+>>>  #include <linux/irqdomain.h>
+>>>  #include <linux/memblock.h>
+>>> +#include <linux/of_fdt.h>
+>>>  #include <linux/smp.h>
+>>>
+>>> -int acpi_noirq;                      /* skip ACPI IRQ initialization */
+>>> -int acpi_disabled;
+>>> +int acpi_noirq = 1;          /* skip ACPI IRQ initialization */
+>>> +int acpi_disabled = 1;
+>>>  EXPORT_SYMBOL(acpi_disabled);
+>>>
+>>> -int acpi_pci_disabled;               /* skip ACPI PCI scan and IRQ initialization */
+>>> +int acpi_pci_disabled = 1;   /* skip ACPI PCI scan and IRQ initialization */
+>>>  EXPORT_SYMBOL(acpi_pci_disabled);
+>>>
+>>> +static bool param_acpi_off __initdata;
+>>> +static bool param_acpi_force __initdata;
+>>> +
+>>> +static int __init parse_acpi(char *arg)
+>>> +{
+>>> +     if (!arg)
+>>> +             return -EINVAL;
+>>> +
+>>> +     /* "acpi=off" disables both ACPI table parsing and interpreter */
+>>> +     if (strcmp(arg, "off") == 0)
+>>> +             param_acpi_off = true;
+>>> +     else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+>>> +             param_acpi_force = true;
+>>> +     else
+>>> +             return -EINVAL; /* Core will print when we return error */
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +early_param("acpi", parse_acpi);
+>>> +
+>>> +static int __init dt_scan_depth1_nodes(unsigned long node,
+>>> +                                    const char *uname, int depth,
+>>> +                                    void *data)
+>>> +{
+>>> +     /*
+>>> +      * Return 1 as soon as we encounter a node at depth 1 that is
+>>> +      * not the /chosen node.
+>>> +      */
+>>> +     if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>> +             return 1;
+>>> +     return 0;
+>>> +}
+>>> +
+>>>  /*
+>>>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>>>   * or early_memremap() should be called here to for ACPI table mapping.
+>>> @@ -83,10 +117,18 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+>>>   */
+>>>  void __init acpi_boot_table_init(void)
+>>>  {
+>>> -     /* If acpi_disabled, bail out */
+>>> -     if (acpi_disabled)
+>>> +     /*
+>>> +      * Enable ACPI instead of device tree unless
+>>> +      * - ACPI has been disabled explicitly (acpi=off), or
+>>> +      * - the device tree is not empty (it has more than just a /chosen node)
+>>> +      *   and ACPI has not been force enabled (acpi=force)
+>>> +      */
+>>> +     if (param_acpi_off ||
+>>> +         (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>>               return;
+>>>
+>>> +     enable_acpi();
+>>> +
+>>>       /* Initialize the ACPI boot-time table parser. */
+>>>       if (acpi_table_init()) {
+>>>               disable_acpi();
+>>> --
+>>> 1.9.1
+>>>
+>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> .
+>
