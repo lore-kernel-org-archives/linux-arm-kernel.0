@@ -1,24 +1,32 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 19 Mar 2015 09:42:24 +0000
-Subject: [Linux-kernel] ATSAMA5D big endian work
-In-Reply-To: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <550A9A00.9060808@codethink.co.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Mar 2015 10:48:50 +0100
+Subject: [PATCH 1/2] MAINTAINERS: change the Atmel audio alsa driver entry
+Message-ID: <1426758530-7656-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/03/15 15:52, Ben Dooks wrote:
-> I have been testing the ATSAMA5D36 xplained board with big endian and
-> the following are the fixes to get the system working.
+I take over the the maintainship of Atmel alsa drivers from Voice.
+Thanks for your work!
 
-As a note, I am still having issues with the macb driver (DMA HRESP
-faults) which don't happen on the Xilinx version of this. Since I
-have no data on the block I could do with some feedback from ATMEL
-on this.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Bo Shen <voice.shen@atmel.com>
+Cc: Mark Brown <broonie@linaro.org>
+---
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I still have yet to fix the NAND driver, but do not have any time
-today to re-visit this.
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ddc5a8cf9a8a..679b2d0cb2d1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1751,7 +1751,7 @@ S:	Supported
+ F:	drivers/tty/serial/atmel_serial.c
+ 
+ ATMEL Audio ALSA driver
+-M:	Bo Shen <voice.shen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+ S:	Supported
+ F:	sound/soc/atmel
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+2.1.3
