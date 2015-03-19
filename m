@@ -1,117 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 20 Mar 2015 01:19:03 +0800
-Subject: [PATCH 1/6] clk: sunxi: Add muxable ahb factors clock for sun5i and
- sun7i
+Date: Fri, 20 Mar 2015 01:19:08 +0800
+Subject: [PATCH 6/6] ARM: dts: sunxi: Update ahb clocks for sun5i and sun7i
 In-Reply-To: <1426785548-5932-1-git-send-email-wens@csie.org>
 References: <1426785548-5932-1-git-send-email-wens@csie.org>
-Message-ID: <1426785548-5932-2-git-send-email-wens@csie.org>
+Message-ID: <1426785548-5932-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AHB clock on sun5i and sun7i are muxable divider clocks.
-Use a factors clock to support them.
+The clock driver now supports a muxable ahb clock. Update the dtsi
+with the proper compatible and add the new parent clocks.
+
+This also adds the new pll6/4 output for pll6 on sun7i-a20. The
+output is not used on sun4/5i.
+
+Also use assigned-clocks to reparent ahb to pll6. We want ahb to
+have a stable, non-changing clock rate. cpu/axi clock rate changes
+as a result of newly added cpufreq support.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sunxi.c                     | 52 +++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
+ arch/arm/boot/dts/sun5i.dtsi     | 10 ++++++++--
+ arch/arm/boot/dts/sun7i-a20.dtsi | 13 ++++++++++---
+ 2 files changed, 18 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 3f1dcd879af7..4fa11af3d378 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -20,6 +20,7 @@ Required properties:
- 	"allwinner,sun8i-a23-axi-clk" - for the AXI clock on A23
- 	"allwinner,sun4i-a10-axi-gates-clk" - for the AXI gates
- 	"allwinner,sun4i-a10-ahb-clk" - for the AHB clock
-+	"allwinner,sun5i-a13-ahb-clk" - for the AHB clock on A13
- 	"allwinner,sun9i-a80-ahb-clk" - for the AHB bus clocks on A80
- 	"allwinner,sun4i-a10-ahb-gates-clk" - for the AHB gates on A10
- 	"allwinner,sun5i-a13-ahb-gates-clk" - for the AHB gates on A13
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index b6f28ac4f9d5..ae7b1c4d6aae 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -482,6 +482,45 @@ static void sun6i_a31_get_pll6_factors(u32 *freq, u32 parent_rate,
- }
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index e42cbb03620f..df79b4c75b34 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -150,10 +150,16 @@
  
- /**
-+ * sun5i_a13_get_ahb_factors() - calculates m, p factors for AHB
-+ * AHB rate is calculated as follows
-+ * rate = parent_rate >> p
-+ */
-+
-+static void sun5i_a13_get_ahb_factors(u32 *freq, u32 parent_rate,
-+				       u8 *n, u8 *k, u8 *m, u8 *p)
-+{
-+	u32 div;
-+
-+	/* divide only */
-+	if (parent_rate < *freq)
-+		*freq = parent_rate;
-+
-+	/*
-+	 * user manual says valid speed is 8k ~ 276M, but tests show it
-+	 * can work@speeds up to 300M, just after reparenting to pll6
-+	 */
-+	if (*freq < 8000)
-+		*freq = 8000;
-+	if (*freq > 300000000)
-+		*freq = 300000000;
-+
-+	div = order_base_2(DIV_ROUND_UP(parent_rate, *freq));
-+
-+	/* p = 0 ~ 3 */
-+	if (div > 3)
-+		div = 3;
-+
-+	*freq = parent_rate >> div;
-+
-+	/* we were called to round the frequency, we can now return */
-+	if (p == NULL)
-+		return;
-+
-+	*p = div;
-+}
-+
-+/**
-  * sun4i_get_apb1_factors() - calculates m, p factors for APB1
-  * APB1 rate is calculated as follows
-  * rate = (parent_rate >> p) / (m + 1);
-@@ -616,6 +655,11 @@ static struct clk_factors_config sun6i_a31_pll6_config = {
- 	.n_start = 1,
- };
+ 		ahb: ahb at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun5i-a13-ahb-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&axi>;
++			clocks = <&axi>, <&cpu>, <&pll6 1>;
+ 			clock-output-names = "ahb";
++			/*
++			 * Use PLL6 as parent, instead of CPU/AXI
++			 * which has rate changes due to cpufreq
++			 */
++			assigned-clocks = <&ahb>;
++			assigned-clock-parents = <&pll6 1>;
+ 		};
  
-+static struct clk_factors_config sun5i_a13_ahb_config = {
-+	.pshift = 4,
-+	.pwidth = 2,
-+};
-+
- static struct clk_factors_config sun4i_apb1_config = {
- 	.mshift = 0,
- 	.mwidth = 5,
-@@ -676,6 +720,13 @@ static const struct factors_data sun6i_a31_pll6_data __initconst = {
- 	.name = "pll6x2",
- };
+ 		apb0: apb0 at 01c20054 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 3a8530b79f1c..52538beb969a 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -225,7 +225,8 @@
+ 			compatible = "allwinner,sun4i-a10-pll6-clk";
+ 			reg = <0x01c20028 0x4>;
+ 			clocks = <&osc24M>;
+-			clock-output-names = "pll6_sata", "pll6_other", "pll6";
++			clock-output-names = "pll6_sata", "pll6_other", "pll6",
++					     "pll6_div_4";
+ 		};
  
-+static const struct factors_data sun5i_a13_ahb_data __initconst = {
-+	.mux = 6,
-+	.muxmask = BIT(1) | BIT(0),
-+	.table = &sun5i_a13_ahb_config,
-+	.getter = sun5i_a13_get_ahb_factors,
-+};
-+
- static const struct factors_data sun4i_apb1_data __initconst = {
- 	.mux = 24,
- 	.muxmask = BIT(1) | BIT(0),
-@@ -1184,6 +1235,7 @@ static const struct of_device_id clk_factors_match[] __initconst = {
- 	{.compatible = "allwinner,sun6i-a31-pll1-clk", .data = &sun6i_a31_pll1_data,},
- 	{.compatible = "allwinner,sun8i-a23-pll1-clk", .data = &sun8i_a23_pll1_data,},
- 	{.compatible = "allwinner,sun7i-a20-pll4-clk", .data = &sun7i_a20_pll4_data,},
-+	{.compatible = "allwinner,sun5i-a13-ahb-clk", .data = &sun5i_a13_ahb_data,},
- 	{.compatible = "allwinner,sun4i-a10-apb1-clk", .data = &sun4i_apb1_data,},
- 	{.compatible = "allwinner,sun7i-a20-out-clk", .data = &sun7i_a20_out_data,},
- 	{}
+ 		pll8: clk at 01c20040 {
+@@ -254,10 +255,16 @@
+ 
+ 		ahb: ahb at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun5i-a13-ahb-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&axi>;
++			clocks = <&axi>, <&pll6 3>, <&pll6 1>;
+ 			clock-output-names = "ahb";
++			/*
++			 * Use PLL6 as parent, instead of CPU/AXI
++			 * which has rate changes due to cpufreq
++			 */
++			assigned-clocks = <&ahb>;
++			assigned-clock-parents = <&pll6 3>;
+ 		};
+ 
+ 		ahb_gates: clk at 01c20060 {
 -- 
 2.1.4
