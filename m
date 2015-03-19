@@ -1,192 +1,80 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 19 Mar 2015 09:38:56 -0700
-Subject: [PATCH 1/2] input: keypad: tc3589x: localize platform data
-In-Reply-To: <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150319163856.GF30732@dtor-ws>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Mar 2015 16:39:55 +0000
+Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <20150319162753.GC4751@arm.com>
+References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
+ <20150319154435.GC25967@leverpostej>
+ <20150319160008.GA4751@arm.com>
+ <20150319161143.GE25967@leverpostej>
+ <20150319162753.GC4751@arm.com>
+Message-ID: <20150319163955.GG25967@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Thu, Mar 19, 2015 at 03:52:44PM +0100, Linus Walleij wrote:
-> This driver can only get its platform data from the device tree,
-> and all platforms using it does that. Localize the platform data
-> for the keypad. A later patch will enforce the device tree / OF
-> dependence.
+On Thu, Mar 19, 2015 at 04:27:53PM +0000, Will Deacon wrote:
+> On Thu, Mar 19, 2015 at 04:11:44PM +0000, Mark Rutland wrote:
+> > On Thu, Mar 19, 2015 at 04:00:09PM +0000, Will Deacon wrote:
+> > > On Thu, Mar 19, 2015 at 03:44:36PM +0000, Mark Rutland wrote:
+> > > > On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
+> > > > > +/*
+> > > > > + * Modules aren't allowed to use preempt_enable_no_resched, and it is
+> > > > > + * undef'ed. If we are unable to use preempt_enable_no_resched, then
+> > > > > + * fallback to the standard preempt_enable.
+> > > > > + */
+> > > > > +#ifdef preempt_enable_no_resched
+> > > > > +#define __pcp_preempt_enable()	preempt_enable_no_resched()
+> > > > > +#else
+> > > > > +#define __pcp_preempt_enable()	preempt_enable()
+> > > > > +#endif /* preempt_enable_no_resched */
+> > > > 
+> > > > I think it would be worth mentioning in the comment why we want to use
+> > > > preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
+> > > > sequences where we want to have as few retries as possible).
+> > > 
+> > > Hmm, I'm not sure I agree with that. In the interest of throughput, I can
+> > > understand that you want to minimise the retries but since preempt kernels
+> > > are all about minimising latency then actually scheduling when a cmpxchg
+> > > loop fail sounds pretty ideal to me.
+> > 
+> > I'm on about scheduling at the end of the read, before the cmpxchg. It's
+> > basically asking for another thread to make the read stale (and hence
+> > the cmpxchg is very likely to fail).
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Dmitry it would be great if you could ACK this patch so Lee can
-> take it with the other patch through MFD.
-
-It looks like if you are making this OF-only you can get rid of pdata
-altogether and parse the OF data directly into the keypad. But that can
-be done later.
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-Thanks.
-
-> ---
->  drivers/input/keyboard/tc3589x-keypad.c | 49 ++++++++++++++++++++++-----------
->  include/linux/mfd/tc3589x.h             | 23 ----------------
->  2 files changed, 33 insertions(+), 39 deletions(-)
+> /me gets introduced to SLUB's slab_alloc_node.
 > 
-> diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
-> index 563932500ff1..0ccc7de9b59d 100644
-> --- a/drivers/input/keyboard/tc3589x-keypad.c
-> +++ b/drivers/input/keyboard/tc3589x-keypad.c
-> @@ -70,6 +70,28 @@
->  #define TC3589x_KBD_INT_CLR	0x1
->  
->  /**
-> + * struct tc35893_keypad_platform_data - platform specific keypad data
-> + * @keymap_data:        matrix scan code table for keycodes
-> + * @krow:               mask for available rows, value is 0xFF
-> + * @kcol:               mask for available columns, value is 0xFF
-> + * @debounce_period:    platform specific debounce time
-> + * @settle_time:        platform specific settle down time
-> + * @irqtype:            type of interrupt, falling or rising edge
-> + * @enable_wakeup:      specifies if keypad event can wake up system from sleep
-> + * @no_autorepeat:      flag for auto repetition
-> + */
-> +struct tc3589x_keypad_platform_data {
-> +	const struct matrix_keymap_data *keymap_data;
-> +	u8                      krow;
-> +	u8                      kcol;
-> +	u8                      debounce_period;
-> +	u8                      settle_time;
-> +	unsigned long           irqtype;
-> +	bool                    enable_wakeup;
-> +	bool                    no_autorepeat;
-> +};
-> +
-> +/**
->   * struct tc_keypad - data structure used by keypad driver
->   * @tc3589x:    pointer to tc35893
->   * @input:      pointer to input device object
-> @@ -360,23 +382,19 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
->  	struct tc3589x *tc3589x = dev_get_drvdata(pdev->dev.parent);
->  	struct tc_keypad *keypad;
->  	struct input_dev *input;
-> -	const struct tc3589x_keypad_platform_data *plat;
->  	int error, irq;
->  
-> -	plat = tc3589x->pdata->keypad;
-> -	if (!plat) {
-> -		plat = tc3589x_keypad_of_probe(&pdev->dev);
-> -		if (IS_ERR(plat)) {
-> -			dev_err(&pdev->dev, "invalid keypad platform data\n");
-> -			return PTR_ERR(plat);
-> -		}
-> -	}
-> -
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0)
->  		return irq;
->  
->  	keypad = kzalloc(sizeof(struct tc_keypad), GFP_KERNEL);
-> +	keypad->board = tc3589x_keypad_of_probe(&pdev->dev);
-> +	if (IS_ERR(keypad->board)) {
-> +		dev_err(&pdev->dev, "invalid keypad platform data\n");
-> +		return PTR_ERR(keypad->board);
-> +	}
-> +
->  	input = input_allocate_device();
->  	if (!keypad || !input) {
->  		dev_err(&pdev->dev, "failed to allocate keypad memory\n");
-> @@ -384,7 +402,6 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
->  		goto err_free_mem;
->  	}
->  
-> -	keypad->board = plat;
->  	keypad->input = input;
->  	keypad->tc3589x = tc3589x;
->  
-> @@ -395,7 +412,7 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
->  	input->open = tc3589x_keypad_open;
->  	input->close = tc3589x_keypad_close;
->  
-> -	error = matrix_keypad_build_keymap(plat->keymap_data, NULL,
-> +	error = matrix_keypad_build_keymap(keypad->board->keymap_data, NULL,
->  					   TC3589x_MAX_KPROW, TC3589x_MAX_KPCOL,
->  					   NULL, input);
->  	if (error) {
-> @@ -406,13 +423,13 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
->  	keypad->keymap = input->keycode;
->  
->  	input_set_capability(input, EV_MSC, MSC_SCAN);
-> -	if (!plat->no_autorepeat)
-> +	if (!keypad->board->no_autorepeat)
->  		__set_bit(EV_REP, input->evbit);
->  
->  	input_set_drvdata(input, keypad);
->  
->  	error = request_threaded_irq(irq, NULL, tc3589x_keypad_irq,
-> -				     plat->irqtype | IRQF_ONESHOT,
-> +				     keypad->board->irqtype | IRQF_ONESHOT,
->  				     "tc3589x-keypad", keypad);
->  	if (error < 0) {
->  		dev_err(&pdev->dev,
-> @@ -428,8 +445,8 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
->  	}
->  
->  	/* let platform decide if keypad is a wakeup source or not */
-> -	device_init_wakeup(&pdev->dev, plat->enable_wakeup);
-> -	device_set_wakeup_capable(&pdev->dev, plat->enable_wakeup);
-> +	device_init_wakeup(&pdev->dev, keypad->board->enable_wakeup);
-> +	device_set_wakeup_capable(&pdev->dev, keypad->board->enable_wakeup);
->  
->  	platform_set_drvdata(pdev, keypad);
->  
-> diff --git a/include/linux/mfd/tc3589x.h b/include/linux/mfd/tc3589x.h
-> index c203c9c56776..468c31a27fcf 100644
-> --- a/include/linux/mfd/tc3589x.h
-> +++ b/include/linux/mfd/tc3589x.h
-> @@ -140,36 +140,13 @@ extern int tc3589x_set_bits(struct tc3589x *tc3589x, u8 reg, u8 mask, u8 val);
->  #define TC_KPD_DEBOUNCE_PERIOD  0xA3
->  #define TC_KPD_SETTLE_TIME      0xA3
->  
-> -/**
-> - * struct tc35893_platform_data - data structure for platform specific data
-> - * @keymap_data:        matrix scan code table for keycodes
-> - * @krow:               mask for available rows, value is 0xFF
-> - * @kcol:               mask for available columns, value is 0xFF
-> - * @debounce_period:    platform specific debounce time
-> - * @settle_time:        platform specific settle down time
-> - * @irqtype:            type of interrupt, falling or rising edge
-> - * @enable_wakeup:      specifies if keypad event can wake up system from sleep
-> - * @no_autorepeat:      flag for auto repetition
-> - */
-> -struct tc3589x_keypad_platform_data {
-> -	const struct matrix_keymap_data *keymap_data;
-> -	u8                      krow;
-> -	u8                      kcol;
-> -	u8                      debounce_period;
-> -	u8                      settle_time;
-> -	unsigned long           irqtype;
-> -	bool                    enable_wakeup;
-> -	bool                    no_autorepeat;
-> -};
->  
->  /**
->   * struct tc3589x_platform_data - TC3589x platform data
->   * @block: bitmask of blocks to enable (use TC3589x_BLOCK_*)
-> - * @keypad: keypad-specific platform data
->   */
->  struct tc3589x_platform_data {
->  	unsigned int block;
-> -	const struct tc3589x_keypad_platform_data *keypad;
->  };
->  
->  #endif
-> -- 
-> 1.9.3
+> > Scheduling after the cmpxchg is fine.
 > 
+> I still don't think the slub code warrants using preempt_enable_no_resched,
+> for a number of reasons:
+> 
+>   (1) s390 uses preempt_enable, so it doesn't appear to be the end of the
+>       world
+> 
+>   (2) The slub code is well aware of what it's doing, but doesn't consider
+>       it an issue:
+> 
+>       * [...] We may switch back and forth between cpus while
+>       * reading from one cpu area. That does not matter as long
+>       * as we end up on the original cpu again when doing
+>       * the cmpxchg.
 
--- 
-Dmitry
+Sure, the code is correct regardless, on both of these points.
+
+>   (3) Preemption isn't actually an issue here -- CPU migration is. I'd
+>       expect that to be a lot rarer.
+
+That's not true: in a read-modify-cmpxchg loop (even on a UP system) if
+you get preempted at the end of the read and another thread modifies
+your datastructure, then your subsequent cmpxchg will fail. So any
+preemption could cause you to have to retry, so you want to miminise
+potential preemptions.
+
+Note that this is a performance argument rather than a correctness
+argument.
+
+>   (4) Having different preempt behaviour depending on whether or not
+>       something is built as a module is bloody horrible
+
+Agreed.
+
+Mark.
