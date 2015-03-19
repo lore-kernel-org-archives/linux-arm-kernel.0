@@ -1,87 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Mar 2015 09:57:38 +0000
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CABb+yY0tMwYTFDvF2Gce4h5xhKOboLS=32yK42-eoksZ8SAbZA@mail.gmail.com>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
- <20150318131226.GM3318@x1>
- <CABb+yY2HwZn3VSvZ4iVfWE8GrsLDA6Tx_V2HZiOBvJb9UHY2Mg@mail.gmail.com>
- <20150318152658.GO3318@x1>
- <CABb+yY0tMwYTFDvF2Gce4h5xhKOboLS=32yK42-eoksZ8SAbZA@mail.gmail.com>
-Message-ID: <20150319095738.GY3318@x1>
+Date: Thu, 19 Mar 2015 10:04:37 +0000
+Subject: [PATCH 1/3] mfd: devicetree: qcom_rpm: document IPQ8064 resources
+In-Reply-To: <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
+References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
+ <1416512485-7292-2-git-send-email-joshc@codeaurora.org>
+Message-ID: <20150319100437.GZ3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Jassi Brar wrote:
+On Thu, 20 Nov 2014, Josh Cartwright wrote:
 
-> On Wed, Mar 18, 2015 at 8:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 18 Mar 2015, Jassi Brar wrote:
+> The IPQ8064 SoC has several RPM-controlled resources, an NSS fabrick
+> clock and four regulator resources.  Provide definitions for them.
 > 
-> >> >> > +                       mbox->irq = irq_create_mapping(mbinst->irq_domain,
-> >> >> > +                                                      mbox->rx_id);
-> >> >> >
-> >> >> simply assigning same IRQ to all controller DT nodes and using
-> >> >> IRQF_SHARED for the common handler, wouldn't work?
-> >> >
-> >> > I do have intentions to simplify this driver somewhat, but that will
-> >> > take some time as it will require a great deal of consultation and
-> >> > testing from the ST side.  This is the current internal implementation
-> >> > which is used in the wild and has been fully tested.  If you'll allow
-> >> > me to conduct my adaptions subsequently we can have full history and a
-> >> > possible reversion plan if anything untoward take place i.e. I mess
-> >> > something up.
-> >> >
-> >> OK, but wouldn't that break the bindings of this driver when you
-> >> eventually do that?
-> >
-> > That's going to happen regardless, since these bindings are already in
-> > use internally.  Mainline (i.e. v4.0+) isn't going to be used in
-> > products for years to come, so we have a lot of time until any new
-> > bindings become ABI.
-> >
-> I thought time starts from upstream. It doesn't seem right to
-> knowingly introduce a binding that we are going to break in coming
-> weeks. For this reason, it needs ACK from some DT maintainer.
+> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/qcom-rpm.txt | 6 +++++-
+>  include/dt-bindings/mfd/qcom-rpm.h                 | 6 ++++++
+>  2 files changed, 11 insertions(+), 1 deletion(-)
 
-Time starts from when binding comes out of active development mode and
-becomes ABI.  I can issue a statement in the binding document to say
-that is in a state of flux if that makes you feel better about it.
+Applied with Stephen's Ack.
 
-Development bindings change all the time.
-
-> >> >> > + * struct sti_mbox_msg - sti mailbox message description
-> >> >> > + * @dsize:             data payload size
-> >> >> > + * @pdata:             message data payload
-> >> >> > + */
-> >> >> > +struct sti_mbox_msg {
-> >> >> > +       u32             dsize;
-> >> >> > +       u8              *pdata;
-> >> >> > +};
-> >> >> >
-> >> >> There isn't any client driver in this patchset to tell exactly, but it
-> >> >> seems the header could be split into one shared between mailbox
-> >> >> clients and provider and another internal to client/provider ?
-> >> >
-> >> > I believe only the above will be required by the client.  Seems silly
-> >> > to create a client specific header just for that, don't you think?
-> >> >
-> >> Do you mean to have copies of the structure in controller and client driver? :O
-> >
-> > I do not.  I planned on sharing the main header with with client
-> > also.
-> >
-> > But I guess by your reaction you suggest having a teeny client header
-> > as the best way forward then.
-> >
-> Yes, please.
-
-Roger red leader.
-
-> And also no header that's included by exactly one file.
-
-So you also want me to drag in all of the controller structs into the
-driver?
+> diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> index 4264021..6d4e3ec 100644
+> --- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> +++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
+> @@ -12,6 +12,7 @@ frequencies.
+>  		    "qcom,rpm-apq8064"
+>  		    "qcom,rpm-msm8660"
+>  		    "qcom,rpm-msm8960"
+> +		    "qcom,rpm-ipq8064"
+>  
+>  - reg:
+>  	Usage: required
+> @@ -67,6 +68,7 @@ of valid subnodes that can operate on these resources.
+>  		    "qcom,rpm-pm8901-ftsmps"
+>  		    "qcom,rpm-pm8921-smps"
+>  		    "qcom,rpm-pm8921-ftsmps"
+> +		    "qcom,rpm-smb208"
+>  
+>  - reg:
+>  	Usage: required
+> @@ -76,7 +78,9 @@ of valid subnodes that can operate on these resources.
+>  		    QCOM_RPM_PM8058_SMPS0 - QCOM_RPM_PM8058_SMPS4,
+>  		    QCOM_RPM_PM8821_SMPS1 - QCOM_RPM_PM8821_SMPS2,
+>  		    QCOM_RPM_PM8901_SMPS0 - QCOM_RPM_PM8901_SMPS4,
+> -		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8
+> +		    QCOM_RPM_PM8921_SMPS1 - QCOM_RPM_PM8921_SMPS8,
+> +		    QCOM_RPM_SMB208_S1a, QCOM_RPM_SMB208_S1b,
+> +		    QCOM_RPM_SMB208_S2a, QCOM_RPM_SMB208_S2b
+>  
+>  - bias-pull-down:
+>  	Usage: optional
+> diff --git a/include/dt-bindings/mfd/qcom-rpm.h b/include/dt-bindings/mfd/qcom-rpm.h
+> index 388a6f3..13a9d4b 100644
+> --- a/include/dt-bindings/mfd/qcom-rpm.h
+> +++ b/include/dt-bindings/mfd/qcom-rpm.h
+> @@ -141,6 +141,12 @@
+>  #define QCOM_RPM_SYS_FABRIC_MODE		131
+>  #define QCOM_RPM_USB_OTG_SWITCH			132
+>  #define QCOM_RPM_VDDMIN_GPIO			133
+> +#define QCOM_RPM_NSS_FABRIC_0_CLK		134
+> +#define QCOM_RPM_NSS_FABRIC_1_CLK		135
+> +#define QCOM_RPM_SMB208_S1a			136
+> +#define QCOM_RPM_SMB208_S1b			137
+> +#define QCOM_RPM_SMB208_S2a			138
+> +#define QCOM_RPM_SMB208_S2b			139
+>  
+>  /*
+>   * Constants used to select force mode for regulators.
 
 -- 
 Lee Jones
