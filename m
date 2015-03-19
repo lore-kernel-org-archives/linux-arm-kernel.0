@@ -1,74 +1,26 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Mar 2015 16:44:25 +0100
-Subject: [PATCH] driver core / PM: Add callbacks for PM domain
- initialization/cleanup
-In-Reply-To: <CAPDyKFqmSoKEfbtowk1h0USf4LcJvH1qVYgqkh7VFc7iekyaNQ@mail.gmail.com>
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <Pine.LNX.4.44L0.1503191017590.1135-100000@iolanthe.rowland.org>
- <CAPDyKFqmSoKEfbtowk1h0USf4LcJvH1qVYgqkh7VFc7iekyaNQ@mail.gmail.com>
-Message-ID: <2137701.iWHrxeTcxg@vostro.rjw.lan>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 19 Mar 2015 16:22:58 +0100
+Subject: [PATCH v3 1/2] i2c: dt binding documentation for the Digicolor
+ I2C controller
+In-Reply-To: <7f61d9379c89db43f5b7f65c408433dd0d82a88a.1426763807.git.baruch@tkos.co.il>
+References: <7f61d9379c89db43f5b7f65c408433dd0d82a88a.1426763807.git.baruch@tkos.co.il>
+Message-ID: <20150319152258.GA7657@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 19, 2015 03:45:07 PM Ulf Hansson wrote:
-> On 19 March 2015 at 15:20, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
-> >
-> >> > This doesn't make sense to me.  A bus just called bus_add_device, it can
-> >> > do whatever it wanted to right before calling this function, no need for
-> >> > another callback.
-> >>
-> >> The only caller of bus_add_device() is device_add().
-> >>
-> >> What do you mean by "bus just called bus_add_device"?  Do you think that
-> >> the pm_domain pointer should be populated before calling device_add()?
-> >>
-> >> That wouldn't work for the ACPI PM domain at least, because ACPI companions
-> >> are generally added during device_add() and we arguably cannot point a
-> >> device to the ACPI PM domain before its ACPI companion is set.
-> >
-> >
-> >> There are two alternatives to them.  One is to do PM domain attach/detach in
-> >> the bus type's ->probe and ->remove, but that's suboptimal, because it is
-> >> then carried out every time a driver is probed/removed for a device.  The
-> >> other one would be to have each interested bus type register a bus type
-> >> notifier for itself, but that would be rather ugly, wouldn't it?
-> >
-> > Driver probing and removal is not a hot path.  Successful probes
-> > usually occur only once for each device.  I don't know how many
-> > unsuccessful probes there are on average, but probably not many.
-> >
-> > Doing the PM domain attach/detach in ->probe and ->remove makes sense
-> > to me.
+On Thu, Mar 19, 2015 at 01:16:46PM +0200, Baruch Siach wrote:
+> The CX92755 is an SoC in the Conexant Digicolor series. This devicetree binding
+> document describes the I2C controller on the CX92755 SoC, that is also shared
+> by some other SoCs in the Digicolor series.
 > 
-> Let me elaborate a bit on the current approach, with PM domain
-> attach/detach in ->probe() and ->remove(). This comes with the
-> following limitations.
-> 
-> 1) If the device gets probed earlier than the PM domain has been
-> initialized, we can't return -EPROBE_DEFER since we just don't know
-> anything about the PM domain yet.
-> 
-> 2) The PM domain won't be able to operate on a device without having a
-> driver bound to it, since the device's PM domain pointer is removed at
-> ->remove().
-> 
-> Perhaps Rafael want to add something to these? I don't know whether we
-> think it's okay to keep these limitations or not.
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-There are arguments both ways as you can see.
+Applied to for-next, thanks!
 
-At this point, the most straightforward approach would be to apply the Russell's
-patch adding the ->sync callback alone.
-
-I will then need the ->activate callback for another use case (a PM domain that
-may not be ready for the device to be probed), but in that case I actually know
-that the pm_domain pointer is populated at the really_probe() time.
-
-Going forward we may want to move the attach/detach operations for genpd and
-the ACPI PM domain out of bus type ->probe, but I think that can wait.
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/a2afda6f/attachment.sig>
