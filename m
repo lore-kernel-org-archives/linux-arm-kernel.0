@@ -1,63 +1,99 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 19 Mar 2015 16:46:18 +0000 (UTC)
-Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
- address change
-In-Reply-To: <alpine.DEB.2.02.1503191601520.9480@utopia.booyaka.com>
-References: <20150317083221.32662.14647.stgit@baseline>
- <20150317083221.32662.96822.stgit@baseline>
- <20150317103806.GU8656@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
- <550AEE6B.5080301@wwwdotorg.org>
- <alpine.DEB.2.02.1503191601520.9480@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.02.1503191645350.9480@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Mar 2015 17:46:47 +0100
+Subject: [PATCH 10/13] usb: gadget: atmel_usba: use endian agnostic IO
+ on ARM
+In-Reply-To: <1426693992-31163-11-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-11-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <550AFD77.1080901@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Paul Walmsley wrote:
-
-> On Thu, 19 Mar 2015, Stephen Warren wrote:
+Le 18/03/2015 16:53, Ben Dooks a ?crit :
+> Change from using the __raw IO accesors to the endian agnostic versions
+> of readl/writel_relaxed when not on AVR32. This fixes issues with running
+> big endian on ARMv7.
 > 
-> > On 03/19/2015 09:26 AM, Paul Walmsley wrote:
-> > > On Tue, 17 Mar 2015, Russell King - ARM Linux wrote:
-> > > 
-> > > > On Tue, Mar 17, 2015 at 01:32:21AM -0700, Paul Walmsley wrote:
-> > > > >   Required properties:
-> > > > >   - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
-> > > > > -  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
-> > > > > -  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
-> > > > > -  tegra132, or tegra210.
-> > > > > -- reg : Should contain 1 register ranges(address and length)
-> > > > > +  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and
-> > > > > Tegra124, must
-> > > > > +  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is
-> > > > > tegra114
-> > > > > +  or tegra124.  For Tegra132, the compatible string must contain
-> > > > > +  "nvidia,tegra132-ahb".
-> > > > > +
-> > > > > +- reg : Should contain 1 register ranges(address and length).  On
-> > > > > Tegra20,
-> > > > > +  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical
-> > > > > base
-> > > > > +  address of the IP block must end in 0x04.  On DT files for later
-> > > > > chips, the
-> > > > > +  actual hardware base address of the IP block should be used.
-> > > > 
-> > > > You could check that in the driver.  If you can check it in the driver,
-> > > > you can also decide to ignore it if it were offset by 0x04 (possibly
-> > > > printing a warning.)  That opens up the ability to fix the older Tegra
-> > > > DT files going forward while still remaining compatible with existing
-> > > > DT files, and avoiding the need for a complex note about this.
-> > > 
-> > > That's fine, I'll do that and drop this patch.
-> > 
-> > Don't we still want to update the DT binding documentation to state what the
-> > preferred base address (or at least set of legal base addresses) is/are?
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Felipe, for the record:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, bye.
+
+> CC: Felipe Balbi <balbi@ti.com>
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> CC: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c |  4 ++--
+>  drivers/usb/gadget/udc/atmel_usba_udc.h | 22 ++++++++++++++++------
+>  2 files changed, 18 insertions(+), 8 deletions(-)
 > 
-> As far as I know, the DT binding documents are intended to be a 
-> reference for IP block integration data like base addresses. 
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index d79cb35..be2f503 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -152,7 +152,7 @@ static int regs_dbg_open(struct inode *inode, struct file *file)
+>  
+>  	spin_lock_irq(&udc->lock);
+>  	for (i = 0; i < inode->i_size / 4; i++)
+> -		data[i] = __raw_readl(udc->regs + i * 4);
+> +		data[i] = usba_io_readl(udc->regs + i * 4);
+>  	spin_unlock_irq(&udc->lock);
+>  
+>  	file->private_data = data;
+> @@ -1249,7 +1249,7 @@ static int handle_ep0_setup(struct usba_udc *udc, struct usba_ep *ep,
+>  		if (crq->wLength != cpu_to_le16(sizeof(status)))
+>  			goto stall;
+>  		ep->state = DATA_STAGE_IN;
+> -		__raw_writew(status, ep->fifo);
+> +		usba_io_writew(status, ep->fifo);
+>  		usba_ep_writel(ep, SET_STA, USBA_TX_PK_RDY);
+>  		break;
+>  	}
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+> index 497cd18..92bd486 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.h
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+> @@ -191,18 +191,28 @@
+>  	 | USBA_BF(name, value))
+>  
+>  /* Register access macros */
+> +#ifdef CONFIG_AVR32
+> +#define usba_io_readl	__raw_readl
+> +#define usba_io_writel	__raw_writel
+> +#define usba_io_writew	__raw_writew
+> +#else
+> +#define usba_io_readl	readl_relaxed
+> +#define usba_io_writel	writel_relaxed
+> +#define usba_io_writew	writew_relaxed
+> +#endif
+> +
+>  #define usba_readl(udc, reg)					\
+> -	__raw_readl((udc)->regs + USBA_##reg)
+> +	usba_io_readl((udc)->regs + USBA_##reg)
+>  #define usba_writel(udc, reg, value)				\
+> -	__raw_writel((value), (udc)->regs + USBA_##reg)
+> +	usba_io_writel((value), (udc)->regs + USBA_##reg)
+>  #define usba_ep_readl(ep, reg)					\
+> -	__raw_readl((ep)->ep_regs + USBA_EPT_##reg)
+> +	usba_io_readl((ep)->ep_regs + USBA_EPT_##reg)
+>  #define usba_ep_writel(ep, reg, value)				\
+> -	__raw_writel((value), (ep)->ep_regs + USBA_EPT_##reg)
+> +	usba_io_writel((value), (ep)->ep_regs + USBA_EPT_##reg)
+>  #define usba_dma_readl(ep, reg)					\
+> -	__raw_readl((ep)->dma_regs + USBA_DMA_##reg)
+> +	usba_io_readl((ep)->dma_regs + USBA_DMA_##reg)
+>  #define usba_dma_writel(ep, reg, value)				\
+> -	__raw_writel((value), (ep)->dma_regs + USBA_DMA_##reg)
+> +	usba_io_writel((value), (ep)->dma_regs + USBA_DMA_##reg)
+>  
+>  /* Calculate base address for a given endpoint or DMA controller */
+>  #define USBA_EPT_BASE(x)	(0x100 + (x) * 0x20)
+> 
 
-The above is missing an important word: it should have read "are _not_ 
-intended"
 
-
-- Paul
+-- 
+Nicolas Ferre
