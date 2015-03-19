@@ -1,39 +1,40 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 19 Mar 2015 13:22:11 +0530
-Subject: [GIT PULL] DaVinci McASP changes for v4.1
-Message-ID: <550A802B.7050201@ti.com>
+From: kong.kongxinwei@hisilicon.com (kongxinwei)
+Date: Thu, 19 Mar 2015 15:57:26 +0800
+Subject: [PATCH 0/3] 96boards: add thermal senor support to hikey board
+Message-ID: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+The Linaro connect introduce 96boards series in Hong Kong,The HiKey board
+is the first board to be certified 96Boards Consumer Edition compatible.
+This board is based on the HiSilicon SoC. you can get more information
+from https://www.96boards.org.
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+The hisilicon SoC contains thermal module, this thermal module has 4 sensors,
 
-are available in the git repository at:
+	- sensor 0: local sensor;
+	- sensor 1: remote sensor for ACPU cluster 1;
+	- sensor 2: remote sensor for ACPU cluster 2;
+	- sensor 3: remote sensor for GPU;
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.1/mcasp
+It can obtain this device temperature by operating this hardware. The new
+sensor driver satisfies thermal framework and to realize the ACPU ,GPU and
+so on to cool function.
 
-for you to fetch changes up to 6cfdf55b7746a3b1bc324a9e64abe2f055368e6f:
+kongxinwei (3):
+  thermal: hisilicon: add new hisilicon thermal sensor driver
+  dts: hi6220: enable thermal sensor for hisilicon SoC
+  dt-bindings: Document the hi6220 thermal sensor bindings
 
-  ARM: davinci: dm646x: Add interrupt resource for McASPs (2015-03-18 17:19:50 +0530)
+ .../bindings/thermal/hisilicon-thermal.txt         |  51 ++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 153 ++++++
+ drivers/thermal/Kconfig                            |   8 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/hisi_thermal.c                     | 531 +++++++++++++++++++++
+ 5 files changed, 744 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+ create mode 100644 drivers/thermal/hisi_thermal.c
 
-----------------------------------------------------------------
-This pull request contains cleanups and
-non-urgent fixes for DaVinci McASP platform
-support code.
-
-----------------------------------------------------------------
-Peter Ujfalusi (7):
-      ARM: davinci: devices-da8xx: Add resource name for the McASP DMA request
-      ARM: davinci: devices-da8xx: Add interrupt resource to McASP structs
-      ARM: davinci: devices-da8xx: Clean up and correct the McASP device creation
-      ARM: davinci: devices-da8xx: Add support for McASP2 on da830
-      ARM: davinci: dm646x: Clean up the McASP DMA resources
-      ARM: davinci: irqs: Correct McASP1 TX interrupt definition for DM646x
-      ARM: davinci: dm646x: Add interrupt resource for McASPs
-
- arch/arm/mach-davinci/asp.h               |    7 +++
- arch/arm/mach-davinci/devices-da8xx.c     |   80 ++++++++++++++++++++++++++---
- arch/arm/mach-davinci/dm646x.c            |   24 ++++++---
- arch/arm/mach-davinci/include/mach/irqs.h |    2 +-
- 4 files changed, 98 insertions(+), 15 deletions(-)
+-- 
+1.9.1
