@@ -1,36 +1,36 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 19 Mar 2015 13:45:19 -0500
-Subject: [GIT PULL] SoCFPGA late fix for v4.0
-Message-ID: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 19 Mar 2015 13:50:54 -0500
+Subject: [PATCH 10/13] usb: gadget: atmel_usba: use endian agnostic IO on
+ ARM
+In-Reply-To: <550AFD77.1080901@atmel.com>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-11-git-send-email-ben.dooks@codethink.co.uk>
+ <550AFD77.1080901@atmel.com>
+Message-ID: <20150319185054.GE13793@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin and Olof,
+On Thu, Mar 19, 2015 at 05:46:47PM +0100, Nicolas Ferre wrote:
+> Le 18/03/2015 16:53, Ben Dooks a ?crit :
+> > Change from using the __raw IO accesors to the endian agnostic versions
+> > of readl/writel_relaxed when not on AVR32. This fixes issues with running
+> > big endian on ARMv7.
+> > 
+> > Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> > --
+> > CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Felipe, for the record:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Please pull this 1 patch that fixes SPI. If it's too late for v4.0, then
-this patch can go in for v4.1.
+sorry, it's already in my immutable branch :-(
 
-Thanks,
-
-The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
-
-  Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
-
-are available in the git repository at:
-
-  git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fix_for_v4.0_2
-
-for you to fetch changes up to 1ac31de744202a3a14601170a57f155b4a8d2c21:
-
-  ARM: socfpga: dts: fix spi1 interrupt (2015-03-19 10:51:15 -0500)
-
-----------------------------------------------------------------
-Late fix for v4.0 on the SoCFPGA platform:
-- Fix interrupt number for SPI1 interface
-
-----------------------------------------------------------------
-Mark James (1):
-      ARM: socfpga: dts: fix spi1 interrupt
-
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/a59bf650/attachment.sig>
