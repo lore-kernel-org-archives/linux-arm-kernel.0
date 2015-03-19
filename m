@@ -1,246 +1,102 @@
-From: digetx@gmail.com (Dmitry Osipenko)
-Date: Thu, 19 Mar 2015 15:15:54 +0300
-Subject: [PATCH v2] ARM: tegra: Maintain CPU endianness for asm code
-Message-ID: <1426767359-23212-1-git-send-email-digetx@gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 19 Mar 2015 18:11:08 +0530
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <20150319091742.GX3318@x1>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <3926609.Ff6LCkuuMX@wuerfel>
+ <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
+ <20150318131722.GN3318@x1>
+ <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
+ <20150318153421.GP3318@x1>
+ <CABb+yY0HufMEDy7ANj8KV0hamvM-Tgy4GBkwD73wm3DMumcbaQ@mail.gmail.com>
+ <20150319091742.GX3318@x1>
+Message-ID: <CABb+yY3GZG0Dg5Vzsp1Cv+C1_yc8SxuqGFXLi3_wg7TrBbk6jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for big-endian CPU mode to assembler code, which is
-required for booting secondary CPU's, cpuidle drivers and machine suspend/resume
-functionality with big-endian kernel.
-
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
-
-Tested on Tegra 2 and 3.
-
-Changelog:
-V2: Cleanup a bit: reordered include header and replaced conditional branching with
-    conditional reg reverse in sleep-tegra20.S
-
- arch/arm/mach-tegra/reset-handler.S | 13 +++++++++++++
- arch/arm/mach-tegra/sleep-tegra20.S | 12 ++++++++++++
- arch/arm/mach-tegra/sleep-tegra30.S |  9 +++++++++
- arch/arm/mach-tegra/sleep.S         |  1 +
- arch/arm/mach-tegra/sleep.h         |  3 +++
- 5 files changed, 38 insertions(+)
-
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index e3070fd..a200f4d 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -20,6 +20,7 @@
- #include <soc/tegra/fuse.h>
- 
- #include <asm/asm-offsets.h>
-+#include <asm/assembler.h>
- #include <asm/cache.h>
- 
- #include "flowctrl.h"
-@@ -43,6 +44,9 @@
-  *	r8: CPU part number
-  */
- ENTRY(tegra_resume)
-+
-+ARM_BE8(setend	be)
-+
- 	check_cpu_part_num 0xc09, r8, r9
- 	bleq	v7_invalidate_l1
- 
-@@ -59,12 +63,14 @@ ENTRY(tegra_resume)
- 	cpu_to_csr_reg r1, r0
- 	mov32	r2, TEGRA_FLOW_CTRL_BASE
- 	ldr	r1, [r2, r1]
-+ARM_BE8(rev	r1, r1)
- 	/* Clear event & intr flag */
- 	orr	r1, r1, \
- 		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
- 	movw	r0, #0x3FFD	@ enable, cluster_switch, immed, bitmaps
- 				@ & ext flags for CPU power mgnt
- 	bic	r1, r1, r0
-+ARM_BE8(rev	r1, r1)
- 	str	r1, [r2]
- 1:
- 
-@@ -75,7 +81,9 @@ ENTRY(tegra_resume)
- 	/* enable SCU */
- 	mov32	r0, TEGRA_ARM_PERIF_BASE
- 	ldr	r1, [r0]
-+ARM_BE8(rev	r1, r1)
- 	orr	r1, r1, #1
-+ARM_BE8(rev	r1, r1)
- 	str	r1, [r0]
- #endif
- 
-@@ -118,6 +126,8 @@ ENTRY(__tegra_cpu_reset_handler_start)
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler)
- 
-+ARM_BE8(setend	be)
-+
- 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
- 
- 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
-@@ -222,6 +232,9 @@ __no_cpu0_chk:
-  */
- 
- __die:
-+
-+ARM_BE8(setend	le)
-+
- 	sub	lr, lr, #4
- 	mov32	r7, TEGRA_PMC_BASE
- 	str	lr, [r7, #PMC_SCRATCH41]
-diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-index e6b684e..991c549 100644
---- a/arch/arm/mach-tegra/sleep-tegra20.S
-+++ b/arch/arm/mach-tegra/sleep-tegra20.S
-@@ -105,12 +105,14 @@ ENTRY(tegra20_cpu_shutdown)
- 	cpu_to_halt_reg r1, r0
- 	ldr	r3, =TEGRA_FLOW_CTRL_VIRT
- 	mov	r2, #FLOW_CTRL_WAITEVENT | FLOW_CTRL_JTAG_RESUME
-+ARM_BE8(rev	r2, r2)
- 	str	r2, [r3, r1]		@ put flow controller in wait event mode
- 	ldr	r2, [r3, r1]
- 	isb
- 	dsb
- 	movw	r1, 0x1011
- 	mov	r1, r1, lsl r0
-+ARM_BE8(rev	r1, r1)
- 	ldr	r3, =TEGRA_CLK_RESET_VIRT
- 	str	r1, [r3, #0x340]	@ put slave CPU in reset
- 	isb
-@@ -155,13 +157,16 @@ ENTRY(tegra_pen_lock)
- 	addne	r3, r3, #PMC_SCRATCH38
- 
- 	mov	r12, #1
-+ARM_BE8(rev	r12, r12)
- 	str	r12, [r2]		@ flag[cpu] = 1
- 	dsb
- 	str	r12, [r1]		@ !turn = cpu
- 1:	dsb
- 	ldr	r12, [r3]
-+ARM_BE8(rev	r12, r12)
- 	cmp	r12, #1			@ flag[!cpu] == 1?
- 	ldreq	r12, [r1]
-+ARM_BE8(reveq	r12, r12)
- 	cmpeq	r12, r0			@ !turn == cpu?
- 	beq	1b			@ while !turn == cpu && flag[!cpu] == 1
- 
-@@ -337,6 +342,9 @@ tegra20_iram_start:
-  * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
-  */
- ENTRY(tegra20_lp1_reset)
-+
-+ARM_BE8(setend	le)
-+
- 	/*
- 	 * The CPU and system bus are running at 32KHz and executing from
- 	 * IRAM when this code is executed; immediately switch to CLKM and
-@@ -360,8 +368,10 @@ ENTRY(tegra20_lp1_reset)
- 	mov	r5, #0
- 
- 	ldr	r6, tegra20_sdram_pad_size
-+ARM_BE8(rev	r6, r6)
- padload:
- 	ldr	r7, [r2, r5]		@ r7 is the addr in the pad_address
-+ARM_BE8(rev	r7, r7)
- 
- 	ldr	r1, [r4, r5]
- 	str	r1, [r7]		@ restore the value in pad_save
-@@ -521,8 +531,10 @@ emcself:
- 	mov	r5, #0
- 
- 	ldr	r6, tegra20_sdram_pad_size
-+ARM_BE8(rev	r6, r6)
- padsave:
- 	ldr	r0, [r2, r5]		@ r0 is the addr in the pad_address
-+ARM_BE8(rev	r0, r0)
- 
- 	ldr	r1, [r0]
- 	str	r1, [r4, r5]		@ save the content of the addr
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index 5d8d13a..821c6df 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -184,6 +184,7 @@ _no_cpu0_chk:
-  ARM(	orr	r12, r12, r4, lsl r3	)
-  THUMB(	lsl	r4, r4, r3		)
-  THUMB(	orr	r12, r12, r4		)
-+ARM_BE8(rev	r12, r12)
- 	str	r12, [r1]
- 
- 	/* Halt this CPU. */
-@@ -210,8 +211,10 @@ flow_ctrl_setting_for_lp2:
- 	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_FIQ
- flow_ctrl_done:
- 	cmp	r10, #TEGRA30
-+ARM_BE8(rev	r3, r3)
- 	str	r3, [r2]
- 	ldr	r0, [r2]
-+ARM_BE8(rev	r0, r0)
- 	b	wfe_war
- 
- __cpu_reset_again:
-@@ -319,6 +322,9 @@ tegra30_iram_start:
-  * NOTE: THIS *MUST* BE RELOCATED TO TEGRA_IRAM_LPx_RESUME_AREA.
-  */
- ENTRY(tegra30_lp1_reset)
-+
-+ARM_BE8(setend	le)
-+
- 	/*
- 	 * The CPU and system bus are running at 32KHz and executing from
- 	 * IRAM when this code is executed; immediately switch to CLKM and
-@@ -722,11 +728,13 @@ tegra30_sdram_self_refresh:
- 	cmp	r10, #TEGRA124
- 	adreq	r2, tegra124_sdram_pad_address
- 	ldreq	r3, tegra30_sdram_pad_size
-+ARM_BE8(rev	r3, r3)
- 
- 	mov	r9, #0
- 
- padsave:
- 	ldr	r0, [r2, r9]		@ r0 is the addr in the pad_address
-+ARM_BE8(rev	r0, r0)
- 
- 	ldr	r1, [r0]
- 	str	r1, [r8, r9]		@ save the content of the addr
-@@ -744,6 +752,7 @@ padsave_done:
- 	ldreq	r0, =TEGRA_EMC0_BASE
- 	cmp	r10, #TEGRA124
- 	ldreq	r0, =TEGRA124_EMC_BASE
-+ARM_BE8(rev	r0, r0)
- 
- enter_self_refresh:
- 	cmp	r10, #TEGRA30
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index f024a51..1fd201f 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -139,6 +139,7 @@ ENTRY(tegra_shut_off_mmu)
- 	moveq	r3, #0
- 	streq	r3, [r2, #L2X0_CTRL]
- #endif
-+ARM_BE8(setend	le)
- 	ret	r0
- ENDPROC(tegra_shut_off_mmu)
- 	.popsection
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index 0d59360..fa7aba4 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -118,8 +118,11 @@
- /* Macro to check Tegra revision */
- #define APB_MISC_GP_HIDREV	0x804
- .macro tegra_get_soc_id base, tmp1
-+ARM_BE8(mrc	p15, 0, \tmp1, c1, c0)
-+ARM_BE8(tst	\tmp1, #(1 << 7))		@ check for little-endian bit
- 	mov32	\tmp1, \base
- 	ldr	\tmp1, [\tmp1, #APB_MISC_GP_HIDREV]
-+ARM_BE8(revne	\tmp1, \tmp1)
- 	and	\tmp1, \tmp1, #0xff00
- 	mov	\tmp1, \tmp1, lsr #8
- .endm
--- 
-2.3.2
+On Thu, Mar 19, 2015 at 2:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 19 Mar 2015, Jassi Brar wrote:
+>
+>> On Wed, Mar 18, 2015 at 9:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Wed, 18 Mar 2015, Jassi Brar wrote:
+>> >
+>> >> On Wed, Mar 18, 2015 at 6:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> >> > On Tue, 03 Mar 2015, Jassi Brar wrote:
+>> >> >
+>> >> >> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> >> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
+>> >> >> >> +
+>> >> >> >> +/*
+>> >> >> >> + * struct sti_mbox_msg - sti mailbox message description
+>> >> >> >> + * @dsize:             data payload size
+>> >> >> >> + * @pdata:             message data payload
+>> >> >> >> + */
+>> >> >> >> +struct sti_mbox_msg {
+>> >> >> >> +       u32             dsize;
+>> >> >> >> +       u8              *pdata;
+>> >> >> >> +};
+>> >> >> >
+>> >> >> > As mentioned in another thread, we may just want to add a 'size'
+>> >> >> > argument to the message send function, and a default helper for
+>> >> >> > messages with size of 32 bits.
+>> >> >> >
+>> >> >> Case-a) 'size' is a member of the payload structure itself
+>> >> >>     The extra 'size' argument would only be used for sanity check.
+>> >> >>     This driver seems so. Lee, can you not do without 'dsize'?
+>> >> >>
+>> >> >> Case-b) 'size' is not a member of payload structure:
+>> >> >>      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
+>> >> >>             Here the size argument is redundant.
+>> >> >>
+>> >> >>      b2)  payload length varies
+>> >> >>             This case is highly unlikely because there would be no way
+>> >> >> for remote to know how many bytes to read as the payload. Not to mean
+>> >> >> we can't do without the 'size' argument.
+>> >> >>
+>> >> >> Your opinion has huge weight, but I would like to be enlightened
+>> >> >> before agreeing.
+>> >> >
+>> >> > Let's simplify this.
+>> >> >
+>> >> > If you want to have varying length payloads, you have to carry the
+>> >> > size in the payload.  If you wish to force fixed size payloads, then
+>> >> > you may do without a size segment.
+>> >> >
+>> >> > Do you really want to force all users of Mailbox to use fixed size
+>> >> > payloads?
+>> >> >
+>> >> No. I only observed the fact that every known mailbox controller
+>> >> driver already has a way to figure out the payload length because
+>> >> either the protocol uses fixed length payloads or has the 'size' field
+>> >> in every payload.
+>> >> I am yet to see a platform that uses both, then the 'size' argument
+>> >> will be helpful but still not necessary.
+>> >
+>> > I see.  So your real concern is that controllers shouldn't have two
+>> > means of obtaining size.
+>> >
+>> I think right now there's not much need to expand the api for 'u32'
+>> sized payloads.
+>>
+>> > Arnd's idea of placing the message size as part of the send_message()
+>> > call is fine, but it's still going to end up in the payload isn't it?
+>> >
+>> ... or it will be implied by sizeof(struct my_packet) if the protocol
+>> has finite set of payloads.
+>>
+>> > And what about receiving?
+>> >
+>> Similar to sending - controller driver passes pointer to RX buffer
+>> which the client parses. Remember the protocol would already have a
+>> way to communicate payload length.
+>
+> So this is the bit that's getting me.  How do you pass payload length
+> to the remote processor if you don't have it in the payload?
+>
+Some protocol may use signature to identify a packet type.
+For example, the remote supports upto 100 commands, each having unique
+8bit code. At fixed offset of any payload is the command code. All the
+remote needs to do is read the u8 value of predefined offset and use
+it dispatch the payload to handler of that command. The command
+handler would know the format of such requests.
