@@ -1,94 +1,128 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 19 Mar 2015 11:44:23 +0100
-Subject: [PATCH v2] ARM: zynq: use restart_handler mechanism for slcr reset
-In-Reply-To: <1425049769-24929-1-git-send-email-joshc@ni.com>
-References: <1425049769-24929-1-git-send-email-joshc@ni.com>
-Message-ID: <BL2FFO11OLC004560F6047881E93573D75E2010@BL2FFO11OLC004.protection.gbl>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 19 Mar 2015 12:46:48 +0200
+Subject: [PATCH v2 2/6] clk: qcom: gdsc: Prepare common clk probe to
+ register gdscs
+In-Reply-To: <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
+References: <1426752145-4365-1-git-send-email-rnayak@codeaurora.org>
+ <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <550AA918.3000604@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2015 04:09 PM, Josh Cartwright wrote:
-> By making use of the restart_handler chain mechanism, the SLCR-based
-> reset mechanism can be prioritized amongst other mechanisms available on
-> a particular board.
+Hi Rajendra,
+
+Thanks for the patch!
+
+On 03/19/2015 10:02 AM, Rajendra Nayak wrote:
+> The common clk probe registers a clk provider and a reset controller.
+> Update it to register a genpd provider using the gdsc data provided
+> by each platform.
 > 
-> Choose a default high-ish priority of 192 for this restart mechanism.
-> 
-> Signed-off-by: Josh Cartwright <joshc@ni.com>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 > ---
-> v1 -> v2: Also drop zynq_slcr_system_reset prototype from common.h
+>  drivers/clk/qcom/common.c | 14 +++++++++++++-
+>  drivers/clk/qcom/common.h |  2 ++
+>  drivers/clk/qcom/gdsc.c   | 34 +++++++++++++++++++++++++++++++++-
+>  drivers/clk/qcom/gdsc.h   |  9 ++++++++-
+>  4 files changed, 56 insertions(+), 3 deletions(-)
 > 
->  arch/arm/mach-zynq/common.c |  6 ------
->  arch/arm/mach-zynq/common.h |  1 -
->  arch/arm/mach-zynq/slcr.c   | 16 ++++++++++++----
->  3 files changed, 12 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index c887196..39c1c7d4 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -190,11 +190,6 @@ static void __init zynq_irq_init(void)
->  	irqchip_init();
+> diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+> index a946b48..cc9f56f 100644
+> --- a/drivers/clk/qcom/common.c
+> +++ b/drivers/clk/qcom/common.c
+> @@ -21,6 +21,7 @@
+>  #include "clk-rcg.h"
+>  #include "clk-regmap.h"
+>  #include "reset.h"
+> +#include "gdsc.h"
+>  
+>  struct qcom_cc {
+>  	struct qcom_reset_controller reset;
+> @@ -125,8 +126,18 @@ int qcom_cc_really_probe(struct platform_device *pdev,
+>  
+>  	ret = reset_controller_register(&reset->rcdev);
+>  	if (ret)
+> -		of_clk_del_provider(dev->of_node);
+> +		goto err_reset;
+>  
+> +	ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
+> +	if (ret)
+> +		goto err_pd;
+> +
+> +	return 0;
+> +err_pd:
+> +	dev_err(dev, "Failed to register power domains\n");
+> +	reset_controller_unregister(&reset->rcdev);
+> +err_reset:
+> +	of_clk_del_provider(dev->of_node);
+>  	return ret;
 >  }
+>  EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
+> @@ -145,6 +156,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
 >  
-> -static void zynq_system_reset(enum reboot_mode mode, const char *cmd)
-> -{
-> -	zynq_slcr_system_reset();
-> -}
-> -
->  static const char * const zynq_dt_match[] = {
->  	"xlnx,zynq-7000",
->  	NULL
-> @@ -212,5 +207,4 @@ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
->  	.init_time	= zynq_timer_init,
->  	.dt_compat	= zynq_dt_match,
->  	.reserve	= zynq_memory_init,
-> -	.restart	= zynq_system_reset,
->  MACHINE_END
-> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
-> index 382c60e..f2f0bf2 100644
-> --- a/arch/arm/mach-zynq/common.h
-> +++ b/arch/arm/mach-zynq/common.h
-> @@ -21,7 +21,6 @@ void zynq_secondary_startup(void);
->  
->  extern int zynq_slcr_init(void);
->  extern int zynq_early_slcr_init(void);
-> -extern void zynq_slcr_system_reset(void);
->  extern void zynq_slcr_cpu_stop(int cpu);
->  extern void zynq_slcr_cpu_start(int cpu);
->  extern bool zynq_slcr_cpu_state_read(int cpu);
-> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
-> index c3c24fd8..e92b319 100644
-> --- a/arch/arm/mach-zynq/slcr.c
-> +++ b/arch/arm/mach-zynq/slcr.c
-> @@ -15,6 +15,7 @@
->   */
->  
->  #include <linux/io.h>
-> +#include <linux/reboot.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/of_address.h>
->  #include <linux/regmap.h>
-> @@ -91,10 +92,9 @@ u32 zynq_slcr_get_device_id(void)
->  	return val;
->  }
->  
-> -/**
-> - * zynq_slcr_system_reset - Reset the entire system.
-> - */
-> -void zynq_slcr_system_reset(void)
-> +static
-> +int zynq_slcr_system_restart(struct notifier_block *nb,
-> +			     unsigned long action, void *data)
+>  void qcom_cc_remove(struct platform_device *pdev)
 >  {
+> +	of_genpd_del_provider(pdev->dev.of_node);
 
-First of all sorry for delay.
-Any reason to remove kernel-doc format?
+It would be nice to introduce gdsc_unregister() for symmetry.
 
-The rest looks good and I have also tested it.
+>  	of_clk_del_provider(pdev->dev.of_node);
+>  	reset_controller_unregister(platform_get_drvdata(pdev));
+>  }
 
-BTW: was also thinking about syscon-reboot option but it doesn't fit to
-our reset sequence. :-(
+<snip>
 
-Thanks,
-Michal
+> +
+> +int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
+> +		  struct regmap *regmap)
+> +{
+
+Could you squash implementation of this function with the first patch 1/6.
+
+> +	int i, ret;
+> +	struct genpd_onecell_data *data;
+> +
+> +	if (!num || !scs || !dev || !dev->of_node)
+> +		return 0;
+> +
+> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	data->domains = devm_kzalloc(dev, sizeof(*data->domains) * num,
+> +				     GFP_KERNEL);
+
+Just wondering, are there some obstacles to embed struct
+genpd_onecell_data in struct gdsc, and thus avoid having two memory
+allocations?
+
+> +	if (!data->domains)
+> +		return -ENOMEM;
+> +
+> +	data->num_domains = num;
+> +	for (i = 0; i < num; i++) {
+> +		if (!scs[i])
+> +			continue;
+> +		scs[i]->regmap = regmap;
+> +		ret = gdsc_init(scs[i]);
+> +		if (ret)
+> +			return ret;
+> +		data->domains[i] = &scs[i]->pd;
+> +	}
+> +	return of_genpd_add_provider_onecell(dev->of_node, data);
+> +}
+> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+> index ac6a2d5..14de304 100644
+> --- a/drivers/clk/qcom/gdsc.h
+> +++ b/drivers/clk/qcom/gdsc.h
+> @@ -32,5 +32,12 @@ struct gdsc {
+>  
+>  #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
+
+This is used only from gdsc.c, please move it there.
+
+<snip>
+
+-- 
+regards,
+Stan
