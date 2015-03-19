@@ -1,57 +1,39 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Thu, 19 Mar 2015 09:14:37 -0500
-Subject: ARM: socfpga: dts: fix spi1 interrupt
-In-Reply-To: <20150318080950.GB10862@pengutronix.de>
-References: <55089E1B.7000600@jamers.net>
- <20150318080950.GB10862@pengutronix.de>
-Message-ID: <550AD9CD.5020805@opensource.altera.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 19 Mar 2015 10:20:38 -0400 (EDT)
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <3533423.QQDErEmeTO@vostro.rjw.lan>
+Message-ID: <Pine.LNX.4.44L0.1503191017590.1135-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/18/2015 03:09 AM, Steffen Trumtrar wrote:
-> Hi!
-> 
-> On Tue, Mar 17, 2015 at 09:35:23PM +0000, Mark James wrote:
->> Hello,
->>
->> The socfpga.dtsi currently has the wrong interrupt number set for SPI master 1. Trying to use the master without this change results in the kernel boot process waiting forever for an interrupt that will never occur while attempting to probe any slave devices configured in the device tree as being under SPI master 1.
->>
->> The change works for the Cyclone V, and according to the Arria 5 handbook should be good there too.
->>
->>
->> Signed-off-by: Mark James <maj@jamers.net>
->> Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>
->> ---
->>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->> index 9d87609..d9176e6 100644
->> --- a/arch/arm/boot/dts/socfpga.dtsi
->> +++ b/arch/arm/boot/dts/socfpga.dtsi
->> @@ -660,7 +660,7 @@
->>  			#address-cells = <1>;
->>  			#size-cells = <0>;
->>  			reg = <0xfff01000 0x1000>;
->> -			interrupts = <0 156 4>;
->> +			interrupts = <0 155 4>;
->>  			num-cs = <4>;
->>  			clocks = <&spi_m_clk>;
->>  			status = "disabled";
-> 
-> Thanks for sending the patch to the mainline list.
-> One little nitpick about the patchformat though:
-> 
-> Please add linebreaks after 70-75 characters for readability. And remove the
-> "Hello,\n\n" otherwise this would land in the final git commit, where it
-> doesn't belong.
-> For reference have a look at Documentation/SubmittingPatches in the kernel
-> tree.
-> 
-> Maybe Dinh can fix this up, otherwise he will tell you what to do.
-> 
+On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
 
-Yes, I can pick this up and fix up the commit.
+> > This doesn't make sense to me.  A bus just called bus_add_device, it can
+> > do whatever it wanted to right before calling this function, no need for
+> > another callback.
+> 
+> The only caller of bus_add_device() is device_add().
+> 
+> What do you mean by "bus just called bus_add_device"?  Do you think that
+> the pm_domain pointer should be populated before calling device_add()?
+> 
+> That wouldn't work for the ACPI PM domain at least, because ACPI companions
+> are generally added during device_add() and we arguably cannot point a
+> device to the ACPI PM domain before its ACPI companion is set.
 
-Dinh
+
+> There are two alternatives to them.  One is to do PM domain attach/detach in
+> the bus type's ->probe and ->remove, but that's suboptimal, because it is
+> then carried out every time a driver is probed/removed for a device.  The
+> other one would be to have each interested bus type register a bus type
+> notifier for itself, but that would be rather ugly, wouldn't it?
+
+Driver probing and removal is not a hot path.  Successful probes 
+usually occur only once for each device.  I don't know how many 
+unsuccessful probes there are on average, but probably not many.
+
+Doing the PM domain attach/detach in ->probe and ->remove makes sense 
+to me.
+
+Alan Stern
