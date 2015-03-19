@@ -1,81 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Mar 2015 14:43:01 +0100
-Subject: [PATCH 2/2] drm/panel: simple: Add support for Innolux AT043TN24
-In-Reply-To: <c661ab7f0d1829c7cac7875ce44eb3293a7515a9.1426772560.git.nicolas.ferre@atmel.com>
-References: <c661ab7f0d1829c7cac7875ce44eb3293a7515a9.1426772560.git.nicolas.ferre@atmel.com>
-Message-ID: <84ca8ea51cd7bd709729de927d60d8a2f47664c7.1426772560.git.nicolas.ferre@atmel.com>
+From: joshc@ni.com (Josh Cartwright)
+Date: Thu, 19 Mar 2015 08:49:11 -0500
+Subject: [PATCH 2/2] ARM: zynq: drop use of slcr_unlock in
+ zynq_slcr_system_restart
+In-Reply-To: <1426772033-29277-2-git-send-email-joshc@ni.com>
+References: <BN1BFFO11FD008F29B247339CE49EAEA6AE2010@BN1BFFO11FD008.protection.gbl>
+ <1426772033-29277-1-git-send-email-joshc@ni.com>
+ <1426772033-29277-2-git-send-email-joshc@ni.com>
+Message-ID: <20150319134911.GC23626@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Innolux AT043TN24 4.3" WQVGA TFT LCD panel.
-This panel with backlight is found in PDA 4.3" LCD screen (TM43xx series for
-instance).
+Ugh.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- .../bindings/panel/innolux,at043tn24.txt           |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 28 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/innolux,at043tn24.txt
+On Thu, Mar 19, 2015 at 08:33:53AM -0500, Josh Cartwright wrote:
+> The SLCR is unconditionally unlocked early on boot in zynq_slcr_init()
+> and not unlocked.  As such, it is not necessary to explicitly unlock in
 
-diff --git a/Documentation/devicetree/bindings/panel/innolux,at043tn24.txt b/Documentation/devicetree/bindings/panel/innolux,at043tn24.txt
-new file mode 100644
-index 000000000000..4104226b61bc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/innolux,at043tn24.txt
-@@ -0,0 +1,7 @@
-+Innolux AT043TN24 4.3" WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "innolux,at043tn24"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 6e4a85f50d71..4088f9bd7973 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -663,6 +663,31 @@ static const struct panel_desc hitachi_tx23d38vm0caa = {
- 	},
- };
- 
-+static const struct drm_display_mode innolux_at043tn24_mode = {
-+	.clock = 9000,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 2,
-+	.hsync_end = 480 + 2 + 41,
-+	.htotal = 480 + 2 + 41 + 2,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 2,
-+	.vsync_end = 272 + 2 + 11,
-+	.vtotal = 272 + 2 + 11 + 2,
-+	.vrefresh = 60,
-+	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
-+};
-+
-+static const struct panel_desc innolux_at043tn24 = {
-+	.modes = &innolux_at043tn24_mode,
-+	.num_modes = 1,
-+	.bpc = 8,
-+	.size = {
-+		.width = 95,
-+		.height = 54,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct drm_display_mode innolux_g121i1_l01_mode = {
- 	.clock = 71000,
- 	.hdisplay = 1280,
-@@ -872,6 +897,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "hit,tx23d38vm0caa",
- 		.data = &hitachi_tx23d38vm0caa
- 	}, {
-+		.compatible = "innolux,at043tn24",
-+		.data = &innolux_at043tn24,
-+	}, {
- 		.compatible ="innolux,g121i1-l01",
- 		.data = &innolux_g121i1_l01
- 	}, {
--- 
-2.1.3
+          ^ever re-locked.
+
+Can you fix this up when you apply?
+
+Thanks,
+  Josh
