@@ -1,49 +1,78 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 18 Mar 2015 21:09:33 -0700
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
-Message-ID: <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 19 Mar 2015 12:09:33 +0800
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150318190509.GM10863@arm.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150318190509.GM10863@arm.com>
+Message-ID: <550A4BFD.4070804@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf,
+On 2015/3/19 3:05, Will Deacon wrote:
+> Hanjun,
 
-On Tue, Mar 17, 2015 at 3:23 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> This will get us within .3V of whatever vmmc is.  If vmmc is 3.3V, it
->> will allow vqmmc of 3.0V - 3.6V.
+Hi Will,
+
+>
+> On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
+>> This patch set already tested on multi platforms:
+>>  - AMD Seattle board;
+>>  - Cavium Thunder board;
+>>  - Huawei D02 board;
+>>  - Qualcomm ARM64 platform
 >>
->> This _seems_ sane to me and given any sane system design we should be
->> fine here, I think.  I can't see someone designing a system where
->> vqmmc was not within .3V of vmmc, can you?  If we think someone will
->> actually build a system where vmmc is 3.3V and vqmmc can't go higher
->> than 2.7V then we'll either need to increase the tolerance here or add
->> a new asymmetric system call like my original patches did.
+>> This version 10 patch set address some minor comments and collect ACKs and
+>> Reviewed-bys for v9:
+>>
+>>  - new Acks from Rafael, Olof, Grant, Lorenzo
+>>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
+>>    but no functional change
+>>  - Remove if(!phys) for early ioremappings
+>>  - Rework sleep function for ARM64
+>>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
+>>  - Disable ACPI if not HW_REDUCED_ACPI compliant
+>>  - Remove the doc of why ACPI on ARM
+> So I've had a look at the current state of this series and I think there
+> are a few immediate things left to do:
 >
-> I know about SoC that supports 3.4V vmmc and 2.9V vqmmc.
+>   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
+>       Catalin
+
+Sure, it will be done after the confirmation with Ard.
+
 >
-> What I think we need is the option to have a policy here. We need to
-> allow voltage levels stated by the spec and at the same time try chose
-> the one best suited. That's not being accomplished here.
+>   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
+>       so I'm assuming there will be additional patches from them that are
+>       required.
+
+Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
+
 >
-> Moreover, I wonder whether it's okay (from spec perspective) to have
-> vqmmc at a higher voltage level than vmmc. I don't think that's
-> allowed, but I might be wrong.
+>   (3) I have an open comment about moving the IRQ domain code into the
+>       core, which I'd like to see addressed.
 
-OK, so sounds like I need to add a regulator_set_voltage_tol2()
-function that takes in an upper tolerance and a lower.  We can use the
-same rough implementation in the core we have today (if Mark is OK
-with that) with regulator_set_voltage_tol() but just allow it to be
-asymmetric.
+I replied your email, please share your ideas for what I said.
 
->From what I see in the spec for 3.3V cards are supposed to react to a
-high signal that is .625 * VDD - VDD + .3
+>
+>   (4) We need an ack from Daniel on the arch-timer patch
 
+OK, thanks for your ping to Daniel :)
 
-I might not be able to get to this till next week, though...
+>
+> If you can get that in place, I'm not opposed to putting this into
+> linux-next ahead of the firmware summit in San Jose next week. Note that
+> this is not a commitment for 4.1, since I'm keen to see the outcomes of
+> next week before setting anything in stone.
 
--Doug
+OK, I will stick to this mailing list and respond as soon as I can.
+
+>
+> Also, there's no need to repost patches if you're just adding Acks. I
+> think I'm up to speed with those on my local branch and the Tested-by
+> party is starting to look a little silly.
+
+Should I send another version, and add some incremental cleanup/fix patches
+on top of that?
+
+Thanks
+Hanjun
