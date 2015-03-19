@@ -1,78 +1,136 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 19 Mar 2015 12:09:33 +0800
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150318190509.GM10863@arm.com>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com>
-Message-ID: <550A4BFD.4070804@huawei.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 19 Mar 2015 13:58:28 +0900
+Subject: [PATCH v4 1/4] ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
+In-Reply-To: <1426694453-3242-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
+ <1426694453-3242-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <550A5774.9070504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/19 3:05, Will Deacon wrote:
-> Hanjun,
+Hi Bartlomiej,
 
-Hi Will,
+I tested this patch on Exynos3250-based Gear2 board.
+Thanks for your effor to solve this issue.
 
->
-> On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
->> This patch set already tested on multi platforms:
->>  - AMD Seattle board;
->>  - Cavium Thunder board;
->>  - Huawei D02 board;
->>  - Qualcomm ARM64 platform
->>
->> This version 10 patch set address some minor comments and collect ACKs and
->> Reviewed-bys for v9:
->>
->>  - new Acks from Rafael, Olof, Grant, Lorenzo
->>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
->>    but no functional change
->>  - Remove if(!phys) for early ioremappings
->>  - Rework sleep function for ARM64
->>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
->>  - Disable ACPI if not HW_REDUCED_ACPI compliant
->>  - Remove the doc of why ACPI on ARM
-> So I've had a look at the current state of this series and I think there
-> are a few immediate things left to do:
->
->   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
->       Catalin
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Sure, it will be done after the confirmation with Ard.
+Best Regards,
+Chanwoo Choi
 
->
->   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
->       so I'm assuming there will be additional patches from them that are
->       required.
-
-Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
-
->
->   (3) I have an open comment about moving the IRQ domain code into the
->       core, which I'd like to see addressed.
-
-I replied your email, please share your ideas for what I said.
-
->
->   (4) We need an ack from Daniel on the arch-timer patch
-
-OK, thanks for your ping to Daniel :)
-
->
-> If you can get that in place, I'm not opposed to putting this into
-> linux-next ahead of the firmware summit in San Jose next week. Note that
-> this is not a commitment for 4.1, since I'm keen to see the outcomes of
-> next week before setting anything in stone.
-
-OK, I will stick to this mailing list and respond as soon as I can.
-
->
-> Also, there's no need to repost patches if you're just adding Acks. I
-> think I'm up to speed with those on my local branch and the Tested-by
-> party is starting to look a little silly.
-
-Should I send another version, and add some incremental cleanup/fix patches
-on top of that?
-
-Thanks
-Hanjun
+On 03/19/2015 01:00 AM, Bartlomiej Zolnierkiewicz wrote:
+> CPU1 hotplug may hang when AFTR is used.  Fix it by:
+> - setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
+>   exynos_cpu_power_up()
+> - not clearing reserved bits of ARM_COREx_CONFIGURATION register in
+>   exynos_cpu_power_down()
+> - waiting while an undocumented register 0x0908 becomes non-zero in
+>   exynos_core_restart()
+> - using dsb_sev() instead of IPI in exynos_boot_secondary() on
+>   Exynos3250
+> 
+> This patch also fixes hotplug issues during resume from S2R:
+> $ echo mem > /sys/power/state
+> [  156.517266] Disabling non-boot CPUs ...
+> [  156.517781] IRQ18 no longer affine to CPU1
+> [  156.518043] CPU1: shutdown
+> [  156.544718] Enabling non-boot CPUs ...
+> [  156.554925] CPU1: Software reset
+> [  158.552631] CPU1: failed to come online
+> [  158.552753] Error taking CPU1 up: -5
+> 
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
+>  arch/arm/mach-exynos/regs-pmu.h |  2 ++
+>  2 files changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index d2e9f12..ebd135b 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>   */
+>  void exynos_cpu_power_down(int cpu)
+>  {
+> +	u32 core_conf;
+> +
+>  	if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
+>  		/*
+>  		 * Bypass power down for CPU0 during suspend. Check for
+> @@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
+>  		if (!(val & S5P_CORE_LOCAL_PWR_EN))
+>  			return;
+>  	}
+> -	pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> +
+> +	core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+> +	core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
+> +	pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>  }
+>  
+>  /**
+> @@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
+>   */
+>  void exynos_cpu_power_up(int cpu)
+>  {
+> -	pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> +	u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
+> +
+> +	if (soc_is_exynos3250())
+> +		core_conf |= S5P_CORE_AUTOWAKEUP_EN;
+> +
+> +	pmu_raw_writel(core_conf,
+>  			EXYNOS_ARM_CORE_CONFIGURATION(cpu));
+>  }
+>  
+> @@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
+>  	if (!of_machine_is_compatible("samsung,exynos3250"))
+>  		return;
+>  
+> +	while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> +		udelay(10);
+> +	udelay(10);
+> +
+>  	val = pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
+>  	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
+>  	pmu_raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
+> @@ -346,7 +360,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  
+>  		call_firmware_op(cpu_boot, core_id);
+>  
+> -		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> +		if (soc_is_exynos3250())
+> +			dsb_sev();
+> +		else
+> +			arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>  
+>  		if (pen_release == -1)
+>  			break;
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index eb461e1..84ddce1 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -49,6 +49,7 @@
+>  #define S5P_INFORM5				0x0814
+>  #define S5P_INFORM6				0x0818
+>  #define S5P_INFORM7				0x081C
+> +#define S5P_PMU_SPARE2				0x0908
+>  #define S5P_PMU_SPARE3				0x090C
+>  
+>  #define EXYNOS_IROM_DATA2			0x0988
+> @@ -182,6 +183,7 @@
+>  
+>  #define S5P_CORE_LOCAL_PWR_EN			0x3
+>  #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
+> +#define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
+>  
+>  /* Only for EXYNOS4210 */
+>  #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
+> 
