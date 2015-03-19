@@ -1,72 +1,72 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 19 Mar 2015 09:19:19 +0800
-Subject: [PATCH 08/12] usb: chipidea: add ahb burst configuration
+Date: Thu, 19 Mar 2015 09:19:13 +0800
+Subject: [PATCH 02/12] usb: chipidea: set ITC to 0 for device mode
 In-Reply-To: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
 References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1426727963-32280-9-git-send-email-peter.chen@freescale.com>
+Message-ID: <1426727963-32280-3-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The users can change it through dts or platform data if they
-want to change the default value.
+ITC (Interrupt Threshold Control) is used to set the maximum rate at which
+the host/device controller will issue interrupts. The default value is 8 (1ms)
+for it. EHCI core will modify it to 1, but device mode keeps it as default
+value.
+
+In some use cases like Android ADB, it only has one usb request for each
+direction, and maximum payload data is only 4KB, so the speed is 4MB/s
+at most, it needs controller to trigger interrupt as fast as possible
+to increase the speed. The USB performance will be better if the interrupt
+can be triggered faster.
+
+Reduce ITC value is benefit for USB performance, and the interrupt number
+is increased at the same time, it may increase cpu utilization too.
+Most of use case cares about performance, but some may care about
+cpu utilization, so, we leave a platform interface for user.
+We set ITC as 0 (immediate) as default value.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/bits.h  |  3 +++
- drivers/usb/chipidea/core.c  | 18 ++++++++++++++++++
+ drivers/usb/chipidea/core.c  | 19 +++++++++++++++++++
  include/linux/usb/chipidea.h |  2 ++
- 3 files changed, 23 insertions(+)
+ 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index 3cb9bda..3af6213 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -25,6 +25,9 @@
- #define VERSION		      (0xF << 25)
- #define CIVERSION	      (0x7 << 29)
- 
-+/* SBUSCFG */
-+#define AHBBRST_MASK  0x7
-+
- /* HCCPARAMS */
- #define HCCPARAMS_LEN         BIT(17)
- 
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index f713e32..c0e6bb1 100644
+index 74fea4f..8af9cbf 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -412,6 +412,8 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
-  */
- void ci_platform_config(struct ci_hdrc *ci, int usb_mode)
- {
-+	bool override_needed;
+@@ -463,6 +463,13 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 	/* HW >= 2.3 */
+ 	hw_write(ci, OP_USBMODE, USBMODE_SLOM, USBMODE_SLOM);
+ 
++	/*
++	 * Set interrupt interval for device mode
++	 * host set ITC according to ehci-hcd module parameter log2_irq_thresh
++	 */
++	hw_write(ci, OP_USBCMD, 0xff0000,
++		ci->platdata->gadget_itc_setting << 16);
 +
- 	if (usb_mode == USBMODE_CM_DC) {
- 		if (ci->platdata->flags & CI_HDRC_DISABLE_DEVICE_STREAMING)
- 			hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS,
-@@ -439,6 +441,12 @@ void ci_platform_config(struct ci_hdrc *ci, int usb_mode)
- 			hw_write(ci, OP_PORTSC, PORTSC_PFSC, PORTSC_PFSC);
- 	}
+ 	if (hw_read(ci, OP_USBMODE, USBMODE_CM) != USBMODE_CM_DC) {
+ 		pr_err("cannot enter in %s device mode", ci_role(ci)->name);
+ 		pr_err("lpm = %i", ci->hw_bank.lpm);
+@@ -560,6 +567,8 @@ static irqreturn_t ci_irq(int irq, void *data)
+ static int ci_get_platdata(struct device *dev,
+ 		struct ci_hdrc_platform_data *platdata)
+ {
++	int ret;
++
+ 	if (!platdata->phy_mode)
+ 		platdata->phy_mode = of_usb_get_phy_mode(dev->of_node);
  
-+	/* Override AHB burst configuration if needed */
-+	override_needed = hw_read_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK) !=
-+		(ci->platdata->ahbburst_config & AHBBRST_MASK);
-+	if (override_needed)
-+		hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
-+			ci->platdata->ahbburst_config);
- }
+@@ -591,6 +600,16 @@ static int ci_get_platdata(struct device *dev,
+ 	if (of_usb_get_maximum_speed(dev->of_node) == USB_SPEED_FULL)
+ 		platdata->flags |= CI_HDRC_FORCE_FULLSPEED;
  
- /**
-@@ -633,6 +641,16 @@ static int ci_get_platdata(struct device *dev,
- 		}
- 	}
- 
-+	if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
-+		ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-+			&platdata->ahbburst_config);
++	if (of_find_property(dev->of_node, "gadget-itc-setting", NULL)) {
++		ret = of_property_read_u32(dev->of_node, "gadget-itc-setting",
++			&platdata->gadget_itc_setting);
 +		if (ret) {
 +			dev_err(dev,
-+				"failed to get ahb-burst-config value\n");
++				"failed to get gadget-itc-setting value\n");
 +			return ret;
 +		}
 +	}
@@ -75,22 +75,15 @@ index f713e32..c0e6bb1 100644
  }
  
 diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index d3906a4..4d7ceb3 100644
+index ab94f78..e69d829 100644
 --- a/include/linux/usb/chipidea.h
 +++ b/include/linux/usb/chipidea.h
-@@ -32,6 +32,7 @@ struct ci_hdrc_platform_data {
- #define CI_HDRC_DISABLE_HOST_STREAMING		BIT(9)
- #define CI_HDRC_DISABLE_STREAMING (CI_HDRC_DISABLE_DEVICE_STREAMING |	\
- 		CI_HDRC_DISABLE_HOST_STREAMING)
-+#define CI_HDRC_OVERRIDE_AHB_BURST		BIT(10)
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
-@@ -40,6 +41,7 @@ struct ci_hdrc_platform_data {
+@@ -35,6 +35,8 @@ struct ci_hdrc_platform_data {
+ 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
+ 	struct regulator	*reg_vbus;
  	bool			tpl_support;
- 	/* interrupt threshold value for gadget */
- 	u32			gadget_itc_setting;
-+	u32			ahbburst_config;
++	/* interrupt threshold value for gadget */
++	u32			gadget_itc_setting;
  };
  
  /* Default offset of capability registers */
