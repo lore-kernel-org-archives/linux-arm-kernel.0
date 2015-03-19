@@ -1,48 +1,44 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 20 Mar 2015 14:12:52 +0300
-Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
-Message-ID: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Thu, 19 Mar 2015 19:25:14 +0000
+Subject: [PATCH] dma-mapping: fix size when of_dma_get_range() fails
+In-Reply-To: <1419458210-4079-1-git-send-email-m-karicheri2@ti.com>
+References: <1419458210-4079-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <20150319192514.0F9C7C40B87@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
-split this is not so, because 2*TASK_SIZE overflows 32 bits,
-so the actual value of ELF_ET_DYN_BASE is:
-	(2 * TASK_SIZE / 3) = 0x2a000000
+On Wed, 24 Dec 2014 16:56:50 -0500
+, Murali Karicheri <m-karicheri2@ti.com>
+ wrote:
+> When call to of_dma_get_range() fails, the code currently set size
+> to dev->coherent_dma_mask instead of dev->coherent_dma_mask + 1. Fix this
+> to make the code consistent with the case when size is obtained from
+> dma-range property.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
-On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
-for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
-as it fails to map shadow memory.
-Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
-has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
-even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
+Looks okay to me. I've merged it into my tree.
 
-Fix overflow by dividing TASK_SIZE prior to multiplying.
-After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
-	(TASK_SIZE / 3 * 2) = 0x7f555554
+g.
 
-[1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
-
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-Reported-by: Maria Guseva <m.guseva@samsung.com>
-Cc: stable at vger.kernel.org
----
- arch/arm/include/asm/elf.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index c1ff8ab..1984a92 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -115,7 +115,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
-    the loader.  We need to make sure that it is out of the way of the program
-    that it will "exec", and that there is sufficient room for the brk.  */
- 
--#define ELF_ET_DYN_BASE	(2 * TASK_SIZE / 3)
-+#define ELF_ET_DYN_BASE	(TASK_SIZE / 3 * 2)
- 
- /* When the program starts, a1 contains a pointer to a function to be 
-    registered with atexit, as per the SVR4 ABI.  A value of 0 means we 
--- 
-2.3.3
+> ---
+>  drivers/of/platform.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index a54ec10..af9aef1 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -185,7 +185,7 @@ static void of_dma_configure(struct device *dev)
+>  	ret = of_dma_get_range(dev->of_node, &dma_addr, &paddr, &size);
+>  	if (ret < 0) {
+>  		dma_addr = offset = 0;
+> -		size = dev->coherent_dma_mask;
+> +		size = dev->coherent_dma_mask + 1;
+>  	} else {
+>  		offset = PFN_DOWN(paddr - dma_addr);
+>  		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+> -- 
+> 1.7.9.5
+> 
