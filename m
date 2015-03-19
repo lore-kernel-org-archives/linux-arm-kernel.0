@@ -1,73 +1,43 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 19 Mar 2015 16:39:50 +0100
-Subject: [RFC] pinmux: group and function definitions in the device tree
-Message-ID: <20150319153950.GC30114@odux.rfo.atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Mar 2015 09:42:35 -0600
+Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
+ address change
+In-Reply-To: <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
+References: <20150317083221.32662.14647.stgit@baseline>
+ <20150317083221.32662.96822.stgit@baseline>
+ <20150317103806.GU8656@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
+Message-ID: <550AEE6B.5080301@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/19/2015 09:26 AM, Paul Walmsley wrote:
+> On Tue, 17 Mar 2015, Russell King - ARM Linux wrote:
+>
+>> On Tue, Mar 17, 2015 at 01:32:21AM -0700, Paul Walmsley wrote:
+>>>   Required properties:
+>>>   - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
+>>> -  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
+>>> -  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
+>>> -  tegra132, or tegra210.
+>>> -- reg : Should contain 1 register ranges(address and length)
+>>> +  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and Tegra124, must
+>>> +  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra114
+>>> +  or tegra124.  For Tegra132, the compatible string must contain
+>>> +  "nvidia,tegra132-ahb".
+>>> +
+>>> +- reg : Should contain 1 register ranges(address and length).  On Tegra20,
+>>> +  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical base
+>>> +  address of the IP block must end in 0x04.  On DT files for later chips, the
+>>> +  actual hardware base address of the IP block should be used.
+>>
+>> You could check that in the driver.  If you can check it in the driver,
+>> you can also decide to ignore it if it were offset by 0x04 (possibly
+>> printing a warning.)  That opens up the ability to fix the older Tegra
+>> DT files going forward while still remaining compatible with existing
+>> DT files, and avoiding the need for a complex note about this.
+>
+> That's fine, I'll do that and drop this patch.
 
-I would like to start a discussion about pinmuxing and device tree bindings.
-
-I am currently writing a new pinmuxing driver using the generic pinconf.
-My main concern is about defining functions and which pins belong to a
-group.
-
-At the moment, it seems that most drivers using the generic pinconf
-define this stuff in a static way. The pinctrl-at91 driver covers many
-devices, the new one should do the same for new Atmel devices. Having
-the group and function definitions in the driver could involve a huge
-file...
-I am not sure it is a good thing to embed all these information into a
-single zImage...
-
-How can we achieved this? I was thinking about something like this:
-
-pinctrl at fc06a000 {
-
-	[...]
-
-	pinctrl_defs {
-		mci0 {
-			mci0_ioset0_1bit_grp {
-				at91,pins = <68 69 70>;
-				at91,mux = <2>;
-			};
-
-			mci0_ioset0_4bit_grp {
-				at91,pins = <68 69 70 71 72 73>;
-				at91,mux = <2>;
-			};
-
-			mci0_ioset0_8bit_grp {
-				at91,pins = <68 69 70 71 72 73 74 75 76 77>;
-				at91,mux = <2>;
-			};
-		};
-	};
-
-	pinctrl_mci0_default: mci0_default {
-		mux {
-			function = "mci0";
-			groups = &mci0_ioset0_8bit_grp;
-		};
-
-		conf {
-			groups = &mci0_ioset0_8bit_grp;
-			bias-pullup;
-		};
-	};
-};
-
-- A subnode for these definitions in order to not parse the whole
-  pinctrl node to retrieve groups and functions.
-- Using node names as function and group names.
-- Can we get generic properties to define the groups? Of course a 'pins'
-  property is mandatory. In my case I will need an extra one to tell the
-  controller how to mux the pins (a same pin can have up to 7 muxing
-  possibilities).
-
-
-Thanks for your advices.
-
-Ludovic
+Don't we still want to update the DT binding documentation to state what 
+the preferred base address (or at least set of legal base addresses) is/are?
