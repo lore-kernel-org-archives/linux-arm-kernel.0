@@ -1,63 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Mar 2015 12:14:11 +0100
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
- <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
-Message-ID: <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 19 Mar 2015 13:15:33 +0200
+Subject: [PATCH v2 2/2] i2c: driver for the Conexant Digicolor I2C
+ controller
+In-Reply-To: <20150319110002.GD914@katana>
+References: <844001df525b3073e50cbd95f357c0eb9912a394.1426758858.git.baruch@tkos.co.il>
+ <866aada336ddbeec18749a1c301ab9b365baadde.1426758858.git.baruch@tkos.co.il>
+ <20150319110002.GD914@katana>
+Message-ID: <20150319111533.GF2415@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2015 at 05:09, Doug Anderson <dianders@chromium.org> wrote:
-> Ulf,
->
-> On Tue, Mar 17, 2015 at 3:23 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> This will get us within .3V of whatever vmmc is.  If vmmc is 3.3V, it
->>> will allow vqmmc of 3.0V - 3.6V.
->>>
->>> This _seems_ sane to me and given any sane system design we should be
->>> fine here, I think.  I can't see someone designing a system where
->>> vqmmc was not within .3V of vmmc, can you?  If we think someone will
->>> actually build a system where vmmc is 3.3V and vqmmc can't go higher
->>> than 2.7V then we'll either need to increase the tolerance here or add
->>> a new asymmetric system call like my original patches did.
->>
->> I know about SoC that supports 3.4V vmmc and 2.9V vqmmc.
->>
->> What I think we need is the option to have a policy here. We need to
->> allow voltage levels stated by the spec and at the same time try chose
->> the one best suited. That's not being accomplished here.
->>
->> Moreover, I wonder whether it's okay (from spec perspective) to have
->> vqmmc at a higher voltage level than vmmc. I don't think that's
->> allowed, but I might be wrong.
->
-> OK, so sounds like I need to add a regulator_set_voltage_tol2()
-> function that takes in an upper tolerance and a lower.  We can use the
-> same rough implementation in the core we have today (if Mark is OK
-> with that) with regulator_set_voltage_tol() but just allow it to be
-> asymmetric.
+Hi Wolfram,
 
-Agree. Moreover we need that API to also pick the closest value to
-target, when trying the range "target->minimum". I also believe it
-would be good to allow both upper and lower limits to be zero.
+On Thu, Mar 19, 2015 at 12:00:02PM +0100, Wolfram Sang wrote:
+> On Thu, Mar 19, 2015 at 11:54:18AM +0200, Baruch Siach wrote:
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> > v2:
+> >    * Address the comment of Wolfram Sang:
+> >     - Advertise the I2C_FUNC_NOSTART capability
+> >     - Rebase on v4.0-rc1
+> 
+> Please fix:
+> 
+> Applying: i2c: driver for the Conexant Digicolor I2C controller
+>     CHECKPATCH
+> ...
+> 
+> ERROR: code indent should use tabs where possible
+> #119: FILE: drivers/i2c/busses/i2c-digicolor.c:68:
+> +        STATE_IDLE,$
 
-If Mark disagrees with this approach, we will have to deal with all
-the magic inside the mmc core layer. Very much similar how
-mmc_regulator_get_ocrmask() is implemented.
+Sorry. I should have caught these earlier. Will fix.
 
-Kind regards
-Uffe
+[...]
 
->
-> From what I see in the spec for 3.3V cards are supposed to react to a
-> high signal that is .625 * VDD - VDD + .3
->
->
-> I might not be able to get to this till next week, though...
->
-> -Doug
+> There are more checkpatch warnings I don't care about much.
+> You can decide about them.
+
+Thanks,
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
