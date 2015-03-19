@@ -1,97 +1,92 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 19 Mar 2015 12:11:05 -0700
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller and
- PHY
-In-Reply-To: <20150319173640.GS32500@ld-irv-0074>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
- <550AAEA1.5080301@redhat.com> <20150319155358.GA19571@brian-ubuntu>
- <550B0118.3040104@redhat.com> <20150319173640.GS32500@ld-irv-0074>
-Message-ID: <20150319191105.GU32500@ld-irv-0074>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Mar 2015 19:12:31 +0000
+Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
+In-Reply-To: <550B013B.1060002@gmail.com>
+References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
+ <20150319134910.GF18473@leverpostej> <550B013B.1060002@gmail.com>
+Message-ID: <20150319191231.GC11683@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replying to myself, because I may or may not like having conversations
-with myself :)
+> > I'm not sure I see the point in adding a property which is not
+> > well-defined and not guarnateed to be in any way stable.
+> 
+> This binding is kind of an odd ball to me.  It is clearly _not_ describing
+> hardware, which is really the central point of the dtb.  But the chosen
+> node is allowed to cover policy things like the boot command line.
 
-On Thu, Mar 19, 2015 at 10:36:40AM -0700, Brian Norris wrote:
-> On Thu, Mar 19, 2015 at 06:02:16PM +0100, Hans de Goede wrote:
-> > On 19-03-15 16:53, Brian Norris wrote:
-> > >On Thu, Mar 19, 2015 at 12:10:25PM +0100, Hans de Goede wrote:
-> > >>On 19-03-15 02:23, Brian Norris wrote:
-> > >>>Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> > >>>---
-> > >>>Light dependency on:
-> > >>>   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
-> > >>>for the surrounding text.
-> > >>>
-> > >>>  arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
-> > >>>  1 file changed, 36 insertions(+)
-> > >>>
-> > >>>diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-> > >>>index 9eaeac8dce1b..7a7c4d8c2afe 100644
-> > >>>--- a/arch/arm/boot/dts/bcm7445.dtsi
-> > >>>+++ b/arch/arm/boot/dts/bcm7445.dtsi
-> > >>>@@ -108,6 +108,42 @@
-> > >>>  			brcm,int-map-mask = <0x25c>, <0x7000000>;
-> > >>>  			brcm,int-fwd-mask = <0x70000>;
-> > >>>  		};
-> > >>>+
-> > >>>+		sata at f045a000 {
-> > >>>+			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-> > >>>+			reg-names = "ahci", "top-ctrl";
-> > >>>+			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
-> > >>
-> > >>Why not simply drop the second register range here, and the minimal top-ctrl
-> > >>poking you need in the phy driver's phy_init function ?
-> > >
-> > >I agree it's a little ugly, but your recommended solution will not work.
-> > >
-> > >The 'top-ctrl' register range includes several SATA functionalities,
-> > >some of which are required for the PHY and some of which are definitely
-> > >required for the SATA driver.
+Sure, but this has nothing to do with policy regarding the HW. This is
+entirely to do with the build environment of the DTB, which in general
+you don't need to know.
+
+> If I want to debug DTB related issues, read the source that was used
+> to create the DTB, or slightly modify the DTB - where is the source
+> and what is the version of it in the source control system.
+
+That's only useful if you have access to the machine that the source is
+on, access to the repo on said machine, and so on.
+
+You can easily slightly modify a DTB by decompiling and recompiling it,
+as bootloaders do to inject /chosen/bootargs. Admittedly this can be
+painful, but at least you know exactly what was changed, because you
+know which DTB you started with.
+
+Consider what modification by other agents means for provenance of the
+DTB. We've already been bitten by bootloaders messing with the DTB [1],
+and simple loaders can change things substantially [2,3], and won't
+update any provenance binding.
+
+> When building and installing a DTB, did the version that I wanted to
+> install on the target actually get on the target.
+
+You can already check the hash if you want to check that you copies the
+correct version; which is better than trusting an arbitrary string,
+because if anything fiddles with the DTB it will change.
+
+[...]
+
+> >> +dtb-path
+> >> +	The build directory relative path of the DTB.
+> >> +
+> >> +dts-path
+> >> +	The absolute path of the .dts file compiled to create the DTB.
 > > 
-> > I see, but the phy driver is required for the SATA driver anyways,
-> > and since the BUS_CTRL setting seems to be static it might just as
-> > well be set by the phy driver. The phy driver also poking some
-> > common sata glue bits like this busctrl register is not unheard of,
-> > esp. when these glue bits are in the phy register range.
+> > Why do you need the DTB path?
+> 
+> Paranoia.  Even if not probable, one could build different DTBs from
+> the same .dts.
 
-I realized I *do* still have some reservations about moving the
-SATA_TOP_CTRL register range under the PHY DT binding; it's because all
-arguments for it seem to rest on descriptions of how the software would
-*like* to handle it. It's not at all about describing the hardware
-correctly.
+One could also build the same DTB from two different dts files, no?
 
-I still see SATA_TOP_CTRL as a register resource that belongs to the
-SATA controller, not to the PHY. It just happens that it has a few
-registers in it that are also for use in the PHY.
+You could build the same dtb from the same dts, but with some arbitrary
+things changed, such that the at either end of the process is
+irrelevant. Personally, I end up doing this a fair amount when testing.
 
-So, to best describe the *hardware*, it seems we might split top-ctrl
-into 3 portions, where the middle gets assigned to a phy description,
-and the first and last belong to the SATA controller description.
+> > Why do these differ w.r.t. absolute/relative?
+> 
+> Those are the forms of the path that are present in the build
+> system.  If there is a good reason to change one of them to the
+> other form, I could add the extra complexity to massage the path.
+> 
+> > 
+> > Why would you _ever_ need an absolute path!?
+> 
+> The absolute path tells you which source repository contained the source.
 
-But to most easily describe how *software* would best handle them, we
-might stick all the custom stuff (i.e., all of top-ctrl + phy) into the
-PHY description.
+Except that the absolute path is realtive to the machine it was built
+on, so doesn't actually help.
 
-I still think that, practically speaking, the latter should work just
-fine, and it's only a theoretical concern that suggests the former.
+On various machines I have folders called /home/mark/src/linux. These
+are not the same folder. If I gave you a DTB that told you it was from
+/home/mark/src/linux/arch/arm64/boot/dts/vendor/foo.dts, you would have
+difficulty acquiring that precise file.
 
-Thoughts?
+As far as I can tell, this binding just allows you to place a
+meaningless set of strings in the DTB, that don't actually tell you
+anything useful.
 
-> > >We have:
-> > >
-> > >0x00   VERSION
-> > >0x04   BUS_CTRL
-> > >0x08   TP_CTRL
-> > >0x0C   PHY_CTRL_1
-> > >0x10   PHY_CTRL_2
-> > >0x14   PHY_CTRL_3
-> > >0x18   PHY_CTRL_4
-> > >0x1C   TP_OUT
-> > >0x20   CLIENT_INIT_CTRL
+Mark.
 
-[snip rest]
-
-Brian
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/329938.html
+[2] https://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/
+[3] https://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/commit/?id=e4ae51a1c128ccaac01bdc834692fd15c3a3c8de
