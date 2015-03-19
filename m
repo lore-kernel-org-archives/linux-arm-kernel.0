@@ -1,69 +1,124 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 19 Mar 2015 09:19:15 +0800
-Subject: [PATCH 04/12] usb: chipidea: imx: add stream mode enable for device
- mode at imx6sl/imx6sx
+Date: Thu, 19 Mar 2015 09:19:22 +0800
+Subject: [PATCH 11/12] ARM: imx6: change default burst size for USB
 In-Reply-To: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
 References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1426727963-32280-5-git-send-email-peter.chen@freescale.com>
+Message-ID: <1426727963-32280-12-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stream mode enable is known for better performance, this stream mode
-enable patch has been passed with stress tests at device mode for
-imx6sl and imx6sx, and no issue is found.
+It can improve the USB performance when choosing larger
+burst size at some systems (bus size is larger), there is
+no side effect if this burst size is larger than bus size.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/ci_hdrc_imx.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+ arch/arm/boot/dts/imx6sl.dtsi  | 6 ++++++
+ arch/arm/boot/dts/imx6sx.dtsi  | 6 ++++++
+ 3 files changed, 20 insertions(+)
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_imx.c b/drivers/usb/chipidea/ci_hdrc_imx.c
-index 389f0e0..5373984 100644
---- a/drivers/usb/chipidea/ci_hdrc_imx.c
-+++ b/drivers/usb/chipidea/ci_hdrc_imx.c
-@@ -29,26 +29,31 @@ struct ci_hdrc_imx_platform_flag {
- };
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 2430cc9..4446218 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -836,6 +836,8 @@
+ 				fsl,usbphy = <&usbphy1>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct ci_hdrc_imx_platform_flag imx27_usb_data = {
-+		CI_HDRC_DISABLE_STREAMING,
- };
+@@ -847,6 +849,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct ci_hdrc_imx_platform_flag imx28_usb_data = {
- 	.flags = CI_HDRC_IMX28_WRITE_FIX |
--		CI_HDRC_TURN_VBUS_EARLY_ON,
-+		CI_HDRC_TURN_VBUS_EARLY_ON |
-+		CI_HDRC_DISABLE_STREAMING,
- };
+@@ -857,6 +861,8 @@
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct ci_hdrc_imx_platform_flag imx6q_usb_data = {
- 	.flags = CI_HDRC_SUPPORTS_RUNTIME_PM |
--		CI_HDRC_TURN_VBUS_EARLY_ON,
-+		CI_HDRC_TURN_VBUS_EARLY_ON |
-+		CI_HDRC_DISABLE_STREAMING,
- };
+@@ -867,6 +873,8 @@
+ 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+ 				fsl,usbmisc = <&usbmisc 3>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct ci_hdrc_imx_platform_flag imx6sl_usb_data = {
- 	.flags = CI_HDRC_SUPPORTS_RUNTIME_PM |
--		CI_HDRC_TURN_VBUS_EARLY_ON,
-+		CI_HDRC_TURN_VBUS_EARLY_ON |
-+		CI_HDRC_DISABLE_HOST_STREAMING,
- };
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 9f283cc..9117c4c 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -681,6 +681,8 @@
+ 				fsl,usbphy = <&usbphy1>;
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct ci_hdrc_imx_platform_flag imx6sx_usb_data = {
- 	.flags = CI_HDRC_SUPPORTS_RUNTIME_PM |
--		CI_HDRC_TURN_VBUS_EARLY_ON,
-+		CI_HDRC_TURN_VBUS_EARLY_ON |
-+		CI_HDRC_DISABLE_HOST_STREAMING,
- };
+@@ -692,6 +694,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
  
- static const struct of_device_id ci_hdrc_imx_dt_ids[] = {
-@@ -126,7 +131,6 @@ static int ci_hdrc_imx_probe(struct platform_device *pdev)
- 	struct ci_hdrc_platform_data pdata = {
- 		.name		= dev_name(&pdev->dev),
- 		.capoffset	= DEF_CAPOFFSET,
--		.flags		= CI_HDRC_DISABLE_STREAMING,
- 	};
- 	int ret;
- 	const struct of_device_id *of_id =
+@@ -702,6 +706,8 @@
+ 				clocks = <&clks IMX6SL_CLK_USBOH3>;
+ 				fsl,usbmisc = <&usbmisc 2>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 0cdfa01..464cc3a 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -743,6 +743,8 @@
+ 				fsl,usbmisc = <&usbmisc 0>;
+ 				fsl,anatop = <&anatop>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -754,6 +756,8 @@
+ 				fsl,usbphy = <&usbphy2>;
+ 				fsl,usbmisc = <&usbmisc 1>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -766,6 +770,8 @@
+ 				phy_type = "hsic";
+ 				fsl,anatop = <&anatop>;
+ 				ahb-burst-config = <0x0>;
++				tx-burst-size-dword = <0x10>;
++				rx-burst-size-dword = <0x10>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 1.9.1
