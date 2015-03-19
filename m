@@ -1,44 +1,87 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 19 Mar 2015 05:30:09 +0000
-Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from ARM
- defconfigs
-In-Reply-To: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
-References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 19 Mar 2015 11:20:25 +0530
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <20150318153421.GP3318@x1>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <3926609.Ff6LCkuuMX@wuerfel>
+ <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
+ <20150318131722.GN3318@x1>
+ <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
+ <20150318153421.GP3318@x1>
+Message-ID: <CABb+yY0HufMEDy7ANj8KV0hamvM-Tgy4GBkwD73wm3DMumcbaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Wed, Mar 18, 2015 at 9:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 18 Mar 2015, Jassi Brar wrote:
+>
+>> On Wed, Mar 18, 2015 at 6:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Tue, 03 Mar 2015, Jassi Brar wrote:
+>> >
+>> >> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
+>> >> >> +
+>> >> >> +/*
+>> >> >> + * struct sti_mbox_msg - sti mailbox message description
+>> >> >> + * @dsize:             data payload size
+>> >> >> + * @pdata:             message data payload
+>> >> >> + */
+>> >> >> +struct sti_mbox_msg {
+>> >> >> +       u32             dsize;
+>> >> >> +       u8              *pdata;
+>> >> >> +};
+>> >> >
+>> >> > As mentioned in another thread, we may just want to add a 'size'
+>> >> > argument to the message send function, and a default helper for
+>> >> > messages with size of 32 bits.
+>> >> >
+>> >> Case-a) 'size' is a member of the payload structure itself
+>> >>     The extra 'size' argument would only be used for sanity check.
+>> >>     This driver seems so. Lee, can you not do without 'dsize'?
+>> >>
+>> >> Case-b) 'size' is not a member of payload structure:
+>> >>      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
+>> >>             Here the size argument is redundant.
+>> >>
+>> >>      b2)  payload length varies
+>> >>             This case is highly unlikely because there would be no way
+>> >> for remote to know how many bytes to read as the payload. Not to mean
+>> >> we can't do without the 'size' argument.
+>> >>
+>> >> Your opinion has huge weight, but I would like to be enlightened
+>> >> before agreeing.
+>> >
+>> > Let's simplify this.
+>> >
+>> > If you want to have varying length payloads, you have to carry the
+>> > size in the payload.  If you wish to force fixed size payloads, then
+>> > you may do without a size segment.
+>> >
+>> > Do you really want to force all users of Mailbox to use fixed size
+>> > payloads?
+>> >
+>> No. I only observed the fact that every known mailbox controller
+>> driver already has a way to figure out the payload length because
+>> either the protocol uses fixed length payloads or has the 'size' field
+>> in every payload.
+>> I am yet to see a platform that uses both, then the 'size' argument
+>> will be helpful but still not necessary.
+>
+> I see.  So your real concern is that controllers shouldn't have two
+> means of obtaining size.
+>
+I think right now there's not much need to expand the api for 'u32'
+sized payloads.
 
-Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
-Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
-And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
-But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
-not a general purpose DMAC (2nd DMAC is for Device to Device inside
-sound system). Additionally, current DMAEngine can't support Device to
-Device, and we don't have correct DT bindings for it at this point.
-So the easiest solution for it is that move it from DMAEngine to rsnd
-driver.
-Audio DMAC peri peri DMAEngine is no longer needed.
-Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
+> Arnd's idea of placing the message size as part of the send_message()
+> call is fine, but it's still going to end up in the payload isn't it?
+>
+... or it will be implied by sizeof(struct my_packet) if the protocol
+has finite set of payloads.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/configs/multi_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 06075b6..e805984 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -505,7 +505,6 @@ CONFIG_DW_DMAC=y
- CONFIG_MV_XOR=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_SH_DMAE=y
--CONFIG_RCAR_AUDMAC_PP=m
- CONFIG_RCAR_DMAC=y
- CONFIG_STE_DMA40=y
- CONFIG_SIRF_DMA=y
--- 
-1.9.1
+> And what about receiving?
+>
+Similar to sending - controller driver passes pointer to RX buffer
+which the client parses. Remember the protocol would already have a
+way to communicate payload length.
