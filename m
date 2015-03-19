@@ -1,55 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Mar 2015 19:39:27 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150319101727.GC24556@red-moon>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
- <20150319101727.GC24556@red-moon>
-Message-ID: <20150319193927.GG4751@arm.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Thu, 19 Mar 2015 20:52:42 +0100
+Subject: [PATCH] ARM: tegra: use generated pinmux for Beaver board
+In-Reply-To: <1425323769.2182.0.camel@lynxeye.de>
+References: <1420495066-19221-1-git-send-email-dev@lynxeye.de>
+ <54AB0B68.7050704@wwwdotorg.org> <1420591830.25483.16.camel@lynxeye.de>
+ <1425323769.2182.0.camel@lynxeye.de>
+Message-ID: <1426794762.2212.0.camel@lynxeye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
-> > On 2015/3/19 3:05, Will Deacon wrote:
-> > > On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
-> > >> This patch set already tested on multi platforms:
-> > >>  - AMD Seattle board;
-> > >>  - Cavium Thunder board;
-> > >>  - Huawei D02 board;
-> > >>  - Qualcomm ARM64 platform
-> > >>
-> > >> This version 10 patch set address some minor comments and collect ACKs and
-> > >> Reviewed-bys for v9:
-> > >>
-> > >>  - new Acks from Rafael, Olof, Grant, Lorenzo
-> > >>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
-> > >>    but no functional change
-> > >>  - Remove if(!phys) for early ioremappings
-> > >>  - Rework sleep function for ARM64
-> > >>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
-> > >>  - Disable ACPI if not HW_REDUCED_ACPI compliant
-> > >>  - Remove the doc of why ACPI on ARM
-> > > So I've had a look at the current state of this series and I think there
-> > > are a few immediate things left to do:
-> > >
-> > >   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
-> > >       Catalin
+Am Montag, den 02.03.2015, 20:16 +0100 schrieb Lucas Stach:
+> Am Mittwoch, den 07.01.2015, 01:50 +0100 schrieb Lucas Stach:
+> > Am Montag, den 05.01.2015, 15:08 -0700 schrieb Stephen Warren:
+> > > On 01/05/2015 02:57 PM, Lucas Stach wrote:
+> > > > Replace the current incomplete pinmux setup with a proper one generated
+> > > > using the tegra pinmux scripts.
+> > > 
+> > > I assume this is identical to the existing content, it's just that the 
+> > > node sort order changed to match the auto-generation order?
+> > > 
+> > Yes auto-generation changes the representation of the nodes a bit, but I
+> > made sure to keep the properties of the existing kernel DT pinmux where
+> > they were different from the U-Boot pinmux.
 > > 
-> > Sure, it will be done after the confirmation with Ard.
+> > > If so,
+> > > Acked-by: Stephen Warren <swarren@nvidia.com>
 > > 
-> > >
-> > >   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
-> > >       so I'm assuming there will be additional patches from them that are
-> > >       required.
-> > 
-> > Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
+> This has not been applied. Could anyone please pick this up, so it
+> doesn't miss yet another merge window?
 > 
-> Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> I am working on it, I do not think it should be a blocking point, patch
-> coming asap on top of your series.
-
-Well, I don't really want to merge the series without those patches so I
-do think it blocks the code from getting into mainline.
-
-Will
+Friendly ping.
