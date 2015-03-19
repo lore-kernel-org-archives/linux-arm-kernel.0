@@ -1,76 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Mar 2015 10:35:52 +0000
-Subject: [PATCH v5 8/8] arm64: enforce x1|x2|x3 == 0 upon kernel entry as
- per boot protocol
-In-Reply-To: <CAKv+Gu-o4x1H1JnWfizTnr_+6MKEQbMXL3yEzT-LggvgM6V0QQ@mail.gmail.com>
-References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-9-git-send-email-ard.biesheuvel@linaro.org>
- <20150318181315.GH19814@leverpostej>
- <CAKv+Gu_Psdg1PGbW8mydKGGUvyW=F1D125VSTdABLQEOHMaTwQ@mail.gmail.com>
- <CAKv+Gu_f=e4UG1GmtFh7j8fvq67v94VA=FwgaxHV5rECx0Wf=Q@mail.gmail.com>
- <20150318185737.GJ19814@leverpostej>
- <CAKv+Gu-PX4cPz=yuFeRUbB3COc7jRvGuCYR7h_xLVuUv7A9CfA@mail.gmail.com>
- <20150318202430.GA17417@leverpostej>
- <CAKv+Gu-o4x1H1JnWfizTnr_+6MKEQbMXL3yEzT-LggvgM6V0QQ@mail.gmail.com>
-Message-ID: <20150319103551.GA18473@leverpostej>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 19 Mar 2015 11:36:29 +0100
+Subject: [PATCH 00/12] USB: chipidea: patchset for performance improvement
+In-Reply-To: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
+References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20150319103629.GI14457@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 07:30:03AM +0000, Ard Biesheuvel wrote:
-> On 18 March 2015 at 21:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >> >>>  ENTRY(stext)
-> >> >> >>> +     adr_l   x8, boot_regs                   // record the contents of
-> >> >> >>> +     stp     x0, x1, [x8]                    // x0 .. x3 at kernel entry
-> >> >> >>> +     stp     x2, x3, [x8, #16]
-> >> >> >>
-> >> >> >> I think we should have a dc ivac here as we do for
-> >> >> >> set_cpu_boot_mode_flag.
-> >> >> >>
-> >> >> >> That avoids a potential issue with boot_regs sharing a cacheline with
-> >> >> >> data we write with the MMU on -- using __flush_dcache_area will result
-> >> >> >> in a civac, so we could write back dirty data atop of the boot_regs if
-> >> >> >> there were clean entries in the cache when we did the non-cacheable
-> >> >> >> write.
-> >> >> >>
-> >> >> >
-> >> >> > Hmm, I wondered about that.
-> >> >> >
-> >> >> > Could we instead just make it u64 __initconst boot_regs[] in setup.c ?
-> >> >> >
-> >> >>
-> >> >> Never mind, it's easier just to do the invalidate right after, and I
-> >> >> can drop the flush before the access.
-> >> >
-> >> > Yup.
-> >> >
-> >> > Annoyingly the minimum cache line size seems to be a word (given the
-> >> > defnition of CTR.DminLine), which means you need a few dc ivac
-> >> > instructions to be architecturally correct.
-> >> >
-> >>
-> >> But that applies to cpu_boot_mode as well then?
-> >
-> > It writes a single word, so it happens to be safe.
-> >
-> >> I will add a call to __inval_cache_range() right after recording the
-> >> initial values, that should do the right thing regarding llinesize
-> >
-> > That works, with one caveat: you'll need a dmb sy between the writes and
-> > the call -- dc instructions by VA only hazard against normal cacheable
-> > accesses, and __inval_cache_range assumes the caches are on and so
-> > doesn't have a dmb prior to the dc instructions.
-> >
+On 09:19 Thu 19 Mar     , Peter Chen wrote:
+> Hi all,
 > 
-> Does it matter at all that __inval_cache_range() will mostly end up
-> doing a civac for the whole array, since it uses civac not ivac for
-> both non-cachelined aligned ends of the region, and the typical
-> cacheline size is larger then the size of the array? Couldn't that
-> also clobber what we just wrote with a stale cacheline?
+> In this patch set, I add some interfaces for tuning the performance
+> of chipidea usb driver. With this set, the USB performance can be improved
+> at some user cases with suitable parameters. The main changes:
+> 
+> - Interface to tune interrupt threshold control, and set
+> 'Immediate' for default value
+> - The glue layer can disable stream mode according to USB role
+> - Interface to tune AHB burst configuration at SBUSCFG
+> - Interface to tune tx/rx burst size
+> - i.mx changes for achieving better performance, it can reduce
+>   the latecy between bus and USB FIFO, and reduce the overrun
+>   and underrun occurrences, it is useful for the system bus is busy.
+>   we see great improvement for ISO transfer, eg, high resolution
+>   USB camera when the bus is busy.
+> 
+> Below are some test results at imx6sx sdb board
+> (set ehci_hcd.park=3 at bootargs), the tests are done
+> at v4.0 kernel, no other bus loading during the tests,
+> so we have not seen performance change for some use cases.
+> 
+> USB Mass Storage (Host mode)
+> With Patch Set		Without Patch Set
+> R: 26.9 MB/s		27 MB/s
+> W: 25.2 MB/s		24.5 MB/s
+> 
+> 1G USB Ethernet Card
+> With Patch Set		Without Patch Set
+> TX: 186 Mb/s		185 Mb/s
+> RX: 219 Mb/s		216 Mb/s
+> 
+> g_ncm (Device Mode)
+> With Patch Set		Without Patch Set
+> TX: 166MB/s		163MB/s
+> RX: 230MB/s		184MB/s
 
-Yes, though only if the memory were outside the footprint of the loaded
-Image (which per the boot protocol should be clean to the PoC).
+The improve is not drag sticks except for gcm RX
 
-So I guess we should move the boot_regs structure back into head.S so it
-doesn't fall outside 
+The most interesting path will be on full system loaded
 
-Mark.
+can you test it and provide data?
+
+Best Regards,
+J.
