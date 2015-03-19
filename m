@@ -1,72 +1,69 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 19 Mar 2015 14:11:48 +0900
-Subject: [PATCH v4 0/4] ARM: EXYNOS: cpuidle: add AFTR mode support for
- Exynos3250
-In-Reply-To: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <550A5A94.2080207@samsung.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 19 Mar 2015 10:43:54 +0530
+Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <20150318152658.GO3318@x1>
+References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
+ <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
+ <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
+ <20150318131226.GM3318@x1>
+ <CABb+yY2HwZn3VSvZ4iVfWE8GrsLDA6Tx_V2HZiOBvJb9UHY2Mg@mail.gmail.com>
+ <20150318152658.GO3318@x1>
+Message-ID: <CABb+yY0tMwYTFDvF2Gce4h5xhKOboLS=32yK42-eoksZ8SAbZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Wed, Mar 18, 2015 at 8:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 18 Mar 2015, Jassi Brar wrote:
 
-I tested this patch-set for AFTR mode.
-When CPU1 is offline state, I checked that CPU0 enter the AFTR mode.
+>> >> > +                       mbox->irq = irq_create_mapping(mbinst->irq_domain,
+>> >> > +                                                      mbox->rx_id);
+>> >> >
+>> >> simply assigning same IRQ to all controller DT nodes and using
+>> >> IRQF_SHARED for the common handler, wouldn't work?
+>> >
+>> > I do have intentions to simplify this driver somewhat, but that will
+>> > take some time as it will require a great deal of consultation and
+>> > testing from the ST side.  This is the current internal implementation
+>> > which is used in the wild and has been fully tested.  If you'll allow
+>> > me to conduct my adaptions subsequently we can have full history and a
+>> > possible reversion plan if anything untoward take place i.e. I mess
+>> > something up.
+>> >
+>> OK, but wouldn't that break the bindings of this driver when you
+>> eventually do that?
+>
+> That's going to happen regardless, since these bindings are already in
+> use internally.  Mainline (i.e. v4.0+) isn't going to be used in
+> products for years to come, so we have a lot of time until any new
+> bindings become ABI.
+>
+I thought time starts from upstream. It doesn't seem right to
+knowingly introduce a binding that we are going to break in coming
+weeks. For this reason, it needs ACK from some DT maintainer.
 
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Best Regards,
-Chanwoo Choi
-
-On 03/19/2015 01:00 AM, Bartlomiej Zolnierkiewicz wrote:
-> Hi,
-> 
-> This patch series adds support for AFTR idle mode on boards with
-> Exynos3250 SoC and allows EXYNOS cpuidle driver usage on these
-> boards.
-> 
-> It has been tested on Samsung Rinato board (Gear 2).
-> 
-> Depends on:
-> - for-next branch (commit: 77105c882ba6) of linux-samsung.git
->   kernel tree
-> 
-> Changes since v3:
-> - enhanced patch description for patch #1
-> - added Reviewed-by/Tested-by tags from Krzysztof
-> - enhanced C2_STATE BOOT mode flag comment
-> - moved exynos_{set,clear}_boot_flag() to firmware.c
-> - added patch description to patch #3
-> 
-> Changes since v2:
-> - rebased on top of for-next branch (commit: 77105c882ba6) of
->   linux-samsung.git kernel tree
-> 
-> Changes since v1:
-> - rebased on top of for-next branch (commit: ce275c369a0b) of
->   linux-samsung.git kernel tree
-> - fixed lockup on hotplug by using dsb_sev() instead of IPI in
->   exynos_boot_secondary() on Exynos3250
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
-> 
-> Bartlomiej Zolnierkiewicz (4):
->   ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
->   ARM: EXYNOS: add code for setting/clearing boot flag
->   ARM: EXYNOS: cpuidle: add AFTR mode support for Exynos3250
->   ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250 SoC
-> 
->  arch/arm/mach-exynos/common.h   |  6 ++++++
->  arch/arm/mach-exynos/exynos.c   |  1 +
->  arch/arm/mach-exynos/firmware.c | 33 ++++++++++++++++++++++++++++++++-
->  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
->  arch/arm/mach-exynos/pm.c       | 12 +++++++++++-
->  arch/arm/mach-exynos/regs-pmu.h |  3 +++
->  arch/arm/mach-exynos/smc.h      |  9 +++++++++
->  7 files changed, 82 insertions(+), 5 deletions(-)
-> 
+>> >> > + * struct sti_mbox_msg - sti mailbox message description
+>> >> > + * @dsize:             data payload size
+>> >> > + * @pdata:             message data payload
+>> >> > + */
+>> >> > +struct sti_mbox_msg {
+>> >> > +       u32             dsize;
+>> >> > +       u8              *pdata;
+>> >> > +};
+>> >> >
+>> >> There isn't any client driver in this patchset to tell exactly, but it
+>> >> seems the header could be split into one shared between mailbox
+>> >> clients and provider and another internal to client/provider ?
+>> >
+>> > I believe only the above will be required by the client.  Seems silly
+>> > to create a client specific header just for that, don't you think?
+>> >
+>> Do you mean to have copies of the structure in controller and client driver? :O
+>
+> I do not.  I planned on sharing the main header with with client
+> also.
+>
+> But I guess by your reaction you suggest having a teeny client header
+> as the best way forward then.
+>
+Yes, please. And also no header that's included by exactly one file.
