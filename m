@@ -1,74 +1,158 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Mar 2015 15:43:00 +0000
-Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at init_mm
-Message-ID: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 19 Mar 2015 15:44:51 +0000
+Subject: [PATCH 08/12] KVM: arm/arm64: implement kvm_io_bus MMIO handling
+ for the VGIC
+In-Reply-To: <20150314142720.GD10935@cbox>
+References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+ <1426263012-22935-9-git-send-email-andre.przywara@arm.com>
+ <20150314142720.GD10935@cbox>
+Message-ID: <550AEEF3.80702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-init_mm isn't a normal mm: it has swapper_pg_dir as its pgd (which
-contains kernel mappings) and is used as the active_mm for the idle
-thread.
+Hej Christoffer,
 
-When restoring the pgd after an EFI call, we write current->active_mm
-into TTBR0. If the current task is actually the idle thread (e.g. when
-initialising the EFI RTC before entering userspace), then the TLB can
-erroneously populate itself with junk global entries as a result of
-speculative table walks.
+On 14/03/15 14:27, Christoffer Dall wrote:
+> On Fri, Mar 13, 2015 at 04:10:08PM +0000, Andre Przywara wrote:
+>> Currently we use a lot of VGIC specific code to do the MMIO
+>> dispatching.
+>> Use the previous reworks to add kvm_io_bus style MMIO handlers.
+>>
+>> Those are not yet called by the MMIO abort handler, also the actual
+>> VGIC emulator function do not make use of it yet, but will be enabled
+>> with the following patches.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/arm_vgic.h |    9 ++++
+>>  virt/kvm/arm/vgic.c    |  111 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  virt/kvm/arm/vgic.h    |    7 +++
+>>  3 files changed, 127 insertions(+)
+>>
+>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+>> index b81630b..4bfc6a3 100644
+>> --- a/include/kvm/arm_vgic.h
+>> +++ b/include/kvm/arm_vgic.h
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/irqreturn.h>
+>>  #include <linux/spinlock.h>
+>>  #include <linux/types.h>
+>> +#include <kvm/iodev.h>
+>>
+>>  #define VGIC_NR_IRQS_LEGACY 256
+>>  #define VGIC_NR_SGIS                16
+>> @@ -147,6 +148,14 @@ struct vgic_vm_ops {
+>>      int     (*map_resources)(struct kvm *, const struct vgic_params *);
+>>  };
+>>
+>> +struct vgic_io_device {
+>> +    gpa_t addr;
+>> +    int len;
+>> +    const struct vgic_io_range *reg_ranges;
+>> +    struct kvm_vcpu *redist_vcpu;
+>> +    struct kvm_io_device dev;
+>> +};
+>> +
+>>  struct vgic_dist {
+>>      spinlock_t              lock;
+>>      bool                    in_kernel;
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 7aae19b..71389b8 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -32,6 +32,8 @@
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_mmu.h>
+>>  #include <trace/events/kvm.h>
+>> +#include <asm/kvm.h>
+>> +#include <kvm/iodev.h>
+>>
+>>  /*
+>>   * How the whole thing works (courtesy of Christoffer Dall):
+>> @@ -774,6 +776,66 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  }
+>>
+>>  /**
+>> + * vgic_handle_mmio_access - handle an in-kernel MMIO access
+>> + * This is called by the read/write KVM IO device wrappers below.
+>> + * @vcpu:   pointer to the vcpu performing the access
+>> + * @this:   pointer to the KVM IO device in charge
+>> + * @addr:   guest physical address of the access
+>> + * @len:    size of the access
+>> + * @val:    pointer to the data region
+>> + * @is_write:       read or write access
+>> + *
+>> + * returns true if the MMIO access could be performed
+>> + */
+>> +static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+>> +                               struct kvm_io_device *this, gpa_t addr,
+>> +                               int len, void *val, bool is_write)
+>> +{
+>> +    struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +    struct vgic_io_device *iodev = container_of(this,
+>> +                                                struct vgic_io_device, dev);
+>> +    struct kvm_run *run = vcpu->run;
+>> +    const struct vgic_io_range *range;
+>> +    struct kvm_exit_mmio mmio;
+>> +    bool updated_state;
+>> +    gpa_t offset;
+>> +
+>> +    offset = addr - iodev->addr;
+>> +    range = vgic_find_range(iodev->reg_ranges, len, offset);
+>> +    if (unlikely(!range || !range->handle_mmio)) {
+>> +            pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
+>> +            return -ENXIO;
+>> +    }
+>> +
+>> +    mmio.phys_addr = addr;
+>> +    mmio.len = len;
+>> +    mmio.is_write = is_write;
+>> +    if (is_write)
+>> +            memcpy(mmio.data, val, len);
+>> +    mmio.private = iodev->redist_vcpu;
+>> +
+>> +    spin_lock(&dist->lock);
+>> +    offset -= range->base;
+>> +    if (vgic_validate_access(dist, range, offset)) {
+>> +            updated_state = call_range_handler(vcpu, &mmio, offset, range);
+>> +            if (!is_write)
+>> +                    memcpy(val, mmio.data, len);
+>> +    } else {
+>> +            if (!is_write)
+>> +                    memset(val, 0, len);
+>> +            updated_state = false;
+>> +    }
+>> +    spin_unlock(&dist->lock);
+>> +    kvm_prepare_mmio(run, &mmio);
+>
+> we're not the only user of kvm_exit_mmio I believe, so we could rename
 
-When we do eventually return to userspace, the task can end up hitting
-these junk mappings leading to lockups, corruption or crashes.
+(assuming you mean we _are_ the only user here, which I can acknowledge)
 
-This patch fixes the problem in the same way as the CPU suspend code by
-ensuring that we never switch to the init_mm in efi_set_pgd and instead
-point TTBR0 at the zero page. A check is also added to cpu_switch_mm to
-BUG if we get passed swapper_pg_dir.
+> this to vgic_io as well and you could change the mmio.data array to be a
+> void *val pointer, which just gets set to the pointer passed into this
+> function (which I think points to the kvm_run structs data array) and
+> you can avoid all these memcopies, right?
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Fixes: f3cdfd239da5 ("arm64/efi: move SetVirtualAddressMap() to UEFI stub")
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+That sounds indeed tempting, but the comment on the struct kvm_exit_mmio
+declaration reads:
+/*
+ * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
+ * which is an anonymous type. Use our own type instead.
+ */
+How I understand this the structure was introduced to _not_ use the same
+memory, but use a copy instead. Do you remember any reason for this? And
+in how far is this type anonymous? It's even in an uapi header.
 
-This patch gets armhf Debian booting again on my Juno (I guess 64-bit
-userspace tends to use virtual addresses that are high enough to avoid
-hitting the junk TLB entries!).
+Briefly looking at the code we do quite some memcpy on the way.
+I am about to go all the way down into that ARM MMIO handling cave now
+to check this (Marc, if I am not showing up again after some hours,
+please come and rescue me ;-)
 
- arch/arm64/include/asm/proc-fns.h | 6 +++++-
- arch/arm64/kernel/efi.c           | 6 +++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
+Cheers,
+Andre.
 
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 9a8fd84f8fb2..941c375616e2 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -39,7 +39,11 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
- #include <asm/memory.h>
- 
--#define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
-+#define cpu_switch_mm(pgd,mm)				\
-+do {							\
-+	BUG_ON(pgd == swapper_pg_dir);			\
-+	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
-+} while (0)
- 
- #define cpu_get_pgd()					\
- ({							\
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 2b8d70164428..ab21e0d58278 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -337,7 +337,11 @@ core_initcall(arm64_dmi_init);
- 
- static void efi_set_pgd(struct mm_struct *mm)
- {
--	cpu_switch_mm(mm->pgd, mm);
-+	if (mm == &init_mm)
-+		cpu_set_reserved_ttbr0();
-+	else
-+		cpu_switch_mm(mm->pgd, mm);
-+
- 	flush_tlb_all();
- 	if (icache_is_aivivt())
- 		__flush_icache_all();
--- 
-2.1.4
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
+
+ARM Limited, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2557590
+ARM Holdings plc, Registered office 110 Fulbourn Road, Cambridge CB1 9NJ, Registered in England & Wales, Company No:  2548782
