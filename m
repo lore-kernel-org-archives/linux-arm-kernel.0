@@ -1,56 +1,167 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 19 Mar 2015 15:55:40 +0100
-Subject: [RFC v5 02/13] VFIO: platform: test forwarded state when selecting
- IRQ handler
-In-Reply-To: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-References: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1426776951-24901-3-git-send-email-eric.auger@linaro.org>
+Date: Thu, 19 Mar 2015 15:55:38 +0100
+Subject: [RFC v5 00/13] KVM-VFIO IRQ forward control
+Message-ID: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the IRQ is forwarded, the VFIO platform IRQ handler does not
-need to disable the IRQ anymore.
+This series proposes an integration of "ARM: Forwarding physical
+interrupts to a guest VM" (http://lwn.net/Articles/603514/) in
+KVM.
 
-When setting the IRQ handler we now also test the forwarded state. In
-case the IRQ is forwarded we select the vfio_irq_handler.
+It enables to set/unset forwarding for a VFIO platform device IRQ.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+A forwarded IRQ is deactivated by the guest and not by the host.
+When the guest deactivates the associated virtual IRQ, the interrupt
+controller automatically completes the physical IRQ. Obviously
+this requires some HW support in the interrupt controller. This is
+the case for ARM GICv2.
+
+The direct benefit is that, for a level sensitive IRQ, a VM exit
+can be avoided on forwarded IRQ completion.
+
+When the IRQ is forwarded, the VFIO platform driver does not need to
+mask the physical IRQ anymore before signaling the eventfd. Indeed
+genirq lowers the running priority, enabling other physical IRQ to hit
+except that one.
+
+Besides, the injection still is based on irqfd triggering. The only
+impact on irqfd process is resamplefd is not called anymore on
+virtual IRQ completion since deactivation is not trapped by KVM.
+
+The current integration is based on an extension of the KVM-VFIO
+device, previously used by KVM to interact with VFIO groups. The
+patch series now enables KVM to directly interact with a VFIO
+platform device. The VFIO external API was extended for that purpose.
+
+The IRQ forward programming is architecture specific (virtual interrupt
+controller programming basically). However the whole infrastructure is
+kept generic.
+
+from a user point of view, the functionality is provided through a
+new KVM-VFIO group named KVM_DEV_VFIO_DEVICE and 2 associated
+attributes:
+- KVM_DEV_VFIO_DEVICE_FORWARD_IRQ,
+- KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ.
+
+The capability can be checked with KVM_HAS_DEVICE_ATTR.
+
+Forwarding must be activated when the VFIO IRQ is not active at
+physical level or being under injection into the guest (VFIO masked)
+Forwarding can be unset at any time.
 
 ---
+
+This patch series has the following dependencies:
+- "ARM: Forwarding physical interrupts to a guest VM"
+  (http://lwn.net/Articles/603514/)
+- [PATCH v4 0/3] genirq: Saving/restoring the irqchip state of an irq line
+- [RFC v2] chip/vgic adaptations for forwarded irq
+
+Integrated pieces can be found at
+ssh://git.linaro.org/people/eric.auger/linux.git
+on branch vfio_integ_v11_kernel
+
+This was tested on Calxeda Midway, assigning the xgmac main IRQ.
+Unforward was tested doing periodic forward/unforward with random offsets,
+while using netcat traffic to make sure unforward often occurs while the
+IRQ is in progress.
+
+v4 -> v5:
+- fix arm64 compilation issues
+  - arch/arm64/include/asm/kvm_host.h now defines
+    x __KVM_HAVE_ARCH_KVM_VFIO_FORWARD for arm64
+    x __KVM_HAVE_ARCH_HALT_GUEST
+    x and features pause renamed into power_off
 
 v3 -> v4:
-- change title
+- revert as RFC again due to lots of changes, extra complexity induced
+  by new set/unset_forward implementation, and dependencies on RFC patches
+- kvm_vfio_dev_irq struct is used at user level to pass the parameters
+  to KVM-VFIO KVM_DEV_VFIO_DEVICE/KVM_DEV_VFIO_DEVICE_UNFORWARD_IRQ. Shared
+  with Intel posted IRQs.
+- unforward now can happen any time with no constraint and cannot fail
+- new VFIO platform external functions introduced:
+  vfio_externl_set_automasked, vfio_external_mask, vfio_external_is_active,
+- introduce a modality to force guest to exit & prevent it from being
+  re-entered and rename older ARM pause modality into power-off
+  (related to PSCI power-off start)
+- kvm_vfio_arm.c no more exists. architecture specific code is moved into
+  arm/gic.c. This code is not that much VFIO dependent anymore. Although
+  some references still exit in comments.
+- 2 separate architecture specific functions for set and unset (only one
+  has a return value).
 
 v2 -> v3:
-- forwarded state was tested in the handler. Now the forwarded state
-  is tested before setting the handler. This definitively limits
-  the dynamics of forwarded state changes but I don't think there is
-  a use case where we need to be able to change the state at any time.
+- kvm_fwd_irq_action enum replaced by a bool (KVM_VFIO_IRQ_CLEANUP does not
+  exist anymore)
+- a new struct local to vfio.c was introduced to wrap kvm_fw_irq and make it
+  linkable: kvm_vfio_fwd_irq_node
+- kvm_fwd_irq now is self-contained (includes struct vfio_device *)
+- a single list of kvm_vfio_fwd_irq_irq_node is used instead of having
+  a list of devices and a list of forward irq per device. Having 2 lists
+  brought extra complexity.
+- the VFIO device ref counter is incremented each time a new IRQ is forwarded.
+  It is not attempted anymore to hold a single reference whatever the number
+  of forwarded IRQs.
+- subindex added on top of index to be closer to VFIO API
+- platform device check moved in the arm specific implementation
+- enable the KVM-VFIO device for arm64
+- forwarded state change only can happen while the VFIO IRQ handler is not
+  set; in other words, when the VFIO IRQ signaling is not set.
 
-Conflicts:
-	drivers/vfio/platform/vfio_platform_irq.c
----
- drivers/vfio/platform/vfio_platform_irq.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+v1 -> v2:
+- forward control is moved from architecture specific file into generic
+  vfio.c module.
+  only kvm_arch_set_fwd_state remains architecture specific
+- integrate Kim's patch which enables KVM-VFIO for ARM
+- fix vgic state bypass in vgic_queue_hwirq
+- struct kvm_arch_forwarded_irq moved from arch/arm/include/uapi/asm/kvm.h
+  to include/uapi/linux/kvm.h
+  also irq_index renamed into index and guest_irq renamed into gsi
+- ASSIGN/DEASSIGN renamed into FORWARD/UNFORWARD
+- vfio_external_get_base_device renamed into vfio_external_base_device
+- vfio_external_get_type removed
+- kvm_vfio_external_get_base_device renamed into kvm_vfio_external_base_device
+- __KVM_HAVE_ARCH_KVM_VFIO renamed into __KVM_HAVE_ARCH_KVM_VFIO_FORWARD
 
-diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
-index 88bba57..132bb3f 100644
---- a/drivers/vfio/platform/vfio_platform_irq.c
-+++ b/drivers/vfio/platform/vfio_platform_irq.c
-@@ -229,8 +229,13 @@ static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
- {
- 	struct vfio_platform_irq *irq = &vdev->irqs[index];
- 	irq_handler_t handler;
-+	struct irq_data *d;
-+	bool is_forwarded;
- 
--	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED)
-+	d = irq_get_irq_data(irq->hwirq);
-+	is_forwarded = irqd_irq_forwarded(d);
-+
-+	if (vdev->irqs[index].flags & VFIO_IRQ_INFO_AUTOMASKED && !is_forwarded)
- 		handler = vfio_automasked_irq_handler;
- 	else
- 		handler = vfio_irq_handler;
+Eric Auger (12):
+  VFIO: platform: test forwarded state when selecting IRQ handler
+  VFIO: platform: single handler using function pointer
+  KVM: kvm-vfio: User API for IRQ forwarding
+  VFIO: external user API for interaction with vfio devices
+  VFIO: platform: add vfio_external_{mask|is_active|set_automasked}
+  KVM: kvm-vfio: wrappers to VFIO external API device helpers
+  KVM: kvm-vfio: wrappers for
+    vfio_external_{mask|is_active|set_automasked}
+  KVM: arm: rename pause into power_off
+  kvm: introduce kvm_arch_halt_guest and kvm_arch_resume_guest
+  kvm: arm/arm64: implement kvm_arch_halt_guest and
+    kvm_arch_resume_guest
+  KVM: kvm-vfio: generic forwarding control
+  KVM: arm/arm64: vgic: forwarding control
+
+Kim Phillips (1):
+  KVM: arm/arm64: Enable the KVM-VFIO device
+
+ Documentation/virtual/kvm/devices/vfio.txt    |  34 +-
+ arch/arm/include/asm/kvm_host.h               |   7 +-
+ arch/arm/kvm/Kconfig                          |   1 +
+ arch/arm/kvm/Makefile                         |   2 +-
+ arch/arm/kvm/arm.c                            |  38 ++-
+ arch/arm/kvm/psci.c                           |  10 +-
+ arch/arm64/include/asm/kvm_host.h             |   5 +
+ arch/arm64/kvm/Kconfig                        |   1 +
+ arch/arm64/kvm/Makefile                       |   2 +-
+ drivers/vfio/platform/vfio_platform_irq.c     |  71 ++++-
+ drivers/vfio/platform/vfio_platform_private.h |   1 +
+ drivers/vfio/vfio.c                           |  24 ++
+ include/linux/kvm_host.h                      |  59 ++++
+ include/linux/vfio.h                          |  15 +
+ include/uapi/linux/kvm.h                      |  12 +
+ virt/kvm/arm/vgic.c                           | 190 ++++++++++++
+ virt/kvm/vfio.c                               | 429 +++++++++++++++++++++++++-
+ 17 files changed, 871 insertions(+), 30 deletions(-)
+
 -- 
 1.9.1
