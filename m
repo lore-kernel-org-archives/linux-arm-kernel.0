@@ -1,71 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 Mar 2015 08:23:29 -0500
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550A4382.4030209@gmail.com>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
-Message-ID: <CAL_Jsq+sPkZtreQ0sp8KXpkUVpFy=Yh9dr249u8uyoa8yksjmg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 19 Mar 2015 14:26:02 +0100
+Subject: [PATCH v2] clocksource: atmel-st: select MFD_SYSCON
+In-Reply-To: <1426771068-9657-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426771068-9657-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <550ACE6A.4000705@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 10:33 PM, Frank Rowand <frowand.list@gmail.com> wrote:
-> From: Frank Rowand <frank.rowand@sonymobile.com>
+On 03/19/2015 02:17 PM, Alexandre Belloni wrote:
+> Enforce MFD_SYSCON selection as the driver needs it. Else, it will still
+> compile with some warning about X1, x2 or sr being used uninitialized.
 >
-> Add /chosen/dtb-node binding.
-
-Why? Please write better commit messages.
-
->
-> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+> Reported-by: fengguang.wu at intel.com
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/chosen.txt |   37 +++++++++++
+> Daniel,
 >
-> Index: b/Documentation/devicetree/bindings/chosen.txt
-> ===================================================================
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -46,6 +46,43 @@ on PowerPC "stdout" if "stdout-path" is
->  should only use the "stdout-path" property.
+> I think this should go through the at91 tree as the patch introducing that issue
+> went there.
+
+Ok.
+
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+>   drivers/clocksource/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
 >
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 168035883afa..55aef6f89074 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -146,6 +146,7 @@ config ATMEL_PIT
+>   config ATMEL_ST
+>   	bool
+>   	select CLKSRC_OF
+> +	select MFD_SYSCON
 >
-> +dtb-info node
-> +----------------
-> +
-> +Information that describes where the device tree blob (DTB) came from and the
-> +environment it was created in.
-> +
-> +This node is normally created by including arch/arm/boot/dts/skeleton.dtsi,
-> +which includes include/dt-bindings/version.dtsi.
-> +
-> +Properties:
-> +
-> +version
-> +       The version of the DTB.  This is analagous to the linux kernel version.
-> +
-> +       This is a format free field intended for human consumption.  User space
-> +       programs should not have any expections about this property.
-> +
-> +       The DTB number in this property is incremented each time a make that
-> +       creates one or more DTBs is invoked.  If the make creates multiple
-> +       DTBs then this number is only incremented once.
-> +
-> +       The DTB number is stored in file .version_dtb.
-> +
-> +version-linux
-> +       The version of the linux kernel most recently built in the source
-> +       control system that contains the source used to build the DTB.
-> +
-> +       The linux kernel version number is not incremented for a make that
-> +       creates a DTB.
-> +
-> +dtb-path
-> +       The build directory relative path of the DTB.
-> +
-> +dts-path
-> +       The absolute path of the .dts file compiled to create the DTB.
+>   config CLKSRC_METAG_GENERIC
+>   	def_bool y if METAG
+>
 
-So these become an ABI and we can never change the directory structure?
 
-The problem with informational fields is someone, somewhere will rely
-on them and then we are stuck with them. Look at /proc/cpuinfo.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Rob
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
