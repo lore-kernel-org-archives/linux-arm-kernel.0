@@ -1,46 +1,91 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 18 Mar 2015 17:31:32 -0700
-Subject: [PATCH 2/2] ARM: dts: brcmstb: add IRQ0 controller
-In-Reply-To: <1426725092-16392-1-git-send-email-computersforpeace@gmail.com>
-References: <1426725092-16392-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1426725092-16392-2-git-send-email-computersforpeace@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 18 Mar 2015 17:52:38 -0700
+Subject: [PATCH 2/3] mfd: qcom_rpm: add support for IPQ8064
+In-Reply-To: <20141124103835.GH4241@x1>
+References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
+ <1416512485-7292-3-git-send-email-joshc@codeaurora.org>
+ <20141124103835.GH4241@x1>
+Message-ID: <550A1DD6.3070900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This L2 controller handles multiplexing a few different interrupts. We
-also need it for configuring the interrupt forwarding masks for the
-UART.
+On 11/24/14 02:38, Lee Jones wrote:
+> On Thu, 20 Nov 2014, Josh Cartwright wrote:
+>
+>> The IPQ8064 also includes an RPM following the same message structure as
+>> other chips.  In addition, it supports a few new resource types to
+>> support the NSS fabric clocks and the SMB208/SMB209 regulators found on
+>> the reference boards.
+>>
+>> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
+>> ---
+>>  drivers/mfd/qcom_rpm.c | 41 +++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 41 insertions(+)
+> For my own reference:
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+>
 
-With this, we can *now* boot BCM7445 to a prompt using the upstream
-kernel + DTB.
+Lee, can you pick this patch up please?
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
- arch/arm/boot/dts/bcm7445.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+>> diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
+>> index 0dd7a6fe..5ead23b 100644
+>> --- a/drivers/mfd/qcom_rpm.c
+>> +++ b/drivers/mfd/qcom_rpm.c
+>> @@ -324,10 +324,51 @@ static const struct qcom_rpm_data msm8960_template = {
+>>  	.n_resources = ARRAY_SIZE(msm8960_rpm_resource_table),
+>>  };
+>>  
+>> +static const struct qcom_rpm_resource ipq806x_rpm_resource_table[] = {
+>> +	[QCOM_RPM_CXO_CLK] =			{ 25, 9, 5, 1 },
+>> +	[QCOM_RPM_PXO_CLK] =			{ 26, 10, 6, 1 },
+>> +	[QCOM_RPM_APPS_FABRIC_CLK] =		{ 27, 11, 8, 1 },
+>> +	[QCOM_RPM_SYS_FABRIC_CLK] =		{ 28, 12, 9, 1 },
+>> +	[QCOM_RPM_NSS_FABRIC_0_CLK] =		{ 29, 13, 10, 1 },
+>> +	[QCOM_RPM_DAYTONA_FABRIC_CLK] =		{ 30, 14, 11, 1 },
+>> +	[QCOM_RPM_SFPB_CLK] =			{ 31, 15, 12, 1 },
+>> +	[QCOM_RPM_CFPB_CLK] =			{ 32, 16, 13, 1 },
+>> +	[QCOM_RPM_NSS_FABRIC_1_CLK] =		{ 33, 17, 14, 1 },
+>> +	[QCOM_RPM_EBI1_CLK] =			{ 34, 18, 16, 1 },
+>> +	[QCOM_RPM_APPS_FABRIC_HALT] =		{ 35, 19, 18, 2 },
+>> +	[QCOM_RPM_APPS_FABRIC_MODE] =		{ 37, 20, 19, 3 },
+>> +	[QCOM_RPM_APPS_FABRIC_IOCTL] =		{ 40, 21, 20, 1 },
+>> +	[QCOM_RPM_APPS_FABRIC_ARB] =		{ 41, 22, 21, 12 },
+>> +	[QCOM_RPM_SYS_FABRIC_HALT] =		{ 53, 23, 22, 2 },
+>> +	[QCOM_RPM_SYS_FABRIC_MODE] =		{ 55, 24, 23, 3 },
+>> +	[QCOM_RPM_SYS_FABRIC_IOCTL] =		{ 58, 25, 24, 1 },
+>> +	[QCOM_RPM_SYS_FABRIC_ARB] =		{ 59, 26, 25, 30 },
+>> +	[QCOM_RPM_MM_FABRIC_HALT] =		{ 89, 27, 26, 2 },
+>> +	[QCOM_RPM_MM_FABRIC_MODE] =		{ 91, 28, 27, 3 },
+>> +	[QCOM_RPM_MM_FABRIC_IOCTL] =		{ 94, 29, 28, 1 },
+>> +	[QCOM_RPM_MM_FABRIC_ARB] =		{ 95, 30, 29, 2 },
+>> +	[QCOM_RPM_CXO_BUFFERS] =		{ 209, 33, 31, 1 },
+>> +	[QCOM_RPM_USB_OTG_SWITCH] =		{ 210, 34, 32, 1 },
+>> +	[QCOM_RPM_HDMI_SWITCH] =		{ 211, 35, 33, 1 },
+>> +	[QCOM_RPM_DDR_DMM] =			{ 212, 36, 34, 2 },
+>> +	[QCOM_RPM_VDDMIN_GPIO] =		{ 215, 40, 39, 1 },
+>> +	[QCOM_RPM_SMB208_S1a] =			{ 216, 41, 90, 2 },
+>> +	[QCOM_RPM_SMB208_S1b] =			{ 218, 43, 91, 2 },
+>> +	[QCOM_RPM_SMB208_S2a] =			{ 220, 45, 92, 2 },
+>> +	[QCOM_RPM_SMB208_S2b] =			{ 222, 47, 93, 2 },
+>> +};
+>> +
+>> +static const struct qcom_rpm_data ipq806x_template = {
+>> +	.version = 3,
+>> +	.resource_table = ipq806x_rpm_resource_table,
+>> +	.n_resources = ARRAY_SIZE(ipq806x_rpm_resource_table),
+>> +};
+>> +
+>>  static const struct of_device_id qcom_rpm_of_match[] = {
+>>  	{ .compatible = "qcom,rpm-apq8064", .data = &apq8064_template },
+>>  	{ .compatible = "qcom,rpm-msm8660", .data = &msm8660_template },
+>>  	{ .compatible = "qcom,rpm-msm8960", .data = &msm8960_template },
+>> +	{ .compatible = "qcom,rpm-ipq8064", .data = &ipq806x_template },
+>>  	{ }
+>>  };
+>>  MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
 
-diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-index b183dc99111a..9eaeac8dce1b 100644
---- a/arch/arm/boot/dts/bcm7445.dtsi
-+++ b/arch/arm/boot/dts/bcm7445.dtsi
-@@ -96,6 +96,18 @@
- 				     "syscon";
- 			reg = <0x452000 0x100>;
- 		};
-+
-+		irq0_intc: interrupt-controller at f040a780 {
-+			compatible = "brcm,bcm7120-l2-intc";
-+			interrupt-parent = <&gic>;
-+			#interrupt-cells = <1>;
-+			reg = <0x40a780 0x8>;
-+			interrupt-controller;
-+			interrupts = <GIC_SPI 0x45 0x0>,
-+				     <GIC_SPI 0x43 0x0>;
-+			brcm,int-map-mask = <0x25c>, <0x7000000>;
-+			brcm,int-fwd-mask = <0x70000>;
-+		};
- 	};
- 
- 	smpboot {
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
