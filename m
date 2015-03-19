@@ -1,36 +1,60 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Thu, 19 Mar 2015 20:57:21 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
- <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
- <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
-Message-ID: <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 19 Mar 2015 13:59:35 -0700
+Subject: [PATCH v2 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX
+ termination driver
+In-Reply-To: <20150319204929.GH26935@google.com>
+References: <1678162.2PJ2o1jRen@wuerfel> <cover.1425497218.git.dhdang@apm.com>
+ <CADaLND=+Aq-zgMWE6vnn1kt1g2iz1k-AxMj4--kejF-q=f=bfg@mail.gmail.com>
+ <20150319204929.GH26935@google.com>
+Message-ID: <CADaLND=PPuYWM_j7+GeDx+wtpN1cPsNk8UoZx0k7F9eEXPuAjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eventually....I got it to boot.
+On Thu, Mar 19, 2015 at 1:49 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> [+cc Marc]
+>
+> On Wed, Mar 18, 2015 at 10:43:10AM -0700, Duc Dang wrote:
+>> On Wed, Mar 4, 2015 at 11:39 AM, Duc Dang <dhdang@apm.com> wrote:
+>> > This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+>> > APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+>> > to GIC V2M specification for MSI Termination.
+>> >
+>> > There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+>> > block supports 2688 MSI termination ports coalesced into 16 physical HW IRQ lines
+>> > and shared across all 5 PCIe ports.
+>> >
+>> > v2 changes:
+>> >         1. Use msi_controller structure
+>> >         2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+>> >
+>> >  .../devicetree/bindings/pci/xgene-pci-msi.txt      |  61 ++++
+>> >  MAINTAINERS                                        |   8 +
+>> >  arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 ++
+>> >  drivers/pci/host/Kconfig                           |   4 +
+>> >  drivers/pci/host/Makefile                          |   1 +
+>> >  drivers/pci/host/pci-xgene-msi.c                   | 393 +++++++++++++++++++++
+>> >  drivers/pci/host/pci-xgene.c                       |  25 ++
+>> >  7 files changed, 519 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+>> >  create mode 100644 drivers/pci/host/pci-xgene-msi.c
+>> >
+>> > --
+>> > 1.9.1
+>> >
+>> Hi Bjorn, Arnd, and All,
+>>
+>> Did you have a chance to take a look at this v2 patch set for X-Gene 1
+>> MSI support?
+>
+> Marc had some comments, and as far as I can tell, you haven't addressed
+> them yet.  Am I mistaken?
+>
+Hi Bjorn,
 
-I had to remove both CONFIG_HIGHMEM and CONFIG_SMP and then I could boot completely from ROM (which for me is external QSPI flash that is memory mapping into linear CPU space at address 0x18000000)
+You are correct. I am making the changes as Marc pointed out. Will
+update a new version soon.
 
-So, the total changes was:
+Regards,
+Duc Dang.
 
-1. start with shmobile_defconfig
-2. remove all architectures but RZ/A1 (ARCH_R7S72100)
-3. remove !ARCH_MULTIPLATFORM from XIP_KERNEL's dependencies
-4. modify  'select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL'  in PHYS_OFFSET (because I need to be able to set PHYS_OFFSET)
-5. patch up mmu.c, proc-v7.S and link-vmlinux.sh
-6. remove CONFIG_HIGHMEM and CONFIG_SMP
-
-I also modified the DT to use internal RAM instead external SDRAM.
-
-Of course to actually boot an XIP kernel, you have to make a custom command in u-boot (using bootm or go is not going to work).
-
-
-Generally this exercise has taught me that  XIP and ARCH_MULTIPLATFORM do not play well together.
-
-So while I think linux-4.0 will have the ability to run XIP with and ARMv7 (with a handful of patches), you'll definitely need to start with an out of tree config.
-
-Chris
+> Bjorn
