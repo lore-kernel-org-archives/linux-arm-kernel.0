@@ -1,152 +1,128 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 19 Mar 2015 13:32:21 +0530
-Subject: [PATCH v2 2/6] clk: qcom: gdsc: Prepare common clk probe to register
- gdscs
+Date: Thu, 19 Mar 2015 13:32:22 +0530
+Subject: [PATCH v2 3/6] clk: qcom: gdsc: Add GDSCs in msm8916 GCC
 In-Reply-To: <1426752145-4365-1-git-send-email-rnayak@codeaurora.org>
 References: <1426752145-4365-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1426752145-4365-4-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clk probe registers a clk provider and a reset controller.
-Update it to register a genpd provider using the gdsc data provided
-by each platform.
+Add all data for the GDSCs which are part of msm8916 GCC block.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/common.c | 14 +++++++++++++-
- drivers/clk/qcom/common.h |  2 ++
- drivers/clk/qcom/gdsc.c   | 34 +++++++++++++++++++++++++++++++++-
- drivers/clk/qcom/gdsc.h   |  9 ++++++++-
- 4 files changed, 56 insertions(+), 3 deletions(-)
+ drivers/clk/qcom/Kconfig                     |  1 +
+ drivers/clk/qcom/gcc-msm8916.c               | 46 ++++++++++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8916.h |  8 +++++
+ 3 files changed, 55 insertions(+)
 
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index a946b48..cc9f56f 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -21,6 +21,7 @@
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index f436bcf..2fe1b30 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -53,6 +53,7 @@ config MSM_GCC_8660
+ 
+ config MSM_GCC_8916
+ 	tristate "MSM8916 Global Clock Controller"
++	select QCOM_GDSC
+ 	depends on COMMON_CLK_QCOM
+ 	help
+ 	  Support for the global clock controller on msm8916 devices.
+diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
+index c961f0d..37d63a3 100644
+--- a/drivers/clk/qcom/gcc-msm8916.c
++++ b/drivers/clk/qcom/gcc-msm8916.c
+@@ -31,6 +31,7 @@
  #include "clk-rcg.h"
- #include "clk-regmap.h"
+ #include "clk-branch.h"
  #include "reset.h"
 +#include "gdsc.h"
  
- struct qcom_cc {
- 	struct qcom_reset_controller reset;
-@@ -125,8 +126,18 @@ int qcom_cc_really_probe(struct platform_device *pdev,
- 
- 	ret = reset_controller_register(&reset->rcdev);
- 	if (ret)
--		of_clk_del_provider(dev->of_node);
-+		goto err_reset;
- 
-+	ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
-+	if (ret)
-+		goto err_pd;
-+
-+	return 0;
-+err_pd:
-+	dev_err(dev, "Failed to register power domains\n");
-+	reset_controller_unregister(&reset->rcdev);
-+err_reset:
-+	of_clk_del_provider(dev->of_node);
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
-@@ -145,6 +156,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
- 
- void qcom_cc_remove(struct platform_device *pdev)
- {
-+	of_genpd_del_provider(pdev->dev.of_node);
- 	of_clk_del_provider(pdev->dev.of_node);
- 	reset_controller_unregister(platform_get_drvdata(pdev));
- }
-diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
-index b3d7e57..480fdbe 100644
---- a/drivers/clk/qcom/common.h
-+++ b/drivers/clk/qcom/common.h
-@@ -27,6 +27,8 @@ struct qcom_cc_desc {
- 	size_t num_clks;
- 	const struct qcom_reset_map *resets;
- 	size_t num_resets;
-+	struct gdsc **gdscs;
-+	size_t num_gdscs;
+ enum {
+ 	P_XO,
+@@ -2574,6 +2575,41 @@ static struct clk_branch gcc_venus0_vcodec0_clk = {
+ 	},
  };
  
- extern const struct freq_tbl *qcom_find_freq(const struct freq_tbl *f,
-diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index 4c89312..7de9a00 100644
---- a/drivers/clk/qcom/gdsc.c
-+++ b/drivers/clk/qcom/gdsc.c
-@@ -16,6 +16,7 @@
- #include <linux/export.h>
- #include <linux/jiffies.h>
- #include <linux/regmap.h>
-+#include <linux/slab.h>
- #include "gdsc.h"
- 
- #define PWR_ON_MASK		BIT(31)
-@@ -100,7 +101,7 @@ static int gdsc_disable(struct generic_pm_domain *domain)
- 	return gdsc_toggle_logic(sc, false);
- }
- 
--int gdsc_init(struct gdsc *sc)
-+static int gdsc_init(struct gdsc *sc)
- {
- 	u32 mask, val;
- 	int on, ret;
-@@ -127,3 +128,34 @@ int gdsc_init(struct gdsc *sc)
- 
- 	return 0;
- }
++static struct gdsc venus_gdsc = {
++	.gdscr = 0x4c018,
++	.pd = {
++		.name = "venus",
++	},
++};
 +
-+int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
-+		  struct regmap *regmap)
-+{
-+	int i, ret;
-+	struct genpd_onecell_data *data;
++static struct gdsc mdss_gdsc = {
++	.gdscr = 0x4d078,
++	.pd = {
++		.name = "mdss",
++	},
++};
 +
-+	if (!num || !scs || !dev || !dev->of_node)
-+		return 0;
++static struct gdsc jpeg_gdsc = {
++	.gdscr = 0x5701c,
++	.pd = {
++		.name = "jpeg",
++	},
++};
 +
-+	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
++static struct gdsc vfe_gdsc = {
++	.gdscr = 0x58034,
++	.pd = {
++		.name = "vfe",
++	},
++};
 +
-+	data->domains = devm_kzalloc(dev, sizeof(*data->domains) * num,
-+				     GFP_KERNEL);
-+	if (!data->domains)
-+		return -ENOMEM;
++static struct gdsc oxili_gdsc = {
++	.gdscr = 0x5901c,
++	.pd = {
++		.name = "oxili",
++	},
++};
 +
-+	data->num_domains = num;
-+	for (i = 0; i < num; i++) {
-+		if (!scs[i])
-+			continue;
-+		scs[i]->regmap = regmap;
-+		ret = gdsc_init(scs[i]);
-+		if (ret)
-+			return ret;
-+		data->domains[i] = &scs[i]->pd;
-+	}
-+	return of_genpd_add_provider_onecell(dev->of_node, data);
-+}
-diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-index ac6a2d5..14de304 100644
---- a/drivers/clk/qcom/gdsc.h
-+++ b/drivers/clk/qcom/gdsc.h
-@@ -32,5 +32,12 @@ struct gdsc {
+ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GPLL0] = &gpll0.clkr,
+ 	[GPLL0_VOTE] = &gpll0_vote,
+@@ -2715,6 +2751,14 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GCC_VENUS0_VCODEC0_CLK] = &gcc_venus0_vcodec0_clk.clkr,
+ };
  
- #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
++static struct gdsc *gcc_msm8916_gdscs[] = {
++	[VENUS_GDSC] = &venus_gdsc,
++	[MDSS_GDSC] = &mdss_gdsc,
++	[JPEG_GDSC] = &jpeg_gdsc,
++	[VFE_GDSC] = &vfe_gdsc,
++	[OXILI_GDSC] = &oxili_gdsc,
++};
++
+ static const struct qcom_reset_map gcc_msm8916_resets[] = {
+ 	[GCC_BLSP1_BCR] = { 0x01000 },
+ 	[GCC_BLSP1_QUP1_BCR] = { 0x02000 },
+@@ -2822,6 +2866,8 @@ static const struct qcom_cc_desc gcc_msm8916_desc = {
+ 	.num_clks = ARRAY_SIZE(gcc_msm8916_clocks),
+ 	.resets = gcc_msm8916_resets,
+ 	.num_resets = ARRAY_SIZE(gcc_msm8916_resets),
++	.gdscs = gcc_msm8916_gdscs,
++	.num_gdscs = ARRAY_SIZE(gcc_msm8916_gdscs),
+ };
  
--int gdsc_init(struct generic_pm_domain *domain, struct regmap *regmap);
-+#ifdef CONFIG_QCOM_GDSC
-+int gdsc_register(struct device *, struct gdsc **, size_t n, struct regmap *);
-+#else
-+int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct regmap *r)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_QCOM_GDSC */
- #endif /* __QCOM_GDSC_H__ */
+ static const struct of_device_id gcc_msm8916_match_table[] = {
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+index e430f64..11566c5 100644
+--- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
++++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+@@ -153,4 +153,12 @@
+ #define GCC_VENUS0_AXI_CLK			136
+ #define GCC_VENUS0_VCODEC0_CLK			137
+ 
++/* Indexes for GDSCs */
++#define BIMC_GDSC				0
++#define VENUS_GDSC				1
++#define MDSS_GDSC				2
++#define JPEG_GDSC				3
++#define VFE_GDSC				4
++#define OXILI_GDSC				5
++
+ #endif
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
