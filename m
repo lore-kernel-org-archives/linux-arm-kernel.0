@@ -1,67 +1,119 @@
-From: ben.hutchings@codethink.co.uk (Ben Hutchings)
-Date: Thu, 19 Mar 2015 14:22:46 +0000
-Subject: [Linux-kernel] [PATCH 12/13] mmc: atmel-mci: use endian
- agnostic IO
-In-Reply-To: <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
+From: joshc@ni.com (Josh Cartwright)
+Date: Thu, 19 Mar 2015 09:24:38 -0500
+Subject: [PATCH v4] ARM: zynq: use restart_handler mechanism for slcr reset
+In-Reply-To: <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
+References: <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
+Message-ID: <1426775078-31496-1-git-send-email-joshc@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-03-18 at 15:53 +0000, Ben Dooks wrote:
-> Change the __raw IO functions to endian agnostic relaxed ones to allow
-> the driver to function on big endian ARM systems.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> --
-> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
-> CC: Chris Ball <chris@printf.net>
-> CC: Ulf Hansson <ulf.hansson@linaro.org>
-> CC: linux-mmc at vger.kernel.org
-> ---
->  drivers/mmc/host/atmel-mci-regs.h | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
-> index c97001e..711bb53 100644
-> --- a/drivers/mmc/host/atmel-mci-regs.h
-> +++ b/drivers/mmc/host/atmel-mci-regs.h
-> @@ -135,10 +135,17 @@
->  #define ATMCI_REGS_SIZE		0x100
->  
->  /* Register access macros */
-> -#define atmci_readl(port,reg)				\
-> +#ifdef CONFIG_AVR32
-> +#define atmci_readl(port,reg)			\
->  	__raw_readl((port)->regs + reg)
->  #define atmci_writel(port,reg,value)			\
->  	__raw_writel((value), (port)->regs + reg)
-> +#else
-> +#define atmci_readl(port,reg)			\
-> +	readl_relaxed((port)->regs + reg)
-> +#define atmci_writel(port,reg,value)			\
-> +	writel_relaxed((value), (port)->regs + reg)
-> +#endif
+By making use of the restart_handler chain mechanism, the SLCR-based
+reset mechanism can be prioritized amongst other mechanisms available on
+a particular board.
 
-This pattern is repeated in a lot of drivers; is it worth defining
-atmel_{read,write}l_relaxed() in a common header?
+Choose a default high-ish priority of 192 for this restart mechanism.
 
-#ifdef CONFIG_AVR32
+Signed-off-by: Josh Cartwright <joshc@ni.com>
+---
 
-/* CPU and peripherals are both big-endian, so don't byte-swap */
-#define atmel_readl_relaxed(addr)		__raw_readl(addr)
-#define atmel_writel_relaxed(value, addr)	__raw_writel(value, addr)
+v3 -> v4: Document restart notifier callback parameters.
+v2 -> v3: Don't drop the kerneldoc
+v1 -> v2: Also drop zynq_slcr_system_reset prototype from common.h
 
-#else
+ arch/arm/mach-zynq/common.c |  6 ------
+ arch/arm/mach-zynq/common.h |  1 -
+ arch/arm/mach-zynq/slcr.c   | 21 +++++++++++++++++++--
+ 3 files changed, 19 insertions(+), 9 deletions(-)
 
-/* Peripherals are little-endian, so byte-swap if CPU isn't */
-#define atmel_readl_relaxed(addr)		readl_relaxed(addr)
-#define atmel_writel_relaxed(value, addr)	writel_relaxed(value, addr)
-
-#endif
-
-Ben.
-
->  /* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
->  #ifdef CONFIG_AVR32
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 58ef2a7..616d584 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -190,11 +190,6 @@ static void __init zynq_irq_init(void)
+ 	irqchip_init();
+ }
+ 
+-static void zynq_system_reset(enum reboot_mode mode, const char *cmd)
+-{
+-	zynq_slcr_system_reset();
+-}
+-
+ static const char * const zynq_dt_match[] = {
+ 	"xlnx,zynq-7000",
+ 	NULL
+@@ -212,5 +207,4 @@ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.init_time	= zynq_timer_init,
+ 	.dt_compat	= zynq_dt_match,
+ 	.reserve	= zynq_memory_init,
+-	.restart	= zynq_system_reset,
+ MACHINE_END
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index 382c60e..f2f0bf2 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -21,7 +21,6 @@ void zynq_secondary_startup(void);
+ 
+ extern int zynq_slcr_init(void);
+ extern int zynq_early_slcr_init(void);
+-extern void zynq_slcr_system_reset(void);
+ extern void zynq_slcr_cpu_stop(int cpu);
+ extern void zynq_slcr_cpu_start(int cpu);
+ extern bool zynq_slcr_cpu_state_read(int cpu);
+diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+index c3c24fd8..af8fb50 100644
+--- a/arch/arm/mach-zynq/slcr.c
++++ b/arch/arm/mach-zynq/slcr.c
+@@ -15,6 +15,7 @@
+  */
+ 
+ #include <linux/io.h>
++#include <linux/reboot.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/of_address.h>
+ #include <linux/regmap.h>
+@@ -92,9 +93,17 @@ u32 zynq_slcr_get_device_id(void)
+ }
+ 
+ /**
+- * zynq_slcr_system_reset - Reset the entire system.
++ * zynq_slcr_system_restart - Restart the entire system.
++ *
++ * @nb:		Pointer to restart notifier block (unused)
++ * @action:	Reboot mode (unused)
++ * @data:	Restart handler private data (unused)
++ *
++ * Return:	a negative value on error, 0 on success
+  */
+-void zynq_slcr_system_reset(void)
++static
++int zynq_slcr_system_restart(struct notifier_block *nb,
++			     unsigned long action, void *data)
+ {
+ 	u32 reboot;
+ 
+@@ -113,8 +122,14 @@ void zynq_slcr_system_reset(void)
+ 	zynq_slcr_read(&reboot, SLCR_REBOOT_STATUS_OFFSET);
+ 	zynq_slcr_write(reboot & 0xF0FFFFFF, SLCR_REBOOT_STATUS_OFFSET);
+ 	zynq_slcr_write(1, SLCR_PS_RST_CTRL_OFFSET);
++	return 0;
+ }
+ 
++static struct notifier_block zynq_slcr_restart_nb = {
++	.notifier_call	= zynq_slcr_system_restart,
++	.priority	= 192,
++};
++
+ /**
+  * zynq_slcr_cpu_start - Start cpu
+  * @cpu:	cpu number
+@@ -219,6 +234,8 @@ int __init zynq_early_slcr_init(void)
+ 	/* unlock the SLCR so that registers can be changed */
+ 	zynq_slcr_unlock();
+ 
++	register_restart_handler(&zynq_slcr_restart_nb);
++
+ 	pr_info("%s mapped to %p\n", np->name, zynq_slcr_base);
+ 
+ 	of_node_put(np);
+-- 
+2.3.3
