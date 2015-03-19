@@ -1,87 +1,84 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 19 Mar 2015 11:20:25 +0530
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <20150318153421.GP3318@x1>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <3926609.Ff6LCkuuMX@wuerfel>
- <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
- <20150318131722.GN3318@x1>
- <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
- <20150318153421.GP3318@x1>
-Message-ID: <CABb+yY0HufMEDy7ANj8KV0hamvM-Tgy4GBkwD73wm3DMumcbaQ@mail.gmail.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 19 Mar 2015 08:57:16 +0200
+Subject: [PATCH 1/2] ARM: dts: sun4i: a10-lime: Override and remove
+ 1008MHz OPP setting
+In-Reply-To: <1426732773-7179-2-git-send-email-wens@csie.org>
+References: <1426732773-7179-1-git-send-email-wens@csie.org>
+ <1426732773-7179-2-git-send-email-wens@csie.org>
+Message-ID: <20150319085716.75d3ce76@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 9:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 18 Mar 2015, Jassi Brar wrote:
->
->> On Wed, Mar 18, 2015 at 6:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Tue, 03 Mar 2015, Jassi Brar wrote:
->> >
->> >> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
->> >> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
->> >> >> +
->> >> >> +/*
->> >> >> + * struct sti_mbox_msg - sti mailbox message description
->> >> >> + * @dsize:             data payload size
->> >> >> + * @pdata:             message data payload
->> >> >> + */
->> >> >> +struct sti_mbox_msg {
->> >> >> +       u32             dsize;
->> >> >> +       u8              *pdata;
->> >> >> +};
->> >> >
->> >> > As mentioned in another thread, we may just want to add a 'size'
->> >> > argument to the message send function, and a default helper for
->> >> > messages with size of 32 bits.
->> >> >
->> >> Case-a) 'size' is a member of the payload structure itself
->> >>     The extra 'size' argument would only be used for sanity check.
->> >>     This driver seems so. Lee, can you not do without 'dsize'?
->> >>
->> >> Case-b) 'size' is not a member of payload structure:
->> >>      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
->> >>             Here the size argument is redundant.
->> >>
->> >>      b2)  payload length varies
->> >>             This case is highly unlikely because there would be no way
->> >> for remote to know how many bytes to read as the payload. Not to mean
->> >> we can't do without the 'size' argument.
->> >>
->> >> Your opinion has huge weight, but I would like to be enlightened
->> >> before agreeing.
->> >
->> > Let's simplify this.
->> >
->> > If you want to have varying length payloads, you have to carry the
->> > size in the payload.  If you wish to force fixed size payloads, then
->> > you may do without a size segment.
->> >
->> > Do you really want to force all users of Mailbox to use fixed size
->> > payloads?
->> >
->> No. I only observed the fact that every known mailbox controller
->> driver already has a way to figure out the payload length because
->> either the protocol uses fixed length payloads or has the 'size' field
->> in every payload.
->> I am yet to see a platform that uses both, then the 'size' argument
->> will be helpful but still not necessary.
->
-> I see.  So your real concern is that controllers shouldn't have two
-> means of obtaining size.
->
-I think right now there's not much need to expand the api for 'u32'
-sized payloads.
+On Thu, 19 Mar 2015 10:39:32 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-> Arnd's idea of placing the message size as part of the send_message()
-> call is fine, but it's still going to end up in the payload isn't it?
->
-... or it will be implied by sizeof(struct my_packet) if the protocol
-has finite set of payloads.
+> The Olimex A10-Lime is known to be unstable when running at 1008MHz.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> index 31dc2f1c3870..16ecb8938e19 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> @@ -74,6 +74,20 @@
+>  	status = "okay";
+>  };
+>  
+> +&cpu0 {
+> +	/* The A10-Lime is known to be unstable when running at 1008 MHz */
+> +	operating-points = <
+> +		/* kHz    uV */
+> +		960000  1400000
+> +		912000  1400000
+> +		864000  1300000
+> +		720000  1200000
+> +		528000  1100000
+> +		312000  1000000
+> +		144000  900000
+> +		>;
+> +};
+> +
+>  &ehci0 {
+>  	status = "okay";
+>  };
 
-> And what about receiving?
->
-Similar to sending - controller driver passes pointer to RX buffer
-which the client parses. Remember the protocol would already have a
-way to communicate payload length.
+Thanks for the patch. At least it should make my A10-OLinuXino-LIME
+working without obvious failures out of the box (the U-Boot is still
+another story though and there is a gap during boot up when the board
+is running with unreliable settings, but the probability of a failure
+is rather low).
+
+I should also mention that using 960MHz @1.4V does not fail, but it does
+not have any safety headroom either (the cyan 'sun4i_poorlime' line
+on the plot):
+
+    http://people.freedesktop.org/~siamashka/files/20140512/sunxi-cpufreq-plot.png
+
+On the other hand, my board is on the worst part of the spectrum (many
+other a10-lime boards do not fail even at 1008MHz), so maybe having
+extra safety headroom is less necessary.
+
+An interesting question is whether the same problem may be reproducible
+on the Allwinner A10 devices other than A10-OLinuXino-LIME. My original
+problem report
+
+    https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg04343.html
+    
+mentioned the A10-OLinuXino-LIME rev.A and introduced some sort of
+a bias by itself. At least I have seen people saying something like
+"my a10-lime revision is not rev.A, so it's none of my concern and
+I'm not going to bother running any tests". So far we have accumulated
+reports from 4 or 5 people having this reliability problem on their
+A10-OLinuXino-LIME (various revisions, not just rev.A), but not
+much from the other boards owners.
+
+Anyway, this particular patch is
+Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com> 
+Acked-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+
+-- 
+Best regards,
+Siarhei Siamashka
