@@ -1,117 +1,36 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 19 Mar 2015 14:29:07 +0100
-Subject: [PATCH] driver core / PM: Add callbacks for PM domain
- initialization/cleanup
-In-Reply-To: <2317791.ICLpdqLgyu@vostro.rjw.lan>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <2524443.vpfcNqfmJz@vostro.rjw.lan>
- <CAPDyKFp_xjOOxCEu7GtWwamkWYffhN-oJ3B78-4xC5RFS-qFdQ@mail.gmail.com>
- <2317791.ICLpdqLgyu@vostro.rjw.lan>
-Message-ID: <20150319132907.GA3707@kroah.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 19 Mar 2015 14:30:50 +0100
+Subject: ATSAMA5D big endian work
+In-Reply-To: <550A9833.2080408@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20150318183040.GT4560@piout.net>
+ <550A9833.2080408@codethink.co.uk>
+Message-ID: <20150319133050.GD4750@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 04:02:11PM +0100, Rafael J. Wysocki wrote:
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On 19/03/2015 at 09:34:43 +0000, Ben Dooks wrote :
+> On 18/03/15 18:30, Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > On 18/03/2015 at 15:52:59 +0000, Ben Dooks wrote :
+> >> I have been testing the ATSAMA5D36 xplained board with big endian and
+> >> the following are the fixes to get the system working.
+> >>
+> > 
+> > The series looks good to me, we will drop patches 3 and 4 as the files
+> > doesn't exist anymore.
 > 
-> If PM domains are in use, it may be necessary to prepare the code
-> handling a PM domain for driver probing.  For example, in some
-> cases device drivers rely on the ability to power on the devices
-> with the help of the IO runtime PM framework and the PM domain
-> code needs to be ready for that.  Also, if that code has not been
-> fully initialized yet, the driver probing should be deferred.
+> Where can I find a repository with these changes in?
 > 
-> Moreover, after the probing is complete, it may be necessary to
-> put the PM domain in question into the state reflecting the current
-> needs of the devices in it, for example, to prevent power from being
-> drawn in vain.
-> 
-> For these reasons, introduce new PM domain callbacks, ->activate
-> and ->sync, called, respectively, before probing for a device
-> driver and after the probing has been completed.
-> 
-> That is not sufficient, however, because the device's PM domain
-> pointer has to be populated for the ->activate callback to be
-> executed, so setting it in bus type ->probe callback routines
-> would be too late.  Also, there are bus types where PM domains
-> are not used at all and the core should not attempt to set the
-> pm_domain pointer for the devices on those buses.
-> 
-> To overcome that difficulty, introduce two new bus type
-> callbacks, ->init and ->release, called by bus_add_device() and
-> bus_remove_device(), respectively.  That will allow ->init to
-> be used to populate the pm_domain pointer for the bus types
-> that want to do that and ->release will be useful for any
-> cleanup that may be necessary after removing a device that
-> was part of a PM domain.
-> 
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> ---
-> 
-> It occured to me that we might want to ->sync regardless of whether or
-> not the probing had been succenssful, so I changed the code in
-> really_probe() along these lines.  Please let me know if that's
-> not OK.
-> 
-> ---
->  drivers/base/bus.c     |   12 +++++++++++-
->  drivers/base/dd.c      |   20 ++++++++++++++------
->  include/linux/device.h |    5 +++++
->  include/linux/pm.h     |    6 ++++++
->  4 files changed, 36 insertions(+), 7 deletions(-)
-> 
-> Index: linux-pm/drivers/base/bus.c
-> ===================================================================
-> --- linux-pm.orig/drivers/base/bus.c
-> +++ linux-pm/drivers/base/bus.c
-> @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
->  	int error = 0;
->  
->  	if (bus) {
-> +		if (bus->init) {
-> +			error = bus->init(dev);
-> +			if (error)
-> +				goto out_put;
-> +		}
 
-This doesn't make sense to me.  A bus just called bus_add_device, it can
-do whatever it wanted to right before calling this function, no need for
-another callback.
+You can use this branch until Nicolas merges my patches:
 
+https://github.com/alexandrebelloni/linux/tree/at91_4.1_04_cleanup2
 
->  		pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
->  		error = device_add_attrs(bus, dev);
->  		if (error)
-> -			goto out_put;
-> +			goto out_release;
->  		error = device_add_groups(dev, bus->dev_groups);
->  		if (error)
->  			goto out_groups;
-> @@ -534,6 +539,9 @@ out_groups:
->  	device_remove_groups(dev, bus->dev_groups);
->  out_id:
->  	device_remove_attrs(bus, dev);
-> +out_release:
-> +	if (bus->release)
-> +		bus->release(dev);
+The remaining __raw_writel and __raw_readl are in pm.h
 
->  out_put:
->  	bus_put(dev->bus);
->  	return error;
-> @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
->  	device_remove_groups(dev, dev->bus->dev_groups);
->  	if (klist_node_attached(&dev->p->knode_bus))
->  		klist_del(&dev->p->knode_bus);
-> +	if (bus->release)
-> +		bus->release(dev);
-
-Same with release(), this happens when a bus wants to remove a device,
-it controls this, why have a callback right away?  These both shouldn't
-be needed.
-
-sorry if I missed this before, I hadn't noticed these callbacks in
-previous patches but I wasn't paying much attention.
-
-thanks,
-
-greg k-h
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
