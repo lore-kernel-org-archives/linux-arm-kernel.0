@@ -1,38 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 19 Mar 2015 11:36:46 +0000
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
- <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
- <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
-Message-ID: <20150319113646.GQ2869@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Mar 2015 11:38:24 +0000
+Subject: [PATCH V2 7/8] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <550AB298.6040907@linaro.org>
+References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
+ <1426704372-20406-8-git-send-email-daniel.lezcano@linaro.org>
+ <20150319110806.GE24556@red-moon> <550AB298.6040907@linaro.org>
+Message-ID: <20150319113824.GC4449@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 12:14:11PM +0100, Ulf Hansson wrote:
+On Thu, Mar 19, 2015 at 11:27:20AM +0000, Daniel Lezcano wrote:
 
-> Agree. Moreover we need that API to also pick the closest value to
-> target, when trying the range "target->minimum". I also believe it
+[...]
 
-The implementation *should* do that anyway, it's just not trivial to
-implement in an efficient fashion with the current information we have
-from drivers.
+> >>   	for_each_possible_cpu(cpu) {
+> >>   		ret = arm_cpuidle_init(cpu);
+> >> +
+> >> +		/* This cpu does not support any idle states */
+> >> +		if (ret == -ENOSYS)
+> >> +			continue;
+> >> +
+> >>   		if (ret) {
+> >>   			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> >> -			return ret;
+> >> +			goto out_fail;
+> >> +		}
+> >> +
+> >> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> >> +		if (!dev) {
+> >> +			pr_err("Failed to allocate cpuidle device\n");
+> >> +			goto out_fail;
+> >> +		}
+> >> +
+> >> +		dev->cpu = cpu;
+> >> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
+> >> +
+> >> +		ret = cpuidle_register_device(dev);
+> >> +		if (ret) {
+> >> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> >> +			       cpu);
+> >> +			kfree(dev);
+> >> +			goto out_fail;
+> >>   		}
+> >>   	}
+> >> +out:
+> >> +	return ret;
+> >
+> > return 0;
+> >
+> >>
+> >> -	return cpuidle_register(drv, NULL);
+> >> +out_fail:
+> >> +	for (cpu--; cpu <= 0; cpu--) {
+> >
+> > This loop is wrong.
+> 
+> Why is it wrong ? We have to initialize at cpu - 1 to unregister the 
+> previous registered cpu, not the current one, no ?
 
-> would be good to allow both upper and lower limits to be zero.
+Yes, but on cpu>=0 not cpu<=0
 
-The lower limit can be zero already though it isn't clear to me that
-this is useful.  Setting an upper limit of zero seems nonsensical, an
-upper limit that is lower than the lower limit isn't terribly obvious
-and removing the upper limit isn't safe - it means that we'll happily
-oversupply things which is a road to physical damage.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/7de1b59e/attachment-0001.sig>
+while (--cpu >= 0)
+
+?
+
+Lorenzo
