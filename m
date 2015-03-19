@@ -1,84 +1,31 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Thu, 19 Mar 2015 06:13:41 +0100
-Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
-In-Reply-To: <20150318165453.GP31346@atomide.com>
-References: <1421192272-20754-1-git-send-email-tony@atomide.com>
- <1421192272-20754-5-git-send-email-tony@atomide.com>
- <20150117164709.GS18552@atomide.com>
- <CAALWOA-XVrC84=6Xt04m+QaBhweAcp2HVTH7v=QewtJmQLEaWA@mail.gmail.com>
- <20150202160932.GF16250@atomide.com> <20150318000652.GJ31346@atomide.com>
- <CAALWOA9yoS5sdo-A_hdqhkqGqZ-VCg9jZfdavhxskFdE_pA1Sg@mail.gmail.com>
- <20150318165453.GP31346@atomide.com>
-Message-ID: <CAALWOA9=tY3X38O9p-xYabb-AZy7rJBM5AOFYgco_ZmsixOViQ@mail.gmail.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 19 Mar 2015 14:29:01 +0900
+Subject: [PATCH 0/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from ARM
+ defconfigs
+Message-ID: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
-> 44400500 target 11 vcp
-> 44800100 target 18 vlynq ?
 
-scrap these guesses: I don't think Netra has a vcp module, and I had
-only filled in vlynq based on it being the only remaining target NIU.
-Once the memory ranges for the targets have been determined they
-should be easy to identify conclusively.
+Hi Olof, Kevin, Arnd
 
-On 18 March 2015 at 17:54, Tony Lindgren <tony@atomide.com> wrote:
-> Oh there's a gap here and it goes all the way to 2400.. Is there
-> a gap on am335x too?
+This patch removes CONFIG_RCAR_AUDMAC_PP from arch/arm/configs,
+because rcar_audmac_periperi is no longer DMAEngine driver.
 
-There are indeed. See my work-in-progress spreadsheet on its L3
-interconnect: http://goo.gl/miyCQw
+DMAEngine maintainer Vinod accepted about rcar_audmac_periperi removal patch on
 
-As with the memory map, there are some "ghost" modules which I'm
-reasonably sure don't exist, even though they have a target NIU and
-clkctrl registers.
+	git://git.infradead.org/users/vkoul/slave-dma.git :: topic/sh
 
-I haven't yet checked which initiator the sole bandwidth regulator on
-subarctic is attached to. Plausible options are SGX, the LCD
-controller, or one of the EDMA TCs.
+	3cd44dcd35a6618df88c51561290dc02fb35b8e2
+	(dmaengine: remove Renesas Audio DMAC peri peri)
 
-I also just noticed how *big* its statistics collectors are. o.O  For
-comparison, the ones on netra and centaurus are 0x200 (statcoll 0 and
-3) or 0x400 (statcoll 1 and 2).
+And, this patch was posted to him in v1/v2 patch-set.
+But, he couldn't apply it, because of base branch (?)
+According to Simon (= SH-ARM maintainer) this patch should be taken
+ARM maintainer.
+http://thread.gmane.org/gmane.linux.ports.sh.devel/44657/focus=44857
 
-
->> 2. Disable all L3 Target NIUs. You will temporarily lose access to all
->> peripherals, OCMC ram, and on subarctic also DDR memory (I think on
->> devices with a DMM you'd retain access to DDR memory). Note that the
->> service network itself isn't considered an L3 target.
->
-> Hmm well we could that in the kernel using the SRAM code as long as
-> it does not reset the devices.
-
-If you run with MMU disabled then you'd have to run out of the 64K
-internal SRAM, and catch data aborts since all writes will be
-non-posted. With MMU enabled, locking code and MMU translation tables
-into the (much larger) L2 cache makes more sense.
-
-I *think* disabling the NIU only blocks access to the module and
-doesn't affect the module operationally. I'd be inclined to put
-external RAM into self-refresh during the procedure just to be sure,
-in case disabling NIUs results in clock gating (which would otherwise
-be hard to notice).
-
-> OK the driver would have to be enabled with interrupts while scanning.
-
-Polling makes more sense, especially since nothing else can be going
-on at the same time anyway.
-
-
-I still think a separate tool that scrapes as much data as possible
-from the target and pours it into DT form makes more sense than doing
-it in a kernel driver, especially since discovered targets may often
-still need manual identification.  Also, probing discovered targets
-requires you enable the clock(s) they need and if necessary release
-local reset.  Auto-discovery of these associations may also be
-possible, but probably would become a rather lenghy procedure. A
-separate tool can also leave a record of what it's doing in SRAM and
-enable the watchdog to be able to recover from probes that lock up the
-system (and log a warning about them).
-
-Also, on HS devices, it would surprise me if you're allowed to access
-any interconnect registers at all.
-
-Matthijs
+I can say that this removal CONFIG_RCAR_AUDMAC_PP patch has no relationship
+to DMAEngine branch, because no SoC/platform is using it.
+(more detail, defconfig has it, but, there is no DT settings in upstream)
+So, I think you don't need to care about Vinod's branch
