@@ -1,143 +1,123 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 19 Mar 2015 16:31:14 +0530
-Subject: [PATCH v2 2/6] clk: qcom: gdsc: Prepare common clk probe to
- register gdscs
-In-Reply-To: <550AA918.3000604@mm-sol.com>
-References: <1426752145-4365-1-git-send-email-rnayak@codeaurora.org>
- <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
- <550AA918.3000604@mm-sol.com>
-Message-ID: <550AAC7A.5010302@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 19 Mar 2015 11:08:06 +0000
+Subject: [PATCH V2 7/8] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <1426704372-20406-8-git-send-email-daniel.lezcano@linaro.org>
+References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
+ <1426704372-20406-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150319110806.GE24556@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 04:16 PM, Stanimir Varbanov wrote:
-> Hi Rajendra,
->
-> Thanks for the patch!
->
-> On 03/19/2015 10:02 AM, Rajendra Nayak wrote:
->> The common clk probe registers a clk provider and a reset controller.
->> Update it to register a genpd provider using the gdsc data provided
->> by each platform.
->>
->> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
->> ---
->>   drivers/clk/qcom/common.c | 14 +++++++++++++-
->>   drivers/clk/qcom/common.h |  2 ++
->>   drivers/clk/qcom/gdsc.c   | 34 +++++++++++++++++++++++++++++++++-
->>   drivers/clk/qcom/gdsc.h   |  9 ++++++++-
->>   4 files changed, 56 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
->> index a946b48..cc9f56f 100644
->> --- a/drivers/clk/qcom/common.c
->> +++ b/drivers/clk/qcom/common.c
->> @@ -21,6 +21,7 @@
->>   #include "clk-rcg.h"
->>   #include "clk-regmap.h"
->>   #include "reset.h"
->> +#include "gdsc.h"
->>
->>   struct qcom_cc {
->>   	struct qcom_reset_controller reset;
->> @@ -125,8 +126,18 @@ int qcom_cc_really_probe(struct platform_device *pdev,
->>
->>   	ret = reset_controller_register(&reset->rcdev);
->>   	if (ret)
->> -		of_clk_del_provider(dev->of_node);
->> +		goto err_reset;
->>
->> +	ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
->> +	if (ret)
->> +		goto err_pd;
->> +
->> +	return 0;
->> +err_pd:
->> +	dev_err(dev, "Failed to register power domains\n");
->> +	reset_controller_unregister(&reset->rcdev);
->> +err_reset:
->> +	of_clk_del_provider(dev->of_node);
->>   	return ret;
->>   }
->>   EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
->> @@ -145,6 +156,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
->>
->>   void qcom_cc_remove(struct platform_device *pdev)
->>   {
->> +	of_genpd_del_provider(pdev->dev.of_node);
->
-> It would be nice to introduce gdsc_unregister() for symmetry.
+On Wed, Mar 18, 2015 at 06:46:11PM +0000, Daniel Lezcano wrote:
+> Some architectures have some cpus which does not support idle states.
+> 
+> Let the underlying low level code to return -ENOSYS when it is not
+> possible to set an idle state.
 
-yeah I thought about adding it and then realized it would just call
-of_genpd_del_provider() internally and not do anything much.
-But I guess I can add one if that makes it look more symmetric.
+http://www.spinics.net/lists/linux-acpi/msg55550.html
 
->
->>   	of_clk_del_provider(pdev->dev.of_node);
->>   	reset_controller_unregister(platform_get_drvdata(pdev));
->>   }
->
-> <snip>
->
->> +
->> +int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
->> +		  struct regmap *regmap)
->> +{
->
-> Could you squash implementation of this function with the first patch 1/6.
+-ENXIO ?
 
-yup, will do.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 45 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 43 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 1c94b88..0682ed0 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -17,11 +17,14 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/slab.h>
+>  
+>  #include <asm/cpuidle.h>
+>  
+>  #include "dt_idle_states.h"
+>  
+> +static DEFINE_PER_CPU(struct cpuidle_device, *cpuidle_arm_dev);
+> +
+>  /*
+>   * arm_enter_idle_state - Programs CPU to enter the specified state
+>   *
+> @@ -94,6 +97,7 @@ static int __init arm_idle_init(void)
+>  {
+>  	int cpu, ret;
+>  	struct cpuidle_driver *drv = &arm_idle_driver;
+> +	struct cpuidle_device *dev;
+>  
+>  	/*
+>  	 * Initialize idle states data, starting at index 1.
+> @@ -105,18 +109,55 @@ static int __init arm_idle_init(void)
+>  	if (ret <= 0)
+>  		return ret ? : -ENODEV;
+>  
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		pr_err("Failed to register cpuidle driver\n");
+> +		return ret;
+> +	}
+> +
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+>  	 */
+>  	for_each_possible_cpu(cpu) {
+>  		ret = arm_cpuidle_init(cpu);
+> +
+> +		/* This cpu does not support any idle states */
+> +		if (ret == -ENOSYS)
+> +			continue;
+> +
+>  		if (ret) {
+>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> -			return ret;
+> +			goto out_fail;
+> +		}
+> +
+> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> +		if (!dev) {
+> +			pr_err("Failed to allocate cpuidle device\n");
+> +			goto out_fail;
+> +		}
+> +
+> +		dev->cpu = cpu;
+> +		per_cpu(cpuidle_arm_dev, cpu) = dev;
+> +
+> +		ret = cpuidle_register_device(dev);
+> +		if (ret) {
+> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> +			       cpu);
+> +			kfree(dev);
+> +			goto out_fail;
+>  		}
+>  	}
+> +out:
+> +	return ret;
 
->
->> +	int i, ret;
->> +	struct genpd_onecell_data *data;
->> +
->> +	if (!num || !scs || !dev || !dev->of_node)
->> +		return 0;
->> +
->> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> +	if (!data)
->> +		return -ENOMEM;
->> +
->> +	data->domains = devm_kzalloc(dev, sizeof(*data->domains) * num,
->> +				     GFP_KERNEL);
->
-> Just wondering, are there some obstacles to embed struct
-> genpd_onecell_data in struct gdsc, and thus avoid having two memory
-> allocations?
+return 0;
 
-Its just that we dont need one genpd_onecell_data per gdsc instance.
-We only have one provider and hence just need one instance.
+>  
+> -	return cpuidle_register(drv, NULL);
+> +out_fail:
+> +	for (cpu--; cpu <= 0; cpu--) {
 
-regards,
-Rajendra
+This loop is wrong.
 
->
->> +	if (!data->domains)
->> +		return -ENOMEM;
->> +
->> +	data->num_domains = num;
->> +	for (i = 0; i < num; i++) {
->> +		if (!scs[i])
->> +			continue;
->> +		scs[i]->regmap = regmap;
->> +		ret = gdsc_init(scs[i]);
->> +		if (ret)
->> +			return ret;
->> +		data->domains[i] = &scs[i]->pd;
->> +	}
->> +	return of_genpd_add_provider_onecell(dev->of_node, data);
->> +}
->> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
->> index ac6a2d5..14de304 100644
->> --- a/drivers/clk/qcom/gdsc.h
->> +++ b/drivers/clk/qcom/gdsc.h
->> @@ -32,5 +32,12 @@ struct gdsc {
->>
->>   #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
->
-> This is used only from gdsc.c, please move it there.
+> +		dev = per_cpu(cpuidle_arm_dev, cpu);
+> +		cpuidle_unregister_device(dev);
+> +		kfree(dev);
+> +	}
+> +	cpuidle_unregister_driver(drv);
+> +	goto out;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+You just:
+
+return ret;
+
+little point in jumping around to just return.
+
+Lorenzo
