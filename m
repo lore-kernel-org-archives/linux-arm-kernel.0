@@ -1,39 +1,61 @@
 From: kong.kongxinwei@hisilicon.com (kongxinwei)
-Date: Thu, 19 Mar 2015 15:57:28 +0800
-Subject: [PATCH 2/3] dts: hi6220: enable thermal sensor for hisilicon SoC
+Date: Thu, 19 Mar 2015 15:57:29 +0800
+Subject: [PATCH 3/3] dt-bindings: Document the hi6220 thermal sensor bindings
 In-Reply-To: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
 References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <1426751849-10604-3-git-send-email-kong.kongxinwei@hisilicon.com>
+Message-ID: <1426751849-10604-4-git-send-email-kong.kongxinwei@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There have two parts for thermal sensor:
-
-1. The first part is related with thermal sensor, every sensor need to
-pass the sensor id, the threshold and reset temperature; so the sensor
-will be registered as sensor devices;
-
-2. The second part is related with thermal zones, in this part it will
-define the thermal zones and which sensor device should be bound to. it
-also need specify the polling interval for every thermal zone.
+This adds documentation of device tree bindings for the
+thermal sensor controller of hi6220 SoC.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 153 ++++++++++++++++++++++++++++++
- 1 file changed, 153 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+ .../bindings/thermal/hisilicon-thermal.txt         | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+diff --git a/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
 new file mode 100644
-index 0000000..da49790
+index 0000000..b75c48e
 --- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -0,0 +1,153 @@
++++ b/Documentation/devicetree/bindings/thermal/hisilicon-thermal.txt
+@@ -0,0 +1,51 @@
++* Hisilicon Thermal
 +
-+#include <dt-bindings/thermal/thermal.h>
++This driver is for hi6220 SoC which contain 4 thermal sensor.
 +
-+/ {
++	1. sensor 0: local sensor;
++	2. sensor 1: remote sensor for ACPU cluster 1;
++	3. sensor 2: remote sensor for ACPU cluster 2;
++	4. sensor 3: remote sensor for GPU.
++
++Every sensor use one child node to represent it, so thermal sensor include
++parent node and four child node. The parent node describe common feature and
++child node describe private feature for thermal sensor;
++
++** Required properties :
++
++- compatible : "hisilicon,tsensor";
++- reg : address range of the thermal sensor registers;
++- interrupt : Standard way to define interrupt numbr;
++- clock-names : Should be "thermal_clk".
++		  See: Documentation/devicetree/bindings/resource-names.txt;
++- clocks : Phandle of the clock used by the thermal sensor.
++	     See: Documentation/devicetree/bindings/clock/clock-bindingm.txt
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description;
++
++** Required properties for child nodes :
++
++- hisilicon,tsensor-id : the index of thermal senor;
++- hisilicon,tsensor-thres-temp : the interrupt threshold temperature of
++				thermal senor;
++- hisilicon,tsensor-reset-temp : the reset temperature of the hardware SoC;
++- hisilicon,tsensor-bind-irq : systerm interrupt binding thermal sensor;
++
++Example :
 +
 +	tsensor: tsensor at 0,f7030700 {
 +		compatible = "hisilicon,tsensor";
@@ -45,143 +67,12 @@ index 0000000..da49790
 +
 +		local_sensor {
 +			hisilicon,tsensor-id = <0>;
-+			hisilicon,tsensor-thres-temp = <80000>;
++			hisilicon,tsensor-lag-value = <10>;
++			hisilicon,tsensor-thres-temp = <35000>;
 +			hisilicon,tsensor-reset-temp = <100000>;
 +			hisilicon,tsensor-bind-irq;
-+		};
-+
-+		acpu1_sensor {
-+			hisilicon,tsensor-id = <1>;
-+			hisilicon,tsensor-thres-temp = <80000>;
-+			hisilicon,tsensor-reset-temp = <100000>;
-+		};
-+
-+		acpu0_sensor {
-+			hisilicon,tsensor-id = <2>;
-+			hisilicon,tsensor-thres-temp = <80000>;
-+			hisilicon,tsensor-reset-temp = <100000>;
-+		};
-+
-+		gpu_sensor {
-+			hisilicon,tsensor-id = <3>;
-+			hisilicon,tsensor-thres-temp = <80000>;
-+			hisilicon,tsensor-reset-temp = <100000>;
-+		};
-+	};
-+
-+	thermal-zones {
-+		local: local {
-+			/* milliseconds */
-+			polling-delay-passive = <1000>;
-+			/* milliseconds */
-+			polling-delay = <5000>;
-+
-+			/* sensor	ID */
-+			thermal-sensors = <&tsensor  0>;
-+
-+			trips {
-+				local_alert: local_alert {
-+					/* millicelsius */
-+					temperature = <70000>;
-+					/* millicelsius */
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				local_crit: local_crit {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				/* There are currently no cooling maps
-+				because there are no cooling devices */
-+			};
-+		};
-+
-+		cluster1: cluster1 {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+
-+			/* sensor	ID */
-+			thermal-sensors = <&tsensor  1>;
-+
-+			trips {
-+				cluster1_alert: cluster1_alert {
-+					temperature = <70000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cluster1_crit: cluster1_crit {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				/* There are currently no cooling maps
-+				because there are no cooling devices */
-+			};
-+		};
-+
-+		cluster0: cluster0 {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+
-+			/* sensor	ID */
-+			thermal-sensors = <&tsensor  2>;
-+
-+			trips {
-+				cluster0_alert: cluster0_alert {
-+					temperature = <70000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cluster0_crit: cluster0_crit {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cluster0_alert>;
-+					cooling-device =
-+					    <&cpu0 THERMAL_NO_LIMIT
-+						THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+
-+		gpu: gpu {
-+			polling-delay-passive = <1000>;
-+			polling-delay = <5000>;
-+
-+			/* sensor	ID */
-+			thermal-sensors = <&tsensor  3>;
-+
-+			trips {
-+				gpu_alert: gpu_alert {
-+					temperature = <70000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				gpu_crit: gpu_crit {
-+					temperature = <90000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				/* There are currently no cooling maps
-+				because there are no cooling devices */
-+			};
-+		};
-+	};
-+}
++		}
++		.......
++	}
 -- 
 1.9.1
