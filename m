@@ -1,68 +1,87 @@
-From: maj@jamers.net (Mark James)
-Date: Thu, 19 Mar 2015 17:23:45 +0000
-Subject: ARM: socfpga: dts: fix spi1 interrupt
-In-Reply-To: <550AD9CD.5020805@opensource.altera.com>
-References: <55089E1B.7000600@jamers.net>
- <20150318080950.GB10862@pengutronix.de>
- <550AD9CD.5020805@opensource.altera.com>
-Message-ID: <550B0621.3070101@jamers.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Mar 2015 17:25:31 +0000
+Subject: [UPDATED] [PATCH 3/5] arm-cci: Get rid of secure transactions
+ for PMU driver
+In-Reply-To: <1426585901-19137-1-git-send-email-suzuki.poulose@arm.com>
+References: <1426000735-14375-4-git-send-email-suzuki.poulose@arm.com>
+ <1426585901-19137-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20150319172531.GB10153@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
-
-Thank you for that - I thought I would be all good with what I sent having changed the settings in Thunderbird as per Documentation/email-clients.txt, evidently not! Will do some more reading before submitting any more patches.
-
-Thanks again,
-
-Mark
-
-On 19/03/15 14:14, Dinh Nguyen wrote:
-> On 03/18/2015 03:09 AM, Steffen Trumtrar wrote:
->> Hi!
->>
->> On Tue, Mar 17, 2015 at 09:35:23PM +0000, Mark James wrote:
->>> Hello,
->>>
->>> The socfpga.dtsi currently has the wrong interrupt number set for SPI master 1. Trying to use the master without this change results in the kernel boot process waiting forever for an interrupt that will never occur while attempting to probe any slave devices configured in the device tree as being under SPI master 1.
->>>
->>> The change works for the Cyclone V, and according to the Arria 5 handbook should be good there too.
->>>
->>>
->>> Signed-off-by: Mark James <maj@jamers.net>
->>> Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>
->>> ---
->>>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
->>> index 9d87609..d9176e6 100644
->>> --- a/arch/arm/boot/dts/socfpga.dtsi
->>> +++ b/arch/arm/boot/dts/socfpga.dtsi
->>> @@ -660,7 +660,7 @@
->>>  			#address-cells = <1>;
->>>  			#size-cells = <0>;
->>>  			reg = <0xfff01000 0x1000>;
->>> -			interrupts = <0 156 4>;
->>> +			interrupts = <0 155 4>;
->>>  			num-cs = <4>;
->>>  			clocks = <&spi_m_clk>;
->>>  			status = "disabled";
->>
->> Thanks for sending the patch to the mainline list.
->> One little nitpick about the patchformat though:
->>
->> Please add linebreaks after 70-75 characters for readability. And remove the
->> "Hello,\n\n" otherwise this would land in the final git commit, where it
->> doesn't belong.
->> For reference have a look at Documentation/SubmittingPatches in the kernel
->> tree.
->>
->> Maybe Dinh can fix this up, otherwise he will tell you what to do.
->>
+On Tue, Mar 17, 2015 at 09:51:41AM +0000, Suzuki K. Poulose wrote:
+> From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 > 
-> Yes, I can pick this up and fix up the commit.
+> A minor change, fixed missplled 'DEPRECATED' in the dev_warn().
 > 
-> Dinh
+> Thanks
+> Suzuki
 > 
+> ----8>----
+> Avoid secure transactions while probing the CCI PMU. The
+> existing code makes use of the Peripheral ID2 (PID2) register
+> to determine the revision of the CCI400, which requires a
+> secure transaction. This puts a limitation on the usage of the
+> driver on systems running non-secure Linux(e.g, ARM64).
+> 
+> Updated the device-tree binding for cci pmu node to add the explicit
+> revision number for the compatible field.
+> 
+> The supported strings are :
+> 	arm,cci-400-pmu,r0
+> 	arm,cci-400-pmu,r1
+> 	arm,cci-400-pmu - DEPRECATED. See NOTE below
+> 
+> NOTE: If the revision is not mentioned, we need to probe the cci revision,
+> which could be fatal on a platform running non-secure. We need a reliable way
+> to know if we can poke the CCI registers at runtime on ARM32. We depend on
+> 'mcpm_is_available()' when it is available. mcpm_is_available() returns true
+> only when there is a registered driver for mcpm. Otherwise, we assume that we
+> don't have secure access, and skips probing the revision number(ARM64 case).
+> 
+> The MCPM should figure out if it is safe to access the CCI. Unfortunately
+> there isn't a reliable way to indicate the same via dtb. This patch doesn't
+> address/change the current situation. It only deals with the CCI-PMU, leaving
+> the assumptions about the secure access as it has been, prior to this patch.
+> 
+> Changes since V2:
+>  - Use 'bool' instead of 'int' for platform_has_secure_cci_access().
+>    (Suggested-by: Sudeep Holla)
+> 
+> Cc: devicetree at vger.kernel.org
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+> Tested-by: Sudeep Holla <sudeep.holla@arm.com>
+> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/cci.txt |    7 +++--
+>  arch/arm/include/asm/arm-cci.h                |   42 +++++++++++++++++++++++++
+>  arch/arm64/include/asm/arm-cci.h              |   27 ++++++++++++++++
+>  drivers/bus/arm-cci.c                         |   17 +++++++++-
+>  include/linux/arm-cci.h                       |    2 ++
+>  5 files changed, 92 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/include/asm/arm-cci.h
+>  create mode 100644 arch/arm64/include/asm/arm-cci.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+> index f28d82b..0e4b6a7 100644
+> --- a/Documentation/devicetree/bindings/arm/cci.txt
+> +++ b/Documentation/devicetree/bindings/arm/cci.txt
+> @@ -94,8 +94,11 @@ specific to ARM.
+>  		- compatible
+>  			Usage: required
+>  			Value type: <string>
+> -			Definition: must be "arm,cci-400-pmu"
+> -
+> +			Definition: Supported strings are :
+
+I'd prefer we said "Must contain one of:".
+
+> +				 "arm,cci-400-pmu,r0"
+> +				 "arm,cci-400-pmu,r1"
+> +				 "arm,cci-400-pmu"  - DEPRECATED, permitted only where OS has
+> +						      secure acces to CCI registers
+
+Otherwise, the binding change looks fine to me, so:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com> [DT binding]
