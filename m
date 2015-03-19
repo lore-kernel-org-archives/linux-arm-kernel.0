@@ -1,57 +1,50 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Thu, 19 Mar 2015 10:18:43 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: sun8i: Add SMP support for
- the Allwinner A23
-In-Reply-To: <2015031912050362587032@gmail.com>
-References: <1426649042-30547-1-git-send-email-wens@csie.org>
- <1426649042-30547-3-git-send-email-wens@csie.org>
- <20150318102939.GP4638@lukather>
- <CAGb2v65qZBPcury1e-DXwmpJOyS97oWFVisGQKEbTZkc+Z60nQ@mail.gmail.com>
- <2015031912050362587032@gmail.com>
-Message-ID: <20150319091843.GA4255@lukather>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 19 Mar 2015 11:30:43 +0200
+Subject: [PATCH 2/2] i2c: driver for the Conexant Digicolor I2C controller
+In-Reply-To: <20150318210730.GA12960@katana>
+References: <7da767503ac6085c10fbd1953ffd36621b8bf0c5.1424092804.git.baruch@tkos.co.il>
+ <a106023efa9fd648f46021cd063437df798528de.1424092804.git.baruch@tkos.co.il>
+ <20150318210730.GA12960@katana>
+Message-ID: <20150319093042.GB2415@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Wolfram,
 
-On Thu, Mar 19, 2015 at 12:05:06PM +0800, kevin.z.m.zh at gmail.com wrote:
-> >> One question I couldn't find any answer to is that does the SMP bit is
-> >> set in secondary_startup?
-> >>
-> >> I couldn't find where it was set, but it still looks like the right
-> >> thing to do, so I would expect the code to do that.
+On Wed, Mar 18, 2015 at 10:07:30PM +0100, Wolfram Sang wrote:
+> On Mon, Feb 16, 2015 at 03:20:04PM +0200, Baruch Siach wrote:
+> > This commit adds a driver for the I2C master controller on the CX92755 SoC. The
+> > CX92755 is one SoC in the Conexant Digicolor series. This driver should support
+> > other SoCs from that series.
 > > 
-> > I don't see it either. The sun8i code is just the sun6i code with the
-> > power clamps removed. And sun6i secondary_startup was removed some time
-> > ago in commit 1146b600044d ("ARM: sunxi: fix build for THUMB2_KERNEL").
+> > Only 7bit slave addresses are currently supported.
 > > 
-> > ChenYu
->
-> The SMP bit should be set in the function of "__v7_ca7mp_setup", which is located
-> in the file:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mm/proc-v7.S?id=refs/tags/v4.0-rc4
-> I'm not sure if this is your discussion.
+> > Tested on the Equinox CX92755 EVK, using i2c-tools utilities to read and write
+> > the on-chip (sic) audio codec.
+> > 
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> 
+> Looks mostly good.
+> 
+> > +static u32 dc_i2c_func(struct i2c_adapter *adap)
+> > +{
+> > +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
+> > +}
+> 
+> You probably want to advertise I2C_FUNC_NOSTART here, too?
 
-It is, but I wasn't seeing it called anywhere in the secondary_startup
-code path.
+OK.
 
-I was expecting a direct call, but it looks like it's a dynamic call,
-with a function-pointer like call, that is indeed run both in the
-kernel entry point and the secondary_startup.
+> And if you could rebase to something after 4.0-rc1, that would be much
+> appreciated.
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/kernel/head.S?id=refs/tags/v4.0-rc4#n389
+Did that some time ago along with the rest of my queue for that platform. Just 
+waited for some review before reposting.
 
-Thanks!
-Maxime
+Thanks for reviewing,
+baruch
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/352e3468/attachment.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
