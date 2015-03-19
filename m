@@ -1,96 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Mar 2015 14:17:53 +0000
-Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
- driver
-In-Reply-To: <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <20150319141753.GB25967@leverpostej>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Thu, 19 Mar 2015 09:14:37 -0500
+Subject: ARM: socfpga: dts: fix spi1 interrupt
+In-Reply-To: <20150318080950.GB10862@pengutronix.de>
+References: <55089E1B.7000600@jamers.net>
+ <20150318080950.GB10862@pengutronix.de>
+Message-ID: <550AD9CD.5020805@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 07:57:27AM +0000, kongxinwei wrote:
-> This patch adds the support for hisilicon thermal sensor, within
-> hisilicon SoC. there will register sensors for thermal framework
-> and use device tree to bind cooling device.
+On 03/18/2015 03:09 AM, Steffen Trumtrar wrote:
+> Hi!
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
-> ---
->  drivers/thermal/Kconfig        |   8 +
->  drivers/thermal/Makefile       |   1 +
->  drivers/thermal/hisi_thermal.c | 531 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 540 insertions(+)
->  create mode 100644 drivers/thermal/hisi_thermal.c
+> On Tue, Mar 17, 2015 at 09:35:23PM +0000, Mark James wrote:
+>> Hello,
+>>
+>> The socfpga.dtsi currently has the wrong interrupt number set for SPI master 1. Trying to use the master without this change results in the kernel boot process waiting forever for an interrupt that will never occur while attempting to probe any slave devices configured in the device tree as being under SPI master 1.
+>>
+>> The change works for the Cyclone V, and according to the Arria 5 handbook should be good there too.
+>>
+>>
+>> Signed-off-by: Mark James <maj@jamers.net>
+>> Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>
+>> ---
+>>  arch/arm/boot/dts/socfpga.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+>> index 9d87609..d9176e6 100644
+>> --- a/arch/arm/boot/dts/socfpga.dtsi
+>> +++ b/arch/arm/boot/dts/socfpga.dtsi
+>> @@ -660,7 +660,7 @@
+>>  			#address-cells = <1>;
+>>  			#size-cells = <0>;
+>>  			reg = <0xfff01000 0x1000>;
+>> -			interrupts = <0 156 4>;
+>> +			interrupts = <0 155 4>;
+>>  			num-cs = <4>;
+>>  			clocks = <&spi_m_clk>;
+>>  			status = "disabled";
+> 
+> Thanks for sending the patch to the mainline list.
+> One little nitpick about the patchformat though:
+> 
+> Please add linebreaks after 70-75 characters for readability. And remove the
+> "Hello,\n\n" otherwise this would land in the final git commit, where it
+> doesn't belong.
+> For reference have a look at Documentation/SubmittingPatches in the kernel
+> tree.
+> 
+> Maybe Dinh can fix this up, otherwise he will tell you what to do.
+> 
 
-[...]
+Yes, I can pick this up and fix up the commit.
 
-> +       ret = of_property_read_u32(np, "hisilicon,tsensor-lag-value",
-> +                                  &sensor->lag);
-
-This wasn't in the binding.
-
-[...]
-
-> +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
-> +                                  &sensor->thres_temp);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
-> +                       index, ret);
-> +               return ret;
-> +       }
-> +
-> +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
-> +                                  &sensor->reset_temp);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
-> +                       index, ret);
-> +               return ret;
-> +       }
-
-I see now that these properties result in the HW being programmed. You
-should figure out how to reconcile these with thermal-zone trip points
-rather than having parallel properties.
-
-> +
-> +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
-> +
-> +               if (data->irq_bind_sensor != -1)
-> +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
-> +                                data->irq_bind_sensor);
-> +
-> +               /* bind irq to this sensor */
-> +               data->irq_bind_sensor = index;
-> +       }
-
-I don't see why this should be specified in the DT. Why do you believe
-it should?
-
-[...]
-
-> +static int hisi_thermal_probe(struct platform_device *pdev)
-> +{
-> +       struct hisi_thermal_data *data;
-> +       struct resource *res;
-> +       int i;
-> +       int ret;
-> +
-> +       if (!cpufreq_get_current_driver()) {
-> +               dev_dbg(&pdev->dev, "no cpufreq driver!");
-> +               return -EPROBE_DEFER;
-> +       }
-
-Surely we care about not burning out the board even if we don't have
-cpufreq?
-
-Is there any ordering guarantee between the probing of this driver and
-cpufreq?
-
-
-[...]
-
-> +       data->clk = devm_clk_get(&pdev->dev, NULL);
-
-You gave this clock a name in the binding. Use it or drop it.
-
-Mark. 
+Dinh
