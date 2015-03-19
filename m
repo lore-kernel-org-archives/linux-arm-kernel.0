@@ -1,30 +1,32 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 18 Mar 2015 18:58:09 -0700
-Subject: [PATCH 35/35 linux-next] pinctrl: constify of_device_id array
-In-Reply-To: <1426535949-26107-4-git-send-email-fabf@skynet.be>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-4-git-send-email-fabf@skynet.be>
-Message-ID: <1426730289.21744.7.camel@mussux00.eus.mediatek.inc>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Mar 2015 11:05:26 +0900
+Subject: [PATCH V2] ARM: shmobile: cpuidle: Remove the pointless default
+ driver
+In-Reply-To: <550847BA.8050503@linaro.org>
+References: <1426605912-28032-1-git-send-email-daniel.lezcano@linaro.org>
+ <550847BA.8050503@linaro.org>
+Message-ID: <20150319020526.GL14051@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-16 at 20:59 +0100, Fabian Frederick wrote:
-> of_device_id is always used as const.
-> (See driver.of_match_table and open firmware functions)
+On Tue, Mar 17, 2015 at 04:26:50PM +0100, Daniel Lezcano wrote:
 > 
-> Signed-off-by: Fabian Frederick <fabf@skynet.be>
-> ---
->  drivers/pinctrl/bcm/pinctrl-bcm2835.c       | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mt8135.c   | 2 +-
->  drivers/pinctrl/mediatek/pinctrl-mt8173.c   | 2 +-
->  
+> Sorry Geert, I forget to Cc you.
+> 
+> On 03/17/2015 04:25 PM, Daniel Lezcano wrote:
+> >The default idle driver uses one state with the WFI instruction.
+> >The default idle routine invokes WFI when no cpuidle driver is present.
+> >
+> >The default cpuidle driver is pointless and does not give more than the
+> >default idle routine and moreover it pulls all the mathematics tied with
+> >the cpuidle governor for nothing, hence consuming more energy.
+> >
+> >Remove the default driver, the related code and register the driver directly.
+> >
+> >[compiled only - no board - no test]
+> >
+> >Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-For the pinctrl-mt81xx driver,
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Thanks Daniel,
 
-By the way, Axel has sent same patch to linux-gpio.
-http://article.gmane.org/gmane.linux.kernel.gpio/6815
-
-Thanks.
-Hongzhou
+I have queued this up for v4.1.
