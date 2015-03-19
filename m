@@ -1,47 +1,137 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 Mar 2015 16:14:00 -0700
-Subject: [GIT PULL 2/3] omap defconfig changes for v4.1
-In-Reply-To: <pull-1426799683-420388>
-References: <pull-1426799683-420388>
-Message-ID: <pull-1426799683-420388-2>
+Date: Thu, 19 Mar 2015 16:13:59 -0700
+Subject: [GIT PULL 1/3] omap device tree changes for v4.1, part1
+Message-ID: <pull-1426799683-420388>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+The following changes since commit 13a7a6ac0a11197edcd0f756a035f472b42cdf8b:
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+  Linux 4.0-rc2 (2015-03-03 09:04:59 -0800)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/v4.1-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/v4.1-dt
 
-for you to fetch changes up to 1fd6d08cbd4bd8984241c7cef2f7c5cb67fce1aa:
+for you to fetch changes up to 10709c0858d89716b10b7bbf6d825044f2f59602:
 
-  ARM: omap2plus_defconfig: Enable n900 modem as loadable modules (2015-03-16 12:48:44 -0700)
+  ARM: dts: Update Nanobone dts file (2015-03-19 10:59:28 -0700)
 
 ----------------------------------------------------------------
-Few omap2plus_defconfig updates to add commonly used drivers as
-loadable modules.
+Device tree related changes for omaps:
 
-Note that I'll do patches for armv7_defconfig for these at some
-point too once we're happy with omap2plus_defconfig to avoid
-extra churn on the defconfig files.
+- Add support for ChiliSOM
+
+- Add support for OpenPandora
+
+- Add support for BeagleBoard NAND
+
+- Enable crypto devices for omap3 devices
+
+- Add bindings for omap3 camera support
+
+- Updates for am437x and dra7x and dm816x SoCs
 
 ----------------------------------------------------------------
 Felipe Balbi (1):
-      arm: config: omap2plus_defconfig: switch over to LZMA compression
+      ARM: dts: am437x-idk: enable i2c2
 
-Paul Walmsley (1):
-      ARM: omap1_defconfig: drop obsolete Kconfig symbols
+H. Nikolaus Schaller (3):
+      ARM: dts: omap3-pandora: add common device tree
+      ARM: dts: omap3-pandora: add OMAP3530 600 MHz version
+      ARM: dts: omap3-pandora: add DM3730 1 GHz version
 
-Roger Quadros (1):
-      ARM: omap2plus_defconfig: Enable EXTCON_GPIO_USB
+Marek Belisko (2):
+      ARM: dts: omap3: Remove all references to ti,codec property
+      Documentation: omap-twl4030: Move ti,codec property to optional
+
+Mark Jackson (1):
+      ARM: dts: Update Nanobone dts file
+
+Matt Porter (1):
+      Documentation: DT: omap_serial: document missing properties and add an example
+
+Pali Roh?r (4):
+      ARM: dts: n9/n950: Enable omap crypto support
+      ARM: dts: n900: Enable omap sham and include directly omap34xx.dtsi
+      ARM: dts: omap3-tao3530: Include directly omap34xx.dtsi
+      ARM: dts: Remove files omap34xx-hs.dtsi and omap36xx-hs.dtsi
+
+Peter Ujfalusi (2):
+      ARM: dts: dra7xx-clocks: Add gate clock for CLKOUT2
+      ARM: dts: am57xx-beagle-x15: Do not include the atl header
+
+Roger Quadros (2):
+      ARM: dts: omap3-beagle: Add NAND device
+      ARM: dts: dra7x-evm: beagle-x15: Fix USB Peripheral
+
+Rostislav Lisovy (3):
+      ARM: dts: Add vendor prefix for Grinn
+      ARM: dts: am335x: Add DTS for ChiliSOM module
+      ARM: dts: am335x: Add Chiliboard DTS
+
+Sakari Ailus (3):
+      Documentation: DT: Add bindings for omap3isp
+      ARM: dts: omap3: Add DT entries for OMAP 3 ISP
+      ARM: dts: n950, n9: Add primary camera support
+
+Suman Anna (1):
+      ARM: dts: DRA7: Remove ti,timer-dsp and ti,timer-pwm properties
 
 Tony Lindgren (3):
-      ARM: omap2plus_defconfig: Enable leds-pwm
-      ARM: omap2plus_defconfig: Update bluetooth options
-      ARM: omap2plus_defconfig: Enable n900 modem as loadable modules
+      ARM: dts: Fix typo for dm816x usb0_pins
+      ARM: dts: Add cppi41 support for dm816x MUSB
+      ARM: dts: Remove PIN_INPUT for dm816x McSPI
 
- arch/arm/configs/omap1_defconfig     | 16 ----------------
- arch/arm/configs/omap2plus_defconfig | 27 +++++++++++++++++++++++++++
- 2 files changed, 27 insertions(+), 16 deletions(-)
+Vignesh R (1):
+      ARM: dts: AM4372: update hdq compatible property
+
+ .../devicetree/bindings/media/ti,omap3isp.txt      |  71 +++
+ .../devicetree/bindings/serial/omap_serial.txt     |  20 +
+ .../devicetree/bindings/sound/omap-twl4030.txt     |   3 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/Makefile                         |   5 +-
+ arch/arm/boot/dts/am335x-chiliboard.dts            | 112 ++++
+ arch/arm/boot/dts/am335x-chilisom.dtsi             | 239 ++++++++
+ arch/arm/boot/dts/am335x-nano.dts                  |  18 +-
+ arch/arm/boot/dts/am4372.dtsi                      |   2 +-
+ arch/arm/boot/dts/am437x-idk-evm.dts               |  22 +
+ arch/arm/boot/dts/am57xx-beagle-x15.dts            |   9 +-
+ arch/arm/boot/dts/dm8168-evm.dts                   |  14 +-
+ arch/arm/boot/dts/dm816x.dtsi                      |  60 ++
+ arch/arm/boot/dts/dra7-evm.dts                     |   8 +
+ arch/arm/boot/dts/dra7.dtsi                        |   7 -
+ arch/arm/boot/dts/dra72-evm.dts                    |   8 +
+ arch/arm/boot/dts/dra7xx-clocks.dtsi               |   8 +
+ arch/arm/boot/dts/omap3-beagle-xm.dts              |   1 -
+ arch/arm/boot/dts/omap3-beagle.dts                 |  53 +-
+ arch/arm/boot/dts/omap3-cm-t3x30.dtsi              |   1 -
+ arch/arm/boot/dts/omap3-devkit8000.dts             |   1 -
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |   1 -
+ arch/arm/boot/dts/omap3-igep.dtsi                  |   1 -
+ arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |   1 -
+ arch/arm/boot/dts/omap3-n9.dts                     |  37 ++
+ arch/arm/boot/dts/omap3-n900.dts                   |  16 +-
+ arch/arm/boot/dts/omap3-n950-n9.dtsi               |   2 +-
+ arch/arm/boot/dts/omap3-n950.dts                   |  37 ++
+ arch/arm/boot/dts/omap3-overo-base.dtsi            |   1 -
+ arch/arm/boot/dts/omap3-pandora-1ghz.dts           |  70 +++
+ arch/arm/boot/dts/omap3-pandora-600mhz.dts         |  65 +++
+ arch/arm/boot/dts/omap3-pandora-common.dtsi        | 640 +++++++++++++++++++++
+ arch/arm/boot/dts/omap3-tao3530.dtsi               |  12 +-
+ arch/arm/boot/dts/omap34xx-hs.dtsi                 |  16 -
+ arch/arm/boot/dts/omap34xx.dtsi                    |  17 +
+ arch/arm/boot/dts/omap36xx-hs.dtsi                 |  16 -
+ arch/arm/boot/dts/omap36xx.dtsi                    |  17 +
+ include/dt-bindings/media/omap3-isp.h              |  22 +
+ 39 files changed, 1565 insertions(+), 70 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/ti,omap3isp.txt
+ create mode 100644 arch/arm/boot/dts/am335x-chiliboard.dts
+ create mode 100644 arch/arm/boot/dts/am335x-chilisom.dtsi
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-1ghz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-600mhz.dts
+ create mode 100644 arch/arm/boot/dts/omap3-pandora-common.dtsi
+ delete mode 100644 arch/arm/boot/dts/omap34xx-hs.dtsi
+ delete mode 100644 arch/arm/boot/dts/omap36xx-hs.dtsi
+ create mode 100644 include/dt-bindings/media/omap3-isp.h
