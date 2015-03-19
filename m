@@ -1,57 +1,42 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Mar 2015 17:47:26 +0100
-Subject: [PATCH 11/13] can: at91_can: use endian agnostic IO accessors
-In-Reply-To: <1426693992-31163-12-git-send-email-ben.dooks@codethink.co.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <1426693992-31163-12-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <550AFD9E.60801@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 Mar 2015 10:49:02 -0600
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <20150319160208.GF7657@katana>
+References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
+ <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
+ <20150319100944.GA914@katana> <550AEF9D.6090307@wwwdotorg.org>
+ <20150319160208.GF7657@katana>
+Message-ID: <550AFDFE.8040005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/03/2015 16:53, Ben Dooks a ?crit :
-> Change __raw accesors to  endian agnostic versions to allow the driver
-> to work properly on big endian systems.
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> --
-> CC: Wolfgang Grandegger <wg@grandegger.com>
-> CC: Marc Kleine-Budde <mkl@pengutronix.de>
-> CC: linux-can at vger.kernel.org
-> CC: netdev at vger.kernel.org
-> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 03/19/2015 10:02 AM, Wolfram Sang wrote:
+>>> -	/* Only register child devices if the adapter has a node pointer set */
+>>> -	if (!adap->dev.of_node)
+>>> +	/* Only register childs if adapter has a node pointer with enabled status */
+>>> +	if (!adap->dev.of_node || !of_device_is_available(adap->dev.of_node))
+>>>   		return;
+>>
+>> That feels a bit odd to me. For a regular non-mux I2C controller, that extra
+>> case would never trigger if the controller node was disabled, since the
+>> device core would never probe the controller device itself. So, we'd end up
+>> with inconsistent paths through the I2C core for regular controllers and
+>> muxes.
+>
+> I first thought the no-op for the non-mux case wouldn't hurt, but I
+> agree about the consistent code path. I mentioned in my previous mail
+> that i2c-mux might be a better place for this...
+>
+>> Perhaps better would be to have a mux-specific function to iterate over a
+>> mux's child nodes and instantiate buses for those. That function would check
+>> whether each bus node was disabled or not. That'd isolate the special case
+>> into the place where it was relevant.
+>
+> ... so I wonder what you think about putting the
+> of_device_is_available() check into i2c_add_mux_adapter() once the
+> reg-property and chan_id have been matched?
 
-Sure!
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks, bye.
-
-
-> ---
->  drivers/net/can/at91_can.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/can/at91_can.c b/drivers/net/can/at91_can.c
-> index eeb4b8b..f4e40aa 100644
-> --- a/drivers/net/can/at91_can.c
-> +++ b/drivers/net/can/at91_can.c
-> @@ -291,13 +291,13 @@ static inline unsigned int get_tx_echo_mb(const struct at91_priv *priv)
->  
->  static inline u32 at91_read(const struct at91_priv *priv, enum at91_reg reg)
->  {
-> -	return __raw_readl(priv->reg_base + reg);
-> +	return readl_relaxed(priv->reg_base + reg);
->  }
->  
->  static inline void at91_write(const struct at91_priv *priv, enum at91_reg reg,
->  		u32 value)
->  {
-> -	__raw_writel(value, priv->reg_base + reg);
-> +	writel_relaxed(value, priv->reg_base + reg);
->  }
->  
->  static inline void set_mb_mode_prio(const struct at91_priv *priv,
-> 
-
-
--- 
-Nicolas Ferre
+I think that looks like a good place, yes.
