@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 19 Mar 2015 11:15:19 +0900
-Subject: [PATCH 1/6] ARM: shmobile: r8a7790: add reg-names for sound
+Date: Thu, 19 Mar 2015 11:15:20 +0900
+Subject: [PATCH 2/6] ARM: shmobile: r8a7791: add reg-names for sound
 In-Reply-To: <cover.1426731062.git.horms+renesas@verge.net.au>
 References: <cover.1426731062.git.horms+renesas@verge.net.au>
-Message-ID: <46a158f2ce965940f68ccb07ac8127e1091bebe8.1426731062.git.horms+renesas@verge.net.au>
+Message-ID: <d88a6a2a2184b0f58c42dfda77fdda87ab28b6aa.1426731062.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,21 +15,21 @@ Let's use it.
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 2 ++
+ arch/arm/boot/dts/r8a7791.dtsi | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index b320252..2041ec7 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1461,6 +1461,8 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index e899f79..8631e02 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1504,6 +1504,8 @@
  			<0 0xec5a0000 0 0x100>,  /* ADG */
  			<0 0xec540000 0 0x1000>, /* SSIU */
  			<0 0xec541000 0 0x1280>; /* SSI */
 +		reg-names = "scu", "adg", "ssiu", "ssi";
 +
- 		clocks = <&mstp10_clks R8A7790_CLK_SSI_ALL>,
- 			<&mstp10_clks R8A7790_CLK_SSI9>, <&mstp10_clks R8A7790_CLK_SSI8>,
- 			<&mstp10_clks R8A7790_CLK_SSI7>, <&mstp10_clks R8A7790_CLK_SSI6>,
+ 		clocks = <&mstp10_clks R8A7791_CLK_SSI_ALL>,
+ 			<&mstp10_clks R8A7791_CLK_SSI9>, <&mstp10_clks R8A7791_CLK_SSI8>,
+ 			<&mstp10_clks R8A7791_CLK_SSI7>, <&mstp10_clks R8A7791_CLK_SSI6>,
 -- 
 2.1.4
