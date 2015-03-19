@@ -1,65 +1,208 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 18 Mar 2015 18:23:39 -0700
-Subject: [PATCH 2/5] Documentation: devicetree: add Broadcom SATA PHY binding
+Date: Wed, 18 Mar 2015 18:23:40 -0700
+Subject: [PATCH 3/5] ata: add Broadcom AHCI SATA3 driver for STB chips
 In-Reply-To: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
 References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1426728222-8197-2-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1426728222-8197-3-git-send-email-computersforpeace@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 28nm STB chips, based on BCM7445.
+Pretty straightforward driver, using the nice library-ization of the
+generic ahci_platform driver.
 
 Signed-off-by: Brian Norris <computersforpeace@gmail.com>
 ---
- .../bindings/phy/brcm,brcmstb-sata-phy.txt         | 40 ++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+ drivers/ata/Kconfig        |   9 +++
+ drivers/ata/Makefile       |   1 +
+ drivers/ata/sata_brcmstb.c | 148 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 158 insertions(+)
+ create mode 100644 drivers/ata/sata_brcmstb.c
 
-diff --git a/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt b/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index 5f601553b9b0..33d4b3031705 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -98,6 +98,15 @@ config SATA_AHCI_PLATFORM
+ 
+ 	  If unsure, say N.
+ 
++config SATA_BRCMSTB
++	tristate "Broadcom STB AHCI SATA support"
++	depends on ARCH_BRCMSTB
++	help
++	  This option enables support for the AHCI SATA3 controller found on
++	  STB SoC's.
++
++	  If unsure, say N.
++
+ config AHCI_DA850
+ 	tristate "DaVinci DA850 AHCI SATA support"
+ 	depends on ARCH_DAVINCI_DA850
+diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+index ae41107afc1f..5d1e6a96bc93 100644
+--- a/drivers/ata/Makefile
++++ b/drivers/ata/Makefile
+@@ -5,6 +5,7 @@ obj-$(CONFIG_ATA)		+= libata.o
+ obj-$(CONFIG_SATA_AHCI)		+= ahci.o libahci.o
+ obj-$(CONFIG_SATA_ACARD_AHCI)	+= acard-ahci.o libahci.o
+ obj-$(CONFIG_SATA_AHCI_PLATFORM) += ahci_platform.o libahci.o libahci_platform.o
++obj-$(CONFIG_SATA_BRCMSTB)	+= sata_brcmstb.o libahci.o libahci_platform.o
+ obj-$(CONFIG_SATA_FSL)		+= sata_fsl.o
+ obj-$(CONFIG_SATA_INIC162X)	+= sata_inic162x.o
+ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+diff --git a/drivers/ata/sata_brcmstb.c b/drivers/ata/sata_brcmstb.c
 new file mode 100644
-index 000000000000..39eddd53b318
+index 000000000000..2a3aff419332
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/brcm,brcmstb-sata-phy.txt
-@@ -0,0 +1,40 @@
-+* Broadcom SATA3 PHY for STB
++++ b/drivers/ata/sata_brcmstb.c
+@@ -0,0 +1,148 @@
++/*
++ * Broadcom SATA3 AHCI Controller Driver
++ *
++ * Copyright ? 2009-2015 Broadcom Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2, or (at your option)
++ * any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+Required properties:
-+- compatible: should be one or more of
-+     "brcm,bcm7445-sata-phy"
-+     "brcm,phy-sata3"
-+- address-cells: should be 1
-+- size-cells: should be 0
-+- phy-cells: generic PHY binding; must be 1
-+- reg: register ranges for the PHY PCB interface, and for the PHY port control
-+     registers found in the SATA_TOP_CTRL block (i.e., PHY_CTRL 1/2/3/4)
-+- reg-names: should be "phy" and "port-ctrl"
++#include <linux/ahci_platform.h>
++#include <linux/compiler.h>
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/libata.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/string.h>
 +
-+Sub-nodes:
-+  Each port's PHY should be represented as a sub-node.
++#include "ahci.h"
 +
-+Sub-nodes required properties:
-+- reg: the PHY number
-+Optional:
-+- brcm,enable-ssc: use spread spectrum clocking (SSC) on this port
++#define DRV_NAME			"brcm-ahci"
 +
++#define SATA_TOP_CTRL_VERSION		0x0
++#define SATA_TOP_CTRL_BUS_CTRL		0x4
 +
-+Example:
++#ifdef __BIG_ENDIAN
++#define DATA_ENDIAN			 2 /* AHCI->DDR inbound accesses */
++#define MMIO_ENDIAN			 2 /* CPU->AHCI outbound accesses */
++#else
++#define DATA_ENDIAN			 0
++#define MMIO_ENDIAN			 0
++#endif
 +
-+	sata-phy at f0458100 {
-+		compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
-+		reg = <0xf0458100 0x1e00>, <0xf045804c 0x10>;
-+		reg-names = "phy", "port-ctrl";
-+		#phy-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++struct brcm_ahci_priv {
++	struct device *dev;
++	struct ahci_host_priv *hpriv;
 +
-+		sata-phy at 0 {
-+			reg = <0>;
-+		};
++	void __iomem *top_ctrl;
++};
 +
-+		sata-phy at 1 {
-+			reg = <1>;
-+		};
-+	};
++static const struct ata_port_info ahci_brcm_port_info = {
++	.flags		= AHCI_FLAG_COMMON,
++	.pio_mask	= ATA_PIO4,
++	.udma_mask	= ATA_UDMA6,
++	.port_ops	= &ahci_platform_ops,
++};
++
++static void brcm_sata3_init_config(struct brcm_ahci_priv *priv)
++{
++	/* Configure endianness */
++	writel((DATA_ENDIAN << 4) | (DATA_ENDIAN << 2) | (MMIO_ENDIAN << 0),
++		priv->top_ctrl + SATA_TOP_CTRL_BUS_CTRL);
++}
++
++static int brcm_ahci_suspend(struct device *dev)
++{
++	return ahci_platform_suspend(dev);
++}
++
++static int brcm_ahci_resume(struct device *dev)
++{
++	struct brcm_ahci_priv *priv = dev_get_drvdata(dev);
++
++	brcm_sata3_init_config(priv);
++	return ahci_platform_resume(dev);
++}
++
++static struct scsi_host_template ahci_platform_sht = {
++	AHCI_SHT(DRV_NAME),
++};
++
++static int brcm_ahci_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct brcm_ahci_priv *priv;
++	struct ahci_host_priv *hpriv;
++	struct resource *res;
++	int ret;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++	dev_set_drvdata(dev, priv);
++	priv->dev = dev;
++
++	hpriv = ahci_platform_get_resources(pdev);
++	if (IS_ERR(hpriv))
++		return PTR_ERR(hpriv);
++
++	priv->hpriv = hpriv;
++
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "top-ctrl");
++	priv->top_ctrl = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->top_ctrl))
++		return PTR_ERR(priv->top_ctrl);
++
++	brcm_sata3_init_config(priv);
++
++	ret = ahci_platform_enable_resources(hpriv);
++	if (ret)
++		return ret;
++
++	hpriv->plat_data = priv;
++
++	ret = ahci_platform_init_host(pdev, hpriv, &ahci_brcm_port_info,
++				      &ahci_platform_sht);
++	if (ret)
++		return ret;
++
++	dev_info(dev, "Broadcom AHCI SATA3 registered\n");
++
++	return 0;
++}
++
++static const struct of_device_id ahci_of_match[] = {
++	{.compatible = "brcm,sata3-ahci"},
++	{},
++};
++MODULE_DEVICE_TABLE(of, ahci_of_match);
++
++static SIMPLE_DEV_PM_OPS(ahci_brcm_pm_ops, brcm_ahci_suspend, brcm_ahci_resume);
++
++static struct platform_driver brcm_ahci_driver = {
++	.probe = brcm_ahci_probe,
++	.remove = ata_platform_remove_one,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table = ahci_of_match,
++		.pm = &ahci_brcm_pm_ops,
++	},
++};
++module_platform_driver(brcm_ahci_driver);
++
++MODULE_DESCRIPTION("Broadcom SATA3 AHCI Controller Driver");
++MODULE_AUTHOR("Brian Norris");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:sata-brcmstb");
 -- 
 1.9.1
