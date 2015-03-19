@@ -1,42 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 19 Mar 2015 09:24:46 +0100
-Subject: [PATCH] PCI: mvebu: add suspend/resume support
-In-Reply-To: <20150317151501.GC3368@io.lakedaemon.net>
-References: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150317151501.GC3368@io.lakedaemon.net>
-Message-ID: <20150319092446.468ab397@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 Mar 2015 09:27:02 +0100
+Subject: [PATCH v2 1/2] pinctrl: Add support for Meson8b
+In-Reply-To: <CAOQ7t2avzGJU=eMaPZ8ajGiw5CaO40pn9njpN=6quiH+pii7dw@mail.gmail.com>
+References: <1426064430-5826-1-git-send-email-carlo@caione.org>
+ <1426064430-5826-2-git-send-email-carlo@caione.org>
+ <CACRpkday9fO9mSr03qSy0jT1bG+Vu9qE6FUd8eZqxdnicuBTYQ@mail.gmail.com>
+ <CAOQ7t2avzGJU=eMaPZ8ajGiw5CaO40pn9njpN=6quiH+pii7dw@mail.gmail.com>
+Message-ID: <CACRpkda-Cp=EO571ACKj=AS4pNn3-Yq8MJ2VQ82_Y_iE3QLi0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Tue, Mar 17, 2015 at 3:10 PM, Carlo Caione <carlo@caione.org> wrote:
+> On Tue, Mar 17, 2015 at 12:49 PM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
 
-On Tue, 17 Mar 2015 15:15:01 +0000, Jason Cooper wrote:
+>>> +#ifndef _DT_BINDINGS_MESON8B_GPIO_H
+>>> +#define _DT_BINDINGS_MESON8B_GPIO_H
+>>> +
+>>> +#include <dt-bindings/gpio/meson8-gpio.h>
+>>
+>> Why is this file including itself?
+>
+> It's not, the file is called meson8b-gpio.h and it's including meson8-gpio.h
 
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index 1309cfb..1ab8635 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -129,6 +129,7 @@ struct mvebu_pcie_port {
-> >  	size_t memwin_size;
-> >  	phys_addr_t iowin_base;
-> >  	size_t iowin_size;
-> > +	u32 saved_pcie_stat;
-> 
-> nit:  It's already in the pcie port struct, why not just call it saved_state?
+Aha I was totally lost, sorry...
 
-Well the "stat" does not mean "state", but refers to the register being
-saved in this field. The register is called: PCIE_STAT_OFF. Hence the
-name saved_pcie_stat. But I'm fine with changing this to some other
-name, I really don't care :)
-
-> Either way,
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
