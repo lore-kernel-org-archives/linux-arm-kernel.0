@@ -1,25 +1,40 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 19 Mar 2015 16:23:45 +0100
-Subject: [PATCH v3 2/2] i2c: driver for the Conexant Digicolor I2C
- controller
-In-Reply-To: <fcd782e43c6f038c853772d3b6f23e4d9d6d3cc8.1426763807.git.baruch@tkos.co.il>
-References: <7f61d9379c89db43f5b7f65c408433dd0d82a88a.1426763807.git.baruch@tkos.co.il>
- <fcd782e43c6f038c853772d3b6f23e4d9d6d3cc8.1426763807.git.baruch@tkos.co.il>
-Message-ID: <20150319152345.GB7657@katana>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 19 Mar 2015 15:26:06 +0000 (UTC)
+Subject: [PATCHv2 3/3] Documentation: DT bindings: Tegra AHB: note base
+ address change
+In-Reply-To: <20150317103806.GU8656@n2100.arm.linux.org.uk>
+References: <20150317083221.32662.14647.stgit@baseline>
+ <20150317083221.32662.96822.stgit@baseline>
+ <20150317103806.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1503191525450.9480@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 01:16:47PM +0200, Baruch Siach wrote:
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+On Tue, 17 Mar 2015, Russell King - ARM Linux wrote:
 
-I fixed two remaining 'check' issues with spaces around operators.
+> On Tue, Mar 17, 2015 at 01:32:21AM -0700, Paul Walmsley wrote:
+> >  Required properties:
+> >  - compatible : For Tegra20, must contain "nvidia,tegra20-ahb".  For
+> > -  Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
+> > -  '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
+> > -  tegra132, or tegra210.
+> > -- reg : Should contain 1 register ranges(address and length)
+> > +  Tegra30, must contain "nvidia,tegra30-ahb".  For Tegra114 and Tegra124, must
+> > +  contain '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra114
+> > +  or tegra124.  For Tegra132, the compatible string must contain
+> > +  "nvidia,tegra132-ahb".
+> > +
+> > +- reg : Should contain 1 register ranges(address and length).  On Tegra20,
+> > +  Tegra30, Tegra114, and Tegra124 chips, the low byte of the physical base
+> > +  address of the IP block must end in 0x04.  On DT files for later chips, the
+> > +  actual hardware base address of the IP block should be used.
+> 
+> You could check that in the driver.  If you can check it in the driver,
+> you can also decide to ignore it if it were offset by 0x04 (possibly
+> printing a warning.)  That opens up the ability to fix the older Tegra
+> DT files going forward while still remaining compatible with existing
+> DT files, and avoiding the need for a complex note about this.
 
-Applied to for-next, thanks!
+That's fine, I'll do that and drop this patch.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/aa43c431/attachment-0001.sig>
+- Paul
