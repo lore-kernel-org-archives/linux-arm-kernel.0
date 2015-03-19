@@ -1,96 +1,81 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Mar 2015 17:18:34 +0100
-Subject: [PATCH] driver core / PM: Add callbacks for PM domain
- initialization/cleanup
-In-Reply-To: <CAPDyKFo8YNpnriaAcLnEJ8tLZ+G68N_fyfOAYoEjBPHP=wyWbQ@mail.gmail.com>
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <356697065.8Z1o4ApA72@vostro.rjw.lan>
- <CAPDyKFo8YNpnriaAcLnEJ8tLZ+G68N_fyfOAYoEjBPHP=wyWbQ@mail.gmail.com>
-Message-ID: <3998390.WErrfO4Yno@vostro.rjw.lan>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 19 Mar 2015 15:55:28 +0000
+Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <20150319154435.GC25967@leverpostej>
+References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
+ <20150319154435.GC25967@leverpostej>
+Message-ID: <CAPvkgC2ntPrTVKi_WxHcMHqV2Rt9KZR9u-oUqVHNH8+1=nnnDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 19, 2015 04:48:22 PM Ulf Hansson wrote:
-> On 19 March 2015 at 17:04, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Thursday, March 19, 2015 04:37:26 PM Ulf Hansson wrote:
-> >> On 19 March 2015 at 16:44, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> >> > On Thursday, March 19, 2015 03:45:07 PM Ulf Hansson wrote:
-> >> >> On 19 March 2015 at 15:20, Alan Stern <stern@rowland.harvard.edu> wrote:
-> >> >> > On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
-> >> >> >
-> >> >> >> > This doesn't make sense to me.  A bus just called bus_add_device, it can
-> >> >> >> > do whatever it wanted to right before calling this function, no need for
-> >> >> >> > another callback.
-> >> >> >>
-> >> >> >> The only caller of bus_add_device() is device_add().
-> >> >> >>
-> >> >> >> What do you mean by "bus just called bus_add_device"?  Do you think that
-> >> >> >> the pm_domain pointer should be populated before calling device_add()?
-> >> >> >>
-> >> >> >> That wouldn't work for the ACPI PM domain at least, because ACPI companions
-> >> >> >> are generally added during device_add() and we arguably cannot point a
-> >> >> >> device to the ACPI PM domain before its ACPI companion is set.
-> >> >> >
-> >> >> >
-> >> >> >> There are two alternatives to them.  One is to do PM domain attach/detach in
-> >> >> >> the bus type's ->probe and ->remove, but that's suboptimal, because it is
-> >> >> >> then carried out every time a driver is probed/removed for a device.  The
-> >> >> >> other one would be to have each interested bus type register a bus type
-> >> >> >> notifier for itself, but that would be rather ugly, wouldn't it?
-> >> >> >
-> >> >> > Driver probing and removal is not a hot path.  Successful probes
-> >> >> > usually occur only once for each device.  I don't know how many
-> >> >> > unsuccessful probes there are on average, but probably not many.
-> >> >> >
-> >> >> > Doing the PM domain attach/detach in ->probe and ->remove makes sense
-> >> >> > to me.
-> >> >>
-> >> >> Let me elaborate a bit on the current approach, with PM domain
-> >> >> attach/detach in ->probe() and ->remove(). This comes with the
-> >> >> following limitations.
-> >> >>
-> >> >> 1) If the device gets probed earlier than the PM domain has been
-> >> >> initialized, we can't return -EPROBE_DEFER since we just don't know
-> >> >> anything about the PM domain yet.
-> >> >>
-> >> >> 2) The PM domain won't be able to operate on a device without having a
-> >> >> driver bound to it, since the device's PM domain pointer is removed at
-> >> >> ->remove().
-> >> >>
-> >> >> Perhaps Rafael want to add something to these? I don't know whether we
-> >> >> think it's okay to keep these limitations or not.
-> >> >
-> >> > There are arguments both ways as you can see.
-> >> >
-> >> > At this point, the most straightforward approach would be to apply the Russell's
-> >> > patch adding the ->sync callback alone.
-> >> >
-> >> > I will then need the ->activate callback for another use case (a PM domain that
-> >> > may not be ready for the device to be probed), but in that case I actually know
-> >> > that the pm_domain pointer is populated at the really_probe() time.
-> >>
-> >> Then, how about adding only the ->sync() and ->activate() callback in
-> >> one patch - and invoke them from really_probe()? That's seems to fit
-> >> both our short and long term approach.
-> >>
-> >> Genpd may then implement the ->sync() callback, which is similar to
-> >> Russell's patch, except that it will now cover all buses and not just
-> >> the platform bus as it where before.
-> >
-> > OK
-> >
-> > So do we need to do ->sync at the driver removal time too?  I guess we do?
-> 
-> For genpd, it will currently not matter since the device will be
-> detached from its PM domain before that ->sync() would be called.
-> 
-> Though, to prepare for the "long term" solution we could decide to add it...
+On 19 March 2015 at 15:44, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Steve,
+>
 
-OK, at that time.
+Hey Mark,
 
-Fine, I'll send an update, then.
+> Thanks for putting this together!
+>
+> On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
+>> this_cpu operations were implemented for arm64 in:
+>>  5284e1b arm64: xchg: Implement cmpxchg_double
+>>  f97fc81 arm64: percpu: Implement this_cpu operations
+>>
+>> Unfortunately, it is possible for pre-emption to take place between
+>> address generation and data access. This can lead to cases where data
+>> is being manipulated by this_cpu for a different CPU than it was
+>> called on. Which effectively breaks the spec.
+>>
+>> This patch disables pre-emption for the this_cpu operations
+>> guaranteeing that address generation and data manipulation.
+>
+> Shouldn't that last sentence end with "occur on the same CPU", or
+> something like that?
+
+Gah! Yes it should, thank you.
+
+>
+> [...]
+>
+>> +/*
+>> + * Modules aren't allowed to use preempt_enable_no_resched, and it is
+>> + * undef'ed. If we are unable to use preempt_enable_no_resched, then
+>> + * fallback to the standard preempt_enable.
+>> + */
+>> +#ifdef preempt_enable_no_resched
+>> +#define __pcp_preempt_enable()       preempt_enable_no_resched()
+>> +#else
+>> +#define __pcp_preempt_enable()       preempt_enable()
+>> +#endif /* preempt_enable_no_resched */
+>
+> I think it would be worth mentioning in the comment why we want to use
+> preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
+> sequences where we want to have as few retries as possible).
+
+Good point, I'll add something.
 
 
+>
+> Other than those points, the patch looks good to me, feel free to add:
+>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks!
+
+>
+> It's a shame there don't seem to be any this_cpu_* self-tests; I've
+> booted a kernel with this applied, but I didn't have anything that
+> exploded without this, so I'd feel uneasy giving a Tested-by.
+
+There is the percpu_test module, I ran this and it appeared to pass.
+Also, I ran the traditional hackbench tests.
+
+Thanks Mark, I'll send out a V2 shortly with the amended commit log
+and expanded comment.
+
+Cheers,
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Steve
+
+>
+> Mark.
