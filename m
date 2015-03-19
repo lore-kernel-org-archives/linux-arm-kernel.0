@@ -1,32 +1,26 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 18 Mar 2015 18:09:05 -0700
-Subject: [PATCH] MAINTAINERS: add brcmstb regex
-Message-ID: <1426727345-5838-1-git-send-email-computersforpeace@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 19 Mar 2015 10:10:50 +0900
+Subject: linux-next: manual merge of the slave-dma tree with the arm-soc
+ tree
+In-Reply-To: <20150318120347.21288162@canb.auug.org.au>
+References: <20150318120347.21288162@canb.auug.org.au>
+Message-ID: <20150319011048.GA14051@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This could probably consolidate a few file listings. And it satisfies
-the spirit of the highly annoying [1] checkpatch warning for every new
-file, though it sadly won't quash it.
+On Wed, Mar 18, 2015 at 12:03:47PM +1100, Stephen Rothwell wrote:
+> Hi Vinod,
+> 
+> Today's linux-next merge of the slave-dma tree got a conflict in
+> arch/arm/mach-shmobile/board-mackerel.c between commit a521422ea4ae
+> ("ARM: shmobile: mackerel: Remove Legacy C board code") from the
+> arm-soc tree and commit c078c62a7528 ("mmc: sh_mobile_sdhi: remove
+> sh_mobile_sdhi_info v2") from the slave-dma tree.
+> 
+> I fixed it up (the former removed the file, so I did that) and can
+> carry the fix as necessary (no action is required).
 
-[1] https://lkml.org/lkml/2014/12/17/24
+Thanks Stephen,
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0e1abe8cc684..52a1cf7cd18a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2179,6 +2179,7 @@ S:	Maintained
- F:	arch/arm/mach-bcm/*brcmstb*
- F:	arch/arm/boot/dts/bcm7*.dts*
- F:	drivers/bus/brcmstb_gisb.c
-+N:	brcmstb
- 
- BROADCOM BMIPS MIPS ARCHITECTURE
- M:	Kevin Cernekee <cernekee@gmail.com>
--- 
-1.9.1
+my understanding is that the plan is to correct the file in Vinod's tree
+even thought it is removed in mine. Your fix is correct from my point of view.
