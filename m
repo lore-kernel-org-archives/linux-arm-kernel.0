@@ -1,42 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Mar 2015 10:49:02 -0600
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <20150319160208.GF7657@katana>
-References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
- <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
- <20150319100944.GA914@katana> <550AEF9D.6090307@wwwdotorg.org>
- <20150319160208.GF7657@katana>
-Message-ID: <550AFDFE.8040005@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 19 Mar 2015 16:49:47 +0000 (UTC)
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <550AF78B.3050202@linaro.org>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com> <5509A998.2080509@ti.com>
+ <20150318165706.GQ31346@atomide.com> <5509D3BD.6030004@linaro.org>
+ <alpine.DEB.2.02.1503191455020.9480@utopia.booyaka.com>
+ <550AEDA1.50109@linaro.org>
+ <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
+ <550AF78B.3050202@linaro.org>
+Message-ID: <alpine.DEB.2.02.1503191647150.9480@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 10:02 AM, Wolfram Sang wrote:
->>> -	/* Only register child devices if the adapter has a node pointer set */
->>> -	if (!adap->dev.of_node)
->>> +	/* Only register childs if adapter has a node pointer with enabled status */
->>> +	if (!adap->dev.of_node || !of_device_is_available(adap->dev.of_node))
->>>   		return;
->>
->> That feels a bit odd to me. For a regular non-mux I2C controller, that extra
->> case would never trigger if the controller node was disabled, since the
->> device core would never probe the controller device itself. So, we'd end up
->> with inconsistent paths through the I2C core for regular controllers and
->> muxes.
->
-> I first thought the no-op for the non-mux case wouldn't hurt, but I
-> agree about the consistent code path. I mentioned in my previous mail
-> that i2c-mux might be a better place for this...
->
->> Perhaps better would be to have a mux-specific function to iterate over a
->> mux's child nodes and instantiate buses for those. That function would check
->> whether each bus node was disabled or not. That'd isolate the special case
->> into the place where it was relevant.
->
-> ... so I wonder what you think about putting the
-> of_device_is_available() check into i2c_add_mux_adapter() once the
-> reg-property and chan_id have been matched?
+On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
 
-I think that looks like a good place, yes.
+> On 03/19/2015 05:45 PM, Paul Walmsley wrote:
+> > On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> > 
+> >> On 03/19/2015 04:55 PM, Paul Walmsley wrote:
+> >>> On Wed, 18 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> >>>
+> >>>> On 03/18/2015 06:57 PM, Tony Lindgren wrote:
+> >>>>> * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
+> >>>>>> As I can see Patch 1 from this series was merged in 4.0-rc4,
+> >>>>>> but this patch wasn't. As result, I can see below warning all the time
+> >>>>>> during boot now:
+> >>>>>>
+> >>>>>> [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod
+> >>>>>> 'pcie1-phy'
+> >>>>>
+> >>>>> OK. Is this needed as a fix for the v4.0-rc series, or can this wait
+> >>>>> for v4.1?
+> >>>>
+> >>>> I think, Yes. These two patches should go all together, because they are
+> >>>> interrelated.
+> >>>
+> >>> Does the warning result in a functional problem, or is it just a warning?
+> >>>
+> >>
+> >> PCE1 PHY device is not registered any more.
+> > 
+> > How does the second patch fix that?
+> 
+> I've re-checked it - sorry for disinfo.
+> 
+> PHY devices are created, but omap_device_fail_pm_domain is assigned to them.
+> As result Runtime PM is not working any more.
+> 
+> 
+> [    0.592501] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
+> [    0.597510] pinctrl-single 4a003400.pinmux: 281 pins at pa fc003400 size 1124
+> [    0.602794] ti-pipe3 4a094000.pciephy: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+> 
+> When ti,hwmods is not present PCI PHY will be added as regular Platform device
+> and Runtime PM will work again.
+
+OK then it should definitely go up as a fix.  
+
+Kishon, for future references, those two patches should have been combined 
+into a single patch.  As it stands now, if someone bisects down to that 
+first patch, it sounds like PM will be at least partially broken.  Too bad 
+I don't have a DRA7xx board where things like this can be tested before 
+being sent upstream.
+
+
+
+- Paul
