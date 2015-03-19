@@ -1,87 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 19 Mar 2015 17:01:20 +0100
-Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
- init_mm
-In-Reply-To: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
-References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu8C+aQAKtuz41_KaB8OutB=CMeagCCUptWZkXfEqOgQeA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 19 Mar 2015 17:02:08 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <550AEF9D.6090307@wwwdotorg.org>
+References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
+ <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
+ <20150319100944.GA914@katana> <550AEF9D.6090307@wwwdotorg.org>
+Message-ID: <20150319160208.GF7657@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2015 at 16:43, Will Deacon <will.deacon@arm.com> wrote:
-> init_mm isn't a normal mm: it has swapper_pg_dir as its pgd (which
-> contains kernel mappings) and is used as the active_mm for the idle
-> thread.
->
-> When restoring the pgd after an EFI call, we write current->active_mm
-> into TTBR0. If the current task is actually the idle thread (e.g. when
-> initialising the EFI RTC before entering userspace), then the TLB can
-> erroneously populate itself with junk global entries as a result of
-> speculative table walks.
->
-> When we do eventually return to userspace, the task can end up hitting
-> these junk mappings leading to lockups, corruption or crashes.
->
-> This patch fixes the problem in the same way as the CPU suspend code by
-> ensuring that we never switch to the init_mm in efi_set_pgd and instead
-> point TTBR0 at the zero page. A check is also added to cpu_switch_mm to
-> BUG if we get passed swapper_pg_dir.
->
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Fixes: f3cdfd239da5 ("arm64/efi: move SetVirtualAddressMap() to UEFI stub")
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> >-	/* Only register child devices if the adapter has a node pointer set */
+> >-	if (!adap->dev.of_node)
+> >+	/* Only register childs if adapter has a node pointer with enabled status */
+> >+	if (!adap->dev.of_node || !of_device_is_available(adap->dev.of_node))
+> >  		return;
+> 
+> That feels a bit odd to me. For a regular non-mux I2C controller, that extra
+> case would never trigger if the controller node was disabled, since the
+> device core would never probe the controller device itself. So, we'd end up
+> with inconsistent paths through the I2C core for regular controllers and
+> muxes.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+I first thought the no-op for the non-mux case wouldn't hurt, but I
+agree about the consistent code path. I mentioned in my previous mail
+that i2c-mux might be a better place for this...
 
-> ---
->
-> This patch gets armhf Debian booting again on my Juno (I guess 64-bit
-> userspace tends to use virtual addresses that are high enough to avoid
-> hitting the junk TLB entries!).
->
+> Perhaps better would be to have a mux-specific function to iterate over a
+> mux's child nodes and instantiate buses for those. That function would check
+> whether each bus node was disabled or not. That'd isolate the special case
+> into the place where it was relevant.
 
-I guess that also explains the lack of bug reports: quite a few people
-have been running with these patches over the past months, but nobody
-noticed afaik
+... so I wonder what you think about putting the
+of_device_is_available() check into i2c_add_mux_adapter() once the
+reg-property and chan_id have been matched?
 
->  arch/arm64/include/asm/proc-fns.h | 6 +++++-
->  arch/arm64/kernel/efi.c           | 6 +++++-
->  2 files changed, 10 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> index 9a8fd84f8fb2..941c375616e2 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -39,7 +39,11 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
->
->  #include <asm/memory.h>
->
-> -#define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
-> +#define cpu_switch_mm(pgd,mm)                          \
-> +do {                                                   \
-> +       BUG_ON(pgd == swapper_pg_dir);                  \
-> +       cpu_do_switch_mm(virt_to_phys(pgd),mm);         \
-> +} while (0)
->
->  #define cpu_get_pgd()                                  \
->  ({                                                     \
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 2b8d70164428..ab21e0d58278 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -337,7 +337,11 @@ core_initcall(arm64_dmi_init);
->
->  static void efi_set_pgd(struct mm_struct *mm)
->  {
-> -       cpu_switch_mm(mm->pgd, mm);
-> +       if (mm == &init_mm)
-> +               cpu_set_reserved_ttbr0();
-> +       else
-> +               cpu_switch_mm(mm->pgd, mm);
-> +
->         flush_tlb_all();
->         if (icache_is_aivivt())
->                 __flush_icache_all();
-> --
-> 2.1.4
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/2d377123/attachment.sig>
