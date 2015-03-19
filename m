@@ -1,155 +1,126 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Thu, 19 Mar 2015 11:19:29 +0100
-Subject: [PATCH 05/12] usb: chipidea: introduce ci_platform_config
-In-Reply-To: <1426727963-32280-6-git-send-email-peter.chen@freescale.com>
-References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
- <1426727963-32280-6-git-send-email-peter.chen@freescale.com>
-Message-ID: <20150319101929.GC9894@pengutronix.de>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Thu, 19 Mar 2015 12:28:13 +0200
+Subject: [PATCH 1/2] ARM: dts: sun4i: a10-lime: Override and remove
+ 1008MHz OPP setting
+In-Reply-To: <CAGb2v656kP=+K+NCuH5hkcc4D0XhpYksbN52wZRKEVEDsBN6+w@mail.gmail.com>
+References: <1426732773-7179-1-git-send-email-wens@csie.org>
+ <1426732773-7179-2-git-send-email-wens@csie.org>
+ <20150319085716.75d3ce76@i7>
+ <CAGb2v656kP=+K+NCuH5hkcc4D0XhpYksbN52wZRKEVEDsBN6+w@mail.gmail.com>
+Message-ID: <20150319122813.39112da2@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 09:19:16AM +0800, Peter Chen wrote:
-> It is used to configure controller parameters according to
-> platform data, like speed, interrupt threshold, stream mode, etc.
-> 
-> Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> ---
->  drivers/usb/chipidea/ci.h   |  2 ++
->  drivers/usb/chipidea/core.c | 57 +++++++++++++++++++++++++++++++--------------
->  drivers/usb/chipidea/host.c |  6 +----
->  3 files changed, 43 insertions(+), 22 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> index aeec5f0..888606b 100644
-> --- a/drivers/usb/chipidea/ci.h
-> +++ b/drivers/usb/chipidea/ci.h
-> @@ -426,4 +426,6 @@ u8 hw_port_test_get(struct ci_hdrc *ci);
->  int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
->  				u32 value, unsigned int timeout_ms);
->  
-> +void ci_platform_config(struct ci_hdrc *ci, int usb_mode);
-> +
->  #endif	/* __DRIVERS_USB_CHIPIDEA_CI_H */
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index 4d79392..f713e32 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -403,6 +403,44 @@ static int ci_usb_phy_init(struct ci_hdrc *ci)
->  	return ret;
->  }
->  
-> +
-> +/**
-> + * ci_platform_config: do controller configure
-> + * @ci: the controller
-> + * @usb_mode: the usb mode
-> + *
-> + */
-> +void ci_platform_config(struct ci_hdrc *ci, int usb_mode)
-> +{
-> +	if (usb_mode == USBMODE_CM_DC) {
-> +		if (ci->platdata->flags & CI_HDRC_DISABLE_DEVICE_STREAMING)
-> +			hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS,
-> +					USBMODE_CI_SDIS);
-> +
-> +		/*
-> +		 * Set interrupt interval for device mode
-> +		 * host set ITC according to ehci-hcd module
-> +		 * parameter log2_irq_thresh
-> +		 */
-> +		hw_write(ci, OP_USBCMD, 0xff0000,
-> +			ci->platdata->gadget_itc_setting << 16);
-> +	} else if (usb_mode == USBMODE_CM_HC) {
-> +		if (ci->platdata->flags & CI_HDRC_DISABLE_HOST_STREAMING)
-> +			hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS,
-> +					USBMODE_CI_SDIS);
-> +	} else {
-> +		dev_warn(ci->dev, "USB mode in still not set\n");
-> +	}
-> +
-> +	if (ci->platdata->flags & CI_HDRC_FORCE_FULLSPEED) {
-> +		if (ci->hw_bank.lpm)
-> +			hw_write(ci, OP_DEVLC, DEVLC_PFSC, DEVLC_PFSC);
-> +		else
-> +			hw_write(ci, OP_PORTSC, PORTSC_PFSC, PORTSC_PFSC);
-> +	}
-> +
-> +}
-> +
->  /**
->   * hw_controller_reset: do controller reset
->   * @ci: the controller
-> @@ -447,35 +485,20 @@ int hw_device_reset(struct ci_hdrc *ci)
->  		ci->platdata->notify_event(ci,
->  			CI_HDRC_CONTROLLER_RESET_EVENT);
->  
-> -	if (ci->platdata->flags & CI_HDRC_DISABLE_DEVICE_STREAMING)
-> -		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
-> -
-> -	if (ci->platdata->flags & CI_HDRC_FORCE_FULLSPEED) {
-> -		if (ci->hw_bank.lpm)
-> -			hw_write(ci, OP_DEVLC, DEVLC_PFSC, DEVLC_PFSC);
-> -		else
-> -			hw_write(ci, OP_PORTSC, PORTSC_PFSC, PORTSC_PFSC);
-> -	}
-> -
->  	/* USBMODE should be configured step by step */
->  	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_IDLE);
->  	hw_write(ci, OP_USBMODE, USBMODE_CM, USBMODE_CM_DC);
->  	/* HW >= 2.3 */
->  	hw_write(ci, OP_USBMODE, USBMODE_SLOM, USBMODE_SLOM);
->  
-> -	/*
-> -	 * Set interrupt interval for device mode
-> -	 * host set ITC according to ehci-hcd module parameter log2_irq_thresh
-> -	 */
-> -	hw_write(ci, OP_USBCMD, 0xff0000,
-> -		ci->platdata->gadget_itc_setting << 16);
-> -
+On Thu, 19 Mar 2015 16:17:30 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-This codepath was added by patch 02 "usb: chipidea: set ITC to 0 for
-device mode". You should add it after this one, so this code gets added
-directly to its final position.
+> On Thu, Mar 19, 2015 at 2:57 PM, Siarhei Siamashka
+> <siarhei.siamashka@gmail.com> wrote:
+> > On Thu, 19 Mar 2015 10:39:32 +0800
+> > Chen-Yu Tsai <wens@csie.org> wrote:
+> >
+> >> The Olimex A10-Lime is known to be unstable when running at 1008MHz.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 14 ++++++++++++++
+> >>  1 file changed, 14 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> >> index 31dc2f1c3870..16ecb8938e19 100644
+> >> --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> >> +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+> >> @@ -74,6 +74,20 @@
+> >>       status = "okay";
+> >>  };
+> >>
+> >> +&cpu0 {
+> >> +     /* The A10-Lime is known to be unstable when running at 1008 MHz */
+> >> +     operating-points = <
+> >> +             /* kHz    uV */
+> >> +             960000  1400000
+> >> +             912000  1400000
+> >> +             864000  1300000
+> >> +             720000  1200000
+> >> +             528000  1100000
+> >> +             312000  1000000
+> >> +             144000  900000
+> >> +             >;
+> >> +};
+> >> +
+> >>  &ehci0 {
+> >>       status = "okay";
+> >>  };
+> >
+> > Thanks for the patch. At least it should make my A10-OLinuXino-LIME
+> > working without obvious failures out of the box (the U-Boot is still
+> > another story though and there is a gap during boot up when the board
+> > is running with unreliable settings, but the probability of a failure
+> > is rather low).
+> >
+> > I should also mention that using 960MHz @1.4V does not fail, but it does
+> > not have any safety headroom either (the cyan 'sun4i_poorlime' line
+> > on the plot):
+> >
+> >     http://people.freedesktop.org/~siamashka/files/20140512/sunxi-cpufreq-plot.png
+> >
+> > On the other hand, my board is on the worst part of the spectrum (many
+> > other a10-lime boards do not fail even at 1008MHz), so maybe having
+> > extra safety headroom is less necessary.
+> >
+> > An interesting question is whether the same problem may be reproducible
+> > on the Allwinner A10 devices other than A10-OLinuXino-LIME. My original
+> > problem report
+> >
+> >     https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg04343.html
+> >
+> > mentioned the A10-OLinuXino-LIME rev.A and introduced some sort of
+> > a bias by itself. At least I have seen people saying something like
+> > "my a10-lime revision is not rev.A, so it's none of my concern and
+> > I'm not going to bother running any tests". So far we have accumulated
+> > reports from 4 or 5 people having this reliability problem on their
+> > A10-OLinuXino-LIME (various revisions, not just rev.A), but not
+> > much from the other boards owners.
+> >
+> > Anyway, this particular patch is
+> > Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> > Acked-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+> 
+> Good to hear it works. Did you test all the settings?
 
->  	if (hw_read(ci, OP_USBMODE, USBMODE_CM) != USBMODE_CM_DC) {
->  		pr_err("cannot enter in %s device mode", ci_role(ci)->name);
->  		pr_err("lpm = %i", ci->hw_bank.lpm);
->  		return -ENODEV;
->  	}
->  
-> +	ci_platform_config(ci, USBMODE_CM_DC);
-> +
->  	return 0;
->  }
->  
-> diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-> index b262c1c..c4f76b7 100644
-> --- a/drivers/usb/chipidea/host.c
-> +++ b/drivers/usb/chipidea/host.c
-> @@ -141,11 +141,7 @@ static int host_start(struct ci_hdrc *ci)
->  		}
->  	}
->  
-> -	if (ci->platdata->flags & CI_HDRC_FORCE_FULLSPEED)
-> -		hw_write(ci, OP_PORTSC, PORTSC_PFSC, PORTSC_PFSC);
-> -
-> -	if (ci->platdata->flags & CI_HDRC_DISABLE_HOST_STREAMING)
-> -		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
-> +	ci_platform_config(ci, USBMODE_CM_HC);
->  
->  	return ret;
->  
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+You have nailed it. I was about to send the results of the full
+round of tests after running them a bit longer and revoke the
+initial Tested-by.
+
+Turns out that the 312MHz and 144MHz operating points fail to work
+reliable and tend to deadlock:
+
+Testing CPU 0
+  960 MHz ............................................................ OK
+  912 MHz ............................................................ OK
+  864 MHz ............................................................ OK
+  720 MHz ............................................................ OK
+  528 MHz ............................................................ OK
+  312 MHz ............................................................ OK
+  144 MHz Write failed: Broken pipe
+
+Testing CPU 0
+  960 MHz ............................................................ OK
+  912 MHz ............................................................ OK
+  864 MHz ............................................................ OK
+  720 MHz ............................................................ OK
+  528 MHz ............................................................ OK
+  312 MHz .................Write failed: Broken pipe
+
+
+> I copied the wrong settings, from sun5i-a13.dtsi instead of sun4i-a10.dtsi.
+
+I guess, this explains the problems at lower operating points.
+
+> I'll send a fixed version later.
+
+Thanks.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Best regards,
+Siarhei Siamashka
