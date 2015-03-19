@@ -1,44 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 19 Mar 2015 22:06:06 +0100
-Subject: [PATCH v2] usb: ehci-orion: add more constants for register values
-In-Reply-To: <Pine.LNX.4.44L0.1503191625140.1098-100000@iolanthe.rowland.org>
-References: <20150319154540.786e6b4e@free-electrons.com>
- <Pine.LNX.4.44L0.1503191625140.1098-100000@iolanthe.rowland.org>
-Message-ID: <20150319220606.72468301@free-electrons.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 19 Mar 2015 16:08:59 -0500
+Subject: [PATCH v2 0/4] PCI: X-Gene: Add APM X-Gene v1 MSI/MSIX
+ termination driver
+In-Reply-To: <CADaLND=PPuYWM_j7+GeDx+wtpN1cPsNk8UoZx0k7F9eEXPuAjg@mail.gmail.com>
+References: <1678162.2PJ2o1jRen@wuerfel> <cover.1425497218.git.dhdang@apm.com>
+ <CADaLND=+Aq-zgMWE6vnn1kt1g2iz1k-AxMj4--kejF-q=f=bfg@mail.gmail.com>
+ <20150319204929.GH26935@google.com>
+ <CADaLND=PPuYWM_j7+GeDx+wtpN1cPsNk8UoZx0k7F9eEXPuAjg@mail.gmail.com>
+Message-ID: <20150319210859.GJ26935@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alan,
-
-On Thu, 19 Mar 2015 16:30:09 -0400 (EDT), Alan Stern wrote:
-> On Thu, 19 Mar 2015, Thomas Petazzoni wrote:
+On Thu, Mar 19, 2015 at 01:59:35PM -0700, Duc Dang wrote:
+> On Thu, Mar 19, 2015 at 1:49 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> > [+cc Marc]
+> >
+> > On Wed, Mar 18, 2015 at 10:43:10AM -0700, Duc Dang wrote:
+> >> On Wed, Mar 4, 2015 at 11:39 AM, Duc Dang <dhdang@apm.com> wrote:
+> >> > This patch set adds MSI/MSIX termination driver support for APM X-Gene v1 SoC.
+> >> > APM X-Gene v1 SoC supports its own implementation of MSI, which is not compliant
+> >> > to GIC V2M specification for MSI Termination.
+> >> >
+> >> > There is single MSI block in X-Gene v1 SOC which serves all 5 PCIe ports. This MSI
+> >> > block supports 2688 MSI termination ports coalesced into 16 physical HW IRQ lines
+> >> > and shared across all 5 PCIe ports.
+> >> >
+> >> > v2 changes:
+> >> >         1. Use msi_controller structure
+> >> >         2. Remove arch hooks arch_teardown_msi_irqs and arch_setup_msi_irqs
+> >> >
+> >> >  .../devicetree/bindings/pci/xgene-pci-msi.txt      |  61 ++++
+> >> >  MAINTAINERS                                        |   8 +
+> >> >  arch/arm64/boot/dts/apm/apm-storm.dtsi             |  27 ++
+> >> >  drivers/pci/host/Kconfig                           |   4 +
+> >> >  drivers/pci/host/Makefile                          |   1 +
+> >> >  drivers/pci/host/pci-xgene-msi.c                   | 393 +++++++++++++++++++++
+> >> >  drivers/pci/host/pci-xgene.c                       |  25 ++
+> >> >  7 files changed, 519 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+> >> >  create mode 100644 drivers/pci/host/pci-xgene-msi.c
+> >> >
+> >> > --
+> >> > 1.9.1
+> >> >
+> >> Hi Bjorn, Arnd, and All,
+> >>
+> >> Did you have a chance to take a look at this v2 patch set for X-Gene 1
+> >> MSI support?
+> >
+> > Marc had some comments, and as far as I can tell, you haven't addressed
+> > them yet.  Am I mistaken?
+> >
+> Hi Bjorn,
 > 
-> > These are indeed all valid concerns. However, as you can see, those
-> > concerns are completely orthogonal to the patch: the original code
-> > already has those issues.
-> 
-> Quite true.  You may add
-> 
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> You are correct. I am making the changes as Marc pointed out. Will
+> update a new version soon.
 
-Thanks. So I presume this means Greg will take the patch?
+OK, thanks.  If other people provide feedback, I usually wait until that's
+addressed before I spend much time looking at it, because I don't want to
+spend time rediscovering things people have already commented on, and I
+can't keep up with the list as it is :)
 
-> > Regarding the addition of a timeout, I unfortunately have absolutely no
-> > idea what would be the a proper timeout value at this place. I quickly
-> > glanced through
-> > http://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/ehci-specification-for-usb.pdf
-> > for the documentation of this reset bit, but couldn't spot a maximum
-> > accepted duration for the operation.
-> 
-> ehci-hcd uses 250 ms.  This seems to be an arbitrary value, but at 
-> least it's better than hanging the system.
-
-Ok, then I'll cook a patch to adjust this aspect of the driver.
-
-Thanks for the suggestion,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Bjorn
