@@ -1,54 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 Mar 2015 14:33:32 +0300
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller
- and PHY
-In-Reply-To: <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
-Message-ID: <550AB40C.8060607@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Mar 2015 11:36:46 +0000
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+ <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+ <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+Message-ID: <20150319113646.GQ2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Mar 19, 2015 at 12:14:11PM +0100, Ulf Hansson wrote:
 
-On 3/19/2015 4:23 AM, Brian Norris wrote:
+> Agree. Moreover we need that API to also pick the closest value to
+> target, when trying the range "target->minimum". I also believe it
 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> ---
-> Light dependency on:
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
-> for the surrounding text.
+The implementation *should* do that anyway, it's just not trivial to
+implement in an efficient fashion with the current information we have
+from drivers.
 
->   arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->   1 file changed, 36 insertions(+)
+> would be good to allow both upper and lower limits to be zero.
 
-> diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-> index 9eaeac8dce1b..7a7c4d8c2afe 100644
-> --- a/arch/arm/boot/dts/bcm7445.dtsi
-> +++ b/arch/arm/boot/dts/bcm7445.dtsi
-> @@ -108,6 +108,42 @@
->   			brcm,int-map-mask = <0x25c>, <0x7000000>;
->   			brcm,int-fwd-mask = <0x70000>;
->   		};
-> +
-> +		sata at f045a000 {
-
-    Hm, why the <unit-address> part of the name doesn't correspond to the 
-"reg" prop?
-
-> +			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-> +			reg-names = "ahci", "top-ctrl";
-> +			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
-> +			interrupts = <GIC_SPI 30 0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-[...]
-> +		sata_phy: sata-phy at f0458100 {
-
-    Same question here...
-
-> +			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
-> +			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
-[...]
-
-WBR, Sergei
+The lower limit can be zero already though it isn't clear to me that
+this is useful.  Setting an upper limit of zero seems nonsensical, an
+upper limit that is lower than the lower limit isn't terribly obvious
+and removing the upper limit isn't safe - it means that we'll happily
+oversupply things which is a road to physical damage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/7de1b59e/attachment-0001.sig>
