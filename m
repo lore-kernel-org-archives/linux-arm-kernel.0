@@ -1,68 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Mar 2015 16:27:53 +0000
-Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
-In-Reply-To: <20150319161143.GE25967@leverpostej>
-References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
- <20150319154435.GC25967@leverpostej>
- <20150319160008.GA4751@arm.com>
- <20150319161143.GE25967@leverpostej>
-Message-ID: <20150319162753.GC4751@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 19 Mar 2015 12:31:38 -0400
+Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
+In-Reply-To: <alpine.DEB.2.11.1503191120310.26866@gentwo.org>
+References: <20150316173154.537b80ee@gandalf.local.home>
+ <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
+ <20150317081341.0f9a8b4c@gandalf.local.home>
+ <20150317101113.32f5618a@gandalf.local.home>
+ <20150317104038.312e73d1@gandalf.local.home>
+ <20150317144701.GJ10068@pengutronix.de>
+ <20150317110750.2a0e2b73@gandalf.local.home>
+ <alpine.DEB.2.11.1503191120310.26866@gentwo.org>
+Message-ID: <20150319123138.69fe4966@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 04:11:44PM +0000, Mark Rutland wrote:
-> On Thu, Mar 19, 2015 at 04:00:09PM +0000, Will Deacon wrote:
-> > On Thu, Mar 19, 2015 at 03:44:36PM +0000, Mark Rutland wrote:
-> > > On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
-> > > > +/*
-> > > > + * Modules aren't allowed to use preempt_enable_no_resched, and it is
-> > > > + * undef'ed. If we are unable to use preempt_enable_no_resched, then
-> > > > + * fallback to the standard preempt_enable.
-> > > > + */
-> > > > +#ifdef preempt_enable_no_resched
-> > > > +#define __pcp_preempt_enable()	preempt_enable_no_resched()
-> > > > +#else
-> > > > +#define __pcp_preempt_enable()	preempt_enable()
-> > > > +#endif /* preempt_enable_no_resched */
-> > > 
-> > > I think it would be worth mentioning in the comment why we want to use
-> > > preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
-> > > sequences where we want to have as few retries as possible).
-> > 
-> > Hmm, I'm not sure I agree with that. In the interest of throughput, I can
-> > understand that you want to minimise the retries but since preempt kernels
-> > are all about minimising latency then actually scheduling when a cmpxchg
-> > loop fail sounds pretty ideal to me.
+On Thu, 19 Mar 2015 11:20:53 -0500 (CDT)
+Christoph Lameter <cl@linux.com> wrote:
+
+> On Tue, 17 Mar 2015, Steven Rostedt wrote:
 > 
-> I'm on about scheduling at the end of the read, before the cmpxchg. It's
-> basically asking for another thread to make the read stale (and hence
-> the cmpxchg is very likely to fail).
+> > Christoph, you happy with this version?
+> 
+> Yes looks good.
+> 
+> Acked-by: Christoph Lameter <cl@linux.com>
 
-/me gets introduced to SLUB's slab_alloc_node.
+Thanks, will add your ack.
 
-> Scheduling after the cmpxchg is fine.
-
-I still don't think the slub code warrants using preempt_enable_no_resched,
-for a number of reasons:
-
-  (1) s390 uses preempt_enable, so it doesn't appear to be the end of the
-      world
-
-  (2) The slub code is well aware of what it's doing, but doesn't consider
-      it an issue:
-
-      * [...] We may switch back and forth between cpus while
-      * reading from one cpu area. That does not matter as long
-      * as we end up on the original cpu again when doing
-      * the cmpxchg.
-
-  (3) Preemption isn't actually an issue here -- CPU migration is. I'd
-      expect that to be a lot rarer.
-
-  (4) Having different preempt behaviour depending on whether or not
-      something is built as a module is bloody horrible
-
-If we wanted to change anything, SLUB is probably a better candidate than
-the pcpu accessors!
-
-Will
+-- Steve
