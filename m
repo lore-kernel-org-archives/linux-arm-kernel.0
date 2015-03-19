@@ -1,128 +1,30 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 19 Mar 2015 12:46:48 +0200
-Subject: [PATCH v2 2/6] clk: qcom: gdsc: Prepare common clk probe to
- register gdscs
-In-Reply-To: <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
-References: <1426752145-4365-1-git-send-email-rnayak@codeaurora.org>
- <1426752145-4365-3-git-send-email-rnayak@codeaurora.org>
-Message-ID: <550AA918.3000604@mm-sol.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 19 Mar 2015 11:48:09 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <20150319100944.GA914@katana>
+References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
+ <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
+ <20150319100944.GA914@katana>
+Message-ID: <20150319104809.GC914@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
-
-Thanks for the patch!
-
-On 03/19/2015 10:02 AM, Rajendra Nayak wrote:
-> The common clk probe registers a clk provider and a reset controller.
-> Update it to register a genpd provider using the gdsc data provided
-> by each platform.
+> > I am still not too eager working on it but if you insist, I can see
+> > what I can do as long as Stephen sticks with testing it on Tegra. ;)
 > 
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
->  drivers/clk/qcom/common.c | 14 +++++++++++++-
->  drivers/clk/qcom/common.h |  2 ++
->  drivers/clk/qcom/gdsc.c   | 34 +++++++++++++++++++++++++++++++++-
->  drivers/clk/qcom/gdsc.h   |  9 ++++++++-
->  4 files changed, 56 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-> index a946b48..cc9f56f 100644
-> --- a/drivers/clk/qcom/common.c
-> +++ b/drivers/clk/qcom/common.c
-> @@ -21,6 +21,7 @@
->  #include "clk-rcg.h"
->  #include "clk-regmap.h"
->  #include "reset.h"
-> +#include "gdsc.h"
->  
->  struct qcom_cc {
->  	struct qcom_reset_controller reset;
-> @@ -125,8 +126,18 @@ int qcom_cc_really_probe(struct platform_device *pdev,
->  
->  	ret = reset_controller_register(&reset->rcdev);
->  	if (ret)
-> -		of_clk_del_provider(dev->of_node);
-> +		goto err_reset;
->  
-> +	ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
-> +	if (ret)
-> +		goto err_pd;
-> +
-> +	return 0;
-> +err_pd:
-> +	dev_err(dev, "Failed to register power domains\n");
-> +	reset_controller_unregister(&reset->rcdev);
-> +err_reset:
-> +	of_clk_del_provider(dev->of_node);
->  	return ret;
->  }
->  EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
-> @@ -145,6 +156,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
->  
->  void qcom_cc_remove(struct platform_device *pdev)
->  {
-> +	of_genpd_del_provider(pdev->dev.of_node);
+> Please decide if you want to work on it. Remember, I am not short of
+> patches to deal with.
 
-It would be nice to introduce gdsc_unregister() for symmetry.
+Maybe sounds more harsh than it was meant. I just want to know if I need
+to schedule time for this issue.
 
->  	of_clk_del_provider(pdev->dev.of_node);
->  	reset_controller_unregister(platform_get_drvdata(pdev));
->  }
-
-<snip>
-
-> +
-> +int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
-> +		  struct regmap *regmap)
-> +{
-
-Could you squash implementation of this function with the first patch 1/6.
-
-> +	int i, ret;
-> +	struct genpd_onecell_data *data;
-> +
-> +	if (!num || !scs || !dev || !dev->of_node)
-> +		return 0;
-> +
-> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	data->domains = devm_kzalloc(dev, sizeof(*data->domains) * num,
-> +				     GFP_KERNEL);
-
-Just wondering, are there some obstacles to embed struct
-genpd_onecell_data in struct gdsc, and thus avoid having two memory
-allocations?
-
-> +	if (!data->domains)
-> +		return -ENOMEM;
-> +
-> +	data->num_domains = num;
-> +	for (i = 0; i < num; i++) {
-> +		if (!scs[i])
-> +			continue;
-> +		scs[i]->regmap = regmap;
-> +		ret = gdsc_init(scs[i]);
-> +		if (ret)
-> +			return ret;
-> +		data->domains[i] = &scs[i]->pd;
-> +	}
-> +	return of_genpd_add_provider_onecell(dev->of_node, data);
-> +}
-> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-> index ac6a2d5..14de304 100644
-> --- a/drivers/clk/qcom/gdsc.h
-> +++ b/drivers/clk/qcom/gdsc.h
-> @@ -32,5 +32,12 @@ struct gdsc {
->  
->  #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
-
-This is used only from gdsc.c, please move it there.
-
-<snip>
-
--- 
-regards,
-Stan
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/a2f794c8/attachment.sig>
