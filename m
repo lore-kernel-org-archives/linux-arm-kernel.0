@@ -1,64 +1,90 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 19 Mar 2015 09:47:41 -0600
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <20150319100944.GA914@katana>
-References: <1425039885-5137-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
- <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
- <20150319100944.GA914@katana>
-Message-ID: <550AEF9D.6090307@wwwdotorg.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Mar 2015 16:48:22 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <356697065.8Z1o4ApA72@vostro.rjw.lan>
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <2137701.iWHrxeTcxg@vostro.rjw.lan>
+ <CAPDyKFpBC6z4aFrfqc-NS3+tPmExhmYobS5p4BKcegPhZ9KwVg@mail.gmail.com>
+ <356697065.8Z1o4ApA72@vostro.rjw.lan>
+Message-ID: <CAPDyKFo8YNpnriaAcLnEJ8tLZ+G68N_fyfOAYoEjBPHP=wyWbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 04:09 AM, Wolfram Sang wrote:
->
->>>> Possible. But this change just makes i2c-mux-pinctrl honor status
->>>> property at all. There is no functional change except it now allows
->>>> you to disable any of the sub-busses.
->>>
->>> Actually, this is the feature I like. However, I wonder if we shouldn't
->>> have that in the core, say in of_i2c_register_devices()?
+On 19 March 2015 at 17:04, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Thursday, March 19, 2015 04:37:26 PM Ulf Hansson wrote:
+>> On 19 March 2015 at 16:44, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> > On Thursday, March 19, 2015 03:45:07 PM Ulf Hansson wrote:
+>> >> On 19 March 2015 at 15:20, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> >> > On Thu, 19 Mar 2015, Rafael J. Wysocki wrote:
+>> >> >
+>> >> >> > This doesn't make sense to me.  A bus just called bus_add_device, it can
+>> >> >> > do whatever it wanted to right before calling this function, no need for
+>> >> >> > another callback.
+>> >> >>
+>> >> >> The only caller of bus_add_device() is device_add().
+>> >> >>
+>> >> >> What do you mean by "bus just called bus_add_device"?  Do you think that
+>> >> >> the pm_domain pointer should be populated before calling device_add()?
+>> >> >>
+>> >> >> That wouldn't work for the ACPI PM domain at least, because ACPI companions
+>> >> >> are generally added during device_add() and we arguably cannot point a
+>> >> >> device to the ACPI PM domain before its ACPI companion is set.
+>> >> >
+>> >> >
+>> >> >> There are two alternatives to them.  One is to do PM domain attach/detach in
+>> >> >> the bus type's ->probe and ->remove, but that's suboptimal, because it is
+>> >> >> then carried out every time a driver is probed/removed for a device.  The
+>> >> >> other one would be to have each interested bus type register a bus type
+>> >> >> notifier for itself, but that would be rather ugly, wouldn't it?
+>> >> >
+>> >> > Driver probing and removal is not a hot path.  Successful probes
+>> >> > usually occur only once for each device.  I don't know how many
+>> >> > unsuccessful probes there are on average, but probably not many.
+>> >> >
+>> >> > Doing the PM domain attach/detach in ->probe and ->remove makes sense
+>> >> > to me.
+>> >>
+>> >> Let me elaborate a bit on the current approach, with PM domain
+>> >> attach/detach in ->probe() and ->remove(). This comes with the
+>> >> following limitations.
+>> >>
+>> >> 1) If the device gets probed earlier than the PM domain has been
+>> >> initialized, we can't return -EPROBE_DEFER since we just don't know
+>> >> anything about the PM domain yet.
+>> >>
+>> >> 2) The PM domain won't be able to operate on a device without having a
+>> >> driver bound to it, since the device's PM domain pointer is removed at
+>> >> ->remove().
+>> >>
+>> >> Perhaps Rafael want to add something to these? I don't know whether we
+>> >> think it's okay to keep these limitations or not.
+>> >
+>> > There are arguments both ways as you can see.
+>> >
+>> > At this point, the most straightforward approach would be to apply the Russell's
+>> > patch adding the ->sync callback alone.
+>> >
+>> > I will then need the ->activate callback for another use case (a PM domain that
+>> > may not be ready for the device to be probed), but in that case I actually know
+>> > that the pm_domain pointer is populated at the really_probe() time.
 >>
->> Hmm, looking at of_i2c_register_devices():
+>> Then, how about adding only the ->sync() and ->activate() callback in
+>> one patch - and invoke them from really_probe()? That's seems to fit
+>> both our short and long term approach.
 >>
->> 	for_each_available_child_of_node(adap->dev.of_node, node)
->> 		of_i2c_register_device(adap, node);
->>
->> already honors status properties by using for_each_available_foo.
->> Therefore, i2c-core will also skip i2c device nodes disabled by
->> status property.
+>> Genpd may then implement the ->sync() callback, which is similar to
+>> Russell's patch, except that it will now cover all buses and not just
+>> the platform bus as it where before.
 >
-> Yes, but only child nodes, not the complete bus. Here is an RFC of what
-> I mean:
+> OK
 >
-> From: Wolfram Sang <wsa@the-dreams.de>
-> Subject: [RFC] i2c: of: always check if busses are enabled
->
-> Allow all busses to have a "status" property which allows busses to not
-> be probed when set to "disabled". Needed for DTS overlays with i2c mux
-> scenarios.
+> So do we need to do ->sync at the driver removal time too?  I guess we do?
 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+For genpd, it will currently not matter since the device will be
+detached from its PM domain before that ->sync() would be called.
 
-> @@ -1305,8 +1305,8 @@ static void of_i2c_register_devices(struct i2c_adapter *adap)
->   {
->   	struct device_node *node;
->
-> -	/* Only register child devices if the adapter has a node pointer set */
-> -	if (!adap->dev.of_node)
-> +	/* Only register childs if adapter has a node pointer with enabled status */
-> +	if (!adap->dev.of_node || !of_device_is_available(adap->dev.of_node))
->   		return;
+Though, to prepare for the "long term" solution we could decide to add it...
 
-That feels a bit odd to me. For a regular non-mux I2C controller, that 
-extra case would never trigger if the controller node was disabled, 
-since the device core would never probe the controller device itself. 
-So, we'd end up with inconsistent paths through the I2C core for regular 
-controllers and muxes.
-
-Perhaps better would be to have a mux-specific function to iterate over 
-a mux's child nodes and instantiate buses for those. That function would 
-check whether each bus node was disabled or not. That'd isolate the 
-special case into the place where it was relevant.
+Kind regards
+Uffe
