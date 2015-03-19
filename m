@@ -1,36 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 19 Mar 2015 14:30:50 +0100
-Subject: ATSAMA5D big endian work
-In-Reply-To: <550A9833.2080408@codethink.co.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <20150318183040.GT4560@piout.net>
- <550A9833.2080408@codethink.co.uk>
-Message-ID: <20150319133050.GD4750@piout.net>
+From: joshc@ni.com (Josh Cartwright)
+Date: Thu, 19 Mar 2015 08:33:53 -0500
+Subject: [PATCH 2/2] ARM: zynq: drop use of slcr_unlock in
+ zynq_slcr_system_restart
+In-Reply-To: <1426772033-29277-1-git-send-email-joshc@ni.com>
+References: <BN1BFFO11FD008F29B247339CE49EAEA6AE2010@BN1BFFO11FD008.protection.gbl>
+ <1426772033-29277-1-git-send-email-joshc@ni.com>
+Message-ID: <1426772033-29277-2-git-send-email-joshc@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/2015 at 09:34:43 +0000, Ben Dooks wrote :
-> On 18/03/15 18:30, Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > On 18/03/2015 at 15:52:59 +0000, Ben Dooks wrote :
-> >> I have been testing the ATSAMA5D36 xplained board with big endian and
-> >> the following are the fixes to get the system working.
-> >>
-> > 
-> > The series looks good to me, we will drop patches 3 and 4 as the files
-> > doesn't exist anymore.
-> 
-> Where can I find a repository with these changes in?
-> 
+The SLCR is unconditionally unlocked early on boot in zynq_slcr_init()
+and not unlocked.  As such, it is not necessary to explicitly unlock in
+the restart codepath.
 
-You can use this branch until Nicolas merges my patches:
+Signed-off-by: Josh Cartwright <joshc@ni.com>
+---
+ arch/arm/mach-zynq/slcr.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-https://github.com/alexandrebelloni/linux/tree/at91_4.1_04_cleanup2
-
-The remaining __raw_writel and __raw_readl are in pm.h
-
+diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+index fa4c796..698dc3b 100644
+--- a/arch/arm/mach-zynq/slcr.c
++++ b/arch/arm/mach-zynq/slcr.c
+@@ -102,13 +102,6 @@ int zynq_slcr_system_restart(struct notifier_block *nb,
+ 	u32 reboot;
+ 
+ 	/*
+-	 * Unlock the SLCR then reset the system.
+-	 * Note that this seems to require raw i/o
+-	 * functions or there's a lockup?
+-	 */
+-	zynq_slcr_unlock();
+-
+-	/*
+ 	 * Clear 0x0F000000 bits of reboot status register to workaround
+ 	 * the FSBL not loading the bitstream after soft-reboot
+ 	 * This is a temporary solution until we know more.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.3.3
