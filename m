@@ -1,86 +1,74 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 19 Mar 2015 09:16:15 +0800
-Subject: [PATCH v10 18/21] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY
- if ACPI is enabled on ARM64
-In-Reply-To: <18318670.U16Joq6nSS@vostro.rjw.lan>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <5506BF89.9040703@linaro.org> <20150318091820.GB2846@red-moon>
- <18318670.U16Joq6nSS@vostro.rjw.lan>
-Message-ID: <550A235F.8060808@huawei.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 19 Mar 2015 09:19:11 +0800
+Subject: [PATCH 00/12] USB: chipidea: patchset for performance improvement
+Message-ID: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/18 23:06, Rafael J. Wysocki wrote:
-> On Wednesday, March 18, 2015 09:18:20 AM Lorenzo Pieralisi wrote:
->> On Mon, Mar 16, 2015 at 11:33:29AM +0000, Hanjun Guo wrote:
->>> On 2015?03?13? 19:04, Lorenzo Pieralisi wrote:
->>>> On Fri, Mar 13, 2015 at 03:28:45AM +0000, Hanjun Guo wrote:
->>>>
->>>> [...]
->>>>
->>>>>>   /*
->>>>>>    * acpi_boot_table_init() called from setup_arch(), always.
->>>>>>    *	1. find RSDP and get its address, and then find XSDT
->>>>>>    *	2. extract all tables and checksums them all
->>>>>>    *	3. check ACPI FADT revision
->>>>>> + *	4. check ACPI FADT HW reduced flag
->>>>>>    *
->>>>>>    * We can parse ACPI boot-time tables such as MADT after
->>>>>>    * this function is called.
->>>>>>    */
->>>>>>   void __init acpi_boot_table_init(void)
->>>>>>   {
->>>>>> +	struct acpi_table_header *table;
->>>>>> +	struct acpi_table_fadt *fadt;
->>>>>> +	acpi_status status;
->>>>>> +	acpi_size tbl_size;
->>>>>> +
->>>>>>   	/*
->>>>>>   	 * Enable ACPI instead of device tree unless
->>>>>>   	 * - ACPI has been disabled explicitly (acpi=off), or
->>>>>> @@ -351,19 +318,52 @@ void __init acpi_boot_table_init(void)
->>>>>>   	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
->>>>>>   		return;
->>>>>>
->>>>>> -	enable_acpi();
->>>>>> -
->>>>>>   	/* Initialize the ACPI boot-time table parser. */
->>>>>>   	if (acpi_table_init()) {
->>>>> Since we disable ACPI in default, it is a bit strange for me to init all
->>>>> the ACPI tables and parse FADT when ACPI is disabled, could you
->>>>> put some comments here to clarify the purpose? other than that, it is looks
->>>>> good to me.
->>>> Ok, the purpose was to make things simpler, but I think that given
->>>> current code it is not 100% safe to init ACPI tables with
->>>> acpi_disabled == 1.
->>>>
->>>> To me having to enable ACPI to parse the tables and check *if* ACPI tables
->>>> are there is a bit crazy, but I agree with you that given current code
->>>> it is safer.
->>>>
->>>> Patch rewritten, here below, please have a look, test it and rework
->>>> bits as needed, I added comments where I thought they were needed but
->>>> please add to that if you feel it is worth it.
->>>>
->>>> It should be easy to split, let me know if you want an incremental
->>>> version.
->>> This one is much better, pretty fine to me, thanks!
->>>
->>> I assume that this patch is cleanup patch on top of ARM64 ACPI
->>> core patches, right?
->> For the records, I created a branch with my patch split over some
->> of your patches, even though I think to make things simpler it is best
->> to apply it as a single patch on top of your series,
-> I agree.  In particular, the patches that have already been reviewed and
-> ACKed won't need to be reviewed again this way which seems to be crucially
-> important to me.
->
->> I will prepare the commit log for the single patch version too.
-> Thanks!
->
-> Hanjun, please add this one to the series when ready.
+Hi all,
 
-Sure, I will.
+In this patch set, I add some interfaces for tuning the performance
+of chipidea usb driver. With this set, the USB performance can be improved
+at some user cases with suitable parameters. The main changes:
 
-Thanks
-Hanjun
+- Interface to tune interrupt threshold control, and set
+'Immediate' for default value
+- The glue layer can disable stream mode according to USB role
+- Interface to tune AHB burst configuration at SBUSCFG
+- Interface to tune tx/rx burst size
+- i.mx changes for achieving better performance, it can reduce
+  the latecy between bus and USB FIFO, and reduce the overrun
+  and underrun occurrences, it is useful for the system bus is busy.
+  we see great improvement for ISO transfer, eg, high resolution
+  USB camera when the bus is busy.
+
+Below are some test results at imx6sx sdb board
+(set ehci_hcd.park=3 at bootargs), the tests are done
+at v4.0 kernel, no other bus loading during the tests,
+so we have not seen performance change for some use cases.
+
+USB Mass Storage (Host mode)
+With Patch Set		Without Patch Set
+R: 26.9 MB/s		27 MB/s
+W: 25.2 MB/s		24.5 MB/s
+
+1G USB Ethernet Card
+With Patch Set		Without Patch Set
+TX: 186 Mb/s		185 Mb/s
+RX: 219 Mb/s		216 Mb/s
+
+g_ncm (Device Mode)
+With Patch Set		Without Patch Set
+TX: 166MB/s		163MB/s
+RX: 230MB/s		184MB/s
+
+Peter Chen (12):
+  Doc: usb: ci-hdrc-imx: add gadget-itc-setting for binding doc
+  usb: chipidea: set ITC to 0 for device mode
+  usb: chipidea: define stream mode disable for both roles
+  usb: chipidea: imx: add stream mode enable for device mode at
+    imx6sl/imx6sx
+  usb: chipidea: introduce ci_platform_config
+  Doc: usb: ci-hdrc-imx: add ahb-burst-config for binding doc
+  ARM: imx6: set ahb-burst-config as 0 for USB
+  usb: chipidea: add ahb burst configuration
+  usb: chipidea: usbmisc_imx: add unburst setting for imx6
+  Doc: usb: ci-hdrc-imx: add tx(rx)-burst-config-dword for binding doc
+  ARM: imx6: change default burst size for USB
+  usb: chipidea: add burst size configuration interface
+
+ .../devicetree/bindings/usb/ci-hdrc-imx.txt        |  12 +++
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  12 +++
+ arch/arm/boot/dts/imx6sl.dtsi                      |   9 ++
+ arch/arm/boot/dts/imx6sx.dtsi                      |   9 ++
+ drivers/usb/chipidea/bits.h                        |   7 ++
+ drivers/usb/chipidea/ci.h                          |   3 +
+ drivers/usb/chipidea/ci_hdrc_imx.c                 |  14 ++-
+ drivers/usb/chipidea/core.c                        | 119 +++++++++++++++++++--
+ drivers/usb/chipidea/host.c                        |   6 +-
+ drivers/usb/chipidea/usbmisc_imx.c                 |  12 ++-
+ include/linux/usb/chipidea.h                       |  11 +-
+ 11 files changed, 191 insertions(+), 23 deletions(-)
+
+-- 
+1.9.1
