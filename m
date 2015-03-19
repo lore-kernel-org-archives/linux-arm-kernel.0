@@ -1,34 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Mar 2015 09:48:41 +0100
-Subject: [PATCH 1/6] clk: make strings in parent name arrays const
-In-Reply-To: <1426754530-3137-2-git-send-email-s.hauer@pengutronix.de>
-References: <1426754530-3137-1-git-send-email-s.hauer@pengutronix.de>
- <1426754530-3137-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150319084841.GT10068@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Mar 2015 09:53:55 +0100
+Subject: [PATCH 09/13] spi: atmel: use endian agnostic IO
+In-Reply-To: <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <550A8EA3.4000903@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Mar 19, 2015 at 09:42:05AM +0100, Sascha Hauer wrote:
-> The clk functions and structs declare the parent_name arrays as
-> 'const char **parent_names' which means the parent name strings
-> are const, but the array itself is not. Use
-> 'const char * const * parent_names' instead which also makes
-> the array const. This allows us to put the parent_name arrays into
-> the __initconst section.
+Le 18/03/2015 16:53, Ben Dooks a ?crit :
+> Use the endian agnositc IO functions instead of the __raw ones for when
+> the driver is in use on big-endian systems.
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-looks sensible:
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Looks good to me:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-It would be nice to have this for more clock types (which of course
-shouldn't delay this patch).
+Mark,
+There is no dependency on the series, so you can take this one right now.
 
-Best regards
-Uwe
+Bye.
+
+> --
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com> (supporter:ATMEL SPI DRIVER)
+> CC: Mark Brown <broonie@kernel.org> (maintainer:SPI SUBSYSTEM)
+> CC: linux-spi at vger.kernel.org (open list:SPI SUBSYSTEM)
+> ---
+>  drivers/spi/spi-atmel.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 06de340..a2f40b1 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -180,11 +180,17 @@
+>  	  | SPI_BF(name, value))
+>  
+>  /* Register access macros */
+> +#ifdef CONFIG_AVR32
+>  #define spi_readl(port, reg) \
+>  	__raw_readl((port)->regs + SPI_##reg)
+>  #define spi_writel(port, reg, value) \
+>  	__raw_writel((value), (port)->regs + SPI_##reg)
+> -
+> +#else
+> +#define spi_readl(port, reg) \
+> +	readl_relaxed((port)->regs + SPI_##reg)
+> +#define spi_writel(port, reg, value) \
+> +	writel_relaxed((value), (port)->regs + SPI_##reg)
+> +#endif
+>  /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
+>   * cache operations; better heuristics consider wordsize and bitrate.
+>   */
+> 
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Nicolas Ferre
