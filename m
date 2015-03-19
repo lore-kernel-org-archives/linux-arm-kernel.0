@@ -1,132 +1,36 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 19 Mar 2015 12:45:26 +0100
-Subject: [PATCH] driver core / PM: Add callbacks for PM domain
- initialization/cleanup
-In-Reply-To: <CAPDyKFp6=16HuRLC=M+mJavGVy=jEG6+=xKTTHa+V7QVJDxxkw@mail.gmail.com>
-References: <1426261429-31883-1-git-send-email-ulf.hansson@linaro.org>
- <2317791.ICLpdqLgyu@vostro.rjw.lan>
- <CAPDyKFp6=16HuRLC=M+mJavGVy=jEG6+=xKTTHa+V7QVJDxxkw@mail.gmail.com>
-Message-ID: <1937500.ipRbAIt7Og@vostro.rjw.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 19 Mar 2015 11:24:30 +0000
+Subject: [PATCH] spi: trigger trace event for message-done before
+ mesg->complete
+In-Reply-To: <20150318144854.GS10068@pengutronix.de>
+References: <1426674448-8246-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20150318113635.GB2869@sirena.org.uk>
+ <20150318133226.GR10068@pengutronix.de>
+ <20150318135854.GI2869@sirena.org.uk>
+ <20150318144854.GS10068@pengutronix.de>
+Message-ID: <20150319112430.GP2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, March 19, 2015 09:49:19 AM Ulf Hansson wrote:
-> On 18 March 2015 at 16:02, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> >
-> > If PM domains are in use, it may be necessary to prepare the code
-> > handling a PM domain for driver probing.  For example, in some
-> > cases device drivers rely on the ability to power on the devices
-> > with the help of the IO runtime PM framework and the PM domain
-> > code needs to be ready for that.  Also, if that code has not been
-> > fully initialized yet, the driver probing should be deferred.
-> >
-> > Moreover, after the probing is complete, it may be necessary to
-> > put the PM domain in question into the state reflecting the current
-> > needs of the devices in it, for example, to prevent power from being
-> > drawn in vain.
-> >
-> > For these reasons, introduce new PM domain callbacks, ->activate
-> > and ->sync, called, respectively, before probing for a device
-> > driver and after the probing has been completed.
-> >
-> > That is not sufficient, however, because the device's PM domain
-> > pointer has to be populated for the ->activate callback to be
-> > executed, so setting it in bus type ->probe callback routines
-> > would be too late.  Also, there are bus types where PM domains
-> > are not used at all and the core should not attempt to set the
-> > pm_domain pointer for the devices on those buses.
-> >
-> > To overcome that difficulty, introduce two new bus type
-> > callbacks, ->init and ->release, called by bus_add_device() and
-> > bus_remove_device(), respectively.  That will allow ->init to
-> > be used to populate the pm_domain pointer for the bus types
-> > that want to do that and ->release will be useful for any
-> > cleanup that may be necessary after removing a device that
-> > was part of a PM domain.
-> >
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> >
-> > It occured to me that we might want to ->sync regardless of whether or
-> > not the probing had been succenssful, so I changed the code in
-> > really_probe() along these lines.  Please let me know if that's
-> > not OK.
-> 
-> Make perfect sense!
-> 
-> >
-> > ---
-> >  drivers/base/bus.c     |   12 +++++++++++-
-> >  drivers/base/dd.c      |   20 ++++++++++++++------
-> >  include/linux/device.h |    5 +++++
-> >  include/linux/pm.h     |    6 ++++++
-> >  4 files changed, 36 insertions(+), 7 deletions(-)
-> >
-> > Index: linux-pm/drivers/base/bus.c
-> > ===================================================================
-> > --- linux-pm.orig/drivers/base/bus.c
-> > +++ linux-pm/drivers/base/bus.c
-> > @@ -509,10 +509,15 @@ int bus_add_device(struct device *dev)
-> >         int error = 0;
-> >
-> >         if (bus) {
-> > +               if (bus->init) {
-> > +                       error = bus->init(dev);
-> > +                       if (error)
-> > +                               goto out_put;
-> > +               }
-> >                 pr_debug("bus: '%s': add device %s\n", bus->name, dev_name(dev));
-> >                 error = device_add_attrs(bus, dev);
-> >                 if (error)
-> > -                       goto out_put;
-> > +                       goto out_release;
-> >                 error = device_add_groups(dev, bus->dev_groups);
-> >                 if (error)
-> >                         goto out_groups;
-> > @@ -534,6 +539,9 @@ out_groups:
-> >         device_remove_groups(dev, bus->dev_groups);
-> >  out_id:
-> >         device_remove_attrs(bus, dev);
-> > +out_release:
-> > +       if (bus->release)
-> > +               bus->release(dev);
-> >  out_put:
-> >         bus_put(dev->bus);
-> >         return error;
-> > @@ -597,6 +605,8 @@ void bus_remove_device(struct device *de
-> >         device_remove_groups(dev, dev->bus->dev_groups);
-> >         if (klist_node_attached(&dev->p->knode_bus))
-> >                 klist_del(&dev->p->knode_bus);
-> > +       if (bus->release)
-> > +               bus->release(dev);
-> 
-> I think we should move this new code block below the call to
-> device_release_driver(), since else the bus'/driver's ->remove()
-> callbacks may be invoked after the ->pm_domain pointer for the device
-> has been removed.
+On Wed, Mar 18, 2015 at 03:48:54PM +0100, Uwe Kleine-K?nig wrote:
+> On Wed, Mar 18, 2015 at 01:58:54PM +0000, Mark Brown wrote:
 
-Good point, I'll fix that.
+> > My point here is that the analysis of the issue shouldn't depend on
+> > spidev in particular, if you need to call out the specific driver you're
+> > working with that's an alarm sign that it's doing something weird and
+> > perhaps the problem is with the driver.
 
-> Moving the code below the call to device_release_driver() also means
-> device's devm* managed resources will be freed prior invoking the bus'
-> ->release() callback. Genpd don't have any issues to cope with that I
-> believe that's okay for ACPI as well, but not sure.
+> This just happens to be the driver I saw the problem with. Don't have
+> another spi device on that bus to cross check with other drivers. I
+> wouldn't be too concerned here.
 
-It is.
-
-> Moreover, considering the case where device won't be removed but only
-> its corresponding driver. In that case, the PM domain won't be
-> notified other than through runtime PM transitions. I don't think
-> that's enough, we will likely need to add yet another callback in the
-> struct dev_pm_domain, to be invoked from __device_release_driver().
-
-Right, so do we want to ->sync then or do we want a separate callback?
-
-The only use case I have which is not genpd doesn't need that, so genpd
-will be the only user of it for the time being.
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Sure, but it's better to write it up in terms of a generic driver - it's
+the difference between "let's work around this driver" and "the core
+isn't doing the right thing for drivers here".
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/7062fe0f/attachment.sig>
