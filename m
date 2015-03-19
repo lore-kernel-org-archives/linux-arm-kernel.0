@@ -1,70 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Mar 2015 23:53:44 +0100
-Subject: [PATCH v3 0/5] clocksource: sun5i: Support parent clock rate
- changes
-In-Reply-To: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150319225344.GF4255@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Mar 2015 16:14:01 -0700
+Subject: [GIT PULL 3/3] omap legacy boot clean-up for v4.1
+In-Reply-To: <pull-1426799683-420388>
+References: <pull-1426799683-420388>
+Message-ID: <pull-1426799683-420388-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-On Thu, Mar 05, 2015 at 11:20:51AM +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> The Allwinner HS timers have the AHB clock as their parent
-> clock. Since this clock is shared with other devices, we could very
-> well have another driver requesting a rate change of that clock,
-> making our timer change frequency at the same time.
-> 
-> This is especially true on the A31, where the DMA controller needs to
-> do such a rate change, making the HS timer unreliable at the time on
-> the A31.
-> 
-> This serie makes some cleanups and implements clock notifiers to be
-> able to reflect such rate changes and make sure that the timer is
-> always working.
-> 
-> Maxime
-> 
-> Changes from v2:
->   - Rebased on top of v4.0-rc1
->   - Removed the local_irq_save/restore around clockevents_update_freq
-> 
-> Changes from v1:
->   - Changed the interrupt name to its previous value
-> 
-> Maxime Ripard (5):
->   clocksource: sun5i: Switch to request_irq
->   clocksource: sun5i: Use of_io_request_and_map
->   clocksource: sun5i: Remove sched_clock
->   clocksource: sun5i: Refactor the current code
->   clocksource: sun5i: Add clock notifiers
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-Have these patches been merged?
+are available in the git repository at:
 
-If not, it woulde be great if the third one ("clocksource: sun5i:
-Remove sched_clock") was merged for 4.0.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/v4.1-legacy
 
-The sched_clock we use on some system is this timer's, and since we
-started using cpufreq, the cpu clock (that is one of the timer's clock
-indirect parent) now changes, along with the actual sched_clock rate.
+for you to fetch changes up to 01ea0d4247bb3a224a66007e0a1291232c15d61a:
 
-We can safely remove the sched_clock on those systems, since we have
-other reliable sched_clock in the system.
+  ARM: OMAP2+: Remove legacy support for omap3 TouchBook (2015-03-16 17:07:26 -0700)
 
-Thanks,
-Maxime
+----------------------------------------------------------------
+Drop three omap3 legacy board-*.c files
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/de221ac2/attachment.sig>
+We want to get omap3 moved over to device tree only based booting.
+
+These three board-*.c files seem to be inactive, so let's attempt
+to drop them now rather than later. With these dropped, we have
+omap3 device tree conversion status in a known state. Then we know
+that we have .dts support for the remaining omap3 board-*.c files,
+or it's being worked on.
+
+By dropping these files now, we can simply revert them if really
+needed for the next few merge cycles if we run into suprises.
+Reverting things later on will not be so easily done.
+
+----------------------------------------------------------------
+Tony Lindgren (3):
+      ARM: OMAP3: Remove legacy support for EMA-Tech Stalker board
+      ARM: OMAP3: Remove legacy support for devkit8000
+      ARM: OMAP2+: Remove legacy support for omap3 TouchBook
+
+ arch/arm/mach-omap2/Kconfig                |  18 -
+ arch/arm/mach-omap2/Makefile               |   4 -
+ arch/arm/mach-omap2/board-devkit8000.c     | 654 -----------------------------
+ arch/arm/mach-omap2/board-omap3stalker.c   | 433 -------------------
+ arch/arm/mach-omap2/board-omap3touchbook.c | 395 -----------------
+ 5 files changed, 1504 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-devkit8000.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3stalker.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3touchbook.c
