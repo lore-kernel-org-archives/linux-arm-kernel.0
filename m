@@ -1,60 +1,67 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Thu, 19 Mar 2015 09:22:26 -0500
-Subject: [PATCH v3 1/2] ARM: zynq: use restart_handler mechanism for slcr
- reset
-In-Reply-To: <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
-References: <BN1BFFO11FD008F29B247339CE49EAEA6AE2010@BN1BFFO11FD008.protection.gbl>
- <1426772033-29277-1-git-send-email-joshc@ni.com>
- <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
-Message-ID: <20150319142226.GD23626@jcartwri.amer.corp.natinst.com>
+From: ben.hutchings@codethink.co.uk (Ben Hutchings)
+Date: Thu, 19 Mar 2015 14:22:46 +0000
+Subject: [Linux-kernel] [PATCH 12/13] mmc: atmel-mci: use endian
+ agnostic IO
+In-Reply-To: <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 03:01:13PM +0100, Michal Simek wrote:
-> On 03/19/2015 02:33 PM, Josh Cartwright wrote:
-[..]
-> >  /**
-> > - * zynq_slcr_system_reset - Reset the entire system.
-> > + * zynq_slcr_system_restart - Restart the entire system.
-> >   */
-> > -void zynq_slcr_system_reset(void)
-> > +static
-> > +int zynq_slcr_system_restart(struct notifier_block *nb,
-> > +			     unsigned long action, void *data)
+On Wed, 2015-03-18 at 15:53 +0000, Ben Dooks wrote:
+> Change the __raw IO functions to endian agnostic relaxed ones to allow
+> the driver to function on big endian ARM systems.
 > 
-> This doesn't look right to me.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
+> CC: Chris Ball <chris@printf.net>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: linux-mmc at vger.kernel.org
+> ---
+>  drivers/mmc/host/atmel-mci-regs.h | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> [linux]$ ./scripts/kernel-doc -man -v arch/arm/mach-zynq/slcr.c >/dev/null
-> Info(arch/arm/mach-zynq/slcr.c:42): Scanning doc for zynq_slcr_write
-> Info(arch/arm/mach-zynq/slcr.c:55): Scanning doc for zynq_slcr_read
-> Info(arch/arm/mach-zynq/slcr.c:68): Scanning doc for zynq_slcr_unlock
-> Info(arch/arm/mach-zynq/slcr.c:80): Scanning doc for zynq_slcr_get_device_id
-> Info(arch/arm/mach-zynq/slcr.c:96): Scanning doc for zynq_slcr_system_restart
-> Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'nb'
-> Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'action'
-> Warning(arch/arm/mach-zynq/slcr.c:101): No description found for parameter 'data'
-> Warning(arch/arm/mach-zynq/slcr.c:101): No description found for return value of 'zynq_slcr_system_restart'
+> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+> index c97001e..711bb53 100644
+> --- a/drivers/mmc/host/atmel-mci-regs.h
+> +++ b/drivers/mmc/host/atmel-mci-regs.h
+> @@ -135,10 +135,17 @@
+>  #define ATMCI_REGS_SIZE		0x100
+>  
+>  /* Register access macros */
+> -#define atmci_readl(port,reg)				\
+> +#ifdef CONFIG_AVR32
+> +#define atmci_readl(port,reg)			\
+>  	__raw_readl((port)->regs + reg)
+>  #define atmci_writel(port,reg,value)			\
+>  	__raw_writel((value), (port)->regs + reg)
+> +#else
+> +#define atmci_readl(port,reg)			\
+> +	readl_relaxed((port)->regs + reg)
+> +#define atmci_writel(port,reg,value)			\
+> +	writel_relaxed((value), (port)->regs + reg)
+> +#endif
 
-*Sigh*.  I guess now is as good as ever to learn how to write kerneldoc.
+This pattern is repeated in a lot of drivers; is it worth defining
+atmel_{read,write}l_relaxed() in a common header?
 
-I can't help but feel this effort really isn't worth it.  I'll do it,
-obviously, because I want this patch to go in, but I really don't
-understand at all what value is being provided here.
+#ifdef CONFIG_AVR32
 
-Are you advocating for _every_ function in the kernel to have an
-associated kerneldoc annotation?  Even for small/self-evident/internal
-functions?
+/* CPU and peripherals are both big-endian, so don't byte-swap */
+#define atmel_readl_relaxed(addr)		__raw_readl(addr)
+#define atmel_writel_relaxed(value, addr)	__raw_writel(value, addr)
 
-In my opinion, kerneldoc annotations make sense for those functions
-which:
+#else
 
-  1.) Are widely used (think synchronization primitives, device core, etc.)
-  2.) Have non-obvious semantics, or:
-  3.) Have caller-mandated requirements that aren't clear otherwise
-      (locks to be acquired, lifecycle management requirements, state to
-       be maintained, etc.)
+/* Peripherals are little-endian, so byte-swap if CPU isn't */
+#define atmel_readl_relaxed(addr)		readl_relaxed(addr)
+#define atmel_writel_relaxed(value, addr)	writel_relaxed(value, addr)
 
-Beyond that, it's just review churn and fighting the inevitable
-code-and-documentation-out-of-sync problem.
+#endif
 
-  Josh
+Ben.
+
+>  /* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
+>  #ifdef CONFIG_AVR32
