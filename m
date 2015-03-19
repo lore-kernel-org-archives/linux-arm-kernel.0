@@ -1,136 +1,46 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 19 Mar 2015 13:58:28 +0900
-Subject: [PATCH v4 1/4] ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
-In-Reply-To: <1426694453-3242-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
- <1426694453-3242-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <550A5774.9070504@samsung.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 19 Mar 2015 05:03:52 +0000
+Subject: [PATCH 2/2 v2] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP
+ from ARM defconfigs
+In-Reply-To: <20150319012503.GD14051@verge.net.au>
+References: <87pp8ff3sb.wl%kuninori.morimoto.gx@renesas.com>
+ <87mw3jf3qe.wl%kuninori.morimoto.gx@renesas.com>
+ <20150318112155.GL32683@intel.com>
+ <87vbhxeubk.wl%kuninori.morimoto.gx@renesas.com>
+ <20150319012503.GD14051@verge.net.au>
+Message-ID: <87619xefz4.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
 
-I tested this patch on Exynos3250-based Gear2 board.
-Thanks for your effor to solve this issue.
+Hi Simon
 
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> > > > Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
+> > > > Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
+> > > > And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
+> > > > But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
+> > > > not a general purpose DMAC (2nd DMAC is for Device to Device inside
+> > > > sound system). Additionally, current DMAEngine can't support Device to
+> > > > Device, and we don't have correct DT bindings for it at this point.
+> > > > So the easiest solution for it is that move it from DMAEngine to rsnd
+> > > > driver.
+> > > > Audio DMAC peri peri DMAEngine is no longer needed.
+> > > > Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
+> > > 
+> > > This fails for me, I noticed the removal is not present in topc/sh.
+> > > What was this patch based on?
+> > 
+> > Thank you for your help.
+> > I think [1/2] (= remove driver) is controlled by Vinod,
+> > [2/2] (= remove setting from defconfigs) is controlled by Simon is good idea.
+> > These are no relationship anymore.
+> 
+> This patch is probably best taken by the ARM SoC maintainers
+> as it is for a generic defconfig rather than a Renesas-specific one.
 
-Best Regards,
-Chanwoo Choi
+OK, I see
+I send it to ARM SoC maintainers / ARM-ML
 
-On 03/19/2015 01:00 AM, Bartlomiej Zolnierkiewicz wrote:
-> CPU1 hotplug may hang when AFTR is used.  Fix it by:
-> - setting AUTOWAKEUP_EN bit in ARM_COREx_CONFIGURATION register in
->   exynos_cpu_power_up()
-> - not clearing reserved bits of ARM_COREx_CONFIGURATION register in
->   exynos_cpu_power_down()
-> - waiting while an undocumented register 0x0908 becomes non-zero in
->   exynos_core_restart()
-> - using dsb_sev() instead of IPI in exynos_boot_secondary() on
->   Exynos3250
-> 
-> This patch also fixes hotplug issues during resume from S2R:
-> $ echo mem > /sys/power/state
-> [  156.517266] Disabling non-boot CPUs ...
-> [  156.517781] IRQ18 no longer affine to CPU1
-> [  156.518043] CPU1: shutdown
-> [  156.544718] Enabling non-boot CPUs ...
-> [  156.554925] CPU1: Software reset
-> [  158.552631] CPU1: failed to come online
-> [  158.552753] Error taking CPU1 up: -5
-> 
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
->  arch/arm/mach-exynos/regs-pmu.h |  2 ++
->  2 files changed, 22 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index d2e9f12..ebd135b 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -126,6 +126,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->   */
->  void exynos_cpu_power_down(int cpu)
->  {
-> +	u32 core_conf;
-> +
->  	if (cpu == 0 && (soc_is_exynos5420() || soc_is_exynos5800())) {
->  		/*
->  		 * Bypass power down for CPU0 during suspend. Check for
-> @@ -137,7 +139,10 @@ void exynos_cpu_power_down(int cpu)
->  		if (!(val & S5P_CORE_LOCAL_PWR_EN))
->  			return;
->  	}
-> -	pmu_raw_writel(0, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +
-> +	core_conf = pmu_raw_readl(EXYNOS_ARM_CORE_CONFIGURATION(cpu));
-> +	core_conf &= ~S5P_CORE_LOCAL_PWR_EN;
-> +	pmu_raw_writel(core_conf, EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->  }
->  
->  /**
-> @@ -148,7 +153,12 @@ void exynos_cpu_power_down(int cpu)
->   */
->  void exynos_cpu_power_up(int cpu)
->  {
-> -	pmu_raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> +	u32 core_conf = S5P_CORE_LOCAL_PWR_EN;
-> +
-> +	if (soc_is_exynos3250())
-> +		core_conf |= S5P_CORE_AUTOWAKEUP_EN;
-> +
-> +	pmu_raw_writel(core_conf,
->  			EXYNOS_ARM_CORE_CONFIGURATION(cpu));
->  }
->  
-> @@ -226,6 +236,10 @@ static void exynos_core_restart(u32 core_id)
->  	if (!of_machine_is_compatible("samsung,exynos3250"))
->  		return;
->  
-> +	while (!pmu_raw_readl(S5P_PMU_SPARE2))
-> +		udelay(10);
-> +	udelay(10);
-> +
->  	val = pmu_raw_readl(EXYNOS_ARM_CORE_STATUS(core_id));
->  	val |= S5P_CORE_WAKEUP_FROM_LOCAL_CFG;
->  	pmu_raw_writel(val, EXYNOS_ARM_CORE_STATUS(core_id));
-> @@ -346,7 +360,10 @@ static int exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  
->  		call_firmware_op(cpu_boot, core_id);
->  
-> -		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +		if (soc_is_exynos3250())
-> +			dsb_sev();
-> +		else
-> +			arch_send_wakeup_ipi_mask(cpumask_of(cpu));
->  
->  		if (pen_release == -1)
->  			break;
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index eb461e1..84ddce1 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -49,6 +49,7 @@
->  #define S5P_INFORM5				0x0814
->  #define S5P_INFORM6				0x0818
->  #define S5P_INFORM7				0x081C
-> +#define S5P_PMU_SPARE2				0x0908
->  #define S5P_PMU_SPARE3				0x090C
->  
->  #define EXYNOS_IROM_DATA2			0x0988
-> @@ -182,6 +183,7 @@
->  
->  #define S5P_CORE_LOCAL_PWR_EN			0x3
->  #define S5P_CORE_WAKEUP_FROM_LOCAL_CFG		(0x3 << 8)
-> +#define S5P_CORE_AUTOWAKEUP_EN			(1 << 31)
->  
->  /* Only for EXYNOS4210 */
->  #define S5P_CMU_CLKSTOP_LCD1_LOWPWR	0x1154
-> 
+Best regards
+---
+Kuninori Morimoto
