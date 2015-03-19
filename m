@@ -1,91 +1,127 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Thu, 19 Mar 2015 09:19:13 +0800
-Subject: [PATCH 02/12] usb: chipidea: set ITC to 0 for device mode
+Date: Thu, 19 Mar 2015 09:19:14 +0800
+Subject: [PATCH 03/12] usb: chipidea: define stream mode disable for both roles
 In-Reply-To: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
 References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1426727963-32280-3-git-send-email-peter.chen@freescale.com>
+Message-ID: <1426727963-32280-4-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ITC (Interrupt Threshold Control) is used to set the maximum rate at which
-the host/device controller will issue interrupts. The default value is 8 (1ms)
-for it. EHCI core will modify it to 1, but device mode keeps it as default
-value.
+The chipidea IP has different limitations for host and device mode,
+see below errata, we may need to enable SDIS(Stream Disable Mode)
+at host mode. But we don't want it at device mode at some situations.
 
-In some use cases like Android ADB, it only has one usb request for each
-direction, and maximum payload data is only 4KB, so the speed is 4MB/s
-at most, it needs controller to trigger interrupt as fast as possible
-to increase the speed. The USB performance will be better if the interrupt
-can be triggered faster.
+TAR 9000378958
+Title: Non-Double Word Aligned Buffer Address Sometimes Causes Host to Hang on OUT Retry
+Impacted Configuration: Host mode, all transfer types
+Description:
+The host core operating in streaming mode may under run while sending the data packet of an OUT transaction. This under run can occur if there are unexpected system delays in fetching the remaining packet data from memory. The host forces a bad CRC on the packet, the device detects the error and discards the packet. The host then retries a Bulk, Interrupt, or Control transfer if an under run occurs according to the USB specification.
+During simulations, it was found that the host does not issue the retry of the failed bulk OUT. It does not issue any other transactions except SOF packets that have incorrect frame numbers.
+The second failure mode occurs if the under run occurs on an ISO OUT transaction and the next ISO transaction is a zero byte packet. The host does not issue any transactions (including SOFs). The device detects a Suspend condition, reverts to full speed, and waits for resume signaling.
+A third failure mode occurs when the host under runs on an ISO OUT and the next ISO in the schedule is an ISO OUT with two max packets of 1024 bytes each.
+The host should issue MDATA for the first OUT followed by DATA1 for the second. However, it drops the MDATA transaction, and issues the DATA1 transaction.
+The system impact of this bug is the same regardless of the failure mode observed. The host core hangs, the ehci_ctrl state machine waits for the protocol engine to send the completion status for the corrupted transaction, which never occurs. No indication is sent to the host controller driver, no register bits change and no interrupts occur. Eventually the requesting application times out.
+Detailed internal behavior:
+The EHCI control state machine (ehci_ctrl) in the DMA block is responsible for parsing the schedules and initiating all transactions. The ehci_ctrl state machine passes the transaction details to the protocol block by writing the transaction information in to the TxFIFO. It then asserts the pe_hst_run_pkt signal to inform the host protocol state machine (pe_hst_state) that there is a packet in the TxFIFO.
+A tag of 0x0 indicates a start of packet with the data providing the following information:
 
-Reduce ITC value is benefit for USB performance, and the interrupt number
-is increased at the same time, it may increase cpu utilization too.
-Most of use case cares about performance, but some may care about
-cpu utilization, so, we leave a platform interface for user.
-We set ITC as 0 (immediate) as default value.
+35:32 Tag
+31:30 Reserved
+29:23 Endpoint (lowest 4 bits)
+22:16 Address
+15:10 Reserved
+9:8 Endpoint speed
+7:6 Endpoint type
+5:6 Data Toggle
+3:0 PID
+The pe_hst_state reads the packet information and constructs the packet and issues it to the PHY interface.
+The ehci_ctrl state machine writes the start transaction information in to the TxFIFO as 0x03002910c for the OUT packet that had the under run error. However, it writes 0xC3002910C for the retry of the Out transaction, which is incorrect.
+The pe_hst_state enters a bus timeout state after sending the bad CRC for the packet that under ran. It then purges any data that was back filled in to the TxFIFO for the packet that under ran. The pe_hst_state machine stops purging the TxFIFO when it is empty or if it reads a location that has a tag of 0x0, indicating a start of packet command.
+The pe_hst_state reads 0xC3002910C and discards it as it does not decode to a start of packet command. It continues to purge the OUT data that has been pre-buffered for the OUT retry . The pe_hst_state detects the hst_packet_run signal and attempts to read the PID and address information from the TxFIFO. This location has packet data and so does not decode to a valid PID and so falls through to the PE_HST_SOF_LOAD state where the frame_num_counter is updated. The frame_num_counter is updated with the data in the TxFIFO. In this case, the data is incorrect as the ehci_ctrl state machine did not initiate the load. The hst_pe_state machine detects the SOF request signal and sends an SOF with the bad frame number. Meanwhile, the ehci_ctrl state machine waits indefinitely in the run_pkt state waiting for the completion status from pe_hst_state machine, which will never happen.
+The ISO failure case is similar except that there is no retry for ISO. The ehci_ctrl state machine moves to the next transfer in the periodic schedule. If the under run occurs on the last entry of the periodic list then it moves to the Async schedule.
+In the case of ISO OUT simulations, the next ISO is a zero byte OUT and again the start of packet command gets corrupted. The TxFIFO is empty when the hst_pe_state attempts to read the Address and PID information as the transaction is a zero byte packet. This results in the hst_pe_state machine staying in the GET_PID state, which means that it does not issue any transactions (including SOFs). The device detects a Suspend condition and reverts to full speed mode and waits for a Resume or Reset signal.
+The EHCI specification allows a Non-DoubleWord (32 bits) offset to be used as a current offset for Buffer Pointer Page 0 of the qTD. In Non-DoubleWord aligned cases, the core reads the packet data from the AHB memory, performs the alignment operation before writing it in to the TxFIFO as a 32 bit data word. An End Of Packet tag (EOP) is written to the TxFIFO after all the packet data has been written in to the TxFIFO. The alignment function is reset to Idle by the EOP tag. The corruption of the start of packet command arises because the packet buffer for the OUT transaction that under ran is not aligned to a DoubleWord, and hence no EOP tag is written to the TxFIFO. The alignment function is still active when the start packet information is written in to the TxFIFO for the retry of the bulk packet or for the next transaction in the case of an under run on an ISO. This results in the corruption of the start tag and the transaction information.
+Click for waveform showing the command 0x 0000300291 being written in to the TX FIFO for the Out that under ran.
+Click for waveform showing the command 0xC3002910C written to the TxFIFO instead of 0x 0000300291
+Versions affected: Versions 2.10a and previous versions
+How discovered: Customer simulation
+Workaround:
+1- The EHCI specification allows a non-DoubleWord offset to be used as a current offset for Buffer Pointer Page 0 of the qTD. However, if a DoubleWord offset is used then this issue does not arise.
+2- Use non streaming mode to eliminate under runs.
+Resolution:
+The fix involves changes to the traffic state machine in the vusb_hs_dma_traf block. The ehci_ctrl state machine updates the context information by encoding the transaction results on the hst_op_context_update signals at the end of a transaction. The signal hst_op_context_update is added to the traffic state machine, and the tx_fifo_under_ran_r signal is generated if the transaction results in an under run error. Click for waveform
+The traffic state machine then traverses to the do_eop states if the tx_fifo_under_ran error is asserted. Thus an EOP tag is written in to the TxFIFO as shown in this waveform .
+The EOP tag resets the align state machine to the Idle state ensuring that the next command written by the echi_ctrl state machine does not get corrupted.
+File(s) modified:
+RTL code fixed: ?..
+Method of reproducing: This failure cannot be reproduced in the current test bench.
+Date Found: March 2010
+Date Fixed: June 2010
+Update information:
+Added the RTL code fix
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/core.c  | 19 +++++++++++++++++++
- include/linux/usb/chipidea.h |  2 ++
- 2 files changed, 21 insertions(+)
+ drivers/usb/chipidea/core.c  | 2 +-
+ drivers/usb/chipidea/host.c  | 6 +++---
+ include/linux/usb/chipidea.h | 5 ++++-
+ 3 files changed, 8 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 74fea4f..8af9cbf 100644
+index 8af9cbf..4d79392 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -463,6 +463,13 @@ int hw_device_reset(struct ci_hdrc *ci)
- 	/* HW >= 2.3 */
- 	hw_write(ci, OP_USBMODE, USBMODE_SLOM, USBMODE_SLOM);
+@@ -447,7 +447,7 @@ int hw_device_reset(struct ci_hdrc *ci)
+ 		ci->platdata->notify_event(ci,
+ 			CI_HDRC_CONTROLLER_RESET_EVENT);
  
-+	/*
-+	 * Set interrupt interval for device mode
-+	 * host set ITC according to ehci-hcd module parameter log2_irq_thresh
-+	 */
-+	hw_write(ci, OP_USBCMD, 0xff0000,
-+		ci->platdata->gadget_itc_setting << 16);
+-	if (ci->platdata->flags & CI_HDRC_DISABLE_STREAMING)
++	if (ci->platdata->flags & CI_HDRC_DISABLE_DEVICE_STREAMING)
+ 		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
+ 
+ 	if (ci->platdata->flags & CI_HDRC_FORCE_FULLSPEED) {
+diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
+index 21fe1a3..b262c1c 100644
+--- a/drivers/usb/chipidea/host.c
++++ b/drivers/usb/chipidea/host.c
+@@ -141,12 +141,12 @@ static int host_start(struct ci_hdrc *ci)
+ 		}
+ 	}
+ 
+-	if (ci->platdata->flags & CI_HDRC_DISABLE_STREAMING)
+-		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
+-
+ 	if (ci->platdata->flags & CI_HDRC_FORCE_FULLSPEED)
+ 		hw_write(ci, OP_PORTSC, PORTSC_PFSC, PORTSC_PFSC);
+ 
++	if (ci->platdata->flags & CI_HDRC_DISABLE_HOST_STREAMING)
++		hw_write(ci, OP_USBMODE, USBMODE_CI_SDIS, USBMODE_CI_SDIS);
 +
- 	if (hw_read(ci, OP_USBMODE, USBMODE_CM) != USBMODE_CM_DC) {
- 		pr_err("cannot enter in %s device mode", ci_role(ci)->name);
- 		pr_err("lpm = %i", ci->hw_bank.lpm);
-@@ -560,6 +567,8 @@ static irqreturn_t ci_irq(int irq, void *data)
- static int ci_get_platdata(struct device *dev,
- 		struct ci_hdrc_platform_data *platdata)
- {
-+	int ret;
-+
- 	if (!platdata->phy_mode)
- 		platdata->phy_mode = of_usb_get_phy_mode(dev->of_node);
+ 	return ret;
  
-@@ -591,6 +600,16 @@ static int ci_get_platdata(struct device *dev,
- 	if (of_usb_get_maximum_speed(dev->of_node) == USB_SPEED_FULL)
- 		platdata->flags |= CI_HDRC_FORCE_FULLSPEED;
- 
-+	if (of_find_property(dev->of_node, "gadget-itc-setting", NULL)) {
-+		ret = of_property_read_u32(dev->of_node, "gadget-itc-setting",
-+			&platdata->gadget_itc_setting);
-+		if (ret) {
-+			dev_err(dev,
-+				"failed to get gadget-itc-setting value\n");
-+			return ret;
-+		}
-+	}
-+
- 	return 0;
- }
- 
+ disable_reg:
 diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index ab94f78..e69d829 100644
+index e69d829..d3906a4 100644
 --- a/include/linux/usb/chipidea.h
 +++ b/include/linux/usb/chipidea.h
-@@ -35,6 +35,8 @@ struct ci_hdrc_platform_data {
- 	void	(*notify_event) (struct ci_hdrc *ci, unsigned event);
- 	struct regulator	*reg_vbus;
- 	bool			tpl_support;
-+	/* interrupt threshold value for gadget */
-+	u32			gadget_itc_setting;
- };
- 
- /* Default offset of capability registers */
+@@ -20,7 +20,6 @@ struct ci_hdrc_platform_data {
+ 	unsigned long	 flags;
+ #define CI_HDRC_REGS_SHARED		BIT(0)
+ #define CI_HDRC_SUPPORTS_RUNTIME_PM	BIT(2)
+-#define CI_HDRC_DISABLE_STREAMING	BIT(3)
+ 	/*
+ 	 * Only set it when DCCPARAMS.DC==1 and DCCPARAMS.HC==1,
+ 	 * but otg is not supported (no register otgsc).
+@@ -29,6 +28,10 @@ struct ci_hdrc_platform_data {
+ #define CI_HDRC_IMX28_WRITE_FIX		BIT(5)
+ #define CI_HDRC_FORCE_FULLSPEED		BIT(6)
+ #define CI_HDRC_TURN_VBUS_EARLY_ON	BIT(7)
++#define CI_HDRC_DISABLE_DEVICE_STREAMING	BIT(8)
++#define CI_HDRC_DISABLE_HOST_STREAMING		BIT(9)
++#define CI_HDRC_DISABLE_STREAMING (CI_HDRC_DISABLE_DEVICE_STREAMING |	\
++		CI_HDRC_DISABLE_HOST_STREAMING)
+ 	enum usb_dr_mode	dr_mode;
+ #define CI_HDRC_CONTROLLER_RESET_EVENT		0
+ #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
 -- 
 1.9.1
