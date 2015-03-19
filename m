@@ -1,69 +1,84 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 19 Mar 2015 10:43:54 +0530
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <20150318152658.GO3318@x1>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <CAJe_Zhc1uLf_grsbzOs3ahJHJXXZ+BF__702mEPPL=SWPU5nzw@mail.gmail.com>
- <20150318131226.GM3318@x1>
- <CABb+yY2HwZn3VSvZ4iVfWE8GrsLDA6Tx_V2HZiOBvJb9UHY2Mg@mail.gmail.com>
- <20150318152658.GO3318@x1>
-Message-ID: <CABb+yY0tMwYTFDvF2Gce4h5xhKOboLS=32yK42-eoksZ8SAbZA@mail.gmail.com>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Thu, 19 Mar 2015 06:13:41 +0100
+Subject: [PATCH 4/4] ARM: dts: Add minimal support for dm8168-evm
+In-Reply-To: <20150318165453.GP31346@atomide.com>
+References: <1421192272-20754-1-git-send-email-tony@atomide.com>
+ <1421192272-20754-5-git-send-email-tony@atomide.com>
+ <20150117164709.GS18552@atomide.com>
+ <CAALWOA-XVrC84=6Xt04m+QaBhweAcp2HVTH7v=QewtJmQLEaWA@mail.gmail.com>
+ <20150202160932.GF16250@atomide.com> <20150318000652.GJ31346@atomide.com>
+ <CAALWOA9yoS5sdo-A_hdqhkqGqZ-VCg9jZfdavhxskFdE_pA1Sg@mail.gmail.com>
+ <20150318165453.GP31346@atomide.com>
+Message-ID: <CAALWOA9=tY3X38O9p-xYabb-AZy7rJBM5AOFYgco_ZmsixOViQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 8:56 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 18 Mar 2015, Jassi Brar wrote:
+> Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> 44400500 target 11 vcp
+> 44800100 target 18 vlynq ?
 
->> >> > +                       mbox->irq = irq_create_mapping(mbinst->irq_domain,
->> >> > +                                                      mbox->rx_id);
->> >> >
->> >> simply assigning same IRQ to all controller DT nodes and using
->> >> IRQF_SHARED for the common handler, wouldn't work?
->> >
->> > I do have intentions to simplify this driver somewhat, but that will
->> > take some time as it will require a great deal of consultation and
->> > testing from the ST side.  This is the current internal implementation
->> > which is used in the wild and has been fully tested.  If you'll allow
->> > me to conduct my adaptions subsequently we can have full history and a
->> > possible reversion plan if anything untoward take place i.e. I mess
->> > something up.
->> >
->> OK, but wouldn't that break the bindings of this driver when you
->> eventually do that?
->
-> That's going to happen regardless, since these bindings are already in
-> use internally.  Mainline (i.e. v4.0+) isn't going to be used in
-> products for years to come, so we have a lot of time until any new
-> bindings become ABI.
->
-I thought time starts from upstream. It doesn't seem right to
-knowingly introduce a binding that we are going to break in coming
-weeks. For this reason, it needs ACK from some DT maintainer.
+scrap these guesses: I don't think Netra has a vcp module, and I had
+only filled in vlynq based on it being the only remaining target NIU.
+Once the memory ranges for the targets have been determined they
+should be easy to identify conclusively.
+
+On 18 March 2015 at 17:54, Tony Lindgren <tony@atomide.com> wrote:
+> Oh there's a gap here and it goes all the way to 2400.. Is there
+> a gap on am335x too?
+
+There are indeed. See my work-in-progress spreadsheet on its L3
+interconnect: http://goo.gl/miyCQw
+
+As with the memory map, there are some "ghost" modules which I'm
+reasonably sure don't exist, even though they have a target NIU and
+clkctrl registers.
+
+I haven't yet checked which initiator the sole bandwidth regulator on
+subarctic is attached to. Plausible options are SGX, the LCD
+controller, or one of the EDMA TCs.
+
+I also just noticed how *big* its statistics collectors are. o.O  For
+comparison, the ones on netra and centaurus are 0x200 (statcoll 0 and
+3) or 0x400 (statcoll 1 and 2).
 
 
->> >> > + * struct sti_mbox_msg - sti mailbox message description
->> >> > + * @dsize:             data payload size
->> >> > + * @pdata:             message data payload
->> >> > + */
->> >> > +struct sti_mbox_msg {
->> >> > +       u32             dsize;
->> >> > +       u8              *pdata;
->> >> > +};
->> >> >
->> >> There isn't any client driver in this patchset to tell exactly, but it
->> >> seems the header could be split into one shared between mailbox
->> >> clients and provider and another internal to client/provider ?
->> >
->> > I believe only the above will be required by the client.  Seems silly
->> > to create a client specific header just for that, don't you think?
->> >
->> Do you mean to have copies of the structure in controller and client driver? :O
+>> 2. Disable all L3 Target NIUs. You will temporarily lose access to all
+>> peripherals, OCMC ram, and on subarctic also DDR memory (I think on
+>> devices with a DMM you'd retain access to DDR memory). Note that the
+>> service network itself isn't considered an L3 target.
 >
-> I do not.  I planned on sharing the main header with with client
-> also.
->
-> But I guess by your reaction you suggest having a teeny client header
-> as the best way forward then.
->
-Yes, please. And also no header that's included by exactly one file.
+> Hmm well we could that in the kernel using the SRAM code as long as
+> it does not reset the devices.
+
+If you run with MMU disabled then you'd have to run out of the 64K
+internal SRAM, and catch data aborts since all writes will be
+non-posted. With MMU enabled, locking code and MMU translation tables
+into the (much larger) L2 cache makes more sense.
+
+I *think* disabling the NIU only blocks access to the module and
+doesn't affect the module operationally. I'd be inclined to put
+external RAM into self-refresh during the procedure just to be sure,
+in case disabling NIUs results in clock gating (which would otherwise
+be hard to notice).
+
+> OK the driver would have to be enabled with interrupts while scanning.
+
+Polling makes more sense, especially since nothing else can be going
+on at the same time anyway.
+
+
+I still think a separate tool that scrapes as much data as possible
+from the target and pours it into DT form makes more sense than doing
+it in a kernel driver, especially since discovered targets may often
+still need manual identification.  Also, probing discovered targets
+requires you enable the clock(s) they need and if necessary release
+local reset.  Auto-discovery of these associations may also be
+possible, but probably would become a rather lenghy procedure. A
+separate tool can also leave a record of what it's doing in SRAM and
+enable the watchdog to be able to recover from probes that lock up the
+system (and log a warning about them).
+
+Also, on HS devices, it would surprise me if you're allowed to access
+any interconnect registers at all.
+
+Matthijs
