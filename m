@@ -1,22 +1,58 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Thu, 19 Mar 2015 11:20:53 -0500 (CDT)
-Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
-In-Reply-To: <20150317110750.2a0e2b73@gandalf.local.home>
-References: <20150316173154.537b80ee@gandalf.local.home>
- <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
- <20150317081341.0f9a8b4c@gandalf.local.home>
- <20150317101113.32f5618a@gandalf.local.home>
- <20150317104038.312e73d1@gandalf.local.home>
- <20150317144701.GJ10068@pengutronix.de>
- <20150317110750.2a0e2b73@gandalf.local.home>
-Message-ID: <alpine.DEB.2.11.1503191120310.26866@gentwo.org>
+From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
+Date: Thu, 19 Mar 2015 18:21:31 +0200
+Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
+In-Reply-To: <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
+References: <1424422274-27946-1-git-send-email-kishon@ti.com>
+ <1424422274-27946-2-git-send-email-kishon@ti.com> <5509A998.2080509@ti.com>
+ <20150318165706.GQ31346@atomide.com> <5509D3BD.6030004@linaro.org>
+ <alpine.DEB.2.02.1503191455020.9480@utopia.booyaka.com>
+ <550AEDA1.50109@linaro.org>
+ <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
+Message-ID: <550AF78B.3050202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Mar 2015, Steven Rostedt wrote:
+On 03/19/2015 05:45 PM, Paul Walmsley wrote:
+> On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> 
+>> On 03/19/2015 04:55 PM, Paul Walmsley wrote:
+>>> On Wed, 18 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+>>>
+>>>> On 03/18/2015 06:57 PM, Tony Lindgren wrote:
+>>>>> * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
+>>>>>> As I can see Patch 1 from this series was merged in 4.0-rc4,
+>>>>>> but this patch wasn't. As result, I can see below warning all the time
+>>>>>> during boot now:
+>>>>>>
+>>>>>> [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod
+>>>>>> 'pcie1-phy'
+>>>>>
+>>>>> OK. Is this needed as a fix for the v4.0-rc series, or can this wait
+>>>>> for v4.1?
+>>>>
+>>>> I think, Yes. These two patches should go all together, because they are
+>>>> interrelated.
+>>>
+>>> Does the warning result in a functional problem, or is it just a warning?
+>>>
+>>
+>> PCE1 PHY device is not registered any more.
+> 
+> How does the second patch fix that?
 
-> Christoph, you happy with this version?
+I've re-checked it - sorry for disinfo.
 
-Yes looks good.
+PHY devices are created, but omap_device_fail_pm_domain is assigned to them.
+As result Runtime PM is not working any more.
 
-Acked-by: Christoph Lameter <cl@linux.com>
+
+[    0.592501] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
+[    0.597510] pinctrl-single 4a003400.pinmux: 281 pins at pa fc003400 size 1124
+[    0.602794] ti-pipe3 4a094000.pciephy: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+
+When ti,hwmods is not present PCI PHY will be added as regular Platform device
+and Runtime PM will work again.
+
+-- 
+regards,
+-grygorii
