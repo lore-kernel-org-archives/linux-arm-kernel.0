@@ -1,58 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Mar 2015 16:11:44 +0000
-Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
-In-Reply-To: <20150319160008.GA4751@arm.com>
-References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
- <20150319154435.GC25967@leverpostej>
- <20150319160008.GA4751@arm.com>
-Message-ID: <20150319161143.GE25967@leverpostej>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 Mar 2015 17:13:01 +0100
+Subject: [PATCH 08/13] rtc: at91rm9200: make IO endian agnostic
+In-Reply-To: <1426693992-31163-9-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-9-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <550AF58D.9040900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 04:00:09PM +0000, Will Deacon wrote:
-> On Thu, Mar 19, 2015 at 03:44:36PM +0000, Mark Rutland wrote:
-> > On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
-> > > this_cpu operations were implemented for arm64 in:
-> > >  5284e1b arm64: xchg: Implement cmpxchg_double
-> > >  f97fc81 arm64: percpu: Implement this_cpu operations
-> > > 
-> > > Unfortunately, it is possible for pre-emption to take place between
-> > > address generation and data access. This can lead to cases where data
-> > > is being manipulated by this_cpu for a different CPU than it was
-> > > called on. Which effectively breaks the spec.
-> > > 
-> > > This patch disables pre-emption for the this_cpu operations
-> > > guaranteeing that address generation and data manipulation.
-> > 
-> > Shouldn't that last sentence end with "occur on the same CPU", or
-> > something like that?
-> > 
-> > [...]
-> > 
-> > > +/*
-> > > + * Modules aren't allowed to use preempt_enable_no_resched, and it is
-> > > + * undef'ed. If we are unable to use preempt_enable_no_resched, then
-> > > + * fallback to the standard preempt_enable.
-> > > + */
-> > > +#ifdef preempt_enable_no_resched
-> > > +#define __pcp_preempt_enable()	preempt_enable_no_resched()
-> > > +#else
-> > > +#define __pcp_preempt_enable()	preempt_enable()
-> > > +#endif /* preempt_enable_no_resched */
-> > 
-> > I think it would be worth mentioning in the comment why we want to use
-> > preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
-> > sequences where we want to have as few retries as possible).
+Le 18/03/2015 16:53, Ben Dooks a ?crit :
+> Change the __raw IO calls to readl/write_relaxed which makes the driver
+> endian agnostic to run properly on big endian systems.
 > 
-> Hmm, I'm not sure I agree with that. In the interest of throughput, I can
-> understand that you want to minimise the retries but since preempt kernels
-> are all about minimising latency then actually scheduling when a cmpxchg
-> loop fail sounds pretty ideal to me.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Alessandro Zummo <a.zummo@towertech.it>
+> CC: rtc-linux at googlegroups.com
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: Andrew Victor <linux@maxim.org.za>
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-I'm on about scheduling at the end of the read, before the cmpxchg. It's
-basically asking for another thread to make the read stale (and hence
-the cmpxchg is very likely to fail).
+Yes, that seems neat:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Scheduling after the cmpxchg is fine.
+Thanks!
 
-Mark.
+> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>  drivers/rtc/rtc-at91rm9200.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
+> index b4f7744..4106abc 100644
+> --- a/drivers/rtc/rtc-at91rm9200.c
+> +++ b/drivers/rtc/rtc-at91rm9200.c
+> @@ -37,9 +37,9 @@
+>  #include "rtc-at91rm9200.h"
+>  
+>  #define at91_rtc_read(field) \
+> -	__raw_readl(at91_rtc_regs + field)
+> +	readl_relaxed(at91_rtc_regs + field)
+>  #define at91_rtc_write(field, val) \
+> -	__raw_writel((val), at91_rtc_regs + field)
+> +	writel_relaxed((val), at91_rtc_regs + field)
+>  
+>  #define AT91_RTC_EPOCH		1900UL	/* just like arch/arm/common/rtctime.c */
+>  
+> 
+
+
+-- 
+Nicolas Ferre
