@@ -1,52 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Mar 2015 19:32:25 +0000
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550B1D16.7000108@gmail.com>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
- <CAL_Jsq+sPkZtreQ0sp8KXpkUVpFy=Yh9dr249u8uyoa8yksjmg@mail.gmail.com>
- <20150319184139.GG8656@n2100.arm.linux.org.uk>
- <550B1D16.7000108@gmail.com>
-Message-ID: <20150319193225.GH8656@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Mar 2015 19:37:24 +0000
+Subject: [PATCH v10 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <20150319101205.GB24556@red-moon>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-16-git-send-email-hanjun.guo@linaro.org>
+ <20150318184114.GL10863@arm.com> <550A465F.50701@huawei.com>
+ <20150319101205.GB24556@red-moon>
+Message-ID: <20150319193724.GF4751@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 12:01:42PM -0700, Frank Rowand wrote:
-> On 3/19/2015 11:41 AM, Russell King - ARM Linux wrote:
-> What???  Why would we ever accept code that tested the dtb version
-> instead of the compatible strings and properties in device nodes?
-> The dtb version is a meaningless number just like the kernel version
-> number in /proc/version is a meaningless number.  It starts at 1 (and
-> can be reset to 1 anytime the person controlling the build environment
-> chooses to for any random reason).  The dtb version number only makes
-> sense in a local context to check which build of an object actually
-> got onto the target.
+On Thu, Mar 19, 2015 at 10:12:05AM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Mar 19, 2015 at 03:45:35AM +0000, Hanjun Guo wrote:
+> > >> +	if (trigger == ACPI_EDGE_SENSITIVE &&
+> > >> +				polarity == ACPI_ACTIVE_LOW)
+> > >> +		irq_type = IRQ_TYPE_EDGE_FALLING;
+> > >> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
+> > >> +				polarity == ACPI_ACTIVE_HIGH)
+> > >> +		irq_type = IRQ_TYPE_EDGE_RISING;
+> > >> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> > >> +				polarity == ACPI_ACTIVE_LOW)
+> > >> +		irq_type = IRQ_TYPE_LEVEL_LOW;
+> > >> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> > >> +				polarity == ACPI_ACTIVE_HIGH)
+> > >> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
+> > >> +	else
+> > >> +		irq_type = IRQ_TYPE_NONE;
+> > >> +
+> > >> +	/*
+> > >> +	 * Since only one GIC is supported in ACPI 5.0, we can
+> > >> +	 * create mapping refer to the default domain
+> > >> +	 */
+> > >> +	irq = irq_create_mapping(NULL, gsi);
+> > >> +	if (!irq)
+> > >> +		return irq;
+> > >> +
+> > >> +	/* Set irq type if specified and different than the current one */
+> > >> +	if (irq_type != IRQ_TYPE_NONE &&
+> > >> +		irq_type != irq_get_trigger_type(irq))
+> > >> +		irq_set_irq_type(irq, irq_type);
+> > >> +	return irq;
+> > >> +}
+> > >> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> > > I see you've still got this buried in the arch code. Is there any plan to
+> > > move it out, as I moaned about this in the last version of the series and
+> > > nothing seems to have changed?
+> > 
+> > Ah, sorry. Last time when I was in Hongkong for LCA this Feb, I
+> > discussed with Lorenzo and he had a look into that too, he also met some
+> > obstacles to do that, so Lorenzo said that he will talk to you about
+> > this (Lorenzo, correct me if I'm wrong due to hearing problems of much
+> > noise in that room where we were talking).
+> > 
+> > Anyway, if we move those functions to core code, such as irqdomain code,
+> > which will be compiled for x86 too, we can only set those functions as
+> > _weak, or we guard with them as #ifdef CONFIG_ARM64 ... #endif, so for
+> > me, it's really not a big deal to move those code out of arch/arm64, but
+> > I'm still open for suggestions if you can do that in a proper way.
+> 
+> You heard me clear and sound in HK, Will has a point and I looked into
+> this. Code is generic but not enough to be useful on other arches at
+> the moment, I need more time to look into this and see if we can move
+> this code to acpi core in a way that makes sense, to have, as you say,
+> a "default" implementation.
 
-I think you need to learn a lesson here.  I rotfled at your "just like
-the kernel version number" comment, because we already have code in the
-kernel to map 3.x and 4.x kernels to a 2.60.x number because userspace
-breaks with 3.x and 4.x version numbers.
+Yeah, just something guarded by a CONFIG option (probably not ARM64
+though) would be enough, I think. Nothing too fancy.
 
-I'm quite sure that someone made the exact same argument about kernel
-version numbers that you're making above about versioning dtb stuff.
-
-At the end of the day, if userspace starts abusing an API that we've
-provided in good faith, and we change something such as the version
-information which results in userspace breaking - even if userspace is
-doing something that's wrong according to how we've defined it, it's
-still our problem to fix.  No userspace regressions when upgrading.
-That's the rule.
-
-Don't bother trying to argue against this - you can't.  We will not accept
-any argument (no matter how valid) which will result in userspace breaking
-upon an upgrade.
-
-You must be *absolutely* *sure* that you want to export this information,
-and that you are absolutely happy with the consequences which would occur
-should userspace then start using this information in a way which you did
-not intend, which could very well block you from ever being able to change
-the version number from a prescribed "this version number makes userspace
-work" value.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Will
