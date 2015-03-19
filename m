@@ -1,86 +1,63 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 19 Mar 2015 12:10:25 +0100
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller
- and PHY
-In-Reply-To: <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
-Message-ID: <550AAEA1.5080301@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 19 Mar 2015 12:14:11 +0100
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+ <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+Message-ID: <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 19-03-15 02:23, Brian Norris wrote:
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> ---
-> Light dependency on:
->    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
-> for the surrounding text.
+On 19 March 2015 at 05:09, Doug Anderson <dianders@chromium.org> wrote:
+> Ulf,
 >
->   arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->   1 file changed, 36 insertions(+)
+> On Tue, Mar 17, 2015 at 3:23 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> This will get us within .3V of whatever vmmc is.  If vmmc is 3.3V, it
+>>> will allow vqmmc of 3.0V - 3.6V.
+>>>
+>>> This _seems_ sane to me and given any sane system design we should be
+>>> fine here, I think.  I can't see someone designing a system where
+>>> vqmmc was not within .3V of vmmc, can you?  If we think someone will
+>>> actually build a system where vmmc is 3.3V and vqmmc can't go higher
+>>> than 2.7V then we'll either need to increase the tolerance here or add
+>>> a new asymmetric system call like my original patches did.
+>>
+>> I know about SoC that supports 3.4V vmmc and 2.9V vqmmc.
+>>
+>> What I think we need is the option to have a policy here. We need to
+>> allow voltage levels stated by the spec and at the same time try chose
+>> the one best suited. That's not being accomplished here.
+>>
+>> Moreover, I wonder whether it's okay (from spec perspective) to have
+>> vqmmc at a higher voltage level than vmmc. I don't think that's
+>> allowed, but I might be wrong.
 >
-> diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
-> index 9eaeac8dce1b..7a7c4d8c2afe 100644
-> --- a/arch/arm/boot/dts/bcm7445.dtsi
-> +++ b/arch/arm/boot/dts/bcm7445.dtsi
-> @@ -108,6 +108,42 @@
->   			brcm,int-map-mask = <0x25c>, <0x7000000>;
->   			brcm,int-fwd-mask = <0x70000>;
->   		};
-> +
-> +		sata at f045a000 {
-> +			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
-> +			reg-names = "ahci", "top-ctrl";
-> +			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
+> OK, so sounds like I need to add a regulator_set_voltage_tol2()
+> function that takes in an upper tolerance and a lower.  We can use the
+> same rough implementation in the core we have today (if Mark is OK
+> with that) with regulator_set_voltage_tol() but just allow it to be
+> asymmetric.
 
-Why not simply drop the second register range here, and the minimal top-ctrl
-poking you need in the phy driver's phy_init function ?
+Agree. Moreover we need that API to also pick the closest value to
+target, when trying the range "target->minimum". I also believe it
+would be good to allow both upper and lower limits to be zero.
 
-This avoids the weird / ugly register overlap with the phy driver, and I think you
-can then just use the ahci_platform driver unmodified.
+If Mark disagrees with this approach, we will have to deal with all
+the magic inside the mmc core layer. Very much similar how
+mmc_regulator_get_ocrmask() is implemented.
 
-> +			interrupts = <GIC_SPI 30 0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			sata0: sata-port at 0 {
-> +				reg = <0>;
-> +				phys = <&sata_phy 0>;
-> +			};
-> +
-> +			sata1: sata-port at 1 {
-> +				reg = <1>;
-> +				phys = <&sata_phy 1>;
-> +			};
-> +		};
-> +
-> +		sata_phy: sata-phy at f0458100 {
-> +			compatible = "brcm,bcm7445-sata-phy", "brcm,phy-sata3";
-> +			reg = <0x458100 0x1e00>, <0x45804c 0x10>;
+Kind regards
+Uffe
 
-Why not simply use: reg = <0x458000 0x2000>, to me it seems that what you should
-really be using here.
-
-> +			reg-names = "phy", "port-ctrl";
-> +			#phy-cells = <1>;
-> +			#address-cells = <0x1>;
-> +			#size-cells = <0x0>;
-> +
-> +			sata-phy at 0 {
-> +				reg = <0>;
-> +			};
-> +
-> +			sata-phy at 1 {
-> +				reg = <1>;
-> +			};
-> +		};
->   	};
 >
->   	smpboot {
+> From what I see in the spec for 3.3V cards are supposed to react to a
+> high signal that is .625 * VDD - VDD + .3
 >
-
-Regards,
-
-Hans
+>
+> I might not be able to get to this till next week, though...
+>
+> -Doug
