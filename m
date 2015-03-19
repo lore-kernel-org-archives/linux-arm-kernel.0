@@ -1,52 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Mar 2015 16:00:09 +0000
-Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
-In-Reply-To: <20150319154435.GC25967@leverpostej>
-References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
- <20150319154435.GC25967@leverpostej>
-Message-ID: <20150319160008.GA4751@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Mar 2015 17:01:20 +0100
+Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
+ init_mm
+In-Reply-To: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu8C+aQAKtuz41_KaB8OutB=CMeagCCUptWZkXfEqOgQeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 03:44:36PM +0000, Mark Rutland wrote:
-> On Thu, Mar 19, 2015 at 02:52:31PM +0000, Steve Capper wrote:
-> > this_cpu operations were implemented for arm64 in:
-> >  5284e1b arm64: xchg: Implement cmpxchg_double
-> >  f97fc81 arm64: percpu: Implement this_cpu operations
-> > 
-> > Unfortunately, it is possible for pre-emption to take place between
-> > address generation and data access. This can lead to cases where data
-> > is being manipulated by this_cpu for a different CPU than it was
-> > called on. Which effectively breaks the spec.
-> > 
-> > This patch disables pre-emption for the this_cpu operations
-> > guaranteeing that address generation and data manipulation.
-> 
-> Shouldn't that last sentence end with "occur on the same CPU", or
-> something like that?
-> 
-> [...]
-> 
-> > +/*
-> > + * Modules aren't allowed to use preempt_enable_no_resched, and it is
-> > + * undef'ed. If we are unable to use preempt_enable_no_resched, then
-> > + * fallback to the standard preempt_enable.
-> > + */
-> > +#ifdef preempt_enable_no_resched
-> > +#define __pcp_preempt_enable()	preempt_enable_no_resched()
-> > +#else
-> > +#define __pcp_preempt_enable()	preempt_enable()
-> > +#endif /* preempt_enable_no_resched */
-> 
-> I think it would be worth mentioning in the comment why we want to use
-> preempt_enable_no_resched where possible (e.g. read-modify-cmpxchg
-> sequences where we want to have as few retries as possible).
+On 19 March 2015 at 16:43, Will Deacon <will.deacon@arm.com> wrote:
+> init_mm isn't a normal mm: it has swapper_pg_dir as its pgd (which
+> contains kernel mappings) and is used as the active_mm for the idle
+> thread.
+>
+> When restoring the pgd after an EFI call, we write current->active_mm
+> into TTBR0. If the current task is actually the idle thread (e.g. when
+> initialising the EFI RTC before entering userspace), then the TLB can
+> erroneously populate itself with junk global entries as a result of
+> speculative table walks.
+>
+> When we do eventually return to userspace, the task can end up hitting
+> these junk mappings leading to lockups, corruption or crashes.
+>
+> This patch fixes the problem in the same way as the CPU suspend code by
+> ensuring that we never switch to the init_mm in efi_set_pgd and instead
+> point TTBR0 at the zero page. A check is also added to cpu_switch_mm to
+> BUG if we get passed swapper_pg_dir.
+>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Fixes: f3cdfd239da5 ("arm64/efi: move SetVirtualAddressMap() to UEFI stub")
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Hmm, I'm not sure I agree with that. In the interest of throughput, I can
-understand that you want to minimise the retries but since preempt kernels
-are all about minimising latency then actually scheduling when a cmpxchg
-loop fail sounds pretty ideal to me.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Why can't we just use preempt_enable?
+> ---
+>
+> This patch gets armhf Debian booting again on my Juno (I guess 64-bit
+> userspace tends to use virtual addresses that are high enough to avoid
+> hitting the junk TLB entries!).
+>
 
-Will
+I guess that also explains the lack of bug reports: quite a few people
+have been running with these patches over the past months, but nobody
+noticed afaik
+
+>  arch/arm64/include/asm/proc-fns.h | 6 +++++-
+>  arch/arm64/kernel/efi.c           | 6 +++++-
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> index 9a8fd84f8fb2..941c375616e2 100644
+> --- a/arch/arm64/include/asm/proc-fns.h
+> +++ b/arch/arm64/include/asm/proc-fns.h
+> @@ -39,7 +39,11 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+>
+>  #include <asm/memory.h>
+>
+> -#define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+> +#define cpu_switch_mm(pgd,mm)                          \
+> +do {                                                   \
+> +       BUG_ON(pgd == swapper_pg_dir);                  \
+> +       cpu_do_switch_mm(virt_to_phys(pgd),mm);         \
+> +} while (0)
+>
+>  #define cpu_get_pgd()                                  \
+>  ({                                                     \
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 2b8d70164428..ab21e0d58278 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -337,7 +337,11 @@ core_initcall(arm64_dmi_init);
+>
+>  static void efi_set_pgd(struct mm_struct *mm)
+>  {
+> -       cpu_switch_mm(mm->pgd, mm);
+> +       if (mm == &init_mm)
+> +               cpu_set_reserved_ttbr0();
+> +       else
+> +               cpu_switch_mm(mm->pgd, mm);
+> +
+>         flush_tlb_all();
+>         if (icache_is_aivivt())
+>                 __flush_icache_all();
+> --
+> 2.1.4
+>
