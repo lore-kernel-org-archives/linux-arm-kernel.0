@@ -1,102 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 19 Mar 2015 09:17:42 +0000
-Subject: [PATCH 3/3] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CABb+yY0HufMEDy7ANj8KV0hamvM-Tgy4GBkwD73wm3DMumcbaQ@mail.gmail.com>
-References: <1425379283-1567-1-git-send-email-lee.jones@linaro.org>
- <1425379283-1567-4-git-send-email-lee.jones@linaro.org>
- <3926609.Ff6LCkuuMX@wuerfel>
- <CAJe_ZhdjPa3C_TUDAPA3fS3K83FGB-GaAjVBjtsow2mp5h8NRw@mail.gmail.com>
- <20150318131722.GN3318@x1>
- <CABb+yY0wmy+oYUsVkStrMVmfGjvedDPn+wsN_yjvdMRQoVEHOg@mail.gmail.com>
- <20150318153421.GP3318@x1>
- <CABb+yY0HufMEDy7ANj8KV0hamvM-Tgy4GBkwD73wm3DMumcbaQ@mail.gmail.com>
-Message-ID: <20150319091742.GX3318@x1>
+From: maxime.ripard@free-electrons.com (maxime.ripard)
+Date: Thu, 19 Mar 2015 10:18:43 +0100
+Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: sun8i: Add SMP support for
+ the Allwinner A23
+In-Reply-To: <2015031912050362587032@gmail.com>
+References: <1426649042-30547-1-git-send-email-wens@csie.org>
+ <1426649042-30547-3-git-send-email-wens@csie.org>
+ <20150318102939.GP4638@lukather>
+ <CAGb2v65qZBPcury1e-DXwmpJOyS97oWFVisGQKEbTZkc+Z60nQ@mail.gmail.com>
+ <2015031912050362587032@gmail.com>
+Message-ID: <20150319091843.GA4255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Jassi Brar wrote:
+Hi Kevin,
 
-> On Wed, Mar 18, 2015 at 9:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 18 Mar 2015, Jassi Brar wrote:
-> >
-> >> On Wed, Mar 18, 2015 at 6:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > On Tue, 03 Mar 2015, Jassi Brar wrote:
-> >> >
-> >> >> On 3 March 2015 at 17:04, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> >> > On Tuesday 03 March 2015 10:41:23 Lee Jones wrote:
-> >> >> >> +
-> >> >> >> +/*
-> >> >> >> + * struct sti_mbox_msg - sti mailbox message description
-> >> >> >> + * @dsize:             data payload size
-> >> >> >> + * @pdata:             message data payload
-> >> >> >> + */
-> >> >> >> +struct sti_mbox_msg {
-> >> >> >> +       u32             dsize;
-> >> >> >> +       u8              *pdata;
-> >> >> >> +};
-> >> >> >
-> >> >> > As mentioned in another thread, we may just want to add a 'size'
-> >> >> > argument to the message send function, and a default helper for
-> >> >> > messages with size of 32 bits.
-> >> >> >
-> >> >> Case-a) 'size' is a member of the payload structure itself
-> >> >>     The extra 'size' argument would only be used for sanity check.
-> >> >>     This driver seems so. Lee, can you not do without 'dsize'?
-> >> >>
-> >> >> Case-b) 'size' is not a member of payload structure:
-> >> >>      b1)  payload is fixed length, that is 'size' := sizeof(struct my_payload)
-> >> >>             Here the size argument is redundant.
-> >> >>
-> >> >>      b2)  payload length varies
-> >> >>             This case is highly unlikely because there would be no way
-> >> >> for remote to know how many bytes to read as the payload. Not to mean
-> >> >> we can't do without the 'size' argument.
-> >> >>
-> >> >> Your opinion has huge weight, but I would like to be enlightened
-> >> >> before agreeing.
-> >> >
-> >> > Let's simplify this.
-> >> >
-> >> > If you want to have varying length payloads, you have to carry the
-> >> > size in the payload.  If you wish to force fixed size payloads, then
-> >> > you may do without a size segment.
-> >> >
-> >> > Do you really want to force all users of Mailbox to use fixed size
-> >> > payloads?
-> >> >
-> >> No. I only observed the fact that every known mailbox controller
-> >> driver already has a way to figure out the payload length because
-> >> either the protocol uses fixed length payloads or has the 'size' field
-> >> in every payload.
-> >> I am yet to see a platform that uses both, then the 'size' argument
-> >> will be helpful but still not necessary.
-> >
-> > I see.  So your real concern is that controllers shouldn't have two
-> > means of obtaining size.
-> >
-> I think right now there's not much need to expand the api for 'u32'
-> sized payloads.
-> 
-> > Arnd's idea of placing the message size as part of the send_message()
-> > call is fine, but it's still going to end up in the payload isn't it?
-> >
-> ... or it will be implied by sizeof(struct my_packet) if the protocol
-> has finite set of payloads.
-> 
-> > And what about receiving?
-> >
-> Similar to sending - controller driver passes pointer to RX buffer
-> which the client parses. Remember the protocol would already have a
-> way to communicate payload length.
+On Thu, Mar 19, 2015 at 12:05:06PM +0800, kevin.z.m.zh at gmail.com wrote:
+> >> One question I couldn't find any answer to is that does the SMP bit is
+> >> set in secondary_startup?
+> >>
+> >> I couldn't find where it was set, but it still looks like the right
+> >> thing to do, so I would expect the code to do that.
+> > 
+> > I don't see it either. The sun8i code is just the sun6i code with the
+> > power clamps removed. And sun6i secondary_startup was removed some time
+> > ago in commit 1146b600044d ("ARM: sunxi: fix build for THUMB2_KERNEL").
+> > 
+> > ChenYu
+>
+> The SMP bit should be set in the function of "__v7_ca7mp_setup", which is located
+> in the file:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mm/proc-v7.S?id=refs/tags/v4.0-rc4
+> I'm not sure if this is your discussion.
 
-So this is the bit that's getting me.  How do you pass payload length
-to the remote processor if you don't have it in the payload?  Unless
-we are using cross-terminology of course.  I'm thinking that the
-payload is the entire message sent to the remote proc i.e:
-[[ size ][ data]].
+It is, but I wasn't seeing it called anywhere in the secondary_startup
+code path.
+
+I was expecting a direct call, but it looks like it's a dynamic call,
+with a function-pointer like call, that is indeed run both in the
+kernel entry point and the secondary_startup.
+
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/kernel/head.S?id=refs/tags/v4.0-rc4#n389
+
+Thanks!
+Maxime
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150319/352e3468/attachment.sig>
