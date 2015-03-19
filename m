@@ -1,34 +1,29 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Thu, 19 Mar 2015 08:59:25 +0200
-Subject: [PATCH 2/2] ARM: dts: sunxi: Remove overclocked/overvoltaged OPP
-In-Reply-To: <1426732773-7179-3-git-send-email-wens@csie.org>
-References: <1426732773-7179-1-git-send-email-wens@csie.org>
- <1426732773-7179-3-git-send-email-wens@csie.org>
-Message-ID: <20150319085925.70d8a10d@i7>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 19 Mar 2015 07:06:14 +0000
+Subject: [PATCHv3] mm: Don't offset memmap for flatmem
+In-Reply-To: <CAJAp7OhebH088EjXxo0tG__p8m11FiNw8qqG6k8eAky6cg2P8g@mail.gmail.com>
+References: <1426291715-16242-1-git-send-email-lauraa@codeaurora.org>
+ <CAJAp7OhebH088EjXxo0tG__p8m11FiNw8qqG6k8eAky6cg2P8g@mail.gmail.com>
+Message-ID: <550A7566.8070907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015 10:39:33 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
 
-> Without proper regulator support for individual boards, it is dangerous
-> to have overclocked/overvoltaged OPPs in the list. Cpufreq will increase
-> the frequency without the accompanying voltage increase, resulting in
-> an unstable system.
-> 
-> Remove them for now. We can revisit them with the new version of OPP
-> bindings, which support boost settings and frequency ranges, among
-> other things.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  arch/arm/boot/dts/sun5i-a13.dtsi | 3 +--
->  arch/arm/boot/dts/sun7i-a20.dtsi | 3 +--
->  2 files changed, 2 insertions(+), 4 deletions(-)
 
-What about the sun4i-a10.dtsi file? Was it forgotten or skipped
-deliberately?
+On 19/03/15 00:21, Bjorn Andersson wrote:
+>> the memmap array. Just use the allocated memmap without any offset
+>> >when running with CONFIG_FLATMEM to avoid the overrun.
+>> >
+>> >Signed-off-by: Laura Abbott<lauraa@codeaurora.org>
+>> >Reported-by: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
+>> >---
+> With this I can boot 8960 and 8064 without patching up the MEM ATAGs
+> from the bootloader (as well as "reserving" smem).
+>
+Yes I forgot the mention this I can boot my IFC6410 without the 
+fixup.bin ...\o/ .
 
--- 
-Best regards,
-Siarhei Siamashka
+--srini
+> Tested-by: Bjorn Andersson<bjorn.andersson@sonymobile.com>
+>
+> Thanks,
