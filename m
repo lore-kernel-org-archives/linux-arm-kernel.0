@@ -1,62 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Mar 2015 13:40:27 +0000
-Subject: [patch 1/7] dt: dtb version: consolidate documentation of chosen
- node bindings
-In-Reply-To: <550A4326.2070801@gmail.com>
-References: <550A42AC.8060104@gmail.com>
- <550A4326.2070801@gmail.com>
-Message-ID: <20150319134027.GE18473@leverpostej>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 19 Mar 2015 16:42:13 +0300
+Subject: [PATCH] usb: ehci-orion: add more constants for register values
+In-Reply-To: <1426761136-4118-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1426761136-4118-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <550AD235.4020305@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 03:31:50AM +0000, Frank Rowand wrote:
-> From: Frank Rowand <frank.rowand@sonymobile.com>
-> 
-> Documentation of bindings in node /chosen are scattered in several bindings
-> files.  If not already in Documentation/devicetree/bindings/chosen.txt, add
-> a pointer in that file to where the property and node bindings are described.
-> 
-> This is a clean up in anticipation of adding another node binding in /chosen.
-> 
-> Signed-off-by: Frank Rowand <frank.rowand@sonymobile.com>
+Hello.
+
+On 3/19/2015 1:32 PM, Thomas Petazzoni wrote:
+
+> This commit adds new register values for the USB_CMD and USB_MODE
+> registers, which allows to avoid the usage of a number of magic values
+> in orion_usb_phy_v1_setup().
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/chosen.txt |   31 +++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
-> 
-> Index: b/Documentation/devicetree/bindings/chosen.txt
-> ===================================================================
-> --- a/Documentation/devicetree/bindings/chosen.txt
-> +++ b/Documentation/devicetree/bindings/chosen.txt
-> @@ -44,3 +44,34 @@ Implementation note: Linux will look for
->  on PowerPC "stdout" if "stdout-path" is not found.  However, the
->  "linux,stdout-path" and "stdout" properties are deprecated. New platforms
->  should only use the "stdout-path" property.
-> +
-> +
-> +Properties documented in other bindings
-> +---------------------------------------
-> +#address-cells                          video/simple-framebuffer-sunxi.txt
-> +
-> +#size-cells                             video/simple-framebuffer-sunxi.txt
-> +
-> +bootargs                                booting-without-of.txt
-> +                                        usage-model.txt
-> +
-> +initrd-end                              usage-model.txt
-> +initrd-start                            usage-model.txt
-> +
-> +interrupt-controller (obsolete)         booting-without-of.txt
-> +
-> +linux,pci-probe-only                    pci/host-generic-pci.txt
-> +
-> +linux,stdout-path                       booting-without-of.txt
-> +
-> +ranges                                  video/simple-framebuffer-sunxi.txt
-> +
-> +stdout-path                             video/simple-framebuffer.txt
+>   drivers/usb/host/ehci-orion.c | 18 ++++++++++++------
+>   1 file changed, 12 insertions(+), 6 deletions(-)
 
-The usual form of stdout-path is documented immediately above this
-section. That should probably be updated to refer to the
-video/simple-framebuffer.txt case.
+> diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+> index f6eafec..0feca8a 100644
+> --- a/drivers/usb/host/ehci-orion.c
+> +++ b/drivers/usb/host/ehci-orion.c
+> @@ -29,7 +29,13 @@
+>   #define wrl(off, val)	writel_relaxed((val), hcd->regs + (off))
+>
+>   #define USB_CMD			0x140
+> +#define   USB_CMD_RUN           BIT(0)
+> +#define   USB_CMD_RESET         BIT(1)
 
-Mark.
+    Please use tabs to align the values, not spaces.
+
+>   #define USB_MODE		0x1a8
+> +#define   USB_MODE_MASK         GENMASK(1, 0)
+> +#define   USB_MODE_DEVICE       0x2
+> +#define   USB_MODE_HOST         0x3
+> +#define   USB_MODE_SDIS         BIT(4)
+
+    Here too.
+
+>   #define USB_CAUSE		0x310
+>   #define USB_MASK		0x314
+>   #define USB_WINDOW_CTRL(i)	(0x320 + ((i) << 4))
+[...]
+
+WBR, Sergei
