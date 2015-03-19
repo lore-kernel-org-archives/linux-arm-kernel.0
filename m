@@ -1,31 +1,44 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 19 Mar 2015 14:29:01 +0900
-Subject: [PATCH 0/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from ARM
+Date: Thu, 19 Mar 2015 05:30:09 +0000
+Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from ARM
  defconfigs
-Message-ID: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
+In-Reply-To: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
+References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Hi Olof, Kevin, Arnd
+Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
+Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
+And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
+But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
+not a general purpose DMAC (2nd DMAC is for Device to Device inside
+sound system). Additionally, current DMAEngine can't support Device to
+Device, and we don't have correct DT bindings for it at this point.
+So the easiest solution for it is that move it from DMAEngine to rsnd
+driver.
+Audio DMAC peri peri DMAEngine is no longer needed.
+Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
 
-This patch removes CONFIG_RCAR_AUDMAC_PP from arch/arm/configs,
-because rcar_audmac_periperi is no longer DMAEngine driver.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-DMAEngine maintainer Vinod accepted about rcar_audmac_periperi removal patch on
-
-	git://git.infradead.org/users/vkoul/slave-dma.git :: topic/sh
-
-	3cd44dcd35a6618df88c51561290dc02fb35b8e2
-	(dmaengine: remove Renesas Audio DMAC peri peri)
-
-And, this patch was posted to him in v1/v2 patch-set.
-But, he couldn't apply it, because of base branch (?)
-According to Simon (= SH-ARM maintainer) this patch should be taken
-ARM maintainer.
-http://thread.gmane.org/gmane.linux.ports.sh.devel/44657/focus=44857
-
-I can say that this removal CONFIG_RCAR_AUDMAC_PP patch has no relationship
-to DMAEngine branch, because no SoC/platform is using it.
-(more detail, defconfig has it, but, there is no DT settings in upstream)
-So, I think you don't need to care about Vinod's branch
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 06075b6..e805984 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -505,7 +505,6 @@ CONFIG_DW_DMAC=y
+ CONFIG_MV_XOR=y
+ CONFIG_TEGRA20_APB_DMA=y
+ CONFIG_SH_DMAE=y
+-CONFIG_RCAR_AUDMAC_PP=m
+ CONFIG_RCAR_DMAC=y
+ CONFIG_STE_DMA40=y
+ CONFIG_SIRF_DMA=y
+-- 
+1.9.1
