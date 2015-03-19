@@ -1,58 +1,47 @@
-From: grygorii.strashko@linaro.org (Grygorii.Strashko@linaro.org)
-Date: Thu, 19 Mar 2015 18:21:31 +0200
-Subject: [PATCH 2/2] ARM: dts: dra7: remove ti,hwmod property from pcie phy
-In-Reply-To: <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
-References: <1424422274-27946-1-git-send-email-kishon@ti.com>
- <1424422274-27946-2-git-send-email-kishon@ti.com> <5509A998.2080509@ti.com>
- <20150318165706.GQ31346@atomide.com> <5509D3BD.6030004@linaro.org>
- <alpine.DEB.2.02.1503191455020.9480@utopia.booyaka.com>
- <550AEDA1.50109@linaro.org>
- <alpine.DEB.2.02.1503191541270.9480@utopia.booyaka.com>
-Message-ID: <550AF78B.3050202@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 19 Mar 2015 16:23:01 +0000
+Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <CAPvkgC2ntPrTVKi_WxHcMHqV2Rt9KZR9u-oUqVHNH8+1=nnnDg@mail.gmail.com>
+References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
+ <20150319154435.GC25967@leverpostej>
+ <CAPvkgC2ntPrTVKi_WxHcMHqV2Rt9KZR9u-oUqVHNH8+1=nnnDg@mail.gmail.com>
+Message-ID: <20150319162300.GF25967@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 05:45 PM, Paul Walmsley wrote:
-> On Thu, 19 Mar 2015, Grygorii.Strashko at linaro.org wrote:
+> > It's a shame there don't seem to be any this_cpu_* self-tests; I've
+> > booted a kernel with this applied, but I didn't have anything that
+> > exploded without this, so I'd feel uneasy giving a Tested-by.
 > 
->> On 03/19/2015 04:55 PM, Paul Walmsley wrote:
->>> On Wed, 18 Mar 2015, Grygorii.Strashko at linaro.org wrote:
->>>
->>>> On 03/18/2015 06:57 PM, Tony Lindgren wrote:
->>>>> * Grygorii Strashko <grygorii.strashko@ti.com> [150318 09:37]:
->>>>>> As I can see Patch 1 from this series was merged in 4.0-rc4,
->>>>>> but this patch wasn't. As result, I can see below warning all the time
->>>>>> during boot now:
->>>>>>
->>>>>> [    0.594591] platform 4a094000.pciephy: Cannot lookup hwmod
->>>>>> 'pcie1-phy'
->>>>>
->>>>> OK. Is this needed as a fix for the v4.0-rc series, or can this wait
->>>>> for v4.1?
->>>>
->>>> I think, Yes. These two patches should go all together, because they are
->>>> interrelated.
->>>
->>> Does the warning result in a functional problem, or is it just a warning?
->>>
->>
->> PCE1 PHY device is not registered any more.
-> 
-> How does the second patch fix that?
+> There is the percpu_test module, I ran this and it appeared to pass.
+> Also, I ran the traditional hackbench tests.
 
-I've re-checked it - sorry for disinfo.
+I haan't spotted the percpu_test module, but looking at it, it seems to
+be effectively useless. The body of the test is:
 
-PHY devices are created, but omap_device_fail_pm_domain is assigned to them.
-As result Runtime PM is not working any more.
+static int __init percpu_test_init(void)
+{
+	pr_info("percpu test start\n");
+	preempt_disable();
 
+	...
+	/*
+	 * test each this_cpu operation in turn
+	 */
+	...
 
-[    0.592501] platform 4a094000.pciephy: Cannot lookup hwmod 'pcie1-phy'
-[    0.597510] pinctrl-single 4a003400.pinmux: 281 pins at pa fc003400 size 1124
-[    0.602794] ti-pipe3 4a094000.pciephy: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+	preempt_enable();
+	pr_info("percpu test done\n");
 
-When ti,hwmods is not present PCI PHY will be added as regular Platform device
-and Runtime PM will work again.
+	return -EAGAIN;
+}
 
--- 
-regards,
--grygorii
+Which doesn't stress the this_cpu operations at all, unless you consider
+the hard part to be the maths ;)
+
+To test this patch thoroughly we need something that has a few threads
+which perform some common use patterns (while getting migrated),
+checking that they end up with consistent and the system doesn't lockup
+or explode.
+
+Mark.
