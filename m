@@ -1,126 +1,96 @@
-From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
-Date: Thu, 19 Mar 2015 12:28:13 +0200
-Subject: [PATCH 1/2] ARM: dts: sun4i: a10-lime: Override and remove
- 1008MHz OPP setting
-In-Reply-To: <CAGb2v656kP=+K+NCuH5hkcc4D0XhpYksbN52wZRKEVEDsBN6+w@mail.gmail.com>
-References: <1426732773-7179-1-git-send-email-wens@csie.org>
- <1426732773-7179-2-git-send-email-wens@csie.org>
- <20150319085716.75d3ce76@i7>
- <CAGb2v656kP=+K+NCuH5hkcc4D0XhpYksbN52wZRKEVEDsBN6+w@mail.gmail.com>
-Message-ID: <20150319122813.39112da2@i7>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 19 Mar 2015 11:30:47 +0100
+Subject: [PATCH] pinctrl: mvebu: add suspend/resume support to Armada XP
+ pinctrl driver
+Message-ID: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015 16:17:30 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+This commit adds suspend/resume support to the Armada XP pinctrl
+driver, by simply saving and restoring the MPP registers.
 
-> On Thu, Mar 19, 2015 at 2:57 PM, Siarhei Siamashka
-> <siarhei.siamashka@gmail.com> wrote:
-> > On Thu, 19 Mar 2015 10:39:32 +0800
-> > Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> >> The Olimex A10-Lime is known to be unstable when running at 1008MHz.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 14 ++++++++++++++
-> >>  1 file changed, 14 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> >> index 31dc2f1c3870..16ecb8938e19 100644
-> >> --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> >> +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> >> @@ -74,6 +74,20 @@
-> >>       status = "okay";
-> >>  };
-> >>
-> >> +&cpu0 {
-> >> +     /* The A10-Lime is known to be unstable when running at 1008 MHz */
-> >> +     operating-points = <
-> >> +             /* kHz    uV */
-> >> +             960000  1400000
-> >> +             912000  1400000
-> >> +             864000  1300000
-> >> +             720000  1200000
-> >> +             528000  1100000
-> >> +             312000  1000000
-> >> +             144000  900000
-> >> +             >;
-> >> +};
-> >> +
-> >>  &ehci0 {
-> >>       status = "okay";
-> >>  };
-> >
-> > Thanks for the patch. At least it should make my A10-OLinuXino-LIME
-> > working without obvious failures out of the box (the U-Boot is still
-> > another story though and there is a gap during boot up when the board
-> > is running with unreliable settings, but the probability of a failure
-> > is rather low).
-> >
-> > I should also mention that using 960MHz @1.4V does not fail, but it does
-> > not have any safety headroom either (the cyan 'sun4i_poorlime' line
-> > on the plot):
-> >
-> >     http://people.freedesktop.org/~siamashka/files/20140512/sunxi-cpufreq-plot.png
-> >
-> > On the other hand, my board is on the worst part of the spectrum (many
-> > other a10-lime boards do not fail even at 1008MHz), so maybe having
-> > extra safety headroom is less necessary.
-> >
-> > An interesting question is whether the same problem may be reproducible
-> > on the Allwinner A10 devices other than A10-OLinuXino-LIME. My original
-> > problem report
-> >
-> >     https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg04343.html
-> >
-> > mentioned the A10-OLinuXino-LIME rev.A and introduced some sort of
-> > a bias by itself. At least I have seen people saying something like
-> > "my a10-lime revision is not rev.A, so it's none of my concern and
-> > I'm not going to bother running any tests". So far we have accumulated
-> > reports from 4 or 5 people having this reliability problem on their
-> > A10-OLinuXino-LIME (various revisions, not just rev.A), but not
-> > much from the other boards owners.
-> >
-> > Anyway, this particular patch is
-> > Tested-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
-> > Acked-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
-> 
-> Good to hear it works. Did you test all the settings?
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-You have nailed it. I was about to send the results of the full
-round of tests after running them a bit longer and revoke the
-initial Tested-by.
-
-Turns out that the 312MHz and 144MHz operating points fail to work
-reliable and tend to deadlock:
-
-Testing CPU 0
-  960 MHz ............................................................ OK
-  912 MHz ............................................................ OK
-  864 MHz ............................................................ OK
-  720 MHz ............................................................ OK
-  528 MHz ............................................................ OK
-  312 MHz ............................................................ OK
-  144 MHz Write failed: Broken pipe
-
-Testing CPU 0
-  960 MHz ............................................................ OK
-  912 MHz ............................................................ OK
-  864 MHz ............................................................ OK
-  720 MHz ............................................................ OK
-  528 MHz ............................................................ OK
-  312 MHz .................Write failed: Broken pipe
-
-
-> I copied the wrong settings, from sun5i-a13.dtsi instead of sun4i-a10.dtsi.
-
-I guess, this explains the problems at lower operating points.
-
-> I'll send a fixed version later.
-
-Thanks.
-
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+index fc33761..d191c3a 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
+@@ -34,6 +34,7 @@
+ #include "pinctrl-mvebu.h"
+ 
+ static void __iomem *mpp_base;
++static u32 *mpp_saved_regs;
+ 
+ static int armada_xp_mpp_ctrl_get(unsigned pid, unsigned long *config)
+ {
+@@ -406,12 +407,42 @@ static struct pinctrl_gpio_range mv78460_mpp_gpio_ranges[] = {
+ 	MPP_GPIO_RANGE(2,  64, 64,  3),
+ };
+ 
++static int armada_xp_pinctrl_suspend(struct platform_device *pdev,
++				     pm_message_t state)
++{
++	struct mvebu_pinctrl_soc_info *soc =
++		platform_get_drvdata(pdev);
++	int i, nregs;
++
++	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
++
++	for (i = 0; i < nregs; i++)
++		mpp_saved_regs[i] = readl(mpp_base + i * 4);
++
++	return 0;
++}
++
++static int armada_xp_pinctrl_resume(struct platform_device *pdev)
++{
++	struct mvebu_pinctrl_soc_info *soc =
++		platform_get_drvdata(pdev);
++	int i, nregs;
++
++	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
++
++	for (i = 0; i < nregs; i++)
++		writel(mpp_saved_regs[i], mpp_base + i * 4);
++
++	return 0;
++}
++
+ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	struct mvebu_pinctrl_soc_info *soc = &armada_xp_pinctrl_info;
+ 	const struct of_device_id *match =
+ 		of_match_device(armada_xp_pinctrl_of_match, &pdev->dev);
+ 	struct resource *res;
++	int nregs;
+ 
+ 	if (!match)
+ 		return -ENODEV;
+@@ -459,6 +490,13 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
+ 		break;
+ 	}
+ 
++	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
++
++	mpp_saved_regs = devm_kmalloc(&pdev->dev, nregs * sizeof(u32),
++				      GFP_KERNEL);
++	if (!mpp_saved_regs)
++		return -ENOMEM;
++
+ 	pdev->dev.platform_data = soc;
+ 
+ 	return mvebu_pinctrl_probe(pdev);
+@@ -476,6 +514,8 @@ static struct platform_driver armada_xp_pinctrl_driver = {
+ 	},
+ 	.probe = armada_xp_pinctrl_probe,
+ 	.remove = armada_xp_pinctrl_remove,
++	.suspend = armada_xp_pinctrl_suspend,
++	.resume = armada_xp_pinctrl_resume,
+ };
+ 
+ module_platform_driver(armada_xp_pinctrl_driver);
 -- 
-Best regards,
-Siarhei Siamashka
+2.1.0
