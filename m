@@ -1,54 +1,59 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 19 Mar 2015 15:45:40 +0100
-Subject: [PATCH v2] usb: ehci-orion: add more constants for register values
-In-Reply-To: <Pine.LNX.4.44L0.1503191023030.1135-100000@iolanthe.rowland.org>
-References: <1426773667-29488-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <Pine.LNX.4.44L0.1503191023030.1135-100000@iolanthe.rowland.org>
-Message-ID: <20150319154540.786e6b4e@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 Mar 2015 15:46:29 +0100
+Subject: [PATCH] driver core / PM: Add callbacks for PM domain
+ initialization/cleanup
+In-Reply-To: <Pine.LNX.4.44L0.1503191017590.1135-100000@iolanthe.rowland.org>
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <Pine.LNX.4.44L0.1503191017590.1135-100000@iolanthe.rowland.org>
+Message-ID: <CAMuHMdWcOXEjSb39D2y8KCGRuvfWZj0-4Qr8xk1ZKcE9hbP9BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Alan Stern,
+On Thu, Mar 19, 2015 at 3:20 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> There are two alternatives to them.  One is to do PM domain attach/detach in
+>> the bus type's ->probe and ->remove, but that's suboptimal, because it is
+>> then carried out every time a driver is probed/removed for a device.  The
+>> other one would be to have each interested bus type register a bus type
+>> notifier for itself, but that would be rather ugly, wouldn't it?
+>
+> Driver probing and removal is not a hot path.  Successful probes
+> usually occur only once for each device.  I don't know how many
+> unsuccessful probes there are on average, but probably not many.
 
-On Thu, 19 Mar 2015 10:27:18 -0400 (EDT), Alan Stern wrote:
+Do not underestimate the power of deferred probing:
 
-> > @@ -69,8 +75,8 @@ static void orion_usb_phy_v1_setup(struct usb_hcd *hcd)
-> >  	/*
-> >  	 * Reset controller
-> >  	 */
-> > -	wrl(USB_CMD, rdl(USB_CMD) | 0x2);
-> > -	while (rdl(USB_CMD) & 0x2);
-> > +	wrl(USB_CMD, rdl(USB_CMD) | USB_CMD_RESET);
-> > +	while (rdl(USB_CMD) & USB_CMD_RESET);
-> 
-> For one thing, this use of whitespace does not make the syntax clear.  
-> At the very least, it should be written as:
-> 
-> 	while (rdl(USB_CMD) & USB_CMD_RESET)
-> 		;
-> 
-> so that the reader can see this is a loop with an empty body.  Right 
-> now it looks like an ordinary, non-looping statement.
-> 
-> For another, have you considered what will happen if the hardware is 
-> defective and never turns off the USB_CMD_RESET bit?  This sort of 
-> thing should always be implemented with some sort of timeout.
+sh_mobile_sdhi ee100000.sd: GPIO lookup for consumer cd
+sh_mobile_sdhi ee100000.sd: using device tree for GPIO lookup
+of_get_named_gpiod_flags: parsed 'cd-gpios' property of node
+'/sd at ee100000[0]' - status (0)
+sh_mobile_sdhi ee100000.sd: Got CD GPIO
+sh_mobile_sdhi ee100000.sd: GPIO lookup for consumer wp
+sh_mobile_sdhi ee100000.sd: using device tree for GPIO lookup
+of_get_named_gpiod_flags: parsed 'wp-gpios' property of node
+'/sd at ee100000[0]' - status (0)
+sh_mobile_sdhi ee100000.sd: Got WP GPIO
+platform ee100000.sd: Driver sh_mobile_sdhi requests probe deferral
+...
+sh_mobile_sdhi ee100000.sd: GPIO lookup for consumer cd
+sh_mobile_sdhi ee100000.sd: using device tree for GPIO lookup
+of_get_named_gpiod_flags: parsed 'cd-gpios' property of node
+'/sd at ee100000[0]' - status (0)
+sh_mobile_sdhi ee100000.sd: Got CD GPIO
+sh_mobile_sdhi ee100000.sd: GPIO lookup for consumer wp
+sh_mobile_sdhi ee100000.sd: using device tree for GPIO lookup
+of_get_named_gpiod_flags: parsed 'wp-gpios' property of node
+'/sd at ee100000[0]' - status (0)
+sh_mobile_sdhi ee100000.sd: Got WP GPIO
+gpio_rcar e6055400.gpio: sense irq = 6, type = 3
+sh_mobile_sdhi ee100000.sd: mmc0 base at 0xee100000 clock rate 97 MHz
 
-These are indeed all valid concerns. However, as you can see, those
-concerns are completely orthogonal to the patch: the original code
-already has those issues.
+Gr{oetje,eeting}s,
 
-Regarding the addition of a timeout, I unfortunately have absolutely no
-idea what would be the a proper timeout value at this place. I quickly
-glanced through
-http://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/ehci-specification-for-usb.pdf
-for the documentation of this reset bit, but couldn't spot a maximum
-accepted duration for the operation.
+                        Geert
 
-Best regards,
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
