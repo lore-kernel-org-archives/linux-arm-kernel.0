@@ -1,115 +1,96 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 20 Mar 2015 13:59:27 +0100
-Subject: [PATCH v3] driver core / PM: Add PM domain callbacks for device
- setup/cleanup
-In-Reply-To: <1654636.FxBHsexDm1@vostro.rjw.lan>
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <1810625.BTgaNclHRk@vostro.rjw.lan> <1654636.FxBHsexDm1@vostro.rjw.lan>
-Message-ID: <3289026.ADmXXipokh@vostro.rjw.lan>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 20 Mar 2015 12:40:02 +0000
+Subject: [PATCH 08/12] KVM: arm/arm64: implement kvm_io_bus MMIO handling
+ for the VGIC
+In-Reply-To: <550AEEF3.80702@arm.com>
+References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
+ <1426263012-22935-9-git-send-email-andre.przywara@arm.com>
+ <20150314142720.GD10935@cbox> <550AEEF3.80702@arm.com>
+Message-ID: <550C1522.80105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On 03/19/2015 03:44 PM, Andre Przywara wrote:
+> Hej Christoffer,
+> 
 
-If PM domains are in use, it may be necessary to prepare the code
-handling a PM domain for driver probing.  For example, in some
-cases device drivers rely on the ability to power on the devices
-with the help of the IO runtime PM framework and the PM domain
-code needs to be ready for that.  Also, if that code has not been
-fully initialized yet, the driver probing should be deferred.
+[ ... ]
 
-Moreover, after the probing is complete, it may be necessary to
-put the PM domain in question into the state reflecting the current
-needs of the devices in it, for example, so that power is not drawn
-in vain.  The same should be done after removing a driver from
-a device, as the PM domain state may need to be changed to reflect
-the new situation.
+>>> +static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+>>> +				   struct kvm_io_device *this, gpa_t addr,
+>>> +				   int len, void *val, bool is_write)
+>>> +{
+>>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>> +	struct vgic_io_device *iodev = container_of(this,
+>>> +						    struct vgic_io_device, dev);
+>>> +	struct kvm_run *run = vcpu->run;
+>>> +	const struct vgic_io_range *range;
+>>> +	struct kvm_exit_mmio mmio;
+>>> +	bool updated_state;
+>>> +	gpa_t offset;
+>>> +
+>>> +	offset = addr - iodev->addr;
+>>> +	range = vgic_find_range(iodev->reg_ranges, len, offset);
+>>> +	if (unlikely(!range || !range->handle_mmio)) {
+>>> +		pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
+>>> +		return -ENXIO;
+>>> +	}
+>>> +
+>>> +	mmio.phys_addr = addr;
+>>> +	mmio.len = len;
+>>> +	mmio.is_write = is_write;
+>>> +	if (is_write)
+>>> +		memcpy(mmio.data, val, len);
+>>> +	mmio.private = iodev->redist_vcpu;
+>>> +
+>>> +	spin_lock(&dist->lock);
+>>> +	offset -= range->base;
+>>> +	if (vgic_validate_access(dist, range, offset)) {
+>>> +		updated_state = call_range_handler(vcpu, &mmio, offset, range);
+>>> +		if (!is_write)
+>>> +			memcpy(val, mmio.data, len);
+>>> +	} else {
+>>> +		if (!is_write)
+>>> +			memset(val, 0, len);
+>>> +		updated_state = false;
+>>> +	}
+>>> +	spin_unlock(&dist->lock);
+>>> +	kvm_prepare_mmio(run, &mmio);
+>>
+>> we're not the only user of kvm_exit_mmio I believe, so we could rename
+> 
+> (assuming you mean we _are_ the only user here, which I can acknowledge)
+> 
+>> this to vgic_io as well and you could change the mmio.data array to be a
+>> void *val pointer, which just gets set to the pointer passed into this
+>> function (which I think points to the kvm_run structs data array) and
+>> you can avoid all these memcopies, right?
+> 
+> That sounds indeed tempting, but the comment on the struct kvm_exit_mmio
+> declaration reads:
+> /*
+>  * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
+>  * which is an anonymous type. Use our own type instead.
+>  */
+> How I understand this the structure was introduced to _not_ use the same
+> memory, but use a copy instead. Do you remember any reason for this? And
+> in how far is this type anonymous? It's even in an uapi header.
+> 
+> Briefly looking at the code we do quite some memcpy on the way.
+> I am about to go all the way down into that ARM MMIO handling cave now
+> to check this (Marc, if I am not showing up again after some hours,
+> please come and rescue me ;-)
 
-For these reasons, introduce new PM domain callbacks, ->activate,
-->sync and ->dismiss called, respectively, before probing for a
-device driver, after the probing has completed successfully and
-if the probing has failed or the driver has been removed.
+So, I feel that there is quite some unneeded copying and masking on the
+way, but a real fix would be quite invasive and needs quite some testing
+and review. I don't feel like rushing this into a v2 of this series.
+I quickly did what you proposed (replacing memcpy by pointer
+assignment), and that seems to work, but I don't have many chances of
+testing this this weekend, since I am on the road. Also I have to dig
+out my cross-endian test scripts first. So not sure if you want to take
+the risk with this series.
+I changed the other minor points you mentioned in the review though, so
+do you want to have a "v1.5" or how do we proceed from here?
 
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
-
-One more update taking Dmitry's comments into account and fixing an
-overoptimization bug spotted by Ulf.
-
-And this actually contains the patch this time (clicked on "Send" too
-early last time, sorry about that).
-
----
- drivers/base/dd.c  |   14 ++++++++++++++
- include/linux/pm.h |    8 ++++++++
- 2 files changed, 22 insertions(+)
-
-Index: linux-pm/include/linux/pm.h
-===================================================================
---- linux-pm.orig/include/linux/pm.h
-+++ linux-pm/include/linux/pm.h
-@@ -603,10 +603,18 @@ extern void dev_pm_put_subsys_data(struc
-  * Power domains provide callbacks that are executed during system suspend,
-  * hibernation, system resume and during runtime PM transitions along with
-  * subsystem-level and driver-level callbacks.
-+ *
-+ * @detach: Called when removing a device from the domain.
-+ * @activate: Called before executing probe routines for bus types and drivers.
-+ * @sync: Called after successful driver probe.
-+ * @dismiss: Called after unsuccessful driver probe and after driver removal.
-  */
- struct dev_pm_domain {
- 	struct dev_pm_ops	ops;
- 	void (*detach)(struct device *dev, bool power_off);
-+	int (*activate)(struct device *dev);
-+	void (*sync)(struct device *dev);
-+	void (*dismiss)(struct device *dev);
- };
- 
- /*
-Index: linux-pm/drivers/base/dd.c
-===================================================================
---- linux-pm.orig/drivers/base/dd.c
-+++ linux-pm/drivers/base/dd.c
-@@ -298,6 +298,12 @@ static int really_probe(struct device *d
- 		goto probe_failed;
- 	}
- 
-+	if (dev->pm_domain && dev->pm_domain->activate) {
-+		ret = dev->pm_domain->activate(dev);
-+		if (ret)
-+			goto probe_failed;
-+	}
-+
- 	if (dev->bus->probe) {
- 		ret = dev->bus->probe(dev);
- 		if (ret)
-@@ -308,6 +314,9 @@ static int really_probe(struct device *d
- 			goto probe_failed;
- 	}
- 
-+	if (dev->pm_domain && dev->pm_domain->sync)
-+		dev->pm_domain->sync(dev);
-+
- 	driver_bound(dev);
- 	ret = 1;
- 	pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
-@@ -319,6 +328,8 @@ probe_failed:
- 	driver_sysfs_remove(dev);
- 	dev->driver = NULL;
- 	dev_set_drvdata(dev, NULL);
-+	if (dev->pm_domain && dev->pm_domain->dismiss)
-+		dev->pm_domain->dismiss(dev);
- 
- 	if (ret == -EPROBE_DEFER) {
- 		/* Driver requested deferred probing */
-@@ -525,6 +536,9 @@ static void __device_release_driver(stru
- 		devres_release_all(dev);
- 		dev->driver = NULL;
- 		dev_set_drvdata(dev, NULL);
-+		if (dev->pm_domain && dev->pm_domain->dismiss)
-+			dev->pm_domain->dismiss(dev);
-+
- 		klist_remove(&dev->p->knode_driver);
- 		if (dev->bus)
- 			blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+Cheers,
+Andre.
