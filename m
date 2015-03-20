@@ -1,50 +1,55 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 19 Mar 2015 22:02:08 -0500
-Subject: [PATCH] mfd: devicetree: qcom_rpm: document IPQ8064 resources
-Message-ID: <1426820528-12013-1-git-send-email-agross@codeaurora.org>
+From: kong.kongxinwei@hisilicon.com (kongxinwei)
+Date: Fri, 20 Mar 2015 11:10:16 +0800
+Subject: [PATCH 0/3] 96boards: add thermal senor support to hikey board
+In-Reply-To: <20150319135946.GG18473@leverpostej>
+References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150319135946.GG18473@leverpostej>
+Message-ID: <550B8F98.3070701@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Cartwright <joshc@codeaurora.org>
+hi Mark Rutland:
 
-The IPQ8064 SoC has several RPM-controlled resources, an NSS fabric
-clock and four regulator resources.  Provide definitions for them.
+? 2015/3/19 21:59, Mark Rutland ??:
+> On Thu, Mar 19, 2015 at 07:57:26AM +0000, kongxinwei wrote:
+>> The Linaro connect introduce 96boards series in Hong Kong,The HiKey board
+>> is the first board to be certified 96Boards Consumer Edition compatible.
+>> This board is based on the HiSilicon SoC. you can get more information
+>> from https://www.96boards.org.
+>>
+>> The hisilicon SoC contains thermal module, this thermal module has 4 sensors,
+>>
+>> 	- sensor 0: local sensor;
+>> 	- sensor 1: remote sensor for ACPU cluster 1;
+>> 	- sensor 2: remote sensor for ACPU cluster 2;
+>> 	- sensor 3: remote sensor for GPU;
+>>
+>> It can obtain this device temperature by operating this hardware. The new
+>> sensor driver satisfies thermal framework and to realize the ACPU ,GPU and
+>> so on to cool function.
+>>
+>> kongxinwei (3):
+>>   thermal: hisilicon: add new hisilicon thermal sensor driver
+>>   dts: hi6220: enable thermal sensor for hisilicon SoC
+>>   dt-bindings: Document the hi6220 thermal sensor bindings
+>>
+>>  .../bindings/thermal/hisilicon-thermal.txt         |  51 ++
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 153 ++++++
+>>  drivers/thermal/Kconfig                            |   8 +
+>>  drivers/thermal/Makefile                           |   1 +
+>>  drivers/thermal/hisi_thermal.c                     | 531 +++++++++++++++++++++
+> 
+> Mainline does not have a hi6220 dtsi.
+> 
+> Which tree is this against?
+> 
+> What are your dependencies?
+> 
+> Mark.
+> 
+Hikey board code are being upstreamed by our team.If hi6220 dtsi be accepted, this patch is ok.
 
-Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
----
- Documentation/devicetree/bindings/mfd/qcom-rpm.txt |    1 +
- include/dt-bindings/mfd/qcom-rpm.h                 |    6 ++++++
- 2 files changed, 7 insertions(+)
+Xinwei
 
-diff --git a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-index 85e3198..94d9ae8 100644
---- a/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-+++ b/Documentation/devicetree/bindings/mfd/qcom-rpm.txt
-@@ -12,6 +12,7 @@ frequencies.
- 		    "qcom,rpm-apq8064"
- 		    "qcom,rpm-msm8660"
- 		    "qcom,rpm-msm8960"
-+		    "qcom,rpm-ipq8064"
- 
- - reg:
- 	Usage: required
-diff --git a/include/dt-bindings/mfd/qcom-rpm.h b/include/dt-bindings/mfd/qcom-rpm.h
-index 388a6f3..13a9d4b 100644
---- a/include/dt-bindings/mfd/qcom-rpm.h
-+++ b/include/dt-bindings/mfd/qcom-rpm.h
-@@ -141,6 +141,12 @@
- #define QCOM_RPM_SYS_FABRIC_MODE		131
- #define QCOM_RPM_USB_OTG_SWITCH			132
- #define QCOM_RPM_VDDMIN_GPIO			133
-+#define QCOM_RPM_NSS_FABRIC_0_CLK		134
-+#define QCOM_RPM_NSS_FABRIC_1_CLK		135
-+#define QCOM_RPM_SMB208_S1a			136
-+#define QCOM_RPM_SMB208_S1b			137
-+#define QCOM_RPM_SMB208_S2a			138
-+#define QCOM_RPM_SMB208_S2b			139
- 
- /*
-  * Constants used to select force mode for regulators.
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> .
+> 
