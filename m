@@ -1,117 +1,126 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 15:25:19 +0000
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550B3F2E.2000303@gmail.com>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
- <20150319134910.GF18473@leverpostej> <550B013B.1060002@gmail.com>
- <20150319191231.GC11683@leverpostej> <550B3F2E.2000303@gmail.com>
-Message-ID: <20150320152518.GI14766@leverpostej>
+From: xweikong@hotmail.com (Xinwei Kong)
+Date: Fri, 20 Mar 2015 23:27:07 +0800
+Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
+ driver
+In-Reply-To: <20150320112414.GD14766@leverpostej>
+References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150319141753.GB25967@leverpostej> <20150320060653.GC18907@leoy-linaro>
+ <20150320112414.GD14766@leverpostej>
+Message-ID: <BLU436-SMTP12064F8642A4FE53FB4A448C10E0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > You can already check the hash if you want to check that you copies the
-> > correct version; which is better than trusting an arbitrary string,
-> > because if anything fiddles with the DTB it will change.
-> 
-> I'm confused.  If the bootloader fiddles with the DTB then I can not
-> compare a hash of the DTB from the build host to a hash of the DTB
-> on the target.  Of course the bootloader can also fiddle with the
-> dtb-info if it wants to .  Bootloaders do what they want to do.  :-(
 
-This is a fundamental issue with the approach: if bootloaders  mess with
-the DTB, then the provenance information is at best misleading.
+On 2015?03?20? 19:24, Mark Rutland wrote:
+>>>> +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
+>>>> +                                  &sensor->thres_temp);
+>>>> +       if (ret) {
+>>>> +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
+>>>> +                       index, ret);
+>>>> +               return ret;
+>>>> +       }
+>>>> +
+>>>> +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
+>>>> +                                  &sensor->reset_temp);
+>>>> +       if (ret) {
+>>>> +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
+>>>> +                       index, ret);
+>>>> +               return ret;
+>>>> +       }
+>>> I see now that these properties result in the HW being programmed. You
+>>> should figure out how to reconcile these with thermal-zone trip points
+>>> rather than having parallel properties.
+>>   
+>> Set "tsensor-thres-temp" to register so that if thermal reaches the
+>> threshold, the sensor will trigger h/w interrupt.
+>>
+>> Set "tsensor-reset-temp" to register so that if thermal reaches the
+>> reset value, the sensor will assert SoC reset signal to trigger h/w
+>> reset.
+> I understand this.
+>
+>> This is different w/t thermal-zone trip points, the trip points are
+>> used for timer polling.
+> That may be the case in the code as it stands today, but per the binding
+> the trip points are the temperatures at which an action is to be taken.
+>
+> The thermal-zone has poilling-delay and polling-delay-passive, but
+> there's no reason you couldn't also use the interrupt to handle the
+> "hot" trip-point, adn the reset at the "critical" trip-point. All that's
+> missing is the plumbing in order to do so.
+>
+> So please co-ordinate with the thermal framework to do that.
 
-If bootloaders don't mess with the DTB, then a hash gives you reliable
-provenance information, provided you have a DB of the hashes of DTBs
-you've shipped. If you're already in the habit of distributing binaries
-that should be fine, and if you're not then it presumably doesn't matter
-anyway.
+In order to co-ordinate with the thermal framework, We will fix "tsensor-thres-temp"
+and "tsensor-reset-temp" value in the dts. This temperatue will higher than thermal
+zone trip-point value. During polling delay time if SoC temperature is above thermal
+zone trip-point value and below "tsensor-thres-temp" value,the systerm will use this
+thermal framework ways to realize basic function such as cpu cooling device. Otherwise
+it will use interrput mode to cause some functions.
 
-> >>>> +dtb-path
-> >>>> +	The build directory relative path of the DTB.
-> >>>> +
-> >>>> +dts-path
-> >>>> +	The absolute path of the .dts file compiled to create the DTB.
-> >>>
-> >>> Why do you need the DTB path?
-> >>
-> >> Paranoia.  Even if not probable, one could build different DTBs from
-> >> the same .dts.
-> > 
-> > One could also build the same DTB from two different dts files, no?
-> > 
-> > You could build the same dtb from the same dts, but with some arbitrary
-> > things changed, such that the at either end of the process is
-> > irrelevant. Personally, I end up doing this a fair amount when testing.
-> 
-> Exactly.  And the dtb version number will change when the DTB is
-> recompiled.
+This interrupt mode help thermal framework way to complete function, in high temperature
+situation this interrupt is better than other mode. I think that it can work well.
 
-Consider having to work around stale object issues in the build system
-with git clean -fdx or similar. While unfortunate, this is sometimes
-necessary. Due to this, I build two different DTBs with exactly the same
-"version".
+Xinwei
 
-If you need to tell these apart, you can do that by hash. You don't need
-the "version" to do so.
-
-(and yes, I am aware that the same is true of the kernel).
-
-> >>> Why do these differ w.r.t. absolute/relative?
-> >>
-> >> Those are the forms of the path that are present in the build
-> >> system.  If there is a good reason to change one of them to the
-> >> other form, I could add the extra complexity to massage the path.
-> >>
-> >>>
-> >>> Why would you _ever_ need an absolute path!?
-> >>
-> >> The absolute path tells you which source repository contained the source.
-> > 
-> > Except that the absolute path is realtive to the machine it was built
-> > on, so doesn't actually help.
-> 
-> Different use cases for different people.
-
-Given the reservations that have been expressed so far, it sounds like
-the set of negative use cases is larger than the set of positives.
-
-> In all cases the absolute path includes the relative path, so it is
-> just a case of extra information.  The relative portion of the path
-> is still useful for anyone who wants to know what .dts was used in
-> the build, even if they don't have access to the build machine.
-> (They do have access to the gpl v2 source code, which will have
-> at least the relative portion of the path because that is needed
-> to build the DTB from the .dts.)
-> 
-> The extra information in the absolute path could be useful to a
-> build engineer, a distro engineer, or a support person for a distro.
-> Or could just be useless extra info.
-
-I very much suspect it will end up being the latter. For example I've
-seen various iterations of certain FW ship with all-zero ID numbers, for
-which the use-cases of said ID numbers are exactly those you mention
-above.
-
-As far as I can see, the only consistent and sane way to identify a
-binary object is by its hash, which for obvious reasons cannot be
-encoded within itself (though can be computed consistently).
-
-> > On various machines I have folders called /home/mark/src/linux. These
-> > are not the same folder. If I gave you a DTB that told you it was from
-> > /home/mark/src/linux/arch/arm64/boot/dts/vendor/foo.dts, you would have
-> > difficulty acquiring that precise file.
-> 
-> If you distributed the DTB to me under the gpl v2 then you have also
-> either distributed the source to me or offered to make it available
-> to me.
-
-That being the case you don't care about the fields; we've established
-that they're meaningless to the end user.
-
-Were I to have distributed files to you, I would have archived the
-relevant build (with source, config, and so on). I can look up what I've
-distributed to you and hand you the source without needing additional
-properties in the DTB.
-
-Mark.
+>> Do u think below modification is more reasonable?
+>>
+>> - Set "tsensor-thres-temp" = 700000, which equal to thermal-zone
+>>    passive trip point, so that we can use h/w interrupt to update the
+>>    thermal value immediately, rather than using polling method w/t long
+>>    delay;
+>>
+>> - Set "tsensor-reset-temp" = <100000>, which is higher than
+>>    thermal-zone critical trip point, so that the s/w reset method has
+>>    higher priority than h/w reset; we also can easily know the reset is
+>>    caused by thermal framework; "tsensor-reset-temp" is only used to
+>>    protect h/w circuit.
+> As mentioned above, I think that you should co-ordinate with the thermal
+> framework. You're worknig around limitations inthe code as it stands
+> today rather than solving the fundamental issue.
+>
+>>>> +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
+>>>> +
+>>>> +               if (data->irq_bind_sensor != -1)
+>>>> +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
+>>>> +                                data->irq_bind_sensor);
+>>>> +
+>>>> +               /* bind irq to this sensor */
+>>>> +               data->irq_bind_sensor = index;
+>>>> +       }
+>>> I don't see why this should be specified in the DT. Why do you believe
+>>> it should?
+>> The thermal sensor module has four sensors, but have only one
+>> interrupt signal; This interrupt can only be used by one sensor;
+>> So want to use dts to bind the interrupt with one selected sensor.
+> That's not all that great, though I'm not exactly sure how the kernel
+> would select the best sensor to measure with. It would be good if you
+> could talk to the thermal maintainers w.r.t. this.
+>
+>>>> +static int hisi_thermal_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +       struct hisi_thermal_data *data;
+>>>> +       struct resource *res;
+>>>> +       int i;
+>>>> +       int ret;
+>>>> +
+>>>> +       if (!cpufreq_get_current_driver()) {
+>>>> +               dev_dbg(&pdev->dev, "no cpufreq driver!");
+>>>> +               return -EPROBE_DEFER;
+>>>> +       }
+>>> Surely we care about not burning out the board even if we don't have
+>>> cpufreq?
+>>>
+>>> Is there any ordering guarantee between the probing of this driver and
+>>> cpufreq?
+>> Yes, here need binding the thermal sensor w/t cpu cooling device,
+>> and cpu cooling device is based on cpufreq driver.
+> Sure, but if you don't have a cooling device you still want the critical
+> temperature reset and so on, no?
+>
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
