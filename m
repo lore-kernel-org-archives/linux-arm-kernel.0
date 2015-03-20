@@ -1,34 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Mar 2015 18:02:29 +0000
-Subject: [PATCH] arm64: percpu: Make this_cpu accessors pre-empt safe
-In-Reply-To: <20150319163955.GG25967@leverpostej>
-References: <1426776751-20526-1-git-send-email-steve.capper@linaro.org>
- <20150319154435.GC25967@leverpostej>
- <20150319160008.GA4751@arm.com>
- <20150319161143.GE25967@leverpostej>
- <20150319162753.GC4751@arm.com>
- <20150319163955.GG25967@leverpostej>
-Message-ID: <20150320180228.GI1474@arm.com>
+Date: Fri, 20 Mar 2015 18:15:33 +0000
+Subject: [PATCH 0/4] iommu/arm-smmu: current updates for 4.1
+Message-ID: <1426875337-12808-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 04:39:55PM +0000, Mark Rutland wrote:
-> On Thu, Mar 19, 2015 at 04:27:53PM +0000, Will Deacon wrote:
-> >   (3) Preemption isn't actually an issue here -- CPU migration is. I'd
-> >       expect that to be a lot rarer.
-> 
-> That's not true: in a read-modify-cmpxchg loop (even on a UP system) if
-> you get preempted at the end of the read and another thread modifies
-> your datastructure, then your subsequent cmpxchg will fail. So any
-> preemption could cause you to have to retry, so you want to miminise
-> potential preemptions.
-> 
-> Note that this is a performance argument rather than a correctness
-> argument.
+Hi all,
 
-My argument is more that a migration will always break the cmpxchg, whereas
-preemption doesn't necessarily.
+I only have a small handful of arm-smmu patches on the radar for 4.1,
+so here they are in case anybody has any comments.
 
-Steve -- can you respin this using preempt_enable everywhere please?
+Cheers,
 
 Will
+
+--->8
+
+Robin Murphy (1):
+  iommu/arm-smmu: set a more appropriate DMA mask
+
+Will Deacon (3):
+  iommu/arm-smmu: ensure CBA2R is initialised before CBAR on SMMUv2
+  iommu/arm-smmu: handle multi-alias IOMMU groups for PCI devices
+  iommu/io-pgtable-arm: avoid speculative walks through TTBR1
+
+ drivers/iommu/arm-smmu.c       | 125 ++++++++++++++++++++++++++---------------
+ drivers/iommu/io-pgtable-arm.c |   5 ++
+ 2 files changed, 85 insertions(+), 45 deletions(-)
+
+-- 
+2.1.4
