@@ -1,58 +1,34 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 20 Mar 2015 14:13:22 +0800
-Subject: [PATCH 0/3] 96boards: add thermal senor support to hikey board
-In-Reply-To: <550B8F98.3070701@hisilicon.com>
-References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <20150319135946.GG18473@leverpostej>
- <550B8F98.3070701@hisilicon.com>
-Message-ID: <20150320061322.GD18907@leoy-linaro>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 20 Mar 2015 00:11:02 -0600
+Subject: amba: tegra-ahb: fix base address and register offsets for future
+ chip support
+Message-ID: <20150320061102.14355.4781.stgit@mcwayne>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 11:10:16AM +0800, kongxinwei wrote:
-> hi Mark Rutland:
-> 
-> ? 2015/3/19 21:59, Mark Rutland ??:
-> > On Thu, Mar 19, 2015 at 07:57:26AM +0000, kongxinwei wrote:
-> >> The Linaro connect introduce 96boards series in Hong Kong,The HiKey board
-> >> is the first board to be certified 96Boards Consumer Edition compatible.
-> >> This board is based on the HiSilicon SoC. you can get more information
-> >> from https://www.96boards.org.
-> >>
-> >> The hisilicon SoC contains thermal module, this thermal module has 4 sensors,
-> >>
-> >> 	- sensor 0: local sensor;
-> >> 	- sensor 1: remote sensor for ACPU cluster 1;
-> >> 	- sensor 2: remote sensor for ACPU cluster 2;
-> >> 	- sensor 3: remote sensor for GPU;
-> >>
-> >> It can obtain this device temperature by operating this hardware. The new
-> >> sensor driver satisfies thermal framework and to realize the ACPU ,GPU and
-> >> so on to cool function.
-> >>
-> >> kongxinwei (3):
-> >>   thermal: hisilicon: add new hisilicon thermal sensor driver
-> >>   dts: hi6220: enable thermal sensor for hisilicon SoC
-> >>   dt-bindings: Document the hi6220 thermal sensor bindings
-> >>
-> >>  .../bindings/thermal/hisilicon-thermal.txt         |  51 ++
-> >>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi          | 153 ++++++
-> >>  drivers/thermal/Kconfig                            |   8 +
-> >>  drivers/thermal/Makefile                           |   1 +
-> >>  drivers/thermal/hisi_thermal.c                     | 531 +++++++++++++++++++++
-> > 
-> > Mainline does not have a hi6220 dtsi.
-> > 
-> > Which tree is this against?
-> > 
-> > What are your dependencies?
-> > 
-> > Mark.
-> > 
-> Hikey board code are being upstreamed by our team.If hi6220 dtsi be accepted, this patch is ok.
+>From a hardware SoC integration point of view, the offsets of the
+Tegra AHB registers that are currently defined in tegra-ahb.c macros
+are all off by four bytes.  Similarly, the starting address of this IP
+block in our existing DT files is also off by four bytes.  This series
+fixes the driver such that the macro offsets are correct, and that the
+driver is backwards-compatible with previous chip DT data, but that future
+chip DT data can use the correct base.  See also
 
-Xinwei, u could resend this patch after hi6220 dtsi related patches has
-been merged. Suggest this patchset are only for thermal driver.
+    http://www.spinics.net/lists/arm-kernel/msg394171.html
 
-Thanks,
-Leo Yan
+This series has been boot-tested on Tegra20 Trimslice, Tegra30
+Beaver, Tegra114 Dalmore, Tegra124 Jetson TK1, Tegra132 Norrin64
+FFD (with a few additional out-of-tree patches, since T132
+support is not yet upstream), and QEMU Versatile Express 64.
+Basic build and boot test logs for T30, T114, T124, and QEMU
+Versatile Express 64 are here:
+
+http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150317011136_159e7763d517804c61a673736660a5a35f2ea5f8/20150317011136/
+
+This series is based on next-20150319 and is intended for v4.1.
+
+This third version of the series incorporates feedback from Russell
+King <linux@arm.linux.org.uk> and Stephen Warren <swarren@wwwdotorg.org>.
+
+
+- Paul
