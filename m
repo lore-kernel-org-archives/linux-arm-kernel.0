@@ -1,114 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Mar 2015 18:49:53 +0100
-Subject: [PATCH] arm64: relax Image placement requirement
-In-Reply-To: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8ULazD0SuRq+v5GOZUc7hfuXnphpv_P4hghD=q4QDmAA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 20 Mar 2015 18:52:48 +0100
+Subject: exynos5800-peach-pi: suspend/resume (still) broken
+In-Reply-To: <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
+References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>	<550953ED.10508@collabora.co.uk>	<CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>	<550C47ED.3010301@collabora.co.uk>	<CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
+ <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
+Message-ID: <550C5E70.30009@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2015 at 18:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Hi all,
->
-> This is another possible approach to fixing the current, flawed
-> EFI Image placement logic: instead of fixing that logic and the
-> documentation, why not relax the requirement that the kernel
-> Image not be placed across a 512 MB boundary?
+Hello Abhilash,
+
+On 03/20/2015 06:40 PM, Abhilash Kesavan wrote:
+>>
+>> I have made some progress on this. This is the current state:
+>>
+>> If I use next-20141114 (which was when the S2R code first appeared in
+>> linux-next), then all is good. next-20141117 is fine too but things
+>> are broken in next-20141118.
+>> I have narrowed it down to the commit: "ae43b32 ARM: 8202/1:
+>> dmaengine: pl330: Add runtime Power Management support v12". The only
+>> way I see this impacting s2r is because it disables the dma pclk while
+>> suspending or before.
+>>
+>> Checking further, will update in a bit.
+> 
+> OK, so disabling the mdma0 node in "arch/arm/boot/dts/exynos5420.dtsi"
+> gets things working. Like Kevin mentioned in the initial report, I
+> need to disable DRM else there is a crash while suspending. With these
+> two changes, on linus' tree and kgene's for-next s2r works fine.
 >
 
-Hmm, it seems this still needs a pinch of refinement, but we could at
-least discuss the general idea.
+Awesome, thanks a lot for digging this out!
+ 
+> On linux-next, I need to disable CONFIG_MWIFIEX too.
+> 
 
--- 
-Ard.
+Yes, I also saw that issue with mwfiex when suspend-to-idle (which works
+in -next) due the MMC_PM_KEEP_POWER flag being set in the host pm caps.
+But I don't see that being set in the host driver.
 
-> ---------------->8-----------------
+> Also, I observe cros-ec-spi transfer failures during resume and
+> sometimes it is unable to re-enable the tps fets causing a crash.
+> However, that would be a driver specific issue.
+> 
+
+Indeed, I can take a look to that issue as well.
+
+> Regarding the mdma0 disablement, it looks like for the system to
+> suspend properly the mdma0 pclk needs to stay on.
 >
-> This patch changes the early page table code so that two adjacent
-> entries are used to map two pages worth of block entries at the
-> lowest level, both for idmap_pg_dir and swapper_pg_dir.
->
-> The purpose is to allow the kernel Image to cross a 512 MB or 1 GB
-> alignment boundary (depending on page size), which is something that
-> is not specifically banned by the current wording of the boot protocol.
-> (The boot protocol stipulates that the kernel must be placed within
-> 512 MB if the beginning of RAM. However, the beginning of RAM is not
-> necessarily aligned to 512 MB)
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/page.h |  4 ++--
->  arch/arm64/kernel/head.S      | 17 +++++++++++++----
->  2 files changed, 15 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-> index 3d02b1869eb8..d2189c359364 100644
-> --- a/arch/arm64/include/asm/page.h
-> +++ b/arch/arm64/include/asm/page.h
-> @@ -43,8 +43,8 @@
->  #define SWAPPER_PGTABLE_LEVELS (CONFIG_ARM64_PGTABLE_LEVELS - 1)
->  #endif
->
-> -#define SWAPPER_DIR_SIZE       (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-> -#define IDMAP_DIR_SIZE         (3 * PAGE_SIZE)
-> +#define SWAPPER_DIR_SIZE       ((SWAPPER_PGTABLE_LEVELS + 1) * PAGE_SIZE)
-> +#define IDMAP_DIR_SIZE         (4 * PAGE_SIZE)
->
->  #ifndef __ASSEMBLY__
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0dbdb4f3634f..9c3f95f30421 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -274,18 +274,21 @@ ENDPROC(preserve_boot_args)
->   *     virt:   virtual address
->   *     shift:  #imm page table shift
->   *     ptrs:   #imm pointers per table page
-> + *     offset: #imm offset into the lowest translation level, in pages
->   *
->   * Preserves:  virt
->   * Corrupts:   tmp1, tmp2
->   * Returns:    tbl -> next level table page address
->   */
-> -       .macro  create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-> +       .macro  create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2, offset=0
->         lsr     \tmp1, \virt, #\shift
-> +       .if     \offset
-> +       add     \tmp1, \tmp1, #\offset
-> +       .endif
->         and     \tmp1, \tmp1, #\ptrs - 1        // table index
-> -       add     \tmp2, \tbl, #PAGE_SIZE
-> +       add     \tmp2, \tbl, #(\offset + 1) * PAGE_SIZE
->         orr     \tmp2, \tmp2, #PMD_TYPE_TABLE   // address of next table and entry type
->         str     \tmp2, [\tbl, \tmp1, lsl #3]
-> -       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->         .endm
->
->  /*
-> @@ -297,9 +300,14 @@ ENDPROC(preserve_boot_args)
->   */
->         .macro  create_pgd_entry, tbl, virt, tmp1, tmp2
->         create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
-> -#if SWAPPER_PGTABLE_LEVELS == 3
-> +#if SWAPPER_PGTABLE_LEVELS != 3
-> +       create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2, 1
-> +#else
-> +       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->         create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
-> +       create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2, 1
->  #endif
-> +       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->         .endm
->
->  /*
-> @@ -396,6 +404,7 @@ __create_page_tables:
->         str_l   x5, idmap_t0sz, x6
->
->         create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
-> +       add     x0, x0, #PAGE_SIZE              // next level table page
->  1:
->  #endif
->
-> --
-> 1.8.3.2
->
+
+It seems so, I remember we had other issues with the mentioned commit
+due clocks being gated. For example the mau_epll clock that was needed
+to access the audss block registers and caused a boot hang on Exyos5420.
+
+That specific issue was fixed by f1e9203e2366 ("clk: samsung: Fix Exynos
+5420 pinctrl setup and clock disable failure due to domain being gated")
+which solves it by enabling the mau_epll on probe.
+ 
+> Regards,
+> Abhilash
+>>>
+
+Best regards,
+Javier
