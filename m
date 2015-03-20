@@ -1,24 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 20 Mar 2015 16:20:59 +0000
-Subject: [PATCH] ARM: trusted_foundations: Maintain CPU endianness
-In-Reply-To: <550C4106.4090801@gmail.com>
-References: <1426865807-22981-1-git-send-email-digetx@gmail.com>
- <550C4106.4090801@gmail.com>
-Message-ID: <20150320162059.GD4725@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Mar 2015 09:21:38 -0700
+Subject: [PATCH v7 5/6] ARM: dts: add wl12xx/wl18xx bindings
+In-Reply-To: <87bnjnfz1t.fsf@kamboji.qca.qualcomm.com>
+References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
+ <1426696710-6891-6-git-send-email-eliad@wizery.com>
+ <550AD7C1.2030405@gmail.com>
+ <CAB3XZEfpD7YkwdU7OJJaNFy=MnYVY3-fOVxkA48Vu01LzU0GFg@mail.gmail.com>
+ <20150319212505.GN31346@atomide.com>
+ <87h9tgi4sg.fsf@kamboji.qca.qualcomm.com>
+ <20150320153357.GT31346@atomide.com>
+ <87bnjnfz1t.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <20150320162138.GU31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 06:47:18PM +0300, Dmitry Osipenko wrote:
-> This patch not tested. I assume that firmware save/restore cp15
-> context, i.e. it doesn't require switching to LE before smc call and
-> restore endianness after.
+* Kalle Valo <kvalo@codeaurora.org> [150320 08:51]:
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > * Kalle Valo <kvalo@codeaurora.org> [150319 23:04]:
+> >> Tony Lindgren <tony@atomide.com> writes:
+> >> 
+> >> >> > Tested OK (boot, scan, join, ping) on Pandaboard ES.
+> >> >> >
+> >> >> thanks for testing it!
+> >> >
+> >> > Great. As suggested by Kalle, I'll apply all these into
+> >> > omap-for-v4.1/wl12xx branch and send a pull request for
+> >> > the arm-soc probably on Friday if no issues are found.
+> >> 
+> >> Great, thank you. Just in case you want this:
+> >> 
+> >> Acked-by: Kalle Valo <kvalo@codeaurora.org>
+> >
+> > Thanks, I can push out a new branch omap-for-v4.1/wl12xx-v2
+> > with your acks assuming you or somebody else have not
+> > merged the existing omap-for-v4.1/wl12xx branch yet into the
+> > wireless tree?
+> >
+> > In that case I can scrap omap-for-v4.1/wl12xx and then will
+> > reply with a commit that we can consider immutable that can
+> > be merged into various trees as needed in case of merge
+> > conflicts.
+> >
+> > But I'll wait for your confirmation first :)
+> 
+> After John "retired" we actually have two set of trees now: mac80211
+> maintained by Johannes and wireless-drivers maintained by me. I haven't
+> pulled anything from your tree and I'm 100% sure Johannes hasn't either.
+> So green light from me.
 
-That assumption should be valid.
+OK, I'll set up the new branch then. I take your ack is for the
+whole series? If it's just for the $subject patch, please let
+me know.
 
-However, I think this patch must be tested before assuming it is
-correct.  If the arguments were passed in memory then there might
-force LE order for that data block, but there should not be a need for
-this if the values are in registers.
+Regards,
 
-Cheers
----Dave
+Tony
