@@ -1,48 +1,147 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 14:42:02 +0000
-Subject: [patch 2/7] dt: dtb version: document chosen/dtb-info node binding
-In-Reply-To: <550B3549.1030808@gmail.com>
-References: <550A42AC.8060104@gmail.com> <550A4382.4030209@gmail.com>
- <CAL_Jsq+sPkZtreQ0sp8KXpkUVpFy=Yh9dr249u8uyoa8yksjmg@mail.gmail.com>
- <20150319184139.GG8656@n2100.arm.linux.org.uk>
- <550B1D16.7000108@gmail.com>
- <20150319193225.GH8656@n2100.arm.linux.org.uk>
- <550B3549.1030808@gmail.com>
-Message-ID: <20150320144202.GH14766@leverpostej>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 20 Mar 2015 22:53:53 +0800
+Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
+ driver
+In-Reply-To: <20150320112414.GD14766@leverpostej>
+References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150319141753.GB25967@leverpostej>
+ <20150320060653.GC18907@leoy-linaro>
+ <20150320112414.GD14766@leverpostej>
+Message-ID: <20150320145353.GA20461@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > You must be *absolutely* *sure* that you want to export this information,
-> > and that you are absolutely happy with the consequences which would occur
-> > should userspace then start using this information in a way which you did
-> > not intend, which could very well block you from ever being able to change
-> > the version number from a prescribed "this version number makes userspace
-> > work" value.
+On Fri, Mar 20, 2015 at 11:24:14AM +0000, Mark Rutland wrote:
+> > > > +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
+> > > > +                                  &sensor->thres_temp);
+> > > > +       if (ret) {
+> > > > +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
+> > > > +                       index, ret);
+> > > > +               return ret;
+> > > > +       }
+> > > > +
+> > > > +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
+> > > > +                                  &sensor->reset_temp);
+> > > > +       if (ret) {
+> > > > +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
+> > > > +                       index, ret);
+> > > > +               return ret;
+> > > > +       }
+> > > 
+> > > I see now that these properties result in the HW being programmed. You
+> > > should figure out how to reconcile these with thermal-zone trip points
+> > > rather than having parallel properties.
+> >  
+> > Set "tsensor-thres-temp" to register so that if thermal reaches the
+> > threshold, the sensor will trigger h/w interrupt.
+> > 
+> > Set "tsensor-reset-temp" to register so that if thermal reaches the
+> > reset value, the sensor will assert SoC reset signal to trigger h/w
+> > reset.
 > 
-> I understand the concern you are expressing.  And I agree it is an issue to
-> be concerned about and not dismissed.  But I also think that the concern is
-> mis-characterizing the "DTB version".  To pick on the example in patch 0,
-> an analogous Linux version is "#5" (not "4.0.0"):
+> I understand this.
 > 
->    Linux version 4.0.0-rc4-dirty (frank at buildhost) (gcc version 4.6.x-google 20120106 (prerelease) (GCC) ) #5 SMP PREEMPT Wed Mar 18 20:04:48 PDT 2015
+> > This is different w/t thermal-zone trip points, the trip points are
+> > used for timer polling.
 > 
-> and the proposed DTB version is "#4":
+> That may be the case in the code as it stands today, but per the binding
+> the trip points are the temperatures at which an action is to be taken.
 > 
->    DTB version 4.0.0-rc4-dirty (frank at buildhost) (DTC 1.4.0-dirty) #4 Wed Mar 18 20:04:11 PDT 2015
+> The thermal-zone has poilling-delay and polling-delay-passive, but
+> there's no reason you couldn't also use the interrupt to handle the
+> "hot" trip-point, adn the reset at the "critical" trip-point. All that's
+> missing is the plumbing in order to do so.
 > 
-> I don't think the concern holds for "#5" and "#4".
-> 
-> I will concede that there is something unique in the proposed DTB version -
-> the source code system commit version number (in this example "4.0.0-rc4-dirty"
-> from git).
+> So please co-ordinate with the thermal framework to do that.
 
-The problem that Russell is describing is that regardless of the origin
-and intended purpose of the value, some consumer of the value will
-decide that some arbitrary value means something special to them (even
-if it does not), and when this changes thigns will break.
+Let's dig further more for this point, so that we can get more specific
+gudiance and have a good preparation for next version's patch set.
 
-So in that respect, it doesn't matter where the value came from or what
-you intend it to mean; it will almost certainly be abused. We try to
-avoid introducing fragile interfaces like these.
+After i reviewed the thermal framework code, currently have one smooth
+way to co-ordinate the trip points w/t thermal framework: use the function
+*thermal_zone_device_register()* to register sensor, and can use the
+callback function .get_trip_temp to tell thermal framework for the
+trip points' temperature.
 
-Mark.
+For hisi thermal case, now the driver is using the function
+*thermal_zone_of_sensor_register* to register sensor, but use this way
+i have not found there have standard APIs which can be used by sensor
+driver to get the trip points info from thermal framework.
+
+I may miss something for thermal framework, so if have existed APIs to
+get the trip points, could pls point out?
+
+> > Do u think below modification is more reasonable?
+> > 
+> > - Set "tsensor-thres-temp" = 700000, which equal to thermal-zone
+> >   passive trip point, so that we can use h/w interrupt to update the
+> >   thermal value immediately, rather than using polling method w/t long
+> >   delay;
+> > 
+> > - Set "tsensor-reset-temp" = <100000>, which is higher than
+> >   thermal-zone critical trip point, so that the s/w reset method has
+> >   higher priority than h/w reset; we also can easily know the reset is
+> >   caused by thermal framework; "tsensor-reset-temp" is only used to
+> >   protect h/w circuit.
+> 
+> As mentioned above, I think that you should co-ordinate with the thermal
+> framework. You're worknig around limitations inthe code as it stands
+> today rather than solving the fundamental issue.
+> 
+> > > > +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
+> > > > +
+> > > > +               if (data->irq_bind_sensor != -1)
+> > > > +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
+> > > > +                                data->irq_bind_sensor);
+> > > > +
+> > > > +               /* bind irq to this sensor */
+> > > > +               data->irq_bind_sensor = index;
+> > > > +       }
+> > > 
+> > > I don't see why this should be specified in the DT. Why do you believe
+> > > it should?
+> > 
+> > The thermal sensor module has four sensors, but have only one
+> > interrupt signal; This interrupt can only be used by one sensor;
+> > So want to use dts to bind the interrupt with one selected sensor.
+> 
+> That's not all that great, though I'm not exactly sure how the kernel
+> would select the best sensor to measure with. It would be good if you
+> could talk to the thermal maintainers w.r.t. this.
+
+This will be decided by the silicon, right? Every soc has different
+combination with cpu/gpu/vpu, so which part is hottest, this maybe
+highly dependent on individual SoC.
+
+S/W just need provide the flexibility so that later can choose
+the interrupt to bind with the sensor within the hottest part.
+
+> > > > +static int hisi_thermal_probe(struct platform_device *pdev)
+> > > > +{
+> > > > +       struct hisi_thermal_data *data;
+> > > > +       struct resource *res;
+> > > > +       int i;
+> > > > +       int ret;
+> > > > +
+> > > > +       if (!cpufreq_get_current_driver()) {
+> > > > +               dev_dbg(&pdev->dev, "no cpufreq driver!");
+> > > > +               return -EPROBE_DEFER;
+> > > > +       }
+> > > 
+> > > Surely we care about not burning out the board even if we don't have
+> > > cpufreq?
+> > > 
+> > > Is there any ordering guarantee between the probing of this driver and
+> > > cpufreq?
+> > 
+> > Yes, here need binding the thermal sensor w/t cpu cooling device,
+> > and cpu cooling device is based on cpufreq driver.
+> 
+> Sure, but if you don't have a cooling device you still want the critical
+> temperature reset and so on, no?
+
+Okay, let's remove this dependency.
+
+Thanks,
+Leo Yan
