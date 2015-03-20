@@ -1,9 +1,9 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Fri, 20 Mar 2015 14:07:09 -0700
-Subject: [PATCH 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
+Date: Fri, 20 Mar 2015 14:07:10 -0700
+Subject: [PATCH 3/3] usb: ohci-platform: Use devm_of_phy_get_by_index
 In-Reply-To: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1426885630-32429-3-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1426885630-32429-4-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,22 +14,22 @@ Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 ---
- drivers/usb/host/ehci-platform.c | 20 ++++----------------
+ drivers/usb/host/ohci-platform.c | 20 ++++----------------
  1 file changed, 4 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index d8a75a5..8b0c7ae 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -154,7 +154,6 @@ static int ehci_platform_probe(struct platform_device *dev)
- 	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ehci_platform_priv *priv;
- 	struct ehci_hcd *ehci;
+diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
+index 185ceee..8b2ec4e 100644
+--- a/drivers/usb/host/ohci-platform.c
++++ b/drivers/usb/host/ohci-platform.c
+@@ -123,7 +123,6 @@ static int ohci_platform_probe(struct platform_device *dev)
+ 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
+ 	struct ohci_platform_priv *priv;
+ 	struct ohci_hcd *ohci;
 -	const char *phy_name;
  	int err, irq, phy_num, clk = 0;
  
  	if (usb_disabled())
-@@ -212,21 +211,10 @@ static int ehci_platform_probe(struct platform_device *dev)
+@@ -182,21 +181,10 @@ static int ohci_platform_probe(struct platform_device *dev)
  			return -ENOMEM;
  
  		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
