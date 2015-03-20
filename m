@@ -1,196 +1,128 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 20 Mar 2015 12:43:55 +0100
-Subject: [PATCH V3 2/8] ARM: cpuidle: Add a cpuidle ops structure to be used
- for DT
+Date: Fri, 20 Mar 2015 12:43:58 +0100
+Subject: [PATCH V3 5/8] ARM64: cpuidle: Remove arm64 reference
 In-Reply-To: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426851841-2072-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1426851841-2072-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current state of the different cpuidle drivers is the different PM
-operations are passed via the platform_data using the platform driver
-paradigm.
-
-This approach allowed to split the low level PM code from the arch specific
-and the generic cpuidle code.
-
-Unfortunately there are complaints about this approach as, in the context of the
-single kernel image, we have multiple drivers loaded in memory for nothing and
-the platform driver is not adequate for cpuidle.
-
-This patch provides a common interface via cpuidle ops for all new cpuidle
-driver and a definition for the device tree.
-
-It will allow with the next patches to a have a common definition with ARM64
-and share the same cpuidle driver.
-
-The code is optimized to use the __init section intensively in order to reduce
-the memory footprint after the driver is initialized and unify the function
-names with ARM64.
+In the next patch, this driver will be common across ARM/ARM64. Remove all refs
+to ARM64 as it will be shared with ARM32.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Acked-by: Kevin Hilman <khilman@linaro.org>
 Acked-by: Rob Herring <robherring2@gmail.com>
 ---
- arch/arm/include/asm/cpuidle.h    | 21 ++++++++++++
- arch/arm/kernel/cpuidle.c         | 72 +++++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/cpuidle.h  |  5 ++-
- include/asm-generic/vmlinux.lds.h |  2 ++
- 4 files changed, 99 insertions(+), 1 deletion(-)
+ drivers/cpuidle/cpuidle-arm64.c | 34 +++++++++++++++++-----------------
+ 1 file changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index 348dc81..0f84249 100644
---- a/arch/arm/include/asm/cpuidle.h
-+++ b/arch/arm/include/asm/cpuidle.h
-@@ -27,4 +27,25 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
+index 6ef291c7..1c94b88 100644
+--- a/drivers/cpuidle/cpuidle-arm64.c
++++ b/drivers/cpuidle/cpuidle-arm64.c
+@@ -1,5 +1,5 @@
+ /*
+- * ARM64 generic CPU idle driver.
++ * ARM/ARM64 generic CPU idle driver.
+  *
+  * Copyright (C) 2014 ARM Ltd.
+  * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+@@ -9,7 +9,7 @@
+  * published by the Free Software Foundation.
   */
- #define ARM_CPUIDLE_WFI_STATE ARM_CPUIDLE_WFI_STATE_PWR(UINT_MAX)
  
-+struct device_node;
-+
-+struct cpuidle_ops {
-+	int (*suspend)(int cpu, unsigned long arg);
-+	int (*init)(struct device_node *, int cpu);
-+};
-+
-+struct of_cpuidle_method {
-+	const char *method;
-+	struct cpuidle_ops *ops;
-+};
-+
-+#define CPUIDLE_METHOD_OF_DECLARE(name, _method, _ops)			\
-+	static const struct of_cpuidle_method __cpuidle_method_of_table_##name \
-+	__used __section(__cpuidle_method_of_table)			\
-+	= { .method = _method, .ops = _ops }
-+
-+extern int arm_cpuidle_suspend(int index);
-+
-+extern int arm_cpuidle_init(int cpu);
-+
- #endif
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 45969f8..7b42a40 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -10,8 +10,17 @@
-  */
+-#define pr_fmt(fmt) "CPUidle arm64: " fmt
++#define pr_fmt(fmt) "CPUidle arm: " fmt
  
  #include <linux/cpuidle.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- #include <asm/cpuidle.h>
+ #include <linux/cpumask.h>
+@@ -23,7 +23,7 @@
+ #include "dt_idle_states.h"
  
-+extern struct of_cpuidle_method __cpuidle_method_of_table[];
-+
-+static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
-+	__used __section(__cpuidle_method_of_table_end);
-+
-+static struct cpuidle_ops cpuidle_ops[NR_CPUS];
-+
- int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- 		struct cpuidle_driver *drv, int index)
+ /*
+- * arm64_enter_idle_state - Programs CPU to enter the specified state
++ * arm_enter_idle_state - Programs CPU to enter the specified state
+  *
+  * dev: cpuidle device
+  * drv: cpuidle driver
+@@ -32,8 +32,8 @@
+  * Called from the CPUidle framework to program the device to the
+  * specified target state selected by the governor.
+  */
+-static int arm64_enter_idle_state(struct cpuidle_device *dev,
+-				  struct cpuidle_driver *drv, int idx)
++static int arm_enter_idle_state(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv, int idx)
  {
-@@ -19,3 +28,66 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+ 	int ret;
  
- 	return index;
+@@ -57,8 +57,8 @@ static int arm64_enter_idle_state(struct cpuidle_device *dev,
+ 	return ret ? -1 : idx;
  }
-+
-+int arm_cpuidle_suspend(int index)
-+{
-+	int ret = -EOPNOTSUPP;
-+	int cpu = smp_processor_id();
-+
-+	if (cpuidle_ops[cpu].suspend)
-+		ret = cpuidle_ops[cpu].suspend(cpu, index);
-+
-+	return ret;
-+}
-+
-+static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
-+{
-+	struct of_cpuidle_method *m = __cpuidle_method_of_table;
-+
-+	for (; m->method; m++)
-+		if (!strcmp(m->method, method))
-+			return m->ops;
-+
-+	return NULL;
-+}
-+
-+static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
-+{
-+	const char *enable_method;
-+	struct cpuidle_ops *ops;
-+
-+	enable_method = of_get_property(dn, "enable-method", NULL);
-+	if (!enable_method)
-+		return -ENOENT;
-+
-+	ops = arm_cpuidle_get_ops(enable_method);
-+	if (!ops) {
-+		pr_warn("%s: unsupported enable-method property: %s\n",
-+			dn->full_name, enable_method);
-+		return -EOPNOTSUPP;
-+	}
-+
-+	cpuidle_ops[cpu] = *ops; /* structure copy */
-+
-+	pr_notice("cpuidle: enable-method property '%s'"
-+		  " found operations\n", enable_method);
-+
-+	return 0;
-+}
-+
-+int __init arm_cpuidle_init(int cpu)
-+{
-+	int ret = -EOPNOTSUPP;
-+	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-+
-+	if (!cpu_node)
-+		return -ENODEV;
-+
-+	ret = arm_cpuidle_read_ops(cpu_node, cpu);
-+	if (!ret && cpuidle_ops[cpu].init)
-+		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
-+
-+	of_node_put(cpu_node);
-+
-+	return ret;
-+}
-diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
-index c60643f..460a38b 100644
---- a/arch/arm64/include/asm/cpuidle.h
-+++ b/arch/arm64/include/asm/cpuidle.h
-@@ -17,5 +17,8 @@ static inline int cpu_suspend(unsigned long arg)
- 	return -EOPNOTSUPP;
- }
- #endif
--
-+static inline int arm_cpuidle_suspend(int index)
-+{
-+	return cpu_suspend(index);
-+}
- #endif
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index ac78910..91c0930 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -167,6 +167,7 @@
- #define IOMMU_OF_TABLES()	OF_TABLE(CONFIG_OF_IOMMU, iommu)
- #define RESERVEDMEM_OF_TABLES()	OF_TABLE(CONFIG_OF_RESERVED_MEM, reservedmem)
- #define CPU_METHOD_OF_TABLES()	OF_TABLE(CONFIG_SMP, cpu_method)
-+#define CPUIDLE_METHOD_OF_TABLES() OF_TABLE(CONFIG_CPU_IDLE, cpuidle_method)
- #define EARLYCON_OF_TABLES()	OF_TABLE(CONFIG_SERIAL_EARLYCON, earlycon)
  
- #define KERNEL_DTB()							\
-@@ -501,6 +502,7 @@
- 	CLKSRC_OF_TABLES()						\
- 	IOMMU_OF_TABLES()						\
- 	CPU_METHOD_OF_TABLES()						\
-+	CPUIDLE_METHOD_OF_TABLES()					\
- 	KERNEL_DTB()							\
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	EARLYCON_OF_TABLES()
+-static struct cpuidle_driver arm64_idle_driver = {
+-	.name = "arm64_idle",
++static struct cpuidle_driver arm_idle_driver = {
++	.name = "arm_idle",
+ 	.owner = THIS_MODULE,
+ 	/*
+ 	 * State at index 0 is standby wfi and considered standard
+@@ -68,32 +68,32 @@ static struct cpuidle_driver arm64_idle_driver = {
+ 	 * handler for idle state index 0.
+ 	 */
+ 	.states[0] = {
+-		.enter                  = arm64_enter_idle_state,
++		.enter                  = arm_enter_idle_state,
+ 		.exit_latency           = 1,
+ 		.target_residency       = 1,
+ 		.power_usage		= UINT_MAX,
+ 		.name                   = "WFI",
+-		.desc                   = "ARM64 WFI",
++		.desc                   = "ARM WFI",
+ 	}
+ };
+ 
+-static const struct of_device_id arm64_idle_state_match[] __initconst = {
++static const struct of_device_id arm_idle_state_match[] __initconst = {
+ 	{ .compatible = "arm,idle-state",
+-	  .data = arm64_enter_idle_state },
++	  .data = arm_enter_idle_state },
+ 	{ },
+ };
+ 
+ /*
+- * arm64_idle_init
++ * arm_idle_init
+  *
+- * Registers the arm64 specific cpuidle driver with the cpuidle
++ * Registers the arm specific cpuidle driver with the cpuidle
+  * framework. It relies on core code to parse the idle states
+  * and initialize them using driver data structures accordingly.
+  */
+-static int __init arm64_idle_init(void)
++static int __init arm_idle_init(void)
+ {
+ 	int cpu, ret;
+-	struct cpuidle_driver *drv = &arm64_idle_driver;
++	struct cpuidle_driver *drv = &arm_idle_driver;
+ 
+ 	/*
+ 	 * Initialize idle states data, starting at index 1.
+@@ -101,7 +101,7 @@ static int __init arm64_idle_init(void)
+ 	 * let the driver initialization fail accordingly since there is no
+ 	 * reason to initialize the idle driver if only wfi is supported.
+ 	 */
+-	ret = dt_init_idle_driver(drv, arm64_idle_state_match, 1);
++	ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
+ 	if (ret <= 0)
+ 		return ret ? : -ENODEV;
+ 
+@@ -119,4 +119,4 @@ static int __init arm64_idle_init(void)
+ 
+ 	return cpuidle_register(drv, NULL);
+ }
+-device_initcall(arm64_idle_init);
++device_initcall(arm_idle_init);
 -- 
 1.9.1
