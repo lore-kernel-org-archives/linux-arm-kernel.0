@@ -1,70 +1,35 @@
 From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 20 Mar 2015 20:12:00 +0100
-Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
-Message-ID: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+Date: Fri, 20 Mar 2015 20:12:01 +0100
+Subject: [PATCH 2/2] pinctrl: at91: Add missing include
+In-Reply-To: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+Message-ID: <1426878721-2618-2-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the callback for set_multiple.
-As this controller has a separate set and clear register, we can't write
-directly to PIO_ODSR as this would required a cached variable and would
-race with at91_gpio_set.
-So build masks for the PIO_SODR and PIO_CODR registers and write them
-together.
+This fixes the sparse warning:
+drivers/pinctrl/pinctrl-at91.c:1556:6: warning: symbol
+ 'at91_pinctrl_gpio_suspend' was not declared. Should it be static?
+drivers/pinctrl/pinctrl-at91.c:1580:6: warning: symbol
+ 'at91_pinctrl_gpio_resume' was not declared. Should it be static?
 
 Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
-This was tested by using an own test driver which uses
-gpiod_set_array_cansleep to set multiple GPIOs at once.
-
- drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/pinctrl/pinctrl-at91.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index f4cd0b9..a882523 100644
+index a882523..02f6477 100644
 --- a/drivers/pinctrl/pinctrl-at91.c
 +++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1330,6 +1330,33 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
- 	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
- }
+@@ -25,6 +25,8 @@
+ /* Since we request GPIOs from ourself */
+ #include <linux/pinctrl/consumer.h>
  
-+static void at91_gpio_set_multiple(struct gpio_chip *chip,
-+				      unsigned long *mask, unsigned long *bits)
-+{
-+	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-+	void __iomem *pio = at91_gpio->regbase;
-+	unsigned long set_mask;
-+	unsigned long clear_mask;
-+	size_t i;
++#include <mach/hardware.h>
 +
-+	set_mask = 0;
-+	clear_mask = 0;
-+
-+	for (i = 0; i < chip->ngpio; i++) {
-+		if (*mask == 0)
-+			break;
-+		if (__test_and_clear_bit(i, mask)) {
-+			if (test_bit(i, bits))
-+				set_mask |= BIT(i);
-+			else
-+				clear_mask |= BIT(i);
-+		}
-+	}
-+
-+	writel_relaxed(set_mask, pio + PIO_SODR);
-+	writel_relaxed(clear_mask, pio + PIO_CODR);
-+}
-+
- static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
- 				int val)
- {
-@@ -1692,6 +1719,7 @@ static struct gpio_chip at91_gpio_template = {
- 	.get			= at91_gpio_get,
- 	.direction_output	= at91_gpio_direction_output,
- 	.set			= at91_gpio_set,
-+	.set_multiple		= at91_gpio_set_multiple,
- 	.dbg_show		= at91_gpio_dbg_show,
- 	.can_sleep		= false,
- 	.ngpio			= MAX_NB_GPIO_PER_BANK,
+ #include "pinctrl-at91.h"
+ #include "core.h"
+ 
 -- 
 2.3.3
