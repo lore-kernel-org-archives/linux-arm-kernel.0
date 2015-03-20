@@ -1,68 +1,70 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Mar 2015 20:11:19 +0100
-Subject: [PATCH v2 10/13] ARM: dts: sun4i: Enable USB DRC on Chuwi V7 CW0825
-In-Reply-To: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
-References: <1426878682-14521-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1426878682-14521-11-git-send-email-hdegoede@redhat.com>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 20 Mar 2015 20:12:00 +0100
+Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
+Message-ID: <1426878721-2618-1-git-send-email-alexanders83@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the otg/drc usb controller on the Chuwi V7 CW0825 tablet.
+This adds the callback for set_multiple.
+As this controller has a separate set and clear register, we can't write
+directly to PIO_ODSR as this would required a cached variable and would
+race with at91_gpio_set.
+So build masks for the PIO_SODR and PIO_CODR registers and write them
+together.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Signed-off-by: Alexander Stein <alexanders83@web.de>
 ---
- arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts | 31 +++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+This was tested by using an own test driver which uses
+gpiod_set_array_cansleep to set multiple GPIOs at once.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-index 97fca89..8a2f4c5 100644
---- a/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts
-@@ -111,6 +111,26 @@
- 	status = "okay";
- };
+ drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index f4cd0b9..a882523 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1330,6 +1330,33 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
+ 	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
+ }
  
-+&pio {
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH4";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
++static void at91_gpio_set_multiple(struct gpio_chip *chip,
++				      unsigned long *mask, unsigned long *bits)
++{
++	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
++	void __iomem *pio = at91_gpio->regbase;
++	unsigned long set_mask;
++	unsigned long clear_mask;
++	size_t i;
 +
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PH5";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+};
++	set_mask = 0;
++	clear_mask = 0;
 +
-+&reg_usb0_vbus {
-+	status = "okay";
-+};
++	for (i = 0; i < chip->ngpio; i++) {
++		if (*mask == 0)
++			break;
++		if (__test_and_clear_bit(i, mask)) {
++			if (test_bit(i, bits))
++				set_mask |= BIT(i);
++			else
++				clear_mask |= BIT(i);
++		}
++	}
 +
- &reg_usb2_vbus {
- 	status = "okay";
- };
-@@ -121,7 +141,18 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
++	writel_relaxed(set_mask, pio + PIO_SODR);
++	writel_relaxed(clear_mask, pio + PIO_CODR);
++}
 +
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin
-+		     &usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 4 GPIO_ACTIVE_HIGH>; /* PH4 */
-+	usb0_vbus_det-gpio = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
- };
+ static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+ 				int val)
+ {
+@@ -1692,6 +1719,7 @@ static struct gpio_chip at91_gpio_template = {
+ 	.get			= at91_gpio_get,
+ 	.direction_output	= at91_gpio_direction_output,
+ 	.set			= at91_gpio_set,
++	.set_multiple		= at91_gpio_set_multiple,
+ 	.dbg_show		= at91_gpio_dbg_show,
+ 	.can_sleep		= false,
+ 	.ngpio			= MAX_NB_GPIO_PER_BANK,
 -- 
 2.3.3
