@@ -1,156 +1,220 @@
-From: t-kristo@TI.COM (Tero Kristo)
-Date: Fri, 20 Mar 2015 20:44:21 +0200
-Subject: [PATCHv5 10/35] ARM: OMAP2+: PRCM: add support for static clock
- memmap indices
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 20 Mar 2015 20:44:22 +0200
+Subject: [PATCHv5 11/35] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
 In-Reply-To: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
 References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426877086-17131-11-git-send-email-t-kristo@ti.com>
+Message-ID: <1426877086-17131-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All clock provider related drivers will now register their iomaps
-with a static index. This makes it easier to split up the individual
-drivers to their own files in subsequent patches.
+Splits the clock provider init out of the PRM driver and moves it to
+clock driver. This is needed so that once the PRCM drivers are separated,
+they can logically just access the clock driver not needing to go through
+common PRM code. This would be wrong in the case of control module for
+example.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prcm-common.h |    8 ++++
- arch/arm/mach-omap2/prm_common.c  |   79 +++++++++++++++++++++++--------------
- include/linux/clk/ti.h            |    1 +
- 3 files changed, 59 insertions(+), 29 deletions(-)
+ arch/arm/mach-omap2/clock.c      |   75 ++++++++++++++++++++++++++++++++------
+ arch/arm/mach-omap2/clock.h      |    6 ++-
+ arch/arm/mach-omap2/prm_common.c |   36 ++++--------------
+ 3 files changed, 76 insertions(+), 41 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index 6163d66..ee38356 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -518,6 +518,14 @@ struct omap_prcm_irq_setup {
- 	.priority = _priority				\
- 	}
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index 6124db5..3327128 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/io.h>
+ #include <linux/bitops.h>
++#include <linux/of_address.h>
+ #include <asm/cpu.h>
  
-+/**
-+ * struct omap_prcm_init_data - PRCM driver init data
-+ * @index: clock memory mapping index to be used
-+ */
-+struct omap_prcm_init_data {
-+	int index;
-+};
+ #include <trace/events/power.h>
+@@ -72,32 +73,84 @@ struct ti_clk_features ti_clk_features;
+ static bool clkdm_control = true;
+ 
+ static LIST_HEAD(clk_hw_omap_clocks);
+-void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
++static void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
 +
- extern void omap_prcm_irq_cleanup(void);
- extern int omap_prcm_register_chain_handler(
- 	struct omap_prcm_irq_setup *irq_setup);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 79cee11..8ec5201 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -633,31 +633,47 @@ int prm_unregister(struct prm_ll_data *pld)
- 	return 0;
++static void clk_memmap_writel(u32 val, void __iomem *reg)
++{
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++
++	writel_relaxed(val, clk_memmaps[r->index] + r->offset);
++}
++
++static u32 clk_memmap_readl(void __iomem *reg)
++{
++	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
++
++	return readl_relaxed(clk_memmaps[r->index] + r->offset);
++}
+ 
+ void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
+ {
+-	if (clk->flags & MEMMAP_ADDRESSING) {
+-		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+-		writel_relaxed(val, clk_memmaps[r->index] + r->offset);
+-	} else {
++	if (clk->flags & MEMMAP_ADDRESSING)
++		clk_memmap_writel(val, reg);
++	else
+ 		writel_relaxed(val, reg);
+-	}
  }
  
-+static struct omap_prcm_init_data prm_data = {
-+	.index = TI_CLKM_PRM,
+ u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
+ {
+ 	u32 val;
+ 
+-	if (clk->flags & MEMMAP_ADDRESSING) {
+-		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+-		val = readl_relaxed(clk_memmaps[r->index] + r->offset);
+-	} else {
++	if (clk->flags & MEMMAP_ADDRESSING)
++		val = clk_memmap_readl(reg);
++	else
+ 		val = readl_relaxed(reg);
+-	}
+ 
+ 	return val;
+ }
+ 
++static struct ti_clk_ll_ops omap_clk_ll_ops = {
++	.clk_readl = clk_memmap_readl,
++	.clk_writel = clk_memmap_writel,
 +};
 +
-+static struct omap_prcm_init_data cm_data = {
-+	.index = TI_CLKM_CM,
-+};
++/**
++ * omap2_clk_provider_init - initialize a clock provider
++ * @match_table: DT device table to match for devices to init
++ * @np: device node pointer for the this clock provider
++ * @index: index for the clock provider
++ * @mem: iomem pointer for the clock provider memory area
++ *
++ * Initializes a clock provider module (CM/PRM etc.), registering
++ * the memory mapping at specified index and initializing the
++ * low level driver infrastructure. Returns 0 in success.
++ */
++int __init omap2_clk_provider_init(struct device_node *np, int index,
++				   void __iomem *mem)
++{
++	ti_clk_ll_ops = &omap_clk_ll_ops;
 +
-+static struct omap_prcm_init_data cm2_data = {
-+	.index = TI_CLKM_CM2,
-+};
++	clk_memmaps[index] = mem;
 +
-+static struct omap_prcm_init_data scrm_data = {
-+	.index = TI_CLKM_SCRM,
-+};
++	ti_dt_clk_init_provider(np, index);
 +
- static const struct of_device_id omap_prcm_dt_match_table[] = {
--	{ .compatible = "ti,am3-prcm" },
--	{ .compatible = "ti,am3-scrm" },
--	{ .compatible = "ti,am4-prcm" },
--	{ .compatible = "ti,am4-scrm" },
--	{ .compatible = "ti,dm814-prcm" },
--	{ .compatible = "ti,dm814-scrm" },
--	{ .compatible = "ti,dm816-prcm" },
--	{ .compatible = "ti,dm816-scrm" },
--	{ .compatible = "ti,omap2-prcm" },
--	{ .compatible = "ti,omap2-scrm" },
--	{ .compatible = "ti,omap3-prm" },
--	{ .compatible = "ti,omap3-cm" },
--	{ .compatible = "ti,omap3-scrm" },
--	{ .compatible = "ti,omap4-cm1" },
--	{ .compatible = "ti,omap4-prm" },
--	{ .compatible = "ti,omap4-cm2" },
--	{ .compatible = "ti,omap4-scrm" },
--	{ .compatible = "ti,omap5-prm" },
--	{ .compatible = "ti,omap5-cm-core-aon" },
--	{ .compatible = "ti,omap5-scrm" },
--	{ .compatible = "ti,omap5-cm-core" },
--	{ .compatible = "ti,dra7-prm" },
--	{ .compatible = "ti,dra7-cm-core-aon" },
--	{ .compatible = "ti,dra7-cm-core" },
-+	{ .compatible = "ti,am3-prcm", .data = &prm_data },
-+	{ .compatible = "ti,am3-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,am4-prcm", .data = &prm_data },
-+	{ .compatible = "ti,am4-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,dm814-prcm", .data = &prm_data },
-+	{ .compatible = "ti,dm814-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,dm816-prcm", .data = &prm_data },
-+	{ .compatible = "ti,dm816-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,omap2-prcm", .data = &prm_data },
-+	{ .compatible = "ti,omap2-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,omap3-prm", .data = &prm_data },
-+	{ .compatible = "ti,omap3-cm", .data = &cm_data },
-+	{ .compatible = "ti,omap3-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
-+	{ .compatible = "ti,omap4-prm", .data = &prm_data },
-+	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
-+	{ .compatible = "ti,omap4-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,omap5-prm", .data = &prm_data },
-+	{ .compatible = "ti,omap5-cm-core-aon", .data = &cm_data },
-+	{ .compatible = "ti,omap5-scrm", .data = &scrm_data },
-+	{ .compatible = "ti,omap5-cm-core", .data = &cm2_data },
-+	{ .compatible = "ti,dra7-prm", .data = &prm_data },
-+	{ .compatible = "ti,dra7-cm-core-aon", .data = &cm_data },
-+	{ .compatible = "ti,dra7-cm-core", .data = &cm2_data },
++	return 0;
++}
++
++/**
++ * omap2_clk_legacy_provider_init - initialize a legacy clock provider
++ * @index: index for the clock provider
++ * @mem: iomem pointer for the clock provider memory area
++ *
++ * Initializes a legacy clock provider memory mapping.
++ */
++void __init omap2_clk_legacy_provider_init(int index, void __iomem *mem)
++{
++	ti_clk_ll_ops = &omap_clk_ll_ops;
++
++	clk_memmaps[index] = mem;
++}
++
+ /*
+  * OMAP2+ specific clock functions
+  */
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index a56742f..b6433fc 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -271,10 +271,12 @@ extern const struct clksel_rate div_1_3_rates[];
+ extern const struct clksel_rate div_1_4_rates[];
+ extern const struct clksel_rate div31_1to31_rates[];
+ 
+-extern void __iomem *clk_memmaps[];
+-
+ extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
+ extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
+ 
++int __init omap2_clk_provider_init(struct device_node *np, int index,
++				   void __iomem *mem);
++void __init omap2_clk_legacy_provider_init(int index, void __iomem *mem);
++
+ void __init ti_clk_init_features(void);
+ #endif
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 8ec5201..1bfd00e 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -677,25 +677,6 @@ static const struct of_device_id omap_prcm_dt_match_table[] = {
  	{ }
  };
  
-@@ -690,15 +706,20 @@ int __init omap_prcm_init(void)
- {
- 	struct device_node *np;
+-static struct clk_hw_omap memmap_dummy_ck = {
+-	.flags = MEMMAP_ADDRESSING,
+-};
+-
+-static u32 prm_clk_readl(void __iomem *reg)
+-{
+-	return omap2_clk_readl(&memmap_dummy_ck, reg);
+-}
+-
+-static void prm_clk_writel(u32 val, void __iomem *reg)
+-{
+-	omap2_clk_writel(val, &memmap_dummy_ck, reg);
+-}
+-
+-static struct ti_clk_ll_ops omap_clk_ll_ops = {
+-	.clk_readl = prm_clk_readl,
+-	.clk_writel = prm_clk_writel,
+-};
+-
+ /**
+  * omap_prcm_init - low level init for the PRCM drivers
+  *
+@@ -708,8 +689,7 @@ int __init omap_prcm_init(void)
  	void __iomem *mem;
--	int memmap_index = 0;
-+	const struct of_device_id *match;
-+	const struct omap_prcm_init_data *data;
+ 	const struct of_device_id *match;
+ 	const struct omap_prcm_init_data *data;
+-
+-	ti_clk_ll_ops = &omap_clk_ll_ops;
++	int ret;
  
- 	ti_clk_ll_ops = &omap_clk_ll_ops;
+ 	for_each_matching_node_and_match(np, omap_prcm_dt_match_table, &match) {
+ 		data = match->data;
+@@ -718,8 +698,9 @@ int __init omap_prcm_init(void)
+ 		if (!mem)
+ 			return -ENOMEM;
  
--	for_each_matching_node(np, omap_prcm_dt_match_table) {
-+	for_each_matching_node_and_match(np, omap_prcm_dt_match_table, &match) {
-+		data = match->data;
-+
- 		mem = of_iomap(np, 0);
--		clk_memmaps[memmap_index] = mem;
--		ti_dt_clk_init_provider(np, memmap_index);
--		memmap_index++;
-+		if (!mem)
-+			return -ENOMEM;
-+
-+		clk_memmaps[data->index] = mem;
-+		ti_dt_clk_init_provider(np, data->index);
+-		clk_memmaps[data->index] = mem;
+-		ti_dt_clk_init_provider(np, data->index);
++		ret = omap2_clk_provider_init(np, data->index, mem);
++		if (ret)
++			return ret;
  	}
  
  	return 0;
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 6784400..19895a3 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -221,6 +221,7 @@ struct ti_dt_clk {
- /* Static memmap indices */
- enum {
- 	TI_CLKM_CM = 0,
-+	TI_CLKM_CM2,
- 	TI_CLKM_PRM,
- 	TI_CLKM_SCRM,
- };
+@@ -727,11 +708,10 @@ int __init omap_prcm_init(void)
+ 
+ void __init omap3_prcm_legacy_iomaps_init(void)
+ {
+-	ti_clk_ll_ops = &omap_clk_ll_ops;
+-
+-	clk_memmaps[TI_CLKM_CM] = cm_base + OMAP3430_IVA2_MOD;
+-	clk_memmaps[TI_CLKM_PRM] = prm_base + OMAP3430_IVA2_MOD;
+-	clk_memmaps[TI_CLKM_SCRM] = omap_ctrl_base_get();
++	omap2_clk_legacy_provider_init(TI_CLKM_CM, cm_base + OMAP3430_IVA2_MOD);
++	omap2_clk_legacy_provider_init(TI_CLKM_PRM,
++				       prm_base + OMAP3430_IVA2_MOD);
++	omap2_clk_legacy_provider_init(TI_CLKM_SCRM, omap_ctrl_base_get());
+ }
+ 
+ static int __init prm_late_init(void)
 -- 
 1.7.9.5
