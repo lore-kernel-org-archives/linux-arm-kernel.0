@@ -1,63 +1,89 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 20 Mar 2015 11:28:28 +0000
-Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
-In-Reply-To: <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <1426112117-18220-2-git-send-email-dianders@chromium.org>
- <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
- <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
- <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
- <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
- <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
- <20150319113646.GQ2869@sirena.org.uk>
- <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
-Message-ID: <20150320112828.GF2869@sirena.org.uk>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 20 Mar 2015 11:29:54 +0000
+Subject: [RFC PATCH 1/3] of/device: manage resources similar
+ =?iso-8859-1?Q?to=0D?= platform_device_add
+In-Reply-To: <54C17087.7060003@ti.com>
+References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
+ <1420651854-17768-2-git-send-email-s-anna@ti.com>
+ <CAL_Jsq+79cnCiww6g8ejki0yT59-N8eucHC3QGMbsXG4DksWuQ@mail.gmail.com>
+ <54B58D5D.5070508@ti.com>
+ <CAL_JsqLW9PRktHntLquohH3x_bPgJrrn2Y2_8RYA_HnKhpTDHg@mail.gmail.com>
+ <54B5A499.7060106@ti.com> <54C17087.7060003@ti.com>
+Message-ID: <20150320112954.A3903C419C2@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 11:55:50AM +0100, Ulf Hansson wrote:
-> On 19 March 2015 at 12:36, Mark Brown <broonie@kernel.org> wrote:
+On Thu, 22 Jan 2015 15:49:59 -0600
+, Suman Anna <s-anna@ti.com>
+ wrote:
+> Hi Grant,
+> 
+> On 01/13/2015 05:04 PM, Suman Anna wrote:
+> > On 01/13/2015 04:00 PM, Rob Herring wrote:
+> >> On Tue, Jan 13, 2015 at 3:25 PM, Suman Anna <s-anna@ti.com> wrote:
+> >>> Hi Rob,
+> >>>
+> >>> On 01/13/2015 02:38 PM, Rob Herring wrote:
+> >>>> On Wed, Jan 7, 2015 at 11:30 AM, Suman Anna <s-anna@ti.com> wrote:
+> >>>>> Drivers can use of_platform_populate() to create platform devices
+> >>>>> for children of the device main node, and a complementary API
+> >>>>> of_platform_depopulate() is provided to delete these child platform
+> >>>>> devices. The of_platform_depopulate() leverages the platform API
+> >>>>> for performing the cleanup of these devices.
+> >>>>>
+> >>>>> The platform device resources are managed differently between
+> >>>>> of_device_add and platform_device_add, and this asymmetry causes
+> >>>>> a kernel oops in platform_device_del during removal of the resources.
+> >>>>> Manage the platform device resources similar to platform_device_add
+> >>>>> to fix this kernel oops.
+> >>>>
+> >>>> This is a known issue and has been attempted to be fixed before (I
+> >>>> believe there is a revert in mainline). The problem is there are known
+> >>>> devicetrees which have overlapping resources and they will break with
+> >>>> your change.
+> >>>
+> >>> Are you referring to 02bbde7849e6 (Revert "of: use
+> >>> platform_device_add")?
+> >>
+> >> I believe that's the one.
+> >>
+> >>> That one seems to be in registration path, and
+> >>> this crash is in the unregistration path. If so, to fix the crash,
+> >>> should we be skipping the release_resource() for now in
+> >>> platform_device_del for DT nodes, or replace platform_device_unregister
+> >>> with of_device_unregister in of_platform_device_destroy()?
+> >>
+> >> IIRC, the problem is inserting a resource twice on add from 2
+> >> different nodes, not the removal path. Perhaps we could make a
+> >> collision non-fatal for in the DT case.
+> > 
+> > We may be talking two different things here, I understand that this
+> > patch would create an issue with inserting a resource twice in the
+> > devicetrees with overlapping resources (just like the commit that was
+> > reverted above), but the crash is on devices with resources whose
+> > parent, child, sibling pointers have never been initialized (the
+> > of_device_add path does not touch these at all), and get dereferenced in
+> > platform_device_del()->release_resource(). See the following that has a
+> > better explanation [1].
+> > 
+> > regards
+> > Suman
+> > 
+> > [1]
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274412.html
+> > 
+> > 
+> >> Grant may have some ideas on
+> >> what's needed here.
+> 
+> Ping, any suggestions here? Do we ought to replace
+> platform_device_unregister() with of_device_unregister() similar to the
+> approach taken in 02bbde7849e6 (Revert "of: use platform_device_add")?
 
-> > The implementation *should* do that anyway, it's just not trivial to
-> > implement in an efficient fashion with the current information we have
-> > from drivers.
+Hi Suman,
 
-> The APIs regulator_count_voltages() and regulator_list_voltage(), are
-> currently used from the mmc core to find out which voltages that is
-> supported (with 0.1V granularity). Then that information can be used
-> when trying to set a new voltage.
+Yes, I think the solution to both problems is to create an
+of_device_unregister() function. It's not the prettiest thing, but I
+think it is for the best.
 
-> But I guess such a wrapper API is out of the question?
-
-> Anyway, I get the feeling that we will need to do the same for this case.
-
-As previously discussed the problem is that there can be a *lot* of
-voltages on a modern regulator with fine grained voltage steps and
-tolerances are also used for things like cpufreq where we care about
-performance.  We need something that doesn't require a linear scan of
-possible values.
-
-> >> would be good to allow both upper and lower limits to be zero.
-
-> > The lower limit can be zero already though it isn't clear to me that
-> > this is useful.  Setting an upper limit of zero seems nonsensical, an
-> > upper limit that is lower than the lower limit isn't terribly obvious
-> > and removing the upper limit isn't safe - it means that we'll happily
-> > oversupply things which is a road to physical damage.
-
-> I am not sure I follow here. In the regulator_set_voltage_tol() you
-> can only specifiy one limit (tolerance?). What Dough proposed was to
-> add a new API which can have both a low tolerance value and a high
-> tolerance value.
-
-Tolerances are not limits - when you say "limit" that sounds like a hard
-value.  I can't see any reason why the code would prevent anyone setting
-a tolerance of zero, though it should be rare that this is actually the
-best thing to do.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/295ed9f1/attachment.sig>
+g.
