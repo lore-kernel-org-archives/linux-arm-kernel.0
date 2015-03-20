@@ -1,126 +1,98 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 20 Mar 2015 12:43:59 +0100
-Subject: [PATCH V3 6/8] ARM: cpuidle: Enable the ARM64 driver for both
- ARM32/ARM64
+Date: Fri, 20 Mar 2015 12:44:00 +0100
+Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
 In-Reply-To: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426851841-2072-7-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM32 and ARM64 have the same DT definitions and the same approaches.
+Some architectures have some cpus which does not support idle states.
 
-The generic ARM cpuidle driver can be put in common for those two
-architectures.
+Let the underlying low level code to return -ENXIO when it is not
+possible to set an idle state.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Kevin Hilman <khilman@linaro.org>
-Acked-by: Rob Herring <robherring2@gmail.com>
 ---
- drivers/cpuidle/Kconfig                            |  7 +------
- drivers/cpuidle/Kconfig.arm                        | 12 +++++++++++-
- drivers/cpuidle/Kconfig.arm64                      | 13 -------------
- drivers/cpuidle/Makefile                           |  5 +----
- drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} |  0
- 5 files changed, 13 insertions(+), 24 deletions(-)
- delete mode 100644 drivers/cpuidle/Kconfig.arm64
- rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (100%)
+ drivers/cpuidle/cpuidle-arm.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index c5029c1..8c7930b 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -29,15 +29,10 @@ config DT_IDLE_STATES
- 	bool
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 1c94b88..e4a6eba 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -17,6 +17,7 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/slab.h>
  
- menu "ARM CPU Idle Drivers"
--depends on ARM
-+depends on ARM || ARM64
- source "drivers/cpuidle/Kconfig.arm"
- endmenu
+ #include <asm/cpuidle.h>
  
--menu "ARM64 CPU Idle Drivers"
--depends on ARM64
--source "drivers/cpuidle/Kconfig.arm64"
--endmenu
--
- menu "MIPS CPU Idle Drivers"
- depends on MIPS
- source "drivers/cpuidle/Kconfig.mips"
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 8e07c94..1f067bd 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -14,6 +14,16 @@ config ARM_BIG_LITTLE_CPUIDLE
- 	  define different C-states for little and big cores through the
- 	  multiple CPU idle drivers infrastructure.
+@@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
+ {
+ 	int cpu, ret;
+ 	struct cpuidle_driver *drv = &arm_idle_driver;
++	struct cpuidle_device *dev;
  
-+config ARM_CPUIDLE
-+	bool "Generic ARM/ARM64 CPU idle Driver"
-+	select DT_IDLE_STATES
-+	help
-+	  Select this to enable generic cpuidle driver for ARM.
-+	  It provides a generic idle driver whose idle states are configured
-+	  at run-time through DT nodes. The CPUidle suspend backend is
-+	  initialized by calling the CPU operations init idle hook
-+	  provided by architecture code.
+ 	/*
+ 	 * Initialize idle states data, starting at index 1.
+@@ -105,18 +107,54 @@ static int __init arm_idle_init(void)
+ 	if (ret <= 0)
+ 		return ret ? : -ENODEV;
+ 
++	ret = cpuidle_register_driver(drv);
++	if (ret) {
++		pr_err("Failed to register cpuidle driver\n");
++		return ret;
++	}
 +
- config ARM_CLPS711X_CPUIDLE
- 	bool "CPU Idle Driver for CLPS711X processors"
- 	depends on ARCH_CLPS711X || COMPILE_TEST
-@@ -54,7 +64,7 @@ config ARM_AT91_CPUIDLE
+ 	/*
+ 	 * Call arch CPU operations in order to initialize
+ 	 * idle states suspend back-end specific data
+ 	 */
+ 	for_each_possible_cpu(cpu) {
+ 		ret = arm_cpuidle_init(cpu);
++
++		/* This cpu does not support any idle states */
++		if (ret == -ENXIO)
++			continue;
++
+ 		if (ret) {
+ 			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+-			return ret;
++			goto out_fail;
++		}
++
++		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++		if (!dev) {
++			pr_err("Failed to allocate cpuidle device\n");
++			goto out_fail;
++		}
++		dev->cpu = cpu;
++
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("Failed to register cpuidle device for CPU %d\n",
++			       cpu);
++			kfree(dev);
++			goto out_fail;
+ 		}
+ 	}
  
- config ARM_EXYNOS_CPUIDLE
- 	bool "Cpu Idle Driver for the Exynos processors"
--	depends on ARCH_EXYNOS
-+	depends on ARCH_EXYNOS && !ARM64
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
- 	help
- 	  Select this to enable cpuidle for Exynos processors
-diff --git a/drivers/cpuidle/Kconfig.arm64 b/drivers/cpuidle/Kconfig.arm64
-deleted file mode 100644
-index 6effb36..0000000
---- a/drivers/cpuidle/Kconfig.arm64
-+++ /dev/null
-@@ -1,13 +0,0 @@
--#
--# ARM64 CPU Idle drivers
--#
--
--config ARM64_CPUIDLE
--	bool "Generic ARM64 CPU idle Driver"
--	select DT_IDLE_STATES
--	help
--	  Select this to enable generic cpuidle driver for ARM64.
--	  It provides a generic idle driver whose idle states are configured
--	  at run-time through DT nodes. The CPUidle suspend backend is
--	  initialized by calling the CPU operations init idle hook
--	  provided by architecture code.
-diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
-index 4d177b9..3ba81b1 100644
---- a/drivers/cpuidle/Makefile
-+++ b/drivers/cpuidle/Makefile
-@@ -17,16 +17,13 @@ obj-$(CONFIG_ARM_ZYNQ_CPUIDLE)		+= cpuidle-zynq.o
- obj-$(CONFIG_ARM_U8500_CPUIDLE)         += cpuidle-ux500.o
- obj-$(CONFIG_ARM_AT91_CPUIDLE)          += cpuidle-at91.o
- obj-$(CONFIG_ARM_EXYNOS_CPUIDLE)        += cpuidle-exynos.o
-+obj-$(CONFIG_ARM_CPUIDLE)		+= cpuidle-arm.o
- 
- ###############################################################################
- # MIPS drivers
- obj-$(CONFIG_MIPS_CPS_CPUIDLE)		+= cpuidle-cps.o
- 
- ###############################################################################
--# ARM64 drivers
--obj-$(CONFIG_ARM64_CPUIDLE)		+= cpuidle-arm64.o
--
--###############################################################################
- # POWERPC drivers
- obj-$(CONFIG_PSERIES_CPUIDLE)		+= cpuidle-pseries.o
- obj-$(CONFIG_POWERNV_CPUIDLE)		+= cpuidle-powernv.o
-diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm.c
-similarity index 100%
-rename from drivers/cpuidle/cpuidle-arm64.c
-rename to drivers/cpuidle/cpuidle-arm.c
+-	return cpuidle_register(drv, NULL);
++	return 0;
++out_fail:
++	while (--cpu >= 0) {
++		dev = per_cpu(cpuidle_devices, cpu);
++		cpuidle_unregister_device(dev);
++		kfree(dev);
++	}
++
++	cpuidle_unregister_driver(drv);
++
++	return ret;
+ }
+ device_initcall(arm_idle_init);
 -- 
 1.9.1
