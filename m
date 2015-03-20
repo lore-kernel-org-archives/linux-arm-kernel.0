@@ -1,35 +1,60 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Sat, 21 Mar 2015 06:53:51 +1030
-Subject: [PATCH] ARM: Exynos5420: dt: Fixed the checkpatch.pl WARNING
- misspelled
-Message-ID: <1426883031-3518-1-git-send-email-linux.amoon@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Mar 2015 21:53:32 +0100
+Subject: [PATCH RFC 2/3] ARM: sun7i: Add A20 SRAM and SRAM controller
+In-Reply-To: <5509CE0D.7000904@redhat.com>
+References: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
+ <5509CE0D.7000904@redhat.com>
+Message-ID: <20150320205332.GI4255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes fixes the misspelled of #interrups-cell.
+On Wed, Mar 18, 2015 at 08:12:13PM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 12-03-15 14:13, Maxime Ripard wrote:
+> >The A20 has a few SRAM that can be mapped either to a device or to the CPU,
+> >with the mapping being controlled by an SRAM controller.
+> >
+> >Since most of the time these SRAM won't be accessible by the CPU, we can't use
+> >the mmio-sram driver and compatible.
+> >
+> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >---
+> >  arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++++++++++++++++-
+> >  1 file changed, 30 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >index a1ebd80e6f24..a249828a1df5 100644
+> >--- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> >+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> >@@ -522,12 +522,41 @@
+> >  		};
+> >  	};
+> >
+> >-	soc at 01c00000 {
+> >+	soc {
+> 
+> Please do not do this, this changes devicetree paths used by
+> u-boot, see:
+> 
+> http://git.denx.de/?p=u-boot.git;a=blob;f=include/configs/sunxi-common.h#l232
 
-arch/arm/boot/dts/exynos5420.dtsi:224: WARNING: 'interrups'
-	 may be misspelled - perhaps 'interrupts'?
+Ah, I didn't think about that. That's unfortunate, since the SRAM
+start lower than this address, but I guess we'll have to live with
+that :)
 
-Tested on OdroidXU3 board.
+Thanks!
+Maxime
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos5420.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c0e98cf..a78ac1f 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -221,7 +221,7 @@
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x101C0000 0x800>;
- 		interrupt-controller;
--		#interrups-cells = <1>;
-+		#interrupt-cells = <1>;
- 		interrupt-parent = <&mct_map>;
- 		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>,
- 				<8>, <9>, <10>, <11>;
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/499ed5f9/attachment.sig>
