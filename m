@@ -1,43 +1,129 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 20 Mar 2015 09:19:10 +0100
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
- <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
- <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
- <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <20150320081910.GF10068@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 20 Mar 2015 08:21:58 +0000
+Subject: [PATCH 2/2] mfd: tc3589x: enforce device-tree only mode
+In-Reply-To: <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
+References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
+ <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150320082158.GD3318@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 08:57:21PM +0000, Chris Brandt wrote:
-> Eventually....I got it to boot.
-> 
-> I had to remove both CONFIG_HIGHMEM and CONFIG_SMP and then I could boot completely from ROM (which for me is external QSPI flash that is memory mapping into linear CPU space at address 0x18000000)
-> 
-> So, the total changes was:
-> 
-> 1. start with shmobile_defconfig
-> 2. remove all architectures but RZ/A1 (ARCH_R7S72100)
-> 3. remove !ARCH_MULTIPLATFORM from XIP_KERNEL's dependencies
-> 4. modify  'select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL'  in PHYS_OFFSET (because I need to be able to set PHYS_OFFSET)
-> 5. patch up mmu.c, proc-v7.S and link-vmlinux.sh
-> 6. remove CONFIG_HIGHMEM and CONFIG_SMP
-> 
-> I also modified the DT to use internal RAM instead external SDRAM.
-> 
-> Of course to actually boot an XIP kernel, you have to make a custom command in u-boot (using bootm or go is not going to work).
-It should. I remember that you need to pass something unintuitive to
-mkimage (to not say buggy). See
-http://lists.denx.de/pipermail/u-boot/2007-March/020171.html for my try
-to fix that back when I still cared about U-Boot.
+On Thu, 19 Mar 2015, Linus Walleij wrote:
 
-Best regards
-Uwe
+> All systems using the TC3589x multifunction expander uses
+> devicetree, so don't clutter the place with a lot of
+> and assume it is there.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> ---
+>  drivers/gpio/Kconfig                    | 1 +
+>  drivers/gpio/gpio-tc3589x.c             | 3 ---
+>  drivers/input/keyboard/tc3589x-keypad.c | 9 ---------
+>  drivers/mfd/Kconfig                     | 1 +
+>  drivers/mfd/tc3589x.c                   | 9 ---------
+>  5 files changed, 2 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index c1e2ca3d9a51..dc1aaa83a347 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -669,6 +669,7 @@ config GPIO_STP_XWAY
+>  config GPIO_TC3589X
+>  	bool "TC3589X GPIOs"
+>  	depends on MFD_TC3589X
+> +	depends on OF_GPIO
+>  	select GPIOLIB_IRQCHIP
+>  	help
+>  	  This enables support for the GPIOs found on the TC3589X
+> diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
+> index 11aed2671065..31b244cffabb 100644
+> --- a/drivers/gpio/gpio-tc3589x.c
+> +++ b/drivers/gpio/gpio-tc3589x.c
+> @@ -260,10 +260,7 @@ static int tc3589x_gpio_probe(struct platform_device *pdev)
+>  	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
+>  	tc3589x_gpio->chip.dev = &pdev->dev;
+>  	tc3589x_gpio->chip.base = -1;
+> -
+> -#ifdef CONFIG_OF_GPIO
+>  	tc3589x_gpio->chip.of_node = np;
+> -#endif
+>  
+>  	/* Bring the GPIO module out of reset */
+>  	ret = tc3589x_set_bits(tc3589x, TC3589x_RSTCTRL,
+> diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
+> index 0ccc7de9b59d..08e62e6aeb1b 100644
+> --- a/drivers/input/keyboard/tc3589x-keypad.c
+> +++ b/drivers/input/keyboard/tc3589x-keypad.c
+> @@ -318,7 +318,6 @@ static void tc3589x_keypad_close(struct input_dev *input)
+>  	tc3589x_keypad_disable(keypad);
+>  }
+>  
+> -#ifdef CONFIG_OF
+>  static const struct tc3589x_keypad_platform_data *
+>  tc3589x_keypad_of_probe(struct device *dev)
+>  {
+> @@ -368,14 +367,6 @@ tc3589x_keypad_of_probe(struct device *dev)
+>  
+>  	return plat;
+>  }
+> -#else
+> -static inline const struct tc3589x_keypad_platform_data *
+> -tc3589x_keypad_of_probe(struct device *dev)
+> -{
+> -	return ERR_PTR(-ENODEV);
+> -}
+> -#endif
+> -
+>  
+>  static int tc3589x_keypad_probe(struct platform_device *pdev)
+>  {
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 38356e39adba..476e63745742 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1210,6 +1210,7 @@ config MFD_TIMBERDALE
+>  config MFD_TC3589X
+>  	bool "Toshiba TC35892 and variants"
+>  	depends on I2C=y
+> +	depends on OF
+>  	select MFD_CORE
+>  	help
+>  	  Support for the Toshiba TC35892 and variants I/O Expander.
+> diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
+> index aacb3720065c..cf356395c9e9 100644
+> --- a/drivers/mfd/tc3589x.c
+> +++ b/drivers/mfd/tc3589x.c
+> @@ -318,7 +318,6 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
+>  	return ret;
+>  }
+>  
+> -#ifdef CONFIG_OF
+>  static const struct of_device_id tc3589x_match[] = {
+>  	/* Legacy compatible string */
+>  	{ .compatible = "tc3589x", .data = (void *) TC3589X_UNKNOWN },
+> @@ -359,14 +358,6 @@ tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
+>  
+>  	return pdata;
+>  }
+> -#else
+> -static inline struct tc3589x_platform_data *
+> -tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
+> -{
+> -	dev_err(dev, "no device tree support\n");
+> -	return ERR_PTR(-ENODEV);
+> -}
+> -#endif
+>  
+>  static int tc3589x_probe(struct i2c_client *i2c,
+>  				   const struct i2c_device_id *id)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
