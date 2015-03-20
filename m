@@ -1,62 +1,35 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Mar 2015 09:56:50 +0100
-Subject: [PATCH 33/35 linux-next] mmc: constify of_device_id array
-In-Reply-To: <CAPDyKFodW1zgrQ-sd5TPO_rCa_-tm95JkwCWiGX4BCUSFqPHdg@mail.gmail.com>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-2-git-send-email-fabf@skynet.be>
- <CAPDyKFodW1zgrQ-sd5TPO_rCa_-tm95JkwCWiGX4BCUSFqPHdg@mail.gmail.com>
-Message-ID: <CAPDyKFoWoQhSat9vAfTGy_exdubcknySMPjoSXp5ox_YB+M6ZQ@mail.gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 20 Mar 2015 10:06:58 +0100
+Subject: [PATCH 11/13] can: at91_can: use endian agnostic IO accessors
+In-Reply-To: <1426693992-31163-12-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-12-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <550BE332.1030901@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 March 2015 at 10:49, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 16 March 2015 at 20:59, Fabian Frederick <fabf@skynet.be> wrote:
->> of_device_id is always used as const.
->> (See driver.of_match_table and open firmware functions)
->>
->> Signed-off-by: Fabian Frederick <fabf@skynet.be>
->
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+On 03/18/2015 04:53 PM, Ben Dooks wrote:
+> Change __raw accesors to  endian agnostic versions to allow the driver
+> to work properly on big endian systems.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-I realized that you might wanted me to pick this up and queue it
-through my mmc tree? Just tell me if that's what you want.
+applied to can-next.
 
-Kind regards
-Uffe
+Thanks,
+Marc
 
->
->> ---
->>  drivers/mmc/host/mmc_spi.c   | 2 +-
->>  drivers/mmc/host/wmt-sdmmc.c | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
->> index e4a0754..ae19d83 100644
->> --- a/drivers/mmc/host/mmc_spi.c
->> +++ b/drivers/mmc/host/mmc_spi.c
->> @@ -1507,7 +1507,7 @@ static int mmc_spi_remove(struct spi_device *spi)
->>         return 0;
->>  }
->>
->> -static struct of_device_id mmc_spi_of_match_table[] = {
->> +static const struct of_device_id mmc_spi_of_match_table[] = {
->>         { .compatible = "mmc-spi-slot", },
->>         {},
->>  };
->> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
->> index dd2e1aa..5af0055 100644
->> --- a/drivers/mmc/host/wmt-sdmmc.c
->> +++ b/drivers/mmc/host/wmt-sdmmc.c
->> @@ -744,7 +744,7 @@ static struct wmt_mci_caps wm8505_caps = {
->>         .max_blk_size = 2048,
->>  };
->>
->> -static struct of_device_id wmt_mci_dt_ids[] = {
->> +static const struct of_device_id wmt_mci_dt_ids[] = {
->>         { .compatible = "wm,wm8505-sdhc", .data = &wm8505_caps },
->>         { /* Sentinel */ },
->>  };
->> --
->> 2.1.0
->>
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/24c639df/attachment.sig>
