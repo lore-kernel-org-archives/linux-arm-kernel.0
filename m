@@ -1,52 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 11:41:42 +0000
-Subject: [PATCH v3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
- boot protocol
-In-Reply-To: <CAKv+Gu-=n8fbdFeZX=EEpLypOdu0xXePzXH4-gOn6SqufA6CGg@mail.gmail.com>
-References: <20150319104100.GB18473@leverpostej>
- <1426762852-13699-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150319133612.GD18473@leverpostej>
- <CAKv+Gu-=n8fbdFeZX=EEpLypOdu0xXePzXH4-gOn6SqufA6CGg@mail.gmail.com>
-Message-ID: <20150320114142.GF14766@leverpostej>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Fri, 20 Mar 2015 14:42:38 +0300
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+In-Reply-To: <550C0503.3000207@samsung.com>
+References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+ <550C0503.3000207@samsung.com>
+Message-ID: <550C07AE.8030708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +     if (boot_args[1] || boot_args[2] || boot_args[3]) {
-> >> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
-> >> +                     boot_args[1], boot_args[2], boot_args[3]);
-> >> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
-> >
-> > If we ever decide to use x1-x3 for something, and try to boot an older
-> > kernel, that warning is going to be a bit misleading. That could matter
-> > for VMs where we're going to see old kernel images for a long time.
-> >
-> > I would like the warning to mention that could be the case.
-> >
-> > It would also be nice if the message were consistently spaced regardless
-> > of the values of x1-x3, so we should zero-pad them (and as that takes a
-> > resonable amount of space, let's give them a line each).
-> >
-> > So could we change the warning to be something like:
-> >
-> >         pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
-> >                "\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
-> >                "This indicates a broken bootloader or old kernel\n",
-> >                boot_args[1], boot_args[2], boot_args[3]);
-> >
+On 03/20/2015 02:31 PM, Yury Gribov wrote:
+> On 03/20/2015 02:12 PM, Andrey Ryabinin wrote:
+>> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+>> split this is not so, because 2*TASK_SIZE overflows 32 bits,
+>> so the actual value of ELF_ET_DYN_BASE is:
+>>     (2 * TASK_SIZE / 3) = 0x2a000000
 > 
-> OK, I have applied this change.
+> AFAIK on most platforms (e.g. Intel) that's (TASK_SIZE / 3 * 2) so ARM is kind of special here.
 > 
-> But I would like to note that we should probably only extend the boot
-> protocol in a way that would not trigger this on older kernels in the
-> first place.
-> I.e., assign a bit in the flags field in the header, which indicates
-> whether some boot protocol enhancement is supported by the kernel
-> being loaded, and only allow x1/x2/x3 to be non-zero if said
-> enhancement defines that.
+>>
+>> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+>> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+>> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+>> as it fails to map shadow memory.
+>> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+>> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+>> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
+>>
+>> Fix overflow by dividing TASK_SIZE prior to multiplying.
+>> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+>>     (TASK_SIZE / 3 * 2) = 0x7f555554
+>>
+>> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
+> 
+> Perhaps we should fix other platforms as well?
+> 
 
-Good point.
-
-Given that, if you want to restore your original last line, that would
-be fine with me (and my Ack still applies).
-
-Mark.
+Seems only avr32 and cris platforms have the same problem.
+All other 32bit platforms where ELF_ET_DYB_BASE = (2 * TASK_SIZE / 3) have TASK_SIZE < 2G, so there is no overflow.
