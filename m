@@ -1,107 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Mar 2015 19:53:55 +0100
-Subject: [PATCH 5/5] net: allwinner: emac: Claim our SRAM
-In-Reply-To: <1426877569-11493-6-git-send-email-hdegoede@redhat.com>
-References: <1426877569-11493-1-git-send-email-hdegoede@redhat.com>
- <1426877569-11493-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <550C6CC3.8010101@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 Mar 2015 18:54:00 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <550A4BFD.4070804@huawei.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
+Message-ID: <20150320185400.GK1474@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
+> On 2015/3/19 3:05, Will Deacon wrote:
+> > If you can get that in place, I'm not opposed to putting this into
+> > linux-next ahead of the firmware summit in San Jose next week. Note that
+> > this is not a commitment for 4.1, since I'm keen to see the outcomes of
+> > next week before setting anything in stone.
+> 
+> OK, I will stick to this mailing list and respond as soon as I can.
 
-On 20-03-15 19:52, Hans de Goede wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
->
-> The SRAM the EMAC is using might not have been mapped accordingly by the
-> bootloader, preventing the EMAC to work properly.
->
-> Ask for that SRAM to be mapped at probe time to make sure that this never
-> happens.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [hdegoede at redhat.com: Make sure SUNXI_SRAM gets enabled in Kconfig]
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+This doesn't even build for me:
 
-Note this patch is only included for completeness / as an example,
-it should probably go upstream through the network-drivers tree
-once the rest is merged.
 
-Regards,
+$ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- allmodconfig
+$ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- Image
 
-Hans
+[...]
 
-> ---
->   drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
->   drivers/net/ethernet/stmicro/stmmac/Kconfig |  1 +
->   2 files changed, 12 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> index f3470d9..9d0136b 100644
-> --- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-> +++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> @@ -29,6 +29,8 @@
->   #include <linux/platform_device.h>
->   #include <linux/phy.h>
->
-> +#include <linux/soc/sunxi/sunxi_sram.h>
-> +
->   #include "sun4i-emac.h"
->
->   #define DRV_NAME		"sun4i-emac"
-> @@ -857,11 +859,15 @@ static int emac_probe(struct platform_device *pdev)
->
->   	clk_prepare_enable(db->clk);
->
-> +	ret = sunxi_sram_claim(SUNXI_SRAM_EMAC, "emac");
-> +	if (ret)
-> +		dev_warn(&pdev->dev, "Couldn't map SRAM to device\n");
-> +
->   	db->phy_node = of_parse_phandle(np, "phy", 0);
->   	if (!db->phy_node) {
->   		dev_err(&pdev->dev, "no associated PHY\n");
->   		ret = -ENODEV;
-> -		goto out;
-> +		goto out_release_sram;
->   	}
->
->   	/* Read MAC-address from DT */
-> @@ -893,7 +899,7 @@ static int emac_probe(struct platform_device *pdev)
->   	if (ret) {
->   		dev_err(&pdev->dev, "Registering netdev failed!\n");
->   		ret = -ENODEV;
-> -		goto out;
-> +		goto out_release_sram;
->   	}
->
->   	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
-> @@ -901,6 +907,8 @@ static int emac_probe(struct platform_device *pdev)
->
->   	return 0;
->
-> +out_release_sram:
-> +	sunxi_sram_release(SUNXI_SRAM_EMAC);
->   out:
->   	dev_err(db->dev, "not found (%d).\n", ret);
->
-> @@ -914,6 +922,7 @@ static int emac_remove(struct platform_device *pdev)
->   	struct net_device *ndev = platform_get_drvdata(pdev);
->
->   	unregister_netdev(ndev);
-> +	sunxi_sram_release(SUNXI_SRAM_EMAC);
->   	free_netdev(ndev);
->
->   	dev_dbg(&pdev->dev, "released and freed device\n");
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> index 7d3af19..785ca22 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> @@ -16,6 +16,7 @@ if STMMAC_ETH
->   config STMMAC_PLATFORM
->   	tristate "STMMAC Platform bus support"
->   	depends on STMMAC_ETH
-> +	select SUNXI_SRAM if ARCH_SUNXI
->   	default y
->   	---help---
->   	  This selects the platform specific bus support for the stmmac driver.
->
+In file included from drivers/xen/acpi.c:33:0:
+include/xen/acpi.h: In function ?xen_acpi_sleep_register?:
+include/xen/acpi.h:102:3: error: ?acpi_suspend_lowlevel? undeclared (first use in this function)
+   acpi_suspend_lowlevel = xen_acpi_suspend_lowlevel;
+   ^
+include/xen/acpi.h:102:3: note: each undeclared identifier is reported only once for each function it appears in
+drivers/xen/acpi.c: In function ?xen_acpi_notify_hypervisor_state?:
+drivers/xen/acpi.c:61:2: error: implicit declaration of function ?HYPERVISOR_dom0_op? [-Werror=implicit-function-declaration]
+  HYPERVISOR_dom0_op(&op);
+  ^
+cc1: some warnings being treated as errors
+make[2]: *** [drivers/xen/acpi.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
+make[1]: *** [drivers/xen] Error 2
+make[1]: *** Waiting for unfinished jobs....
+make: *** [drivers] Error 2
+
+
+Am I missing some other patches?
+
+Will
