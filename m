@@ -1,45 +1,62 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Fri, 20 Mar 2015 02:01:01 +0000
-Subject: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
-In-Reply-To: <1426618604.15575.3.camel@x220>
-References: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
- <1426618604.15575.3.camel@x220>
-Message-ID: <BL2PR03MB3388B4AE092A0726563F778830E0@BL2PR03MB338.namprd03.prod.outlook.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 20 Mar 2015 10:33:30 +0800
+Subject: [PATCH 00/12] USB: chipidea: patchset for performance improvement
+In-Reply-To: <20150319103629.GI14457@ns203013.ovh.net>
+References: <1426727963-32280-1-git-send-email-peter.chen@freescale.com>
+ <20150319103629.GI14457@ns203013.ovh.net>
+Message-ID: <20150320023328.GA7537@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for your review. I will fix it in the next version.
+On Thu, Mar 19, 2015 at 11:36:29AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 09:19 Thu 19 Mar     , Peter Chen wrote:
+> > Hi all,
+> > 
+> > In this patch set, I add some interfaces for tuning the performance
+> > of chipidea usb driver. With this set, the USB performance can be improved
+> > at some user cases with suitable parameters. The main changes:
+> > 
+> > - Interface to tune interrupt threshold control, and set
+> > 'Immediate' for default value
+> > - The glue layer can disable stream mode according to USB role
+> > - Interface to tune AHB burst configuration at SBUSCFG
+> > - Interface to tune tx/rx burst size
+> > - i.mx changes for achieving better performance, it can reduce
+> >   the latecy between bus and USB FIFO, and reduce the overrun
+> >   and underrun occurrences, it is useful for the system bus is busy.
+> >   we see great improvement for ISO transfer, eg, high resolution
+> >   USB camera when the bus is busy.
+> > 
+> > Below are some test results at imx6sx sdb board
+> > (set ehci_hcd.park=3 at bootargs), the tests are done
+> > at v4.0 kernel, no other bus loading during the tests,
+> > so we have not seen performance change for some use cases.
+> > 
+> > USB Mass Storage (Host mode)
+> > With Patch Set		Without Patch Set
+> > R: 26.9 MB/s		27 MB/s
+> > W: 25.2 MB/s		24.5 MB/s
+> > 
+> > 1G USB Ethernet Card
+> > With Patch Set		Without Patch Set
+> > TX: 186 Mb/s		185 Mb/s
+> > RX: 219 Mb/s		216 Mb/s
+> > 
+> > g_ncm (Device Mode)
+> > With Patch Set		Without Patch Set
+> > TX: 166MB/s		163MB/s
+> > RX: 230MB/s		184MB/s
+> 
+> The improve is not drag sticks except for gcm RX
+> 
+> The most interesting path will be on full system loaded
+> 
+
+Yeah, I can have a try. But we have no GPU driver and related
+apps on it, I am not sure if I can create starve bus situation.
+Any high bus loading tools suggest?
+
+-- 
 
 Best Regards,
-Yuan Yao
-
-> -----Original Message-----
-> From: Paul Bolle [mailto:pebolle at tiscali.nl]
-> Sent: Wednesday, March 18, 2015 2:57 AM
-> To: Yuan Yao-B46683
-> Cc: vinod.koul at intel.com; shawn.guo at linaro.org; dan.j.williams at intel.com;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
-> 
-> Just a license nit.
-> 
-> On Tue, 2015-03-17 at 13:28 +0800, Yuan Yao wrote:
-> > --- /dev/null
-> > +++ b/drivers/dma/fsl-qdma.c
-> 
-> > + * This program is free software; you can redistribute  it and/or modify it
-> > + * under  the terms of  the GNU General  Public License as published by the
-> > + * Free Software Foundation;  either version 2 of the  License, or (at your
-> > + * option) any later version.
-> 
-> This states the license is GPL v2 or later.
-> 
-> > +MODULE_LICENSE("GPL v2");
-> 
-> And
->     MODULE_LICENSE("GPL");
-> 
-> would match that statement.
-> 
-> 
-> Paul Bolle
+Peter Chen
