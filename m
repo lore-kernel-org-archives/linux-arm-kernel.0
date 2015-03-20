@@ -1,89 +1,36 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 20 Mar 2015 11:29:54 +0000
-Subject: [RFC PATCH 1/3] of/device: manage resources similar
- =?iso-8859-1?Q?to=0D?= platform_device_add
-In-Reply-To: <54C17087.7060003@ti.com>
-References: <1420651854-17768-1-git-send-email-s-anna@ti.com>
- <1420651854-17768-2-git-send-email-s-anna@ti.com>
- <CAL_Jsq+79cnCiww6g8ejki0yT59-N8eucHC3QGMbsXG4DksWuQ@mail.gmail.com>
- <54B58D5D.5070508@ti.com>
- <CAL_JsqLW9PRktHntLquohH3x_bPgJrrn2Y2_8RYA_HnKhpTDHg@mail.gmail.com>
- <54B5A499.7060106@ti.com> <54C17087.7060003@ti.com>
-Message-ID: <20150320112954.A3903C419C2@trevor.secretlab.ca>
+From: y.gribov@samsung.com (Yury Gribov)
+Date: Fri, 20 Mar 2015 14:31:15 +0300
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+In-Reply-To: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <550C0503.3000207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Jan 2015 15:49:59 -0600
-, Suman Anna <s-anna@ti.com>
- wrote:
-> Hi Grant,
-> 
-> On 01/13/2015 05:04 PM, Suman Anna wrote:
-> > On 01/13/2015 04:00 PM, Rob Herring wrote:
-> >> On Tue, Jan 13, 2015 at 3:25 PM, Suman Anna <s-anna@ti.com> wrote:
-> >>> Hi Rob,
-> >>>
-> >>> On 01/13/2015 02:38 PM, Rob Herring wrote:
-> >>>> On Wed, Jan 7, 2015 at 11:30 AM, Suman Anna <s-anna@ti.com> wrote:
-> >>>>> Drivers can use of_platform_populate() to create platform devices
-> >>>>> for children of the device main node, and a complementary API
-> >>>>> of_platform_depopulate() is provided to delete these child platform
-> >>>>> devices. The of_platform_depopulate() leverages the platform API
-> >>>>> for performing the cleanup of these devices.
-> >>>>>
-> >>>>> The platform device resources are managed differently between
-> >>>>> of_device_add and platform_device_add, and this asymmetry causes
-> >>>>> a kernel oops in platform_device_del during removal of the resources.
-> >>>>> Manage the platform device resources similar to platform_device_add
-> >>>>> to fix this kernel oops.
-> >>>>
-> >>>> This is a known issue and has been attempted to be fixed before (I
-> >>>> believe there is a revert in mainline). The problem is there are known
-> >>>> devicetrees which have overlapping resources and they will break with
-> >>>> your change.
-> >>>
-> >>> Are you referring to 02bbde7849e6 (Revert "of: use
-> >>> platform_device_add")?
-> >>
-> >> I believe that's the one.
-> >>
-> >>> That one seems to be in registration path, and
-> >>> this crash is in the unregistration path. If so, to fix the crash,
-> >>> should we be skipping the release_resource() for now in
-> >>> platform_device_del for DT nodes, or replace platform_device_unregister
-> >>> with of_device_unregister in of_platform_device_destroy()?
-> >>
-> >> IIRC, the problem is inserting a resource twice on add from 2
-> >> different nodes, not the removal path. Perhaps we could make a
-> >> collision non-fatal for in the DT case.
-> > 
-> > We may be talking two different things here, I understand that this
-> > patch would create an issue with inserting a resource twice in the
-> > devicetrees with overlapping resources (just like the commit that was
-> > reverted above), but the crash is on devices with resources whose
-> > parent, child, sibling pointers have never been initialized (the
-> > of_device_add path does not touch these at all), and get dereferenced in
-> > platform_device_del()->release_resource(). See the following that has a
-> > better explanation [1].
-> > 
-> > regards
-> > Suman
-> > 
-> > [1]
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/274412.html
-> > 
-> > 
-> >> Grant may have some ideas on
-> >> what's needed here.
-> 
-> Ping, any suggestions here? Do we ought to replace
-> platform_device_unregister() with of_device_unregister() similar to the
-> approach taken in 02bbde7849e6 (Revert "of: use platform_device_add")?
+On 03/20/2015 02:12 PM, Andrey Ryabinin wrote:
+> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+> split this is not so, because 2*TASK_SIZE overflows 32 bits,
+> so the actual value of ELF_ET_DYN_BASE is:
+> 	(2 * TASK_SIZE / 3) = 0x2a000000
 
-Hi Suman,
+AFAIK on most platforms (e.g. Intel) that's (TASK_SIZE / 3 * 2) so ARM 
+is kind of special here.
 
-Yes, I think the solution to both problems is to create an
-of_device_unregister() function. It's not the prettiest thing, but I
-think it is for the best.
+>
+> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+> as it fails to map shadow memory.
+> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
+>
+> Fix overflow by dividing TASK_SIZE prior to multiplying.
+> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+> 	(TASK_SIZE / 3 * 2) = 0x7f555554
+>
+> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
 
-g.
+Perhaps we should fix other platforms as well?
+
+-Y
