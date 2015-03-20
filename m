@@ -1,37 +1,88 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 20 Mar 2015 14:21:10 -0600
-Subject: [PATCH v17 03/10] ARM: cpuidle: Add cpuidle support for QCOM cpus
+Date: Fri, 20 Mar 2015 14:21:12 -0600
+Subject: [PATCH v17 05/10] ARM: dts: qcom: Add power-controller device node
+ for 8084 Krait CPUs
 In-Reply-To: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
 References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1426882877-33008-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1426882877-33008-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define ARM_QCOM_CPUIDLE config item to enable cpuidle support.
+Each Krait CPU in the QCOM 8084 SoC has an SAW power controller to
+regulate the power to the cpu and aide the core in entering idle states.
+Reference the SAW instance and associate the instance with the CPU core.
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/cpuidle/Kconfig.arm | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 1f067bd..644a647 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -74,3 +74,10 @@ config ARM_MVEBU_V7_CPUIDLE
- 	depends on ARCH_MVEBU
- 	help
- 	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 1f130bc..71182bf 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -21,6 +21,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc0>;
++			qcom,saw = <&saw0>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -30,6 +31,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc1>;
++			qcom,saw = <&saw1>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -39,6 +41,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc2>;
++			qcom,saw = <&saw2>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -48,6 +51,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc3>;
++			qcom,saw = <&saw3>;
+ 		};
+ 
+ 		L2: l2-cache {
+@@ -144,7 +148,27 @@
+ 			};
+ 		};
+ 
+-		saw_l2: regulator at f9012000 {
++		saw0: power-controller at f9089000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu";
++			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
++		};
 +
-+config ARM_QCOM_CPUIDLE
-+	bool "CPU Idle Driver for QCOM processors"
-+	depends on ARCH_QCOM
-+	select ARM_CPUIDLE
-+	help
-+	  Select this to enable cpuidle on QCOM processors.
++		saw1: power-controller at f9099000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu";
++			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw2: power-controller at f90a9000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu";
++			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw3: power-controller at f90b9000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu";
++			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw_l2: power-controller at f9012000 {
+ 			compatible = "qcom,saw2";
+ 			reg = <0xf9012000 0x1000>;
+ 			regulator;
 -- 
 2.1.0
