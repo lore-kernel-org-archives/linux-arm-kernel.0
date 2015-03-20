@@ -1,63 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 19:48:38 +0000
-Subject: [PATCH 0/6] arm64 kexec kernel patches V8
-In-Reply-To: <cover.1426793116.git.geoff@infradead.org>
-References: <cover.1426793116.git.geoff@infradead.org>
-Message-ID: <20150320194838.GD24455@leverpostej>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 20 Mar 2015 14:21:07 -0600
+Subject: [PATCH v17 00/11] ARM: qcom: cpuidle support for 8064, 8074, 8084
+Message-ID: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 08:35:27PM +0000, Geoff Levand wrote:
-> Hi All,
+Hi,
 
-Hi Geoff,
+This v17 revision of patch has minor changes since v16. Primarily rebased on
+top of Daniels' changes [1].
 
-As a heads-up, I'm not going to have the chanec to review this until
-after the FW summit next week.
+Changes since v16:
+- Dropped per-cpu cpuidle changes in the cpuidle-arm driver, Daniel submitted
+  it as part of his series.
+- Rebase on top of [1].
+- Return -ENXIO when qcom_cpuidle_init() detects SPM device is not probed yet.
+- Declare cpuidle_ops using CPUIDLE_METHOD_OF_DECLARE.
 
-[...]
+Changes since v15:
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg64700.html
+- Clean up cpuidle-arm.c to use devm_kzalloc and print error codes.
+- Remove qcom,idle-state-stby as a DT mode, instead use the ARM WFI defined in
+  ARM cpuidle driver for clock gating/standby modes. The platform driver will
+  default to standby for all cpus after executing any low power state. This allows
+  us to be completely compatible with generic ARM cpuidle driver and not send out
+  cpu_pm notifications that are sent out for all 'platform states'.
+- Cleaned up comments around setting SPM states.
+- Platform idle state (SPC) starts at index 1, previous patch was overwritting
+  ARM WFI state, which is mandated to be default state at index 0. 
+- Removed duplicate cpu_pm_enter() and cpu_pm_exit() callbacks.
+- Re-introduce ARM_QCOM_CPUIDLE defconfig item to enable/disable QCOM cpuidle
+  support.
+- Update documentation on standby state to indicate that this state is no longer
+  defined in the DT.
+- Remove unused qcom,saw2-v1.* compatibles from documentation.
+- Rebased on top of SCM changes that were pulled in Kumar's 'soc' branch [2].
+- Removed Reviewed-by tags from DT patches due to change in idle states.
 
-> KVM
-> ---
-> 
-> PROBLEM: KVM acquires hypervisor resources on startup, but does not free those
-> resources on shutdown, so the first stage kernel cannot be shutdown properly
-> when using kexec.
-> 
-> WORK-AROUND: Build the first stage kernel with CONFIG_KVM=n, or apply KVM bug
-> fix patches from [1].
-> 
-> FIX: Takahiro Akashi has preliminary patches to fix the KVM shutdown problem.  I
-> have those in my master branch at [1].  KVM + kexec works properly with that
-> branch.  Patches neeeded:
-> 
->  arm64: kvm: add a cpu tear-down function
->  arm64: kexec: fix kvm issue
->  arm64/kvm: Remove !KEXEC Kconfig dependency
->  arm64/kexec: Enable kexec in the arm64 defconfig
+Changes since v14:
+- Support for cpuidle_ops
+- SPM probe changes to register cpuidle
+- Rebase on top of 4.0-rc1
+- Remove SCM patches from series. Rebased on top of Kumar's tree
+- Removed cpuidle-qcom.c in favor of ARM generic cpuidle driver
+- Included Daniel's change for supporting creating cpuidle devices by platform
 
-These (or some descendents thereof) are going to be a prerequisite for
-kexec.
+Tested on: 8074, 8084.
 
-> /memreserve/
-> ----------
-> 
-> PROBLEM: Device tree /memreserve/ entries are not available in
-> /proc/device-tree.  For systems that have /memreserve/ entries and use
-> /proc/device-tree during kexec, the second stage kernel will use the reserved
-> regions and the system will become unstable.
-> 
-> WORK-AROUND: Enable the kernel config option CONFIG_SYSFS=y to expose a binary
-> device tree to user space at /sys/firmware/fdt that includes /memreserve/
-> entries OR pass a user specified DTB using the kexec --dtb option.
-> 
-> FIX: This is expected behavior.  To maximize user support, rework device tree
-> definitions to not use /memreserve/ entries.
+Thanks,
+Lina
 
-I'd say that requiring CONFIG_SYSFS is the real fix here. That's a
-kernel change that maximises compatibility with DTBs (which we don't
-really have control over).
+[1]. https://lkml.org/lkml/2015/3/20/165
 
-I hope that the tools warn somehow if they cannot see the fdt.
 
-Mark.
+Lina Iyer (10):
+  ARM: qcom: Add Subsystem Power Manager (SPM) driver
+  ARM: cpuidle: qcom: Add documentation for qcom cpuidle states
+  ARM: cpuidle: Add cpuidle support for QCOM cpus
+  ARM: dts: qcom: Add power-controller device node for 8074 Krait CPUs
+  ARM: dts: qcom: Add power-controller device node for 8084 Krait CPUs
+  ARM: dts: qcom: Update power-controller device node for 8064 Krait
+    CPUs
+  ARM: dts: qcom: Add idle states device nodes for 8974/8074
+  ARM: dts: qcom: Add idle states device nodes for 8084
+  ARM: dts: qcom: Add idle state device nodes for 8064
+  ARM: qcom: Update defconfig to enable cpuidle
+
+ .../bindings/arm/msm/qcom,idle-state.txt           |  84 +++++
+ .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  29 +-
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  30 +-
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |  40 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  40 +-
+ arch/arm/configs/qcom_defconfig                    |   2 +
+ drivers/cpuidle/Kconfig.arm                        |   7 +
+ drivers/soc/qcom/Kconfig                           |   7 +
+ drivers/soc/qcom/Makefile                          |   1 +
+ drivers/soc/qcom/spm.c                             | 405 +++++++++++++++++++++
+ 10 files changed, 629 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,idle-state.txt
+ create mode 100644 drivers/soc/qcom/spm.c
+
+-- 
+2.1.0
