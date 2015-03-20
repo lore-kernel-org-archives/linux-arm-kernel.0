@@ -1,155 +1,69 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 20 Mar 2015 11:01:23 -0600
-Subject: [PATCH v2] coresight: moving to new "hwtracing" directory
-Message-ID: <1426870883-12169-1-git-send-email-mathieu.poirier@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Mar 2015 17:02:13 +0000
+Subject: [PATCH] arm64: dts: kill skeleton.dtsi
+Message-ID: <1426870933-23126-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keeping drivers related to HW tracing on ARM, i.e coresight,
-under "drivers/coresight" doesn't make sense when other
-architectures start rolling out technologies of the same
-nature.
+While skeleton.dtsi was initially conceived as a simple way to bootstrap
+writing a dts, it has proven to be problematic:
 
-As such creating a new "drivers/hwtracing" directory where all
-drivers of the same kind can reside, reducing namespace
-pollution under "drivers/".
+* The #address-cells and #size-cells values used in skeleton.dtsi may
+  not match what a user wants (e.g. when they need to describe a range
+  larger than 4GB).
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+* For dts files where memory nodes have unit-addresses, it adds a
+  redundant /memory node, for which the reg entry may not be
+  appropriately sized (e.g. where #size-cells has been overridden).
+
+* For dts files which assume that a bootloader will fill in the memory
+  node(s), no node is present in the dts (and hence there is no attached
+  comment), making it hard to distinguish these cases from bad dts
+  files, and masking any warnings dtc may produce w.r.t. missing nodes.
+
+* The default empty /chosen and /aliases are somewhat useless, and it
+  would be preferable for dts to fill these in (e.g. for
+  /aliases/serial0 and /chosen/stdout-path).
+
+This patch removes skeleton.dtsi from arm64. There are currently no
+users, so we can remove it before any appear.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Rob Herring <rob.herring@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
-Change for v2:
- - generated patch with -M option 
----
- MAINTAINERS                                              | 2 +-
- arch/arm/Kconfig.debug                                   | 2 +-
- arch/arm64/Kconfig.debug                                 | 2 +-
- drivers/Makefile                                         | 2 +-
- drivers/{ => hwtracing}/coresight/Kconfig                | 0
- drivers/{ => hwtracing}/coresight/Makefile               | 0
- drivers/{ => hwtracing}/coresight/coresight-etb10.c      | 0
- drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c   | 0
- drivers/{ => hwtracing}/coresight/coresight-etm.h        | 0
- drivers/{ => hwtracing}/coresight/coresight-etm3x.c      | 0
- drivers/{ => hwtracing}/coresight/coresight-funnel.c     | 0
- drivers/{ => hwtracing}/coresight/coresight-priv.h       | 0
- drivers/{ => hwtracing}/coresight/coresight-replicator.c | 0
- drivers/{ => hwtracing}/coresight/coresight-tmc.c        | 0
- drivers/{ => hwtracing}/coresight/coresight-tpiu.c       | 0
- drivers/{ => hwtracing}/coresight/coresight.c            | 0
- drivers/{ => hwtracing}/coresight/of_coresight.c         | 0
- 17 files changed, 4 insertions(+), 4 deletions(-)
- rename drivers/{ => hwtracing}/coresight/Kconfig (100%)
- rename drivers/{ => hwtracing}/coresight/Makefile (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etb10.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm3x.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-funnel.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-priv.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-replicator.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-tmc.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-tpiu.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight.c (100%)
- rename drivers/{ => hwtracing}/coresight/of_coresight.c (100%)
+ arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
+ 1 file changed, 13 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0e1abe8cc684..bc5d53ba1197 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -953,7 +953,7 @@ ARM/CORESIGHT FRAMEWORK AND DRIVERS
- M:	Mathieu Poirier <mathieu.poirier@linaro.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--F:	drivers/coresight/*
-+F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
- F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 8d14ad4e1db0..8b0183a9a300 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1610,6 +1610,6 @@ config DEBUG_SET_MODULE_RONX
- 	  against certain classes of kernel exploits.
- 	  If in doubt, say "N".
- 
--source "drivers/coresight/Kconfig"
-+source "drivers/hwtracing/coresight/Kconfig"
- 
- endmenu
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 5b2ffd8e6cdb..d6285ef9b5f9 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -89,6 +89,6 @@ config DEBUG_ALIGN_RODATA
- 
- 	  If in doubt, say N
- 
--source "drivers/coresight/Kconfig"
-+source "drivers/hwtracing/coresight/Kconfig"
- 
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 527a6da8d539..46d2554be404 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -163,5 +163,5 @@ obj-$(CONFIG_POWERCAP)		+= powercap/
- obj-$(CONFIG_MCB)		+= mcb/
- obj-$(CONFIG_RAS)		+= ras/
- obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
--obj-$(CONFIG_CORESIGHT)		+= coresight/
-+obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
- obj-$(CONFIG_ANDROID)		+= android/
-diff --git a/drivers/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-similarity index 100%
-rename from drivers/coresight/Kconfig
-rename to drivers/hwtracing/coresight/Kconfig
-diff --git a/drivers/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-similarity index 100%
-rename from drivers/coresight/Makefile
-rename to drivers/hwtracing/coresight/Makefile
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-similarity index 100%
-rename from drivers/coresight/coresight-etb10.c
-rename to drivers/hwtracing/coresight/coresight-etb10.c
-diff --git a/drivers/coresight/coresight-etm-cp14.c b/drivers/hwtracing/coresight/coresight-etm-cp14.c
-similarity index 100%
-rename from drivers/coresight/coresight-etm-cp14.c
-rename to drivers/hwtracing/coresight/coresight-etm-cp14.c
-diff --git a/drivers/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-similarity index 100%
-rename from drivers/coresight/coresight-etm.h
-rename to drivers/hwtracing/coresight/coresight-etm.h
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-similarity index 100%
-rename from drivers/coresight/coresight-etm3x.c
-rename to drivers/hwtracing/coresight/coresight-etm3x.c
-diff --git a/drivers/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-similarity index 100%
-rename from drivers/coresight/coresight-funnel.c
-rename to drivers/hwtracing/coresight/coresight-funnel.c
-diff --git a/drivers/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-similarity index 100%
-rename from drivers/coresight/coresight-priv.h
-rename to drivers/hwtracing/coresight/coresight-priv.h
-diff --git a/drivers/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-similarity index 100%
-rename from drivers/coresight/coresight-replicator.c
-rename to drivers/hwtracing/coresight/coresight-replicator.c
-diff --git a/drivers/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-similarity index 100%
-rename from drivers/coresight/coresight-tmc.c
-rename to drivers/hwtracing/coresight/coresight-tmc.c
-diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-similarity index 100%
-rename from drivers/coresight/coresight-tpiu.c
-rename to drivers/hwtracing/coresight/coresight-tpiu.c
-diff --git a/drivers/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-similarity index 100%
-rename from drivers/coresight/coresight.c
-rename to drivers/hwtracing/coresight/coresight.c
-diff --git a/drivers/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-similarity index 100%
-rename from drivers/coresight/of_coresight.c
-rename to drivers/hwtracing/coresight/of_coresight.c
+Recent comments reminded me to send this.
+
+I've taken a look in mainline and linux-next and I see no skeleton.dtsi users
+in arch/arm64/boot/dts/.
+
+Mark.
+
+diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
+deleted file mode 100644
+index 38ead82..0000000
+--- a/arch/arm64/boot/dts/skeleton.dtsi
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/*
+- * Skeleton device tree; the bare minimum needed to boot; just include and
+- * add a compatible value.  The bootloader will typically populate the memory
+- * node.
+- */
+-
+-/ {
+-	#address-cells = <2>;
+-	#size-cells = <1>;
+-	chosen { };
+-	aliases { };
+-	memory { device_type = "memory"; reg = <0 0 0>; };
+-};
 -- 
 1.9.1
