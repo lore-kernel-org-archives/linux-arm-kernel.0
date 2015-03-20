@@ -1,104 +1,130 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Mar 2015 09:48:42 +0100
-Subject: [PATCH 5/5] ARM: dts: brcmstb: add nodes for SATA controller
- and PHY
-In-Reply-To: <20150319191105.GU32500@ld-irv-0074>
-References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
- <1426728222-8197-5-git-send-email-computersforpeace@gmail.com>
- <550AAEA1.5080301@redhat.com> <20150319155358.GA19571@brian-ubuntu>
- <550B0118.3040104@redhat.com> <20150319173640.GS32500@ld-irv-0074>
- <20150319191105.GU32500@ld-irv-0074>
-Message-ID: <550BDEEA.9080503@redhat.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Mar 2015 09:54:33 +0100
+Subject: [PATCH/RFC 0/5] ARM: shmobile: rcar-gen2: Add CPG Clock Domain
+In-Reply-To: <1426708017-28885-1-git-send-email-geert+renesas@glider.be>
+References: <1426708017-28885-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAPDyKFox=MoUX5tzxyVjLh+d61AFNsPR+LY0sP-VF+68Gs_rKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 19-03-15 20:11, Brian Norris wrote:
-> Replying to myself, because I may or may not like having conversations
-> with myself :)
+On 18 March 2015 at 20:46, Geert Uytterhoeven <geert+renesas@glider.be> wrote:
+>         Hi,
 >
-> On Thu, Mar 19, 2015 at 10:36:40AM -0700, Brian Norris wrote:
->> On Thu, Mar 19, 2015 at 06:02:16PM +0100, Hans de Goede wrote:
->>> On 19-03-15 16:53, Brian Norris wrote:
->>>> On Thu, Mar 19, 2015 at 12:10:25PM +0100, Hans de Goede wrote:
->>>>> On 19-03-15 02:23, Brian Norris wrote:
->>>>>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
->>>>>> ---
->>>>>> Light dependency on:
->>>>>>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/331921.html
->>>>>> for the surrounding text.
->>>>>>
->>>>>>   arch/arm/boot/dts/bcm7445.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->>>>>>   1 file changed, 36 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
->>>>>> index 9eaeac8dce1b..7a7c4d8c2afe 100644
->>>>>> --- a/arch/arm/boot/dts/bcm7445.dtsi
->>>>>> +++ b/arch/arm/boot/dts/bcm7445.dtsi
->>>>>> @@ -108,6 +108,42 @@
->>>>>>   			brcm,int-map-mask = <0x25c>, <0x7000000>;
->>>>>>   			brcm,int-fwd-mask = <0x70000>;
->>>>>>   		};
->>>>>> +
->>>>>> +		sata at f045a000 {
->>>>>> +			compatible = "brcm,bcm7445-ahci", "brcm,sata3-ahci";
->>>>>> +			reg-names = "ahci", "top-ctrl";
->>>>>> +			reg = <0x45a000 0xa9c>, <0x458040 0x24>;
->>>>>
->>>>> Why not simply drop the second register range here, and the minimal top-ctrl
->>>>> poking you need in the phy driver's phy_init function ?
->>>>
->>>> I agree it's a little ugly, but your recommended solution will not work.
->>>>
->>>> The 'top-ctrl' register range includes several SATA functionalities,
->>>> some of which are required for the PHY and some of which are definitely
->>>> required for the SATA driver.
->>>
->>> I see, but the phy driver is required for the SATA driver anyways,
->>> and since the BUS_CTRL setting seems to be static it might just as
->>> well be set by the phy driver. The phy driver also poking some
->>> common sata glue bits like this busctrl register is not unheard of,
->>> esp. when these glue bits are in the phy register range.
+> This RFC patch series adds Clock Domain support to the R-Car Gen2 Clock
+> Pulse Generator (CPG) driver using the generic PM Domain.  This allows
+> to power-manage the module clocks of SoC devices that are part of the
+> CPG Clock Domain using Runtime PM, or for system suspend/resume.
 >
-> I realized I *do* still have some reservations about moving the
-> SATA_TOP_CTRL register range under the PHY DT binding; it's because all
-> arguments for it seem to rest on descriptions of how the software would
-> *like* to handle it. It's not at all about describing the hardware
-> correctly.
-
-I had the same doubts myself when making the suggestion actually :)
-
-If the busctrl register purely influences the ahci functional block and
-not the phy functional block, then you are right.
-
-However if you look at the registermap, then doing as I suggest
-feels more natural as you get 2 distinct register blocks, one for ahci
-one for the phy, but if the one register in the phy range actually is a
-ahci register, then it would probably be more accurate to describe
-things that way ...
-
-> I still see SATA_TOP_CTRL as a register resource that belongs to the
-> SATA controller, not to the PHY. It just happens that it has a few
-> registers in it that are also for use in the PHY.
+> SoC devices that are part of the CPG Clock Domain and can be
+> power-managed through their primary clock are tagged in DT with a proper
+> "power-domains" property. Drivers for devices with multiple clocks
+> (notably du and rcar-sound) still have to manage their (multiple module)
+> clocks themselves.
 >
-> So, to best describe the *hardware*, it seems we might split top-ctrl
-> into 3 portions, where the middle gets assigned to a phy description,
-> and the first and last belong to the SATA controller description.
+> Finally, the legacy default PM domain hack in drivers/sh/pm_runtime.c is
+> disabled when running on an R-Car Gen2 SoC with genpd support.
 >
-> But to most easily describe how *software* would best handle them, we
-> might stick all the custom stuff (i.e., all of top-ctrl + phy) into the
-> PHY description.
+> Compared to the legacy default PM domain hack, the CPG Clock Domain has
+> several advantages:
+>   - It only affects on-SoC devices, not all platform devices,
+>   - It only affects the on-SoC devices we want, as specified in DT,
+>   - Allmost all module clocks of all on-SoC devices (barring devices
+>     needed for wake-up[*]) are now gated during s2ram, saving more
+>     power.
 >
-> I still think that, practically speaking, the latter should work just
-> fine, and it's only a theoretical concern that suggests the former.
+> Here's a list of all devices in the CPG Clock Domain on r8a7791:
 >
-> Thoughts?
+> root at koelsch:~# cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>     domain                      status         slaves
+>            /device                                      runtime status
+> ----------------------------------------------------------------------
+> cpg_clocks                      on
+>     /devices/platform/e61c0000.interrupt-controller     active
+>     /devices/platform/e60b0000.i2c                      suspended
+>     /devices/platform/ffca0000.timer                    suspended
+>     /devices/platform/e6050000.gpio                     active
+>     /devices/platform/e6051000.gpio                     active
+>     /devices/platform/e6052000.gpio                     active
+>     /devices/platform/e6053000.gpio                     active
+>     /devices/platform/e6054000.gpio                     active
+>     /devices/platform/e6055000.gpio                     active
+>     /devices/platform/e6055400.gpio                     active
+>     /devices/platform/e6055800.gpio                     active
+>     /devices/platform/ee090000.pci                      active
+>     /devices/platform/ee0d0000.pci                      active
+>     /devices/platform/fe000000.pcie                     unsupported
+>     /devices/platform/e6700000.dma-controller           active
+>     /devices/platform/e6720000.dma-controller           active
+>     /devices/platform/ec700000.dma-controller           active
+>     /devices/platform/ec720000.dma-controller           suspended
+>     /devices/platform/e6e60000.serial                   active
+>     /devices/platform/e6e68000.serial                   active
+>     /devices/platform/ee300000.sata                     unsupported
+>     /devices/platform/e6b10000.spi                      suspended
+>     /devices/platform/e6e20000.spi                      suspended
+>     /devices/platform/ee700000.ethernet                 active
+>     /devices/platform/e6530000.i2c                      suspended
+>     /devices/platform/e6ef1000.video                    suspended
+>     /devices/platform/e61f0000.thermal                  active
+>     /devices/platform/ee100000.sd                       active
+>     /devices/platform/ee140000.sd                       active
+>     /devices/platform/ee160000.sd                       active
+> root at koelsch:~#
+>
+> Logically, the CPG Clock Domain operates on the SoC CPG/MSTP block.
+> As there's no single device node in DT representing this block (there
+> are separate device nodes for the CPG and for the individual MSTP
+> clocks), I bound the logic to the CPG device node.
+> Perhaps this is something we should change for future SoCs?
+>
+> As usual when involving clocks and/or PM Domains, the DTS changes depend
+> stricly on the driver change. The final patch must be applied last.
+>
+> The DTS changes also depend on the series "[PATCH 0/5] ARM: shmobile:
+> Add INTC-SYS clock to device tree" I've just sent.
+>
+> This was tested on r8a7791/koelsch.
+>
+> Thanks for your comments!
+>
+> [*] GPIO wake-up requires "[PATCH 0/3] gpio: rcar: Fix wake up using
+> gpio-keys with PM domain").
+>
+> Geert Uytterhoeven (5):
+>   [RFC] clk: shmobile: rcar-gen2: Add CPG Clock Domain support
+>   [RFC] ARM: shmobile: r8a7790 dtsi: Add CPG Clock Domain
+>   [RFC] ARM: shmobile: r8a7791 dtsi: Add CPG Clock Domain
+>   [RFC] ARM: shmobile: r8a7794 dtsi: Add CPG Clock Domain
+>   drivers: sh: Disable PM runtime for multi-platform R-Car Gen2 with
+>     genpd
+>
+>  .../clock/renesas,rcar-gen2-cpg-clocks.txt         | 26 ++++++-
+>  arch/arm/boot/dts/r8a7790.dtsi                     | 77 +++++++++++++++++++--
+>  arch/arm/boot/dts/r8a7791.dtsi                     | 80 ++++++++++++++++++++--
+>  arch/arm/boot/dts/r8a7794.dtsi                     | 29 ++++++++
+>  arch/arm/mach-shmobile/Kconfig                     |  1 +
+>  drivers/clk/shmobile/clk-rcar-gen2.c               | 63 +++++++++++++++++
+>  drivers/sh/pm_runtime.c                            | 10 +--
+>  7 files changed, 268 insertions(+), 18 deletions(-)
 
-I do not like your original proposal with the overlapping / conflicting
-resources. I'm fine with either alternative you suggest above. So unless
-someone else weighs in you get to chose which one you like best.
+For the complete patchset.
 
-Regards,
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Hans
+Kind regards
+Uffe
+
+>
+> --
+> 1.9.1
+>
+> Gr{oetje,eeting}s,
+>
+>                                                 Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                                             -- Linus Torvalds
