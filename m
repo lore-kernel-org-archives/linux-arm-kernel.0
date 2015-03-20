@@ -1,87 +1,63 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 20 Mar 2015 14:47:39 -0500
-Subject: [PATCH 1/3] ARM: dts: OMAP5+: separate the cpu thermal zone
- definition from omap4
-In-Reply-To: <1426880861-9266-1-git-send-email-nm@ti.com>
-References: <1426880861-9266-1-git-send-email-nm@ti.com>
-Message-ID: <1426880861-9266-2-git-send-email-nm@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Mar 2015 19:48:38 +0000
+Subject: [PATCH 0/6] arm64 kexec kernel patches V8
+In-Reply-To: <cover.1426793116.git.geoff@infradead.org>
+References: <cover.1426793116.git.geoff@infradead.org>
+Message-ID: <20150320194838.GD24455@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
+On Thu, Mar 19, 2015 at 08:35:27PM +0000, Geoff Levand wrote:
+> Hi All,
 
-OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
-in the thermal zone polling intervals. OMAP5/DRA7 have different counter
-mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
-zone accordingly for OMAP5/DRA7.
+Hi Geoff,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/omap5-cpu-thermal.dtsi |   41 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi             |    2 +-
- 2 files changed, 42 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/omap5-cpu-thermal.dtsi
+As a heads-up, I'm not going to have the chanec to review this until
+after the FW summit next week.
 
-diff --git a/arch/arm/boot/dts/omap5-cpu-thermal.dtsi b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
-new file mode 100644
-index 000000000000..4a6427c1e47e
---- /dev/null
-+++ b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
-@@ -0,0 +1,41 @@
-+/*
-+ * Device Tree Source for OMAP4/5 SoC CPU thermal
-+ *
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ * Contact: Tero Kristo <t-kristo@ti.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/thermal/thermal.h>
-+
-+cpu_thermal: cpu_thermal {
-+	polling-delay-passive = <250>; /* milliseconds */
-+	polling-delay = <500>; /* milliseconds */
-+
-+			/* sensor       ID */
-+	thermal-sensors = <&bandgap     0>;
-+
-+	cpu_trips: trips {
-+		cpu_alert0: cpu_alert {
-+			temperature = <100000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "passive";
-+		};
-+		cpu_crit: cpu_crit {
-+			temperature = <125000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "critical";
-+		};
-+	};
-+
-+	cpu_cooling_maps: cooling-maps {
-+		map0 {
-+			trip = <&cpu_alert0>;
-+			cooling-device =
-+				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index ddff674bd05e..e650d4eb59dd 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -67,7 +67,7 @@
- 	};
- 
- 	thermal-zones {
--		#include "omap4-cpu-thermal.dtsi"
-+		#include "omap5-cpu-thermal.dtsi"
- 		#include "omap5-gpu-thermal.dtsi"
- 		#include "omap5-core-thermal.dtsi"
- 	};
--- 
-1.7.9.5
+[...]
+
+> KVM
+> ---
+> 
+> PROBLEM: KVM acquires hypervisor resources on startup, but does not free those
+> resources on shutdown, so the first stage kernel cannot be shutdown properly
+> when using kexec.
+> 
+> WORK-AROUND: Build the first stage kernel with CONFIG_KVM=n, or apply KVM bug
+> fix patches from [1].
+> 
+> FIX: Takahiro Akashi has preliminary patches to fix the KVM shutdown problem.  I
+> have those in my master branch at [1].  KVM + kexec works properly with that
+> branch.  Patches neeeded:
+> 
+>  arm64: kvm: add a cpu tear-down function
+>  arm64: kexec: fix kvm issue
+>  arm64/kvm: Remove !KEXEC Kconfig dependency
+>  arm64/kexec: Enable kexec in the arm64 defconfig
+
+These (or some descendents thereof) are going to be a prerequisite for
+kexec.
+
+> /memreserve/
+> ----------
+> 
+> PROBLEM: Device tree /memreserve/ entries are not available in
+> /proc/device-tree.  For systems that have /memreserve/ entries and use
+> /proc/device-tree during kexec, the second stage kernel will use the reserved
+> regions and the system will become unstable.
+> 
+> WORK-AROUND: Enable the kernel config option CONFIG_SYSFS=y to expose a binary
+> device tree to user space at /sys/firmware/fdt that includes /memreserve/
+> entries OR pass a user specified DTB using the kexec --dtb option.
+> 
+> FIX: This is expected behavior.  To maximize user support, rework device tree
+> definitions to not use /memreserve/ entries.
+
+I'd say that requiring CONFIG_SYSFS is the real fix here. That's a
+kernel change that maximises compatibility with DTBs (which we don't
+really have control over).
+
+I hope that the tools warn somehow if they cannot see the fdt.
+
+Mark.
