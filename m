@@ -1,90 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Mar 2015 21:56:55 +0100
-Subject: [PATCH v3 0/5] clocksource: sun5i: Support parent clock rate
- changes
-In-Reply-To: <550C28EC.2040800@linaro.org>
-References: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
- <20150319225344.GF4255@lukather> <550C28EC.2040800@linaro.org>
-Message-ID: <20150320205655.GJ4255@lukather>
+From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
+Date: Fri, 20 Mar 2015 14:07:07 -0700
+Subject: [PATCH 0/3] Add devm_of_phy_get_by_index and update platform drivers
+Message-ID: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch set adds a new API to get phy by index when multiple 
+phys are present. This patch is based on discussion with Arnd Bergmann
+about dt bindings for multiple phys. 
 
-On Fri, Mar 20, 2015 at 03:04:28PM +0100, Daniel Lezcano wrote:
-> On 03/19/2015 11:53 PM, Maxime Ripard wrote:
-> >Hi Daniel,
-> >
-> >On Thu, Mar 05, 2015 at 11:20:51AM +0100, Maxime Ripard wrote:
-> >>Hi,
-> >>
-> >>The Allwinner HS timers have the AHB clock as their parent
-> >>clock. Since this clock is shared with other devices, we could very
-> >>well have another driver requesting a rate change of that clock,
-> >>making our timer change frequency at the same time.
-> >>
-> >>This is especially true on the A31, where the DMA controller needs to
-> >>do such a rate change, making the HS timer unreliable at the time on
-> >>the A31.
-> >>
-> >>This serie makes some cleanups and implements clock notifiers to be
-> >>able to reflect such rate changes and make sure that the timer is
-> >>always working.
-> >>
-> >>Maxime
-> >>
-> >>Changes from v2:
-> >>   - Rebased on top of v4.0-rc1
-> >>   - Removed the local_irq_save/restore around clockevents_update_freq
-> >>
-> >>Changes from v1:
-> >>   - Changed the interrupt name to its previous value
-> >>
-> >>Maxime Ripard (5):
-> >>   clocksource: sun5i: Switch to request_irq
-> >>   clocksource: sun5i: Use of_io_request_and_map
-> >>   clocksource: sun5i: Remove sched_clock
-> >>   clocksource: sun5i: Refactor the current code
-> >>   clocksource: sun5i: Add clock notifiers
-> >
-> >Have these patches been merged?
-> >
-> >If not, it woulde be great if the third one ("clocksource: sun5i:
-> >Remove sched_clock") was merged for 4.0.
-> >
-> >The sched_clock we use on some system is this timer's, and since we
-> >started using cpufreq, the cpu clock (that is one of the timer's clock
-> >indirect parent) now changes, along with the actual sched_clock rate.
-> >
-> >We can safely remove the sched_clock on those systems, since we have
-> >other reliable sched_clock in the system.
-> 
-> Ok, I applied the patch for v4.0-rc5 but I had to fix a conflict and change
-> the changelog.
+Arun Ramamurthy (3):
+  phy: core: Add devm_of_phy_get_by_index to phy-core
+  usb: ehci-platform: Use devm_of_phy_get_by_index
+  usb: ohci-platform: Use devm_of_phy_get_by_index
 
-It looks fine.
-
-Note that the rest of the serie should also be merged, this is just a
-temporary measure for 4.0.
-
-> Mind to test it works ?
-> 
-> git.linaro.org/people/daniel.lezcano/linux.git clockevents/v4.0-rc4
-
-Unfortunately, I won't have access to my boards for ~10 days due to
-travel to ELC. Chen-Yu, Hans, could you test this and see if it works?
-
-Thanks,
-Maxime
+ drivers/phy/phy-core.c           | 30 ++++++++++++++++++++++++++++++
+ drivers/usb/host/ehci-platform.c | 20 ++++----------------
+ drivers/usb/host/ohci-platform.c | 20 ++++----------------
+ include/linux/phy/phy.h          |  2 ++
+ 4 files changed, 40 insertions(+), 32 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/7ee31909/attachment-0001.sig>
+2.3.2
