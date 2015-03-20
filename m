@@ -1,133 +1,204 @@
-From: kong.kongxinwei@hisilicon.com (kongxinwei)
-Date: Fri, 20 Mar 2015 15:37:24 +0800
-Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
- driver
-In-Reply-To: <20150319141753.GB25967@leverpostej>
-References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <20150319141753.GB25967@leverpostej>
-Message-ID: <550BCE34.9010904@hisilicon.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 20 Mar 2015 07:38:36 +0000
+Subject: [PATCH v3 1/6] clk: qcom: Add support for GDSCs
+In-Reply-To: <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
+References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+ <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
+Message-ID: <550BCE7C.3030000@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Minor Nit picks,
 
+On 20/03/15 06:21, Rajendra Nayak wrote:
+> From: Stephen Boyd <sboyd@codeaurora.org>
+>
+> GDSCs (Global Distributed Switch Controllers) are responsible for
+> safely collapsing and restoring power to peripherals in the SoC.
+> These are best modelled as power domains using genpd and given
+> the registers are scattered throughout the clock controller register
+> space, its best to have the support added through the clock driver.
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>   drivers/clk/qcom/Kconfig  |   5 ++
+>   drivers/clk/qcom/Makefile |   1 +
+>   drivers/clk/qcom/gdsc.c   | 166 ++++++++++++++++++++++++++++++++++++++++++++++
+>   drivers/clk/qcom/gdsc.h   |  46 +++++++++++++
+>   4 files changed, 218 insertions(+)
+>   create mode 100644 drivers/clk/qcom/gdsc.c
+>   create mode 100644 drivers/clk/qcom/gdsc.h
+>
+...
+> +
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+?? Do you need this?
 
-? 2015/3/19 22:17, Mark Rutland ??:
-> On Thu, Mar 19, 2015 at 07:57:27AM +0000, kongxinwei wrote:
->> This patch adds the support for hisilicon thermal sensor, within
->> hisilicon SoC. there will register sensors for thermal framework
->> and use device tree to bind cooling device.
->>
->> Signed-off-by: Leo Yan <leo.yan@linaro.org>
->> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
->> ---
->>  drivers/thermal/Kconfig        |   8 +
->>  drivers/thermal/Makefile       |   1 +
->>  drivers/thermal/hisi_thermal.c | 531 +++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 540 insertions(+)
->>  create mode 100644 drivers/thermal/hisi_thermal.c
-> 
-> [...]
-> 
->> +       ret = of_property_read_u32(np, "hisilicon,tsensor-lag-value",
->> +                                  &sensor->lag);
-> 
-> This wasn't in the binding.
-> 
+> +#include <linux/jiffies.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include "gdsc.h"
+> +
+> +#define PWR_ON_MASK		BIT(31)
+> +#define EN_REST_WAIT_MASK	GENMASK(23, 20)
+> +#define EN_FEW_WAIT_MASK	GENMASK(19, 16)
+> +#define CLK_DIS_WAIT_MASK	GENMASK(15, 12)
+> +#define SW_OVERRIDE_MASK	BIT(2)
+> +#define HW_CONTROL_MASK		BIT(1)
+> +#define SW_COLLAPSE_MASK	BIT(0)
+> +
+> +/* Wait 2^n CXO cycles between all states. Here, n=2 (4 cycles). */
+> +#define EN_REST_WAIT_VAL	(0x2 << 20)
+> +#define EN_FEW_WAIT_VAL		(0x8 << 16)
+> +#define CLK_DIS_WAIT_VAL	(0x2 << 12)
+> +
+> +#define TIMEOUT_US		100
+> +
+> +static int gdsc_is_enabled(struct gdsc *sc)
+> +{
+> +	u32 val;
+> +	int ret;
+> +
+> +	ret = regmap_read(sc->regmap, sc->gdscr, &val);
+> +	if (ret)
+> +		return ret;
+Line after this would be good.
+> +	return !!(val & PWR_ON_MASK);
+> +}
+> +
+> +static int gdsc_toggle_logic(struct gdsc *sc, bool en)
+> +{
+> +	int ret;
+> +	u32 val = en ? 0 : SW_COLLAPSE_MASK;
+> +	u32 check = en ? PWR_ON_MASK : 0;
+> +	unsigned long timeout;
+> +
+> +	ret = regmap_update_bits(sc->regmap, sc->gdscr, SW_COLLAPSE_MASK, val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	timeout = jiffies + usecs_to_jiffies(TIMEOUT_US);
+> +	do {
+> +		ret = regmap_read(sc->regmap, sc->gdscr, &val);
+> +		if (ret)
+> +			return ret;
+> +		if ((val & PWR_ON_MASK) == check)
+> +			return 0;
+> +	} while (time_before(jiffies, timeout));
+> +
+> +	ret =  regmap_read(sc->regmap, sc->gdscr, &val);
+> +	if (ret)
+> +		return ret;
+New line here.
+> +	if ((val & PWR_ON_MASK) == check)
+> +		return 0;
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+...
 
-good comment, delete it.
+> +
+> +int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
+> +		  struct regmap *regmap)
+> +{
+> +	int i, ret;
+> +	struct genpd_onecell_data *data;
+> +
+> +	if (!num || !scs || !dev || !dev->of_node)
+> +		return 0;
+Should it not return -EINVAL here?
 
-Xinwei
+> +
+> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	data->domains = devm_kzalloc(dev, sizeof(*data->domains) * num,
+> +				     GFP_KERNEL);
+> +	if (!data->domains)
+> +		return -ENOMEM;
+> +
+> +	data->num_domains = num;
+> +	for (i = 0; i < num; i++) {
+> +		if (!scs[i])
+> +			continue;
+> +		scs[i]->regmap = regmap;
+> +		ret = gdsc_init(scs[i]);
+> +		if (ret)
+> +			return ret;
+> +		data->domains[i] = &scs[i]->pd;
+> +	}
+New line?
+> +	return of_genpd_add_provider_onecell(dev->of_node, data);
+> +}
+> +
+> +void gdsc_unregister(struct device *dev)
+> +{
+> +	of_genpd_del_provider(dev->of_node);
+> +}
+> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+> new file mode 100644
+> index 0000000..02e2990
+> --- /dev/null
+> +++ b/drivers/clk/qcom/gdsc.h
+> @@ -0,0 +1,46 @@
+> +/*
+> + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __QCOM_GDSC_H__
+> +#define __QCOM_GDSC_H__
+> +
+> +#include <linux/pm_domain.h>
+> +
+> +struct regmap;
+> +
+> +/**
+> + * struct gdsc - Globally Distributed Switch Controller
+> + * @pd: generic power domain
+> + * @regmap: regmap for MMIO accesses
+> + * @gdscr: gsdc control register
+> + */
+> +struct gdsc {
+> +	struct generic_pm_domain	pd;
+> +	struct regmap			*regmap;
+> +	unsigned int			gdscr;
+> +};
+> +
+> +#define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
+> +
+> +#ifdef CONFIG_QCOM_GDSC
+> +int gdsc_register(struct device *, struct gdsc **, size_t n, struct regmap *);
+> +void gdsc_unregister(struct device *);
+> +#else
+> +int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct regmap *r)
 
-> [...]
-> 
->> +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
->> +                                  &sensor->thres_temp);
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
->> +                       index, ret);
->> +               return ret;
->> +       }
->> +
->> +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
->> +                                  &sensor->reset_temp);
->> +       if (ret) {
->> +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
->> +                       index, ret);
->> +               return ret;
->> +       }
-> 
-> I see now that these properties result in the HW being programmed. You
-> should figure out how to reconcile these with thermal-zone trip points
-> rather than having parallel properties.
-> 
-oh,firstly,this "tsensor-thres-temp" property is threshold temperature value
-which causes interrupt function by setting thermal value register. "thermal
--zone trip points" applies scanning mode to cause other function such as
-cooling freq .., but this "tsensor-thres-temp" property be used by interrupt
-mode. when scanning mode don't satisfies systerm demands, the interrut mode
-perfectly help scanning mode to complete function. "tsensor-thres-temp" temp-
-erature is higher than "thermal-zone trip points" temperature, so this "
-tsensor-thres-temp" property is secondary attribute.
+static inline here??? else it would result in muliple definitions?
 
-secondly, this "tsensor-reset-temp" property is hardware protect temperature
-which is close to or is below to burn out the SoC. When SoC temperature is
-"tsensor-reset-temp" temperature value, SoC will be force to reboot and ensure
-SoC not to burn out. So it don't conflict thermal-zone.
-
-
->> +
->> +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
->> +
->> +               if (data->irq_bind_sensor != -1)
->> +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
->> +                                data->irq_bind_sensor);
->> +
->> +               /* bind irq to this sensor */
->> +               data->irq_bind_sensor = index;
->> +       }
-> 
-> I don't see why this should be specified in the DT. Why do you believe
-> it should?
-> 
-SoC include foure thermal sensor modules,every modules is able to cause
-interrupt,so binding a module to realize interupt function and i believe
-it should be specified.
-> [...]
-> 
->> +static int hisi_thermal_probe(struct platform_device *pdev)
->> +{
->> +       struct hisi_thermal_data *data;
->> +       struct resource *res;
->> +       int i;
->> +       int ret;
->> +
->> +       if (!cpufreq_get_current_driver()) {
->> +               dev_dbg(&pdev->dev, "no cpufreq driver!");
->> +               return -EPROBE_DEFER;
->> +       }
-> 
-> Surely we care about not burning out the board even if we don't have
-> cpufreq?
-> 
-> Is there any ordering guarantee between the probing of this driver and
-> cpufreq?
-> 
-> 
-Yes! It will use thermal framework to realize cpu cooling device function.
-
-> [...]
-> 
->> +       data->clk = devm_clk_get(&pdev->dev, NULL);
-> 
-> You gave this clock a name in the binding. Use it or drop it.
+> +{
+> +	return 0;
+return -ENOSYS; I
+> +}
+> +
+> +void gdsc_unregister(struct device *d) {};
+same static inline...
+Braces should be in next line too.
+> +#endif /* CONFIG_QCOM_GDSC */
+> +#endif /* __QCOM_GDSC_H__ */
 >
 
-Thanks comment,use it.
 
-> Mark. 
-> 
-
-Xinwei
-> .
-> 
+--srini
