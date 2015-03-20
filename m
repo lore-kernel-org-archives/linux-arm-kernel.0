@@ -1,59 +1,89 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Fri, 20 Mar 2015 14:07:10 -0700
-Subject: [PATCH 3/3] usb: ohci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1426885630-32429-4-git-send-email-arun.ramamurthy@broadcom.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Fri, 20 Mar 2015 16:13:23 -0500
+Subject: [PATCH v11 4/4] ARM: add CONFIG_VDSO Kconfig and Makefile bits
+In-Reply-To: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+References: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1426886003-30123-5-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting phys by index instead of phy names so that the dt
-bindings phy-names remain consistent when multiple phys are present
+Allow users to enable the vdso in Kconfig; include the vdso in the
+build if CONFIG_VDSO is enabled.  Add 'vdso_install' target.
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
 ---
- drivers/usb/host/ohci-platform.c | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
+ arch/arm/Makefile        |  8 ++++++++
+ arch/arm/kernel/Makefile |  1 +
+ arch/arm/mm/Kconfig      | 14 ++++++++++++++
+ 3 files changed, 23 insertions(+)
 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index 185ceee..8b2ec4e 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -123,7 +123,6 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	const char *phy_name;
- 	int err, irq, phy_num, clk = 0;
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 7f99cd652203..6c13a84b6cd2 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -263,6 +263,7 @@ core-$(CONFIG_FPE_FASTFPE)	+= $(FASTFPE_OBJ)
+ core-$(CONFIG_VFP)		+= arch/arm/vfp/
+ core-$(CONFIG_XEN)		+= arch/arm/xen/
+ core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
++core-$(CONFIG_VDSO)		+= arch/arm/vdso/
  
- 	if (usb_disabled())
-@@ -182,21 +181,10 @@ static int ohci_platform_probe(struct platform_device *dev)
- 			return -ENOMEM;
+ # If we have a machine-specific directory, then include it in the build.
+ core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
+@@ -320,6 +321,12 @@ dtbs: prepare scripts
+ dtbs_install:
+ 	$(Q)$(MAKE) $(dtbinst)=$(boot)/dts
  
- 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--				err = of_property_read_string_index(
--						dev->dev.of_node,
--						"phy-names", phy_num,
--						&phy_name);
--
--				if (err < 0) {
--					if (priv->num_phys > 1) {
--						dev_err(&dev->dev, "phy-names not provided");
--						goto err_put_hcd;
--					} else
--						phy_name = "usb";
--				}
--
--				priv->phys[phy_num] = devm_phy_get(&dev->dev,
--						phy_name);
-+				priv->phys[phy_num] =
-+					devm_of_phy_get_by_index(&dev->dev,
-+							dev->dev.of_node,
-+							phy_num);
- 				if (IS_ERR(priv->phys[phy_num])) {
- 					err = PTR_ERR(priv->phys[phy_num]);
- 					if ((priv->num_phys > 1) ||
++PHONY += vdso_install
++vdso_install:
++ifeq ($(CONFIG_VDSO),y)
++	$(Q)$(MAKE) $(build)=arch/arm/vdso $@
++endif
++
+ # We use MRPROPER_FILES and CLEAN_FILES now
+ archclean:
+ 	$(Q)$(MAKE) $(clean)=$(boot)
+@@ -344,4 +351,5 @@ define archhelp
+   echo  '                  Install using (your) ~/bin/$(INSTALLKERNEL) or'
+   echo  '                  (distribution) /sbin/$(INSTALLKERNEL) or'
+   echo  '                  install to $$(INSTALL_PATH) and run lilo'
++  echo  '  vdso_install  - Install unstripped vdso.so to $$(INSTALL_MOD_PATH)/vdso'
+ endef
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 902397dd1000..3e316ca54e40 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -75,6 +75,7 @@ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_event_cpu.o
+ CFLAGS_pj4-cp0.o		:= -marm
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
++obj-$(CONFIG_VDSO)		+= vdso.o
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 9b4f29e595a4..8a5f1e644104 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -825,6 +825,20 @@ config KUSER_HELPERS
+ 	  Say N here only if you are absolutely certain that you do not
+ 	  need these helpers; otherwise, the safe option is to say Y.
+ 
++config VDSO
++	bool "Enable VDSO for acceleration of some system calls"
++	depends on AEABI && MMU
++	default y if ARM_ARCH_TIMER
++	select GENERIC_TIME_VSYSCALL
++	help
++	  Place in the process address space an ELF shared object
++	  providing fast implementations of gettimeofday and
++	  clock_gettime.  Systems that implement the ARM architected
++	  timer will receive maximum benefit.
++
++	  You must have glibc 2.22 or later for programs to seamlessly
++	  take advantage of this.
++
+ config DMA_CACHE_RWFO
+ 	bool "Enable read/write for ownership DMA cache maintenance"
+ 	depends on CPU_V6K && SMP
 -- 
-2.3.2
+1.9.3
