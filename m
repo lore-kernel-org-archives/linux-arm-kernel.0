@@ -1,50 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Mar 2015 10:07:28 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.1
-Message-ID: <cover.1426813316.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Mar 2015 10:07:26 +0900
+Subject: [PATCH 1/4] ARM: shmobile: Enable ape6evm board in multiplatform
+ defconfig
+In-Reply-To: <cover.1426813316.git.horms+renesas@verge.net.au>
+References: <cover.1426813316.git.horms+renesas@verge.net.au>
+Message-ID: <aa01bf614842e774b093f4f02cbc0d473f479e7c.1426813316.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.1.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/shmobile_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-I have been holding off on this for a while as the patches to
-enable multiplatform builds for the bockw and ape6evm boards only
-really make sense with the following two pull requests applied.
-Please consider those pull requests first.
-
-* Renesas ARM Based SoC r8a73a4 CCF and Multiplatform Updates for v4.1
-* Renesas ARM Based SoC sh73a0 Multiplatform Updates for v4.1
-
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.1
-
-for you to fetch changes up to bb3ab878a29a3879669bb922bebce87b9a9af755:
-
-  ARM: shmobile: Enable bockw board in multiplatform defconfig (2015-03-05 09:20:26 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.1
-
-Multiplatform defconfig updates
-* Enable bockw and ape6evm boards
-* Drop useless SERIAL_8250_EXTENDED=y
-* Enable R-Mobile reset
-
-----------------------------------------------------------------
-Geert Uytterhoeven (4):
-      ARM: shmobile: Enable ape6evm board in multiplatform defconfig
-      ARM: shmobile: Enable R-Mobile reset driver in multiplatform defconfig
-      ARM: shmobile: defconfig: Drop useless SERIAL_8250_EXTENDED=y
-      ARM: shmobile: Enable bockw board in multiplatform defconfig
-
- arch/arm/configs/shmobile_defconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index b170360..21851f8 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -12,6 +12,7 @@ CONFIG_SLAB=y
+ CONFIG_ARCH_SHMOBILE_MULTI=y
+ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
++CONFIG_ARCH_R8A73A4=y
+ CONFIG_ARCH_R8A7740=y
+ CONFIG_ARCH_R8A7779=y
+ CONFIG_ARCH_R8A7790=y
+@@ -121,6 +122,7 @@ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_MAX8973=y
+ CONFIG_MEDIA_SUPPORT=y
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
+-- 
+2.1.4
