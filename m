@@ -1,70 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Mar 2015 15:35:41 -0700
-Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
- control module support
-In-Reply-To: <550C9490.3070505@ti.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-28-git-send-email-t-kristo@ti.com>
- <550C9490.3070505@ti.com>
-Message-ID: <20150320223541.GV31346@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 20 Mar 2015 15:58:48 -0700
+Subject: [PATCH 3/5] ata: add Broadcom AHCI SATA3 driver for STB chips
+In-Reply-To: <1426728222-8197-3-git-send-email-computersforpeace@gmail.com>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-3-git-send-email-computersforpeace@gmail.com>
+Message-ID: <550CA628.3020704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150320 14:44]:
-> On 03/20/2015 01:44 PM, Kristo, Tero wrote:
-> > +			scm: scm at 210000 {
-> > +				compatible = "ti,am3-scm", "simple-bus";
-> > +				reg = <0x210000 0x2000>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <1>;
-> > +				ranges = <0 0x210000 0x2000>;
-> > +
-> > +				am33xx_pinmux: pinmux at 800 {
-> > +					compatible = "pinctrl-single";
-> > +					reg = <0x800 0x238>;
-> > +					#address-cells = <1>;
-> > +					#size-cells = <0>;
-> > +					pinctrl-single,register-width = <32>;
-> > +					pinctrl-single,function-mask = <0x7f>;
-> > +				};
-> > +
-> > +				scm_conf: scm_conf at 0 {
-> > +					compatible = "syscon";
-> > +					reg = <0x0 0x7fc>;
+On 18/03/15 18:23, Brian Norris wrote:
+> Pretty straightforward driver, using the nice library-ization of the
+> generic ahci_platform driver.
 > 
-> Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
-> this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> ---
+>  drivers/ata/Kconfig        |   9 +++
+>  drivers/ata/Makefile       |   1 +
+>  drivers/ata/sata_brcmstb.c | 148 +++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 158 insertions(+)
+>  create mode 100644 drivers/ata/sata_brcmstb.c
+> 
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 5f601553b9b0..33d4b3031705 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -98,6 +98,15 @@ config SATA_AHCI_PLATFORM
+>  
+>  	  If unsure, say N.
+>  
+> +config SATA_BRCMSTB
+> +	tristate "Broadcom STB AHCI SATA support"
+> +	depends on ARCH_BRCMSTB
 
-Seems correct to me, it's offset 0, size 0x7fc. So that's the scm_conf
-syscon area before pinctrl-single at 0x44c00000 + 0x210000 + 0.
+We would probably want a select PHY_BRCMSTB_SATA here?
 
-The io area for pinctrl-single starts at 0x800, so the scm_conf should
-be before it in the dts file.
+[snip]
 
-> Also, are we ordering the child nodes of scm by node names or addresses.
-> I have to add the wkup_m3 node, and prefer ordering by addresses.
+> +
+> +static void brcm_sata3_init_config(struct brcm_ahci_priv *priv)
+> +{
+> +	/* Configure endianness */
+> +	writel((DATA_ENDIAN << 4) | (DATA_ENDIAN << 2) | (MMIO_ENDIAN << 0),
+> +		priv->top_ctrl + SATA_TOP_CTRL_BUS_CTRL);
 
-Yeah address ordering makes most sense here IMO.
-
-Note that you should follow the TRM "Table 2-2. L4_WKUP Peripheral Memory
-Map" and set up things as separate devices as shown there. Pretty much
-each row in that table is a separate device on the interconnect. That's
-especially true if the device has registers like revision, sysc, syss
-and so on. In that case they can be clocked and idled separately.
-
-So with these changes we follow the hardware mapping, although only
-partially have it populated now for l4_wkup:
-
-l3 (ocp) +-> l4_per  +-> ...
-         |           |-> ...
-         |
-         +-> l4_wkup +-> prcm
-         |           |-> scm 
-	 |           |-> ...
-         |
-         +-> ...     +-> ...
+AFAIR, this portion of the initialization must be done in the host-CPU
+native endianness, so __raw_writel() would be more appropriate, or we
+could use Kevin's conditional I/O accessors and do either ioread32() or
+ioread32be() based on the absence/presence of the "big-endian" property?
 
 
-Regards,
+[snip]
 
-Tony
+> +
+> +static const struct of_device_id ahci_of_match[] = {
+> +	{.compatible = "brcm,sata3-ahci"},
+
+The binding specifies brcm,bcm7445-ahci as a valid compatible string,
+such that we would probably want to match it here for consistency.
+-- 
+Florian
