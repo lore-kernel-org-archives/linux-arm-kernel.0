@@ -1,69 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 17:02:13 +0000
-Subject: [PATCH] arm64: dts: kill skeleton.dtsi
-Message-ID: <1426870933-23126-1-git-send-email-mark.rutland@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Mar 2015 18:02:54 +0100
+Subject: [PATCH] arm64: relax Image placement requirement
+Message-ID: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While skeleton.dtsi was initially conceived as a simple way to bootstrap
-writing a dts, it has proven to be problematic:
+Hi all,
 
-* The #address-cells and #size-cells values used in skeleton.dtsi may
-  not match what a user wants (e.g. when they need to describe a range
-  larger than 4GB).
+This is another possible approach to fixing the current, flawed
+EFI Image placement logic: instead of fixing that logic and the
+documentation, why not relax the requirement that the kernel
+Image not be placed across a 512 MB boundary?
 
-* For dts files where memory nodes have unit-addresses, it adds a
-  redundant /memory node, for which the reg entry may not be
-  appropriately sized (e.g. where #size-cells has been overridden).
+---------------->8-----------------
 
-* For dts files which assume that a bootloader will fill in the memory
-  node(s), no node is present in the dts (and hence there is no attached
-  comment), making it hard to distinguish these cases from bad dts
-  files, and masking any warnings dtc may produce w.r.t. missing nodes.
+This patch changes the early page table code so that two adjacent
+entries are used to map two pages worth of block entries at the
+lowest level, both for idmap_pg_dir and swapper_pg_dir.
 
-* The default empty /chosen and /aliases are somewhat useless, and it
-  would be preferable for dts to fill these in (e.g. for
-  /aliases/serial0 and /chosen/stdout-path).
+The purpose is to allow the kernel Image to cross a 512 MB or 1 GB
+alignment boundary (depending on page size), which is something that
+is not specifically banned by the current wording of the boot protocol.
+(The boot protocol stipulates that the kernel must be placed within
+512 MB if the beginning of RAM. However, the beginning of RAM is not
+necessarily aligned to 512 MB)
 
-This patch removes skeleton.dtsi from arm64. There are currently no
-users, so we can remove it before any appear.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Rob Herring <rob.herring@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
- 1 file changed, 13 deletions(-)
- delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
+ arch/arm64/include/asm/page.h |  4 ++--
+ arch/arm64/kernel/head.S      | 17 +++++++++++++----
+ 2 files changed, 15 insertions(+), 6 deletions(-)
 
-Recent comments reminded me to send this.
-
-I've taken a look in mainline and linux-next and I see no skeleton.dtsi users
-in arch/arm64/boot/dts/.
-
-Mark.
-
-diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
-deleted file mode 100644
-index 38ead82..0000000
---- a/arch/arm64/boot/dts/skeleton.dtsi
-+++ /dev/null
-@@ -1,13 +0,0 @@
--/*
-- * Skeleton device tree; the bare minimum needed to boot; just include and
-- * add a compatible value.  The bootloader will typically populate the memory
-- * node.
-- */
--
--/ {
--	#address-cells = <2>;
--	#size-cells = <1>;
--	chosen { };
--	aliases { };
--	memory { device_type = "memory"; reg = <0 0 0>; };
--};
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 3d02b1869eb8..d2189c359364 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -43,8 +43,8 @@
+ #define SWAPPER_PGTABLE_LEVELS	(CONFIG_ARM64_PGTABLE_LEVELS - 1)
+ #endif
+ 
+-#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+-#define IDMAP_DIR_SIZE		(3 * PAGE_SIZE)
++#define SWAPPER_DIR_SIZE	((SWAPPER_PGTABLE_LEVELS + 1) * PAGE_SIZE)
++#define IDMAP_DIR_SIZE		(4 * PAGE_SIZE)
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0dbdb4f3634f..9c3f95f30421 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -274,18 +274,21 @@ ENDPROC(preserve_boot_args)
+  *	virt:	virtual address
+  *	shift:	#imm page table shift
+  *	ptrs:	#imm pointers per table page
++ * 	offset:	#imm offset into the lowest translation level, in pages
+  *
+  * Preserves:	virt
+  * Corrupts:	tmp1, tmp2
+  * Returns:	tbl -> next level table page address
+  */
+-	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
++	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2, offset=0
+ 	lsr	\tmp1, \virt, #\shift
++	.if	\offset
++	add	\tmp1, \tmp1, #\offset
++	.endif
+ 	and	\tmp1, \tmp1, #\ptrs - 1	// table index
+-	add	\tmp2, \tbl, #PAGE_SIZE
++	add	\tmp2, \tbl, #(\offset + 1) * PAGE_SIZE
+ 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
+ 	str	\tmp2, [\tbl, \tmp1, lsl #3]
+-	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	.endm
+ 
+ /*
+@@ -297,9 +300,14 @@ ENDPROC(preserve_boot_args)
+  */
+ 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
+ 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
+-#if SWAPPER_PGTABLE_LEVELS == 3
++#if SWAPPER_PGTABLE_LEVELS != 3
++	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2, 1
++#else
++	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
++	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2, 1
+ #endif
++	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	.endm
+ 
+ /*
+@@ -396,6 +404,7 @@ __create_page_tables:
+ 	str_l	x5, idmap_t0sz, x6
+ 
+ 	create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
++	add	x0, x0, #PAGE_SIZE		// next level table page
+ 1:
+ #endif
+ 
 -- 
-1.9.1
+1.8.3.2
