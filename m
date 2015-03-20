@@ -1,118 +1,165 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Mar 2015 12:31:30 +0100
-Subject: [PATCH v3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
- boot protocol
-In-Reply-To: <20150319133612.GD18473@leverpostej>
-References: <20150319104100.GB18473@leverpostej>
- <1426762852-13699-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150319133612.GD18473@leverpostej>
-Message-ID: <CAKv+Gu-=n8fbdFeZX=EEpLypOdu0xXePzXH4-gOn6SqufA6CGg@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Mar 2015 12:37:47 +0100
+Subject: [PATCH v2] driver core / PM: Add PM domain callbacks for device
+ setup/cleanup
+In-Reply-To: <CAPDyKFr-c+SNKw1+5BE_8K0_jWMNavkEX5+dhST8b9Ggzx-cyw@mail.gmail.com>
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <3998390.WErrfO4Yno@vostro.rjw.lan>
+ <5975784.LhOHuiUKGO@vostro.rjw.lan>
+ <1810625.BTgaNclHRk@vostro.rjw.lan>
+ <CAPDyKFr-c+SNKw1+5BE_8K0_jWMNavkEX5+dhST8b9Ggzx-cyw@mail.gmail.com>
+Message-ID: <CAPDyKFpvBvWOM0V0jAbz4tTQEvtzp8A6naV316p7S1sAYF43uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 March 2015 at 14:36, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Mar 19, 2015 at 11:00:52AM +0000, Ard Biesheuvel wrote:
->> According to the arm64 boot protocol, registers x1 to x3 should be
->> zero upon kernel entry, and non-zero values are reserved for future
->> use. This future use is going to be problematic if we never enforce
->> the current rules, so start enforcing them now, by emitting a warning
->> if non-zero values are detected.
+On 20 March 2015 at 08:45, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 19 March 2015 at 22:51, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> Subject: driver core / PM: Add PM domain callbacks for device setup/cleanup
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> If PM domains are in use, it may be necessary to prepare the code
+>> handling a PM domain for driver probing.  For example, in some
+>> cases device drivers rely on the ability to power on the devices
+>> with the help of the IO runtime PM framework and the PM domain
+>> code needs to be ready for that.  Also, if that code has not been
+>> fully initialized yet, the driver probing should be deferred.
+>>
+>> Moreover, after the probing is complete, it may be necessary to
+>> put the PM domain in question into the state reflecting the current
+>> needs of the devices in it, for example, so that power is not drawn
+>> in vain.  The same should be done after removing a driver from
+>> a device, as the PM domain state may need to be changed to reflect
+>> the new situation.
+>>
+>> For these reasons, introduce new PM domain callbacks, ->activate
+>> and ->sync, called, respectively, before probing for a device
+>> driver and after the probing has been completed or the driver
+>> has been removed.
+>>
+>> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>
+> This looks good to me!
+>
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+I was a bit too quick acking this a minor fix is needed. See below.
+
+>
 >> ---
->>  arch/arm64/kernel/head.S  | 19 ++++++++++++++++++-
->>  arch/arm64/kernel/setup.c | 10 ++++++++++
->>  2 files changed, 28 insertions(+), 1 deletion(-)
+>>> ---
+>>>
+>>> This is an update without the additional bus type callbacks.  This should
+>>> be suffucient at this point for the use cases we have.
+>>>
+>>> I've decided to also call ->sync on driver removal as that is consistent
+>>> with what happens for failing probe.
+>>>
+>>> ---
 >>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index f5ac337f9598..1fdf42041f42 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -233,7 +233,7 @@ section_table:
->>  #endif
+>> One more update.
 >>
->>  ENTRY(stext)
->> -     mov     x21, x0                         // x21=FDT
->> +     bl      preserve_boot_args
->>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>       adrp    x24, __PHYS_OFFSET
->>       bl      set_cpu_boot_mode_flag
->> @@ -253,6 +253,23 @@ ENTRY(stext)
->>  ENDPROC(stext)
+>> I've realized that in the PM domain's ->sync callback is called after
+>> clearing the device's driver field (in the failed probe or driver removal
+>> case) rather than before it, that could be used to distinguish between the
+>> two cases (successful probe vs no driver), so I reworked the patch accordingly.
+>>
+>> ---
+>>  drivers/base/dd.c  |   16 ++++++++++++++++
+>>  include/linux/pm.h |    6 ++++++
+>>  2 files changed, 22 insertions(+)
+>>
+>> Index: linux-pm/include/linux/pm.h
+>> ===================================================================
+>> --- linux-pm.orig/include/linux/pm.h
+>> +++ linux-pm/include/linux/pm.h
+>> @@ -603,10 +603,16 @@ extern void dev_pm_put_subsys_data(struc
+>>   * Power domains provide callbacks that are executed during system suspend,
+>>   * hibernation, system resume and during runtime PM transitions along with
+>>   * subsystem-level and driver-level callbacks.
+>> + *
+>> + * @detach: Called when removing a device from the domain.
+>> + * @activate: Called before executing probe routines for bus types and drivers.
+>> + * @sync: Called after driver probe and removal.
+>>   */
+>>  struct dev_pm_domain {
+>>         struct dev_pm_ops       ops;
+>>         void (*detach)(struct device *dev, bool power_off);
+>> +       int (*activate)(struct device *dev);
+>> +       void (*sync)(struct device *dev);
+>>  };
 >>
 >>  /*
->> + * Preserve the arguments passed by the bootloader in x0 .. x3
->> + */
->> +preserve_boot_args:
->> +     mov     x21, x0                         // x21=FDT
->> +
->> +     adr_l   x0, boot_args                   // record the contents of
->> +     stp     x21, x1, [x0]                   // x0 .. x3 at kernel entry
->> +     stp     x2, x3, [x0, #16]
->> +
->> +     dmb     sy                              // needed before dc ivac with
->> +                                             // MMU off
->> +
->> +     add     x1, x0, #0x20                   // 4 x 8 bytes
->> +     b       __inval_cache_range             // tail call
->> +ENDPROC(preserve_boot_args)
->> +
->> +/*
->>   * Determine validity of the x21 FDT pointer.
->>   * The dtb must be 8-byte aligned and live in the first 512M of memory.
->>   */
->> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
->> index 1783b38cf4c0..2f384019b201 100644
->> --- a/arch/arm64/kernel/setup.c
->> +++ b/arch/arm64/kernel/setup.c
->> @@ -115,6 +115,11 @@ void __init early_print(const char *str, ...)
->>       printk("%s", buf);
->>  }
->>
->> +/*
->> + * The recorded values of x0 .. x3 upon kernel entry.
->> + */
->> +u64 __cacheline_aligned boot_args[4];
->
-> All the above looks correct to me.
->
->> +
->>  void __init smp_setup_processor_id(void)
+>> Index: linux-pm/drivers/base/dd.c
+>> ===================================================================
+>> --- linux-pm.orig/drivers/base/dd.c
+>> +++ linux-pm/drivers/base/dd.c
+>> @@ -279,6 +279,7 @@ static int really_probe(struct device *d
 >>  {
->>       u64 mpidr = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
->> @@ -412,6 +417,11 @@ void __init setup_arch(char **cmdline_p)
->>       conswitchp = &dummy_con;
->>  #endif
->>  #endif
->> +     if (boot_args[1] || boot_args[2] || boot_args[3]) {
->> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
->> +                     boot_args[1], boot_args[2], boot_args[3]);
->> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
->
-> If we ever decide to use x1-x3 for something, and try to boot an older
-> kernel, that warning is going to be a bit misleading. That could matter
-> for VMs where we're going to see old kernel images for a long time.
->
-> I would like the warning to mention that could be the case.
->
-> It would also be nice if the message were consistently spaced regardless
-> of the values of x1-x3, so we should zero-pad them (and as that takes a
-> resonable amount of space, let's give them a line each).
->
-> So could we change the warning to be something like:
->
->         pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
->                "\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
->                "This indicates a broken bootloader or old kernel\n",
->                boot_args[1], boot_args[2], boot_args[3]);
->
+>>         int ret = 0;
+>>         int local_trigger_count = atomic_read(&deferred_trigger_count);
+>> +       struct dev_pm_domain *pm_domain = dev->pm_domain;
+>>
+>>         atomic_inc(&probe_count);
+>>         pr_debug("bus: '%s': %s: probing driver %s with device %s\n",
+>> @@ -298,6 +299,12 @@ static int really_probe(struct device *d
+>>                 goto probe_failed;
+>>         }
+>>
 
-OK, I have applied this change.
 
-But I would like to note that we should probably only extend the boot
-protocol in a way that would not trigger this on older kernels in the
-first place.
-I.e., assign a bit in the flags field in the header, which indicates
-whether some boot protocol enhancement is supported by the kernel
-being loaded, and only allow x1/x2/x3 to be non-zero if said
-enhancement defines that.
+
+>> +       if (pm_domain && pm_domain->activate) {
+
+You need to re-fetch the pm_domain pointer at this point, since it
+will be updated during ->probe().
+
+Maybe it's just safer to always do the following check:
+
+if (dev->pm_domain && dev->pm_domain->activate|sync)
+...
+
+>> +               ret = pm_domain->activate(dev);
+>> +               if (ret)
+>> +                       goto probe_failed;
+>> +       }
+>> +
+>>         if (dev->bus->probe) {
+>>                 ret = dev->bus->probe(dev);
+>>                 if (ret)
+>> @@ -308,6 +315,9 @@ static int really_probe(struct device *d
+>>                         goto probe_failed;
+>>         }
+>>
+>> +       if (pm_domain && pm_domain->sync)
+>> +               pm_domain->sync(dev);
+>> +
+>>         driver_bound(dev);
+>>         ret = 1;
+>>         pr_debug("bus: '%s': %s: bound device %s to driver %s\n",
+>> @@ -319,6 +329,8 @@ probe_failed:
+>>         driver_sysfs_remove(dev);
+>>         dev->driver = NULL;
+>>         dev_set_drvdata(dev, NULL);
+>> +       if (pm_domain && pm_domain->sync)
+>> +               pm_domain->sync(dev);
+>>
+>>         if (ret == -EPROBE_DEFER) {
+>>                 /* Driver requested deferred probing */
+>> @@ -522,9 +534,13 @@ static void __device_release_driver(stru
+>>                         dev->bus->remove(dev);
+>>                 else if (drv->remove)
+>>                         drv->remove(dev);
+>> +
+>>                 devres_release_all(dev);
+>>                 dev->driver = NULL;
+>>                 dev_set_drvdata(dev, NULL);
+>> +               if (dev->pm_domain && dev->pm_domain->sync)
+>> +                       dev->pm_domain->sync(dev);
+>> +
+>>                 klist_remove(&dev->p->knode_driver);
+>>                 if (dev->bus)
+>>                         blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
+>>
+
+Kind regards
+Uffe
