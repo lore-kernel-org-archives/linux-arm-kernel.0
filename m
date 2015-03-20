@@ -1,51 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Mar 2015 17:20:41 +0000
-Subject: ERRATA work-arounds in the kernel
-In-Reply-To: <550C4B12.1030608@free.fr>
-References: <550C4B12.1030608@free.fr>
-Message-ID: <20150320172041.GI3421@e104818-lin.cambridge.arm.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 20 Mar 2015 17:20:28 +0000
+Subject: [PATCH 1/3] pm: domains: quieten down generic pm domains
+In-Reply-To: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YZ0ay-0000sk-HM@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 05:30:10PM +0100, Mason wrote:
-> I also looked at ARM's "Errata Summary Table" for the Cortex A9. There are
-> roughly 90 errata documented there. (This document is 2 years old.)
-> 
-> I assume that some (most?) of these do not apply to Linux, but it seems
-> likely that some do?
-> 
-> I'm wondering why there are not more work-arounds available in Kconfig?
+PM domains are rather noisy; scheduling behaviour can cause callbacks
+to take longer, which causes them to spit out a warning-level message
+each time a callback takes a little longer than the previous time.
+There really isn't a need for this, except when debugging.
 
-There are a few reasons:
+Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/power/domain.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-- erratum cannot be triggered in Linux
-- erratum cannot be worked around in Linux (e.g. it requires some
-  undocumented control bits to be set by firmware or even hw workaround
-  like the system errata)
-- cat A erratum with no feasible workaround (and partners usually take
-  an ECO fix)
-- erratum does not affect any CPU revision in production (not all rxpy
-  revisions are in the field; I would include here early CPU revisions
-  that were licensed as development chips but not widely used)
-- we simply missed them. So if you think there is any that needs to be
-  upstreamed, let us know or submit a patch
-
-> I'm wondering if it is possible to trigger some of these with a "normal"
-> work-load on a "normal" kernel? Has anyone (perhaps ARM employees) looked
-> at that? (I suppose they have.)
-
-Define "normal". It's really hard to quantify as the workloads can vary
-widely between different use cases (e.g. mobile vs server).
-
-> For example, errata #782772
-> "Speculative execution of a Load-Exclusive or Store-Exclusive instruction
-> after a write to Strongly Ordered memory might deadlock the processor."
-> (The recommended work-around is a strategically-placed DMB.)
-> 
-> Since ldrex is used in low-level code, it seems possible to hit that one?
-> Or perhaps Linux does not support "Strongly Ordered" memory regions?
-
-It support SO memory and it's used in some cases.
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 0d8780c04a5e..b3fbc21da2dc 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -173,8 +173,8 @@ static int genpd_power_on(struct generic_pm_domain *genpd)
+ 	genpd->power_on_latency_ns = elapsed_ns;
+ 	genpd->max_off_time_changed = true;
+ 	genpd_recalc_cpu_exit_latency(genpd);
+-	pr_warn("%s: Power-%s latency exceeded, new value %lld ns\n",
+-		genpd->name, "on", elapsed_ns);
++	pr_debug("%s: Power-%s latency exceeded, new value %lld ns\n",
++		 genpd->name, "on", elapsed_ns);
+ 
+ 	return ret;
+ }
+@@ -199,8 +199,8 @@ static int genpd_power_off(struct generic_pm_domain *genpd)
+ 
+ 	genpd->power_off_latency_ns = elapsed_ns;
+ 	genpd->max_off_time_changed = true;
+-	pr_warn("%s: Power-%s latency exceeded, new value %lld ns\n",
+-		genpd->name, "off", elapsed_ns);
++	pr_debug("%s: Power-%s latency exceeded, new value %lld ns\n",
++		 genpd->name, "off", elapsed_ns);
+ 
+ 	return ret;
+ }
 -- 
-Catalin
+1.8.3.1
