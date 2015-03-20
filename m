@@ -1,48 +1,28 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 20 Mar 2015 17:20:38 +0000
-Subject: [PATCH 3/3] pm: domains: avoid potential oops in
- pm_genpd_remove_device()
-In-Reply-To: <20150320171941.GK8656@n2100.arm.linux.org.uk>
-References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
-Message-ID: <E1YZ0b8-0000ss-Nq@rmk-PC.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 Mar 2015 17:23:54 +0000
+Subject: [PATCH 2/6] ARM: cpuidle: Add a cpuidle ops structure to be used
+ for DT
+In-Reply-To: <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1425385777-14766-1-git-send-email-daniel.lezcano@linaro.org>
+ <1425385777-14766-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150320172353.GJ3421@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pm_genpd_remove_device() tries hard to validate the generic PM domain
-passed to it, but the validation is not complete.
+On Tue, Mar 03, 2015 at 01:29:33PM +0100, Daniel Lezcano wrote:
+> diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+> index 0710654..1bee287 100644
+> --- a/arch/arm64/include/asm/cpuidle.h
+> +++ b/arch/arm64/include/asm/cpuidle.h
+> @@ -15,5 +15,8 @@ static inline int cpu_suspend(unsigned long arg)
+>  	return -EOPNOTSUPP;
+>  }
+>  #endif
+> -
+> +static inline int arm_cpuidle_suspend(int index)
+> +{
+> +	return cpu_suspend(index);
+> +}
+>  #endif
 
-dev->pm_domain contains a struct dev_pm_domain, which is the "base
-class" of generic PM domains.  Other users of dev_pm_domains include
-stuff like vga_switheroo.  Hence, a device could have a generic PM
-domain or a vga_switcheroo PM domain in dev->pm_domain.
-
-We need ot be certain that the PM domain is actually valid before we
-try to remove it.  We can do this easily as we have a way to get the
-current validated generic PM domain for a struct device.  This must
-match the generic PM domain being requested for removal.
-
-Convert the code to use this alternative validation method instead.
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/base/power/domain.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 89d2eea7f561..5f560fa45a32 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1538,9 +1538,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
- 
- 	dev_dbg(dev, "%s()\n", __func__);
- 
--	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev)
--	    ||  IS_ERR_OR_NULL(dev->pm_domain)
--	    ||  pd_to_genpd(dev->pm_domain) != genpd)
-+	if (!genpd || genpd != pm_genpd_lookup_dev(dev))
- 		return -EINVAL;
- 
- 	genpd_acquire_lock(genpd);
--- 
-1.8.3.1
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
