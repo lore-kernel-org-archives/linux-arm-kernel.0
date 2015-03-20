@@ -1,25 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 Mar 2015 17:19:41 +0000
-Subject: [FOR DISCUSSION 0/9] Dove PMU support
-In-Reply-To: <1466359.8taRhRkKWI@vostro.rjw.lan>
-References: <20150312183020.GU8656@n2100.arm.linux.org.uk>
- <1824813.kJQ02QuMbA@vostro.rjw.lan>
- <20150320121659.GJ8656@n2100.arm.linux.org.uk>
- <1466359.8taRhRkKWI@vostro.rjw.lan>
-Message-ID: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 20 Mar 2015 17:20:38 +0000
+Subject: [PATCH 3/3] pm: domains: avoid potential oops in
+ pm_genpd_remove_device()
+In-Reply-To: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+Message-ID: <E1YZ0b8-0000ss-Nq@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 01:44:30PM +0100, Rafael J. Wysocki wrote:
-> Both work for me, actually.  I think that Kevin has ACKed the patch despite
-> the comments, so it would be fine to apply it I guess.
+pm_genpd_remove_device() tries hard to validate the generic PM domain
+passed to it, but the validation is not complete.
 
-Here's the set of three - with the second one reworked.
+dev->pm_domain contains a struct dev_pm_domain, which is the "base
+class" of generic PM domains.  Other users of dev_pm_domains include
+stuff like vga_switheroo.  Hence, a device could have a generic PM
+domain or a vga_switcheroo PM domain in dev->pm_domain.
 
- drivers/base/power/domain.c | 58 +++++++++++++++++++++++++++++----------------
- include/linux/pm_domain.h   |  6 ++---
- 2 files changed, 40 insertions(+), 24 deletions(-)
+We need ot be certain that the PM domain is actually valid before we
+try to remove it.  We can do this easily as we have a way to get the
+current validated generic PM domain for a struct device.  This must
+match the generic PM domain being requested for removal.
 
+Convert the code to use this alternative validation method instead.
+
+Acked-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/base/power/domain.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 89d2eea7f561..5f560fa45a32 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1538,9 +1538,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
+ 
+ 	dev_dbg(dev, "%s()\n", __func__);
+ 
+-	if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev)
+-	    ||  IS_ERR_OR_NULL(dev->pm_domain)
+-	    ||  pd_to_genpd(dev->pm_domain) != genpd)
++	if (!genpd || genpd != pm_genpd_lookup_dev(dev))
+ 		return -EINVAL;
+ 
+ 	genpd_acquire_lock(genpd);
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
