@@ -1,58 +1,55 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 20 Mar 2015 15:31:04 +0530
-Subject: [PATCH v3 1/6] clk: qcom: Add support for GDSCs
-In-Reply-To: <550BED93.3000305@codeaurora.org>
-References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
- <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
- <550BCE7C.3030000@linaro.org> <550BED93.3000305@codeaurora.org>
-Message-ID: <550BEFE0.1020004@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 20 Mar 2015 11:12:46 +0100
+Subject: [GIT PULL] clk: mvebu changes for 4.1
+Message-ID: <550BF29E.1030003@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[]...
->>> @@ -0,0 +1,46 @@
->>> +/*
->>> + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 and
->>> + * only version 2 as published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#ifndef __QCOM_GDSC_H__
->>> +#define __QCOM_GDSC_H__
->>> +
->>> +#include <linux/pm_domain.h>
->>> +
->>> +struct regmap;
+Mike,
 
-I realized, after Srini pointed out on irc that this fwd declaration
-is a complete waste. I'll remove it when I do a repost.
+Here is the first pull request for the clocks for mvebu for v4.1.
 
->>> +
->>> +/**
->>> + * struct gdsc - Globally Distributed Switch Controller
->>> + * @pd: generic power domain
->>> + * @regmap: regmap for MMIO accesses
->>> + * @gdscr: gsdc control register
->>> + */
->>> +struct gdsc {
->>> +    struct generic_pm_domain    pd;
->>> +    struct regmap            *regmap;
->>> +    unsigned int            gdscr;
->>> +};
->>> +
->>> +#define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
->>> +
->>> +#ifdef CONFIG_QCOM_GDSC
->>> +int gdsc_register(struct device *, struct gdsc **, size_t n, struct
->>> regmap *);
->>> +void gdsc_unregister(struct device *);
->>> +#else
->>> +int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct
->>> regmap *r)
+It is a pretty small one and I don't expect an other one.
+
+Gregory
+
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-4.1
+
+for you to fetch changes up to 8da6f3c1662a74a39b5ebc773ee27a949b5d7658:
+
+  clk: mvebu: add Marvell Armada 39x driver (2015-03-04 15:18:53 +0100)
+
+----------------------------------------------------------------
+clock changes for mvebu for v4.1
+
+- Add clock support for Armada 39x
+
+----------------------------------------------------------------
+Thomas Petazzoni (3):
+      devicetree: bindings: update DT bindings for Marvell EBU clock support
+      clk: mvebu: extend common code to allow an optional refclk
+      clk: mvebu: add Marvell Armada 39x driver
+
+ Documentation/devicetree/bindings/clock/mvebu-core-clock.txt  |   9 +++++++++
+ Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt |  15 ++++++++++++++-
+ drivers/clk/mvebu/Kconfig                                     |   4 ++++
+ drivers/clk/mvebu/Makefile                                    |   1 +
+ drivers/clk/mvebu/armada-39x.c                                | 156
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/mvebu/common.c                                    |  17 +++++++++++++++++
+ drivers/clk/mvebu/common.h                                    |   1 +
+ 7 files changed, 202 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/mvebu/armada-39x.c
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
