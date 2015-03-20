@@ -1,30 +1,73 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 20 Mar 2015 19:52:44 +0100
-Subject: [PATCH 0/5] ARM: sunxi: SRAM mapping support
-Message-ID: <1426877569-11493-1-git-send-email-hdegoede@redhat.com>
+Date: Fri, 20 Mar 2015 19:52:46 +0100
+Subject: [PATCH 2/5] ARM: dts: sun4i: Add A10 SRAM and SRAM controller
+In-Reply-To: <1426877569-11493-1-git-send-email-hdegoede@redhat.com>
+References: <1426877569-11493-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1426877569-11493-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The A10 has a few SRAM that can be mapped either to a device or to the CPU,
+with the mapping being controlled by a SRAM controller.
 
-Here is a cleaned up version of Maxime's sunxi SRAM controller driver.
+Since most of the time these SRAM won't be accessible by the CPU,
+we can't use the mmio-sram driver and compatible.
 
-I've been using / testing this together with the sunxi musb support patches
-I've been working on, and it works well. I've tested it on sun4i, sun5i and
-sun7i. See the per patch commit messages for the (minor) changes which I did
-compared to Maxime's RFC.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-A note about the changing of the compatible to a sun4i-a10 prefix, I've
-looked at the user manual for all 3 generations and the sram controller is
-the same for all 3. Register 0x1c00024 (SoC version) is only documented in
-the A20 manual, but is present and works indentical in all 3 generations.
-
-Since this is a prereq for my musb work, if there are no objections then I
-would like to see this go upstream soon.
-
-Since it only touches sunxi files (and one Makefile), it is probably best if
-this all goes upstream through Maxime.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index b66ebb3..88f57b4 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -451,12 +451,46 @@
+ 		};
+ 	};
+ 
++	/*
++	 * Note we use the address were mmio registers start, not where the
++	 * SRAM blocks start, this cannot be changed because that would be
++	 * a devicetree ABI change.
++	 */
+ 	soc at 01c00000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		sram at 00000000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00000000 0x4000>;
++			allwinner,sram-name = "A1";
++		};
++
++		sram at 00004000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00004000 0x4000>;
++			allwinner,sram-name = "A2";
++		};
++
++		sram at 00008000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00008000 0x4000>;
++			allwinner,sram-name = "A3-A4";
++		};
++
++		sram at 00010000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00010000 0x1000>;
++			allwinner,sram-name = "D";
++		};
++
++		sram-controller at 01c00000 {
++			compatible = "allwinner,sun4i-a10-sram-controller";
++			reg = <0x01c00000 0x30>;
++		};
++
+ 		dma: dma-controller at 01c02000 {
+ 			compatible = "allwinner,sun4i-a10-dma";
+ 			reg = <0x01c02000 0x1000>;
+-- 
+2.3.3
