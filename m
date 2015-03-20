@@ -1,57 +1,40 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Mar 2015 16:50:31 +0000
-Subject: [PATCH v2 0/3] Kill off pgsize_bitmap field from struct iommu_ops
-Message-ID: <1426870234-12910-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 20 Mar 2015 16:50:32 +0000
+Subject: [PATCH v2 1/3] iommu: remove unused priv field from struct iommu_ops
+In-Reply-To: <1426870234-12910-1-git-send-email-will.deacon@arm.com>
+References: <1426870234-12910-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1426870234-12910-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The priv field from iommu_ops is a hangover from the of_dma_configure
+series and isn't actually used. Remove it before it has chance to
+spread.
 
-This is version two of the patches originally posted here:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ include/linux/iommu.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-  http://comments.gmane.org/gmane.linux.kernel.iommu/8993
-
-Changes since v1 include:
-
-  * Move the priv removal code into its own patch
-  * Fixed bitmap definition for ipmmu-vmsa.c
-  * Added acks
-
-Comments welcome,
-
-Will
-
---->8
-
-Robin Murphy (1):
-  iommu: of: enforce const-ness of struct iommu_ops
-
-Will Deacon (2):
-  iommu: remove unused priv field from struct iommu_ops
-  iommu: move pgsize_bitmap from struct iommu_ops to struct iommu_domain
-
- arch/arm/include/asm/dma-mapping.h   |  2 +-
- arch/arm/mm/dma-mapping.c            |  6 +++---
- arch/arm64/include/asm/dma-mapping.h |  3 ++-
- drivers/iommu/amd_iommu.c            |  2 +-
- drivers/iommu/arm-smmu.c             | 12 +++++-------
- drivers/iommu/exynos-iommu.c         |  3 ++-
- drivers/iommu/intel-iommu.c          |  2 +-
- drivers/iommu/iommu.c                | 16 ++++++++--------
- drivers/iommu/ipmmu-vmsa.c           |  2 +-
- drivers/iommu/msm_iommu.c            |  3 ++-
- drivers/iommu/of_iommu.c             | 12 ++++++------
- drivers/iommu/omap-iommu.c           |  3 ++-
- drivers/iommu/rockchip-iommu.c       |  2 +-
- drivers/iommu/shmobile-iommu.c       |  2 +-
- drivers/iommu/tegra-gart.c           |  2 +-
- drivers/iommu/tegra-smmu.c           |  3 +--
- drivers/of/platform.c                |  2 +-
- drivers/vfio/vfio_iommu_type1.c      |  2 +-
- include/linux/dma-mapping.h          |  2 +-
- include/linux/iommu.h                |  6 +-----
- include/linux/of_iommu.h             |  8 ++++----
- 21 files changed, 46 insertions(+), 49 deletions(-)
-
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 38daa453f2e5..73b7bb29546c 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -109,7 +109,6 @@ enum iommu_attr {
+  * @domain_set_attr: Change domain attributes
+  * @of_xlate: add OF master IDs to iommu grouping
+  * @pgsize_bitmap: bitmap of supported page sizes
+- * @priv: per-instance data private to the iommu driver
+  */
+ struct iommu_ops {
+ 	bool (*capable)(enum iommu_cap);
+@@ -146,7 +145,6 @@ struct iommu_ops {
+ #endif
+ 
+ 	unsigned long pgsize_bitmap;
+-	void *priv;
+ };
+ 
+ #define IOMMU_GROUP_NOTIFY_ADD_DEVICE		1 /* Device added */
 -- 
 2.1.4
