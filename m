@@ -1,36 +1,37 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Mar 2015 20:44:19 +0200
-Subject: [PATCHv5 08/35] ARM: OMAP4: PRM: move omap4xxx_prm_init earlier in
- init order
+Date: Fri, 20 Mar 2015 20:44:20 +0200
+Subject: [PATCHv5 09/35] Documentation: DT: document PRCM compatible strings
+ for dm81x SoCs
 In-Reply-To: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
 References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426877086-17131-9-git-send-email-t-kristo@ti.com>
+Message-ID: <1426877086-17131-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP4 has different ordering of PRM and CM init calls in the early init.
-Re-oder these accordingly for OMAP4 also. This is needed so that we
-can do some optimizations in the following patches for the PRCM init.
+These PRCM nodes were earlier added in patch 7800064ba5 ("ARM: dts: Add
+basic dm816x device tree configuration"), but the documentation for
+the same wasn't added. Fix this by adding the missing compatible strings
+under the generic prcm.txt document.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/io.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/arm/omap/prcm.txt          |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 364b530..460da22 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -654,9 +654,9 @@ void __init omap4430_init_early(void)
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
- 	omap4xxx_check_revision();
- 	omap4xxx_check_features();
-+	omap44xx_prm_init();
- 	omap4_cm_init();
- 	omap4_pm_init_early();
--	omap44xx_prm_init();
- 	omap44xx_voltagedomains_init();
- 	omap44xx_powerdomains_init();
- 	omap44xx_clockdomains_init();
+diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+index 79074da..68f96f8 100644
+--- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
++++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+@@ -29,6 +29,10 @@ Required properties:
+ 		"ti,dra7-prm"
+ 		"ti,dra7-cm-core-aon"
+ 		"ti,dra7-cm-core"
++		"ti,dm814-prcm"
++		"ti,dm814-scrm"
++		"ti,dm816-prcm"
++		"ti,dm816-scrm"
+ - reg:		Contains PRCM module register address range
+ 		(base address and length)
+ - clocks:	clocks for this module
 -- 
 1.7.9.5
