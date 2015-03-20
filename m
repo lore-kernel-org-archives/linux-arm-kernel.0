@@ -1,80 +1,106 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 20 Mar 2015 18:23:05 -0500
-Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
- control module support
-In-Reply-To: <20150320223541.GV31346@atomide.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-28-git-send-email-t-kristo@ti.com>
- <550C9490.3070505@ti.com> <20150320223541.GV31346@atomide.com>
-Message-ID: <550CABD9.5060000@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 20 Mar 2015 18:27:01 -0500
+Subject: [PATCH] PCI: mvebu: add suspend/resume support
+In-Reply-To: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1426604145-12335-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150320232701.GQ26935@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2015 05:35 PM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [150320 14:44]:
->> On 03/20/2015 01:44 PM, Kristo, Tero wrote:
->>> +			scm: scm at 210000 {
->>> +				compatible = "ti,am3-scm", "simple-bus";
->>> +				reg = <0x210000 0x2000>;
->>> +				#address-cells = <1>;
->>> +				#size-cells = <1>;
->>> +				ranges = <0 0x210000 0x2000>;
->>> +
->>> +				am33xx_pinmux: pinmux at 800 {
->>> +					compatible = "pinctrl-single";
->>> +					reg = <0x800 0x238>;
->>> +					#address-cells = <1>;
->>> +					#size-cells = <0>;
->>> +					pinctrl-single,register-width = <32>;
->>> +					pinctrl-single,function-mask = <0x7f>;
->>> +				};
->>> +
->>> +				scm_conf: scm_conf at 0 {
->>> +					compatible = "syscon";
->>> +					reg = <0x0 0x7fc>;
->>
->> Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
->> this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
+On Tue, Mar 17, 2015 at 03:55:45PM +0100, Thomas Petazzoni wrote:
+> This commit implements suspend/resume support for the mvebu PCIe host
+> driver. Without this commit, the system will panic at resume time when
+> PCIe devices are connected.
 > 
-> Seems correct to me, it's offset 0, size 0x7fc. So that's the scm_conf
-> syscon area before pinctrl-single at 0x44c00000 + 0x210000 + 0.
+> Note that we have to use the ->suspend_noirq() and ->resume_noirq()
+> hooks, because at resume time, the PCI fixups are done at
+> ->resume_noirq() time, so the PCIe controller has to be ready at this
+> point.
 > 
-> The io area for pinctrl-single starts at 0x800, so the scm_conf should
-> be before it in the dts file.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-Well, I understand that it is how it was before, but we won't be mapping
-or covering the last register efuse_sma before the pinctrl cfg
-registers. Any reason for just leaving out that register?
+Applied with Jason's ack to pci/host-mvebu for v4.1, thanks!
 
-regards
-Suman
-
+> ---
+>  drivers/pci/host/pci-mvebu.c | 38 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
 > 
->> Also, are we ordering the child nodes of scm by node names or addresses.
->> I have to add the wkup_m3 node, and prefer ordering by addresses.
-> 
-> Yeah address ordering makes most sense here IMO.
-> 
-> Note that you should follow the TRM "Table 2-2. L4_WKUP Peripheral Memory
-> Map" and set up things as separate devices as shown there. Pretty much
-> each row in that table is a separate device on the interconnect. That's
-> especially true if the device has registers like revision, sysc, syss
-> and so on. In that case they can be clocked and idled separately.
-> 
-> So with these changes we follow the hardware mapping, although only
-> partially have it populated now for l4_wkup:
-> 
-> l3 (ocp) +-> l4_per  +-> ...
->          |           |-> ...
->          |
->          +-> l4_wkup +-> prcm
->          |           |-> scm 
-> 	 |           |-> ...
->          |
->          +-> ...     +-> ...
-> 
-> 
-> Regards,
-> 
-> Tony
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 1309cfb..1ab8635 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -129,6 +129,7 @@ struct mvebu_pcie_port {
+>  	size_t memwin_size;
+>  	phys_addr_t iowin_base;
+>  	size_t iowin_size;
+> +	u32 saved_pcie_stat;
+>  };
+>  
+>  static inline void mvebu_writel(struct mvebu_pcie_port *port, u32 val, u32 reg)
+> @@ -899,6 +900,35 @@ static void mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
+>  		pcie->msi->dev = &pcie->pdev->dev;
+>  }
+>  
+> +static int mvebu_pcie_suspend(struct device *dev)
+> +{
+> +	struct mvebu_pcie *pcie;
+> +	int i;
+> +
+> +	pcie = dev_get_drvdata(dev);
+> +	for (i = 0; i < pcie->nports; i++) {
+> +		struct mvebu_pcie_port *port = pcie->ports + i;
+> +		port->saved_pcie_stat = mvebu_readl(port, PCIE_STAT_OFF);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mvebu_pcie_resume(struct device *dev)
+> +{
+> +	struct mvebu_pcie *pcie;
+> +	int i;
+> +
+> +	pcie = dev_get_drvdata(dev);
+> +	for (i = 0; i < pcie->nports; i++) {
+> +		struct mvebu_pcie_port *port = pcie->ports + i;
+> +		mvebu_writel(port, port->saved_pcie_stat, PCIE_STAT_OFF);
+> +		mvebu_pcie_setup_hw(port);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int mvebu_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct mvebu_pcie *pcie;
+> @@ -1056,6 +1086,8 @@ static int mvebu_pcie_probe(struct platform_device *pdev)
+>  	mvebu_pcie_msi_enable(pcie);
+>  	mvebu_pcie_enable(pcie);
+>  
+> +	platform_set_drvdata(pdev, pcie);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1068,12 +1100,18 @@ static const struct of_device_id mvebu_pcie_of_match_table[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
+>  
+> +static struct dev_pm_ops mvebu_pcie_pm_ops = {
+> +	.suspend_noirq = mvebu_pcie_suspend,
+> +	.resume_noirq = mvebu_pcie_resume,
+> +};
+> +
+>  static struct platform_driver mvebu_pcie_driver = {
+>  	.driver = {
+>  		.name = "mvebu-pcie",
+>  		.of_match_table = mvebu_pcie_of_match_table,
+>  		/* driver unloading/unbinding currently not supported */
+>  		.suppress_bind_attrs = true,
+> +		.pm = &mvebu_pcie_pm_ops,
+>  	},
+>  	.probe = mvebu_pcie_probe,
+>  };
+> -- 
+> 2.1.0
 > 
