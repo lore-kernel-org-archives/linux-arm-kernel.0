@@ -1,91 +1,133 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 20 Mar 2015 08:17:57 +0100
-Subject: [PATCH] coresight: moving to new "hwtracing" directory
-In-Reply-To: <CANLsYkx07_xYcXYbj=TwvUpaDRo9=ppLqsg69e2ju2nO-MArwA@mail.gmail.com>
-References: <1426802522-25743-1-git-send-email-mathieu.poirier@linaro.org>
- <20150319222741.GA24999@kroah.com>
- <CANLsYkx07_xYcXYbj=TwvUpaDRo9=ppLqsg69e2ju2nO-MArwA@mail.gmail.com>
-Message-ID: <20150320071757.GA30346@kroah.com>
+From: kong.kongxinwei@hisilicon.com (kongxinwei)
+Date: Fri, 20 Mar 2015 15:37:24 +0800
+Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
+ driver
+In-Reply-To: <20150319141753.GB25967@leverpostej>
+References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150319141753.GB25967@leverpostej>
+Message-ID: <550BCE34.9010904@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 06:21:56PM -0600, Mathieu Poirier wrote:
-> On 19 March 2015 at 16:27, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Thu, Mar 19, 2015 at 04:02:02PM -0600, Mathieu Poirier wrote:
-> >> Keeping drivers related to HW tracing on ARM, i.e coresight,
-> >> under "drivers/coresight" doesn't make sense when other
-> >> architectures start rolling out technologies of the same
-> >> nature.
-> >>
-> >> As such creating a new "drivers/hwtracing" directory where all
-> >> drivers of the same kind can reside, reducing namespace
-> >> pollution under "drivers/".
-> >>
-> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> >> ---
-> >>  MAINTAINERS                                        |    2 +-
-> >>  arch/arm/Kconfig.debug                             |    2 +-
-> >>  arch/arm64/Kconfig.debug                           |    2 +-
-> >>  drivers/Makefile                                   |    2 +-
-> >>  drivers/coresight/Kconfig                          |   61 -
-> >>  drivers/coresight/Makefile                         |   11 -
-> >>  drivers/coresight/coresight-etb10.c                |  527 ------
-> >>  drivers/coresight/coresight-etm-cp14.c             |  591 ------
-> >>  drivers/coresight/coresight-etm.h                  |  251 ---
-> >>  drivers/coresight/coresight-etm3x.c                | 1932 --------------------
-> >>  drivers/coresight/coresight-funnel.c               |  258 ---
-> >>  drivers/coresight/coresight-priv.h                 |   63 -
-> >>  drivers/coresight/coresight-replicator.c           |  137 --
-> >>  drivers/coresight/coresight-tmc.c                  |  822 ---------
-> >>  drivers/coresight/coresight-tpiu.c                 |  207 ---
-> >>  drivers/coresight/coresight.c                      |  720 --------
-> >>  drivers/coresight/of_coresight.c                   |  200 --
-> >>  drivers/hwtracing/coresight/Kconfig                |   61 +
-> >>  drivers/hwtracing/coresight/Makefile               |   11 +
-> >>  drivers/hwtracing/coresight/coresight-etb10.c      |  527 ++++++
-> >>  drivers/hwtracing/coresight/coresight-etm-cp14.c   |  591 ++++++
-> >>  drivers/hwtracing/coresight/coresight-etm.h        |  251 +++
-> >>  drivers/hwtracing/coresight/coresight-etm3x.c      | 1932 ++++++++++++++++++++
-> >>  drivers/hwtracing/coresight/coresight-funnel.c     |  258 +++
-> >>  drivers/hwtracing/coresight/coresight-priv.h       |   63 +
-> >>  drivers/hwtracing/coresight/coresight-replicator.c |  137 ++
-> >>  drivers/hwtracing/coresight/coresight-tmc.c        |  822 +++++++++
-> >>  drivers/hwtracing/coresight/coresight-tpiu.c       |  207 +++
-> >>  drivers/hwtracing/coresight/coresight.c            |  720 ++++++++
-> >>  drivers/hwtracing/coresight/of_coresight.c         |  200 ++
-> >>  30 files changed, 5784 insertions(+), 5784 deletions(-)
-> >>  delete mode 100644 drivers/coresight/Kconfig
-> >>  delete mode 100644 drivers/coresight/Makefile
-> >>  delete mode 100644 drivers/coresight/coresight-etb10.c
-> >>  delete mode 100644 drivers/coresight/coresight-etm-cp14.c
-> >>  delete mode 100644 drivers/coresight/coresight-etm.h
-> >>  delete mode 100644 drivers/coresight/coresight-etm3x.c
-> >>  delete mode 100644 drivers/coresight/coresight-funnel.c
-> >>  delete mode 100644 drivers/coresight/coresight-priv.h
-> >>  delete mode 100644 drivers/coresight/coresight-replicator.c
-> >>  delete mode 100644 drivers/coresight/coresight-tmc.c
-> >>  delete mode 100644 drivers/coresight/coresight-tpiu.c
-> >>  delete mode 100644 drivers/coresight/coresight.c
-> >>  delete mode 100644 drivers/coresight/of_coresight.c
-> >>  create mode 100644 drivers/hwtracing/coresight/Kconfig
-> >>  create mode 100644 drivers/hwtracing/coresight/Makefile
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-etb10.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-etm-cp14.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-etm.h
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-etm3x.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-funnel.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-priv.h
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-replicator.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-tmc.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight-tpiu.c
-> >>  create mode 100644 drivers/hwtracing/coresight/coresight.c
-> >>  create mode 100644 drivers/hwtracing/coresight/of_coresight.c
-> >
-> > This looks good to me, but please create your patches with -M option to
-> > git, so it just moves the code, and we can easily see that it is a move
-> > and nothing else changed.
-> >
-> 
-> Right, it's nothing more than a move - would you like me to resend this?
 
-Yes please, I can't apply it as-is :)
+
+? 2015/3/19 22:17, Mark Rutland ??:
+> On Thu, Mar 19, 2015 at 07:57:27AM +0000, kongxinwei wrote:
+>> This patch adds the support for hisilicon thermal sensor, within
+>> hisilicon SoC. there will register sensors for thermal framework
+>> and use device tree to bind cooling device.
+>>
+>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
+>> ---
+>>  drivers/thermal/Kconfig        |   8 +
+>>  drivers/thermal/Makefile       |   1 +
+>>  drivers/thermal/hisi_thermal.c | 531 +++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 540 insertions(+)
+>>  create mode 100644 drivers/thermal/hisi_thermal.c
+> 
+> [...]
+> 
+>> +       ret = of_property_read_u32(np, "hisilicon,tsensor-lag-value",
+>> +                                  &sensor->lag);
+> 
+> This wasn't in the binding.
+> 
+
+good comment, delete it.
+
+Xinwei
+
+> [...]
+> 
+>> +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
+>> +                                  &sensor->thres_temp);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
+>> +                       index, ret);
+>> +               return ret;
+>> +       }
+>> +
+>> +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
+>> +                                  &sensor->reset_temp);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
+>> +                       index, ret);
+>> +               return ret;
+>> +       }
+> 
+> I see now that these properties result in the HW being programmed. You
+> should figure out how to reconcile these with thermal-zone trip points
+> rather than having parallel properties.
+> 
+oh,firstly,this "tsensor-thres-temp" property is threshold temperature value
+which causes interrupt function by setting thermal value register. "thermal
+-zone trip points" applies scanning mode to cause other function such as
+cooling freq .., but this "tsensor-thres-temp" property be used by interrupt
+mode. when scanning mode don't satisfies systerm demands, the interrut mode
+perfectly help scanning mode to complete function. "tsensor-thres-temp" temp-
+erature is higher than "thermal-zone trip points" temperature, so this "
+tsensor-thres-temp" property is secondary attribute.
+
+secondly, this "tsensor-reset-temp" property is hardware protect temperature
+which is close to or is below to burn out the SoC. When SoC temperature is
+"tsensor-reset-temp" temperature value, SoC will be force to reboot and ensure
+SoC not to burn out. So it don't conflict thermal-zone.
+
+
+>> +
+>> +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
+>> +
+>> +               if (data->irq_bind_sensor != -1)
+>> +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
+>> +                                data->irq_bind_sensor);
+>> +
+>> +               /* bind irq to this sensor */
+>> +               data->irq_bind_sensor = index;
+>> +       }
+> 
+> I don't see why this should be specified in the DT. Why do you believe
+> it should?
+> 
+SoC include foure thermal sensor modules,every modules is able to cause
+interrupt,so binding a module to realize interupt function and i believe
+it should be specified.
+> [...]
+> 
+>> +static int hisi_thermal_probe(struct platform_device *pdev)
+>> +{
+>> +       struct hisi_thermal_data *data;
+>> +       struct resource *res;
+>> +       int i;
+>> +       int ret;
+>> +
+>> +       if (!cpufreq_get_current_driver()) {
+>> +               dev_dbg(&pdev->dev, "no cpufreq driver!");
+>> +               return -EPROBE_DEFER;
+>> +       }
+> 
+> Surely we care about not burning out the board even if we don't have
+> cpufreq?
+> 
+> Is there any ordering guarantee between the probing of this driver and
+> cpufreq?
+> 
+> 
+Yes! It will use thermal framework to realize cpu cooling device function.
+
+> [...]
+> 
+>> +       data->clk = devm_clk_get(&pdev->dev, NULL);
+> 
+> You gave this clock a name in the binding. Use it or drop it.
+>
+
+Thanks comment,use it.
+
+> Mark. 
+> 
+
+Xinwei
+> .
+> 
