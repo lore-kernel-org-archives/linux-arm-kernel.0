@@ -1,53 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Mar 2015 11:54:48 +0100
-Subject: [PATCH] ARM: at91: fix pm_suspend.S compilation when ARMv6 is
- selected
-In-Reply-To: <1426796080-18506-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1426796080-18506-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <550BFC78.3050500@atmel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Mar 2015 11:55:50 +0100
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <20150319113646.GQ2869@sirena.org.uk>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+ <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+ <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+ <20150319113646.GQ2869@sirena.org.uk>
+Message-ID: <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/03/2015 21:14, Alexandre Belloni a ?crit :
-> When compiling for multiplatform for both ARMv6 and ARMv7, the default compiler
-> flags are for ARMv6, and results in:
-> 
-> arch/arm/mach-at91/pm_suspend.S:144: Error: selected processor does not support ARM mode `dsb'
-> 
-> Enforce ARMv7 flags for pm_suspend.o when CPU_V7 is selected.
-> 
-> Reported-by: fengguang.wu at intel.com
+On 19 March 2015 at 12:36, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Mar 19, 2015 at 12:14:11PM +0100, Ulf Hansson wrote:
+>
+>> Agree. Moreover we need that API to also pick the closest value to
+>> target, when trying the range "target->minimum". I also believe it
+>
+> The implementation *should* do that anyway, it's just not trivial to
+> implement in an efficient fashion with the current information we have
+> from drivers.
 
-Changed in:
+The APIs regulator_count_voltages() and regulator_list_voltage(), are
+currently used from the mmc core to find out which voltages that is
+supported (with 0.1V granularity). Then that information can be used
+when trying to set a new voltage.
 
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
+But I guess such a wrapper API is out of the question?
 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Anyway, I get the feeling that we will need to do the same for this case.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+>> would be good to allow both upper and lower limits to be zero.
+>
+> The lower limit can be zero already though it isn't clear to me that
+> this is useful.  Setting an upper limit of zero seems nonsensical, an
+> upper limit that is lower than the lower limit isn't terribly obvious
+> and removing the upper limit isn't safe - it means that we'll happily
+> oversupply things which is a road to physical damage.
 
-Thanks.
+I am not sure I follow here. In the regulator_set_voltage_tol() you
+can only specifiy one limit (tolerance?). What Dough proposed was to
+add a new API which can have both a low tolerance value and a high
+tolerance value.
 
-> ---
->  arch/arm/mach-at91/Makefile | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-> index 06a4cefd33a0..4fa8b4541e64 100644
-> --- a/arch/arm/mach-at91/Makefile
-> +++ b/arch/arm/mach-at91/Makefile
-> @@ -17,6 +17,9 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
->  obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM)		+= pm_suspend.o
->  
-> +ifeq ($(CONFIG_CPU_V7),y)
-> +AFLAGS_pm_suspend.o := -march=armv7-a
-> +endif
->  ifeq ($(CONFIG_PM_DEBUG),y)
->  CFLAGS_pm.o += -DDEBUG
->  endif
-> 
-
-
--- 
-Nicolas Ferre
+Kind regards
+Uffe
