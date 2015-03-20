@@ -1,39 +1,31 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 20 Mar 2015 16:58:39 +0000
-Subject: ATSAMA5D big endian work
-In-Reply-To: <20150319133050.GD4750@piout.net>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <20150318183040.GT4560@piout.net> <550A9833.2080408@codethink.co.uk>
- <20150319133050.GD4750@piout.net>
-Message-ID: <550C51BF.6030501@codethink.co.uk>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 20 Mar 2015 17:57:46 +0100
+Subject: [PATCH 31/35 linux-next] EDAC: constify of_device_id array
+In-Reply-To: <1426535685-25996-10-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-1-git-send-email-fabf@skynet.be>
+ <1426535685-25996-10-git-send-email-fabf@skynet.be>
+Message-ID: <20150320165746.GJ17058@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/15 13:30, Alexandre Belloni wrote:
-> On 19/03/2015 at 09:34:43 +0000, Ben Dooks wrote :
->> On 18/03/15 18:30, Alexandre Belloni wrote:
->>> Hi,
->>>
->>> On 18/03/2015 at 15:52:59 +0000, Ben Dooks wrote :
->>>> I have been testing the ATSAMA5D36 xplained board with big endian and
->>>> the following are the fixes to get the system working.
->>>>
->>>
->>> The series looks good to me, we will drop patches 3 and 4 as the files
->>> doesn't exist anymore.
->>
->> Where can I find a repository with these changes in?
->>
+On Mon, Mar 16, 2015 at 08:54:41PM +0100, Fabian Frederick wrote:
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
 > 
-> You can use this branch until Nicolas merges my patches:
-> 
-> https://github.com/alexandrebelloni/linux/tree/at91_4.1_04_cleanup2
-> 
-> The remaining __raw_writel and __raw_readl are in pm.h
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> ---
+>  drivers/edac/highbank_mc_edac.c | 2 +-
+>  drivers/edac/mpc85xx_edac.c     | 4 ++--
+>  drivers/edac/ppc4xx_edac.c      | 2 +-
+>  drivers/edac/synopsys_edac.c    | 2 +-
+>  4 files changed, 5 insertions(+), 5 deletions(-)
 
-Ok, should I submit my next series for inclusion in to your tree?
-
+Applied, thanks.
 
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
