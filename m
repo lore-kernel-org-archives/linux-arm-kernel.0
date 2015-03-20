@@ -1,244 +1,57 @@
 From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 20 Mar 2015 16:13:19 -0500
-Subject: [PATCH v11 0/4] ARM: VDSO
-Message-ID: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+Date: Fri, 20 Mar 2015 16:13:21 -0500
+Subject: [PATCH v11 2/4] ARM: add VDSO user-space code
+In-Reply-To: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+References: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <1426886003-30123-3-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide fast userspace implementations of gettimeofday and
-clock_gettime on systems that implement the generic timers extension
-defined in ARMv7.  This follows the example of arm64 in conception but
-significantly differs in some aspects of the implementation (C vs
-assembly, mainly).
+Place VDSO-related user-space code in arch/arm/kernel/vdso/.
 
-Clocks supported:
-- CLOCK_REALTIME
-- CLOCK_MONOTONIC
-- CLOCK_REALTIME_COARSE
-- CLOCK_MONOTONIC_COARSE
+It is almost completely written in C with some assembly helpers to
+load the data page address, sample the counter, and fall back to
+system calls when necessary.
 
-getcpu support is planned but not included at this time.
+The VDSO can service gettimeofday and clock_gettime when
+CONFIG_ARM_ARCH_TIMER is enabled and the architected timer is present
+(and correctly configured).  It reads the CP15-based virtual counter
+to compute high-resolution timestamps.
 
-For applications to transparently benefit from this change,
-ARM-specific support code needs to be added to glibc.  I hope to have
-that code added to glibc for the 2.22 release, pending acceptance of
-the kernel changes.
+Of particular note is that a post-processing step ("vdsomunge") is
+necessary to produce a shared object which is architecturally allowed
+to be used by both soft- and hard-float EABI programs.
 
-The VDSO symbols are available for lookup via dlsym even with an
-unpatched glibc.
+The 2012 edition of the ARM ABI defines Tag_ABI_VFP_args = 3 "Code is
+compatible with both the base and VFP variants; the user did not
+permit non-variadic functions to pass FP parameters/results."
+Unfortunately current toolchains do not support this tag, which is
+ideally what we would use.
 
-Here are some tables demonstrating the improvement on one platform
-which benefits from the VDSO (OMAP5), and the hopefully acceptable
-cost on two platforms lacking the architected timer.  The numbers are
-the cost in nanoseconds for a call to gettimeofday via glibc, measured
-with a microbenchmark.
+The best available option is to ensure that both EF_ARM_ABI_FLOAT_SOFT
+and EF_ARM_ABI_FLOAT_HARD are unset in the ELF header's e_flags,
+indicating that the shared object is "old" and should be accepted for
+backward compatibility's sake.  While binutils < 2.24 appear to
+produce a vdso.so with both flags clear, 2.24 always sets
+EF_ARM_ABI_FLOAT_SOFT, with no way to inhibit this behavior.  So we
+have to fix things up with a custom post-processing step.
 
-| OMAP5           | glibc 2.21 | glibc 2.21 + |
-| (Cortex-A15)    |            | vdso support |
-|-----------------+------------+--------------|
-| v4.0-rc1        |        346 |          351 |
-| v4.0-rc1 + vdso |        343 |          118 |
+In fact, the VDSO code in glibc does much less validation (including
+checking these flags) than the code for handling conventional
+file-backed shared libraries, so this is a bit moot unless glibc's
+VDSO code becomes more strict.
 
-
-| BeagleBone Black | glibc 2.21 | glibc 2.21 + |
-| (Cortex-A8)      |            | vdso support |
-|------------------+------------+--------------|
-| v4.0-rc1         |        651 |          668 |
-| v4.0-rc1 + vdso  |        651 |          661 |
-
-
-| i.MX6Q          | glibc 2.21 | glibc 2.21 + |
-| (Cortex-A9)     |            | vdso support |
-|-----------------+------------+--------------|
-| v4.0-rc1        |        563 |          579 |
-| v4.0-rc1 + vdso |        569 |          584 |
-
-
-These numbers vary slightly from one run to another (i.MX6Q in
-particular seems a little "noisy" with variances of +/-10ns).
-
-I believe this is the minimum overhead (or very close to it) that can
-be achieved on systems lacking the arch timer, and it's due to adding
-a test and branch to the syscall wrappers in glibc.  Previous versions
-of these patches caused glibc to dispatch through the VDSO
-unconditionally, imposing up to ~70ns penalty on i.MX6Q.  See patch #3
-for how this has been addressed.
-
-I've been verifying and benchmarking this with some custom test code
-which I have hosted here:
-
-https://github.com/nlynch-mentor/vdsotest
-
-Unpatched FSF GDB may complain "warning: Could not load shared library
-symbols for linux-vdso.so.1."  This is not an ARM-specific issue.
-Current Fedora and Debian patch their GDB packages to prevent this
-warning.
-
-Changes since v10:
-- Update to 4.0-rc1.
-- Drop clock_getres support (easy to implement, but no use case).
-- User access to virtual counter is always enabled since e1ce5c7adc73
-  "clocksource: arm_arch_timer: Enable counter access for 32-bit ARM";
-  drop runtime check.
-- Zero out gettimeofday/clock_gettime entry points when the
-  architected timer is unusable.
-- Do not use the generic timer facility when the CPU registers are not
-  initialized by firmware (arm,cpu-registers-not-fw-configured).
-- Do not service coarse clocks if high-resolution clocks are not
-  accelerated.
-
-Changes since v9:
-- Update to 3.17-rc5.
-- Fixed minor checkpatch warnings (line length etc).
-- Removed useless VDSO_LBASE constant.
-- Added 'notrace' attributes to VDSO-internal functions.
-- Removed unused debug code from vdsomunge host program.
-
-Changes since v8:
-- Update to 3.17-rc1.
-- Split out arch timer changes into separate series.
-- Ensure that VDSO will not attempt to read the counter if access is
-  not enabled; this check can be removed after the arch timer changes
-  are merged.  See update_vsyscall and vdso_can_use_arch_timer in
-  patch #5.
-
-Changes since v7:
-- Update to next-20140801.
-- In arch_setup_additional_pages, fix call to get_unmapped_area - use
-  bytes (not pages) for length argument.
-- As x86 does, separate data and text into two VMAs, [vvar] and [vdso]
-  respectively.  These have different permissions; [vdso] will allow
-  debuggers to set breakpoints, but [vvar] is read-only and cannot be
-  modified even via ptrace.
-- Use _install_special_mapping for signal page, vvar, and vdso
-  mappings.
-- Add -DDISABLE_BRANCH_PROFILING.
-- Add --no-undefined -Bsymbolic to link options to cause linker to
-  error out on unresolved references, making checkundef script
-  unnecessary.
-- Specify max-page-size, common-page-size in linker options so the
-  true alignment is reflected in program header; otherwise gdb gets
-  confused.
-- Fix incremental build vs. generated auxvec.h.
-- Use appropriate unwind directives in __get_datapage.
-- Added vdso_install target and help text.  Install build-id symlinks
-  as x86 does.
-- Adjust update_vsyscall for changes in struct timekeeper.
-
-Changes since v6:
-- Update to 3.16-rc1.
-- Remove -lgcc from link step - need to support GCC installations
-  without libgcc.
-- Force -O2 compilation to prevent GCC from emitting calls to libgcc
-  math routines.
-- Use custom post-processing to clear the EF_ARM_ABI_FLOAT_SOFT flag
-  if set in the ELF header to produce a shared object which is
-  architecturally allowed to be used by both soft- and hard-float
-  code.
-- Consolidate common arch timer code instead of duplicating it.
-- Prevent the VDSO from attempting CP15 access on memory-only
-  architected timer implementations by renaming the clocksource.
-
-Changes since v5:
-- Update to 3.15-rc1.
-- Place vdso at a randomized offset above the stack along with the
-  sigpage.
-- Properly export asm/auxvec.h.
-- Split patch into series for ease of review.
-
-Changes since v4:
-- Map data page at the beginning of the VMA to prevent orphan
-  sections at the end of output invalidating the calculated offset.
-- Move checkundef into cmd_vdsold to avoid spurious rebuilds.
-- Change vdso_init message to pr_debug.
-- Add -fno-stack-protector to cflags.
-
-Changes since v3:
-- Update to 3.14-rc6.
-- Record vdso base in mm context before installing mapping (for the
-  sake of perf_mmap_event).
-- Use a more seqcount-like API for critical sections.  Using seqcount
-  API directly, however, would leak kernel pointers to userspace when
-  lockdep is enabled.
-- Trap instead of looping forever in division-by-zero stubs.
-
-Changes since v2:
-- Update to 3.14-rc4.
-- Make vDSO configurable, depending on AEABI and MMU.
-- Defer shifting of nanosecond component of timespec: fixes observed
-  1ns inconsistencies for CLOCK_REALTIME, CLOCK_MONOTONIC (see
-  45a7905fc48f for arm64 equivalent).
-- Force reload of seq_count when spinning: without a memory clobber
-  after the load of vdata->seq_count, GCC can generate code like this:
-    2f8:   e59c9020        ldr     r9, [ip, #32]
-    2fc:   e3190001        tst     r9, #1
-    300:   1a000033        bne     3d4 <do_realtime+0x104>
-    304:   f57ff05b        dmb     ish
-    308:   e59c3034        ldr     r3, [ip, #52]   ; 0x34
-    ...
-    3d4:   eafffffe        b       3d4 <do_realtime+0x104>
-- Build vdso.so with -lgcc: calls to __lshrdi3, __divsi3 sometimes
-  emitted (especially with -Os).  Override certain libgcc functions to
-  prevent undefined symbols.
-- Do not clear PG_reserved on vdso pages.
-- Remove unnecessary get_page calls.
-- Simplify ELF signature check during init.
-- Use volatile for asm syscall fallbacks.
-- Check whether vdso_pagelist is initialized in arm_install_vdso.
-- Record clocksource mask in data page.
-- Reduce code duplication in do_realtime, do_monotonic.
-- Reduce calculations performed in critical sections.
-- Simplify coarse clock handling.
-- Move datapage load to its own assembly routine.
-- Tune vdso_data layout and tweak field names.
-- Check vdso shared object for undefined symbols during build.
-
-Changes since v1:
-- update to 3.14-rc1
-- ensure cache coherency for data page
-- Document the kernel-to-userspace protocol for vdso data page updates,
-  and note that the timekeeping core prevents concurrent updates.
-- update wall-to-monotonic fields unconditionally
-- move vdso_start, vdso_end declarations to vdso.h
-- correctly build and run when CONFIG_ARM_ARCH_TIMER=n
-- rearrange linker script to avoid overlapping sections when CONFIG_DEBUGINFO=n
-- remove use_syscall checks from coarse clock paths
-- crib BUG_INSTR (0xe7f001f2) from asm/bug.h for text fill
-
-
-Nathan Lynch (4):
-  ARM: miscellaneous vdso infrastructure, preparation
-  ARM: add VDSO user-space code
-  ARM: VDSO initialization, mapping, and synchronization
-  ARM: add CONFIG_VDSO Kconfig and Makefile bits
-
- arch/arm/Makefile                    |   8 +
- arch/arm/include/asm/Kbuild          |   1 -
- arch/arm/include/asm/auxvec.h        |   1 +
- arch/arm/include/asm/elf.h           |   9 +
- arch/arm/include/asm/mmu.h           |   3 +
- arch/arm/include/asm/vdso.h          |  32 ++++
- arch/arm/include/asm/vdso_datapage.h |  60 +++++++
- arch/arm/include/uapi/asm/Kbuild     |   1 +
- arch/arm/include/uapi/asm/auxvec.h   |   7 +
- arch/arm/kernel/Makefile             |   1 +
- arch/arm/kernel/asm-offsets.c        |   5 +
- arch/arm/kernel/process.c            |  17 +-
- arch/arm/kernel/vdso.c               | 337 +++++++++++++++++++++++++++++++++++
- arch/arm/mm/Kconfig                  |  14 ++
- arch/arm/vdso/.gitignore             |   1 +
- arch/arm/vdso/Makefile               |  74 ++++++++
- arch/arm/vdso/datapage.S             |  15 ++
- arch/arm/vdso/vdso.S                 |  35 ++++
- arch/arm/vdso/vdso.lds.S             |  87 +++++++++
- arch/arm/vdso/vdsomunge.c            | 201 +++++++++++++++++++++
- arch/arm/vdso/vgettimeofday.c        | 282 +++++++++++++++++++++++++++++
- 21 files changed, 1187 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/include/asm/auxvec.h
- create mode 100644 arch/arm/include/asm/vdso.h
- create mode 100644 arch/arm/include/asm/vdso_datapage.h
- create mode 100644 arch/arm/include/uapi/asm/auxvec.h
- create mode 100644 arch/arm/kernel/vdso.c
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/kernel/asm-offsets.c |   5 +
+ arch/arm/vdso/.gitignore      |   1 +
+ arch/arm/vdso/Makefile        |  74 +++++++++++
+ arch/arm/vdso/datapage.S      |  15 +++
+ arch/arm/vdso/vdso.S          |  35 ++++++
+ arch/arm/vdso/vdso.lds.S      |  87 +++++++++++++
+ arch/arm/vdso/vdsomunge.c     | 201 ++++++++++++++++++++++++++++++
+ arch/arm/vdso/vgettimeofday.c | 282 ++++++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 700 insertions(+)
  create mode 100644 arch/arm/vdso/.gitignore
  create mode 100644 arch/arm/vdso/Makefile
  create mode 100644 arch/arm/vdso/datapage.S
@@ -247,5 +60,764 @@ Nathan Lynch (4):
  create mode 100644 arch/arm/vdso/vdsomunge.c
  create mode 100644 arch/arm/vdso/vgettimeofday.c
 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 2d2d6087b9b1..9147008f0d51 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -25,6 +25,7 @@
+ #include <asm/memory.h>
+ #include <asm/procinfo.h>
+ #include <asm/suspend.h>
++#include <asm/vdso_datapage.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <linux/kbuild.h>
+ 
+@@ -210,5 +211,9 @@ int main(void)
+ #endif
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+ #endif
++  BLANK();
++#ifdef CONFIG_VDSO
++  DEFINE(VDSO_DATA_SIZE,	sizeof(union vdso_data_store));
++#endif
+   return 0; 
+ }
+diff --git a/arch/arm/vdso/.gitignore b/arch/arm/vdso/.gitignore
+new file mode 100644
+index 000000000000..f8b69d84238e
+--- /dev/null
++++ b/arch/arm/vdso/.gitignore
+@@ -0,0 +1 @@
++vdso.lds
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+new file mode 100644
+index 000000000000..bab0a8be7924
+--- /dev/null
++++ b/arch/arm/vdso/Makefile
+@@ -0,0 +1,74 @@
++hostprogs-y := vdsomunge
++
++obj-vdso := vgettimeofday.o datapage.o
++
++# Build rules
++targets := $(obj-vdso) vdso.so vdso.so.dbg vdso.so.raw vdso.lds
++obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
++
++ccflags-y := -shared -fPIC -fno-common -fno-builtin -fno-stack-protector
++ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 -DDISABLE_BRANCH_PROFILING
++ccflags-y += -Wl,--no-undefined $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
++
++obj-y += vdso.o
++extra-y += vdso.lds
++CPPFLAGS_vdso.lds += -P -C -U$(ARCH)
++
++CFLAGS_REMOVE_vdso.o = -pg
++
++# Force -O2 to avoid libgcc dependencies
++CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
++CFLAGS_vgettimeofday.o = -O2
++
++# Disable gcov profiling for VDSO code
++GCOV_PROFILE := n
++
++# Force dependency
++$(obj)/vdso.o : $(obj)/vdso.so
++
++# Link rule for the .so file
++$(obj)/vdso.so.raw: $(src)/vdso.lds $(obj-vdso) FORCE
++	$(call if_changed,vdsold)
++
++$(obj)/vdso.so.dbg: $(obj)/vdso.so.raw $(obj)/vdsomunge FORCE
++	$(call if_changed,vdsomunge)
++
++# Strip rule for the .so file
++$(obj)/%.so: OBJCOPYFLAGS := -S
++$(obj)/%.so: $(obj)/%.so.dbg FORCE
++	$(call if_changed,objcopy)
++
++# Actual build commands
++quiet_cmd_vdsold = VDSO    $@
++      cmd_vdsold = $(CC) $(c_flags) -Wl,-T $(filter %.lds,$^) $(filter %.o,$^) \
++                   $(call cc-ldoption, -Wl$(comma)--build-id) \
++                   -Wl,-Bsymbolic -Wl,-z,max-page-size=4096 \
++                   -Wl,-z,common-page-size=4096 -o $@
++
++quiet_cmd_vdsomunge = MUNGE   $@
++      cmd_vdsomunge = $(objtree)/$(obj)/vdsomunge $< $@
++
++#
++# Install the unstripped copy of vdso.so.dbg.  If our toolchain
++# supports build-id, install .build-id links as well.
++#
++# Cribbed from arch/x86/vdso/Makefile.
++#
++quiet_cmd_vdso_install = INSTALL $<
++define cmd_vdso_install
++	cp $< "$(MODLIB)/vdso/vdso.so"; \
++	if readelf -n $< | grep -q 'Build ID'; then \
++	  buildid=`readelf -n $< |grep 'Build ID' |sed -e 's/^.*Build ID: \(.*\)$$/\1/'`; \
++	  first=`echo $$buildid | cut -b-2`; \
++	  last=`echo $$buildid | cut -b3-`; \
++	  mkdir -p "$(MODLIB)/vdso/.build-id/$$first"; \
++	  ln -sf "../../vdso.so" "$(MODLIB)/vdso/.build-id/$$first/$$last.debug"; \
++	fi
++endef
++
++$(MODLIB)/vdso: FORCE
++	@mkdir -p $(MODLIB)/vdso
++
++PHONY += vdso_install
++vdso_install: $(obj)/vdso.so.dbg $(MODLIB)/vdso FORCE
++	$(call cmd,vdso_install)
+diff --git a/arch/arm/vdso/datapage.S b/arch/arm/vdso/datapage.S
+new file mode 100644
+index 000000000000..a2e60367931b
+--- /dev/null
++++ b/arch/arm/vdso/datapage.S
+@@ -0,0 +1,15 @@
++#include <linux/linkage.h>
++#include <asm/asm-offsets.h>
++
++	.align 2
++.L_vdso_data_ptr:
++	.long	_start - . - VDSO_DATA_SIZE
++
++ENTRY(__get_datapage)
++	.fnstart
++	adr	r0, .L_vdso_data_ptr
++	ldr	r1, [r0]
++	add	r0, r0, r1
++	bx	lr
++	.fnend
++ENDPROC(__get_datapage)
+diff --git a/arch/arm/vdso/vdso.S b/arch/arm/vdso/vdso.S
+new file mode 100644
+index 000000000000..b2b97e3e7bab
+--- /dev/null
++++ b/arch/arm/vdso/vdso.S
+@@ -0,0 +1,35 @@
++/*
++ * Adapted from arm64 version.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ */
++
++#include <linux/init.h>
++#include <linux/linkage.h>
++#include <linux/const.h>
++#include <asm/page.h>
++
++	__PAGE_ALIGNED_DATA
++
++	.globl vdso_start, vdso_end
++	.balign PAGE_SIZE
++vdso_start:
++	.incbin "arch/arm/vdso/vdso.so"
++	.balign PAGE_SIZE
++vdso_end:
++
++	.previous
+diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
+new file mode 100644
+index 000000000000..89ca89f12d23
+--- /dev/null
++++ b/arch/arm/vdso/vdso.lds.S
+@@ -0,0 +1,87 @@
++/*
++ * Adapted from arm64 version.
++ *
++ * GNU linker script for the VDSO library.
++ *
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Author: Will Deacon <will.deacon@arm.com>
++ * Heavily based on the vDSO linker scripts for other archs.
++ */
++
++#include <linux/const.h>
++#include <asm/page.h>
++#include <asm/vdso.h>
++
++OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
++OUTPUT_ARCH(arm)
++
++SECTIONS
++{
++	PROVIDE(_start = .);
++
++	. = SIZEOF_HEADERS;
++
++	.hash		: { *(.hash) }			:text
++	.gnu.hash	: { *(.gnu.hash) }
++	.dynsym		: { *(.dynsym) }
++	.dynstr		: { *(.dynstr) }
++	.gnu.version	: { *(.gnu.version) }
++	.gnu.version_d	: { *(.gnu.version_d) }
++	.gnu.version_r	: { *(.gnu.version_r) }
++
++	.note		: { *(.note.*) }		:text	:note
++
++
++	.eh_frame_hdr	: { *(.eh_frame_hdr) }		:text	:eh_frame_hdr
++	.eh_frame	: { KEEP (*(.eh_frame)) }	:text
++
++	.dynamic	: { *(.dynamic) }		:text	:dynamic
++
++	.rodata		: { *(.rodata*) }		:text
++
++	.text		: { *(.text*) }			:text	=0xe7f001f2
++
++	.got		: { *(.got) }
++	.rel.plt	: { *(.rel.plt) }
++
++	/DISCARD/	: {
++		*(.note.GNU-stack)
++		*(.data .data.* .gnu.linkonce.d.* .sdata*)
++		*(.bss .sbss .dynbss .dynsbss)
++	}
++}
++
++/*
++ * We must supply the ELF program headers explicitly to get just one
++ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
++ */
++PHDRS
++{
++	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
++	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
++	note		PT_NOTE		FLAGS(4);		/* PF_R */
++	eh_frame_hdr	PT_GNU_EH_FRAME;
++}
++
++VERSION
++{
++	LINUX_2.6 {
++	global:
++		__vdso_clock_gettime;
++		__vdso_gettimeofday;
++	local: *;
++	};
++}
+diff --git a/arch/arm/vdso/vdsomunge.c b/arch/arm/vdso/vdsomunge.c
+new file mode 100644
+index 000000000000..9005b07296c8
+--- /dev/null
++++ b/arch/arm/vdso/vdsomunge.c
+@@ -0,0 +1,201 @@
++/*
++ * Copyright 2015 Mentor Graphics Corporation.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2 of the
++ * License.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ *
++ * vdsomunge - Host program which produces a shared object
++ * architecturally specified to be usable by both soft- and hard-float
++ * programs.
++ *
++ * The Procedure Call Standard for the ARM Architecture (ARM IHI
++ * 0042E) says:
++ *
++ *	6.4.1 VFP and Base Standard Compatibility
++ *
++ *	Code compiled for the VFP calling standard is compatible with
++ *	the base standard (and vice-versa) if no floating-point or
++ *	containerized vector arguments or results are used.
++ *
++ * And ELF for the ARM Architecture (ARM IHI 0044E) (Table 4-2) says:
++ *
++ *	If both EF_ARM_ABI_FLOAT_XXXX bits are clear, conformance to the
++ *	base procedure-call standard is implied.
++ *
++ * The VDSO is built with -msoft-float, as with the rest of the ARM
++ * kernel, and uses no floating point arguments or results.  The build
++ * process will produce a shared object that may or may not have the
++ * EF_ARM_ABI_FLOAT_SOFT flag set (it seems to depend on the binutils
++ * version; binutils starting with 2.24 appears to set it).  The
++ * EF_ARM_ABI_FLOAT_HARD flag should definitely not be set, and this
++ * program will error out if it is.
++ *
++ * If the soft-float flag is set, this program clears it.  That's all
++ * it does.
++ */
++
++#define _GNU_SOURCE
++
++#include <byteswap.h>
++#include <elf.h>
++#include <errno.h>
++#include <error.h>
++#include <fcntl.h>
++#include <stdbool.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define HOST_ORDER ELFDATA2LSB
++#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++#define HOST_ORDER ELFDATA2MSB
++#endif
++
++/* Some of the ELF constants we'd like to use were added to <elf.h>
++ * relatively recently.
++ */
++#ifndef EF_ARM_EABI_VER5
++#define EF_ARM_EABI_VER5 0x05000000
++#endif
++
++#ifndef EF_ARM_ABI_FLOAT_SOFT
++#define EF_ARM_ABI_FLOAT_SOFT 0x200
++#endif
++
++#ifndef EF_ARM_ABI_FLOAT_HARD
++#define EF_ARM_ABI_FLOAT_HARD 0x400
++#endif
++
++static const char *outfile;
++
++static void cleanup(void)
++{
++	if (error_message_count > 0 && outfile != NULL)
++		unlink(outfile);
++}
++
++static Elf32_Word read_elf_word(Elf32_Word word, bool swap)
++{
++	return swap ? bswap_32(word) : word;
++}
++
++static Elf32_Half read_elf_half(Elf32_Half half, bool swap)
++{
++	return swap ? bswap_16(half) : half;
++}
++
++static void write_elf_word(Elf32_Word val, Elf32_Word *dst, bool swap)
++{
++	*dst = swap ? bswap_32(val) : val;
++}
++
++int main(int argc, char **argv)
++{
++	const Elf32_Ehdr *inhdr;
++	bool clear_soft_float;
++	const char *infile;
++	Elf32_Word e_flags;
++	const void *inbuf;
++	struct stat stat;
++	void *outbuf;
++	bool swap;
++	int outfd;
++	int infd;
++
++	atexit(cleanup);
++
++	if (argc != 3)
++		error(EXIT_FAILURE, 0, "Usage: %s [infile] [outfile]", argv[0]);
++
++	infile = argv[1];
++	outfile = argv[2];
++
++	infd = open(infile, O_RDONLY);
++	if (infd < 0)
++		error(EXIT_FAILURE, errno, "Cannot open %s", infile);
++
++	if (fstat(infd, &stat) != 0)
++		error(EXIT_FAILURE, errno, "Failed stat for %s", infile);
++
++	inbuf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, infd, 0);
++	if (inbuf == MAP_FAILED)
++		error(EXIT_FAILURE, errno, "Failed to map %s", infile);
++
++	close(infd);
++
++	inhdr = inbuf;
++
++	if (memcmp(&inhdr->e_ident, ELFMAG, SELFMAG) != 0)
++		error(EXIT_FAILURE, 0, "Not an ELF file");
++
++	if (inhdr->e_ident[EI_CLASS] != ELFCLASS32)
++		error(EXIT_FAILURE, 0, "Unsupported ELF class");
++
++	swap = inhdr->e_ident[EI_DATA] != HOST_ORDER;
++
++	if (read_elf_half(inhdr->e_type, swap) != ET_DYN)
++		error(EXIT_FAILURE, 0, "Not a shared object");
++
++	if (read_elf_half(inhdr->e_machine, swap) != EM_ARM) {
++		error(EXIT_FAILURE, 0, "Unsupported architecture %#x",
++		      inhdr->e_machine);
++	}
++
++	e_flags = read_elf_word(inhdr->e_flags, swap);
++
++	if (EF_ARM_EABI_VERSION(e_flags) != EF_ARM_EABI_VER5) {
++		error(EXIT_FAILURE, 0, "Unsupported EABI version %#x",
++		      EF_ARM_EABI_VERSION(e_flags));
++	}
++
++	if (e_flags & EF_ARM_ABI_FLOAT_HARD)
++		error(EXIT_FAILURE, 0,
++		      "Unexpected hard-float flag set in e_flags");
++
++	clear_soft_float = !!(e_flags & EF_ARM_ABI_FLOAT_SOFT);
++
++	outfd = open(outfile, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
++	if (outfd < 0)
++		error(EXIT_FAILURE, errno, "Cannot open %s", outfile);
++
++	if (ftruncate(outfd, stat.st_size) != 0)
++		error(EXIT_FAILURE, errno, "Cannot truncate %s", outfile);
++
++	outbuf = mmap(NULL, stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED,
++		      outfd, 0);
++	if (outbuf == MAP_FAILED)
++		error(EXIT_FAILURE, errno, "Failed to map %s", outfile);
++
++	close(outfd);
++
++	memcpy(outbuf, inbuf, stat.st_size);
++
++	if (clear_soft_float) {
++		Elf32_Ehdr *outhdr;
++
++		outhdr = outbuf;
++		e_flags &= ~EF_ARM_ABI_FLOAT_SOFT;
++		write_elf_word(e_flags, &outhdr->e_flags, swap);
++	}
++
++	if (msync(outbuf, stat.st_size, MS_SYNC) != 0)
++		error(EXIT_FAILURE, errno, "Failed to sync %s", outfile);
++
++	return EXIT_SUCCESS;
++}
+diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
+new file mode 100644
+index 000000000000..79214d5ff097
+--- /dev/null
++++ b/arch/arm/vdso/vgettimeofday.c
+@@ -0,0 +1,282 @@
++/*
++ * Copyright 2015 Mentor Graphics Corporation.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2 of the
++ * License.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/compiler.h>
++#include <linux/hrtimer.h>
++#include <linux/time.h>
++#include <asm/arch_timer.h>
++#include <asm/barrier.h>
++#include <asm/bug.h>
++#include <asm/page.h>
++#include <asm/unistd.h>
++#include <asm/vdso_datapage.h>
++
++#ifndef CONFIG_AEABI
++#error This code depends on AEABI system call conventions
++#endif
++
++extern struct vdso_data *__get_datapage(void);
++
++static notrace u32 __vdso_read_begin(const struct vdso_data *vdata)
++{
++	u32 seq;
++repeat:
++	seq = ACCESS_ONCE(vdata->seq_count);
++	if (seq & 1) {
++		cpu_relax();
++		goto repeat;
++	}
++	return seq;
++}
++
++static notrace u32 vdso_read_begin(const struct vdso_data *vdata)
++{
++	u32 seq;
++
++	seq = __vdso_read_begin(vdata);
++
++	smp_rmb(); /* Pairs with smp_wmb in vdso_write_end */
++	return seq;
++}
++
++static notrace int vdso_read_retry(const struct vdso_data *vdata, u32 start)
++{
++	smp_rmb(); /* Pairs with smp_wmb in vdso_write_begin */
++	return vdata->seq_count != start;
++}
++
++static notrace long clock_gettime_fallback(clockid_t _clkid,
++					   struct timespec *_ts)
++{
++	register struct timespec *ts asm("r1") = _ts;
++	register clockid_t clkid asm("r0") = _clkid;
++	register long ret asm ("r0");
++	register long nr asm("r7") = __NR_clock_gettime;
++
++	asm volatile(
++	"	swi #0\n"
++	: "=r" (ret)
++	: "r" (clkid), "r" (ts), "r" (nr)
++	: "memory");
++
++	return ret;
++}
++
++static notrace int do_realtime_coarse(struct timespec *ts,
++				      struct vdso_data *vdata)
++{
++	u32 seq;
++
++	do {
++		seq = vdso_read_begin(vdata);
++
++		ts->tv_sec = vdata->xtime_coarse_sec;
++		ts->tv_nsec = vdata->xtime_coarse_nsec;
++
++	} while (vdso_read_retry(vdata, seq));
++
++	return 0;
++}
++
++static notrace int do_monotonic_coarse(struct timespec *ts,
++				       struct vdso_data *vdata)
++{
++	struct timespec tomono;
++	u32 seq;
++
++	do {
++		seq = vdso_read_begin(vdata);
++
++		ts->tv_sec = vdata->xtime_coarse_sec;
++		ts->tv_nsec = vdata->xtime_coarse_nsec;
++
++		tomono.tv_sec = vdata->wtm_clock_sec;
++		tomono.tv_nsec = vdata->wtm_clock_nsec;
++
++	} while (vdso_read_retry(vdata, seq));
++
++	ts->tv_sec += tomono.tv_sec;
++	timespec_add_ns(ts, tomono.tv_nsec);
++
++	return 0;
++}
++
++#ifdef CONFIG_ARM_ARCH_TIMER
++
++static notrace u64 get_ns(struct vdso_data *vdata)
++{
++	u64 cycle_delta;
++	u64 cycle_now;
++	u64 nsec;
++
++	cycle_now = arch_counter_get_cntvct();
++
++	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
++
++	nsec = (cycle_delta * vdata->cs_mult) + vdata->xtime_clock_snsec;
++	nsec >>= vdata->cs_shift;
++
++	return nsec;
++}
++
++static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
++{
++	u64 nsecs;
++	u32 seq;
++
++	do {
++		seq = vdso_read_begin(vdata);
++
++		if (!vdata->tk_is_cntvct)
++			return -1;
++
++		ts->tv_sec = vdata->xtime_clock_sec;
++		nsecs = get_ns(vdata);
++
++	} while (vdso_read_retry(vdata, seq));
++
++	ts->tv_nsec = 0;
++	timespec_add_ns(ts, nsecs);
++
++	return 0;
++}
++
++static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
++{
++	struct timespec tomono;
++	u64 nsecs;
++	u32 seq;
++
++	do {
++		seq = vdso_read_begin(vdata);
++
++		if (!vdata->tk_is_cntvct)
++			return -1;
++
++		ts->tv_sec = vdata->xtime_clock_sec;
++		nsecs = get_ns(vdata);
++
++		tomono.tv_sec = vdata->wtm_clock_sec;
++		tomono.tv_nsec = vdata->wtm_clock_nsec;
++
++	} while (vdso_read_retry(vdata, seq));
++
++	ts->tv_sec += tomono.tv_sec;
++	ts->tv_nsec = 0;
++	timespec_add_ns(ts, nsecs + tomono.tv_nsec);
++
++	return 0;
++}
++
++#else /* CONFIG_ARM_ARCH_TIMER */
++
++static notrace int do_realtime(struct timespec *ts, struct vdso_data *vdata)
++{
++	return -1;
++}
++
++static notrace int do_monotonic(struct timespec *ts, struct vdso_data *vdata)
++{
++	return -1;
++}
++
++#endif /* CONFIG_ARM_ARCH_TIMER */
++
++notrace int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
++{
++	struct vdso_data *vdata;
++	int ret = -1;
++
++	vdata = __get_datapage();
++
++	switch (clkid) {
++	case CLOCK_REALTIME_COARSE:
++		ret = do_realtime_coarse(ts, vdata);
++		break;
++	case CLOCK_MONOTONIC_COARSE:
++		ret = do_monotonic_coarse(ts, vdata);
++		break;
++	case CLOCK_REALTIME:
++		ret = do_realtime(ts, vdata);
++		break;
++	case CLOCK_MONOTONIC:
++		ret = do_monotonic(ts, vdata);
++		break;
++	default:
++		break;
++	}
++
++	if (ret)
++		ret = clock_gettime_fallback(clkid, ts);
++
++	return ret;
++}
++
++static notrace long gettimeofday_fallback(struct timeval *_tv,
++					  struct timezone *_tz)
++{
++	register struct timezone *tz asm("r1") = _tz;
++	register struct timeval *tv asm("r0") = _tv;
++	register long ret asm ("r0");
++	register long nr asm("r7") = __NR_gettimeofday;
++
++	asm volatile(
++	"	swi #0\n"
++	: "=r" (ret)
++	: "r" (tv), "r" (tz), "r" (nr)
++	: "memory");
++
++	return ret;
++}
++
++notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
++{
++	struct timespec ts;
++	struct vdso_data *vdata;
++	int ret;
++
++	vdata = __get_datapage();
++
++	ret = do_realtime(&ts, vdata);
++	if (ret)
++		return gettimeofday_fallback(tv, tz);
++
++	if (tv) {
++		tv->tv_sec = ts.tv_sec;
++		tv->tv_usec = ts.tv_nsec / 1000;
++	}
++	if (tz) {
++		tz->tz_minuteswest = vdata->tz_minuteswest;
++		tz->tz_dsttime = vdata->tz_dsttime;
++	}
++
++	return ret;
++}
++
++/* Avoid unresolved references emitted by GCC */
++
++void __aeabi_unwind_cpp_pr0(void)
++{
++}
++
++void __aeabi_unwind_cpp_pr1(void)
++{
++}
++
++void __aeabi_unwind_cpp_pr2(void)
++{
++}
 -- 
 1.9.3
