@@ -1,52 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 20 Mar 2015 10:02:28 -0600
-Subject: [PATCH v3 3/3] Documentation: DT bindings: Tegra AHB: require
- the legacy base address for existing chips
-In-Reply-To: <20150320061102.14355.87959.stgit@mcwayne>
-References: <20150320061102.14355.4781.stgit@mcwayne>
- <20150320061102.14355.87959.stgit@mcwayne>
-Message-ID: <550C4494.2010609@wwwdotorg.org>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Fri, 20 Mar 2015 17:03:25 +0100
+Subject: [PATCH] exynos: pmu: use =?UTF-8?Q?PS=5FHOLD=20based=20powero?=
+ =?UTF-8?Q?ff=20for=20all=20supported=20SoCs?=
+In-Reply-To: <550C3888.7050905@samsung.com>
+References: <1423466741-11421-1-git-send-email-m.szyprowski@samsung.com>
+ <CAJKOXPeeUjcwO6qBdHA8DJaviPxRwjAsSe7ciyGDFOUoNhZvcQ@mail.gmail.com>
+ <CAJKOXPe4=DHsV3_axDUhpimRaqSHA3=HLiSJ1K3DYZoGRRiTTg@mail.gmail.com>
+ <550C3888.7050905@samsung.com>
+Message-ID: <0674e072e0ff906ff4d41a4a9a95253f@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2015 12:11 AM, Paul Walmsley wrote:
-> Per Stephen Warren, note in the Tegra AHB DT binding documentation
-> that we specifically deprecate any attempt to use the IP block's
-> actual hardware base address, and advocate the use of the legacy
-> "off-by-four" address in the 'regs' property, for Tegra chips with
-> existing upstream Linux DT files that include a Tegra AHB node.  This
-> patch updates the documentation accordingly.
->
-> Changing the existing kernel DT data isn't under consideration because
-> Linux kernel DT data policy is to preserve compatibility between newer
-> DT data files and older kernels.  However, this additional step of
-> changing the documentation should discourage others from sending
-> kernel patches to try to change the legacy kernel DT data.
-> Furthermore, for out-of-tree software (such as bootloaders or other
-> operating systems) that may rely on Linux kernel DT binding
-> documentation as an ABI (but not the Linux kernel DT data itself),
-> such a change may allow future convergence with the Linux kernel DT
-> data without additional code changes.
+Hello Marek,
 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
-> index 067c9790062f..9a4295b54539 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra/nvidia,tegra20-ahb.txt
-> @@ -5,9 +5,12 @@ Required properties:
->     Tegra30, must contain "nvidia,tegra30-ahb".  Otherwise, must contain
->     '"nvidia,<chip>-ahb", "nvidia,tegra30-ahb"' where <chip> is tegra124,
->     tegra132, or tegra210.
-> -- reg : Should contain 1 register ranges(address and length)
-> +- reg : Should contain 1 register ranges(address and length).  For
-> +  Tegra20, Tegra30, and Tegra114 chips, the value must be <0x6000c004
-> +  0x10c>.  For Tegra124, Tegra132 and Tegra210 chips, the value should
-> +  be be <0x6000c000 0x150>.
+On 2015-03-20 16:11, Marek Szyprowski wrote:
+>> It was my fault (I left attached JIG cable which prevents power off).
+>> Now it works fine.
+>> 
+>> Tested on Trats2 (Exynos4412):
+>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> 
+>> Patch also looks good, so:
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Gentle ping for merging this in v4.1-next...
+> 
+> Best regards
+I'd say that this is even a candidate for 4.0.0. Like I reported 
+earlier, the SoC gets really hot without proper shutdown, so definitely 
+something you don't want for a not properly cooled system (U3 without 
+the fan running e.g.).
 
-I would have expected the exception to exist on Tegra124 too since 
-that's long been supported upstream. However, since we haven't actually 
-added the AHB node into the DT files on Tegra124 yet, I suppose we can 
-assume that nobody has anywhere so the slightly retro-active change on 
-Tegra124 is OK.
-
-The series,
-Acked-by: Stephen Warren <swarren@nvidia.com>
+With best wishes,
+Tobias
