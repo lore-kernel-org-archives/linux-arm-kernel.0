@@ -1,103 +1,58 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 20 Mar 2015 17:54:03 -0400
-Subject: [PATCH 1/3] ARM: dts: OMAP5+: separate the cpu thermal zone
- definition from omap4
-In-Reply-To: <1426880861-9266-2-git-send-email-nm@ti.com>
-References: <1426880861-9266-1-git-send-email-nm@ti.com>
- <1426880861-9266-2-git-send-email-nm@ti.com>
-Message-ID: <20150320215402.GB7346@developer.amazonguestwifi.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 Mar 2015 22:23:20 +0000
+Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
+In-Reply-To: <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
+ <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
+ <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
+ <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <20150320222320.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 02:47:39PM -0500, Nishanth Menon wrote:
-> From: Tero Kristo <t-kristo@ti.com>
+On Thu, Mar 19, 2015 at 08:57:21PM +0000, Chris Brandt wrote:
+> Eventually....I got it to boot.
 > 
-> OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
-> in the thermal zone polling intervals. OMAP5/DRA7 have different counter
-> mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
-> zone accordingly for OMAP5/DRA7.
+> I had to remove both CONFIG_HIGHMEM and CONFIG_SMP and then I could
+> boot completely from ROM (which for me is external QSPI flash that
+> is memory mapping into linear CPU space at address 0x18000000)
+
+At first glance, HIGHMEM shouldn't be affected by XIP_KERNEL at all.
+
+However, SMP_ON_UP is incompatible with XIP_KERNEL (as already listed
+in its dependencies) and building with SMP=y without SMP_ON_UP, and
+trying to run on UP hardware will definitely fail.
+
+To put that another way:
+1. SMP_ON_UP relies on being able to change the kernel text, which it
+   can't do with an XIP kernel.
+2. UP hardware requires either a SMP=n kernel _or_ SMP=SMP_ON_UP=y
+   kernel.
+
+> So, the total changes was:
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+> 1. start with shmobile_defconfig
+> 2. remove all architectures but RZ/A1 (ARCH_R7S72100)
+> 3. remove !ARCH_MULTIPLATFORM from XIP_KERNEL's dependencies
+> 4. modify  'select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL'  in PHYS_OFFSET
+>    (because I need to be able to set PHYS_OFFSET)
 
+I'm not sure what you mean by this.  We have:
 
-> ---
->  arch/arm/boot/dts/omap5-cpu-thermal.dtsi |   41 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap5.dtsi             |    2 +-
->  2 files changed, 42 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/omap5-cpu-thermal.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap5-cpu-thermal.dtsi b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
-> new file mode 100644
-> index 000000000000..4a6427c1e47e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
-> @@ -0,0 +1,41 @@
-> +/*
-> + * Device Tree Source for OMAP4/5 SoC CPU thermal
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + * Contact: Tero Kristo <t-kristo@ti.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +#include <dt-bindings/thermal/thermal.h>
-> +
-> +cpu_thermal: cpu_thermal {
-> +	polling-delay-passive = <250>; /* milliseconds */
-> +	polling-delay = <500>; /* milliseconds */
-> +
-> +			/* sensor       ID */
-> +	thermal-sensors = <&bandgap     0>;
-> +
-> +	cpu_trips: trips {
-> +		cpu_alert0: cpu_alert {
-> +			temperature = <100000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "passive";
-> +		};
-> +		cpu_crit: cpu_crit {
-> +			temperature = <125000>; /* millicelsius */
-> +			hysteresis = <2000>; /* millicelsius */
-> +			type = "critical";
-> +		};
-> +	};
-> +
-> +	cpu_cooling_maps: cooling-maps {
-> +		map0 {
-> +			trip = <&cpu_alert0>;
-> +			cooling-device =
-> +				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index ddff674bd05e..e650d4eb59dd 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -67,7 +67,7 @@
->  	};
->  
->  	thermal-zones {
-> -		#include "omap4-cpu-thermal.dtsi"
-> +		#include "omap5-cpu-thermal.dtsi"
+config PHYS_OFFSET
+        hex "Physical address of main memory" if MMU
+        depends on !ARM_PATCH_PHYS_VIRT
 
-Can't we simple change the polling value for the omap5 case and reuse
-the omap4 file?
+which is quite correct - PHYS_OFFSET depends on not having the phys
+offset patching code enabled.  However, for an XIP kernel, you don't
+want to have the phys offset patching code enabled, so you want
+ARM_PATCH_PHYS_VIRT to be off.
 
->  		#include "omap5-gpu-thermal.dtsi"
->  		#include "omap5-core-thermal.dtsi"
->  	};
-> -- 
-> 1.7.9.5
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/96b13faf/attachment-0001.sig>
+Maybe you mean the "select ARM_PATCH_PHYS_VIRT" under ARCH_MULTIPLATFORM?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
