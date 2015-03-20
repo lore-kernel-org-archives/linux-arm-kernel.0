@@ -1,179 +1,110 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 20 Mar 2015 16:43:44 -0500
-Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
- control module support
-In-Reply-To: <1426877086-17131-28-git-send-email-t-kristo@ti.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-28-git-send-email-t-kristo@ti.com>
-Message-ID: <550C9490.3070505@ti.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 20 Mar 2015 17:50:22 -0400
+Subject: [PATCH 3/3] ARM: dts: am57xx-beagle-x15: Add thermal map
+In-Reply-To: <1426880861-9266-4-git-send-email-nm@ti.com>
+References: <1426880861-9266-1-git-send-email-nm@ti.com>
+ <1426880861-9266-4-git-send-email-nm@ti.com>
+Message-ID: <20150320214959.GB7226@developer.amazonguestwifi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
+On Fri, Mar 20, 2015 at 02:47:41PM -0500, Nishanth Menon wrote:
+> BeagleBoard-X15 has capability for a fan and has an onboard TMP102
+> temperature sensor as well. This allows us to create a new thermal
+> zone (called, un-imaginatively "board"), and allows us to use some
+> active cooling as temperatures start edge upward in the system by
+> creating a new alert temperature (emperically 50C) for cpu.
+> 
+> NOTE: Fan is NOT mounted by default on the platform, in such a case,
+> all we end up doing is switch on a regulator and leak very minimal
+> current.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-On 03/20/2015 01:44 PM, Kristo, Tero wrote:
-> This patch creates an l4_wkup interconnect for AM33xx, and moves some of
-> the generic peripherals under it. System control module nodes are moved
-> under this new interconnect also, and the SCM clock layout is changed
-> to use the renamed SCM node as the clock provider.
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
 > ---
->  Documentation/devicetree/bindings/arm/omap/l4.txt  |    1 +
->  .../devicetree/bindings/arm/omap/prcm.txt          |    2 +-
->  arch/arm/boot/dts/am33xx-clocks.dtsi               |    2 +-
->  arch/arm/boot/dts/am33xx.dtsi                      |   87 +++++++++++---------
->  arch/arm/mach-omap2/control.c                      |    2 +-
->  5 files changed, 51 insertions(+), 43 deletions(-)
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts |   49 +++++++++++++++++++++++++++++++
+>  1 file changed, 49 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
-> index 6402022..d333f0a 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/l4.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
-> @@ -6,6 +6,7 @@ Required properties:
->  - compatible : Should be "ti,omap2-l4" for OMAP2 family l4 core bus
->  	       Should be "ti,omap2-l4-wkup" for OMAP2 family l4 wkup bus
->  	       Should be "ti,omap3-l4-core" for OMAP3 family l4 core bus
-> +	       Should be "ti,am3-l4-wkup" for AM33xx family l4 wkup bus
->  - ranges : contains the IO map range for the bus
->  
->  Examples:
-> diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-> index ef5a74b..c8e2027 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-> @@ -10,7 +10,7 @@ documentation about the individual clock/clockdomain nodes.
->  Required properties:
->  - compatible:	Must be one of:
->  		"ti,am3-prcm"
-> -		"ti,am3-scrm"
-> +		"ti,am3-scm"
->  		"ti,am4-prcm"
->  		"ti,am4-scrm"
->  		"ti,omap2-prcm"
-> diff --git a/arch/arm/boot/dts/am33xx-clocks.dtsi b/arch/arm/boot/dts/am33xx-clocks.dtsi
-> index 712edce..236c78a 100644
-> --- a/arch/arm/boot/dts/am33xx-clocks.dtsi
-> +++ b/arch/arm/boot/dts/am33xx-clocks.dtsi
-> @@ -7,7 +7,7 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> -&scrm_clocks {
-> +&scm_clocks {
->  	sys_clkin_ck: sys_clkin_ck {
->  		#clock-cells = <0>;
->  		compatible = "ti,mux-clock";
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index acd3705..8d26261 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -83,20 +83,6 @@
->  		};
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> index 41642fe770a1..6a3621c23017 100644
+> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> @@ -86,6 +86,7 @@
+>  		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
+>  		gpio-fan,speed-map = <0     0>,
+>  				     <13000 1>;
+> +		#cooling-cells = <2>;
 >  	};
 >  
-> -	am33xx_control_module: control_module at 4a002000 {
-> -		compatible = "syscon";
-> -		reg = <0x44e10000 0x7fc>;
-> -	};
-> -
-> -	am33xx_pinmux: pinmux at 44e10800 {
-> -		compatible = "pinctrl-single";
-> -		reg = <0x44e10800 0x0238>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -		pinctrl-single,register-width = <32>;
-> -		pinctrl-single,function-mask = <0x7f>;
-> -	};
-> -
->  	/*
->  	 * XXX: Use a flat representation of the AM33XX interconnect.
->  	 * The real AM33XX interconnect network is quite complex. Since
-> @@ -111,37 +97,58 @@
->  		ranges;
->  		ti,hwmods = "l3_main";
+>  	extcon_usb1: extcon_usb1 {
+> @@ -441,6 +442,7 @@
+>  		pinctrl-0 = <&tmp102_pins_default>;
+>  		interrupt-parent = <&gpio7>;
+>  		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
+> +		#thermal-sensor-cells = <1>;
+>  	};
+>  };
 >  
-> -		prcm: prcm at 44e00000 {
-> -			compatible = "ti,am3-prcm";
-> -			reg = <0x44e00000 0x4000>;
-> -
-> -			prcm_clocks: clocks {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> -			};
-> +		l4_wkup: l4_wkup at 44c00000 {
-> +			compatible = "ti,am3-l4-wkup", "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 0x44c00000 0x280000>;
->  
-> -			prcm_clockdomains: clockdomains {
-> -			};
-> -		};
-> +			prcm: prcm at 200000 {
-> +				compatible = "ti,am3-prcm";
-> +				reg = <0x200000 0x4000>;
->  
-> -		scrm: scrm at 44e10000 {
-> -			compatible = "ti,am3-scrm";
-> -			reg = <0x44e10000 0x2000>;
-> +				prcm_clocks: clocks {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +				};
->  
-> -			scrm_clocks: clocks {
-> -				#address-cells = <1>;
-> -				#size-cells = <0>;
-> +				prcm_clockdomains: clockdomains {
-> +				};
->  			};
->  
-> -			scrm_clockdomains: clockdomains {
-> +			scm: scm at 210000 {
-> +				compatible = "ti,am3-scm", "simple-bus";
-> +				reg = <0x210000 0x2000>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0 0x210000 0x2000>;
+> @@ -559,3 +561,50 @@
+>  &usb2 {
+>  	dr_mode = "peripheral";
+>  };
 > +
-> +				am33xx_pinmux: pinmux at 800 {
-> +					compatible = "pinctrl-single";
-> +					reg = <0x800 0x238>;
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					pinctrl-single,register-width = <32>;
-> +					pinctrl-single,function-mask = <0x7f>;
-> +				};
+> +&cpu_trips {
+> +	cpu_alert1: cpu_alert1 {
+> +		temperature = <50000>; /* millicelsius */
+> +		hysteresis = <2000>; /* millicelsius */
+> +		type = "active";
+> +	};
+> +};
 > +
-> +				scm_conf: scm_conf at 0 {
-> +					compatible = "syscon";
-> +					reg = <0x0 0x7fc>;
-
-Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
-this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
-Also, are we ordering the child nodes of scm by node names or addresses.
-I have to add the wkup_m3 node, and prefer ordering by addresses.
-
-> +					#address-cells = <1>;
-> +					#size-cells = <1>;
+> +&cpu_cooling_maps {
+> +	map1 {
+> +		trip = <&cpu_alert1>;
+> +		cooling-device = <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +	};
+> +};
 > +
-> +					scm_clocks: clocks {
-> +						#address-cells = <1>;
-> +						#size-cells = <0>;
-> +					};
-> +				};
+> +&thermal_zones {
+> +	board_thermal: board_thermal {
+> +		polling-delay-passive = <1250>; /* milliseconds */
+> +		polling-delay = <1500>; /* milliseconds */
 > +
-> +				scm_clockdomains: clockdomains {
-> +				};
->  			};
->  		};
->  
-> -		cm: syscon at 44e10000 {
-> -			compatible = "ti,am33xx-controlmodule", "syscon";
-> -			reg = <0x44e10000 0x800>;
-> -		};
-> -
-
-regards
-Suman
+> +				/* sensor       ID */
+> +		thermal-sensors = <&tmp102     0>;
+> +
+> +		board_trips: trips {
+> +			board_alert0: board_alert {
+> +				temperature = <40000>; /* millicelsius */
+> +				hysteresis = <2000>; /* millicelsius */
+> +				type = "active";
+> +			};
+> +
+> +			board_crit: board_crit {
+> +				temperature = <105000>; /* millicelsius */
+> +				hysteresis = <0>; /* millicelsius */
+> +				type = "critical";
+> +			};
+> +		};
+> +
+> +		board_cooling_maps: cooling-maps {
+> +			map0 {
+> +				trip = <&board_alert0>;
+> +				cooling-device =
+> +				  <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +			};
+> +		};
+> +       };
+> +};
+> -- 
+> 1.7.9.5
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/8e78ae8a/attachment.sig>
