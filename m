@@ -1,54 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Mar 2015 11:58:00 +0100
-Subject: [PATCH v2] clocksource: atmel-st: select MFD_SYSCON
-In-Reply-To: <550ACE6A.4000705@linaro.org>
-References: <1426771068-9657-1-git-send-email-alexandre.belloni@free-electrons.com>
- <550ACE6A.4000705@linaro.org>
-Message-ID: <550BFD38.6080008@atmel.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Fri, 20 Mar 2015 14:12:52 +0300
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+Message-ID: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/03/2015 14:26, Daniel Lezcano a ?crit :
-> On 03/19/2015 02:17 PM, Alexandre Belloni wrote:
->> Enforce MFD_SYSCON selection as the driver needs it. Else, it will still
->> compile with some warning about X1, x2 or sr being used uninitialized.
->>
->> Reported-by: fengguang.wu at intel.com
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->> Daniel,
->>
->> I think this should go through the at91 tree as the patch introducing that issue
->> went there.
-> 
-> Ok.
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+split this is not so, because 2*TASK_SIZE overflows 32 bits,
+so the actual value of ELF_ET_DYN_BASE is:
+	(2 * TASK_SIZE / 3) = 0x2a000000
 
-I take it: thanks!
+When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+as it fails to map shadow memory.
+Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Fix overflow by dividing TASK_SIZE prior to multiplying.
+After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+	(TASK_SIZE / 3 * 2) = 0x7f555554
 
+[1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
 
->>   drivers/clocksource/Kconfig | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 168035883afa..55aef6f89074 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -146,6 +146,7 @@ config ATMEL_PIT
->>   config ATMEL_ST
->>   	bool
->>   	select CLKSRC_OF
->> +	select MFD_SYSCON
->>
->>   config CLKSRC_METAG_GENERIC
->>   	def_bool y if METAG
->>
-> 
-> 
+Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+Reported-by: Maria Guseva <m.guseva@samsung.com>
+Cc: stable at vger.kernel.org
+---
+ arch/arm/include/asm/elf.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index c1ff8ab..1984a92 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -115,7 +115,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+    the loader.  We need to make sure that it is out of the way of the program
+    that it will "exec", and that there is sufficient room for the brk.  */
+ 
+-#define ELF_ET_DYN_BASE	(2 * TASK_SIZE / 3)
++#define ELF_ET_DYN_BASE	(TASK_SIZE / 3 * 2)
+ 
+ /* When the program starts, a1 contains a pointer to a function to be 
+    registered with atexit, as per the SVR4 ABI.  A value of 0 means we 
 -- 
-Nicolas Ferre
+2.3.3
