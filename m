@@ -1,66 +1,76 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 20 Mar 2015 18:52:48 +0100
-Subject: exynos5800-peach-pi: suspend/resume (still) broken
-In-Reply-To: <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
-References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>	<550953ED.10508@collabora.co.uk>	<CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>	<550C47ED.3010301@collabora.co.uk>	<CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
- <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
-Message-ID: <550C5E70.30009@collabora.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Mar 2015 17:57:47 +0000
+Subject: [PATCH RESEND] Doc: dt: arch_timer: discourage clock-frequency use
+Message-ID: <1426874267-24413-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
+The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
+features a CPU register (CNTFRQ) which firmware is intended to
+initialize, and non-secure software can read to determine the frequency
+of the timer. On CPUs with secure state, this register cannot be written
+from non-secure states.
 
-On 03/20/2015 06:40 PM, Abhilash Kesavan wrote:
->>
->> I have made some progress on this. This is the current state:
->>
->> If I use next-20141114 (which was when the S2R code first appeared in
->> linux-next), then all is good. next-20141117 is fine too but things
->> are broken in next-20141118.
->> I have narrowed it down to the commit: "ae43b32 ARM: 8202/1:
->> dmaengine: pl330: Add runtime Power Management support v12". The only
->> way I see this impacting s2r is because it disables the dma pclk while
->> suspending or before.
->>
->> Checking further, will update in a bit.
-> 
-> OK, so disabling the mdma0 node in "arch/arm/boot/dts/exynos5420.dtsi"
-> gets things working. Like Kevin mentioned in the initial report, I
-> need to disable DRM else there is a crash while suspending. With these
-> two changes, on linus' tree and kgene's for-next s2r works fine.
->
+The firmware of early SoCs featuring the timer did not correctly
+initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
+described in DT as a workaround. This workaround is not complete however
+as it is exposed to all software in a privileged non-secure mode
+(including guests running under a hypervisor). The firmware and DTs for
+recent SoCs have followed the example set by these early SoCs.
 
-Awesome, thanks a lot for digging this out!
+This patch updates the arch timer binding documentation to make it
+clearer that the use of the clock-frequency property is a poor
+work-around. The MMIO generic timer binding is similarly updated, though
+this is less of a concern as there is generally no need to expose the
+MMIO timers to guest OSs.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Olof Johansson <olof@lixom.net>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+This patch has fallen through the cracks a few times [1,2], though that appears
+to be my fault for not sorting out a reasonable Cc list.
+
+Rob, are you happy to take this through your tree?
+
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282804.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282830.html
+
+
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index 256b4d8..e774128 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
+ - interrupts : Interrupt list for secure, non-secure, virtual and
+   hypervisor timers, in that order.
  
-> On linux-next, I need to disable CONFIG_MWIFIEX too.
-> 
-
-Yes, I also saw that issue with mwfiex when suspend-to-idle (which works
-in -next) due the MMC_PM_KEEP_POWER flag being set in the host pm caps.
-But I don't see that being set in the host driver.
-
-> Also, I observe cros-ec-spi transfer failures during resume and
-> sometimes it is unable to re-enable the tps fets causing a crash.
-> However, that would be a driver specific issue.
-> 
-
-Indeed, I can take a look to that issue as well.
-
-> Regarding the mdma0 disablement, it looks like for the system to
-> suspend properly the mdma0 pclk needs to stay on.
->
-
-It seems so, I remember we had other issues with the mentioned commit
-due clocks being gated. For example the mau_epll clock that was needed
-to access the audss block registers and caused a boot hang on Exyos5420.
-
-That specific issue was fixed by f1e9203e2366 ("clk: samsung: Fix Exynos
-5420 pinctrl setup and clock disable failure due to domain being gated")
-which solves it by enabling the mau_epll on probe.
+-- clock-frequency : The frequency of the main counter, in Hz. Optional.
++- clock-frequency : The frequency of the main counter, in Hz. Should be present
++  only where necessary to work around broken firmware which does not configure
++  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
++  strongly discouraged; fix your firmware unless absolutely impossible.
  
-> Regards,
-> Abhilash
->>>
-
-Best regards,
-Javier
+ - always-on : a boolean property. If present, the timer is powered through an
+   always-on power domain, therefore it never loses context.
+@@ -46,7 +49,8 @@ Example:
+ 
+ - compatible : Should at least contain "arm,armv7-timer-mem".
+ 
+-- clock-frequency : The frequency of the main counter, in Hz. Optional.
++- clock-frequency : The frequency of the main counter, in Hz. Should be present
++  only when firmware has not configured the MMIO CNTFRQ registers.
+ 
+ - reg : The control frame base address.
+ 
+-- 
+1.9.1
