@@ -1,35 +1,57 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Mar 2015 20:44:34 +0200
-Subject: [PATCHv5 23/35] ARM: OMAP2+: id: cache omap_type value
+Date: Fri, 20 Mar 2015 20:44:33 +0200
+Subject: [PATCHv5 22/35] ARM: OMAP2+: control: remove API for getting control
+ module base address
 In-Reply-To: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
 References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1426877086-17131-24-git-send-email-t-kristo@ti.com>
+Message-ID: <1426877086-17131-23-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to read the register with every invocation of the function,
-as the value is constant. Thus, cache the value in a static variable.
+This shall not be used anymore, as control module driver is converted
+into using regmap.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/id.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/control.c |    5 -----
+ arch/arm/mach-omap2/control.h |    2 --
+ 2 files changed, 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 2a2f4d5..f8121db 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -52,7 +52,10 @@ EXPORT_SYMBOL(omap_rev);
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index 4b40946..202fc72 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -145,11 +145,6 @@ void __init omap2_set_globals_control(void __iomem *ctrl,
+ 	omap4_ctrl_pad_base = ctrl_pad;
+ }
  
- int omap_type(void)
+-void __iomem *omap_ctrl_base_get(void)
+-{
+-	return omap2_ctrl_base;
+-}
+-
+ u8 omap_ctrl_readb(u16 offset)
  {
--	u32 val = 0;
-+	static u32 val = OMAP2_DEVICETYPE_MASK;
-+
-+	if (val < OMAP2_DEVICETYPE_MASK)
-+		return val;
+ 	return readb_relaxed(OMAP_CTRL_REGADDR(offset));
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index c1057eb..5353ff4 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -440,7 +440,6 @@
  
- 	if (cpu_is_omap24xx()) {
- 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
+ #ifndef __ASSEMBLY__
+ #ifdef CONFIG_ARCH_OMAP2PLUS
+-extern void __iomem *omap_ctrl_base_get(void);
+ extern u8 omap_ctrl_readb(u16 offset);
+ extern u16 omap_ctrl_readw(u16 offset);
+ extern u32 omap_ctrl_readl(u16 offset);
+@@ -470,7 +469,6 @@ extern void omap2_set_globals_control(void __iomem *ctrl,
+ 				      void __iomem *ctrl_pad);
+ void __init omap3_control_legacy_iomap_init(void);
+ #else
+-#define omap_ctrl_base_get()		0
+ #define omap_ctrl_readb(x)		0
+ #define omap_ctrl_readw(x)		0
+ #define omap_ctrl_readl(x)		0
 -- 
 1.7.9.5
