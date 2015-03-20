@@ -1,62 +1,141 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 20 Mar 2015 10:38:51 -0700
-Subject: [PATCH 3/4 v4] mailbox: Enable BCM2835 mailbox support
-In-Reply-To: <CABb+yY0qN4KcZ9kc6eurSUWPn38f2keKe4FB2efKBAVjREcZbg@mail.gmail.com>
-References: <1426213936-4139-1-git-send-email-eric@anholt.net>
- <1426213936-4139-3-git-send-email-eric@anholt.net>
- <5507A095.5090805@wwwdotorg.org> <87619xq414.fsf@eliezer.anholt.net>
- <550BA6B4.3030604@wwwdotorg.org>
- <CABb+yY0qN4KcZ9kc6eurSUWPn38f2keKe4FB2efKBAVjREcZbg@mail.gmail.com>
-Message-ID: <87r3sjk1qs.fsf@eliezer.anholt.net>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 20 Mar 2015 23:10:10 +0530
+Subject: exynos5800-peach-pi: suspend/resume (still) broken
+In-Reply-To: <CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
+References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>
+ <550953ED.10508@collabora.co.uk>
+ <CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>
+ <550C47ED.3010301@collabora.co.uk>
+ <CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
+Message-ID: <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar <jassisinghbrar@gmail.com> writes:
+Hi,
 
-> On Fri, Mar 20, 2015 at 10:18 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 03/18/2015 05:28 PM, Eric Anholt wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>
->>>> On 03/12/2015 08:32 PM, Eric Anholt wrote:
->>>>> diff --git a/drivers/mailbox/bcm2835-mailbox.c
->>>>> b/drivers/mailbox/bcm2835-mailbox.c
->>>>
->>>>> +#define MBOX_MSG(chan, data28)             (((data28) & ~0xf) | ((chan) &
->>>>> 0xf)) +#define MBOX_CHAN(msg)                       ((msg) & 0xf) +#define
->>>>> MBOX_DATA28(msg)            ((msg) & ~0xf)
->>>>
->>>> Even the concept of storing channel IDs in the LSBs feels like it
->>>> might be RPi-firmware-specific rather than HW-specific?
->>>
->>> I guess?  If we found another firmware protocol, we could have
->>> that device's dt just specify a different compatible string.  But
->>> in the absence of another firmware to talk to, I'm not sure what
->>> you want here.
+On Fri, Mar 20, 2015 at 9:59 PM, Abhilash Kesavan
+<kesavan.abhilash@gmail.com> wrote:
+> Hi Javier,
+>
+> On Fri, Mar 20, 2015 at 9:46 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Hello Abhilash,
 >>
->> I would expect the mailbox driver to expose a single channel that just
->> transports 32-bit values, since the HW doesn't impose any kind of
->> structure on the values it transports AFAIK. Clients of the mailbox
->> driver would formulate the messages they send through the mailox using
->> the macros above.
+>> On 03/20/2015 03:23 PM, Abhilash Kesavan wrote:
+>>>> On 03/17/2015 06:35 PM, Kevin Hilman wrote:
+>>>>>
+>>>>> Anyone else having better luck with suspend/resume on peach-pi?
+>>>>>
+>>>>
+>>>> # echo +2 > /sys/class/rtc/rtc0/wakealarm && echo mem > /sys/power/state
+>>>>
+>>>> Suspend and CPUs shutdown seems to succeed according to [0] but the system
+>>>> never wakes up...
+>>>>
+>>>> I also tried to wakeup the system with the keyboard and the trackpad that is
+>>>> a wake up source but it does not work either.
+>>>>
+>>>> I remember that when the 5420 s2r support series were posted, aclk200_disp1
+>>>> and aclk300_disp1 clocks needed to be marked as CLK_IGNORE_UNUSED but afaiu
+>>>> that was only because display support was not yet merged but it is now.
+>>>>
+>>>> I tried anyways both marking those clocks as CLK_IGNORE_UNUSED and passing
+>>>> the clk_ignore_unused to the kernel command line but did not work either.
+>>>>
+>>>> Abhilash, Vikas, Pankaj,
+>>>>
+>>>> Any ideas of what could be causing this regression? It seems that by the
+>>>> time the Exynos5420 S2R support landed in mainline, it was already not
+>>>> working which makes it hard to bisect what caused the issue.
+>>>
+>>> I remember the Pi power LED changing color from blue on suspend. Does
 >>
-> Yes, it should be so.
+>> Thanks a lot for answering. Who manages that LED? is the kernel or the
+>> firwmare in the EC? I tried suspend to ram using ChromeOS 3.8 kernel and
+>> I see that the blue LED is indeed turned off on suspend but that does not
+>> happen in mainline.
+>
+> I am not too sure. It was just something I remembered from earlier.
+>
+>>
+>>> that happen ? I'll try reproducing the issue and then probably use an
+>>> old working s2r branch in one of my local repos to track this down.
+>>>
+>>
+>> If I checkout mainline with HEAD in your commit adc548d77c22
+>> ("ARM: EXYNOS: Use MCPM call-backs to support S2R on exynos5420") + the
+>> patch you mentioned back then to keep the aclk200_disp1 and aclk300_disp1
+>> clocks enabled even when not used [0], I have S2R working. But even with
+>> that commit, I don't see the blue LED to be turn off like is the case in
+>> the ChromeOS 3.8 kernel.
+>>
+>> So I think you can use that as a base. I tried bisecting but it is tricky
+>> due other issues masking the S2R regression. I also tried to compare the
+>> diff between adc548d77c22 and v3.19-rc1 that is the first known bad afaict
+>> but didn't find any relevant either.
+>>
+>> By adding printouts I can tell that all the CPUs enter exynos_power_down()
+>> in arch/arm/mach-exynos/mcpm-exynos.c and also the last man disables the
+>> cluster for both Cortex A-15 and A-7 clusters.
+>>
+>> So it seems that the problem is on the resume path.
+>
+> I have made some progress on this. This is the current state:
+>
+> If I use next-20141114 (which was when the S2R code first appeared in
+> linux-next), then all is good. next-20141117 is fine too but things
+> are broken in next-20141118.
+> I have narrowed it down to the commit: "ae43b32 ARM: 8202/1:
+> dmaengine: pl330: Add runtime Power Management support v12". The only
+> way I see this impacting s2r is because it disables the dma pclk while
+> suspending or before.
+>
+> Checking further, will update in a bit.
 
-I'm getting pretty frustrated here.
+OK, so disabling the mdma0 node in "arch/arm/boot/dts/exynos5420.dtsi"
+gets things working. Like Kevin mentioned in the initial report, I
+need to disable DRM else there is a crash while suspending. With these
+two changes, on linus' tree and kgene's for-next s2r works fine.
 
-So, if I build a global client serializing requests and stop presenting
-channels, what exactly is the generic mailbox infrastructure gaining me?
-I don't need add_to_rbuf.  I don't need tpoll_txdone.  I don't need
-tx_tick.  I don't need peek_data.  I don't need channels.  It doesn't
-even handle waiting on requests for me, and I keep having to do it in
-clients.  There's nothing left that the generic code is doing for me.
+On linux-next, I need to disable CONFIG_MWIFIEX too.
 
-If I have to do any more changes ot this driver (we're at 27 hours of
-just my work on it so far...), I'd rather go back to the trivial driver
-we had before that simply, obviously did what we wanted.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/c18c25a5/attachment.sig>
+Also, I observe cros-ec-spi transfer failures during resume and
+sometimes it is unable to re-enable the tps fets causing a crash.
+However, that would be a driver specific issue.
+
+Regarding the mdma0 disablement, it looks like for the system to
+suspend properly the mdma0 pclk needs to stay on.
+
+Regards,
+Abhilash
+>>
+>>> Regards,
+>>> Abhilash
+>>>>
+>>
+>> Best regards,
+>> Javier
+>>
+>> [0]:
+>> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+>> index 848d602efc06..d8b66339d564 100644
+>> --- a/drivers/clk/samsung/clk-exynos5420.c
+>> +++ b/drivers/clk/samsung/clk-exynos5420.c
+>> @@ -932,14 +932,14 @@ static struct samsung_gate_clock exynos5x_gate_clks[] __initdata = {
+>>         GATE(0, "aclk400_mscl", "mout_user_aclk400_mscl",
+>>                         GATE_BUS_TOP, 17, 0, 0),
+>>         GATE(0, "aclk200_disp1", "mout_user_aclk200_disp1",
+>> -                       GATE_BUS_TOP, 18, 0, 0),
+>> +                       GATE_BUS_TOP, 18, CLK_IGNORE_UNUSED, 0),
+>>         GATE(CLK_SCLK_MPHY_IXTAL24, "sclk_mphy_ixtal24", "mphy_refclk_ixtal24",
+>>                         GATE_BUS_TOP, 28, 0, 0),
+>>         GATE(CLK_SCLK_HSIC_12M, "sclk_hsic_12m", "ff_hsic_12m",
+>>                         GATE_BUS_TOP, 29, 0, 0),
+>>
+>>         GATE(0, "aclk300_disp1", "mout_user_aclk300_disp1",
+>> -                       SRC_MASK_TOP2, 24, 0, 0),
+>> +                       SRC_MASK_TOP2, 24, CLK_IGNORE_UNUSED, 0),
+>>
+>>         GATE(CLK_MAU_EPLL, "mau_epll", "mout_mau_epll_clk",
+>>                         SRC_MASK_TOP7, 20, 0, 0),
+>>
