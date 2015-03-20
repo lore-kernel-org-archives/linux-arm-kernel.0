@@ -1,96 +1,83 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 20 Mar 2015 12:40:02 +0000
-Subject: [PATCH 08/12] KVM: arm/arm64: implement kvm_io_bus MMIO handling
- for the VGIC
-In-Reply-To: <550AEEF3.80702@arm.com>
-References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
- <1426263012-22935-9-git-send-email-andre.przywara@arm.com>
- <20150314142720.GD10935@cbox> <550AEEF3.80702@arm.com>
-Message-ID: <550C1522.80105@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Mar 2015 13:50:37 +0100
+Subject: [PATCH v3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
+ boot protocol
+In-Reply-To: <20150320122502.GA1474@arm.com>
+References: <20150319104100.GB18473@leverpostej>
+ <1426762852-13699-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150319133612.GD18473@leverpostej>
+ <CAKv+Gu-=n8fbdFeZX=EEpLypOdu0xXePzXH4-gOn6SqufA6CGg@mail.gmail.com>
+ <20150320114142.GF14766@leverpostej>
+ <CAKv+Gu88xUKaW9inod2=4sfBesZRxojVMnWzjugB+W0WnD=Vyw@mail.gmail.com>
+ <20150320122502.GA1474@arm.com>
+Message-ID: <CAKv+Gu8NKRdQ423UW4okkm_G9jwKqwrKrEJAsD6Ao3ezrgqs5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/2015 03:44 PM, Andre Przywara wrote:
-> Hej Christoffer,
-> 
-
-[ ... ]
-
->>> +static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
->>> +				   struct kvm_io_device *this, gpa_t addr,
->>> +				   int len, void *val, bool is_write)
->>> +{
->>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->>> +	struct vgic_io_device *iodev = container_of(this,
->>> +						    struct vgic_io_device, dev);
->>> +	struct kvm_run *run = vcpu->run;
->>> +	const struct vgic_io_range *range;
->>> +	struct kvm_exit_mmio mmio;
->>> +	bool updated_state;
->>> +	gpa_t offset;
->>> +
->>> +	offset = addr - iodev->addr;
->>> +	range = vgic_find_range(iodev->reg_ranges, len, offset);
->>> +	if (unlikely(!range || !range->handle_mmio)) {
->>> +		pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
->>> +		return -ENXIO;
->>> +	}
->>> +
->>> +	mmio.phys_addr = addr;
->>> +	mmio.len = len;
->>> +	mmio.is_write = is_write;
->>> +	if (is_write)
->>> +		memcpy(mmio.data, val, len);
->>> +	mmio.private = iodev->redist_vcpu;
->>> +
->>> +	spin_lock(&dist->lock);
->>> +	offset -= range->base;
->>> +	if (vgic_validate_access(dist, range, offset)) {
->>> +		updated_state = call_range_handler(vcpu, &mmio, offset, range);
->>> +		if (!is_write)
->>> +			memcpy(val, mmio.data, len);
->>> +	} else {
->>> +		if (!is_write)
->>> +			memset(val, 0, len);
->>> +		updated_state = false;
->>> +	}
->>> +	spin_unlock(&dist->lock);
->>> +	kvm_prepare_mmio(run, &mmio);
+On 20 March 2015 at 13:25, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Mar 20, 2015 at 11:45:17AM +0000, Ard Biesheuvel wrote:
+>> On 20 March 2015 at 12:41, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> >> +     if (boot_args[1] || boot_args[2] || boot_args[3]) {
+>> >> >> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
+>> >> >> +                     boot_args[1], boot_args[2], boot_args[3]);
+>> >> >> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
+>> >> >
+>> >> > If we ever decide to use x1-x3 for something, and try to boot an older
+>> >> > kernel, that warning is going to be a bit misleading. That could matter
+>> >> > for VMs where we're going to see old kernel images for a long time.
+>> >> >
+>> >> > I would like the warning to mention that could be the case.
+>> >> >
+>> >> > It would also be nice if the message were consistently spaced regardless
+>> >> > of the values of x1-x3, so we should zero-pad them (and as that takes a
+>> >> > resonable amount of space, let's give them a line each).
+>> >> >
+>> >> > So could we change the warning to be something like:
+>> >> >
+>> >> >         pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
+>> >> >                "\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
+>> >> >                "This indicates a broken bootloader or old kernel\n",
+>> >> >                boot_args[1], boot_args[2], boot_args[3]);
+>> >> >
+>> >>
+>> >> OK, I have applied this change.
+>> >>
+>> >> But I would like to note that we should probably only extend the boot
+>> >> protocol in a way that would not trigger this on older kernels in the
+>> >> first place.
+>> >> I.e., assign a bit in the flags field in the header, which indicates
+>> >> whether some boot protocol enhancement is supported by the kernel
+>> >> being loaded, and only allow x1/x2/x3 to be non-zero if said
+>> >> enhancement defines that.
+>> >
+>> > Good point.
+>> >
+>> > Given that, if you want to restore your original last line, that would
+>> > be fine with me (and my Ack still applies).
+>> >
 >>
->> we're not the only user of kvm_exit_mmio I believe, so we could rename
-> 
-> (assuming you mean we _are_ the only user here, which I can acknowledge)
-> 
->> this to vgic_io as well and you could change the mmio.data array to be a
->> void *val pointer, which just gets set to the pointer passed into this
->> function (which I think points to the kvm_run structs data array) and
->> you can avoid all these memcopies, right?
-> 
-> That sounds indeed tempting, but the comment on the struct kvm_exit_mmio
-> declaration reads:
-> /*
->  * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
->  * which is an anonymous type. Use our own type instead.
->  */
-> How I understand this the structure was introduced to _not_ use the same
-> memory, but use a copy instead. Do you remember any reason for this? And
-> in how far is this type anonymous? It's even in an uapi header.
-> 
-> Briefly looking at the code we do quite some memcpy on the way.
-> I am about to go all the way down into that ARM MMIO handling cave now
-> to check this (Marc, if I am not showing up again after some hours,
-> please come and rescue me ;-)
+>> I think it's fine to leave it as is
+>
+> Yup, and this is sitting pretty on the arm64 devel branch.
+>
+> Ard: I also pushed a kvm-bounce-page branch for you. Next step would be to
+> merge everything into for-next/core and put your VA changes on top of that.
+>
+> I'd appreciate a sanity check of the current branch first, though!
+>
 
-So, I feel that there is quite some unneeded copying and masking on the
-way, but a real fix would be quite invasive and needs quite some testing
-and review. I don't feel like rushing this into a v2 of this series.
-I quickly did what you proposed (replacing memcpy by pointer
-assignment), and that seems to work, but I don't have many chances of
-testing this this weekend, since I am on the road. Also I have to dig
-out my cross-endian test scripts first. So not sure if you want to take
-the risk with this series.
-I changed the other minor points you mentioned in the review though, so
-do you want to have a "v1.5" or how do we proceed from here?
+OK, I pulled devel and put the KVM and VA branches on top, and
+everything builds and runs fine afaict.
 
-Cheers,
-Andre.
+I also checked that Arnd's dotconfig from hell does not have the false
+negative on the HYP text size assert.
+
+"""
+0x00000001                ASSERT ((((__hyp_idmap_text_start & 0xfff) +
+__hyp_idmap_size) <= 0x1000), , HYP init code too big or misaligned)
+"""
+
+(Note that this .config does not even produce a bootable zImage.)
+
+You will get a conflict in head.S when you merge the core VA range patch.
+Nothing major but I'm happy to resend the patch.
