@@ -1,93 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 20 Mar 2015 00:11:02 -0600
-Subject: [PATCH v3 2/3] amba: tegra-ahb: detect and correct bogus base address
-In-Reply-To: <20150320061102.14355.4781.stgit@mcwayne>
-References: <20150320061102.14355.4781.stgit@mcwayne>
-Message-ID: <20150320061102.14355.95682.stgit@mcwayne>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 20 Mar 2015 08:17:38 +0200
+Subject: [PATCH] MAINTAINERS: add amlogic meson git tree and website
+In-Reply-To: <CAOQ7t2ZiPR5ft6wFYjQd-MB7K-DYVZzKYmEmbMj+FpKsWkxNCg@mail.gmail.com>
+References: <fc786af5b6700345b6c7d38b4c323d69d843194a.1426690724.git.baruch@tkos.co.il>
+ <CAOQ7t2ZiPR5ft6wFYjQd-MB7K-DYVZzKYmEmbMj+FpKsWkxNCg@mail.gmail.com>
+Message-ID: <20150320061738.GF25388@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From a hardware SoC integration point of view, the starting address of
-this IP block in the existing Tegra SoC DT files is off by 4 bytes
-from the actual base address.  Since we attempt to make old DT files
-forward-compatible with newer kernels, we cannot fix the IP block base
-address in old DT data. This patch works around the problem by
-detecting the four byte base address offset in the driver code, and
-correcting it if it's detected.  (In general, IP block base addresses
-almost always have a null low byte.)
+Hi Carlo,
 
-Future SoC DT data for Tegra AHB should use the correct Tegra AHB base
-address, in cases where there is no DT data backward compatibility
-requirement.
+On Wed, Mar 18, 2015 at 04:02:42PM +0100, Carlo Caione wrote:
+> On Wed, Mar 18, 2015 at 3:58 PM, Baruch Siach <baruch@tkos.co.il> wrote:
+> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> > ---
+> >  MAINTAINERS | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 0e1abe8cc684..bfedf32979dd 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -877,6 +877,8 @@ F:  drivers/clk/sunxi/
+> >  ARM/Amlogic MesonX SoC support
+> >  M:     Carlo Caione <carlo@caione.org>
+> >  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +T:     git git://github.com/carlocaione/linux-meson
+> > +W:     http://linux-meson.com
+> >  S:     Maintained
+> >  F:     drivers/media/rc/meson-ir.c
+> >  N:     meson[x68]
+> 
+> Acked-by: Carlo Caione <carlo@caione.org>
 
-This patch is a revision of the patch originally titled
-"amba: tegra-ahb: use correct base address for future chip support".
-This revision implements changes requested by Russell King:
+Thanks. Do you intend to take this patch via your tree?
 
-http://marc.info/?l=linux-tegra&m=142658851825062&w=2
-http://marc.info/?l=linux-tegra&m=142658873925178&w=2
+baruch
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Paul Walmsley <pwalmsley@nvidia.com>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Hiroshi DOYU <hdoyu@nvidia.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-kernel at vger.kernel.org
----
- drivers/amba/tegra-ahb.c |   23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/amba/tegra-ahb.c b/drivers/amba/tegra-ahb.c
-index 30759a55efe4..b0b688c481e8 100644
---- a/drivers/amba/tegra-ahb.c
-+++ b/drivers/amba/tegra-ahb.c
-@@ -82,6 +82,16 @@
- 
- #define AHB_ARBITRATION_XBAR_CTRL_SMMU_INIT_DONE BIT(17)
- 
-+/*
-+ * INCORRECT_BASE_ADDR_LOW_BYTE: Legacy kernel DT files for Tegra SoCs
-+ * prior to Tegra124 generally use a physical base address ending in
-+ * 0x4 for the AHB IP block.  According to the TRM, the low byte
-+ * should be 0x0.  During device probing, this macro is used to detect
-+ * whether the passed-in physical address is incorrect, and if so, to
-+ * correct it.
-+ */
-+#define INCORRECT_BASE_ADDR_LOW_BYTE		0x4
-+
- static struct platform_driver tegra_ahb_driver;
- 
- static const u32 tegra_ahb_gizmo[] = {
-@@ -124,12 +134,12 @@ struct tegra_ahb {
- 
- static inline u32 gizmo_readl(struct tegra_ahb *ahb, u32 offset)
- {
--	return readl(ahb->regs - 4 + offset);
-+	return readl(ahb->regs + offset);
- }
- 
- static inline void gizmo_writel(struct tegra_ahb *ahb, u32 value, u32 offset)
- {
--	writel(value, ahb->regs - 4 + offset);
-+	writel(value, ahb->regs + offset);
- }
- 
- #ifdef CONFIG_TEGRA_IOMMU_SMMU
-@@ -258,6 +268,15 @@ static int tegra_ahb_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	/* Correct the IP block base address if necessary */
-+	if (res &&
-+	    (res->start & INCORRECT_BASE_ADDR_LOW_BYTE) ==
-+	    INCORRECT_BASE_ADDR_LOW_BYTE) {
-+		dev_warn(&pdev->dev, "incorrect AHB base address in DT data - enabling workaround\n");
-+		res->start -= INCORRECT_BASE_ADDR_LOW_BYTE;
-+	}
-+
- 	ahb->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(ahb->regs))
- 		return PTR_ERR(ahb->regs);
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
