@@ -1,98 +1,55 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 20 Mar 2015 12:44:00 +0100
-Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Mar 2015 12:45:17 +0100
+Subject: [PATCH v3] arm64: enforce x1|x2|x3 == 0 upon kernel entry as per
+ boot protocol
+In-Reply-To: <20150320114142.GF14766@leverpostej>
+References: <20150319104100.GB18473@leverpostej>
+ <1426762852-13699-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150319133612.GD18473@leverpostej>
+ <CAKv+Gu-=n8fbdFeZX=EEpLypOdu0xXePzXH4-gOn6SqufA6CGg@mail.gmail.com>
+ <20150320114142.GF14766@leverpostej>
+Message-ID: <CAKv+Gu88xUKaW9inod2=4sfBesZRxojVMnWzjugB+W0WnD=Vyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures have some cpus which does not support idle states.
+On 20 March 2015 at 12:41, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> +     if (boot_args[1] || boot_args[2] || boot_args[3]) {
+>> >> +             pr_err("WARNING: boot protocol violation detected (x1 == %llx, x2 == %llx, x3 == %llx)\n",
+>> >> +                     boot_args[1], boot_args[2], boot_args[3]);
+>> >> +             pr_err("WARNING: your bootloader may fail to load newer kernels\n");
+>> >
+>> > If we ever decide to use x1-x3 for something, and try to boot an older
+>> > kernel, that warning is going to be a bit misleading. That could matter
+>> > for VMs where we're going to see old kernel images for a long time.
+>> >
+>> > I would like the warning to mention that could be the case.
+>> >
+>> > It would also be nice if the message were consistently spaced regardless
+>> > of the values of x1-x3, so we should zero-pad them (and as that takes a
+>> > resonable amount of space, let's give them a line each).
+>> >
+>> > So could we change the warning to be something like:
+>> >
+>> >         pr_err("WARNING: x1-x3 nonzero in violation of boot protocol:\n"
+>> >                "\tx1: %016llx\n\tx2: %016llx\n\tx3: %016llx\n"
+>> >                "This indicates a broken bootloader or old kernel\n",
+>> >                boot_args[1], boot_args[2], boot_args[3]);
+>> >
+>>
+>> OK, I have applied this change.
+>>
+>> But I would like to note that we should probably only extend the boot
+>> protocol in a way that would not trigger this on older kernels in the
+>> first place.
+>> I.e., assign a bit in the flags field in the header, which indicates
+>> whether some boot protocol enhancement is supported by the kernel
+>> being loaded, and only allow x1/x2/x3 to be non-zero if said
+>> enhancement defines that.
+>
+> Good point.
+>
+> Given that, if you want to restore your original last line, that would
+> be fine with me (and my Ack still applies).
+>
 
-Let the underlying low level code to return -ENXIO when it is not
-possible to set an idle state.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/cpuidle/cpuidle-arm.c | 42 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 40 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 1c94b88..e4a6eba 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -17,6 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/slab.h>
- 
- #include <asm/cpuidle.h>
- 
-@@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
- {
- 	int cpu, ret;
- 	struct cpuidle_driver *drv = &arm_idle_driver;
-+	struct cpuidle_device *dev;
- 
- 	/*
- 	 * Initialize idle states data, starting at index 1.
-@@ -105,18 +107,54 @@ static int __init arm_idle_init(void)
- 	if (ret <= 0)
- 		return ret ? : -ENODEV;
- 
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("Failed to register cpuidle driver\n");
-+		return ret;
-+	}
-+
- 	/*
- 	 * Call arch CPU operations in order to initialize
- 	 * idle states suspend back-end specific data
- 	 */
- 	for_each_possible_cpu(cpu) {
- 		ret = arm_cpuidle_init(cpu);
-+
-+		/* This cpu does not support any idle states */
-+		if (ret == -ENXIO)
-+			continue;
-+
- 		if (ret) {
- 			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
--			return ret;
-+			goto out_fail;
-+		}
-+
-+		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+		if (!dev) {
-+			pr_err("Failed to allocate cpuidle device\n");
-+			goto out_fail;
-+		}
-+		dev->cpu = cpu;
-+
-+		ret = cpuidle_register_device(dev);
-+		if (ret) {
-+			pr_err("Failed to register cpuidle device for CPU %d\n",
-+			       cpu);
-+			kfree(dev);
-+			goto out_fail;
- 		}
- 	}
- 
--	return cpuidle_register(drv, NULL);
-+	return 0;
-+out_fail:
-+	while (--cpu >= 0) {
-+		dev = per_cpu(cpuidle_devices, cpu);
-+		cpuidle_unregister_device(dev);
-+		kfree(dev);
-+	}
-+
-+	cpuidle_unregister_driver(drv);
-+
-+	return ret;
- }
- device_initcall(arm_idle_init);
--- 
-1.9.1
+I think it's fine to leave it as is
