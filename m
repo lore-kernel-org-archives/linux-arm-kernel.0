@@ -1,45 +1,42 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 20 Mar 2015 10:40:43 +0100
-Subject: [PATCH] MAINTAINERS: add amlogic meson git tree and website
-In-Reply-To: <20150320061738.GF25388@tarshish>
-References: <fc786af5b6700345b6c7d38b4c323d69d843194a.1426690724.git.baruch@tkos.co.il>
- <CAOQ7t2ZiPR5ft6wFYjQd-MB7K-DYVZzKYmEmbMj+FpKsWkxNCg@mail.gmail.com>
- <20150320061738.GF25388@tarshish>
-Message-ID: <CAOQ7t2ZdeA3abqg8VaB2djw__f8jXi8_hPB6MYfG2+QoqDnoCA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 20 Mar 2015 10:48:55 +0100
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v4.1 (round 2)
+Message-ID: <550BED07.6070809@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 7:17 AM, Baruch Siach <baruch@tkos.co.il> wrote:
-> Hi Carlo,
->
-> On Wed, Mar 18, 2015 at 04:02:42PM +0100, Carlo Caione wrote:
->> On Wed, Mar 18, 2015 at 3:58 PM, Baruch Siach <baruch@tkos.co.il> wrote:
->> > Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->> > ---
->> >  MAINTAINERS | 2 ++
->> >  1 file changed, 2 insertions(+)
->> >
->> > diff --git a/MAINTAINERS b/MAINTAINERS
->> > index 0e1abe8cc684..bfedf32979dd 100644
->> > --- a/MAINTAINERS
->> > +++ b/MAINTAINERS
->> > @@ -877,6 +877,8 @@ F:  drivers/clk/sunxi/
->> >  ARM/Amlogic MesonX SoC support
->> >  M:     Carlo Caione <carlo@caione.org>
->> >  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->> > +T:     git git://github.com/carlocaione/linux-meson
->> > +W:     http://linux-meson.com
->> >  S:     Maintained
->> >  F:     drivers/media/rc/meson-ir.c
->> >  N:     meson[x68]
->>
->> Acked-by: Carlo Caione <carlo@caione.org>
->
-> Thanks. Do you intend to take this patch via your tree?
+Hi,
 
-I'll take it.
+Here is the second pull request for defconfig for mvebu for v4.1
 
-Thanks,
+Gregory
+
+The following changes since commit f224b572dcc86017d793c047c92c8479f5a6ae14:
+
+  ARM: mvebu: enable Armada 39x in mvebu_v7_defconfig (2015-03-04 15:44:29 +0100)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.1-2
+
+for you to fetch changes up to 76b21e300c508edf2fc9bf27e314821ee46fcfec:
+
+  ARM: mvebu: Enable perf support in mvebu_v7_defconfig (2015-03-20 10:04:47 +0100)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v4.1 (part #2)
+
+- add perf support in mvebu_v7_defconfig
+
+----------------------------------------------------------------
+Ezequiel Garcia (1):
+      ARM: mvebu: Enable perf support in mvebu_v7_defconfig
+
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 -- 
-Carlo Caione
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
