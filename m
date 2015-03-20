@@ -1,50 +1,80 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Mar 2015 21:53:32 +0100
-Subject: [PATCH RFC 2/3] ARM: sun7i: Add A20 SRAM and SRAM controller
-In-Reply-To: <5509CE0D.7000904@redhat.com>
-References: <1426166024-24922-1-git-send-email-maxime.ripard@free-electrons.com>
- <1426166024-24922-3-git-send-email-maxime.ripard@free-electrons.com>
- <5509CE0D.7000904@redhat.com>
-Message-ID: <20150320205332.GI4255@lukather>
+Date: Fri, 20 Mar 2015 21:56:55 +0100
+Subject: [PATCH v3 0/5] clocksource: sun5i: Support parent clock rate
+ changes
+In-Reply-To: <550C28EC.2040800@linaro.org>
+References: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20150319225344.GF4255@lukather> <550C28EC.2040800@linaro.org>
+Message-ID: <20150320205655.GJ4255@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 08:12:13PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 12-03-15 14:13, Maxime Ripard wrote:
-> >The A20 has a few SRAM that can be mapped either to a device or to the CPU,
-> >with the mapping being controlled by an SRAM controller.
-> >
-> >Since most of the time these SRAM won't be accessible by the CPU, we can't use
-> >the mmio-sram driver and compatible.
-> >
-> >Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >---
-> >  arch/arm/boot/dts/sun7i-a20.dtsi | 31 ++++++++++++++++++++++++++++++-
-> >  1 file changed, 30 insertions(+), 1 deletion(-)
-> >
-> >diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> >index a1ebd80e6f24..a249828a1df5 100644
-> >--- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> >+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> >@@ -522,12 +522,41 @@
-> >  		};
-> >  	};
-> >
-> >-	soc at 01c00000 {
-> >+	soc {
-> 
-> Please do not do this, this changes devicetree paths used by
-> u-boot, see:
-> 
-> http://git.denx.de/?p=u-boot.git;a=blob;f=include/configs/sunxi-common.h#l232
+Hi,
 
-Ah, I didn't think about that. That's unfortunate, since the SRAM
-start lower than this address, but I guess we'll have to live with
-that :)
+On Fri, Mar 20, 2015 at 03:04:28PM +0100, Daniel Lezcano wrote:
+> On 03/19/2015 11:53 PM, Maxime Ripard wrote:
+> >Hi Daniel,
+> >
+> >On Thu, Mar 05, 2015 at 11:20:51AM +0100, Maxime Ripard wrote:
+> >>Hi,
+> >>
+> >>The Allwinner HS timers have the AHB clock as their parent
+> >>clock. Since this clock is shared with other devices, we could very
+> >>well have another driver requesting a rate change of that clock,
+> >>making our timer change frequency at the same time.
+> >>
+> >>This is especially true on the A31, where the DMA controller needs to
+> >>do such a rate change, making the HS timer unreliable at the time on
+> >>the A31.
+> >>
+> >>This serie makes some cleanups and implements clock notifiers to be
+> >>able to reflect such rate changes and make sure that the timer is
+> >>always working.
+> >>
+> >>Maxime
+> >>
+> >>Changes from v2:
+> >>   - Rebased on top of v4.0-rc1
+> >>   - Removed the local_irq_save/restore around clockevents_update_freq
+> >>
+> >>Changes from v1:
+> >>   - Changed the interrupt name to its previous value
+> >>
+> >>Maxime Ripard (5):
+> >>   clocksource: sun5i: Switch to request_irq
+> >>   clocksource: sun5i: Use of_io_request_and_map
+> >>   clocksource: sun5i: Remove sched_clock
+> >>   clocksource: sun5i: Refactor the current code
+> >>   clocksource: sun5i: Add clock notifiers
+> >
+> >Have these patches been merged?
+> >
+> >If not, it woulde be great if the third one ("clocksource: sun5i:
+> >Remove sched_clock") was merged for 4.0.
+> >
+> >The sched_clock we use on some system is this timer's, and since we
+> >started using cpufreq, the cpu clock (that is one of the timer's clock
+> >indirect parent) now changes, along with the actual sched_clock rate.
+> >
+> >We can safely remove the sched_clock on those systems, since we have
+> >other reliable sched_clock in the system.
+> 
+> Ok, I applied the patch for v4.0-rc5 but I had to fix a conflict and change
+> the changelog.
 
-Thanks!
+It looks fine.
+
+Note that the rest of the serie should also be merged, this is just a
+temporary measure for 4.0.
+
+> Mind to test it works ?
+> 
+> git.linaro.org/people/daniel.lezcano/linux.git clockevents/v4.0-rc4
+
+Unfortunately, I won't have access to my boards for ~10 days due to
+travel to ELC. Chen-Yu, Hans, could you test this and see if it works?
+
+Thanks,
 Maxime
 
 -- 
@@ -57,4 +87,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/499ed5f9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/7ee31909/attachment-0001.sig>
