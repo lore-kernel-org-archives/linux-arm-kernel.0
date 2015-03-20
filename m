@@ -1,67 +1,128 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 20 Mar 2015 11:51:17 +0530
-Subject: [PATCH v3 0/6] Add support for QCOM GDSCs
-Message-ID: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+Date: Fri, 20 Mar 2015 11:51:20 +0530
+Subject: [PATCH v3 3/6] clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+In-Reply-To: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1426832483-27026-4-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GDSCs (Global Distributed Switch Controllers) control switches
-that supply power to an on-chip power domain and hence can be
-programmed in SW to safely power collapse and restore power to the
-respective PDs. They are part of a considerable number of recent QCOM
-SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
-and are part of the Clock control block.
+Add all data for the GDSCs which are part of msm8916 GCC block.
 
-The series implements support for GDSC using the genpd framework
-modelling these as SW controllable power domains.
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+---
+ drivers/clk/qcom/Kconfig                     |  1 +
+ drivers/clk/qcom/gcc-msm8916.c               | 46 ++++++++++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8916.h |  8 +++++
+ 3 files changed, 55 insertions(+)
 
-* Patch 3/6 has a dependency on 8916 GCC support series [1]
-* Client drivers which plan to use GDSC can refer to
-  Documentation/devicetree/bindings/power/power_domain.txt to know
-  how to hook up the power domain for the device through DT
-* Runtime PM specific documentation can be found in
-  Documentation/power/runtime_pm.txt
-
-Changes since v2:
-* gdsc_unregister added
-* gdsc_register/unregister introduced in patch 1/6
-
-Changes since v1:
-* added err checks for regmap apis
-* added gdsc_register() in gdsc.c
-
-[1] https://lkml.org/lkml/2015/3/18/408
-
-Rajendra Nayak (3):
-  clk: qcom: gdsc: Prepare common clk probe to register gdscs
-  clk: qcom: gdsc: Add GDSCs in msm8916 GCC
-  clk: qcom: gdsc: Add GDSCs in apq8084 GCC
-
-Stephen Boyd (3):
-  clk: qcom: Add support for GDSCs
-  clk: qcom: gdsc: Add GDSCs in msm8974 GCC
-  clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
-
- arch/arm/boot/dts/qcom-apq8084.dtsi           |   1 +
- arch/arm/boot/dts/qcom-msm8974.dtsi           |   2 +
- drivers/clk/qcom/Kconfig                      |   9 ++
- drivers/clk/qcom/Makefile                     |   1 +
- drivers/clk/qcom/common.c                     |  14 ++-
- drivers/clk/qcom/common.h                     |   2 +
- drivers/clk/qcom/gcc-apq8084.c                |  38 ++++++
- drivers/clk/qcom/gcc-msm8916.c                |  46 +++++++
- drivers/clk/qcom/gcc-msm8974.c                |  14 +++
- drivers/clk/qcom/gdsc.c                       | 166 ++++++++++++++++++++++++++
- drivers/clk/qcom/gdsc.h                       |  46 +++++++
- drivers/clk/qcom/mmcc-msm8974.c               |  54 +++++++++
- include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 +
- include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 ++
- include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
- include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 ++
- 16 files changed, 417 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/qcom/gdsc.c
- create mode 100644 drivers/clk/qcom/gdsc.h
-
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index f436bcf..2fe1b30 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -53,6 +53,7 @@ config MSM_GCC_8660
+ 
+ config MSM_GCC_8916
+ 	tristate "MSM8916 Global Clock Controller"
++	select QCOM_GDSC
+ 	depends on COMMON_CLK_QCOM
+ 	help
+ 	  Support for the global clock controller on msm8916 devices.
+diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
+index c961f0d..37d63a3 100644
+--- a/drivers/clk/qcom/gcc-msm8916.c
++++ b/drivers/clk/qcom/gcc-msm8916.c
+@@ -31,6 +31,7 @@
+ #include "clk-rcg.h"
+ #include "clk-branch.h"
+ #include "reset.h"
++#include "gdsc.h"
+ 
+ enum {
+ 	P_XO,
+@@ -2574,6 +2575,41 @@ static struct clk_branch gcc_venus0_vcodec0_clk = {
+ 	},
+ };
+ 
++static struct gdsc venus_gdsc = {
++	.gdscr = 0x4c018,
++	.pd = {
++		.name = "venus",
++	},
++};
++
++static struct gdsc mdss_gdsc = {
++	.gdscr = 0x4d078,
++	.pd = {
++		.name = "mdss",
++	},
++};
++
++static struct gdsc jpeg_gdsc = {
++	.gdscr = 0x5701c,
++	.pd = {
++		.name = "jpeg",
++	},
++};
++
++static struct gdsc vfe_gdsc = {
++	.gdscr = 0x58034,
++	.pd = {
++		.name = "vfe",
++	},
++};
++
++static struct gdsc oxili_gdsc = {
++	.gdscr = 0x5901c,
++	.pd = {
++		.name = "oxili",
++	},
++};
++
+ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GPLL0] = &gpll0.clkr,
+ 	[GPLL0_VOTE] = &gpll0_vote,
+@@ -2715,6 +2751,14 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GCC_VENUS0_VCODEC0_CLK] = &gcc_venus0_vcodec0_clk.clkr,
+ };
+ 
++static struct gdsc *gcc_msm8916_gdscs[] = {
++	[VENUS_GDSC] = &venus_gdsc,
++	[MDSS_GDSC] = &mdss_gdsc,
++	[JPEG_GDSC] = &jpeg_gdsc,
++	[VFE_GDSC] = &vfe_gdsc,
++	[OXILI_GDSC] = &oxili_gdsc,
++};
++
+ static const struct qcom_reset_map gcc_msm8916_resets[] = {
+ 	[GCC_BLSP1_BCR] = { 0x01000 },
+ 	[GCC_BLSP1_QUP1_BCR] = { 0x02000 },
+@@ -2822,6 +2866,8 @@ static const struct qcom_cc_desc gcc_msm8916_desc = {
+ 	.num_clks = ARRAY_SIZE(gcc_msm8916_clocks),
+ 	.resets = gcc_msm8916_resets,
+ 	.num_resets = ARRAY_SIZE(gcc_msm8916_resets),
++	.gdscs = gcc_msm8916_gdscs,
++	.num_gdscs = ARRAY_SIZE(gcc_msm8916_gdscs),
+ };
+ 
+ static const struct of_device_id gcc_msm8916_match_table[] = {
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+index e430f64..11566c5 100644
+--- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
++++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+@@ -153,4 +153,12 @@
+ #define GCC_VENUS0_AXI_CLK			136
+ #define GCC_VENUS0_VCODEC0_CLK			137
+ 
++/* Indexes for GDSCs */
++#define BIMC_GDSC				0
++#define VENUS_GDSC				1
++#define MDSS_GDSC				2
++#define JPEG_GDSC				3
++#define VFE_GDSC				4
++#define OXILI_GDSC				5
++
+ #endif
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
