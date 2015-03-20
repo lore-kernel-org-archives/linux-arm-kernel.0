@@ -1,118 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 20 Mar 2015 11:24:14 +0000
-Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
- driver
-In-Reply-To: <20150320060653.GC18907@leoy-linaro>
-References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <20150319141753.GB25967@leverpostej>
- <20150320060653.GC18907@leoy-linaro>
-Message-ID: <20150320112414.GD14766@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Mar 2015 11:28:28 +0000
+Subject: [PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()
+In-Reply-To: <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+ <1426112117-18220-2-git-send-email-dianders@chromium.org>
+ <CAPDyKFq_WMJfqNGuxwN7xPmhv2X6-+G1zXpdD6zYDkDe7-Jo2A@mail.gmail.com>
+ <CAD=FV=U-YnT5jF5MFC==hANXGPqVpV3iLMPu85TrQ4dNDsWeCA@mail.gmail.com>
+ <CAPDyKFpG=q88QEkuAgoLqkZU40Kx7dB7PmnXHqEt0EtbYvR_Cg@mail.gmail.com>
+ <CAD=FV=X=1=AnXCGgWWkJDcHLO-MfVqsSB2aJxi3WOgWJhD_ggA@mail.gmail.com>
+ <CAPDyKFrkznbW7k_=BDo99jJhWzDbUgbeU+MXWB_E_UWXh=56Eg@mail.gmail.com>
+ <20150319113646.GQ2869@sirena.org.uk>
+ <CAPDyKFroe9N3j9oMWKknH5huv7j8fkrBr5UKjjp190hkqNsNRg@mail.gmail.com>
+Message-ID: <20150320112828.GF2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +       ret = of_property_read_u32(np, "hisilicon,tsensor-thres-temp",
-> > > +                                  &sensor->thres_temp);
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "failed to get thres value %d: %d\n",
-> > > +                       index, ret);
-> > > +               return ret;
-> > > +       }
-> > > +
-> > > +       ret = of_property_read_u32(np, "hisilicon,tsensor-reset-temp",
-> > > +                                  &sensor->reset_temp);
-> > > +       if (ret) {
-> > > +               dev_err(&pdev->dev, "failed to get reset value %d: %d\n",
-> > > +                       index, ret);
-> > > +               return ret;
-> > > +       }
-> > 
-> > I see now that these properties result in the HW being programmed. You
-> > should figure out how to reconcile these with thermal-zone trip points
-> > rather than having parallel properties.
->  
-> Set "tsensor-thres-temp" to register so that if thermal reaches the
-> threshold, the sensor will trigger h/w interrupt.
-> 
-> Set "tsensor-reset-temp" to register so that if thermal reaches the
-> reset value, the sensor will assert SoC reset signal to trigger h/w
-> reset.
+On Fri, Mar 20, 2015 at 11:55:50AM +0100, Ulf Hansson wrote:
+> On 19 March 2015 at 12:36, Mark Brown <broonie@kernel.org> wrote:
 
-I understand this.
+> > The implementation *should* do that anyway, it's just not trivial to
+> > implement in an efficient fashion with the current information we have
+> > from drivers.
 
-> This is different w/t thermal-zone trip points, the trip points are
-> used for timer polling.
+> The APIs regulator_count_voltages() and regulator_list_voltage(), are
+> currently used from the mmc core to find out which voltages that is
+> supported (with 0.1V granularity). Then that information can be used
+> when trying to set a new voltage.
 
-That may be the case in the code as it stands today, but per the binding
-the trip points are the temperatures at which an action is to be taken.
+> But I guess such a wrapper API is out of the question?
 
-The thermal-zone has poilling-delay and polling-delay-passive, but
-there's no reason you couldn't also use the interrupt to handle the
-"hot" trip-point, adn the reset at the "critical" trip-point. All that's
-missing is the plumbing in order to do so.
+> Anyway, I get the feeling that we will need to do the same for this case.
 
-So please co-ordinate with the thermal framework to do that.
+As previously discussed the problem is that there can be a *lot* of
+voltages on a modern regulator with fine grained voltage steps and
+tolerances are also used for things like cpufreq where we care about
+performance.  We need something that doesn't require a linear scan of
+possible values.
 
-> Do u think below modification is more reasonable?
-> 
-> - Set "tsensor-thres-temp" = 700000, which equal to thermal-zone
->   passive trip point, so that we can use h/w interrupt to update the
->   thermal value immediately, rather than using polling method w/t long
->   delay;
-> 
-> - Set "tsensor-reset-temp" = <100000>, which is higher than
->   thermal-zone critical trip point, so that the s/w reset method has
->   higher priority than h/w reset; we also can easily know the reset is
->   caused by thermal framework; "tsensor-reset-temp" is only used to
->   protect h/w circuit.
+> >> would be good to allow both upper and lower limits to be zero.
 
-As mentioned above, I think that you should co-ordinate with the thermal
-framework. You're worknig around limitations inthe code as it stands
-today rather than solving the fundamental issue.
+> > The lower limit can be zero already though it isn't clear to me that
+> > this is useful.  Setting an upper limit of zero seems nonsensical, an
+> > upper limit that is lower than the lower limit isn't terribly obvious
+> > and removing the upper limit isn't safe - it means that we'll happily
+> > oversupply things which is a road to physical damage.
 
-> > > +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
-> > > +
-> > > +               if (data->irq_bind_sensor != -1)
-> > > +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
-> > > +                                data->irq_bind_sensor);
-> > > +
-> > > +               /* bind irq to this sensor */
-> > > +               data->irq_bind_sensor = index;
-> > > +       }
-> > 
-> > I don't see why this should be specified in the DT. Why do you believe
-> > it should?
-> 
-> The thermal sensor module has four sensors, but have only one
-> interrupt signal; This interrupt can only be used by one sensor;
-> So want to use dts to bind the interrupt with one selected sensor.
+> I am not sure I follow here. In the regulator_set_voltage_tol() you
+> can only specifiy one limit (tolerance?). What Dough proposed was to
+> add a new API which can have both a low tolerance value and a high
+> tolerance value.
 
-That's not all that great, though I'm not exactly sure how the kernel
-would select the best sensor to measure with. It would be good if you
-could talk to the thermal maintainers w.r.t. this.
-
-> > > +static int hisi_thermal_probe(struct platform_device *pdev)
-> > > +{
-> > > +       struct hisi_thermal_data *data;
-> > > +       struct resource *res;
-> > > +       int i;
-> > > +       int ret;
-> > > +
-> > > +       if (!cpufreq_get_current_driver()) {
-> > > +               dev_dbg(&pdev->dev, "no cpufreq driver!");
-> > > +               return -EPROBE_DEFER;
-> > > +       }
-> > 
-> > Surely we care about not burning out the board even if we don't have
-> > cpufreq?
-> > 
-> > Is there any ordering guarantee between the probing of this driver and
-> > cpufreq?
-> 
-> Yes, here need binding the thermal sensor w/t cpu cooling device,
-> and cpu cooling device is based on cpufreq driver.
-
-Sure, but if you don't have a cooling device you still want the critical
-temperature reset and so on, no?
-
-Mark.
+Tolerances are not limits - when you say "limit" that sounds like a hard
+value.  I can't see any reason why the code would prevent anyone setting
+a tolerance of zero, though it should be rare that this is actually the
+best thing to do.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150320/295ed9f1/attachment.sig>
