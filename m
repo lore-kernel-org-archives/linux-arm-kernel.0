@@ -1,107 +1,76 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 20 Mar 2015 11:51:21 +0530
-Subject: [PATCH v3 4/6] clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+Date: Fri, 20 Mar 2015 11:51:19 +0530
+Subject: [PATCH v3 2/6] clk: qcom: gdsc: Prepare common clk probe to register
+ gdscs
 In-Reply-To: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
 References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1426832483-27026-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1426832483-27026-3-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+The common clk probe registers a clk provider and a reset controller.
+Update it to register a genpd provider using the gdsc data provided
+by each platform.
 
-Theres just one GDSC as part of the msm8974 GCC block.
-
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8974.dtsi          |  1 +
- drivers/clk/qcom/Kconfig                     |  1 +
- drivers/clk/qcom/gcc-msm8974.c               | 14 ++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8974.h |  3 +++
- 4 files changed, 19 insertions(+)
+ drivers/clk/qcom/common.c | 14 +++++++++++++-
+ drivers/clk/qcom/common.h |  2 ++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec1..12d17c2 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -179,6 +179,7 @@
- 			compatible = "qcom,gcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index 2fe1b30..77568bd 100644
---- a/drivers/clk/qcom/Kconfig
-+++ b/drivers/clk/qcom/Kconfig
-@@ -88,6 +88,7 @@ config MSM_MMCC_8960
- 
- config MSM_GCC_8974
- 	tristate "MSM8974 Global Clock Controller"
-+	select QCOM_GDSC
- 	depends on COMMON_CLK_QCOM
- 	help
- 	  Support for the global clock controller on msm8974 devices.
-diff --git a/drivers/clk/qcom/gcc-msm8974.c b/drivers/clk/qcom/gcc-msm8974.c
-index a714114..c0f4e62 100644
---- a/drivers/clk/qcom/gcc-msm8974.c
-+++ b/drivers/clk/qcom/gcc-msm8974.c
-@@ -31,6 +31,7 @@
+diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
+index a946b48..0c9fbc7 100644
+--- a/drivers/clk/qcom/common.c
++++ b/drivers/clk/qcom/common.c
+@@ -21,6 +21,7 @@
  #include "clk-rcg.h"
- #include "clk-branch.h"
+ #include "clk-regmap.h"
  #include "reset.h"
 +#include "gdsc.h"
  
- enum {
- 	P_XO,
-@@ -2434,6 +2435,13 @@ static struct clk_branch gcc_usb_hsic_system_clk = {
- 	},
+ struct qcom_cc {
+ 	struct qcom_reset_controller reset;
+@@ -125,8 +126,18 @@ int qcom_cc_really_probe(struct platform_device *pdev,
+ 
+ 	ret = reset_controller_register(&reset->rcdev);
+ 	if (ret)
+-		of_clk_del_provider(dev->of_node);
++		goto err_reset;
+ 
++	ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
++	if (ret)
++		goto err_pd;
++
++	return 0;
++err_pd:
++	dev_err(dev, "Failed to register power domains\n");
++	reset_controller_unregister(&reset->rcdev);
++err_reset:
++	of_clk_del_provider(dev->of_node);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
+@@ -145,6 +156,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
+ 
+ void qcom_cc_remove(struct platform_device *pdev)
+ {
++	gdsc_unregister(&pdev->dev);
+ 	of_clk_del_provider(pdev->dev.of_node);
+ 	reset_controller_unregister(platform_get_drvdata(pdev));
+ }
+diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
+index b3d7e57..480fdbe 100644
+--- a/drivers/clk/qcom/common.h
++++ b/drivers/clk/qcom/common.h
+@@ -27,6 +27,8 @@ struct qcom_cc_desc {
+ 	size_t num_clks;
+ 	const struct qcom_reset_map *resets;
+ 	size_t num_resets;
++	struct gdsc **gdscs;
++	size_t num_gdscs;
  };
  
-+static struct gdsc usb_hs_hsic_gdsc = {
-+	.gdscr = 0x404,
-+	.pd = {
-+		.name = "usb_hs_hsic",
-+	},
-+};
-+
- static struct clk_regmap *gcc_msm8974_clocks[] = {
- 	[GPLL0] = &gpll0.clkr,
- 	[GPLL0_VOTE] = &gpll0_vote,
-@@ -2663,6 +2671,10 @@ static const struct qcom_reset_map gcc_msm8974_resets[] = {
- 	[GCC_VENUS_RESTART] = { 0x1740 },
- };
- 
-+static struct gdsc *gcc_msm8974_gdscs[] = {
-+	[USB_HS_HSIC_GDSC] = &usb_hs_hsic_gdsc,
-+};
-+
- static const struct regmap_config gcc_msm8974_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
-@@ -2677,6 +2689,8 @@ static const struct qcom_cc_desc gcc_msm8974_desc = {
- 	.num_clks = ARRAY_SIZE(gcc_msm8974_clocks),
- 	.resets = gcc_msm8974_resets,
- 	.num_resets = ARRAY_SIZE(gcc_msm8974_resets),
-+	.gdscs = gcc_msm8974_gdscs,
-+	.num_gdscs = ARRAY_SIZE(gcc_msm8974_gdscs),
- };
- 
- static const struct of_device_id gcc_msm8974_match_table[] = {
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8974.h b/include/dt-bindings/clock/qcom,gcc-msm8974.h
-index 51e51c8..81d32f6 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8974.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8974.h
-@@ -321,4 +321,7 @@
- #define GCC_SDCC1_CDCCAL_SLEEP_CLK				304
- #define GCC_SDCC1_CDCCAL_FF_CLK					305
- 
-+/* gdscs */
-+#define USB_HS_HSIC_GDSC					0
-+
- #endif
+ extern const struct freq_tbl *qcom_find_freq(const struct freq_tbl *f,
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
