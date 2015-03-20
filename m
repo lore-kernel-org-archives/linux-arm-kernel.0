@@ -1,147 +1,49 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 Mar 2015 18:15:36 +0000
-Subject: [PATCH 3/4] iommu/arm-smmu: handle multi-alias IOMMU groups for PCI
- devices
+Date: Fri, 20 Mar 2015 18:15:37 +0000
+Subject: [PATCH 4/4] iommu/io-pgtable-arm: avoid speculative walks through
+ TTBR1
 In-Reply-To: <1426875337-12808-1-git-send-email-will.deacon@arm.com>
 References: <1426875337-12808-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1426875337-12808-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1426875337-12808-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU groups for PCI devices can correspond to multiple DMA aliases due
-to things like ACS and PCI quirks.
+Although we set TCR.T1SZ to 0, the input address range covered by TTBR1
+is actually calculated using T0SZ in this case on the ARM SMMU. This
+could theoretically lead to speculative table walks through physical
+address zero, leading to all sorts of fun and games if we have MMIO
+regions down there.
 
-This patch extends the ARM SMMU ->add_device callback so that we
-consider all of the DMA aliases for a PCI IOMMU group, rather than
-creating a separate group for each Requester ID.
+This patch avoids the issue by setting EPD1 to disable walks through
+the unused TTBR1 register.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 92 ++++++++++++++++++++++++++++++------------------
- 1 file changed, 57 insertions(+), 35 deletions(-)
+ drivers/iommu/io-pgtable-arm.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 161dd46999e2..6ac184669295 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1330,61 +1330,83 @@ static void __arm_smmu_release_pci_iommudata(void *data)
- 	kfree(data);
- }
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index b610a8dee238..4e460216bd16 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -116,6 +116,8 @@
+ #define ARM_32_LPAE_TCR_EAE		(1 << 31)
+ #define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
  
--static int arm_smmu_add_device(struct device *dev)
-+static int arm_smmu_add_pci_device(struct pci_dev *pdev)
- {
--	struct arm_smmu_device *smmu;
--	struct arm_smmu_master_cfg *cfg;
-+	int i, ret;
-+	u16 sid;
- 	struct iommu_group *group;
--	void (*releasefn)(void *) = NULL;
--	int ret;
--
--	smmu = find_smmu_for_device(dev);
--	if (!smmu)
--		return -ENODEV;
-+	struct arm_smmu_master_cfg *cfg;
- 
--	group = iommu_group_alloc();
--	if (IS_ERR(group)) {
--		dev_err(dev, "Failed to allocate IOMMU group\n");
-+	group = iommu_group_get_for_dev(&pdev->dev);
-+	if (IS_ERR(group))
- 		return PTR_ERR(group);
--	}
--
--	if (dev_is_pci(dev)) {
--		struct pci_dev *pdev = to_pci_dev(dev);
- 
-+	cfg = iommu_group_get_iommudata(group);
-+	if (!cfg) {
- 		cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
- 		if (!cfg) {
- 			ret = -ENOMEM;
- 			goto out_put_group;
- 		}
- 
--		cfg->num_streamids = 1;
--		/*
--		 * Assume Stream ID == Requester ID for now.
--		 * We need a way to describe the ID mappings in FDT.
--		 */
--		pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid,
--				       &cfg->streamids[0]);
--		releasefn = __arm_smmu_release_pci_iommudata;
--	} else {
--		struct arm_smmu_master *master;
--
--		master = find_smmu_master(smmu, dev->of_node);
--		if (!master) {
--			ret = -ENODEV;
--			goto out_put_group;
--		}
-+		iommu_group_set_iommudata(group, cfg,
-+					  __arm_smmu_release_pci_iommudata);
-+	}
- 
--		cfg = &master->cfg;
-+	if (cfg->num_streamids >= MAX_MASTER_STREAMIDS) {
-+		ret = -ENOSPC;
-+		goto out_put_group;
++#define ARM_LPAE_TCR_EPD1		(1 << 23)
++
+ #define ARM_LPAE_TCR_TG0_4K		(0 << 14)
+ #define ARM_LPAE_TCR_TG0_64K		(1 << 14)
+ #define ARM_LPAE_TCR_TG0_16K		(2 << 14)
+@@ -621,6 +623,9 @@ arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
  	}
  
--	iommu_group_set_iommudata(group, cfg, releasefn);
--	ret = iommu_group_add_device(group, dev);
-+	/*
-+	 * Assume Stream ID == Requester ID for now.
-+	 * We need a way to describe the ID mappings in FDT.
-+	 */
-+	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
-+	for (i = 0; i < cfg->num_streamids; ++i)
-+		if (cfg->streamids[i] == sid)
-+			break;
+ 	reg |= (64ULL - cfg->ias) << ARM_LPAE_TCR_T0SZ_SHIFT;
 +
-+	/* Avoid duplicate SIDs, as this can lead to SMR conflicts */
-+	if (i == cfg->num_streamids)
-+		cfg->streamids[cfg->num_streamids++] = sid;
++	/* Disable speculative walks through TTBR1 */
++	reg |= ARM_LPAE_TCR_EPD1;
+ 	cfg->arm_lpae_s1_cfg.tcr = reg;
  
-+	return 0;
- out_put_group:
- 	iommu_group_put(group);
- 	return ret;
- }
- 
-+static int arm_smmu_add_platform_device(struct device *dev)
-+{
-+	struct iommu_group *group;
-+	struct arm_smmu_master *master;
-+	struct arm_smmu_device *smmu = find_smmu_for_device(dev);
-+
-+	if (!smmu)
-+		return -ENODEV;
-+
-+	master = find_smmu_master(smmu, dev->of_node);
-+	if (!master)
-+		return -ENODEV;
-+
-+	/* No automatic group creation for platform devices */
-+	group = iommu_group_alloc();
-+	if (IS_ERR(group))
-+		return PTR_ERR(group);
-+
-+	iommu_group_set_iommudata(group, &master->cfg, NULL);
-+	return iommu_group_add_device(group, dev);
-+}
-+
-+static int arm_smmu_add_device(struct device *dev)
-+{
-+	if (dev_is_pci(dev))
-+		return arm_smmu_add_pci_device(to_pci_dev(dev));
-+
-+	return arm_smmu_add_platform_device(dev);
-+}
-+
- static void arm_smmu_remove_device(struct device *dev)
- {
- 	iommu_group_remove_device(dev);
+ 	/* MAIRs */
 -- 
 2.1.4
