@@ -1,51 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 20 Mar 2015 10:07:15 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC PM Updates for v4.1
-Message-ID: <cover.1426812951.git.horms+renesas@verge.net.au>
+Date: Fri, 20 Mar 2015 10:07:20 +0900
+Subject: [PATCH 1/3] ARM: shmobile: r8a7790: Correct SYSCIER value
+In-Reply-To: <cover.1426812951.git.horms+renesas@verge.net.au>
+References: <cover.1426812951.git.horms+renesas@verge.net.au>
+Message-ID: <ee72f6adfdd95b53432eb60b6944c6fe2790dd13.1426812951.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+Set the SYSCIER as per the values indicated in the documentation.
+The value previously used appears to been copied from the r8a7779
+implementation but on closer inspection is not correct for the r8a7790.
 
-Please consider these Renesas ARM based SoC PM updates for v4.1.
+Fixes: a48f165509c1 ("ARM: shmobile: r8a7790 SYSC setup code")
+Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-r8a7790.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pm-for-v4.1
-
-for you to fetch changes up to a8caad66904a7923c05fc4a137110085533ef00c:
-
-  ARM: shmobile: Consolidate the pm code for R-Car Gen2 (2015-03-17 08:05:13 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC PM Updates for v4.1
-
-* Consolidate the pm code for R-Car Gen2
-* Correct SYSCIER value for r8a7790 and r8a7791 SoCs
-
-----------------------------------------------------------------
-Gaku Inami (1):
-      ARM: shmobile: Consolidate the pm code for R-Car Gen2
-
-Simon Horman (2):
-      ARM: shmobile: r8a7790: Correct SYSCIER value
-      ARM: shmobile: r8a7791: Correct SYSCIER value
-
- arch/arm/mach-shmobile/Makefile       |   5 +-
- arch/arm/mach-shmobile/pm-r8a7790.c   |  82 ------------------------
- arch/arm/mach-shmobile/pm-r8a7791.c   |  73 ---------------------
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 115 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-shmobile/r8a7790.h      |   1 -
- arch/arm/mach-shmobile/r8a7791.h      |   1 -
- arch/arm/mach-shmobile/rcar-gen2.h    |   1 +
- arch/arm/mach-shmobile/smp-r8a7790.c  |   3 +-
- arch/arm/mach-shmobile/smp-r8a7791.c  |   2 +-
- 9 files changed, 122 insertions(+), 161 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/pm-r8a7790.c
- delete mode 100644 arch/arm/mach-shmobile/pm-r8a7791.c
- create mode 100644 arch/arm/mach-shmobile/pm-rcar-gen2.c
+diff --git a/arch/arm/mach-shmobile/pm-r8a7790.c b/arch/arm/mach-shmobile/pm-r8a7790.c
+index 80e8d95..23b61f1 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7790.c
++++ b/arch/arm/mach-shmobile/pm-r8a7790.c
+@@ -38,7 +38,7 @@ static void __init r8a7790_sysc_init(void)
+ 	void __iomem *base = rcar_sysc_init(0xe6180000);
+ 
+ 	/* enable all interrupt sources, but do not use interrupt handler */
+-	iowrite32(0x0131000e, base + SYSCIER);
++	iowrite32(0x013111ef, base + SYSCIER);
+ 	iowrite32(0, base + SYSCIMR);
+ }
+ 
+-- 
+2.1.4
