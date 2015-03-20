@@ -1,44 +1,67 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 20 Mar 2015 20:44:11 +0200
-Subject: [PATCHv5 00/35] ARM: OMAP2+: PRCM/SCM cleanups against 4.0-rc 
-Message-ID: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 20 Mar 2015 20:44:13 +0200
+Subject: [PATCHv5 02/35] ARM: OMAP2+: PRCM: rename of_prcm_init to
+ omap_prcm_init
+In-Reply-To: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1426877086-17131-3-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This avoids conflicts in the global namespace, and is more descriptive
+of the purpose anyway.
 
-v5 contains the following changes still:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/io.c         |    2 +-
+ arch/arm/mach-omap2/prm.h        |    2 +-
+ arch/arm/mach-omap2/prm_common.c |    8 +++++++-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
-- re-ordered patches a bit, the single clock driver fix moved to beginning
-  of the set, waiting for a separate merge from Mike
-- Changed patch #23 to fix the slightly misleading logic (removed the extra +1)
-- Changed patches #16 and #18 to fix OMAP2/3/4 etc. only builds
-- Fixed ti81xx boot issues (hopefully, I don't have access to hardware
-  to test it)
-- Changed control module DTS layout based on discussions with Tony, this
-  includes addition of minimal l4 bus (patch #25+)
-
-Testing done for v5:
- 1: am335x-evm      : boot
- 2: am335x-evmsk    : boot
- 3: am3517-evm      : boot
- 4: am43x-epos-evm  : boot
- 5: am437x-gp-evm   : boot
- 6: omap3-beagle-xm : boot
- 7: omap3-beagle    : boot, suspend (ret/off), cpuidle (ret/off)
- 8: am335x-boneblack: boot
- 9: am335x-bone     : boot
-10: dra7xx-evm      : boot
-11: omap3-n900      : boot
-12: omap5-uevm      : boot
-13: omap4-panda-es  : boot, suspend (ret), cpuidle (ret)
-14: omap4-panda     : boot
-15: omap2430-sdp    : boot
-16: omap3430-sdp    : boot
-17: omap4-sdp-es23plus: boot
-
-Branch available at:
-- tree: https://github.com/t-kristo/linux-pm.git
-- branch: 4.0-rc1-prcm-cleanup-v5
-
--Tero
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index c4871c5..f504f71 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -764,7 +764,7 @@ int __init omap_clk_init(void)
+ 	ti_clk_init_features();
+ 
+ 	if (of_have_populated_dt()) {
+-		ret = of_prcm_init();
++		ret = omap_prcm_init();
+ 		if (ret)
+ 			return ret;
+ 
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index b9061a6..ba9b933 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -19,7 +19,7 @@
+ extern void __iomem *prm_base;
+ extern u16 prm_features;
+ extern void omap2_set_globals_prm(void __iomem *prm);
+-int of_prcm_init(void);
++int omap_prcm_init(void);
+ void omap3_prcm_legacy_iomaps_init(void);
+ # endif
+ 
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index bfaa7ba..c5cfaa9 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -625,7 +625,13 @@ static struct ti_clk_ll_ops omap_clk_ll_ops = {
+ 	.clk_writel = prm_clk_writel,
+ };
+ 
+-int __init of_prcm_init(void)
++/**
++ * omap_prcm_init - low level init for the PRCM drivers
++ *
++ * Initializes the low level clock infrastructure for PRCM drivers.
++ * Returns 0 in success, negative error value in failure.
++ */
++int __init omap_prcm_init(void)
+ {
+ 	struct device_node *np;
+ 	void __iomem *mem;
+-- 
+1.7.9.5
