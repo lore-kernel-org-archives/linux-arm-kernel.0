@@ -1,39 +1,87 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 20 Mar 2015 14:42:38 +0300
-Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
-In-Reply-To: <550C0503.3000207@samsung.com>
-References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
- <550C0503.3000207@samsung.com>
-Message-ID: <550C07AE.8030708@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 20 Mar 2015 12:43:53 +0100
+Subject: [PATCH V3 0/8] ARM: cpuidle: Unify the ARM64/ARM DT approach
+Message-ID: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2015 02:31 PM, Yury Gribov wrote:
-> On 03/20/2015 02:12 PM, Andrey Ryabinin wrote:
->> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
->> split this is not so, because 2*TASK_SIZE overflows 32 bits,
->> so the actual value of ELF_ET_DYN_BASE is:
->>     (2 * TASK_SIZE / 3) = 0x2a000000
-> 
-> AFAIK on most platforms (e.g. Intel) that's (TASK_SIZE / 3 * 2) so ARM is kind of special here.
-> 
->>
->> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
->> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
->> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
->> as it fails to map shadow memory.
->> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
->> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
->> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
->>
->> Fix overflow by dividing TASK_SIZE prior to multiplying.
->> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
->>     (TASK_SIZE / 3 * 2) = 0x7f555554
->>
->> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
-> 
-> Perhaps we should fix other platforms as well?
-> 
+There is a big number of cpuidle drivers for the ARM architecture.
 
-Seems only avr32 and cris platforms have the same problem.
-All other 32bit platforms where ELF_ET_DYB_BASE = (2 * TASK_SIZE / 3) have TASK_SIZE < 2G, so there is no overflow.
+These drivers have been cleaned up and grouped into the drivers/cpuidle
+directory to keep track of the changes more easily and ensure the code
+is following the same scheme across the drivers.
+
+That had the benefit of simplifying the code and factor out a lot of common
+parts. Beside that, as the drivers belong to the 'drivers' directory, we had
+to split the arch specific bits and the generic code in order to keep
+everything self contained. The platform driver paradigm was used for this
+purpose.
+
+Unfortunately, this approach is now no longer accepted and a different solution
+must be provided to reach the same goal: one example is the Qualcomm cpuidle
+driver upstreaming attempt.
+
+In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
+
+The DT definition provides an 'enable-method' to specify one of the cpu
+operations (PSCI, ...).
+
+This patchset unify this driver with ARM32, using the same DT definition.
+
+Thanks with this patchset we can use the 'enable-method' to specify a cpu
+operations, hence get rid of the platform driver approach and go further in the
+cpuidle driver flexibility via the DT.
+
+Changelog:
+
+ V3:
+	* Fixed unroll loop when failing to register the device
+	* Removed the per cpu cpuidle_device
+	* Remove goto statement in the registration path
+	* Fixed a compilation failure with allyesconfig on arm64
+
+ V2:
+	* Used smp_operations style for cpuidle_ops
+	* Fixed some nits in the comments
+	* Added a patch to change the name of the functions
+	* Added per cpu device registration patch
+
+Daniel Lezcano (8):
+  ARM: cpuidle: Remove duplicate header inclusion
+  ARM: cpuidle: Add a cpuidle ops structure to be used for DT
+  ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
+  ARM64: cpuidle: Rename cpu_init_idle to a common function name
+  ARM64: cpuidle: Remove arm64 reference
+  ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
+  ARM: cpuidle: Register per cpuidle device
+  ARM: cpuidle: Change function name to be consistent with x86
+
+ arch/arm/include/asm/cpuidle.h                     | 23 +++++++
+ arch/arm/kernel/cpuidle.c                          | 74 +++++++++++++++++++-
+ arch/arm/mach-davinci/cpuidle.c                    |  1 -
+ arch/arm/mach-imx/cpuidle-imx6q.c                  |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sl.c                 |  1 -
+ arch/arm/mach-imx/cpuidle-imx6sx.c                 |  1 -
+ arch/arm/mach-omap2/cpuidle44xx.c                  |  1 -
+ arch/arm/mach-s3c64xx/cpuidle.c                    |  2 +-
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |  1 -
+ arch/arm/mach-tegra/cpuidle-tegra30.c              |  1 -
+ arch/arm64/include/asm/cpuidle.h                   |  9 ++-
+ arch/arm64/kernel/cpuidle.c                        |  2 +-
+ drivers/cpuidle/Kconfig                            |  7 +-
+ drivers/cpuidle/Kconfig.arm                        | 12 +++-
+ drivers/cpuidle/Kconfig.arm64                      | 13 ----
+ drivers/cpuidle/Makefile                           |  5 +-
+ drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} | 80 ++++++++++++++++------
+ drivers/cpuidle/cpuidle-at91.c                     |  1 -
+ drivers/cpuidle/cpuidle-exynos.c                   |  1 -
+ drivers/cpuidle/cpuidle-kirkwood.c                 |  1 -
+ drivers/cpuidle/cpuidle-ux500.c                    |  1 -
+ drivers/cpuidle/cpuidle-zynq.c                     |  1 -
+ include/asm-generic/vmlinux.lds.h                  |  2 +
+ 23 files changed, 178 insertions(+), 63 deletions(-)
+ delete mode 100644 drivers/cpuidle/Kconfig.arm64
+ rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (57%)
+
+-- 
+1.9.1
