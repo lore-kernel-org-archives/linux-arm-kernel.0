@@ -1,336 +1,95 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Fri, 20 Mar 2015 08:48:50 +0100
-Subject: [PATCH v2] thermal: exynos: Add the support for Exynos5433 TMU
-In-Reply-To: <1425954224-31035-1-git-send-email-cw00.choi@samsung.com>
-References: <1425954224-31035-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20150320084850.539010f5@amdc2363>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 20 Mar 2015 08:48:56 +0100
+Subject: [PATCH v4] ARM: zynq: use restart_handler mechanism for slcr reset
+In-Reply-To: <1426775078-31496-1-git-send-email-joshc@ni.com>
+References: <BN1BFFO11FD028DBA8016227BB3B18A2B8E2010@BN1BFFO11FD028.protection.gbl>
+ <1426775078-31496-1-git-send-email-joshc@ni.com>
+Message-ID: <BL2FFO11FD023E0F02C7ACC5756029B69E20E0@BL2FFO11FD023.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
-
-> This patch adds the support for Exynos5433's TMU (Thermal Management
-> Unit). Exynos5433 has a little different register bit fields as
-> following description:
-> - Support the eight trip points for rising/falling interrupt by using
-> two registers
-> - Read the calibration type (1-point or 2-point) and sensor id from
-> TRIMINFO register
-> - Use a little different register address
+On 03/19/2015 03:24 PM, Josh Cartwright wrote:
+> By making use of the restart_handler chain mechanism, the SLCR-based
+> reset mechanism can be prioritized amongst other mechanisms available on
+> a particular board.
 > 
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Choose a default high-ish priority of 192 for this restart mechanism.
+> 
+> Signed-off-by: Josh Cartwright <joshc@ni.com>
 > ---
-> Changes from v1:
-> (https://lkml.org/lkml/2015/2/26/234)
-> - Add exynos5433_tmu_control() instead of using exynos7_tmu_control()
-> on both Exynos5433 and Exynos7.
-> - Separate the patches related to devicetree and then send send
-> Exnos5433's tmu patches[1] with other Exynos5433 devicetree patches.
->   [1] https://lkml.org/lkml/2015/3/9/1036
 > 
->  drivers/thermal/samsung/exynos_tmu.c | 187
-> ++++++++++++++++++++++++++++++++++-
-> drivers/thermal/samsung/exynos_tmu.h |   1 + 2 files changed, 186
-> insertions(+), 2 deletions(-)
+> v3 -> v4: Document restart notifier callback parameters.
+> v2 -> v3: Don't drop the kerneldoc
+> v1 -> v2: Also drop zynq_slcr_system_reset prototype from common.h
 > 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index 1d30b09..531f4b17 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -97,6 +97,32 @@
->  #define EXYNOS4412_MUX_ADDR_VALUE          6
->  #define EXYNOS4412_MUX_ADDR_SHIFT          20
->  
-> +/* Exynos5433 specific registers */
-> +#define EXYNOS5433_TMU_REG_CONTROL1		0x024
-> +#define EXYNOS5433_TMU_SAMPLING_INTERVAL	0x02c
-> +#define EXYNOS5433_TMU_COUNTER_VALUE0		0x030
-> +#define EXYNOS5433_TMU_COUNTER_VALUE1		0x034
-> +#define EXYNOS5433_TMU_REG_CURRENT_TEMP1	0x044
-> +#define EXYNOS5433_THD_TEMP_RISE3_0		0x050
-> +#define EXYNOS5433_THD_TEMP_RISE7_4		0x054
-> +#define EXYNOS5433_THD_TEMP_FALL3_0		0x060
-> +#define EXYNOS5433_THD_TEMP_FALL7_4		0x064
-> +#define EXYNOS5433_TMU_REG_INTEN		0x0c0
-> +#define EXYNOS5433_TMU_REG_INTPEND		0x0c8
-> +#define EXYNOS5433_TMU_EMUL_CON			0x110
-> +#define EXYNOS5433_TMU_PD_DET_EN		0x130
-> +
-> +#define EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT	16
-> +#define EXYNOS5433_TRIMINFO_CALIB_SEL_SHIFT	23
-> +#define EXYNOS5433_TRIMINFO_SENSOR_ID_MASK	\
-> +			(0xf << EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT)
-> +#define EXYNOS5433_TRIMINFO_CALIB_SEL_MASK	BIT(23)
-> +
-> +#define EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING	0
-> +#define EXYNOS5433_TRIMINFO_TWO_POINT_TRIMMING	1
-> +
-> +#define EXYNOS5433_PD_DET_EN			1
-> +
->  /*exynos5440 specific registers*/
->  #define EXYNOS5440_TMU_S0_7_TRIM		0x000
->  #define EXYNOS5440_TMU_S0_7_CTRL		0x020
-> @@ -484,6 +510,101 @@ out:
->  	return ret;
+>  arch/arm/mach-zynq/common.c |  6 ------
+>  arch/arm/mach-zynq/common.h |  1 -
+>  arch/arm/mach-zynq/slcr.c   | 21 +++++++++++++++++++--
+>  3 files changed, 19 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 58ef2a7..616d584 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -190,11 +190,6 @@ static void __init zynq_irq_init(void)
+>  	irqchip_init();
 >  }
 >  
-> +static int exynos5433_tmu_initialize(struct platform_device *pdev)
-> +{
-> +	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> +	struct exynos_tmu_platform_data *pdata = data->pdata;
-> +	struct thermal_zone_device *tz = data->tzd;
-> +	unsigned int status, trim_info;
-> +	unsigned int rising_threshold = 0, falling_threshold = 0;
-> +	unsigned long temp, temp_hist;
-> +	int ret = 0, threshold_code, i, sensor_id, cal_type;
-> +
-> +	status = readb(data->base + EXYNOS_TMU_REG_STATUS);
-> +	if (!status) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	trim_info = readl(data->base + EXYNOS_TMU_REG_TRIMINFO);
-> +	sanitize_temp_error(data, trim_info);
-> +
-> +	/* Read the temperature sensor id */
-> +	sensor_id = (trim_info & EXYNOS5433_TRIMINFO_SENSOR_ID_MASK)
-> +				>>
-> EXYNOS5433_TRIMINFO_SENSOR_ID_SHIFT;
-> +	dev_info(&pdev->dev, "Temperature sensor ID: 0x%x\n",
-> sensor_id); +
-> +	/* Read the calibration mode */
-> +	writel(trim_info, data->base + EXYNOS_TMU_REG_TRIMINFO);
-> +	cal_type = (trim_info & EXYNOS5433_TRIMINFO_CALIB_SEL_MASK)
-> +				>>
-> EXYNOS5433_TRIMINFO_CALIB_SEL_SHIFT; +
-> +	switch (cal_type) {
-> +	case EXYNOS5433_TRIMINFO_ONE_POINT_TRIMMING:
-> +		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
-> +		break;
-> +	case EXYNOS5433_TRIMINFO_TWO_POINT_TRIMMING:
-> +		pdata->cal_type = TYPE_TWO_POINT_TRIMMING;
-> +		break;
-> +	default:
-> +		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
-> +		break;
-> +	};
-> +
-> +	dev_info(&pdev->dev, "Calibration type is %d-point
-> calibration\n",
-> +			cal_type ?  2 : 1);
-> +
-> +	/* Write temperature code for rising and falling threshold */
-> +	for (i = 0; i < of_thermal_get_ntrips(tz); i++) {
-> +		int rising_reg_offset, falling_reg_offset;
-> +		int j = 0;
-> +
-> +		switch (i) {
-> +		case 0:
-> +		case 1:
-> +		case 2:
-> +		case 3:
-> +			rising_reg_offset =
-> EXYNOS5433_THD_TEMP_RISE3_0;
-> +			falling_reg_offset =
-> EXYNOS5433_THD_TEMP_FALL3_0;
-> +			j = i;
-> +			break;
-> +		case 4:
-> +		case 5:
-> +		case 6:
-> +		case 7:
-> +			rising_reg_offset =
-> EXYNOS5433_THD_TEMP_RISE7_4;
-> +			falling_reg_offset =
-> EXYNOS5433_THD_TEMP_FALL7_4;
-> +			j = i - 4;
-> +			break;
-> +		default:
-> +			continue;
-> +		}
-> +
-> +		/* Write temperature code for rising threshold */
-> +		tz->ops->get_trip_temp(tz, i, &temp);
-> +		temp /= MCELSIUS;
-> +		threshold_code = temp_to_code(data, temp);
-> +
-> +		rising_threshold = readl(data->base +
-> rising_reg_offset);
-> +		rising_threshold |= (threshold_code << j * 8);
-> +		writel(rising_threshold, data->base +
-> rising_reg_offset); +
-> +		/* Write temperature code for falling threshold */
-> +		tz->ops->get_trip_hyst(tz, i, &temp_hist);
-> +		temp_hist = temp - (temp_hist / MCELSIUS);
-> +		threshold_code = temp_to_code(data, temp_hist);
-> +
-> +		falling_threshold = readl(data->base +
-> falling_reg_offset);
-> +		falling_threshold &= ~(0xff << j * 8);
-> +		falling_threshold |= (threshold_code << j * 8);
-> +		writel(falling_threshold, data->base +
-> falling_reg_offset);
-> +	}
-> +
-> +	data->tmu_clear_irqs(data);
-> +out:
-> +	return ret;
-> +}
-> +
->  static int exynos5440_tmu_initialize(struct platform_device *pdev)
->  {
->  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> @@ -643,6 +764,48 @@ static void exynos4210_tmu_control(struct
-> platform_device *pdev, bool on) writel(con, data->base +
-> EXYNOS_TMU_REG_CONTROL); }
+> -static void zynq_system_reset(enum reboot_mode mode, const char *cmd)
+> -{
+> -	zynq_slcr_system_reset();
+> -}
+> -
+>  static const char * const zynq_dt_match[] = {
+>  	"xlnx,zynq-7000",
+>  	NULL
+> @@ -212,5 +207,4 @@ DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+>  	.init_time	= zynq_timer_init,
+>  	.dt_compat	= zynq_dt_match,
+>  	.reserve	= zynq_memory_init,
+> -	.restart	= zynq_system_reset,
+>  MACHINE_END
+> diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+> index 382c60e..f2f0bf2 100644
+> --- a/arch/arm/mach-zynq/common.h
+> +++ b/arch/arm/mach-zynq/common.h
+> @@ -21,7 +21,6 @@ void zynq_secondary_startup(void);
 >  
-> +static void exynos5433_tmu_control(struct platform_device *pdev,
-> bool on) +{
-> +	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> +	struct thermal_zone_device *tz = data->tzd;
-> +	unsigned int con, interrupt_en, pd_det_en;
-> +
-> +	con = get_con_reg(data, readl(data->base +
-> EXYNOS_TMU_REG_CONTROL)); +
-> +	if (on) {
-> +		con |= (1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		interrupt_en =
-> +			(of_thermal_is_trip_valid(tz, 7)
-> +			<< EXYNOS7_TMU_INTEN_RISE7_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 6)
-> +			<< EXYNOS7_TMU_INTEN_RISE6_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 5)
-> +			<< EXYNOS7_TMU_INTEN_RISE5_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 4)
-> +			<< EXYNOS7_TMU_INTEN_RISE4_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 3)
-> +			<< EXYNOS7_TMU_INTEN_RISE3_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 2)
-> +			<< EXYNOS7_TMU_INTEN_RISE2_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 1)
-> +			<< EXYNOS7_TMU_INTEN_RISE1_SHIFT) |
-> +			(of_thermal_is_trip_valid(tz, 0)
-> +			<< EXYNOS7_TMU_INTEN_RISE0_SHIFT);
-> +
-> +		interrupt_en |=
-> +			interrupt_en << EXYNOS_TMU_INTEN_FALL0_SHIFT;
-> +	} else {
-> +		con &= ~(1 << EXYNOS_TMU_CORE_EN_SHIFT);
-> +		interrupt_en = 0; /* Disable all interrupts */
-> +	}
-> +
-> +	pd_det_en = on ? EXYNOS5433_PD_DET_EN : 0;
-> +
-> +	writel(pd_det_en, data->base + EXYNOS5433_TMU_PD_DET_EN);
-> +	writel(interrupt_en, data->base + EXYNOS5433_TMU_REG_INTEN);
-> +	writel(con, data->base + EXYNOS_TMU_REG_CONTROL);
-> +}
-> +
->  static void exynos5440_tmu_control(struct platform_device *pdev,
-> bool on) {
->  	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
-> @@ -770,6 +933,8 @@ static void exynos4412_tmu_set_emulation(struct
-> exynos_tmu_data *data, 
->  	if (data->soc == SOC_ARCH_EXYNOS5260)
->  		emul_con = EXYNOS5260_EMUL_CON;
-> +	if (data->soc == SOC_ARCH_EXYNOS5433)
-> +		emul_con = EXYNOS5433_TMU_EMUL_CON;
->  	else if (data->soc == SOC_ARCH_EXYNOS7)
->  		emul_con = EXYNOS7_TMU_REG_EMUL_CON;
->  	else
-> @@ -882,6 +1047,9 @@ static void exynos4210_tmu_clear_irqs(struct
-> exynos_tmu_data *data) } else if (data->soc == SOC_ARCH_EXYNOS7) {
->  		tmu_intstat = EXYNOS7_TMU_REG_INTPEND;
->  		tmu_intclear = EXYNOS7_TMU_REG_INTPEND;
-> +	} else if (data->soc == SOC_ARCH_EXYNOS5433) {
-> +		tmu_intstat = EXYNOS5433_TMU_REG_INTPEND;
-> +		tmu_intclear = EXYNOS5433_TMU_REG_INTPEND;
->  	} else {
->  		tmu_intstat = EXYNOS_TMU_REG_INTSTAT;
->  		tmu_intclear = EXYNOS_TMU_REG_INTCLEAR;
-> @@ -926,6 +1094,7 @@ static const struct of_device_id
-> exynos_tmu_match[] = { { .compatible = "samsung,exynos5260-tmu", },
->  	{ .compatible = "samsung,exynos5420-tmu", },
->  	{ .compatible = "samsung,exynos5420-tmu-ext-triminfo", },
-> +	{ .compatible = "samsung,exynos5433-tmu", },
->  	{ .compatible = "samsung,exynos5440-tmu", },
->  	{ .compatible = "samsung,exynos7-tmu", },
->  	{ /* sentinel */ },
-> @@ -949,6 +1118,8 @@ static int exynos_of_get_soc_type(struct
-> device_node *np) else if (of_device_is_compatible(np,
->  					 "samsung,exynos5420-tmu-ext-triminfo"))
->  		return SOC_ARCH_EXYNOS5420_TRIMINFO;
-> +	else if (of_device_is_compatible(np,
-> "samsung,exynos5433-tmu"))
-> +		return SOC_ARCH_EXYNOS5433;
->  	else if (of_device_is_compatible(np,
-> "samsung,exynos5440-tmu")) return SOC_ARCH_EXYNOS5440;
->  	else if (of_device_is_compatible(np, "samsung,exynos7-tmu"))
-> @@ -1069,6 +1240,13 @@ static int exynos_map_dt_data(struct
-> platform_device *pdev) data->tmu_set_emulation =
-> exynos4412_tmu_set_emulation; data->tmu_clear_irqs =
-> exynos4210_tmu_clear_irqs; break;
-> +	case SOC_ARCH_EXYNOS5433:
-> +		data->tmu_initialize = exynos5433_tmu_initialize;
-> +		data->tmu_control = exynos5433_tmu_control;
-> +		data->tmu_read = exynos4412_tmu_read;
-> +		data->tmu_set_emulation =
-> exynos4412_tmu_set_emulation;
-> +		data->tmu_clear_irqs = exynos4210_tmu_clear_irqs;
-> +		break;
->  	case SOC_ARCH_EXYNOS5440:
->  		data->tmu_initialize = exynos5440_tmu_initialize;
->  		data->tmu_control = exynos5440_tmu_control;
-> @@ -1172,7 +1350,9 @@ static int exynos_tmu_probe(struct
-> platform_device *pdev) goto err_clk_sec;
->  	}
+>  extern int zynq_slcr_init(void);
+>  extern int zynq_early_slcr_init(void);
+> -extern void zynq_slcr_system_reset(void);
+>  extern void zynq_slcr_cpu_stop(int cpu);
+>  extern void zynq_slcr_cpu_start(int cpu);
+>  extern bool zynq_slcr_cpu_state_read(int cpu);
+> diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/mach-zynq/slcr.c
+> index c3c24fd8..af8fb50 100644
+> --- a/arch/arm/mach-zynq/slcr.c
+> +++ b/arch/arm/mach-zynq/slcr.c
+> @@ -15,6 +15,7 @@
+>   */
 >  
-> -	if (data->soc == SOC_ARCH_EXYNOS7) {
-> +	switch (data->soc) {
-> +	case SOC_ARCH_EXYNOS5433:
-> +	case SOC_ARCH_EXYNOS7:
->  		data->sclk = devm_clk_get(&pdev->dev, "tmu_sclk");
->  		if (IS_ERR(data->sclk)) {
->  			dev_err(&pdev->dev, "Failed to get sclk\n");
-> @@ -1184,7 +1364,10 @@ static int exynos_tmu_probe(struct
-> platform_device *pdev) goto err_clk;
->  			}
->  		}
-> -	}
-> +		break;
-> +	default:
-> +		break;
-> +	};
+>  #include <linux/io.h>
+> +#include <linux/reboot.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/of_address.h>
+>  #include <linux/regmap.h>
+> @@ -92,9 +93,17 @@ u32 zynq_slcr_get_device_id(void)
+>  }
 >  
->  	ret = exynos_tmu_initialize(pdev);
->  	if (ret) {
-> diff --git a/drivers/thermal/samsung/exynos_tmu.h
-> b/drivers/thermal/samsung/exynos_tmu.h index 4d71ec6..440c714 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.h
-> +++ b/drivers/thermal/samsung/exynos_tmu.h
-> @@ -33,6 +33,7 @@ enum soc_type {
->  	SOC_ARCH_EXYNOS5260,
->  	SOC_ARCH_EXYNOS5420,
->  	SOC_ARCH_EXYNOS5420_TRIMINFO,
-> +	SOC_ARCH_EXYNOS5433,
->  	SOC_ARCH_EXYNOS5440,
->  	SOC_ARCH_EXYNOS7,
->  };
+>  /**
+> - * zynq_slcr_system_reset - Reset the entire system.
+> + * zynq_slcr_system_restart - Restart the entire system.
+> + *
+> + * @nb:		Pointer to restart notifier block (unused)
+> + * @action:	Reboot mode (unused)
+> + * @data:	Restart handler private data (unused)
+> + *
+> + * Return:	a negative value on error, 0 on success
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+:-) I can't see any negative value on error.
+I will fix it myself to 0 always.
 
-I will test this patch (@ Odroid U3) when linux-samusng-thermal/next
-branch would be updated to newest mainline.
+Applied both.
 
-Eduardo, could you update your -next branch?
-
--- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Cheers,
+Michal
