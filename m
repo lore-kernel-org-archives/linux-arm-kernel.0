@@ -1,81 +1,85 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 Mar 2015 13:24:06 -0500
-Subject: [PATCH] arm64: dts: kill skeleton.dtsi
-In-Reply-To: <1426870933-23126-1-git-send-email-mark.rutland@arm.com>
-References: <1426870933-23126-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAL_JsqLh320hBCpcf+VobXReaPE=QYxWDf3H_cdRrMzby1Ax0Q@mail.gmail.com>
+Date: Fri, 20 Mar 2015 13:25:31 -0500
+Subject: [PATCH RESEND] Doc: dt: arch_timer: discourage clock-frequency use
+In-Reply-To: <1426874267-24413-1-git-send-email-mark.rutland@arm.com>
+References: <1426874267-24413-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAL_JsqJfyknhZxGvbWcj1Vj1FGRt40qT9b=xrbhm0wfu-BduTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 12:02 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> While skeleton.dtsi was initially conceived as a simple way to bootstrap
-> writing a dts, it has proven to be problematic:
+On Fri, Mar 20, 2015 at 12:57 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> The ARM Generic Timer (AKA the architected timer, arm_arch_timer)
+> features a CPU register (CNTFRQ) which firmware is intended to
+> initialize, and non-secure software can read to determine the frequency
+> of the timer. On CPUs with secure state, this register cannot be written
+> from non-secure states.
 >
-> * The #address-cells and #size-cells values used in skeleton.dtsi may
->   not match what a user wants (e.g. when they need to describe a range
->   larger than 4GB).
+> The firmware of early SoCs featuring the timer did not correctly
+> initialize CNTFRQ correctly on all CPUs, requiring the frequency to be
+> described in DT as a workaround. This workaround is not complete however
+> as it is exposed to all software in a privileged non-secure mode
+> (including guests running under a hypervisor). The firmware and DTs for
+> recent SoCs have followed the example set by these early SoCs.
 >
-> * For dts files where memory nodes have unit-addresses, it adds a
->   redundant /memory node, for which the reg entry may not be
->   appropriately sized (e.g. where #size-cells has been overridden).
->
-> * For dts files which assume that a bootloader will fill in the memory
->   node(s), no node is present in the dts (and hence there is no attached
->   comment), making it hard to distinguish these cases from bad dts
->   files, and masking any warnings dtc may produce w.r.t. missing nodes.
->
-> * The default empty /chosen and /aliases are somewhat useless, and it
->   would be preferable for dts to fill these in (e.g. for
->   /aliases/serial0 and /chosen/stdout-path).
->
-> This patch removes skeleton.dtsi from arm64. There are currently no
-> users, so we can remove it before any appear.
+> This patch updates the arch timer binding documentation to make it
+> clearer that the use of the clock-frequency property is a poor
+> work-around. The MMIO generic timer binding is similarly updated, though
+> this is less of a concern as there is generally no need to expose the
+> MMIO timers to guest OSs.
 >
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Rob Herring <rob.herring@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Will Deacon <will.deacon@arm.com>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
 > ---
->  arch/arm64/boot/dts/skeleton.dtsi | 13 -------------
->  1 file changed, 13 deletions(-)
->  delete mode 100644 arch/arm64/boot/dts/skeleton.dtsi
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
 >
-> Recent comments reminded me to send this.
+> This patch has fallen through the cracks a few times [1,2], though that appears
+> to be my fault for not sorting out a reasonable Cc list.
 >
-> I've taken a look in mainline and linux-next and I see no skeleton.dtsi users
-> in arch/arm64/boot/dts/.
+> Rob, are you happy to take this through your tree?
+
+Yes, I'll take it.
+
+Rob
+
 >
 > Mark.
 >
-> diff --git a/arch/arm64/boot/dts/skeleton.dtsi b/arch/arm64/boot/dts/skeleton.dtsi
-> deleted file mode 100644
-> index 38ead82..0000000
-> --- a/arch/arm64/boot/dts/skeleton.dtsi
-> +++ /dev/null
-> @@ -1,13 +0,0 @@
-> -/*
-> - * Skeleton device tree; the bare minimum needed to boot; just include and
-> - * add a compatible value.  The bootloader will typically populate the memory
-> - * node.
-> - */
-> -
-> -/ {
-> -       #address-cells = <2>;
-> -       #size-cells = <1>;
-> -       chosen { };
-> -       aliases { };
-> -       memory { device_type = "memory"; reg = <0 0 0>; };
-> -};
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282804.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-August/282830.html
+>
+>
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index 256b4d8..e774128 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -17,7 +17,10 @@ to deliver its interrupts via SPIs.
+>  - interrupts : Interrupt list for secure, non-secure, virtual and
+>    hypervisor timers, in that order.
+>
+> -- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> +- clock-frequency : The frequency of the main counter, in Hz. Should be present
+> +  only where necessary to work around broken firmware which does not configure
+> +  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
+> +  strongly discouraged; fix your firmware unless absolutely impossible.
+>
+>  - always-on : a boolean property. If present, the timer is powered through an
+>    always-on power domain, therefore it never loses context.
+> @@ -46,7 +49,8 @@ Example:
+>
+>  - compatible : Should at least contain "arm,armv7-timer-mem".
+>
+> -- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> +- clock-frequency : The frequency of the main counter, in Hz. Should be present
+> +  only when firmware has not configured the MMIO CNTFRQ registers.
+>
+>  - reg : The control frame base address.
+>
 > --
 > 1.9.1
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
