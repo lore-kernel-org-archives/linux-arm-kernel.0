@@ -1,37 +1,28 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 20 Mar 2015 17:30:10 +0100
-Subject: ERRATA work-arounds in the kernel
-Message-ID: <550C4B12.1030608@free.fr>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Fri, 20 Mar 2015 19:41:37 +0300
+Subject: [PATCH] ARM: trusted_foundations: Maintain CPU endianness
+In-Reply-To: <550C45AB.3070703@wwwdotorg.org>
+References: <1426865807-22981-1-git-send-email-digetx@gmail.com>
+ <550C45AB.3070703@wwwdotorg.org>
+Message-ID: <550C4DC1.3090909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+20.03.2015 19:07, Stephen Warren ?????:
+> On 03/20/2015 09:36 AM, Dmitry Osipenko wrote:
+>> Convert CPU reset vector address to LE to support big-endian kernel.
+>
+> Naively this sounds a little odd; the value here is in a CPU register all the
+> time, not in memory, so I'm not sure why endianness is relevant? Presumably the
+> CPU doesn't end up byte-swapping values in registers when running in BE mode or
+> it takes an SMC? If it does, why don't we need
+> cpu_to_le32(TF_SET_CPU_BOOT_ADDR_SMC) too?
+>
+> Sorry if this is a silly question; I haven't followed any of the BE kernel patches.
 
-I was recently looking (in arch/arm/Kconfig) at the list of work-arounds
-for ARM CPU Errata. I saw 18, with 8 documented as applying to Cortex A9.
+You absolutely right. I goofed it by replacing 'smc' with 'str' without adding 
+reg reverse for BE when was testing and then blindly made patch. Please ignore 
+it and sorry for the noise.
 
-I also looked at ARM's "Errata Summary Table" for the Cortex A9. There are
-roughly 90 errata documented there. (This document is 2 years old.)
-
-I assume that some (most?) of these do not apply to Linux, but it seems
-likely that some do?
-
-I'm wondering why there are not more work-arounds available in Kconfig?
-
-Could it be that some work-arounds have been applied unconditionally, thus
-not showing as an entry in Kconfig? (I doubt that, since work-arounds are
-very CPU-specific.)
-
-I'm wondering if it is possible to trigger some of these with a "normal"
-work-load on a "normal" kernel? Has anyone (perhaps ARM employees) looked
-at that? (I suppose they have.)
-
-For example, errata #782772
-"Speculative execution of a Load-Exclusive or Store-Exclusive instruction
-after a write to Strongly Ordered memory might deadlock the processor."
-(The recommended work-around is a strategically-placed DMB.)
-
-Since ldrex is used in low-level code, it seems possible to hit that one?
-Or perhaps Linux does not support "Strongly Ordered" memory regions?
-
-Regards.
+-- 
+Dmitry
