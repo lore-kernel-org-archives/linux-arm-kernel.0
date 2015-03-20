@@ -1,71 +1,179 @@
-From: dtor@google.com (Dmitry Torokhov)
-Date: Fri, 20 Mar 2015 14:40:37 -0700
-Subject: [PATCH 2/3] usb: ehci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1426885630-32429-3-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426885630-32429-3-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <20150320214037.GC25405@dtor-ws>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 20 Mar 2015 16:43:44 -0500
+Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
+ control module support
+In-Reply-To: <1426877086-17131-28-git-send-email-t-kristo@ti.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-28-git-send-email-t-kristo@ti.com>
+Message-ID: <550C9490.3070505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arun,
+Hi Tero,
 
-On Fri, Mar 20, 2015 at 02:07:09PM -0700, Arun Ramamurthy wrote:
-> Getting phys by index instead of phy names so that the dt
-> bindings phy-names remain consistent when multiple phys are present
+On 03/20/2015 01:44 PM, Kristo, Tero wrote:
+> This patch creates an l4_wkup interconnect for AM33xx, and moves some of
+> the generic peripherals under it. System control module nodes are moved
+> under this new interconnect also, and the SCM clock layout is changed
+> to use the renamed SCM node as the clock provider.
 > 
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  drivers/usb/host/ehci-platform.c | 20 ++++----------------
->  1 file changed, 4 insertions(+), 16 deletions(-)
+>  Documentation/devicetree/bindings/arm/omap/l4.txt  |    1 +
+>  .../devicetree/bindings/arm/omap/prcm.txt          |    2 +-
+>  arch/arm/boot/dts/am33xx-clocks.dtsi               |    2 +-
+>  arch/arm/boot/dts/am33xx.dtsi                      |   87 +++++++++++---------
+>  arch/arm/mach-omap2/control.c                      |    2 +-
+>  5 files changed, 51 insertions(+), 43 deletions(-)
 > 
-> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-> index d8a75a5..8b0c7ae 100644
-> --- a/drivers/usb/host/ehci-platform.c
-> +++ b/drivers/usb/host/ehci-platform.c
-> @@ -154,7 +154,6 @@ static int ehci_platform_probe(struct platform_device *dev)
->  	struct usb_ehci_pdata *pdata = dev_get_platdata(&dev->dev);
->  	struct ehci_platform_priv *priv;
->  	struct ehci_hcd *ehci;
-> -	const char *phy_name;
->  	int err, irq, phy_num, clk = 0;
+> diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
+> index 6402022..d333f0a 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/l4.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
+> @@ -6,6 +6,7 @@ Required properties:
+>  - compatible : Should be "ti,omap2-l4" for OMAP2 family l4 core bus
+>  	       Should be "ti,omap2-l4-wkup" for OMAP2 family l4 wkup bus
+>  	       Should be "ti,omap3-l4-core" for OMAP3 family l4 core bus
+> +	       Should be "ti,am3-l4-wkup" for AM33xx family l4 wkup bus
+>  - ranges : contains the IO map range for the bus
 >  
->  	if (usb_disabled())
-> @@ -212,21 +211,10 @@ static int ehci_platform_probe(struct platform_device *dev)
->  			return -ENOMEM;
+>  Examples:
+> diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+> index ef5a74b..c8e2027 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+> @@ -10,7 +10,7 @@ documentation about the individual clock/clockdomain nodes.
+>  Required properties:
+>  - compatible:	Must be one of:
+>  		"ti,am3-prcm"
+> -		"ti,am3-scrm"
+> +		"ti,am3-scm"
+>  		"ti,am4-prcm"
+>  		"ti,am4-scrm"
+>  		"ti,omap2-prcm"
+> diff --git a/arch/arm/boot/dts/am33xx-clocks.dtsi b/arch/arm/boot/dts/am33xx-clocks.dtsi
+> index 712edce..236c78a 100644
+> --- a/arch/arm/boot/dts/am33xx-clocks.dtsi
+> +++ b/arch/arm/boot/dts/am33xx-clocks.dtsi
+> @@ -7,7 +7,7 @@
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>   */
+> -&scrm_clocks {
+> +&scm_clocks {
+>  	sys_clkin_ck: sys_clkin_ck {
+>  		#clock-cells = <0>;
+>  		compatible = "ti,mux-clock";
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index acd3705..8d26261 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -83,20 +83,6 @@
+>  		};
+>  	};
 >  
->  		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
-> -				err = of_property_read_string_index(
-> -						dev->dev.of_node,
-> -						"phy-names", phy_num,
-> -						&phy_name);
+> -	am33xx_control_module: control_module at 4a002000 {
+> -		compatible = "syscon";
+> -		reg = <0x44e10000 0x7fc>;
+> -	};
 > -
-> -				if (err < 0) {
-> -					if (priv->num_phys > 1) {
-> -						dev_err(&dev->dev, "phy-names not provided");
-> -						goto err_put_hcd;
-> -					} else
-> -						phy_name = "usb";
-> -				}
+> -	am33xx_pinmux: pinmux at 44e10800 {
+> -		compatible = "pinctrl-single";
+> -		reg = <0x44e10800 0x0238>;
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -		pinctrl-single,register-width = <32>;
+> -		pinctrl-single,function-mask = <0x7f>;
+> -	};
 > -
-> -				priv->phys[phy_num] = devm_phy_get(&dev->dev,
-> -						phy_name);
-> +				priv->phys[phy_num] =
-> +					devm_of_phy_get_by_index(&dev->dev,
-> +							dev->dev.of_node,
-> +							phy_num);
->  				if (IS_ERR(priv->phys[phy_num])) {
->  					err = PTR_ERR(priv->phys[phy_num]);
->  					if ((priv->num_phys > 1) ||
+>  	/*
+>  	 * XXX: Use a flat representation of the AM33XX interconnect.
+>  	 * The real AM33XX interconnect network is quite complex. Since
+> @@ -111,37 +97,58 @@
+>  		ranges;
+>  		ti,hwmods = "l3_main";
+>  
+> -		prcm: prcm at 44e00000 {
+> -			compatible = "ti,am3-prcm";
+> -			reg = <0x44e00000 0x4000>;
+> -
+> -			prcm_clocks: clocks {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> -			};
+> +		l4_wkup: l4_wkup at 44c00000 {
+> +			compatible = "ti,am3-l4-wkup", "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0 0x44c00000 0x280000>;
+>  
+> -			prcm_clockdomains: clockdomains {
+> -			};
+> -		};
+> +			prcm: prcm at 200000 {
+> +				compatible = "ti,am3-prcm";
+> +				reg = <0x200000 0x4000>;
+>  
+> -		scrm: scrm at 44e10000 {
+> -			compatible = "ti,am3-scrm";
+> -			reg = <0x44e10000 0x2000>;
+> +				prcm_clocks: clocks {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +				};
+>  
+> -			scrm_clocks: clocks {
+> -				#address-cells = <1>;
+> -				#size-cells = <0>;
+> +				prcm_clockdomains: clockdomains {
+> +				};
+>  			};
+>  
+> -			scrm_clockdomains: clockdomains {
+> +			scm: scm at 210000 {
+> +				compatible = "ti,am3-scm", "simple-bus";
+> +				reg = <0x210000 0x2000>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges = <0 0x210000 0x2000>;
+> +
+> +				am33xx_pinmux: pinmux at 800 {
+> +					compatible = "pinctrl-single";
+> +					reg = <0x800 0x238>;
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					pinctrl-single,register-width = <32>;
+> +					pinctrl-single,function-mask = <0x7f>;
+> +				};
+> +
+> +				scm_conf: scm_conf at 0 {
+> +					compatible = "syscon";
+> +					reg = <0x0 0x7fc>;
 
-While you are fixing this can you please correct the wrong indentation
-level and clean up that whole weird business of treating "phy" not
-present in DT in a special way and, stuffing NULL pointer in priv->phys,
-and checking it for NULL elsewhere?
+Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
+this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
+Also, are we ordering the child nodes of scm by node names or addresses.
+I have to add the wkup_m3 node, and prefer ordering by addresses.
 
-Thanks!
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +
+> +					scm_clocks: clocks {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +					};
+> +				};
+> +
+> +				scm_clockdomains: clockdomains {
+> +				};
+>  			};
+>  		};
+>  
+> -		cm: syscon at 44e10000 {
+> -			compatible = "ti,am33xx-controlmodule", "syscon";
+> -			reg = <0x44e10000 0x800>;
+> -		};
+> -
 
--- 
-Dmitry
+regards
+Suman
