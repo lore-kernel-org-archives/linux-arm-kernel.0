@@ -1,105 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Mar 2015 15:25:41 +0100
-Subject: [PATCH 08/12] KVM: arm/arm64: implement kvm_io_bus MMIO handling
- for the VGIC
-In-Reply-To: <550C1522.80105@arm.com>
-References: <1426263012-22935-1-git-send-email-andre.przywara@arm.com>
- <1426263012-22935-9-git-send-email-andre.przywara@arm.com>
- <20150314142720.GD10935@cbox> <550AEEF3.80702@arm.com>
- <550C1522.80105@arm.com>
-Message-ID: <20150320142541.GG23225@cbox>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 20 Mar 2015 14:25:09 +0000
+Subject: [PATCH v10 15/21] ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and
+ register device's gsi
+In-Reply-To: <550C1B80.1080204@huawei.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <1426077587-1561-16-git-send-email-hanjun.guo@linaro.org>
+ <20150318184114.GL10863@arm.com> <550A465F.50701@huawei.com>
+ <20150319101205.GB24556@red-moon> <20150319193724.GF4751@arm.com>
+ <550C1B80.1080204@huawei.com>
+Message-ID: <20150320142508.GA15630@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 12:40:02PM +0000, Andre Przywara wrote:
-> On 03/19/2015 03:44 PM, Andre Przywara wrote:
-> > Hej Christoffer,
-> > 
+On Fri, Mar 20, 2015 at 01:07:12PM +0000, Hanjun Guo wrote:
+> On 2015/3/20 3:37, Will Deacon wrote:
+> > On Thu, Mar 19, 2015 at 10:12:05AM +0000, Lorenzo Pieralisi wrote:
+> >> On Thu, Mar 19, 2015 at 03:45:35AM +0000, Hanjun Guo wrote:
+> >>>>> +	if (trigger == ACPI_EDGE_SENSITIVE &&
+> >>>>> +				polarity == ACPI_ACTIVE_LOW)
+> >>>>> +		irq_type = IRQ_TYPE_EDGE_FALLING;
+> >>>>> +	else if (trigger == ACPI_EDGE_SENSITIVE &&
+> >>>>> +				polarity == ACPI_ACTIVE_HIGH)
+> >>>>> +		irq_type = IRQ_TYPE_EDGE_RISING;
+> >>>>> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> >>>>> +				polarity == ACPI_ACTIVE_LOW)
+> >>>>> +		irq_type = IRQ_TYPE_LEVEL_LOW;
+> >>>>> +	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> >>>>> +				polarity == ACPI_ACTIVE_HIGH)
+> >>>>> +		irq_type = IRQ_TYPE_LEVEL_HIGH;
+> >>>>> +	else
+> >>>>> +		irq_type = IRQ_TYPE_NONE;
+> >>>>> +
+> >>>>> +	/*
+> >>>>> +	 * Since only one GIC is supported in ACPI 5.0, we can
+> >>>>> +	 * create mapping refer to the default domain
+> >>>>> +	 */
+> >>>>> +	irq = irq_create_mapping(NULL, gsi);
+> >>>>> +	if (!irq)
+> >>>>> +		return irq;
+> >>>>> +
+> >>>>> +	/* Set irq type if specified and different than the current one */
+> >>>>> +	if (irq_type != IRQ_TYPE_NONE &&
+> >>>>> +		irq_type != irq_get_trigger_type(irq))
+> >>>>> +		irq_set_irq_type(irq, irq_type);
+> >>>>> +	return irq;
+> >>>>> +}
+> >>>>> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> >>>> I see you've still got this buried in the arch code. Is there any plan to
+> >>>> move it out, as I moaned about this in the last version of the series and
+> >>>> nothing seems to have changed?
+> >>> Ah, sorry. Last time when I was in Hongkong for LCA this Feb, I
+> >>> discussed with Lorenzo and he had a look into that too, he also met some
+> >>> obstacles to do that, so Lorenzo said that he will talk to you about
+> >>> this (Lorenzo, correct me if I'm wrong due to hearing problems of much
+> >>> noise in that room where we were talking).
+> >>>
+> >>> Anyway, if we move those functions to core code, such as irqdomain code,
+> >>> which will be compiled for x86 too, we can only set those functions as
+> >>> _weak, or we guard with them as #ifdef CONFIG_ARM64 ... #endif, so for
+> >>> me, it's really not a big deal to move those code out of arch/arm64, but
+> >>> I'm still open for suggestions if you can do that in a proper way.
+> >> You heard me clear and sound in HK, Will has a point and I looked into
+> >> this. Code is generic but not enough to be useful on other arches at
+> >> the moment, I need more time to look into this and see if we can move
+> >> this code to acpi core in a way that makes sense, to have, as you say,
+> >> a "default" implementation.
+> > Yeah, just something guarded by a CONFIG option (probably not ARM64
+> > though) would be enough, I think. Nothing too fancy.
+> Hi Will,
 > 
-> [ ... ]
-> 
-> >>> +static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
-> >>> +				   struct kvm_io_device *this, gpa_t addr,
-> >>> +				   int len, void *val, bool is_write)
-> >>> +{
-> >>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> >>> +	struct vgic_io_device *iodev = container_of(this,
-> >>> +						    struct vgic_io_device, dev);
-> >>> +	struct kvm_run *run = vcpu->run;
-> >>> +	const struct vgic_io_range *range;
-> >>> +	struct kvm_exit_mmio mmio;
-> >>> +	bool updated_state;
-> >>> +	gpa_t offset;
-> >>> +
-> >>> +	offset = addr - iodev->addr;
-> >>> +	range = vgic_find_range(iodev->reg_ranges, len, offset);
-> >>> +	if (unlikely(!range || !range->handle_mmio)) {
-> >>> +		pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
-> >>> +		return -ENXIO;
-> >>> +	}
-> >>> +
-> >>> +	mmio.phys_addr = addr;
-> >>> +	mmio.len = len;
-> >>> +	mmio.is_write = is_write;
-> >>> +	if (is_write)
-> >>> +		memcpy(mmio.data, val, len);
-> >>> +	mmio.private = iodev->redist_vcpu;
-> >>> +
-> >>> +	spin_lock(&dist->lock);
-> >>> +	offset -= range->base;
-> >>> +	if (vgic_validate_access(dist, range, offset)) {
-> >>> +		updated_state = call_range_handler(vcpu, &mmio, offset, range);
-> >>> +		if (!is_write)
-> >>> +			memcpy(val, mmio.data, len);
-> >>> +	} else {
-> >>> +		if (!is_write)
-> >>> +			memset(val, 0, len);
-> >>> +		updated_state = false;
-> >>> +	}
-> >>> +	spin_unlock(&dist->lock);
-> >>> +	kvm_prepare_mmio(run, &mmio);
-> >>
-> >> we're not the only user of kvm_exit_mmio I believe, so we could rename
-> > 
-> > (assuming you mean we _are_ the only user here, which I can acknowledge)
-> > 
-> >> this to vgic_io as well and you could change the mmio.data array to be a
-> >> void *val pointer, which just gets set to the pointer passed into this
-> >> function (which I think points to the kvm_run structs data array) and
-> >> you can avoid all these memcopies, right?
-> > 
-> > That sounds indeed tempting, but the comment on the struct kvm_exit_mmio
-> > declaration reads:
-> > /*
-> >  * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
-> >  * which is an anonymous type. Use our own type instead.
-> >  */
-> > How I understand this the structure was introduced to _not_ use the same
-> > memory, but use a copy instead. Do you remember any reason for this? And
-> > in how far is this type anonymous? It's even in an uapi header.
-> > 
-> > Briefly looking at the code we do quite some memcpy on the way.
-> > I am about to go all the way down into that ARM MMIO handling cave now
-> > to check this (Marc, if I am not showing up again after some hours,
-> > please come and rescue me ;-)
-> 
-> So, I feel that there is quite some unneeded copying and masking on the
-> way, but a real fix would be quite invasive and needs quite some testing
-> and review. I don't feel like rushing this into a v2 of this series.
-> I quickly did what you proposed (replacing memcpy by pointer
-> assignment), and that seems to work, but I don't have many chances of
-> testing this this weekend, since I am on the road. Also I have to dig
-> out my cross-endian test scripts first. So not sure if you want to take
-> the risk with this series.
-> I changed the other minor points you mentioned in the review though, so
-> do you want to have a "v1.5" or how do we proceed from here?
-> 
-Why is it so invasive?  See my previous mail.  If you can convince me
-that we're touching something truly nasty (code snippet?) then ok, we
-can take a version without the cleanup and cleanup later.
+> It is ARM64 related code and ACPI specific, I can come up with following code:
+No. It is ACPI code that can be made generic (if it is not already,
+apart from GIC specific comments), so IMO it should live in drivers/acpi
+and we can introduce a config option for that as we did for S-states and
+select it on arm64.
 
-If you're out of time, send me whatever you have, and we'll see if I fix
-it up further or just leave it for the future.
-
-Thanks,
--Christoffer
+Lorenzo
