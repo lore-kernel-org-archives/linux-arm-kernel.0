@@ -1,96 +1,71 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Fri, 20 Mar 2015 14:25:26 -0700
-Subject: [PATCH v1 2/3] Phy: DT binding documentation for Broadcom Cygnus USB
- PHY driver
+Date: Fri, 20 Mar 2015 14:25:25 -0700
+Subject: [PATCH v1 1/3] phy: phy-core: allow specifying supply at port level
 In-Reply-To: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
 References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1426886727-537-3-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1426886727-537-2-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Broadcom's Cygnus chip has a USB 2.0 host controller connected to
-three separate phys. One of the phs (port 2) is also connectd to
-a usb 2.0 device controller
+Multi-port phy's may have per-port power supplies. Let's change phy core
+to first attempt to look up the supply at the port level, and then, if
+not found, check parent device.
 
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-
 ---
- .../bindings/phy/brcm,cygnus-usb-phy.txt           | 65 ++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+ drivers/phy/phy-core.c | 30 ++++++++++++++++++++----------
+ 1 file changed, 20 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
-new file mode 100644
-index 0000000..002bd59
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
-@@ -0,0 +1,65 @@
-+BROADCOM CYGNUS USB PHY
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index a12d353..b43bb6b 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -650,16 +650,6 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+ 		goto free_phy;
+ 	}
+ 
+-	/* phy-supply */
+-	phy->pwr = regulator_get_optional(dev, "phy");
+-	if (IS_ERR(phy->pwr)) {
+-		if (PTR_ERR(phy->pwr) == -EPROBE_DEFER) {
+-			ret = -EPROBE_DEFER;
+-			goto free_ida;
+-		}
+-		phy->pwr = NULL;
+-	}
+-
+ 	device_initialize(&phy->dev);
+ 	mutex_init(&phy->mutex);
+ 
+@@ -673,6 +663,26 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+ 	if (ret)
+ 		goto put_dev;
+ 
++	/*
++	 * Locate phy-supply. We first try individual port and then,
++	 * if supply is not found, try parent device.
++	 */
++	phy->pwr = regulator_get_optional(&phy->dev, "phy");
++	if (IS_ERR(phy->pwr)) {
++		ret = PTR_ERR(phy->pwr);
++		if (ret == -EPROBE_DEFER)
++			goto free_ida;
 +
-+Required Properties:
-+	- compatible:  brcm,cygnus-usb-phy
-+	- reg : usbphy_regs - Base address of phy registers
-+			usb2h_idm_regs - Base address of host idm registers
-+			usb2d_idm_regs - Base address of device idm registers
-+The node that uses the phy must provide one integers, 0 for device and 1 for host
++		phy->pwr = regulator_get_optional(phy->dev.parent, "phy");
++		if (IS_ERR(phy->pwr)) {
++			ret = PTR_ERR(phy->pwr);
++			if (ret == -EPROBE_DEFER)
++				goto free_ida;
 +
-+NOTE: port 0 and port 1 are host only and port 2 can be configured for host or device.
++			phy->pwr = NULL;
++		}
++	}
 +
-+Example of phy :
-+	usbphy0: usbphy at 0x0301c000 {
-+		compatible = "brcm,cygnus-usb-phy";
-+		reg = <0x0301c000 0x2000>,
-+		      <0x18115000 0x1000>,
-+		      <0x18111000 0x1000>;
-+		status = "okay";
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		usbphy0_0: usbphy0 at 0 {
-+			#phy-cells = <1>;
-+			reg = <0>;
-+			status = "okay";
-+			phy-supply = <&vbus_p0>;
-+		};
-+
-+		usbphy0_1: usbphy0 at 1 {
-+			#phy-cells = <1>;
-+			reg = <1>;
-+			status = "okay";
-+		};
-+
-+		usbphy0_2: usbphy0 at 2 {
-+			#phy-cells = <1>;
-+			reg = <2>;
-+			status = "okay";
-+			phy-supply = <&vbus_p2>;
-+		};
-+	};
-+
-+Example of node using the phy:
-+
-+	/* This nodes declares all three ports as host */
-+	
-+	ehci0: usb at 0x18048000 {
-+		compatible = "generic-ehci";
-+		reg = <0x18048000 0x100>;
-+		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+		phys = <&usbphy0_0 1 &usbphy0_1 1 &usbphy0_2 1>;
-+		phy-names = "usb","usb","usb";
-+		status = "okay";
-+	};
-+
-+	/* This node declares port 2 phy
-+	and configures it for device */
-+
-+	usbd_udc_dwc1: usbd_udc_dwc at 0x1804c000 {
-+		compatible = "iproc-udc";
-+		reg = <0x1804c000 0x2000>;
-+		interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
-+		phys = <&usbphy0_2 0>;
-+		phy-names = "usb";
-+	};
+ 	ret = device_add(&phy->dev);
+ 	if (ret)
+ 		goto put_dev;
 -- 
 2.3.2
