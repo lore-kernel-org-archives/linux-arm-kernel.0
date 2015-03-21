@@ -1,45 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Sat, 21 Mar 2015 20:56:27 +0000
-Subject: [PATCH V2 3/8] ARM64: cpuidle: Replace cpu_suspend by the common
- ARM/ARM64 function
-In-Reply-To: <1426704372-20406-4-git-send-email-daniel.lezcano@linaro.org>
-References: <1426704372-20406-1-git-send-email-daniel.lezcano@linaro.org>
- <1426704372-20406-4-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150321205627.GG22354@red-moon>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 21 Mar 2015 22:00:29 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <20150320101925.GC2071@katana>
+References: <1425903665-19343-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20150318123012.GA3580@katana> <55097C46.9010605@gmail.com>
+ <20150318140037.GE3580@katana> <550A05E5.3050100@gmail.com>
+ <20150319100944.GA914@katana> <550AEF9D.6090307@wwwdotorg.org>
+ <20150319160208.GF7657@katana> <550B3725.10209@gmail.com>
+ <20150320101925.GC2071@katana>
+Message-ID: <20150321210028.GA1078@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 06:46:07PM +0000, Daniel Lezcano wrote:
-> Call the common ARM/ARM64 'arm_cpuidle_suspend' instead of cpu_suspend function
-> which is specific to ARM64.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> Acked-by: Rob Herring <robherring2@gmail.com>
 
-I think that's ok even though I would like with this set to stop
-churning out arm64 cpuidle related functions renaming, so:
+> > I guess what you want to have is that i2c_add_adapter() is not called
+> > for the disabled case, right?
+> 
+> I think that makes sense.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+But maybe we should just start simple and keep calling i2c_add_adapter()
+for the disabled case. We will just skip probing devices on the bus.
+Would that help the issue you were originally trying to solve?
 
-> ---
->  drivers/cpuidle/cpuidle-arm64.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm64.c b/drivers/cpuidle/cpuidle-arm64.c
-> index 39a2c62..0cea244 100644
-> --- a/drivers/cpuidle/cpuidle-arm64.c
-> +++ b/drivers/cpuidle/cpuidle-arm64.c
-> @@ -49,7 +49,7 @@ static int arm64_enter_idle_state(struct cpuidle_device *dev,
->  		 * call the CPU ops suspend protocol with idle index as a
->  		 * parameter.
->  		 */
-> -		ret = cpu_suspend(idx);
-> +		arm_cpuidle_suspend(idx);
->  
->  		cpu_pm_exit();
->  	}
-> -- 
-> 1.9.1
-> 
-> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150321/443aa47a/attachment.sig>
