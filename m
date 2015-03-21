@@ -1,50 +1,109 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 21 Mar 2015 23:44:23 +0100
-Subject: [PATCH 0/5] Driver for pxa architectures
-Message-ID: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+Date: Sat, 21 Mar 2015 23:44:28 +0100
+Subject: [PATCH 5/5] dmaengine: pxa_dma: add support for legacy transition
+In-Reply-To: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+References: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1426977868-5414-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+In order to achieve smooth transition of pxa drivers from old legacy dma
+handling to new dmaengine, introduce a function to "hide" dma physical
+channels from dmaengine.
 
-This serie introduces a new driver for Marvell pxa architectures. There is a
-full rationale explanation in patch 3/5 on why mmp_pdma was not reused nor
-patched incrementally.
+This is temporary situation where pxa dma will be handled in 2 places :
+ - arch/arm/plat-pxa/dma.c
+ - drivers/dma/pxa_dma.c
 
-This new driver provides all the capabilities to port all the drivers of pxa
-architecture to dmaengine. It was tested against the most dma advanced user I
-know (pxa_camera), as well a more casual ones (pxamci and dmatest).
+The resources, ie. dma channels, will be controlled by pxa_dma. The
+legacy code will request or release a channel with
+pxad_toggle_reserved_channel().
 
-This is big piece of code, so I expect the review will take time. If we converge
-on it, it will be maintained as well as part of the pxa architeture
-maintainance.
+This is not very pretty, but it ensures both legacy and dmaengine
+consumers can live in the same kernel until the conversion is done.
 
-It is as well one of the last steps (or so I hope) for pxa architure to be part
-of the multiplatform ARM architecture, and at the same time keep its legacy
-platforms operational. It will kill arch/arm/plat-pxa/dma.c in the long term.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-Cheers.
-
---
-Robert
-
-Robert Jarzmik (5):
-  Documentation: dmaengine: pxa-dma design
-  MAINTAINERS: add pxa dma driver to pxa architecture
-  dmaengine: pxa: add pxa dmaengine driver
-  dmaengine: pxa_dma: add debug information
-  dmaengine: pxa_dma: add support for legacy transition
-
- Documentation/dmaengine/pxa_dma.txt |  157 ++++
- MAINTAINERS                         |    1 +
- drivers/dma/Kconfig                 |   11 +
- drivers/dma/Makefile                |    1 +
- drivers/dma/pxa_dma.c               | 1475 +++++++++++++++++++++++++++++++++++
- include/linux/dma/pxa-dma.h         |   27 +
- 6 files changed, 1672 insertions(+)
- create mode 100644 Documentation/dmaengine/pxa_dma.txt
- create mode 100644 drivers/dma/pxa_dma.c
- create mode 100644 include/linux/dma/pxa-dma.h
-
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index aec3e71..9b8ca68 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -417,6 +417,15 @@ static inline void pxad_init_debugfs(struct pxad_device *pdev) {}
+ static inline void pxad_cleanup_debugfs(struct pxad_device *pdev) {}
+ #endif
+ 
++/*
++ * In the transition phase where legacy pxa handling is done at the same time as
++ * mmp_dma, the DMA physical channel split between the 2 DMA providers is done
++ * through legacy_reserved. Legacy code reserves DMA channels by settings
++ * corresponding bits in legacy_reserved.
++ */
++static u32 legacy_reserved;
++static u32 legacy_unavailable;
++
+ static struct pxad_phy *lookup_phy(struct pxad_chan *pchan)
+ {
+ 	int prio, i;
+@@ -437,10 +446,14 @@ static struct pxad_phy *lookup_phy(struct pxad_chan *pchan)
+ 		for (i = 0; i < pdev->nr_chans; i++) {
+ 			if (prio != (i & 0xf) >> 2)
+ 				continue;
++			if ((i < 32) && (legacy_reserved & BIT(i)))
++				continue;
+ 			phy = &pdev->phys[i];
+ 			if (!phy->vchan) {
+ 				phy->vchan = pchan;
+ 				found = phy;
++				if (i < 32)
++					legacy_unavailable |= BIT(i);
+ 				goto out_unlock;
+ 			}
+ 		}
+@@ -458,6 +471,7 @@ static void pxad_free_phy(struct pxad_chan *chan)
+ 	struct pxad_device *pdev = to_pxad_dev(chan->vc.chan.device);
+ 	unsigned long flags;
+ 	u32 reg;
++	int i;
+ 
+ 	chan_dbg(chan, "freeing\n");
+ 	if (!chan->phy)
+@@ -468,6 +482,9 @@ static void pxad_free_phy(struct pxad_chan *chan)
+ 	writel_relaxed(0, chan->phy->base + reg);
+ 
+ 	spin_lock_irqsave(&pdev->phy_lock, flags);
++	for (i = 0; i < 32; i++)
++		if (chan->phy == &pdev->phys[i])
++			legacy_unavailable &= ~BIT(i);
+ 	chan->phy->vchan = NULL;
+ 	chan->phy = NULL;
+ 	spin_unlock_irqrestore(&pdev->phy_lock, flags);
+@@ -689,6 +706,8 @@ static irqreturn_t pxad_int_handler(int irq, void *dev_id)
+ 		i = __ffs(dint);
+ 		dint &= (dint - 1);
+ 		phy = &pdev->phys[i];
++		if ((i < 32) && (legacy_reserved & BIT(i)))
++			continue;
+ 		if (pxad_chan_handler(irq, phy) == IRQ_HANDLED)
+ 			ret = IRQ_HANDLED;
+ 	}
+@@ -1440,6 +1459,15 @@ bool pxad_filter_fn(struct dma_chan *chan, void *param)
+ }
+ EXPORT_SYMBOL_GPL(pxad_filter_fn);
+ 
++int pxad_toggle_reserved_channel(int legacy_channel)
++{
++	if (legacy_unavailable & (BIT(legacy_channel)))
++		return -EBUSY;
++	legacy_reserved ^= BIT(legacy_channel);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(pxad_toggle_reserved_channel);
++
+ module_platform_driver(pxad_driver);
+ 
+ MODULE_DESCRIPTION("Marvell PXA Peripheral DMA Driver");
 -- 
 2.1.4
