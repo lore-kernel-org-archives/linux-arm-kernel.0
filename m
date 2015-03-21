@@ -1,53 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Mar 2015 16:30:44 -0700
-Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
- control module support
-In-Reply-To: <550CABD9.5060000@ti.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-28-git-send-email-t-kristo@ti.com>
- <550C9490.3070505@ti.com> <20150320223541.GV31346@atomide.com>
- <550CABD9.5060000@ti.com>
-Message-ID: <20150320233043.GW31346@atomide.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 20 Mar 2015 17:09:30 -0700
+Subject: [PATCH v3] driver core / PM: Add PM domain callbacks for device
+ setup/cleanup
+In-Reply-To: <3289026.ADmXXipokh@vostro.rjw.lan> (Rafael J. Wysocki's message
+ of "Fri, 20 Mar 2015 13:59:27 +0100")
+References: <3533423.QQDErEmeTO@vostro.rjw.lan>
+ <1810625.BTgaNclHRk@vostro.rjw.lan>
+ <1654636.FxBHsexDm1@vostro.rjw.lan>
+ <3289026.ADmXXipokh@vostro.rjw.lan>
+Message-ID: <7hzj77i539.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150320 16:24]:
-> On 03/20/2015 05:35 PM, Tony Lindgren wrote:
-> > * Suman Anna <s-anna@ti.com> [150320 14:44]:
-> >> On 03/20/2015 01:44 PM, Kristo, Tero wrote:
-> >>> +			scm: scm at 210000 {
-> >>> +				compatible = "ti,am3-scm", "simple-bus";
-> >>> +				reg = <0x210000 0x2000>;
-> >>> +				#address-cells = <1>;
-> >>> +				#size-cells = <1>;
-> >>> +				ranges = <0 0x210000 0x2000>;
-> >>> +
-> >>> +				am33xx_pinmux: pinmux at 800 {
-> >>> +					compatible = "pinctrl-single";
-> >>> +					reg = <0x800 0x238>;
-> >>> +					#address-cells = <1>;
-> >>> +					#size-cells = <0>;
-> >>> +					pinctrl-single,register-width = <32>;
-> >>> +					pinctrl-single,function-mask = <0x7f>;
-> >>> +				};
-> >>> +
-> >>> +				scm_conf: scm_conf at 0 {
-> >>> +					compatible = "syscon";
-> >>> +					reg = <0x0 0x7fc>;
-> >>
-> >> Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
-> >> this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
-> > 
-> > Seems correct to me, it's offset 0, size 0x7fc. So that's the scm_conf
-> > syscon area before pinctrl-single at 0x44c00000 + 0x210000 + 0.
-> > 
-> > The io area for pinctrl-single starts at 0x800, so the scm_conf should
-> > be before it in the dts file.
-> 
-> Well, I understand that it is how it was before, but we won't be mapping
-> or covering the last register efuse_sma before the pinctrl cfg
-> registers. Any reason for just leaving out that register?
+"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
 
-Oh I see yeah that looks like a bug to me.
+> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>
+> If PM domains are in use, it may be necessary to prepare the code
+> handling a PM domain for driver probing.  For example, in some
+> cases device drivers rely on the ability to power on the devices
+> with the help of the IO runtime PM framework and the PM domain
+> code needs to be ready for that.  Also, if that code has not been
+> fully initialized yet, the driver probing should be deferred.
+>
+> Moreover, after the probing is complete, it may be necessary to
+> put the PM domain in question into the state reflecting the current
+> needs of the devices in it, for example, so that power is not drawn
+> in vain.  The same should be done after removing a driver from
+> a device, as the PM domain state may need to be changed to reflect
+> the new situation.
+>
+> For these reasons, introduce new PM domain callbacks, ->activate,
+> ->sync and ->dismiss called, respectively, before probing for a
+> device driver, after the probing has completed successfully and
+> if the probing has failed or the driver has been removed.
+>
+> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> ---
+>
+> One more update taking Dmitry's comments into account and fixing an
+> overoptimization bug spotted by Ulf.
+>
+> And this actually contains the patch this time (clicked on "Send" too
+> early last time, sorry about that).
 
-Tony
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+Unless I'm missing somthing, this along with the just the genpd part of
+Russell's patch should then fix his problem as well.
+
+Kevin
