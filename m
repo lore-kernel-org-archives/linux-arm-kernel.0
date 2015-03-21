@@ -1,32 +1,182 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 21 Mar 2015 19:35:30 -0300
-Subject: Bug in drivers/net/ethernet/freescale/fec_main.c, TX is broken.
- In 4.0.0-rc3
-In-Reply-To: <20150321205359.GM8656@n2100.arm.linux.org.uk>
-References: <390621425930628@web28o.yandex.ru>
- <3625951426018334@web26j.yandex.ru>
- <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
- <726281426513068@web10o.yandex.ru>
- <BLUPR03MB3739B9C6E14A106CCAEBA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
- <994171426532944@web7m.yandex.ru>
- <20150321205359.GM8656@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5BnPQTFoBRr4EGH24_yZZAY6NJmVFg4WeiJcTqrYqki5A@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 21 Mar 2015 23:44:24 +0100
+Subject: [PATCH 1/5] Documentation: dmaengine: pxa-dma design
+In-Reply-To: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+References: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1426977868-5414-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Document the new design of the pxa dma driver.
 
-On Sat, Mar 21, 2015 at 5:53 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ Documentation/dmaengine/pxa_dma.txt | 157 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 157 insertions(+)
+ create mode 100644 Documentation/dmaengine/pxa_dma.txt
 
-> Given that this bug can seriously screw data up in undetectable ways (TCP
-> checksums don't save you, because the FEC generates them on the data which
-> it read from memory, even if it happened to read the data from the SoC's
-> boot ROM) we do need to get this fixed ASAP.
-
-Current mainline has 2b995f63987013 reverted, so 4.0-rc5 will not have
-this corruption problem.
-
-Regards,
-
-Fabio Estevam
+diff --git a/Documentation/dmaengine/pxa_dma.txt b/Documentation/dmaengine/pxa_dma.txt
+new file mode 100644
+index 0000000..63db9fe
+--- /dev/null
++++ b/Documentation/dmaengine/pxa_dma.txt
+@@ -0,0 +1,157 @@
++PXA/MMP - DMA Slave controller
++==============================
++
++Constraints
++-----------
++  a) Transfers hot queuing
++     A driver submitting a transfer and issuing it should be granted the transfer
++     is queued even on a running DMA channel.
++     This implies that the queuing doesn't wait for the previous transfer end,
++     and that the descriptor chaining is not only done in the irq/tasklet code
++     triggered by the end of the transfer.
++
++  b) All transfers having asked for confirmation should be signaled
++     Any issued transfer with DMA_PREP_INTERRUPT should trigger a callback call.
++     This implies that even if an irq/tasklet is triggered by end of tx1, but
++     at the time of irq/dma tx2 is already finished, tx1->complete() and
++     tx2->complete() should be called.
++
++  c) Channel residue calculation
++     A channel should be able to report how much advanced is a transfer. The
++     granularity is still descriptor based.
++
++  d) Channel running state
++     A driver should be able to query if a channel is running or not. For the
++     multimedia case, such as video capture, if a transfer is submitted and then
++     a check of the DMA channel reports a "stopped channel", the transfer should
++     not be issued until the next "start of frame interrupt", hence the need to
++     know if a channel is in running or stopped state.
++
++  e) Bandwidth guarantee
++     The PXA architecture has 4 levels of DMAs priorities : high, normal, low.
++     The high prorities get twice as much bandwidth as the normal, which get twice
++     as much as the low priorities.
++     A driver should be able to request a priority, especially the real-time
++     ones such as pxa_camera with (big) throughputs.
++
++  f) Transfer reusability
++     An issued and finished transfer should be "reusable". The choice of
++     "DMA_CTRL_ACK" should be left to the client, not the dma driver.
++
++Design
++------
++  a) Virtual channels
++     Same concept as in sa11x0 driver, ie. a driver was assigned a "virtual
++     channel" linked to the requestor line, and the physical DMA channel is
++     assigned on the fly when the transfer is issued.
++
++  b) Transfer anatomy for a scatter-gather transfer
++     +------------+-----+---------------+----------------+-----------------+
++     | desc-sg[0] | ... | desc-sg[last] | status updater | finisher/linker |
++     +------------+-----+---------------+----------------+-----------------+
++
++     This structure is pointed by dma->sg_cpu.
++     The descriptors are used as follows :
++      - desc-sg[i]: i-th descriptor, transferring the i-th sg
++        element to the video buffer scatter gather
++      - status updater
++        Transfers a single u32 to a well known dma coherent memory to leave
++        a trace that this transfer is done. The "well known" is unique per
++        physical channel, meaning that a read of this value will tell which
++        is the last finished transfer at that point in time.
++      - finisher: has ddadr=DADDR_STOP, dcmd=ENDIRQEN
++      - linker: has ddadr= desc-sg[0] of next transfer, dcmd=0
++
++  b) Transfers hot-chaining
++     Suppose the running chain is :
++         Buffer 1         Buffer 2
++     +---------+----+---+  +----+----+----+---+
++     | d0 | .. | dN | l |  | d0 | .. | dN | f |
++     +---------+----+-|-+  ^----+----+----+---+
++                      |    |
++                      +----+
++
++     After a call to dmaengine_submit(b3), the chain will look like :
++          Buffer 1              Buffer 2             Buffer 3
++     +---------+----+---+  +----+----+----+---+  +----+----+----+---+
++     | d0 | .. | dN | l |  | d0 | .. | dN | l |  | d0 | .. | dN | f |
++     +---------+----+-|-+  ^----+----+----+-|-+  ^----+----+----+---+
++                      |    |                |    |
++                      +----+                +----+
++                                           new_link
++
++     If while new_link was created the DMA channel stopped, it is _not_
++     restarted. Hot-chaining doesn't break the assumption that
++     dma_async_issue_pending() is to be used to ensure the transfer is actually started.
++
++     One exception to this rule :
++       - if Buffer1 and Buffer2 had all their addresses 8 bytes aligned
++       - and if Buffer3 has at least one address not 4 bytes aligned
++       - then hot-chaining cannot happen, as the channel must be stopped, the
++         "align bit" must be set, and the channel restarted As a consequence,
++         such a transfer tx_submit() will be queued on the submitted queue, and
++         this specific case if the DMA is already running in aligned mode.
++
++  c) Transfers completion updater
++     Each time a transfer is completed on a channel, an interrupt might be
++     generated or not, up to the client's request. But in each case, the last
++     descriptor of a transfer, the "status updater", will write the latest
++     transfer being completed into the physical channel's completion mark.
++
++     This will speed up residue calculation, for large transfers such as video
++     buffers which hold around 6k descriptors or more. This also allows without
++     any lock to find out what is the latest completed transfer in a running
++     DMA chain.
++
++  d) Transfers completion, irq and tasklet
++     When a transfer flagged as "DMA_PREP_INTERRUPT" is finished, the dma irq
++     is raised. Upon this interrupt, a tasklet is scheduled for the physical
++     channel.
++     The tasklet is responsible for :
++      - reading the physical channel last updater mark
++      - calling all the transfer callbacks of finished transfers, based on
++        that mark, and each transfer flags.
++     If a transfer is completed while this handling is done, a dma irq will
++     be raised, and the tasklet will be scheduled once again, having a new
++     updater mark.
++
++  e) Residue
++     Residue granularity will be descriptor based. The issued but not completed
++     transfers will be scanned for all of their descriptors against the
++     currently running descriptor.
++
++  f) Most complicated case of driver's tx queues
++     The most tricky situation is when :
++       - there are not "acked" transfers (tx0)
++       - a driver submitted an aligned tx1, not chained
++       - a driver submitted an aligned tx2 => tx2 is cold chained to tx1
++       - a driver issued tx1+tx2 => channel is running in aligned mode
++       - a driver submitted an aligned tx3 => tx3 is hot-chained
++       - a driver submitted an unaligned tx4 => tx4 is put in submitted queue,
++         not chained
++       - a driver issued tx4 => tx4 is put in issued queue, not chained
++       - a driver submitted an aligned tx5 => tx5 is put in submitted queue, not
++         chained
++       - a driver submitted an aligned tx6 => tx6 is put in submitted queue,
++         cold chained to tx5
++
++     This translates into (after tx4 is issued) :
++       - issued queue
++     +-----+ +-----+ +-----+ +-----+
++     | tx1 | | tx2 | | tx3 | | tx4 |
++     +---|-+ ^---|-+ ^-----+ +-----+
++         |   |   |   |
++         +---+   +---+
++       - submitted queue
++     +-----+ +-----+
++     | tx5 | | tx6 |
++     +---|-+ ^-----+
++         |   |
++         +---+
++       - completed queue : empty
++       - allocated queue : tx0
++
++     It should be noted that after tx3 is completed, the channel is stopped, and
++     restarted in "unaligned mode" to handle tx4.
++
++Author: Robert Jarzmik <robert.jarzmik@free.fr>
+-- 
+2.1.4
