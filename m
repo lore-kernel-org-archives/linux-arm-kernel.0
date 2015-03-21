@@ -1,37 +1,75 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 21 Mar 2015 19:42:00 +0000 (UTC)
-Subject: [PATCH 0/2] Couple of DRA7 hwmod patches on Timers
-In-Reply-To: <1426539294-28375-1-git-send-email-s-anna@ti.com>
-References: <1426539294-28375-1-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1503211939340.2512@utopia.booyaka.com>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Sat, 21 Mar 2015 21:09:05 +0100 (CET)
+Subject: [PATCH 33/35 linux-next] mmc: constify of_device_id array
+In-Reply-To: <CAPDyKFoWoQhSat9vAfTGy_exdubcknySMPjoSXp5ox_YB+M6ZQ@mail.gmail.com>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-2-git-send-email-fabf@skynet.be>
+ <CAPDyKFodW1zgrQ-sd5TPO_rCa_-tm95JkwCWiGX4BCUSFqPHdg@mail.gmail.com>
+ <CAPDyKFoWoQhSat9vAfTGy_exdubcknySMPjoSXp5ox_YB+M6ZQ@mail.gmail.com>
+Message-ID: <1374583183.180918.1426968545752.open-xchange@webmail.nmp.proximus.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
-
-On Mon, 16 Mar 2015, Suman Anna wrote:
-
-> Following are couple of DRA7 hwmod patches for the GPTimers.
-> Patches based on 4.0-rc1.
-> 
-> The first patch adds the data for timers 13 through 16, the DT
-> nodes are already present, and when enabled without the hwmod
-> data triggers a l3_noc interrupt and hangs the kernel boot [1].
-> The boot hang can also be fixed by checking the return status
-> of pm_runtime_get_sync() in the OMAP dmtimer probe, I will post
-> a separate fix for that.
-> 
-> Second patch is a minor fix.
-
-Thanks.  Sounds like the first one should go in for v4.0-rc fixes, and the 
-second one can wait for v4.1?  
-
-If so then could you repost the first fix to include the description of 
-why it should go in early in the patch description ("the DT nodes are 
-already present, and when enabled without the hwmod data triggers a l3_noc 
-interrupt and hangs the kernel boot").  That should avoid anyone 
-questioning why it would go in as a v4.0-rc fix at this point, and should 
-help the -stable crew out.
 
 
-- Paul
+> On 20 March 2015 at 09:56 Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>
+>
+> On 17 March 2015 at 10:49, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > On 16 March 2015 at 20:59, Fabian Frederick <fabf@skynet.be> wrote:
+> >> of_device_id is always used as const.
+> >> (See driver.of_match_table and open firmware functions)
+> >>
+> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> >
+> > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> I realized that you might wanted me to pick this up and queue it
+> through my mmc tree? Just tell me if that's what you want.
+>
+> Kind regards
+> Uffe
+
+Hi Ulf,
+
+? ? ? ? Yes of course :) (it has not been added to linux-next yet).
+
+Thanks,
+Fabian
+>
+> >
+> >> ---
+> >>? drivers/mmc/host/mmc_spi.c? ?| 2 +-
+> >>? drivers/mmc/host/wmt-sdmmc.c | 2 +-
+> >>? 2 files changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
+> >> index e4a0754..ae19d83 100644
+> >> --- a/drivers/mmc/host/mmc_spi.c
+> >> +++ b/drivers/mmc/host/mmc_spi.c
+> >> @@ -1507,7 +1507,7 @@ static int mmc_spi_remove(struct spi_device *spi)
+> >>? ? ? ? ?return 0;
+> >>? }
+> >>
+> >> -static struct of_device_id mmc_spi_of_match_table[] = {
+> >> +static const struct of_device_id mmc_spi_of_match_table[] = {
+> >>? ? ? ? ?{ .compatible = "mmc-spi-slot", },
+> >>? ? ? ? ?{},
+> >>? };
+> >> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+> >> index dd2e1aa..5af0055 100644
+> >> --- a/drivers/mmc/host/wmt-sdmmc.c
+> >> +++ b/drivers/mmc/host/wmt-sdmmc.c
+> >> @@ -744,7 +744,7 @@ static struct wmt_mci_caps wm8505_caps = {
+> >>? ? ? ? ?.max_blk_size = 2048,
+> >>? };
+> >>
+> >> -static struct of_device_id wmt_mci_dt_ids[] = {
+> >> +static const struct of_device_id wmt_mci_dt_ids[] = {
+> >>? ? ? ? ?{ .compatible = "wm,wm8505-sdhc", .data = &wm8505_caps },
+> >>? ? ? ? ?{ /* Sentinel */ },
+> >>? };
+> >> --
+> >> 2.1.0
+> >>
