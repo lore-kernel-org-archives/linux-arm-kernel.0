@@ -1,359 +1,194 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Mar 2015 23:45:24 -0700
-Subject: [PATCH v3 05/13] clk: qcom: Add support for High-Frequency PLLs
- (HFPLLs)
+Date: Fri, 20 Mar 2015 23:45:21 -0700
+Subject: [PATCH v3 02/13] clk: mux: Split out register accessors for reuse
 In-Reply-To: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
 References: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426920332-9340-6-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1426920332-9340-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HFPLLs are the main frequency source for Krait CPU clocks. Add
-support for changing the rate of these PLLs.
+We want to reuse the logic in clk-mux.c for other clock drivers
+that don't use readl as register accessors. Fortunately, there
+really isn't much to the mux code besides the table indirection
+and quirk flags if you assume any bit shifting and masking has
+been done already. Pull that logic out into reusable functions
+that operate on an optional table and some flags so that other
+drivers can use the same logic.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ drivers/clk/clk-mux.c        | 76 +++++++++++++++++++++++++++-----------------
+ include/linux/clk-provider.h |  9 ++++--
+ 2 files changed, 54 insertions(+), 31 deletions(-)
 
-I'd really like to get rid of __clk_hfpll_init_once() if possible...
-
- drivers/clk/qcom/Makefile    |   1 +
- drivers/clk/qcom/clk-hfpll.c | 253 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/qcom/clk-hfpll.h |  54 +++++++++
- 3 files changed, 308 insertions(+)
- create mode 100644 drivers/clk/qcom/clk-hfpll.c
- create mode 100644 drivers/clk/qcom/clk-hfpll.h
-
-diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
-index 617826469595..953f792d2133 100644
---- a/drivers/clk/qcom/Makefile
-+++ b/drivers/clk/qcom/Makefile
-@@ -8,6 +8,7 @@ clk-qcom-y += clk-rcg2.o
- clk-qcom-y += clk-branch.o
- clk-qcom-y += clk-regmap-divider.o
- clk-qcom-y += clk-regmap-mux.o
-+clk-qcom-y += clk-hfpll.o
- clk-qcom-y += reset.o
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 69a094c3783d..70a05c7f0fb1 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -29,35 +29,24 @@
  
- obj-$(CONFIG_APQ_GCC_8084) += gcc-apq8084.o
-diff --git a/drivers/clk/qcom/clk-hfpll.c b/drivers/clk/qcom/clk-hfpll.c
-new file mode 100644
-index 000000000000..367eb95f1477
---- /dev/null
-+++ b/drivers/clk/qcom/clk-hfpll.c
-@@ -0,0 +1,253 @@
-+/*
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/export.h>
-+#include <linux/regmap.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+
-+#include "clk-regmap.h"
-+#include "clk-hfpll.h"
-+
-+#define PLL_OUTCTRL	BIT(0)
-+#define PLL_BYPASSNL	BIT(1)
-+#define PLL_RESET_N	BIT(2)
-+
-+/* Initialize a HFPLL at a given rate and enable it. */
-+static void __clk_hfpll_init_once(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+
-+	if (likely(h->init_done))
-+		return;
-+
-+	/* Configure PLL parameters for integer mode. */
-+	if (hd->config_val)
-+		regmap_write(regmap, hd->config_reg, hd->config_val);
-+	regmap_write(regmap, hd->m_reg, 0);
-+	regmap_write(regmap, hd->n_reg, 1);
-+
-+	if (hd->user_reg) {
-+		u32 regval = hd->user_val;
-+		unsigned long rate;
-+
-+		rate = __clk_get_rate(hw->clk);
-+
-+		/* Pick the right VCO. */
-+		if (hd->user_vco_mask && rate > hd->low_vco_max_rate)
-+			regval |= hd->user_vco_mask;
-+		regmap_write(regmap, hd->user_reg, regval);
-+	}
-+
-+	if (hd->droop_reg)
-+		regmap_write(regmap, hd->droop_reg, hd->droop_val);
-+
-+	h->init_done = true;
-+}
-+
-+static void __clk_hfpll_enable(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 val;
-+
-+	__clk_hfpll_init_once(hw);
-+
-+	/* Disable PLL bypass mode. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_BYPASSNL, PLL_BYPASSNL);
-+
+ #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
+ 
+-static u8 clk_mux_get_parent(struct clk_hw *hw)
++unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
++				unsigned int *table, unsigned long flags)
+ {
+-	struct clk_mux *mux = to_clk_mux(hw);
+ 	int num_parents = __clk_get_num_parents(hw->clk);
+-	u32 val;
+ 
+-	/*
+-	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
+-	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
+-	 * to 0x7 (index starts at one)
+-	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
+-	 * val = 0x4 really means "bit 2, index starts at bit 0"
+-	 */
+-	val = clk_readl(mux->reg) >> mux->shift;
+-	val &= mux->mask;
+-
+-	if (mux->table) {
++	if (table) {
+ 		int i;
+ 
+ 		for (i = 0; i < num_parents; i++)
+-			if (mux->table[i] == val)
++			if (table[i] == val)
+ 				return i;
+ 		return -EINVAL;
+ 	}
+ 
+-	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
++	if (val && (flags & CLK_MUX_INDEX_BIT))
+ 		val = ffs(val) - 1;
+ 
+-	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
++	if (val && (flags & CLK_MUX_INDEX_ONE))
+ 		val--;
+ 
+ 	if (val >= num_parents)
+@@ -65,24 +54,53 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
+ 
+ 	return val;
+ }
++EXPORT_SYMBOL_GPL(clk_mux_get_parent);
+ 
+-static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
++static u8 _clk_mux_get_parent(struct clk_hw *hw)
+ {
+ 	struct clk_mux *mux = to_clk_mux(hw);
+ 	u32 val;
+-	unsigned long flags = 0;
+ 
+-	if (mux->table)
+-		index = mux->table[index];
 +	/*
-+	 * H/W requires a 5us delay between disabling the bypass and
-+	 * de-asserting the reset. Delay 10us just to be safe.
++	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
++	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
++	 * to 0x7 (index starts at one)
++	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
++	 * val = 0x4 really means "bit 2, index starts at bit 0"
 +	 */
-+	udelay(10);
++	val = clk_readl(mux->reg) >> mux->shift;
++	val &= mux->mask;
 +
-+	/* De-assert active-low PLL reset. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_RESET_N, PLL_RESET_N);
-+
-+	/* Wait for PLL to lock. */
-+	if (hd->status_reg) {
-+		do {
-+			regmap_read(regmap, hd->status_reg, &val);
-+		} while (!(val & BIT(hd->lock_bit)));
++	return clk_mux_get_parent(hw, val, mux->table, mux->flags);
++}
+ 
+-	else {
+-		if (mux->flags & CLK_MUX_INDEX_BIT)
+-			index = 1 << index;
++unsigned int clk_mux_reindex(u8 index, unsigned int *table,
++			     unsigned long flags)
++{
++	unsigned int val = index;
+ 
+-		if (mux->flags & CLK_MUX_INDEX_ONE)
+-			index++;
++	if (table) {
++		val = table[val];
 +	} else {
-+		udelay(60);
-+	}
++		if (flags & CLK_MUX_INDEX_BIT)
++			val = 1 << index;
 +
-+	/* Enable PLL output. */
-+	regmap_update_bits(regmap, hd->mode_reg, PLL_OUTCTRL, PLL_OUTCTRL);
++		if (flags & CLK_MUX_INDEX_ONE)
++			val++;
+ 	}
+ 
++	return val;
 +}
++EXPORT_SYMBOL_GPL(clk_mux_reindex);
 +
-+/* Enable an already-configured HFPLL. */
-+static int clk_hfpll_enable(struct clk_hw *hw)
++static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
 +{
-+	unsigned long flags;
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode;
++	struct clk_mux *mux = to_clk_mux(hw);
++	u32 val;
++	unsigned long flags = 0;
 +
-+	spin_lock_irqsave(&h->lock, flags);
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	if (!(mode & (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)))
-+		__clk_hfpll_enable(hw);
-+	spin_unlock_irqrestore(&h->lock, flags);
++	index = clk_mux_reindex(index, mux->table, mux->flags);
 +
-+	return 0;
-+}
+ 	if (mux->lock)
+ 		spin_lock_irqsave(mux->lock, flags);
+ 
+@@ -102,21 +120,21 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ }
+ 
+ const struct clk_ops clk_mux_ops = {
+-	.get_parent = clk_mux_get_parent,
++	.get_parent = _clk_mux_get_parent,
+ 	.set_parent = clk_mux_set_parent,
+ 	.determine_rate = __clk_mux_determine_rate,
+ };
+ EXPORT_SYMBOL_GPL(clk_mux_ops);
+ 
+ const struct clk_ops clk_mux_ro_ops = {
+-	.get_parent = clk_mux_get_parent,
++	.get_parent = _clk_mux_get_parent,
+ };
+ EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
+ 
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u32 mask,
+-		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
++		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock)
+ {
+ 	struct clk_mux *mux;
+ 	struct clk *clk;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5591ea71a8d1..f7a6f60f8e0c 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -409,7 +409,7 @@ void clk_unregister_divider(struct clk *clk);
+ struct clk_mux {
+ 	struct clk_hw	hw;
+ 	void __iomem	*reg;
+-	u32		*table;
++	unsigned int	*table;
+ 	u32		mask;
+ 	u8		shift;
+ 	u8		flags;
+@@ -425,6 +425,11 @@ struct clk_mux {
+ extern const struct clk_ops clk_mux_ops;
+ extern const struct clk_ops clk_mux_ro_ops;
+ 
++unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
++				unsigned int *table, unsigned long flags);
++unsigned int clk_mux_reindex(u8 index, unsigned int *table,
++			     unsigned long flags);
 +
-+static void __clk_hfpll_disable(struct clk_hfpll *h)
-+{
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+
-+	/*
-+	 * Disable the PLL output, disable test mode, enable the bypass mode,
-+	 * and assert the reset.
-+	 */
-+	regmap_update_bits(regmap, hd->mode_reg,
-+			PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL, 0);
-+}
-+
-+static void clk_hfpll_disable(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&h->lock, flags);
-+	__clk_hfpll_disable(h);
-+	spin_unlock_irqrestore(&h->lock, flags);
-+}
-+
-+static long clk_hfpll_round_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long *parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	unsigned long rrate;
-+
-+	rate = clamp(rate, hd->min_rate, hd->max_rate);
-+
-+	rrate = DIV_ROUND_UP(rate, *parent_rate) * *parent_rate;
-+	if (rrate > hd->max_rate)
-+		rrate -= *parent_rate;
-+
-+	return rrate;
-+}
-+
-+/*
-+ * For optimization reasons, assumes no downstream clocks are actively using
-+ * it.
-+ */
-+static int clk_hfpll_set_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	unsigned long flags;
-+	u32 l_val, val;
-+	bool enabled;
-+
-+	l_val = rate / parent_rate;
-+
-+	spin_lock_irqsave(&h->lock, flags);
-+
-+	enabled = __clk_is_enabled(hw->clk);
-+	if (enabled)
-+		__clk_hfpll_disable(h);
-+
-+	/* Pick the right VCO. */
-+	if (hd->user_reg && hd->user_vco_mask) {
-+		regmap_read(regmap, hd->user_reg, &val);
-+		if (rate <= hd->low_vco_max_rate)
-+			val &= ~hd->user_vco_mask;
-+		else
-+			val |= hd->user_vco_mask;
-+		regmap_write(regmap, hd->user_reg, val);
-+	}
-+
-+	regmap_write(regmap, hd->l_reg, l_val);
-+
-+	if (enabled)
-+		__clk_hfpll_enable(hw);
-+
-+	spin_unlock_irqrestore(&h->lock, flags);
-+
-+	return 0;
-+}
-+
-+static unsigned long clk_hfpll_recalc_rate(struct clk_hw *hw,
-+					   unsigned long parent_rate)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 l_val;
-+
-+	regmap_read(regmap, hd->l_reg, &l_val);
-+
-+	return l_val * parent_rate;
-+}
-+
-+static void clk_hfpll_init(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode, status;
-+
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	if (mode != (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL)) {
-+		__clk_hfpll_init_once(hw);
-+		return;
-+	}
-+
-+	if (hd->status_reg) {
-+		regmap_read(regmap, hd->status_reg, &status);
-+		if (!(status & BIT(hd->lock_bit))) {
-+			WARN(1, "HFPLL %s is ON, but not locked!\n",
-+					__clk_get_name(hw->clk));
-+			clk_hfpll_disable(hw);
-+			__clk_hfpll_init_once(hw);
-+		}
-+	}
-+}
-+
-+static int hfpll_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_hfpll *h = to_clk_hfpll(hw);
-+	struct hfpll_data const *hd = h->d;
-+	struct regmap *regmap = h->clkr.regmap;
-+	u32 mode;
-+
-+	regmap_read(regmap, hd->mode_reg, &mode);
-+	mode &= 0x7;
-+	return mode == (PLL_BYPASSNL | PLL_RESET_N | PLL_OUTCTRL);
-+}
-+
-+const struct clk_ops clk_ops_hfpll = {
-+	.enable = clk_hfpll_enable,
-+	.disable = clk_hfpll_disable,
-+	.is_enabled = hfpll_is_enabled,
-+	.round_rate = clk_hfpll_round_rate,
-+	.set_rate = clk_hfpll_set_rate,
-+	.recalc_rate = clk_hfpll_recalc_rate,
-+	.init = clk_hfpll_init,
-+};
-+EXPORT_SYMBOL_GPL(clk_ops_hfpll);
-diff --git a/drivers/clk/qcom/clk-hfpll.h b/drivers/clk/qcom/clk-hfpll.h
-new file mode 100644
-index 000000000000..48c18d664f4e
---- /dev/null
-+++ b/drivers/clk/qcom/clk-hfpll.h
-@@ -0,0 +1,54 @@
-+/*
-+ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __QCOM_CLK_HFPLL_H__
-+#define __QCOM_CLK_HFPLL_H__
-+
-+#include <linux/clk-provider.h>
-+#include <linux/spinlock.h>
-+#include "clk-regmap.h"
-+
-+struct hfpll_data {
-+	u32 mode_reg;
-+	u32 l_reg;
-+	u32 m_reg;
-+	u32 n_reg;
-+	u32 user_reg;
-+	u32 droop_reg;
-+	u32 config_reg;
-+	u32 status_reg;
-+	u8  lock_bit;
-+
-+	u32 droop_val;
-+	u32 config_val;
-+	u32 user_val;
-+	u32 user_vco_mask;
-+	unsigned long low_vco_max_rate;
-+
-+	unsigned long min_rate;
-+	unsigned long max_rate;
-+};
-+
-+struct clk_hfpll {
-+	struct hfpll_data const *d;
-+	int init_done;
-+
-+	struct clk_regmap clkr;
-+	spinlock_t lock;
-+};
-+
-+#define to_clk_hfpll(_hw) \
-+	container_of(to_clk_regmap(_hw), struct clk_hfpll, clkr)
-+
-+extern const struct clk_ops clk_ops_hfpll;
-+
-+#endif
+ struct clk *clk_register_mux(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u8 width,
+@@ -433,7 +438,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
+ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 		const char **parent_names, u8 num_parents, unsigned long flags,
+ 		void __iomem *reg, u8 shift, u32 mask,
+-		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
++		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock);
+ 
+ void clk_unregister_mux(struct clk *clk);
+ 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
