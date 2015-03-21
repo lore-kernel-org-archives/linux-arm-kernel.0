@@ -1,82 +1,145 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Sat, 21 Mar 2015 16:38:21 +0000
-Subject: [PATCH 05/10] ARM: s3c64xx: enable sparse IRQ support
-In-Reply-To: <20150318000234.GU28806@sirena.org.uk>
-References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
- <1425299763-4066822-6-git-send-email-arnd@arndb.de>
- <20150306174316.GA26692@opensource.wolfsonmicro.com>
- <6643361.dhtMagqMYZ@wuerfel> <20150318000234.GU28806@sirena.org.uk>
-Message-ID: <20150321163821.GE23705@opensource.wolfsonmicro.com>
+From: cat.schulze@alice-dsl.net (Christopher Alexander Tobias Schulze)
+Date: Sat, 21 Mar 2015 17:40:00 +0100
+Subject: RFC: [PATCH] arm: vfp: vfp_save_state() crashes on VFP11 when
+ FPEXC.EX bit is set
+Message-ID: <201503211740.01106.cat.schulze@alice-dsl.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 12:02:34AM +0000, Mark Brown wrote:
-> On Sun, Mar 08, 2015 at 10:42:59PM +0100, Arnd Bergmann wrote:
-> > On Friday 06 March 2015 17:43:16 Charles Keepax wrote:
-> > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> > index f395a5617142..cbe353a5450e 100644
-> > --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-> > +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-> > @@ -855,7 +855,7 @@ static void __init crag6410_machine_init(void)
-> >  MACHINE_START(WLF_CRAGG_6410, "Wolfson Cragganmore 6410")
-> >  	/* Maintainer: Mark Brown <broonie@opensource.wolfsonmicro.com> */
-> >  	.atag_offset	= 0x100,
-> > -	.nr_irqs	= S3C64XX_NR_IRQS + 160,
-> > +	.nr_irqs	= S3C64XX_NR_IRQS,
-> >  	.init_irq	= s3c6410_init_irq,
-> >  	.map_io		= crag6410_map_io,
-> >  	.init_machine	= crag6410_machine_init,
-> 
-> > The samsung-gpio driver does not allocate irq descriptors for itself
-> > though, otherwise we could make the S3C64XX_NR_IRQS number smaller.
-> 
-> That's not the only thing, I'm still seeing an issue even with the
-> change above.  The VICs are also complaining about preallocated
-> descriptors, but they just assume the descriptors were preallocated and
-> carry on happily.  I'd also expect this to be affecting both wm831xs but
-> it's only affecting the WM8311 on the base board, not the primary
-> WM8312, so this seems to be a red herring.
-> 
-> I rather suspect that the issue is at least partly that the interrupt
-> numbering is off - the CODEC has 24 interrupts allocated to it in
-> crag6410.h which is nowhere near enough and the PMICs have 32 each
-> rather than the 58 they need.  This is broken for the existing code too
-> so we should get a fix to make that right in before anything else.  A
-> trivial change to fix that doesn't seem to have helped though but I
-> probably just miscounted or something.
+This mail is a request for comment for a patch I used to fix a kernel
+crash on Raspberry Pi 1 machines using a VFP11 FPU. As I do not have
+too intimate knowledge of ARM VFP (and in particular all VFP variants
+out there), I want to ask for your feedback, remarks and possibly
+corrections, to avoid potential incompatibilities with other VFP
+implementations, or any subtile flaws in my patch which might only
+trigger under circumstances not covered by my tests.
 
-Ok guys very sorry about the massive delay in looking at this
-again, I have been a bit swamped lately. I think I see what is
-going on here.
+Patch follows below - remove this header when committing.
 
-The fix from Arnd there definitely helped, but still doesn't
-quite work and those defines you are talking about there are
-actually for the GPIOs so they are a bit of a red herring. There
-are two PMICs as you mention one of which is given a fixed IRQ
-base and the other which allocates it own. The problem appears to
-be that the one which allocates its own IRQ base takes the space
-that is specified as the fixed base for the other PMIC. Which
-then fails to allocate its IRQs.
+-----------------------------------------------------------------------
 
-So adding a bit of an offset into the PMIC with the fixed IRQ
-base fixes the problem. Although I am not sure if it would be
-better to move both PMICs onto a fixed IRQ base so there is no
-chance of the clashing. Any thoughts?
+The ARM1176JZF-S CPU used on Raspberry Pi generation 1 boards includes
+a VFP11 floating point unit. Several users have reported kernel crashes
+("BUG: unsupported FP instruction in kernel mode") under certain
+circumstances, which are fixed by this patch.
 
-Thanks,
-Charles
+A precondition to see the crashes is that floating point exception
+traps are enabled. In this case, the VFP11 might determine that a FPU
+operation needs to trap at a point in time when it is not possible to
+signal this to the ARM11 core any more. The VFP11 will then set the
+FPEXC.EX bit and store the trapped opcode in FPINST. (In some cases,
+a second opcode might have been accepted by the VFP11 before the
+exception was detected and could be reported to the ARM11 - in this
+case, the VFP11 also sets FPEXC.FP2V and stores the second opcode in
+FPINST2.)
 
-Applying this diff, on top of Arnd's fixup, gets everything
-working for me:
+If FPEXC.EX is set, the VFP11 will "bounce" the next FPU opcode issued
+by the ARM11 CPU, which will be seen by the ARM11 as an undefined opcode
+trap. The VFP support code examines the FPEXC.EX and FPEXC.FP2V bits
+to decide what actions to take, i.e., whether to emulate the opcodes
+found in FPINST and FPINST2, and whether to retry the bounced instruction.
 
-diff --git a/arch/arm/mach-s3c64xx/crag6410.h
-b/arch/arm/mach-s3c64xx/crag6410.h
-index 7bc6668..59c5f44 100644
---- a/arch/arm/mach-s3c64xx/crag6410.h
-+++ b/arch/arm/mach-s3c64xx/crag6410.h
-@@ -13,7 +13,7 @@
+If a user space application has left the VFP11 in this "pending trap"
+state, the next FPU opcode issued to the VFP11 might actually be the
+VSTMIA operation vfp_save_state() uses to store the FPU registers
+to memory (in our test cases, when building the signal stack frame).
+In this case, the kernel crashes as described above.
 
- #include <mach/gpio-samsung.h>
+This patch fixes the problem by making sure that vfp_save_state() is
+always entered with FPEXC.EX cleared. (The current value of FPEXC has
+already been saved, so this does not corrupt the context. Clearing
+FPEXC.EX has no effects on FPINST or FPINST2. Also note that many
+callers already modify FPEXC by setting FPEXC.EN before invoking
+vfp_save_state().)
 
--#define GLENFARCLAS_PMIC_IRQ_BASE      IRQ_BOARD_START
-+#define GLENFARCLAS_PMIC_IRQ_BASE      IRQ_BOARD_START + 256
+This patch also addresses a second problem related to FPEXC.EX: After
+returning from signal handling, the kernel reloads the VFP context
+from the user mode stack. However, the current code explicitly clears
+both FPEXC.EX and FPEXC.FP2V during reload. As VFP11 requires these
+bits to be preserved, this patch disables clearing them for VFP
+implementations belonging to architecture 1. There should be no
+negative side effects: the user can set both bits by executing FPU
+opcodes anyway, and while user code may now place arbitrary values
+into FPINST and FPINST2 (e.g., non-VFP ARM opcodes) the VFP support
+code knows which instructions can be emulated, and rejects other
+opcodes with "unhandled bounce" messages, so there should be no
+security impact from allowing reloading FPEXC.EX and FPEXC.FP2V.
+
+Signed-off-by: Christopher Alexander Tobias Schulze <cat.schulze@alice-dsl.net>
+---
+--- vfpmodule-3.18.9.c  2015-03-20 13:51:32.000000000 +0100
++++ vfpmodule-patched.c 2015-03-21 09:58:03.027806844 +0100
+@@ -183,8 +183,11 @@ static int vfp_notifier(struct notifier_
+                 * case the thread migrates to a different CPU. The
+                 * restoring is done lazily.
+                 */
+-               if ((fpexc & FPEXC_EN) && vfp_current_hw_state[cpu])
++               if ((fpexc & FPEXC_EN) && vfp_current_hw_state[cpu]) {
++                       /* vfp_save_state oopses on VFP11 if EX bit set */
++                       fmxr(FPEXC, fpexc & ~FPEXC_EX);
+                        vfp_save_state(vfp_current_hw_state[cpu], fpexc);
++               }
+ #endif
+ 
+                /*
+@@ -454,13 +457,16 @@ static int vfp_pm_suspend(void)
+        /* if vfp is on, then save state for resumption */
+        if (fpexc & FPEXC_EN) {
+                pr_debug("%s: saving vfp state\n", __func__);
++               /* vfp_save_state oopses on VFP11 if EX bit set */
++               fmxr(FPEXC, fpexc & ~FPEXC_EX);
+                vfp_save_state(&ti->vfpstate, fpexc);
+ 
+                /* disable, just in case */
+                fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+        } else if (vfp_current_hw_state[ti->cpu]) {
+ #ifndef CONFIG_SMP
+-               fmxr(FPEXC, fpexc | FPEXC_EN);
++               /* vfp_save_state oopses on VFP11 if EX bit set */
++               fmxr(FPEXC, (fpexc & ~FPEXC_EX) | FPEXC_EN);
+                vfp_save_state(vfp_current_hw_state[ti->cpu], fpexc);
+                fmxr(FPEXC, fpexc);
+ #endif
+@@ -523,7 +529,8 @@ void vfp_sync_hwstate(struct thread_info
+                /*
+                 * Save the last VFP state on this CPU.
+                 */
+-               fmxr(FPEXC, fpexc | FPEXC_EN);
++               /* vfp_save_state oopses on VFP11 if EX bit set */
++               fmxr(FPEXC, (fpexc & ~FPEXC_EX) | FPEXC_EN);
+                vfp_save_state(&thread->vfpstate, fpexc | FPEXC_EN);
+                fmxr(FPEXC, fpexc);
+        }
+@@ -595,6 +602,7 @@ int vfp_restore_user_hwstate(struct user
+        struct vfp_hard_struct *hwstate = &thread->vfpstate.hard;
+        unsigned long fpexc;
+        int err = 0;
++       u32 fpsid = fmrx(FPSID);
+ 
+        /* Disable VFP to avoid corrupting the new thread state. */
+        vfp_flush_hwstate(thread);
+@@ -618,8 +626,12 @@ int vfp_restore_user_hwstate(struct user
+        /* Ensure the VFP is enabled. */
+        fpexc |= FPEXC_EN;
+ 
+-       /* Ensure FPINST2 is invalid and the exception flag is cleared. */
+-       fpexc &= ~(FPEXC_EX | FPEXC_FP2V);
++       /* Mask FPXEC_EX and FPEXC_FP2V if not required by VFP arch */
++       if ((fpsid & FPSID_ARCH_MASK) != (1 << FPSID_ARCH_BIT)) {
++               /* Ensure FPINST2 is invalid and the exception flag is cleared. */
++               fpexc &= ~(FPEXC_EX | FPEXC_FP2V);
++       }
++
+        hwstate->fpexc = fpexc;
+ 
+        __get_user_error(hwstate->fpinst, &ufp_exc->fpinst, err);
+@@ -689,7 +701,8 @@ void kernel_neon_begin(void)
+        cpu = get_cpu();
+ 
+        fpexc = fmrx(FPEXC) | FPEXC_EN;
+-       fmxr(FPEXC, fpexc);
++       /* vfp_save_state oopses on VFP11 if EX bit set */
++       fmxr(FPEXC, fpexc & ~FPEXC_EX);
+ 
+        /*
+         * Save the userland NEON/VFP state. Under UP,
