@@ -1,194 +1,215 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Mar 2015 23:45:21 -0700
-Subject: [PATCH v3 02/13] clk: mux: Split out register accessors for reuse
+Date: Fri, 20 Mar 2015 23:45:29 -0700
+Subject: [PATCH v3 10/13] clk: qcom: Add KPSS ACC/GCC driver
 In-Reply-To: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
 References: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426920332-9340-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1426920332-9340-11-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to reuse the logic in clk-mux.c for other clock drivers
-that don't use readl as register accessors. Fortunately, there
-really isn't much to the mux code besides the table indirection
-and quirk flags if you assume any bit shifting and masking has
-been done already. Pull that logic out into reusable functions
-that operate on an optional table and some flags so that other
-drivers can use the same logic.
+The ACC and GCC regions present in KPSSv1 contain registers to
+control clocks and power to each Krait CPU and L2. For CPUfreq
+purposes probe these devices and expose a mux clock that chooses
+between PXO and PLL8.
 
+Cc: <devicetree@vger.kernel.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/clk-mux.c        | 76 +++++++++++++++++++++++++++-----------------
- include/linux/clk-provider.h |  9 ++++--
- 2 files changed, 54 insertions(+), 31 deletions(-)
+ .../devicetree/bindings/arm/msm/qcom,kpss-acc.txt  |  7 ++
+ .../devicetree/bindings/arm/msm/qcom,kpss-gcc.txt  | 28 +++++++
+ drivers/clk/qcom/Kconfig                           |  8 ++
+ drivers/clk/qcom/Makefile                          |  1 +
+ drivers/clk/qcom/kpss-xcc.c                        | 95 ++++++++++++++++++++++
+ 5 files changed, 139 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+ create mode 100644 drivers/clk/qcom/kpss-xcc.c
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 69a094c3783d..70a05c7f0fb1 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -29,35 +29,24 @@
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+index 1333db9acfee..382a574a5c55 100644
+--- a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-acc.txt
+@@ -21,10 +21,17 @@ PROPERTIES
+ 		    the register region. An optional second element specifies
+ 		    the base address and size of the alias register region.
  
- #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
- 
--static u8 clk_mux_get_parent(struct clk_hw *hw)
-+unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-+				unsigned int *table, unsigned long flags)
- {
--	struct clk_mux *mux = to_clk_mux(hw);
- 	int num_parents = __clk_get_num_parents(hw->clk);
--	u32 val;
- 
--	/*
--	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
--	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
--	 * to 0x7 (index starts at one)
--	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
--	 * val = 0x4 really means "bit 2, index starts at bit 0"
--	 */
--	val = clk_readl(mux->reg) >> mux->shift;
--	val &= mux->mask;
--
--	if (mux->table) {
-+	if (table) {
- 		int i;
- 
- 		for (i = 0; i < num_parents; i++)
--			if (mux->table[i] == val)
-+			if (table[i] == val)
- 				return i;
- 		return -EINVAL;
- 	}
- 
--	if (val && (mux->flags & CLK_MUX_INDEX_BIT))
-+	if (val && (flags & CLK_MUX_INDEX_BIT))
- 		val = ffs(val) - 1;
- 
--	if (val && (mux->flags & CLK_MUX_INDEX_ONE))
-+	if (val && (flags & CLK_MUX_INDEX_ONE))
- 		val--;
- 
- 	if (val >= num_parents)
-@@ -65,24 +54,53 @@ static u8 clk_mux_get_parent(struct clk_hw *hw)
- 
- 	return val;
- }
-+EXPORT_SYMBOL_GPL(clk_mux_get_parent);
- 
--static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
-+static u8 _clk_mux_get_parent(struct clk_hw *hw)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	u32 val;
--	unsigned long flags = 0;
- 
--	if (mux->table)
--		index = mux->table[index];
-+	/*
-+	 * FIXME need a mux-specific flag to determine if val is bitwise or numeric
-+	 * e.g. sys_clkin_ck's clksel field is 3 bits wide, but ranges from 0x1
-+	 * to 0x7 (index starts at one)
-+	 * OTOH, pmd_trace_clk_mux_ck uses a separate bit for each clock, so
-+	 * val = 0x4 really means "bit 2, index starts at bit 0"
-+	 */
-+	val = clk_readl(mux->reg) >> mux->shift;
-+	val &= mux->mask;
++- clock-output-names:
++	Usage: optional
++	Value type: <string>
++	Definition: Name of the output clock. Typically acpuX_aux where X is a
++		    CPU number starting at 0.
 +
-+	return clk_mux_get_parent(hw, val, mux->table, mux->flags);
-+}
+ Example:
  
--	else {
--		if (mux->flags & CLK_MUX_INDEX_BIT)
--			index = 1 << index;
-+unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-+			     unsigned long flags)
+ 	clock-controller at 2088000 {
+ 		compatible = "qcom,kpss-acc-v2";
+ 		reg = <0x02088000 0x1000>,
+ 		      <0x02008000 0x1000>;
++		clock-output-names = "acpu0_aux";
+ 	};
+diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+new file mode 100644
+index 000000000000..d1e12f16a28c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/qcom,kpss-gcc.txt
+@@ -0,0 +1,28 @@
++Krait Processor Sub-system (KPSS) Global Clock Controller (GCC)
++
++PROPERTIES
++
++- compatible:
++	Usage: required
++	Value type: <string>
++	Definition: should be one of:
++			"qcom,kpss-gcc"
++
++- reg:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: base address and size of the register region
++
++- clock-output-names:
++	Usage: required
++	Value type: <string>
++	Definition: Name of the output clock. Typically acpu_l2_aux indicating
++		    an L2 cache auxiliary clock.
++
++Example:
++
++	l2cc: clock-controller at 2011000 {
++		compatible = "qcom,kpss-gcc";
++		reg = <0x2011000 0x1000>;
++		clock-output-names = "acpu_l2_aux";
++	};
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index 7b82b3c4e259..92eb883533d5 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -97,6 +97,14 @@ config QCOM_HFPLL
+ 	  Say Y if you want to support CPU frequency scaling on devices
+ 	  such as MSM8974, APQ8084, etc.
+ 
++config KPSS_XCC
++	tristate "KPSS Clock Controller"
++	depends on COMMON_CLK_QCOM
++	help
++	  Support for the Krait ACC and GCC clock controllers. Say Y
++	  if you want to support CPU frequency scaling on devices such
++	  as MSM8960, APQ8064, etc.
++
+ config KRAIT_CLOCKS
+ 	bool
+ 	select KRAIT_L2_ACCESSORS
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index f8d7cfaee4a2..6327dd623773 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -22,4 +22,5 @@ obj-$(CONFIG_MSM_LCC_8960) += lcc-msm8960.o
+ obj-$(CONFIG_MSM_GCC_8974) += gcc-msm8974.o
+ obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o
+ obj-$(CONFIG_MSM_MMCC_8974) += mmcc-msm8974.o
++obj-$(CONFIG_KPSS_XCC) += kpss-xcc.o
+ obj-$(CONFIG_QCOM_HFPLL) += hfpll.o
+diff --git a/drivers/clk/qcom/kpss-xcc.c b/drivers/clk/qcom/kpss-xcc.c
+new file mode 100644
+index 000000000000..abf6bfd053c1
+--- /dev/null
++++ b/drivers/clk/qcom/kpss-xcc.c
+@@ -0,0 +1,95 @@
++/* Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++
++static const char *aux_parents[] = {
++	"pll8_vote",
++	"pxo",
++};
++
++static unsigned int aux_parent_map[] = {
++	3,
++	0,
++};
++
++static const struct of_device_id kpss_xcc_match_table[] = {
++	{ .compatible = "qcom,kpss-acc-v1", .data = (void *)1UL },
++	{ .compatible = "qcom,kpss-gcc" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, kpss_xcc_match_table);
++
++static int kpss_xcc_driver_probe(struct platform_device *pdev)
 +{
-+	unsigned int val = index;
- 
--		if (mux->flags & CLK_MUX_INDEX_ONE)
--			index++;
-+	if (table) {
-+		val = table[val];
++	const struct of_device_id *id;
++	struct clk *clk;
++	struct resource *res;
++	void __iomem *base;
++	const char *name;
++
++	id = of_match_device(kpss_xcc_match_table, &pdev->dev);
++	if (!id)
++		return -ENODEV;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	if (id->data) {
++		if (of_property_read_string_index(pdev->dev.of_node,
++					"clock-output-names", 0, &name))
++			return -ENODEV;
++		base += 0x14;
 +	} else {
-+		if (flags & CLK_MUX_INDEX_BIT)
-+			val = 1 << index;
++		name = "acpu_l2_aux";
++		base += 0x28;
++	}
 +
-+		if (flags & CLK_MUX_INDEX_ONE)
-+			val++;
- 	}
- 
-+	return val;
++	clk = clk_register_mux_table(&pdev->dev, name, aux_parents,
++				     ARRAY_SIZE(aux_parents), 0, base, 0, 0x3,
++				     0, aux_parent_map, NULL);
++
++	platform_set_drvdata(pdev, clk);
++
++	return PTR_ERR_OR_ZERO(clk);
 +}
-+EXPORT_SYMBOL_GPL(clk_mux_reindex);
 +
-+static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
++static int kpss_xcc_driver_remove(struct platform_device *pdev)
 +{
-+	struct clk_mux *mux = to_clk_mux(hw);
-+	u32 val;
-+	unsigned long flags = 0;
++	clk_unregister_mux(platform_get_drvdata(pdev));
++	return 0;
++}
 +
-+	index = clk_mux_reindex(index, mux->table, mux->flags);
++static struct platform_driver kpss_xcc_driver = {
++	.probe = kpss_xcc_driver_probe,
++	.remove = kpss_xcc_driver_remove,
++	.driver = {
++		.name = "kpss-xcc",
++		.of_match_table = kpss_xcc_match_table,
++	},
++};
++module_platform_driver(kpss_xcc_driver);
 +
- 	if (mux->lock)
- 		spin_lock_irqsave(mux->lock, flags);
- 
-@@ -102,21 +120,21 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- }
- 
- const struct clk_ops clk_mux_ops = {
--	.get_parent = clk_mux_get_parent,
-+	.get_parent = _clk_mux_get_parent,
- 	.set_parent = clk_mux_set_parent,
- 	.determine_rate = __clk_mux_determine_rate,
- };
- EXPORT_SYMBOL_GPL(clk_mux_ops);
- 
- const struct clk_ops clk_mux_ro_ops = {
--	.get_parent = clk_mux_get_parent,
-+	.get_parent = _clk_mux_get_parent,
- };
- EXPORT_SYMBOL_GPL(clk_mux_ro_ops);
- 
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
--		u8 clk_mux_flags, u32 *table, spinlock_t *lock)
-+		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock)
- {
- 	struct clk_mux *mux;
- 	struct clk *clk;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5591ea71a8d1..f7a6f60f8e0c 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -409,7 +409,7 @@ void clk_unregister_divider(struct clk *clk);
- struct clk_mux {
- 	struct clk_hw	hw;
- 	void __iomem	*reg;
--	u32		*table;
-+	unsigned int	*table;
- 	u32		mask;
- 	u8		shift;
- 	u8		flags;
-@@ -425,6 +425,11 @@ struct clk_mux {
- extern const struct clk_ops clk_mux_ops;
- extern const struct clk_ops clk_mux_ro_ops;
- 
-+unsigned int clk_mux_get_parent(struct clk_hw *hw, unsigned int val,
-+				unsigned int *table, unsigned long flags);
-+unsigned int clk_mux_reindex(u8 index, unsigned int *table,
-+			     unsigned long flags);
-+
- struct clk *clk_register_mux(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u8 width,
-@@ -433,7 +438,7 @@ struct clk *clk_register_mux(struct device *dev, const char *name,
- struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 		const char **parent_names, u8 num_parents, unsigned long flags,
- 		void __iomem *reg, u8 shift, u32 mask,
--		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
-+		u8 clk_mux_flags, unsigned int *table, spinlock_t *lock);
- 
- void clk_unregister_mux(struct clk *clk);
- 
++MODULE_DESCRIPTION("Krait Processor Sub System (KPSS) Clock Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:kpss-xcc");
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
