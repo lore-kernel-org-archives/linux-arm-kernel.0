@@ -1,167 +1,279 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Mar 2015 23:45:23 -0700
-Subject: [PATCH v3 04/13] clk: Add safe switch hook
+Date: Fri, 20 Mar 2015 23:45:28 -0700
+Subject: [PATCH v3 09/13] clk: qcom: Add support for Krait clocks
 In-Reply-To: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
 References: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426920332-9340-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1426920332-9340-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes clocks can't accept their parent source turning off
-while the source is reprogrammed to a different rate. Most
-notably CPU clocks require a way to switch away from the current
-PLL they're running on, reprogram that PLL to a new rate, and
-then switch back to the PLL with the new rate once they're done.
-Add a hook that drivers can implement allowing them to return a
-'safe parent' that they can switch their parent to while the
-upstream source is reprogrammed to support this.
+The Krait clocks are made up of a series of muxes and a divider
+that choose between a fixed rate clock and dedicated HFPLLs for
+each CPU. Instead of using mmio accesses to remux parents, the
+Krait implementation exposes the remux control via cp15
+registers. Support these clocks.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ drivers/clk/qcom/Kconfig     |   4 ++
+ drivers/clk/qcom/Makefile    |   1 +
+ drivers/clk/qcom/clk-krait.c | 166 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/clk-krait.h |  49 +++++++++++++
+ 4 files changed, 220 insertions(+)
+ create mode 100644 drivers/clk/qcom/clk-krait.c
+ create mode 100644 drivers/clk/qcom/clk-krait.h
 
-This patch is good enough for Krait, but soon I'll need to 
-support a "safe rate" where we ask a clock what rate it needs to be running
-at to be sure it's within voltage constraints. Right now safe parent
-handles that problem on Krait, but on other platforms it won't work.
-
- drivers/clk/clk.c            | 61 ++++++++++++++++++++++++++++++++++++++------
- include/linux/clk-provider.h |  1 +
- 2 files changed, 54 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 0712bea649c1..ead015a8e047 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -56,9 +56,12 @@ struct clk_core {
- 	struct clk_core		**parents;
- 	u8			num_parents;
- 	u8			new_parent_index;
-+	u8			safe_parent_index;
- 	unsigned long		rate;
- 	unsigned long		req_rate;
-+	unsigned long		old_rate;
- 	unsigned long		new_rate;
-+	struct clk_core		*safe_parent;
- 	struct clk_core		*new_parent;
- 	struct clk_core		*new_child;
- 	unsigned long		flags;
-@@ -1550,7 +1553,8 @@ out:
- static void clk_calc_subtree(struct clk_core *clk, unsigned long new_rate,
- 			     struct clk_core *new_parent, u8 p_index)
- {
--	struct clk_core *child;
-+	struct clk_core *child, *parent;
-+	struct clk_hw *parent_hw;
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index d421fd195114..7b82b3c4e259 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -96,3 +96,7 @@ config QCOM_HFPLL
+ 	  Support for the high-frequency PLLs present on Qualcomm devices.
+ 	  Say Y if you want to support CPU frequency scaling on devices
+ 	  such as MSM8974, APQ8084, etc.
++
++config KRAIT_CLOCKS
++	bool
++	select KRAIT_L2_ACCESSORS
+diff --git a/drivers/clk/qcom/Makefile b/drivers/clk/qcom/Makefile
+index b1076179fb17..f8d7cfaee4a2 100644
+--- a/drivers/clk/qcom/Makefile
++++ b/drivers/clk/qcom/Makefile
+@@ -8,6 +8,7 @@ clk-qcom-y += clk-rcg2.o
+ clk-qcom-y += clk-branch.o
+ clk-qcom-y += clk-regmap-divider.o
+ clk-qcom-y += clk-regmap-mux.o
++clk-qcom-$(CONFIG_KRAIT_CLOCKS) += clk-krait.o
+ clk-qcom-y += clk-hfpll.o
+ clk-qcom-y += reset.o
  
- 	clk->new_rate = new_rate;
- 	clk->new_parent = new_parent;
-@@ -1560,6 +1564,18 @@ static void clk_calc_subtree(struct clk_core *clk, unsigned long new_rate,
- 	if (new_parent && new_parent != clk->parent)
- 		new_parent->new_child = clk;
- 
-+	if (clk->ops->get_safe_parent) {
-+		parent_hw = clk->ops->get_safe_parent(clk->hw);
-+		if (parent_hw) {
-+			parent = parent_hw->core;
-+			p_index = clk_fetch_parent_index(clk, parent);
-+			clk->safe_parent_index = p_index;
-+			clk->safe_parent = parent;
-+		}
-+	} else {
-+		clk->safe_parent = NULL;
+diff --git a/drivers/clk/qcom/clk-krait.c b/drivers/clk/qcom/clk-krait.c
+new file mode 100644
+index 000000000000..6506730d085e
+--- /dev/null
++++ b/drivers/clk/qcom/clk-krait.c
+@@ -0,0 +1,166 @@
++/*
++ * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/clk-provider.h>
++#include <linux/spinlock.h>
++
++#include <asm/krait-l2-accessors.h>
++
++#include "clk-krait.h"
++
++/* Secondary and primary muxes share the same cp15 register */
++static DEFINE_SPINLOCK(krait_clock_reg_lock);
++
++#define LPL_SHIFT	8
++static void __krait_mux_set_sel(struct krait_mux_clk *mux, int sel)
++{
++	unsigned long flags;
++	u32 regval;
++
++	spin_lock_irqsave(&krait_clock_reg_lock, flags);
++	regval = krait_get_l2_indirect_reg(mux->offset);
++	regval &= ~(mux->mask << mux->shift);
++	regval |= (sel & mux->mask) << mux->shift;
++	if (mux->lpl) {
++		regval &= ~(mux->mask << (mux->shift + LPL_SHIFT));
++		regval |= (sel & mux->mask) << (mux->shift + LPL_SHIFT);
 +	}
++	krait_set_l2_indirect_reg(mux->offset, regval);
++	spin_unlock_irqrestore(&krait_clock_reg_lock, flags);
 +
- 	hlist_for_each_entry(child, &clk->children, child_node) {
- 		child->new_rate = clk_recalc(child, new_rate);
- 		clk_calc_subtree(child, child->new_rate, NULL, 0);
-@@ -1655,14 +1671,43 @@ static struct clk_core *clk_propagate_rate_change(struct clk_core *clk,
- 						  unsigned long event)
- {
- 	struct clk_core *child, *tmp_clk, *fail_clk = NULL;
-+	struct clk_core *old_parent;
- 	int ret = NOTIFY_DONE;
- 
--	if (clk->rate == clk->new_rate)
-+	if (clk->rate == clk->new_rate && event != POST_RATE_CHANGE)
- 		return NULL;
- 
-+	switch (event) {
-+	case PRE_RATE_CHANGE:
-+		if (clk->safe_parent)
-+			clk->ops->set_parent(clk->hw, clk->safe_parent_index);
-+		clk->old_rate = clk->rate;
-+		break;
-+	case POST_RATE_CHANGE:
-+		if (clk->safe_parent) {
-+			old_parent = __clk_set_parent_before(clk,
-+							     clk->new_parent);
-+			if (clk->ops->set_rate_and_parent) {
-+				clk->ops->set_rate_and_parent(clk->hw,
-+						clk->new_rate,
-+						clk->new_parent ?
-+						clk->new_parent->rate : 0,
-+						clk->new_parent_index);
-+			} else if (clk->ops->set_parent) {
-+				clk->ops->set_parent(clk->hw,
-+						clk->new_parent_index);
-+			}
-+			__clk_set_parent_after(clk, clk->new_parent,
-+					       old_parent);
-+		}
-+		break;
-+	}
++	/* Wait for switch to complete. */
++	mb();
++	udelay(1);
++}
 +
- 	if (clk->notifier_count) {
--		ret = __clk_notify(clk, event, clk->rate, clk->new_rate);
--		if (ret & NOTIFY_STOP_MASK)
-+		if (event != POST_RATE_CHANGE || clk->old_rate != clk->rate)
-+			ret = __clk_notify(clk, event, clk->old_rate,
-+					   clk->new_rate);
-+		if (ret & NOTIFY_STOP_MASK && event != POST_RATE_CHANGE)
- 			fail_clk = clk;
- 	}
- 
-@@ -1708,7 +1753,8 @@ clk_change_rate(struct clk_core *clk, unsigned long best_parent_rate)
- 
- 	old_rate = clk->rate;
- 
--	if (clk->new_parent && clk->new_parent != clk->parent) {
-+	if (clk->new_parent && clk->new_parent != clk->parent &&
-+			!clk->safe_parent) {
- 		old_parent = __clk_set_parent_before(clk, clk->new_parent);
- 
- 		if (clk->ops->set_rate_and_parent) {
-@@ -1728,9 +1774,6 @@ clk_change_rate(struct clk_core *clk, unsigned long best_parent_rate)
- 
- 	clk->rate = clk->new_rate;
- 
--	if (clk->notifier_count && old_rate != clk->rate)
--		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
--
- 	/*
- 	 * Use safe iteration, as change_rate can actually swap parents
- 	 * for certain clock types.
-@@ -1790,6 +1833,8 @@ static int clk_core_set_rate_nolock(struct clk_core *clk,
- 
- 	clk->req_rate = req_rate;
- 
-+	clk_propagate_rate_change(top, POST_RATE_CHANGE);
++static int krait_mux_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
++	u32 sel;
 +
- 	return ret;
- }
- 
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index f7a6f60f8e0c..bc0f6faaeda4 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -183,6 +183,7 @@ struct clk_ops {
- 					  struct clk_hw **best_parent_hw);
- 	int		(*set_parent)(struct clk_hw *hw, u8 index);
- 	u8		(*get_parent)(struct clk_hw *hw);
-+	struct clk_hw	*(*get_safe_parent)(struct clk_hw *hw);
- 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
- 				    unsigned long parent_rate);
- 	int		(*set_rate_and_parent)(struct clk_hw *hw,
++	sel = clk_mux_reindex(index, mux->parent_map, 0);
++	mux->en_mask = sel;
++	/* Don't touch mux if CPU is off as it won't work */
++	if (__clk_is_enabled(hw->clk))
++		__krait_mux_set_sel(mux, sel);
++	return 0;
++}
++
++static u8 krait_mux_get_parent(struct clk_hw *hw)
++{
++	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
++	u32 sel;
++
++	sel = krait_get_l2_indirect_reg(mux->offset);
++	sel >>= mux->shift;
++	sel &= mux->mask;
++	mux->en_mask = sel;
++
++	return clk_mux_get_parent(hw, sel, mux->parent_map, 0);
++}
++
++static struct clk_hw *krait_mux_get_safe_parent(struct clk_hw *hw)
++{
++	int i;
++	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
++	int num_parents = __clk_get_num_parents(hw->clk);
++
++	i = mux->safe_sel;
++	for (i = 0; i < num_parents; i++)
++		if (mux->safe_sel == mux->parent_map[i])
++			break;
++
++	return __clk_get_hw(clk_get_parent_by_index(hw->clk, i));
++}
++
++static int krait_mux_enable(struct clk_hw *hw)
++{
++	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
++
++	__krait_mux_set_sel(mux, mux->en_mask);
++
++	return 0;
++}
++
++static void krait_mux_disable(struct clk_hw *hw)
++{
++	struct krait_mux_clk *mux = to_krait_mux_clk(hw);
++
++	__krait_mux_set_sel(mux, mux->safe_sel);
++}
++
++const struct clk_ops krait_mux_clk_ops = {
++	.enable = krait_mux_enable,
++	.disable = krait_mux_disable,
++	.set_parent = krait_mux_set_parent,
++	.get_parent = krait_mux_get_parent,
++	.determine_rate = __clk_mux_determine_rate_closest,
++	.get_safe_parent = krait_mux_get_safe_parent,
++};
++EXPORT_SYMBOL_GPL(krait_mux_clk_ops);
++
++/* The divider can divide by 2, 4, 6 and 8. But we only really need div-2. */
++static long krait_div2_round_rate(struct clk_hw *hw, unsigned long rate,
++				  unsigned long *parent_rate)
++{
++	*parent_rate = __clk_round_rate(__clk_get_parent(hw->clk), rate * 2);
++	return DIV_ROUND_UP(*parent_rate, 2);
++}
++
++static int krait_div2_set_rate(struct clk_hw *hw, unsigned long rate,
++			unsigned long parent_rate)
++{
++	struct krait_div2_clk *d = to_krait_div2_clk(hw);
++	unsigned long flags;
++	u32 val;
++	u32 mask = BIT(d->width) - 1;
++
++	if (d->lpl)
++		mask = mask << (d->shift + LPL_SHIFT) | mask << d->shift;
++
++	spin_lock_irqsave(&krait_clock_reg_lock, flags);
++	val = krait_get_l2_indirect_reg(d->offset);
++	val &= ~mask;
++	krait_set_l2_indirect_reg(d->offset, val);
++	spin_unlock_irqrestore(&krait_clock_reg_lock, flags);
++
++	return 0;
++}
++
++static unsigned long
++krait_div2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct krait_div2_clk *d = to_krait_div2_clk(hw);
++	u32 mask = BIT(d->width) - 1;
++	u32 div;
++
++	div = krait_get_l2_indirect_reg(d->offset);
++	div >>= d->shift;
++	div &= mask;
++	div = (div + 1) * 2;
++
++	return DIV_ROUND_UP(parent_rate, div);
++}
++
++const struct clk_ops krait_div2_clk_ops = {
++	.round_rate = krait_div2_round_rate,
++	.set_rate = krait_div2_set_rate,
++	.recalc_rate = krait_div2_recalc_rate,
++};
++EXPORT_SYMBOL_GPL(krait_div2_clk_ops);
+diff --git a/drivers/clk/qcom/clk-krait.h b/drivers/clk/qcom/clk-krait.h
+new file mode 100644
+index 000000000000..5d0063538e5d
+--- /dev/null
++++ b/drivers/clk/qcom/clk-krait.h
+@@ -0,0 +1,49 @@
++/*
++ * Copyright (c) 2013, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __QCOM_CLK_KRAIT_H
++#define __QCOM_CLK_KRAIT_H
++
++#include <linux/clk-provider.h>
++
++struct krait_mux_clk {
++	unsigned int	*parent_map;
++	bool		has_safe_parent;
++	u8		safe_sel;
++	u32		offset;
++	u32		mask;
++	u32		shift;
++	u32		en_mask;
++	bool		lpl;
++
++	struct clk_hw	hw;
++};
++
++#define to_krait_mux_clk(_hw) container_of(_hw, struct krait_mux_clk, hw)
++
++extern const struct clk_ops krait_mux_clk_ops;
++
++struct krait_div2_clk {
++	u32		offset;
++	u8		width;
++	u32		shift;
++	bool		lpl;
++
++	struct clk_hw	hw;
++};
++
++#define to_krait_div2_clk(_hw) container_of(_hw, struct krait_div2_clk, hw)
++
++extern const struct clk_ops krait_div2_clk_ops;
++
++#endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
