@@ -1,45 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 21 Mar 2015 10:54:09 +0000
-Subject: [GIT PULL] arm64 fixes for 4.0-rc5
-Message-ID: <20150321105401.GA32696@e104818-lin.cambridge.arm.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Sat, 21 Mar 2015 13:05:31 +0100
+Subject: [PATCH 1/4] iio: adc: add support for Berlin
+In-Reply-To: <1426858565-31053-2-git-send-email-antoine.tenart@free-electrons.com>
+References: <1426858565-31053-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1426858565-31053-2-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1426939531.15426.9.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Just a license nit.
 
-Please pull the arm64 fixes below. Thanks.
+On Fri, 2015-03-20 at 14:36 +0100, Antoine Tenart wrote:
+> --- /dev/null
+> +++ b/drivers/iio/adc/berlin-adc.c
 
-The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
 
-  Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+This states the license is GPL v2.
 
-are available in the git repository at:
+> +MODULE_LICENSE("GPL");
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+And
+    MODULE_LICENSE("GPL v2");
 
-for you to fetch changes up to 7132813c384515c9dede1ae20e56f3895feb7f1e:
+would match that statement.
 
-  arm64: Honor __GFP_ZERO in dma allocations (2015-03-20 18:18:54 +0000)
 
-----------------------------------------------------------------
-arm64 fixes:
-- mm switching fix where the kernel pgd ends up in the user TTBR0 after
-  returning from an EFI run-time services call
-- fix __GFP_ZERO handling for atomic pool and CMA DMA allocations (the
-  generic code does get the gfp flags, so it's left with the arch code
-  to memzero accordingly)
-
-----------------------------------------------------------------
-Suzuki K. Poulose (1):
-      arm64: Honor __GFP_ZERO in dma allocations
-
-Will Deacon (1):
-      arm64: efi: don't restore TTBR0 if active_mm points at init_mm
-
- arch/arm64/include/asm/proc-fns.h |  6 +++++-
- arch/arm64/kernel/efi.c           |  6 +++++-
- arch/arm64/mm/dma-mapping.c       | 12 +++++++++---
- 3 files changed, 19 insertions(+), 5 deletions(-)
-
--- 
-Catalin
+Paul Bolle
