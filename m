@@ -1,52 +1,50 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 20 Mar 2015 17:09:30 -0700
-Subject: [PATCH v3] driver core / PM: Add PM domain callbacks for device
- setup/cleanup
-In-Reply-To: <3289026.ADmXXipokh@vostro.rjw.lan> (Rafael J. Wysocki's message
- of "Fri, 20 Mar 2015 13:59:27 +0100")
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <1810625.BTgaNclHRk@vostro.rjw.lan>
- <1654636.FxBHsexDm1@vostro.rjw.lan>
- <3289026.ADmXXipokh@vostro.rjw.lan>
-Message-ID: <7hzj77i539.fsf@deeprootsystems.com>
+Date: Fri, 20 Mar 2015 17:14:34 -0700
+Subject: [PATCH V2] PM / Domains: Sync runtime PM status with genpd after
+ probe
+In-Reply-To: <1426863312-31132-1-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Fri, 20 Mar 2015 15:55:12 +0100")
+References: <1426863312-31132-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <7hvbhvi4ut.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Rafael J. Wysocki" <rjw@rjwysocki.net> writes:
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
 >
-> If PM domains are in use, it may be necessary to prepare the code
-> handling a PM domain for driver probing.  For example, in some
-> cases device drivers rely on the ability to power on the devices
-> with the help of the IO runtime PM framework and the PM domain
-> code needs to be ready for that.  Also, if that code has not been
-> fully initialized yet, the driver probing should be deferred.
+> Buses which currently supports attaching devices to their PM domains,
+> will invoke the dev_pm_domain_attach() API from their ->probe()
+> callbacks. During the attach procedure, genpd power up the PM domain.
 >
-> Moreover, after the probing is complete, it may be necessary to
-> put the PM domain in question into the state reflecting the current
-> needs of the devices in it, for example, so that power is not drawn
-> in vain.  The same should be done after removing a driver from
-> a device, as the PM domain state may need to be changed to reflect
-> the new situation.
+> In those scenarios where the bus/driver don't need to access its device
+> during probe, it may leave it in runtime PM suspended state since
+> that's also the default state. In that way, no notifications through
+> the runtime PM callbacks will reach the PM domain during probe.
 >
-> For these reasons, introduce new PM domain callbacks, ->activate,
-> ->sync and ->dismiss called, respectively, before probing for a
-> device driver, after the probing has completed successfully and
-> if the probing has failed or the driver has been removed.
+> For genpd, the consequence from the above scenario means the PM domain
+> will remain powered. Therefore, implement the struct dev_pm_domain's
+> ->sync() callback, which is invoked from driver core after the
+> bus/driver has probed the device. It allows genpd to power off the PM
+> domain if it's unused.
 >
-> Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> [Ulf: Updated patch according to updates in driver core]
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
 >
-> One more update taking Dmitry's comments into account and fixing an
-> overoptimization bug spotted by Ulf.
+> Changes in v2:
+> 	- I picked up Russell's earlier patch [1] and updated it to fit the
+> 	changes [2] proposed to be done to the driver core.
 >
-> And this actually contains the patch this time (clicked on "Send" too
-> early last time, sorry about that).
+> 	[1]: [PATCH 3/9] pm: domains: sync runtime PM status with PM domains
+> 	after probe
+>
+> 	[2]: [PATCH v3] driver core / PM: Add PM domain callbacks for device
+> 	setup/cleanup
+> 	http://www.spinics.net/lists/arm-kernel/msg407394.html
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Ah, I hadn't seen this when I reviewed Rafael's v3 and suggested
+Russell's patch be reworked.  This is just what I had in mind.
 
-Unless I'm missing somthing, this along with the just the genpd part of
-Russell's patch should then fix his problem as well.
-
-Kevin
+Acked-by: Kevin Hilman <khilman@linaro.org>
