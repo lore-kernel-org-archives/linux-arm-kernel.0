@@ -1,766 +1,116 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Mar 2015 23:45:32 -0700
-Subject: [PATCH v3 13/13] ARM: dts: qcom: Add necessary DT data for Krait
- cpufreq
-In-Reply-To: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
-References: <1426920332-9340-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1426920332-9340-14-git-send-email-sboyd@codeaurora.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sat, 21 Mar 2015 15:03:26 +0800
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <550CE2CE.4080508@linaro.org>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
+ <20150320185400.GK1474@arm.com> <550CE2CE.4080508@linaro.org>
+Message-ID: <550D17BE.70009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary DT nodes and data so we can probe the cpufreq
-driver on MSM devices with Krait CPUs.
+On 2015/3/21 11:17, Hanjun Guo wrote:
+> +CC Parth Dixit, Stefano Stabellini.
+>
+> On 2015?03?21? 02:54, Will Deacon wrote:
+>> On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
+>>> On 2015/3/19 3:05, Will Deacon wrote:
+>>>> If you can get that in place, I'm not opposed to putting this into
+>>>> linux-next ahead of the firmware summit in San Jose next week. Note that
+>>>> this is not a commitment for 4.1, since I'm keen to see the outcomes of
+>>>> next week before setting anything in stone.
+>>>
+>>> OK, I will stick to this mailing list and respond as soon as I can.
+>>
+>> This doesn't even build for me:
+>>
+>>
+>> $ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- allmodconfig
+>> $ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- Image
+>>
+>> [...]
+>>
+>> In file included from drivers/xen/acpi.c:33:0:
+>
+> Sorry, I didn't build ACPI with XEN enabled on ARM64.
+>
+>> include/xen/acpi.h: In function ?xen_acpi_sleep_register?:
+>> include/xen/acpi.h:102:3: error: ?acpi_suspend_lowlevel? undeclared (first use in this function)
+>>     acpi_suspend_lowlevel = xen_acpi_suspend_lowlevel;
+>
+> acpi_suspend_lowlevel is defined only for X86 and IA64 for now.
+>
+>>     ^
+>> include/xen/acpi.h:102:3: note: each undeclared identifier is reported only once for each function it appears in
+>> drivers/xen/acpi.c: In function ?xen_acpi_notify_hypervisor_state?:
+>> drivers/xen/acpi.c:61:2: error: implicit declaration of function ?HYPERVISOR_dom0_op? [-Werror=implicit-function-declaration]
+>>    HYPERVISOR_dom0_op(&op);
+>
+> And this is only for x86:
+> ./arch/x86/include/asm/xen/hypercall.h:HYPERVISOR_dom0_op(struct xen_platform_op *platform_op)
+>
+>>    ^
+>> cc1: some warnings being treated as errors
+>> make[2]: *** [drivers/xen/acpi.o] Error 1
+>> make[2]: *** Waiting for unfinished jobs....
+>> make[1]: *** [drivers/xen] Error 2
+>> make[1]: *** Waiting for unfinished jobs....
+>> make: *** [drivers] Error 2
+>>
+>>
+>> Am I missing some other patches?
+>
+> No, you miss nothing. Parth Dixit is still working on XEN ACPI for
+> ARM64, before it's in full function, how about introduce a Kconfig
+> CONFIG_XEN_ACPI and let it depends on x86? when XEN ACPI for ARM64
+> comes, we can enable ARM64 for CONFIG_XEN_ACPI and fix the problems
+> above.
+>
+> Stefano, Parth, what do you think?
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+I prepared a patch for further reference:
+
+>From 268dcdafa34a690e2f99c0784ca33a6d2352ecf5 Mon Sep 17 00:00:00 2001
+From: Hanjun Guo <hanjun.guo@linaro.org>
+Date: Sat, 21 Mar 2015 14:43:54 +0800
+Subject: [PATCH] XEN / ACPI: Make XEN ACPI depend on X86
+
+When ACPI is enabled on ARM64, XEN ACPI will also compiled
+into the kernel, but XEN ACPI is x86 dependent, so introduce
+CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
+functional on ARM64.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 230 ++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-msm8960.dtsi |  49 ++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi | 311 +++++++++++++++++++++++++++++++++++-
- 3 files changed, 586 insertions(+), 4 deletions(-)
+ drivers/xen/Kconfig  | 4 ++++
+ drivers/xen/Makefile | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index b3154c071652..a97cbec75abe 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -23,6 +23,9 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
-+			clocks = <&kraitcc 0>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index b812462..a31cd29 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -253,4 +253,8 @@ config XEN_EFI
+     def_bool y
+     depends on X86_64 && EFI
  
- 		cpu at 1 {
-@@ -33,6 +36,9 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
-+			clocks = <&kraitcc 1>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
++config XEN_ACPI
++    def_bool y
++    depends on X86 && ACPI
++
+ endmenu
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index 2ccd359..f4622ab 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -13,7 +13,7 @@ CFLAGS_efi.o                += -fshort-wchar
  
- 		cpu at 2 {
-@@ -43,6 +49,9 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
- 			qcom,saw = <&saw2>;
-+			clocks = <&kraitcc 2>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
- 		cpu at 3 {
-@@ -53,6 +62,9 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
- 			qcom,saw = <&saw3>;
-+			clocks = <&kraitcc 3>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
- 		L2: l2-cache {
-@@ -66,6 +78,214 @@
- 		interrupts = <1 10 0x304>;
- 	};
- 
-+	qcom,pvs {
-+		qcom,pvs-format-a;
-+		qcom,speed0-pvs0-bin-v0 =
-+			< 384000000 950000  >,
-+			< 486000000 975000  >,
-+			< 594000000 1000000  >,
-+			< 702000000 1025000  >,
-+			< 810000000 1075000  >,
-+			< 918000000 1100000  >;
-+
-+		qcom,speed0-pvs1-bin-v0 =
-+			< 384000000 900000  >,
-+			< 486000000 925000  >,
-+			< 594000000 950000  >,
-+			< 702000000 975000  >,
-+			< 810000000 1025000  >,
-+			< 918000000 1050000  >;
-+
-+		qcom,speed0-pvs3-bin-v0 =
-+			< 384000000 850000  >,
-+			< 486000000 875000  >,
-+			< 594000000 900000  >,
-+			< 702000000 925000  >,
-+			< 810000000 975000  >,
-+			< 918000000 1000000  >;
-+
-+		qcom,speed0-pvs4-bin-v0 =
-+			< 384000000 850000  >,
-+			< 486000000 875000  >,
-+			< 594000000 900000  >,
-+			< 702000000 925000  >,
-+			< 810000000 962500  >,
-+			< 918000000 975000  >;
-+
-+		qcom,speed1-pvs0-bin-v0 =
-+			< 384000000 950000  >,
-+			< 486000000 950000  >,
-+			< 594000000 950000  >,
-+			< 702000000 962500  >,
-+			< 810000000 1000000  >,
-+			< 918000000 1025000  >;
-+
-+		qcom,speed1-pvs1-bin-v0 =
-+			< 384000000 950000  >,
-+			< 486000000 950000  >,
-+			< 594000000 950000  >,
-+			< 702000000 962500  >,
-+			< 810000000 975000  >,
-+			< 918000000 1000000  >;
-+
-+		qcom,speed1-pvs2-bin-v0 =
-+			< 384000000 925000  >,
-+			< 486000000 925000  >,
-+			< 594000000 925000  >,
-+			< 702000000 925000  >,
-+			< 810000000 937500  >,
-+			< 918000000 950000  >;
-+
-+		qcom,speed1-pvs3-bin-v0 =
-+			< 384000000 900000  >,
-+			< 486000000 900000  >,
-+			< 594000000 900000  >,
-+			< 702000000 900000  >,
-+			< 810000000 900000  >,
-+			< 918000000 925000  >;
-+
-+		qcom,speed1-pvs4-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed1-pvs5-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed1-pvs6-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed2-pvs0-bin-v0 =
-+			< 384000000 950000  >,
-+			< 486000000 950000  >,
-+			< 594000000 950000  >,
-+			< 702000000 950000  >,
-+			< 810000000 962500  >,
-+			< 918000000 975000  >;
-+
-+		qcom,speed2-pvs1-bin-v0 =
-+			< 384000000 925000  >,
-+			< 486000000 925000  >,
-+			< 594000000 925000  >,
-+			< 702000000 925000  >,
-+			< 810000000 937500  >,
-+			< 918000000 950000  >;
-+
-+		qcom,speed2-pvs2-bin-v0 =
-+			< 384000000 900000  >,
-+			< 486000000 900000  >,
-+			< 594000000 900000  >,
-+			< 702000000 900000  >,
-+			< 810000000 912500  >,
-+			< 918000000 925000  >;
-+
-+		qcom,speed2-pvs3-bin-v0 =
-+			< 384000000 900000  >,
-+			< 486000000 900000  >,
-+			< 594000000 900000  >,
-+			< 702000000 900000  >,
-+			< 810000000 900000  >,
-+			< 918000000 912500  >;
-+
-+		qcom,speed2-pvs4-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed2-pvs5-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed2-pvs6-bin-v0 =
-+			< 384000000 875000  >,
-+			< 486000000 875000  >,
-+			< 594000000 875000  >,
-+			< 702000000 875000  >,
-+			< 810000000 887500  >,
-+			< 918000000 900000  >;
-+
-+		qcom,speed14-pvs0-bin-v0 =
-+			< 384000000 950000 >,
-+			< 486000000 950000 >,
-+			< 594000000 950000 >,
-+			< 702000000 962500 >,
-+			< 810000000 1000000 >,
-+			< 918000000 1025000 >;
-+
-+		qcom,speed14-pvs1-bin-v0 =
-+			< 384000000 950000 >,
-+			< 486000000 950000 >,
-+			< 594000000 950000 >,
-+			< 702000000 962500 >,
-+			< 810000000 975000 >,
-+			< 918000000 1000000 >;
-+
-+		qcom,speed14-pvs2-bin-v0 =
-+			< 384000000 925000 >,
-+			< 486000000 925000 >,
-+			< 594000000 925000 >,
-+			< 702000000 925000 >,
-+			< 810000000 937500 >,
-+			< 918000000 950000 >;
-+
-+		qcom,speed14-pvs3-bin-v0 =
-+			< 384000000 900000 >,
-+			< 486000000 900000 >,
-+			< 594000000 900000 >,
-+			< 702000000 900000 >,
-+			< 810000000 900000 >,
-+			< 918000000 925000 >;
-+
-+		qcom,speed14-pvs4-bin-v0 =
-+			< 384000000 875000 >,
-+			< 486000000 875000 >,
-+			< 594000000 875000 >,
-+			< 702000000 875000 >,
-+			< 810000000 887500 >,
-+			< 918000000 900000 >;
-+
-+		qcom,speed14-pvs5-bin-v0 =
-+			< 384000000 875000 >,
-+			< 486000000 875000 >,
-+			< 594000000 875000 >,
-+			< 702000000 875000 >,
-+			< 810000000 887500 >,
-+			< 918000000 900000 >;
-+
-+		qcom,speed14-pvs6-bin-v0 =
-+			< 384000000 875000 >,
-+			< 486000000 875000 >,
-+			< 594000000 875000 >,
-+			< 702000000 875000 >,
-+			< 810000000 887500 >,
-+			< 918000000 900000 >;
-+	};
-+
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v1";
-+		#clock-cells = <1>;
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -122,21 +342,31 @@
- 		acc0: clock-controller at 2088000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu0_aux";
- 		};
- 
- 		acc1: clock-controller at 2098000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu1_aux";
- 		};
- 
- 		acc2: clock-controller at 20a8000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x020a8000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu2_aux";
- 		};
- 
- 		acc3: clock-controller at 20b8000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu3_aux";
-+		};
-+
-+		l2cc: clock-controller at 2011000 {
-+			compatible = "qcom,kpss-gcc";
-+			reg = <0x2011000 0x1000>;
-+			clock-output-names = "acpu_l2_aux";
- 		};
- 
- 		saw0: regulator at 2089000 {
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index e1b0d5cd9e3c..ef89daf7a258 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -24,6 +24,10 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
- 			qcom,saw = <&saw0>;
-+			clocks = <&kraitcc 0>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
-+
- 		};
- 
- 		cpu at 1 {
-@@ -34,6 +38,10 @@
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
- 			qcom,saw = <&saw1>;
-+			clocks = <&kraitcc 1>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
-+
- 		};
- 
- 		L2: l2-cache {
-@@ -48,6 +56,39 @@
- 		qcom,no-pc-write;
- 	};
- 
-+	qcom,pvs {
-+		qcom,pvs-format-a;
-+			/* Hz		uV */
-+		qcom,speed0-pvs0-bin-v0 =
-+			<  384000000  950000 >,
-+			<  486000000  975000 >,
-+			<  594000000 1000000 >,
-+			<  702000000 1025000 >,
-+			<  810000000 1075000 >,
-+			<  918000000 1100000 >;
-+
-+		qcom,speed0-pvs1-bin-v0 =
-+			<  384000000  900000 >,
-+			<  486000000  925000 >,
-+			<  594000000  950000 >,
-+			<  702000000  975000 >,
-+			<  810000000 1025000 >,
-+			<  918000000 1050000 >;
-+
-+		qcom,speed0-pvs3-bin-v0 =
-+			<  384000000  850000 >,
-+			<  486000000  875000 >,
-+			<  594000000  900000 >,
-+			<  702000000  925000 >,
-+			<  810000000  975000 >,
-+			<  918000000 1000000 >;
-+	};
-+
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v1";
-+		#clock-cells = <1>;
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -101,11 +142,19 @@
- 		acc0: clock-controller at 2088000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02088000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu0_aux";
- 		};
- 
- 		acc1: clock-controller at 2098000 {
- 			compatible = "qcom,kpss-acc-v1";
- 			reg = <0x02098000 0x1000>, <0x02008000 0x1000>;
-+			clock-output-names = "acpu1_aux";
-+		};
-+
-+		l2cc: clock-controller at 2011000 {
-+			compatible = "qcom,kpss-gcc";
-+			reg = <0x2011000 0x1000>;
-+			clock-output-names = "acpu_l2_aux";
- 		};
- 
- 		saw0: regulator at 2089000 {
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec16a787..45ff96d74079 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -14,40 +14,52 @@
- 		#size-cells = <0>;
- 		interrupts = <1 9 0xf04>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
-+			clocks = <&kraitcc 0>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
-+			clocks = <&kraitcc 1>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
-+			clocks = <&kraitcc 2>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			compatible = "qcom,krait";
- 			enable-method = "qcom,kpss-acc-v2";
- 			device_type = "cpu";
- 			reg = <3>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
-+			clocks = <&kraitcc 3>;
-+			clock-names = "cpu";
-+			clock-latency = <100000>;
- 		};
- 
- 		L2: l2-cache {
-@@ -71,6 +83,267 @@
- 		clock-frequency = <19200000>;
- 	};
- 
-+	qcom,pvs {
-+		qcom,pvs-format-b;
-+			/* Hz		uV	ua */
-+		qcom,speed0-pvs0-bin-v0 =
-+			<  300000000  815000  73 >,
-+			<  345600000  825000  85 >,
-+			<  422400000  835000 104 >,
-+			<  499200000  845000 124 >,
-+			<  576000000  855000 144 >,
-+			<  652800000  865000 165 >,
-+			<  729600000  875000 186 >,
-+			<  806400000  890000 208 >,
-+			<  883200000  900000 229 >,
-+			<  960000000  915000 252 >;
-+
-+		qcom,speed0-pvs1-bin-v0 =
-+			<  300000000  800000  73 >,
-+			<  345600000  810000  85 >,
-+			<  422400000  820000 104 >,
-+			<  499200000  830000 124 >,
-+			<  576000000  840000 144 >,
-+			<  652800000  850000 165 >,
-+			<  729600000  860000 186 >,
-+			<  806400000  875000 208 >,
-+			<  883200000  885000 229 >,
-+			<  960000000  895000 252 >;
-+
-+		qcom,speed0-pvs2-bin-v0 =
-+			<  300000000  785000  73 >,
-+			<  345600000  795000  85 >,
-+			<  422400000  805000 104 >,
-+			<  499200000  815000 124 >,
-+			<  576000000  825000 144 >,
-+			<  652800000  835000 165 >,
-+			<  729600000  845000 186 >,
-+			<  806400000  855000 208 >,
-+			<  883200000  865000 229 >,
-+			<  960000000  875000 252 >;
-+
-+		qcom,speed0-pvs3-bin-v0 =
-+			<  300000000  775000  73 >,
-+			<  345600000  780000  85 >,
-+			<  422400000  790000 104 >,
-+			<  499200000  800000 124 >,
-+			<  576000000  810000 144 >,
-+			<  652800000  820000 165 >,
-+			<  729600000  830000 186 >,
-+			<  806400000  840000 208 >,
-+			<  883200000  850000 229 >,
-+			<  960000000  860000 252 >;
-+
-+		qcom,speed0-pvs4-bin-v0 =
-+			<  300000000  775000  73 >,
-+			<  345600000  775000  85 >,
-+			<  422400000  780000 104 >,
-+			<  499200000  790000 124 >,
-+			<  576000000  800000 144 >,
-+			<  652800000  810000 165 >,
-+			<  729600000  820000 186 >,
-+			<  806400000  830000 208 >,
-+			<  883200000  840000 229 >,
-+			<  960000000  850000 252 >;
-+
-+		qcom,speed0-pvs5-bin-v0 =
-+			<  300000000  750000  73 >,
-+			<  345600000  760000  85 >,
-+			<  422400000  770000 104 >,
-+			<  499200000  780000 124 >,
-+			<  576000000  790000 144 >,
-+			<  652800000  800000 165 >,
-+			<  729600000  810000 186 >,
-+			<  806400000  820000 208 >,
-+			<  883200000  830000 229 >,
-+			<  960000000  840000 252 >;
-+
-+		qcom,speed0-pvs6-bin-v0 =
-+			<  300000000  750000  73 >,
-+			<  345600000  750000  85 >,
-+			<  422400000  760000 104 >,
-+			<  499200000  770000 124 >,
-+			<  576000000  780000 144 >,
-+			<  652800000  790000 165 >,
-+			<  729600000  800000 186 >,
-+			<  806400000  810000 208 >,
-+			<  883200000  820000 229 >,
-+			<  960000000  830000 252 >;
-+
-+		qcom,speed2-pvs0-bin-v0 =
-+			<  300000000  800000  72 >,
-+			<  345600000  800000  83 >,
-+			<  422400000  805000 102 >,
-+			<  499200000  815000 121 >,
-+			<  576000000  825000 141 >,
-+			<  652800000  835000 161 >,
-+			<  729600000  845000 181 >,
-+			<  806400000  855000 202 >,
-+			<  883200000  865000 223 >,
-+			<  960000000  875000 245 >;
-+
-+		qcom,speed2-pvs1-bin-v0 =
-+			<  300000000  800000  72 >,
-+			<  345600000  800000  83 >,
-+			<  422400000  800000 102 >,
-+			<  499200000  800000 121 >,
-+			<  576000000  810000 141 >,
-+			<  652800000  820000 161 >,
-+			<  729600000  830000 181 >,
-+			<  806400000  840000 202 >,
-+			<  883200000  850000 223 >,
-+			<  960000000  860000 245 >;
-+
-+		qcom,speed2-pvs2-bin-v0 =
-+			<  300000000  775000  72 >,
-+			<  345600000  775000  83 >,
-+			<  422400000  775000 102 >,
-+			<  499200000  785000 121 >,
-+			<  576000000  795000 141 >,
-+			<  652800000  805000 161 >,
-+			<  729600000  815000 181 >,
-+			<  806400000  825000 202 >,
-+			<  883200000  835000 223 >,
-+			<  960000000  845000 245 >;
-+
-+		qcom,speed2-pvs3-bin-v0 =
-+			<  300000000  775000  72 >,
-+			<  345600000  775000  83 >,
-+			<  422400000  775000 102 >,
-+			<  499200000  775000 121 >,
-+			<  576000000  780000 141 >,
-+			<  652800000  790000 161 >,
-+			<  729600000  800000 181 >,
-+			<  806400000  810000 202 >,
-+			<  883200000  820000 223 >,
-+			<  960000000  830000 245 >;
-+
-+		qcom,speed2-pvs4-bin-v0 =
-+			<  300000000  775000  72 >,
-+			<  345600000  775000  83 >,
-+			<  422400000  775000 102 >,
-+			<  499200000  775000 121 >,
-+			<  576000000  775000 141 >,
-+			<  652800000  780000 161 >,
-+			<  729600000  790000 181 >,
-+			<  806400000  800000 202 >,
-+			<  883200000  810000 223 >,
-+			<  960000000  820000 245 >;
-+
-+		qcom,speed2-pvs5-bin-v0 =
-+			<  300000000  750000  72 >,
-+			<  345600000  750000  83 >,
-+			<  422400000  750000 102 >,
-+			<  499200000  750000 121 >,
-+			<  576000000  760000 141 >,
-+			<  652800000  770000 161 >,
-+			<  729600000  780000 181 >,
-+			<  806400000  790000 202 >,
-+			<  883200000  800000 223 >,
-+			<  960000000  810000 245 >;
-+
-+		qcom,speed2-pvs6-bin-v0 =
-+			<  300000000  750000  72 >,
-+			<  345600000  750000  83 >,
-+			<  422400000  750000 102 >,
-+			<  499200000  750000 121 >,
-+			<  576000000  750000 141 >,
-+			<  652800000  760000 161 >,
-+			<  729600000  770000 181 >,
-+			<  806400000  780000 202 >,
-+			<  883200000  790000 223 >,
-+			<  960000000  800000 245 >;
-+
-+		qcom,speed1-pvs0-bin-v0 =
-+			<  300000000  775000  72 >,
-+			<  345600000  775000  83 >,
-+			<  422400000  775000 101 >,
-+			<  499200000  780000 120 >,
-+			<  576000000  790000 139 >,
-+			<  652800000  800000 159 >,
-+			<  729600000  810000 180 >,
-+			<  806400000  820000 200 >,
-+			<  883200000  830000 221 >,
-+			<  960000000  840000 242 >;
-+
-+		qcom,speed1-pvs1-bin-v0 =
-+			<  300000000  775000  72 >,
-+			<  345600000  775000  83 >,
-+			<  422400000  775000 101 >,
-+			<  499200000  775000 120 >,
-+			<  576000000  775000 139 >,
-+			<  652800000  785000 159 >,
-+			<  729600000  795000 180 >,
-+			<  806400000  805000 200 >,
-+			<  883200000  815000 221 >,
-+			<  960000000  825000 242 >;
-+
-+		qcom,speed1-pvs2-bin-v0 =
-+			<  300000000  750000  72 >,
-+			<  345600000  750000  83 >,
-+			<  422400000  750000 101 >,
-+			<  499200000  750000 120 >,
-+			<  576000000  760000 139 >,
-+			<  652800000  770000 159 >,
-+			<  729600000  780000 180 >,
-+			<  806400000  790000 200 >,
-+			<  883200000  800000 221 >,
-+			<  960000000  810000 242 >;
-+
-+		qcom,speed1-pvs3-bin-v0 =
-+			<  300000000  750000  72 >,
-+			<  345600000  750000  83 >,
-+			<  422400000  750000 101 >,
-+			<  499200000  750000 120 >,
-+			<  576000000  750000 139 >,
-+			<  652800000  755000 159 >,
-+			<  729600000  765000 180 >,
-+			<  806400000  775000 200 >,
-+			<  883200000  785000 221 >,
-+			<  960000000  795000 242 >;
-+
-+		qcom,speed1-pvs4-bin-v0 =
-+			<  300000000  750000  72 >,
-+			<  345600000  750000  83 >,
-+			<  422400000  750000 101 >,
-+			<  499200000  750000 120 >,
-+			<  576000000  750000 139 >,
-+			<  652800000  750000 159 >,
-+			<  729600000  755000 180 >,
-+			<  806400000  765000 200 >,
-+			<  883200000  775000 221 >,
-+			<  960000000  785000 242 >;
-+
-+		qcom,speed1-pvs5-bin-v0 =
-+			<  300000000  725000  72 >,
-+			<  345600000  725000  83 >,
-+			<  422400000  725000 101 >,
-+			<  499200000  725000 120 >,
-+			<  576000000  725000 139 >,
-+			<  652800000  735000 159 >,
-+			<  729600000  745000 180 >,
-+			<  806400000  755000 200 >,
-+			<  883200000  765000 221 >,
-+			<  960000000  775000 242 >;
-+
-+		qcom,speed1-pvs6-bin-v0 =
-+			<  300000000  725000  72 >,
-+			<  345600000  725000  83 >,
-+			<  422400000  725000 101 >,
-+			<  499200000  725000 120 >,
-+			<  576000000  725000 139 >,
-+			<  652800000  725000 159 >,
-+			<  729600000  735000 180 >,
-+			<  806400000  745000 200 >,
-+			<  883200000  755000 221 >,
-+			<  960000000  765000 242 >;
-+	};
-+
-+	kraitcc: clock-controller {
-+		compatible = "qcom,krait-cc-v2";
-+		#clock-cells = <1>;
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -144,6 +417,36 @@
- 			};
- 		};
- 
-+		clock-controller at f9016000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf9016000 0x30>;
-+			clock-output-names = "hfpll_l2";
-+		};
-+
-+		clock-controller at f908a000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf908a000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll0";
-+		};
-+
-+		clock-controller at f909a000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf909a000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll1";
-+		};
-+
-+		clock-controller at f90aa000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf90aa000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll2";
-+		};
-+
-+		clock-controller at f90ba000 {
-+			compatible = "qcom,hfpll";
-+			reg = <0xf90ba000 0x30>, <0xf900a000 0x30>;
-+			clock-output-names = "hfpll3";
-+		};
-+
- 		saw_l2: regulator at f9012000 {
- 			compatible = "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
+ dom0-$(CONFIG_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+-dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
++dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+ xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+ dom0-$(CONFIG_X86) += pcpu.o
+ obj-$(CONFIG_XEN_DOM0)            += $(dom0-y)
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.7.12.4
