@@ -1,40 +1,57 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 22 Mar 2015 00:45:35 +0100
-Subject: [PATCH] ARM: cygnus: fix const declaration bcm_cygnus_dt_compat
-Message-ID: <1426981535-1800-1-git-send-email-stefan@agner.ch>
+Date: Sun, 22 Mar 2015 00:51:08 +0100
+Subject: [PATCH] dmaengine: ste_dma40: fix implicit conversion
+Message-ID: <1426981868-1988-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The const declaration for char* is actually duplicated, however
-the array of strings is currently not constant. However, typically
-the dt_compat array is declared as const char *const. Follow
-that convention and also add the __initconst macro for constant
-initialization data.
+The function d40_prep_sg takes the type enum dma_transfer_direction
+as second last parameter. However, the memcpy calls pass DMA_NONE
+which is of type enum dma_data_direction. Fix this by passing the
+actual transfer direction DMA_MEM_TO_MEM.
+
+This does not change the actual code flow since only the transfer
+direction DMA_MEM_TO_DEV and DMA_DEV_TO_MEM are actually used in the
+function d40_prep_sg.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-This was uncovered by a LLVM/clang warning:
-arch/arm/mach-bcm/bcm_cygnus.c:16:19: warning: duplicate 'const' declaration
-specifier [-Wduplicate-decl-specifier]
-static const char const *bcm_cygnus_dt_compat[] = {
-                  ^~~~~~
-1 warning generated.
+This was uncovered by a LLVM/clang warnings:
+drivers/dma/ste_dma40.c:2505:48: warning: implicit conversion from enumeration type 'enum dma_data_direction' to different enumeration type 'enum dma_transfer_direction'
+      [-Wenum-conversion]
+        return d40_prep_sg(chan, &src_sg, &dst_sg, 1, DMA_NONE, dma_flags);
+               ~~~~~~~~~~~                            ^~~~~~~~
+drivers/dma/ste_dma40.c:2517:54: warning: implicit conversion from enumeration type 'enum dma_data_direction' to different enumeration type 'enum dma_transfer_direction'
+      [-Wenum-conversion]
+        return d40_prep_sg(chan, src_sg, dst_sg, src_nents, DMA_NONE, dma_flags);
+               ~~~~~~~~~~~                                  ^~~~~~~~
 
- arch/arm/mach-bcm/bcm_cygnus.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/ste_dma40.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-bcm/bcm_cygnus.c b/arch/arm/mach-bcm/bcm_cygnus.c
-index 30dc58b..7ae894c 100644
---- a/arch/arm/mach-bcm/bcm_cygnus.c
-+++ b/arch/arm/mach-bcm/bcm_cygnus.c
-@@ -13,7 +13,7 @@
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 15d4946..ace03dc 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -2502,7 +2502,8 @@ static struct dma_async_tx_descriptor *d40_prep_memcpy(struct dma_chan *chan,
+ 	sg_dma_len(&dst_sg) = size;
+ 	sg_dma_len(&src_sg) = size;
  
- #include <asm/mach/arch.h>
+-	return d40_prep_sg(chan, &src_sg, &dst_sg, 1, DMA_NONE, dma_flags);
++	return d40_prep_sg(chan, &src_sg, &dst_sg, 1,
++			   DMA_MEM_TO_MEM, dma_flags);
+ }
  
--static const char const *bcm_cygnus_dt_compat[] = {
-+static const char * const bcm_cygnus_dt_compat[] __initconst = {
- 	"brcm,cygnus",
- 	NULL,
- };
+ static struct dma_async_tx_descriptor *
+@@ -2514,7 +2515,8 @@ d40_prep_memcpy_sg(struct dma_chan *chan,
+ 	if (dst_nents != src_nents)
+ 		return NULL;
+ 
+-	return d40_prep_sg(chan, src_sg, dst_sg, src_nents, DMA_NONE, dma_flags);
++	return d40_prep_sg(chan, src_sg, dst_sg, src_nents,
++			   DMA_MEM_TO_MEM, dma_flags);
+ }
+ 
+ static struct dma_async_tx_descriptor *
 -- 
 2.3.3
