@@ -1,96 +1,82 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 21 Mar 2015 17:26:24 +0100
-Subject: [PATCH] extcon: Fix missing locking when [un]registering notifiers
-Message-ID: <1426955184-3727-1-git-send-email-hdegoede@redhat.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Sat, 21 Mar 2015 16:38:21 +0000
+Subject: [PATCH 05/10] ARM: s3c64xx: enable sparse IRQ support
+In-Reply-To: <20150318000234.GU28806@sirena.org.uk>
+References: <1425299763-4066822-1-git-send-email-arnd@arndb.de>
+ <1425299763-4066822-6-git-send-email-arnd@arndb.de>
+ <20150306174316.GA26692@opensource.wolfsonmicro.com>
+ <6643361.dhtMagqMYZ@wuerfel> <20150318000234.GU28806@sirena.org.uk>
+Message-ID: <20150321163821.GE23705@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since extcon-class.c is using raw_notifiers it must protect the notifier
-list itself when [un]registering notifiers to avoid the list changing while
-extcon_update_state is walking the list (through raw_notifier_call_chain).
+On Wed, Mar 18, 2015 at 12:02:34AM +0000, Mark Brown wrote:
+> On Sun, Mar 08, 2015 at 10:42:59PM +0100, Arnd Bergmann wrote:
+> > On Friday 06 March 2015 17:43:16 Charles Keepax wrote:
+> > diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> > index f395a5617142..cbe353a5450e 100644
+> > --- a/arch/arm/mach-s3c64xx/mach-crag6410.c
+> > +++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+> > @@ -855,7 +855,7 @@ static void __init crag6410_machine_init(void)
+> >  MACHINE_START(WLF_CRAGG_6410, "Wolfson Cragganmore 6410")
+> >  	/* Maintainer: Mark Brown <broonie@opensource.wolfsonmicro.com> */
+> >  	.atag_offset	= 0x100,
+> > -	.nr_irqs	= S3C64XX_NR_IRQS + 160,
+> > +	.nr_irqs	= S3C64XX_NR_IRQS,
+> >  	.init_irq	= s3c6410_init_irq,
+> >  	.map_io		= crag6410_map_io,
+> >  	.init_machine	= crag6410_machine_init,
+> 
+> > The samsung-gpio driver does not allocate irq descriptors for itself
+> > though, otherwise we could make the S3C64XX_NR_IRQS number smaller.
+> 
+> That's not the only thing, I'm still seeing an issue even with the
+> change above.  The VICs are also complaining about preallocated
+> descriptors, but they just assume the descriptors were preallocated and
+> carry on happily.  I'd also expect this to be affecting both wm831xs but
+> it's only affecting the WM8311 on the base board, not the primary
+> WM8312, so this seems to be a red herring.
+> 
+> I rather suspect that the issue is at least partly that the interrupt
+> numbering is off - the CODEC has 24 interrupts allocated to it in
+> crag6410.h which is nowhere near enough and the PMICs have 32 each
+> rather than the 58 they need.  This is broken for the existing code too
+> so we should get a fix to make that right in before anything else.  A
+> trivial change to fix that doesn't seem to have helped though but I
+> probably just miscounted or something.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/extcon/extcon-class.c | 35 +++++++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+Ok guys very sorry about the massive delay in looking at this
+again, I have been a bit swamped lately. I think I see what is
+going on here.
 
-diff --git a/drivers/extcon/extcon-class.c b/drivers/extcon/extcon-class.c
-index 8319f25..b079c41 100644
---- a/drivers/extcon/extcon-class.c
-+++ b/drivers/extcon/extcon-class.c
-@@ -444,6 +444,9 @@ int extcon_register_interest(struct extcon_specific_cable_nb *obj,
- 			     const char *extcon_name, const char *cable_name,
- 			     struct notifier_block *nb)
- {
-+	unsigned long flags;
-+	int ret;
-+
- 	if (!obj || !cable_name || !nb)
- 		return -EINVAL;
- 
-@@ -461,8 +464,11 @@ int extcon_register_interest(struct extcon_specific_cable_nb *obj,
- 
- 		obj->internal_nb.notifier_call = _call_per_cable;
- 
--		return raw_notifier_chain_register(&obj->edev->nh,
-+		spin_lock_irqsave(&obj->edev->lock, flags);
-+		ret = raw_notifier_chain_register(&obj->edev->nh,
- 						  &obj->internal_nb);
-+		spin_unlock_irqrestore(&obj->edev->lock, flags);
-+		return ret;
- 	} else {
- 		struct class_dev_iter iter;
- 		struct extcon_dev *extd;
-@@ -495,10 +501,17 @@ EXPORT_SYMBOL_GPL(extcon_register_interest);
-  */
- int extcon_unregister_interest(struct extcon_specific_cable_nb *obj)
- {
-+	unsigned long flags;
-+	int ret;
-+
- 	if (!obj)
- 		return -EINVAL;
- 
--	return raw_notifier_chain_unregister(&obj->edev->nh, &obj->internal_nb);
-+	spin_lock_irqsave(&obj->edev->lock, flags);
-+	ret = raw_notifier_chain_unregister(&obj->edev->nh, &obj->internal_nb);
-+	spin_unlock_irqrestore(&obj->edev->lock, flags);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(extcon_unregister_interest);
- 
-@@ -515,7 +528,14 @@ EXPORT_SYMBOL_GPL(extcon_unregister_interest);
- int extcon_register_notifier(struct extcon_dev *edev,
- 			struct notifier_block *nb)
- {
--	return raw_notifier_chain_register(&edev->nh, nb);
-+	unsigned long flags;
-+	int ret;
-+
-+	spin_lock_irqsave(&edev->lock, flags);
-+	ret = raw_notifier_chain_register(&edev->nh, nb);
-+	spin_unlock_irqrestore(&edev->lock, flags);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(extcon_register_notifier);
- 
-@@ -527,7 +547,14 @@ EXPORT_SYMBOL_GPL(extcon_register_notifier);
- int extcon_unregister_notifier(struct extcon_dev *edev,
- 			struct notifier_block *nb)
- {
--	return raw_notifier_chain_unregister(&edev->nh, nb);
-+	unsigned long flags;
-+	int ret;
-+
-+	spin_lock_irqsave(&edev->lock, flags);
-+	ret = raw_notifier_chain_unregister(&edev->nh, nb);
-+	spin_unlock_irqrestore(&edev->lock, flags);
-+
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(extcon_unregister_notifier);
- 
--- 
-2.3.3
+The fix from Arnd there definitely helped, but still doesn't
+quite work and those defines you are talking about there are
+actually for the GPIOs so they are a bit of a red herring. There
+are two PMICs as you mention one of which is given a fixed IRQ
+base and the other which allocates it own. The problem appears to
+be that the one which allocates its own IRQ base takes the space
+that is specified as the fixed base for the other PMIC. Which
+then fails to allocate its IRQs.
+
+So adding a bit of an offset into the PMIC with the fixed IRQ
+base fixes the problem. Although I am not sure if it would be
+better to move both PMICs onto a fixed IRQ base so there is no
+chance of the clashing. Any thoughts?
+
+Thanks,
+Charles
+
+Applying this diff, on top of Arnd's fixup, gets everything
+working for me:
+
+diff --git a/arch/arm/mach-s3c64xx/crag6410.h
+b/arch/arm/mach-s3c64xx/crag6410.h
+index 7bc6668..59c5f44 100644
+--- a/arch/arm/mach-s3c64xx/crag6410.h
++++ b/arch/arm/mach-s3c64xx/crag6410.h
+@@ -13,7 +13,7 @@
+
+ #include <mach/gpio-samsung.h>
+
+-#define GLENFARCLAS_PMIC_IRQ_BASE      IRQ_BOARD_START
++#define GLENFARCLAS_PMIC_IRQ_BASE      IRQ_BOARD_START + 256
