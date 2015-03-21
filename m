@@ -1,116 +1,39 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 21 Mar 2015 15:03:26 +0800
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <550CE2CE.4080508@linaro.org>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
- <20150320185400.GK1474@arm.com> <550CE2CE.4080508@linaro.org>
-Message-ID: <550D17BE.70009@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 21 Mar 2015 10:09:52 +0100
+Subject: [PATCH 4/5] phy: add Broadcom SATA3 PHY driver for Broadcom STB
+ SoCs
+In-Reply-To: <550CA6F8.7080504@gmail.com>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-4-git-send-email-computersforpeace@gmail.com>
+ <550CA6F8.7080504@gmail.com>
+Message-ID: <550D3560.8070802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/21 11:17, Hanjun Guo wrote:
-> +CC Parth Dixit, Stefano Stabellini.
->
-> On 2015?03?21? 02:54, Will Deacon wrote:
->> On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
->>> On 2015/3/19 3:05, Will Deacon wrote:
->>>> If you can get that in place, I'm not opposed to putting this into
->>>> linux-next ahead of the firmware summit in San Jose next week. Note that
->>>> this is not a commitment for 4.1, since I'm keen to see the outcomes of
->>>> next week before setting anything in stone.
->>>
->>> OK, I will stick to this mailing list and respond as soon as I can.
->>
->> This doesn't even build for me:
->>
->>
->> $ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- allmodconfig
->> $ make ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-gnu- Image
->>
->> [...]
->>
->> In file included from drivers/xen/acpi.c:33:0:
->
-> Sorry, I didn't build ACPI with XEN enabled on ARM64.
->
->> include/xen/acpi.h: In function ?xen_acpi_sleep_register?:
->> include/xen/acpi.h:102:3: error: ?acpi_suspend_lowlevel? undeclared (first use in this function)
->>     acpi_suspend_lowlevel = xen_acpi_suspend_lowlevel;
->
-> acpi_suspend_lowlevel is defined only for X86 and IA64 for now.
->
->>     ^
->> include/xen/acpi.h:102:3: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/xen/acpi.c: In function ?xen_acpi_notify_hypervisor_state?:
->> drivers/xen/acpi.c:61:2: error: implicit declaration of function ?HYPERVISOR_dom0_op? [-Werror=implicit-function-declaration]
->>    HYPERVISOR_dom0_op(&op);
->
-> And this is only for x86:
-> ./arch/x86/include/asm/xen/hypercall.h:HYPERVISOR_dom0_op(struct xen_platform_op *platform_op)
->
->>    ^
->> cc1: some warnings being treated as errors
->> make[2]: *** [drivers/xen/acpi.o] Error 1
->> make[2]: *** Waiting for unfinished jobs....
->> make[1]: *** [drivers/xen] Error 2
->> make[1]: *** Waiting for unfinished jobs....
->> make: *** [drivers] Error 2
->>
->>
->> Am I missing some other patches?
->
-> No, you miss nothing. Parth Dixit is still working on XEN ACPI for
-> ARM64, before it's in full function, how about introduce a Kconfig
-> CONFIG_XEN_ACPI and let it depends on x86? when XEN ACPI for ARM64
-> comes, we can enable ARM64 for CONFIG_XEN_ACPI and fix the problems
-> above.
->
-> Stefano, Parth, what do you think?
+Hi,
 
-I prepared a patch for further reference:
+On 21-03-15 00:02, Florian Fainelli wrote:
+> On 18/03/15 18:23, Brian Norris wrote:
+>> Supports up to two ports which can each be powered on/off and configured
+>> independently.
+>>
+>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+>> ---
+>
+> [snip]
+>
+>> +
+>> +static const struct of_device_id brcmstb_sata_phy_of_match[] = {
+>> +	{ .compatible	= "brcm,bcm7445-sata-phy" },
+>
+> The binding document specifies "brcm,phy-sata3" as a fallback compatible
+> string, so we want to match it here.
 
->From 268dcdafa34a690e2f99c0784ca33a6d2352ecf5 Mon Sep 17 00:00:00 2001
-From: Hanjun Guo <hanjun.guo@linaro.org>
-Date: Sat, 21 Mar 2015 14:43:54 +0800
-Subject: [PATCH] XEN / ACPI: Make XEN ACPI depend on X86
+Erm no we do not, what if another sata3 brcm phy comes along which
+is not compatible, both would use "brcm,phy-sata3" as fallback / for
+informational purposes, but we do not want this driver to be binding
+to that other phy, which it would do with your suggestion.
 
-When ACPI is enabled on ARM64, XEN ACPI will also compiled
-into the kernel, but XEN ACPI is x86 dependent, so introduce
-CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
-functional on ARM64.
+Regards,
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/xen/Kconfig  | 4 ++++
- drivers/xen/Makefile | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-index b812462..a31cd29 100644
---- a/drivers/xen/Kconfig
-+++ b/drivers/xen/Kconfig
-@@ -253,4 +253,8 @@ config XEN_EFI
-     def_bool y
-     depends on X86_64 && EFI
- 
-+config XEN_ACPI
-+    def_bool y
-+    depends on X86 && ACPI
-+
- endmenu
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index 2ccd359..f4622ab 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -13,7 +13,7 @@ CFLAGS_efi.o                += -fshort-wchar
- 
- dom0-$(CONFIG_PCI) += pci.o
- dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
--dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
-+dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
- xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
- dom0-$(CONFIG_X86) += pcpu.o
- obj-$(CONFIG_XEN_DOM0)            += $(dom0-y)
--- 
-1.7.12.4
+Hans
