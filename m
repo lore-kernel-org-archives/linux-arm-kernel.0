@@ -1,61 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 Mar 2015 20:48:47 +0100
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <20150322165710.GO8656@n2100.arm.linux.org.uk>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <HK2PR06MB05611E6828E494FB938179658A0F0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20150322165710.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <201503222048.47779.arnd@arndb.de>
+From: rockford@yandex.ru (=?koi8-r?B?8MHOz9cg4c7E0sXK?=)
+Date: Sun, 22 Mar 2015 23:08:01 +0300
+Subject: Bug in drivers/net/ethernet/freescale/fec_main.c,
+ TX is broken. In 4.0.0-rc3
+In-Reply-To: <CAOMZO5BnPQTFoBRr4EGH24_yZZAY6NJmVFg4WeiJcTqrYqki5A@mail.gmail.com>
+References: <390621425930628@web28o.yandex.ru>
+ <3625951426018334@web26j.yandex.ru>
+ <BLUPR03MB373A446E2D97992CA7AAA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+ <726281426513068@web10o.yandex.ru>
+ <BLUPR03MB3739B9C6E14A106CCAEBA32F5020@BLUPR03MB373.namprd03.prod.outlook.com>
+ <994171426532944@web7m.yandex.ru>
+ <20150321205359.GM8656@n2100.arm.linux.org.uk>
+ <CAOMZO5BnPQTFoBRr4EGH24_yZZAY6NJmVFg4WeiJcTqrYqki5A@mail.gmail.com>
+Message-ID: <8321261427054881@web25h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 March 2015, Russell King - ARM Linux wrote:
-> > You are correct...maybe my wording was confusing. This is what I meant:
-> > 
-> > config ARCH_MULTIPLATFORM
-> >       bool "Allow multiple platforms to be selected"
-> >       depends on MMU
-> >       select ARCH_WANT_OPTIONAL_GPIOLIB
-> >       select ARM_HAS_SG_CHAIN
-> > -     select ARM_PATCH_PHYS_VIRT
-> > +     select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL
-> 
-> Yes, that makes sense if we agree that we want to have multi-platform
-> XIP kernels.
+Hi!
 
-I'd rather see this possibility enabled than have separate multiplatform
-and non-multiplatform Kconfig entries for each machine that may
-want XIP_KERNEL. The same thing applies to no-MMU support: we now
-have platforms (i.MX for now, other likely to follow) that are already
-multiplatform and that are gaining support for no-MMU implementations.
+22.03.2015, 01:35, "Fabio Estevam" <festevam@gmail.com>:
+> Hi Russell,
+>
+> On Sat, Mar 21, 2015 at 5:53 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> ?Given that this bug can seriously screw data up in undetectable ways (TCP
+>> ?checksums don't save you, because the FEC generates them on the data which
+>> ?it read from memory, even if it happened to read the data from the SoC's
+>> ?boot ROM) we do need to get this fixed ASAP.
+>
+> Current mainline has 2b995f63987013 reverted, so 4.0-rc5 will not have
+> this corruption problem.
 
-For those too, we need to set the physical address, which means
-we can not run on othe rmachines that may be configured at the
-same time.
+I've tested with current mainline and with mainline+2b995f63987013 commit with Russell's
+fix and it both works fine, without corruption.
 
-> The problem is going to be expressing what a set of valid configurations
-> are - soo many of them just won't boot.  For example, if any of the
-> multiplatforms select SMP, but you want a non-SMP XIP kernel, you have
-> to devine which platforms are forcibly selecting SMP and turn them off.
-> In some of the kernel configurators, that's almost impossible to find
-> out.
-
-For a XIP kernel, I'd normally expect the user to turn off all machines
-other than the one that the kernel is meant to run on, except for build
-testing.
-
-> I guess the other problem is going to be that people will want to add a
-> set of reasonable defaults for CONFIG_PHYS_OFFSET based upon the
-> platform selected - and we know that we have problems with that kind of
-> thing when it comes to the DEBUG_LL stuff interacting with a multiplatform
-> kernel.
-
-I think a number of people have expressed that they'd rather get rid of the
-DEBUG_LL list in the long run, now that we have earlycon working. If we
-can treat XIP_KERNEL as a special case that would only be used for special
-embedded systems, I don't think we need a preconfigured list of defaults,
-but rather hide XIP_KERNEL under CONFIG_EXPERT and expect the few users
-that need it to know the address or start with a working defconfig file
-that has it configured.
-
-	Arnd
+--
+ ??????
