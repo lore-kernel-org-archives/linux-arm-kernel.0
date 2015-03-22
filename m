@@ -1,27 +1,37 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 22 Mar 2015 12:36:47 +0200
-Subject: [PATCH] ARM: remove duplicate reboot.h include in process.c
-Message-ID: <3093e9eafb72eae28fe83b350ddb88d2cd5c99d8.1427020607.git.baruch@tkos.co.il>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 22 Mar 2015 12:00:55 +0100
+Subject: [PATCH v3] input: Add support for ChipOne icn8318 based
+ touchscreens
+In-Reply-To: <20150322040305.GA40622@dtor-ws>
+References: <1426007133-9606-1-git-send-email-hdegoede@redhat.com>
+ <20150322040305.GA40622@dtor-ws>
+Message-ID: <550EA0E7.30608@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes: 7b6d864b48d ('reboot: arm: change reboot_mode to use enum reboot_mode')
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/kernel/process.c | 1 -
- 1 file changed, 1 deletion(-)
+Hi,
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index fdfa3a78ec8c..7989a9063fea 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -31,7 +31,6 @@
- #include <linux/random.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/leds.h>
--#include <linux/reboot.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/idmap.h>
--- 
-2.1.4
+On 22-03-15 05:03, Dmitry Torokhov wrote:
+> Hi Hans,
+>
+> On Tue, Mar 10, 2015 at 06:05:33PM +0100, Hans de Goede wrote:
+>> +	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq,
+>> +					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+>
+> Shouldn't we let DT data tell us what trigger to use? I.e. just leave
+> IRQF_ONESHOT here?
+
+That is an interesting question, that new data is available is signalled by
+the irq pin of the chip going low is a property of the chip, not the board
+layout, so I believe it is best to leave this as is.
+
+Also note that if we want to get this from devicetree, that simply leaving out the
+flag is not enough, we must specifically get the data from devicetree and pass
+it into request_irq AFAICT. So the above would change to:
+
+	irqflags = irqd_get_trigger_type(irq_get_irq_data(client->irq)) | IRQF_ONESHOT,
+	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq, irqflags,
+
+Regards,
+
+Hans
