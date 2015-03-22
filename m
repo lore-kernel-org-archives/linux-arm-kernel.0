@@ -1,50 +1,91 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 22 Mar 2015 15:42:14 -0700
-Subject: [PATCH v3] input: Add support for ChipOne icn8318 based
- touchscreens
-In-Reply-To: <550EA0E7.30608@redhat.com>
-References: <1426007133-9606-1-git-send-email-hdegoede@redhat.com>
- <20150322040305.GA40622@dtor-ws> <550EA0E7.30608@redhat.com>
-Message-ID: <20150322224214.GA9792@dtor-ws>
+From: ola@adapteva.com (Ola Jeppsson)
+Date: Sun, 22 Mar 2015 23:55:53 +0100
+Subject: [PATCH] arm: zynq: Fix system clock with multi_v7_defconfig
+Message-ID: <550F4879.3020207@adapteva.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 22, 2015 at 12:00:55PM +0100, Hans de Goede wrote:
-> Hi,
-> 
-> On 22-03-15 05:03, Dmitry Torokhov wrote:
-> >Hi Hans,
-> >
-> >On Tue, Mar 10, 2015 at 06:05:33PM +0100, Hans de Goede wrote:
-> >>+	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq,
-> >>+					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
-> >
-> >Shouldn't we let DT data tell us what trigger to use? I.e. just leave
-> >IRQF_ONESHOT here?
-> 
-> That is an interesting question, that new data is available is signalled by
-> the irq pin of the chip going low is a property of the chip, not the board
-> layout, so I believe it is best to leave this as is.
+As mentioned in this commit:
+arm: zynq: Don't use arm_global_timer with cpufreq
+61f1fc7e9258a169ac8afb5ddf657a181e60d052
 
-My concern is that even if pin behavior is property of chip maybe on
-some boards we want to use level-triggered interrupts instead of edge?
-And if we indeed want to hard-code the trigger then shouldn't the
-binding document use onecell mapping (so that users do not attempt to
-configure triggers from DT)?
+arm_global_timer depends on the CPU frequency. With cpufreq altering the
+CPU frequency arm_global_timer will not maintain a stable time base. So
+arm_global_timer must not be the clocksource when cpufreq is enabled.
 
-> 
-> Also note that if we want to get this from devicetree, that simply leaving out the
-> flag is not enough, we must specifically get the data from devicetree and pass
-> it into request_irq AFAICT. So the above would change to:
-> 
-> 	irqflags = irqd_get_trigger_type(irq_get_irq_data(client->irq)) | IRQF_ONESHOT,
-> 	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq, irqflags,
+The above commit tries to solve this at build time by only selecting
+CONFIG_ARM_GLOBAL_TIMER if CONFIG_CPU_FREQ is disabled. This is not
+always sufficient because other machs can also enable
+CONFIG_ARM_GLOBAL_TIMER.
 
-No, of_irq_get() that i2c core calls before probing driver should
-already set the trigger type for us. There is no need for the individual
-drivers to do that.
+Therefore: If built with CONFIG_CPU_FREQ and CONFIG_ARM_GLOBAL_TIMER,
+disable (on Zynq) the arm_global_timer devicetree node at boot before
+clock sources are initialized. This ensures that arm_global_timer will
+not be selected clocksource.
 
-Thanks.
+Signed-off-by: Ola Jeppsson <ola@adapteva.com>
+---
+ arch/arm/mach-zynq/Makefile |  4 ++++
+ arch/arm/mach-zynq/common.c | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
+diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+index b03a97e..ec94b04 100644
+--- a/arch/arm/mach-zynq/Makefile
++++ b/arch/arm/mach-zynq/Makefile
+@@ -2,6 +2,10 @@
+ # Makefile for the linux kernel.
+ #
+ 
++ifeq ($(CONFIG_CPU_FREQ)-$(CONFIG_ARM_GLOBAL_TIMER), y-y)
++	CFLAGS_common.o += -DDISABLE_ARM_GLOBAL_TIMER
++endif
++
+ # Common support
+ obj-y				:= common.o slcr.o pm.o
+ obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index c887196..0619ef4 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -148,10 +148,38 @@ out:
+ 	platform_device_register_full(&devinfo);
+ }
+ 
++#ifdef DISABLE_ARM_GLOBAL_TIMER
++static struct property zynq_disable_arm_global_timer_prop = {
++	.name = "status",
++	.length = sizeof("disabled"),
++	.value = "disabled"
++};
++
++static void __init zynq_maybe_disable_arm_global_timer(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-global-timer");
++	if (!np)
++		return;
++
++	pr_info("%s: disabling arm_global_timer node\n", __func__);
++
++	if (of_update_property(np, &zynq_disable_arm_global_timer_prop))
++		pr_warn("%s: could not disable arm_global_timer node\n",
++			__func__);
++}
++#else
++static void __init zynq_maybe_disable_arm_global_timer(void)
++{
++}
++#endif
++
+ static void __init zynq_timer_init(void)
+ {
+ 	zynq_early_slcr_init();
+ 
++	zynq_maybe_disable_arm_global_timer();
+ 	zynq_clock_init();
+ 	of_clk_init(NULL);
+ 	clocksource_of_init();
 -- 
-Dmitry
+2.3.3
