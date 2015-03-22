@@ -1,182 +1,85 @@
-From: fabf@skynet.be (Fabian Frederick)
-Date: Sun, 22 Mar 2015 11:34:09 +0100 (CET)
-Subject: [PATCH 32/35 linux-next] clk: constify of_device_id array
-In-Reply-To: <20150318141509.7930.28419@quantum>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-1-git-send-email-fabf@skynet.be>
- <20150318141509.7930.28419@quantum>
-Message-ID: <386731024.185864.1427020449384.open-xchange@webmail.nmp.proximus.be>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 22 Mar 2015 11:40:54 +0100
+Subject: [PATCH 2/7] power: mxs_power: add driver for mxs power subsystem
+In-Reply-To: <1426984203-9133-3-git-send-email-stefan.wahren@i2se.com>
+References: <1426984203-9133-1-git-send-email-stefan.wahren@i2se.com>
+ <1426984203-9133-3-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20150322104053.GA5394@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-> On 18 March 2015 at 15:15 Michael Turquette <mturquette@linaro.org> wrote:
+On Sun, Mar 22, 2015 at 12:29:58AM +0000, Stefan Wahren wrote:
+> This patch adds a minimal driver for the Freescale i.MX23, i.MX28
+> power subsystem. It's required to trigger the probing of the underlying
+> drivers like on-chip regulators.
+> 
+> [...]
 >
+> +config MXS_POWER
+> +	tristate "Freescale MXS power subsystem support"
+> +	depends on ARCH_MXS
+
+please add "|| COMPILE_TEST"
+
+> +	help
+> +	  Say Y here to enable support for the Freescale i.MX23/i.MX28
+> +	  power subsystem. This is a requirement to get access to on-chip
+> +	  regulators, battery charger and many more.
 >
-> Quoting Fabian Frederick (2015-03-16 12:59:06)
-> > of_device_id is always used as const.
-> > (See driver.of_match_table and open firmware functions)
-> >
-> > Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> [...]
 >
-> Acked-by: Michael Turquette <mturquette@linaro.org>
+> +static int mxs_power_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct resource *res;
+> +	struct mxs_power_data *data;
+> +	struct power_supply_config psy_cfg = {};
+> +	void __iomem *v5ctrl_addr;
+> +
+> +	if (!np) {
+> +		dev_err(dev, "missing device tree\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->base_addr = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(data->base_addr))
+> +		return PTR_ERR(data->base_addr);
+> +
+> +	psy_cfg.drv_data = data;
+> +
+> +	data->ac = power_supply_register(dev, &ac_desc, &psy_cfg);
+> +	if (IS_ERR(data->ac))
+> +		return PTR_ERR(data->ac);
 
-Thanks :)
+You can use devm_power_supply_register to simplify the driver
+a bit more.
 
-btw, something I forgot to mention in changelog is the __initdata -> __initconst
-for ti_clkdm_match_table[]
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	v5ctrl_addr = data->base_addr + HW_POWER_5VCTRL_OFFSET;
+> +
+> +	/* Make sure the current limit of the linregs are disabled. */
+> +	writel(BM_POWER_5VCTRL_ENABLE_LINREG_ILIMIT,
+> +	       v5ctrl_addr + HW_POWER_CTRL_CLR);
+> +
+> +	return of_platform_populate(np, NULL, NULL, dev);
+> +}
+> +
+> [...]
 
-I can send it again with a new changelog if necessary ...
-
-Regards,
-Fabian
-
->
-> > ---
-> >? drivers/clk/clk-palmas.c? ? ? ? ? ? ? ? ?| 2 +-
-> >? drivers/clk/st/clkgen-fsyn.c? ? ? ? ? ? ?| 2 +-
-> >? drivers/clk/st/clkgen-mux.c? ? ? ? ? ? ? | 8 ++++----
-> >? drivers/clk/st/clkgen-pll.c? ? ? ? ? ? ? | 4 ++--
-> >? drivers/clk/ti/clk-dra7-atl.c? ? ? ? ? ? | 2 +-
-> >? drivers/clk/ti/clockdomain.c? ? ? ? ? ? ?| 2 +-
-> >? drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
-> >? 7 files changed, 11 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
-> > index 8d45992..45a535a 100644
-> > --- a/drivers/clk/clk-palmas.c
-> > +++ b/drivers/clk/clk-palmas.c
-> > @@ -161,7 +161,7 @@ static struct palmas_clks_of_match_data
-> > palmas_of_clk32kgaudio = {
-> >? ? ? ? ?},
-> >? };
-> >?
-> > -static struct of_device_id palmas_clks_of_match[] = {
-> > +static const struct of_device_id palmas_clks_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "ti,palmas-clk32kg",
-> >? ? ? ? ? ? ? ? ?.data = &palmas_of_clk32kg,
-> > diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-> > index af94ed8..a917c4c 100644
-> > --- a/drivers/clk/st/clkgen-fsyn.c
-> > +++ b/drivers/clk/st/clkgen-fsyn.c
-> > @@ -1057,7 +1057,7 @@ static struct clk * __init
-> > st_clk_register_quadfs_fsynth(
-> >? ? ? ? ?return clk;
-> >? }
-> >?
-> > -static struct of_device_id quadfs_of_match[] = {
-> > +static const struct of_device_id quadfs_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "st,stih416-quadfs216",
-> >? ? ? ? ? ? ? ? ?.data = &st_fs216c65_416
-> > diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-> > index 9a15ec3..fdcff10 100644
-> > --- a/drivers/clk/st/clkgen-mux.c
-> > +++ b/drivers/clk/st/clkgen-mux.c
-> > @@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
-> >? ? ? ? ?.fb_start_bit_idx = 24,
-> >? };
-> >?
-> > -static struct of_device_id clkgena_divmux_of_match[] = {
-> > +static const struct of_device_id clkgena_divmux_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "st,clkgena-divmux-c65-hs",
-> >? ? ? ? ? ? ? ? ?.data = &st_divmux_c65hs,
-> > @@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
-> >? ? ? ? ?.table = prediv_table16,
-> >? };
-> >?
-> > -static struct of_device_id clkgena_prediv_of_match[] = {
-> > +static const struct of_device_id clkgena_prediv_of_match[] = {
-> >? ? ? ? ?{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
-> >? ? ? ? ?{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
-> >? ? ? ? ?{}
-> > @@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
-> >? ? ? ? ?.width = 2,
-> >? };
-> >?
-> > -static struct of_device_id mux_of_match[] = {
-> > +static const struct of_device_id mux_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "st,stih416-clkgenc-vcc-hd",
-> >? ? ? ? ? ? ? ? ?.data = &clkgen_mux_c_vcc_hd_416,
-> > @@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
-> >? ? ? ? ?.lock = &clkgenf_lock,
-> >? };
-> >?
-> > -static struct of_device_id vcc_of_match[] = {
-> > +static const struct of_device_id vcc_of_match[] = {
-> >? ? ? ? ?{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
-> >? ? ? ? ?{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
-> >? ? ? ? ?{}
-> > diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-> > index 29769d7..d204ba8 100644
-> > --- a/drivers/clk/st/clkgen-pll.c
-> > +++ b/drivers/clk/st/clkgen-pll.c
-> > @@ -593,7 +593,7 @@ static struct clk * __init clkgen_odf_register(const
-> > char *parent_name,
-> >? ? ? ? ?return clk;
-> >? }
-> >?
-> > -static struct of_device_id c32_pll_of_match[] = {
-> > +static const struct of_device_id c32_pll_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "st,plls-c32-a1x-0",
-> >? ? ? ? ? ? ? ? ?.data = &st_pll3200c32_a1x_0,
-> > @@ -708,7 +708,7 @@ err:
-> >? }
-> >? CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
-> >?
-> > -static struct of_device_id c32_gpu_pll_of_match[] = {
-> > +static const struct of_device_id c32_gpu_pll_of_match[] = {
-> >? ? ? ? ?{
-> >? ? ? ? ? ? ? ? ?.compatible = "st,stih415-gpu-pll-c32",
-> >? ? ? ? ? ? ? ? ?.data = &st_pll1200c32_gpu_415,
-> > diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
-> > index 59bb4b3..d86bc46 100644
-> > --- a/drivers/clk/ti/clk-dra7-atl.c
-> > +++ b/drivers/clk/ti/clk-dra7-atl.c
-> > @@ -294,7 +294,7 @@ static int of_dra7_atl_clk_remove(struct platform_device
-> > *pdev)
-> >? ? ? ? ?return 0;
-> >? }
-> >?
-> > -static struct of_device_id of_dra7_atl_clk_match_tbl[] = {
-> > +static const struct of_device_id of_dra7_atl_clk_match_tbl[] = {
-> >? ? ? ? ?{ .compatible = "ti,dra7-atl", },
-> >? ? ? ? ?{},
-> >? };
-> > diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-> > index b4c5fac..35fe108 100644
-> > --- a/drivers/clk/ti/clockdomain.c
-> > +++ b/drivers/clk/ti/clockdomain.c
-> > @@ -52,7 +52,7 @@ static void __init of_ti_clockdomain_setup(struct
-> > device_node *node)
-> >? ? ? ? ?}
-> >? }
-> >?
-> > -static struct of_device_id ti_clkdm_match_table[] __initdata = {
-> > +static const struct of_device_id ti_clkdm_match_table[] __initconst = {
-> >? ? ? ? ?{ .compatible = "ti,clockdomain" },
-> >? ? ? ? ?{ }
-> >? };
-> > diff --git a/drivers/clk/versatile/clk-vexpress-osc.c
-> > b/drivers/clk/versatile/clk-vexpress-osc.c
-> > index 765f1e0..89c0609 100644
-> > --- a/drivers/clk/versatile/clk-vexpress-osc.c
-> > +++ b/drivers/clk/versatile/clk-vexpress-osc.c
-> > @@ -110,7 +110,7 @@ static int vexpress_osc_probe(struct platform_device
-> > *pdev)
-> >? ? ? ? ?return 0;
-> >? }
-> >?
-> > -static struct of_device_id vexpress_osc_of_match[] = {
-> > +static const struct of_device_id vexpress_osc_of_match[] = {
-> >? ? ? ? ?{ .compatible = "arm,vexpress-osc", },
-> >? ? ? ? ?{}
-> >? };
-> > --
-> > 2.1.0
-> >
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150322/76b83142/attachment.sig>
