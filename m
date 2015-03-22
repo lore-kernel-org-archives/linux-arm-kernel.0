@@ -1,48 +1,149 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 Mar 2015 14:40:05 +0000
-Subject: configuration for nc pins without pull
-In-Reply-To: <20150322100059.GH5664@pengutronix.de>
-References: <20150322100059.GH5664@pengutronix.de>
-Message-ID: <20150322144004.GN8656@n2100.arm.linux.org.uk>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Sun, 22 Mar 2015 14:51:51 +0000
+Subject: [PATCH V2] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <20150320180228.GI1474@arm.com>
+References: <20150320180228.GI1474@arm.com>
+Message-ID: <1427035911-10585-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 22, 2015 at 11:00:59AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> for a machine I want to configure a pin that is actually not connected
-> to minimize floating. (I think this is sensible, isn't it?)
+this_cpu operations were implemented for arm64 in:
+ 5284e1b arm64: xchg: Implement cmpxchg_double
+ f97fc81 arm64: percpu: Implement this_cpu operations
 
-Definitely.  It's a design error to leave a pin floating, especially
-if they're MOS inputs (which most are).  The reason is that many
-MOS inputs are a pair of MOS transistors - one from +V to their output
-(into the device) the other between their output and ground.
+Unfortunately, it is possible for pre-emption to take place between
+address generation and data access. This can lead to cases where data
+is being manipulated by this_cpu for a different CPU than it was
+called on. Which effectively breaks the spec.
 
-If the input floats, then both transistors are partially turned on,
-which gives a wasteful flow of current between +V and ground - hence
-this increases the current draw and dissipation of the device - and
-is a total waste of energy.
+This patch disables pre-emption for the this_cpu operations
+guaranteeing that address generation and data manipulation take place
+without a pre-emption in-between.
 
-Generally, when designing MOS circuitry using standard gates, it is
-very much a design error to leave any unused gate inputs unconnected
-for this very reason - not only that, but the input is also sensitive
-to static electricity.  A floating input has a very high input
-resistance, and a static discharge into it can destroy those input
-transistors I've mentioned above - turning *both* hard on, which
-gives you a dead short between +V and ground.
+Fixes: 5284e1b4bc8a ("arm64: xchg: Implement cmpxchg_double")
+Fixes: f97fc810798c ("arm64: percpu: Implement this_cpu operations")
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+Changed in V2, moved over to preempt_enable() completely.
+Corrected the "Fixes" tag.
 
-That can result in the device effectively being fried, even if the
-fried input is not being used (because it drags the supply down.)
+Mark, I've dropped your Reviewed-by as I've changed some logic, please
+let me know if I should re-add it.
 
-Floating inputs are *always* bad.
-
-(Just make sure that the designer hasn't already thought of this and
-tied the inputs high or low, possibly through a resistor.  Even so,
-I'd say that it's good practice if the chip has biasing to bias them
-accordingly, so that should there be a bad joint on the board, it
-doesn't allow the pin to start floating.  Bad joints happen, and
-sometimes show after a few months of otherwise good operation...)
-
+Cheers,
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Steve
+---
+ arch/arm64/include/asm/cmpxchg.h | 32 +++++++++++++++++++++--------
+ arch/arm64/include/asm/percpu.h  | 44 ++++++++++++++++++++++++++++++----------
+ 2 files changed, 57 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index cb95930..d8c25b7 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -246,14 +246,30 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
+-#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+-#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+-#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+-#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+-
+-#define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
+-	cmpxchg_double_local(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
+-				o1, o2, n1, n2)
++#define _protect_cmpxchg_local(pcp, o, n)			\
++({								\
++	typeof(*raw_cpu_ptr(&(pcp))) __ret;			\
++	preempt_disable();					\
++	__ret = cmpxchg_local(raw_cpu_ptr(&(pcp)), o, n);	\
++	preempt_enable();					\
++	__ret;							\
++})
++
++#define this_cpu_cmpxchg_1(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
++#define this_cpu_cmpxchg_2(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
++#define this_cpu_cmpxchg_4(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
++#define this_cpu_cmpxchg_8(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
++
++#define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2)		\
++({									\
++	int __ret;							\
++	preempt_disable();						\
++	__ret = cmpxchg_double_local(	raw_cpu_ptr(&(ptr1)),		\
++					raw_cpu_ptr(&(ptr2)),		\
++					o1, o2, n1, n2);		\
++	preempt_enable();						\
++	__ret;								\
++})
+ 
+ #define cmpxchg64(ptr,o,n)		cmpxchg((ptr),(o),(n))
+ #define cmpxchg64_local(ptr,o,n)	cmpxchg_local((ptr),(o),(n))
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 09da25b..e6083c4 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -204,25 +204,47 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+ 	return ret;
+ }
+ 
++#define _percpu_read(pcp)						\
++({									\
++	typeof(pcp) __retval;						\
++	preempt_disable();						\
++	__retval = (typeof(pcp)) __percpu_read(raw_cpu_ptr(&(pcp)), 	\
++					sizeof(pcp));			\
++	preempt_enable();						\
++	__retval;							\
++})
++
++#define _percpu_write(pcp, val)						\
++do {									\
++	preempt_disable();						\
++	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long) (val), 	\
++				sizeof(pcp));				\
++	preempt_enable();						\
++} while(0)								\
++
++#define _pcp_protect(operation, pcp, val)			\
++({								\
++	typeof(pcp) __retval;					\
++	preempt_disable();					\
++	__retval = (typeof(pcp)) operation(raw_cpu_ptr(&(pcp)),	\
++				(val), sizeof(pcp));		\
++	preempt_enable();					\
++	__retval;						\
++})
++
+ #define _percpu_add(pcp, val) \
+-	__percpu_add(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++	_pcp_protect(__percpu_add, pcp, val)
+ 
+-#define _percpu_add_return(pcp, val) (typeof(pcp)) (_percpu_add(pcp, val))
++#define _percpu_add_return(pcp, val) _percpu_add(pcp, val)
+ 
+ #define _percpu_and(pcp, val) \
+-	__percpu_and(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
++	_pcp_protect(__percpu_and, pcp, val)
+ 
+ #define _percpu_or(pcp, val) \
+-	__percpu_or(raw_cpu_ptr(&(pcp)), val, sizeof(pcp))
+-
+-#define _percpu_read(pcp) (typeof(pcp))	\
+-	(__percpu_read(raw_cpu_ptr(&(pcp)), sizeof(pcp)))
+-
+-#define _percpu_write(pcp, val) \
+-	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp))
++	_pcp_protect(__percpu_or, pcp, val)
+ 
+ #define _percpu_xchg(pcp, val) (typeof(pcp)) \
+-	(__percpu_xchg(raw_cpu_ptr(&(pcp)), (unsigned long)(val), sizeof(pcp)))
++	_pcp_protect(__percpu_xchg, pcp, (unsigned long)(val))
+ 
+ #define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
+ #define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
+-- 
+2.1.0
