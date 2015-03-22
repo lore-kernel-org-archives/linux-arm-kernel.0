@@ -1,45 +1,27 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Sun, 22 Mar 2015 10:40:41 +0000
-Subject: [PATCH] ARM: S3C64XX: Use fixed IRQ bases to avoid conflicts on
- Cragganmore
-Message-ID: <1427020841-24189-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 22 Mar 2015 12:36:47 +0200
+Subject: [PATCH] ARM: remove duplicate reboot.h include in process.c
+Message-ID: <3093e9eafb72eae28fe83b350ddb88d2cd5c99d8.1427020607.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two PMICs on Cragganmore, currently one dynamically assign
-its IRQ base and the other uses a fixed base. It is possible for the
-statically assigned PMIC to fail if its IRQ is taken by the dynamically
-assigned one. Fix this by statically assigning both the IRQ bases.
-
-Signed-off-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Fixes: 7b6d864b48d ('reboot: arm: change reboot_mode to use enum reboot_mode')
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- arch/arm/mach-s3c64xx/crag6410.h      |    1 +
- arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
- 2 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/kernel/process.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-s3c64xx/crag6410.h b/arch/arm/mach-s3c64xx/crag6410.h
-index 7bc6668..dcbe17f 100644
---- a/arch/arm/mach-s3c64xx/crag6410.h
-+++ b/arch/arm/mach-s3c64xx/crag6410.h
-@@ -14,6 +14,7 @@
- #include <mach/gpio-samsung.h>
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index fdfa3a78ec8c..7989a9063fea 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -31,7 +31,6 @@
+ #include <linux/random.h>
+ #include <linux/hw_breakpoint.h>
+ #include <linux/leds.h>
+-#include <linux/reboot.h>
  
- #define GLENFARCLAS_PMIC_IRQ_BASE	IRQ_BOARD_START
-+#define BANFF_PMIC_IRQ_BASE		(IRQ_BOARD_START + 64)
- 
- #define PCA935X_GPIO_BASE		GPIO_BOARD_START
- #define CODEC_GPIO_BASE			(GPIO_BOARD_START + 8)
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 10b913b..65c426b 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -554,6 +554,7 @@ static struct wm831x_touch_pdata touch_pdata = {
- 
- static struct wm831x_pdata crag_pmic_pdata = {
- 	.wm831x_num = 1,
-+	.irq_base = BANFF_PMIC_IRQ_BASE,
- 	.gpio_base = BANFF_PMIC_GPIO_BASE,
- 	.soft_shutdown = true,
- 
+ #include <asm/cacheflush.h>
+ #include <asm/idmap.h>
 -- 
-1.7.2.5
+2.1.4
