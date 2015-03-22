@@ -1,127 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Mar 2015 16:36:37 +0100
-Subject: [PATCH] arm64: relax Image placement requirement
-In-Reply-To: <CAKv+Gu8ULazD0SuRq+v5GOZUc7hfuXnphpv_P4hghD=q4QDmAA@mail.gmail.com>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu8ULazD0SuRq+v5GOZUc7hfuXnphpv_P4hghD=q4QDmAA@mail.gmail.com>
-Message-ID: <CAKv+Gu8ETVJAVtvw0RM1bGc9+QvgTa9qpYkFAkzxgRxRautK3g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 22 Mar 2015 08:44:29 -0700
+Subject: [PATCH] sun4i-timer: Only register a sched_clock on sun4i and
+ sun5i
+In-Reply-To: <1426949157-24033-1-git-send-email-hdegoede@redhat.com>
+References: <1426949157-24033-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150322154429.GI2774@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2015 at 18:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 20 March 2015 at 18:02, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Hi all,
->>
->> This is another possible approach to fixing the current, flawed
->> EFI Image placement logic: instead of fixing that logic and the
->> documentation, why not relax the requirement that the kernel
->> Image not be placed across a 512 MB boundary?
->>
->
-> Hmm, it seems this still needs a pinch of refinement, but we could at
-> least discuss the general idea.
->
+On Sat, Mar 21, 2015 at 03:45:57PM +0100, Hans de Goede wrote:
+> sun6i and newer have an arm arch timer which is a better sched_clock source
+> then the sun4i-timer, and sched_clock does not have priorities, so do not
+> register the sun4i-timer sched_clock at all on sun6i and newer.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-Replying to self again:
-it appears that, in order to relax the restriction that no 512 MB
-alignment boundary may be crossed, it would be sufficient to shrink
-the ID mapping to a single page, containing only the couple of
-instructions we execute between enabling the MMU and jumping into the
-virtually remapped kernel text. Since mapping a single page can never
-cross such a boundary, no extended translation tables are needed.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
 
 -- 
-Ard.
-
-
-
->> ---------------->8-----------------
->>
->> This patch changes the early page table code so that two adjacent
->> entries are used to map two pages worth of block entries at the
->> lowest level, both for idmap_pg_dir and swapper_pg_dir.
->>
->> The purpose is to allow the kernel Image to cross a 512 MB or 1 GB
->> alignment boundary (depending on page size), which is something that
->> is not specifically banned by the current wording of the boot protocol.
->> (The boot protocol stipulates that the kernel must be placed within
->> 512 MB if the beginning of RAM. However, the beginning of RAM is not
->> necessarily aligned to 512 MB)
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/page.h |  4 ++--
->>  arch/arm64/kernel/head.S      | 17 +++++++++++++----
->>  2 files changed, 15 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
->> index 3d02b1869eb8..d2189c359364 100644
->> --- a/arch/arm64/include/asm/page.h
->> +++ b/arch/arm64/include/asm/page.h
->> @@ -43,8 +43,8 @@
->>  #define SWAPPER_PGTABLE_LEVELS (CONFIG_ARM64_PGTABLE_LEVELS - 1)
->>  #endif
->>
->> -#define SWAPPER_DIR_SIZE       (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
->> -#define IDMAP_DIR_SIZE         (3 * PAGE_SIZE)
->> +#define SWAPPER_DIR_SIZE       ((SWAPPER_PGTABLE_LEVELS + 1) * PAGE_SIZE)
->> +#define IDMAP_DIR_SIZE         (4 * PAGE_SIZE)
->>
->>  #ifndef __ASSEMBLY__
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 0dbdb4f3634f..9c3f95f30421 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -274,18 +274,21 @@ ENDPROC(preserve_boot_args)
->>   *     virt:   virtual address
->>   *     shift:  #imm page table shift
->>   *     ptrs:   #imm pointers per table page
->> + *     offset: #imm offset into the lowest translation level, in pages
->>   *
->>   * Preserves:  virt
->>   * Corrupts:   tmp1, tmp2
->>   * Returns:    tbl -> next level table page address
->>   */
->> -       .macro  create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
->> +       .macro  create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2, offset=0
->>         lsr     \tmp1, \virt, #\shift
->> +       .if     \offset
->> +       add     \tmp1, \tmp1, #\offset
->> +       .endif
->>         and     \tmp1, \tmp1, #\ptrs - 1        // table index
->> -       add     \tmp2, \tbl, #PAGE_SIZE
->> +       add     \tmp2, \tbl, #(\offset + 1) * PAGE_SIZE
->>         orr     \tmp2, \tmp2, #PMD_TYPE_TABLE   // address of next table and entry type
->>         str     \tmp2, [\tbl, \tmp1, lsl #3]
->> -       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->>         .endm
->>
->>  /*
->> @@ -297,9 +300,14 @@ ENDPROC(preserve_boot_args)
->>   */
->>         .macro  create_pgd_entry, tbl, virt, tmp1, tmp2
->>         create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
->> -#if SWAPPER_PGTABLE_LEVELS == 3
->> +#if SWAPPER_PGTABLE_LEVELS != 3
->> +       create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2, 1
->> +#else
->> +       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->>         create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
->> +       create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2, 1
->>  #endif
->> +       add     \tbl, \tbl, #PAGE_SIZE          // next level table page
->>         .endm
->>
->>  /*
->> @@ -396,6 +404,7 @@ __create_page_tables:
->>         str_l   x5, idmap_t0sz, x6
->>
->>         create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
->> +       add     x0, x0, #PAGE_SIZE              // next level table page
->>  1:
->>  #endif
->>
->> --
->> 1.8.3.2
->>
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150322/e58e7b16/attachment.sig>
