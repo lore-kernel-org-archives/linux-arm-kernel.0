@@ -1,54 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 22 Mar 2015 12:46:31 +0100
-Subject: [PATCH v3] driver core / PM: Add PM domain callbacks for device
- setup/cleanup
-In-Reply-To: <1945120.Dj0Xbsak18@vostro.rjw.lan>
-References: <3533423.QQDErEmeTO@vostro.rjw.lan>
- <1654636.FxBHsexDm1@vostro.rjw.lan>
- <3289026.ADmXXipokh@vostro.rjw.lan>
- <1945120.Dj0Xbsak18@vostro.rjw.lan>
-Message-ID: <20150322114631.GA23465@kroah.com>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Sun, 22 Mar 2015 17:46:46 +0530
+Subject: [PATCH] mmc: dw_mmc: Don't send clock off command if power is off
+In-Reply-To: <1426874420-25103-1-git-send-email-dianders@chromium.org>
+References: <1426874420-25103-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAGOxZ52OWucMh_HjWnZnhN=c7C3TXeQ4aV-GAe5XXtRbu0r2Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 21, 2015 at 02:00:24AM +0100, Rafael J. Wysocki wrote:
-> On Friday, March 20, 2015 01:59:27 PM Rafael J. Wysocki wrote:
-> > From: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > 
-> > If PM domains are in use, it may be necessary to prepare the code
-> > handling a PM domain for driver probing.  For example, in some
-> > cases device drivers rely on the ability to power on the devices
-> > with the help of the IO runtime PM framework and the PM domain
-> > code needs to be ready for that.  Also, if that code has not been
-> > fully initialized yet, the driver probing should be deferred.
-> > 
-> > Moreover, after the probing is complete, it may be necessary to
-> > put the PM domain in question into the state reflecting the current
-> > needs of the devices in it, for example, so that power is not drawn
-> > in vain.  The same should be done after removing a driver from
-> > a device, as the PM domain state may need to be changed to reflect
-> > the new situation.
-> > 
-> > For these reasons, introduce new PM domain callbacks, ->activate,
-> > ->sync and ->dismiss called, respectively, before probing for a
-> > device driver, after the probing has completed successfully and
-> > if the probing has failed or the driver has been removed.
-> > 
-> > Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> > ---
-> > 
-> > One more update taking Dmitry's comments into account and fixing an
-> > overoptimization bug spotted by Ulf.
-> > 
-> > And this actually contains the patch this time (clicked on "Send" too
-> > early last time, sorry about that).
-> 
-> Hi Greg,
-> 
-> Since everybody seems to like this one, do you have any objectctions against it?
-> 
-> If not, would it be a problem if I queued it up for 4.1?
+Hi Doug,
 
-No problem, nice cleanup:
+On Fri, Mar 20, 2015 at 11:30 PM, Doug Anderson <dianders@chromium.org> wrote:
+> We've already seen that it causes failures if we try to send the
+> "SDMMC_CMD_UPD_CLK" command when power is off to the system.  Here's
+> another case where we were doing it: we were sending an
+> SDMMC_CMD_UPD_CLK to set the clock to 0 when the card was already
+> powered off and the clock was already at 0.  Let's avoid that command
+> and avoid problems.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  drivers/mmc/host/dw_mmc.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 47dfd0e..aeec698 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -1172,8 +1172,9 @@ static void dw_mci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>
+>                 break;
+>         case MMC_POWER_OFF:
+> -               /* Turn clock off before power goes down */
+> -               dw_mci_setup_bus(slot, false);
+> +               /* Turn clock off before power goes down; only if powered */
+> +               if (slot->host->vqmmc_enabled)
+> +                       dw_mci_setup_bus(slot, false);
+>
+vqmmc_enabled is always _true_ when entering MMC_POWER_OFF case..right?
+Is this done for extra protection? Or do you have a case where vqmmc
+is OFF and driver still calls dw_mci_setup_bus from here?
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>                 if (!IS_ERR(mmc->supply.vmmc))
+>                         mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> --
+> 2.2.0.rc0.207.ga3a616c
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Regards,
+Alim
