@@ -1,51 +1,41 @@
-From: LinoSanfilippo@gmx.de (Lino Sanfilippo)
-Date: Sun, 22 Mar 2015 01:56:10 +0100
-Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
- attribute "section"
-In-Reply-To: <54F9EFE2.2020205@gmx.de>
-References: <1425290502-2322-1-git-send-email-lsanfil@marvell.com>
- <20150303144130.GB5177@e103592.cambridge.arm.com>
- <54F6EF32.7080306@marvell.com>
- <20150304143527.GA5653@e103592.cambridge.arm.com>
- <54F732DA.2050004@marvell.com>
- <20150305122606.GC3612@e103592.cambridge.arm.com>
- <54F8582B.80703@marvell.com>
- <20150305134733.GE3612@e103592.cambridge.arm.com>
- <54F8770C.8080709@marvell.com>
- <20150305173327.GF3612@e103592.cambridge.arm.com>
- <54F9B36F.8040307@marvell.com> <54F9EFE2.2020205@gmx.de>
-Message-ID: <550E132A.7050304@gmx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 Mar 2015 02:31:40 +0100
+Subject: [PATCH] Add support for CONFIG_ARM64_DMA_USE_IOMMU.
+In-Reply-To: <CAOHikRCSYy6Zd=Oi34-KnyhG=bY8-XdD_QpdndbC_dCox8sJEQ@mail.gmail.com>
+References: <1422379495-10268-1-git-send-email-stripathi@apm.com>
+ <CAOHikRCSoijzZ8oKEtMadEHOvLiWLO6fWkqiGEiPyb+Egb_1rw@mail.gmail.com>
+ <CAOHikRCSYy6Zd=Oi34-KnyhG=bY8-XdD_QpdndbC_dCox8sJEQ@mail.gmail.com>
+Message-ID: <201503220231.40375.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.03.2015 19:20, Lino Sanfilippo wrote:
+On Wednesday 18 March 2015, Suman Tripathi wrote:
+> I guess there is an overlap with this thread:
 > 
->>>
->> 
->> Ok, I got a link to the source now. It can be found here:
->> 
->> http://tp-lab200/release/gcc/temp/internal/2010q4-113-4.4.5/marvell-gcc.src-2010q4-113.tar.bz2
->> 
+> http://thread.gmane.org/gmane.linux.kernel.iommu/8213
 > 
+> I would rather go for a more generic solution that Robin (cc'ed) is
+> trying to implement.
 > 
-> Sigh. Just realized that the url is not accessible. Will check that on
-> monday.
+> I followed the above thread but our requirement deviates from normal
+> IOMMU conventions.
+> For our case we need a 1:1 mapping of PA to IOVA. Actually our's is
+> not a real IOMMU (ie not having a cap of page table walk). It's a
+> simple 32-bit from (device side ) ot 64-bit (cpu side) address
+> translation with the help of a set of window registers. So we want to
+> bypass the entire iova .
 > 
-> Lino
-> 
+> Any suggestions on this ?
 
-Hello Dave,
+My first suggestion would be to separate this from IOMMU support completely
+as you don't really have an IOMMU. The easiest way to deal with hardware
+like this is to use swiotlb with a fixed mapping. This is also the only
+way to deal with any devices that may have multiple outstanding DMAs
+(PCI, SATA, USB, ...). 
 
-sorry for my late reply. But I was a few days out of office and had to
-contact some people which are not in my departement. The outcome is:
-there is no public repository in which the source code of that special
-(buggy) toolchain is available any more. There are newer versions
-already, but even for those the source code is only accessible for
-customers (thats what I was told). However the responsible developer
-could confirm that the wrong alignment I initially reported is indeed a
-bug in the toolchain which now is fixed in the newer versions.
-I really would have liked to send you the source, but unfortunately I
-cant. However thanks again for all your help.
+If you have any high-speed devices that only do a single request at a
+time connected to this remapper, I would suggest you implement your own
+set of dma_map_ops and come back with performance data showing whether it's
+worth merging this compared to the trivial iommu support.
 
-Regards,
-Lino
+	Arnd
