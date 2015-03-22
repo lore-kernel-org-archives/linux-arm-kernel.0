@@ -1,33 +1,28 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Mon, 23 Mar 2015 06:51:58 +0200
-Subject: [PATCH v7 5/6] ARM: dts: add wl12xx/wl18xx bindings
-In-Reply-To: <20150320162138.GU31346@atomide.com> (Tony Lindgren's message of
- "Fri, 20 Mar 2015 09:21:38 -0700")
-References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
- <1426696710-6891-6-git-send-email-eliad@wizery.com>
- <550AD7C1.2030405@gmail.com>
- <CAB3XZEfpD7YkwdU7OJJaNFy=MnYVY3-fOVxkA48Vu01LzU0GFg@mail.gmail.com>
- <20150319212505.GN31346@atomide.com>
- <87h9tgi4sg.fsf@kamboji.qca.qualcomm.com>
- <20150320153357.GT31346@atomide.com>
- <87bnjnfz1t.fsf@kamboji.qca.qualcomm.com>
- <20150320162138.GU31346@atomide.com>
-Message-ID: <87twxce2oh.fsf@kamboji.qca.qualcomm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 22 Mar 2015 18:52:37 +0000
+Subject: [PATCH v2 1/3] ARM: shmobile: armadillo800eva: Properly specify
+ HDMI audio link format
+In-Reply-To: <87k2z4fbfv.wl%kuninori.morimoto.gx@renesas.com>
+References: <1421847492-8857-1-git-send-email-lars@metafoo.de>
+ <87d25wg804.wl%kuninori.morimoto.gx@renesas.com>
+ <20150211002802.GC7826@verge.net.au>
+ <87k2z4fbfv.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20150322185237.GH6643@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Fri, Feb 27, 2015 at 12:23:26AM +0000, Kuninori Morimoto wrote:
 
->> After John "retired" we actually have two set of trees now: mac80211
->> maintained by Johannes and wireless-drivers maintained by me. I haven't
->> pulled anything from your tree and I'm 100% sure Johannes hasn't either.
->> So green light from me.
->
-> OK, I'll set up the new branch then. I take your ack is for the
-> whole series? If it's just for the $subject patch, please let
-> me know.
+> As I mentioned above (and, Simon agreed), I think we can
+> agree if [2/3] patch was exchanged
 
-It was for the whole series.
-
--- 
-Kalle Valo
+Do you mean that patch 2/3 should be replaced with soemthing else - if
+so what should it be replaced by?  I've not seen an updated version of
+this series...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150322/d61f25d2/attachment.sig>
