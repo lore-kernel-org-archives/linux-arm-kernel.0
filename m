@@ -1,28 +1,29 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Sun, 22 Mar 2015 16:03:16 +0000
-Subject: [PATCH] ARM: S3C64XX: Use fixed IRQ bases to avoid conflicts on
- Cragganmore
-In-Reply-To: <1427020841-24189-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
-References: <1427020841-24189-1-git-send-email-ckeepax@opensource.wolfsonmicro.com>
-Message-ID: <20150322160316.GB6643@sirena.org.uk>
+Date: Sun, 22 Mar 2015 18:01:10 +0000
+Subject: [PATCH 09/13] spi: atmel: use endian agnostic IO
+In-Reply-To: <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-10-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20150322180110.GN6643@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 22, 2015 at 10:40:41AM +0000, Charles Keepax wrote:
-> There are two PMICs on Cragganmore, currently one dynamically assign
-> its IRQ base and the other uses a fixed base. It is possible for the
-> statically assigned PMIC to fail if its IRQ is taken by the dynamically
-> assigned one. Fix this by statically assigning both the IRQ bases.
+On Wed, Mar 18, 2015 at 03:53:08PM +0000, Ben Dooks wrote:
+> Use the endian agnositc IO functions instead of the __raw ones for when
+> the driver is in use on big-endian systems.
 > 
-> Signed-off-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com> (supporter:ATMEL SPI DRIVER)
+> CC: Mark Brown <broonie@kernel.org> (maintainer:SPI SUBSYSTEM)
+> CC: linux-spi at vger.kernel.org (open list:SPI SUBSYSTEM)
 
-Reviwed-by: Mark Brown <broonie@kernel.org>
-
-This probably wants to go to stable as well.
+Applied, thanks.  If you don't want things to go into the message then
+they should be after --- not --.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150322/9eb8281e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150322/af2032f7/attachment-0001.sig>
