@@ -1,103 +1,152 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 23 Mar 2015 08:37:42 -0700
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150323140041.GQ8656@n2100.arm.linux.org.uk>
-References: <20150225125610.GY8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
- <20150225170011.GC8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
- <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
- <20150226010505.GU15405@linux.vnet.ibm.com>
- <20150322233057.GA17605@linux.vnet.ibm.com>
- <20150323125545.GP8656@n2100.arm.linux.org.uk>
- <20150323132133.GD5718@linux.vnet.ibm.com>
- <20150323140041.GQ8656@n2100.arm.linux.org.uk>
-Message-ID: <20150323153742.GF5718@linux.vnet.ibm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 23 Mar 2015 16:41:02 +0100
+Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <20150321203546.GE22354@red-moon>
+References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
+ <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
+ <20150321203546.GE22354@red-moon>
+Message-ID: <5510340E.7000802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 02:00:41PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Mar 23, 2015 at 06:21:33AM -0700, Paul E. McKenney wrote:
-> > On Mon, Mar 23, 2015 at 12:55:45PM +0000, Russell King - ARM Linux wrote:
-> > > What if the cpu_hotplug_state for the CPU changes between reading it
-> > > testing its value, and then writing it, or do we guarantee that it
-> > > can't change other than by this function here?  If it can't change,
-> > > then what's the point of using atomic_t for this?
-> > 
-> > It indeed cannot change -here-, but there are other situations where
-> > more than one CPU can be attempting to change it at the same time.
-> > The reason that it cannot change here is that the variable has the
-> > value that indicates that the previous offline completed within the
-> > timeout period, so there are no outstanding writes.
-> > 
-> > When going offline, the outgoing CPU might take so long leaving that
-> > the surviving CPU times out, thus both CPUs write to the variable at
-> > the same time, which by itself requires atomics.  If this seems
-> > unlikely, consider virtualized environments where the hypervisor
-> > might preempt the guest OS.
-> 
-> If two CPUs write using atomic_set() to the same location, what value do
-> you end up with?  It's just the same as if two CPUs write normally to the
-> same location.
+On 03/21/2015 09:35 PM, Lorenzo Pieralisi wrote:
+> On Fri, Mar 20, 2015 at 11:44:00AM +0000, Daniel Lezcano wrote:
+>> Some architectures have some cpus which does not support idle states.
+>>
+>> Let the underlying low level code to return -ENXIO when it is not
+>> possible to set an idle state.
+>
+> Well, this is getting interesting. We are parsing possible CPUs to
+> detect if they have common idle states in DT. If a CPU does not support
+> idle states, the cpu node for that CPU should not define any idle
+> state.
+>
+> The approach above will work with my heterogenous system patch, since
+> the respective CPUidle driver mask will be created by parsing the DT
+> idle states.
+>
+> http://www.spinics.net/lists/arm-kernel/msg403190.html
+>
+> In current approach if a "possible " CPU does not have idle states, we do
+> not init CPUidle at all.
+>
+> So, to cut a long story short, what does "a cpu does not support idle
+> states" mean ?
+>
+> Does it mean that firmware defines idle states for that CPU in DT but
+> initializing them fail ?
+>
+> I am fine with this patch, but we need to define -ENXIO return properly.
 
-If that happens when using these functions, that is a usage error.
+Ok, so after discussing with Lina, it appears my change log is not correct.
 
-> The only way it can be different is if you use atomic_cmpxchg(), or
-> cmpxchg() so you can atomically test that the original value is what's
-> expected prior to writing it.
-> 
-> To illustrate this (I'll abbreviate the per-cpu state):
-> 
-> 	CPU0					CPU1
-> 	oldstate = atomic_read(state);
-> 	if (oldstate == CPU_DEAD) /* it isn't */
-> 	atomic_cmpxchg(state, oldstate, CPU_BROKEN)
-> 						atomic_xchg(state, CPU_DEAD)
-> 
-> 	/* succeeds */
-> 	!= old_state /* fails */
-> 	... so doesn't loop
-> 	cpu_wait_death() returns false (failed)
-> 
-> Here, we report that the CPU failed to go offline, but the state is set
-> to CPU_DEAD.  If it had been slightly earlier, CPU0 would have updated
-> it to CPU_DEAD_POST.
+In Qcom's platform, each core has a SPM. The device associated with this 
+SPM is initialized before the cpuidle framework. If there is an error in 
+the initialization (eg. error in the DT), the system continues to boot 
+but in degraded mode as some SPM may not be correctly initialized. In 
+this case, the EXNIO tells the cpuidle driver to not initialize the 
+cpuidle device as the associated SPM is not operational. That prevents 
+the system to crash and allows to handle the error gracefully.
 
-Indeed.  Which is precisely why cpu_check_up_prepare() returns an error
-after that timeout occurs.  This allows the arch code to decide what to
-do, which might be to reset the CPU in some way.  Or to simply error
-out the attempt to online the CPU.
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   drivers/cpuidle/cpuidle-arm.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+>>   1 file changed, 40 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+>> index 1c94b88..e4a6eba 100644
+>> --- a/drivers/cpuidle/cpuidle-arm.c
+>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>> @@ -17,6 +17,7 @@
+>>   #include <linux/kernel.h>
+>>   #include <linux/module.h>
+>>   #include <linux/of.h>
+>> +#include <linux/slab.h>
+>>
+>>   #include <asm/cpuidle.h>
+>>
+>> @@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
+>>   {
+>>   	int cpu, ret;
+>>   	struct cpuidle_driver *drv = &arm_idle_driver;
+>> +	struct cpuidle_device *dev;
+>>
+>>   	/*
+>>   	 * Initialize idle states data, starting at index 1.
+>> @@ -105,18 +107,54 @@ static int __init arm_idle_init(void)
+>>   	if (ret <= 0)
+>>   		return ret ? : -ENODEV;
+>>
+>> +	ret = cpuidle_register_driver(drv);
+>> +	if (ret) {
+>> +		pr_err("Failed to register cpuidle driver\n");
+>> +		return ret;
+>> +	}
+>> +
+>>   	/*
+>>   	 * Call arch CPU operations in order to initialize
+>>   	 * idle states suspend back-end specific data
+>>   	 */
+>>   	for_each_possible_cpu(cpu) {
+>>   		ret = arm_cpuidle_init(cpu);
+>> +
+>> +		/* This cpu does not support any idle states */
+>
+> We need to define what this means. If it means a cpu with no idle
+> states in its cpu node the parsing would not even get here since
+> to init the driver all possible cpus have to have the *same* idle states to
+> function at present.
+>
+> Lorenzo
+>
+>> +		if (ret == -ENXIO)
+>> +			continue;
+>> +
+>>   		if (ret) {
+>>   			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+>> -			return ret;
+>> +			goto out_fail;
+>> +		}
+>> +
+>> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>> +		if (!dev) {
+>> +			pr_err("Failed to allocate cpuidle device\n");
+>> +			goto out_fail;
+>> +		}
+>> +		dev->cpu = cpu;
+>> +
+>> +		ret = cpuidle_register_device(dev);
+>> +		if (ret) {
+>> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+>> +			       cpu);
+>> +			kfree(dev);
+>> +			goto out_fail;
+>>   		}
+>>   	}
+>>
+>> -	return cpuidle_register(drv, NULL);
+>> +	return 0;
+>> +out_fail:
+>> +	while (--cpu >= 0) {
+>> +		dev = per_cpu(cpuidle_devices, cpu);
+>> +		cpuidle_unregister_device(dev);
+>> +		kfree(dev);
+>> +	}
+>> +
+>> +	cpuidle_unregister_driver(drv);
+>> +
+>> +	return ret;
+>>   }
+>>   device_initcall(arm_idle_init);
+>> --
+>> 1.9.1
+>>
+>>
 
-> If we instead got rid of this atomic stuff, and looked at the code
-> without atomic_* stuff confusing the picture, we'd probably have seen
-> that.  This is why, whenever I see atomic_read() and atomic_set(), I'm
-> very suspicious that the code is correct; virtually every time I've
-> seen this pattern, the code has always had some problem.  I utterly
-> hate code which uses these functions.
 
-They do have their uses, including this case.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-> So, I'd suggest getting rid of atomic_read() and atomic_set() here
-> converting atomic_cmpxchg() to a plain cmpxchg(), and replacing that
-> atomic_xchg() with a similar call to cmpxchg() so that a broken CPU
-> doesn't confusingly end up being reported as broken yet getting a
-> CPU_DEAD state.
-
-And exactly how would that help?  You have all the same issues with this
-transformed version of the code.  You just have READ_ONCE() instead of
-atomic_read() and WRITE_ONCE() instead of atomic_set().  Or you have
-bare accesses that the compiler might well be able to optimize into
-nonsensical code.  Again, how does this help?
-
-> After all, we know that a CPU going down _should_ be online before it
-> goes down - if it isn't online, how can it be executing code. :)
-
-That is indeed one scenario.
-
-Another scenario is that the CPU failed to go down promptly during a
-previous offline operation, and the arch-specific code chose to ignore
-that error when the CPU was next brought online.  In this case, at the
-next offline, this code would se CPU_DEAD_FROZEN or CPU_BROKEN instead
-of CPU_ONLINE.  And there are architectures that do just this.
-
-							Thanx, Paul
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
