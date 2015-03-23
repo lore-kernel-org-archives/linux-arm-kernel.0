@@ -1,7 +1,7 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Mon, 23 Mar 2015 01:24:51 +0000
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 23 Mar 2015 02:37:05 +0100
 Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <20150322165710.GO8656@n2100.arm.linux.org.uk>
+In-Reply-To: <HK2PR06MB05611E6828E494FB938179658A0F0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
  <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
  <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
@@ -11,27 +11,36 @@ References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.
  <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
  <20150320222320.GL8656@n2100.arm.linux.org.uk>
  <HK2PR06MB05611E6828E494FB938179658A0F0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20150322165710.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <HK2PR06MB056105B026481446243452FC8A0D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdVLWffQW3d_4z9RAQOg8BCUCSU6ny3yG0poZ_7v=ozNbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> So, allowing both XIP_KERNEL=y and SMP=y is quite correct: however, folk need to understand that the SMP option _must_ match the hardware they're booting on.
+Hi Chris,
 
-OK. I think I have some studying to do before I try to attempt XIP on another platform. Or at least, give some guidance to the chip designers if XIP Linux will be a desired operational mode.
+On Sat, Mar 21, 2015 at 4:39 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+>> However, SMP_ON_UP is incompatible with XIP_KERNEL (as already listed in its dependencies) and building with SMP=y without SMP_ON_UP, and trying to run on UP hardware will definitely fail.
+>
+> So, it sounds like you are saying XIP_KERNEL and SMP is not going to happen.
 
+I think you misunderstood: XIP_KERNEL=y and SMP=y should work on an SMP
+system, XIP_KERNEL=y and SMP=n should work on a uniprocessor system.
 
-> If you consider that the SMP alternatives table is 0x5ee0 bytes long for my iMX6 kernel, and that each entry is 8 bytes, -snip-
+The problem is SMP_ON_UP (run SMP=y kernel on a uniprocessor system).
+You just can't have one kernel that works on both.
 
-Well there goes that idea.
+As Arnd mentioned, making XIP_KERNEL depend on !SMP_ON_UP sounds
+like the way to go.
 
+BTW, since you're asking about SMP=y, I guess you're not just interested in
+running XIP_KERNEL=y on r7s72100, which is UP?
 
-> Yes, that makes sense if we agree that we want to have multi-platform XIP kernels.
+Gr{oetje,eeting}s,
 
-My initial ambition was to simply understand what the minimum Kconfig changes were needed to build XIP on the current upstream kernel.
-I'm not convinced XIP and multi-platform really make sense together (unless ARM comes up with a new supper speedy configurable cache system just for DDR reads, but DDR writes have to be done from different address location).
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-I guess my first goal is to make sure the existing XIP_KERNEL code doesn't get yanked out because no one thought it was being used.
-
-Chris
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
