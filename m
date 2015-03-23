@@ -1,79 +1,33 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 23 Mar 2015 20:29:12 +0100
-Subject: [PATCH v2 6/9] ARM: at91/pm: use the atmel-mc syscon defines
+Date: Mon, 23 Mar 2015 20:29:15 +0100
+Subject: [PATCH v2 9/9] ARM: at91: remove useless Makefile.boot
 In-Reply-To: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1427138955-3617-7-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1427138955-3617-10-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the defines from atmel-mc.h instead of at91rm9200_sdramc.h
+Makefile.boot is not used anymore, remove it.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/include/mach/at91_ramc.h | 2 +-
- arch/arm/mach-at91/pm.c                     | 8 ++++----
- arch/arm/mach-at91/pm_suspend.S             | 2 +-
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/mach-at91/Makefile.boot | 8 --------
+ 1 file changed, 8 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/Makefile.boot
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_ramc.h b/arch/arm/mach-at91/include/mach/at91_ramc.h
-index 493bc486e858..39547496d4b0 100644
---- a/arch/arm/mach-at91/include/mach/at91_ramc.h
-+++ b/arch/arm/mach-at91/include/mach/at91_ramc.h
-@@ -21,7 +21,7 @@ extern void __iomem *at91_ramc_base[];
- .extern at91_ramc_base
- #endif
- 
--#include <soc/at91/at91rm9200_sdramc.h>
-+#include <linux/mfd/syscon/atmel-mc.h>
- #include <soc/at91/at91sam9_ddrsdr.h>
- #include <soc/at91/at91sam9_sdramc.h>
- 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 5062699cbb12..1e184767c3be 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -233,7 +233,7 @@ static void at91_pm_set_standby(void (*at91_standby)(void))
-  */
- static void at91rm9200_standby(void)
- {
--	u32 lpr = at91_ramc_read(0, AT91RM9200_SDRAMC_LPR);
-+	u32 lpr = at91_ramc_read(0, AT91_MC_SDRAMC_LPR);
- 
- 	asm volatile(
- 		"b    1f\n\t"
-@@ -244,8 +244,8 @@ static void at91rm9200_standby(void)
- 		"    mcr    p15, 0, %0, c7, c0, 4\n\t"
- 		"    str    %5, [%1, %2]"
- 		:
--		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91RM9200_SDRAMC_LPR),
--		  "r" (1), "r" (AT91RM9200_SDRAMC_SRR),
-+		: "r" (0), "r" (at91_ramc_base[0]), "r" (AT91_MC_SDRAMC_LPR),
-+		  "r" (1), "r" (AT91_MC_SDRAMC_SRR),
- 		  "r" (lpr));
- }
- 
-@@ -414,7 +414,7 @@ void __init at91rm9200_pm_init(void)
- 	/*
- 	 * AT91RM9200 SDRAM low-power mode cannot be used with self-refresh.
- 	 */
--	at91_ramc_write(0, AT91RM9200_SDRAMC_LPR, 0);
-+	at91_ramc_write(0, AT91_MC_SDRAMC_LPR, 0);
- 
- 	at91_pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
- 	at91_pm_data.memctrl = AT91_MEMCTRL_MC;
-diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
-index bd22b2c8a051..fda4e0164ed7 100644
---- a/arch/arm/mach-at91/pm_suspend.S
-+++ b/arch/arm/mach-at91/pm_suspend.S
-@@ -216,7 +216,7 @@ ENTRY(at91_sramc_self_refresh)
- 
- 	/* Active SDRAM self-refresh mode */
- 	mov	r3, #1
--	str	r3, [r2, #AT91RM9200_SDRAMC_SRR]
-+	str	r3, [r2, #AT91_MC_SDRAMC_SRR]
- 	b	exit_sramc_sf
- 
- ddrc_sf:
+diff --git a/arch/arm/mach-at91/Makefile.boot b/arch/arm/mach-at91/Makefile.boot
+deleted file mode 100644
+index 29ed0fa374ca..000000000000
+--- a/arch/arm/mach-at91/Makefile.boot
++++ /dev/null
+@@ -1,8 +0,0 @@
+-# Note: the following conditions must always be true:
+-#   ZRELADDR == virt_to_phys(TEXTADDR)
+-#   PARAMS_PHYS must be within 4MB of ZRELADDR
+-#   INITRD_PHYS must be in RAM
+-
+-   zreladdr-y	+= 0x20008000
+-params_phys-y	:= 0x20000100
+-initrd_phys-y	:= 0x20410000
 -- 
 2.1.0
