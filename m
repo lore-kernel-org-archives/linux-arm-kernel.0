@@ -1,132 +1,113 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 23 Mar 2015 22:58:28 +0000
-Subject: [PATCH V4] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <1427129424-17175-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20150323162514.GE18904@red-moon>
- <1427129424-17175-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 23 Mar 2015 17:06:28 -0600
+Subject: [PATCH v17 04/10] ARM: dts: qcom: Add power-controller device
+ node for 8074 Krait CPUs
+In-Reply-To: <292C2E97-ED74-4F17-B592-B5EA7BDD1E8E@codeaurora.org>
+References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
+ <1426882877-33008-5-git-send-email-lina.iyer@linaro.org>
+ <292C2E97-ED74-4F17-B592-B5EA7BDD1E8E@codeaurora.org>
+Message-ID: <20150323230628.GA1790@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 04:50:24PM +0000, Daniel Lezcano wrote:
-> On some platforms, the low level PM code may not be initialized correctly for
-> a specific cpu. In this case, the EXNIO tells the cpuidle driver to not
+On Mon, Mar 23 2015 at 16:05 -0600, Kumar Gala wrote:
+>
+>On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>
+>> Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
+>> regulate the power to the cpu and aide the core in entering idle states.
+>> Reference the SAW instance and associate the instance with the CPU core.
+>>
+>> Cc: Kumar Gala <galak@codeaurora.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>> arch/arm/boot/dts/qcom-msm8974.dtsi | 26 +++++++++++++++++++++++++-
+>> 1 file changed, 25 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> index e265ec1..5a41f44 100644
+>> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+>> @@ -21,6 +21,7 @@
+>> 			reg = <0>;
+>> 			next-level-cache = <&L2>;
+>> 			qcom,acc = <&acc0>;
+>> +			qcom,saw = <&saw0>;
+>> 		};
+>>
+>> 		cpu at 1 {
+>> @@ -30,6 +31,7 @@
+>> 			reg = <1>;
+>> 			next-level-cache = <&L2>;
+>> 			qcom,acc = <&acc1>;
+>> +			qcom,saw = <&saw1>;
+>> 		};
+>>
+>> 		cpu at 2 {
+>> @@ -39,6 +41,7 @@
+>> 			reg = <2>;
+>> 			next-level-cache = <&L2>;
+>> 			qcom,acc = <&acc2>;
+>> +			qcom,saw = <&saw2>;
+>> 		};
+>>
+>> 		cpu at 3 {
+>> @@ -48,6 +51,7 @@
+>> 			reg = <3>;
+>> 			next-level-cache = <&L2>;
+>> 			qcom,acc = <&acc3>;
+>> +			qcom,saw = <&saw3>;
+>> 		};
+>>
+>> 		L2: l2-cache {
+>> @@ -144,7 +148,27 @@
+>> 			};
+>> 		};
+>>
+>> -		saw_l2: regulator at f9012000 {
+>> +		saw0: power-controller at f9089000 {
+>> +			compatible = "qcom,msm8974-saw2-v2.1-cpu?;
+>
+>Should these include ?qcom,saw??
+>
+I believe the qcom,saw2 is a way for the regulator node to identify
+which node is also a regulator.
 
-"-ENXIO", but honestly these sentences should be rewritten, I understand
-what you mean, but for someone who has not reviewed the code before
-this log means precious little.
+Only saw_l2 is a regulator node as well on 8074 and thereby needs qcom,saw2.
 
-"If the cpuidle init cpu operation returns -ENXIO, therefore reporting HW
-failure or misconfiguration, the CPUidle driver skips the respective
-cpuidle device initialization because the associated platform back-end HW
-is not operational".
-
-> initialize the cpuidle device as the associated low level PM is not operational.
-> 
-> That prevents the system to crash and allows to handle the error gracefully.
-> 
-> For example, on Qcom's platform, each core has a SPM. The device associated
-> with this SPM is initialized before the cpuidle framework. If there is an error
-> in the initialization (eg. error in the DT), the system continues to boot but
-> in degraded mode as some SPM may not be correctly initialized.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 46 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 44 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 1c94b88..a7a01ce 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -17,6 +17,7 @@
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/slab.h>
->  
->  #include <asm/cpuidle.h>
->  
-> @@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
->  {
->  	int cpu, ret;
->  	struct cpuidle_driver *drv = &arm_idle_driver;
-> +	struct cpuidle_device *dev;
->  
->  	/*
->  	 * Initialize idle states data, starting at index 1.
-> @@ -105,18 +107,58 @@ static int __init arm_idle_init(void)
->  	if (ret <= 0)
->  		return ret ? : -ENODEV;
->  
-> +	ret = cpuidle_register_driver(drv);
-> +	if (ret) {
-> +		pr_err("Failed to register cpuidle driver\n");
-> +		return ret;
-> +	}
-> +
->  	/*
->  	 * Call arch CPU operations in order to initialize
->  	 * idle states suspend back-end specific data
->  	 */
->  	for_each_possible_cpu(cpu) {
->  		ret = arm_cpuidle_init(cpu);
-> +
-> +		/* 
-> +		 * Do not register the cpuidle device. This situation could
-> +		 * happen when the low level PM was not able to initialize
-> +		 * for any reaon.
-
-s/reaon/reason. I disagree, it is not for *any* reason. Something like:
-
-/*
- * Skip the cpuidle device initialization if the reported failure
- * is a HW misconfiguration/breakage (-ENXIO).
- */
-
-arm_cpuidle_init() should be documented in this respect.
-
-> +		 */
-> +		if (ret == -ENXIO)
-> +			continue;
-> +
->  		if (ret) {
->  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
-> -			return ret;
-> +			goto out_fail;
-> +		}
-> +
-> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> +		if (!dev) {
-> +			pr_err("Failed to allocate cpuidle device\n");
-> +			goto out_fail;
-> +		}
-> +		dev->cpu = cpu;
-> +
-> +		ret = cpuidle_register_device(dev);
-> +		if (ret) {
-> +			pr_err("Failed to register cpuidle device for CPU %d\n",
-> +			       cpu);
-> +			kfree(dev);
-> +			goto out_fail;
->  		}
->  	}
->  
-> -	return cpuidle_register(drv, NULL);
-> +	return 0;
-> +out_fail:
-> +	while (--cpu >= 0) {
-> +		dev = per_cpu(cpuidle_devices, cpu);
-> +		cpuidle_unregister_device(dev);
-> +		kfree(dev);
-> +	}
-> +
-> +	cpuidle_unregister_driver(drv);
-> +
-> +	return ret;
->  }
->  device_initcall(arm_idle_init);
-
-With the changes requested:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> +			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
+>> +		};
+>> +
+>> +		saw1: power-controller at f9099000 {
+>> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+>> +			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
+>> +		};
+>> +
+>> +		saw2: power-controller at f90a9000 {
+>> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+>> +			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
+>> +		};
+>> +
+>> +		saw3: power-controller at f90b9000 {
+>> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+>> +			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
+>> +		};
+>> +
+>> +		saw_l2: power-controller at f9012000 {
+>> 			compatible = "qcom,saw2";
+>> 			reg = <0xf9012000 0x1000>;
+>> 			regulator;
+>> --
+>> 2.1.0
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>-- 
+>Qualcomm Innovation Center, Inc.
+>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>a Linux Foundation Collaborative Project
+>
