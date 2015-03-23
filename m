@@ -1,67 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Mar 2015 11:14:28 +0000
-Subject: [PATCH 2/5] ARM: Add Broadcom Brahma-B15 readahead cache support
-In-Reply-To: <55086C2E.3030700@gmail.com>
-References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
- <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
- <20150317172930.GY8399@arm.com> <55086C2E.3030700@gmail.com>
-Message-ID: <20150323111427.GE11189@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 23 Mar 2015 12:25:18 +0100
+Subject: [PATCHv2] thermal: add omap3 support
+In-Reply-To: <20150314180240.GB4332@amd>
+References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
+ <20150313120935.GA27533@amd> <20150313165343.GB30104@developer>
+ <20150314180240.GB4332@amd>
+Message-ID: <20150323112518.GA7871@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 06:02:22PM +0000, Florian Fainelli wrote:
-> On 17/03/15 10:29, Will Deacon wrote:
-> > On Sat, Mar 07, 2015 at 12:54:50AM +0000, Florian Fainelli wrote:
-> >> This patch adds support for the Broadcom Brahma-B15 CPU readahead cache
-> >> controller. This cache controller sits between the L2 and the memory bus
-> >> and its purpose is to provide a friendler burst size towards the DDR
-> >> interface than the native cache line size.
-> >>
-> >> The readahead cache is mostly transparent, except for
-> >> flush_kern_cache_all, flush_kern_cache_louis and flush_icache_all, which
-> >> is precisely what we are overriding here.
+On Sat 2015-03-14 19:02:40, Pavel Machek wrote:
+> On Fri 2015-03-13 12:53:45, Eduardo Valentin wrote:
 > > 
-> > I'm struggling to understand why you care about flush_kern_cache_louis
-> > and flush_icache_all for a cache that sits the other side of the L2.
+> > Hey Pavel,
 > > 
-> > Can you explain why we need to do anything in these cases, please?
+> > On Fri, Mar 13, 2015 at 01:09:35PM +0100, Pavel Machek wrote:
+> > > Hi!
+> > > 
+> > > I checked 4.0-rc3 and linux-next as of today, and can not see omap3
+> > > thermal support. Can you apply the patches?
+> > 
+> > Yeah, it should be possible. Apologize, it really fell into the cracks.
+> > 
+> > There is a comment on it though. Please check my concern in you v2.
 > 
-> Let's try, as you may have read in the comment, all MVA-based cache
-> maintenance operations are snooped by the RAC, so they are effectively
-> "transparent" to software, all others are not.
-> 
-> flush_kern_cache_louis() and flush_icache_all() both use ICALLIUS in the
-> SMP case and ICIALLU in the UP case which were flagged as not being
-> transparently handled.
-> 
-> The concern is that, if you perform a L1 cache (data or instruction)
-> flush (essentially an invalidate), this will also flush (invalidate)
-> corresponding L2 cache lines, but the RAC has no way to be signaled that
-> is should also invalidate its own RAC cache lines pertaining to that
-> data, and RAC holds per-CPU "super" cache lines.
-> 
-> In arch/arm/kernel/smp.c, all uses of flush_cache_louis() are for
-> writing-back data, so the RAC is not an issue. In
-> arch/arm/kernel/suspend.c, flush_cache_louis() is known not to guarantee
-> a "clean" all the way to main memory, so __cpu_flush_dcache_area is used
-> in conjunction. In arch/arm/mm/idmap.c and mmu.c, the use of
-> flush_cache_louis() seems to be meant to see fresh data, not write-back,
-> so not transparent to the RAC, is that right?
-> 
-> It may very well be that we are super cautious here and that the only
-> case to take care of is essentially flush_cache_all(), and nothing more.
-> 
-> Would you suggestions on how to instrument/exercise whether we really
-> need to deal with flush_cache_louis() and flush_icache_all()?
+> And there's explanation for that concern :-). Let me know what you
+> need.
 
-I think that both flush_cache_louis and flush_icache_all only care about
-the inner-shareable domain, so you don't need to do anything with the
-RAC. It's a bit like the PL310 outer-cache, which is also not affected
-by these operations.
-
-I don't think there's a good way to determine statically if we have
-missing cacheflush calls. Maybe a better bet would be to implement a
-RAC driver using the outer_cache framework and only implement the
-flush_all callback.
-
-Will
+...ping? It would be good to get this into 4.1.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
