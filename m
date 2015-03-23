@@ -1,101 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Mar 2015 09:54:05 -0700
-Subject: [PATCH v3 0/5] clocksource: sun5i: Support parent clock rate
- changes
-In-Reply-To: <550D4B6C.2020607@redhat.com>
-References: <1425550856-12928-1-git-send-email-maxime.ripard@free-electrons.com>
- <20150319225344.GF4255@lukather> <550C28EC.2040800@linaro.org>
- <20150320205655.GJ4255@lukather> <550D4B6C.2020607@redhat.com>
-Message-ID: <20150323165405.GB15676@lukather>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 23 Mar 2015 17:22:57 +0000
+Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
+ init_mm
+In-Reply-To: <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
+References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+ <1427116945.2693.10.camel@linaro.org>
+ <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
+Message-ID: <1427131377.2693.25.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 21, 2015 at 11:43:56AM +0100, Hans de Goede wrote:
-> Hi,
+On Mon, 2015-03-23 at 15:44 +0000, Catalin Marinas wrote:
+[...]
+> I think for stable, we can do
+> with the patch below. We could clean up the cpu_switch_mm() uses through
+> the arch/arm64 and set the reserved ttbr0 but we only have two at the
+> moment (__cpu_suspend and efi_set_pgd).
 > 
-> On 20-03-15 21:56, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Fri, Mar 20, 2015 at 03:04:28PM +0100, Daniel Lezcano wrote:
-> >>On 03/19/2015 11:53 PM, Maxime Ripard wrote:
-> >>>Hi Daniel,
-> >>>
-> >>>On Thu, Mar 05, 2015 at 11:20:51AM +0100, Maxime Ripard wrote:
-> >>>>Hi,
-> >>>>
-> >>>>The Allwinner HS timers have the AHB clock as their parent
-> >>>>clock. Since this clock is shared with other devices, we could very
-> >>>>well have another driver requesting a rate change of that clock,
-> >>>>making our timer change frequency at the same time.
-> >>>>
-> >>>>This is especially true on the A31, where the DMA controller needs to
-> >>>>do such a rate change, making the HS timer unreliable at the time on
-> >>>>the A31.
-> >>>>
-> >>>>This serie makes some cleanups and implements clock notifiers to be
-> >>>>able to reflect such rate changes and make sure that the timer is
-> >>>>always working.
-> >>>>
-> >>>>Maxime
-> >>>>
-> >>>>Changes from v2:
-> >>>>   - Rebased on top of v4.0-rc1
-> >>>>   - Removed the local_irq_save/restore around clockevents_update_freq
-> >>>>
-> >>>>Changes from v1:
-> >>>>   - Changed the interrupt name to its previous value
-> >>>>
-> >>>>Maxime Ripard (5):
-> >>>>   clocksource: sun5i: Switch to request_irq
-> >>>>   clocksource: sun5i: Use of_io_request_and_map
-> >>>>   clocksource: sun5i: Remove sched_clock
-> >>>>   clocksource: sun5i: Refactor the current code
-> >>>>   clocksource: sun5i: Add clock notifiers
-> >>>
-> >>>Have these patches been merged?
-> >>>
-> >>>If not, it woulde be great if the third one ("clocksource: sun5i:
-> >>>Remove sched_clock") was merged for 4.0.
-> >>>
-> >>>The sched_clock we use on some system is this timer's, and since we
-> >>>started using cpufreq, the cpu clock (that is one of the timer's clock
-> >>>indirect parent) now changes, along with the actual sched_clock rate.
-> >>>
-> >>>We can safely remove the sched_clock on those systems, since we have
-> >>>other reliable sched_clock in the system.
-> >>
-> >>Ok, I applied the patch for v4.0-rc5 but I had to fix a conflict and change
-> >>the changelog.
-> >
-> >It looks fine.
-> >
-> >Note that the rest of the serie should also be merged, this is just a
-> >temporary measure for 4.0.
-> >
-> >>Mind to test it works ?
-> >>
-> >>git.linaro.org/people/daniel.lezcano/linux.git clockevents/v4.0-rc4
-> >
-> >Unfortunately, I won't have access to my boards for ~10 days due to
-> >travel to ELC. Chen-Yu, Hans, could you test this and see if it works?
+> -----------------8<-------------------------
 > 
-> I've just given this a test run on an A20 board, using the dmesg
-> timestamps are off reproducer discussed before, and the problem no
-> longer reproduces on the clockevents/4.0-rc4 branch, and everything
-> else still seems to work fine.
+> From 5d9e3540b6480558528612dd3672543fa8ab3528 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Mon, 23 Mar 2015 15:06:50 +0000
+> Subject: [PATCH] arm64: Use the reserved TTBR0 if context switching to the
+>  init_mm
+> 
+> The idle_task_exit() function may call switch_mm() with next ==
+> &init_mm. On arm64, init_mm.pgd cannot be used for user mappings, so
+> this patch simply sets the reserved TTBR0.
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Great, thanks!
+That unsurprising fixes the BUG_ON I was seeing on Juno, so...
+Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/2b8859d2/attachment-0001.sig>
+One question, is bypassing setting the mm_cpumask and context.id for
+init_mm OK? I'm not familiar with the code but had a quick look, and it
+looks like they are just used for ASID management, in which case I
+assume everything is OK - ASIDs only being relevant for user mappings in
+ttbr0?
+ 
+> ---
+>  arch/arm64/include/asm/mmu_context.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index a9eee33dfa62..101a42bde728 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -151,6 +151,15 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  {
+>  	unsigned int cpu = smp_processor_id();
+>  
+> +	/*
+> +	 * init_mm.pgd does not contain any user mappings and it is always
+> +	 * active for kernel addresses in TTBR1. Just set the reserved TTBR0.
+> +	 */
+> +	if (next == &init_mm) {
+> +		cpu_set_reserved_ttbr0();
+> +		return;
+> +	}
+> +
+>  	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next)
+>  		check_and_switch_context(next, tsk);
+>  }
