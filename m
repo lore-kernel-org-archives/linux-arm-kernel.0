@@ -1,21 +1,81 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Mar 2015 21:58:01 +0800
-Subject: [PATCH] ARM: dts: imx28: add alternative pinmuxing for spi3
-In-Reply-To: <1426758947-18003-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1426758947-18003-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150323135759.GF28410@dragon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Mar 2015 14:00:41 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150323132133.GD5718@linux.vnet.ibm.com>
+References: <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <20150225125610.GY8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
+ <20150225170011.GC8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+ <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
+ <20150226010505.GU15405@linux.vnet.ibm.com>
+ <20150322233057.GA17605@linux.vnet.ibm.com>
+ <20150323125545.GP8656@n2100.arm.linux.org.uk>
+ <20150323132133.GD5718@linux.vnet.ibm.com>
+Message-ID: <20150323140041.GQ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 10:55:47AM +0100, Uwe Kleine-K?nig wrote:
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello Shawn,
+On Mon, Mar 23, 2015 at 06:21:33AM -0700, Paul E. McKenney wrote:
+> On Mon, Mar 23, 2015 at 12:55:45PM +0000, Russell King - ARM Linux wrote:
+> > What if the cpu_hotplug_state for the CPU changes between reading it
+> > testing its value, and then writing it, or do we guarantee that it
+> > can't change other than by this function here?  If it can't change,
+> > then what's the point of using atomic_t for this?
 > 
-> the .dts that uses this pinmuxing is for a customer board that is not
-> supposed to go into mainline. Still the pinmuxing going in is very helpful
-> because I cannot define it in the machine.dts.
+> It indeed cannot change -here-, but there are other situations where
+> more than one CPU can be attempting to change it at the same time.
+> The reason that it cannot change here is that the variable has the
+> value that indicates that the previous offline completed within the
+> timeout period, so there are no outstanding writes.
 > 
-> So it would be great if you could pick this up even without an user.
+> When going offline, the outgoing CPU might take so long leaving that
+> the surviving CPU times out, thus both CPUs write to the variable at
+> the same time, which by itself requires atomics.  If this seems
+> unlikely, consider virtualized environments where the hypervisor
+> might preempt the guest OS.
 
-Applied, thanks.
+If two CPUs write using atomic_set() to the same location, what value do
+you end up with?  It's just the same as if two CPUs write normally to the
+same location.
+
+The only way it can be different is if you use atomic_cmpxchg(), or
+cmpxchg() so you can atomically test that the original value is what's
+expected prior to writing it.
+
+To illustrate this (I'll abbreviate the per-cpu state):
+
+	CPU0					CPU1
+	oldstate = atomic_read(state);
+	if (oldstate == CPU_DEAD) /* it isn't */
+	atomic_cmpxchg(state, oldstate, CPU_BROKEN)
+						atomic_xchg(state, CPU_DEAD)
+
+	/* succeeds */
+	!= old_state /* fails */
+	... so doesn't loop
+	cpu_wait_death() returns false (failed)
+
+Here, we report that the CPU failed to go offline, but the state is set
+to CPU_DEAD.  If it had been slightly earlier, CPU0 would have updated
+it to CPU_DEAD_POST.
+
+If we instead got rid of this atomic stuff, and looked at the code
+without atomic_* stuff confusing the picture, we'd probably have seen
+that.  This is why, whenever I see atomic_read() and atomic_set(), I'm
+very suspicious that the code is correct; virtually every time I've
+seen this pattern, the code has always had some problem.  I utterly
+hate code which uses these functions.
+
+So, I'd suggest getting rid of atomic_read() and atomic_set() here
+converting atomic_cmpxchg() to a plain cmpxchg(), and replacing that
+atomic_xchg() with a similar call to cmpxchg() so that a broken CPU
+doesn't confusingly end up being reported as broken yet getting a
+CPU_DEAD state.
+
+After all, we know that a CPU going down _should_ be online before it
+goes down - if it isn't online, how can it be executing code. :)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
