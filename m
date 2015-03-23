@@ -1,38 +1,65 @@
-From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
-Date: Mon, 23 Mar 2015 19:05:11 +0000
-Subject: [RFC PATCH 1/7] serial: Emulate break using control characters
-In-Reply-To: <20150323162805.GA3579@e103592.cambridge.arm.com>
-References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
- <1426688428-3150-2-git-send-email-daniel.thompson@linaro.org>
- <20150320142847.GB4725@e103592.cambridge.arm.com>
- <55103125.7080500@linaro.org>
- <20150323162805.GA3579@e103592.cambridge.arm.com>
-Message-ID: <20150323190511.76b02115@lxorguk.ukuu.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 23 Mar 2015 20:29:06 +0100
+Subject: [PATCH v2 0/9] ARM: at91 cleanups for 4.1 #2
+Message-ID: <1427138955-3617-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > To be clear I included the patch in this series only because:
-> > 
-> > 1. I couldn't figure out any way to send a serial break to the ARM
-> >    Foundation Model making it impossible for me to provoke SysRq actions
-> >    from interrupt context,
-> 
-> Agreed, there's no direct way to do it (annoyingly).
-> 
-> Arguably that's a deficiency in the model, though that's not much help to
-> you right now.
+Hi,
 
-If it isn't affecting real hardware and it's just for a flawed model then
-hack a check for a suitable symbol into the specific patches for
-the model and its serial driver and claim it was a break - don't dump it
-into the mainstream.
+This patch set finishes the clean up of the mach-at91 directory.
 
-There are some "conventional" escapes platforms have used (ctrl and
-symbols for example such as ctrl-^) which are less likely to cause
-conflicts than sequences. Nevetheless its not something you want anywhere
-mainstream if you can avoid it because those symbols could be sent over a
-remote management modem or similar.
+It fixes the remaining two drivers (at91_cf and pata_at91) so that they compile
+in a multiplatform configuration.
 
-They may be better if it does need to end up in the core kernel.
+Then it removes the uneeded headers.
 
-Alan
+Changes in v2:
+ - remove incorrect tabs in atmel-mc.h
+ - collected acks
+ - Added a new patch to remove Makefile.boot
+ - improved the commit massage of the first patch
+
+Alexandre Belloni (8):
+  ata: at91: use syscon to configure the smc
+  ARM: at91: drop sam9_smc.c
+  ARM: at91: declare the at91rm9200 memory controller as a syscon
+  pcmcia: at91_cf: Use syscon to configure the MC/smc
+  ARM: at91/pm: use the atmel-mc syscon defines
+  ARM: at91: remove mach/at91_ramc.h and mach/at91rm9200_mc.h
+  ARM: at91: remove at91rm9200_sdramc.h
+  ARM: at91: remove useless Makefile.boot
+
+Boris Brezillon (1):
+  mfd: syscon: Add Atmel MC (Memory Controller) registers definition
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |   2 +-
+ arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
+ arch/arm/mach-at91/Makefile                        |   5 -
+ arch/arm/mach-at91/Makefile.boot                   |   8 --
+ arch/arm/mach-at91/include/mach/at91_ramc.h        |  28 ----
+ arch/arm/mach-at91/include/mach/at91rm9200_mc.h    | 116 -----------------
+ arch/arm/mach-at91/include/mach/at91sam9_smc.h     |  98 --------------
+ arch/arm/mach-at91/pm.c                            |   8 +-
+ arch/arm/mach-at91/pm.h                            |  14 +-
+ arch/arm/mach-at91/pm_suspend.S                    |   3 +-
+ arch/arm/mach-at91/sam9_smc.c                      | 136 -------------------
+ arch/arm/mach-at91/sam9_smc.h                      |  11 --
+ drivers/ata/Kconfig                                |   1 -
+ drivers/ata/pata_at91.c                            |  92 ++++++++++---
+ drivers/pcmcia/Kconfig                             |   1 -
+ drivers/pcmcia/at91_cf.c                           |  25 ++--
+ include/linux/mfd/syscon/atmel-mc.h                | 144 +++++++++++++++++++++
+ include/soc/at91/at91rm9200_sdramc.h               |  63 ---------
+ 18 files changed, 249 insertions(+), 508 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/Makefile.boot
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9_smc.h
+ delete mode 100644 arch/arm/mach-at91/sam9_smc.c
+ delete mode 100644 arch/arm/mach-at91/sam9_smc.h
+ create mode 100644 include/linux/mfd/syscon/atmel-mc.h
+ delete mode 100644 include/soc/at91/at91rm9200_sdramc.h
+
+-- 
+2.1.0
