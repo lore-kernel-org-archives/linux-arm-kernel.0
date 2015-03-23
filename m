@@ -1,81 +1,62 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 23 Mar 2015 11:32:43 +0100
-Subject: [PATCH 0/4] Allow to use leds-ns2 with n090401 boards
-In-Reply-To: <20150313094433.GU1509@kw.sim.vm.gnt>
-References: <1425480739-2373-1-git-send-email-simon.guinot@sequanux.org>
- <20150313094433.GU1509@kw.sim.vm.gnt>
-Message-ID: <20150323103243.GQ1509@kw.sim.vm.gnt>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 23 Mar 2015 12:32:38 +0200
+Subject: [GIT PULL] OMAP-GPMC driver updates for v4.1
+Message-ID: <550FEBC6.3000902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 10:44:33AM +0100, Simon Guinot wrote:
-> On Wed, Mar 04, 2015 at 03:52:15PM +0100, Simon Guinot wrote:
-> > Hello,
-> > 
-> > This patch series allows to use the leds-ns2 driver with the n090401
-> > boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
-> > 
-> > Here is the list changes:
-> > 
-> > - Allow to configure the LED mode mapping.
-> > - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
-> >   GPIO expander.
-> > - Make leds-ns2 depends on MACH_ARMADA_370.
-> 
-> Hi Brian,
-> 
-> Please consider applying the leds-ns2 patches of this serie.
+Hi Arnd, Hi Olof,
 
-Hi Brian,
+Based on Tony's request I will be sending you pull requests for OMAP-GPMC driver
+hence forth. I've sent this earlier on the 9th of March but had missed to copy Olof.
 
-Again, it would be nice to have this patches for the incoming release.
-Please, consider picking the leds-ns2 patches of this serie.
+Please pull in these OMAP-GPMC driver fixes for v4.1.
+Patches have been tested for GPMC-NAND on dra7-evm and omap3-beagle.
 
-Thanks,
+Thanks.
 
-Simon
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-> > Simon Guinot (2):
-> >   leds: leds-ns2: handle can_sleep GPIOs
-> >   leds: leds-ns2: depends on MACH_ARMADA_370
-> > 
-> > Vincent Donnefort (2):
-> >   leds: leds-ns2: move LED modes mapping outside of the driver
-> >   ARM: Kirkwood: add modes-map property to ns2-leds nodes
-> > 
-> >  .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
-> >  arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
-> >  arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
-> >  arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
-> >  arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
-> >  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
-> >  drivers/leds/Kconfig                               |  12 +-
-> >  drivers/leds/leds-ns2.c                            | 156 +++++++++++++--------
-> >  include/dt-bindings/leds/leds-ns2.h                |   8 ++
-> >  include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
-> >  10 files changed, 159 insertions(+), 65 deletions(-)
-> >  create mode 100644 include/dt-bindings/leds/leds-ns2.h
-> > 
-> > -- 
-> > 2.1.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
+are available in the git repository at:
 
+  git at github.com:rogerq/linux.git tags/gpmc-omap-for-v4.1
 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+for you to fetch changes up to 4b613e9b4bbe94545a588a100e09006d827a7ebe:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/6333bcc8/attachment.sig>
+  ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters (2015-03-06 12:55:32 +0200)
+
+----------------------------------------------------------------
+OMAP-GPMC driver fixes for v4.1
+
+* Fixed WAITMONITORINGTIME programming to be based on
+GPMC_CLK instead of GPMC_FCLK. The GPMC clock divider
+programming is fixed for both synchronous and asynchronous
+modes.
+* Allow GPMC's children of default bus type to be populated in
+the device tree.
+* Improved DEBUG output data and format.
+* Prevent writing 1 into reserved bits of GPMC_CONFIG7.
+
+----------------------------------------------------------------
+Robert ABEL (8):
+      ARM OMAP2+ GPMC: don't undef DEBUG
+      ARM OMAP2+ GPMC: add bus children
+      ARM OMAP2+ GPMC: fix debug output alignment
+      ARM OMAP2+ GPMC: change get_gpmc_timing_reg output for DTS
+      ARM OMAP2+ GPMC: always program GPMCFCLKDIVIDER
+      ARM OMAP2+ GPMC: calculate GPMCFCLKDIVIDER based on WAITMONITORINGTIME
+      ARM OMAP2+ GPMC: fix WAITMONITORINGTIME divider bug
+      ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters
+
+Semen Protsenko (2):
+      ARM: OMAP2+: gpmc: Fix writing in gpmc_cs_set_memconf
+      ARM: OMAP2+: gpmc: make gpmc_cs_get_name() static
+
+ arch/arm/mach-omap2/gpmc-nand.c    |  18 +++++----
+ arch/arm/mach-omap2/gpmc-onenand.c |   4 +-
+ arch/arm/mach-omap2/usb-tusb6010.c |   4 +-
+ drivers/memory/omap-gpmc.c         | 358 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------
+ include/linux/omap-gpmc.h          |   3 +-
+ 5 files changed, 305 insertions(+), 82 deletions(-)
