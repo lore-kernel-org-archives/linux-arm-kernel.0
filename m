@@ -1,83 +1,159 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 23 Mar 2015 11:06:57 +0100
-Subject: [PATCH 33/35 linux-next] mmc: constify of_device_id array
-In-Reply-To: <1374583183.180918.1426968545752.open-xchange@webmail.nmp.proximus.be>
-References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-1-git-send-email-fabf@skynet.be>
- <1426535949-26107-2-git-send-email-fabf@skynet.be>
- <CAPDyKFodW1zgrQ-sd5TPO_rCa_-tm95JkwCWiGX4BCUSFqPHdg@mail.gmail.com>
- <CAPDyKFoWoQhSat9vAfTGy_exdubcknySMPjoSXp5ox_YB+M6ZQ@mail.gmail.com>
- <1374583183.180918.1426968545752.open-xchange@webmail.nmp.proximus.be>
-Message-ID: <CAPDyKFqJf-iYeMWEJL0v6SQngOWJBpNc03NU59seyOLuh61KoA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Mar 2015 10:08:20 +0000
+Subject: [PATCH] ARM: io: Unpessimize relaxed io accessors
+In-Reply-To: <1426958753-26903-1-git-send-email-peter@hurleysoftware.com>
+References: <1426958753-26903-1-git-send-email-peter@hurleysoftware.com>
+Message-ID: <20150323100820.GA11189@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2015 at 21:09, Fabian Frederick <fabf@skynet.be> wrote:
->
->
->> On 20 March 2015 at 09:56 Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>
->>
->> On 17 March 2015 at 10:49, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> > On 16 March 2015 at 20:59, Fabian Frederick <fabf@skynet.be> wrote:
->> >> of_device_id is always used as const.
->> >> (See driver.of_match_table and open firmware functions)
->> >>
->> >> Signed-off-by: Fabian Frederick <fabf@skynet.be>
->> >
->> > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> I realized that you might wanted me to pick this up and queue it
->> through my mmc tree? Just tell me if that's what you want.
->>
->> Kind regards
->> Uffe
->
-> Hi Ulf,
->
->         Yes of course :) (it has not been added to linux-next yet).
+Hi Peter,
 
-Thanks! Applied.
+On Sat, Mar 21, 2015 at 05:25:53PM +0000, Peter Hurley wrote:
+> commit 195bbcac2e5c12f7fb ("ARM: 7500/1: io: avoid writeback addressing
+> modes for __raw_ accessors") disables writeback addressing modes for
+> raw i/o. However, the "+Q" assembler constraint forces the compiler to
+> invalidate and reload the 'addr' input.
+> 
+> The 'addr' parameter is an input, not an output, and the instructions do
+> not change the value of 'addr', so the '+' constraint modifier is
+> unnecessarily pessimistic and leads to poor code generation. This is
+> especially noticeable with complex address inputs in loops; the compiler
+> is forced to recompute 'addr' on each loop iteration.
 
-Kind regards
-Uffe
+My understanding of the modifier is that the '+' actually applies to the
+contents of the memory location, not the address (in the same way as
+the "m" constraint). Given that even IO reads could alter the register
+value, I believe the current code is strictly correct.
 
->
-> Thanks,
-> Fabian
->>
->> >
->> >> ---
->> >>  drivers/mmc/host/mmc_spi.c   | 2 +-
->> >>  drivers/mmc/host/wmt-sdmmc.c | 2 +-
->> >>  2 files changed, 2 insertions(+), 2 deletions(-)
->> >>
->> >> diff --git a/drivers/mmc/host/mmc_spi.c b/drivers/mmc/host/mmc_spi.c
->> >> index e4a0754..ae19d83 100644
->> >> --- a/drivers/mmc/host/mmc_spi.c
->> >> +++ b/drivers/mmc/host/mmc_spi.c
->> >> @@ -1507,7 +1507,7 @@ static int mmc_spi_remove(struct spi_device *spi)
->> >>         return 0;
->> >>  }
->> >>
->> >> -static struct of_device_id mmc_spi_of_match_table[] = {
->> >> +static const struct of_device_id mmc_spi_of_match_table[] = {
->> >>         { .compatible = "mmc-spi-slot", },
->> >>         {},
->> >>  };
->> >> diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
->> >> index dd2e1aa..5af0055 100644
->> >> --- a/drivers/mmc/host/wmt-sdmmc.c
->> >> +++ b/drivers/mmc/host/wmt-sdmmc.c
->> >> @@ -744,7 +744,7 @@ static struct wmt_mci_caps wm8505_caps = {
->> >>         .max_blk_size = 2048,
->> >>  };
->> >>
->> >> -static struct of_device_id wmt_mci_dt_ids[] = {
->> >> +static const struct of_device_id wmt_mci_dt_ids[] = {
->> >>         { .compatible = "wm,wm8505-sdhc", .data = &wm8505_caps },
->> >>         { /* Sentinel */ },
->> >>  };
->> >> --
->> >> 2.1.0
->> >>
+However, we could probably make the assumption that MMIO accesses are
+always performed via these (volatile) accessors and therefore the
+modifiers don't actually need to describe the effect on the MMIO
+registers because there's never a possibility of using a value that has
+been `cached' by the compiler.
+
+In which case, if you change the commit log to reflect that, then:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Cheers,
+
+Will
+
+
+> For example, the following code:
+> 
+>     #include <linux/kernel.h>
+>     #include <linux/io.h>
+> 
+>     static const int *remap;
+> 
+>     void wr_loop(void __iomem *base, int c, int val)
+>     {
+>             int i;
+> 
+>             for (i = 0; i < c; i++)
+>                     writew_relaxed(val, base + remap[c >> 2]);
+>     }
+> 
+> generates
+> 
+>            current master             |             this patch
+>  0: e3510000    cmp     r1, #0        |  0: e3510000    cmp     r1, #0
+>  4: d12fff1e    bxle    lr            |  4: d12fff1e    bxle    lr
+>  8: e3003000    movw    r3, #0        |  8: e3c1c003    bic     ip, r1, #3
+>  c: e3403000    movt    r3, #0        |  c: e6ff2072    uxth    r2, r2
+> 10: e92d4010    push    {r4, lr}      | 10: e3a03000    mov     r3, #0
+> 14: e6ff2072    uxth    r2, r2        | 14: e59cc000    ldr     ip, [ip]
+> 18: e3c14003    bic     r4, r1, #3    | 18: e080000c    add     r0, r0, ip
+> 1c: e593e000    ldr     lr, [r3]      |
+> 20: e3a03000    mov     r3, #0        | 1c: e1c020b0    strh    r2, [r0]
+>                                       | 20: e2833001    add     r3, r3, #1
+> 24: e79ec004    ldr     ip, [lr, r4]  | 24: e1530001    cmp     r3, r1
+> 28: e080c00c    add     ip, r0, ip    | 28: 1afffffb    bne     1c
+> 2c: e1cc20b0    strh    r2, [ip]      | 2c: e12fff1e    bx      lr
+> 30: e2833001    add     r3, r3, #1    |
+> 34: e1530001    cmp     r3, r1        |
+> 38: 1afffff9    bne     24            |
+>                                       |
+> 3c: e8bd8010    pop     {r4, pc}      |
+> 
+> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+> ---
+>  arch/arm/include/asm/io.h | 27 ++++++++++++---------------
+>  1 file changed, 12 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index db58deb..7744e58 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -73,17 +73,16 @@ void __raw_readsl(const volatile void __iomem *addr, void *data, int longlen);
+>  static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+>  {
+>  	asm volatile("strh %1, %0"
+> -		     : "+Q" (*(volatile u16 __force *)addr)
+> -		     : "r" (val));
+> +		     : : "Q" (*(volatile u16 __force *)addr), "r" (val));
+>  }
+>  
+>  #define __raw_readw __raw_readw
+>  static inline u16 __raw_readw(const volatile void __iomem *addr)
+>  {
+>  	u16 val;
+> -	asm volatile("ldrh %1, %0"
+> -		     : "+Q" (*(volatile u16 __force *)addr),
+> -		       "=r" (val));
+> +	asm volatile("ldrh %0, %1"
+> +		     : "=r" (val)
+> +		     : "Q" (*(volatile u16 __force *)addr));
+>  	return val;
+>  }
+>  #endif
+> @@ -92,25 +91,23 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+>  static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+>  {
+>  	asm volatile("strb %1, %0"
+> -		     : "+Qo" (*(volatile u8 __force *)addr)
+> -		     : "r" (val));
+> +		     : : "Qo" (*(volatile u8 __force *)addr), "r" (val));
+>  }
+>  
+>  #define __raw_writel __raw_writel
+>  static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+>  {
+>  	asm volatile("str %1, %0"
+> -		     : "+Qo" (*(volatile u32 __force *)addr)
+> -		     : "r" (val));
+> +		     : : "Qo" (*(volatile u32 __force *)addr), "r" (val));
+>  }
+>  
+>  #define __raw_readb __raw_readb
+>  static inline u8 __raw_readb(const volatile void __iomem *addr)
+>  {
+>  	u8 val;
+> -	asm volatile("ldrb %1, %0"
+> -		     : "+Qo" (*(volatile u8 __force *)addr),
+> -		       "=r" (val));
+> +	asm volatile("ldrb %0, %1"
+> +		     : "=r" (val)
+> +		     : "Qo" (*(volatile u8 __force *)addr));
+>  	return val;
+>  }
+>  
+> @@ -118,9 +115,9 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+>  static inline u32 __raw_readl(const volatile void __iomem *addr)
+>  {
+>  	u32 val;
+> -	asm volatile("ldr %1, %0"
+> -		     : "+Qo" (*(volatile u32 __force *)addr),
+> -		       "=r" (val));
+> +	asm volatile("ldr %0, %1"
+> +		     : "=r" (val)
+> +		     : "Qo" (*(volatile u32 __force *)addr));
+>  	return val;
+>  }
+>  
+> -- 
+> 2.3.3
+> 
+> 
