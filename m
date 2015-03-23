@@ -1,42 +1,73 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 23 Mar 2015 15:58:23 +0000
-Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
- destroyed
-In-Reply-To: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
-References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 23 Mar 2015 15:58:40 +0000
+Subject: [PATCH v2 3/3] arm64: drop sleep_idmap_phys
+In-Reply-To: <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150323155840.GC18904@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
-especially before calling kvm_arch_destroy_vm(). To avoid
-unregistering devices from the already destroyed bus, let's mark
-the bus with NULL to let other users know it has been destroyed
-already.
-This avoids a crash on a VM shutdown with the VGIC using the
-kvm_io_bus later (the unregistering is in there to be able to roll
-back a faulting init).
+On Mon, Mar 23, 2015 at 09:07:26AM +0000, Ard Biesheuvel wrote:
+> The global variable sleep_idmap_phys always points to idmap_pg_dir,
+> so we can just use that value directly in the CPU resume path.
+> 
+> Also unclutters the load of sleep_save_sp::save_ptr_stash_phys.
+> 
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/kvm_main.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Nit: I understand why you want to do more than one change at once,
+I think you should reword the subject though for completeness.
 
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 8c7ab0b..6f164eb 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
- 	list_del(&kvm->vm_list);
- 	spin_unlock(&kvm_lock);
- 	kvm_free_irq_routing(kvm);
--	for (i = 0; i < KVM_NR_BUSES; i++)
-+	for (i = 0; i < KVM_NR_BUSES; i++) {
- 		kvm_io_bus_destroy(kvm->buses[i]);
-+		kvm->buses[i] = NULL;
-+	}
- 	kvm_coalesced_mmio_free(kvm);
- #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
- 	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
--- 
-1.7.9.5
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/sleep.S   | 7 ++-----
+>  arch/arm64/kernel/suspend.c | 3 ---
+>  2 files changed, 2 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+> index 04dc9aa2831e..3c98fe1c1c2f 100644
+> --- a/arch/arm64/kernel/sleep.S
+> +++ b/arch/arm64/kernel/sleep.S
+> @@ -164,15 +164,12 @@ ENTRY(cpu_resume)
+>  #else
+>  	mov	x7, xzr
+>  #endif
+> -	adrp	x0, sleep_save_sp
+> -	add	x0, x0, #:lo12:sleep_save_sp
+> -	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
+> +	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
+>  	ldr	x0, [x0, x7, lsl #3]
+>  	/* load sp from context */
+>  	ldr	x2, [x0, #CPU_CTX_SP]
+> -	adrp	x1, sleep_idmap_phys
+>  	/* load physical address of identity map page table in x1 */
+> -	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
+> +	adrp	x1, idmap_pg_dir
+>  	mov	sp, x2
+>  	/*
+>  	 * cpu_do_resume expects x0 to contain context physical address
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index d7daf45ae7a2..f6073c27d65f 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  }
+>  
+>  struct sleep_save_sp sleep_save_sp;
+> -phys_addr_t sleep_idmap_phys;
+>  
+>  static int __init cpu_suspend_init(void)
+>  {
+> @@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
+>  
+>  	sleep_save_sp.save_ptr_stash = ctx_ptr;
+>  	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
+> -	sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
+>  	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
+> -	__flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
+>  
+>  	return 0;
+>  }
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
