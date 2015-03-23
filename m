@@ -1,25 +1,73 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Mon, 23 Mar 2015 11:13:21 +0100
-Subject: mc34708 regulators
-Message-ID: <550FE741.9080709@parkeon.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Mar 2015 11:14:35 +0100
+Subject: [PATCH 00/10] ARM: at91 cleanups for 4.1 #2
+In-Reply-To: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <550FE78B.6090900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steffen,
+Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
+> Hi,
+> 
+> This patch set finishes the clean up of the mach-at91 directory.
+> 
+> It fixed the remaining two drivers (at91_cf and pata_at91) so that they compile
+> in a multiplatform configuration.
+> 
+> Then it removes the uneeded headers.
+> 
+> 
+> Alexandre Belloni (9):
+>   ARM: at91/pm: move the standby functions to pm.c
+>   ARM: at91/pm: move AT91_MEMCTRL_* to pm.h
 
-I see you have added the regulator definitions for the mc34708 to the 
-imx53-qsrb device tree.
+Ok, I only take the first 2 patches of this series for now.
 
-However there doesn't seem to be a regulator driver for this PMIC in the 
-tree.
+The rest looks good as well, but I need more insight and the review from
+Lee to go forward.
 
-mc13xxx supports parts of the functionalities (like the rtc) but only 
-seems to support mc13783 and mc13892 on the regulator side.
+Thanks, bye.
 
-Am I missing something?
 
-Is there a patch floating around for this?
+>   ata: at91: use syscon to configure the smc
+>   ARM: at91: drop sam9_smc.c
+>   ARM: at91: declare the at91rm9200 memory controller as a syscon
+>   pcmcia: at91_cf: Use syscon to configure the MC/smc
+>   ARM: at91/pm: use the atmel-mc syscon defines
+>   ARM: at91: remove mach/at91_ramc.h and mach/at91rm9200_mc.h
+>   ARM: at91: remove at91rm9200_sdramc.h
+> 
+> Boris Brezillon (1):
+>   mfd: syscon: Add Atmel MC (Memory Controller) registers definition
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |   2 +-
+>  arch/arm/boot/dts/at91rm9200.dtsi                  |   2 +-
+>  arch/arm/mach-at91/Makefile                        |   5 -
+>  arch/arm/mach-at91/include/mach/at91_ramc.h        |  32 -----
+>  arch/arm/mach-at91/include/mach/at91rm9200_mc.h    | 116 -----------------
+>  arch/arm/mach-at91/include/mach/at91sam9_smc.h     |  98 --------------
+>  arch/arm/mach-at91/pm.c                            |  91 ++++++++++++-
+>  arch/arm/mach-at91/pm.h                            | 110 +++-------------
+>  arch/arm/mach-at91/pm_suspend.S                    |   3 +-
+>  arch/arm/mach-at91/sam9_smc.c                      | 136 -------------------
+>  arch/arm/mach-at91/sam9_smc.h                      |  11 --
+>  drivers/ata/Kconfig                                |   1 -
+>  drivers/ata/pata_at91.c                            |  92 ++++++++++---
+>  drivers/pcmcia/Kconfig                             |   1 -
+>  drivers/pcmcia/at91_cf.c                           |  25 ++--
+>  include/linux/mfd/syscon/atmel-mc.h                | 144 +++++++++++++++++++++
+>  include/soc/at91/at91rm9200_sdramc.h               |  63 ---------
+>  17 files changed, 339 insertions(+), 593 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91_ramc.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91rm9200_mc.h
+>  delete mode 100644 arch/arm/mach-at91/include/mach/at91sam9_smc.h
+>  delete mode 100644 arch/arm/mach-at91/sam9_smc.c
+>  delete mode 100644 arch/arm/mach-at91/sam9_smc.h
+>  create mode 100644 include/linux/mfd/syscon/atmel-mc.h
+>  delete mode 100644 include/soc/at91/at91rm9200_sdramc.h
+> 
 
-Regards,
 
-Martin
+-- 
+Nicolas Ferre
