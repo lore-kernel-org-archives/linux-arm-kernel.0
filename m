@@ -1,62 +1,95 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 23 Mar 2015 10:45:37 +0000
-Subject: [PATCH v2 0/3] arm64: relax Image placement requirement
-In-Reply-To: <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150323104536.GA9724@red-moon>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 23 Mar 2015 11:49:59 +0100
+Subject: [PATCH 1/1] Revert "ARM: dts: add display power domain for exynos5250"
+Message-ID: <1427107800-21668-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 09:07:23AM +0000, Ard Biesheuvel wrote:
-> So as it turns out, the 512 MB alignment boundary restriction appears
-> to have been introduced by accident when increasing the ID map to cover
-> the entire kernel Image.
-> 
-> So this reverts that change, by reducing the ID map to something that
-> can never cross a 512 MB boundary by construction.
-> 
-> Patch #1 removes some functions that are unused, so that I don't have
-> to worry about them in patch #2
-> 
-> Patch #2 introduces the reduced ID map, using a separate linker section
-> that contains code the manipulates the state of the MMU.
-> 
-> Patch #3 removes the sleep_idmap_phys global which always points to
-> the ID map anyway
+This reverts commit 2d2c9a8d0a4f90e298315d2f4a282d8bd5d45e5c
+("ARM: dts: add display power domain for exynos5250").
 
-Patch 1 and 2 do not apply for me, what tree/commit are they based against ?
+The mentioned commit added a domain definition for the DISP1
+power domain and references to it in the appropriate devices
+but this change breaks the display in at least the Exynos5250
+based Snow and Spring Chromebooks.
 
-Please let me know so that I can give patch 3 a go.
+On these machines, the boot-loader enables the DISP1 domain and
+before the mentioned commit, the kernel didn't know about it so
+the power domain remained always enabled.
 
-Thanks,
-Lorenzo
+But after that commit when the exynos-dp probe is deferred,
+the DISP1 domain is powered off and on again but the exynos-dp
+driver fails to configure the video showing the following error:
 
-> 
-> 
-> Ard Biesheuvel (3):
->   arm64: remove soft_restart() and friends
->   arm64: reduce ID map to a single page
->   arm64: drop sleep_idmap_phys
-> 
->  arch/arm64/include/asm/mmu.h         |  1 -
->  arch/arm64/include/asm/proc-fns.h    |  3 ---
->  arch/arm64/include/asm/system_misc.h |  1 -
->  arch/arm64/kernel/head.S             | 13 +++++++------
->  arch/arm64/kernel/process.c          | 12 +-----------
->  arch/arm64/kernel/sleep.S            |  9 ++++-----
->  arch/arm64/kernel/suspend.c          |  3 ---
->  arch/arm64/kernel/vmlinux.lds.S      | 11 ++++++++++-
->  arch/arm64/mm/mmu.c                  | 11 -----------
->  arch/arm64/mm/proc.S                 | 33 ---------------------------------
->  10 files changed, 22 insertions(+), 75 deletions(-)
-> 
-> -- 
-> 1.8.3.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+exynos-dp 145b0000.dp-controller: unable to config video
+
+The same issue happens when the display is turned off and on
+again using DPMS.
+
+So, it seems the DISP1 power domain definition is not complete
+since the display works with the initialization made by the boot
+loader but it does not work when the power domain is enabled by
+the kernel.
+
+Having the definition in the DTS makes the power domain to be
+powered on when needed and powered off when not needed which is
+better in terms of power consumption but for now is safer to just
+revert the commit to avoid adding a regression in some machines.
+
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/boot/dts/exynos5250.dtsi | 10 ----------
+ 1 file changed, 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 77f656eb8e6b..482fa97c6b3a 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -105,12 +105,6 @@
+ 		#power-domain-cells = <0>;
+ 	};
+ 
+-	pd_disp1: disp1-power-domain at 100440A0 {
+-		compatible = "samsung,exynos4210-pd";
+-		reg = <0x100440A0 0x20>;
+-		#power-domain-cells = <0>;
+-	};
+-
+ 	clock: clock-controller at 10010000 {
+ 		compatible = "samsung,exynos5250-clock";
+ 		reg = <0x10010000 0x30000>;
+@@ -752,7 +746,6 @@
+ 	hdmi: hdmi {
+ 		compatible = "samsung,exynos4212-hdmi";
+ 		reg = <0x14530000 0x70000>;
+-		power-domains = <&pd_disp1>;
+ 		interrupts = <0 95 0>;
+ 		clocks = <&clock CLK_HDMI>, <&clock CLK_SCLK_HDMI>,
+ 			 <&clock CLK_SCLK_PIXEL>, <&clock CLK_SCLK_HDMIPHY>,
+@@ -765,7 +758,6 @@
+ 	mixer {
+ 		compatible = "samsung,exynos5250-mixer";
+ 		reg = <0x14450000 0x10000>;
+-		power-domains = <&pd_disp1>;
+ 		interrupts = <0 94 0>;
+ 		clocks = <&clock CLK_MIXER>, <&clock CLK_HDMI>,
+ 			 <&clock CLK_SCLK_HDMI>;
+@@ -779,7 +771,6 @@
+ 	};
+ 
+ 	dp: dp-controller at 145B0000 {
+-		power-domains = <&pd_disp1>;
+ 		clocks = <&clock CLK_DP>;
+ 		clock-names = "dp";
+ 		phys = <&dp_phy>;
+@@ -787,7 +778,6 @@
+ 	};
+ 
+ 	fimd: fimd at 14400000 {
+-		power-domains = <&pd_disp1>;
+ 		clocks = <&clock CLK_SCLK_FIMD1>, <&clock CLK_FIMD1>;
+ 		clock-names = "sclk_fimd", "fimd";
+ 	};
+-- 
+2.1.4
