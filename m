@@ -1,25 +1,21 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Mon, 23 Mar 2015 13:54:40 +0000
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <201503230654.40287.arnd@arndb.de>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20150322165710.GO8656@n2100.arm.linux.org.uk>
- <HK2PR06MB056105B026481446243452FC8A0D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <201503230654.40287.arnd@arndb.de>
-Message-ID: <HK2PR06MB0561E40AF1275259EA364BEF8A0D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Mar 2015 21:58:01 +0800
+Subject: [PATCH] ARM: dts: imx28: add alternative pinmuxing for spi3
+In-Reply-To: <1426758947-18003-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1426758947-18003-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150323135759.GF28410@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> There are two different scenarios to consider here:
+On Thu, Mar 19, 2015 at 10:55:47AM +0100, Uwe Kleine-K?nig wrote:
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello Shawn,
 > 
-> a) building a kernel for a single machine while CONFIG_ARCH_MULTIPLATFORM is
->    enabled
-> b) actually enabling all sorts of machines
->
-> This means that I would definitely want to see XIP_KERNEL being possible on your
-> machine with a), but I agree that there is not much use for b) here.
+> the .dts that uses this pinmuxing is for a customer board that is not
+> supposed to go into mainline. Still the pinmuxing going in is very helpful
+> because I cannot define it in the machine.dts.
+> 
+> So it would be great if you could pick this up even without an user.
 
-Given that XIP_KERNEL on ARMv7 is not a very common build configuration, this seems reasonable.
-
-
-Chris
+Applied, thanks.
