@@ -1,168 +1,192 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 10:32:17 +0100
-Subject: [PATCH v2 1/3] arm64: remove soft_restart() and friends
-In-Reply-To: <1427101646-465-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427101646-465-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu-WDusp1AYmyRE8SjgpYFuzPzCZPMMeW+8Un-RAdN=3ig@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Mar 2015 10:57:35 +0100
+Subject: [PATCH 05/10] mfd: syscon: Add Atmel MC (Memory Controller)
+ registers definition
+In-Reply-To: <1426545886-19162-6-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426545886-19162-6-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <550FE38F.7070701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2015 at 10:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> The implementation of soft_restart() and its subordinate functions
-> setup_mm_for_reboot(), cpu_soft_restart() and cpu_reset() have
-> non-trivial dependencies on the state of the caches and the MMU,
-> making them fragile from a maintenance pov. However, soft_restart()
-> isn't actually called anywhere, so just remove the whole bunch.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> The at91rm9200 SoC embeds a Memory Controller block which is used to
+> configure several aspects of the platform:
+> - AHB/APB Bus behavior
+> - SDRAM Controller
+> - EBI (External Bus Interface) and SMC (Static Memory Controller) config
+> 
+> Those registers might be accessed by different drivers, hence we need to
+> define it as a syscon device.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Hmm, I guess kexec will be using soft_restart() so never mind this patch.
+Alexandre, don't you need to Ack this patch at least?
+
 
 > ---
->  arch/arm64/include/asm/mmu.h         |  1 -
->  arch/arm64/include/asm/proc-fns.h    |  3 ---
->  arch/arm64/include/asm/system_misc.h |  1 -
->  arch/arm64/kernel/process.c          | 12 +-----------
->  arch/arm64/mm/mmu.c                  | 11 -----------
->  arch/arm64/mm/proc.S                 | 33 ---------------------------------
->  6 files changed, 1 insertion(+), 60 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index 3d311761e3c2..99064c075fc6 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -28,7 +28,6 @@ typedef struct {
->  #define ASID(mm)       ((mm)->context.id & 0xffff)
->
->  extern void paging_init(void);
-> -extern void setup_mm_for_reboot(void);
->  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->  extern void init_mem_pgprot(void);
->  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-> index 4d9ede7b6361..ab334467c6a4 100644
-> --- a/arch/arm64/include/asm/proc-fns.h
-> +++ b/arch/arm64/include/asm/proc-fns.h
-> @@ -31,9 +31,6 @@ struct cpu_suspend_ctx;
->  extern void cpu_cache_off(void);
->  extern void cpu_do_idle(void);
->  extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
-> -extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
-> -void cpu_soft_restart(phys_addr_t cpu_reset,
-> -               unsigned long addr) __attribute__((noreturn));
->  extern void cpu_do_suspend(struct cpu_suspend_ctx *ptr);
->  extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
->
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 7a18fabbe0f6..659fbf5925de 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -41,7 +41,6 @@ struct mm_struct;
->  extern void show_pte(struct mm_struct *mm, unsigned long addr);
->  extern void __show_regs(struct pt_regs *);
->
-> -void soft_restart(unsigned long);
->  extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->
->  #define UDBG_UNDEFINED (1 << 0)
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index c6b1f3b96f45..c506bee6b613 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -58,14 +58,6 @@ unsigned long __stack_chk_guard __read_mostly;
->  EXPORT_SYMBOL(__stack_chk_guard);
->  #endif
->
-> -void soft_restart(unsigned long addr)
-> -{
-> -       setup_mm_for_reboot();
-> -       cpu_soft_restart(virt_to_phys(cpu_reset), addr);
-> -       /* Should never get here */
-> -       BUG();
-> -}
-> -
->  /*
->   * Function pointers to optional machine specific functions
->   */
-> @@ -136,9 +128,7 @@ void machine_power_off(void)
->
->  /*
->   * Restart requires that the secondary CPUs stop performing any activity
-> - * while the primary CPU resets the system. Systems with a single CPU can
-> - * use soft_restart() as their machine descriptor's .restart hook, since that
-> - * will cause the only available CPU to reset. Systems with multiple CPUs must
-> + * while the primary CPU resets the system. Systems with multiple CPUs must
->   * provide a HW restart implementation, to ensure that all CPUs reset at once.
->   * This is required so that any code running after reset on the primary CPU
->   * doesn't have to co-ordinate with other CPUs to ensure they aren't still
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 428aaf86c95b..15ac396229d5 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -460,17 +460,6 @@ void __init paging_init(void)
->  }
->
->  /*
-> - * Enable the identity mapping to allow the MMU disabling.
-> - */
-> -void setup_mm_for_reboot(void)
-> -{
-> -       cpu_set_reserved_ttbr0();
-> -       flush_tlb_all();
-> -       cpu_set_idmap_tcr_t0sz();
-> -       cpu_switch_mm(idmap_pg_dir, &init_mm);
-> -}
-> -
-> -/*
->   * Check whether a kernel address is valid (derived from arch/x86/).
->   */
->  int kern_addr_valid(unsigned long addr)
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index cdd754e19b9b..a2059ec61463 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -59,39 +59,6 @@ ENTRY(cpu_cache_off)
->  ENDPROC(cpu_cache_off)
->
->  /*
-> - *     cpu_reset(loc)
-> - *
-> - *     Perform a soft reset of the system.  Put the CPU into the same state
-> - *     as it would be if it had been reset, and branch to what would be the
-> - *     reset vector. It must be executed with the flat identity mapping.
-> - *
-> - *     - loc   - location to jump to for soft reset
-> - */
-> -       .align  5
-> -ENTRY(cpu_reset)
-> -       mrs     x1, sctlr_el1
-> -       bic     x1, x1, #1
-> -       msr     sctlr_el1, x1                   // disable the MMU
-> -       isb
-> -       ret     x0
-> -ENDPROC(cpu_reset)
-> -
-> -ENTRY(cpu_soft_restart)
-> -       /* Save address of cpu_reset() and reset address */
-> -       mov     x19, x0
-> -       mov     x20, x1
-> -
-> -       /* Turn D-cache off */
-> -       bl      cpu_cache_off
-> -
-> -       /* Push out all dirty data, and ensure cache is empty */
-> -       bl      flush_cache_all
-> -
-> -       mov     x0, x20
-> -       ret     x19
-> -ENDPROC(cpu_soft_restart)
-> -
-> -/*
->   *     cpu_do_idle()
->   *
->   *     Idle the processor (wait for interrupt).
-> --
-> 1.8.3.2
->
+>  include/linux/mfd/syscon/atmel-mc.h | 144 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 144 insertions(+)
+>  create mode 100644 include/linux/mfd/syscon/atmel-mc.h
+> 
+> diff --git a/include/linux/mfd/syscon/atmel-mc.h b/include/linux/mfd/syscon/atmel-mc.h
+> new file mode 100644
+> index 000000000000..cb7d9fe89e44
+> --- /dev/null
+> +++ b/include/linux/mfd/syscon/atmel-mc.h
+> @@ -0,0 +1,144 @@
+> +/*
+> + * Copyright (C) 2005 Ivan Kokshaysky
+> + * Copyright (C) SAN People
+> + *
+> + * Memory Controllers (MC, EBI, SMC, SDRAMC, BFC) - System peripherals
+> + * registers.
+> + * Based on AT91RM9200 datasheet revision E.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#ifndef _LINUX_MFD_SYSCON_ATMEL_MC_H_
+> +#define _LINUX_MFD_SYSCON_ATMEL_MC_H_
+> +
+> +/* Memory Controller */
+> +#define AT91_MC_RCR			0x00
+> +#define AT91_MC_RCB			BIT(0)
+> +
+> +#define AT91_MC_ASR			0x04
+> +#define AT91_MC_UNADD			BIT(0)
+> +#define AT91_MC_MISADD			BIT(1)
+> +#define AT91_MC_ABTSZ			GENMASK(9, 8)
+> +#define AT91_MC_ABTSZ_BYTE		(0 << 8)
+> +#define AT91_MC_ABTSZ_HALFWORD		(1 << 8)
+> +#define AT91_MC_ABTSZ_WORD		(2 << 8)
+> +#define AT91_MC_ABTTYP			GENMASK(11, 10)
+> +#define AT91_MC_ABTTYP_DATAREAD		(0 << 10)
+> +#define AT91_MC_ABTTYP_DATAWRITE	(1 << 10)
+> +#define AT91_MC_ABTTYP_FETCH		(2 << 10)
+> +#define AT91_MC_MST(n)			BIT(16 + (n))
+> +#define AT91_MC_SVMST(n)		BIT(24 + (n))
+> +
+> +#define AT91_MC_AASR			0x08
+> +
+> +#define AT91_MC_MPR			0x0c
+> +#define AT91_MPR_MSTP(n)		GENMASK(2 + ((x) * 4), ((x) * 4))
+> +
+> +/* External Bus Interface (EBI) registers */
+> +#define AT91_MC_EBI_CSA			0x60
+> +#define AT91_MC_EBI_CS(n)		BIT(x)
+> +#define AT91_MC_EBI_NUM_CS		8
+> +
+> +#define AT91_MC_EBI_CFGR		0x64
+> +#define AT91_MC_EBI_DBPUC		BIT(0)
+> +
+> +/* Static Memory Controller (SMC) registers */
+> +#define	AT91_MC_SMC_CSR(n)		(0x70 + ((n) * 4))
+> +#define AT91_MC_SMC_NWS			GENMASK(6, 0)
+> +#define AT91_MC_SMC_NWS_(x)		((x) << 0)
+> +#define AT91_MC_SMC_WSEN		BIT(7)
+> +#define AT91_MC_SMC_TDF			GENMASK(11, 8)
+> +#define AT91_MC_SMC_TDF_(x)		((x) << 8)
+> +#define AT91_MC_SMC_TDF_MAX		0xf
+> +#define AT91_MC_SMC_BAT			BIT(12)
+> +#define AT91_MC_SMC_DBW			GENMASK(14, 13)
+> +#define AT91_MC_SMC_DBW_16		(1 << 13)
+> +#define AT91_MC_SMC_DBW_8		(2 << 13)
+> +#define AT91_MC_SMC_DPR			BIT(15)
+> +#define AT91_MC_SMC_ACSS		GENMASK(17, 16)
+> +#define AT91_MC_SMC_ACSS_(x)		((x) << 16)
+> +#define AT91_MC_SMC_ACSS_MAX		3
+> +#define AT91_MC_SMC_RWSETUP		GENMASK(26, 24)
+> +#define AT91_MC_SMC_RWSETUP_(x)		((x) << 24)
+> +#define AT91_MC_SMC_RWHOLD		GENMASK(30, 28)
+> +#define AT91_MC_SMC_RWHOLD_(x)		((x) << 28)
+> +#define AT91_MC_SMC_RWHOLDSETUP_MAX	7
+> +
+> +/* SDRAM Controller registers */
+> +#define AT91_MC_SDRAMC_MR		0x90
+> +#define AT91_MC_SDRAMC_MODE		GENMASK(3, 0)
+> +#define AT91_MC_SDRAMC_MODE_NORMAL	(0 << 0)
+> +#define AT91_MC_SDRAMC_MODE_NOP		(1 << 0)
+> +#define AT91_MC_SDRAMC_MODE_PRECHARGE	(2 << 0)
+> +#define AT91_MC_SDRAMC_MODE_LMR		(3 << 0)
+> +#define AT91_MC_SDRAMC_MODE_REFRESH	(4 << 0)
+> +#define AT91_MC_SDRAMC_DBW_16		BIT(4)
+> +
+> +#define AT91_MC_SDRAMC_TR		0x94
+> +#define AT91_MC_SDRAMC_COUNT		GENMASK(11, 0)
+> +
+> +#define AT91_MC_SDRAMC_CR		0x98
+> +#define AT91_MC_SDRAMC_NC		GENMASK(1, 0)
+> +#define AT91_MC_SDRAMC_NC_8		(0 << 0)
+> +#define AT91_MC_SDRAMC_NC_9		(1 << 0)
+> +#define AT91_MC_SDRAMC_NC_10		(2 << 0)
+> +#define AT91_MC_SDRAMC_NC_11		(3 << 0)
+> +#define AT91_MC_SDRAMC_NR		GENMASK(3, 2)
+> +#define AT91_MC_SDRAMC_NR_11		(0 << 2)
+> +#define AT91_MC_SDRAMC_NR_12		(1 << 2)
+> +#define AT91_MC_SDRAMC_NR_13		(2 << 2)
+> +#define	AT91_MC_SDRAMC_NB		BIT(4)
+> +#define AT91_MC_SDRAMC_NB_2		(0 << 4)
+> +#define AT91_MC_SDRAMC_NB_4		(1 << 4)
+> +#define AT91_MC_SDRAMC_CAS		GENMASK(6, 5)
+> +#define AT91_MC_SDRAMC_CAS_2		(2 << 5)
+> +#define AT91_MC_SDRAMC_TWR		GENMASK(10,  7)
+> +#define AT91_MC_SDRAMC_TRC		GENMASK(14, 11)
+> +#define AT91_MC_SDRAMC_TRP		GENMASK(18, 15)
+> +#define AT91_MC_SDRAMC_TRCD		GENMASK(22, 19)
+> +#define AT91_MC_SDRAMC_TRAS		GENMASK(26, 23)
+> +#define AT91_MC_SDRAMC_TXSR		GENMASK(30, 27)
+> +
+> +#define AT91_MC_SDRAMC_SRR		0x9c
+> +#define AT91_MC_SDRAMC_SRCB		BIT(0)
+> +
+> +#define AT91_MC_SDRAMC_LPR		0xa0
+> +#define AT91_MC_SDRAMC_LPCB		BIT(0)
+> +
+> +#define AT91_MC_SDRAMC_IER		0xa4
+> +#define AT91_MC_SDRAMC_IDR		0xa8
+> +#define AT91_MC_SDRAMC_IMR		0xac
+> +#define AT91_MC_SDRAMC_ISR		0xb0
+> +#define AT91_MC_SDRAMC_RES		BIT(0)
+> +
+> +/* Burst Flash Controller register */
+> +#define AT91_MC_BFC_MR			0xc0
+> +#define AT91_MC_BFC_BFCOM		GENMASK(1, 0)
+> +#define AT91_MC_BFC_BFCOM_DISABLED	(0 << 0)
+> +#define AT91_MC_BFC_BFCOM_ASYNC		(1 << 0)
+> +#define AT91_MC_BFC_BFCOM_BURST		(2 << 0)
+> +#define AT91_MC_BFC_BFCC		GENMASK(3, 2)
+> +#define AT91_MC_BFC_BFCC_MCK		(1 << 2)
+> +#define AT91_MC_BFC_BFCC_DIV2		(2 << 2)
+> +#define AT91_MC_BFC_BFCC_DIV4		(3 << 2)
+> +#define AT91_MC_BFC_AVL			GENMASK(7,  4)
+> +#define AT91_MC_BFC_PAGES		GENMASK(10, 8)
+> +#define AT91_MC_BFC_PAGES_NO_PAGE	(0 << 8)
+> +#define AT91_MC_BFC_PAGES_16		(1 << 8)
+> +#define AT91_MC_BFC_PAGES_32		(2 << 8)
+> +#define AT91_MC_BFC_PAGES_64		(3 << 8)
+> +#define AT91_MC_BFC_PAGES_128		(4 << 8)
+> +#define AT91_MC_BFC_PAGES_256		(5 << 8)
+> +#define AT91_MC_BFC_PAGES_512		(6 << 8)
+> +#define AT91_MC_BFC_PAGES_1024		(7 << 8)
+> +#define AT91_MC_BFC_OEL			GENMASK(13, 12)
+> +#define AT91_MC_BFC_BAAEN		BIT(16)
+> +#define AT91_MC_BFC_BFOEH		BIT(17)
+> +#define AT91_MC_BFC_MUXEN		BIT(18)
+> +#define AT91_MC_BFC_RDYEN		BIT(19)
+> +
+> +#endif /* _LINUX_MFD_SYSCON_ATMEL_MC_H_ */
+> 
+
+I'm not a big fan of the use of BIT/GENMASK macros in mix with the <<
+operator, but I guess it can be done anyway, so I'm okay:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Bye,
+-- 
+Nicolas Ferre
