@@ -1,110 +1,86 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 23 Mar 2015 12:16:39 +0200
-Subject: [PATCH 1/3] ARM: dts: OMAP5+: separate the cpu thermal zone
- definition from omap4
-In-Reply-To: <20150320215402.GB7346@developer.amazonguestwifi.org>
-References: <1426880861-9266-1-git-send-email-nm@ti.com>
- <1426880861-9266-2-git-send-email-nm@ti.com>
- <20150320215402.GB7346@developer.amazonguestwifi.org>
-Message-ID: <550FE807.6020107@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Mar 2015 10:17:58 +0000
+Subject: [PATCH V2] arm64: percpu: Make this_cpu accessors pre-empt safe
+In-Reply-To: <1427035911-10585-1-git-send-email-steve.capper@linaro.org>
+References: <20150320180228.GI1474@arm.com>
+ <1427035911-10585-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20150323101758.GB11189@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20/2015 11:54 PM, Eduardo Valentin wrote:
-> On Fri, Mar 20, 2015 at 02:47:39PM -0500, Nishanth Menon wrote:
->> From: Tero Kristo <t-kristo@ti.com>
->>
->> OMAP4 has a finer counter granularity, which allows for a delay of 1000ms
->> in the thermal zone polling intervals. OMAP5/DRA7 have different counter
->> mechanism, which allows at maximum a 500ms timer. Adjust the cpu thermal
->> zone accordingly for OMAP5/DRA7.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->
->
->> ---
->>   arch/arm/boot/dts/omap5-cpu-thermal.dtsi |   41 ++++++++++++++++++++++++++++++
->>   arch/arm/boot/dts/omap5.dtsi             |    2 +-
->>   2 files changed, 42 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/boot/dts/omap5-cpu-thermal.dtsi
->>
->> diff --git a/arch/arm/boot/dts/omap5-cpu-thermal.dtsi b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
->> new file mode 100644
->> index 000000000000..4a6427c1e47e
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap5-cpu-thermal.dtsi
->> @@ -0,0 +1,41 @@
->> +/*
->> + * Device Tree Source for OMAP4/5 SoC CPU thermal
->> + *
->> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
->> + * Contact: Tero Kristo <t-kristo@ti.com>
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +#include <dt-bindings/thermal/thermal.h>
->> +
->> +cpu_thermal: cpu_thermal {
->> +	polling-delay-passive = <250>; /* milliseconds */
->> +	polling-delay = <500>; /* milliseconds */
->> +
->> +			/* sensor       ID */
->> +	thermal-sensors = <&bandgap     0>;
->> +
->> +	cpu_trips: trips {
->> +		cpu_alert0: cpu_alert {
->> +			temperature = <100000>; /* millicelsius */
->> +			hysteresis = <2000>; /* millicelsius */
->> +			type = "passive";
->> +		};
->> +		cpu_crit: cpu_crit {
->> +			temperature = <125000>; /* millicelsius */
->> +			hysteresis = <2000>; /* millicelsius */
->> +			type = "critical";
->> +		};
->> +	};
->> +
->> +	cpu_cooling_maps: cooling-maps {
->> +		map0 {
->> +			trip = <&cpu_alert0>;
->> +			cooling-device =
->> +				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->> +		};
->> +	};
->> +};
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index ddff674bd05e..e650d4eb59dd 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -67,7 +67,7 @@
->>   	};
->>
->>   	thermal-zones {
->> -		#include "omap4-cpu-thermal.dtsi"
->> +		#include "omap5-cpu-thermal.dtsi"
->
-> Can't we simple change the polling value for the omap5 case and reuse
-> the omap4 file?
+On Sun, Mar 22, 2015 at 02:51:51PM +0000, Steve Capper wrote:
+> this_cpu operations were implemented for arm64 in:
+>  5284e1b arm64: xchg: Implement cmpxchg_double
+>  f97fc81 arm64: percpu: Implement this_cpu operations
+> 
+> Unfortunately, it is possible for pre-emption to take place between
+> address generation and data access. This can lead to cases where data
+> is being manipulated by this_cpu for a different CPU than it was
+> called on. Which effectively breaks the spec.
+> 
+> This patch disables pre-emption for the this_cpu operations
+> guaranteeing that address generation and data manipulation take place
+> without a pre-emption in-between.
+> 
+> Fixes: 5284e1b4bc8a ("arm64: xchg: Implement cmpxchg_double")
+> Fixes: f97fc810798c ("arm64: percpu: Implement this_cpu operations")
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+> Changed in V2, moved over to preempt_enable() completely.
+> Corrected the "Fixes" tag.
+> 
+> Mark, I've dropped your Reviewed-by as I've changed some logic, please
+> let me know if I should re-add it.
+> 
+> Cheers,
+> -- 
+> Steve
+> ---
+>  arch/arm64/include/asm/cmpxchg.h | 32 +++++++++++++++++++++--------
+>  arch/arm64/include/asm/percpu.h  | 44 ++++++++++++++++++++++++++++++----------
+>  2 files changed, 57 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+> index cb95930..d8c25b7 100644
+> --- a/arch/arm64/include/asm/cmpxchg.h
+> +++ b/arch/arm64/include/asm/cmpxchg.h
+> @@ -246,14 +246,30 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+>  	__ret; \
+>  })
+>  
+> -#define this_cpu_cmpxchg_1(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+> -#define this_cpu_cmpxchg_2(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+> -#define this_cpu_cmpxchg_4(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+> -#define this_cpu_cmpxchg_8(ptr, o, n) cmpxchg_local(raw_cpu_ptr(&(ptr)), o, n)
+> -
+> -#define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2) \
+> -	cmpxchg_double_local(raw_cpu_ptr(&(ptr1)), raw_cpu_ptr(&(ptr2)), \
+> -				o1, o2, n1, n2)
+> +#define _protect_cmpxchg_local(pcp, o, n)			\
+> +({								\
+> +	typeof(*raw_cpu_ptr(&(pcp))) __ret;			\
+> +	preempt_disable();					\
+> +	__ret = cmpxchg_local(raw_cpu_ptr(&(pcp)), o, n);	\
+> +	preempt_enable();					\
+> +	__ret;							\
+> +})
+> +
+> +#define this_cpu_cmpxchg_1(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+> +#define this_cpu_cmpxchg_2(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+> +#define this_cpu_cmpxchg_4(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+> +#define this_cpu_cmpxchg_8(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+> +
+> +#define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2)		\
+> +({									\
+> +	int __ret;							\
+> +	preempt_disable();						\
+> +	__ret = cmpxchg_double_local(	raw_cpu_ptr(&(ptr1)),		\
 
-Hmm yea, I posted a patch like this before for o5 and it was queued 
-already. See:
+Weird whitespace here, but the patch looks fine to me:
 
-http://thread.gmane.org/gmane.linux.ports.arm.omap/123729
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-The dra7 part was missing from this set though, so patches 2/3 do not 
-directly work with that one and will require some changes similar to the 
-linked omap4 one.
+Thanks, Steve.
 
--Tero
-
->
->>   		#include "omap5-gpu-thermal.dtsi"
->>   		#include "omap5-core-thermal.dtsi"
->>   	};
->> --
->> 1.7.9.5
->>
+Will
