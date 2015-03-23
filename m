@@ -1,31 +1,36 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 23 Mar 2015 09:30:30 -0700
-Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-In-Reply-To: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-References: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-Message-ID: <CAD=FV=UMy9+o6h8jM8czevttJxaN_TGqDdZyj2=+1z=eZ9C7gg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 23 Mar 2015 17:38:57 +0100
+Subject: [PATCH 03/10] ata: at91: use syscon to configure the smc
+In-Reply-To: <550FE6D7.6000107@atmel.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426545886-19162-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <550FE6D7.6000107@atmel.com>
+Message-ID: <20150323163857.GA20732@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On 23/03/2015 at 11:11:35 +0100, Nicolas Ferre wrote :
+> Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
+> > Use syscon/regmap to configure the smc. This allows to avoid using
+> > at91sam9_smc.h and to compile the driver in a multiplatform configuration.
+> > 
+> > The driver will still not probe until the proper DT bindings are added.
+> 
+> Alexandre, just for the record, can you describe the DT node that will
+> match this?
+> Is it one that will be added to
+> Documentation/devicetree/bindings/mfd/atmel-smc.txt?
+> 
 
-On Mon, Mar 23, 2015 at 12:27 AM, Tomasz Figa <tfiga@chromium.org> wrote:
-> IOMMU should be able to use single pages as well as bigger blocks, so if
-> higher order allocations fail, we should not affect state of the system,
-> with events such as OOM killer, but rather fall back to order 0
-> allocations.
->
-> This patch changes the behavior of ARM IOMMU DMA allocator to use
-> __GFP_NORETRY, which bypasses OOM invocation, for orders higher than
-> zero and, only if that fails, fall back to normal order 0 allocation
-> which might invoke OOM killer.
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
->  arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
+I believe it should be documented when the full binding will be defined.
+This binding will include a mandatory property:
+ atmel,smc: phandle to the smc
 
-FWIW:
+and will look like:
+ atmel,smc = <&smc>;
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
