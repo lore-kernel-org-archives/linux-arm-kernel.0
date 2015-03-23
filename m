@@ -1,73 +1,101 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 23 Mar 2015 15:58:40 +0000
-Subject: [PATCH v2 3/3] arm64: drop sleep_idmap_phys
-In-Reply-To: <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150323155840.GC18904@red-moon>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 23 Mar 2015 15:58:24 +0000
+Subject: [PATCH v2 07/12] KVM: arm/arm64: simplify vgic_find_range() and
+ callers
+In-Reply-To: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1427126309-11223-8-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 09:07:26AM +0000, Ard Biesheuvel wrote:
-> The global variable sleep_idmap_phys always points to idmap_pg_dir,
-> so we can just use that value directly in the CPU resume path.
-> 
-> Also unclutters the load of sleep_save_sp::save_ptr_stash_phys.
-> 
+The vgic_find_range() function in vgic.c takes a struct kvm_exit_mmio
+argument, but actually only used the length field in there. Since we
+need to get rid of that structure in that part of the code anyway,
+let's rework the function (and it's callers) to pass the length
+argument to the function directly.
 
-Nit: I understand why you want to do more than one change at once,
-I think you should reword the subject though for completeness.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic-v2-emul.c |    2 +-
+ virt/kvm/arm/vgic.c         |   22 ++++++++--------------
+ virt/kvm/arm/vgic.h         |    3 +--
+ 3 files changed, 10 insertions(+), 17 deletions(-)
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/sleep.S   | 7 ++-----
->  arch/arm64/kernel/suspend.c | 3 ---
->  2 files changed, 2 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-> index 04dc9aa2831e..3c98fe1c1c2f 100644
-> --- a/arch/arm64/kernel/sleep.S
-> +++ b/arch/arm64/kernel/sleep.S
-> @@ -164,15 +164,12 @@ ENTRY(cpu_resume)
->  #else
->  	mov	x7, xzr
->  #endif
-> -	adrp	x0, sleep_save_sp
-> -	add	x0, x0, #:lo12:sleep_save_sp
-> -	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-> +	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
->  	ldr	x0, [x0, x7, lsl #3]
->  	/* load sp from context */
->  	ldr	x2, [x0, #CPU_CTX_SP]
-> -	adrp	x1, sleep_idmap_phys
->  	/* load physical address of identity map page table in x1 */
-> -	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
-> +	adrp	x1, idmap_pg_dir
->  	mov	sp, x2
->  	/*
->  	 * cpu_do_resume expects x0 to contain context physical address
-> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-> index d7daf45ae7a2..f6073c27d65f 100644
-> --- a/arch/arm64/kernel/suspend.c
-> +++ b/arch/arm64/kernel/suspend.c
-> @@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
->  }
->  
->  struct sleep_save_sp sleep_save_sp;
-> -phys_addr_t sleep_idmap_phys;
->  
->  static int __init cpu_suspend_init(void)
->  {
-> @@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
->  
->  	sleep_save_sp.save_ptr_stash = ctx_ptr;
->  	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
-> -	sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
->  	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
-> -	__flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
->  
->  	return 0;
->  }
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+index ddb3135..1dd183e 100644
+--- a/virt/kvm/arm/vgic-v2-emul.c
++++ b/virt/kvm/arm/vgic-v2-emul.c
+@@ -715,7 +715,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 	default:
+ 		BUG();
+ 	}
+-	r = vgic_find_range(ranges, &mmio, offset);
++	r = vgic_find_range(ranges, 4, offset);
+ 
+ 	if (unlikely(!r || !r->handle_mmio)) {
+ 		ret = -ENXIO;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 21a3550..8802ad7 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -713,16 +713,13 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ 
+ const
+ struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
+-				      struct kvm_exit_mmio *mmio,
+-				      phys_addr_t offset)
++				      int len, gpa_t offset)
+ {
+-	const struct vgic_io_range *r = ranges;
+-
+-	while (r->len) {
+-		if (offset >= r->base &&
+-		    (offset + mmio->len) <= (r->base + r->len))
+-			return r;
+-		r++;
++	while (ranges->len) {
++		if (offset >= ranges->base &&
++		    (offset + len) <= (ranges->base + ranges->len))
++			return ranges;
++		ranges++;
+ 	}
+ 
+ 	return NULL;
+@@ -813,7 +810,7 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	unsigned long offset;
+ 
+ 	offset = mmio->phys_addr - mmio_base;
+-	range = vgic_find_range(ranges, mmio, offset);
++	range = vgic_find_range(ranges, mmio->len, offset);
+ 	if (unlikely(!range || !range->handle_mmio)) {
+ 		pr_warn("Unhandled access %d %08llx %d\n",
+ 			mmio->is_write, mmio->phys_addr, mmio->len);
+@@ -1986,10 +1983,7 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 
+ int vgic_has_attr_regs(const struct vgic_io_range *ranges, phys_addr_t offset)
+ {
+-	struct kvm_exit_mmio dev_attr_mmio;
+-
+-	dev_attr_mmio.len = 4;
+-	if (vgic_find_range(ranges, &dev_attr_mmio, offset))
++	if (vgic_find_range(ranges, 4, offset))
+ 		return 0;
+ 	else
+ 		return -ENXIO;
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index 6fccb96..01aa622 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -90,8 +90,7 @@ static inline bool is_in_range(phys_addr_t addr, unsigned long len,
+ 
+ const
+ struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
+-				      struct kvm_exit_mmio *mmio,
+-				      phys_addr_t offset);
++				      int len, gpa_t offset);
+ 
+ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			    struct kvm_exit_mmio *mmio,
+-- 
+1.7.9.5
