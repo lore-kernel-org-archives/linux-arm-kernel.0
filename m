@@ -1,54 +1,66 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 23 Mar 2015 15:42:01 +0100
-Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <20150321203546.GE22354@red-moon>
-References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
- <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
- <20150321203546.GE22354@red-moon>
-Message-ID: <55102639.4000305@linaro.org>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 23 Mar 2015 15:46:12 +0100
+Subject: [PATCH resend] ASoC: fsl-ssi: Fix bitclock calculation for master mode
+Message-ID: <1427121972-5059-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2015 09:35 PM, Lorenzo Pieralisi wrote:
-> On Fri, Mar 20, 2015 at 11:44:00AM +0000, Daniel Lezcano wrote:
->> Some architectures have some cpus which does not support idle states.
->>
->> Let the underlying low level code to return -ENXIO when it is not
->> possible to set an idle state.
->
-> Well, this is getting interesting. We are parsing possible CPUs to
-> detect if they have common idle states in DT. If a CPU does not support
-> idle states, the cpu node for that CPU should not define any idle
-> state.
->
-> The approach above will work with my heterogenous system patch, since
-> the respective CPUidle driver mask will be created by parsing the DT
-> idle states.
->
-> http://www.spinics.net/lists/arm-kernel/msg403190.html
->
-> In current approach if a "possible " CPU does not have idle states, we do
-> not init CPUidle at all.
->
-> So, to cut a long story short, what does "a cpu does not support idle
-> states" mean ?
->
-> Does it mean that firmware defines idle states for that CPU in DT but
-> initializing them fail ?
->
-> I am fine with this patch, but we need to define -ENXIO return properly.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Ok, I think that needs more discussion.
+in fsl_ssi_set_bclk we are looking for the best divider by iterating
+over all possible dividers. The divider is in the range 1..256, so
+make this clear by using 'div' as name for the loop counter and iterate
+from 1 to 256 instead of 0 to 255. This makes obvious that tmprate is
+calculated wrong, it has to be freq * factor * div, not
+freq * factor * (i + 2).
 
-I will drop this patch from my patchset as we agreed on the other 
-patches and resubmit.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ sound/soc/fsl/fsl_ssi.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-   -- Daniel
-
-
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index b9fabbf69db6..b8af08e49085 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -578,7 +578,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+ 	struct regmap *regs = ssi_private->regs;
+ 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
+-	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
++	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, div;
+ 	unsigned long clkrate, baudrate, tmprate;
+ 	u64 sub, savesub = 100000;
+ 	unsigned int freq;
+@@ -602,8 +602,8 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 
+ 	factor = (div2 + 1) * (7 * psr + 1) * 2;
+ 
+-	for (i = 0; i < 255; i++) {
+-		tmprate = freq * factor * (i + 2);
++	for (div = 1; div < 256; div++) {
++		tmprate = freq * factor * div;
+ 
+ 		if (baudclk_is_used)
+ 			clkrate = clk_get_rate(ssi_private->baudclk);
+@@ -618,7 +618,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 			continue;
+ 
+ 		clkrate /= factor;
+-		afreq = clkrate / (i + 1);
++		afreq = clkrate / div;
+ 
+ 		if (freq == afreq)
+ 			sub = 0;
+@@ -636,7 +636,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
+ 		if (sub < savesub) {
+ 			baudrate = tmprate;
+ 			savesub = sub;
+-			pm = i;
++			pm = div - 1;
+ 		}
+ 
+ 		/* We are lucky */
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.1.4
