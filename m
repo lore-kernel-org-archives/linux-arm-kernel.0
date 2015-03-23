@@ -1,36 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 23 Mar 2015 17:38:57 +0100
-Subject: [PATCH 03/10] ata: at91: use syscon to configure the smc
-In-Reply-To: <550FE6D7.6000107@atmel.com>
-References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1426545886-19162-4-git-send-email-alexandre.belloni@free-electrons.com>
- <550FE6D7.6000107@atmel.com>
-Message-ID: <20150323163857.GA20732@piout.net>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 23 Mar 2015 17:43:40 +0100
+Subject: [PATCH] cpufreq: exynos: allow build for !THERMAL or !CPU_THERMAL
+ cases
+In-Reply-To: <CAKohpomXnpdLtMpnWeFWdGDCE4t8iEz5aDxA=PhTcR-UKjQM6A@mail.gmail.com>
+References: <2275232.48muFcOOQv@amdc1032>
+ <CAKohpomXnpdLtMpnWeFWdGDCE4t8iEz5aDxA=PhTcR-UKjQM6A@mail.gmail.com>
+Message-ID: <75115513.B5dLcdQ7nU@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2015 at 11:11:35 +0100, Nicolas Ferre wrote :
-> Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
-> > Use syscon/regmap to configure the smc. This allows to avoid using
-> > at91sam9_smc.h and to compile the driver in a multiplatform configuration.
-> > 
-> > The driver will still not probe until the proper DT bindings are added.
+
+Hi,
+
+On Monday, February 23, 2015 10:07:50 AM Viresh Kumar wrote:
+> On 20 February 2015 at 21:50, Bartlomiej Zolnierkiewicz
+> <b.zolnierkie@samsung.com> wrote:
+> > Allow driver build for !THERMAL or !CPU_THERMAL cases.
+> >
+> > The new dependency rule is the same as the one that CPUFREQ_DT
+> > option has (for cpufreq-dt driver which has the same issue with
+> > using of_cpufreq_cooling_register()).
+> >
+> > Cc: Kukjin Kim <kgene@kernel.org>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Eduardo Valentin <edubezval@gmail.com>
+> > Cc: Lukasz Majewski <l.majewski@samsung.com>
+> > Fixes: 8b2b4a4e5366 ("cpufreq: exynos: allow modular build")
+> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > index 1b06fc4..f4df4af3 100644
+> > --- a/drivers/cpufreq/Kconfig.arm
+> > +++ b/drivers/cpufreq/Kconfig.arm
+> > @@ -28,7 +28,8 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+> >  config ARM_EXYNOS_CPUFREQ
+> >         tristate "SAMSUNG EXYNOS CPUfreq Driver"
+> >         depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
+> > -       depends on THERMAL
+> > +       # if CPU_THERMAL is on and THERMAL=m, ARM_EXYNOS_CPUFREQ cannot be =y:
+> > +       depends on !CPU_THERMAL || THERMAL
+> >         help
+> >           This adds the CPUFreq driver for Samsung EXYNOS platforms.
+> >           Supported SoC versions are:
 > 
-> Alexandre, just for the record, can you describe the DT node that will
-> match this?
-> Is it one that will be added to
-> Documentation/devicetree/bindings/mfd/atmel-smc.txt?
-> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I believe it should be documented when the full binding will be defined.
-This binding will include a mandatory property:
- atmel,smc: phandle to the smc
+Thank you for the ACK.
 
-and will look like:
- atmel,smc = <&smc>;
+Would you pick this patch up or should I resend it to Rafael?
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
