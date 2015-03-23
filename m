@@ -1,34 +1,58 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 23 Mar 2015 12:25:18 +0100
-Subject: [PATCHv2] thermal: add omap3 support
-In-Reply-To: <20150314180240.GB4332@amd>
-References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
- <20150313120935.GA27533@amd> <20150313165343.GB30104@developer>
- <20150314180240.GB4332@amd>
-Message-ID: <20150323112518.GA7871@amd>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Mar 2015 12:27:47 +0100
+Subject: [PATCH 06/13] ARM: at91: PIT: make IO endian agnostic
+In-Reply-To: <1426693992-31163-7-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-7-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <550FF8B3.2080708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2015-03-14 19:02:40, Pavel Machek wrote:
-> On Fri 2015-03-13 12:53:45, Eduardo Valentin wrote:
-> > 
-> > Hey Pavel,
-> > 
-> > On Fri, Mar 13, 2015 at 01:09:35PM +0100, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > I checked 4.0-rc3 and linux-next as of today, and can not see omap3
-> > > thermal support. Can you apply the patches?
-> > 
-> > Yeah, it should be possible. Apologize, it really fell into the cracks.
-> > 
-> > There is a comment on it though. Please check my concern in you v2.
+Le 18/03/2015 16:53, Ben Dooks a ?crit :
+> Fix the use of __raw IO accessor with the readl/writel_relaxed versions
+> to allow the code to be used on a system running in big endian.
 > 
-> And there's explanation for that concern :-). Let me know what you
-> need.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: Linux Kernel <linux-kernel@vger.kernel.org>
+> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+> CC: Andrew Victor <linux@maxim.org.za>
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-...ping? It would be good to get this into 4.1.
-									Pavel
+Yes:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Daniel, do you want to take it?
+
+
+> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>  drivers/clocksource/timer-atmel-pit.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+> index b5b4d45..c0304ff 100644
+> --- a/drivers/clocksource/timer-atmel-pit.c
+> +++ b/drivers/clocksource/timer-atmel-pit.c
+> @@ -61,12 +61,12 @@ static inline struct pit_data *clkevt_to_pit_data(struct clock_event_device *clk
+>  
+>  static inline unsigned int pit_read(void __iomem *base, unsigned int reg_offset)
+>  {
+> -	return __raw_readl(base + reg_offset);
+> +	return readl_relaxed(base + reg_offset);
+>  }
+>  
+>  static inline void pit_write(void __iomem *base, unsigned int reg_offset, unsigned long value)
+>  {
+> -	__raw_writel(value, base + reg_offset);
+> +	writel_relaxed(value, base + reg_offset);
+>  }
+>  
+>  /*
+> 
+
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Nicolas Ferre
