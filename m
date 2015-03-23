@@ -1,67 +1,71 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 23 Mar 2015 16:35:00 +0900
-Subject: [PATCH v6 0/8] Add support for Tegra Activity Monitor
-In-Reply-To: <CAAObsKDWuGatDaX2a8AqXDMayd0uJAUCLLdRYUmef1Oh=kvd3g@mail.gmail.com>
-References: <78905871.274971426655422042.JavaMail.weblogic@epmlwas07d>
- <CAAObsKDWuGatDaX2a8AqXDMayd0uJAUCLLdRYUmef1Oh=kvd3g@mail.gmail.com>
-Message-ID: <CAAVeFuLf=FEci=NtCLi2p3kOkpWDNfCdAA8Wm9C5Z2cTGBiRzQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 23 Mar 2015 08:39:05 +0100
+Subject: [PATCH v5 3/3] I2C: mediatek: Add driver for MediaTek MT8173 I2C
+ controller
+In-Reply-To: <1426917922-61356-4-git-send-email-eddie.huang@mediatek.com>
+References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
+ <1426917922-61356-4-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150323073905.GF9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 3:27 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> On 18 March 2015 at 06:10, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
->>> Hello,
->>>
->>> something happened during the last cycle and an old version of the devfreq
->>> driver was merged.
->>>
->>> This thread contains patches that bring it up to date to the last submitted
->>> version and also incorporates the feedback that that version received, plus
->>> some other small fixes and improvements that came up during rebase and
->>> testing.
->>>
->>> These patches implement support for setting the rate of the EMC clock based on
->>> stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
->>> memory accesses (among others).
->>>
->>> It depends on the following in-flight patches:
->>>
->>> * EMC driver: http://thread.gmane.org/gmane.linux.kernel/1907035
->>> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1897078
->>>
->>> I have pushed a branch here for testing:
->>>
->>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v6
->>>
->>> Regards,
->>>
->>> Tomeu
->>>
->>> Tomeu Vizoso (8):
->>>   of: Add binding for NVIDIA Tegra ACTMON node
->>>   PM / devfreq: tegra: Update to v5 of the submitted patches
->>>   clk: tegra: Have EMC clock implement determine_rate()
->>>   PM / devfreq: tegra: Use clock rate constraints
->>>   PM / devfreq: tegra: remove operating-points
->>>   PM / devfreq: tegra: Set drvdata before enabling the irq
->>>   PM / devfreq: tegra: Enable interrupts after resuming the devfreq
->>>     monitor
->>>   ARM: tegra: Add Tegra124 ACTMON support
->>
->> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> for all PM / devfreq patches (2, 4, 5, 6, 7)
->> And merged in for-rc tree with a little modification.
->
-> Thanks. Though that's fine with me, I was wondering if Mikko or
-> Alexandre would have any comments on the changes, even if they are
-> small regarding what they already reviewed.
+On Sat, Mar 21, 2015 at 02:05:22PM +0800, Eddie Huang wrote:
+> Add mediatek MT8173 I2C controller driver. Compare to I2C controller
+> of earlier mediatek SoC, MT8173 fix write-then-read limitation, and
+> also increase message size to 64kb.
+> 
 
-After a quick look I think I'm good with it. I will try to look in
-further detail. If there is anything wrong, we can fix it with fixup
-patches, since what has been merged is good stuff already!
+[...]
 
-I guess it would now be interesting to look at the watermark support
-for devfreq. I am not sure if anything is happening to it? Arto?
+> +static const struct i2c_adapter_quirks mt8173_i2c_quirks = {
+> +	.max_num_msgs = MAX_MSG_NUM_MT8173,
+> +	.max_write_len = MAX_DMA_TRANS_SIZE_MT8173,
+> +	.max_read_len = MAX_DMA_TRANS_SIZE_MT8173,
+> +	.max_comb_1st_msg_len = MAX_DMA_TRANS_SIZE_MT8173,
+> +	.max_comb_2nd_msg_len = MAX_WRRD_TRANS_SIZE_MT8173,
+> +};
+> +
+>  static int mtk_i2c_probe(struct platform_device *pdev)
+>  {
+>  	int ret = 0;
+> @@ -587,7 +626,8 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  
+>  	i2c->platform_compat = mtk_get_device_prop(pdev);
+> -	if (i2c->have_pmic && (i2c->platform_compat & COMPAT_MT6577))
+> +	if (i2c->have_pmic && (i2c->platform_compat &
+> +			(COMPAT_MT6577 | COMPAT_MT8173)))
+>  		return -EINVAL;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -613,7 +653,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+>  	i2c->adap.dev.parent = &pdev->dev;
+>  	i2c->adap.owner = THIS_MODULE;
+>  	i2c->adap.algo = &mtk_i2c_algorithm;
+> -	i2c->adap.quirks = &mt6577_i2c_quirks;
+> +	if (i2c->platform_compat & COMPAT_MT8173)
+> +		i2c->adap.quirks = &mt8173_i2c_quirks;
+> +	else
+> +		i2c->adap.quirks = &mt6577_i2c_quirks;
 
-https://lkml.org/lkml/2014/12/5/262
+Instead of putting an integer into struct of_device_id you should
+introduce a
+
+struct mtk_i2c_data {
+	struct i2c_adapter_quirks quirks;
+	int compat;
+	/* Additional SoC specific data */
+};
+
+and put a pointer to this directly into the of_device_id. This way you
+need less casting and can put newly discovered differences diretly into
+some data struct and don't have to introduce if(socxy) ... else ...
+everytime.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
