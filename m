@@ -1,48 +1,127 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Mar 2015 14:39:37 -0500
-Subject: [PATCH V2 0/2] DRA7/X15: Thermal dts patches
-Message-ID: <1427139579-4215-1-git-send-email-nm@ti.com>
+Date: Mon, 23 Mar 2015 14:39:39 -0500
+Subject: [PATCH V2 2/2] ARM: dts: am57xx-beagle-x15: Add thermal map to
+ include fan and tmp102
+In-Reply-To: <1427139579-4215-1-git-send-email-nm@ti.com>
+References: <1427139579-4215-1-git-send-email-nm@ti.com>
+Message-ID: <1427139579-4215-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-Here are a few pending patches for DRA7 and patch hooking the
-GPIO fan to the thermal framework.
+BeagleBoard-X15 has capability for a fan and has an onboard TMP102
+temperature sensor as well. This allows us to create a new thermal
+zone (called, un-imaginatively "board"), and allows us to use some
+active cooling as temperatures start edge upward in the system by
+creating a new alert temperature (emperically 50C) for cpu.
 
-Tested on BeagleBoard-X15, uEVM with next-20150320. (just load up
-cpufreq_dt and gpio_fan modules with omap2plus_defconfig, run cpuburn
-to generate thermal and just wait for the fan to trigger - and it
-does- we dont hit the frequency throttling temps) (next-20150323 is
-broken for build currently).
+NOTE: Fan is NOT mounted by default on the platform, in such a case,
+all we end up doing is switch on a regulator and leak very minimal
+current.
 
-The patches are based on
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
-branch: omap-for-v4.1/dt-v2 10709c0858d8 ARM: dts: Update Nanobone dts file
-
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 Changes since V1:
-Based on review comments:
-	- patches 1/3 and 2/3 has been squashed up to introduce zone and bandgap
-	  information
-	- Dropped the entire omap5-cpu-thermal.dtsi idea. done the same way as
-	  omap5.
-	- minor updates to fan - so, all patches have been modified.
-	- Not carrying forward ack due to changes
+	- slight change in omap4-cpu-thermal for usage in am57xx-dtsi
+	- Not carrying forward ack due to change
 
-V1: http://marc.info/?l=devicetree&m=142688089417731&w=2
-
-Keerthy (1):
-  ARM: dts: DRA7: Add bandgap and related thermal nodes
-
-Nishanth Menon (1):
-  ARM: dts: am57xx-beagle-x15: Add thermal map to include fan and
-    tmp102
+V1: http://marc.info/?t=142688102700004&r=1&w=2
 
  arch/arm/boot/dts/am57xx-beagle-x15.dts  |   49 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dra7.dtsi              |   23 ++++++++++++++
- arch/arm/boot/dts/dra72x.dtsi            |    5 +++
- arch/arm/boot/dts/dra74x.dtsi            |    5 +++
  arch/arm/boot/dts/omap4-cpu-thermal.dtsi |    4 +--
- 5 files changed, 84 insertions(+), 2 deletions(-)
+ 2 files changed, 51 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 41642fe770a1..6a3621c23017 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -86,6 +86,7 @@
+ 		gpios =  <&tps659038_gpio 1 GPIO_ACTIVE_HIGH>;
+ 		gpio-fan,speed-map = <0     0>,
+ 				     <13000 1>;
++		#cooling-cells = <2>;
+ 	};
+ 
+ 	extcon_usb1: extcon_usb1 {
+@@ -441,6 +442,7 @@
+ 		pinctrl-0 = <&tmp102_pins_default>;
+ 		interrupt-parent = <&gpio7>;
+ 		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;
++		#thermal-sensor-cells = <1>;
+ 	};
+ };
+ 
+@@ -559,3 +561,50 @@
+ &usb2 {
+ 	dr_mode = "peripheral";
+ };
++
++&cpu_trips {
++	cpu_alert1: cpu_alert1 {
++		temperature = <50000>; /* millicelsius */
++		hysteresis = <2000>; /* millicelsius */
++		type = "active";
++	};
++};
++
++&cpu_cooling_maps {
++	map1 {
++		trip = <&cpu_alert1>;
++		cooling-device = <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++	};
++};
++
++&thermal_zones {
++	board_thermal: board_thermal {
++		polling-delay-passive = <1250>; /* milliseconds */
++		polling-delay = <1500>; /* milliseconds */
++
++				/* sensor       ID */
++		thermal-sensors = <&tmp102     0>;
++
++		board_trips: trips {
++			board_alert0: board_alert {
++				temperature = <40000>; /* millicelsius */
++				hysteresis = <2000>; /* millicelsius */
++				type = "active";
++			};
++
++			board_crit: board_crit {
++				temperature = <105000>; /* millicelsius */
++				hysteresis = <0>; /* millicelsius */
++				type = "critical";
++			};
++		};
++
++		board_cooling_maps: cooling-maps {
++			map0 {
++				trip = <&board_alert0>;
++				cooling-device =
++				  <&gpio_fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++			};
++		};
++       };
++};
+diff --git a/arch/arm/boot/dts/omap4-cpu-thermal.dtsi b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+index cb9458feb2e3..ab7f87ae96f0 100644
+--- a/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
++++ b/arch/arm/boot/dts/omap4-cpu-thermal.dtsi
+@@ -18,7 +18,7 @@ cpu_thermal: cpu_thermal {
+ 			/* sensor       ID */
+         thermal-sensors = <&bandgap     0>;
+ 
+-        trips {
++	cpu_trips: trips {
+                 cpu_alert0: cpu_alert {
+                         temperature = <100000>; /* millicelsius */
+                         hysteresis = <2000>; /* millicelsius */
+@@ -31,7 +31,7 @@ cpu_thermal: cpu_thermal {
+                 };
+         };
+ 
+-	cooling-maps {
++	cpu_cooling_maps: cooling-maps {
+ 		map0 {
+ 			trip = <&cpu_alert0>;
+ 			cooling-device =
 -- 
 1.7.9.5
