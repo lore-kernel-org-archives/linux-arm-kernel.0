@@ -1,116 +1,87 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Mon, 23 Mar 2015 17:05:43 +0000
-Subject: [PATCH v5 5/6] target-arm: kvm64 fix save/restore of SPSR regs
-In-Reply-To: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
-References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1427130344-27986-6-git-send-email-alex.bennee@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Mon, 23 Mar 2015 17:11:02 +0000
+Subject: [PATCH v5 1/8] arm64: Get rid of struct cpu_table
+In-Reply-To: <1426690527-14258-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1426690527-14258-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <55104926.1060901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code was negatively indexing the cpu state array and not
-synchronizing banked spsr register state with the current mode's spsr
-state, causing occasional failures with migration.
+On 18/03/15 14:55, Ard Biesheuvel wrote:
+> From: Marc Zyngier <marc.zyngier@arm.com>
+>
+> struct cpu_table is an artifact left from the (very) early days of
+> the arm64 port, and its only real use is to allow the most beautiful
+> "AArch64 Processor" string to be displayed at boot time.
+>
+> Really? Yes, really.
+>
+> Let's get rid of it. In order to avoid another BogoMips-gate, the
+> aforementioned string is preserved.
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Some munging is done to take care of the aarch64 mapping and also to
-ensure the most current value of the spsr is updated to the banked
-registers (relevant for KVM<->TCG migration).
+> ---
+>   arch/arm64/include/asm/cputable.h | 30 ----------------
+>   arch/arm64/kernel/Makefile        |  2 +-
+>   arch/arm64/kernel/asm-offsets.c   |  4 ---
+>   arch/arm64/kernel/cputable.c      | 33 -----------------
+>   arch/arm64/kernel/head.S          | 76 +++------------------------------------
+>   arch/arm64/kernel/setup.c         | 16 ++-------
+>   6 files changed, 8 insertions(+), 153 deletions(-)
+>   delete mode 100644 arch/arm64/include/asm/cputable.h
+>   delete mode 100644 arch/arm64/kernel/cputable.c
+...
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -50,7 +50,6 @@
+>   #include <asm/cpu.h>
+>   #include <asm/cputype.h>
+>   #include <asm/elf.h>
+> -#include <asm/cputable.h>
+>   #include <asm/cpufeature.h>
+>   #include <asm/cpu_ops.h>
+>   #include <asm/sections.h>
+> @@ -83,7 +82,6 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+>
+>   DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
+>
+> -static const char *cpu_name;
+>   phys_addr_t __fdt_pointer __initdata;
+>
+>   /*
+> @@ -209,22 +207,12 @@ static void __init smp_build_mpidr_hash(void)
+>
+>   static void __init setup_processor(void)
+>   {
+> -       struct cpu_info *cpu_info;
+>          u64 features, block;
+>          u32 cwg;
+>          int cls;
+>
+> -       cpu_info = lookup_processor_type(read_cpuid_id());
+> -       if (!cpu_info) {
+> -               printk("CPU configuration botched (ID %08x), unable to continue.\n",
+> -                      read_cpuid_id());
+> -               while (1);
+> -       }
+> -
+> -       cpu_name = cpu_info->cpu_name;
+> -
+> -       printk("CPU: %s [%08x] revision %d\n",
+> -              cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
+> +       printk("CPU: AArch64 Processor [%08x] revision %d\n",
+> +              read_cpuid_id(), read_cpuid_id() & 15);
+>
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+While we are at it, does it make sense to change
 
----
-v2 (ajb)
-  - minor tweaks and clarifications
-v3
-  - Use the correct bank index function for setting/getting env->spsr
-  - only deal with spsrs in elevated exception levels
-v4
- - try and make commentary clearer
- - ensure env->banked_spsr[0] = env->spsr before we sync
-v5
- - fix banking index now banking fixed
- - keep wide spacing on [ ] forms
- - claimed authorship
+  s/CPU/Boot CPU/
 
-diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
-index 857e970..5270fa7 100644
---- a/target-arm/kvm64.c
-+++ b/target-arm/kvm64.c
-@@ -139,6 +139,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-     uint64_t val;
-     int i;
-     int ret;
-+    unsigned int el;
- 
-     ARMCPU *cpu = ARM_CPU(cs);
-     CPUARMState *env = &cpu->env;
-@@ -205,9 +206,24 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-         return ret;
-     }
- 
-+    /* Saved Program State Registers
-+     *
-+     * Before we restore from the banked_spsr[] array we need to
-+     * ensure that any modifications to env->spsr are correctly
-+     * reflected in the banks.
-+     */
-+    el = arm_current_el(env);
-+    if (el > 0) {
-+        i = is_a64(env) ?
-+            aarch64_banked_spsr_index(el) :
-+            bank_number(env->uncached_cpsr & CPSR_M);
-+        env->banked_spsr[i] = env->spsr;
-+    }
-+
-+    /* KVM 0-4 map to QEMU banks 1-5 */
-     for (i = 0; i < KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i + 1];
-         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
-@@ -253,11 +269,13 @@ int kvm_arch_put_registers(CPUState *cs, int level)
-     return ret;
- }
- 
-+
- int kvm_arch_get_registers(CPUState *cs)
- {
-     struct kvm_one_reg reg;
-     uint64_t val;
-     uint32_t fpr;
-+    unsigned int el;
-     int i;
-     int ret;
- 
-@@ -330,15 +348,27 @@ int kvm_arch_get_registers(CPUState *cs)
-         return ret;
-     }
- 
-+    /* Fetch the SPSR registers
-+     *
-+     * KVM SPSRs 0-4 map to QEMU banks 1-5
-+     */
-     for (i = 0; i < KVM_NR_SPSR; i++) {
-         reg.id = AARCH64_CORE_REG(spsr[i]);
--        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
-+        reg.addr = (uintptr_t) &env->banked_spsr[i + 1];
-         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
-         if (ret) {
-             return ret;
-         }
-     }
- 
-+    el = arm_current_el(env);
-+    if (el > 0) {
-+        i = is_a64(env) ?
-+            aarch64_banked_spsr_index(el) :
-+            bank_number(env->uncached_cpsr & CPSR_M);
-+        env->spsr = env->banked_spsr[i];
-+    }
-+
-     /* Advanced SIMD and FP registers
-      * We map Qn = regs[2n+1]:regs[2n]
-      */
--- 
-2.3.2
+to make it clear on a big.Little system ?
+
+Suzuki
