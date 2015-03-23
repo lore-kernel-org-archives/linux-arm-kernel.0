@@ -1,54 +1,69 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 23 Mar 2015 07:23:21 +0000 (UTC)
-Subject: Tegra baseline test results for v4.0-rc5
-Message-ID: <alpine.DEB.2.02.1503230720340.1882@utopia.booyaka.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Mon, 23 Mar 2015 16:27:00 +0900
+Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
+ allocations
+Message-ID: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+IOMMU should be able to use single pages as well as bigger blocks, so if
+higher order allocations fail, we should not affect state of the system,
+with events such as OOM killer, but rather fall back to order 0
+allocations.
 
-Here are some basic Tegra test results for Linux v4.0-rc5.
-Logs and other details at:
+This patch changes the behavior of ARM IOMMU DMA allocator to use
+__GFP_NORETRY, which bypasses OOM invocation, for orders higher than
+zero and, only if that fails, fall back to normal order 0 allocation
+which might invoke OOM killer.
 
-    http://nvt.pwsan.com/pub/linux/testlogs/test_v4.0-rc5/20150322234204/
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+---
+ arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
+Changes since v1:
+(https://patchwork.kernel.org/patch/6015921/)
+ - do not clear __GFP_NORETRY, as it might come from the caller,
+ - s/positive order/order higher than 0/.
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 3/ 3): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.0-rc4 (06e5801b8cb3fc057d88cb4dc03c0b64b2744cda)):
-   text     data      bss    total  kernel
-   -560       -8        0     -568  multi_v7_defconfig
-     +4        0        0       +4  tegra_defconfig
-  +4192    -4096        0      +96  defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.0-rc4 (06e5801b8cb3fc057d88cb4dc03c0b64b2744cda))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 83cd5ac..3f1ac51 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1150,13 +1150,28 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+ 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+ 
+ 	while (count) {
+-		int j, order = __fls(count);
++		int j, order;
++
++		for (order = __fls(count); order > 0; --order) {
++			/*
++			 * We do not want OOM killer to be invoked as long
++			 * as we can fall back to single pages, so we force
++			 * __GFP_NORETRY for orders higher than zero.
++			 */
++			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
++			if (pages[i])
++				break;
++		}
+ 
+-		pages[i] = alloc_pages(gfp, order);
+-		while (!pages[i] && order)
+-			pages[i] = alloc_pages(gfp, --order);
+-		if (!pages[i])
+-			goto error;
++		if (!pages[i]) {
++			/*
++			 * Fall back to single page allocation.
++			 * Might invoke OOM killer as last resort.
++			 */
++			pages[i] = alloc_pages(gfp, 0);
++			if (!pages[i])
++				goto error;
++		}
+ 
+ 		if (order) {
+ 			split_page(pages[i], order);
+-- 
+2.2.0.rc0.207.ga3a616c
