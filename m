@@ -1,123 +1,209 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Mar 2015 11:09:13 +0100
-Subject: [RFC] pinmux: group and function definitions in the device tree
-In-Reply-To: <20150323090827.GD32259@odux.rfo.atmel.com>
-References: <20150319153950.GC30114@odux.rfo.atmel.com>
- <20150319185637.GV4927@pengutronix.de>
- <20150320150609.GB32259@odux.rfo.atmel.com>
- <20150323064424.GD9742@pengutronix.de>
- <20150323090827.GD32259@odux.rfo.atmel.com>
-Message-ID: <20150323100913.GJ9742@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Mar 2015 11:11:35 +0100
+Subject: [PATCH 03/10] ata: at91: use syscon to configure the smc
+In-Reply-To: <1426545886-19162-4-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426545886-19162-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <550FE6D7.6000107@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 10:08:27AM +0100, Ludovic Desroches wrote:
-> On Mon, Mar 23, 2015 at 07:44:24AM +0100, Sascha Hauer wrote:
-> > On Fri, Mar 20, 2015 at 04:06:09PM +0100, Ludovic Desroches wrote:
-> > > On Thu, Mar 19, 2015 at 07:56:37PM +0100, Sascha Hauer wrote:
-> > > > On Thu, Mar 19, 2015 at 04:39:50PM +0100, Ludovic Desroches wrote:
-> > > > > 	[...]
-> > > > > 
-> > > > > 	pinctrl_defs {
-> > > > > 		mci0 {
-> > > > > 			mci0_ioset0_1bit_grp {
-> > > > > 				at91,pins = <68 69 70>;
-> > > > > 				at91,mux = <2>;
-> > > > > 			};
-> > > > > 
-> > > > > 			mci0_ioset0_4bit_grp {
-> > > > > 				at91,pins = <68 69 70 71 72 73>;
-> > > > > 				at91,mux = <2>;
-> > > > > 			};
-> > > > > 
-> > > > > 			mci0_ioset0_8bit_grp {
-> > > > > 				at91,pins = <68 69 70 71 72 73 74 75 76 77>;
-> > > > > 				at91,mux = <2>;
-> > > > > 			};
-> > > > > 		};
-> > > > > 	};
-> > > > 
-> > > > Why are different groups here? Do you want to put them into the dtsi?
-> > > 
-> > > We used to have a configuration per pin in our products. On next ones we
-> > > will have some constraints ie. on the controller side we still have a
-> > > configuration per pin but we will introduced the notion of iosets. This
-> > > notion involves that timings are guaranteed only in one ioset. That's
-> > > why we can't mix signals from several iosets because. On the controller side
-> > > we can do all we want so I would like to use groups as a software protection.
-> > 
-> > What does happen when you mix signals of different iosets? It won't work
-> > so the developer will change it. What do you need the software
-> > protection for?
-> > 
+Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
+> Use syscon/regmap to configure the smc. This allows to avoid using
+> at91sam9_smc.h and to compile the driver in a multiplatform configuration.
 > 
-> I can't say it won't work, it could work in some cases. My fear is to
-> have some support cases because of this. It seems easy to spot this kind
-> of issue but experience tell us that we can loose time for this kind of
-> "stupid" error.
+> The driver will still not probe until the proper DT bindings are added.
 
-Hm, the software (dts in this case) developer will only mix signals of
-different iosets when he is forced to by the board designer. It's the
-board designer that has made this mistake, the software developer will
-only try to make it work anyway. I doubt that the board designer will
-design the board based on the possibilities shown in the dts files.
+Alexandre, just for the record, can you describe the DT node that will
+match this?
+Is it one that will be added to
+Documentation/devicetree/bindings/mfd/atmel-smc.txt?
 
-> > > > > - A subnode for these definitions in order to not parse the whole
-> > > > >   pinctrl node to retrieve groups and functions.
-> > > > > - Using node names as function and group names.
-> > > > > - Can we get generic properties to define the groups? Of course a 'pins'
-> > > > >   property is mandatory. In my case I will need an extra one to tell the
-> > > > >   controller how to mux the pins (a same pin can have up to 7 muxing
-> > > > >   possibilities).
-> > > > 
-> > > > Did you have a look at the RFC I sent for these kind of controllers [1] and
-> > > > the final result for the Mediatek driver currently in Linux-next [2]?.
-> > > > 
-> > > > The binding has both the config and the pins in a single node and thus
-> > > > is very compact.
-> > > > 
-> > > 
-> > > Thanks for the links. Well I had a look to them and now I am a bit
-> > > lost...
-> > > 
-> > > I agree with this binding but it involves to get rid of
-> > > pinconf_generic_dt_node_to_map_all, isn't it? What do group and function
-> > > become? It seems these concepts have disappeared.
-> > 
-> > The binding I suggested changes nothing with pinconf, only the pinmux
-> > information is added to the same node. You can still call
-> > pinconf_generic_dt_node_to_map_all() on the nodes, it will simply ignore
-> > the pinmux information. You would have to handle them separately (or
-> > write some generic helper if you like)
+...
+
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/ata/Kconfig     |  1 -
+>  drivers/ata/pata_at91.c | 92 ++++++++++++++++++++++++++++++++++++++-----------
+>  2 files changed, 71 insertions(+), 22 deletions(-)
 > 
-> Yes, I can still use it. What I mean is there is no generic helper at the
-> moment to get both pinmux (excepting using the function property) and
-> pinconf information. Is it planned to have something generic for the
-> pinmux property?
+> diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+> index 5f601553b9b0..a3a13605a9c4 100644
+> --- a/drivers/ata/Kconfig
+> +++ b/drivers/ata/Kconfig
+> @@ -835,7 +835,6 @@ config PATA_AT32
+>  config PATA_AT91
+>  	tristate "PATA support for AT91SAM9260"
+>  	depends on ARM && SOC_AT91SAM9
+> -	depends on !ARCH_MULTIPLATFORM
+>  	help
+>  	  This option enables support for IDE devices on the Atmel AT91SAM9260 SoC.
+>  
+> diff --git a/drivers/ata/pata_at91.c b/drivers/ata/pata_at91.c
+> index 9e85937d36a9..ace0a4de3449 100644
+> --- a/drivers/ata/pata_at91.c
+> +++ b/drivers/ata/pata_at91.c
+> @@ -24,11 +24,13 @@
+>  #include <linux/ata.h>
+>  #include <linux/clk.h>
+>  #include <linux/libata.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/atmel-smc.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/ata_platform.h>
+>  #include <linux/platform_data/atmel.h>
+> +#include <linux/regmap.h>
+>  
+> -#include <mach/at91sam9_smc.h>
+>  #include <asm/gpio.h>
+>  
+>  #define DRV_NAME		"pata_at91"
+> @@ -57,6 +59,15 @@ struct smc_range {
+>  	int max;
+>  };
+>  
+> +struct regmap *smc;
+> +
+> +struct at91sam9_smc_generic_fields {
+> +	struct regmap_field *setup;
+> +	struct regmap_field *pulse;
+> +	struct regmap_field *cycle;
+> +	struct regmap_field *mode;
+> +} fields;
+> +
+>  /**
+>   * adjust_smc_value - adjust value for one of SMC registers.
+>   * @value: adjusted value
+> @@ -206,7 +217,6 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>  {
+>  	int ret = 0;
+>  	int use_iordy;
+> -	struct sam9_smc_config smc;
+>  	unsigned int t6z;         /* data tristate time in ns */
+>  	unsigned int cycle;       /* SMC Cycle width in MCK ticks */
+>  	unsigned int setup;       /* SMC Setup width in MCK ticks */
+> @@ -244,19 +254,21 @@ static void set_smc_timing(struct device *dev, struct ata_device *adev,
+>  
+>  	dev_dbg(dev, "Use IORDY=%u, TDF Cycles=%u\n", use_iordy, tdf_cycles);
+>  
+> -	/* SMC Setup Register */
+> -	smc.nwe_setup = smc.nrd_setup = setup;
+> -	smc.ncs_write_setup = smc.ncs_read_setup = 0;
+> -	/* SMC Pulse Register */
+> -	smc.nwe_pulse = smc.nrd_pulse = pulse;
+> -	smc.ncs_write_pulse = smc.ncs_read_pulse = cs_pulse;
+> -	/* SMC Cycle Register */
+> -	smc.write_cycle = smc.read_cycle = cycle;
+> -	/* SMC Mode Register*/
+> -	smc.tdf_cycles = tdf_cycles;
+> -	smc.mode = info->mode;
+> -
+> -	sam9_smc_configure(0, info->cs, &smc);
+> +	regmap_fields_write(fields.setup, info->cs,
+> +			    AT91SAM9_SMC_NRDSETUP(setup) |
+> +			    AT91SAM9_SMC_NWESETUP(setup) |
+> +			    AT91SAM9_SMC_NCS_NRDSETUP(0) |
+> +			    AT91SAM9_SMC_NCS_WRSETUP(0));
+> +	regmap_fields_write(fields.pulse, info->cs,
+> +			    AT91SAM9_SMC_NRDPULSE(pulse) |
+> +			    AT91SAM9_SMC_NWEPULSE(pulse) |
+> +			    AT91SAM9_SMC_NCS_NRDPULSE(cs_pulse) |
+> +			    AT91SAM9_SMC_NCS_WRPULSE(cs_pulse));
+> +	regmap_fields_write(fields.cycle, info->cs,
+> +			    AT91SAM9_SMC_NRDCYCLE(cycle) |
+> +			    AT91SAM9_SMC_NWECYCLE(cycle));
+> +	regmap_fields_write(fields.mode, info->cs, info->mode |
+> +			    AT91_SMC_TDF_(tdf_cycles));
+>  }
+>  
+>  static void pata_at91_set_piomode(struct ata_port *ap, struct ata_device *adev)
+> @@ -280,21 +292,21 @@ static unsigned int pata_at91_data_xfer_noirq(struct ata_device *dev,
+>  {
+>  	struct at91_ide_info *info = dev->link->ap->host->private_data;
+>  	unsigned int consumed;
+> +	unsigned int mode;
+>  	unsigned long flags;
+> -	struct sam9_smc_config smc;
+>  
+>  	local_irq_save(flags);
+> -	sam9_smc_read_mode(0, info->cs, &smc);
+> +	regmap_fields_read(fields.mode, info->cs, &mode);
+>  
+>  	/* set 16bit mode before writing data */
+> -	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_16;
+> -	sam9_smc_write_mode(0, info->cs, &smc);
+> +	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
+> +			    AT91_SMC_DBW_16);
+>  
+>  	consumed = ata_sff_data_xfer(dev, buf, buflen, rw);
+>  
+>  	/* restore 8bit mode after data is written */
+> -	smc.mode = (smc.mode & ~AT91_SMC_DBW) | AT91_SMC_DBW_8;
+> -	sam9_smc_write_mode(0, info->cs, &smc);
+> +	regmap_fields_write(fields.mode, info->cs, (mode & ~AT91_SMC_DBW) |
+> +			    AT91_SMC_DBW_8);
+>  
+>  	local_irq_restore(flags);
+>  	return consumed;
+> @@ -312,6 +324,36 @@ static struct ata_port_operations pata_at91_port_ops = {
+>  	.cable_detect	= ata_cable_40wire,
+>  };
+>  
+> +static int at91sam9_smc_fields_init(struct device *dev)
+> +{
+> +	struct reg_field field = REG_FIELD(0, 0, 31);
+> +
+> +	field.id_size = 8;
+> +	field.id_offset = AT91SAM9_SMC_GENERIC_BLK_SZ;
+> +
+> +	field.reg = AT91SAM9_SMC_SETUP(AT91SAM9_SMC_GENERIC);
+> +	fields.setup = devm_regmap_field_alloc(dev, smc, field);
+> +	if (IS_ERR(fields.setup))
+> +		return PTR_ERR(fields.setup);
+> +
+> +	field.reg = AT91SAM9_SMC_PULSE(AT91SAM9_SMC_GENERIC);
+> +	fields.pulse = devm_regmap_field_alloc(dev, smc, field);
+> +	if (IS_ERR(fields.pulse))
+> +		return PTR_ERR(fields.pulse);
+> +
+> +	field.reg = AT91SAM9_SMC_CYCLE(AT91SAM9_SMC_GENERIC);
+> +	fields.cycle = devm_regmap_field_alloc(dev, smc, field);
+> +	if (IS_ERR(fields.cycle))
+> +		return PTR_ERR(fields.cycle);
+> +
+> +	field.reg = AT91SAM9_SMC_MODE(AT91SAM9_SMC_GENERIC);
+> +	fields.mode = devm_regmap_field_alloc(dev, smc, field);
+> +	if (IS_ERR(fields.mode))
+> +		return PTR_ERR(fields.mode);
+> +
+> +	return 0;
+> +}
+> +
+>  static int pata_at91_probe(struct platform_device *pdev)
+>  {
+>  	struct at91_cf_data *board = dev_get_platdata(&pdev->dev);
+> @@ -341,6 +383,14 @@ static int pata_at91_probe(struct platform_device *pdev)
+>  
+>  	irq = board->irq_pin;
+>  
+> +	smc = syscon_regmap_lookup_by_phandle(pdev->dev.of_node, "atmel,smc");
 
-Not yet, but it would be a good idea to add something generic.
+... yes, regarding this string "atmel,smc": what will it match?
 
-> I see MTK_GET_PIN_NO and MTK_GET_PIN_FUNC macros, on my side,
-> I think it will feet my needs. Maybe we only need to remove the MTK
-> prefix and put these macros in another header.
+Thanks, bye.
+
+> +	if (IS_ERR(smc))
+> +		return PTR_ERR(smc);
+> +
+> +	ret = at91sam9_smc_fields_init(dev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+>  	/* init ata host */
+>  
+>  	host = ata_host_alloc(dev, 1);
 > 
-> In the mediatek driver, I have also noticed that we have a group for
-> each pin. I have the feeling that the concept of groups disappear, isn't
-> it?
 
-This may be because the concept of groups doesn't most hardware.
-There really is hardware out there which can only handle the pins in
-groups (that is, a single mux switches multiple pins), but this hardware
-is not very common. Most hardware can indeed control every pin
-indivually. In this situation some drivers are consequent and make a
-group out of each pin which renders the group concept moot. Other
-drivers just interpret each device node as pin group which creates
-artificial groups which do not exist in hardware.
-
-Sascha
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
