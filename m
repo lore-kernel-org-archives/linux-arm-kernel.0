@@ -1,66 +1,200 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 23 Mar 2015 15:46:12 +0100
-Subject: [PATCH resend] ASoC: fsl-ssi: Fix bitclock calculation for master mode
-Message-ID: <1427121972-5059-1-git-send-email-mkl@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 23 Mar 2015 14:47:06 +0000
+Subject: [PATCH 05/10] mfd: syscon: Add Atmel MC (Memory Controller)
+ registers definition
+In-Reply-To: <550FE38F.7070701@atmel.com>
+References: <1426545886-19162-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1426545886-19162-6-git-send-email-alexandre.belloni@free-electrons.com>
+ <550FE38F.7070701@atmel.com>
+Message-ID: <20150323144706.GK24804@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, 23 Mar 2015, Nicolas Ferre wrote:
 
-in fsl_ssi_set_bclk we are looking for the best divider by iterating
-over all possible dividers. The divider is in the range 1..256, so
-make this clear by using 'div' as name for the loop counter and iterate
-from 1 to 256 instead of 0 to 255. This makes obvious that tmprate is
-calculated wrong, it has to be freq * factor * div, not
-freq * factor * (i + 2).
+> Le 16/03/2015 23:44, Alexandre Belloni a ?crit :
+> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > The at91rm9200 SoC embeds a Memory Controller block which is used to
+> > configure several aspects of the platform:
+> > - AHB/APB Bus behavior
+> > - SDRAM Controller
+> > - EBI (External Bus Interface) and SMC (Static Memory Controller) config
+> > 
+> > Those registers might be accessed by different drivers, hence we need to
+> > define it as a syscon device.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> Alexandre, don't you need to Ack this patch at least?
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- sound/soc/fsl/fsl_ssi.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+If he is submitting, he needs his SoB.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index b9fabbf69db6..b8af08e49085 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -578,7 +578,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
- 	struct regmap *regs = ssi_private->regs;
- 	int synchronous = ssi_private->cpu_dai_drv.symmetric_rates, ret;
--	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, i;
-+	u32 pm = 999, div2, psr, stccr, mask, afreq, factor, div;
- 	unsigned long clkrate, baudrate, tmprate;
- 	u64 sub, savesub = 100000;
- 	unsigned int freq;
-@@ -602,8 +602,8 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 
- 	factor = (div2 + 1) * (7 * psr + 1) * 2;
- 
--	for (i = 0; i < 255; i++) {
--		tmprate = freq * factor * (i + 2);
-+	for (div = 1; div < 256; div++) {
-+		tmprate = freq * factor * div;
- 
- 		if (baudclk_is_used)
- 			clkrate = clk_get_rate(ssi_private->baudclk);
-@@ -618,7 +618,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 			continue;
- 
- 		clkrate /= factor;
--		afreq = clkrate / (i + 1);
-+		afreq = clkrate / div;
- 
- 		if (freq == afreq)
- 			sub = 0;
-@@ -636,7 +636,7 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
- 		if (sub < savesub) {
- 			baudrate = tmprate;
- 			savesub = sub;
--			pm = i;
-+			pm = div - 1;
- 		}
- 
- 		/* We are lucky */
+> > ---
+> >  include/linux/mfd/syscon/atmel-mc.h | 144 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 144 insertions(+)
+> >  create mode 100644 include/linux/mfd/syscon/atmel-mc.h
+> > 
+> > diff --git a/include/linux/mfd/syscon/atmel-mc.h b/include/linux/mfd/syscon/atmel-mc.h
+> > new file mode 100644
+> > index 000000000000..cb7d9fe89e44
+> > --- /dev/null
+> > +++ b/include/linux/mfd/syscon/atmel-mc.h
+> > @@ -0,0 +1,144 @@
+> > +/*
+> > + * Copyright (C) 2005 Ivan Kokshaysky
+> > + * Copyright (C) SAN People
+> > + *
+> > + * Memory Controllers (MC, EBI, SMC, SDRAMC, BFC) - System peripherals
+> > + * registers.
+> > + * Based on AT91RM9200 datasheet revision E.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#ifndef _LINUX_MFD_SYSCON_ATMEL_MC_H_
+> > +#define _LINUX_MFD_SYSCON_ATMEL_MC_H_
+> > +
+> > +/* Memory Controller */
+> > +#define AT91_MC_RCR			0x00
+> > +#define AT91_MC_RCB			BIT(0)
+> > +
+> > +#define AT91_MC_ASR			0x04
+> > +#define AT91_MC_UNADD			BIT(0)
+> > +#define AT91_MC_MISADD			BIT(1)
+> > +#define AT91_MC_ABTSZ			GENMASK(9, 8)
+> > +#define AT91_MC_ABTSZ_BYTE		(0 << 8)
+> > +#define AT91_MC_ABTSZ_HALFWORD		(1 << 8)
+> > +#define AT91_MC_ABTSZ_WORD		(2 << 8)
+> > +#define AT91_MC_ABTTYP			GENMASK(11, 10)
+> > +#define AT91_MC_ABTTYP_DATAREAD		(0 << 10)
+> > +#define AT91_MC_ABTTYP_DATAWRITE	(1 << 10)
+> > +#define AT91_MC_ABTTYP_FETCH		(2 << 10)
+> > +#define AT91_MC_MST(n)			BIT(16 + (n))
+> > +#define AT91_MC_SVMST(n)		BIT(24 + (n))
+> > +
+> > +#define AT91_MC_AASR			0x08
+> > +
+> > +#define AT91_MC_MPR			0x0c
+> > +#define AT91_MPR_MSTP(n)		GENMASK(2 + ((x) * 4), ((x) * 4))
+> > +
+> > +/* External Bus Interface (EBI) registers */
+> > +#define AT91_MC_EBI_CSA			0x60
+> > +#define AT91_MC_EBI_CS(n)		BIT(x)
+> > +#define AT91_MC_EBI_NUM_CS		8
+> > +
+> > +#define AT91_MC_EBI_CFGR		0x64
+> > +#define AT91_MC_EBI_DBPUC		BIT(0)
+> > +
+> > +/* Static Memory Controller (SMC) registers */
+> > +#define	AT91_MC_SMC_CSR(n)		(0x70 + ((n) * 4))
+> > +#define AT91_MC_SMC_NWS			GENMASK(6, 0)
+> > +#define AT91_MC_SMC_NWS_(x)		((x) << 0)
+> > +#define AT91_MC_SMC_WSEN		BIT(7)
+> > +#define AT91_MC_SMC_TDF			GENMASK(11, 8)
+> > +#define AT91_MC_SMC_TDF_(x)		((x) << 8)
+> > +#define AT91_MC_SMC_TDF_MAX		0xf
+> > +#define AT91_MC_SMC_BAT			BIT(12)
+> > +#define AT91_MC_SMC_DBW			GENMASK(14, 13)
+> > +#define AT91_MC_SMC_DBW_16		(1 << 13)
+> > +#define AT91_MC_SMC_DBW_8		(2 << 13)
+> > +#define AT91_MC_SMC_DPR			BIT(15)
+> > +#define AT91_MC_SMC_ACSS		GENMASK(17, 16)
+> > +#define AT91_MC_SMC_ACSS_(x)		((x) << 16)
+> > +#define AT91_MC_SMC_ACSS_MAX		3
+> > +#define AT91_MC_SMC_RWSETUP		GENMASK(26, 24)
+> > +#define AT91_MC_SMC_RWSETUP_(x)		((x) << 24)
+> > +#define AT91_MC_SMC_RWHOLD		GENMASK(30, 28)
+> > +#define AT91_MC_SMC_RWHOLD_(x)		((x) << 28)
+> > +#define AT91_MC_SMC_RWHOLDSETUP_MAX	7
+> > +
+> > +/* SDRAM Controller registers */
+> > +#define AT91_MC_SDRAMC_MR		0x90
+> > +#define AT91_MC_SDRAMC_MODE		GENMASK(3, 0)
+> > +#define AT91_MC_SDRAMC_MODE_NORMAL	(0 << 0)
+> > +#define AT91_MC_SDRAMC_MODE_NOP		(1 << 0)
+> > +#define AT91_MC_SDRAMC_MODE_PRECHARGE	(2 << 0)
+> > +#define AT91_MC_SDRAMC_MODE_LMR		(3 << 0)
+> > +#define AT91_MC_SDRAMC_MODE_REFRESH	(4 << 0)
+> > +#define AT91_MC_SDRAMC_DBW_16		BIT(4)
+> > +
+> > +#define AT91_MC_SDRAMC_TR		0x94
+> > +#define AT91_MC_SDRAMC_COUNT		GENMASK(11, 0)
+> > +
+> > +#define AT91_MC_SDRAMC_CR		0x98
+> > +#define AT91_MC_SDRAMC_NC		GENMASK(1, 0)
+> > +#define AT91_MC_SDRAMC_NC_8		(0 << 0)
+> > +#define AT91_MC_SDRAMC_NC_9		(1 << 0)
+> > +#define AT91_MC_SDRAMC_NC_10		(2 << 0)
+> > +#define AT91_MC_SDRAMC_NC_11		(3 << 0)
+> > +#define AT91_MC_SDRAMC_NR		GENMASK(3, 2)
+> > +#define AT91_MC_SDRAMC_NR_11		(0 << 2)
+> > +#define AT91_MC_SDRAMC_NR_12		(1 << 2)
+> > +#define AT91_MC_SDRAMC_NR_13		(2 << 2)
+> > +#define	AT91_MC_SDRAMC_NB		BIT(4)
+> > +#define AT91_MC_SDRAMC_NB_2		(0 << 4)
+> > +#define AT91_MC_SDRAMC_NB_4		(1 << 4)
+> > +#define AT91_MC_SDRAMC_CAS		GENMASK(6, 5)
+> > +#define AT91_MC_SDRAMC_CAS_2		(2 << 5)
+> > +#define AT91_MC_SDRAMC_TWR		GENMASK(10,  7)
+> > +#define AT91_MC_SDRAMC_TRC		GENMASK(14, 11)
+> > +#define AT91_MC_SDRAMC_TRP		GENMASK(18, 15)
+> > +#define AT91_MC_SDRAMC_TRCD		GENMASK(22, 19)
+> > +#define AT91_MC_SDRAMC_TRAS		GENMASK(26, 23)
+> > +#define AT91_MC_SDRAMC_TXSR		GENMASK(30, 27)
+> > +
+> > +#define AT91_MC_SDRAMC_SRR		0x9c
+> > +#define AT91_MC_SDRAMC_SRCB		BIT(0)
+> > +
+> > +#define AT91_MC_SDRAMC_LPR		0xa0
+> > +#define AT91_MC_SDRAMC_LPCB		BIT(0)
+> > +
+> > +#define AT91_MC_SDRAMC_IER		0xa4
+> > +#define AT91_MC_SDRAMC_IDR		0xa8
+> > +#define AT91_MC_SDRAMC_IMR		0xac
+> > +#define AT91_MC_SDRAMC_ISR		0xb0
+> > +#define AT91_MC_SDRAMC_RES		BIT(0)
+> > +
+> > +/* Burst Flash Controller register */
+> > +#define AT91_MC_BFC_MR			0xc0
+> > +#define AT91_MC_BFC_BFCOM		GENMASK(1, 0)
+> > +#define AT91_MC_BFC_BFCOM_DISABLED	(0 << 0)
+> > +#define AT91_MC_BFC_BFCOM_ASYNC		(1 << 0)
+> > +#define AT91_MC_BFC_BFCOM_BURST		(2 << 0)
+> > +#define AT91_MC_BFC_BFCC		GENMASK(3, 2)
+> > +#define AT91_MC_BFC_BFCC_MCK		(1 << 2)
+> > +#define AT91_MC_BFC_BFCC_DIV2		(2 << 2)
+> > +#define AT91_MC_BFC_BFCC_DIV4		(3 << 2)
+> > +#define AT91_MC_BFC_AVL			GENMASK(7,  4)
+> > +#define AT91_MC_BFC_PAGES		GENMASK(10, 8)
+> > +#define AT91_MC_BFC_PAGES_NO_PAGE	(0 << 8)
+> > +#define AT91_MC_BFC_PAGES_16		(1 << 8)
+> > +#define AT91_MC_BFC_PAGES_32		(2 << 8)
+> > +#define AT91_MC_BFC_PAGES_64		(3 << 8)
+> > +#define AT91_MC_BFC_PAGES_128		(4 << 8)
+> > +#define AT91_MC_BFC_PAGES_256		(5 << 8)
+> > +#define AT91_MC_BFC_PAGES_512		(6 << 8)
+> > +#define AT91_MC_BFC_PAGES_1024		(7 << 8)
+> > +#define AT91_MC_BFC_OEL			GENMASK(13, 12)
+> > +#define AT91_MC_BFC_BAAEN		BIT(16)
+> > +#define AT91_MC_BFC_BFOEH		BIT(17)
+> > +#define AT91_MC_BFC_MUXEN		BIT(18)
+> > +#define AT91_MC_BFC_RDYEN		BIT(19)
+> > +
+> > +#endif /* _LINUX_MFD_SYSCON_ATMEL_MC_H_ */
+> > 
+> 
+> I'm not a big fan of the use of BIT/GENMASK macros in mix with the <<
+> operator, but I guess it can be done anyway, so I'm okay:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Please ensure Nicolas' Ack is applied to your next submission.
+
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
