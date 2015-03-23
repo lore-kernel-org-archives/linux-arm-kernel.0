@@ -1,46 +1,45 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 23 Mar 2015 09:59:59 +0100
-Subject: [PATCH] ARM: tegra: use generated pinmux for Beaver board
-In-Reply-To: <1426794762.2212.0.camel@lynxeye.de>
-References: <1420495066-19221-1-git-send-email-dev@lynxeye.de>
- <54AB0B68.7050704@wwwdotorg.org>
- <1420591830.25483.16.camel@lynxeye.de>
- <1425323769.2182.0.camel@lynxeye.de>
- <1426794762.2212.0.camel@lynxeye.de>
-Message-ID: <20150323085958.GA11268@ulmo>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Mar 2015 10:07:23 +0100
+Subject: [PATCH v2 0/3] arm64: relax Image placement requirement
+In-Reply-To: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 08:52:42PM +0100, Lucas Stach wrote:
-> Am Montag, den 02.03.2015, 20:16 +0100 schrieb Lucas Stach:
-> > Am Mittwoch, den 07.01.2015, 01:50 +0100 schrieb Lucas Stach:
-> > > Am Montag, den 05.01.2015, 15:08 -0700 schrieb Stephen Warren:
-> > > > On 01/05/2015 02:57 PM, Lucas Stach wrote:
-> > > > > Replace the current incomplete pinmux setup with a proper one generated
-> > > > > using the tegra pinmux scripts.
-> > > > 
-> > > > I assume this is identical to the existing content, it's just that the 
-> > > > node sort order changed to match the auto-generation order?
-> > > > 
-> > > Yes auto-generation changes the representation of the nodes a bit, but I
-> > > made sure to keep the properties of the existing kernel DT pinmux where
-> > > they were different from the U-Boot pinmux.
-> > > 
-> > > > If so,
-> > > > Acked-by: Stephen Warren <swarren@nvidia.com>
-> > > 
-> > This has not been applied. Could anyone please pick this up, so it
-> > doesn't miss yet another merge window?
-> > 
-> Friendly ping.
+So as it turns out, the 512 MB alignment boundary restriction appears
+to have been introduced by accident when increasing the ID map to cover
+the entire kernel Image.
 
-Applied, thanks.
+So this reverts that change, by reducing the ID map to something that
+can never cross a 512 MB boundary by construction.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/852d9787/attachment.sig>
+Patch #1 removes some functions that are unused, so that I don't have
+to worry about them in patch #2
+
+Patch #2 introduces the reduced ID map, using a separate linker section
+that contains code the manipulates the state of the MMU.
+
+Patch #3 removes the sleep_idmap_phys global which always points to
+the ID map anyway
+
+
+Ard Biesheuvel (3):
+  arm64: remove soft_restart() and friends
+  arm64: reduce ID map to a single page
+  arm64: drop sleep_idmap_phys
+
+ arch/arm64/include/asm/mmu.h         |  1 -
+ arch/arm64/include/asm/proc-fns.h    |  3 ---
+ arch/arm64/include/asm/system_misc.h |  1 -
+ arch/arm64/kernel/head.S             | 13 +++++++------
+ arch/arm64/kernel/process.c          | 12 +-----------
+ arch/arm64/kernel/sleep.S            |  9 ++++-----
+ arch/arm64/kernel/suspend.c          |  3 ---
+ arch/arm64/kernel/vmlinux.lds.S      | 11 ++++++++++-
+ arch/arm64/mm/mmu.c                  | 11 -----------
+ arch/arm64/mm/proc.S                 | 33 ---------------------------------
+ 10 files changed, 22 insertions(+), 75 deletions(-)
+
+-- 
+1.8.3.2
