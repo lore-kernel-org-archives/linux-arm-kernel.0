@@ -1,71 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Mar 2015 11:54:25 +0000
-Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information
- to DT bindings
-In-Reply-To: <1425988764-23618-9-git-send-email-wens@csie.org>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-9-git-send-email-wens@csie.org>
-Message-ID: <20150323115425.GC24422@x1>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 23 Mar 2015 20:53:55 +0900
+Subject: [RFC 0/4] arm64: kexec: fix kvm issue in kexec
+Message-ID: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
+This patch set addresses KVM issue described in Geoff's kexec patch set.
+    http://lists.infradead.org/pipermail/kexec/2015-March/013432.html
 
-> Add the list of regulators for AXP22x to the DT bindings.
-> This includes the names and supply names.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 3914a3f91ff6..0fc2f1f35cef 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -49,6 +49,33 @@ LDO3		: LDO		: ldo3in-supply
->  LDO4		: LDO		: ldo24in-supply	: shared supply
->  LDO5		: LDO		: ldo5in-supply
->  
-> +
+The basic approach here is to define a kvm tear-down function and add
+a reboot hook to gracefully shutdown the 1st kernel. This way, kvm gets
+free from kexec-specific cleanup and yet we allows future enhancement,
+like cpu hotplug & building kvm as a module, based on tear-down function.
+In this sense, patch #1 & #2 actually fix the problem, and #3 & #4 are
+rather informative.
 
-Nit: I'm not keen on double line spacing.
+I confirmed that 1st kernel successfully shut down and 2nd kernel started
+with the following messages:
 
-> +AXP221 regulators, type, and corresponding input supply names:
-> +
-> +Regulator	  Type		  Supply Name		  Notes
-> +---------	  ----		  -----------		  -----
-> +DCDC1		: DC-DC buck	: vin1-supply
-> +DCDC2		: DC-DC buck	: vin2-supply
-> +DCDC3		: DC-DC	buck	: vin3-supply
-> +DCDC4		: DC-DC	buck	: vin4-supply
-> +DCDC5		: DC-DC	buck	: vin5-supply
-> +DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
-> +DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
-> +ALDO1		: LDO		: aldoin-supply		: shared supply
-> +ALDO2		: LDO		: aldoin-supply		: shared supply
-> +ALDO3		: LDO		: aldoin-supply		: shared supply
-> +DLDO1		: LDO		: dldoin-supply		: shared supply
-> +DLDO2		: LDO		: dldoin-supply		: shared supply
-> +DLDO3		: LDO		: dldoin-supply		: shared supply
-> +DLDO4		: LDO		: dldoin-supply		: shared supply
-> +ELDO1		: LDO		: eldoin-supply		: shared supply
-> +ELDO2		: LDO		: eldoin-supply		: shared supply
-> +ELDO3		: LDO		: eldoin-supply		: shared supply
-> +LDO_IO0		: LDO		: ips-supply		: GPIO 0
-> +LDO_IO1		: LDO		: ips-supply		: GPIO 1
-> +RTC_LDO		: LDO		: ips-supply		: always on
-> +
-> +
+    kvm [1]: Using HYP init bounce page @8fa52f000
+    kvm [1]: interrupt-controller at 2c02f000 IRQ6
+    kvm [1]: timer IRQ3
+    kvm [1]: Hyp mode initialized successfully
 
-Nit: I'm not keen on double line spacing.
+test target: Base fast model
+version:     kernel v4.0-rc4 + Geoff's kexec v8
 
->  Example:
->  
->  axp209: pmic at 34 {
+
+I still have some concerns about the following points. Please let me know
+if you have any comments:
+
+1) Call kvm_cpu_reset() on non-boot cpus in reboot notifier
+   We don't have to do so in kexec-specific case. But the current code runs
+   the function on each cpu for safety since we use a general reboot hook.
+2) Flush D$ in kvm_cpu_reset()
+   Currently doesn't do so because all the cpus are just going to shut down,
+   and we actually flush D$ on boot cpu in Geoff's cpu_reset().
+3) Compatibility with arm implementation
+   Frediano is no longer working on this issue on arm as he left his
+   company. But my approach here is based on a generic interface and can be
+   applied to arm in a similar way.
+
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322231.html
+
+
+AKASHI Takahiro (4):
+  arm64: kvm: add a cpu tear-down function
+  arm64: kexec: fix kvm issue
+  arm64: kvm: add cpu reset hook for cpu hotplug
+  arm64: kvm: add cpu reset at module exit
+
+ arch/arm/kvm/arm.c                |   54 +++++++++++++++++++++++++++++++++++++
+ arch/arm/kvm/mmu.c                |   16 +++++++++++
+ arch/arm64/include/asm/kvm_asm.h  |    3 +++
+ arch/arm64/include/asm/kvm_host.h |   11 +++++++-
+ arch/arm64/include/asm/kvm_mmu.h  |    3 +++
+ arch/arm64/include/asm/virt.h     |   11 ++++++++
+ arch/arm64/kvm/Kconfig            |    1 -
+ arch/arm64/kvm/hyp-init.S         |   41 ++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp.S              |   29 +++++++++++++++++---
+ 9 files changed, 163 insertions(+), 6 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.9.5
