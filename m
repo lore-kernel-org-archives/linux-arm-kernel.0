@@ -1,20 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 23 Mar 2015 14:18:41 +0530
-Subject: [PATCH v7 6/6] wlcore: remove wl12xx_platform_data
-In-Reply-To: <CAB3XZEeKUwDE9NJzX-W1fKc9gP4kG+EjKN+XJbdaaADc1vi-BQ@mail.gmail.com>
-References: <1426696710-6891-1-git-send-email-eliad@wizery.com>	<1426696710-6891-7-git-send-email-eliad@wizery.com>	<550FC60F.4050206@ti.com>	<CAB3XZEdyQGtHzY-61baafBQuJ3hNHv1MSkBD+1EmjYzgoSG58g@mail.gmail.com>	<550FCD16.6030809@ti.com>
- <CAB3XZEeKUwDE9NJzX-W1fKc9gP4kG+EjKN+XJbdaaADc1vi-BQ@mail.gmail.com>
-Message-ID: <550FD369.90902@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Mar 2015 09:59:59 +0100
+Subject: [PATCH] ARM: tegra: use generated pinmux for Beaver board
+In-Reply-To: <1426794762.2212.0.camel@lynxeye.de>
+References: <1420495066-19221-1-git-send-email-dev@lynxeye.de>
+ <54AB0B68.7050704@wwwdotorg.org>
+ <1420591830.25483.16.camel@lynxeye.de>
+ <1425323769.2182.0.camel@lynxeye.de>
+ <1426794762.2212.0.camel@lynxeye.de>
+Message-ID: <20150323085958.GA11268@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 March 2015 01:57 PM, Eliad Peller wrote:
->> I was applying the whole series, but over v4.0-rc1 :) Its best to
->> mention the baseline in cover-letter itself.
->>
-> check out again the cover-letter. you probably overlooked it :)
+On Thu, Mar 19, 2015 at 08:52:42PM +0100, Lucas Stach wrote:
+> Am Montag, den 02.03.2015, 20:16 +0100 schrieb Lucas Stach:
+> > Am Mittwoch, den 07.01.2015, 01:50 +0100 schrieb Lucas Stach:
+> > > Am Montag, den 05.01.2015, 15:08 -0700 schrieb Stephen Warren:
+> > > > On 01/05/2015 02:57 PM, Lucas Stach wrote:
+> > > > > Replace the current incomplete pinmux setup with a proper one generated
+> > > > > using the tegra pinmux scripts.
+> > > > 
+> > > > I assume this is identical to the existing content, it's just that the 
+> > > > node sort order changed to match the auto-generation order?
+> > > > 
+> > > Yes auto-generation changes the representation of the nodes a bit, but I
+> > > made sure to keep the properties of the existing kernel DT pinmux where
+> > > they were different from the U-Boot pinmux.
+> > > 
+> > > > If so,
+> > > > Acked-by: Stephen Warren <swarren@nvidia.com>
+> > > 
+> > This has not been applied. Could anyone please pick this up, so it
+> > doesn't miss yet another merge window?
+> > 
+> Friendly ping.
 
-I see it now :)
+Applied, thanks.
 
-Thanks,
-Sekhar
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/852d9787/attachment.sig>
