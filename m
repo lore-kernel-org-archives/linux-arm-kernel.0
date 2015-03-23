@@ -1,233 +1,308 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 23 Mar 2015 15:58:25 +0000
-Subject: [PATCH v2 08/12] KVM: arm/arm64: implement kvm_io_bus MMIO handling
- for the VGIC
+Date: Mon, 23 Mar 2015 15:58:19 +0000
+Subject: [PATCH v2 02/12] KVM: move iodev.h from virt/kvm/ to include/kvm
 In-Reply-To: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
 References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1427126309-11223-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <1427126309-11223-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we use a lot of VGIC specific code to do the MMIO
-dispatching.
-Use the previous reworks to add kvm_io_bus style MMIO handlers.
-
-Those are not yet called by the MMIO abort handler, also the actual
-VGIC emulator function do not make use of it yet, but will be enabled
-with the following patches.
+iodev.h contains definitions for the kvm_io_bus framework. This is
+needed both by the generic KVM code in virt/kvm as well as by
+architecture specific code under arch/. Putting the header file in
+virt/kvm and using local includes in the architecture part seems at
+least dodgy to me, so let's move the file into include/kvm, so that a
+more natural "#include <kvm/iodev.h>" can be used by all of the code.
+This also solves a problem later when using struct kvm_io_device
+in arm_vgic.h.
+Fixing up the FSF address in the GPL header and a wrong include path
+on the way.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_vgic.h |    9 ++++
- virt/kvm/arm/vgic.c    |  129 ++++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic.h    |    7 +++
- 3 files changed, 145 insertions(+)
+ arch/powerpc/kvm/mpic.c   |    2 +-
+ arch/x86/kvm/i8254.h      |    2 +-
+ arch/x86/kvm/ioapic.h     |    2 +-
+ arch/x86/kvm/irq.h        |    2 +-
+ arch/x86/kvm/lapic.h      |    2 +-
+ include/kvm/iodev.h       |   76 ++++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/coalesced_mmio.c |    2 +-
+ virt/kvm/eventfd.c        |    2 +-
+ virt/kvm/iodev.h          |   77 ---------------------------------------------
+ virt/kvm/kvm_main.c       |    2 +-
+ 10 files changed, 84 insertions(+), 85 deletions(-)
+ create mode 100644 include/kvm/iodev.h
+ delete mode 100644 virt/kvm/iodev.h
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 9092fad..f90140c 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -24,6 +24,7 @@
- #include <linux/irqreturn.h>
+diff --git a/arch/powerpc/kvm/mpic.c b/arch/powerpc/kvm/mpic.c
+index 8542f07..4703fad 100644
+--- a/arch/powerpc/kvm/mpic.c
++++ b/arch/powerpc/kvm/mpic.c
+@@ -34,7 +34,7 @@
+ #include <asm/kvm_para.h>
+ #include <asm/kvm_host.h>
+ #include <asm/kvm_ppc.h>
+-#include "iodev.h"
++#include <kvm/iodev.h>
+ 
+ #define MAX_CPU     32
+ #define MAX_SRC     256
+diff --git a/arch/x86/kvm/i8254.h b/arch/x86/kvm/i8254.h
+index dd1b16b..c84990b 100644
+--- a/arch/x86/kvm/i8254.h
++++ b/arch/x86/kvm/i8254.h
+@@ -3,7 +3,7 @@
+ 
+ #include <linux/kthread.h>
+ 
+-#include "iodev.h"
++#include <kvm/iodev.h>
+ 
+ struct kvm_kpit_channel_state {
+ 	u32 count; /* can be 65536 */
+diff --git a/arch/x86/kvm/ioapic.h b/arch/x86/kvm/ioapic.h
+index c2e36d9..d9e02ca 100644
+--- a/arch/x86/kvm/ioapic.h
++++ b/arch/x86/kvm/ioapic.h
+@@ -3,7 +3,7 @@
+ 
+ #include <linux/kvm_host.h>
+ 
+-#include "iodev.h"
++#include <kvm/iodev.h>
+ 
+ struct kvm;
+ struct kvm_vcpu;
+diff --git a/arch/x86/kvm/irq.h b/arch/x86/kvm/irq.h
+index 2d03568..ad68c73 100644
+--- a/arch/x86/kvm/irq.h
++++ b/arch/x86/kvm/irq.h
+@@ -27,7 +27,7 @@
+ #include <linux/kvm_host.h>
  #include <linux/spinlock.h>
- #include <linux/types.h>
+ 
+-#include "iodev.h"
++#include <kvm/iodev.h>
+ #include "ioapic.h"
+ #include "lapic.h"
+ 
+diff --git a/arch/x86/kvm/lapic.h b/arch/x86/kvm/lapic.h
+index 0bc6c65..e284c28 100644
+--- a/arch/x86/kvm/lapic.h
++++ b/arch/x86/kvm/lapic.h
+@@ -1,7 +1,7 @@
+ #ifndef __KVM_X86_LAPIC_H
+ #define __KVM_X86_LAPIC_H
+ 
+-#include "iodev.h"
 +#include <kvm/iodev.h>
  
- #define VGIC_NR_IRQS_LEGACY	256
- #define VGIC_NR_SGIS		16
-@@ -147,6 +148,14 @@ struct vgic_vm_ops {
- 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
- };
+ #include <linux/kvm_host.h>
  
-+struct vgic_io_device {
-+	gpa_t addr;
-+	int len;
-+	const struct vgic_io_range *reg_ranges;
-+	struct kvm_vcpu *redist_vcpu;
-+	struct kvm_io_device dev;
+diff --git a/include/kvm/iodev.h b/include/kvm/iodev.h
+new file mode 100644
+index 0000000..a6d208b
+--- /dev/null
++++ b/include/kvm/iodev.h
+@@ -0,0 +1,76 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __KVM_IODEV_H__
++#define __KVM_IODEV_H__
++
++#include <linux/kvm_types.h>
++#include <linux/errno.h>
++
++struct kvm_io_device;
++struct kvm_vcpu;
++
++/**
++ * kvm_io_device_ops are called under kvm slots_lock.
++ * read and write handlers return 0 if the transaction has been handled,
++ * or non-zero to have it passed to the next device.
++ **/
++struct kvm_io_device_ops {
++	int (*read)(struct kvm_vcpu *vcpu,
++		    struct kvm_io_device *this,
++		    gpa_t addr,
++		    int len,
++		    void *val);
++	int (*write)(struct kvm_vcpu *vcpu,
++		     struct kvm_io_device *this,
++		     gpa_t addr,
++		     int len,
++		     const void *val);
++	void (*destructor)(struct kvm_io_device *this);
 +};
 +
- struct vgic_dist {
- 	spinlock_t		lock;
- 	bool			in_kernel;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 8802ad7..e968179 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -32,6 +32,8 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
++
++struct kvm_io_device {
++	const struct kvm_io_device_ops *ops;
++};
++
++static inline void kvm_iodevice_init(struct kvm_io_device *dev,
++				     const struct kvm_io_device_ops *ops)
++{
++	dev->ops = ops;
++}
++
++static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
++				    struct kvm_io_device *dev, gpa_t addr,
++				    int l, void *v)
++{
++	return dev->ops->read ? dev->ops->read(vcpu, dev, addr, l, v)
++				: -EOPNOTSUPP;
++}
++
++static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
++				     struct kvm_io_device *dev, gpa_t addr,
++				     int l, const void *v)
++{
++	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
++				 : -EOPNOTSUPP;
++}
++
++static inline void kvm_iodevice_destructor(struct kvm_io_device *dev)
++{
++	if (dev->ops->destructor)
++		dev->ops->destructor(dev);
++}
++
++#endif /* __KVM_IODEV_H__ */
+diff --git a/virt/kvm/coalesced_mmio.c b/virt/kvm/coalesced_mmio.c
+index c831a40..571c1ce 100644
+--- a/virt/kvm/coalesced_mmio.c
++++ b/virt/kvm/coalesced_mmio.c
+@@ -8,7 +8,7 @@
+  *
+  */
+ 
+-#include "iodev.h"
++#include <kvm/iodev.h>
+ 
+ #include <linux/kvm_host.h>
+ #include <linux/slab.h>
+diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+index 26c72f3..9ff4193 100644
+--- a/virt/kvm/eventfd.c
++++ b/virt/kvm/eventfd.c
+@@ -36,7 +36,7 @@
+ #include <linux/seqlock.h>
  #include <trace/events/kvm.h>
-+#include <asm/kvm.h>
+ 
+-#include "iodev.h"
 +#include <kvm/iodev.h>
  
+ #ifdef CONFIG_HAVE_KVM_IRQFD
  /*
-  * How the whole thing works (courtesy of Christoffer Dall):
-@@ -837,6 +839,66 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- }
+diff --git a/virt/kvm/iodev.h b/virt/kvm/iodev.h
+deleted file mode 100644
+index 9ef709c..0000000
+--- a/virt/kvm/iodev.h
++++ /dev/null
+@@ -1,77 +0,0 @@
+-/*
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+- */
+-
+-#ifndef __KVM_IODEV_H__
+-#define __KVM_IODEV_H__
+-
+-#include <linux/kvm_types.h>
+-#include <asm/errno.h>
+-
+-struct kvm_io_device;
+-struct kvm_vcpu;
+-
+-/**
+- * kvm_io_device_ops are called under kvm slots_lock.
+- * read and write handlers return 0 if the transaction has been handled,
+- * or non-zero to have it passed to the next device.
+- **/
+-struct kvm_io_device_ops {
+-	int (*read)(struct kvm_vcpu *vcpu,
+-		    struct kvm_io_device *this,
+-		    gpa_t addr,
+-		    int len,
+-		    void *val);
+-	int (*write)(struct kvm_vcpu *vcpu,
+-		     struct kvm_io_device *this,
+-		     gpa_t addr,
+-		     int len,
+-		     const void *val);
+-	void (*destructor)(struct kvm_io_device *this);
+-};
+-
+-
+-struct kvm_io_device {
+-	const struct kvm_io_device_ops *ops;
+-};
+-
+-static inline void kvm_iodevice_init(struct kvm_io_device *dev,
+-				     const struct kvm_io_device_ops *ops)
+-{
+-	dev->ops = ops;
+-}
+-
+-static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
+-				    struct kvm_io_device *dev, gpa_t addr,
+-				    int l, void *v)
+-{
+-	return dev->ops->read ? dev->ops->read(vcpu, dev, addr, l, v)
+-				: -EOPNOTSUPP;
+-}
+-
+-static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
+-				     struct kvm_io_device *dev, gpa_t addr,
+-				     int l, const void *v)
+-{
+-	return dev->ops->write ? dev->ops->write(vcpu, dev, addr, l, v)
+-				 : -EOPNOTSUPP;
+-}
+-
+-static inline void kvm_iodevice_destructor(struct kvm_io_device *dev)
+-{
+-	if (dev->ops->destructor)
+-		dev->ops->destructor(dev);
+-}
+-
+-#endif /* __KVM_IODEV_H__ */
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index ce86493..8c7ab0b 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -16,7 +16,7 @@
+  *
+  */
  
- /**
-+ * vgic_handle_mmio_access - handle an in-kernel MMIO access
-+ * This is called by the read/write KVM IO device wrappers below.
-+ * @vcpu:	pointer to the vcpu performing the access
-+ * @this:	pointer to the KVM IO device in charge
-+ * @addr:	guest physical address of the access
-+ * @len:	size of the access
-+ * @val:	pointer to the data region
-+ * @is_write:	read or write access
-+ *
-+ * returns true if the MMIO access could be performed
-+ */
-+static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *this, gpa_t addr,
-+				   int len, void *val, bool is_write)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	struct kvm_run *run = vcpu->run;
-+	const struct vgic_io_range *range;
-+	struct kvm_exit_mmio mmio;
-+	bool updated_state;
-+	gpa_t offset;
-+
-+	offset = addr - iodev->addr;
-+	range = vgic_find_range(iodev->reg_ranges, len, offset);
-+	if (unlikely(!range || !range->handle_mmio)) {
-+		pr_warn("Unhandled access %d %08llx %d\n", is_write, addr, len);
-+		return -ENXIO;
-+	}
-+
-+	mmio.phys_addr = addr;
-+	mmio.len = len;
-+	mmio.is_write = is_write;
-+	if (is_write)
-+		memcpy(mmio.data, val, len);
-+	mmio.private = iodev->redist_vcpu;
-+
-+	spin_lock(&dist->lock);
-+	offset -= range->base;
-+	if (vgic_validate_access(dist, range, offset)) {
-+		updated_state = call_range_handler(vcpu, &mmio, offset, range);
-+		if (!is_write)
-+			memcpy(val, mmio.data, len);
-+	} else {
-+		if (!is_write)
-+			memset(val, 0, len);
-+		updated_state = false;
-+	}
-+	spin_unlock(&dist->lock);
-+	kvm_prepare_mmio(run, &mmio);
-+	kvm_handle_mmio_return(vcpu, run);
-+
-+	if (updated_state)
-+		vgic_kick_vcpus(vcpu->kvm);
-+
-+	return 0;
-+}
-+
-+/**
-  * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
-  * @vcpu:      pointer to the vcpu performing the access
-  * @run:       pointer to the kvm_run structure
-@@ -860,6 +922,73 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	return vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, run, mmio);
- }
- 
-+static int vgic_handle_mmio_read(struct kvm_vcpu *vcpu,
-+				 struct kvm_io_device *this,
-+				 gpa_t addr, int len, void *val)
-+{
-+	return vgic_handle_mmio_access(vcpu, this, addr, len, val, false);
-+}
-+
-+static int vgic_handle_mmio_write(struct kvm_vcpu *vcpu,
-+				  struct kvm_io_device *this,
-+				  gpa_t addr, int len, const void *val)
-+{
-+	return vgic_handle_mmio_access(vcpu, this, addr, len, (void *)val,
-+				       true);
-+}
-+
-+struct kvm_io_device_ops vgic_io_ops = {
-+	.read	= vgic_handle_mmio_read,
-+	.write	= vgic_handle_mmio_write,
-+};
-+
-+/**
-+ * vgic_register_kvm_io_dev - register VGIC register frame on the KVM I/O bus
-+ * @kvm:            The VM structure pointer
-+ * @base:           The (guest) base address for the register frame
-+ * @len:            Length of the register frame window
-+ * @ranges:         Describing the handler functions for each register
-+ * @redist_vcpu_id: The VCPU ID to pass on to the handlers on call
-+ * @iodev:          Points to memory to be passed on to the handler
-+ *
-+ * @iodev stores the parameters of this function to be usable by the handler
-+ * respectively the dispatcher function (since the KVM I/O bus framework lacks
-+ * an opaque parameter). Initialization is done in this function, but the
-+ * reference should be valid and unique for the whole VGIC lifetime.
-+ * If the register frame is not mapped for a specific VCPU, pass -1 to
-+ * @redist_vcpu_id.
-+ */
-+int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
-+			     const struct vgic_io_range *ranges,
-+			     int redist_vcpu_id,
-+			     struct vgic_io_device *iodev)
-+{
-+	struct kvm_vcpu *vcpu = NULL;
-+	int ret;
-+
-+	if (redist_vcpu_id >= 0)
-+		vcpu = kvm_get_vcpu(kvm, redist_vcpu_id);
-+
-+	iodev->addr		= base;
-+	iodev->len		= len;
-+	iodev->reg_ranges	= ranges;
-+	iodev->redist_vcpu	= vcpu;
-+
-+	kvm_iodevice_init(&iodev->dev, &vgic_io_ops);
-+
-+	mutex_lock(&kvm->slots_lock);
-+
-+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, base, len,
-+				      &iodev->dev);
-+	mutex_unlock(&kvm->slots_lock);
-+
-+	/* Mark the iodev as invalid if registration fails. */
-+	if (ret)
-+		iodev->dev.ops = NULL;
-+
-+	return ret;
-+}
-+
- static int vgic_nr_shared_irqs(struct vgic_dist *dist)
- {
- 	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index 01aa622..28fa3aa 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -20,6 +20,8 @@
- #ifndef __KVM_VGIC_H__
- #define __KVM_VGIC_H__
- 
+-#include "iodev.h"
 +#include <kvm/iodev.h>
-+
- #define VGIC_ADDR_UNDEF		(-1)
- #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
  
-@@ -82,6 +84,11 @@ struct vgic_io_range {
- 			    phys_addr_t offset);
- };
- 
-+int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
-+			     const struct vgic_io_range *ranges,
-+			     int redist_id,
-+			     struct vgic_io_device *iodev);
-+
- static inline bool is_in_range(phys_addr_t addr, unsigned long len,
- 			       phys_addr_t baseaddr, unsigned long size)
- {
+ #include <linux/kvm_host.h>
+ #include <linux/kvm.h>
 -- 
 1.7.9.5
