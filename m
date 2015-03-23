@@ -1,198 +1,103 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 16:36:55 +0100
-Subject: [PATCH 3/4] arm64: move kernel text below PAGE_OFFSET
-In-Reply-To: <1427125016-3873-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427125016-3873-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1427125016-3873-4-git-send-email-ard.biesheuvel@linaro.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 23 Mar 2015 08:37:42 -0700
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150323140041.GQ8656@n2100.arm.linux.org.uk>
+References: <20150225125610.GY8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
+ <20150225170011.GC8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+ <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
+ <20150226010505.GU15405@linux.vnet.ibm.com>
+ <20150322233057.GA17605@linux.vnet.ibm.com>
+ <20150323125545.GP8656@n2100.arm.linux.org.uk>
+ <20150323132133.GD5718@linux.vnet.ibm.com>
+ <20150323140041.GQ8656@n2100.arm.linux.org.uk>
+Message-ID: <20150323153742.GF5718@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the virtual mapping of the kernel Image down into
-the lower half of the kernel virtual memory range, moving it
-out of the linear mapping.
+On Mon, Mar 23, 2015 at 02:00:41PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Mar 23, 2015 at 06:21:33AM -0700, Paul E. McKenney wrote:
+> > On Mon, Mar 23, 2015 at 12:55:45PM +0000, Russell King - ARM Linux wrote:
+> > > What if the cpu_hotplug_state for the CPU changes between reading it
+> > > testing its value, and then writing it, or do we guarantee that it
+> > > can't change other than by this function here?  If it can't change,
+> > > then what's the point of using atomic_t for this?
+> > 
+> > It indeed cannot change -here-, but there are other situations where
+> > more than one CPU can be attempting to change it at the same time.
+> > The reason that it cannot change here is that the variable has the
+> > value that indicates that the previous offline completed within the
+> > timeout period, so there are no outstanding writes.
+> > 
+> > When going offline, the outgoing CPU might take so long leaving that
+> > the surviving CPU times out, thus both CPUs write to the variable at
+> > the same time, which by itself requires atomics.  If this seems
+> > unlikely, consider virtualized environments where the hypervisor
+> > might preempt the guest OS.
+> 
+> If two CPUs write using atomic_set() to the same location, what value do
+> you end up with?  It's just the same as if two CPUs write normally to the
+> same location.
 
-An exception is made for the statically allocated translation
-tables: these are so entangled with the translation regime that
-they need to be accessed via the linear mapping exclusively.
+If that happens when using these functions, that is a usage error.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/memory.h |  9 +++++++--
- arch/arm64/kernel/head.S        | 39 +++++++++++++++++++++++++++++----------
- arch/arm64/kernel/vmlinux.lds.S |  4 ++--
- arch/arm64/mm/mmu.c             |  2 ++
- 4 files changed, 40 insertions(+), 14 deletions(-)
+> The only way it can be different is if you use atomic_cmpxchg(), or
+> cmpxchg() so you can atomically test that the original value is what's
+> expected prior to writing it.
+> 
+> To illustrate this (I'll abbreviate the per-cpu state):
+> 
+> 	CPU0					CPU1
+> 	oldstate = atomic_read(state);
+> 	if (oldstate == CPU_DEAD) /* it isn't */
+> 	atomic_cmpxchg(state, oldstate, CPU_BROKEN)
+> 						atomic_xchg(state, CPU_DEAD)
+> 
+> 	/* succeeds */
+> 	!= old_state /* fails */
+> 	... so doesn't loop
+> 	cpu_wait_death() returns false (failed)
+> 
+> Here, we report that the CPU failed to go offline, but the state is set
+> to CPU_DEAD.  If it had been slightly earlier, CPU0 would have updated
+> it to CPU_DEAD_POST.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 7dfe1b0c9c01..2b2d2fccfee3 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -38,6 +38,8 @@
-  */
- #define PCI_IO_SIZE		SZ_16M
- 
-+#define KIMAGE_OFFSET		SZ_64M
-+
- /*
-  * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-  *		 (VA_BITS - 1))
-@@ -49,7 +51,8 @@
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
--#define MODULES_END		(PAGE_OFFSET)
-+#define KIMAGE_VADDR		(PAGE_OFFSET - KIMAGE_OFFSET)
-+#define MODULES_END		KIMAGE_VADDR
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
- #define PCI_IO_END		(MODULES_VADDR - SZ_2M)
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
-@@ -117,6 +120,8 @@ extern phys_addr_t		memstart_addr;
- /* PHYS_OFFSET - the physical address of the start of memory. */
- #define PHYS_OFFSET		({ memstart_addr; })
- 
-+extern u64 image_offset;
-+
- /*
-  * PFNs are used to describe any physical page; this means
-  * PFN 0 == physical address 0.
-@@ -151,7 +156,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-  */
- static inline phys_addr_t __text_to_phys(unsigned long x)
- {
--	return __virt_to_phys(__VIRT(x));
-+	return __virt_to_phys(__VIRT(x)) + image_offset;
- }
- 
- /*
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 504423422e20..16134608eecf 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -235,7 +235,10 @@ section_table:
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-+
- 	adrp	x24, __PHYS_OFFSET
-+	mov	x23, #KIMAGE_OFFSET
-+
- 	bl	set_cpu_boot_mode_flag
- 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
- 	/*
-@@ -279,13 +282,15 @@ ENDPROC(preserve_boot_args)
-  * Corrupts:	tmp1, tmp2
-  * Returns:	tbl -> next level table page address
-  */
--	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
-+	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2, off=0
- 	lsr	\tmp1, \virt, #\shift
-+	.if	\off
-+	add	\tmp1, \tmp1, #\off
-+	.endif
- 	and	\tmp1, \tmp1, #\ptrs - 1	// table index
--	add	\tmp2, \tbl, #PAGE_SIZE
-+	add	\tmp2, \tbl, #(\off + 1) * PAGE_SIZE
- 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
- 	str	\tmp2, [\tbl, \tmp1, lsl #3]
--	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	.endm
- 
- /*
-@@ -298,8 +303,13 @@ ENDPROC(preserve_boot_args)
- 	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
- 	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
- #if SWAPPER_PGTABLE_LEVELS == 3
-+	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
-+	create_table_entry \tbl, \virt, TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2, 1
-+#else
-+	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2, 1
- #endif
-+	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
- 	.endm
- 
- /*
-@@ -312,15 +322,15 @@ ENDPROC(preserve_boot_args)
- 	.macro	create_block_map, tbl, flags, phys, start, end
- 	lsr	\phys, \phys, #BLOCK_SHIFT
- 	lsr	\start, \start, #BLOCK_SHIFT
--	and	\start, \start, #PTRS_PER_PTE - 1	// table index
- 	orr	\phys, \flags, \phys, lsl #BLOCK_SHIFT	// table entry
- 	lsr	\end, \end, #BLOCK_SHIFT
--	and	\end, \end, #PTRS_PER_PTE - 1		// table end index
-+	sub	\end, \end, \start
-+	and	\start, \start, #PTRS_PER_PTE - 1	// table index
- 9999:	str	\phys, [\tbl, \start, lsl #3]		// store the entry
- 	add	\start, \start, #1			// next entry
- 	add	\phys, \phys, #BLOCK_SIZE		// next block
--	cmp	\start, \end
--	b.ls	9999b
-+	subs	\end, \end, #1
-+	b.pl	9999b
- 	.endm
- 
- /*
-@@ -371,10 +381,18 @@ __create_page_tables:
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
- 	mov	x0, x26				// swapper_pg_dir
--	mov	x5, #PAGE_OFFSET
-+	ldr	x5, =KERNEL_START		// VA of __PHYS_OFFSET
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	x6, =KERNEL_END			// __va(KERNEL_END)
--	mov	x3, x24				// phys offset
-+	ldr	x6, =__pgdir_start		// VA of KERNEL_END
-+	adrp	x3, KERNEL_START		// phys offset
-+	create_block_map x0, x7, x3, x5, x6
-+
-+	ldr	x5, =__pgdir_start
-+	add	x5, x5, x23
-+	adrp	x3, idmap_pg_dir
-+	add	x0, x0, #PAGE_SIZE
-+	ldr	x6, =__pgdir_stop
-+	add	x6, x6, x23
- 	create_block_map x0, x7, x3, x5, x6
- 
- 	/*
-@@ -406,6 +424,7 @@ __mmap_switched:
- 2:
- 	adr_l	sp, initial_sp, x4
- 	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
-+	str_l	x23, image_offset, x5
- 	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
- 	mov	x29, #0
- 	b	start_kernel
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index d3885043f0b7..9f514a0a38ad 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -74,7 +74,7 @@ SECTIONS
- 		*(.discard.*)
- 	}
- 
--	. = __TEXT(PAGE_OFFSET) + TEXT_OFFSET;
-+	. = __TEXT(KIMAGE_VADDR) + TEXT_OFFSET;
- 
- 	.head.text : {
- 		_text = .;
-@@ -176,4 +176,4 @@ ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) > __hyp_idmap_text_end),
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
-  */
--ASSERT(_text == (__TEXT(PAGE_OFFSET) + TEXT_OFFSET), "HEAD is misaligned")
-+ASSERT(_text == (__TEXT(KIMAGE_VADDR) + TEXT_OFFSET), "HEAD is misaligned")
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index bb3ce41130f3..14ba1dd80932 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -47,6 +47,8 @@
- struct page *empty_zero_page;
- EXPORT_SYMBOL(empty_zero_page);
- 
-+u64 image_offset;
-+
- pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 			      unsigned long size, pgprot_t vma_prot)
- {
--- 
-1.8.3.2
+Indeed.  Which is precisely why cpu_check_up_prepare() returns an error
+after that timeout occurs.  This allows the arch code to decide what to
+do, which might be to reset the CPU in some way.  Or to simply error
+out the attempt to online the CPU.
+
+> If we instead got rid of this atomic stuff, and looked at the code
+> without atomic_* stuff confusing the picture, we'd probably have seen
+> that.  This is why, whenever I see atomic_read() and atomic_set(), I'm
+> very suspicious that the code is correct; virtually every time I've
+> seen this pattern, the code has always had some problem.  I utterly
+> hate code which uses these functions.
+
+They do have their uses, including this case.
+
+> So, I'd suggest getting rid of atomic_read() and atomic_set() here
+> converting atomic_cmpxchg() to a plain cmpxchg(), and replacing that
+> atomic_xchg() with a similar call to cmpxchg() so that a broken CPU
+> doesn't confusingly end up being reported as broken yet getting a
+> CPU_DEAD state.
+
+And exactly how would that help?  You have all the same issues with this
+transformed version of the code.  You just have READ_ONCE() instead of
+atomic_read() and WRITE_ONCE() instead of atomic_set().  Or you have
+bare accesses that the compiler might well be able to optimize into
+nonsensical code.  Again, how does this help?
+
+> After all, we know that a CPU going down _should_ be online before it
+> goes down - if it isn't online, how can it be executing code. :)
+
+That is indeed one scenario.
+
+Another scenario is that the CPU failed to go down promptly during a
+previous offline operation, and the arch-specific code chose to ignore
+that error when the CPU was next brought online.  In this case, at the
+next offline, this code would se CPU_DEAD_FROZEN or CPU_BROKEN instead
+of CPU_ONLINE.  And there are architectures that do just this.
+
+							Thanx, Paul
