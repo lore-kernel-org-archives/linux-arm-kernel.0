@@ -1,58 +1,70 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 23 Mar 2015 20:40:50 +0800
-Subject: [PATCH v7 24/31] PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+Date: Mon, 23 Mar 2015 20:40:47 +0800
+Subject: [PATCH v7 21/31] sparc/PCI: Use pci_scan_host_bridge() for simplicity
 In-Reply-To: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
 References: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427114457-16687-25-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427114457-16687-22-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now pci_scan_root_bus() is almost similar to
-pci_create_root_bus() + pci_scan_child_bus().
-So we could use common pci_scan_root_bus() in
-pci_common_init_dev() to scan pci busses.
-tegra_pcie_scan_bus() is redundant, remove it.
+Now we could use pci_scan_host_bridge() to scan
+pci buses, provide sparc specific pci_host_bridge_ops.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thierry Reding <thierry.reding@gmail.com>
-CC: linux-tegra at vger.kernel.org
+CC: "David S. Miller" <davem@davemloft.net>
+CC: sparclinux at vger.kernel.org
 ---
- drivers/pci/host/pci-tegra.c |   16 ----------------
- 1 files changed, 0 insertions(+), 16 deletions(-)
+ arch/sparc/kernel/pci.c |   27 +++++++++++++++++++++------
+ 1 files changed, 21 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 94e9362..10c0571 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
- 	return irq;
+diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+index e40e456..2a0f5ec 100644
+--- a/arch/sparc/kernel/pci.c
++++ b/arch/sparc/kernel/pci.c
+@@ -650,6 +650,20 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+ 		pci_claim_bus_resources(child_bus);
  }
  
--static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
--{
--	struct tegra_pcie *pcie = sys_to_pcie(sys);
--	struct pci_bus *bus;
--
--	bus = pci_create_root_bus(pcie->dev, -1, sys->busnr, &tegra_pcie_ops,
--			sys, &sys->resources);
--	if (!bus)
--		return NULL;
--
--	pci_scan_child_bus(bus);
--
--	return bus;
--}
--
- static irqreturn_t tegra_pcie_isr(int irq, void *arg)
++static int pci_host_bridge_of_scan_bus(
++		struct pci_host_bridge_ *host)
++{
++	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
++	struct device_node *node = pbm->op->dev.of_node;
++
++	pci_of_scan_bus(pbm, node, host->bus);
++	return pci_bus_child_max_busnr(host->bus);
++}
++
++static struct pci_host_bridge_ops pci_host_ops = {
++	.scan_bus = pci_host_of_scan_bus,
++};
++
+ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 				 struct device *parent)
  {
- 	const char *err_msg[] = {
-@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
- 	hw.private_data = (void **)&pcie;
- 	hw.setup = tegra_pcie_setup;
- 	hw.map_irq = tegra_pcie_map_irq;
--	hw.scan = tegra_pcie_scan_bus;
- 	hw.ops = &tegra_pcie_ops;
+@@ -667,16 +681,17 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 	pbm->busn.end	= pbm->pci_last_busno;
+ 	pbm->busn.flags	= IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &pbm->busn);
+-	bus = pci_create_root_bus(parent, pbm->index, pbm->pci_first_busno,
+-			pbm->pci_ops, pbm, &resources);
+-	if (!bus) {
+-		printk(KERN_ERR "Failed to create bus for %s\n",
+-		       node->full_name);
++	pci_host_ops.pci_ops = pbm->pci_ops;
++	bus = pci_scan_host_bridge(parent, pbm->index, pbm->pci_first_busno,
++			pbm, &resources, &pci_host_ops);
++	if (!host) {
++		pr_err("Failed to create host bridge pci%04x:%02x for %s\n",
++		       pbm->index, pbm->pci_first_busno, node->full_name);
+ 		pci_free_resource_list(&resources);
+ 		return NULL;
+ 	}
  
- 	pci_common_init_dev(pcie->dev, &hw);
+-	pci_of_scan_bus(pbm, node, bus);
++	bus = host->bus;
+ 	pci_bus_register_of_sysfs(bus);
+ 
+ 	pci_claim_bus_resources(bus);
 -- 
 1.7.1
