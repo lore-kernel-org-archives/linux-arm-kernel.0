@@ -1,91 +1,44 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 23 Mar 2015 20:53:57 +0900
-Subject: [RFC 2/4] arm64: kexec: fix kvm issue
-In-Reply-To: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1427111639-4575-3-git-send-email-takahiro.akashi@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 23 Mar 2015 11:55:06 +0000
+Subject: [PATCH v5 09/12] mfd: axp20x: Enable AXP22X regulators
+In-Reply-To: <1425988764-23618-10-git-send-email-wens@csie.org>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-10-git-send-email-wens@csie.org>
+Message-ID: <20150323115506.GD24422@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current kvm implementation keeps EL2 vector table installed even
-when the system is shut down. This prevents kexec from putting the system
-with kvm back into EL2 when starting a new kernel.
+On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
 
-This patch resolves this issue by calling a cpu tear-down function via
-reboot notifier, kvm_reboot_notify(), which is invoked by
-kernel_restart_prepare() in kernel_kexec().
-While kvm has a generic hook, kvm_reboot(), we can't use it here because
-a cpu teardown function will not be invoked, under current implementation,
-if no guest vm has been created by kvm_create_vm().
-Please note that kvm_usage_count is zero in this case.
+> Now that the axp20x-regulators driver supports different variants of the
+> AXP family, we can enable regulator support for AXP22X without the risk
+> of incorrectly configuring regulators.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mfd/axp20x.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-We'd better, in the future, implement cpu hotplug support and put the
-arch-specific initialization into kvm_arch_hardware_enable/disable().
-This way, we would be able to revert this patch.
+For my own reference:
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm/kvm/arm.c     |   21 +++++++++++++++++++++
- arch/arm64/kvm/Kconfig |    1 -
- 2 files changed, 21 insertions(+), 1 deletion(-)
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 35c8bc0..b879cf6 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -25,6 +25,7 @@
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
- #include <linux/mman.h>
-+#include <linux/reboot.h>
- #include <linux/sched.h>
- #include <linux/kvm.h>
- #include <trace/events/kvm.h>
-@@ -1103,6 +1104,23 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr)
- 	return NULL;
- }
- 
-+static int kvm_reboot_notify(struct notifier_block *nb,
-+			     unsigned long val, void *v)
-+{
-+	/*
-+	 * Reset each CPU in EL2 to initial state.
-+	 */
-+	on_each_cpu(kvm_cpu_reset, NULL, 1);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block kvm_reboot_nb = {
-+	.notifier_call		= kvm_reboot_notify,
-+	.next			= NULL,
-+	.priority		= 0, /* FIXME */
-+};
-+
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
-@@ -1141,6 +1159,9 @@ int kvm_arch_init(void *opaque)
- 	hyp_cpu_pm_init();
- 
- 	kvm_coproc_table_init();
-+
-+	register_reboot_notifier(&kvm_reboot_nb);
-+
- 	return 0;
- out_err:
- 	cpu_notifier_register_done();
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 30ae7a7..f5590c8 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -18,7 +18,6 @@ if VIRTUALIZATION
- 
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
--	depends on !KEXEC
- 	select MMU_NOTIFIER
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 0ec27d5023df..8d2dbb7eb588 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -370,6 +370,8 @@ static struct mfd_cell axp22x_cells[] = {
+>  		.name			= "axp20x-pek",
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources		= axp22x_pek_resources,
+> +	}, {
+> +		.name			= "axp20x-regulator",
+>  	},
+>  };
+>  
+
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
