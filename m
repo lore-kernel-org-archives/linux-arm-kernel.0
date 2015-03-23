@@ -1,129 +1,81 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 23 Mar 2015 19:17:49 +0100
-Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
- regulators
-In-Reply-To: <4184159.j0iXe39dFB@phil>
-References: <4184159.j0iXe39dFB@phil>
-Message-ID: <2619686.csNBBFyt8W@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Mar 2015 19:26:03 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <20150323135009.GB820@google.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+Message-ID: <CAKv+Gu8qcVVTqy6Fd8PMA8ZTxiMssKz+TbMQW=fAhCBpUH2jTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+(resending due to size bounce)
 
-Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
-> At least the Rockchip variant of the dw_hdmi can have controllable power
-> supplies providing 1.0 and 1.8V. Therefore add the possibility for the
-> generic bridge driver to enable supplies provided by the hw-specific
-> drivers.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On 23 March 2015 at 14:50, Sami Tolvanen <samitolvanen@google.com> wrote:
+> Add Andy Polyakov's optimized assembly and NEON implementations for
+> SHA-256/224.
+>
+> The sha256-armv4.pl script for generating the assembly code is from
+> OpenSSL commit 2ecd32a1f8f0643ae7b38f59bbaf9f0d6ef326fe.
+>
+> Compared to sha256-generic these implementations have the following
+> tcrypt speed improvements on Motorola Nexus 6 (Snapdragon 805):
+>
+>   bs    b/u      sha256-neon  sha256-asm
+>   16    16       x1.32        x1.19
+>   64    16       x1.27        x1.15
+>   64    64       x1.36        x1.20
+>   256   16       x1.22        x1.11
+>   256   64       x1.36        x1.19
+>   256   256      x1.59        x1.23
+>   1024  16       x1.21        x1.10
+>   1024  256      x1.65        x1.23
+>   1024  1024     x1.76        x1.25
+>   2048  16       x1.21        x1.10
+>   2048  256      x1.66        x1.23
+>   2048  1024     x1.78        x1.25
+>   2048  2048     x1.79        x1.25
+>   4096  16       x1.20        x1.09
+>   4096  256      x1.66        x1.23
+>   4096  1024     x1.79        x1.26
+>   4096  4096     x1.82        x1.26
+>   8192  16       x1.20        x1.09
+>   8192  256      x1.67        x1.23
+>   8192  1024     x1.80        x1.26
+>   8192  4096     x1.85        x1.28
+>   8192  8192     x1.85        x1.27
+>
+> Where bs refers to block size and b/u to bytes per update.
+>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+> Cc: Andy Polyakov <appro@openssl.org>
+>
 
-does this look ok now?
+This builds fine and passes the tcrypt.ko tests in ARM and Thumb2 and
+even in big-endian (ARM) mode, so
 
-And as we talked about in Chemnitz, who will be taking such bridge-related 
-changes, as you mentioned some last bridge-patches going through Thierry.
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
+Nice work!
 
-Heiko
+Ard.
 
 > ---
-> changes since v2:
-> - rename supplies to the names found in the hdmi IP databook
-> changes since v1:
-> - follow suggestion from Russell King to keep regulator handling local
->   to the rockchip implementation for the time being and only generalize
->   when a real second implementation needs regulator handling
-> 
->  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32
-> +++++++++++++++++++++- 2 files changed, 36 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt index
-> a905c14..bb74640 100644
-> --- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> +++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
-> @@ -22,6 +22,11 @@ Optional properties
->  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
->  - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
-> 
-> +Optional supplies:
-> +rockchip,rk3288-dw-hdmi handles two optional power supplies:
-> +- vp-supply: 1.0V power supply
-> +- vph-supply: 1.8V power supply
-> +
->  Example:
->  	hdmi: hdmi at 0120000 {
->  		compatible = "fsl,imx6q-hdmi";
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c index d236faa..647a240 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -11,6 +11,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/regmap.h>
-> +#include <linux/regulator/consumer.h>
->  #include <drm/drm_of.h>
->  #include <drm/drmP.h>
->  #include <drm/drm_crtc_helper.h>
-> @@ -28,6 +29,9 @@ struct rockchip_hdmi {
->  	struct device *dev;
->  	struct regmap *regmap;
->  	struct drm_encoder encoder;
-> +	struct regulator_bulk_data supplies[2];
-> +	int nsupplies;
-> +	bool supplies_enabled;
->  };
-> 
->  #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
-> @@ -179,6 +183,12 @@ static struct drm_encoder_funcs
-> dw_hdmi_rockchip_encoder_funcs = {
-> 
->  static void dw_hdmi_rockchip_encoder_disable(struct drm_encoder *encoder)
->  {
-> +	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
-> +
-> +	if (hdmi->nsupplies > 0 && hdmi->supplies_enabled) {
-> +		regulator_bulk_disable(hdmi->nsupplies, hdmi->supplies);
-> +		hdmi->supplies_enabled = false;
-> +	}
->  }
-> 
->  static bool
-> @@ -199,7 +209,16 @@ static void dw_hdmi_rockchip_encoder_commit(struct
-> drm_encoder *encoder) {
->  	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
->  	u32 val;
-> -	int mux;
-> +	int mux, ret;
-> +
-> +	if (hdmi->nsupplies > 0 && !hdmi->supplies_enabled) {
-> +		ret = regulator_bulk_enable(hdmi->nsupplies, hdmi->supplies);
-> +		if (ret) {
-> +			dev_err(hdmi->dev, "could not enable hdmi analog supplies\n");
-> +			return;
-> +		}
-> +		hdmi->supplies_enabled = true;
-> +	}
-> 
->  	mux = rockchip_drm_encoder_get_mux_id(hdmi->dev->of_node, encoder);
->  	if (mux)
-> @@ -275,6 +294,17 @@ static int dw_hdmi_rockchip_bind(struct device *dev,
-> struct device *master, if (!iores)
->  		return -ENXIO;
-> 
-> +	hdmi->supplies[0].supply = "vp";
-> +	hdmi->supplies[1].supply = "vph";
-> +	hdmi->nsupplies = 2;
-> +
-> +	ret = devm_regulator_bulk_get(hdmi->dev,
-> +				      hdmi->nsupplies, hdmi->supplies);
-> +	if (ret == -EPROBE_DEFER)
-> +		return ret;
-> +	if (ret)
-> +		hdmi->nsupplies = 0;
-> +
->  	platform_set_drvdata(pdev, hdmi);
-> 
->  	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
+> Changes since v1:
+>   Rebased to Herbert's cryptodev tree
+>   Include sha256-armv4.pl and use it to generate sha256-core.S
+>   Add integer-only assembly version as sha256-asm
+>   Add support for SHA-224 to the glue code
+>   Change priority for sha256/224-ce to 300
+>
+> ---
+>  arch/arm/crypto/Kconfig               |    7
+>  arch/arm/crypto/Makefile              |    8
+>  arch/arm/crypto/sha2-ce-glue.c        |    4
+>  arch/arm/crypto/sha256-armv4.pl       |  713 ++++++
+>  arch/arm/crypto/sha256-core.S_shipped | 2775 ++++++++++++++++++++++++
+>  arch/arm/crypto/sha256_glue.c         |  246 ++
+>  arch/arm/crypto/sha256_glue.h         |   23
+>  arch/arm/crypto/sha256_neon_glue.c    |  172 +
+>  8 files changed, 3945 insertions(+), 3 deletions(-)
+>
