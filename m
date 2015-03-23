@@ -1,87 +1,79 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 23 Mar 2015 20:40:44 +0800
-Subject: [PATCH v7 18/31] ia64/PCI: Refine pci_acpi_scan_root() with generic
- pci_host_bridge
-In-Reply-To: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-References: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427114457-16687-19-git-send-email-wangyijing@huawei.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 Mar 2015 12:55:45 +0000
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150322233057.GA17605@linux.vnet.ibm.com>
+References: <20150205105035.GL8656@n2100.arm.linux.org.uk>
+ <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <20150225125610.GY8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
+ <20150225170011.GC8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+ <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
+ <20150226010505.GU15405@linux.vnet.ibm.com>
+ <20150322233057.GA17605@linux.vnet.ibm.com>
+Message-ID: <20150323125545.GP8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
+On Sun, Mar 22, 2015 at 04:30:57PM -0700, Paul E. McKenney wrote:
+> On Wed, Feb 25, 2015 at 05:05:05PM -0800, Paul E. McKenney wrote:
+> > On Wed, Feb 25, 2015 at 03:16:59PM -0500, Nicolas Pitre wrote:
+> > > On Wed, 25 Feb 2015, Nicolas Pitre wrote:
+> > > 
+> > > > On Wed, 25 Feb 2015, Russell King - ARM Linux wrote:
+> > > > 
+> > > > > We could just use the spin-and-poll solution instead of an IPI, but
+> > > > > I really don't like that - when you see the complexity needed to
+> > > > > re-initialise it each time, it quickly becomes very yucky because
+> > > > > there is no well defined order between __cpu_die() and __cpu_kill()
+> > > > > being called by the two respective CPUs.
+> > > > > 
+> > > > > The last patch I saw doing that had multiple bits to indicate success
+> > > > > and timeout, and rather a lot of complexity to recover from failures,
+> > > > > and reinitialise state for a second CPU going down.
+> > > > 
+> > > > What about a per CPU state?  That would at least avoid the need to 
+> > > > serialize things across CPUs.  If only one CPU may write its state, that 
+> > > > should eliminate the need for any kind of locking.
+> > > 
+> > > Something like the following?  If according to $subject it is the 
+> > > complete() usage that has problems, then this replacement certainly has 
+> > > it removed while keeping things simple.  And I doubt CPU hotplug is 
+> > > performance critical so a simple polling is certainly good enough.
+> > 
+> > For whatever it is worth, I am proposing the patch below for common code.
+> > Works on x86.  (Famous last words...)
+> 
+> So I am intending to submit these changes to the upcoming merge window.
+> Do you guys have something in place for ARM?
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
----
- arch/ia64/pci/pci.c |   34 +++++++++++++++++++---------------
- 1 files changed, 19 insertions(+), 15 deletions(-)
+I've rather dropped the ball on this (sorry, I've had wisdom teeth out,
+with a week long recovery, and then had to catch back up with mail...).
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index c642bc8..95dc43b 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -420,6 +420,19 @@ probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
- 	return 0;
- }
- 
-+static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
-+{
-+	struct pci_controller *controller = bridge->bus->sysdata;
-+
-+	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
-+	return 0;
-+}
-+
-+static struct pci_host_bridge_ops pci_host_ops = {
-+	.pci_ops = &pci_root_ops,
-+	.prepare = pci_host_bridge_prepare,
-+};
-+
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
- 	struct acpi_device *device = root->device;
-@@ -428,7 +441,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	struct pci_controller *controller;
- 	struct pci_root_info *info = NULL;
- 	int busnum = root->secondary.start;
--	struct pci_bus *pbus;
-+	struct pci_host_bridge *host;
- 	int ret;
- 
- 	controller = alloc_pci_controller(domain);
-@@ -465,26 +478,17 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	 * should handle the case here, but it appears that IA64 hasn't
- 	 * such quirk. So we just ignore the case now.
- 	 */
--	pbus = pci_create_root_bus(NULL, domain, bus, &pci_root_ops,
--			controller, &info->resources);
--	if (!pbus) {
-+	host = pci_scan_host_bridge(NULL, domain, bus, controller,
-+			&info->resources, &pci_host_ops);
-+	if (!host) {
- 		pci_free_resource_list(&info->resources);
- 		__release_pci_root_info(info);
- 		return NULL;
- 	}
- 
--	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
-+	pci_set_host_bridge_release(host,
- 			release_pci_root_info, info);
--	pci_scan_child_bus(pbus);
--	return pbus;
--}
--
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_controller *controller = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
--	return 0;
-+	return host->bus;
- }
- 
- void pcibios_fixup_device_resources(struct pci_dev *dev)
+Looking at this patch, what advantage does using atomic_t give us?
+For example:
+
+> > +int cpu_check_up_prepare(int cpu)
+> > +{
+> > +	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
+> > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+> > +		return 0;
+> > +	}
+> > +
+> > +	switch (atomic_read(&per_cpu(cpu_hotplug_state, cpu))) {
+> > +
+> > +	case CPU_POST_DEAD:
+> > +
+> > +		/* The CPU died properly, so just start it up again. */
+> > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+> > +		return 0;
+
+What if the cpu_hotplug_state for the CPU changes between reading it
+testing its value, and then writing it, or do we guarantee that it
+can't change other than by this function here?  If it can't change,
+then what's the point of using atomic_t for this?
+
 -- 
-1.7.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
