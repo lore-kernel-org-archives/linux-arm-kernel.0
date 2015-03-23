@@ -1,64 +1,108 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Mon, 23 Mar 2015 16:07:57 -0700
-Subject: [GIT PULL] clk: mvebu changes for 4.1
-In-Reply-To: <550BF29E.1030003@free-electrons.com>
-References: <550BF29E.1030003@free-electrons.com>
-Message-ID: <20150323230757.7930.91960@quantum>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 23 Mar 2015 17:15:34 -0600
+Subject: [PATCH v17 01/10] ARM: qcom: Add Subsystem Power Manager (SPM)
+ driver
+In-Reply-To: <F7886F3F-50DF-4E1B-A6DF-5463362B2BC7@codeaurora.org>
+References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
+ <1426882877-33008-2-git-send-email-lina.iyer@linaro.org>
+ <F7886F3F-50DF-4E1B-A6DF-5463362B2BC7@codeaurora.org>
+Message-ID: <20150323231534.GB1790@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2015-03-20 03:12:46)
-> Mike,
-> 
-> Here is the first pull request for the clocks for mvebu for v4.1.
-> 
-> It is a pretty small one and I don't expect an other one.
+On Mon, Mar 23 2015 at 16:06 -0600, Kumar Gala wrote:
+>
+>On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>
+>>
+>> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
+>> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
+>> Original tree available at -
+>> git://codeaurora.org/quic/la/kernel/msm-3.10.git
+>>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Kevin Hilman <khilman@linaro.org>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  29 +-
+>> drivers/soc/qcom/Kconfig                           |   7 +
+>> drivers/soc/qcom/Makefile                          |   1 +
+>> drivers/soc/qcom/spm.c                             | 405 +++++++++++++++++++++
+>> 4 files changed, 436 insertions(+), 6 deletions(-)
+>> create mode 100644 drivers/soc/qcom/spm.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> index 1505fb8..664aa91 100644
+>> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
+>> @@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
+>>
+>> The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
+>> Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
+>> -micro-controller that transitions a piece of hardware (like a processor or
+>> +power-controller that transitions a piece of hardware (like a processor or
+>> subsystem) into and out of low power modes via a direct connection to
+>> the PMIC. It can also be wired up to interact with other processors in the
+>> system, notifying them when a low power state is entered or exited.
+>>
+>> +Multiple revisions of the SAW hardware are supported using these Device Nodes.
+>> +SAW2 revisions differ in the register offset and configuration data. Also, the
+>> +same revision of the SAW in different SoCs may have different configuration
+>> +data due the the differences in hardware capabilities. Hence the SoC name, the
+>> +version of the SAW hardware in that SoC and the distinction between cpu (big
+>> +or Little) or cache, may be needed to uniquely identify the SAW register
+>> +configuration and initialization data. The compatible string is used to
+>> +indicate this parameter.
+>> +
+>> PROPERTIES
+>>
+>> - compatible:
+>> @@ -14,10 +23,11 @@ PROPERTIES
+>> 	Value type: <string>
+>> 	Definition: shall contain "qcom,saw2". A more specific value should be
+>> 		    one of:
+>
+>Does ?qcom,saw2? have any meaning anymore?  I see we use it in some places, but not everywhere on the .dts.  We also see to have the L2 just be a ?qcom,saw2? node, do we expect that to change?
+>
+It does help match a regulator node as opposed to the specific values
+below.
 
-Pulled.
-
-Regards,
-Mike
-
-> 
-> Gregory
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-clk-4.1
-> 
-> for you to fetch changes up to 8da6f3c1662a74a39b5ebc773ee27a949b5d7658:
-> 
->   clk: mvebu: add Marvell Armada 39x driver (2015-03-04 15:18:53 +0100)
-> 
-> ----------------------------------------------------------------
-> clock changes for mvebu for v4.1
-> 
-> - Add clock support for Armada 39x
-> 
-> ----------------------------------------------------------------
-> Thomas Petazzoni (3):
->       devicetree: bindings: update DT bindings for Marvell EBU clock support
->       clk: mvebu: extend common code to allow an optional refclk
->       clk: mvebu: add Marvell Armada 39x driver
-> 
->  Documentation/devicetree/bindings/clock/mvebu-core-clock.txt  |   9 +++++++++
->  Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt |  15 ++++++++++++++-
->  drivers/clk/mvebu/Kconfig                                     |   4 ++++
->  drivers/clk/mvebu/Makefile                                    |   1 +
->  drivers/clk/mvebu/armada-39x.c                                | 156
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/mvebu/common.c                                    |  17 +++++++++++++++++
->  drivers/clk/mvebu/common.h                                    |   1 +
->  7 files changed, 202 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/mvebu/armada-39x.c
-> 
-> 
-> -- 
-> Gregory Clement, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+>> -			 "qcom,saw2-v1"
+>> -			 "qcom,saw2-v1.1"
+>> -			 "qcom,saw2-v2"
+>> -			 "qcom,saw2-v2.1"
+>> +			"qcom,saw2-v2"
+>> +			"qcom,saw2-v2.1"
+>> +			"qcom,apq8064-saw2-v1.1-cpu"
+>> +			"qcom,msm8974-saw2-v2.1-cpu"
+>> +			"qcom,apq8084-saw2-v2.1-cpu"
+>>
+>> - reg:
+>> 	Usage: required
+>> @@ -26,10 +36,17 @@ PROPERTIES
+>> 		    the register region. An optional second element specifies
+>> 		    the base address and size of the alias register region.
+>>
+>> +- regulator:
+>> +	Usage: optional
+>> +	Value type: boolean
+>> +	Definition: Indicates that this SPM device acts as a regulator device
+>> +			device for the core (CPU or Cache) the SPM is attached
+>> +			to.
+>>
+>> Example:
+>>
+>> -	regulator at 2099000 {
+>> +	power-controller at 2099000 {
+>> 		compatible = "qcom,saw2";
+>> 		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+>> +		regulator;
+>> 	};
+>
+>-- 
+>Qualcomm Innovation Center, Inc.
+>The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>a Linux Foundation Collaborative Project
+>
