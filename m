@@ -1,71 +1,61 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 23 Mar 2015 08:17:25 +0200
-Subject: [PATCH 2/2] watchdog: digicolor: driver for Conexant Digicolor
- CX92755 SoC
-In-Reply-To: <550FA9A4.5010304@roeck-us.net>
-References: <6bc6e867b500cd3cfc629b96f90442f5c0aced3a.1427028036.git.baruch@tkos.co.il>
- <409ece75204d3911dc526a9bc0c908fc30893b26.1427028036.git.baruch@tkos.co.il>
- <550EF4DA.6040407@roeck-us.net> <20150322180857.GI2825@tarshish>
- <550F111F.9060400@roeck-us.net> <20150323053355.GJ2825@tarshish>
- <550FA9A4.5010304@roeck-us.net>
-Message-ID: <20150323061725.GK2825@tarshish>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 23 Mar 2015 08:35:35 +0200
+Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
+ control module support
+In-Reply-To: <20150320233043.GW31346@atomide.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-28-git-send-email-t-kristo@ti.com>
+ <550C9490.3070505@ti.com> <20150320223541.GV31346@atomide.com>
+ <550CABD9.5060000@ti.com> <20150320233043.GW31346@atomide.com>
+Message-ID: <550FB437.4060206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
-
-Adding LKML to Cc.
-
-On Sun, Mar 22, 2015 at 10:50:28PM -0700, Guenter Roeck wrote:
-> On 03/22/2015 10:33 PM, Baruch Siach wrote:
-> >>>>>+	wdt->restart_handler.notifier_call = dc_restart_handler;
-> >>>>>+	wdt->restart_handler.priority = 128;
-> >>>>
-> >>>>Is 128 intentional, ie is this the expected reset method for this platform ?
-> >>>>If not, it may be better to select a lower priority (eg 64). Using a watchdog
-> >>>>to reset a system should in general be a method of last resort.
-> >>>
-> >>>Copied this value from imx2_wdt. grep indicates that almost all other watchdog
-> >>>drivers implementing restart_handler use priority of 128 (except bcm47xx_wdt).
-> >>>What is the policy here?
-> >>
-> >>The policy is to do what is sensible for the platform. That can only be decided
-> >>on a case-by-case basis. The documentation suggests to use 128 for "Default restart
-> >>handler; use if no other restart handler is expected to be available, and/or if
-> >>restart functionality is sufficient to restart the entire system".
-> >>
-> >>So if this is the only means expected to be available to reset the system
-> >>for this architecture/platform, and if the watchdog resets the entire system
-> >>(not just the CPU), 128 may be ok to use. If, however, there may be other
-> >>means to reset the system, such as a GPIO pin, maybe not.
-> >
-> >This driver is for a SoC hardware block. The restart_handler priority level is
-> >hard coded in the drivers, and should thus work reasonably well for all its
-> >users. The fact that the common priority level is 128, is significant in this
-> >case IMO (as apposed to issues discussed above). Systems designers are likely
-> >take this priority level into account in their designs. If this does not match
-> >the documentation, then documentation needs to change to reflect reality.
+On 03/21/2015 01:30 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [150320 16:24]:
+>> On 03/20/2015 05:35 PM, Tony Lindgren wrote:
+>>> * Suman Anna <s-anna@ti.com> [150320 14:44]:
+>>>> On 03/20/2015 01:44 PM, Kristo, Tero wrote:
+>>>>> +			scm: scm at 210000 {
+>>>>> +				compatible = "ti,am3-scm", "simple-bus";
+>>>>> +				reg = <0x210000 0x2000>;
+>>>>> +				#address-cells = <1>;
+>>>>> +				#size-cells = <1>;
+>>>>> +				ranges = <0 0x210000 0x2000>;
+>>>>> +
+>>>>> +				am33xx_pinmux: pinmux at 800 {
+>>>>> +					compatible = "pinctrl-single";
+>>>>> +					reg = <0x800 0x238>;
+>>>>> +					#address-cells = <1>;
+>>>>> +					#size-cells = <0>;
+>>>>> +					pinctrl-single,register-width = <32>;
+>>>>> +					pinctrl-single,function-mask = <0x7f>;
+>>>>> +				};
+>>>>> +
+>>>>> +				scm_conf: scm_conf at 0 {
+>>>>> +					compatible = "syscon";
+>>>>> +					reg = <0x0 0x7fc>;
+>>>>
+>>>> Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
+>>>> this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
+>>>
+>>> Seems correct to me, it's offset 0, size 0x7fc. So that's the scm_conf
+>>> syscon area before pinctrl-single at 0x44c00000 + 0x210000 + 0.
+>>>
+>>> The io area for pinctrl-single starts at 0x800, so the scm_conf should
+>>> be before it in the dts file.
+>>
+>> Well, I understand that it is how it was before, but we won't be mapping
+>> or covering the last register efuse_sma before the pinctrl cfg
+>> registers. Any reason for just leaving out that register?
 >
-> Seems to me you are arguing (again) that it is ok to use priority 128 not
-> because of merit, but because others do it as well. As you may have noticed,
-> I kind of dislike that line of argument. Actually, I don't consider it to be
-> a valid argument in the first place.
+> Oh I see yeah that looks like a bug to me.
 
-I fully agree with you on other cases as I acknowledged earlier, but I 
-disagree here. The only merit of priority 128 is how it is accepted. This 
-priority level has no technical significance in or by itself. Our only 
-guidance for choosing the "right" level is what others do. That's my opinion, 
-at least.
+Yea thats a bug, I wonder where I got this 7fc. Same issue exists for 
+am43xx also. I can fix this locally in my branch if that is fine.
 
-At the technical level, this watchdog indirectly generates an external reset 
-signal that should be used to reset the entire system. This seems to be the 
-case on the Equinox evaluation board, which is the system I test this driver 
-on. I believe this conforms to the documented behaviour for the 128 priority 
-level.
+-Tero
 
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+>
+> Tony
+>
