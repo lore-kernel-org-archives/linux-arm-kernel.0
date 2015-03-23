@@ -1,97 +1,237 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 23 Mar 2015 15:27:37 +0000
-Subject: [PATCH V3 0/8] ARM: cpuidle: Unify the ARM64/ARM DT approach
-In-Reply-To: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150323152737.GB18904@red-moon>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 23 Mar 2015 15:28:37 +0000
+Subject: [RFC PATCH 1/7] serial: Emulate break using control characters
+In-Reply-To: <20150320142847.GB4725@e103592.cambridge.arm.com>
+References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>
+ <1426688428-3150-2-git-send-email-daniel.thompson@linaro.org>
+ <20150320142847.GB4725@e103592.cambridge.arm.com>
+Message-ID: <55103125.7080500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 11:43:53AM +0000, Daniel Lezcano wrote:
-> There is a big number of cpuidle drivers for the ARM architecture.
-> 
-> These drivers have been cleaned up and grouped into the drivers/cpuidle
-> directory to keep track of the changes more easily and ensure the code
-> is following the same scheme across the drivers.
-> 
-> That had the benefit of simplifying the code and factor out a lot of common
-> parts. Beside that, as the drivers belong to the 'drivers' directory, we had
-> to split the arch specific bits and the generic code in order to keep
-> everything self contained. The platform driver paradigm was used for this
-> purpose.
-> 
-> Unfortunately, this approach is now no longer accepted and a different solution
-> must be provided to reach the same goal: one example is the Qualcomm cpuidle
-> driver upstreaming attempt.
-> 
-> In the meantime, ARM64 developed a generic cpuidle driver based on DT definition.
-> 
-> The DT definition provides an 'enable-method' to specify one of the cpu
-> operations (PSCI, ...).
-> 
-> This patchset unify this driver with ARM32, using the same DT definition.
-> 
-> Thanks with this patchset we can use the 'enable-method' to specify a cpu
-> operations, hence get rid of the platform driver approach and go further in the
-> cpuidle driver flexibility via the DT.
+On 20/03/15 14:28, Dave Martin wrote:
+> On Wed, Mar 18, 2015 at 02:20:22PM +0000, Daniel Thompson wrote:
+>> Currently the magic SysRq functions can accessed by sending a break on
+>> the serial port. Unfortunately some networked serial proxies make it
+>> difficult to send a break meaning SysRq functions cannot be used. This
+>> patch provides a workaround by allowing the (fairly unlikely) sequence
+>> of ^B^R^K characters to emulate a real break.
+>
+> This is neat, but as it stands it feels like a bit of a hack.  It would
+> be preferable to make the magic string configurable, since almost any
+> choice is going to upset somebody.
+>
+> Since this also breaks the console (i.e., changes the behaviour)
+> It should probably not be on by default: a command-line option or
+> /proc/sys/kernel tweak should be required in order to turn it on.
+> Otherwise, this is likely to get activated unconditionally in production
+> kernels.
 
-Tested on arm64 Juno and FVP models.
+It hadn't really occurred to me that it would ever be a good idea to 
+activate this for production kernels. Aren't these code paths rather hot 
+when the serial ports are running as super high speeds?
 
-Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+That said if the magic string were configurable then it could simply 
+default to the empty string and that would result in the serial break 
+emulation being disabled.
 
-> 
-> Changelog:
-> 
->  V3:
-> 	* Fixed unroll loop when failing to register the device
-> 	* Removed the per cpu cpuidle_device
-> 	* Remove goto statement in the registration path
-> 	* Fixed a compilation failure with allyesconfig on arm64
-> 
->  V2:
-> 	* Used smp_operations style for cpuidle_ops
-> 	* Fixed some nits in the comments
-> 	* Added a patch to change the name of the functions
-> 	* Added per cpu device registration patch
-> 
-> Daniel Lezcano (8):
->   ARM: cpuidle: Remove duplicate header inclusion
->   ARM: cpuidle: Add a cpuidle ops structure to be used for DT
->   ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
->   ARM64: cpuidle: Rename cpu_init_idle to a common function name
->   ARM64: cpuidle: Remove arm64 reference
->   ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
->   ARM: cpuidle: Register per cpuidle device
->   ARM: cpuidle: Change function name to be consistent with x86
-> 
->  arch/arm/include/asm/cpuidle.h                     | 23 +++++++
->  arch/arm/kernel/cpuidle.c                          | 74 +++++++++++++++++++-
->  arch/arm/mach-davinci/cpuidle.c                    |  1 -
->  arch/arm/mach-imx/cpuidle-imx6q.c                  |  1 -
->  arch/arm/mach-imx/cpuidle-imx6sl.c                 |  1 -
->  arch/arm/mach-imx/cpuidle-imx6sx.c                 |  1 -
->  arch/arm/mach-omap2/cpuidle44xx.c                  |  1 -
->  arch/arm/mach-s3c64xx/cpuidle.c                    |  2 +-
->  arch/arm/mach-tegra/cpuidle-tegra20.c              |  1 -
->  arch/arm/mach-tegra/cpuidle-tegra30.c              |  1 -
->  arch/arm64/include/asm/cpuidle.h                   |  9 ++-
->  arch/arm64/kernel/cpuidle.c                        |  2 +-
->  drivers/cpuidle/Kconfig                            |  7 +-
->  drivers/cpuidle/Kconfig.arm                        | 12 +++-
->  drivers/cpuidle/Kconfig.arm64                      | 13 ----
->  drivers/cpuidle/Makefile                           |  5 +-
->  drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} | 80 ++++++++++++++++------
->  drivers/cpuidle/cpuidle-at91.c                     |  1 -
->  drivers/cpuidle/cpuidle-exynos.c                   |  1 -
->  drivers/cpuidle/cpuidle-kirkwood.c                 |  1 -
->  drivers/cpuidle/cpuidle-ux500.c                    |  1 -
->  drivers/cpuidle/cpuidle-zynq.c                     |  1 -
->  include/asm-generic/vmlinux.lds.h                  |  2 +
->  23 files changed, 178 insertions(+), 63 deletions(-)
->  delete mode 100644 drivers/cpuidle/Kconfig.arm64
->  rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (57%)
-> 
-> -- 
-> 1.9.1
-> 
-> 
+
+> A particular concern is that something other than a human user could be
+> connected to the UART.
+>
+> I also feel it doesn't really belong in this series.  NMI doesn't
+> require this in order to be useful, this patch doesn't require NMI, and
+> anyway it's not specific to arm.
+
+To be clear I included the patch in this series only because:
+
+1. I couldn't figure out any way to send a serial break to the ARM
+    Foundation Model making it impossible for me to provoke SysRq actions
+    from interrupt context,
+
+2. SysRq-L is a really good way to test the code and, when launched
+    from interrupt context proves that pre-emption by pseudo-NMI works.
+
+I only really included the patch as a convenience for anyone wanting to 
+do any runtime testing.
+
+
+> I suggest posting this separately, CCing linux-serial.
+
+Don't worry, I shared the patch on linux-serial quite some time ago 
+although, as it happens, the patch has got a lot more review comments 
+when I included it as a convenience in an unrelated patchset than it did 
+when I RFCed it separately.
+
+
+>> This approach is very nearly as robust as normal sysrq/break handling
+>> because all trigger recognition happens during interrupt handling. Only
+>> major difference is that to emulate a break we must enter the ISR four
+>> times (instead of twice) and manage an extra byte of state.
+>>
+>> No means is provided to escape the trigger sequence (and pass ^B^R^K to
+>> the underlying process) however the sequence is proved reasonably pretty
+>> collision resistant in practice. The most significant consequence is
+>> that ^B and ^B^R are delayed until a new character is observed.
+>>
+>> The most significant collision I am aware of is with emacs-like
+>> backward-char bindings (^B) because the character movement will become
+>> lumpy (two characters every two key presses rather than one character
+>> per key press). Arrow keys or ^B^B^F provide workarounds.
+>>
+>> Special note for tmux users:
+>>    tmux defaults to using ^B as its escape character but does not have a
+>>    default binding for ^B^R. Likewise tmux had no visual indicator
+>>    showing the beginning of break sequence meaning delayed the delivery
+>>    of ^B is not observable. Thus serial break emulation does not interfere
+>>    with the use of tmux's default key bindings.
+>>
+>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>> ---
+>>   include/linux/serial_core.h | 83 +++++++++++++++++++++++++++++++++++----------
+>>   lib/Kconfig.debug           | 15 ++++++++
+>>   2 files changed, 80 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+>> index cf9c2ce9479d..56f8e3daf42c 100644
+>> --- a/include/linux/serial_core.h
+>> +++ b/include/linux/serial_core.h
+>> @@ -160,6 +160,9 @@ struct uart_port {
+>>   	struct console		*cons;			/* struct console, if any */
+>>   #if defined(CONFIG_SERIAL_CORE_CONSOLE) || defined(SUPPORT_SYSRQ)
+>>   	unsigned long		sysrq;			/* sysrq timeout */
+>> +#ifdef CONFIG_MAGIC_SYSRQ_BREAK_EMULATION
+>> +	char                    sysrq_emul;             /* emulation state */
+>> +#endif
+>>   #endif
+>>
+>>   	/* flags must be updated while holding port mutex */
+>> @@ -420,24 +423,6 @@ extern void uart_handle_cts_change(struct uart_port *uport,
+>>   extern void uart_insert_char(struct uart_port *port, unsigned int status,
+>>   		 unsigned int overrun, unsigned int ch, unsigned int flag);
+>>
+>> -#ifdef SUPPORT_SYSRQ
+>> -static inline int
+>> -uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
+>> -{
+>> -	if (port->sysrq) {
+>> -		if (ch && time_before(jiffies, port->sysrq)) {
+>> -			handle_sysrq(ch);
+>> -			port->sysrq = 0;
+>> -			return 1;
+>> -		}
+>> -		port->sysrq = 0;
+>> -	}
+>> -	return 0;
+>> -}
+>> -#else
+>> -#define uart_handle_sysrq_char(port,ch) ({ (void)port; 0; })
+>> -#endif
+>> -
+>>   /*
+>>    * We do the SysRQ and SAK checking like this...
+>>    */
+>> @@ -462,6 +447,68 @@ static inline int uart_handle_break(struct uart_port *port)
+>>   	return 0;
+>>   }
+>>
+>> +#if defined(SUPPORT_SYSRQ) && defined(CONFIG_MAGIC_SYSRQ_BREAK_EMULATION)
+>> +/*
+>> + * Emulate a break if we are the serial console and receive ^B, ^R, ^K.
+>> + */
+>> +static inline int
+>> +uart_handle_sysrq_break_emulation(struct uart_port *port, unsigned int ch)
+>> +{
+>> +	const unsigned int ctrlb = 'B' & 31;
+>> +	const unsigned int ctrlr = 'R' & 31;
+>> +	const unsigned int ctrlk = 'K' & 31;
+>> +
+>> +	if (uart_console(port)) {
+>> +		if ((port->sysrq_emul == 0 && ch == ctrlb) ||
+>> +		    (port->sysrq_emul == ctrlb && ch == ctrlr)) {
+>> +			/* for either of the first two trigger characters
+>> +			 * update the state variable and move on.
+>> +			 */
+>> +			port->sysrq_emul = ch;
+>> +			return 1;
+>> +		} else if (port->sysrq_emul == ctrlr && ch == ctrlk &&
+>> +			   uart_handle_break(port)) {
+>> +			/* the break has already been emulated whilst
+>> +			 * evaluating the condition, tidy up and move on
+>> +			 */
+>> +			port->sysrq_emul = 0;
+>> +			return 1;
+>> +		}
+>> +	}
+>> +
+>> +	if (port->sysrq_emul) {
+>> +		/* received a partial (false) trigger, tidy up and move on */
+>> +		uart_insert_char(port, 0, 0, ctrlb, TTY_NORMAL);
+>> +		if (port->sysrq_emul == ctrlr)
+>> +			uart_insert_char(port, 0, 0, ctrlr, TTY_NORMAL);
+>> +		port->sysrq_emul = 0;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +#else
+>> +#define uart_handle_sysrq_break_emulation(port, ch) ({ (void)port; 0; })
+>> +#endif
+>> +
+>> +#ifdef SUPPORT_SYSRQ
+>> +static inline int
+>> +uart_handle_sysrq_char(struct uart_port *port, unsigned int ch)
+>> +{
+>> +	if (port->sysrq) {
+>> +		if (ch && time_before(jiffies, port->sysrq)) {
+>> +			handle_sysrq(ch);
+>> +			port->sysrq = 0;
+>> +			return 1;
+>> +		}
+>> +		port->sysrq = 0;
+>> +	}
+>> +
+>> +	return uart_handle_sysrq_break_emulation(port, ch);
+>> +}
+>> +#else
+>> +#define uart_handle_sysrq_char(port, ch) ({ (void)port; 0; })
+>> +#endif
+>> +
+>>   /*
+>>    *	UART_ENABLE_MS - determine if port should enable modem status irqs
+>>    */
+>> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+>> index c2d51af327bc..3f54e85c27d2 100644
+>> --- a/lib/Kconfig.debug
+>> +++ b/lib/Kconfig.debug
+>> @@ -372,6 +372,21 @@ config MAGIC_SYSRQ_DEFAULT_ENABLE
+>>   	  This may be set to 1 or 0 to enable or disable them all, or
+>>   	  to a bitmask as described in Documentation/sysrq.txt.
+>>
+>> +config MAGIC_SYSRQ_BREAK_EMULATION
+>> +	bool "Enable magic SysRq serial break emulation"
+>> +	depends on MAGIC_SYSRQ && SERIAL_CORE_CONSOLE
+>> +	default n
+>> +	help
+>> +	  If you say Y here, then you can use the character sequence ^B^R^K
+>> +	  to simulate a BREAK on the serial console. This is useful if for
+>> +	  some reason you cannot send a BREAK to your console's serial port.
+>> +	  For example, if you have a serial device server that cannot
+>> +	  send a BREAK. Enabling this feature can delay the delivery of
+>> +	  characters to the TTY because the ^B and a subsequent ^R will be
+>> +	  delayed until we know what the next character is.
+>> +
+>> +	  If unsure, say N.
+>> +
+>>   config DEBUG_KERNEL
+>>   	bool "Kernel debugging"
+>>   	help
+>> --
+>> 2.1.0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
