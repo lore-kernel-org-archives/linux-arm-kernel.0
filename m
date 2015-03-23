@@ -1,108 +1,68 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 23 Mar 2015 17:15:34 -0600
-Subject: [PATCH v17 01/10] ARM: qcom: Add Subsystem Power Manager (SPM)
- driver
-In-Reply-To: <F7886F3F-50DF-4E1B-A6DF-5463362B2BC7@codeaurora.org>
-References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
- <1426882877-33008-2-git-send-email-lina.iyer@linaro.org>
- <F7886F3F-50DF-4E1B-A6DF-5463362B2BC7@codeaurora.org>
-Message-ID: <20150323231534.GB1790@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 Mar 2015 16:23:35 -0700
+Subject: [PATCH v3 1/6] clk: qcom: Add support for GDSCs
+In-Reply-To: <550BEFE0.1020004@codeaurora.org>
+References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+ <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
+ <550BCE7C.3030000@linaro.org> <550BED93.3000305@codeaurora.org>
+ <550BEFE0.1020004@codeaurora.org>
+Message-ID: <20150323232335.GA24757@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23 2015 at 16:06 -0600, Kumar Gala wrote:
->
->On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->
->>
->> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
->> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
->> Original tree available at -
->> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> ---
->> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  29 +-
->> drivers/soc/qcom/Kconfig                           |   7 +
->> drivers/soc/qcom/Makefile                          |   1 +
->> drivers/soc/qcom/spm.c                             | 405 +++++++++++++++++++++
->> 4 files changed, 436 insertions(+), 6 deletions(-)
->> create mode 100644 drivers/soc/qcom/spm.c
->>
->> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->> index 1505fb8..664aa91 100644
->> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->> @@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
->>
->> The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
->> Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
->> -micro-controller that transitions a piece of hardware (like a processor or
->> +power-controller that transitions a piece of hardware (like a processor or
->> subsystem) into and out of low power modes via a direct connection to
->> the PMIC. It can also be wired up to interact with other processors in the
->> system, notifying them when a low power state is entered or exited.
->>
->> +Multiple revisions of the SAW hardware are supported using these Device Nodes.
->> +SAW2 revisions differ in the register offset and configuration data. Also, the
->> +same revision of the SAW in different SoCs may have different configuration
->> +data due the the differences in hardware capabilities. Hence the SoC name, the
->> +version of the SAW hardware in that SoC and the distinction between cpu (big
->> +or Little) or cache, may be needed to uniquely identify the SAW register
->> +configuration and initialization data. The compatible string is used to
->> +indicate this parameter.
->> +
->> PROPERTIES
->>
->> - compatible:
->> @@ -14,10 +23,11 @@ PROPERTIES
->> 	Value type: <string>
->> 	Definition: shall contain "qcom,saw2". A more specific value should be
->> 		    one of:
->
->Does ?qcom,saw2? have any meaning anymore?  I see we use it in some places, but not everywhere on the .dts.  We also see to have the L2 just be a ?qcom,saw2? node, do we expect that to change?
->
-It does help match a regulator node as opposed to the specific values
-below.
+On 03/20, Rajendra Nayak wrote:
+> []...
+> >>>@@ -0,0 +1,46 @@
+> >>>+/*
+> >>>+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+> >>>+ *
+> >>>+ * This program is free software; you can redistribute it and/or modify
+> >>>+ * it under the terms of the GNU General Public License version 2 and
+> >>>+ * only version 2 as published by the Free Software Foundation.
+> >>>+ *
+> >>>+ * This program is distributed in the hope that it will be useful,
+> >>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>>+ * GNU General Public License for more details.
+> >>>+ */
+> >>>+
+> >>>+#ifndef __QCOM_GDSC_H__
+> >>>+#define __QCOM_GDSC_H__
+> >>>+
+> >>>+#include <linux/pm_domain.h>
+> >>>+
+> >>>+struct regmap;
+> 
+> I realized, after Srini pointed out on irc that this fwd declaration
+> is a complete waste. I'll remove it when I do a repost.
+> 
 
->> -			 "qcom,saw2-v1"
->> -			 "qcom,saw2-v1.1"
->> -			 "qcom,saw2-v2"
->> -			 "qcom,saw2-v2.1"
->> +			"qcom,saw2-v2"
->> +			"qcom,saw2-v2.1"
->> +			"qcom,apq8064-saw2-v1.1-cpu"
->> +			"qcom,msm8974-saw2-v2.1-cpu"
->> +			"qcom,apq8084-saw2-v2.1-cpu"
->>
->> - reg:
->> 	Usage: required
->> @@ -26,10 +36,17 @@ PROPERTIES
->> 		    the register region. An optional second element specifies
->> 		    the base address and size of the alias register region.
->>
->> +- regulator:
->> +	Usage: optional
->> +	Value type: boolean
->> +	Definition: Indicates that this SPM device acts as a regulator device
->> +			device for the core (CPU or Cache) the SPM is attached
->> +			to.
->>
->> Example:
->>
->> -	regulator at 2099000 {
->> +	power-controller at 2099000 {
->> 		compatible = "qcom,saw2";
->> 		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
->> +		regulator;
->> 	};
->
->-- 
->Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+Why? It's there so that struct regmap is declared instead of
+being declared inside struct gdsc.
+
+> >>>+
+> >>>+/**
+> >>>+ * struct gdsc - Globally Distributed Switch Controller
+> >>>+ * @pd: generic power domain
+> >>>+ * @regmap: regmap for MMIO accesses
+> >>>+ * @gdscr: gsdc control register
+> >>>+ */
+> >>>+struct gdsc {
+> >>>+    struct generic_pm_domain    pd;
+> >>>+    struct regmap            *regmap;
+> >>>+    unsigned int            gdscr;
+> >>>+};
+> >>>+
+> >>>+#define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
+> >>>+
+> >>>+#ifdef CONFIG_QCOM_GDSC
+> >>>+int gdsc_register(struct device *, struct gdsc **, size_t n, struct
+> >>>regmap *);
+> >>>+void gdsc_unregister(struct device *);
+> >>>+#else
+> >>>+int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct
+> >>>regmap *r)
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
