@@ -1,70 +1,49 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 23 Mar 2015 13:55:12 -0400
-Subject: [PATCHv2] thermal: add omap3 support
-In-Reply-To: <20150323155830.GB13297@amd>
-References: <20150103111146.GB7065@amd> <20150118202824.GB29014@amd>
- <20150323143149.GA18339@developer.hsd1.ca.comcast.net>
- <20150323155830.GB13297@amd>
-Message-ID: <20150323175508.GA28302@developer>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Mar 2015 18:00:16 +0000
+Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
+ init_mm
+In-Reply-To: <20150323175055.GD12757@e104818-lin.cambridge.arm.com>
+References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+ <1427116945.2693.10.camel@linaro.org>
+ <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
+ <1427131377.2693.25.camel@linaro.org>
+ <20150323175055.GD12757@e104818-lin.cambridge.arm.com>
+Message-ID: <20150323180016.GE1556@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 04:58:30PM +0100, Pavel Machek wrote:
-> On Mon 2015-03-23 10:31:51, Eduardo Valentin wrote:
-> > On Sun, Jan 18, 2015 at 09:28:24PM +0100, Pavel Machek wrote:
+On Mon, Mar 23, 2015 at 05:50:55PM +0000, Catalin Marinas wrote:
+> On Mon, Mar 23, 2015 at 05:22:57PM +0000, Jon Medhurst (Tixy) wrote:
+> > On Mon, 2015-03-23 at 15:44 +0000, Catalin Marinas wrote:
+> > > From 5d9e3540b6480558528612dd3672543fa8ab3528 Mon Sep 17 00:00:00 2001
+> > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > Date: Mon, 23 Mar 2015 15:06:50 +0000
+> > > Subject: [PATCH] arm64: Use the reserved TTBR0 if context switching to the
+> > >  init_mm
 > > > 
-> > > Add support for omap3430 sensor. Tested on Nokia N900.
+> > > The idle_task_exit() function may call switch_mm() with next ==
+> > > &init_mm. On arm64, init_mm.pgd cannot be used for user mappings, so
+> > > this patch simply sets the reserved TTBR0.
 > > > 
-> > > Fix help text to be closer to english.
-> > > 
-> > > Ifdefs in ti-bandgap.h are not neccessary, as users have #ifdefs,
-> > > already.
-> > > 
-> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > Cc: <stable@vger.kernel.org>
+> > > Reported-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > > 
-> > You need to update the driver device tree binding documentation. Please
-> > include an example of its usage there.
-> > 
-> > Also, a separate patch with the required DT changes is always
-> > welcome.
+> > That unsurprising fixes the BUG_ON I was seeing on Juno, so...
+> > Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
 > 
-> I can do it, but can you merge:
+> Thanks.
 > 
-> Date: Sun, 18 Jan 2015 21:24:47 +0100
-> From: Pavel Machek <pavel@ucw.cz>
-> Subject: [PATCHv2] ti-soc-thermal: request temperature periodically if
-> hw can't do that itself
+> > One question, is bypassing setting the mm_cpumask and context.id for
+> > init_mm OK? I'm not familiar with the code but had a quick look, and it
+> > looks like they are just used for ASID management, in which case I
+> > assume everything is OK - ASIDs only being relevant for user mappings in
+> > ttbr0?
 > 
-> 
-> Date: Sun, 18 Jan 2015 21:20:51 +0100
-> From: Pavel Machek <pavel@ucw.cz>
-> Subject: [PATCHv2] ti-soc-thermal: implement eocz bit to make driver
-> useful on omap3
-> 
-> Date: Sun, 18 Jan 2015 21:17:10 +0100
-> From: Pavel Machek <pavel@ucw.cz>
-> Subject: [PATCHv2] cleanup ti-soc-thermal
-> 
-> First? They are nicely split, as you requested, and I already have too
-> many patches in flight.
-> 
-> Thanks for the comments, I'll fix them in my local tree.
-> 								Pavel
+> That's my thinking as well. Will asked me the same question, so I'll let
+> him confirm if he's seeing anything wrong.
 
-Somehow I really thought I already sent those above. I really apologize
-for the inconvenience. It seams like they've fallen into the cracks.
+I can't seem to break it. The ASID state should all be up to date with the
+previous mm, so this should be harmless...
 
-
-I will check those and apply accordingly.
-
-> 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/78c3e107/attachment.sig>
+Will
