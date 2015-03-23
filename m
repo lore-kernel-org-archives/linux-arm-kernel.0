@@ -1,77 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Mar 2015 10:43:04 -0700
-Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information to
- DT bindings
-In-Reply-To: <20150323115425.GC24422@x1>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-9-git-send-email-wens@csie.org> <20150323115425.GC24422@x1>
-Message-ID: <CAGb2v673WWV4q5eEGQF-nhX=Zq=ciD=yXgei-eZjKMWPDxKv4A@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 23 Mar 2015 18:45:41 +0100 (CET)
+Subject: [PATCH 4/7] regulator: add mxs regulator driver
+In-Reply-To: <20150322161425.GC6643@sirena.org.uk>
+References: <1426984203-9133-1-git-send-email-stefan.wahren@i2se.com>
+ <1426984203-9133-5-git-send-email-stefan.wahren@i2se.com>
+ <20150322161425.GC6643@sirena.org.uk>
+Message-ID: <1459171144.549216.1427132741792.JavaMail.open-xchange@oxbaltgw02.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 4:54 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
->
->> Add the list of regulators for AXP22x to the DT bindings.
->> This includes the names and supply names.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
->>  1 file changed, 27 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> index 3914a3f91ff6..0fc2f1f35cef 100644
->> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
->> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
->> @@ -49,6 +49,33 @@ LDO3               : LDO           : ldo3in-supply
->>  LDO4         : LDO           : ldo24in-supply        : shared supply
->>  LDO5         : LDO           : ldo5in-supply
->>
->> +
->
-> Nit: I'm not keen on double line spacing.
->
->> +AXP221 regulators, type, and corresponding input supply names:
->> +
->> +Regulator      Type            Supply Name             Notes
->> +---------      ----            -----------             -----
->> +DCDC1                : DC-DC buck    : vin1-supply
->> +DCDC2                : DC-DC buck    : vin2-supply
->> +DCDC3                : DC-DC buck    : vin3-supply
->> +DCDC4                : DC-DC buck    : vin4-supply
->> +DCDC5                : DC-DC buck    : vin5-supply
->> +DC1SW                : On/Off Switch : dcdc1-supply          : DCDC1 secondary output
->> +DC5LDO               : LDO           : dcdc5-supply          : input from DCDC5
->> +ALDO1                : LDO           : aldoin-supply         : shared supply
->> +ALDO2                : LDO           : aldoin-supply         : shared supply
->> +ALDO3                : LDO           : aldoin-supply         : shared supply
->> +DLDO1                : LDO           : dldoin-supply         : shared supply
->> +DLDO2                : LDO           : dldoin-supply         : shared supply
->> +DLDO3                : LDO           : dldoin-supply         : shared supply
->> +DLDO4                : LDO           : dldoin-supply         : shared supply
->> +ELDO1                : LDO           : eldoin-supply         : shared supply
->> +ELDO2                : LDO           : eldoin-supply         : shared supply
->> +ELDO3                : LDO           : eldoin-supply         : shared supply
->> +LDO_IO0              : LDO           : ips-supply            : GPIO 0
->> +LDO_IO1              : LDO           : ips-supply            : GPIO 1
->> +RTC_LDO              : LDO           : ips-supply            : always on
->> +
->> +
->
-> Nit: I'm not keen on double line spacing.
+Hi Mark,
 
-Ok. I can get rid of them. IMHO it makes different sections clearer though.
-I assume you don't want them in the original axp20x patches either?
-
-ChenYu
-
->>  Example:
->>
->>  axp209: pmic at 34 {
 >
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> > + if (ldo->get_power_source)
+> > + power_source = ldo->get_power_source(reg);
+> > +
+> > + switch (power_source) {
+> > + case HW_POWER_LINREG_DCDC_OFF:
+> > + case HW_POWER_LINREG_DCDC_READY:
+> > + case HW_POWER_EXTERNAL_SOURCE_5V:
+> > + usleep_range(1000, 2000);
+> > + return 0;
+> > + }
+>
+> I'd expect the switch to be in the if here?
+
+yes, that's possible too.
+
+>
+> > +
+> > + usleep_range(15, 20);
+> > + start = jiffies;
+> > + while (1) {
+> > + if (readl(ldo->status_addr) & BM_POWER_STS_DC_OK)
+> > + return 0;
+> > +
+> > + if (time_after(jiffies, start + msecs_to_jiffies(20)))
+> > + break;
+> > +
+> > + schedule();
+> > + }
+>
+> So, this isn't actually quite a busy wait because we do a schedule()
+> rather than a cpu_relax() but still it could devolve into that - 20ms
+> seems a long time to burn doing that. If we're expecting this to finish
+> very quickly can we do an initial busy wait then fall back to something
+> with an actual sleep or soemthing?
+
+We will need to keep the initial usleep_range(). So do you think of the
+following:
+
+1. usleep_range
+2. busy_wait for BM_POWER_STS_DC_OK
+3. msleep (for the timeout case)
+
+Stefan
