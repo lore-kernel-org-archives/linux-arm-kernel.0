@@ -1,40 +1,32 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 23 Mar 2015 12:00:53 -0500
-Subject: [PATCH 1/3] ARM: dts: OMAP5+: separate the cpu thermal zone
- definition from omap4
-In-Reply-To: <550FE807.6020107@ti.com>
-References: <1426880861-9266-1-git-send-email-nm@ti.com>
- <1426880861-9266-2-git-send-email-nm@ti.com>
- <20150320215402.GB7346@developer.amazonguestwifi.org>
- <550FE807.6020107@ti.com>
-Message-ID: <551046C5.1080901@ti.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Mon, 23 Mar 2015 17:05:44 +0000
+Subject: [PATCH v5 6/6] target-arm: cpu.h document why env->spsr exists
+In-Reply-To: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1427130344-27986-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2015 05:16 AM, Tero Kristo wrote:
-> On 03/20/2015 11:54 PM, Eduardo Valentin wrote:
->> On Fri, Mar 20, 2015 at 02:47:39PM -0500, Nishanth Menon wrote:
->>> From: Tero Kristo <t-kristo@ti.com>
+I was getting very confused about the duplication of state so wanted to
+make it explicit.
 
-[...]
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
->> Can't we simple change the polling value for the omap5 case and reuse
->> the omap4 file?
-> 
-> Hmm yea, I posted a patch like this before for o5 and it was queued 
-> already. See:
-> 
-> http://thread.gmane.org/gmane.linux.ports.arm.omap/123729
-> 
-> The dra7 part was missing from this set though, so patches 2/3 do not 
-> directly work with that one and will require some changes similar to the 
-> linked omap4 one.
-
-OK. will do that and as part of that, I will squash up patch 1 and 2
-Since it is needed only when we introduce DRA7 thermal description -
-Apologies on missing the O5 patch.
-
-
+diff --git a/target-arm/cpu.h b/target-arm/cpu.h
+index 083211c..6dc1799 100644
+--- a/target-arm/cpu.h
++++ b/target-arm/cpu.h
+@@ -155,6 +155,11 @@ typedef struct CPUARMState {
+        This contains all the other bits.  Use cpsr_{read,write} to access
+        the whole CPSR.  */
+     uint32_t uncached_cpsr;
++    /* The spsr is a alias for spsr_elN where N is the current
++     * exception level. It is provided for here so the TCG msr/mrs
++     * implementation can access one register. Care needs to be taken
++     * to ensure the banked_spsr[] is also updated.
++     */
+     uint32_t spsr;
+ 
+     /* Banked registers.  */
 -- 
-Regards,
-Nishanth Menon
+2.3.2
