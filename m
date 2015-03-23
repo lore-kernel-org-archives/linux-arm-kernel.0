@@ -1,62 +1,36 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 23 Mar 2015 20:53:58 +0900
-Subject: [RFC 3/4] arm64: kvm: add cpu reset hook for cpu hotplug
+Date: Mon, 23 Mar 2015 20:53:59 +0900
+Subject: [RFC 4/4] arm64: kvm: add cpu reset at module exit
 In-Reply-To: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1427111639-4575-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1427111639-4575-5-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch doesn't enable cpu hotplug under kvm, but is a prerequiste
-when the feature is implemented.
-Once kvm_arch_hardware_enable/disable() is properly implemented,
-arm64-specific cpu notifier hook, hyp_init_cpu_notify(), will be
-able to be removed and replaced by generic kvm_cpu_hotplug().
+This patch doesn't enable kvm to be built as a module, but is
+a prerequisite when kvm is transformed to be module-capable.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm/kvm/arm.c                |    9 +++++++++
- arch/arm64/include/asm/kvm_host.h |    1 -
- 2 files changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index b879cf6..08804d3 100644
+index 08804d3..b85dad6 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -925,6 +925,10 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
- 		if (__hyp_get_vectors() == hyp_default_vectors)
- 			cpu_init_hyp_mode(NULL);
- 		break;
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		kvm_cpu_reset(NULL);
-+		break;
- 	}
- 
- 	return NOTIFY_OK;
-@@ -1168,6 +1172,11 @@ out_err:
- 	return err;
- }
- 
-+void kvm_arch_hardware_disable(void)
-+{
-+	kvm_cpu_reset(NULL);
-+}
-+
- /* NOP: Compiling as a module not supported */
+@@ -1181,6 +1181,12 @@ void kvm_arch_hardware_disable(void)
  void kvm_arch_exit(void)
  {
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 97f88fe..a97b2fe 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -261,7 +261,6 @@ static inline void vgic_arch_setup(const struct vgic_params *vgic)
- 	}
+ 	kvm_perf_teardown();
++
++	unregister_reboot_notifier(&kvm_reboot_nb);
++	/*
++	 * Reset each CPU in EL2 to initial state.
++	 */
++	on_each_cpu(kvm_cpu_reset, NULL, 1);
  }
  
--static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static int arm_init(void)
 -- 
 1.7.9.5
