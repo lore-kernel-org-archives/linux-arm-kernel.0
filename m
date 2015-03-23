@@ -1,137 +1,94 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 23 Mar 2015 20:40:38 +0800
-Subject: [PATCH v7 12/31] powerpc/PCI: Rename pcibios_root_bridge_prepare() to
- pcibios_set_root_bus_speed()
-In-Reply-To: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-References: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427114457-16687-13-git-send-email-wangyijing@huawei.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 23 Mar 2015 06:21:33 -0700
+Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
+In-Reply-To: <20150323125545.GP8656@n2100.arm.linux.org.uk>
+References: <20150205142918.GA10634@linux.vnet.ibm.com>
+ <20150205161100.GQ8656@n2100.arm.linux.org.uk>
+ <20150225125610.GY8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
+ <20150225170011.GC8656@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
+ <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
+ <20150226010505.GU15405@linux.vnet.ibm.com>
+ <20150322233057.GA17605@linux.vnet.ibm.com>
+ <20150323125545.GP8656@n2100.arm.linux.org.uk>
+Message-ID: <20150323132133.GD5718@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pcibios_root_bridge_prepare() in powerpc set
-root bus speed, it's not the preparation for
-pci host bridge. Rename it for better readability,
-and we could move pcibios_root_bridge_prepare()
-to pci_create_host_bridge(), in which root bus
-is not created. We will clean up these weak functions,
-and add pci_host_bridge_ops to do the same thing
-in later patch.
+On Mon, Mar 23, 2015 at 12:55:45PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Mar 22, 2015 at 04:30:57PM -0700, Paul E. McKenney wrote:
+> > On Wed, Feb 25, 2015 at 05:05:05PM -0800, Paul E. McKenney wrote:
+> > > On Wed, Feb 25, 2015 at 03:16:59PM -0500, Nicolas Pitre wrote:
+> > > > On Wed, 25 Feb 2015, Nicolas Pitre wrote:
+> > > > 
+> > > > > On Wed, 25 Feb 2015, Russell King - ARM Linux wrote:
+> > > > > 
+> > > > > > We could just use the spin-and-poll solution instead of an IPI, but
+> > > > > > I really don't like that - when you see the complexity needed to
+> > > > > > re-initialise it each time, it quickly becomes very yucky because
+> > > > > > there is no well defined order between __cpu_die() and __cpu_kill()
+> > > > > > being called by the two respective CPUs.
+> > > > > > 
+> > > > > > The last patch I saw doing that had multiple bits to indicate success
+> > > > > > and timeout, and rather a lot of complexity to recover from failures,
+> > > > > > and reinitialise state for a second CPU going down.
+> > > > > 
+> > > > > What about a per CPU state?  That would at least avoid the need to 
+> > > > > serialize things across CPUs.  If only one CPU may write its state, that 
+> > > > > should eliminate the need for any kind of locking.
+> > > > 
+> > > > Something like the following?  If according to $subject it is the 
+> > > > complete() usage that has problems, then this replacement certainly has 
+> > > > it removed while keeping things simple.  And I doubt CPU hotplug is 
+> > > > performance critical so a simple polling is certainly good enough.
+> > > 
+> > > For whatever it is worth, I am proposing the patch below for common code.
+> > > Works on x86.  (Famous last words...)
+> > 
+> > So I am intending to submit these changes to the upcoming merge window.
+> > Do you guys have something in place for ARM?
+> 
+> I've rather dropped the ball on this (sorry, I've had wisdom teeth out,
+> with a week long recovery, and then had to catch back up with mail...).
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- arch/powerpc/include/asm/machdep.h     |    2 +-
- arch/powerpc/kernel/pci-common.c       |    8 +++-----
- arch/powerpc/platforms/pseries/pci.c   |    8 ++++----
- arch/powerpc/platforms/pseries/setup.c |    2 +-
- drivers/pci/probe.c                    |    5 +++++
- 5 files changed, 14 insertions(+), 11 deletions(-)
+Ouch!!!
 
-diff --git a/arch/powerpc/include/asm/machdep.h b/arch/powerpc/include/asm/machdep.h
-index c8175a3..b811d12 100644
---- a/arch/powerpc/include/asm/machdep.h
-+++ b/arch/powerpc/include/asm/machdep.h
-@@ -129,7 +129,7 @@ struct machdep_calls {
- 	void		(*pcibios_fixup)(void);
- 	int		(*pci_probe_mode)(struct pci_bus *);
- 	void		(*pci_irq_fixup)(struct pci_dev *dev);
--	int		(*pcibios_root_bridge_prepare)(struct pci_host_bridge
-+	void		(*pcibios_set_root_bus_speed)(struct pci_host_bridge
- 				*bridge);
- 
- 	/* To setup PHBs when using automatic OF platform driver for PCI */
-diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-index 9913f6c..2c58200 100644
---- a/arch/powerpc/kernel/pci-common.c
-+++ b/arch/powerpc/kernel/pci-common.c
-@@ -767,12 +767,10 @@ int pci_proc_domain(struct pci_bus *bus)
- 	return 1;
- }
- 
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-+void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
- {
--	if (ppc_md.pcibios_root_bridge_prepare)
--		return ppc_md.pcibios_root_bridge_prepare(bridge);
--
--	return 0;
-+	if (ppc_md.pcibios_set_root_bus_speed)
-+		return ppc_md.pcibios_set_root_bus_speed(bridge);
- }
- 
- /* This header fixup will do the resource fixup for all devices as they are
-diff --git a/arch/powerpc/platforms/pseries/pci.c b/arch/powerpc/platforms/pseries/pci.c
-index fe16a50..89ff79c 100644
---- a/arch/powerpc/platforms/pseries/pci.c
-+++ b/arch/powerpc/platforms/pseries/pci.c
-@@ -110,7 +110,7 @@ static void fixup_winbond_82c105(struct pci_dev* dev)
- DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105,
- 			 fixup_winbond_82c105);
- 
--int pseries_root_bridge_prepare(struct pci_host_bridge *bridge)
-+void pseries_set_root_bus_speed(struct pci_host_bridge *bridge)
- {
- 	struct device_node *dn, *pdn;
- 	struct pci_bus *bus;
-@@ -121,7 +121,7 @@ int pseries_root_bridge_prepare(struct pci_host_bridge *bridge)
- 
- 	dn = pcibios_get_phb_of_node(bus);
- 	if (!dn)
--		return 0;
-+		return;
- 
- 	for (pdn = dn; pdn != NULL; pdn = of_get_next_parent(pdn)) {
- 		rc = of_property_read_u32_array(pdn,
-@@ -135,7 +135,7 @@ int pseries_root_bridge_prepare(struct pci_host_bridge *bridge)
- 
- 	if (rc) {
- 		pr_debug("no ibm,pcie-link-speed-stats property\n");
--		return 0;
-+		return;
- 	}
- 
- 	switch (pcie_link_speed_stats[0]) {
-@@ -168,5 +168,5 @@ int pseries_root_bridge_prepare(struct pci_host_bridge *bridge)
- 		break;
- 	}
- 
--	return 0;
-+	return;
- }
-diff --git a/arch/powerpc/platforms/pseries/setup.c b/arch/powerpc/platforms/pseries/setup.c
-index e445b67..b196c0d 100644
---- a/arch/powerpc/platforms/pseries/setup.c
-+++ b/arch/powerpc/platforms/pseries/setup.c
-@@ -496,7 +496,7 @@ static void __init pSeries_setup_arch(void)
- 		ppc_md.enable_pmcs = power4_enable_pmcs;
- 	}
- 
--	ppc_md.pcibios_root_bridge_prepare = pseries_root_bridge_prepare;
-+	ppc_md.pcibios_set_root_bus_speed = pseries_set_root_bus_speed;
- 
- 	if (firmware_has_feature(FW_FEATURE_SET_MODE)) {
- 		long rc;
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 0ac2bf6..418a426 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1856,6 +1856,10 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
- 	return 0;
- }
- 
-+void __weak pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
-+{
-+}
-+
- void __weak pcibios_add_bus(struct pci_bus *bus)
- {
- }
-@@ -1893,6 +1897,7 @@ static struct pci_bus *__pci_create_root_bus(
- 	if (error)
- 		goto put_dev;
- 
-+	pcibios_set_root_bus_speed(bridge);
- 	device_enable_async_suspend(b->bridge);
- 	pci_set_bus_of_node(b);
- 
--- 
-1.7.1
+> Looking at this patch, what advantage does using atomic_t give us?
+> For example:
+> 
+> > > +int cpu_check_up_prepare(int cpu)
+> > > +{
+> > > +	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
+> > > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+> > > +		return 0;
+> > > +	}
+> > > +
+> > > +	switch (atomic_read(&per_cpu(cpu_hotplug_state, cpu))) {
+> > > +
+> > > +	case CPU_POST_DEAD:
+> > > +
+> > > +		/* The CPU died properly, so just start it up again. */
+> > > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
+> > > +		return 0;
+> 
+> What if the cpu_hotplug_state for the CPU changes between reading it
+> testing its value, and then writing it, or do we guarantee that it
+> can't change other than by this function here?  If it can't change,
+> then what's the point of using atomic_t for this?
+
+It indeed cannot change -here-, but there are other situations where
+more than one CPU can be attempting to change it at the same time.
+The reason that it cannot change here is that the variable has the
+value that indicates that the previous offline completed within the
+timeout period, so there are no outstanding writes.
+
+When going offline, the outgoing CPU might take so long leaving that
+the surviving CPU times out, thus both CPUs write to the variable at
+the same time, which by itself requires atomics.  If this seems
+unlikely, consider virtualized environments where the hypervisor
+might preempt the guest OS.
+
+Make sense?
+
+							Thanx, Paul
