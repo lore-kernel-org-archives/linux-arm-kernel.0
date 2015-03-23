@@ -1,83 +1,67 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 11:52:57 +0100
-Subject: [PATCH] ARM: kvm: implement replacement for ld's LOG2CEIL()
-Message-ID: <1427107977-18591-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 23 Mar 2015 11:59:31 +0100
+Subject: [PATCH v2 0/3] arm64: relax Image placement requirement
+In-Reply-To: <20150323104536.GA9724@red-moon>
+References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150323104536.GA9724@red-moon>
+Message-ID: <CAKv+Gu_J86pH8qcvuEWkvMy=TFLq02qqDKbNDs96i0=ywfau+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce
-page") uses ld's builtin function LOG2CEIL() to align the
-KVM init code to a log2 upper bound of its size. However,
-this function turns out to be a fairly recent addition to
-binutils, which breaks the build for older toolchains.
+On 23 March 2015 at 11:45, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Mar 23, 2015 at 09:07:23AM +0000, Ard Biesheuvel wrote:
+>> So as it turns out, the 512 MB alignment boundary restriction appears
+>> to have been introduced by accident when increasing the ID map to cover
+>> the entire kernel Image.
+>>
+>> So this reverts that change, by reducing the ID map to something that
+>> can never cross a 512 MB boundary by construction.
+>>
+>> Patch #1 removes some functions that are unused, so that I don't have
+>> to worry about them in patch #2
+>>
+>> Patch #2 introduces the reduced ID map, using a separate linker section
+>> that contains code the manipulates the state of the MMU.
+>>
+>> Patch #3 removes the sleep_idmap_phys global which always points to
+>> the ID map anyway
+>
+> Patch 1 and 2 do not apply for me, what tree/commit are they based against ?
+>
+> Please let me know so that I can give patch 3 a go.
+>
 
-So instead, implement a replacement LOG2_ROUNDUP() using
-the C preprocessor.
+They should apply onto for-next/core, but I pushed them to a public branch here:
+https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-idmap
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+Regards,
+Ard.
 
-Linker map output after applying this patch:
 
-                0xc09a2590                __idmap_text_end = .
-                [...]
- *fill*         0xc09a2590       0x70 
-                0xc09a2600                __hyp_idmap_text_start = .
- *(.hyp.idmap.text)
- .hyp.idmap.text
-                0xc09a2600      0x100 arch/arm/kvm/built-in.o
-                0xc09a2600                __kvm_hyp_init
-                0xc09a26ec                __kvm_hyp_init_end
-                0xc09a2700                __hyp_idmap_text_end = .
-
-which confirms that the alignemnt is correct. The size of the region
-is 0xec bytes, and 0x70 bytes of padding are emitted to align it at
-a 0x100 byte boundary
-
- arch/arm/kernel/vmlinux.lds.S | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index ba65f1217310..2d760df0d57d 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -11,7 +11,27 @@
- #ifdef CONFIG_ARM_KERNMEM_PERMS
- #include <asm/pgtable.h>
- #endif
--	
-+
-+/*
-+ * Poor man's version of LOG2CEIL(), which is
-+ * not available in binutils before v2.24.
-+ */
-+#define LOG2_ROUNDUP(size) (		\
-+	__LOG2_ROUNDUP(size,  2)	\
-+	__LOG2_ROUNDUP(size,  3)	\
-+	__LOG2_ROUNDUP(size,  4)	\
-+	__LOG2_ROUNDUP(size,  5)	\
-+	__LOG2_ROUNDUP(size,  6)	\
-+	__LOG2_ROUNDUP(size,  7)	\
-+	__LOG2_ROUNDUP(size,  8)	\
-+	__LOG2_ROUNDUP(size,  9)	\
-+	__LOG2_ROUNDUP(size, 10)	\
-+	__LOG2_ROUNDUP(size, 11)	\
-+	12)
-+
-+#define __LOG2_ROUNDUP(size, order)	\
-+	(size) <= (1 << order) ? order :
-+
- #define PROC_INFO							\
- 	. = ALIGN(4);							\
- 	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
-@@ -23,7 +43,7 @@
- 	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
- 	*(.idmap.text)							\
- 	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
--	. = ALIGN(1 << LOG2CEIL(__hyp_idmap_size));			\
-+	. = ALIGN(1 << LOG2_ROUNDUP(__hyp_idmap_size));			\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
- 	*(.hyp.idmap.text)						\
- 	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
--- 
-1.8.3.2
+>> Ard Biesheuvel (3):
+>>   arm64: remove soft_restart() and friends
+>>   arm64: reduce ID map to a single page
+>>   arm64: drop sleep_idmap_phys
+>>
+>>  arch/arm64/include/asm/mmu.h         |  1 -
+>>  arch/arm64/include/asm/proc-fns.h    |  3 ---
+>>  arch/arm64/include/asm/system_misc.h |  1 -
+>>  arch/arm64/kernel/head.S             | 13 +++++++------
+>>  arch/arm64/kernel/process.c          | 12 +-----------
+>>  arch/arm64/kernel/sleep.S            |  9 ++++-----
+>>  arch/arm64/kernel/suspend.c          |  3 ---
+>>  arch/arm64/kernel/vmlinux.lds.S      | 11 ++++++++++-
+>>  arch/arm64/mm/mmu.c                  | 11 -----------
+>>  arch/arm64/mm/proc.S                 | 33 ---------------------------------
+>>  10 files changed, 22 insertions(+), 75 deletions(-)
+>>
+>> --
+>> 1.8.3.2
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
