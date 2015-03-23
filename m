@@ -1,94 +1,104 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 23 Mar 2015 06:21:33 -0700
-Subject: [PATCH v2] ARM: Don't use complete() during __cpu_die
-In-Reply-To: <20150323125545.GP8656@n2100.arm.linux.org.uk>
-References: <20150205142918.GA10634@linux.vnet.ibm.com>
- <20150205161100.GQ8656@n2100.arm.linux.org.uk>
- <20150225125610.GY8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502250941210.25484@knanqh.ubzr>
- <20150225170011.GC8656@n2100.arm.linux.org.uk>
- <alpine.LFD.2.11.1502251257410.25484@knanqh.ubzr>
- <alpine.LFD.2.11.1502251427580.25484@knanqh.ubzr>
- <20150226010505.GU15405@linux.vnet.ibm.com>
- <20150322233057.GA17605@linux.vnet.ibm.com>
- <20150323125545.GP8656@n2100.arm.linux.org.uk>
-Message-ID: <20150323132133.GD5718@linux.vnet.ibm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 23 Mar 2015 13:22:25 +0000
+Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
+ init_mm
+In-Reply-To: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1427116945.2693.10.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 12:55:45PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Mar 22, 2015 at 04:30:57PM -0700, Paul E. McKenney wrote:
-> > On Wed, Feb 25, 2015 at 05:05:05PM -0800, Paul E. McKenney wrote:
-> > > On Wed, Feb 25, 2015 at 03:16:59PM -0500, Nicolas Pitre wrote:
-> > > > On Wed, 25 Feb 2015, Nicolas Pitre wrote:
-> > > > 
-> > > > > On Wed, 25 Feb 2015, Russell King - ARM Linux wrote:
-> > > > > 
-> > > > > > We could just use the spin-and-poll solution instead of an IPI, but
-> > > > > > I really don't like that - when you see the complexity needed to
-> > > > > > re-initialise it each time, it quickly becomes very yucky because
-> > > > > > there is no well defined order between __cpu_die() and __cpu_kill()
-> > > > > > being called by the two respective CPUs.
-> > > > > > 
-> > > > > > The last patch I saw doing that had multiple bits to indicate success
-> > > > > > and timeout, and rather a lot of complexity to recover from failures,
-> > > > > > and reinitialise state for a second CPU going down.
-> > > > > 
-> > > > > What about a per CPU state?  That would at least avoid the need to 
-> > > > > serialize things across CPUs.  If only one CPU may write its state, that 
-> > > > > should eliminate the need for any kind of locking.
-> > > > 
-> > > > Something like the following?  If according to $subject it is the 
-> > > > complete() usage that has problems, then this replacement certainly has 
-> > > > it removed while keeping things simple.  And I doubt CPU hotplug is 
-> > > > performance critical so a simple polling is certainly good enough.
-> > > 
-> > > For whatever it is worth, I am proposing the patch below for common code.
-> > > Works on x86.  (Famous last words...)
-> > 
-> > So I am intending to submit these changes to the upcoming merge window.
-> > Do you guys have something in place for ARM?
+On Thu, 2015-03-19 at 15:43 +0000, Will Deacon wrote:
+> init_mm isn't a normal mm: it has swapper_pg_dir as its pgd (which
+> contains kernel mappings) and is used as the active_mm for the idle
+> thread.
 > 
-> I've rather dropped the ball on this (sorry, I've had wisdom teeth out,
-> with a week long recovery, and then had to catch back up with mail...).
-
-Ouch!!!
-
-> Looking at this patch, what advantage does using atomic_t give us?
-> For example:
+> When restoring the pgd after an EFI call, we write current->active_mm
+> into TTBR0. If the current task is actually the idle thread (e.g. when
+> initialising the EFI RTC before entering userspace), then the TLB can
+> erroneously populate itself with junk global entries as a result of
+> speculative table walks.
 > 
-> > > +int cpu_check_up_prepare(int cpu)
-> > > +{
-> > > +	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU)) {
-> > > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
-> > > +		return 0;
-> > > +	}
-> > > +
-> > > +	switch (atomic_read(&per_cpu(cpu_hotplug_state, cpu))) {
-> > > +
-> > > +	case CPU_POST_DEAD:
-> > > +
-> > > +		/* The CPU died properly, so just start it up again. */
-> > > +		atomic_set(&per_cpu(cpu_hotplug_state, cpu), CPU_UP_PREPARE);
-> > > +		return 0;
+> When we do eventually return to userspace, the task can end up hitting
+> these junk mappings leading to lockups, corruption or crashes.
 > 
-> What if the cpu_hotplug_state for the CPU changes between reading it
-> testing its value, and then writing it, or do we guarantee that it
-> can't change other than by this function here?  If it can't change,
-> then what's the point of using atomic_t for this?
+> This patch fixes the problem in the same way as the CPU suspend code by
+> ensuring that we never switch to the init_mm in efi_set_pgd and instead
+> point TTBR0 at the zero page. A check is also added to cpu_switch_mm to
+> BUG if we get passed swapper_pg_dir.
 
-It indeed cannot change -here-, but there are other situations where
-more than one CPU can be attempting to change it at the same time.
-The reason that it cannot change here is that the variable has the
-value that indicates that the previous offline completed within the
-timeout period, so there are no outstanding writes.
+Which seems to happen in idle_task_exit() when you offline a cpu. This
+patch is now in 4.0-rc5 and I get ...
 
-When going offline, the outgoing CPU might take so long leaving that
-the surviving CPU times out, thus both CPUs write to the variable at
-the same time, which by itself requires atomics.  If this seems
-unlikely, consider virtualized environments where the hypervisor
-might preempt the guest OS.
+# echo 0 > cpu1/online
+[   51.750107] BUG: failure at ./arch/arm64/include/asm/mmu_context.h:74/switch_new_context()!
+[   51.750111] Kernel panic - not syncing: BUG!
+[   51.750116] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.0.0-rc5+ #3
+[   51.750118] Hardware name: ARM Juno development board (r0) (DT)
+[   51.750120] Call trace:
+[   51.750131] [<ffffffc00008a4cc>] dump_backtrace+0x0/0x138
+[   51.750136] [<ffffffc00008a620>] show_stack+0x1c/0x28
+[   51.750143] [<ffffffc0006f8ed4>] dump_stack+0x80/0xc4
+[   51.750146] [<ffffffc0006f58b8>] panic+0xe8/0x220
+[   51.750151] [<ffffffc0000c70bc>] idle_task_exit+0x220/0x274
+[   51.750155] [<ffffffc0000919bc>] cpu_die+0x20/0x7c
+[   51.750159] [<ffffffc0000869fc>] arch_cpu_idle_dead+0x10/0x1c
+[   51.750163] [<ffffffc0000d4de4>] cpu_startup_entry+0x2c4/0x36c
+[   51.750167] [<ffffffc00009185c>] secondary_start_kernel+0x12c/0x13c
 
-Make sense?
+There seems to be quite a number of uses of cpu_switch_mm in the kernel.
+I don't know if they have bugs which need fixing, or if it makes more
+sense to replace the
+	BUG_ON(pgd == swapper_pg_dir);
+with 
+	if (pgd != swapper_pg_dir)
 
-							Thanx, Paul
+
+> 
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Fixes: f3cdfd239da5 ("arm64/efi: move SetVirtualAddressMap() to UEFI stub")
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> This patch gets armhf Debian booting again on my Juno (I guess 64-bit
+> userspace tends to use virtual addresses that are high enough to avoid
+> hitting the junk TLB entries!).
+> 
+>  arch/arm64/include/asm/proc-fns.h | 6 +++++-
+>  arch/arm64/kernel/efi.c           | 6 +++++-
+>  2 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+> index 9a8fd84f8fb2..941c375616e2 100644
+> --- a/arch/arm64/include/asm/proc-fns.h
+> +++ b/arch/arm64/include/asm/proc-fns.h
+> @@ -39,7 +39,11 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+>  
+>  #include <asm/memory.h>
+>  
+> -#define cpu_switch_mm(pgd,mm) cpu_do_switch_mm(virt_to_phys(pgd),mm)
+> +#define cpu_switch_mm(pgd,mm)				\
+> +do {							\
+> +	BUG_ON(pgd == swapper_pg_dir);			\
+> +	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
+> +} while (0)
+>  
+>  #define cpu_get_pgd()					\
+>  ({							\
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index 2b8d70164428..ab21e0d58278 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -337,7 +337,11 @@ core_initcall(arm64_dmi_init);
+>  
+>  static void efi_set_pgd(struct mm_struct *mm)
+>  {
+> -	cpu_switch_mm(mm->pgd, mm);
+> +	if (mm == &init_mm)
+> +		cpu_set_reserved_ttbr0();
+> +	else
+> +		cpu_switch_mm(mm->pgd, mm);
+> +
+>  	flush_tlb_all();
+>  	if (icache_is_aivivt())
+>  		__flush_icache_all();
