@@ -1,66 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 10:07:26 +0100
-Subject: [PATCH v2 3/3] arm64: drop sleep_idmap_phys
-In-Reply-To: <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Mon, 23 Mar 2015 02:08:12 -0700
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+ <54D40DAF.4080609@codeaurora.org>
+ <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
+ <54D534FB.1090101@codeaurora.org>
+ <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The global variable sleep_idmap_phys always points to idmap_pg_dir,
-so we can just use that value directly in the CPU resume path.
+Hello,
 
-Also unclutters the load of sleep_save_sp::save_ptr_stash_phys.
+On Tue, Feb 10, 2015 at 3:32 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Feb 09, 2015 at 11:55:54AM -0800, Gregory Fong wrote:
+>> On Fri, Feb 6, 2015 at 1:41 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+>> > So it looks like the lib/show_mem.c does something different
+>> > #ifdef CONFIG_CMA
+>> >         printk("%lu pages reserved\n", (reserved - totalcma_pages));
+>> >         printk("%lu pages cma reserved\n", totalcma_pages);
+>> > #else
+>> >         printk("%lu pages reserved\n", reserved);
+>> > #endif
+>> >
+>> >
+>> > No need to change the name, instead I'd say fix up arm to match what
+>> > the generic showmem is doing.
+>>
+>> The trouble is that lib/show_mem.c and ARM's show_mem use the
+>> 'reserved' variable to hold different info, which was not a problem I
+>> was aiming to tackle here, and am not sure I understand what's going
+>> on well enough to do so.  But let's give it a shot:
+>>
+>> In lib/show_mem.c, reserved is calculated by iterating over all online
+>> nodes, then increasing reserved by (zone->present_pages -
+>> zone->managed_pages).  This count includes CMA pages and so when
+>> reserved pages is printed it should be 'reserved' - totalcma_pages, as
+>> it currently is.
+>
+> So, some digging is needed into why the generic version is different.
+> You have to remember that many of the algorithms for this kind of thing
+> were based on the x86 implementation, so differences like this are
+> probably down to ARM being annoyingly overlooked or ignored when generic
+> changes happen.
+>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/sleep.S   | 7 ++-----
- arch/arm64/kernel/suspend.c | 3 ---
- 2 files changed, 2 insertions(+), 8 deletions(-)
+Revisiting this finally, it looks like this was changed by Mel about a
+year and a half ago in commit c78e93630d15b5f5774213aad9bdc9f52473a89b
+"mm: do not walk all of system memory during show_mem"[1], which
+removes the pfn walk and gets this info from struct zone instead,
+saving a lot of time.  Is there any reason to not to change the ARM
+show_mem to do this as well?  With that, I'm not sure I understand why
+there would need to be an ARM-specific implementation at all anymore,
+but maybe I'm missing something.
 
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 04dc9aa2831e..3c98fe1c1c2f 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -164,15 +164,12 @@ ENTRY(cpu_resume)
- #else
- 	mov	x7, xzr
- #endif
--	adrp	x0, sleep_save_sp
--	add	x0, x0, #:lo12:sleep_save_sp
--	ldr	x0, [x0, #SLEEP_SAVE_SP_PHYS]
-+	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	adrp	x1, sleep_idmap_phys
- 	/* load physical address of identity map page table in x1 */
--	ldr	x1, [x1, #:lo12:sleep_idmap_phys]
-+	adrp	x1, idmap_pg_dir
- 	mov	sp, x2
- 	/*
- 	 * cpu_do_resume expects x0 to contain context physical address
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index d7daf45ae7a2..f6073c27d65f 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- }
- 
- struct sleep_save_sp sleep_save_sp;
--phys_addr_t sleep_idmap_phys;
- 
- static int __init cpu_suspend_init(void)
- {
-@@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
- 
- 	sleep_save_sp.save_ptr_stash = ctx_ptr;
- 	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
--	sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
- 	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
--	__flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
- 
- 	return 0;
- }
--- 
-1.8.3.2
+[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=c78e93630d15b5f5774213aad9bdc9f52473a89b
+
+Best regards,
+Gregory
