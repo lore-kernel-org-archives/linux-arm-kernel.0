@@ -1,88 +1,43 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 23 Mar 2015 20:40:43 +0800
-Subject: [PATCH v7 17/31] x86/PCI: Refine pci_acpi_scan_root() with generic
- pci_host_bridge
+Date: Mon, 23 Mar 2015 20:40:34 +0800
+Subject: [PATCH v7 08/31] PCI: Update pci_host_bridge bus resource
 In-Reply-To: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
 References: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427114457-16687-18-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427114457-16687-9-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: x86 at kernel.org
----
- arch/x86/pci/acpi.c |   37 +++++++++++++++++++++----------------
- 1 files changed, 21 insertions(+), 16 deletions(-)
+From: Yijing Wang <wangyijing0307@gmail.com>
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index d2655d5..877acaf 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -349,6 +349,19 @@ static void probe_pci_root_info(struct pci_root_info *info,
- 			entry->res->name = info->name;
- }
+Sometimes, the bus resource start number is not equal to
+root bus number. For example, in pci_scan_bus(), we always
+add the default bus resource which start bus number is 0,
+but the root bus number callers given may != 0, so
+we need to update pci_host_bridge bus resource, because we
+would check whether host bridge bus resoruce is confict
+in later patch.
+
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/host-bridge.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index ecc1a7c..1a9834b 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -26,8 +26,11 @@ static void pci_host_update_busn_res(
+ 	struct resource_entry *window;
  
-+static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
-+{
-+	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
-+
-+	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
-+	return 0;
-+}
-+
-+static struct pci_host_bridge_ops pci_host_ops = {
-+	.pci_ops = &pci_root_ops,
-+	.prepare = pci_host_bridge_prepare,
-+};
-+
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
- 	struct acpi_device *device = root->device;
-@@ -359,6 +372,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	LIST_HEAD(crs_res);
- 	LIST_HEAD(resources);
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *host = NULL;
- 	struct pci_sysdata *sd;
- 	int node;
+ 	resource_list_for_each_entry(window, resources)
+-		if (window->res->flags & IORESOURCE_BUS)
++		if (window->res->flags & IORESOURCE_BUS) {
++			if (bus > window->res->start)
++				window->res->start = bus;
+ 			return;
++		}
  
-@@ -425,14 +439,13 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 
- 		if (!setup_mcfg_map(info, domain, (u8)root->secondary.start,
- 				    (u8)root->secondary.end, root->mcfg_addr))
--			bus = pci_create_root_bus(NULL, domain, busnum,
--					&pci_root_ops, sd, &resources);
--
--		if (bus) {
--			pci_scan_child_bus(bus);
--			pci_set_host_bridge_release(
--				to_pci_host_bridge(bus->bridge),
--				release_pci_root_info, info);
-+			host = pci_scan_host_bridge(NULL, domain, busnum, sd,
-+					&resources, &pci_host_ops);
-+
-+		if (host) {
-+			bus = host->bus;
-+			pci_set_host_bridge_release(host,
-+					release_pci_root_info, info);
- 		} else {
- 			resource_list_free(&resources);
- 			teardown_mcfg_map(info);
-@@ -455,14 +468,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	return bus;
- }
- 
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_sysdata *sd = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
--	return 0;
--}
--
- int __init pci_acpi_init(void)
- {
- 	struct pci_dev *dev = NULL;
+ 	pr_info(
+ 	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
 -- 
 1.7.1
