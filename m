@@ -1,67 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 11:59:31 +0100
-Subject: [PATCH v2 0/3] arm64: relax Image placement requirement
-In-Reply-To: <20150323104536.GA9724@red-moon>
-References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427101646-465-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150323104536.GA9724@red-moon>
-Message-ID: <CAKv+Gu_J86pH8qcvuEWkvMy=TFLq02qqDKbNDs96i0=ywfau+g@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 23 Mar 2015 12:04:11 +0100
+Subject: [GIT PULL] at91: cleanup for 4.1 #4
+Message-ID: <1427108651-566-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2015 at 11:45, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Mon, Mar 23, 2015 at 09:07:23AM +0000, Ard Biesheuvel wrote:
->> So as it turns out, the 512 MB alignment boundary restriction appears
->> to have been introduced by accident when increasing the ID map to cover
->> the entire kernel Image.
->>
->> So this reverts that change, by reducing the ID map to something that
->> can never cross a 512 MB boundary by construction.
->>
->> Patch #1 removes some functions that are unused, so that I don't have
->> to worry about them in patch #2
->>
->> Patch #2 introduces the reduced ID map, using a separate linker section
->> that contains code the manipulates the state of the MMU.
->>
->> Patch #3 removes the sleep_idmap_phys global which always points to
->> the ID map anyway
->
-> Patch 1 and 2 do not apply for me, what tree/commit are they based against ?
->
-> Please let me know so that I can give patch 3 a go.
->
+Arnd, Olof, Kevin,
 
-They should apply onto for-next/core, but I pushed them to a public branch here:
-https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-idmap
+Another cleanup pull-request for fixing some issues and stacking more PM
+cleanup.
+It is based on the previous "at91-cleanup3" tag sent last week (not inclueded
+yet).
 
-Regards,
-Ard.
+Thanks, best regards,
 
+The following changes since commit 8590ca655a19f9e124b52bfbf28f14eb16a05bec:
 
->> Ard Biesheuvel (3):
->>   arm64: remove soft_restart() and friends
->>   arm64: reduce ID map to a single page
->>   arm64: drop sleep_idmap_phys
->>
->>  arch/arm64/include/asm/mmu.h         |  1 -
->>  arch/arm64/include/asm/proc-fns.h    |  3 ---
->>  arch/arm64/include/asm/system_misc.h |  1 -
->>  arch/arm64/kernel/head.S             | 13 +++++++------
->>  arch/arm64/kernel/process.c          | 12 +-----------
->>  arch/arm64/kernel/sleep.S            |  9 ++++-----
->>  arch/arm64/kernel/suspend.c          |  3 ---
->>  arch/arm64/kernel/vmlinux.lds.S      | 11 ++++++++++-
->>  arch/arm64/mm/mmu.c                  | 11 -----------
->>  arch/arm64/mm/proc.S                 | 33 ---------------------------------
->>  10 files changed, 22 insertions(+), 75 deletions(-)
->>
->> --
->> 1.8.3.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+  ARM: at91: remove useless include (2015-03-16 17:03:08 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup4
+
+for you to fetch changes up to dd905bbb09383f9f62d7a6296f11788d8c283c86:
+
+  ARM: at91/pm: move AT91_MEMCTRL_* to pm.h (2015-03-23 11:16:00 +0100)
+
+----------------------------------------------------------------
+Fourth batch of cleanup for 4.1:
+- 2 issues revealed by the kbuild test robot fixed
+- move of some functions and macros into relevant files to be able to
+  streamline the at91 specific header afterwards
+
+----------------------------------------------------------------
+Alexandre Belloni (4):
+      ARM: at91: fix pm_suspend.S compilation when ARMv6 is selected
+      clocksource: atmel-st: select MFD_SYSCON
+      ARM: at91/pm: move the standby functions to pm.c
+      ARM: at91/pm: move AT91_MEMCTRL_* to pm.h
+
+ arch/arm/mach-at91/Makefile                 |  3 +
+ arch/arm/mach-at91/include/mach/at91_ramc.h |  4 --
+ arch/arm/mach-at91/pm.c                     | 89 ++++++++++++++++++++++++++
+ arch/arm/mach-at91/pm.h                     | 96 ++---------------------------
+ drivers/clocksource/Kconfig                 |  1 +
+ 5 files changed, 97 insertions(+), 96 deletions(-)
+
+-- 
+Nicolas Ferre
