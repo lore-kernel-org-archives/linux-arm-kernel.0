@@ -1,49 +1,136 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Mar 2015 18:00:16 +0000
-Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
- init_mm
-In-Reply-To: <20150323175055.GD12757@e104818-lin.cambridge.arm.com>
-References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
- <1427116945.2693.10.camel@linaro.org>
- <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
- <1427131377.2693.25.camel@linaro.org>
- <20150323175055.GD12757@e104818-lin.cambridge.arm.com>
-Message-ID: <20150323180016.GE1556@arm.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 23 Mar 2015 14:00:19 -0400
+Subject: [PATCH v2] ARM: io: Unpessimize relaxed io accessors
+Message-ID: <1427133619-24005-1-git-send-email-peter@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 05:50:55PM +0000, Catalin Marinas wrote:
-> On Mon, Mar 23, 2015 at 05:22:57PM +0000, Jon Medhurst (Tixy) wrote:
-> > On Mon, 2015-03-23 at 15:44 +0000, Catalin Marinas wrote:
-> > > From 5d9e3540b6480558528612dd3672543fa8ab3528 Mon Sep 17 00:00:00 2001
-> > > From: Catalin Marinas <catalin.marinas@arm.com>
-> > > Date: Mon, 23 Mar 2015 15:06:50 +0000
-> > > Subject: [PATCH] arm64: Use the reserved TTBR0 if context switching to the
-> > >  init_mm
-> > > 
-> > > The idle_task_exit() function may call switch_mm() with next ==
-> > > &init_mm. On arm64, init_mm.pgd cannot be used for user mappings, so
-> > > this patch simply sets the reserved TTBR0.
-> > > 
-> > > Cc: <stable@vger.kernel.org>
-> > > Reported-by: Jon Medhurst (Tixy) <tixy@linaro.org>
-> > > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > That unsurprising fixes the BUG_ON I was seeing on Juno, so...
-> > Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
-> 
-> Thanks.
-> 
-> > One question, is bypassing setting the mm_cpumask and context.id for
-> > init_mm OK? I'm not familiar with the code but had a quick look, and it
-> > looks like they are just used for ASID management, in which case I
-> > assume everything is OK - ASIDs only being relevant for user mappings in
-> > ttbr0?
-> 
-> That's my thinking as well. Will asked me the same question, so I'll let
-> him confirm if he's seeing anything wrong.
+commit 195bbcac2e5c12f7fb ("ARM: 7500/1: io: avoid writeback addressing
+modes for __raw_ accessors") disables writeback addressing modes for
+raw i/o. However, the "+Q" output constraint forces the compiler to
+disable load hoist optimizations (because the output constraint informs the
+compiler of memory stores which the compiler assumes may alias other memory).
 
-I can't seem to break it. The ASID state should all be up to date with the
-previous mm, so this should be harmless...
+Since the relaxed accessors only guarantee ordering wrt i/o accesses to the
+same device and not to main memory, there's never a possibility of an accessor
+invalidating a hoisted load (because only non-i/o loads would have been hoisted).
 
-Will
+The effect is especially noticable with complex address inputs in loops.
+For example, the following code:
+
+    #include <linux/kernel.h>
+    #include <linux/io.h>
+
+    static const int *remap;
+
+    void wr_loop(void __iomem *base, int c, int val)
+    {
+            int i;
+
+            for (i = 0; i < c; i++)
+                    writew_relaxed(val, base + remap[c >> 2]);
+    }
+
+generates
+
+           current master             |             this patch
+ 0: e3510000    cmp     r1, #0        |  0: e3510000    cmp     r1, #0
+ 4: d12fff1e    bxle    lr            |  4: d12fff1e    bxle    lr
+ 8: e3003000    movw    r3, #0        |  8: e3c1c003    bic     ip, r1, #3
+ c: e3403000    movt    r3, #0        |  c: e6ff2072    uxth    r2, r2
+10: e92d4010    push    {r4, lr}      | 10: e3a03000    mov     r3, #0
+14: e6ff2072    uxth    r2, r2        | 14: e59cc000    ldr     ip, [ip]
+18: e3c14003    bic     r4, r1, #3    | 18: e080000c    add     r0, r0, ip
+1c: e593e000    ldr     lr, [r3]      |
+20: e3a03000    mov     r3, #0        | 1c: e1c020b0    strh    r2, [r0]
+                                      | 20: e2833001    add     r3, r3, #1
+24: e79ec004    ldr     ip, [lr, r4]  | 24: e1530001    cmp     r3, r1
+28: e080c00c    add     ip, r0, ip    | 28: 1afffffb    bne     1c
+2c: e1cc20b0    strh    r2, [ip]      | 2c: e12fff1e    bx      lr
+30: e2833001    add     r3, r3, #1    |
+34: e1530001    cmp     r3, r1        |
+38: 1afffff9    bne     24            |
+                                      |
+3c: e8bd8010    pop     {r4, pc}      |
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
+---
+
+* v2: changed up commit log per Will's comment; added Will's ack
+
+ arch/arm/include/asm/io.h | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index db58deb..7744e58 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -73,17 +73,16 @@ void __raw_readsl(const volatile void __iomem *addr, void *data, int longlen);
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strh %1, %0"
+-		     : "+Q" (*(volatile u16 __force *)addr)
+-		     : "r" (val));
++		     : : "Q" (*(volatile u16 __force *)addr), "r" (val));
+ }
+ 
+ #define __raw_readw __raw_readw
+ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+ 	u16 val;
+-	asm volatile("ldrh %1, %0"
+-		     : "+Q" (*(volatile u16 __force *)addr),
+-		       "=r" (val));
++	asm volatile("ldrh %0, %1"
++		     : "=r" (val)
++		     : "Q" (*(volatile u16 __force *)addr));
+ 	return val;
+ }
+ #endif
+@@ -92,25 +91,23 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("strb %1, %0"
+-		     : "+Qo" (*(volatile u8 __force *)addr)
+-		     : "r" (val));
++		     : : "Qo" (*(volatile u8 __force *)addr), "r" (val));
+ }
+ 
+ #define __raw_writel __raw_writel
+ static inline void __raw_writel(u32 val, volatile void __iomem *addr)
+ {
+ 	asm volatile("str %1, %0"
+-		     : "+Qo" (*(volatile u32 __force *)addr)
+-		     : "r" (val));
++		     : : "Qo" (*(volatile u32 __force *)addr), "r" (val));
+ }
+ 
+ #define __raw_readb __raw_readb
+ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ {
+ 	u8 val;
+-	asm volatile("ldrb %1, %0"
+-		     : "+Qo" (*(volatile u8 __force *)addr),
+-		       "=r" (val));
++	asm volatile("ldrb %0, %1"
++		     : "=r" (val)
++		     : "Qo" (*(volatile u8 __force *)addr));
+ 	return val;
+ }
+ 
+@@ -118,9 +115,9 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
+ static inline u32 __raw_readl(const volatile void __iomem *addr)
+ {
+ 	u32 val;
+-	asm volatile("ldr %1, %0"
+-		     : "+Qo" (*(volatile u32 __force *)addr),
+-		       "=r" (val));
++	asm volatile("ldr %0, %1"
++		     : "=r" (val)
++		     : "Qo" (*(volatile u32 __force *)addr));
+ 	return val;
+ }
+ 
+-- 
+2.3.3
