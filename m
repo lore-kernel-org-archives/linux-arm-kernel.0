@@ -1,66 +1,119 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Mon, 23 Mar 2015 21:28:45 +0530
-Subject: [PATCH] Add support for CONFIG_ARM64_DMA_USE_IOMMU.
-In-Reply-To: <201503220231.40375.arnd@arndb.de>
-References: <1422379495-10268-1-git-send-email-stripathi@apm.com>
- <CAOHikRCSoijzZ8oKEtMadEHOvLiWLO6fWkqiGEiPyb+Egb_1rw@mail.gmail.com>
- <CAOHikRCSYy6Zd=Oi34-KnyhG=bY8-XdD_QpdndbC_dCox8sJEQ@mail.gmail.com>
- <201503220231.40375.arnd@arndb.de>
-Message-ID: <CAOHikRC4w7N8DFh0WyjzUDuscmwP6xYeSDBF404P4RMYcCip2g@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 23 Mar 2015 15:58:26 +0000
+Subject: [PATCH v2 09/12] KVM: arm/arm64: prepare GICv2 emulation to be
+ handled by kvm_io_bus
+In-Reply-To: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1427126309-11223-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My first suggestion would be to separate this from IOMMU support completely
-as you don't really have an IOMMU. The easiest way to deal with hardware
-like this is to use swiotlb with a fixed mapping. This is also the only
-way to deal with any devices that may have multiple outstanding DMAs
-(PCI, SATA, USB, ...).
-I guess you are talking about the swiotlb force idea ?  That's really
-good but I think we should make configuring  swiotlb force per device
-otherwise it applies to all devices ??
+Using the framework provided by the recent vgic.c changes we register
+a kvm_io_bus device when initializing the virtual GICv2.
 
-If you have any high-speed devices that only do a single request at a
-time connected to this remapper, I would suggest you implement your own
-set of dma_map_ops and come back with performance data showing whether it's
-worth merging this compared to the trivial iommu support.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/kvm/arm_vgic.h      |    1 +
+ virt/kvm/arm/vgic-v2-emul.c |   13 +++++++++----
+ virt/kvm/arm/vgic.c         |   17 +++++++++++++++++
+ 3 files changed, 27 insertions(+), 4 deletions(-)
 
-Ok. I will make a NON-TRIVIAL IOMMU support .
-
-On Sun, Mar 22, 2015 at 7:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 18 March 2015, Suman Tripathi wrote:
->> I guess there is an overlap with this thread:
->>
->> http://thread.gmane.org/gmane.linux.kernel.iommu/8213
->>
->> I would rather go for a more generic solution that Robin (cc'ed) is
->> trying to implement.
->>
->> I followed the above thread but our requirement deviates from normal
->> IOMMU conventions.
->> For our case we need a 1:1 mapping of PA to IOVA. Actually our's is
->> not a real IOMMU (ie not having a cap of page table walk). It's a
->> simple 32-bit from (device side ) ot 64-bit (cpu side) address
->> translation with the help of a set of window registers. So we want to
->> bypass the entire iova .
->>
->> Any suggestions on this ?
->
-> My first suggestion would be to separate this from IOMMU support completely
-> as you don't really have an IOMMU. The easiest way to deal with hardware
-> like this is to use swiotlb with a fixed mapping. This is also the only
-> way to deal with any devices that may have multiple outstanding DMAs
-> (PCI, SATA, USB, ...).
->
-> If you have any high-speed devices that only do a single request at a
-> time connected to this remapper, I would suggest you implement your own
-> set of dma_map_ops and come back with performance data showing whether it's
-> worth merging this compared to the trivial iommu support.
->
->         Arnd
-
-
-
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index f90140c..4523984 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -251,6 +251,7 @@ struct vgic_dist {
+ 	unsigned long		*irq_active_on_cpu;
+ 
+ 	struct vgic_vm_ops	vm_ops;
++	struct vgic_io_device	dist_iodev;
+ };
+ 
+ struct vgic_v2_cpu_if {
+diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+index 1dd183e..69f27c8 100644
+--- a/virt/kvm/arm/vgic-v2-emul.c
++++ b/virt/kvm/arm/vgic-v2-emul.c
+@@ -506,6 +506,7 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ static int vgic_v2_map_resources(struct kvm *kvm,
+ 				 const struct vgic_params *params)
+ {
++	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	int ret = 0;
+ 
+ 	if (!irqchip_in_kernel(kvm))
+@@ -516,13 +517,17 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+ 	if (vgic_ready(kvm))
+ 		goto out;
+ 
+-	if (IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_dist_base) ||
+-	    IS_VGIC_ADDR_UNDEF(kvm->arch.vgic.vgic_cpu_base)) {
++	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
++	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
+ 		kvm_err("Need to set vgic cpu and dist addresses first\n");
+ 		ret = -ENXIO;
+ 		goto out;
+ 	}
+ 
++	vgic_register_kvm_io_dev(kvm, dist->vgic_dist_base,
++				 KVM_VGIC_V2_DIST_SIZE,
++				 vgic_dist_ranges, -1, &dist->dist_iodev);
++
+ 	/*
+ 	 * Initialize the vgic if this hasn't already been done on demand by
+ 	 * accessing the vgic state from userspace.
+@@ -533,7 +538,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+ 		goto out;
+ 	}
+ 
+-	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
++	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
+ 				    params->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
+ 				    true);
+ 	if (ret) {
+@@ -541,7 +546,7 @@ static int vgic_v2_map_resources(struct kvm *kvm,
+ 		goto out;
+ 	}
+ 
+-	kvm->arch.vgic.ready = true;
++	dist->ready = true;
+ out:
+ 	if (ret)
+ 		kvm_vgic_destroy(kvm);
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index e968179..9a732d0 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -989,6 +989,21 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
+ 	return ret;
+ }
+ 
++static void vgic_unregister_kvm_io_dev(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	if (!dist || !kvm->buses[KVM_MMIO_BUS])
++		return;
++
++	mutex_lock(&kvm->slots_lock);
++	/* We could get here without ever having registered a device. */
++	if (dist->dist_iodev.dev.ops)
++		kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
++					  &dist->dist_iodev.dev);
++	mutex_unlock(&kvm->slots_lock);
++}
++
+ static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+ {
+ 	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+@@ -1705,6 +1720,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 	struct kvm_vcpu *vcpu;
+ 	int i;
+ 
++	vgic_unregister_kvm_io_dev(kvm);
++
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ 
 -- 
-Thanks,
-with regards,
-Suman Tripathi
+1.7.9.5
