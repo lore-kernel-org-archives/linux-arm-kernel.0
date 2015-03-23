@@ -1,31 +1,37 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 23 Mar 2015 15:17:22 +0000
-Subject: Renaming ARM_CCI
-In-Reply-To: <CAD3Xx4+ECHuri6nT7=gpM5EnAqZM2zW8TK4T0yjW+aMMz=pwdA@mail.gmail.com>
-References: <CAD3Xx4+ECHuri6nT7=gpM5EnAqZM2zW8TK4T0yjW+aMMz=pwdA@mail.gmail.com>
-Message-ID: <55102E82.1080404@arm.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Mon, 23 Mar 2015 16:19:37 +0100
+Subject: [PATCH v2 1/2] ARM: dts: imx6: factor out pinmux for edm1 module
+In-Reply-To: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+References: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+Message-ID: <20150323151937.GA20161@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/15 15:10, Valentin Rothberg wrote:
-> Hi Suzuki,
->
-> your commit c9966c98697a ("arm-cci: Split the code for PMU vs driver
-> support") renames the Kconfig option ARM_CCI to ARM_CCI400_PORT_CTRL.
-> However, the commit does not rename all references on ARM_CCI:
->
-It renames, but still, leaves the ARM_CCI to build the arm-cci.o, which 
-is in the original commit.
+On Sun, Mar 08, 2015 at 05:25:59PM +0100, Michael Grzeschik wrote:
+> Thw Wandboard is using the EDM1-CF-IMX6 module which is
+> defined under the edm standard.
+> 
+> http://www.edm-standard.org/
+> 
+> As this module is used on more boards this patch moves the default
+> pinmux settings into the special file imx6qdl-edm1.dtsi.
+> 
+> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> ---
+> - fixed the alphabetical order of the nodes
+> - moved MX6QDL_PAD_GPIO_16__ENET_REF_CLK to the board hogpins
+> 
+>  arch/arm/boot/dts/imx6qdl-edm1.dtsi            | 230 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi |   1 +
+>  arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi |   1 +
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi       |  99 +----------
+>  4 files changed, 234 insertions(+), 97 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-edm1.dtsi
 
-> drivers/bus/Kconfig:29: select ARM_CCI
-> drivers/bus/Makefile:6:obj-$(CONFIG_ARM_CCI)            += arm-cci.o
-> include/linux/arm-cci.h:31:#ifdef CONFIG_ARM_CCI
->
-> Is this intentional or is there a patch scheduled somewhere to fix this issue?
-Yes, it is. This problem was introduced due to a conflict in the linux-next.
+subliminal ping...
 
-See :
-  https://lkml.org/lkml/2015/3/22/240
-
-Cheers
-Suzuki
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
