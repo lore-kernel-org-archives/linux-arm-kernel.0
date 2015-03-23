@@ -1,81 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 23 Mar 2015 19:26:03 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <20150323135009.GB820@google.com>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
-Message-ID: <CAKv+Gu8qcVVTqy6Fd8PMA8ZTxiMssKz+TbMQW=fAhCBpUH2jTw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 23 Mar 2015 19:31:53 +0100
+Subject: [PATCH V2 1/3] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <1424288043-2995-1-git-send-email-fkan@apm.com>
+References: <1424288043-2995-1-git-send-email-fkan@apm.com>
+Message-ID: <20150323183153.GA1128@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(resending due to size bounce)
+On Wed, Feb 18, 2015 at 11:34:01AM -0800, Feng Kan wrote:
+> Add SLIMpro I2C device driver on APM X-Gene platform. This I2C
+> device driver use the SLIMpro Mailbox driver to tunnel message to
+> the SLIMpro coprocessor to do the work of accessing I2C components.
+> 
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> Signed-off-by: Hieu Le <hnle@apm.com>
 
-On 23 March 2015 at 14:50, Sami Tolvanen <samitolvanen@google.com> wrote:
-> Add Andy Polyakov's optimized assembly and NEON implementations for
-> SHA-256/224.
->
-> The sha256-armv4.pl script for generating the assembly code is from
-> OpenSSL commit 2ecd32a1f8f0643ae7b38f59bbaf9f0d6ef326fe.
->
-> Compared to sha256-generic these implementations have the following
-> tcrypt speed improvements on Motorola Nexus 6 (Snapdragon 805):
->
->   bs    b/u      sha256-neon  sha256-asm
->   16    16       x1.32        x1.19
->   64    16       x1.27        x1.15
->   64    64       x1.36        x1.20
->   256   16       x1.22        x1.11
->   256   64       x1.36        x1.19
->   256   256      x1.59        x1.23
->   1024  16       x1.21        x1.10
->   1024  256      x1.65        x1.23
->   1024  1024     x1.76        x1.25
->   2048  16       x1.21        x1.10
->   2048  256      x1.66        x1.23
->   2048  1024     x1.78        x1.25
->   2048  2048     x1.79        x1.25
->   4096  16       x1.20        x1.09
->   4096  256      x1.66        x1.23
->   4096  1024     x1.79        x1.26
->   4096  4096     x1.82        x1.26
->   8192  16       x1.20        x1.09
->   8192  256      x1.67        x1.23
->   8192  1024     x1.80        x1.26
->   8192  4096     x1.85        x1.28
->   8192  8192     x1.85        x1.27
->
-> Where bs refers to block size and b/u to bytes per update.
->
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-> Cc: Andy Polyakov <appro@openssl.org>
->
+Sigh, I lost my first review, so here we go again...
+It looks mostly good. Using checkpatch with '--strict' will show some
+whitespace issues. Please fix these.
 
-This builds fine and passes the tcrypt.ko tests in ARM and Thumb2 and
-even in big-endian (ARM) mode, so
+> +config I2C_XGENE_SLIMPRO
+> +	tristate "APM X-Gene SoC I2C SLIMpro devices support"
+> +	depends on ARCH_XGENE && MAILBOX
 
-Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+COMPILE_TEST?
 
-Nice work!
+> +static int start_i2c_msg_xfer(struct slimpro_i2c_dev *ctx)
+> +{
+> +	if (ctx->mbox_client.tx_block) {
+> +		if (!wait_for_completion_timeout(&ctx->rd_complete,
+> +						 msecs_to_jiffies
+> +						 (MAILBOX_OP_TIMEOUT)))
 
-Ard.
+Don't be too strict with the 80 char limit IMHO. I think it is more
+readable to combine the last two lines into one.
 
-> ---
-> Changes since v1:
->   Rebased to Herbert's cryptodev tree
->   Include sha256-armv4.pl and use it to generate sha256-core.S
->   Add integer-only assembly version as sha256-asm
->   Add support for SHA-224 to the glue code
->   Change priority for sha256/224-ce to 300
->
-> ---
->  arch/arm/crypto/Kconfig               |    7
->  arch/arm/crypto/Makefile              |    8
->  arch/arm/crypto/sha2-ce-glue.c        |    4
->  arch/arm/crypto/sha256-armv4.pl       |  713 ++++++
->  arch/arm/crypto/sha256-core.S_shipped | 2775 ++++++++++++++++++++++++
->  arch/arm/crypto/sha256_glue.c         |  246 ++
->  arch/arm/crypto/sha256_glue.h         |   23
->  arch/arm/crypto/sha256_neon_glue.c    |  172 +
->  8 files changed, 3945 insertions(+), 3 deletions(-)
->
+> +	msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+> +					SLIMPRO_IIC_READ, protocol, addrlen,
+> +					readlen);
+
+ditto
+
+> +	msg[0] = SLIMPRO_IIC_ENCODE_MSG(SLIMPRO_IIC_BUS, chip,
+> +					SLIMPRO_IIC_WRITE, protocol, addrlen,
+> +					writelen);
+
+ditto
+
+> +	paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
+> +			       DMA_FROM_DEVICE);
+
+The device should be the device of the dma channel.
+
+> +	paddr = dma_map_single(ctx->dev, ctx->dma_buffer, writelen,
+> +			       DMA_TO_DEVICE);
+
+ditto
+
+> +	rc = dma_mapping_error(ctx->dev, paddr);
+> +	if (dma_mapping_error(ctx->dev, paddr)) {
+
+if (rc)
+
+> +static struct i2c_algorithm xgene_slimpro_i2c_algorithm = {
+> +	.smbus_xfer = xgene_slimpro_i2c_xfer,
+
+Might be a tad less confusing to name this function
+xgene_slimpro_smbus_xfer. You decide.
+
+> +	rc = i2c_add_adapter(adapter);
+> +	if (rc) {
+> +		dev_err(&pdev->dev, "Adapter registeration failed\n");
+> +		return rc;
+> +	}
+> +
+> +	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +	if (rc)
+> +		dev_warn(&pdev->dev, "Unable to set dma mask\n");
+
+Shouldn't that be before i2c_add_adapter?
+
+> +static struct platform_driver xgene_slimpro_i2c_driver = {
+> +	.probe	= xgene_slimpro_i2c_probe,
+> +	.remove	= xgene_slimpro_i2c_remove,
+> +	.driver	= {
+> +		.name	= "xgene-slimpro-i2c",
+> +		.of_match_table = of_match_ptr(xgene_slimpro_i2c_id)
+
+You are DT only, do we need of_match_ptr?
+
+> +MODULE_DESCRIPTION("APM X-Gene SLIMpro I2C driver");
+> +MODULE_LICENSE("GPL");
+
+MODULE_AUTHOR left out intentionally?
+
+Thanks,
+
+   Wolfram
