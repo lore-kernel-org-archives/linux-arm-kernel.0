@@ -1,81 +1,88 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Sun, 22 Mar 2015 22:03:51 -0500
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
-References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
- <20150105092153.GJ13070@pengutronix.de>
- <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
- <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
-Message-ID: <550F8297.80809@opensource.altera.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 23 Mar 2015 12:46:12 +0800
+Subject: [PATCH 1/3] thermal: hisilicon: add new hisilicon thermal sensor
+ driver
+In-Reply-To: <20150320155527.GJ14766@leverpostej>
+References: <1426751849-10604-1-git-send-email-kong.kongxinwei@hisilicon.com>
+ <1426751849-10604-2-git-send-email-kong.kongxinwei@hisilicon.com>
+ <20150319141753.GB25967@leverpostej>
+ <20150320060653.GC18907@leoy-linaro>
+ <20150320112414.GD14766@leverpostej>
+ <20150320145353.GA20461@leoy-linaro>
+ <20150320155527.GJ14766@leverpostej>
+Message-ID: <20150323044612.GB20840@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Walter,
-
-On 3/19/15 4:27 PM, Walter Lozano wrote:
-> Hi Dinh,
+On Fri, Mar 20, 2015 at 03:55:27PM +0000, Mark Rutland wrote:
+> > > That may be the case in the code as it stands today, but per the binding
+> > > the trip points are the temperatures at which an action is to be taken.
+> > > 
+> > > The thermal-zone has poilling-delay and polling-delay-passive, but
+> > > there's no reason you couldn't also use the interrupt to handle the
+> > > "hot" trip-point, adn the reset at the "critical" trip-point. All that's
+> > > missing is the plumbing in order to do so.
+> > > 
+> > > So please co-ordinate with the thermal framework to do that.
+> > 
+> > Let's dig further more for this point, so that we can get more specific
+> > gudiance and have a good preparation for next version's patch set.
+> > 
+> > After i reviewed the thermal framework code, currently have one smooth
+> > way to co-ordinate the trip points w/t thermal framework: use the function
+> > *thermal_zone_device_register()* to register sensor, and can use the
+> > callback function .get_trip_temp to tell thermal framework for the
+> > trip points' temperature.
+> > 
+> > For hisi thermal case, now the driver is using the function
+> > *thermal_zone_of_sensor_register* to register sensor, but use this way
+> > i have not found there have standard APIs which can be used by sensor
+> > driver to get the trip points info from thermal framework.
+> > 
+> > I may miss something for thermal framework, so if have existed APIs to
+> > get the trip points, could pls point out?
 > 
-> On Mon, Mar 16, 2015 at 10:10 AM, Walter Lozano
-> <walter@vanguardiasur.com.ar> wrote:
->> On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->>> Hi!
->>>
->>> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
->>>> This patch adds the DTS bindings for the adxl34x digital
->>>> accelerometer.
->>>>
->>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
->>>> ---
->>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
->>>>  1 file changed, 16 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> index 16ea6f5..d343e03 100644
->>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> @@ -60,6 +60,22 @@
->>>>       rxc-skew-ps = <2000>;
->>>>  };
->>>>
->>>> +&gpio2 {
->>>> +     status = "okay";
->>>> +};
->>>> +
->>>> +&i2c1 {
->>>> +     status = "okay";
->>>> +
->>>> +     accel1: accelerometer at 53 {
->>>> +             compatible = "adxl34x";
+> I am only familiar with the binding, not the Linux implementation -- The
+> latter can change to accomodate your hardware without requiring binding
+> changes. Please co-ordinate with the thermal maintainers.
 
-Shouldn't this be "adi,adxl34x"? At least that's what the documentation
-says.
+Found the functions of_thermal_get_trip_points(tz) and of_thermal_get_ntrips(tz)
+will help for this.
 
->>>> +             reg = <0x53>;
->>>> +
->>>> +             interrupt-parent = <&portc>;
->>>> +             interrupts = <3 2>;
->>>> +     };
->>>> +};
->>>> +
->>>>  &mmc0 {
->>>>       vmmc-supply = <&regulator_3_3v>;
->>>>       vqmmc-supply = <&regulator_3_3v>;
->>>
->>> I just gave it a short spin. I get some interrupts and the position property
->>> changes, so it seems to work:
->>>
->>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>
->>
->> Ping?
->> How should this continue?
+> > > > > > +       if (of_property_read_bool(np, "hisilicon,tsensor-bind-irq")) {
+> > > > > > +
+> > > > > > +               if (data->irq_bind_sensor != -1)
+> > > > > > +                       dev_warn(&pdev->dev, "irq has bound to index %d\n",
+> > > > > > +                                data->irq_bind_sensor);
+> > > > > > +
+> > > > > > +               /* bind irq to this sensor */
+> > > > > > +               data->irq_bind_sensor = index;
+> > > > > > +       }
+> > > > > 
+> > > > > I don't see why this should be specified in the DT. Why do you believe
+> > > > > it should?
+> > > > 
+> > > > The thermal sensor module has four sensors, but have only one
+> > > > interrupt signal; This interrupt can only be used by one sensor;
+> > > > So want to use dts to bind the interrupt with one selected sensor.
+> > > 
+> > > That's not all that great, though I'm not exactly sure how the kernel
+> > > would select the best sensor to measure with. It would be good if you
+> > > could talk to the thermal maintainers w.r.t. this.
+> > 
+> > This will be decided by the silicon, right? Every soc has different
+> > combination with cpu/gpu/vpu, so which part is hottest, this maybe
+> > highly dependent on individual SoC.
+> > 
+> > S/W just need provide the flexibility so that later can choose
+> > the interrupt to bind with the sensor within the hottest part.
 > 
-> Any news about this patch? It has been acked by Pavel Machek and
-> Steffen Trumtrar a while ago.
->
+> Then the property you care about is which sensor is closest to what is
+> likely to be the hottest component. Given that, the kernel can decide
+> how to use the interrupt.
 
-Sorry, since I wasn't CC on the original patch and somehow my filter
-didn't catch it, I didn't see this patch until now.
+Will modify the driver to dynamically bind the interrupt to hottest
+sensor; Appreciate for good suggestion.
 
-Dinh
+Thanks,
+Leo Yan
