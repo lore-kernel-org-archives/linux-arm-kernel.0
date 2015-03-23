@@ -1,27 +1,22 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 Mar 2015 12:49:14 +0100
-Subject: [RFC] pinmux: group and function definitions in the device tree
-In-Reply-To: <20150323100913.GJ9742@pengutronix.de>
-References: <20150319153950.GC30114@odux.rfo.atmel.com>
- <20150319185637.GV4927@pengutronix.de>
- <20150320150609.GB32259@odux.rfo.atmel.com>
- <20150323064424.GD9742@pengutronix.de>
- <20150323090827.GD32259@odux.rfo.atmel.com>
- <20150323100913.GJ9742@pengutronix.de>
-Message-ID: <20150323114914.GL9742@pengutronix.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 23 Mar 2015 12:49:21 +0100
+Subject: [PATCH 00/15] iommu: Move domain allocation into drivers
+In-Reply-To: <1426843458.23931.17.camel@mtksdaap41>
+References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
+ <1426843458.23931.17.camel@mtksdaap41>
+Message-ID: <20150323114921.GM4441@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 11:09:13AM +0100, Sascha Hauer wrote:
-> 
-> This may be because the concept of groups doesn't most hardware.
+Hi Yingjoe,
 
-I meant "doesn't match most hardware"
+On Fri, Mar 20, 2015 at 05:24:18PM +0800, Yingjoe Chen wrote:
+> What's the status of this patchset?
+> While porting MTK IOMMU driver[1], we need to use a global variable
+> because we need to do dma_alloc_coherent in our domain_init. I think we
+> can remove that global variable if we base on this series.
 
-Sascha
+I plan to send out a new version this week.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+
+	Joerg
