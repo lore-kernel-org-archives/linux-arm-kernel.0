@@ -1,62 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 Mar 2015 09:58:52 -0700
-Subject: [PATCH v5 03/12] mfd: axp20x: add AXP22x PMIC support
-In-Reply-To: <20150323115225.GA24422@x1>
-References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-4-git-send-email-wens@csie.org> <20150323115225.GA24422@x1>
-Message-ID: <CAGb2v66Q+7t=wMUsEKFg57mCTcd6QE5=Q67YrYR40CQDgQo_Mw@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 23 Mar 2015 12:00:53 -0500
+Subject: [PATCH 1/3] ARM: dts: OMAP5+: separate the cpu thermal zone
+ definition from omap4
+In-Reply-To: <550FE807.6020107@ti.com>
+References: <1426880861-9266-1-git-send-email-nm@ti.com>
+ <1426880861-9266-2-git-send-email-nm@ti.com>
+ <20150320215402.GB7346@developer.amazonguestwifi.org>
+ <550FE807.6020107@ti.com>
+Message-ID: <551046C5.1080901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 03/23/2015 05:16 AM, Tero Kristo wrote:
+> On 03/20/2015 11:54 PM, Eduardo Valentin wrote:
+>> On Fri, Mar 20, 2015 at 02:47:39PM -0500, Nishanth Menon wrote:
+>>> From: Tero Kristo <t-kristo@ti.com>
 
-On Mon, Mar 23, 2015 at 4:52 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
->
->> From: Boris BREZILLON <boris.brezillon@free-electrons.com>
->>
->> Add support for the AXP22x PMIC devices to the existing AXP20x driver.
->> This includes the AXP221 and AXP223, which are identical except for
->> the external data bus. Only AXP221 is added for now. AXP223 will be
->> added after it's Reduced Serial Bus (RSB) interface is supported.
->>
->> AXP22x defines a new set of registers, power supplies and regulators,
->> but most of the API is similar to the AXP20x ones.
->>
->> A new irq chip definition is used, even though the available interrupts
->> on AXP22x is a subset of those on AXP20x. This is done so the interrupt
->> numbers match those on the datasheet.
->>
->> This patch only enables the interrupts, system power-off function, and PEK
->> sub-device. The regulator driver must first support different variants
->> before we enable it from the mfd driver.
->>
->> Signed-off-by: Boris BREZILLON <boris.brezillon@free-electrons.com>
->> [wens at csie.org: fix interrupts and move regulators to separate patch]
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  drivers/mfd/axp20x.c       | 98 ++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/mfd/axp20x.h | 86 ++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 184 insertions(+)
->
-> For my own reference:
->
-> Acked-by: Lee Jones <lee.jones@linaro.org>
->
-> How do you wish for these patches to be managed?  Are they okay to be
-> sucked up individually, or do you wish for them to go through together
-> through a single tree?  If the latter, when which tree?
+[...]
 
-The driver code (both mfd and regulator) have compile time dependencies
-which need to go through the same tree Mark already reviewed the
-regulator patches, so if you could take all the mfd and regulator
-patches, that would be great.
+>> Can't we simple change the polling value for the omap5 case and reuse
+>> the omap4 file?
+> 
+> Hmm yea, I posted a patch like this before for o5 and it was queued 
+> already. See:
+> 
+> http://thread.gmane.org/gmane.linux.ports.arm.omap/123729
+> 
+> The dra7 part was missing from this set though, so patches 2/3 do not 
+> directly work with that one and will require some changes similar to the 
+> linked omap4 one.
 
-Maxime already merged some of the dt patches. I still need to fix
-up one comment, but he can merge them individually.
-
-Thanks!
+OK. will do that and as part of that, I will squash up patch 1 and 2
+Since it is needed only when we introduce DRA7 thermal description -
+Apologies on missing the O5 patch.
 
 
-Regards
-ChenYu
+-- 
+Regards,
+Nishanth Menon
