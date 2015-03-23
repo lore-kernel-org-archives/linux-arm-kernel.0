@@ -1,54 +1,75 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 23 Mar 2015 14:32:03 +0100
-Subject: [PATCH 3/3] pm: domains: avoid potential oops in
- pm_genpd_remove_device()
-In-Reply-To: <E1YZ0b8-0000ss-Nq@rmk-PC.arm.linux.org.uk>
-References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
- <E1YZ0b8-0000ss-Nq@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAPDyKFo-SY5r5REjHS30EYgmgmxxKPqP9LxZjXYBOFth4_C-4A@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Mar 2015 21:32:54 +0800
+Subject: [PATCH v2] dts: cubox: Map gpio-keys to gpio3 8
+In-Reply-To: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
+References: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
+Message-ID: <20150323133252.GE28410@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2015 at 18:20, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> pm_genpd_remove_device() tries hard to validate the generic PM domain
-> passed to it, but the validation is not complete.
->
-> dev->pm_domain contains a struct dev_pm_domain, which is the "base
-> class" of generic PM domains.  Other users of dev_pm_domains include
-> stuff like vga_switheroo.  Hence, a device could have a generic PM
-> domain or a vga_switcheroo PM domain in dev->pm_domain.
->
-> We need ot be certain that the PM domain is actually valid before we
-> try to remove it.  We can do this easily as we have a way to get the
-> current validated generic PM domain for a struct device.  This must
-> match the generic PM domain being requested for removal.
->
-> Convert the code to use this alternative validation method instead.
->
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Mar 16, 2015 at 03:53:49PM -0600, George Joseph wrote:
+> The Cubox has a recessed button between the HDMI and RJ-45 connectors
+> that wasn't mapped in the device tree, so I've mapped it to gpio-keys
+> BTN_0.
+> 
+> Signed-off-by: George Joseph <george.joseph@fairview5.com>
+> Tested-by: George Joseph <george.joseph@fairview5.com>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Russell,
+
+Are you fine with this patch?
+
+Shawn
 
 > ---
->  drivers/base/power/domain.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 89d2eea7f561..5f560fa45a32 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1538,9 +1538,7 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
->
->         dev_dbg(dev, "%s()\n", __func__);
->
-> -       if (IS_ERR_OR_NULL(genpd) || IS_ERR_OR_NULL(dev)
-> -           ||  IS_ERR_OR_NULL(dev->pm_domain)
-> -           ||  pd_to_genpd(dev->pm_domain) != genpd)
-> +       if (!genpd || genpd != pm_genpd_lookup_dev(dev))
->                 return -EINVAL;
->
->         genpd_acquire_lock(genpd);
-> --
-> 1.8.3.1
->
+>  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> index 6a524ca..de6e3a8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+> @@ -3,6 +3,8 @@
+>   */
+>  #include "imx6qdl-microsom.dtsi"
+>  #include "imx6qdl-microsom-ar8035.dtsi"
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	ir_recv: ir-receiver {
+> @@ -66,6 +68,18 @@
+>  		spdif-controller = <&spdif>;
+>  		spdif-out;
+>  	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-0 = <&pinctrl_gpio_key>;
+> +		pinctrl-names = "default";
+> +
+> +		button_0 {
+> +			label = "Button 0";
+> +			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
+> +			linux,code = <BTN_0>;
+> +		};
+> +	};
+>  };
+>  
+>  &hdmi {
+> @@ -170,6 +184,12 @@
+>  				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
+>  			>;
+>  		};
+> +
+> +		pinctrl_gpio_key: gpio-key {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_DA8__GPIO3_IO08	0x17059
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 2.1.0
+> 
