@@ -1,159 +1,123 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Mar 2015 10:08:20 +0000
-Subject: [PATCH] ARM: io: Unpessimize relaxed io accessors
-In-Reply-To: <1426958753-26903-1-git-send-email-peter@hurleysoftware.com>
-References: <1426958753-26903-1-git-send-email-peter@hurleysoftware.com>
-Message-ID: <20150323100820.GA11189@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 23 Mar 2015 11:09:13 +0100
+Subject: [RFC] pinmux: group and function definitions in the device tree
+In-Reply-To: <20150323090827.GD32259@odux.rfo.atmel.com>
+References: <20150319153950.GC30114@odux.rfo.atmel.com>
+ <20150319185637.GV4927@pengutronix.de>
+ <20150320150609.GB32259@odux.rfo.atmel.com>
+ <20150323064424.GD9742@pengutronix.de>
+ <20150323090827.GD32259@odux.rfo.atmel.com>
+Message-ID: <20150323100913.GJ9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Mon, Mar 23, 2015 at 10:08:27AM +0100, Ludovic Desroches wrote:
+> On Mon, Mar 23, 2015 at 07:44:24AM +0100, Sascha Hauer wrote:
+> > On Fri, Mar 20, 2015 at 04:06:09PM +0100, Ludovic Desroches wrote:
+> > > On Thu, Mar 19, 2015 at 07:56:37PM +0100, Sascha Hauer wrote:
+> > > > On Thu, Mar 19, 2015 at 04:39:50PM +0100, Ludovic Desroches wrote:
+> > > > > 	[...]
+> > > > > 
+> > > > > 	pinctrl_defs {
+> > > > > 		mci0 {
+> > > > > 			mci0_ioset0_1bit_grp {
+> > > > > 				at91,pins = <68 69 70>;
+> > > > > 				at91,mux = <2>;
+> > > > > 			};
+> > > > > 
+> > > > > 			mci0_ioset0_4bit_grp {
+> > > > > 				at91,pins = <68 69 70 71 72 73>;
+> > > > > 				at91,mux = <2>;
+> > > > > 			};
+> > > > > 
+> > > > > 			mci0_ioset0_8bit_grp {
+> > > > > 				at91,pins = <68 69 70 71 72 73 74 75 76 77>;
+> > > > > 				at91,mux = <2>;
+> > > > > 			};
+> > > > > 		};
+> > > > > 	};
+> > > > 
+> > > > Why are different groups here? Do you want to put them into the dtsi?
+> > > 
+> > > We used to have a configuration per pin in our products. On next ones we
+> > > will have some constraints ie. on the controller side we still have a
+> > > configuration per pin but we will introduced the notion of iosets. This
+> > > notion involves that timings are guaranteed only in one ioset. That's
+> > > why we can't mix signals from several iosets because. On the controller side
+> > > we can do all we want so I would like to use groups as a software protection.
+> > 
+> > What does happen when you mix signals of different iosets? It won't work
+> > so the developer will change it. What do you need the software
+> > protection for?
+> > 
+> 
+> I can't say it won't work, it could work in some cases. My fear is to
+> have some support cases because of this. It seems easy to spot this kind
+> of issue but experience tell us that we can loose time for this kind of
+> "stupid" error.
 
-On Sat, Mar 21, 2015 at 05:25:53PM +0000, Peter Hurley wrote:
-> commit 195bbcac2e5c12f7fb ("ARM: 7500/1: io: avoid writeback addressing
-> modes for __raw_ accessors") disables writeback addressing modes for
-> raw i/o. However, the "+Q" assembler constraint forces the compiler to
-> invalidate and reload the 'addr' input.
-> 
-> The 'addr' parameter is an input, not an output, and the instructions do
-> not change the value of 'addr', so the '+' constraint modifier is
-> unnecessarily pessimistic and leads to poor code generation. This is
-> especially noticeable with complex address inputs in loops; the compiler
-> is forced to recompute 'addr' on each loop iteration.
+Hm, the software (dts in this case) developer will only mix signals of
+different iosets when he is forced to by the board designer. It's the
+board designer that has made this mistake, the software developer will
+only try to make it work anyway. I doubt that the board designer will
+design the board based on the possibilities shown in the dts files.
 
-My understanding of the modifier is that the '+' actually applies to the
-contents of the memory location, not the address (in the same way as
-the "m" constraint). Given that even IO reads could alter the register
-value, I believe the current code is strictly correct.
+> > > > > - A subnode for these definitions in order to not parse the whole
+> > > > >   pinctrl node to retrieve groups and functions.
+> > > > > - Using node names as function and group names.
+> > > > > - Can we get generic properties to define the groups? Of course a 'pins'
+> > > > >   property is mandatory. In my case I will need an extra one to tell the
+> > > > >   controller how to mux the pins (a same pin can have up to 7 muxing
+> > > > >   possibilities).
+> > > > 
+> > > > Did you have a look at the RFC I sent for these kind of controllers [1] and
+> > > > the final result for the Mediatek driver currently in Linux-next [2]?.
+> > > > 
+> > > > The binding has both the config and the pins in a single node and thus
+> > > > is very compact.
+> > > > 
+> > > 
+> > > Thanks for the links. Well I had a look to them and now I am a bit
+> > > lost...
+> > > 
+> > > I agree with this binding but it involves to get rid of
+> > > pinconf_generic_dt_node_to_map_all, isn't it? What do group and function
+> > > become? It seems these concepts have disappeared.
+> > 
+> > The binding I suggested changes nothing with pinconf, only the pinmux
+> > information is added to the same node. You can still call
+> > pinconf_generic_dt_node_to_map_all() on the nodes, it will simply ignore
+> > the pinmux information. You would have to handle them separately (or
+> > write some generic helper if you like)
+> 
+> Yes, I can still use it. What I mean is there is no generic helper at the
+> moment to get both pinmux (excepting using the function property) and
+> pinconf information. Is it planned to have something generic for the
+> pinmux property?
 
-However, we could probably make the assumption that MMIO accesses are
-always performed via these (volatile) accessors and therefore the
-modifiers don't actually need to describe the effect on the MMIO
-registers because there's never a possibility of using a value that has
-been `cached' by the compiler.
+Not yet, but it would be a good idea to add something generic.
 
-In which case, if you change the commit log to reflect that, then:
+> I see MTK_GET_PIN_NO and MTK_GET_PIN_FUNC macros, on my side,
+> I think it will feet my needs. Maybe we only need to remove the MTK
+> prefix and put these macros in another header.
+> 
+> In the mediatek driver, I have also noticed that we have a group for
+> each pin. I have the feeling that the concept of groups disappear, isn't
+> it?
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+This may be because the concept of groups doesn't most hardware.
+There really is hardware out there which can only handle the pins in
+groups (that is, a single mux switches multiple pins), but this hardware
+is not very common. Most hardware can indeed control every pin
+indivually. In this situation some drivers are consequent and make a
+group out of each pin which renders the group concept moot. Other
+drivers just interpret each device node as pin group which creates
+artificial groups which do not exist in hardware.
 
-Cheers,
+Sascha
 
-Will
-
-
-> For example, the following code:
-> 
->     #include <linux/kernel.h>
->     #include <linux/io.h>
-> 
->     static const int *remap;
-> 
->     void wr_loop(void __iomem *base, int c, int val)
->     {
->             int i;
-> 
->             for (i = 0; i < c; i++)
->                     writew_relaxed(val, base + remap[c >> 2]);
->     }
-> 
-> generates
-> 
->            current master             |             this patch
->  0: e3510000    cmp     r1, #0        |  0: e3510000    cmp     r1, #0
->  4: d12fff1e    bxle    lr            |  4: d12fff1e    bxle    lr
->  8: e3003000    movw    r3, #0        |  8: e3c1c003    bic     ip, r1, #3
->  c: e3403000    movt    r3, #0        |  c: e6ff2072    uxth    r2, r2
-> 10: e92d4010    push    {r4, lr}      | 10: e3a03000    mov     r3, #0
-> 14: e6ff2072    uxth    r2, r2        | 14: e59cc000    ldr     ip, [ip]
-> 18: e3c14003    bic     r4, r1, #3    | 18: e080000c    add     r0, r0, ip
-> 1c: e593e000    ldr     lr, [r3]      |
-> 20: e3a03000    mov     r3, #0        | 1c: e1c020b0    strh    r2, [r0]
->                                       | 20: e2833001    add     r3, r3, #1
-> 24: e79ec004    ldr     ip, [lr, r4]  | 24: e1530001    cmp     r3, r1
-> 28: e080c00c    add     ip, r0, ip    | 28: 1afffffb    bne     1c
-> 2c: e1cc20b0    strh    r2, [ip]      | 2c: e12fff1e    bx      lr
-> 30: e2833001    add     r3, r3, #1    |
-> 34: e1530001    cmp     r3, r1        |
-> 38: 1afffff9    bne     24            |
->                                       |
-> 3c: e8bd8010    pop     {r4, pc}      |
-> 
-> Signed-off-by: Peter Hurley <peter@hurleysoftware.com>
-> ---
->  arch/arm/include/asm/io.h | 27 ++++++++++++---------------
->  1 file changed, 12 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-> index db58deb..7744e58 100644
-> --- a/arch/arm/include/asm/io.h
-> +++ b/arch/arm/include/asm/io.h
-> @@ -73,17 +73,16 @@ void __raw_readsl(const volatile void __iomem *addr, void *data, int longlen);
->  static inline void __raw_writew(u16 val, volatile void __iomem *addr)
->  {
->  	asm volatile("strh %1, %0"
-> -		     : "+Q" (*(volatile u16 __force *)addr)
-> -		     : "r" (val));
-> +		     : : "Q" (*(volatile u16 __force *)addr), "r" (val));
->  }
->  
->  #define __raw_readw __raw_readw
->  static inline u16 __raw_readw(const volatile void __iomem *addr)
->  {
->  	u16 val;
-> -	asm volatile("ldrh %1, %0"
-> -		     : "+Q" (*(volatile u16 __force *)addr),
-> -		       "=r" (val));
-> +	asm volatile("ldrh %0, %1"
-> +		     : "=r" (val)
-> +		     : "Q" (*(volatile u16 __force *)addr));
->  	return val;
->  }
->  #endif
-> @@ -92,25 +91,23 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
->  static inline void __raw_writeb(u8 val, volatile void __iomem *addr)
->  {
->  	asm volatile("strb %1, %0"
-> -		     : "+Qo" (*(volatile u8 __force *)addr)
-> -		     : "r" (val));
-> +		     : : "Qo" (*(volatile u8 __force *)addr), "r" (val));
->  }
->  
->  #define __raw_writel __raw_writel
->  static inline void __raw_writel(u32 val, volatile void __iomem *addr)
->  {
->  	asm volatile("str %1, %0"
-> -		     : "+Qo" (*(volatile u32 __force *)addr)
-> -		     : "r" (val));
-> +		     : : "Qo" (*(volatile u32 __force *)addr), "r" (val));
->  }
->  
->  #define __raw_readb __raw_readb
->  static inline u8 __raw_readb(const volatile void __iomem *addr)
->  {
->  	u8 val;
-> -	asm volatile("ldrb %1, %0"
-> -		     : "+Qo" (*(volatile u8 __force *)addr),
-> -		       "=r" (val));
-> +	asm volatile("ldrb %0, %1"
-> +		     : "=r" (val)
-> +		     : "Qo" (*(volatile u8 __force *)addr));
->  	return val;
->  }
->  
-> @@ -118,9 +115,9 @@ static inline u8 __raw_readb(const volatile void __iomem *addr)
->  static inline u32 __raw_readl(const volatile void __iomem *addr)
->  {
->  	u32 val;
-> -	asm volatile("ldr %1, %0"
-> -		     : "+Qo" (*(volatile u32 __force *)addr),
-> -		       "=r" (val));
-> +	asm volatile("ldr %0, %1"
-> +		     : "=r" (val)
-> +		     : "Qo" (*(volatile u32 __force *)addr));
->  	return val;
->  }
->  
-> -- 
-> 2.3.3
-> 
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
