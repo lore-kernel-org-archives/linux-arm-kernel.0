@@ -1,28 +1,51 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 23 Mar 2015 14:51:56 +0000
-Subject: [RFC PATCH 2/7] printk: Simple implementation for NMI backtracing
-In-Reply-To: <20150319150111.778d21d3@gandalf.local.home>
-References: <1426688428-3150-1-git-send-email-daniel.thompson@linaro.org>	<1426688428-3150-3-git-send-email-daniel.thompson@linaro.org>	<20150319133958.4821493e@gandalf.local.home>	<20150319183037.GT23123@twins.programming.kicks-ass.net>	<550B19EA.6000202@linaro.org>
- <20150319150111.778d21d3@gandalf.local.home>
-Message-ID: <5510288C.3020702@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 Mar 2015 16:04:44 +0100
+Subject: [PATCH 0/5] Driver for pxa architectures
+In-Reply-To: <87h9tc6pd8.fsf@free.fr>
+References: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+ <201503220320.52675.arnd@arndb.de> <87h9tc6pd8.fsf@free.fr>
+Message-ID: <201503231604.44551.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/15 19:01, Steven Rostedt wrote:
-> On Thu, 19 Mar 2015 18:48:10 +0000
-> Daniel Thompson <daniel.thompson@linaro.org> wrote:
-> \
->> The barrier was not intended to have anything to do with put_cpu()
->> either though since the barrier was added before put_cpu() arrived:
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=554ec063982752e9a569ab9189eeffa3d96731b2
->>
->> There's nothing in the commit comment explaining the barrier and I
->> really can't see what it is for.
->>
->
-> Looks like it wasn't needed then either.
+On Monday 23 March 2015, Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > On Saturday 21 March 2015, Robert Jarzmik wrote:
+> > as much as I like this series, I think you still have a long way to go before
+> > PXA can really be multiplatform. Other parts that would need to be solved
+> > include the various cpu_is_pxa*() checks in drivers, the per-board header
+> > files, the way that the I/O space is mapped in the PCMCIA drivers and
+> > the XIP support.
+> Ah yes, now you mention it ...  And still that doesn't frighten me that much,
+> and certainly much less than clocks or dma stuff. Only the headers might be
+> troublesome, and pxafb will certainly be a big rework, but that's for the next
+> step :)
 
-Agreed. I'll respin the patchset with the barrier removed.
+Ok.
 
+> As for the per-board header files, as long as they're used only within mach-pxa
+> and not outside (ie. not in drivers) I must admit I don't see what might be a
+> problem.
 
-Daniel.
+No, headers that are used only in mach-pxa (or even plat-pxa) are unproblematic.
+
+> As for XIP support, I don't have a clear view if it's a requirement for
+> multiplatform nor if it works in these builds.
+
+It would be nice to not have to support both options: if we put pxa into
+ARCH_MULTIPLATFORM, I'd like to remove the existing entry from the choice
+statement at the same time.
+
+> > I think all of them are theoretically doable, but I wasn't expecting
+> > to ever get there.
+> Well, that makes me a goal to reach, doesn't it ? I'll stick to optimism here,
+> and we'll see within a year how far I manage to go :)
+
+Fair enough. Any work you do on this is highly appreciated anyway,
+regardless of whether you complete it or not. BTW, one thought I had
+a while ago was that we can move support for any PXA machines that are
+DT enabled into mach-mmp, which hopefully will be fully DT-only and
+multiplatform enabled at some point, and we can keep mach-pxa for the
+legacy board files if you don't succeed in converting them all.
+
+	Arnd
