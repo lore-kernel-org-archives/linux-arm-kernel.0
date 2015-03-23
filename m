@@ -1,74 +1,62 @@
-From: rabeeh@solid-run.com (Rabeeh Khoury)
-Date: Mon, 23 Mar 2015 20:06:27 +0200
-Subject: [PATCH 2/2] ARM: dts: hummingboard: Setup pwm lines
-In-Reply-To: <E1YSWZL-0002Aw-B5@rmk-PC.arm.linux.org.uk>
-References: <E1YSWZL-0002Aw-B5@rmk-PC.arm.linux.org.uk>
-Message-ID: <55105623.1010804@solid-run.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 23 Mar 2015 11:16:16 -0700
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+In-Reply-To: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <CAGXu5jKeKBD8XiyeM=gmYNmnfqH4Q2TCmyO5NWGF+0+52u81ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2015 10:03 PM, Russell King wrote:
-> From: Rabeeh Khoury <rabeeh@solid-run.com>
+On Fri, Mar 20, 2015 at 4:12 AM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+> split this is not so, because 2*TASK_SIZE overflows 32 bits,
+> so the actual value of ELF_ET_DYN_BASE is:
+>         (2 * TASK_SIZE / 3) = 0x2a000000
 >
-> Setup pwm lines as follows -
-> pwm1: In case HummingBoard base carrier; this pin drives through a serial
->        capacitor the mono out of the audio jack.
->        In case HummingBoard pro the this pad can be reached by wiring to
->        C8 capacitors on the board.
-> pwm2: Setup pwm2 on gpio-1 but leave the default function of the iopad as
->        a gpio.
->        The user can change the io pad mux in user space and therefore use
->        this function on gpio-1 (pin number 7 on the 26 pin header).
-> pwm3,pwm4: unused
+> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+> as it fails to map shadow memory.
+> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
 >
-> Signed-off-by: Rabeeh Khoury <rabeeh@solid-run.com>
-> [tweaked alias for pwm pinctrl group --rmk]
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Fix overflow by dividing TASK_SIZE prior to multiplying.
+> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+>         (TASK_SIZE / 3 * 2) = 0x7f555554
+>
+> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
+>
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> Reported-by: Maria Guseva <m.guseva@samsung.com>
+> Cc: stable at vger.kernel.org
 > ---
-> For acks please.
-Ack.
+>  arch/arm/include/asm/elf.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
->   arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 23 +++++++++++++++++++++++
->   1 file changed, 23 insertions(+)
+> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+> index c1ff8ab..1984a92 100644
+> --- a/arch/arm/include/asm/elf.h
+> +++ b/arch/arm/include/asm/elf.h
+> @@ -115,7 +115,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+>     the loader.  We need to make sure that it is out of the way of the program
+>     that it will "exec", and that there is sufficient room for the brk.  */
 >
-> diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> index 93588c987d2c..c0dc5948fa3c 100644
-> --- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-> @@ -164,6 +164,10 @@
->   			>;
->   		};
->   
-> +		pinctrl_hummingboard_pwm1: pwm1grp {
-> +			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1>;
-> +		};
-> +
->   		pinctrl_hummingboard_spdif: hummingboard-spdif {
->   			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
->   		};
-> @@ -203,6 +207,25 @@
->   	};
->   };
->   
-> +&pwm1 {
-> +	 pinctrl-names = "default";
-> +	 pinctrl-0 = <&pinctrl_hummingboard_pwm1>;
-> +	 status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	 pinctrl-names = "default";
-> +	 status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	status = "disabled";
-> +};
-> +
-> +&pwm4 {
-> +	status = "disabled";
-> +};
-> +
->   &spdif {
->   	pinctrl-names = "default";
->   	pinctrl-0 = <&pinctrl_hummingboard_spdif>;
+> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE / 3)
+> +#define ELF_ET_DYN_BASE        (TASK_SIZE / 3 * 2)
+>
+>  /* When the program starts, a1 contains a pointer to a function to be
+>     registered with atexit, as per the SVR4 ABI.  A value of 0 means we
+
+Acked-by: Kees Cook <keescook@chromium.org>
+
+Though, yes, as mentioned in the other replies, please send fixes for
+the other architectures too.
+
+Thanks for catching this!
+
+-Kees
+
+-- 
+Kees Cook
+Chrome OS Security
