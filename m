@@ -1,48 +1,77 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Mon, 23 Mar 2015 17:41:42 +0000
-Subject: [PATCH v5 1/8] arm64: Get rid of struct cpu_table
-In-Reply-To: <20150323173821.GD1556@arm.com>
-References: <1426690527-14258-1-git-send-email-ard.biesheuvel@linaro.org>
- <1426690527-14258-2-git-send-email-ard.biesheuvel@linaro.org>
- <55104926.1060901@arm.com> <20150323173821.GD1556@arm.com>
-Message-ID: <55105056.4020305@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 Mar 2015 10:43:04 -0700
+Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information to
+ DT bindings
+In-Reply-To: <20150323115425.GC24422@x1>
+References: <1425988764-23618-1-git-send-email-wens@csie.org>
+ <1425988764-23618-9-git-send-email-wens@csie.org> <20150323115425.GC24422@x1>
+Message-ID: <CAGb2v673WWV4q5eEGQF-nhX=Zq=ciD=yXgei-eZjKMWPDxKv4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/15 17:38, Will Deacon wrote:
-> On Mon, Mar 23, 2015 at 05:11:02PM +0000, Suzuki K. Poulose wrote:
->> On 18/03/15 14:55, Ard Biesheuvel wrote:
->>> @@ -209,22 +207,12 @@ static void __init smp_build_mpidr_hash(void)
->>>
->>>    static void __init setup_processor(void)
->>>    {
->>> -       struct cpu_info *cpu_info;
->>>           u64 features, block;
->>>           u32 cwg;
->>>           int cls;
->>>
->>> -       cpu_info = lookup_processor_type(read_cpuid_id());
->>> -       if (!cpu_info) {
->>> -               printk("CPU configuration botched (ID %08x), unable to continue.\n",
->>> -                      read_cpuid_id());
->>> -               while (1);
->>> -       }
->>> -
->>> -       cpu_name = cpu_info->cpu_name;
->>> -
->>> -       printk("CPU: %s [%08x] revision %d\n",
->>> -              cpu_name, read_cpuid_id(), read_cpuid_id() & 15);
->>> +       printk("CPU: AArch64 Processor [%08x] revision %d\n",
->>> +              read_cpuid_id(), read_cpuid_id() & 15);
->>>
->>
->> While we are at it, does it make sense to change
->>
->>    s/CPU/Boot CPU/
->>
->> to make it clear on a big.Little system ?
+On Mon, Mar 23, 2015 at 4:54 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
 >
-> This is already queued, so I don't think it's worth the effort now.
-ok, not a major one. I will fix it in one of my series
+>> Add the list of regulators for AXP22x to the DT bindings.
+>> This includes the names and supply names.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
+>>  1 file changed, 27 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+>> index 3914a3f91ff6..0fc2f1f35cef 100644
+>> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+>> @@ -49,6 +49,33 @@ LDO3               : LDO           : ldo3in-supply
+>>  LDO4         : LDO           : ldo24in-supply        : shared supply
+>>  LDO5         : LDO           : ldo5in-supply
+>>
+>> +
+>
+> Nit: I'm not keen on double line spacing.
+>
+>> +AXP221 regulators, type, and corresponding input supply names:
+>> +
+>> +Regulator      Type            Supply Name             Notes
+>> +---------      ----            -----------             -----
+>> +DCDC1                : DC-DC buck    : vin1-supply
+>> +DCDC2                : DC-DC buck    : vin2-supply
+>> +DCDC3                : DC-DC buck    : vin3-supply
+>> +DCDC4                : DC-DC buck    : vin4-supply
+>> +DCDC5                : DC-DC buck    : vin5-supply
+>> +DC1SW                : On/Off Switch : dcdc1-supply          : DCDC1 secondary output
+>> +DC5LDO               : LDO           : dcdc5-supply          : input from DCDC5
+>> +ALDO1                : LDO           : aldoin-supply         : shared supply
+>> +ALDO2                : LDO           : aldoin-supply         : shared supply
+>> +ALDO3                : LDO           : aldoin-supply         : shared supply
+>> +DLDO1                : LDO           : dldoin-supply         : shared supply
+>> +DLDO2                : LDO           : dldoin-supply         : shared supply
+>> +DLDO3                : LDO           : dldoin-supply         : shared supply
+>> +DLDO4                : LDO           : dldoin-supply         : shared supply
+>> +ELDO1                : LDO           : eldoin-supply         : shared supply
+>> +ELDO2                : LDO           : eldoin-supply         : shared supply
+>> +ELDO3                : LDO           : eldoin-supply         : shared supply
+>> +LDO_IO0              : LDO           : ips-supply            : GPIO 0
+>> +LDO_IO1              : LDO           : ips-supply            : GPIO 1
+>> +RTC_LDO              : LDO           : ips-supply            : always on
+>> +
+>> +
+>
+> Nit: I'm not keen on double line spacing.
 
-Suzuki
+Ok. I can get rid of them. IMHO it makes different sections clearer though.
+I assume you don't want them in the original axp20x patches either?
+
+ChenYu
+
+>>  Example:
+>>
+>>  axp209: pmic at 34 {
+>
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
