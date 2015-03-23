@@ -1,58 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 Mar 2015 21:55:45 +0000
-Subject: gpio-syscon for Keystone 2 - DT bindings mismatch code expectation?
-Message-ID: <20150323215545.GT8656@n2100.arm.linux.org.uk>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Mon, 23 Mar 2015 15:05:22 -0700
+Subject: [PATCH v17 04/10] ARM: dts: qcom: Add power-controller device
+ node for 8074 Krait CPUs
+In-Reply-To: <1426882877-33008-5-git-send-email-lina.iyer@linaro.org>
+References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
+ <1426882877-33008-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <292C2E97-ED74-4F17-B592-B5EA7BDD1E8E@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus, Grygorii,
 
-I'm trying to understand what's happening to make Keystone2 print
-this at boot:
+On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-gpio-syscon soc:keystone_dsp_gpio at 02620240: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 2620244: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 2620248: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 262024c: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 2620250: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 2620254: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 2620258: can't read the dir register offset!
-gpio-syscon soc:keystone_dsp_gpio at 262025c: can't read the dir register offset!
+> Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
+> regulate the power to the cpu and aide the core in entering idle states.
+> Reference the SAW instance and associate the instance with the CPU core.
+> 
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+> arch/arm/boot/dts/qcom-msm8974.dtsi | 26 +++++++++++++++++++++++++-
+> 1 file changed, 25 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> index e265ec1..5a41f44 100644
+> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
+> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+> @@ -21,6 +21,7 @@
+> 			reg = <0>;
+> 			next-level-cache = <&L2>;
+> 			qcom,acc = <&acc0>;
+> +			qcom,saw = <&saw0>;
+> 		};
+> 
+> 		cpu at 1 {
+> @@ -30,6 +31,7 @@
+> 			reg = <1>;
+> 			next-level-cache = <&L2>;
+> 			qcom,acc = <&acc1>;
+> +			qcom,saw = <&saw1>;
+> 		};
+> 
+> 		cpu at 2 {
+> @@ -39,6 +41,7 @@
+> 			reg = <2>;
+> 			next-level-cache = <&L2>;
+> 			qcom,acc = <&acc2>;
+> +			qcom,saw = <&saw2>;
+> 		};
+> 
+> 		cpu at 3 {
+> @@ -48,6 +51,7 @@
+> 			reg = <3>;
+> 			next-level-cache = <&L2>;
+> 			qcom,acc = <&acc3>;
+> +			qcom,saw = <&saw3>;
+> 		};
+> 
+> 		L2: l2-cache {
+> @@ -144,7 +148,27 @@
+> 			};
+> 		};
+> 
+> -		saw_l2: regulator at f9012000 {
+> +		saw0: power-controller at f9089000 {
+> +			compatible = "qcom,msm8974-saw2-v2.1-cpu?;
 
->From what I can see in DT, these are defined as:
+Should these include ?qcom,saw??
 
-                dspgpio0: keystone_dsp_gpio at 02620240 {
-                        compatible = "ti,keystone-dsp-gpio";
-                        gpio-controller;
-                        #gpio-cells = <2>;
-                        gpio,syscon-dev = <&devctrl 0x240>;
-                };
-
-However, the patch set which introduced the code included:
-
-commit 5a3e3f88b0a10f8b5baf224ebda5916195fb8745
-Author: Grygorii Strashko <grygorii.strashko@ti.com>
-Date:   Wed Sep 3 20:05:33 2014 +0300
-
-    gpio: syscon: retrive syscon node and regs offsets from dt
-
-which wants gpio,syscon-dev to contain a phandle and two offsets, not
-a single offset.  Moreover, the following patch:
-
-commit 2134cb997f2f1b2d960ad8705d67dc8d690ba59c
-Author: Grygorii Strashko <grygorii.strashko@ti.com>
-Date:   Wed Sep 3 20:05:34 2014 +0300
-
-    gpio: syscon: reuse for keystone 2 socs
-
-added documentation which indicates that for keystone 2, only one
-offset is necessary in gpio,syscon-dev, yet there is no "compatible"
-string to stop the code requiring two offsets.
-
-This looks like a complete trainwreck.  What's going on here?
-
-Please can this get fixed... Thanks.
+> +			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
+> +		};
+> +
+> +		saw1: power-controller at f9099000 {
+> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+> +			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
+> +		};
+> +
+> +		saw2: power-controller at f90a9000 {
+> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+> +			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
+> +		};
+> +
+> +		saw3: power-controller at f90b9000 {
+> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
+> +			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
+> +		};
+> +
+> +		saw_l2: power-controller at f9012000 {
+> 			compatible = "qcom,saw2";
+> 			reg = <0xf9012000 0x1000>;
+> 			regulator;
+> -- 
+> 2.1.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
