@@ -1,60 +1,81 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 23 Mar 2015 17:29:02 +0100
-Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
- find ports by id
-In-Reply-To: <1426063881.3101.33.camel@pengutronix.de>
-References: <1425369592.3146.14.camel@pengutronix.de>
- <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
- <1426063881.3101.33.camel@pengutronix.de>
-Message-ID: <2376013.jScnaqPlDa@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 23 Mar 2015 17:29:32 +0100
+Subject: [PATCH v2 3/3] arm64: drop sleep_idmap_phys
+In-Reply-To: <20150323155840.GC18904@red-moon>
+References: <1426870974-4801-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427101646-465-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20150323155840.GC18904@red-moon>
+Message-ID: <CAKv+Gu9t6=ZS8nK+xsf0osu=gAi8MwgywyY2LWYhkm12ytRVGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Philipp,
+On 23 March 2015 at 16:58, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Mon, Mar 23, 2015 at 09:07:26AM +0000, Ard Biesheuvel wrote:
+>> The global variable sleep_idmap_phys always points to idmap_pg_dir,
+>> so we can just use that value directly in the CPU resume path.
+>>
+>> Also unclutters the load of sleep_save_sp::save_ptr_stash_phys.
+>>
+>
+> Nit: I understand why you want to do more than one change at once,
+> I think you should reword the subject though for completeness.
+>
 
-Am Mittwoch, 11. M?rz 2015, 09:51:21 schrieb Philipp Zabel:
-> Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
-> > I've only been copied on this latest pull request and a version from
-> > March of last year which Grant nak'ed. This series did not go to
-> > devicetree list either. I'll take a look at the series.
-> 
-> My bad, I should have copied you, too. Thanks for having a look now.
+ok
 
-any news on this?
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/sleep.S   | 7 ++-----
+>>  arch/arm64/kernel/suspend.c | 3 ---
+>>  2 files changed, 2 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+>> index 04dc9aa2831e..3c98fe1c1c2f 100644
+>> --- a/arch/arm64/kernel/sleep.S
+>> +++ b/arch/arm64/kernel/sleep.S
+>> @@ -164,15 +164,12 @@ ENTRY(cpu_resume)
+>>  #else
+>>       mov     x7, xzr
+>>  #endif
+>> -     adrp    x0, sleep_save_sp
+>> -     add     x0, x0, #:lo12:sleep_save_sp
+>> -     ldr     x0, [x0, #SLEEP_SAVE_SP_PHYS]
+>> +     ldr_l   x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
+>>       ldr     x0, [x0, x7, lsl #3]
+>>       /* load sp from context */
+>>       ldr     x2, [x0, #CPU_CTX_SP]
+>> -     adrp    x1, sleep_idmap_phys
+>>       /* load physical address of identity map page table in x1 */
+>> -     ldr     x1, [x1, #:lo12:sleep_idmap_phys]
+>> +     adrp    x1, idmap_pg_dir
+>>       mov     sp, x2
+>>       /*
+>>        * cpu_do_resume expects x0 to contain context physical address
+>> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+>> index d7daf45ae7a2..f6073c27d65f 100644
+>> --- a/arch/arm64/kernel/suspend.c
+>> +++ b/arch/arm64/kernel/suspend.c
+>> @@ -118,7 +118,6 @@ int __cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>>  }
+>>
+>>  struct sleep_save_sp sleep_save_sp;
+>> -phys_addr_t sleep_idmap_phys;
+>>
+>>  static int __init cpu_suspend_init(void)
+>>  {
+>> @@ -132,9 +131,7 @@ static int __init cpu_suspend_init(void)
+>>
+>>       sleep_save_sp.save_ptr_stash = ctx_ptr;
+>>       sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
+>> -     sleep_idmap_phys = virt_to_phys(idmap_pg_dir);
+>>       __flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
+>> -     __flush_dcache_area(&sleep_idmap_phys, sizeof(sleep_idmap_phys));
+>>
+>>       return 0;
+>>  }
+>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Because it looks like I'll need the of_graph_get_port_by_id functionality in 
-the short term, it'll be nice to not having to opencode this :-)
-
-
-Thanks
-Heiko
-
-> 
-> The nak'ed series (https://lkml.org/lkml/2014/3/20/664) indeed already
-> included the "of: Add OF graph helper to get a specific port by id" and
-> "of: Add OF graph helpers to iterate over ports" patches, but Grant's
-> nak applied to the first patch, "of: Parse OF graph into graph
-> structure", which I then dropped.
-> 
-> > If there is an explanation of how Grant's nak was addressed that would
-> > speed up my review.
-> 
-> See above. The other two patches have been uncontroversial. The
-> of_graph_get_next_endpoint and for_each_endpoint_of_node patches
-> fix an in-kernel API that was too easy to use incorrectly, and
-> the of_graph_get_port_by_id patch I can't remember being
-> commented on at all.
-> 
-> > I'm not applying for v4.0 though.
-> 
-> If you decide to apply them, please consider merging the tag and giving
-> your ack for it to be merged into the other subsystem trees, too.
-> 
-> regards
-> Philipp
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+Ard.
