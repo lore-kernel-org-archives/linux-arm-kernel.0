@@ -1,46 +1,101 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Mar 2015 02:37:05 +0100
-Subject: XIP_KERNEL and !ARCH_MULTIPLATFORM
-In-Reply-To: <HK2PR06MB05611E6828E494FB938179658A0F0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <HK2PR06MB0561CC16649A9C1F341CC6648A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUR3oLp3RMcdEkMiqX92bosYE=f8tOKA1L_y59KMPuEJw@mail.gmail.com>
- <HK2PR06MB05613B2FBF8466204FA98A9D8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdU3J1uzD5VAgHgF5NNzw_E7Njf7wU7kJ7oPuCKm7N_Arg@mail.gmail.com>
- <HK2PR06MB0561FE47407CA32AA8DDEFCF8A030@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <CAMuHMdUS84s=uLYVk8BtRoKFmBzw7aT1eQCfGF1nx22hTqf15A@mail.gmail.com>
- <HK2PR06MB05611C6D6CED1E32F4617D158A010@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20150320222320.GL8656@n2100.arm.linux.org.uk>
- <HK2PR06MB05611E6828E494FB938179658A0F0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdVLWffQW3d_4z9RAQOg8BCUCSU6ny3yG0poZ_7v=ozNbw@mail.gmail.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 23 Mar 2015 09:37:12 +0800
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <5749112.zNnbMCHVxZ@vostro.rjw.lan>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <2189259.UNlTC1BNmt@vostro.rjw.lan> <550F3500.1040608@linaro.org>
+ <5749112.zNnbMCHVxZ@vostro.rjw.lan>
+Message-ID: <550F6E48.4080406@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-On Sat, Mar 21, 2015 at 4:39 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
->> However, SMP_ON_UP is incompatible with XIP_KERNEL (as already listed in its dependencies) and building with SMP=y without SMP_ON_UP, and trying to run on UP hardware will definitely fail.
+On 2015/3/23 6:11, Rafael J. Wysocki wrote:
+> On Sunday, March 22, 2015 09:32:48 PM Julien Grall wrote:
+>> On 22/03/2015 21:49, Rafael J. Wysocki wrote:
+>>> On Sunday, March 22, 2015 09:05:21 PM Julien Grall wrote:
+>>>> Hello,
+>>>>
+>>>> On 21/03/2015 12:09, Naresh Bhat wrote:
+>>>>>       From 268dcdafa34a690e2f99c0784ca33a6d2352ecf5 Mon Sep 17 00:00:00 2001
+>>>>>      From: Hanjun Guo <hanjun.guo at linaro.org <mailto:hanjun.guo@linaro.org>>
+>>>>>      Date: Sat, 21 Mar 2015 14:43:54 +0800
+>>>>>      Subject: [PATCH] XEN / ACPI: Make XEN ACPI depend on X86
+>>>>>
+>>>>>      When ACPI is enabled on ARM64, XEN ACPI will also compiled
+>>>>>      into the kernel, but XEN ACPI is x86 dependent, so introduce
+>>>>>      CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
+>>>>>      functional on ARM64.
+>>>>>
+>>>>>      Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org
+>>>>>      <mailto:hanjun.guo@linaro.org>>
+>>>>>      ---
+>>>>>        drivers/xen/Kconfig  | 4 ++++
+>>>>>        drivers/xen/Makefile | 2 +-
+>>>>>        2 files changed, 5 insertions(+), 1 deletion(-)
+>>>>>
+>>>>>      diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+>>>>>      index b812462..a31cd29 100644
+>>>>>      --- a/drivers/xen/Kconfig
+>>>>>      +++ b/drivers/xen/Kconfig
+>>>>>      @@ -253,4 +253,8 @@ config XEN_EFI
+>>>>>            def_bool y
+>>>>>            depends on X86_64 && EFI
+>>>>>
+>>>>>      +config XEN_ACPI
+>>>>>      +    def_bool y
+>>>>>      +    depends on X86 && ACPI
+>>>>>      +
+>>>>>        endmenu
+>>>>>      diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+>>>>>      index 2ccd359..f4622ab 100644
+>>>>>      --- a/drivers/xen/Makefile
+>>>>>      +++ b/drivers/xen/Makefile
+>>>>>      @@ -13,7 +13,7 @@ CFLAGS_efi.o                += -fshort-wchar
+>>>>>
+>>>>>        dom0-$(CONFIG_PCI) += pci.o
+>>>>>        dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>>>>>      -dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
+>>>>>      +dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+>>>>>        xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+>>>>>        dom0-$(CONFIG_X86) += pcpu.o
+>>>>>        obj-$(CONFIG_XEN_DOM0)            += $(dom0-y)
+>>>> [..]
+>>>>
+>>>>> AFAIK,  There is already a kernel patch exists to fix this issue.  I
+>>>>> think  Julien or Parth is a right person to ask.  Hence I am CCed Julien
+>>>>> Grall too.
+>>>> The ACPI support for Xen is not ready. So I think avoiding to compile
+>>>> drivers/xen/acpi.c on ARM64/ARM seems the better solution for now.
+>>>>
+>>>> Although, rather than introducing a new CONFIG option, I would use the
+>>>> same trick we use within the Makefile to avoid hotplug.c on ARM/ARM64.
+>>>>
+>>>> ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)), )
+>>>> dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
+>>>> endif
+>>> Well, is avoiding an extra CONFIG_ option worth the ugliness of this?
+>> When the support of ACPI for Xen will come, the CONFIG_ option will be 
+>> an alias to CONFIG_XEN.
+>>
+>> In this case the CONFIG_ option won't bring much improvement to the code 
+>> and add an extra indirection.
+>>
+>> The "ugliness" option has, at least, the advantage to be tiny and 
+>> self-contained.
+> Oh well, not really.  You're moving a config-time check to compile time
+> which means that it will be done every time this Makefile is executed
+> and for all architectures that execute it.  Not nice.
 >
-> So, it sounds like you are saying XIP_KERNEL and SMP is not going to happen.
+> Also I think that ia64 is missing from the list, but I may be wrong.
 
-I think you misunderstood: XIP_KERNEL=y and SMP=y should work on an SMP
-system, XIP_KERNEL=y and SMP=n should work on a uniprocessor system.
+In commit d52eefb47d (ia64/xen: Remove Xen support for ia64), XEN is
+not supported anymore on ia64 now.
 
-The problem is SMP_ON_UP (run SMP=y kernel on a uniprocessor system).
-You just can't have one kernel that works on both.
+>
+> Not to mention the fact that the dependency will be rather difficult to find
+> for tools like xconfig ...
 
-As Arnd mentioned, making XIP_KERNEL depend on !SMP_ON_UP sounds
-like the way to go.
+I also think introducing a CONFIG_ option is a better idea.
 
-BTW, since you're asking about SMP=y, I guess you're not just interested in
-running XIP_KERNEL=y on r7s72100, which is UP?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Hanjun
