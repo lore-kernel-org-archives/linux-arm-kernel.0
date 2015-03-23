@@ -1,75 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 23 Mar 2015 21:32:54 +0800
-Subject: [PATCH v2] dts: cubox: Map gpio-keys to gpio3 8
-In-Reply-To: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
-References: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
-Message-ID: <20150323133252.GE28410@dragon>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Mon, 23 Mar 2015 21:35:36 +0800
+Subject: [PATCH 00/15] iommu: Move domain allocation into drivers
+In-Reply-To: <20150323114921.GM4441@8bytes.org>
+References: <1422316305-19216-1-git-send-email-joro@8bytes.org>
+ <1426843458.23931.17.camel@mtksdaap41>  <20150323114921.GM4441@8bytes.org>
+Message-ID: <1427117736.18677.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 16, 2015 at 03:53:49PM -0600, George Joseph wrote:
-> The Cubox has a recessed button between the HDMI and RJ-45 connectors
-> that wasn't mapped in the device tree, so I've mapped it to gpio-keys
-> BTN_0.
+On Mon, 2015-03-23 at 12:49 +0100, Joerg Roedel wrote:
+> Hi Yingjoe,
 > 
-> Signed-off-by: George Joseph <george.joseph@fairview5.com>
-> Tested-by: George Joseph <george.joseph@fairview5.com>
-
-Russell,
-
-Are you fine with this patch?
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+> On Fri, Mar 20, 2015 at 05:24:18PM +0800, Yingjoe Chen wrote:
+> > What's the status of this patchset?
+> > While porting MTK IOMMU driver[1], we need to use a global variable
+> > because we need to do dma_alloc_coherent in our domain_init. I think we
+> > can remove that global variable if we base on this series.
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> index 6a524ca..de6e3a8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-> @@ -3,6 +3,8 @@
->   */
->  #include "imx6qdl-microsom.dtsi"
->  #include "imx6qdl-microsom-ar8035.dtsi"
-> +#include <dt-bindings/input/input.h>
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	ir_recv: ir-receiver {
-> @@ -66,6 +68,18 @@
->  		spdif-controller = <&spdif>;
->  		spdif-out;
->  	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		pinctrl-0 = <&pinctrl_gpio_key>;
-> +		pinctrl-names = "default";
-> +
-> +		button_0 {
-> +			label = "Button 0";
-> +			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
-> +			linux,code = <BTN_0>;
-> +		};
-> +	};
->  };
->  
->  &hdmi {
-> @@ -170,6 +184,12 @@
->  				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
->  			>;
->  		};
-> +
-> +		pinctrl_gpio_key: gpio-key {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_DA8__GPIO3_IO08	0x17059
-> +			>;
-> +		};
->  	};
->  };
->  
-> -- 
-> 2.1.0
-> 
+> I plan to send out a new version this week.
+
+Hi Joerg,
+
+That's great.
+Thanks for the update :)
+
+Joe.C
