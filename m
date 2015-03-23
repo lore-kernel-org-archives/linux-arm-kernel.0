@@ -1,271 +1,129 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 23 Mar 2015 20:40:56 +0800
-Subject: [PATCH v7 30/31] PCI: Remove pci_bus_assign_domain_nr()
+Date: Mon, 23 Mar 2015 20:40:45 +0800
+Subject: [PATCH v7 19/31] powerpc/pci: Use pci_scan_host_bridge() for
+ simplicity
 In-Reply-To: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
 References: <1427114457-16687-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427114457-16687-31-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427114457-16687-20-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we save the domain number in pci_host_bridge,
-we could remove pci_bus_assign_domain_nr() and
-clean the domain member in pci_bus. Also move
-pci_host_assign_domain_nr() to drivers/pci/host-bridge.c
-for simplicity.
+Now we could use pci_scan_host_bridge() to scan
+pci buses, provide powerpc specific pci_host_bridge_ops.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+CC: linuxppc-dev at lists.ozlabs.org
 ---
- drivers/pci/host-bridge.c |   61 +++++++++++++++++++++++++++++++++++++++++
- drivers/pci/pci.c         |   67 ---------------------------------------------
- drivers/pci/pci.h         |   13 ---------
- drivers/pci/probe.c       |   11 ++-----
- include/linux/pci.h       |    3 --
- 5 files changed, 64 insertions(+), 91 deletions(-)
+ arch/powerpc/kernel/pci-common.c |   60 +++++++++++++++++++++++--------------
+ 1 files changed, 37 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index fa19023..5b85621 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -11,6 +11,8 @@
- static LIST_HEAD(pci_host_bridge_list);
- static DEFINE_MUTEX(pci_host_mutex);
- 
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host);
-+
- static void pci_release_host_bridge_dev(struct device *dev)
- {
- 	struct pci_host_bridge *bridge = to_pci_host_bridge(dev);
-@@ -159,6 +161,65 @@ int pci_domain_nr(struct pci_bus *bus)
- 	return host->domain;
+diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+index 2c58200..e2b50a2 100644
+--- a/arch/powerpc/kernel/pci-common.c
++++ b/arch/powerpc/kernel/pci-common.c
+@@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
+ 		return ppc_md.pcibios_set_root_bus_speed(bridge);
  }
- EXPORT_SYMBOL(pci_domain_nr);
-+
-+static atomic_t __domain_nr = ATOMIC_INIT(-1);
-+
-+int pci_get_new_domain_nr(void)
+ 
++static int pci_host_scan_bus(struct pci_host_bridge *host)
 +{
-+	return atomic_inc_return(&__domain_nr);
-+}
++	int mode = PCI_PROBE_NORMAL;
++	struct pci_bus *bus = host->bus;
++	struct pci_controller *hose = dev_get_drvdata(&host->dev);
 +
-+#ifdef CONFIG_PCI_DOMAINS_GENERIC
-+static int pci_assign_domain_nr(struct device *dev)
-+{
-+	static int use_dt_domains = -1;
-+	int domain = of_get_pci_domain_nr(dev->of_node);
++	/* Get probe mode and perform scan */
++	if (hose->dn && ppc_md.pci_probe_mode)
++		mode = ppc_md.pci_probe_mode(bus);
 +
-+	/*
-+	 * Check DT domain and use_dt_domains values.
-+	 *
-+	 * If DT domain property is valid (domain >= 0) and
-+	 * use_dt_domains != 0, the DT assignment is valid since this means
-+	 * we have not previously allocated a domain number by using
-+	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
-+	 * 1, to indicate that we have just assigned a domain number from
-+	 * DT.
-+	 *
-+	 * If DT domain property value is not valid (ie domain < 0), and we
-+	 * have not previously assigned a domain number from DT
-+	 * (use_dt_domains != 1) we should assign a domain number by
-+	 * using the:
-+	 *
-+	 * pci_get_new_domain_nr()
-+	 *
-+	 * API and update the use_dt_domains value to keep track of method we
-+	 * are using to assign domain numbers (use_dt_domains = 0).
-+	 *
-+	 * All other combinations imply we have a platform that is trying
-+	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-+	 * which is a recipe for domain mishandling and it is prevented by
-+	 * invalidating the domain value (domain = -1) and printing a
-+	 * corresponding error.
-+	 */
-+	if (domain >= 0 && use_dt_domains) {
-+		use_dt_domains = 1;
-+	} else if (domain < 0 && use_dt_domains != 1) {
-+		use_dt_domains = 0;
-+		domain = pci_get_new_domain_nr();
-+	} else {
-+		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-+			dev->of_node->full_name);
-+		domain = -1;
++	pr_debug("    probe mode: %d\n", mode);
++	if (mode == PCI_PROBE_DEVTREE)
++		of_scan_bus(hose->dn, bus);
++
++	if (mode == PCI_PROBE_NORMAL) {
++		pci_bus_update_busn_res_end(bus, 255);
++		hose->last_busno = pci_scan_child_bus(bus);
++		pci_bus_update_busn_res_end(bus, hose->last_busno);
 +	}
 +
-+	return domain;
++	return pci_bus_child_max_busnr(bus);
 +}
 +
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host)
-+{
-+	host->domain = pci_assign_domain_nr(host->dev.parent);
-+}
-+#endif
- #endif
- 
- void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 8a2f12c..044801c 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4515,73 +4515,6 @@ static void pci_no_domains(void)
- #endif
+ /* This header fixup will do the resource fixup for all devices as they are
+  * probed, but not for bridge ranges
+  */
+@@ -1585,6 +1608,11 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+ 	return of_node_get(hose->dn);
  }
  
--#ifdef CONFIG_PCI_DOMAINS
--static atomic_t __domain_nr = ATOMIC_INIT(-1);
++static struct pci_host_bridge_ops pci_host_ops = {
++	.set_root_bus_speed = pcibios_set_root_bus_speed,
++	.scan_bus = pci_host_scan_bus,
++};
++
+ /**
+  * pci_scan_phb - Given a pci_controller, setup and scan the PCI bus
+  * @hose: Pointer to the PCI host controller instance structure
+@@ -1592,9 +1620,8 @@ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus)
+ void pcibios_scan_phb(struct pci_controller *hose)
+ {
+ 	LIST_HEAD(resources);
+-	struct pci_bus *bus;
++	struct pci_host_bridge *host;
+ 	struct device_node *node = hose->dn;
+-	int mode;
+ 
+ 	pr_debug("PCI: Scanning PHB %s\n", of_node_full_name(node));
+ 
+@@ -1609,31 +1636,18 @@ void pcibios_scan_phb(struct pci_controller *hose)
+ 	hose->busn.flags = IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &hose->busn);
+ 
++	pci_host_ops.pci_ops = hose->ops;
+ 	/* Create an empty bus for the toplevel */
+-	bus = pci_create_root_bus(hose->parent, hose->global_number,
+-			hose->first_busno, hose->ops, hose, &resources);
+-	if (bus == NULL) {
+-		pr_err("Failed to create bus for PCI domain %04x\n",
+-			hose->global_number);
++	host = pci_scan_host_bridge(hose->parent, hose->global_number,
++			hose->first_busno, hose, &resources, &pci_host_ops);
++	if (host == NULL) {
++		pr_err("Failed to create host bridge for pci%04x:%02x\n",
++			hose->global_number, hose->first_busno);
+ 		pci_free_resource_list(&resources);
+ 		return;
+ 	}
+ 	hose->bus = bus;
+ 
+-	/* Get probe mode and perform scan */
+-	mode = PCI_PROBE_NORMAL;
+-	if (node && ppc_md.pci_probe_mode)
+-		mode = ppc_md.pci_probe_mode(bus);
+-	pr_debug("    probe mode: %d\n", mode);
+-	if (mode == PCI_PROBE_DEVTREE)
+-		of_scan_bus(node, bus);
 -
--int pci_get_new_domain_nr(void)
--{
--	return atomic_inc_return(&__domain_nr);
--}
--
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--static int pci_assign_domain_nr(struct device *dev)
--{
--	static int use_dt_domains = -1;
--	int domain = of_get_pci_domain_nr(dev->of_node);
--
--	/*
--	 * Check DT domain and use_dt_domains values.
--	 *
--	 * If DT domain property is valid (domain >= 0) and
--	 * use_dt_domains != 0, the DT assignment is valid since this means
--	 * we have not previously allocated a domain number by using
--	 * pci_get_new_domain_nr(); we should also update use_dt_domains to
--	 * 1, to indicate that we have just assigned a domain number from
--	 * DT.
--	 *
--	 * If DT domain property value is not valid (ie domain < 0), and we
--	 * have not previously assigned a domain number from DT
--	 * (use_dt_domains != 1) we should assign a domain number by
--	 * using the:
--	 *
--	 * pci_get_new_domain_nr()
--	 *
--	 * API and update the use_dt_domains value to keep track of method we
--	 * are using to assign domain numbers (use_dt_domains = 0).
--	 *
--	 * All other combinations imply we have a platform that is trying
--	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
--	 * which is a recipe for domain mishandling and it is prevented by
--	 * invalidating the domain value (domain = -1) and printing a
--	 * corresponding error.
--	 */
--	if (domain >= 0 && use_dt_domains) {
--		use_dt_domains = 1;
--	} else if (domain < 0 && use_dt_domains != 1) {
--		use_dt_domains = 0;
--		domain = pci_get_new_domain_nr();
--	} else {
--		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
--			dev->of_node->full_name);
--		domain = -1;
+-	if (mode == PCI_PROBE_NORMAL) {
+-		pci_bus_update_busn_res_end(bus, 255);
+-		hose->last_busno = pci_scan_child_bus(bus);
+-		pci_bus_update_busn_res_end(bus, hose->last_busno);
 -	}
 -
--	return domain;
--}
--
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
--{
--	bus->domain_nr = pci_assign_domain_nr(parent);
--}
--
--void pci_host_assign_domain_nr(struct pci_host_bridge *host)
--{
--	host->domain = pci_assign_domain_nr(host->dev.parent);
--}
--
--#endif
--#endif
--
- /**
-  * pci_ext_cfg_avail - can we access extended PCI config space?
-  *
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index ef10cc1..a6e4d8f 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -321,19 +321,6 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
- }
- #endif
+ 	/* Platform gets a chance to do some global fixups before
+ 	 * we proceed to resource allocation
+ 	 */
+@@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
+ 		ppc_md.pcibios_fixup_phb(hose);
  
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
--void pci_host_assign_domain_nr(struct pci_host_bridge *host);
--#else
--static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
--					struct device *parent)
--{
--}
--static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
--{
--}
--#endif
--
- struct pci_host_bridge *pci_create_host_bridge(
- 		struct device *parent, int domain, int bus, void *sysdata,
- 		struct list_head *resources, struct pci_host_bridge_ops *ops);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cb0237f..53e4887 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -480,7 +480,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+ 	/* Configure PCI Express settings */
+-	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
++	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+ 		struct pci_bus *child;
+-		list_for_each_entry(child, &bus->children, node)
++		list_for_each_entry(child, &host->bus->children, node)
+ 			pcie_bus_configure_settings(child);
  	}
  }
- 
--static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
-+static struct pci_bus *pci_alloc_bus(void)
- {
- 	struct pci_bus *b;
- 
-@@ -495,10 +495,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
- 	INIT_LIST_HEAD(&b->resources);
- 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
- 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	if (parent)
--		b->domain_nr = parent->domain_nr;
--#endif
- 	return b;
- }
- 
-@@ -645,7 +641,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	/*
- 	 * Allocate a new bus, and inherit stuff from the parent..
- 	 */
--	child = pci_alloc_bus(parent);
-+	child = pci_alloc_bus();
- 	if (!child)
- 		return NULL;
- 
-@@ -1865,7 +1861,7 @@ static struct pci_bus *pci_create_root_bus(
- 	char *fmt;
- 
- 	parent = bridge->dev.parent;
--	b = pci_alloc_bus(NULL);
-+	b = pci_alloc_bus();
- 	if (!b)
- 		return NULL;
- 
-@@ -1873,7 +1869,6 @@ static struct pci_bus *pci_create_root_bus(
- 	b->ops = ops;
- 	b->number = b->busn_res.start =
- 		pci_host_first_busnr(bridge);
--	pci_bus_assign_domain_nr(b, parent);
- 
- 	bridge->bus = b;
- 	b->bridge = get_device(&bridge->dev);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index c2c6675..7ef205c 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -469,9 +469,6 @@ struct pci_bus {
- 	unsigned char	primary;	/* number of primary bridge */
- 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
- 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
--#ifdef CONFIG_PCI_DOMAINS_GENERIC
--	int		domain_nr;
--#endif
- 
- 	char		name[48];
- 
 -- 
 1.7.1
