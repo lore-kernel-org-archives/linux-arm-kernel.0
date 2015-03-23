@@ -1,62 +1,96 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 23 Mar 2015 12:32:38 +0200
-Subject: [GIT PULL] OMAP-GPMC driver updates for v4.1
-Message-ID: <550FEBC6.3000902@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 23 Mar 2015 11:36:35 +0100
+Subject: [PATCH] soc/tegra: pmc: Add Tegra210 support
+Message-ID: <1427106995-17265-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+From: Thierry Reding <treding@nvidia.com>
 
-Based on Tony's request I will be sending you pull requests for OMAP-GPMC driver
-hence forth. I've sent this earlier on the 9th of March but had missed to copy Olof.
+Tegra210 uses a power management controller that is compatible with
+earlier SoC generations but adds a couple of power partitions for new
+hardware blocks.
 
-Please pull in these OMAP-GPMC driver fixes for v4.1.
-Patches have been tested for GPMC-NAND on dra7-evm and omap3-beagle.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/soc/tegra/pmc.c                     | 48 +++++++++++++++++++++++++++++
+ include/dt-bindings/power/tegra-powergate.h |  5 +++
+ 2 files changed, 53 insertions(+)
 
-Thanks.
-
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-
-are available in the git repository at:
-
-  git at github.com:rogerq/linux.git tags/gpmc-omap-for-v4.1
-
-for you to fetch changes up to 4b613e9b4bbe94545a588a100e09006d827a7ebe:
-
-  ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters (2015-03-06 12:55:32 +0200)
-
-----------------------------------------------------------------
-OMAP-GPMC driver fixes for v4.1
-
-* Fixed WAITMONITORINGTIME programming to be based on
-GPMC_CLK instead of GPMC_FCLK. The GPMC clock divider
-programming is fixed for both synchronous and asynchronous
-modes.
-* Allow GPMC's children of default bus type to be populated in
-the device tree.
-* Improved DEBUG output data and format.
-* Prevent writing 1 into reserved bits of GPMC_CONFIG7.
-
-----------------------------------------------------------------
-Robert ABEL (8):
-      ARM OMAP2+ GPMC: don't undef DEBUG
-      ARM OMAP2+ GPMC: add bus children
-      ARM OMAP2+ GPMC: fix debug output alignment
-      ARM OMAP2+ GPMC: change get_gpmc_timing_reg output for DTS
-      ARM OMAP2+ GPMC: always program GPMCFCLKDIVIDER
-      ARM OMAP2+ GPMC: calculate GPMCFCLKDIVIDER based on WAITMONITORINGTIME
-      ARM OMAP2+ GPMC: fix WAITMONITORINGTIME divider bug
-      ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters
-
-Semen Protsenko (2):
-      ARM: OMAP2+: gpmc: Fix writing in gpmc_cs_set_memconf
-      ARM: OMAP2+: gpmc: make gpmc_cs_get_name() static
-
- arch/arm/mach-omap2/gpmc-nand.c    |  18 +++++----
- arch/arm/mach-omap2/gpmc-onenand.c |   4 +-
- arch/arm/mach-omap2/usb-tusb6010.c |   4 +-
- drivers/memory/omap-gpmc.c         | 358 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------
- include/linux/omap-gpmc.h          |   3 +-
- 5 files changed, 305 insertions(+), 82 deletions(-)
+diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+index 7dabb8f812e0..e8914e0fb9d2 100644
+--- a/drivers/soc/tegra/pmc.c
++++ b/drivers/soc/tegra/pmc.c
+@@ -1223,7 +1223,55 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
+ 	.has_gpu_clamps = true,
+ };
+ 
++static const char * const tegra210_powergates[] = {
++	[TEGRA_POWERGATE_CPU] = "crail",
++	[TEGRA_POWERGATE_3D] = "3d",
++	[TEGRA_POWERGATE_VENC] = "venc",
++	[TEGRA_POWERGATE_PCIE] = "pcie",
++	[TEGRA_POWERGATE_L2] = "l2",
++	[TEGRA_POWERGATE_MPE] = "mpe",
++	[TEGRA_POWERGATE_HEG] = "heg",
++	[TEGRA_POWERGATE_SATA] = "sata",
++	[TEGRA_POWERGATE_CPU1] = "cpu1",
++	[TEGRA_POWERGATE_CPU2] = "cpu2",
++	[TEGRA_POWERGATE_CPU3] = "cpu3",
++	[TEGRA_POWERGATE_CELP] = "celp",
++	[TEGRA_POWERGATE_CPU0] = "cpu0",
++	[TEGRA_POWERGATE_C0NC] = "c0nc",
++	[TEGRA_POWERGATE_C1NC] = "c1nc",
++	[TEGRA_POWERGATE_SOR] = "sor",
++	[TEGRA_POWERGATE_DIS] = "dis",
++	[TEGRA_POWERGATE_DISB] = "disb",
++	[TEGRA_POWERGATE_XUSBA] = "xusba",
++	[TEGRA_POWERGATE_XUSBB] = "xusbb",
++	[TEGRA_POWERGATE_XUSBC] = "xusbc",
++	[TEGRA_POWERGATE_VIC] = "vic",
++	[TEGRA_POWERGATE_IRAM] = "iram",
++	[TEGRA_POWERGATE_NVDEC] = "nvdec",
++	[TEGRA_POWERGATE_NVJPG] = "nvjpg",
++	[TEGRA_POWERGATE_AUD] = "aud",
++	[TEGRA_POWERGATE_DFD] = "dfd",
++	[TEGRA_POWERGATE_VE2] = "ve2",
++};
++
++static const u8 tegra210_cpu_powergates[] = {
++	TEGRA_POWERGATE_CPU0,
++	TEGRA_POWERGATE_CPU1,
++	TEGRA_POWERGATE_CPU2,
++	TEGRA_POWERGATE_CPU3,
++};
++
++static const struct tegra_pmc_soc tegra210_pmc_soc = {
++	.num_powergates = ARRAY_SIZE(tegra210_powergates),
++	.powergates = tegra210_powergates,
++	.num_cpu_powergates = ARRAY_SIZE(tegra210_cpu_powergates),
++	.cpu_powergates = tegra210_cpu_powergates,
++	.has_tsense_reset = true,
++	.has_gpu_clamps = true,
++};
++
+ static const struct of_device_id tegra_pmc_match[] = {
++	{ .compatible = "nvidia,tegra210-pmc", .data = &tegra210_pmc_soc },
+ 	{ .compatible = "nvidia,tegra132-pmc", .data = &tegra124_pmc_soc },
+ 	{ .compatible = "nvidia,tegra124-pmc", .data = &tegra124_pmc_soc },
+ 	{ .compatible = "nvidia,tegra114-pmc", .data = &tegra114_pmc_soc },
+diff --git a/include/dt-bindings/power/tegra-powergate.h b/include/dt-bindings/power/tegra-powergate.h
+index b8265167c20e..12b72aa77d6a 100644
+--- a/include/dt-bindings/power/tegra-powergate.h
++++ b/include/dt-bindings/power/tegra-powergate.h
+@@ -26,5 +26,10 @@
+ #define TEGRA_POWERGATE_XUSBC	22
+ #define TEGRA_POWERGATE_VIC	23
+ #define TEGRA_POWERGATE_IRAM	24
++#define TEGRA_POWERGATE_NVDEC	25
++#define TEGRA_POWERGATE_NVJPG	26
++#define TEGRA_POWERGATE_AUD	27
++#define TEGRA_POWERGATE_DFD	28
++#define TEGRA_POWERGATE_VE2	29
+ 
+ #endif
+-- 
+2.3.2
