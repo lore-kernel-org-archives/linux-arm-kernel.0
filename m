@@ -1,196 +1,42 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 23 Mar 2015 15:58:22 +0000
-Subject: [PATCH v2 05/12] KVM: arm/arm64: rename struct kvm_mmio_range to
- vgic_io_range
+Date: Mon, 23 Mar 2015 15:58:23 +0000
+Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
+ destroyed
 In-Reply-To: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
 References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1427126309-11223-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name "kvm_mmio_range" is a bit bold, given that it only covers
-the VGIC's MMIO ranges. To avoid confusion with kvm_io_range, rename
-it to vgic_io_range.
+In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
+especially before calling kvm_arch_destroy_vm(). To avoid
+unregistering devices from the already destroyed bus, let's mark
+the bus with NULL to let other users know it has been destroyed
+already.
+This avoids a crash on a VM shutdown with the VGIC using the
+kvm_io_bus later (the unregistering is in there to be able to roll
+back a faulting init).
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic-v2-emul.c |    6 +++---
- virt/kvm/arm/vgic-v3-emul.c |    8 ++++----
- virt/kvm/arm/vgic.c         |   18 +++++++++---------
- virt/kvm/arm/vgic.h         |   12 ++++++------
- 4 files changed, 22 insertions(+), 22 deletions(-)
+ virt/kvm/kvm_main.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-index c818662..ddb3135 100644
---- a/virt/kvm/arm/vgic-v2-emul.c
-+++ b/virt/kvm/arm/vgic-v2-emul.c
-@@ -319,7 +319,7 @@ static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
- 		return write_set_clear_sgi_pend_reg(vcpu, mmio, offset, false);
- }
- 
--static const struct kvm_mmio_range vgic_dist_ranges[] = {
-+static const struct vgic_io_range vgic_dist_ranges[] = {
- 	{
- 		.base		= GIC_DIST_CTRL,
- 		.len		= 12,
-@@ -647,7 +647,7 @@ static bool handle_cpu_mmio_ident(struct kvm_vcpu *vcpu,
-  * CPU Interface Register accesses - these are not accessed by the VM, but by
-  * user space for saving and restoring VGIC state.
-  */
--static const struct kvm_mmio_range vgic_cpu_ranges[] = {
-+static const struct vgic_io_range vgic_cpu_ranges[] = {
- 	{
- 		.base		= GIC_CPU_CTRL,
- 		.len		= 12,
-@@ -674,7 +674,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 				 struct kvm_device_attr *attr,
- 				 u32 *reg, bool is_write)
- {
--	const struct kvm_mmio_range *r = NULL, *ranges;
-+	const struct vgic_io_range *r = NULL, *ranges;
- 	phys_addr_t offset;
- 	int ret, cpuid, c;
- 	struct kvm_vcpu *vcpu, *tmp_vcpu;
-diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index b3f1546..14943e3 100644
---- a/virt/kvm/arm/vgic-v3-emul.c
-+++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -340,7 +340,7 @@ static bool handle_mmio_idregs(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
--static const struct kvm_mmio_range vgic_v3_dist_ranges[] = {
-+static const struct vgic_io_range vgic_v3_dist_ranges[] = {
- 	{
- 		.base           = GICD_CTLR,
- 		.len            = 0x04,
-@@ -570,7 +570,7 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
- 	return vgic_handle_cfg_reg(reg, mmio, offset);
- }
- 
--static const struct kvm_mmio_range vgic_redist_sgi_ranges[] = {
-+static const struct vgic_io_range vgic_redist_sgi_ranges[] = {
- 	{
- 		.base		= GICR_IGROUPR0,
- 		.len		= 0x04,
-@@ -676,7 +676,7 @@ static bool handle_mmio_typer_redist(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
--static const struct kvm_mmio_range vgic_redist_ranges[] = {
-+static const struct vgic_io_range vgic_redist_ranges[] = {
- 	{
- 		.base           = GICR_CTLR,
- 		.len            = 0x04,
-@@ -726,7 +726,7 @@ static bool vgic_v3_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	unsigned long rdbase = dist->vgic_redist_base;
- 	int nrcpus = atomic_read(&vcpu->kvm->online_vcpus);
- 	int vcpu_id;
--	const struct kvm_mmio_range *mmio_range;
-+	const struct vgic_io_range *mmio_range;
- 
- 	if (is_in_range(mmio->phys_addr, mmio->len, dbase, GIC_V3_DIST_SIZE)) {
- 		return vgic_handle_mmio_range(vcpu, run, mmio,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index ffd937c..21a3550 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -712,11 +712,11 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
- }
- 
- const
--struct kvm_mmio_range *vgic_find_range(const struct kvm_mmio_range *ranges,
--				       struct kvm_exit_mmio *mmio,
--				       phys_addr_t offset)
-+struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
-+				      struct kvm_exit_mmio *mmio,
-+				      phys_addr_t offset)
- {
--	const struct kvm_mmio_range *r = ranges;
-+	const struct vgic_io_range *r = ranges;
- 
- 	while (r->len) {
- 		if (offset >= r->base &&
-@@ -729,7 +729,7 @@ struct kvm_mmio_range *vgic_find_range(const struct kvm_mmio_range *ranges,
- }
- 
- static bool vgic_validate_access(const struct vgic_dist *dist,
--				 const struct kvm_mmio_range *range,
-+				 const struct vgic_io_range *range,
- 				 unsigned long offset)
- {
- 	int irq;
-@@ -757,7 +757,7 @@ static bool vgic_validate_access(const struct vgic_dist *dist,
- static bool call_range_handler(struct kvm_vcpu *vcpu,
- 			       struct kvm_exit_mmio *mmio,
- 			       unsigned long offset,
--			       const struct kvm_mmio_range *range)
-+			       const struct vgic_io_range *range)
- {
- 	u32 *data32 = (void *)mmio->data;
- 	struct kvm_exit_mmio mmio32;
-@@ -804,10 +804,10 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
-  */
- bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			    struct kvm_exit_mmio *mmio,
--			    const struct kvm_mmio_range *ranges,
-+			    const struct vgic_io_range *ranges,
- 			    unsigned long mmio_base)
- {
--	const struct kvm_mmio_range *range;
-+	const struct vgic_io_range *range;
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	bool updated_state;
- 	unsigned long offset;
-@@ -1984,7 +1984,7 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 	return r;
- }
- 
--int vgic_has_attr_regs(const struct kvm_mmio_range *ranges, phys_addr_t offset)
-+int vgic_has_attr_regs(const struct vgic_io_range *ranges, phys_addr_t offset)
- {
- 	struct kvm_exit_mmio dev_attr_mmio;
- 
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index 1e5a381..6fccb96 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -74,7 +74,7 @@ void mmio_data_write(struct kvm_exit_mmio *mmio, u32 mask, u32 value)
- 	*((u32 *)mmio->data) = cpu_to_le32(value) & mask;
- }
- 
--struct kvm_mmio_range {
-+struct vgic_io_range {
- 	phys_addr_t base;
- 	unsigned long len;
- 	int bits_per_irq;
-@@ -89,13 +89,13 @@ static inline bool is_in_range(phys_addr_t addr, unsigned long len,
- }
- 
- const
--struct kvm_mmio_range *vgic_find_range(const struct kvm_mmio_range *ranges,
--				       struct kvm_exit_mmio *mmio,
--				       phys_addr_t offset);
-+struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
-+				      struct kvm_exit_mmio *mmio,
-+				      phys_addr_t offset);
- 
- bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			    struct kvm_exit_mmio *mmio,
--			    const struct kvm_mmio_range *ranges,
-+			    const struct vgic_io_range *ranges,
- 			    unsigned long mmio_base);
- 
- bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
-@@ -120,7 +120,7 @@ bool vgic_handle_cfg_reg(u32 *reg, struct kvm_exit_mmio *mmio,
- 
- void vgic_kick_vcpus(struct kvm *kvm);
- 
--int vgic_has_attr_regs(const struct kvm_mmio_range *ranges, phys_addr_t offset);
-+int vgic_has_attr_regs(const struct vgic_io_range *ranges, phys_addr_t offset);
- int vgic_set_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
- int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
- 
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 8c7ab0b..6f164eb 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
+ 	list_del(&kvm->vm_list);
+ 	spin_unlock(&kvm_lock);
+ 	kvm_free_irq_routing(kvm);
+-	for (i = 0; i < KVM_NR_BUSES; i++)
++	for (i = 0; i < KVM_NR_BUSES; i++) {
+ 		kvm_io_bus_destroy(kvm->buses[i]);
++		kvm->buses[i] = NULL;
++	}
+ 	kvm_coalesced_mmio_free(kvm);
+ #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
+ 	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
 -- 
 1.7.9.5
