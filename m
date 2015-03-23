@@ -1,92 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 23 Mar 2015 00:11:28 +0000
-Subject: [PATCH v3 03/12] irqchip: vf610-mscm: support NVIC parent
-In-Reply-To: <1426203380-7155-4-git-send-email-stefan@agner.ch>
-References: <1426203380-7155-1-git-send-email-stefan@agner.ch>
- <1426203380-7155-4-git-send-email-stefan@agner.ch>
-Message-ID: <20150323001128.GL15137@io.lakedaemon.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 23 Mar 2015 12:03:14 +1100
+Subject: linux-next: manual merge of the mips tree with the arm-soc tree
+Message-ID: <20150323120314.3631211a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan,
+Hi Ralf,
 
-On Fri, Mar 13, 2015 at 12:36:11AM +0100, Stefan Agner wrote:
-> Support the NVIC interrupt controller as node parent of the MSCM
-> interrupt router. On the dual-core variants of Vybird (VF6xx), the
-> NVIC interrupt controller is used by the Cortex-M4. To support
-> running Linux on this core too, MSCM needs NVIC parent support too.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/irqchip/irq-vf610-mscm-ir.c | 32 ++++++++++++++++++++++++++------
->  1 file changed, 26 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-vf610-mscm-ir.c b/drivers/irqchip/irq-vf610-mscm-ir.c
-> index 9521057..bb0e1a3 100644
-> --- a/drivers/irqchip/irq-vf610-mscm-ir.c
-> +++ b/drivers/irqchip/irq-vf610-mscm-ir.c
-...
-> @@ -101,17 +103,25 @@ static void vf610_mscm_ir_enable(struct irq_data *data)
->  	writew_relaxed(chip_data->cpu_mask,
->  		       chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
->  
-> -	irq_chip_unmask_parent(data);
-> +	if (parent->chip->irq_enable)
-> +		parent->chip->irq_enable(parent);
-> +	else
-> +		parent->chip->irq_unmask(parent);
-> +
->  }
->  
->  static void vf610_mscm_ir_disable(struct irq_data *data)
->  {
->  	irq_hw_number_t hwirq = data->hwirq;
->  	struct vf610_mscm_ir_chip_data *chip_data = data->chip_data;
-> +	struct irq_data *parent = data->parent_data;
->  
->  	writew_relaxed(0x0, chip_data->mscm_ir_base + MSCM_IRSPRC(hwirq));
->  
-> -	irq_chip_mask_parent(data);
-> +	if (parent->chip->irq_enable)
-> +		parent->chip->irq_disable(parent);
+Today's linux-next merge of the mips tree got a conflict in
+drivers/bus/Makefile between commit 6320c41198c7 ("drivers: bus: Sort
+Makefile entries alphabetically") from the arm-soc tree and commit
+cd46cf20d04a ("MIPS: Add CDMM bus support") from the mips tree.
 
-copy/paste?
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-> @@ -143,10 +153,17 @@ static int vf610_mscm_ir_domain_alloc(struct irq_domain *domain, unsigned int vi
->  					      domain->host_data);
->  
->  	gic_data.np = domain->parent->of_node;
-> -	gic_data.args_count = 3;
-> -	gic_data.args[0] = GIC_SPI;
-> -	gic_data.args[1] = irq_data->args[0];
-> -	gic_data.args[2] = irq_data->args[1];
-> +
-> +	if (mscm_ir_data->is_nvic) {
-> +		gic_data.args_count = 1;
-> +		gic_data.args[0] = irq_data->args[0];
-> +	} else {
-> +		gic_data.args_count = 3;
-> +		gic_data.args[0] = GIC_SPI;
-> +		gic_data.args[1] = irq_data->args[0];
-> +		gic_data.args[2] = irq_data->args[1];
-> +	}
-> +
->  	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs, &gic_data);
->  }
->  
-> @@ -199,6 +216,9 @@ static int __init vf610_mscm_ir_of_init(struct device_node *node,
->  		goto out_unmap;
->  	}
->  
-> +	if (of_device_is_compatible(domain->parent->of_node, "arm,armv7m-nvic"))
-> +		mscm_ir_data->is_nvic = true;
-> +
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Could you walk me through how DT backwards compatibility is being
-preserved/broken here?  I'm not saying it's wrong, but every other conversion
-to stacked domains involves a compatibility break.  At the very least, I'd like
-to see it discussed in the commit log.
-
-thx,
-
-Jason.
+diff --cc drivers/bus/Makefile
+index e023a2bec664,807dd17ef2f8..000000000000
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@@ -2,13 -2,11 +2,14 @@@
+  # Makefile for the bus drivers.
+  #
+  
+ +# Interconnect bus drivers for ARM platforms
+ +obj-$(CONFIG_ARM_CCI)		+= arm-cci.o
+ +obj-$(CONFIG_ARM_CCN)		+= arm-ccn.o
+ +
+  obj-$(CONFIG_BRCMSTB_GISB_ARB)	+= brcmstb_gisb.o
+ -obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+ +obj-$(CONFIG_IMX_WEIM)		+= imx-weim.o
++ obj-$(CONFIG_MIPS_CDMM) += mips_cdmm.o
+ -obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+ -obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+ +obj-$(CONFIG_MVEBU_MBUS) 	+= mvebu-mbus.o
+  
+  # Interconnect bus driver for OMAP SoCs.
+  obj-$(CONFIG_OMAP_INTERCONNECT)	+= omap_l3_smx.o omap_l3_noc.o
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150323/adc78331/attachment.sig>
