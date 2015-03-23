@@ -1,105 +1,53 @@
-From: galak@codeaurora.org (Kumar Gala)
-Date: Mon, 23 Mar 2015 15:05:22 -0700
-Subject: [PATCH v17 04/10] ARM: dts: qcom: Add power-controller device
- node for 8074 Krait CPUs
-In-Reply-To: <1426882877-33008-5-git-send-email-lina.iyer@linaro.org>
-References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
- <1426882877-33008-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <292C2E97-ED74-4F17-B592-B5EA7BDD1E8E@codeaurora.org>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 23 Mar 2015 22:05:31 +0000
+Subject: [PATCH v2 1/7] eeprom: Add a simple EEPROM framework for eeprom
+ providers
+In-Reply-To: <20150323210918.GS14954@sirena.org.uk>
+References: <1426240157-2383-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1426240214-2434-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150323210918.GS14954@sirena.org.uk>
+Message-ID: <55108E2B.7050305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-> Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
-> regulate the power to the cpu and aide the core in entering idle states.
-> Reference the SAW instance and associate the instance with the CPU core.
-> 
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> arch/arm/boot/dts/qcom-msm8974.dtsi | 26 +++++++++++++++++++++++++-
-> 1 file changed, 25 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index e265ec1..5a41f44 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -21,6 +21,7 @@
-> 			reg = <0>;
-> 			next-level-cache = <&L2>;
-> 			qcom,acc = <&acc0>;
-> +			qcom,saw = <&saw0>;
-> 		};
-> 
-> 		cpu at 1 {
-> @@ -30,6 +31,7 @@
-> 			reg = <1>;
-> 			next-level-cache = <&L2>;
-> 			qcom,acc = <&acc1>;
-> +			qcom,saw = <&saw1>;
-> 		};
-> 
-> 		cpu at 2 {
-> @@ -39,6 +41,7 @@
-> 			reg = <2>;
-> 			next-level-cache = <&L2>;
-> 			qcom,acc = <&acc2>;
-> +			qcom,saw = <&saw2>;
-> 		};
-> 
-> 		cpu at 3 {
-> @@ -48,6 +51,7 @@
-> 			reg = <3>;
-> 			next-level-cache = <&L2>;
-> 			qcom,acc = <&acc3>;
-> +			qcom,saw = <&saw3>;
-> 		};
-> 
-> 		L2: l2-cache {
-> @@ -144,7 +148,27 @@
-> 			};
-> 		};
-> 
-> -		saw_l2: regulator at f9012000 {
-> +		saw0: power-controller at f9089000 {
-> +			compatible = "qcom,msm8974-saw2-v2.1-cpu?;
+On 23/03/15 21:09, Mark Brown wrote:
+> On Fri, Mar 13, 2015 at 09:50:14AM +0000, Srinivas Kandagatla wrote:
+>
+> A couple of *very* minor points below, otherwise this looks OK to me.
+>
+Thankyou for the review.
 
-Should these include ?qcom,saw??
+>> +struct eeprom_device *eeprom_register(struct eeprom_config *config)
+>> +{
+>> +	struct eeprom_device *eeprom;
+>> +	int rval;
+>> +
+>> +	if (!config->regmap || !config->size) {
+>> +		dev_err(config->dev, "Regmap not found\n");
+>> +		return ERR_PTR(-EINVAL);
+>> +	}
+>
+> You have a struct device in the config and the regmap API has
+> dev_get_regmap() which for most devices that don't have multiple regmaps
+> will give the right regmap.  It would be nice to support this as a
+> convenience for users.
+Yes, sure that makes sense, I will give it a try.
 
-> +			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
-> +		};
-> +
-> +		saw1: power-controller at f9099000 {
-> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
-> +			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
-> +		};
-> +
-> +		saw2: power-controller at f90a9000 {
-> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
-> +			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
-> +		};
-> +
-> +		saw3: power-controller at f90b9000 {
-> +			compatible = "qcom,msm8974-saw2-v2.1-cpu";
-> +			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
-> +		};
-> +
-> +		saw_l2: power-controller at f9012000 {
-> 			compatible = "qcom,saw2";
-> 			reg = <0xf9012000 0x1000>;
-> 			regulator;
-> -- 
-> 2.1.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>> +	eeprom = kzalloc(sizeof(*eeprom), GFP_KERNEL);
+>> +	if (!eeprom)
+>> +		return ERR_PTR(-ENOMEM);
+>
+> ...
+>
+>> +	rval = device_add(&eeprom->dev);
+>> +	if (rval)
+>> +		return ERR_PTR(rval);
+>
+> Don't you need a kfree() if device_add() fails?
+I will fix it in next version.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+--srini
+>
