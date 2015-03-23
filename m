@@ -1,45 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 Mar 2015 17:50:55 +0000
-Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
- init_mm
-In-Reply-To: <1427131377.2693.25.camel@linaro.org>
-References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
- <1427116945.2693.10.camel@linaro.org>
- <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
- <1427131377.2693.25.camel@linaro.org>
-Message-ID: <20150323175055.GD12757@e104818-lin.cambridge.arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 23 Mar 2015 18:54:34 +0100 (CET)
+Subject: [PATCH 5/7] ARM: dts: enable regulator support for i.MX23/i.MX28
+In-Reply-To: <20150323060706.GB4946@pengutronix.de>
+References: <1426984203-9133-1-git-send-email-stefan.wahren@i2se.com>
+ <1426984203-9133-6-git-send-email-stefan.wahren@i2se.com>
+ <20150323060706.GB4946@pengutronix.de>
+Message-ID: <1469391177.549604.1427133274978.JavaMail.open-xchange@oxbaltgw02.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 05:22:57PM +0000, Jon Medhurst (Tixy) wrote:
-> On Mon, 2015-03-23 at 15:44 +0000, Catalin Marinas wrote:
-> > From 5d9e3540b6480558528612dd3672543fa8ab3528 Mon Sep 17 00:00:00 2001
-> > From: Catalin Marinas <catalin.marinas@arm.com>
-> > Date: Mon, 23 Mar 2015 15:06:50 +0000
-> > Subject: [PATCH] arm64: Use the reserved TTBR0 if context switching to the
-> >  init_mm
-> > 
-> > The idle_task_exit() function may call switch_mm() with next ==
-> > &init_mm. On arm64, init_mm.pgd cannot be used for user mappings, so
-> > this patch simply sets the reserved TTBR0.
-> > 
-> > Cc: <stable@vger.kernel.org>
-> > Reported-by: Jon Medhurst (Tixy) <tixy@linaro.org>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> That unsurprising fixes the BUG_ON I was seeing on Juno, so...
-> Tested-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+Hi Sascha,
 
-Thanks.
+> Sascha Hauer <s.hauer@pengutronix.de> hat am 23. M?rz 2015 um 07:07
+> geschrieben:
+>
+>
+> On Sun, Mar 22, 2015 at 12:30:01AM +0000, Stefan Wahren wrote:
+> > This patch enables the on-chip regulator support for all i.MX23 and
+> > i.MX28 boards.
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > ---
+> > arch/arm/boot/dts/imx23.dtsi | 67 +++++++++++++++++++++++++++++++++++++++++-
+> > arch/arm/boot/dts/imx28.dtsi | 67 +++++++++++++++++++++++++++++++++++++++++-
+> > 2 files changed, 132 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> > index bbcfb5a..be0aee8 100644
+> > --- a/arch/arm/boot/dts/imx23.dtsi
+> > +++ b/arch/arm/boot/dts/imx23.dtsi
+> > @@ -404,8 +404,73 @@
+> > };
+> >
+> > power at 80044000 {
+> > + compatible = "fsl,imx23-power";
+> > + #address-cells = <1>;
+> > + #size-cells = <1>;
+> > reg = <0x80044000 0x2000>;
+> > - status = "disabled";
+> > + interrupts = <3>;
+> > + ranges;
+> > +
+> > + dcdc: regulator at 80044010 {
+> > + reg = <0x80044010 0x10>,
+> > + <0x80044090 0x10>,
+> > + <0x800440c0 0x10>;
+> > + reg-names = "base-address",
+> > + "misc-address",
+> > + "status-address";
+> > + compatible = "fsl,imx23-dcdc";
+> > + regulator-name = "dcdc";
+> > + regulator-boot-on;
+> > + regulator-always-on;
+> > + };
+>
+> It is very unusual to describe the regulators of a device on a register
+> level like this and to iomemap each register individually. I think you
+> should drop the registers here and put this knowledge into the driver
+> like (nearly?) all others do.
 
-> One question, is bypassing setting the mm_cpumask and context.id for
-> init_mm OK? I'm not familiar with the code but had a quick look, and it
-> looks like they are just used for ASID management, in which case I
-> assume everything is OK - ASIDs only being relevant for user mappings in
-> ttbr0?
+do mean dropping the base address of the regulator, too?
 
-That's my thinking as well. Will asked me the same question, so I'll let
-him confirm if he's seeing anything wrong.
+How would you implement it (bare register address or regmap or syscon), since
+there
+are overlapping register regions for different driver?
 
--- 
-Catalin
+@Mark: What's your opinion?
+
+Stefan
+
+>
+> Sascha
+>
+> --
+> Pengutronix e.K. | |
+> Industrial Linux Solutions | http://www.pengutronix.de/ |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 |
+> Amtsgericht Hildesheim, HRA 2686 | Fax: +49-5121-206917-5555 |
