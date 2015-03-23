@@ -1,46 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Mar 2015 11:40:01 +0000
-Subject: [PATCH] ARM: kvm: implement replacement for ld's LOG2CEIL()
-In-Reply-To: <1427107977-18591-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427107977-18591-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150323114001.GF11189@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 23 Mar 2015 12:49:14 +0100
+Subject: [RFC] pinmux: group and function definitions in the device tree
+In-Reply-To: <20150323100913.GJ9742@pengutronix.de>
+References: <20150319153950.GC30114@odux.rfo.atmel.com>
+ <20150319185637.GV4927@pengutronix.de>
+ <20150320150609.GB32259@odux.rfo.atmel.com>
+ <20150323064424.GD9742@pengutronix.de>
+ <20150323090827.GD32259@odux.rfo.atmel.com>
+ <20150323100913.GJ9742@pengutronix.de>
+Message-ID: <20150323114914.GL9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 10:52:57AM +0000, Ard Biesheuvel wrote:
-> Commit 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce
-> page") uses ld's builtin function LOG2CEIL() to align the
-> KVM init code to a log2 upper bound of its size. However,
-> this function turns out to be a fairly recent addition to
-> binutils, which breaks the build for older toolchains.
+On Mon, Mar 23, 2015 at 11:09:13AM +0100, Sascha Hauer wrote:
 > 
-> So instead, implement a replacement LOG2_ROUNDUP() using
-> the C preprocessor.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> Linker map output after applying this patch:
-> 
->                 0xc09a2590                __idmap_text_end = .
->                 [...]
->  *fill*         0xc09a2590       0x70 
->                 0xc09a2600                __hyp_idmap_text_start = .
->  *(.hyp.idmap.text)
->  .hyp.idmap.text
->                 0xc09a2600      0x100 arch/arm/kvm/built-in.o
->                 0xc09a2600                __kvm_hyp_init
->                 0xc09a26ec                __kvm_hyp_init_end
->                 0xc09a2700                __hyp_idmap_text_end = .
-> 
-> which confirms that the alignemnt is correct. The size of the region
-> is 0xec bytes, and 0x70 bytes of padding are emitted to align it at
-> a 0x100 byte boundary
-> 
->  arch/arm/kernel/vmlinux.lds.S | 24 ++++++++++++++++++++++--
->  1 file changed, 22 insertions(+), 2 deletions(-)
+> This may be because the concept of groups doesn't most hardware.
 
-Thanks Ard. I pushed this on top of kvm-bounce-page and re-generated
-for-next/core.
+I meant "doesn't match most hardware"
 
-Will
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
