@@ -1,46 +1,116 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Mon, 23 Mar 2015 17:05:38 +0000
-Subject: [PATCH v5 0/6] QEMU ARM64 Migration Fixes
-Message-ID: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+Date: Mon, 23 Mar 2015 17:05:43 +0000
+Subject: [PATCH v5 5/6] target-arm: kvm64 fix save/restore of SPSR regs
+In-Reply-To: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1427130344-27986-6-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The current code was negatively indexing the cpu state array and not
+synchronizing banked spsr register state with the current mode's spsr
+state, causing occasional failures with migration.
 
-Following some review comments (and a patch) from Peter I've re-spun
-this series:
+Some munging is done to take care of the aarch64 mapping and also to
+ensure the most current value of the spsr is updated to the banked
+registers (relevant for KVM<->TCG migration).
 
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+
+---
+v2 (ajb)
+  - minor tweaks and clarifications
+v3
+  - Use the correct bank index function for setting/getting env->spsr
+  - only deal with spsrs in elevated exception levels
+v4
+ - try and make commentary clearer
+ - ensure env->banked_spsr[0] = env->spsr before we sync
 v5
-  - Added Peter's SPSR_EL1 state fix for architectural mapping
-  - As a result SPSR save/restore no longer does munge
-  - FP register save/restore re-done to deal float128 mapping
-  - Some minor [ spaces ] added
+ - fix banking index now banking fixed
+ - keep wide spacing on [ ] forms
+ - claimed authorship
 
-I submitted the kernel side of this on Friday
-
-Branch: https://github.com/stsquad/qemu/tree/migration/fixes-v5
-Kernel: https://git.linaro.org/people/alex.bennee/linux.git/shortlog/refs/heads/migration/kvmarm-fixes-for-4.0-v3
-
-Alex Benn?e (5):
-  target-arm: kvm: save/restore mp state
-  hw/intc: arm_gic_kvm.c restore config first
-  target-arm: kvm64 sync FP register state
-  target-arm: kvm64 fix save/restore of SPSR regs
-  target-arm: cpu.h document why env->spsr exists
-
-Peter Maydell (1):
-  target-arm: Store SPSR_EL1 state in banked_spsr[1] (SPSR_svc)
-
- hw/intc/arm_gic_kvm.c   |   7 ++-
- target-arm/cpu.h        |   5 +++
- target-arm/helper-a64.c |   2 +-
- target-arm/helper.c     |   2 +-
- target-arm/internals.h  |   5 ++-
- target-arm/kvm.c        |  40 +++++++++++++++++
- target-arm/kvm32.c      |   4 ++
- target-arm/kvm64.c      | 111 +++++++++++++++++++++++++++++++++++++++++++++---
- target-arm/kvm_arm.h    |  18 ++++++++
- 9 files changed, 184 insertions(+), 10 deletions(-)
-
+diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+index 857e970..5270fa7 100644
+--- a/target-arm/kvm64.c
++++ b/target-arm/kvm64.c
+@@ -139,6 +139,7 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+     uint64_t val;
+     int i;
+     int ret;
++    unsigned int el;
+ 
+     ARMCPU *cpu = ARM_CPU(cs);
+     CPUARMState *env = &cpu->env;
+@@ -205,9 +206,24 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+         return ret;
+     }
+ 
++    /* Saved Program State Registers
++     *
++     * Before we restore from the banked_spsr[] array we need to
++     * ensure that any modifications to env->spsr are correctly
++     * reflected in the banks.
++     */
++    el = arm_current_el(env);
++    if (el > 0) {
++        i = is_a64(env) ?
++            aarch64_banked_spsr_index(el) :
++            bank_number(env->uncached_cpsr & CPSR_M);
++        env->banked_spsr[i] = env->spsr;
++    }
++
++    /* KVM 0-4 map to QEMU banks 1-5 */
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i + 1];
+         ret = kvm_vcpu_ioctl(cs, KVM_SET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
+@@ -253,11 +269,13 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+     return ret;
+ }
+ 
++
+ int kvm_arch_get_registers(CPUState *cs)
+ {
+     struct kvm_one_reg reg;
+     uint64_t val;
+     uint32_t fpr;
++    unsigned int el;
+     int i;
+     int ret;
+ 
+@@ -330,15 +348,27 @@ int kvm_arch_get_registers(CPUState *cs)
+         return ret;
+     }
+ 
++    /* Fetch the SPSR registers
++     *
++     * KVM SPSRs 0-4 map to QEMU banks 1-5
++     */
+     for (i = 0; i < KVM_NR_SPSR; i++) {
+         reg.id = AARCH64_CORE_REG(spsr[i]);
+-        reg.addr = (uintptr_t) &env->banked_spsr[i - 1];
++        reg.addr = (uintptr_t) &env->banked_spsr[i + 1];
+         ret = kvm_vcpu_ioctl(cs, KVM_GET_ONE_REG, &reg);
+         if (ret) {
+             return ret;
+         }
+     }
+ 
++    el = arm_current_el(env);
++    if (el > 0) {
++        i = is_a64(env) ?
++            aarch64_banked_spsr_index(el) :
++            bank_number(env->uncached_cpsr & CPSR_M);
++        env->spsr = env->banked_spsr[i];
++    }
++
+     /* Advanced SIMD and FP registers
+      * We map Qn = regs[2n+1]:regs[2n]
+      */
 -- 
 2.3.2
