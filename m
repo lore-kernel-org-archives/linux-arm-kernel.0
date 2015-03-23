@@ -1,54 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Mar 2015 11:53:14 +0000
-Subject: [PATCH v5 04/12] mfd: axp20x: update DT bindings with AXP22x
- compatibles
-In-Reply-To: <1425988764-23618-5-git-send-email-wens@csie.org>
+Date: Mon, 23 Mar 2015 11:54:25 +0000
+Subject: [PATCH v5 08/12] mfd: axp20x: Add AXP22x regulator information
+ to DT bindings
+In-Reply-To: <1425988764-23618-9-git-send-email-wens@csie.org>
 References: <1425988764-23618-1-git-send-email-wens@csie.org>
- <1425988764-23618-5-git-send-email-wens@csie.org>
-Message-ID: <20150323115314.GB24422@x1>
+ <1425988764-23618-9-git-send-email-wens@csie.org>
+Message-ID: <20150323115425.GC24422@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 10 Mar 2015, Chen-Yu Tsai wrote:
 
-> Add AXP221 to the list of supported devices.
-> 
-> Also replace any mention of AXP20x in the document with a
-> generic "PMIC".
+> Add the list of regulators for AXP22x to the DT bindings.
+> This includes the names and supply names.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-
-For my own reference:
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 27 ++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+> 
 > diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index 98685f291a72..3914a3f91ff6 100644
+> index 3914a3f91ff6..0fc2f1f35cef 100644
 > --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
 > +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -1,15 +1,16 @@
-> -AXP202/AXP209 device tree bindings
-> +AXP family PMIC device tree bindings
+> @@ -49,6 +49,33 @@ LDO3		: LDO		: ldo3in-supply
+>  LDO4		: LDO		: ldo24in-supply	: shared supply
+>  LDO5		: LDO		: ldo5in-supply
 >  
->  The axp20x family current members :
->  axp202 (X-Powers)
->  axp209 (X-Powers)
-> +axp221 (X-Powers)
+> +
+
+Nit: I'm not keen on double line spacing.
+
+> +AXP221 regulators, type, and corresponding input supply names:
+> +
+> +Regulator	  Type		  Supply Name		  Notes
+> +---------	  ----		  -----------		  -----
+> +DCDC1		: DC-DC buck	: vin1-supply
+> +DCDC2		: DC-DC buck	: vin2-supply
+> +DCDC3		: DC-DC	buck	: vin3-supply
+> +DCDC4		: DC-DC	buck	: vin4-supply
+> +DCDC5		: DC-DC	buck	: vin5-supply
+> +DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
+> +DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
+> +ALDO1		: LDO		: aldoin-supply		: shared supply
+> +ALDO2		: LDO		: aldoin-supply		: shared supply
+> +ALDO3		: LDO		: aldoin-supply		: shared supply
+> +DLDO1		: LDO		: dldoin-supply		: shared supply
+> +DLDO2		: LDO		: dldoin-supply		: shared supply
+> +DLDO3		: LDO		: dldoin-supply		: shared supply
+> +DLDO4		: LDO		: dldoin-supply		: shared supply
+> +ELDO1		: LDO		: eldoin-supply		: shared supply
+> +ELDO2		: LDO		: eldoin-supply		: shared supply
+> +ELDO3		: LDO		: eldoin-supply		: shared supply
+> +LDO_IO0		: LDO		: ips-supply		: GPIO 0
+> +LDO_IO1		: LDO		: ips-supply		: GPIO 1
+> +RTC_LDO		: LDO		: ips-supply		: always on
+> +
+> +
+
+Nit: I'm not keen on double line spacing.
+
+>  Example:
 >  
->  Required properties:
-> -- compatible: "x-powers,axp202" or "x-powers,axp209"
-> +- compatible: "x-powers,axp202", "x-powers,axp209", "x-powers,axp221"
->  - reg: The I2C slave address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-> -- interrupt-controller: axp20x has its own internal IRQs
-> +- interrupt-controller: The PMIC has its own internal IRQs
->  - #interrupt-cells: Should be set to 1
->  
->  Optional properties:
+>  axp209: pmic at 34 {
 
 -- 
 Lee Jones
