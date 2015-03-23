@@ -1,306 +1,162 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Mon, 23 Mar 2015 16:24:26 +0000
-Subject: [PATCH v5] dma: Add Xilinx AXI Direct Memory Access Engine
- driver support
-In-Reply-To: <20150317110739.GE32683@intel.com>
-References: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
- <20150317110739.GE32683@intel.com>
-Message-ID: <BN1AFFO11FD0176A49A50DC8480B79E879A10D0@BN1AFFO11FD017.protection.gbl>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 23 Mar 2015 16:25:14 +0000
+Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <5510340E.7000802@linaro.org>
+References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
+ <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
+ <20150321203546.GE22354@red-moon> <5510340E.7000802@linaro.org>
+Message-ID: <20150323162514.GE18904@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
-
-Sorry for the delay in reply. Answers for the comments inline.
-
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, March 17, 2015 4:38 PM
-> To: Appana Durga Kedareswara Rao
-> Cc: dan.j.williams at intel.com; Michal Simek; Soren Brinkmann;
-> dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Appana Durga Kedareswara Rao; Anirudha Sarangi;
-> Srikanth Vemula; Srikanth Thokala
-> Subject: Re: [PATCH v5] dma: Add Xilinx AXI Direct Memory Access Engine
-> driver support
->
-> On Mon, Mar 02, 2015 at 11:25:11PM +0530, Kedareswara rao Appana wrote:
-> > This is the driver for the AXI Direct Memory Access (AXI DMA) core,
-> > which is a soft Xilinx IP core that provides high- bandwidth direct
-> > memory access between memory and AXI4-Stream type target
-> peripherals.
+On Mon, Mar 23, 2015 at 03:41:02PM +0000, Daniel Lezcano wrote:
+> On 03/21/2015 09:35 PM, Lorenzo Pieralisi wrote:
+> > On Fri, Mar 20, 2015 at 11:44:00AM +0000, Daniel Lezcano wrote:
+> >> Some architectures have some cpus which does not support idle states.
+> >>
+> >> Let the underlying low level code to return -ENXIO when it is not
+> >> possible to set an idle state.
 > >
-> > Signed-off-by: Srikanth Thokala <sthokal@xilinx.com>
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > This patch is rebased on top of dma: xilinx-dma: move header file to
-> > common location.
-> but not on slave-dma next some API update is required..
+> > Well, this is getting interesting. We are parsing possible CPUs to
+> > detect if they have common idle states in DT. If a CPU does not support
+> > idle states, the cpu node for that CPU should not define any idle
+> > state.
+> >
+> > The approach above will work with my heterogenous system patch, since
+> > the respective CPUidle driver mask will be created by parsing the DT
+> > idle states.
+> >
+> > http://www.spinics.net/lists/arm-kernel/msg403190.html
+> >
+> > In current approach if a "possible " CPU does not have idle states, we do
+> > not init CPUidle at all.
+> >
+> > So, to cut a long story short, what does "a cpu does not support idle
+> > states" mean ?
+> >
+> > Does it mean that firmware defines idle states for that CPU in DT but
+> > initializing them fail ?
+> >
+> > I am fine with this patch, but we need to define -ENXIO return properly.
+> 
+> Ok, so after discussing with Lina, it appears my change log is not correct.
+> 
+> In Qcom's platform, each core has a SPM. The device associated with this 
+> SPM is initialized before the cpuidle framework. If there is an error in 
+> the initialization (eg. error in the DT), the system continues to boot 
+> but in degraded mode as some SPM may not be correctly initialized. In 
+> this case, the EXNIO tells the cpuidle driver to not initialize the 
+> cpuidle device as the associated SPM is not operational. That prevents 
+> the system to crash and allows to handle the error gracefully.
 
-Ok Will make the changes for API updates will send the next patch
-On top of slave-dma next.
+This makes more sense. I think that the whole cpu init idle code should
+be moved to arch code along with the DT idle states parsing, now we
+parse DT idle states in two code paths and that's prone to error, but
+I think that can be done later.
 
->
->
-> > +/*
-> > + * DMA driver for Xilinx DMA Engine
-> > + *
-> > + * Copyright (C) 2010 - 2014 Xilinx, Inc. All rights reserved.
-> 2015?
+Lorenzo
 
-Ok will modify.
-
->
-> > +static struct xilinx_dma_tx_descriptor *
-> > +xilinx_dma_alloc_tx_descriptor(struct xilinx_dma_chan *chan) {
-> > +   struct xilinx_dma_tx_descriptor *desc;
-> > +   unsigned long flags;
-> > +
-> > +   if (chan->allocated_desc)
-> > +           return chan->allocated_desc;
-> > +
-> > +   desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-> GFP_NOWAIT
-
-Ok
-
->
-> > +static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
-> > +                                       dma_cookie_t cookie,
-> > +                                       struct dma_tx_state *txstate) {
-> > +   struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> > +   enum dma_status ret;
-> > +   unsigned long flags;
-> > +
-> > +   ret = dma_cookie_status(dchan, cookie, txstate);
-> > +   if (ret != DMA_COMPLETE) {
-> txstate can be null
-
-Ok will modify.
-It will be something like below
-
-ret = dma_cookie_status(dchan, cookie, txstate);
-if (ret == DMA_COMPLETE || !txstate)
-        return ret;
-Calculate residue.
-
-Please correct me if I am wrong
-
-
->
-> > +           spin_lock_irqsave(&chan->lock, flags);
-> > +           dma_set_residue(txstate, chan->residue);
-> the queried descriptor may not be submitted to HW. Also the expectations
-> are that you will read current value from HW and calculate residue
-
-Ok Will modify will calculate residue here.
-
->
-> > +static int xilinx_dma_device_slave_caps(struct dma_chan *dchan,
-> > +                                   struct dma_slave_caps *caps)
-> > +{
-> > +   caps->directions = BIT(DMA_DEV_TO_MEM) |
-> BIT(DMA_MEM_TO_DEV);
-> > +   caps->cmd_terminate = true;
-> > +   caps->residue_granularity =
-> DMA_RESIDUE_GRANULARITY_SEGMENT;
-> > +
-> > +   return 0;
-> > +}
-> this is based on older API, pls update
-
-Ok Will update.
-
->
->
-> > +static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan
-> > +*chan) {
-> > +   struct xilinx_dma_tx_descriptor *desc;
-> > +   struct xilinx_dma_tx_segment *segment, *next;
-> > +   struct xilinx_dma_desc_hw *hw;
-> > +   unsigned long flags;
-> > +   u32 residue = 0;
-> > +
-> > +   spin_lock_irqsave(&chan->lock, flags);
-> > +
-> > +   desc = chan->active_desc;
-> > +   if (!desc) {
-> > +           dev_dbg(chan->dev, "no running descriptors\n");
-> > +           goto out_unlock;
-> > +   }
-> > +
-> > +   if (chan->has_sg) {
-> > +           list_for_each_entry_safe(segment, next, &desc->segments,
-> node) {
-> > +                   hw = &segment->hw;
-> > +                   residue += (hw->control - hw->status) &
-> > +                              XILINX_DMA_MAX_TRANS_LEN;
-> > +           }
-> why are we calculating residue here?
-
-
-This API is called from Interrupt handler when the BD(Buffer Descriptor) is
-Successfully transmitted.
-Thought of calculating residue here is more accurate than calculating the residue in the
-tx_status.
-
-
-> > +   }
-> > +
-> > +   chan->residue = residue;
-> and this is used in status call, so completely wrong!
-
- OK
-
->
-> > +static dma_cookie_t xilinx_dma_tx_submit(struct
-> > +dma_async_tx_descriptor *tx) {
-> > +   struct xilinx_dma_tx_descriptor *desc = to_dma_tx_descriptor(tx);
-> > +   struct xilinx_dma_chan *chan = to_xilinx_chan(tx->chan);
-> > +   dma_cookie_t cookie;
-> > +   unsigned long flags;
-> > +   int err;
-> > +
-> > +   if (chan->err) {
-> > +           /*
-> > +            * If reset fails, need to hard reset the system.
-> > +            * Channel is no longer functional
-> > +            */
-> > +           err = xilinx_dma_reset(chan);
-> > +           if (err < 0)
-> > +                   return err;
-> > +   }
-> > +
-> > +   spin_lock_irqsave(&chan->lock, flags);
-> > +
-> > +   cookie = dma_cookie_assign(tx);
-> > +
-> > +   /* Append the transaction to the pending transactions queue. */
-> > +   list_add_tail(&desc->node, &chan->pending_list);
-> > +
-> > +   /* Free the allocated desc */
-> > +   chan->allocated_desc = NULL;
-> this bit is confusing, can you explain what is going on?
-
-This will allow to queue up multiple segments on to a single transaction descriptor.
-User will submit this single desc and in the issue_pending() we decode multiple
-Segments and submit to SG HW engine.  We free up the allocated_desc when it is
-Submitted to the HW.
-
-Please let me know if my explanation is not clear.
-
->
-> > +static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
-> > +   struct dma_chan *dchan, struct scatterlist *sgl, unsigned int sg_len,
-> > +   enum dma_transfer_direction direction, unsigned long flags,
-> > +   void *context)
-> > +{
-> > +   struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
-> > +   struct xilinx_dma_tx_descriptor *desc;
-> > +   struct xilinx_dma_tx_segment *segment;
-> > +   struct xilinx_dma_desc_hw *hw;
-> > +   u32 *app_w = (u32 *)context;
-> > +   struct scatterlist *sg;
-> > +   size_t copy, sg_used;
-> > +   int i;
-> > +
-> > +   if (!is_slave_direction(direction))
-> > +           return NULL;
-> > +
-> > +   /* Allocate a transaction descriptor. */
-> > +   desc = xilinx_dma_alloc_tx_descriptor(chan);
-> > +   if (!desc)
-> > +           return NULL;
-> > +
-> > +   desc->direction = direction;
-> > +   dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
-> > +   desc->async_tx.tx_submit = xilinx_dma_tx_submit;
-> > +   desc->async_tx.cookie = 0;
-> ?
-
-This is while preparing the descs, but I see your point.  I will fix
-it in my next version of the patch.
-
->
-> > +   async_tx_ack(&desc->async_tx);
-> why?
-
-It is not required?
-As far as I know we should ack the descriptor for Slave dma case right?
-( https://www.kernel.org/doc/Documentation/crypto/async-tx-api.txt )
-
->
-> > +
-> > +   /* Build transactions using information in the scatter gather list */
-> > +   for_each_sg(sgl, sg, sg_len, i) {
-> > +           sg_used = 0;
-> > +
-> > +           /* Loop until the entire scatterlist entry is used */
-> > +           while (sg_used < sg_dma_len(sg)) {
-> > +
-> > +                   /* Get a free segment */
-> > +                   segment = xilinx_dma_alloc_tx_segment(chan);
-> > +                   if (!segment)
-> > +                           goto error;
-> > +
-> > +                   /*
-> > +                    * Calculate the maximum number of bytes to
-> transfer,
-> > +                    * making sure it is less than the hw limit
-> > +                    */
-> > +                   copy = min_t(size_t, sg_dma_len(sg) - sg_used,
-> > +                                XILINX_DMA_MAX_TRANS_LEN);
-> > +                   hw = &segment->hw;
-> > +
-> > +                   /* Fill in the descriptor */
-> > +                   hw->buf_addr = sg_dma_address(sg) + sg_used;
-> > +
-> > +                   hw->control = copy;
-> > +
-> > +                   if (direction == DMA_MEM_TO_DEV) {
-> > +                           if (app_w)
-> > +                                   memcpy(hw->app, app_w,
-> sizeof(u32) *
-> > +
-> XILINX_DMA_NUM_APP_WORDS);
-> > +
-> > +                           /*
-> > +                            * For the first DMA_MEM_TO_DEV transfer,
-> > +                            * set SOP
-> > +                            */
-> > +                           if (!i)
-> > +                                   hw->control |=
-> XILINX_DMA_BD_SOP;
-> > +                   }
-> no else?
-
-Not required.
-
->
-> > +static int xilinx_dma_remove(struct platform_device *pdev) {
-> > +   struct xilinx_dma_device *xdev = platform_get_drvdata(pdev);
-> > +   int i;
-> > +
-> > +   of_dma_controller_free(pdev->dev.of_node);
-> > +   dma_async_device_unregister(&xdev->common);
-> > +
-> > +   for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
-> > +           if (xdev->chan[i])
-> > +                   xilinx_dma_chan_remove(xdev->chan[i]);
-> > +
-> at this point your irq is active and tasklet cna still be scheduled
-
-We are freeing the IRQ and killing the tasklet in the chan_remove API why irq is still active at this point of time?
-I didn't get you.
-Could you please explain a bit?
-
-Regards,
-Kedar.
-
->
->
-> --
-> ~Vinod
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+> >> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> >> ---
+> >>   drivers/cpuidle/cpuidle-arm.c | 42 ++++++++++++++++++++++++++++++++++++++++--
+> >>   1 file changed, 40 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> >> index 1c94b88..e4a6eba 100644
+> >> --- a/drivers/cpuidle/cpuidle-arm.c
+> >> +++ b/drivers/cpuidle/cpuidle-arm.c
+> >> @@ -17,6 +17,7 @@
+> >>   #include <linux/kernel.h>
+> >>   #include <linux/module.h>
+> >>   #include <linux/of.h>
+> >> +#include <linux/slab.h>
+> >>
+> >>   #include <asm/cpuidle.h>
+> >>
+> >> @@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
+> >>   {
+> >>   	int cpu, ret;
+> >>   	struct cpuidle_driver *drv = &arm_idle_driver;
+> >> +	struct cpuidle_device *dev;
+> >>
+> >>   	/*
+> >>   	 * Initialize idle states data, starting at index 1.
+> >> @@ -105,18 +107,54 @@ static int __init arm_idle_init(void)
+> >>   	if (ret <= 0)
+> >>   		return ret ? : -ENODEV;
+> >>
+> >> +	ret = cpuidle_register_driver(drv);
+> >> +	if (ret) {
+> >> +		pr_err("Failed to register cpuidle driver\n");
+> >> +		return ret;
+> >> +	}
+> >> +
+> >>   	/*
+> >>   	 * Call arch CPU operations in order to initialize
+> >>   	 * idle states suspend back-end specific data
+> >>   	 */
+> >>   	for_each_possible_cpu(cpu) {
+> >>   		ret = arm_cpuidle_init(cpu);
+> >> +
+> >> +		/* This cpu does not support any idle states */
+> >
+> > We need to define what this means. If it means a cpu with no idle
+> > states in its cpu node the parsing would not even get here since
+> > to init the driver all possible cpus have to have the *same* idle states to
+> > function at present.
+> >
+> > Lorenzo
+> >
+> >> +		if (ret == -ENXIO)
+> >> +			continue;
+> >> +
+> >>   		if (ret) {
+> >>   			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> >> -			return ret;
+> >> +			goto out_fail;
+> >> +		}
+> >> +
+> >> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> >> +		if (!dev) {
+> >> +			pr_err("Failed to allocate cpuidle device\n");
+> >> +			goto out_fail;
+> >> +		}
+> >> +		dev->cpu = cpu;
+> >> +
+> >> +		ret = cpuidle_register_device(dev);
+> >> +		if (ret) {
+> >> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> >> +			       cpu);
+> >> +			kfree(dev);
+> >> +			goto out_fail;
+> >>   		}
+> >>   	}
+> >>
+> >> -	return cpuidle_register(drv, NULL);
+> >> +	return 0;
+> >> +out_fail:
+> >> +	while (--cpu >= 0) {
+> >> +		dev = per_cpu(cpuidle_devices, cpu);
+> >> +		cpuidle_unregister_device(dev);
+> >> +		kfree(dev);
+> >> +	}
+> >> +
+> >> +	cpuidle_unregister_driver(drv);
+> >> +
+> >> +	return ret;
+> >>   }
+> >>   device_initcall(arm_idle_init);
+> >> --
+> >> 1.9.1
+> >>
+> >>
+> 
+> 
+> -- 
+>   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
+> 
