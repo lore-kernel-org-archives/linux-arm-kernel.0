@@ -1,130 +1,26 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 23 Mar 2015 14:28:14 +0100
-Subject: [PATCH 2/3] pm: domains: factor out code to get the generic PM
- domain from a struct device
-In-Reply-To: <E1YZ0b3-0000so-KG@rmk-PC.arm.linux.org.uk>
-References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
- <E1YZ0b3-0000so-KG@rmk-PC.arm.linux.org.uk>
-Message-ID: <CAPDyKFrpM0TYnNvAX8Jw6zUAekh0=XXMJyxWxSgKSao=TQf62Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 23 Mar 2015 21:29:04 +0800
+Subject: [PATCH v3 3/6] ARM: mx25: Remove static memory mapping
+In-Reply-To: <CAOMZO5BycRD7bK2oBaUpu=tdZvT_A-t4VsBBU=a_LU55U+tMjA@mail.gmail.com>
+References: <1426253518-3076-1-git-send-email-festevam@gmail.com>
+ <1426253518-3076-3-git-send-email-festevam@gmail.com>
+ <20150313141547.GZ20455@dragon>
+ <CAOMZO5BycRD7bK2oBaUpu=tdZvT_A-t4VsBBU=a_LU55U+tMjA@mail.gmail.com>
+Message-ID: <20150323132900.GC28410@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 March 2015 at 18:20, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> The PM domain code contains two methods to get the generic PM domain
-> for a struct device.  One is dev_to_genpd() which is only safe when
-> we know for certain that the device has a generic PM domain attached.
-> The other is coded into genpd_dev_pm_detach() which ensures that the
-> PM domain in the struct device is a generic PM domain (and so is safer).
->
-> This commit factors out the safer version, documents it, and hides the
-> unsafe dev_to_genpd().
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/base/power/domain.c | 46 +++++++++++++++++++++++++++++++--------------
->  include/linux/pm_domain.h   |  6 +++---
->  2 files changed, 35 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index b3fbc21da2dc..89d2eea7f561 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -68,7 +68,36 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
->         return genpd;
->  }
->
-> -struct generic_pm_domain *dev_to_genpd(struct device *dev)
-> +/*
-> + * Get the generic PM domain for a particular struct device.
-> + * This validates the struct device pointer, the PM domain pointer,
-> + * and checks that the PM domain pointer is a real generic PM domain.
-> + * Any failure results in NULL being returned.
-> + */
-> +struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
+On Tue, Mar 17, 2015 at 09:39:08AM -0300, Fabio Estevam wrote:
+> Hi Shawn,
+> 
+> On Fri, Mar 13, 2015 at 11:15 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > I fixed them up and applied the series.
+> 
+> It seems you missed to push it? This series does not appear at
+> linux-next or at imx/cleanup.
 
-I wouldn't mind keeping also this function static, unless you foresee
-users outside genpd?
+It appears at imx/cleanup now, and will get into linux-next soon.  Sorry
+for the delay.
 
-If converting to static please rename it to genpd_lookup_dev().
-
-> +{
-> +       struct generic_pm_domain *genpd = NULL, *gpd;
-> +
-> +       if (IS_ERR_OR_NULL(dev) || IS_ERR_OR_NULL(dev->pm_domain))
-> +               return NULL;
-> +
-> +       mutex_lock(&gpd_list_lock);
-> +       list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-> +               if (&gpd->domain == dev->pm_domain) {
-> +                       genpd = gpd;
-> +                       break;
-> +               }
-> +       }
-> +       mutex_unlock(&gpd_list_lock);
-> +
-> +       return genpd;
-> +}
-> +
-> +/*
-> + * This should only be used where we are certain that the pm_domain
-> + * attached to the device is a genpd domain.
-> + */
-> +static struct generic_pm_domain *dev_to_genpd(struct device *dev)
->  {
->         if (IS_ERR_OR_NULL(dev->pm_domain))
->                 return ERR_PTR(-EINVAL);
-> @@ -2120,21 +2149,10 @@ EXPORT_SYMBOL_GPL(of_genpd_get_from_provider);
->   */
->  static void genpd_dev_pm_detach(struct device *dev, bool power_off)
->  {
-> -       struct generic_pm_domain *pd = NULL, *gpd;
-> +       struct generic_pm_domain *pd;
->         int ret = 0;
->
-> -       if (!dev->pm_domain)
-> -               return;
-> -
-> -       mutex_lock(&gpd_list_lock);
-> -       list_for_each_entry(gpd, &gpd_list, gpd_list_node) {
-> -               if (&gpd->domain == dev->pm_domain) {
-> -                       pd = gpd;
-> -                       break;
-> -               }
-> -       }
-> -       mutex_unlock(&gpd_list_lock);
-> -
-> +       pd = pm_genpd_lookup_dev(dev);
->         if (!pd)
->                 return;
->
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index a9edab2c787a..441f17bdcb0a 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -129,7 +129,7 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
->         return to_gpd_data(dev->power.subsys_data->domain_data);
->  }
->
-> -extern struct generic_pm_domain *dev_to_genpd(struct device *dev);
-> +extern struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev);
->  extern int __pm_genpd_add_device(struct generic_pm_domain *genpd,
->                                  struct device *dev,
->                                  struct gpd_timing_data *td);
-> @@ -166,9 +166,9 @@ static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
->  {
->         return ERR_PTR(-ENOSYS);
->  }
-> -static inline struct generic_pm_domain *dev_to_genpd(struct device *dev)
-> +static inline struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
->  {
-> -       return ERR_PTR(-ENOSYS);
-> +       return NULL;
->  }
->  static inline int __pm_genpd_add_device(struct generic_pm_domain *genpd,
->                                         struct device *dev,
-> --
-> 1.8.3.1
->
-
-Kind regards
-Uffe
+Shawn
