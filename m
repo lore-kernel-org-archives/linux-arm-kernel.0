@@ -1,152 +1,105 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 23 Mar 2015 16:41:02 +0100
-Subject: [PATCH V3 7/8] ARM: cpuidle: Register per cpuidle device
-In-Reply-To: <20150321203546.GE22354@red-moon>
-References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
- <1426851841-2072-8-git-send-email-daniel.lezcano@linaro.org>
- <20150321203546.GE22354@red-moon>
-Message-ID: <5510340E.7000802@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 Mar 2015 15:44:58 +0000
+Subject: [PATCH] arm64: efi: don't restore TTBR0 if active_mm points at
+ init_mm
+In-Reply-To: <1427116945.2693.10.camel@linaro.org>
+References: <1426779780-4706-1-git-send-email-will.deacon@arm.com>
+ <1427116945.2693.10.camel@linaro.org>
+Message-ID: <20150323154458.GC12757@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/21/2015 09:35 PM, Lorenzo Pieralisi wrote:
-> On Fri, Mar 20, 2015 at 11:44:00AM +0000, Daniel Lezcano wrote:
->> Some architectures have some cpus which does not support idle states.
->>
->> Let the underlying low level code to return -ENXIO when it is not
->> possible to set an idle state.
->
-> Well, this is getting interesting. We are parsing possible CPUs to
-> detect if they have common idle states in DT. If a CPU does not support
-> idle states, the cpu node for that CPU should not define any idle
-> state.
->
-> The approach above will work with my heterogenous system patch, since
-> the respective CPUidle driver mask will be created by parsing the DT
-> idle states.
->
-> http://www.spinics.net/lists/arm-kernel/msg403190.html
->
-> In current approach if a "possible " CPU does not have idle states, we do
-> not init CPUidle at all.
->
-> So, to cut a long story short, what does "a cpu does not support idle
-> states" mean ?
->
-> Does it mean that firmware defines idle states for that CPU in DT but
-> initializing them fail ?
->
-> I am fine with this patch, but we need to define -ENXIO return properly.
+On Mon, Mar 23, 2015 at 01:22:25PM +0000, Jon Medhurst (Tixy) wrote:
+> On Thu, 2015-03-19 at 15:43 +0000, Will Deacon wrote:
+> > init_mm isn't a normal mm: it has swapper_pg_dir as its pgd (which
+> > contains kernel mappings) and is used as the active_mm for the idle
+> > thread.
+> > 
+> > When restoring the pgd after an EFI call, we write current->active_mm
+> > into TTBR0. If the current task is actually the idle thread (e.g. when
+> > initialising the EFI RTC before entering userspace), then the TLB can
+> > erroneously populate itself with junk global entries as a result of
+> > speculative table walks.
+> > 
+> > When we do eventually return to userspace, the task can end up hitting
+> > these junk mappings leading to lockups, corruption or crashes.
+> > 
+> > This patch fixes the problem in the same way as the CPU suspend code by
+> > ensuring that we never switch to the init_mm in efi_set_pgd and instead
+> > point TTBR0 at the zero page. A check is also added to cpu_switch_mm to
+> > BUG if we get passed swapper_pg_dir.
+> 
+> Which seems to happen in idle_task_exit() when you offline a cpu. This
+> patch is now in 4.0-rc5 and I get ...
+> 
+> # echo 0 > cpu1/online
+> [   51.750107] BUG: failure at ./arch/arm64/include/asm/mmu_context.h:74/switch_new_context()!
+> [   51.750111] Kernel panic - not syncing: BUG!
+> [   51.750116] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.0.0-rc5+ #3
+> [   51.750118] Hardware name: ARM Juno development board (r0) (DT)
+> [   51.750120] Call trace:
+> [   51.750131] [<ffffffc00008a4cc>] dump_backtrace+0x0/0x138
+> [   51.750136] [<ffffffc00008a620>] show_stack+0x1c/0x28
+> [   51.750143] [<ffffffc0006f8ed4>] dump_stack+0x80/0xc4
+> [   51.750146] [<ffffffc0006f58b8>] panic+0xe8/0x220
+> [   51.750151] [<ffffffc0000c70bc>] idle_task_exit+0x220/0x274
+> [   51.750155] [<ffffffc0000919bc>] cpu_die+0x20/0x7c
+> [   51.750159] [<ffffffc0000869fc>] arch_cpu_idle_dead+0x10/0x1c
+> [   51.750163] [<ffffffc0000d4de4>] cpu_startup_entry+0x2c4/0x36c
+> [   51.750167] [<ffffffc00009185c>] secondary_start_kernel+0x12c/0x13c
 
-Ok, so after discussing with Lina, it appears my change log is not correct.
+It's good that we now trap on this, otherwise we wouldn't have noticed
+any issue for a long time.
 
-In Qcom's platform, each core has a SPM. The device associated with this 
-SPM is initialized before the cpuidle framework. If there is an error in 
-the initialization (eg. error in the DT), the system continues to boot 
-but in degraded mode as some SPM may not be correctly initialized. In 
-this case, the EXNIO tells the cpuidle driver to not initialize the 
-cpuidle device as the associated SPM is not operational. That prevents 
-the system to crash and allows to handle the error gracefully.
+> There seems to be quite a number of uses of cpu_switch_mm in the kernel.
+> I don't know if they have bugs which need fixing, or if it makes more
+> sense to replace the
+> 	BUG_ON(pgd == swapper_pg_dir);
+> with 
+> 	if (pgd != swapper_pg_dir)
 
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>   drivers/cpuidle/cpuidle-arm.c | 42 ++++++++++++++++++++++++++++++++++++++++--
->>   1 file changed, 40 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
->> index 1c94b88..e4a6eba 100644
->> --- a/drivers/cpuidle/cpuidle-arm.c
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->> @@ -17,6 +17,7 @@
->>   #include <linux/kernel.h>
->>   #include <linux/module.h>
->>   #include <linux/of.h>
->> +#include <linux/slab.h>
->>
->>   #include <asm/cpuidle.h>
->>
->> @@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
->>   {
->>   	int cpu, ret;
->>   	struct cpuidle_driver *drv = &arm_idle_driver;
->> +	struct cpuidle_device *dev;
->>
->>   	/*
->>   	 * Initialize idle states data, starting at index 1.
->> @@ -105,18 +107,54 @@ static int __init arm_idle_init(void)
->>   	if (ret <= 0)
->>   		return ret ? : -ENODEV;
->>
->> +	ret = cpuidle_register_driver(drv);
->> +	if (ret) {
->> +		pr_err("Failed to register cpuidle driver\n");
->> +		return ret;
->> +	}
->> +
->>   	/*
->>   	 * Call arch CPU operations in order to initialize
->>   	 * idle states suspend back-end specific data
->>   	 */
->>   	for_each_possible_cpu(cpu) {
->>   		ret = arm_cpuidle_init(cpu);
->> +
->> +		/* This cpu does not support any idle states */
->
-> We need to define what this means. If it means a cpu with no idle
-> states in its cpu node the parsing would not even get here since
-> to init the driver all possible cpus have to have the *same* idle states to
-> function at present.
->
-> Lorenzo
->
->> +		if (ret == -ENXIO)
->> +			continue;
->> +
->>   		if (ret) {
->>   			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
->> -			return ret;
->> +			goto out_fail;
->> +		}
->> +
->> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->> +		if (!dev) {
->> +			pr_err("Failed to allocate cpuidle device\n");
->> +			goto out_fail;
->> +		}
->> +		dev->cpu = cpu;
->> +
->> +		ret = cpuidle_register_device(dev);
->> +		if (ret) {
->> +			pr_err("Failed to register cpuidle device for CPU %d\n",
->> +			       cpu);
->> +			kfree(dev);
->> +			goto out_fail;
->>   		}
->>   	}
->>
->> -	return cpuidle_register(drv, NULL);
->> +	return 0;
->> +out_fail:
->> +	while (--cpu >= 0) {
->> +		dev = per_cpu(cpuidle_devices, cpu);
->> +		cpuidle_unregister_device(dev);
->> +		kfree(dev);
->> +	}
->> +
->> +	cpuidle_unregister_driver(drv);
->> +
->> +	return ret;
->>   }
->>   device_initcall(arm_idle_init);
->> --
->> 1.9.1
->>
->>
+That's not always correct since the previous pgd may be freed, so we
+need to make sure we move away from it. I think for stable, we can do
+with the patch below. We could clean up the cpu_switch_mm() uses through
+the arch/arm64 and set the reserved ttbr0 but we only have two at the
+moment (__cpu_suspend and efi_set_pgd).
 
+-----------------8<-------------------------
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>From 5d9e3540b6480558528612dd3672543fa8ab3528 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Mon, 23 Mar 2015 15:06:50 +0000
+Subject: [PATCH] arm64: Use the reserved TTBR0 if context switching to the
+ init_mm
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+The idle_task_exit() function may call switch_mm() with next ==
+&init_mm. On arm64, init_mm.pgd cannot be used for user mappings, so
+this patch simply sets the reserved TTBR0.
+
+Cc: <stable@vger.kernel.org>
+Reported-by: Jon Medhurst (Tixy) <tixy@linaro.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/mmu_context.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index a9eee33dfa62..101a42bde728 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -151,6 +151,15 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ {
+ 	unsigned int cpu = smp_processor_id();
+ 
++	/*
++	 * init_mm.pgd does not contain any user mappings and it is always
++	 * active for kernel addresses in TTBR1. Just set the reserved TTBR0.
++	 */
++	if (next == &init_mm) {
++		cpu_set_reserved_ttbr0();
++		return;
++	}
++
+ 	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next)
+ 		check_and_switch_context(next, tsk);
+ }
