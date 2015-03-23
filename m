@@ -1,69 +1,67 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Mon, 23 Mar 2015 16:27:00 +0900
-Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-Message-ID: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 23 Mar 2015 16:35:00 +0900
+Subject: [PATCH v6 0/8] Add support for Tegra Activity Monitor
+In-Reply-To: <CAAObsKDWuGatDaX2a8AqXDMayd0uJAUCLLdRYUmef1Oh=kvd3g@mail.gmail.com>
+References: <78905871.274971426655422042.JavaMail.weblogic@epmlwas07d>
+ <CAAObsKDWuGatDaX2a8AqXDMayd0uJAUCLLdRYUmef1Oh=kvd3g@mail.gmail.com>
+Message-ID: <CAAVeFuLf=FEci=NtCLi2p3kOkpWDNfCdAA8Wm9C5Z2cTGBiRzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IOMMU should be able to use single pages as well as bigger blocks, so if
-higher order allocations fail, we should not affect state of the system,
-with events such as OOM killer, but rather fall back to order 0
-allocations.
+On Wed, Mar 18, 2015 at 3:27 PM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 18 March 2015 at 06:10, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+>>> Hello,
+>>>
+>>> something happened during the last cycle and an old version of the devfreq
+>>> driver was merged.
+>>>
+>>> This thread contains patches that bring it up to date to the last submitted
+>>> version and also incorporates the feedback that that version received, plus
+>>> some other small fixes and improvements that came up during rebase and
+>>> testing.
+>>>
+>>> These patches implement support for setting the rate of the EMC clock based on
+>>> stats collected from the ACTMON, a piece of hw in the Tegra124 that counts
+>>> memory accesses (among others).
+>>>
+>>> It depends on the following in-flight patches:
+>>>
+>>> * EMC driver: http://thread.gmane.org/gmane.linux.kernel/1907035
+>>> * CPUFreq driver: http://thread.gmane.org/gmane.linux.kernel/1897078
+>>>
+>>> I have pushed a branch here for testing:
+>>>
+>>> http://cgit.collabora.com/git/user/tomeu/linux.git/log/?h=actmon-v6
+>>>
+>>> Regards,
+>>>
+>>> Tomeu
+>>>
+>>> Tomeu Vizoso (8):
+>>>   of: Add binding for NVIDIA Tegra ACTMON node
+>>>   PM / devfreq: tegra: Update to v5 of the submitted patches
+>>>   clk: tegra: Have EMC clock implement determine_rate()
+>>>   PM / devfreq: tegra: Use clock rate constraints
+>>>   PM / devfreq: tegra: remove operating-points
+>>>   PM / devfreq: tegra: Set drvdata before enabling the irq
+>>>   PM / devfreq: tegra: Enable interrupts after resuming the devfreq
+>>>     monitor
+>>>   ARM: tegra: Add Tegra124 ACTMON support
+>>
+>> Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> for all PM / devfreq patches (2, 4, 5, 6, 7)
+>> And merged in for-rc tree with a little modification.
+>
+> Thanks. Though that's fine with me, I was wondering if Mikko or
+> Alexandre would have any comments on the changes, even if they are
+> small regarding what they already reviewed.
 
-This patch changes the behavior of ARM IOMMU DMA allocator to use
-__GFP_NORETRY, which bypasses OOM invocation, for orders higher than
-zero and, only if that fails, fall back to normal order 0 allocation
-which might invoke OOM killer.
+After a quick look I think I'm good with it. I will try to look in
+further detail. If there is anything wrong, we can fix it with fixup
+patches, since what has been merged is good stuff already!
 
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
----
- arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
- 1 file changed, 21 insertions(+), 6 deletions(-)
+I guess it would now be interesting to look at the watermark support
+for devfreq. I am not sure if anything is happening to it? Arto?
 
-Changes since v1:
-(https://patchwork.kernel.org/patch/6015921/)
- - do not clear __GFP_NORETRY, as it might come from the caller,
- - s/positive order/order higher than 0/.
-
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 83cd5ac..3f1ac51 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1150,13 +1150,28 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
- 	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
- 
- 	while (count) {
--		int j, order = __fls(count);
-+		int j, order;
-+
-+		for (order = __fls(count); order > 0; --order) {
-+			/*
-+			 * We do not want OOM killer to be invoked as long
-+			 * as we can fall back to single pages, so we force
-+			 * __GFP_NORETRY for orders higher than zero.
-+			 */
-+			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
-+			if (pages[i])
-+				break;
-+		}
- 
--		pages[i] = alloc_pages(gfp, order);
--		while (!pages[i] && order)
--			pages[i] = alloc_pages(gfp, --order);
--		if (!pages[i])
--			goto error;
-+		if (!pages[i]) {
-+			/*
-+			 * Fall back to single page allocation.
-+			 * Might invoke OOM killer as last resort.
-+			 */
-+			pages[i] = alloc_pages(gfp, 0);
-+			if (!pages[i])
-+				goto error;
-+		}
- 
- 		if (order) {
- 			split_page(pages[i], order);
--- 
-2.2.0.rc0.207.ga3a616c
+https://lkml.org/lkml/2014/12/5/262
