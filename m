@@ -1,62 +1,129 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 23 Mar 2015 11:16:16 -0700
-Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
-In-Reply-To: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
-References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <CAGXu5jKeKBD8XiyeM=gmYNmnfqH4Q2TCmyO5NWGF+0+52u81ag@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 23 Mar 2015 19:17:49 +0100
+Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
+ regulators
+In-Reply-To: <4184159.j0iXe39dFB@phil>
+References: <4184159.j0iXe39dFB@phil>
+Message-ID: <2619686.csNBBFyt8W@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 4:12 AM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
-> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
-> split this is not so, because 2*TASK_SIZE overflows 32 bits,
-> so the actual value of ELF_ET_DYN_BASE is:
->         (2 * TASK_SIZE / 3) = 0x2a000000
->
-> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
-> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
-> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
-> as it fails to map shadow memory.
-> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
-> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
-> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
->
-> Fix overflow by dividing TASK_SIZE prior to multiplying.
-> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
->         (TASK_SIZE / 3 * 2) = 0x7f555554
->
-> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
->
-> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-> Reported-by: Maria Guseva <m.guseva@samsung.com>
-> Cc: stable at vger.kernel.org
+Hi Philipp,
+
+Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
+> At least the Rockchip variant of the dw_hdmi can have controllable power
+> supplies providing 1.0 and 1.8V. Therefore add the possibility for the
+> generic bridge driver to enable supplies provided by the hw-specific
+> drivers.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+
+does this look ok now?
+
+And as we talked about in Chemnitz, who will be taking such bridge-related 
+changes, as you mentioned some last bridge-patches going through Thierry.
+
+
+Heiko
+
 > ---
->  arch/arm/include/asm/elf.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> index c1ff8ab..1984a92 100644
-> --- a/arch/arm/include/asm/elf.h
-> +++ b/arch/arm/include/asm/elf.h
-> @@ -115,7 +115,7 @@ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
->     the loader.  We need to make sure that it is out of the way of the program
->     that it will "exec", and that there is sufficient room for the brk.  */
->
-> -#define ELF_ET_DYN_BASE        (2 * TASK_SIZE / 3)
-> +#define ELF_ET_DYN_BASE        (TASK_SIZE / 3 * 2)
->
->  /* When the program starts, a1 contains a pointer to a function to be
->     registered with atexit, as per the SVR4 ABI.  A value of 0 means we
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
-Though, yes, as mentioned in the other replies, please send fixes for
-the other architectures too.
-
-Thanks for catching this!
-
--Kees
-
--- 
-Kees Cook
-Chrome OS Security
+> changes since v2:
+> - rename supplies to the names found in the hdmi IP databook
+> changes since v1:
+> - follow suggestion from Russell King to keep regulator handling local
+>   to the rockchip implementation for the time being and only generalize
+>   when a real second implementation needs regulator handling
+> 
+>  .../devicetree/bindings/drm/bridge/dw_hdmi.txt     |  5 ++++
+>  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c        | 32
+> +++++++++++++++++++++- 2 files changed, 36 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt index
+> a905c14..bb74640 100644
+> --- a/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> +++ b/Documentation/devicetree/bindings/drm/bridge/dw_hdmi.txt
+> @@ -22,6 +22,11 @@ Optional properties
+>  - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+>  - clocks, clock-names: phandle to the HDMI CEC clock, name should be "cec"
+> 
+> +Optional supplies:
+> +rockchip,rk3288-dw-hdmi handles two optional power supplies:
+> +- vp-supply: 1.0V power supply
+> +- vph-supply: 1.8V power supply
+> +
+>  Example:
+>  	hdmi: hdmi at 0120000 {
+>  		compatible = "fsl,imx6q-hdmi";
+> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c index d236faa..647a240 100644
+> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+> +#include <linux/regulator/consumer.h>
+>  #include <drm/drm_of.h>
+>  #include <drm/drmP.h>
+>  #include <drm/drm_crtc_helper.h>
+> @@ -28,6 +29,9 @@ struct rockchip_hdmi {
+>  	struct device *dev;
+>  	struct regmap *regmap;
+>  	struct drm_encoder encoder;
+> +	struct regulator_bulk_data supplies[2];
+> +	int nsupplies;
+> +	bool supplies_enabled;
+>  };
+> 
+>  #define to_rockchip_hdmi(x)	container_of(x, struct rockchip_hdmi, x)
+> @@ -179,6 +183,12 @@ static struct drm_encoder_funcs
+> dw_hdmi_rockchip_encoder_funcs = {
+> 
+>  static void dw_hdmi_rockchip_encoder_disable(struct drm_encoder *encoder)
+>  {
+> +	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
+> +
+> +	if (hdmi->nsupplies > 0 && hdmi->supplies_enabled) {
+> +		regulator_bulk_disable(hdmi->nsupplies, hdmi->supplies);
+> +		hdmi->supplies_enabled = false;
+> +	}
+>  }
+> 
+>  static bool
+> @@ -199,7 +209,16 @@ static void dw_hdmi_rockchip_encoder_commit(struct
+> drm_encoder *encoder) {
+>  	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
+>  	u32 val;
+> -	int mux;
+> +	int mux, ret;
+> +
+> +	if (hdmi->nsupplies > 0 && !hdmi->supplies_enabled) {
+> +		ret = regulator_bulk_enable(hdmi->nsupplies, hdmi->supplies);
+> +		if (ret) {
+> +			dev_err(hdmi->dev, "could not enable hdmi analog supplies\n");
+> +			return;
+> +		}
+> +		hdmi->supplies_enabled = true;
+> +	}
+> 
+>  	mux = rockchip_drm_encoder_get_mux_id(hdmi->dev->of_node, encoder);
+>  	if (mux)
+> @@ -275,6 +294,17 @@ static int dw_hdmi_rockchip_bind(struct device *dev,
+> struct device *master, if (!iores)
+>  		return -ENXIO;
+> 
+> +	hdmi->supplies[0].supply = "vp";
+> +	hdmi->supplies[1].supply = "vph";
+> +	hdmi->nsupplies = 2;
+> +
+> +	ret = devm_regulator_bulk_get(hdmi->dev,
+> +				      hdmi->nsupplies, hdmi->supplies);
+> +	if (ret == -EPROBE_DEFER)
+> +		return ret;
+> +	if (ret)
+> +		hdmi->nsupplies = 0;
+> +
+>  	platform_set_drvdata(pdev, hdmi);
+> 
+>  	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);
