@@ -1,138 +1,202 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 24 Mar 2015 18:51:44 +0000
-Subject: [PATCH 2/2] ARM: cpuidle: Document the code
-In-Reply-To: <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
-References: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
- <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
- <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150324185144.GB27311@red-moon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 24 Mar 2015 20:51:56 +0200
+Subject: [PATCHv5 01/35] clk: ti: fix ti_clk_get_reg_addr error handling
+In-Reply-To: <1426877086-17131-2-git-send-email-t-kristo@ti.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-2-git-send-email-t-kristo@ti.com>
+Message-ID: <5511B24C.7040607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 09:54:02AM +0000, Daniel Lezcano wrote:
-> Add kernel-doc format documentation in the code.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On 03/20/2015 08:44 PM, Tero Kristo wrote:
+> There is a case where NULL can be a valid return value for
+> ti_clk_get_reg_addr, specifically the case where both the provider index
+> and register offsets are zero. In this case, the current error checking
+> against a NULL pointer will fail. Thus, change the API to return a
+> ERR_PTR value in an error case, and change all the users of this API to
+> check against IS_ERR instead.
+>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Acked-by: Michael Turquette <mturquette@linaro.org>
+
+Queued this patch for 4.1 through ti clock driver.
+
+-Tero
+
 > ---
->  arch/arm/kernel/cpuidle.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> index 2b0dae3..9219613 100644
-> --- a/arch/arm/kernel/cpuidle.c
-> +++ b/arch/arm/kernel/cpuidle.c
-> @@ -21,6 +21,17 @@ static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
->  
->  static struct cpuidle_ops cpuidle_ops[NR_CPUS];
->  
-> +/*
-
-You miss a star here to comply with kernel-doc (comment valid throughout
-the patch for all functions).
-
-> + * arm_cpuidle_simple_enter() - a wrapper to cpu_do_idle()
-> + * @dev: not used
-> + * @drv: not used
-> + * @index: not used
-> + *
-> + * A trivial wrapper to allow the cpu_do_idle function to be assigned as a
-> + * cpuidle callback by matching the function signature.
-> + *
-> + * Returns the index passed as parameter
-> + */
->  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->  		struct cpuidle_driver *drv, int index)
->  {
-> @@ -29,6 +40,16 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
->  	return index;
->  }
->  
-> +/*
-> + * arm_cpuidle_suspend() - function to enter low power idle states
-> + * @index: an integer used as an identifier for the low level PM callbacks
-> + *
-> + * This function calls the underlying arch specific low level PM code as
-> + * registered at the init time.
-> + *
-> + * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
-> + * callback otherwise.
-> + */
->  int arm_cpuidle_suspend(int index)
->  {
->  	int ret = -EOPNOTSUPP;
-> @@ -40,6 +61,15 @@ int arm_cpuidle_suspend(int index)
->  	return ret;
->  }
->  
-> +/*
-> + * arm_cpuidle_get_ops() - find a registered cpuidle_ops by name
-> + * @method: the method name
-> + *
-> + * Search in the __cpuidle_method_of_table array the cpuidle ops matching the
-> + * method name.
-> + *
-> + * Returns a struct cpuidle_ops pointer, NULL if not found.
-> + */
->  static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
->  {
->  	struct of_cpuidle_method *m = __cpuidle_method_of_table;
-> @@ -51,6 +81,19 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
->  	return NULL;
->  }
->  
-> +/*
-> + * arm_cpuidle_read_ops() - Initialize the cpuidle ops with the device tree
-> + * @dn: a struct device node corresponding to a cpu node
-
-It is a pointer, not a struct.
-
-> + * @cpu: the cpu identifier
-> + *
-> + * Get the method name defined in the 'enabled-method' property, retrieve the
-> + * associated cpuidle_ops and do a struct copy. This copy is needed because all
-> + * cpuidle_ops are tagged __initdata and will be unloaded after the init
-> + * process.
-> + *
-> + * Return 0 on sucess, -ENOENT if no enabled-method is defined, -EOPNOTSUPP if
-> + * no cpuidle_ops is registered for the enabled-method.
-> + */
->  static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
->  {
->  	const char *enable_method;
-> @@ -75,6 +118,21 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
->  	return 0;
->  }
->  
-> +/*
-> + * arm_cpuidle_init() - Initialize cpuidle_ops for a specific cpu
-> + * @cpu: the cpu to be initialized
-> + *
-> + * Initialize the cpuidle ops with the device for the cpu and then call
-> + * the cpu's idle initialization callback. This may fail if the underlying HW
-> + * is not operational.
-> + *
-> + * Returns:
-> + *  0 on success,
-> + *  -ENODEV if it fails to find the cpu node in the device tree,
-> + *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
-> + *  -ENOENT if it fails to find a enabled-method property,
-
-Ultra-nit: "an enabled-method"
-
-> + *  -ENXIO if the HW reports a failure or a misconfiguration
-
--ENOMEM is missing.
-
-Apart from these ultraminor changes (and thanks for putting it
-together):
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> + */
->  int __init arm_cpuidle_init(int cpu)
->  {
->  	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-> -- 
-> 1.9.1
-> 
-> 
+>   drivers/clk/ti/apll.c      |    5 +++--
+>   drivers/clk/ti/autoidle.c  |    2 +-
+>   drivers/clk/ti/clk.c       |    7 ++++---
+>   drivers/clk/ti/divider.c   |    4 ++--
+>   drivers/clk/ti/dpll.c      |    6 +++---
+>   drivers/clk/ti/gate.c      |    4 ++--
+>   drivers/clk/ti/interface.c |    2 +-
+>   drivers/clk/ti/mux.c       |    4 ++--
+>   8 files changed, 18 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/clk/ti/apll.c b/drivers/clk/ti/apll.c
+> index 72d9727..49baf38 100644
+> --- a/drivers/clk/ti/apll.c
+> +++ b/drivers/clk/ti/apll.c
+> @@ -203,7 +203,7 @@ static void __init of_dra7_apll_setup(struct device_node *node)
+>   	ad->control_reg = ti_clk_get_reg_addr(node, 0);
+>   	ad->idlest_reg = ti_clk_get_reg_addr(node, 1);
+>
+> -	if (!ad->control_reg || !ad->idlest_reg)
+> +	if (IS_ERR(ad->control_reg) || IS_ERR(ad->idlest_reg))
+>   		goto cleanup;
+>
+>   	ad->idlest_mask = 0x1;
+> @@ -384,7 +384,8 @@ static void __init of_omap2_apll_setup(struct device_node *node)
+>   	ad->autoidle_reg = ti_clk_get_reg_addr(node, 1);
+>   	ad->idlest_reg = ti_clk_get_reg_addr(node, 2);
+>
+> -	if (!ad->control_reg || !ad->autoidle_reg || !ad->idlest_reg)
+> +	if (IS_ERR(ad->control_reg) || IS_ERR(ad->autoidle_reg) ||
+> +	    IS_ERR(ad->idlest_reg))
+>   		goto cleanup;
+>
+>   	clk = clk_register(NULL, &clk_hw->hw);
+> diff --git a/drivers/clk/ti/autoidle.c b/drivers/clk/ti/autoidle.c
+> index 8912ff8..e75c64c 100644
+> --- a/drivers/clk/ti/autoidle.c
+> +++ b/drivers/clk/ti/autoidle.c
+> @@ -119,7 +119,7 @@ int __init of_ti_clk_autoidle_setup(struct device_node *node)
+>   	clk->name = node->name;
+>   	clk->reg = ti_clk_get_reg_addr(node, 0);
+>
+> -	if (!clk->reg) {
+> +	if (IS_ERR(clk->reg)) {
+>   		kfree(clk);
+>   		return -EINVAL;
+>   	}
+> diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
+> index e22b956..0ebe5c5 100644
+> --- a/drivers/clk/ti/clk.c
+> +++ b/drivers/clk/ti/clk.c
+> @@ -103,7 +103,8 @@ int __init ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
+>    * @index: register index from the clock node
+>    *
+>    * Builds clock register address from device tree information. This
+> - * is a struct of type clk_omap_reg.
+> + * is a struct of type clk_omap_reg. Returns a pointer to the register
+> + * address, or a pointer error value in failure.
+>    */
+>   void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+>   {
+> @@ -121,14 +122,14 @@ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index)
+>
+>   	if (i == CLK_MAX_MEMMAPS) {
+>   		pr_err("clk-provider not found for %s!\n", node->name);
+> -		return NULL;
+> +		return ERR_PTR(-ENOENT);
+>   	}
+>
+>   	reg->index = i;
+>
+>   	if (of_property_read_u32_index(node, "reg", index, &val)) {
+>   		pr_err("%s must have reg[%d]!\n", node->name, index);
+> -		return NULL;
+> +		return ERR_PTR(-EINVAL);
+>   	}
+>
+>   	reg->offset = val;
+> diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
+> index 6211893..ff5f117 100644
+> --- a/drivers/clk/ti/divider.c
+> +++ b/drivers/clk/ti/divider.c
+> @@ -530,8 +530,8 @@ static int __init ti_clk_divider_populate(struct device_node *node,
+>   	u32 val;
+>
+>   	*reg = ti_clk_get_reg_addr(node, 0);
+> -	if (!*reg)
+> -		return -EINVAL;
+> +	if (IS_ERR(*reg))
+> +		return PTR_ERR(*reg);
+>
+>   	if (!of_property_read_u32(node, "ti,bit-shift", &val))
+>   		*shift = val;
+> diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+> index 81dc469..11478a5 100644
+> --- a/drivers/clk/ti/dpll.c
+> +++ b/drivers/clk/ti/dpll.c
+> @@ -390,18 +390,18 @@ static void __init of_ti_dpll_setup(struct device_node *node,
+>   #endif
+>   	} else {
+>   		dd->idlest_reg = ti_clk_get_reg_addr(node, 1);
+> -		if (!dd->idlest_reg)
+> +		if (IS_ERR(dd->idlest_reg))
+>   			goto cleanup;
+>
+>   		dd->mult_div1_reg = ti_clk_get_reg_addr(node, 2);
+>   	}
+>
+> -	if (!dd->control_reg || !dd->mult_div1_reg)
+> +	if (IS_ERR(dd->control_reg) || IS_ERR(dd->mult_div1_reg))
+>   		goto cleanup;
+>
+>   	if (dd->autoidle_mask) {
+>   		dd->autoidle_reg = ti_clk_get_reg_addr(node, 3);
+> -		if (!dd->autoidle_reg)
+> +		if (IS_ERR(dd->autoidle_reg))
+>   			goto cleanup;
+>   	}
+>
+> diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
+> index d493307..0c6fdfc 100644
+> --- a/drivers/clk/ti/gate.c
+> +++ b/drivers/clk/ti/gate.c
+> @@ -225,7 +225,7 @@ static void __init _of_ti_gate_clk_setup(struct device_node *node,
+>
+>   	if (ops != &omap_gate_clkdm_clk_ops) {
+>   		reg = ti_clk_get_reg_addr(node, 0);
+> -		if (!reg)
+> +		if (IS_ERR(reg))
+>   			return;
+>
+>   		if (!of_property_read_u32(node, "ti,bit-shift", &val))
+> @@ -264,7 +264,7 @@ _of_ti_composite_gate_clk_setup(struct device_node *node,
+>   		return;
+>
+>   	gate->enable_reg = ti_clk_get_reg_addr(node, 0);
+> -	if (!gate->enable_reg)
+> +	if (IS_ERR(gate->enable_reg))
+>   		goto cleanup;
+>
+>   	of_property_read_u32(node, "ti,bit-shift", &val);
+> diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
+> index 265d91f..c76230d 100644
+> --- a/drivers/clk/ti/interface.c
+> +++ b/drivers/clk/ti/interface.c
+> @@ -111,7 +111,7 @@ static void __init _of_ti_interface_clk_setup(struct device_node *node,
+>   	u32 val;
+>
+>   	reg = ti_clk_get_reg_addr(node, 0);
+> -	if (!reg)
+> +	if (IS_ERR(reg))
+>   		return;
+>
+>   	if (!of_property_read_u32(node, "ti,bit-shift", &val))
+> diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
+> index 728e253..5cdeed5 100644
+> --- a/drivers/clk/ti/mux.c
+> +++ b/drivers/clk/ti/mux.c
+> @@ -210,7 +210,7 @@ static void of_mux_clk_setup(struct device_node *node)
+>
+>   	reg = ti_clk_get_reg_addr(node, 0);
+>
+> -	if (!reg)
+> +	if (IS_ERR(reg))
+>   		goto cleanup;
+>
+>   	of_property_read_u32(node, "ti,bit-shift", &shift);
+> @@ -283,7 +283,7 @@ static void __init of_ti_composite_mux_clk_setup(struct device_node *node)
+>
+>   	mux->reg = ti_clk_get_reg_addr(node, 0);
+>
+> -	if (!mux->reg)
+> +	if (IS_ERR(mux->reg))
+>   		goto cleanup;
+>
+>   	if (!of_property_read_u32(node, "ti,bit-shift", &val))
+>
