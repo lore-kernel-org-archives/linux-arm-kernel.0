@@ -1,52 +1,34 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 24 Mar 2015 16:03:16 +0000
-Subject: [PATCH] KVM: arm/arm64: fix MMIO handling on userland induced accesses
-In-Reply-To: <1427126309-11223-12-git-send-email-andre.przywara@arm.com>
-References: <1427126309-11223-12-git-send-email-andre.przywara@arm.com>
-Message-ID: <1427212996-16844-1-git-send-email-andre.przywara@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Mar 2015 17:10:27 +0100
+Subject: [PATCH 0/3] ARM: move cpu_resume() to .text section
+Message-ID: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The guest is not the only user of the MMIO handling routines, userland
-can also read and write to those handlers. Since we don't use the
-KVM iobus framework in this case, we have to set the data pointer to
-some actual memory before executing the handler routines.
-This allows to use QEMU as the userland control tool.
+A couple of the ARM sleep.S files put the resume code in the data
+section. This was originally done for convenience, so that the
+data it touches is always in range of a simple 'adr' PC relative
+reference. However, code in the data section is problematic for
+large kernels, where branched go out of range and the linker
+is unaware that the contents of .data are in fact executable code
+for which it could emit veneers.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Hi,
+So instead, move everything back to .text, and fix up the one
+remaining straight adr reference by changing it into an explicit
+PC relative reference.
 
-just embarrassingly realised that I haven't tested the latest version of this
-series with QEMU, so this bug slipped me. Sorry for that! I will merge this
-patch in the next revision of this series (or just send a new version of
-11/12).
+Note that we could probably drop the b_far/bl_far patches if we
+merge these patches instead.
 
-Cheers,
-Andre.
+Ard Biesheuvel (3):
+  ARM: move cpu_resume() to .text section
+  ARM: exynos: move resume code to .text section
+  ARM: s5pv210: move resume code to .text section
 
- virt/kvm/arm/vgic-v2-emul.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kernel/sleep.S       | 15 ++++++---------
+ arch/arm/mach-exynos/sleep.S  |  9 +--------
+ arch/arm/mach-s5pv210/sleep.S |  2 +-
+ 3 files changed, 8 insertions(+), 18 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-index 12cb1361..a715054 100644
---- a/virt/kvm/arm/vgic-v2-emul.c
-+++ b/virt/kvm/arm/vgic-v2-emul.c
-@@ -666,6 +666,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 	struct kvm_vcpu *vcpu, *tmp_vcpu;
- 	struct vgic_dist *vgic;
- 	struct kvm_exit_mmio mmio;
-+	u32 data;
- 
- 	offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
- 	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-@@ -687,6 +688,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 
- 	mmio.len = 4;
- 	mmio.is_write = is_write;
-+	mmio.data = &data;
- 	if (is_write)
- 		mmio_data_write(&mmio, ~0, *reg);
- 	switch (attr->group) {
 -- 
-1.7.9.5
+1.8.3.2
