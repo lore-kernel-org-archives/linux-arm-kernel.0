@@ -1,38 +1,38 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 18:48:07 +0100
-Subject: [PATCH] ARM: kvm: assert on HYP section boundaries not actual code
- size
-Message-ID: <1427219287-21586-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 24 Mar 2015 18:52:26 +0100
+Subject: [PATCH v2 0/4] ARM veneer and .text/.data fixes for large kernels
+Message-ID: <1427219550-21636-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using ASSERT() with an expression that involves a symbol that
-is only supplied through a PROVIDE() definition in the linker
-script itself is apparently not supported by some older versions
-of binutils.
+A couple of the ARM sleep.S files put the resume code in the data
+section. This was originally done for convenience, so that the
+data it touches is always in range of a simple 'adr' PC relative
+reference. However, code in the data section is problematic for
+large kernels, where branched go out of range and the linker
+is unaware that the contents of .data are in fact executable code
+for which it could emit veneers.
 
-So instead, rewrite the expression so that only the section
-boundaries __hyp_idmap_text_start and __hyp_idmap_text_end
-are used. Note that this reverts the fix in 06f75a1f6200
-("ARM, arm64: kvm: get rid of the bounce page") for the ASSERT()
-being triggered erroneously when unrelated linker emitted veneers
-happen to end up in the HYP idmap region.
+So instead, move everything back to .text, and fix up the one
+remaining straight adr reference by changing it into an explicit
+PC relative reference.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/vmlinux.lds.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Note that we could probably drop the b_far/bl_far patches if we
+merge these patches instead.
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index 2d760df0d57d..808398ec024e 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -381,5 +381,5 @@ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
-  * and should not cross a page boundary.
-  * The above comment applies as well.
-  */
--ASSERT((__hyp_idmap_text_start & ~PAGE_MASK) + __hyp_idmap_size <= PAGE_SIZE,
-+ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
- 	"HYP init code too big or misaligned")
+Now includes the PIC veneer patch with Nico's ack added.
+
+Ard Biesheuvel (4):
+  ARM: force linker to use PIC veneers
+  ARM: move cpu_resume() to .text section
+  ARM: exynos: move resume code to .text section
+  ARM: s5pv210: move resume code to .text section
+
+ arch/arm/Makefile             |  2 +-
+ arch/arm/kernel/sleep.S       | 15 ++++++---------
+ arch/arm/mach-exynos/sleep.S  | 23 +++++++++++++----------
+ arch/arm/mach-s5pv210/sleep.S |  2 +-
+ 4 files changed, 21 insertions(+), 21 deletions(-)
+
 -- 
 1.8.3.2
