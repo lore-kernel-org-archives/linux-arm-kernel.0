@@ -1,43 +1,75 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:34:02 +0800
-Subject: [PATCH v8 08/30] PCI: Update pci_host_bridge bus resource
+Date: Tue, 24 Mar 2015 11:34:07 +0800
+Subject: [PATCH v8 13/30] PCI: Move pcibios_root_bridge_prepare() to
+ pci_create_host_bridge()
 In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
 References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-9-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-14-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
-
-Sometimes, the bus resource start number is not equal to
-root bus number. For example, in pci_scan_bus(), we always
-add the default bus resource which start bus number is 0,
-but the root bus number callers given may != 0, so
-we need to update pci_host_bridge bus resource, because we
-would check whether host bridge bus resoruce is confict
-in later patch.
+Move pcibios_root_bridge_prepare() to pci_create_host_bridge().
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/host-bridge.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/pci/host-bridge.c |   16 +++++++++++++---
+ drivers/pci/probe.c       |    3 ---
+ 2 files changed, 13 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index ecc1a7c..1a9834b 100644
+index b0ed8da..87c4fc5 100644
 --- a/drivers/pci/host-bridge.c
 +++ b/drivers/pci/host-bridge.c
-@@ -26,8 +26,11 @@ static void pci_host_update_busn_res(
- 	struct resource_entry *window;
+@@ -92,9 +92,7 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 			pr_warn("pci host bridge pci%04x:%02x exist\n",
+ 					host->domain, bus);
+ 			mutex_unlock(&pci_host_mutex);
+-			pci_free_resource_list(&host->windows);
+-			kfree(host);
+-			return NULL;
++			goto free_res;
+ 		}
+ 	}
+ 	list_add_tail(&host->list, &pci_host_bridge_list);
+@@ -105,6 +103,10 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	dev_set_name(&host->dev, "pci%04x:%02x",
+ 			host->domain, bus);
  
- 	resource_list_for_each_entry(window, resources)
--		if (window->res->flags & IORESOURCE_BUS)
-+		if (window->res->flags & IORESOURCE_BUS) {
-+			if (bus > window->res->start)
-+				window->res->start = bus;
- 			return;
-+		}
++	error = pcibios_root_bridge_prepare(host);
++	if (error)
++		goto list_del;
++
+ 	error = device_register(&host->dev);
+ 	if (error) {
+ 		put_device(&host->dev);
+@@ -112,6 +114,14 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	}
  
- 	pr_info(
- 	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
+ 	return host;
++list_del:
++	mutex_lock(&pci_host_mutex);
++	list_del(&host->list);
++	mutex_unlock(&pci_host_mutex);
++free_res:
++	pci_free_resource_list(&host->windows);
++	kfree(host);
++	return NULL;
+ }
+ 
+ void pci_free_host_bridge(struct pci_host_bridge *host)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 418a426..ee17d9a 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1893,9 +1893,6 @@ static struct pci_bus *__pci_create_root_bus(
+ 
+ 	bridge->bus = b;
+ 	b->bridge = get_device(&bridge->dev);
+-	error = pcibios_root_bridge_prepare(bridge);
+-	if (error)
+-		goto put_dev;
+ 
+ 	pcibios_set_root_bus_speed(bridge);
+ 	device_enable_async_suspend(b->bridge);
 -- 
 1.7.1
