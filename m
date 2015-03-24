@@ -1,74 +1,34 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 24 Mar 2015 16:25:08 -0700
-Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
-In-Reply-To: <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
-References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
- <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150324232508.7930.89483@quantum>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Mar 2015 23:25:52 +0000
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <CAKv+Gu9pNZFjrRbRkK=Yp5RkV6GCM2NmVWzXRYmqmS97q+e0NQ@mail.gmail.com>
+References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150324122239.GB3579@e103592.cambridge.arm.com>
+ <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+ <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
+ <CAKv+Gu_kLtCqM1FtFRQdyBkzT3Rdqx90zcPFdtovnGOFf=d+3g@mail.gmail.com>
+ <alpine.LFD.2.11.1503241125450.27567@knanqh.ubzr>
+ <CAKv+Gu9pNZFjrRbRkK=Yp5RkV6GCM2NmVWzXRYmqmS97q+e0NQ@mail.gmail.com>
+Message-ID: <20150324232552.GW8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Geert Uytterhoeven (2015-03-18 12:16:00)
-> INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
-> disabled causes:
-> 
->     Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
-> 
-> Currently, the GIC driver cannot enable its module clock for several
-> reasons:
->   - It does not use a platform device, so Runtime PM is not an option,
->   - gic_of_init() runs before any clocks are registered, so it cannot
->     explicitly enable the clock,
->   - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
->     doesn't support deferred probing.
-> 
-> Hence we have to keep on relying on the boot loader for enabling the
-> module clock.
-> 
-> To prevent the module clock from being disabled when the CCF core thinks
-> it is unused, and thus causing a system lock-up, add a quirk to the MSTP
-> clock driver to make sure the module clock is never disabled.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  drivers/clk/shmobile/clk-mstp.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
-> index 2d2fe773ac8168f9..742af84735a07450 100644
-> --- a/drivers/clk/shmobile/clk-mstp.c
-> +++ b/drivers/clk/shmobile/clk-mstp.c
-> @@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
->         unsigned int i;
->         u32 value;
->  
-> +       /* INTC-SYS is the module clock of the GIC, and must not be disabled */
-> +       if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
-> +               pr_debug("MSTP %pC skipping disable\n", hw->clk);
-> +               return 0;
-> +       }
+On Tue, Mar 24, 2015 at 04:51:07PM +0100, Ard Biesheuvel wrote:
+> Yes, there are still some instances left of that, including the core
+> cpu_resume() itself.
+> (and they all copy the same comment :-))
 
-Hello Geert,
+That's because I follow the ethos of "why write complex code when
+simple and obvious code will do" and we'd done this for the original
+SA11x0 CPU resume code which formed (to some extent) the basis of the
+consolidated version we have today.
 
-This is a bit ugly for three reasons:
+At the time cpu_resume() was consolidated (which is actually only in
+the last five years or so) there wasn't the requirement to have large
+kernels link, so rewriting it as relatively complex implementation
+would've been damned stupid and a needless change in the consolidation
+effort.
 
-1) we hit this code for every MSTP clock {en,dis}able call
-2) __clk_get_name is kind of gross
-3) the enable_count will not be correct. It will be zero but the clock
-will actually be enabled
-
-Have you considered Lee's series to express these always-on clocks in
-DT? See,
-
-https://lkml.org/lkml/2015/2/24/495
-
-Regards,
-Mike
-
-> +
->         spin_lock_irqsave(&group->lock, flags);
->  
->         value = clk_readl(group->smstpcr);
-> -- 
-> 1.9.1
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
