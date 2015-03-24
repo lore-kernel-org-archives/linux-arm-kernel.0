@@ -1,18 +1,92 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 24 Mar 2015 07:55:59 +0530
-Subject: [PATCH] cpufreq: exynos: allow build for !THERMAL or !CPU_THERMAL
- cases
-In-Reply-To: <75115513.B5dLcdQ7nU@amdc1032>
-References: <2275232.48muFcOOQv@amdc1032>
- <CAKohpomXnpdLtMpnWeFWdGDCE4t8iEz5aDxA=PhTcR-UKjQM6A@mail.gmail.com>
- <75115513.B5dLcdQ7nU@amdc1032>
-Message-ID: <CAKohponVdAy7OaMUDW4b1wAE7vyvf0Rha4PXPAXpvBVcyu3CGg@mail.gmail.com>
+From: walter@vanguardiasur.com.ar (Walter Lozano)
+Date: Mon, 23 Mar 2015 23:29:07 -0300
+Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
+In-Reply-To: <550F8297.80809@opensource.altera.com>
+References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
+ <20150105092153.GJ13070@pengutronix.de>
+ <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
+ <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
+ <550F8297.80809@opensource.altera.com>
+Message-ID: <CABxpGwA3cs11Wtvs_8iGka9anb2+vHhfph19VKbTwBJOeh9bbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2015 at 22:13, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Would you pick this patch up or should I resend it to Rafael?
+Hi Dinh
 
-Please resend it to Rafael and cc me and linux-pm list.. Also add my
-Ack to it.
+On Mon, Mar 23, 2015 at 12:03 AM, Dinh Nguyen
+<dinguyen@opensource.altera.com> wrote:
+> Hi Walter,
+>
+> On 3/19/15 4:27 PM, Walter Lozano wrote:
+>> Hi Dinh,
+>>
+>> On Mon, Mar 16, 2015 at 10:10 AM, Walter Lozano
+>> <walter@vanguardiasur.com.ar> wrote:
+>>> On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
+>>> <s.trumtrar@pengutronix.de> wrote:
+>>>> Hi!
+>>>>
+>>>> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
+>>>>> This patch adds the DTS bindings for the adxl34x digital
+>>>>> accelerometer.
+>>>>>
+>>>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+>>>>> ---
+>>>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
+>>>>>  1 file changed, 16 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>> index 16ea6f5..d343e03 100644
+>>>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>>>> @@ -60,6 +60,22 @@
+>>>>>       rxc-skew-ps = <2000>;
+>>>>>  };
+>>>>>
+>>>>> +&gpio2 {
+>>>>> +     status = "okay";
+>>>>> +};
+>>>>> +
+>>>>> +&i2c1 {
+>>>>> +     status = "okay";
+>>>>> +
+>>>>> +     accel1: accelerometer at 53 {
+>>>>> +             compatible = "adxl34x";
+>
+> Shouldn't this be "adi,adxl34x"? At least that's what the documentation
+> says.
+>
+>>>>> +             reg = <0x53>;
+>>>>> +
+>>>>> +             interrupt-parent = <&portc>;
+>>>>> +             interrupts = <3 2>;
+>>>>> +     };
+>>>>> +};
+>>>>> +
+>>>>>  &mmc0 {
+>>>>>       vmmc-supply = <&regulator_3_3v>;
+>>>>>       vqmmc-supply = <&regulator_3_3v>;
+>>>>
+>>>> I just gave it a short spin. I get some interrupts and the position property
+>>>> changes, so it seems to work:
+>>>>
+>>>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>>>
+>>>
+>>> Ping?
+>>> How should this continue?
+>>
+>> Any news about this patch? It has been acked by Pavel Machek and
+>> Steffen Trumtrar a while ago.
+>>
+>
+> Sorry, since I wasn't CC on the original patch and somehow my filter
+> didn't catch it, I didn't see this patch until now.
+
+No problem, I know it was my fault as I trust the output of get_maintainer.pl
+
+Regards,
+
+-- 
+Walter Lozano, VanguardiaSur
+www.vanguardiasur.com.ar
