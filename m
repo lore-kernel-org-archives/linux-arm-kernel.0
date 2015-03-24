@@ -1,37 +1,64 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 12:57:33 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <20150324114606.GA11744@gondor.apana.org.au>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <CAKv+Gu8qcVVTqy6Fd8PMA8ZTxiMssKz+TbMQW=fAhCBpUH2jTw@mail.gmail.com>
- <20150324113502.GE11405@gondor.apana.org.au>
- <CAKv+Gu9RtkorW1qiX4xohxDYQ-SfbFnY0NgeiXCxdZ1xx6SA9w@mail.gmail.com>
- <20150324114606.GA11744@gondor.apana.org.au>
-Message-ID: <CAKv+Gu_T36x=eNfUytT63MDo6qr14izX1V7oAO2yCej+yy=81Q@mail.gmail.com>
+From: p.pisati@gmail.com (Paolo Pisati)
+Date: Tue, 24 Mar 2015 13:04:47 +0100
+Subject: [PATCH 0/3] CONFIG_DEBUG_SET_MODULE_RONX fixups
+In-Reply-To: <CAGXu5jKKn1f7bnp3Ezsc3o_iqV19Gu62-83ub3s7Rwu=oK7kBA@mail.gmail.com>
+References: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
+ <CAGXu5jKKn1f7bnp3Ezsc3o_iqV19Gu62-83ub3s7Rwu=oK7kBA@mail.gmail.com>
+Message-ID: <20150324120447.GA3570@luxor.wired.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 12:46, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Tue, Mar 24, 2015 at 12:40:50PM +0100, Ard Biesheuvel wrote:
->>
->> Not so easily. It consists (among other things) of a .pl file that
->> generates a .S file, but to prevent introducing a build time
->> dependency on perl, the .S file is included as a .S_shipped file. That
->> is the big one.
->>
->> i suppose we could add the .S_shipped file in a separate patch, but
->> I'd prefer to keep it as is
->
-> OK then this will have to go up on a website somewhere and then
-> the URL can be posted to the list for review.
->
+On Wed, Feb 25, 2015 at 02:17:55PM -0800, Kees Cook wrote:
+> On Wed, Feb 25, 2015 at 2:14 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> > Hi,
+> >
+> > CONFIG_DEBUG_SET_MODULE_RONX is currently non-functional on arm and arm64
+> > because of changes in behavior of is_module_addr. This series fixes
+> > both arm and arm64 to work correctly and corrects a minor bug
+> > related to section alignment in modules.
+> >
+> > Laura Abbott (3):
+> >   arm64: Don't use is_module_addr in setting page attributes
+> >   arm: Don't use is_module_addr in setting page attributes
+> >   kernel/module.c: Update debug alignment after symtable generation
+> >
+> >  arch/arm/mm/pageattr.c   | 5 ++++-
+> >  arch/arm64/mm/pageattr.c | 5 ++++-
+> >  kernel/module.c          | 2 ++
+> >  3 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> Thanks for fixing this!
+> 
+> Out of curiosity, which change broke DEBUG_SET_MODULE_RONX ? (i.e.
+> does this need a CC: stable, and if so, through which release?)
 
-You can pull it from here if you like
-https://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/tags/arm-sha256-neon
-(rebased onto your cryptodev-2.6/master branch as of 30 mins ago)
+we need it for 3.19.x too:
 
-Does that work or you?
+without your patches:
 
-Thanks,
-Ard.
+root at beaglebone:~# cat /sys/module/bridge/sections/.text
+0xbf199000
+root at beaglebone:~# cat /sys/module/bridge/sections/.data
+0xbf1ae000
+root at beaglebone:~# grep -e 0xbf199000 -e 0xbf1ae000 /sys/kernel/debug/kernel_page_tables
+0xbf199000-0xbf1b6000         116K     RW x      MEM/CACHED/WBRA
+
+with you patches:
+
+root at beaglebone:~# cat /sys/module/bridge/sections/.text                                                                                   
+0xbf191000
+root at beaglebone:~# cat /sys/module/bridge/sections/.data
+0xbf1a6000
+root at beaglebone:~# grep -e 0xbf191000 -e 0xbf1a6000 /sys/kernel/debug/kernel_page_tables                                                   
+0xbf191000-0xbf1a2000          68K     ro x      MEM/CACHED/WBRA
+0xbf1a2000-0xbf1a6000          16K     ro NX     MEM/CACHED/WBRA
+0xbf1a6000-0xbf1ae000          32K     RW NX     MEM/CACHED/WBRA
+root at beaglebone:~# uname -a
+Linux beaglebone 3.19.0-9-generic #9~RONXFIX SMP Tue Mar 24 10:34:39 UTC 2015
+armv7l armv7l armv7l GNU/Linux
+root at beaglebone:~#
+
+can you cc: stable@ ?
+-- 
+bye,
+p.
