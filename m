@@ -1,36 +1,39 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:08 +0200
-Subject: [PATCHv2 08/10] arm/dts: am57xx-beagle-x15.dts: add HDMI
+Date: Tue, 24 Mar 2015 16:55:07 +0200
+Subject: [PATCHv2 07/10] arm/dts: dra72-evm.dts: add HDMI
 In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-9-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1427208910-17678-8-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM57xx Beagle X15 has a HDMI output. This patch adds the device tree
-nodes required for HDMI.
+DRA72 EVM has a HDMI output. This patch adds the device tree nodes
+required for HDMI.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/am57xx-beagle-x15.dts | 81 +++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+ arch/arm/boot/dts/dra72-evm.dts | 110 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 110 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-index 03750af3b49a..7184fc16d31e 100644
---- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-+++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-@@ -19,6 +19,7 @@
- 	aliases {
- 		rtc0 = &mcp_rtc;
- 		rtc1 = &tps659038_rtc;
-+		display0 = &hdmi0;
+diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
+index 4d8711713610..c752d7aa302d 100644
+--- a/arch/arm/boot/dts/dra72-evm.dts
++++ b/arch/arm/boot/dts/dra72-evm.dts
+@@ -19,6 +19,10 @@
+ 		reg = <0x80000000 0x40000000>; /* 1024 MB */
  	};
  
- 	memory {
-@@ -102,6 +103,51 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&extcon_usb2_pins>;
++	aliases {
++		display0 = &hdmi0;
++	};
++
+ 	evm_3v3: fixedregulator-evm_3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "evm_3v3";
+@@ -35,6 +39,51 @@
+ 		compatible = "linux,extcon-usb-gpio";
+ 		id-gpio = <&pcf_gpio_21 2 GPIO_ACTIVE_HIGH>;
  	};
 +
 +	hdmi0: connector {
@@ -52,8 +55,8 @@ index 03750af3b49a..7184fc16d31e 100644
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&tpd12s015_pins>;
 +
-+		gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
-+			<&gpio6 28 GPIO_ACTIVE_HIGH>,	/* gpio6_28, LS OE */
++		gpios = <&pcf_hdmi 4 GPIO_ACTIVE_HIGH>,	/* P4, CT CP HPD */
++			<&pcf_hdmi 5 GPIO_ACTIVE_HIGH>,	/* P5, LS OE */
 +			<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
 +
 +		ports {
@@ -80,44 +83,77 @@ index 03750af3b49a..7184fc16d31e 100644
  };
  
  &dra7_pmx_core {
-@@ -121,6 +167,13 @@
+@@ -45,6 +94,13 @@
  		>;
  	};
  
-+	hdmi_pins: pinmux_hdmi_pins {
++	i2c5_pins: pinmux_i2c5_pins {
 +		pinctrl-single,pins = <
-+			0x408 (PIN_INPUT | MUX_MODE1)	/* i2c2_sda.hdmi1_ddc_scl */
-+			0x40c (PIN_INPUT | MUX_MODE1)	/* i2c2_scl.hdmi1_ddc_sda */
++			0x2b4 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr0.i2c5_sda */
++			0x2b8 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr1.i2c5_scl */
 +		>;
 +	};
 +
- 	i2c3_pins_default: i2c3_pins_default {
+ 	nand_default: nand_default {
  		pinctrl-single,pins = <
- 			0x2a4 (PIN_INPUT| MUX_MODE10)	/* mcasp1_aclkx.i2c3_sda */
-@@ -277,6 +330,14 @@
- 			0x3e8 (PIN_INPUT_PULLUP | MUX_MODE14) /* uart1_ctsn.gpio7_24 */
+ 			0x0	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad0 */
+@@ -144,6 +200,19 @@
+ 			0xb8 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_cs2.qspi1_cs0 */
  		>;
  	};
 +
++	hdmi_pins: pinmux_hdmi_pins {
++		pinctrl-single,pins = <
++			0x408 (PIN_INPUT | MUX_MODE1) /* i2c2_sda.hdmi1_ddc_scl */
++			0x40c (PIN_INPUT | MUX_MODE1) /* i2c2_scl.hdmi1_ddc_sda */
++		>;
++	};
++
 +	tpd12s015_pins: pinmux_tpd12s015_pins {
 +		pinctrl-single,pins = <
-+			0x3b0 (PIN_OUTPUT | MUX_MODE14)		/* gpio7_10 CT_CP_HPD */
-+			0x3b8 (PIN_INPUT_PULLDOWN | MUX_MODE14)	/* gpio7_12 HPD */
-+			0x370 (PIN_OUTPUT | MUX_MODE14)		/* gpio6_28 LS_OE */
++			0x3b8 (PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpio7_12 HPD */
 +		>;
 +	};
  };
  
  &i2c1 {
-@@ -560,3 +621,23 @@
- &usb2 {
- 	dr_mode = "peripheral";
+@@ -280,6 +349,27 @@
+ 	};
+ };
+ 
++&i2c5 {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c5_pins>;
++	clock-frequency = <400000>;
++
++	pcf_hdmi: pcf8575 at 26 {
++		compatible = "nxp,pcf8575";
++		reg = <0x26>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		/*
++		 * initial state is used here to keep the mdio interface
++		 * selected on RU89 through SEL_VIN4_MUX_S0, VIN2_S1 and
++		 * VIN2_S0 driven high otherwise Ethernet stops working
++		 * VIN6_SEL_S0 is low, thus selecting McASP3 over VIN6
++		 */
++		lines-initial-states = <0x0f2b>;
++	};
++};
++
+ &uart1 {
+ 	status = "okay";
+ };
+@@ -569,3 +659,23 @@
+ 		};
+ 	};
  };
 +
 +&dss {
 +	status = "ok";
 +
-+	vdda_video-supply = <&ldoln_reg>;
++	vdda_video-supply = <&ldo5_reg>;
 +};
 +
 +&hdmi {
