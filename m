@@ -1,79 +1,58 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:09 +0200
-Subject: [PATCHv2 09/10] arm: dra7: add DESHDCP clock
+Date: Tue, 24 Mar 2015 16:55:10 +0200
+Subject: [PATCHv2 10/10] CLK: TI: always enable DESHDCP clock
 In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-10-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1427208910-17678-11-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
+DESHDCP clock is needed on DRA7 based SoCs to enable the DSS IP. That
+clock is an odd one, as it is not supposed to be any kind of core clock
+for DSS, and we don't even support HDCP, but the clock is still needed
+even for the HWMOD framework to be able to reset the DSS IP.
+
+As there's no support for multiple core clocks in the HWMOD framework,
+we don't have any obvious place to enable this clock when DSS IP is
+being enabled.
+
+Furthermore, the HDMI on OMAP5 DSS is the same as on DRA7, and OMAP5
+does not have any such clock configuration bit. This suggests that on
+OMAP5 the DESHDCP clock is always enabled, and for DRA7 we have the
+possibility to gate it.
+
+So, as we don't have any clean way to enable and disable the clock
+based on the need, this patch enables the clock at boot time, making it
+work similarly to OMAP5.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi               |  5 +++++
- arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
- drivers/clk/ti/clk-7xx.c                  |  1 +
- 4 files changed, 17 insertions(+)
+ drivers/clk/ti/clk-7xx.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 312ede660b23..c06f30a76f5c 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -123,6 +123,11 @@
- 							regulator-max-microvolt = <3000000>;
- 						};
- 					};
-+
-+					scm_conf_clocks: clocks {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+					};
- 				};
- 
- 				dra7_pmx_core: pinmux at 1400 {
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 0d76233840e6..a93754cf5e2f 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -2057,3 +2057,13 @@
- 		clocks = <&dpll_usb_ck>;
- 	};
- };
-+
-+&scm_conf_clocks {
-+	dss_deshdcp_clk: dss_deshdcp_clk {
-+		#clock-cells = <0>;
-+		compatible = "ti,gate-clock";
-+		clocks = <&l3_iclk_div>;
-+		ti,bit-shift = <0>;
-+		reg = <0x558>;
-+	};
-+};
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 0411b838b4fa..97e3d7a62729 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -459,6 +459,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
- 	{ .role = "video2_clk", .clk = "dss_video2_clk" },
- 	{ .role = "video1_clk", .clk = "dss_video1_clk" },
- 	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
-+	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
- };
- 
- static struct omap_hwmod dra7xx_dss_hwmod = {
 diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index ee32f4deebf4..7b859ec31a14 100644
+index 7b859ec31a14..e132d0677c03 100644
 --- a/drivers/clk/ti/clk-7xx.c
 +++ b/drivers/clk/ti/clk-7xx.c
-@@ -301,6 +301,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- 	DT_CLK("48824000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK("48826000.timer", "timer_sys_ck", "timer_sys_clk_div"),
- 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
-+	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
- 	{ .node_name = NULL },
- };
+@@ -308,7 +308,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
+ int __init dra7xx_dt_clk_init(void)
+ {
+ 	int rc;
+-	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
++	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
  
+ 	ti_dt_clocks_register(dra7xx_clks);
+ 
+@@ -344,5 +344,10 @@ int __init dra7xx_dt_clk_init(void)
+ 	if (rc)
+ 		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
+ 
++	hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
++	rc = clk_prepare_enable(hdcp_ck);
++	if (rc)
++		pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
++
+ 	return rc;
+ }
 -- 
 2.3.3
