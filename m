@@ -1,29 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Mar 2015 15:37:45 -0700
-Subject: [PATCH v3 2/9] regmap: Introduce regmap_get_reg_stride.
-In-Reply-To: <1427236200-18625-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427236200-18625-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150324223745.GC28997@sirena.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Mar 2015 15:34:02 -0700
+Subject: [PATCH] ARM: sunxi: DT: Add stdout-path property
+In-Reply-To: <1426448851-32204-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1426448851-32204-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150324223402.GF23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:30:00PM +0000, Srinivas Kandagatla wrote:
+On Sun, Mar 15, 2015 at 08:47:31PM +0100, Maxime Ripard wrote:
+> Add UART aliases and stdout-path property for all the Allwinner boards so that
+> we won't have to rely on the bootargs' console= value, while working with
+> legacy bootloaders.
+> 
+> While we're at it, also remove the mentions of earlyprintk in the bootargs,
+> that will remove our default bootargs entirely, and allow the kernel to boot on
+> a system even if DEBUG_LL is configured for another system.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> + /* regmap_get_reg_stride(): Report the register address stride
-> + *
-> + * Report the register address stride, mainly intended to for use by
-> + * generic infrastructure built on top of regmap.
-> + */
-> +int regmap_get_reg_stride(struct regmap *map)
+Applied.
 
-Please fix the indentation for the comment block and add kerneldoc for
-the argument.  This is an exported function so it should also be /** not
-/*
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
+Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/a37136bd/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/50f8315b/attachment.sig>
