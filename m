@@ -1,34 +1,67 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 17:10:27 +0100
-Subject: [PATCH 0/3] ARM: move cpu_resume() to .text section
-Message-ID: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 24 Mar 2015 17:10:28 +0100
+Subject: [PATCH 1/3] ARM: move cpu_resume() to .text section
+In-Reply-To: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1427213430-28463-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A couple of the ARM sleep.S files put the resume code in the data
-section. This was originally done for convenience, so that the
-data it touches is always in range of a simple 'adr' PC relative
-reference. However, code in the data section is problematic for
-large kernels, where branched go out of range and the linker
-is unaware that the contents of .data are in fact executable code
-for which it could emit veneers.
+Move cpu_resume() to the .text section where it belongs. Change
+the adr reference to sleep_save_sp to an explicit PC relative
+reference so sleep_save_sp itself can remain in .data.
 
-So instead, move everything back to .text, and fix up the one
-remaining straight adr reference by changing it into an explicit
-PC relative reference.
+This helps prevent linker failure on large kernels, as the code
+in the .data section may be too far away to be in range for normal
+b/bl instructions.
 
-Note that we could probably drop the b_far/bl_far patches if we
-merge these patches instead.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/sleep.S | 15 ++++++---------
+ 1 file changed, 6 insertions(+), 9 deletions(-)
 
-Ard Biesheuvel (3):
-  ARM: move cpu_resume() to .text section
-  ARM: exynos: move resume code to .text section
-  ARM: s5pv210: move resume code to .text section
-
- arch/arm/kernel/sleep.S       | 15 ++++++---------
- arch/arm/mach-exynos/sleep.S  |  9 +--------
- arch/arm/mach-s5pv210/sleep.S |  2 +-
- 3 files changed, 8 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 31041b4a3f53..fb64c96cd801 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -116,14 +116,7 @@ cpu_resume_after_mmu:
+ 	ldmfd	sp!, {r4 - r11, pc}
+ ENDPROC(cpu_resume_after_mmu)
+ 
+-/*
+- * Note: Yes, part of the following code is located into the .data section.
+- *       This is to allow sleep_save_sp to be accessed with a relative load
+- *       while we can't rely on any MMU translation.  We could have put
+- *       sleep_save_sp in the .text section as well, but some setups might
+- *       insist on it to be truly read-only.
+- */
+-	.data
++	.text
+ 	.align
+ ENTRY(cpu_resume)
+ ARM_BE8(setend be)			@ ensure we are in BE mode
+@@ -145,6 +138,8 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	compute_mpidr_hash	r1, r4, r5, r6, r0, r3
+ 1:
+ 	adr	r0, _sleep_save_sp
++	ldr	r2, [r0]
++	add	r0, r0, r2
+ 	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
+ 	ldr	r0, [r0, r1, lsl #2]
+ 
+@@ -156,10 +151,12 @@ THUMB(	bx	r3			)
+ ENDPROC(cpu_resume)
+ 
+ 	.align 2
++_sleep_save_sp:
++	.long	sleep_save_sp - .
+ mpidr_hash_ptr:
+ 	.long	mpidr_hash - .			@ mpidr_hash struct offset
+ 
++	.data
+ 	.type	sleep_save_sp, #object
+ ENTRY(sleep_save_sp)
+-_sleep_save_sp:
+ 	.space	SLEEP_SAVE_SP_SZ		@ struct sleep_save_sp
 -- 
 1.8.3.2
