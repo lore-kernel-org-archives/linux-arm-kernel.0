@@ -1,51 +1,169 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 Mar 2015 23:27:04 +0100
-Subject: [PATCHv2] ti-soc-thermal: request temperature periodically if hw
- can't do that itself
-In-Reply-To: <20150324163032.GA13813@developer.hsd1.ca.comcast.net>
-References: <20150103114632.GA21883@amd> <20150118202447.GA29014@amd>
- <20150324163032.GA13813@developer.hsd1.ca.comcast.net>
-Message-ID: <20150324222704.GA19154@amd>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 24 Mar 2015 22:28:36 +0000
+Subject: [PATCH v3 0/9]  Add simple EEPROM Framework via regmap.
+In-Reply-To: <1426240157-2383-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1426240157-2383-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-03-24 12:30:34, Eduardo Valentin wrote:
-> On Sun, Jan 18, 2015 at 09:24:47PM +0100, Pavel Machek wrote:
-> > 
-> > When periodic mode is not enabled, it is neccessary to force reads.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> This is a malformed patch. here is patch output (or git am)
-> patching file drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> patch: **** malformed patch at line 68: (english)
-> http://www.livejournal.com/~pavelmachek
+Thankyou all for providing inputs and comments on previous versions of this patchset.
+Here is the v3 of the patchset addressing all the issues raised as
+part of previous versions review.
 
-Sorry about that. You should have fixed [PATCHv3] in your inbox now.
+This patchset adds a new simple EEPROM framework to kernel.
 
-> I would really recommend you to use git to send your patches to avoid
-> such problems. Can you please resend this patch in its proper
-> format?
+Up until now, EEPROM drivers were stored in drivers/misc, where they all had to
+duplicate pretty much the same code to register a sysfs file, allow in-kernel
+users to access the content of the devices they were driving, etc.
+    
+This was also a problem as far as other in-kernel users were involved, since
+the solutions used were pretty much different from on driver to another, there
+was a rather big abstraction leak.
+    
+This introduction of this framework aims at solving this. It also introduces DT
+representation for consumer devices to go get the data they require (MAC
+Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+    
+Having regmap interface to this framework would give much better
+abstraction for eeproms on different buses.
 
-Done.
+patch 1-2 Introduces two regmap helper functions.
+patch 3-5 Introduces the EEPROM framework.
+Patch 6 migrates an existing driver to eeprom framework.
+Patch 7-8 Adds Qualcomm specific qfprom driver.
+Patch 9 adds entry in MAINTAINERS.
 
-I verified that the other 2 patches are ok, by applying them in
-following order:
+Its also possible to migrate other eeprom drivers to this framework.
+Patch 6 can also be made a generic mmio-eeprom driver.
 
-Subject: [PATCHv3] ti-soc-thermal: request temperature periodically if
-hw can't do that itself
+Providers APIs:
+	eeprom_register/unregister();
 
-Date: Sun, 18 Jan 2015 21:20:51 +0100
-From: Pavel Machek <pavel@ucw.cz>
-Subject: [PATCHv2] ti-soc-thermal: implement eocz bit to make driver
-useful on omap3
+Consumers APIs:
+	eeprom_cell_get()/of_eeprom_cell_get()/of_eeprom_cell_get_byname();
+	eeprom_cell_put();
+	eeprom_cell_read()/eeprom_cell_write();
 
-Date: Sun, 18 Jan 2015 21:17:10 +0100
-From: Pavel Machek <pavel@ucw.cz>
-Subject: [PATCHv2] cleanup ti-soc-thermal
+Device Tree:
 
-Best regards and thanks for patience,
-									Pavel
+	/* Provider */
+	qfprom: qfprom at 00700000 {
+		compatible 	= "qcom,qfprom";
+		reg		= <0x00700000 0x1000>;
+		...
+
+		/* Data cells */
+		tsens_calibration: calib at 404 {
+			reg = <0x404 0x10>;
+		};
+
+		serial_number: sn {
+			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
+
+		};
+		...
+	};
+	
+	/* Consumer node */
+	tsens: tsens {
+		...
+		eeproms = <&tsens_calibration>;
+		eeprom-names = "calib";
+		...
+	};
+
+userspace interface:
+
+hexdump /sys/class/eeprom/qfprom0/eeprom
+                                                                                                                                                                                                                  
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+...
+*
+0001000
+
+Changes since v2(https://lkml.org/lkml/2015/3/13/168)
+ * Fixed error handling in eeprom_register spotted by Mark Brown
+ * Added new regmap_get_max_register() and regmap_get_reg_stride().
+ * Fixed module build errors reported by kbuild robot.
+ * recycle the ids when eeprom provider is released.
+
+Changes since v1(https://lkml.org/lkml/2015/3/5/153)
+ * Fix various Licencing issues spotted by Paul Bolle and Mark Brown
+ * Allow eeprom core to build as module spotted by Paul Bolle.
+ * Fix various kconfig issues spotted by Paul Bolle.
+ * remove unessary atomic varible spotted by Mark Brown.
+ * Few cleanups and common up some of the code in core.
+ * Add qfprom bindings.
+
+Changes since RFC(https://lkml.org/lkml/2015/2/19/307)
+ * Fix documentation and error checks in read/write spotted by Andrew Lunn
+ * Kconfig fix suggested by Stephen Boyd.
+ * Add module owner suggested by Stephen Boyd and others.
+ * Fix unsafe handling of eeprom in unregister spotted by Russell and Mark Brown.
+ * seperate bindings patch as suggested by Rob.
+ * Add MAINTAINERS as suggested by Rob.
+ * Added support to allow reading eeprom for things like serial number which
+ * canbe scatters across.
+ * Added eeprom data using reg property suggested by Sascha and Stephen.
+ * Added non-DT support.
+ * Move kerneldoc to the src files spotted by Mark Brown.
+ * Remove local list and do eeprom lookup by using class_find_device()
+
+
+Thanks,
+srini
+
+Maxime Ripard (1):
+  eeprom: sunxi: Move the SID driver to the eeprom framework
+
+Srinivas Kandagatla (8):
+  regmap: Introduce regmap_get_max_register.
+  regmap: Introduce regmap_get_reg_stride.
+  eeprom: Add a simple EEPROM framework for eeprom providers
+  eeprom: Add a simple EEPROM framework for eeprom consumers
+  eeprom: Add bindings for simple eeprom framework
+  eeprom: qfprom: Add Qualcomm QFPROM support.
+  eeprom: qfprom: Add bindings for qfprom
+  eeprom: Add to MAINTAINERS for eeprom framework
+
+ Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 -
+ .../bindings/eeprom/allwinner,sunxi-sid.txt        |  21 +
+ .../devicetree/bindings/eeprom/eeprom.txt          |  70 +++
+ .../devicetree/bindings/eeprom/qfprom.txt          |  23 +
+ .../bindings/misc/allwinner,sunxi-sid.txt          |  17 -
+ MAINTAINERS                                        |   9 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/base/regmap/regmap.c                       |  23 +
+ drivers/eeprom/Kconfig                             |  37 ++
+ drivers/eeprom/Makefile                            |  12 +
+ drivers/eeprom/core.c                              | 531 +++++++++++++++++++++
+ drivers/eeprom/qfprom.c                            |  87 ++++
+ drivers/eeprom/sunxi-sid.c                         | 136 ++++++
+ drivers/misc/eeprom/Kconfig                        |  13 -
+ drivers/misc/eeprom/Makefile                       |   1 -
+ drivers/misc/eeprom/sunxi_sid.c                    | 156 ------
+ include/linux/eeprom-consumer.h                    |  67 +++
+ include/linux/eeprom-provider.h                    |  42 ++
+ include/linux/regmap.h                             |  14 +
+ 20 files changed, 1075 insertions(+), 209 deletions(-)
+ delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+ create mode 100644 Documentation/devicetree/bindings/eeprom/allwinner,sunxi-sid.txt
+ create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+ create mode 100644 Documentation/devicetree/bindings/eeprom/qfprom.txt
+ delete mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
+ create mode 100644 drivers/eeprom/Kconfig
+ create mode 100644 drivers/eeprom/Makefile
+ create mode 100644 drivers/eeprom/core.c
+ create mode 100644 drivers/eeprom/qfprom.c
+ create mode 100644 drivers/eeprom/sunxi-sid.c
+ delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+ create mode 100644 include/linux/eeprom-consumer.h
+ create mode 100644 include/linux/eeprom-provider.h
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
