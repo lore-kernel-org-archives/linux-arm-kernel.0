@@ -1,57 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 14:06:42 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <20150324130511.GK14457@ns203013.ovh.net>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <20150324122702.GJ14457@ns203013.ovh.net>
- <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
- <20150324130511.GK14457@ns203013.ovh.net>
-Message-ID: <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 24 Mar 2015 22:11:56 +0900
+Subject: [PATCH] ARM: Exynos5420: dt: Fixed the checkpatch.pl WARNING
+ misspelled
+In-Reply-To: <1426883031-3518-1-git-send-email-linux.amoon@gmail.com>
+References: <1426883031-3518-1-git-send-email-linux.amoon@gmail.com>
+Message-ID: <02fb01d06634$1ac4ebf0$504ec3d0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 14:05, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
->  >> +     '&eor   ($t0,$t0,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',   # Sigma0(a)
->> >> +     '&add   ($h,$h,$t1)',                   # h+=Ch(e,f,g)
->> >> +     '&ldr   ($t1,sprintf "[sp,#%d]",4*(($j+1)&15))  if (($j&15)!=15);'.
->> >> +     '&ldr   ($t1,"[$Ktbl]")                         if ($j==15);'.
->> >> +     '&ldr   ($t1,"[sp,#64]")                        if ($j==31)',
->> >> +     '&and   ($t3,$t3,$t2)',                 # (b^c)&=(a^b)
->> >> +     '&add   ($d,$d,$h)',                    # d+=h
->> >> +     '&add   ($h,$h,$t0,"ror#$Sigma0[0]");'. # h+=Sigma0(a)
->> >> +     '&eor   ($t3,$t3,$b)',                  # Maj(a,b,c)
->> >> +     '$j++;  unshift(@V,pop(@V)); ($t2,$t3)=($t3,$t2);'
->> >> +     )
->> >> +}
->> >> +
->> >> +$code.=<<___;
->> >> +#if __ARM_MAX_ARCH__>=7
->> > this will be compile on armv4 but gcc will not allow it
->> >
->> > we need to drop the neon code for older non v7 build
->> >
->>
->> The .arch and .fpu declarations ensure that it can be built regardless
->> of the platform you are compiling for, unless you have a really old
->> toolchain.
-> I known but does not work for me
->> The glue code ensures that the module can only be loaded if HWCAP_NEON is set.
->>
->> Did you get errors trying to build it?
->
-> yes I do
->
-> I use
->
-> arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320
-> (prerelease)
-> Copyright (C) 2013 Free Software Foundation, Inc.
-> This is free software; see the source for copying conditions.  There is NO
-> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
->
-> so it's not that old
->
+Anand Moon wrote:
+> 
+> Changes fixes the misspelled of #interrups-cell.
+> 
+> arch/arm/boot/dts/exynos5420.dtsi:224: WARNING: 'interrups'
+> 	 may be misspelled - perhaps 'interrupts'?
+> 
+> Tested on OdroidXU3 board.
+> 
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index c0e98cf..a78ac1f 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -221,7 +221,7 @@
+>  		compatible = "samsung,exynos4210-mct";
+>  		reg = <0x101C0000 0x800>;
+>  		interrupt-controller;
+> -		#interrups-cells = <1>;
+> +		#interrupt-cells = <1>;
 
-Could you share the error log please?
+Oops, what's happened :(
+I'm seeing the typo in exynos5250.dtsi as well...
+
+arch/arm/boot/dts/exynos5250.dtsi:146:          #interrups-cells = <2>;
+
+I'll apply with above fix.
+
+Thanks,
+Kukjin
+
+>  		interrupt-parent = <&mct_map>;
+>  		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>,
+>  				<8>, <9>, <10>, <11>;
+> --
+> 1.9.1
