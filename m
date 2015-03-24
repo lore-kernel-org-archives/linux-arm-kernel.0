@@ -1,50 +1,41 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 24 Mar 2015 10:03:55 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable HDMI support
-In-Reply-To: <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
-References: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
- <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
-Message-ID: <CABxcv==Ko2PUfwuo8D2JDL4iR4+VGvewQpR_RDh9pB4Qbg5c=g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 Mar 2015 09:15:40 +0000
+Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints
+ and find ports by id
+In-Reply-To: <2376013.jScnaqPlDa@phil>
+References: <1425369592.3146.14.camel@pengutronix.de>
+ <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
+ <1426063881.3101.33.camel@pengutronix.de> <2376013.jScnaqPlDa@phil>
+Message-ID: <20150324091540.GU8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+On Mon, Mar 23, 2015 at 05:29:02PM +0100, Heiko Stuebner wrote:
+> Hi Rob, Philipp,
+> 
+> Am Mittwoch, 11. M?rz 2015, 09:51:21 schrieb Philipp Zabel:
+> > Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
+> > > I've only been copied on this latest pull request and a version from
+> > > March of last year which Grant nak'ed. This series did not go to
+> > > devicetree list either. I'll take a look at the series.
+> > 
+> > My bad, I should have copied you, too. Thanks for having a look now.
+> 
+> any news on this?
+> 
+> Because it looks like I'll need the of_graph_get_port_by_id functionality in 
+> the short term, it'll be nice to not having to opencode this :-)
 
-On Tue, Mar 17, 2015 at 7:54 PM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
-> On Fri, Feb 6, 2015 at 6:42 PM, Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk> wrote:
->> Many Exynos boards have an HDMI port so enable Exynos DRM HDMI support.
->>
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> ---
->>
->> Exynos DRM HDMI has some issues that were fixed by Andrzej's [0] series.
->> So now is safe to HDMI support for Exynos boards.
->>
->> [0]: https://lkml.org/lkml/2015/2/5/265
->>
->>  arch/arm/configs/exynos_defconfig | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
->> index 70e5d0bdb4e4..e44da52e5223 100644
->> --- a/arch/arm/configs/exynos_defconfig
->> +++ b/arch/arm/configs/exynos_defconfig
->> @@ -120,6 +120,7 @@ CONFIG_REGULATOR_S2MPS11=y
->>  CONFIG_REGULATOR_S5M8767=y
->>  CONFIG_REGULATOR_TPS65090=y
->>  CONFIG_DRM=y
->> +CONFIG_DRM_EXYNOS_HDMI=y
->>  CONFIG_DRM_BRIDGE=y
->>  CONFIG_DRM_PTN3460=y
->>  CONFIG_DRM_PS8622=y
->> --
->
-> It seems you missed this patch when picking the exynos_defconfig patches.
->
+Oh hell, you mean this still hasn't been merged for the next merge window?
 
-Another gentle reminder about this patch.
+What's going on, Grant?
 
-Best regards,
-Javier
+Andrew, can you please take this if we send you the individual patches?
+If not, I'll merge it into my tree, and send it to Linus myself.  If
+Grant wakes up, we can address any comments he has at that time by
+additional patches.  (I'll give Grant an extra few days to reply to
+this mail...)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
