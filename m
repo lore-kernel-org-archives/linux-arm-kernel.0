@@ -1,130 +1,77 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Tue, 24 Mar 2015 19:54:16 +0530
-Subject: [PATCH v7] ARM: dts: Add HS400 support for exynos5420 and
- exynos5800
-In-Reply-To: <1426677623-30532-1-git-send-email-alim.akhtar@samsung.com>
-References: <1426677623-30532-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CAGOxZ50mcg+ASah5-cm8jY+O+RLJDS8cEJvFPAkMasuq-vcVbw@mail.gmail.com>
+From: greg.bellows@linaro.org (Greg Bellows)
+Date: Tue, 24 Mar 2015 09:32:40 -0500
+Subject: [Qemu-devel] [PATCH v5 1/6] target-arm: Store SPSR_EL1 state in
+ banked_spsr[1] (SPSR_svc)
+In-Reply-To: <1427130344-27986-2-git-send-email-alex.bennee@linaro.org>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+ <1427130344-27986-2-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAOgzsHUUsZS5hkyPCWer_OurJXy9v5U3g8AjtRV=9uszL4nntg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle Ping !!
+On Mon, Mar 23, 2015 at 12:05 PM, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> From: Peter Maydell <peter.maydell@linaro.org>
+>
+> The AArch64 SPSR_EL1 register is architecturally mandated to
+> be mapped to the AArch32 SPSR_svc register. This means its
+> state should live in QEMU's env->banked_spsr[1] field.
+> Correct the various places in the code that incorrectly
+> put it in banked_spsr[0].
+>
+> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
+>
+> diff --git a/target-arm/helper-a64.c b/target-arm/helper-a64.c
+> index 7e0d038..861f6fa 100644
+> --- a/target-arm/helper-a64.c
+> +++ b/target-arm/helper-a64.c
+> @@ -523,7 +523,7 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
+>          aarch64_save_sp(env, arm_current_el(env));
+>          env->elr_el[new_el] = env->pc;
+>      } else {
+> -        env->banked_spsr[0] = cpsr_read(env);
+> +        env->banked_spsr[aarch64_banked_spsr_index(new_el)] = cpsr_read(env);
 
+Are the other banks (2-5) only used for KVM?  It seems we go out of
+our way to manage this larger SPSR array then not use all of the slots
+in QEMU itself.
 
-On Wed, Mar 18, 2015 at 4:50 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
-> From: Seungwon Jeon <tgih.jun@samsung.com>
+>          if (!env->thumb) {
+>              env->cp15.esr_el[new_el] |= 1 << 25;
+>          }
+> diff --git a/target-arm/helper.c b/target-arm/helper.c
+> index 10886c5..d77c6de 100644
+> --- a/target-arm/helper.c
+> +++ b/target-arm/helper.c
+> @@ -2438,7 +2438,7 @@ static const ARMCPRegInfo v8_cp_reginfo[] = {
+>      { .name = "SPSR_EL1", .state = ARM_CP_STATE_AA64,
+>        .type = ARM_CP_ALIAS,
+>        .opc0 = 3, .opc1 = 0, .crn = 4, .crm = 0, .opc2 = 0,
+> -      .access = PL1_RW, .fieldoffset = offsetof(CPUARMState, banked_spsr[0]) },
+> +      .access = PL1_RW, .fieldoffset = offsetof(CPUARMState, banked_spsr[1]) },
+>      /* We rely on the access checks not allowing the guest to write to the
+>       * state field when SPSel indicates that it's being used as the stack
+>       * pointer.
+> diff --git a/target-arm/internals.h b/target-arm/internals.h
+> index bb171a7..2cc3017 100644
+> --- a/target-arm/internals.h
+> +++ b/target-arm/internals.h
+> @@ -82,11 +82,14 @@ static inline void arm_log_exception(int idx)
 >
-> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
-> and exynos5800-peach-pi boards.
-> This also adds RCLK GPIO line, this gpio should be in pull-down
-> state.
-> This also enables HS400 on peach-pi and this updates the clock frequency
-> to 800MHz to be set as input clock to controller.
->
-> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> [Alim: addressed review comments]
-> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> ---
-> Changes in V7:
->          Add back bus1 pin, which was removed during rebase in v6
->          as rightly pointed out by Javier[1].
->
-> Changes in V6:
->         Rebased on kukjin's for-next branch[0]
->         (commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
->
-> [0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> [1]: http://www.spinics.net/lists/arm-kernel/msg406618.html
->
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
->  arch/arm/boot/dts/exynos5420-smdk5420.dts  | 5 ++++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
->  4 files changed, 19 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index 3f4e2fe..0788d08 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -699,8 +699,10 @@
->         samsung,dw-mshc-ciu-div = <3>;
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
-> +       samsung,dw-mshc-hs400-timing = <0 2>;
-> +       samsung,read-strobe-delay = <90>;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->         bus-width = <8>;
->  };
->
-> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> index ba686e4..8b15316 100644
-> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> @@ -201,6 +201,13 @@
->                         samsung,pin-drv = <3>;
->                 };
->
-> +               sd0_rclk: sd0-rclk {
-> +                       samsung,pins = "gpc0-7";
-> +                       samsung,pin-function = <2>;
-> +                       samsung,pin-pud = <1>;
-> +                       samsung,pin-drv = <3>;
-> +               };
-> +
->                 sd1_cmd: sd1-cmd {
->                         samsung,pins = "gpc1-1";
->                         samsung,pin-function = <2>;
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> index 7a56852..9103f23 100644
-> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -80,8 +80,11 @@
->                 samsung,dw-mshc-ciu-div = <3>;
->                 samsung,dw-mshc-sdr-timing = <0 4>;
->                 samsung,dw-mshc-ddr-timing = <0 2>;
-> +               samsung,dw-mshc-hs400-timing = <0 2>;
-> +               samsung,read-strobe-delay = <90>;
->                 pinctrl-names = "default";
-> -               pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +               pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8
-> +                            &sd0_rclk>;
->                 bus-width = <8>;
->                 cap-mmc-highspeed;
->         };
-> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> index c833bac..412f41d 100644
-> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-> @@ -654,15 +654,18 @@
->         num-slots = <1>;
->         broken-cd;
->         mmc-hs200-1_8v;
-> +       mmc-hs400-1_8v;
->         cap-mmc-highspeed;
->         non-removable;
->         card-detect-delay = <200>;
-> -       clock-frequency = <400000000>;
-> +       clock-frequency = <800000000>;
->         samsung,dw-mshc-ciu-div = <3>;
->         samsung,dw-mshc-sdr-timing = <0 4>;
->         samsung,dw-mshc-ddr-timing = <0 2>;
-> +       samsung,dw-mshc-hs400-timing = <0 2>;
-> +       samsung,read-strobe-delay = <90>;
->         pinctrl-names = "default";
-> -       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
->         bus-width = <8>;
->  };
->
+>  /*
+>   * For AArch64, map a given EL to an index in the banked_spsr array.
+> + * Note that this mapping and the AArch32 mapping defined in bank_number()
+> + * must agree such that the AArch64<->AArch32 SPSRs have the architecturally
+> + * mandated mapping between each other.
+>   */
+>  static inline unsigned int aarch64_banked_spsr_index(unsigned int el)
+>  {
+>      static const unsigned int map[4] = {
+> -        [1] = 0, /* EL1.  */
+> +        [1] = 1, /* EL1.  */
+>          [2] = 6, /* EL2.  */
+>          [3] = 7, /* EL3.  */
+>      };
 > --
-> 1.9.1
+> 2.3.2
 >
-
-
-
--- 
-Regards,
-Alim
+>
