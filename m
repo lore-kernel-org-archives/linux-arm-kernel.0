@@ -1,41 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 16:23:06 +0100
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Mar 2015 11:23:45 -0400 (EDT)
 Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
+In-Reply-To: <CAKv+Gu_N7rcLev33pM6VKEBH0ospZZJLDRrVYCo6OUo3HqK-vA@mail.gmail.com>
 References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
  <20150324122239.GB3579@e103592.cambridge.arm.com>
  <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
- <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
-Message-ID: <CAKv+Gu_kLtCqM1FtFRQdyBkzT3Rdqx90zcPFdtovnGOFf=d+3g@mail.gmail.com>
+ <20150324135439.GC3579@e103592.cambridge.arm.com>
+ <CAKv+Gu_N7rcLev33pM6VKEBH0ospZZJLDRrVYCo6OUo3HqK-vA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.11.1503241119110.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 16:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
->
->> On 24 March 2015 at 13:22, Dave Martin <Dave.Martin@arm.com> wrote:
->> > How many such veneers get added in the your kernel configuration, and
->> > how many are actually necessary (i.e., calls between MMU-off code and
->> > elsewhere)?
->> >
->>
->> Very few. In addition to the example (which will be addressed in
->> another way regardless) there are some resume functions that get
->> allocated in .data, and those would need it as well.
->
->
-> What are they? I thought we removed all instances of those already.
->
->> I have also proposed b_far/bl_far macros that could be used there as
->> well.
->
-> Could the automatic veneer insertion replace the unconditional
-> b_far/bl_far usage?  The former would be preferable to the later.
->
+On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
 
-Agreed. I am not entirely sure why those functions don't get a veneer.
-Perhaps simply because .data is not annotated as executable?
+> On 24 March 2015 at 14:54, Dave Martin <Dave.Martin@arm.com> wrote:
+> > How big is your kernel?  It would be good to compare the veneer
+> > count with a more normal-sized kernel.
+> >
+> 
+> With all my patches applied, I can actually build allyesconfig which
+> produces a 74 MB zImage. But this is obviously never going to be able
+> to execute with the usual policy of placing zImage around 32 MB into
+> DRAM, and expecting it to be able to decompress.
 
-Frankly, I don't really understand the purpose of putting those in
-.data in the first place. but if they need to remain there, I can try
-to figure out how to get the linker to emit veneers for those as well.
+It should work nevertheless.  zImage knows the size of the decompressed 
+kernel and will figure out that it needs to relocate itself above the 
+final kernel area first.  It might overwrite your DTB and initrd in the 
+process if they're not sufficiently high in memory though.
+
+
+Nicolas
