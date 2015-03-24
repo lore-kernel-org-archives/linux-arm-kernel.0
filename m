@@ -1,109 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Mar 2015 08:22:17 -0700
-Subject: [PATCH 5/5] net: allwinner: emac: Claim our SRAM
-In-Reply-To: <1426877569-11493-6-git-send-email-hdegoede@redhat.com>
-References: <1426877569-11493-1-git-send-email-hdegoede@redhat.com>
- <1426877569-11493-6-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150324152217.GC4951@lukather>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Mar 2015 12:27:58 -0400 (EDT)
+Subject: [PATCH 1/3] ARM: move cpu_resume() to .text section
+In-Reply-To: <1427213430-28463-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427213430-28463-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1503241226160.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 07:52:49PM +0100, Hans de Goede wrote:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
+
+> Move cpu_resume() to the .text section where it belongs. Change
+> the adr reference to sleep_save_sp to an explicit PC relative
+> reference so sleep_save_sp itself can remain in .data.
 > 
-> The SRAM the EMAC is using might not have been mapped accordingly by the
-> bootloader, preventing the EMAC to work properly.
+> This helps prevent linker failure on large kernels, as the code
+> in the .data section may be too far away to be in range for normal
+> b/bl instructions.
 > 
-> Ask for that SRAM to be mapped at probe time to make sure that this never
-> happens.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [hdegoede at redhat.com: Make sure SUNXI_SRAM gets enabled in Kconfig]
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+I'm mystified.  I'm sure I did convert this code away from .data at some 
+point.  Oh well...
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
 > ---
->  drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
->  drivers/net/ethernet/stmicro/stmmac/Kconfig |  1 +
->  2 files changed, 12 insertions(+), 2 deletions(-)
+>  arch/arm/kernel/sleep.S | 15 ++++++---------
+>  1 file changed, 6 insertions(+), 9 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> index f3470d9..9d0136b 100644
-> --- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-> +++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-> @@ -29,6 +29,8 @@
->  #include <linux/platform_device.h>
->  #include <linux/phy.h>
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index 31041b4a3f53..fb64c96cd801 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -116,14 +116,7 @@ cpu_resume_after_mmu:
+>  	ldmfd	sp!, {r4 - r11, pc}
+>  ENDPROC(cpu_resume_after_mmu)
 >  
-> +#include <linux/soc/sunxi/sunxi_sram.h>
-> +
->  #include "sun4i-emac.h"
+> -/*
+> - * Note: Yes, part of the following code is located into the .data section.
+> - *       This is to allow sleep_save_sp to be accessed with a relative load
+> - *       while we can't rely on any MMU translation.  We could have put
+> - *       sleep_save_sp in the .text section as well, but some setups might
+> - *       insist on it to be truly read-only.
+> - */
+> -	.data
+> +	.text
+>  	.align
+>  ENTRY(cpu_resume)
+>  ARM_BE8(setend be)			@ ensure we are in BE mode
+> @@ -145,6 +138,8 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+>  	compute_mpidr_hash	r1, r4, r5, r6, r0, r3
+>  1:
+>  	adr	r0, _sleep_save_sp
+> +	ldr	r2, [r0]
+> +	add	r0, r0, r2
+>  	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
+>  	ldr	r0, [r0, r1, lsl #2]
 >  
->  #define DRV_NAME		"sun4i-emac"
-> @@ -857,11 +859,15 @@ static int emac_probe(struct platform_device *pdev)
+> @@ -156,10 +151,12 @@ THUMB(	bx	r3			)
+>  ENDPROC(cpu_resume)
 >  
->  	clk_prepare_enable(db->clk);
+>  	.align 2
+> +_sleep_save_sp:
+> +	.long	sleep_save_sp - .
+>  mpidr_hash_ptr:
+>  	.long	mpidr_hash - .			@ mpidr_hash struct offset
 >  
-> +	ret = sunxi_sram_claim(SUNXI_SRAM_EMAC, "emac");
-> +	if (ret)
-> +		dev_warn(&pdev->dev, "Couldn't map SRAM to device\n");
-> +
->  	db->phy_node = of_parse_phandle(np, "phy", 0);
->  	if (!db->phy_node) {
->  		dev_err(&pdev->dev, "no associated PHY\n");
->  		ret = -ENODEV;
-> -		goto out;
-> +		goto out_release_sram;
->  	}
->  
->  	/* Read MAC-address from DT */
-> @@ -893,7 +899,7 @@ static int emac_probe(struct platform_device *pdev)
->  	if (ret) {
->  		dev_err(&pdev->dev, "Registering netdev failed!\n");
->  		ret = -ENODEV;
-> -		goto out;
-> +		goto out_release_sram;
->  	}
->  
->  	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
-> @@ -901,6 +907,8 @@ static int emac_probe(struct platform_device *pdev)
->  
->  	return 0;
->  
-> +out_release_sram:
-> +	sunxi_sram_release(SUNXI_SRAM_EMAC);
->  out:
->  	dev_err(db->dev, "not found (%d).\n", ret);
->  
-> @@ -914,6 +922,7 @@ static int emac_remove(struct platform_device *pdev)
->  	struct net_device *ndev = platform_get_drvdata(pdev);
->  
->  	unregister_netdev(ndev);
-> +	sunxi_sram_release(SUNXI_SRAM_EMAC);
->  	free_netdev(ndev);
->  
->  	dev_dbg(&pdev->dev, "released and freed device\n");
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> index 7d3af19..785ca22 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> @@ -16,6 +16,7 @@ if STMMAC_ETH
->  config STMMAC_PLATFORM
->  	tristate "STMMAC Platform bus support"
->  	depends on STMMAC_ETH
-> +	select SUNXI_SRAM if ARCH_SUNXI
->  	default y
->  	---help---
->  	  This selects the platform specific bus support for the stmmac driver.
-
-Shouldn't that be in emac's Kconfig option instead?
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/690d9728/attachment.sig>
+> +	.data
+>  	.type	sleep_save_sp, #object
+>  ENTRY(sleep_save_sp)
+> -_sleep_save_sp:
+>  	.space	SLEEP_SAVE_SP_SZ		@ struct sleep_save_sp
+> -- 
+> 1.8.3.2
+> 
+> 
