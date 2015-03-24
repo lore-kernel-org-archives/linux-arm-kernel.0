@@ -1,41 +1,20 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Mar 2015 12:36:33 -0400 (EDT)
-Subject: [PATCH 3/3] ARM: s5pv210: move resume code to .text section
-In-Reply-To: <1427213430-28463-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427213430-28463-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1503241236120.27567@knanqh.ubzr>
+From: george.joseph@fairview5.com (George Joseph)
+Date: Tue, 24 Mar 2015 10:31:34 -0600
+Subject: [PATCH v3 0/1] dts: cubox: Map gpio-keys to gpio3 8
+In-Reply-To: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
+References: <1426542829-16786-1-git-send-email-george.joseph@fairview5.com>
+Message-ID: <1427214695-16301-1-git-send-email-george.joseph@fairview5.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
+Rebased the patch on rmk's relicensing patch...
+"ARM: dts: Re-license SolidRun iMX6 platform DT GPL v2/X11"
 
-> This code calls cpu_resume() using a straight branch (b), so
-> now that we have moved cpu_resume() back to .text, this should
-> be moved there as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+George Joseph (1):
+  dts: cubox: Map gpio-keys to gpio3 8
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-> ---
->  arch/arm/mach-s5pv210/sleep.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-s5pv210/sleep.S b/arch/arm/mach-s5pv210/sleep.S
-> index 7c43ddd33ba8..dfbfc0f7f8b8 100644
-> --- a/arch/arm/mach-s5pv210/sleep.S
-> +++ b/arch/arm/mach-s5pv210/sleep.S
-> @@ -14,7 +14,7 @@
->  
->  #include <linux/linkage.h>
->  
-> -	.data
-> +	.text
->  	.align
->  
->  	/*
-> -- 
-> 1.8.3.2
-> 
-> 
+-- 
+2.1.0
