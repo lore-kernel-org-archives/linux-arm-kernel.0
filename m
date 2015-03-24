@@ -1,92 +1,74 @@
-From: walter@vanguardiasur.com.ar (Walter Lozano)
-Date: Mon, 23 Mar 2015 23:29:07 -0300
-Subject: [PATCH v2] ARM: socfpga: dts: Add adxl34x
-In-Reply-To: <550F8297.80809@opensource.altera.com>
-References: <1419462712-14151-1-git-send-email-walter@vanguardiasur.com.ar>
- <20150105092153.GJ13070@pengutronix.de>
- <CABxpGwCbFF+pJ0H_sMjqk6c9awdRuxi6j0CL_d3mH5z4Qht+ng@mail.gmail.com>
- <CABxpGwAFdLET+fg3WvMWqXdzsPQHv3hKx9cFwk9RQE9w6+rEbg@mail.gmail.com>
- <550F8297.80809@opensource.altera.com>
-Message-ID: <CABxpGwA3cs11Wtvs_8iGka9anb2+vHhfph19VKbTwBJOeh9bbw@mail.gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Tue, 24 Mar 2015 08:40:13 +0530
+Subject: [PATCH v3 1/6] clk: qcom: Add support for GDSCs
+In-Reply-To: <20150323232335.GA24757@codeaurora.org>
+References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
+ <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
+ <550BCE7C.3030000@linaro.org> <550BED93.3000305@codeaurora.org>
+ <550BEFE0.1020004@codeaurora.org> <20150323232335.GA24757@codeaurora.org>
+Message-ID: <5510D595.4070008@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh
-
-On Mon, Mar 23, 2015 at 12:03 AM, Dinh Nguyen
-<dinguyen@opensource.altera.com> wrote:
-> Hi Walter,
->
-> On 3/19/15 4:27 PM, Walter Lozano wrote:
->> Hi Dinh,
+On 03/24/2015 04:53 AM, Stephen Boyd wrote:
+> On 03/20, Rajendra Nayak wrote:
+>> []...
+>>>>> @@ -0,0 +1,46 @@
+>>>>> +/*
+>>>>> + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
+>>>>> + *
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 and
+>>>>> + * only version 2 as published by the Free Software Foundation.
+>>>>> + *
+>>>>> + * This program is distributed in the hope that it will be useful,
+>>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>>> + * GNU General Public License for more details.
+>>>>> + */
+>>>>> +
+>>>>> +#ifndef __QCOM_GDSC_H__
+>>>>> +#define __QCOM_GDSC_H__
+>>>>> +
+>>>>> +#include <linux/pm_domain.h>
+>>>>> +
+>>>>> +struct regmap;
 >>
->> On Mon, Mar 16, 2015 at 10:10 AM, Walter Lozano
->> <walter@vanguardiasur.com.ar> wrote:
->>> On Mon, Jan 5, 2015 at 6:21 AM, Steffen Trumtrar
->>> <s.trumtrar@pengutronix.de> wrote:
->>>> Hi!
->>>>
->>>> On Wed, Dec 24, 2014 at 08:11:52PM -0300, Walter Lozano wrote:
->>>>> This patch adds the DTS bindings for the adxl34x digital
->>>>> accelerometer.
->>>>>
->>>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
->>>>> ---
->>>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   16 ++++++++++++++++
->>>>>  1 file changed, 16 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>> index 16ea6f5..d343e03 100644
->>>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>>> @@ -60,6 +60,22 @@
->>>>>       rxc-skew-ps = <2000>;
->>>>>  };
->>>>>
->>>>> +&gpio2 {
->>>>> +     status = "okay";
+>> I realized, after Srini pointed out on irc that this fwd declaration
+>> is a complete waste. I'll remove it when I do a repost.
+>>
+>
+> Why? It's there so that struct regmap is declared instead of
+> being declared inside struct gdsc.
+
+ah, sorry. I completely overlooked the fact that there isn;t a
+#include <linux/regmap.h>
+
+>
+>>>>> +
+>>>>> +/**
+>>>>> + * struct gdsc - Globally Distributed Switch Controller
+>>>>> + * @pd: generic power domain
+>>>>> + * @regmap: regmap for MMIO accesses
+>>>>> + * @gdscr: gsdc control register
+>>>>> + */
+>>>>> +struct gdsc {
+>>>>> +    struct generic_pm_domain    pd;
+>>>>> +    struct regmap            *regmap;
+>>>>> +    unsigned int            gdscr;
 >>>>> +};
 >>>>> +
->>>>> +&i2c1 {
->>>>> +     status = "okay";
+>>>>> +#define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
 >>>>> +
->>>>> +     accel1: accelerometer at 53 {
->>>>> +             compatible = "adxl34x";
+>>>>> +#ifdef CONFIG_QCOM_GDSC
+>>>>> +int gdsc_register(struct device *, struct gdsc **, size_t n, struct
+>>>>> regmap *);
+>>>>> +void gdsc_unregister(struct device *);
+>>>>> +#else
+>>>>> +int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct
+>>>>> regmap *r)
 >
-> Shouldn't this be "adi,adxl34x"? At least that's what the documentation
-> says.
->
->>>>> +             reg = <0x53>;
->>>>> +
->>>>> +             interrupt-parent = <&portc>;
->>>>> +             interrupts = <3 2>;
->>>>> +     };
->>>>> +};
->>>>> +
->>>>>  &mmc0 {
->>>>>       vmmc-supply = <&regulator_3_3v>;
->>>>>       vqmmc-supply = <&regulator_3_3v>;
->>>>
->>>> I just gave it a short spin. I get some interrupts and the position property
->>>> changes, so it seems to work:
->>>>
->>>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>>
->>>
->>> Ping?
->>> How should this continue?
->>
->> Any news about this patch? It has been acked by Pavel Machek and
->> Steffen Trumtrar a while ago.
->>
->
-> Sorry, since I wasn't CC on the original patch and somehow my filter
-> didn't catch it, I didn't see this patch until now.
-
-No problem, I know it was my fault as I trust the output of get_maintainer.pl
-
-Regards,
 
 -- 
-Walter Lozano, VanguardiaSur
-www.vanguardiasur.com.ar
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
