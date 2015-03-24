@@ -1,46 +1,62 @@
-From: jhautbois@gmail.com (Jean-Michel Hautbois)
-Date: Tue, 24 Mar 2015 16:27:30 +0100
-Subject: [PATCH 0/5] ARM: imx: ventana: enable LDO-bypass mode
-In-Reply-To: <CAJ+vNU3-Q2LkGDau1c6rXTaGkP9c3-RC-OuHiTvv=DETKvnDaw@mail.gmail.com>
-References: <1414729631-11005-1-git-send-email-tharvey@gateworks.com>
- <CAL8zT=jB1M19WRA4y2q0zHG6zggm=TFHrxNOD0=hgX-o726kNg@mail.gmail.com>
- <CAJ+vNU3-Q2LkGDau1c6rXTaGkP9c3-RC-OuHiTvv=DETKvnDaw@mail.gmail.com>
-Message-ID: <CAL8zT=hTVSKAgHaDeG2_Q1Y0hdJVBDmbbbQaXZ0Lms2sKaC4tQ@mail.gmail.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 24 Mar 2015 11:30:11 -0400
+Subject: [patch v11 19/23] XEN / ACPI: Make XEN ACPI depend on X86
+In-Reply-To: <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55118303.8060003@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
-
-2015-03-24 16:11 GMT+01:00 Tim Harvey <tharvey@gateworks.com>:
-> On Tue, Feb 24, 2015 at 1:36 PM, Jean-Michel Hautbois
-> <jhautbois@gmail.com> wrote:
->> Hi Tim,
->>
->> 2014-10-31 5:27 GMT+01:00 Tim Harvey <tharvey@gateworks.com>:
->>> The IMX6 has some internal LDO regulators provided by the anatop regulator
->>> block that can regulate the arm, soc, gpu/vpu core supplies. Alternatively a
->>> design can supply vdd_arm and vdd_soc externally via a PMIC to provide a lower
->>> power draw (switches are more efficient that ldo's).
->>
->> What is the status of these patches ? My design uses a PFUZE100
->> regulator, and having this would be interesting.
->>
->> Thanks,
->> JM
+On 03/24/2015 10:02 AM, Hanjun Guo wrote:
+> When ACPI is enabled on ARM64, XEN ACPI will also compiled
+> into the kernel, but XEN ACPI is x86 dependent, so introduce
+> CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
+> functional on ARM64.
 >
-> JM,
+> CC: 'Stefano Stabellini' <stefano.stabellini@eu.citrix.com>
+> CC: Julien Grall <julien.grall@linaro.org>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> CC: David Vrabel <david.vrabel@citrix.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>   drivers/xen/Kconfig  | 4 ++++
+>   drivers/xen/Makefile | 2 +-
+>   2 files changed, 5 insertions(+), 1 deletion(-)
 >
-> No update from me - I haven't had time to get back to this
-> unfortunately. Most of our customers are using the Freescale vendor
-> kernel and I have ldo-bypass working fine there, just not in a way
-> that is easily mainlineable without work.
+> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+> index b812462..a31cd29 100644
+> --- a/drivers/xen/Kconfig
+> +++ b/drivers/xen/Kconfig
+> @@ -253,4 +253,8 @@ config XEN_EFI
+>   	def_bool y
+>   	depends on X86_64 && EFI
+>   
+> +config XEN_ACPI
+> +	def_bool y
+> +	depends on X86 && ACPI
+> +
 
 
-OK, thank you...
-It's ashame that Freescale won't do a proper job to mainline
-everything, it would be good for them too !
-Well, If I get some time to look into this I will probably start from
-your proposal.
+I think XEN_DOM0 (in arch/x86/xen/Kconfig) should select this option. 
+Otherwise, if it is set to 'n', we won't be able to build enlighten.c 
+(xen_start_kernel() -> xen_acpi_sleep_register() refers to 
+xen_acpi_notify_hypervisor_sleep()).
 
-Thanks,
-JM
+-boris
+
+>   endmenu
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 2ccd359..f4622ab 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -13,7 +13,7 @@ CFLAGS_efi.o				+= -fshort-wchar
+>   
+>   dom0-$(CONFIG_PCI) += pci.o
+>   dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+> -dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
+> +dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+>   xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+>   dom0-$(CONFIG_X86) += pcpu.o
+>   obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
