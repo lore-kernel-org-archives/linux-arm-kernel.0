@@ -1,122 +1,75 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 23 Mar 2015 17:48:22 -0600
-Subject: [PATCH v17 01/10] ARM: qcom: Add Subsystem Power Manager (SPM)
- driver
-In-Reply-To: <26C515E5-5CA8-4E67-9FC4-2F87208F50C4@codeaurora.org>
-References: <1426882877-33008-1-git-send-email-lina.iyer@linaro.org>
- <1426882877-33008-2-git-send-email-lina.iyer@linaro.org>
- <F7886F3F-50DF-4E1B-A6DF-5463362B2BC7@codeaurora.org>
- <20150323231534.GB1790@linaro.org>
- <26C515E5-5CA8-4E67-9FC4-2F87208F50C4@codeaurora.org>
-Message-ID: <20150323234822.GC1790@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 24 Mar 2015 01:29:05 +0100
+Subject: [PATCH 2/3] pm: domains: factor out code to get the generic PM
+ domain from a struct device
+In-Reply-To: <20150323151740.GR8656@n2100.arm.linux.org.uk>
+References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+ <CAPDyKFrpM0TYnNvAX8Jw6zUAekh0=XXMJyxWxSgKSao=TQf62Q@mail.gmail.com>
+ <20150323151740.GR8656@n2100.arm.linux.org.uk>
+Message-ID: <5429586.AxdftPXcBp@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23 2015 at 17:38 -0600, Kumar Gala wrote:
->
->On Mar 23, 2015, at 4:15 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->
->> On Mon, Mar 23 2015 at 16:06 -0600, Kumar Gala wrote:
->>>
->>> On Mar 20, 2015, at 1:21 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>
->>>>
->>>> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
->>>> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
->>>> Original tree available at -
->>>> git://codeaurora.org/quic/la/kernel/msm-3.10.git
->>>>
->>>> Cc: Stephen Boyd <sboyd@codeaurora.org>
->>>> Cc: Arnd Bergmann <arnd@arndb.de>
->>>> Cc: Kevin Hilman <khilman@linaro.org>
->>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>>> ---
->>>> .../devicetree/bindings/arm/msm/qcom,saw2.txt      |  29 +-
->>>> drivers/soc/qcom/Kconfig                           |   7 +
->>>> drivers/soc/qcom/Makefile                          |   1 +
->>>> drivers/soc/qcom/spm.c                             | 405 +++++++++++++++++++++
->>>> 4 files changed, 436 insertions(+), 6 deletions(-)
->>>> create mode 100644 drivers/soc/qcom/spm.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>>> index 1505fb8..664aa91 100644
->>>> --- a/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/msm/qcom,saw2.txt
->>>> @@ -2,11 +2,20 @@ SPM AVS Wrapper 2 (SAW2)
->>>>
->>>> The SAW2 is a wrapper around the Subsystem Power Manager (SPM) and the
->>>> Adaptive Voltage Scaling (AVS) hardware. The SPM is a programmable
->>>> -micro-controller that transitions a piece of hardware (like a processor or
->>>> +power-controller that transitions a piece of hardware (like a processor or
->>>> subsystem) into and out of low power modes via a direct connection to
->>>> the PMIC. It can also be wired up to interact with other processors in the
->>>> system, notifying them when a low power state is entered or exited.
->>>>
->>>> +Multiple revisions of the SAW hardware are supported using these Device Nodes.
->>>> +SAW2 revisions differ in the register offset and configuration data. Also, the
->>>> +same revision of the SAW in different SoCs may have different configuration
->>>> +data due the the differences in hardware capabilities. Hence the SoC name, the
->>>> +version of the SAW hardware in that SoC and the distinction between cpu (big
->>>> +or Little) or cache, may be needed to uniquely identify the SAW register
->>>> +configuration and initialization data. The compatible string is used to
->>>> +indicate this parameter.
->>>> +
->>>> PROPERTIES
->>>>
->>>> - compatible:
->>>> @@ -14,10 +23,11 @@ PROPERTIES
->>>> 	Value type: <string>
->>>> 	Definition: shall contain "qcom,saw2". A more specific value should be
->>>> 		    one of:
->>>
->>> Does ?qcom,saw2? have any meaning anymore?  I see we use it in some places, but not everywhere on the .dts.  We also see to have the L2 just be a ?qcom,saw2? node, do we expect that to change?
->>>
->> It does help match a regulator node as opposed to the specific values
->> below.
->
->Than we should cleanup the wording.  Right now it reads such that ?qcom,saw2? is always required.
->
-Ah Ok. Sure. I will respin a new patchset.
+On Monday, March 23, 2015 03:17:40 PM Russell King - ARM Linux wrote:
+> On Mon, Mar 23, 2015 at 02:28:14PM +0100, Ulf Hansson wrote:
+> > On 20 March 2015 at 18:20, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+> > > The PM domain code contains two methods to get the generic PM domain
+> > > for a struct device.  One is dev_to_genpd() which is only safe when
+> > > we know for certain that the device has a generic PM domain attached.
+> > > The other is coded into genpd_dev_pm_detach() which ensures that the
+> > > PM domain in the struct device is a generic PM domain (and so is safer).
+> > >
+> > > This commit factors out the safer version, documents it, and hides the
+> > > unsafe dev_to_genpd().
+> > >
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > ---
+> > >  drivers/base/power/domain.c | 46 +++++++++++++++++++++++++++++++--------------
+> > >  include/linux/pm_domain.h   |  6 +++---
+> > >  2 files changed, 35 insertions(+), 17 deletions(-)
+> > >
+> > > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> > > index b3fbc21da2dc..89d2eea7f561 100644
+> > > --- a/drivers/base/power/domain.c
+> > > +++ b/drivers/base/power/domain.c
+> > > @@ -68,7 +68,36 @@ static struct generic_pm_domain *pm_genpd_lookup_name(const char *domain_name)
+> > >         return genpd;
+> > >  }
+> > >
+> > > -struct generic_pm_domain *dev_to_genpd(struct device *dev)
+> > > +/*
+> > > + * Get the generic PM domain for a particular struct device.
+> > > + * This validates the struct device pointer, the PM domain pointer,
+> > > + * and checks that the PM domain pointer is a real generic PM domain.
+> > > + * Any failure results in NULL being returned.
+> > > + */
+> > > +struct generic_pm_domain *pm_genpd_lookup_dev(struct device *dev)
+> > 
+> > I wouldn't mind keeping also this function static, unless you foresee
+> > users outside genpd?
+> 
+> _I_ have users of it outside at the moment.
+> 
+> Once the major churn in PM domains is over and I have no use for this
+> externally, I'll consider making it static in my patch set - but all
+> the time that doing so results in breakage for me...
+> 
+> Plus, you're asking me to do yet another 20+ minute re-spin of this
+> patch set.  I'm going to refuse; I'm almost at the point of just not
+> giving a damn on this stuff, it's wasting too much of my time.
+> Especially as, yet again, you should have replied to the emails in the
+> previous round suggesting this change.
+> 
+> Rafael, please merge these three as we previously agreed.  Thanks.
 
-Anything else?
+I said I would do that, didn't I?
 
->>>> -			 "qcom,saw2-v1"
->>>> -			 "qcom,saw2-v1.1"
->>>> -			 "qcom,saw2-v2"
->>>> -			 "qcom,saw2-v2.1"
->>>> +			"qcom,saw2-v2"
->>>> +			"qcom,saw2-v2.1"
->>>> +			"qcom,apq8064-saw2-v1.1-cpu"
->>>> +			"qcom,msm8974-saw2-v2.1-cpu"
->>>> +			"qcom,apq8084-saw2-v2.1-cpu"
->>>>
->>>> - reg:
->>>> 	Usage: required
->>>> @@ -26,10 +36,17 @@ PROPERTIES
->>>> 		    the register region. An optional second element specifies
->>>> 		    the base address and size of the alias register region.
->>>>
->>>> +- regulator:
->>>> +	Usage: optional
->>>> +	Value type: boolean
->>>> +	Definition: Indicates that this SPM device acts as a regulator device
->>>> +			device for the core (CPU or Cache) the SPM is attached
->>>> +			to.
->>>>
->>>> Example:
->>>>
->>>> -	regulator at 2099000 {
->>>> +	power-controller at 2099000 {
->>>> 		compatible = "qcom,saw2";
->>>> 		reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
->>>> +		regulator;
->>>> 	};
->
->- k
->
->-- 
->Qualcomm Innovation Center, Inc.
->The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
->a Linux Foundation Collaborative Project
->
+I've applied this series plus https://patchwork.kernel.org/patch/6056201/
+and https://patchwork.kernel.org/patch/6057441/ on top of that.
+
+Please let me know if you need anything more from the core.
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
