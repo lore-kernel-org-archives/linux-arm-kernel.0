@@ -1,37 +1,63 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:01 +0200
-Subject: [PATCHv2 01/10] arm/dts: dra7xx: add 'ti,
- set-rate-parent' for dss_dss_clk
+Date: Tue, 24 Mar 2015 16:55:04 +0200
+Subject: [PATCHv2 04/10] ARM: OMAP: display: change compat names to array
 In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1427208910-17678-5-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need set-rate-parent flags for the display's clock path so that the
-DSS driver can change the clock rate of the PLL.
-
-This patchs adds the ti,set-rate-parent flag to 'dss_dss_clk' clock
-node, which is only a gate clock, allowing the setting of the clock rate
-to propagate to the PLL.
+Simplify the DSS detection logic by creating a list of the omapdss
+compat strings, instead of checking each separately with an 'if'.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-omap2/display.c | 29 ++++++++++++++---------------
+ 1 file changed, 14 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-index 4bdcbd61ce47..0d76233840e6 100644
---- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
-@@ -1451,6 +1451,7 @@
- 		clocks = <&dpll_per_h12x2_ck>;
- 		ti,bit-shift = <8>;
- 		reg = <0x1120>;
-+		ti,set-rate-parent;
- 	};
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index f492ae147c6a..9868d0bc7805 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -568,25 +568,24 @@ void __init omapdss_early_init_of(void)
  
- 	dss_hdmi_clk: dss_hdmi_clk {
+ }
+ 
++static const char * const omapdss_compat_names[] __initconst = {
++	"ti,omap2-dss",
++	"ti,omap3-dss",
++	"ti,omap4-dss",
++	"ti,omap5-dss",
++};
++
+ struct device_node * __init omapdss_find_dss_of_node(void)
+ {
+ 	struct device_node *node;
++	int i;
+ 
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap2-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap3-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap4-dss");
+-	if (node)
+-		return node;
+-
+-	node = of_find_compatible_node(NULL, NULL, "ti,omap5-dss");
+-	if (node)
+-		return node;
++	for (i = 0; i < ARRAY_SIZE(omapdss_compat_names); ++i) {
++		node = of_find_compatible_node(NULL, NULL,
++			omapdss_compat_names[i]);
++		if (node)
++			return node;
++	}
+ 
+ 	return NULL;
+ }
 -- 
 2.3.3
