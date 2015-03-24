@@ -1,76 +1,40 @@
-From: paul@paul-moore.com (Paul Moore)
-Date: Tue, 24 Mar 2015 17:16:45 -0400
-Subject: [PATCH] audit.h: remove the macro AUDIT_ARCH_ARMEB definition
-In-Reply-To: <CAJFZqHxfq0DSjKn-uqhT+pAeJ9u8ym2Mr=wsqvPyX7sCicPGZA@mail.gmail.com>
-References: <1426827329-27976-1-git-send-email-roy.qing.li@gmail.com>
- <CAHC9VhR5VcaCtLG9hdVS2gZRWxVmdnpbK+fJwm6wCA8qyLebUQ@mail.gmail.com>
- <CAJFZqHxdPEhX+9z-FYUMvTF_6LVgK=gOetq0zT4UTZSgUGRqCQ@mail.gmail.com>
- <CAJFZqHxfq0DSjKn-uqhT+pAeJ9u8ym2Mr=wsqvPyX7sCicPGZA@mail.gmail.com>
-Message-ID: <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Mar 2015 14:51:04 -0700
+Subject: [PATCH resend v2 0/2] ARM: dts: sunxi: Fix cpufreq instabilities
+In-Reply-To: <1427216007-9185-1-git-send-email-wens@csie.org>
+References: <1427216007-9185-1-git-send-email-wens@csie.org>
+Message-ID: <20150324215104.GA23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 22, 2015 at 8:55 PM, Li RongQing <roy.qing.li@gmail.com> wrote:
-> On Mon, Mar 23, 2015 at 8:51 AM, Li RongQing <roy.qing.li@gmail.com> wrote:
->> On Fri, Mar 20, 2015 at 9:29 PM, Paul Moore <paul@paul-moore.com> wrote:
->>> On Fri, Mar 20, 2015 at 12:55 AM,  <roy.qing.li@gmail.com> wrote:
->>>> From: Li RongQing <roy.qing.li@gmail.com>
->>>>
->>>> After 2f9783669 [ARM: 7412/1: audit: use only AUDIT_ARCH_ARM regardless
->>>> of endianness], no kernel user uses this macro;
->>>>
->>>> Keeping this macro, only makes the compiling old version audit [before
->>>> changeset 931 Improve ARM and AARCH64 support] success, but the audit
->>>> program can not work with the kernel after 2f9783669 still,
->>>> since no syscall entry is enabled for AUDIT_ARCH_ARMEB in kernel.
->>>>
->>>> so remove it to force to use the latest audit program
->>>>
->>>> Signed-off-by: Li RongQing <roy.qing.li@gmail.com>
->>>> ---
->>>> other workaround is to define AUDIT_ARCH_ARMEB as AUDIT_ARCH_ARM,
->>>> but it seems very strange
->>>>
->>>>  include/uapi/linux/audit.h | 1 -
->>>>  1 file changed, 1 deletion(-)
->>>
->>> Since this #define lives in the user visible headers I don't want to
->>> remove it and risk causing a userspace breakage.  Leaving the #define
->>> in the header, even if it is
->
->
-> it is harm, when I compile the audit-2.3.2 for a arm machine, whose linux kernel
-> is 3.14; no compile error, but audit does not work;  spend one day debug to find
-> the root cause is  the audit used MACH_ARMEB, but kernel replaced MACH_ARMEB
->  with MACH_ARM
->
->  grep WITH_ARMEB ./lib/machinetab.h -A10
-> #ifdef WITH_ARMEB
-> _S(MACH_ARMEB,   "armeb"  )
-> _S(MACH_ARMEB,   "armv5tejl")
-> _S(MACH_ARMEB,   "armv5tel")
-> _S(MACH_ARMEB,   "armv6l")
-> _S(MACH_ARMEB,   "armv7l")
-> #endif
->
-> removal of MACH_ARMEB will let the user find this issue when compile, not
-> run.
+On Wed, Mar 25, 2015 at 12:53:25AM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
+> 
+> Here's v2 of the sunxi cpufreq dts fixes, rebased onto v4.0-rc5.
+> I assume you'll fix up the merge conflicts with 4.1 stuff?
+> 
+> The first patch limits the Olimex A10-Lime to 912MHz, as a few people
+> reported on IRC that it was unstable at 1008MHz.
+> 
+> The second patch removes the overclocking settings from sun[457]i dts,
+> so all the boards will be stable, regardless of whether regulators
+> were added or not.
+> 
+> I would like to revisit this after the new OPP bindings are merged
+> and support added to cpufreq-dt.
 
-[NOTE: Adding the linux-arm folks to this thread just in case they are
-interested.]
+Applied both, thanks!
 
-I'm not an ARM expert, but the kernel #define for AUDIT_ARCH_ARMEB
-(below) seems reasonable to me based on the other audit machine
-definitions.  There is clearly a mismatch between the kernel and the
-audit userspace, but I wonder if the issue should be addressed in the
-userspace tools.  Further, you mention kernel 3.14, what happens with
-kernel 3.19 and the most recent audit userspace tools?
-
-  > grep "AUDIT_ARCH_ARMEB" include/uapi/linux/audit.h
-  #define AUDIT_ARCH_ARMEB        (EM_ARM)
-
--Paul
+Maxime
 
 -- 
-paul moore
-www.paul-moore.com
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/0016420b/attachment.sig>
