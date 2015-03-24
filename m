@@ -1,87 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Mar 2015 14:30:41 -0400 (EDT)
-Subject: [PATCH v2 3/4] ARM: exynos: move resume code to .text section
-In-Reply-To: <1427219550-21636-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427219550-21636-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427219550-21636-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.11.1503241427280.27567@knanqh.ubzr>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 24 Mar 2015 11:33:09 -0700
+Subject: [PATCH v3] input: Add support for ChipOne icn8318 based
+ touchscreens
+In-Reply-To: <5511A29F.1010404@redhat.com>
+References: <1426007133-9606-1-git-send-email-hdegoede@redhat.com>
+ <20150322040305.GA40622@dtor-ws> <550EA0E7.30608@redhat.com>
+ <20150322224214.GA9792@dtor-ws> <5511A29F.1010404@redhat.com>
+Message-ID: <20150324183309.GA27693@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
-
-> This code calls cpu_resume() using a straight branch (b), so
-> it has no business being in the .data section, especially now
-> we moved cpu_resume() back to .text as well.
+On Tue, Mar 24, 2015 at 06:45:03PM +0100, Hans de Goede wrote:
+> Hi,
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/mach-exynos/sleep.S | 23 +++++++++++++----------
->  1 file changed, 13 insertions(+), 10 deletions(-)
+> On 03/22/2015 11:42 PM, Dmitry Torokhov wrote:
+> >On Sun, Mar 22, 2015 at 12:00:55PM +0100, Hans de Goede wrote:
+> >>Hi,
+> >>
+> >>On 22-03-15 05:03, Dmitry Torokhov wrote:
+> >>>Hi Hans,
+> >>>
+> >>>On Tue, Mar 10, 2015 at 06:05:33PM +0100, Hans de Goede wrote:
+> >>>>+	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq,
+> >>>>+					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+> >>>
+> >>>Shouldn't we let DT data tell us what trigger to use? I.e. just leave
+> >>>IRQF_ONESHOT here?
+> >>
+> >>That is an interesting question, that new data is available is signalled by
+> >>the irq pin of the chip going low is a property of the chip, not the board
+> >>layout, so I believe it is best to leave this as is.
+> >
+> >My concern is that even if pin behavior is property of chip maybe on
+> >some boards we want to use level-triggered interrupts instead of edge?
+> >And if we indeed want to hard-code the trigger then shouldn't the
+> >binding document use onecell mapping (so that users do not attempt to
+> >configure triggers from DT)?
 > 
-> diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
-> index 31d25834b9c4..fe5d9ed24ac2 100644
-> --- a/arch/arm/mach-exynos/sleep.S
-> +++ b/arch/arm/mach-exynos/sleep.S
-> @@ -23,14 +23,7 @@
->  #define CPU_MASK	0xff0ffff0
->  #define CPU_CORTEX_A9	0x410fc090
->  
-> -	/*
-> -	 * The following code is located into the .data section. This is to
-> -	 * allow l2x0_regs_phys to be accessed with a relative load while we
-> -	 * can't rely on any MMU translation. We could have put l2x0_regs_phys
-> -	 * in the .text section as well, but some setups might insist on it to
-> -	 * be truly read-only. (Reference from: arch/arm/kernel/sleep.S)
-> -	 */
-> -	.data
-> +	.text
->  	.align
->  
->  	/*
-> @@ -69,10 +62,12 @@ ENTRY(exynos_cpu_resume_ns)
->  	cmp	r0, r1
->  	bne	skip_cp15
->  
-> -	adr	r0, cp15_save_power
-> +	adr	r0, _cp15_save_power
->  	ldr	r1, [r0]
-> -	adr	r0, cp15_save_diag
-> +	ldr	r1, [r0, r1]
-> +	adr	r0, _cp15_save_diag
->  	ldr	r2, [r0]
-> +	ldr	r2, [r0, r2]
->  	mov	r0, #SMC_CMD_C15RESUME
->  	dsb
->  	smc	#0
-> @@ -118,6 +113,13 @@ skip_l2x0:
->  skip_cp15:
->  	b	cpu_resume
->  ENDPROC(exynos_cpu_resume_ns)
-> +
+> The number of irq cells is specified by the interrupt controller driver
+> rather then by the device binding.
+> 
+> >
+> >>
+> >>Also note that if we want to get this from devicetree, that simply leaving out the
+> >>flag is not enough, we must specifically get the data from devicetree and pass
+> >>it into request_irq AFAICT. So the above would change to:
+> >>
+> >>	irqflags = irqd_get_trigger_type(irq_get_irq_data(client->irq)) | IRQF_ONESHOT,
+> >>	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq, irqflags,
+> >
+> >No, of_irq_get() that i2c core calls before probing driver should
+> >already set the trigger type for us. There is no need for the individual
+> >drivers to do that.
+> 
+> Ah I see, ok I've just tested removing the IRQF_TRIGGER_FALLING flag and indeed
+> things still work fine, so feel free to merge this patch with that flagged dropped.
 
-A .align would be needed here in case this is compiled as Thumb2.
+OK, thanks, queued for 4.1.
 
-> +_cp15_save_power:
-> +	.long	cp15_save_power - .
-> +_cp15_save_diag:
-> +	.long	cp15_save_diag - .
-> +
-> +	.data
->  	.globl cp15_save_diag
->  cp15_save_diag:
->  	.long	0	@ cp15 diagnostic
-> @@ -126,6 +128,7 @@ cp15_save_power:
->  	.long	0	@ cp15 power control
->  
->  #ifdef CONFIG_CACHE_L2X0
-> +	.text
->  	.align
->  1:	.long	l2x0_saved_regs - .
->  #endif /* CONFIG_CACHE_L2X0 */
+Thanks.
 
-This looks rather weird. I'd suggest you move this before the added 
-.data instead.
-
-
-Nicolas
+-- 
+Dmitry
