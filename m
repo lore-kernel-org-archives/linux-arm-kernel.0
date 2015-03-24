@@ -1,77 +1,119 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:34:15 +0800
-Subject: [PATCH v8 21/30] sparc/PCI: Use pci_scan_host_bridge() for simplicity
+Date: Tue, 24 Mar 2015 11:34:03 +0800
+Subject: [PATCH v8 09/30] PCI: Introduce pci_host_first_busnr() function
 In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
 References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-22-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now we could use pci_scan_host_bridge() to scan
-pci buses, provide sparc specific pci_host_bridge_ops.
+Use it to get the first bus number of the bus
+resource.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: "David S. Miller" <davem@davemloft.net>
-CC: sparclinux at vger.kernel.org
 ---
- arch/sparc/kernel/pci.c |   28 ++++++++++++++++++++++------
- 1 files changed, 22 insertions(+), 6 deletions(-)
+ drivers/pci/pci.h   |   11 +++++++++++
+ drivers/pci/probe.c |   19 ++++++++++---------
+ 2 files changed, 21 insertions(+), 9 deletions(-)
 
-diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
-index e40e456..fa95a1d 100644
---- a/arch/sparc/kernel/pci.c
-+++ b/arch/sparc/kernel/pci.c
-@@ -650,12 +650,27 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
- 		pci_claim_bus_resources(child_bus);
- }
- 
-+static int pci_host_of_scan_bus(
-+		struct pci_host_bridge *host)
-+{
-+	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
-+	struct device_node *node = pbm->op->dev.of_node;
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index 8526790..886d72f 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -337,4 +337,15 @@ static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
+ struct pci_host_bridge *pci_create_host_bridge(struct device *parent,
+ 		int domain, int bus, struct list_head *resources);
+ void pci_free_host_bridge(struct pci_host_bridge *host);
 +
-+	pci_of_scan_bus(pbm, node, host->bus);
-+	return pci_bus_child_max_busnr(host->bus);
++static inline int pci_host_first_busnr(struct pci_host_bridge *host)
++{
++	struct resource_entry *window;
++
++	resource_list_for_each_entry(window, &host->windows)
++		if (window->res->flags & IORESOURCE_BUS)
++			return window->res->start;
++	return -1;
 +}
 +
-+static struct pci_host_bridge_ops pci_host_ops = {
-+	.scan_bus = pci_host_of_scan_bus,
-+};
-+
- struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 				 struct device *parent)
+ #endif /* DRIVERS_PCI_H */
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index d5a12d9..25ac741 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1864,7 +1864,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
  {
- 	LIST_HEAD(resources);
- 	struct device_node *node = pbm->op->dev.of_node;
- 	struct pci_bus *bus;
-+	struct pci_host_bridge *host;
+ }
  
- 	printk("PCI: Scanning PBM %s\n", node->full_name);
+-static struct pci_bus *__pci_create_root_bus(int bus,
++static struct pci_bus *__pci_create_root_bus(
+ 		struct pci_host_bridge *bridge, struct pci_ops *ops,
+ 		void *sysdata)
+ {
+@@ -1884,9 +1884,10 @@ static struct pci_bus *__pci_create_root_bus(int bus,
  
-@@ -667,16 +682,17 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
- 	pbm->busn.end	= pbm->pci_last_busno;
- 	pbm->busn.flags	= IORESOURCE_BUS;
- 	pci_add_resource(&resources, &pbm->busn);
--	bus = pci_create_root_bus(parent, pbm->index, pbm->pci_first_busno,
--			pbm->pci_ops, pbm, &resources);
--	if (!bus) {
--		printk(KERN_ERR "Failed to create bus for %s\n",
--		       node->full_name);
-+	pci_host_ops.pci_ops = pbm->pci_ops;
-+	host = pci_scan_host_bridge(parent, pbm->index, pbm->pci_first_busno,
-+			pbm, &resources, &pci_host_ops);
-+	if (!host) {
-+		pr_err("Failed to create host bridge pci%04x:%02x for %s\n",
-+		       pbm->index, pbm->pci_first_busno, node->full_name);
- 		pci_free_resource_list(&resources);
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+-	b->number = b->busn_res.start = bus;
++	b->number = b->busn_res.start =
++		pci_host_first_busnr(bridge);
+ 	pci_bus_assign_domain_nr(b, parent);
+-	b2 = pci_find_bus(pci_domain_nr(b), bus);
++	b2 = pci_find_bus(pci_domain_nr(b), b->number);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+ 		dev_dbg(&b2->dev, "bus already known\n");
+@@ -1907,7 +1908,7 @@ static struct pci_bus *__pci_create_root_bus(int bus,
+ 
+ 	b->dev.class = &pcibus_class;
+ 	b->dev.parent = b->bridge;
+-	dev_set_name(&b->dev, "%04x:%02x", bridge->domain, bus);
++	dev_set_name(&b->dev, "%04x:%02x", bridge->domain, b->number);
+ 	error = device_register(&b->dev);
+ 	if (error)
+ 		goto put_dev;
+@@ -1927,7 +1928,7 @@ static struct pci_bus *__pci_create_root_bus(int bus,
+ 		res = window->res;
+ 		offset = window->offset;
+ 		if (res->flags & IORESOURCE_BUS)
+-			pci_bus_insert_busn_res(b, bus, res->end);
++			pci_bus_insert_busn_res(b, b->number, res->end);
+ 		else
+ 			pci_bus_add_resource(b, res, 0);
+ 		if (offset) {
+@@ -1966,7 +1967,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent,
+ 	if (!host)
  		return NULL;
- 	}
  
--	pci_of_scan_bus(pbm, node, bus);
-+	bus = host->bus;
- 	pci_bus_register_of_sysfs(bus);
+-	host->bus = __pci_create_root_bus(bus, host, ops, sysdata);
++	host->bus = __pci_create_root_bus(host, ops, sysdata);
+ 	if (!host->bus)
+ 		pci_free_host_bridge(host);
  
- 	pci_claim_bus_resources(bus);
+@@ -2042,14 +2043,14 @@ void pci_bus_release_busn_res(struct pci_bus *b)
+ 			res, ret ? "can not be" : "is");
+ }
+ 
+-static struct pci_bus *__pci_scan_root_bus(int bus,
++static struct pci_bus *__pci_scan_root_bus(
+ 		struct pci_host_bridge *host, struct pci_ops *ops,
+ 		void *sysdata)
+ {
+ 	struct pci_bus *b;
+ 	int max;
+ 
+-	b = __pci_create_root_bus(bus, host, ops, sysdata);
++	b = __pci_create_root_bus(host, ops, sysdata);
+ 	if (!b)
+ 		return NULL;
+ 
+@@ -2074,7 +2075,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
+ 	if (!host)
+ 		return NULL;
+ 
+-	host->bus = __pci_scan_root_bus(bus, host, ops, sysdata);
++	host->bus = __pci_scan_root_bus(host, ops, sysdata);
+ 	if (!host->bus)
+ 		pci_free_host_bridge(host);
+ 
 -- 
 1.7.1
