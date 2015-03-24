@@ -1,82 +1,115 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 24 Mar 2015 18:06:15 +0000 (UTC)
-Subject: [PATCH 2/2] ARM: DRA7: hwmod: Fix the hwmod class for GPTimer4
-In-Reply-To: <1426539294-28375-3-git-send-email-s-anna@ti.com>
-References: <1426539294-28375-1-git-send-email-s-anna@ti.com>
- <1426539294-28375-3-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1503241805060.16497@utopia.booyaka.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 24 Mar 2015 18:10:44 +0000
+Subject: [PATCH V5 1/2] ARM: cpuidle: Register per cpuidle device
+In-Reply-To: <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
+References: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
+ <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150324181044.GA27311@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Mar 2015, Suman Anna wrote:
-
-> GPTimer 4 is a regular timer and not a secure timer, so fix
-> the hwmod to use the correct hwmod class (even though there
-> are no differences in the class definition itself).
+On Tue, Mar 24, 2015 at 09:54:01AM +0000, Daniel Lezcano wrote:
+> If the cpuidle init cpu operation returns -ENXIO, therefore reporting HW
+> failure or misconfiguration, the CPUidle driver skips the respective
+> cpuidle device initialization because the associated platform back-end HW
+> is not operational.
 > 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> That prevents the system to crash and allows to handle the error gracefully.
+> 
+> For example, on Qcom's platform, each core has a SPM. The device associated
+> with this SPM is initialized before the cpuidle framework. If there is an error
+> in the initialization (eg. error in the DT), the system continues to boot but
+> in degraded mode as some SPM may not be correctly initialized.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-This one results in compiler warnings:
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-arch/arm/mach-omap2/omap_hwmod_7xx_data.c:1776:32: warning: 
-?dra7xx_timer_secure_hwmod_class? defined but not used [-Wunused-variable]
- static struct omap_hwmod_class dra7xx_timer_secure_hwmod_class = {
-
-Have queued the following for v4.1.
-
-
-- Paul
-
-From: Suman Anna <s-anna@ti.com>
-Date: Mon, 16 Mar 2015 15:54:54 -0500
-Subject: [PATCH] ARM: DRA7: hwmod: Fix the hwmod class for GPTimer4
-
-GPTimer 4 is a regular timer and not a secure timer, so fix
-the hwmod to use the correct hwmod class (even though there
-are no differences in the class definition itself).
-
-Signed-off-by: Suman Anna <s-anna@ti.com>
-[paul at pwsan.com: dropped dra7xx_timer_secure_hwmod_class and
- dra7xx_timer_secure_sysc to avoid compiler warnings]
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index d0f03e73add4..701234d8db1b 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1763,21 +1763,6 @@ static struct omap_hwmod_class dra7xx_timer_1ms_hwmod_class = {
- 	.sysc	= &dra7xx_timer_1ms_sysc,
- };
- 
--static struct omap_hwmod_class_sysconfig dra7xx_timer_secure_sysc = {
--	.rev_offs	= 0x0000,
--	.sysc_offs	= 0x0010,
--	.sysc_flags	= (SYSC_HAS_EMUFREE | SYSC_HAS_RESET_STATUS |
--			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
--	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   SIDLE_SMART_WKUP),
--	.sysc_fields	= &omap_hwmod_sysc_type2,
--};
--
--static struct omap_hwmod_class dra7xx_timer_secure_hwmod_class = {
--	.name	= "timer",
--	.sysc	= &dra7xx_timer_secure_sysc,
--};
--
- static struct omap_hwmod_class_sysconfig dra7xx_timer_sysc = {
- 	.rev_offs	= 0x0000,
- 	.sysc_offs	= 0x0010,
-@@ -1841,7 +1826,7 @@ static struct omap_hwmod dra7xx_timer3_hwmod = {
- /* timer4 */
- static struct omap_hwmod dra7xx_timer4_hwmod = {
- 	.name		= "timer4",
--	.class		= &dra7xx_timer_secure_hwmod_class,
-+	.class		= &dra7xx_timer_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
- 	.main_clk	= "timer4_gfclk_mux",
- 	.prcm = {
--- 
-2.1.4
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 45 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 43 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 1c94b88..545069d 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/slab.h>
+>  
+>  #include <asm/cpuidle.h>
+>  
+> @@ -94,6 +95,7 @@ static int __init arm_idle_init(void)
+>  {
+>  	int cpu, ret;
+>  	struct cpuidle_driver *drv = &arm_idle_driver;
+> +	struct cpuidle_device *dev;
+>  
+>  	/*
+>  	 * Initialize idle states data, starting at index 1.
+> @@ -105,18 +107,57 @@ static int __init arm_idle_init(void)
+>  	if (ret <= 0)
+>  		return ret ? : -ENODEV;
+>  
+> +	ret = cpuidle_register_driver(drv);
+> +	if (ret) {
+> +		pr_err("Failed to register cpuidle driver\n");
+> +		return ret;
+> +	}
+> +
+>  	/*
+>  	 * Call arch CPU operations in order to initialize
+>  	 * idle states suspend back-end specific data
+>  	 */
+>  	for_each_possible_cpu(cpu) {
+>  		ret = arm_cpuidle_init(cpu);
+> +
+> +		/*
+> +		 * Skip the cpuidle device initialization if the reported
+> +		 * failure is a HW misconfiguration/breakage (-ENXIO).
+> +		 */
+> +		if (ret == -ENXIO)
+> +			continue;
+> +
+>  		if (ret) {
+>  			pr_err("CPU %d failed to init idle CPU ops\n", cpu);
+> -			return ret;
+> +			goto out_fail;
+> +		}
+> +
+> +		dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> +		if (!dev) {
+> +			pr_err("Failed to allocate cpuidle device\n");
+> +			goto out_fail;
+> +		}
+> +		dev->cpu = cpu;
+> +
+> +		ret = cpuidle_register_device(dev);
+> +		if (ret) {
+> +			pr_err("Failed to register cpuidle device for CPU %d\n",
+> +			       cpu);
+> +			kfree(dev);
+> +			goto out_fail;
+>  		}
+>  	}
+>  
+> -	return cpuidle_register(drv, NULL);
+> +	return 0;
+> +out_fail:
+> +	while (--cpu >= 0) {
+> +		dev = per_cpu(cpuidle_devices, cpu);
+> +		cpuidle_unregister_device(dev);
+> +		kfree(dev);
+> +	}
+> +
+> +	cpuidle_unregister_driver(drv);
+> +
+> +	return ret;
+>  }
+>  device_initcall(arm_idle_init);
+> -- 
+> 1.9.1
+> 
+> 
