@@ -1,117 +1,103 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 18:35:56 +0100
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <20150324135439.GC3579@e103592.cambridge.arm.com>
-References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150324122239.GB3579@e103592.cambridge.arm.com>
- <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
- <20150324135439.GC3579@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
+Date: Tue, 24 Mar 2015 18:40:29 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <20150324170543.GL14457@ns203013.ovh.net>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150324122702.GJ14457@ns203013.ovh.net>
+ <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
+ <20150324130511.GK14457@ns203013.ovh.net>
+ <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+ <20150324170543.GL14457@ns203013.ovh.net>
+Message-ID: <CAKv+Gu-LL5JzALPqPnxdVqQ7HUwnJZQ3=GzPk_h1KSUJp2SVAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 14:54, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Mar 24, 2015 at 01:50:40PM +0100, Ard Biesheuvel wrote:
->> On 24 March 2015 at 13:22, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Tue, Mar 24, 2015 at 11:16:24AM +0100, Ard Biesheuvel wrote:
->> >> When building a very large kernel, it is up to the linker to decide
->> >> when and where to insert stubs to allow calls to functions that are
->> >> out of range for the ordinary b/bl instructions.
+On 24 March 2015 at 18:05, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 15:46 Tue 24 Mar     , Ard Biesheuvel wrote:
+>> On 24 March 2015 at 14:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > On 24 March 2015 at 14:05, Jean-Christophe PLAGNIOL-VILLARD
+>> > <plagnioj@jcrosoft.com> wrote:
+>> >>  >> +     '&eor   ($t0,$t0,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',   # Sigma0(a)
+>> >>> >> +     '&add   ($h,$h,$t1)',                   # h+=Ch(e,f,g)
+>> >>> >> +     '&ldr   ($t1,sprintf "[sp,#%d]",4*(($j+1)&15))  if (($j&15)!=15);'.
+>> >>> >> +     '&ldr   ($t1,"[$Ktbl]")                         if ($j==15);'.
+>> >>> >> +     '&ldr   ($t1,"[sp,#64]")                        if ($j==31)',
+>> >>> >> +     '&and   ($t3,$t3,$t2)',                 # (b^c)&=(a^b)
+>> >>> >> +     '&add   ($d,$d,$h)',                    # d+=h
+>> >>> >> +     '&add   ($h,$h,$t0,"ror#$Sigma0[0]");'. # h+=Sigma0(a)
+>> >>> >> +     '&eor   ($t3,$t3,$b)',                  # Maj(a,b,c)
+>> >>> >> +     '$j++;  unshift(@V,pop(@V)); ($t2,$t3)=($t3,$t2);'
+>> >>> >> +     )
+>> >>> >> +}
+>> >>> >> +
+>> >>> >> +$code.=<<___;
+>> >>> >> +#if __ARM_MAX_ARCH__>=7
+>> >>> > this will be compile on armv4 but gcc will not allow it
+>> >>> >
+>> >>> > we need to drop the neon code for older non v7 build
+>> >>> >
+>> >>>
+>> >>> The .arch and .fpu declarations ensure that it can be built regardless
+>> >>> of the platform you are compiling for, unless you have a really old
+>> >>> toolchain.
+>> >> I known but does not work for me
+>> >>> The glue code ensures that the module can only be loaded if HWCAP_NEON is set.
+>> >>>
+>> >>> Did you get errors trying to build it?
 >> >>
->> >> However, since the kernel is built as a position dependent binary,
->> >> these stubs (aka veneers) may contain absolute addresses, which will
->> >> break such veneer assisted far calls performed with the MMU off.
+>> >> yes I do
 >> >>
->> >> For instance, the call from __enable_mmu() in the .head.text section
->> >> to __turn_mmu_on() in the .idmap.text section may be turned into
->> >> something like this:
+>> >> I use
 >> >>
->> >> c0008168 <__enable_mmu>:
->> >> c0008168:       f020 0002       bic.w   r0, r0, #2
->> >> c000816c:       f420 5080       bic.w   r0, r0, #4096
->> >> c0008170:       f000 b846       b.w     c0008200 <____turn_mmu_on_veneer>
->> >> [...]
->> >> c0008200 <____turn_mmu_on_veneer>:
->> >> c0008200:       4778            bx      pc
->> >> c0008202:       46c0            nop
->> >> c0008204:       e59fc000        ldr     ip, [pc]
->> >> c0008208:       e12fff1c        bx      ip
->> >> c000820c:       c13dfae1        teqgt   sp, r1, ror #21
->> >> [...]
->> >> c13dfae0 <__turn_mmu_on>:
->> >> c13dfae0:       4600            mov     r0, r0
->> >> [...]
+>> >> arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320
+>> >> (prerelease)
+>> >> Copyright (C) 2013 Free Software Foundation, Inc.
+>> >> This is free software; see the source for copying conditions.  There is NO
+>> >> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 >> >>
->> >> After adding --pic-veneer to the LDFLAGS, the veneer is emitted like
->> >> this instead:
+>> >> so it's not that old
 >> >>
->> >> c0008200 <____turn_mmu_on_veneer>:
->> >> c0008200:       4778            bx      pc
->> >> c0008202:       46c0            nop
->> >> c0008204:       e59fc004        ldr     ip, [pc, #4]
->> >> c0008208:       e08fc00c        add     ip, pc, ip
->> >> c000820c:       e12fff1c        bx      ip
->> >> c0008210:       013d7d31        teqeq   sp, r1, lsr sp
->> >> c0008214:       00000000        andeq   r0, r0, r0
->> >>
->> >> Note that this particular example is best addressed by moving
->> >> .head.text and .idmap.text closer together, but this issue could
->> >> potentially affect any code that needs to execute with the
->> >> MMU off.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 >> >
->> > Although that fixes the problem, wouldn't this introduce extra potential
->> > overhead for every call in the kernel?
->> >
+>> > Could you share the error log please?
 >>
->> It does not change whether a veneer is emitted or not, it only affects
->> the PIC nature of it.
->> So the overhead is 1 additional word for the add instruction, which I
->
-> You're right, I misunderstood lightly what is going on there.
->
->> think is a small price to pay for correctness, especially considering
->> that someone building such a big kernel obviously does not optimize
->> for size.
+>> OK, I spotted one issue with this code:
 >>
->> > How many such veneers get added in the your kernel configuration, and
->> > how many are actually necessary (i.e., calls between MMU-off code and
->> > elsewhere)?
->> >
+>> arch/arm/crypto/sha256-core.S: Assembler messages:
+>> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
+>> after fixup
+>
+> yes exactly
 >>
->> Very few. In addition to the example (which will be addressed in
->> another way regardless) there are some resume functions that get
->> allocated in .data, and those would need it as well. I have also
->> proposed b_far/bl_far macros that could be used there as well.
+>> This is caused by the fact that, when building the integer-only code
+>> for an older architecture, the conditional compilation produces a
+>> slightly bigger preceding function, and the symbol K256 is out of
+>> range for the adr instruction.
+>
+> Yeap I see that too when debuging
 >>
->> The primary concern is that you can't really check whether any
->> problematic veneers have been emitted, unless all code that may run
->> with the MMU off is moved to the idmap.text section.
+>> @Jean-Christophe: is that the same problem that you hit?
+>>
+>> @Andy: I propose we do something similar as in the bsaes code:
+>>
+>> #ifdef __thumb__
+>> #define adrl adr
+>> #endif
+>>
+>> and replace the offending line with
+>>
+>> adrl r14,K256
 >
-> That's a valid argument.
->
-> Come to think of it, I can't think of a good reason why we don't
-> pass --use-blx to the linker for THUMB2_KERNEL.  I think that would
-> at least make these sequences a bit less painful by getting rid of
-> the "bx pc" stuff.
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 >
 
-Well, passing --use-blx doesn't seem to have the desired effect. I
-still get these
+Thanks!
 
-c0181ba8 <___raw_spin_lock_veneer>:
-c0181ba8:       4778            bx      pc
-c0181baa:       46c0            nop                     ; (mov r8, r8)
-[...]
+@Sami, Andy: we need to respin the whole patch, including updated
+OpenSSL upstream commit id :-(
 
-$ size vmlinux
-   text   data    bss    dec    hex filename
-30038344 13868020 9613876 53520240 330a770 vmlinux
-
-$ grep veneer System.map |wc -l
-2211
-
-Note that this is a Thumb2 kernel, and we may have some diminishing
-returns here due to the reduced reach of the Thumb2 b/bl instructions.
-Also, loading modules is going to be difficult without my PLT patch
+Regards,
+Ard.
