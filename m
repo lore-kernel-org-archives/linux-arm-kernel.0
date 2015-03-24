@@ -1,80 +1,71 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue, 24 Mar 2015 12:53:41 +0000
-Subject: [Linux-kernel] [PATCH 12/13] mmc: atmel-mci: use endian agnostic
- IO
-In-Reply-To: <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>	
- <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
- <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
-Message-ID: <55115E55.4090409@codethink.co.uk>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 24 Mar 2015 21:53:49 +0900
+Subject: [PATCH] cpufreq: exynos: allow build for !THERMAL or !CPU_THERMAL
+ cases
+In-Reply-To: <75115513.B5dLcdQ7nU@amdc1032>
+References: <2275232.48muFcOOQv@amdc1032>
+ <CAKohpomXnpdLtMpnWeFWdGDCE4t8iEz5aDxA=PhTcR-UKjQM6A@mail.gmail.com>
+ <75115513.B5dLcdQ7nU@amdc1032>
+Message-ID: <02c201d06631$92a06440$b7e12cc0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/03/15 14:22, Ben Hutchings wrote:
-> On Wed, 2015-03-18 at 15:53 +0000, Ben Dooks wrote:
->> Change the __raw IO functions to endian agnostic relaxed ones to allow
->> the driver to function on big endian ARM systems.
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> --
->> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
->> CC: Chris Ball <chris@printf.net>
->> CC: Ulf Hansson <ulf.hansson@linaro.org>
->> CC: linux-mmc at vger.kernel.org
->> ---
->>  drivers/mmc/host/atmel-mci-regs.h | 9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
->> index c97001e..711bb53 100644
->> --- a/drivers/mmc/host/atmel-mci-regs.h
->> +++ b/drivers/mmc/host/atmel-mci-regs.h
->> @@ -135,10 +135,17 @@
->>  #define ATMCI_REGS_SIZE		0x100
->>  
->>  /* Register access macros */
->> -#define atmci_readl(port,reg)				\
->> +#ifdef CONFIG_AVR32
->> +#define atmci_readl(port,reg)			\
->>  	__raw_readl((port)->regs + reg)
->>  #define atmci_writel(port,reg,value)			\
->>  	__raw_writel((value), (port)->regs + reg)
->> +#else
->> +#define atmci_readl(port,reg)			\
->> +	readl_relaxed((port)->regs + reg)
->> +#define atmci_writel(port,reg,value)			\
->> +	writel_relaxed((value), (port)->regs + reg)
->> +#endif
+Bartlomiej Zolnierkiewicz wrote:
 > 
-> This pattern is repeated in a lot of drivers; is it worth defining
-> atmel_{read,write}l_relaxed() in a common header?
+> Hi,
 > 
-> #ifdef CONFIG_AVR32
-> 
-> /* CPU and peripherals are both big-endian, so don't byte-swap */
-> #define atmel_readl_relaxed(addr)		__raw_readl(addr)
-> #define atmel_writel_relaxed(value, addr)	__raw_writel(value, addr)
-> 
-> #else
-> 
-> /* Peripherals are little-endian, so byte-swap if CPU isn't */
-> #define atmel_readl_relaxed(addr)		readl_relaxed(addr)
-> #define atmel_writel_relaxed(value, addr)	writel_relaxed(value, addr)
-> 
-> #endif
-> 
-> Ben.
+Hi,
 
-Hi, I think it will probably be a good idea to have an avr32/at91
-read/write functions however I will put this forward as a separate
-series as it will require both avr32 and at91 maintainers as well
-as driver updates.
+> On Monday, February 23, 2015 10:07:50 AM Viresh Kumar wrote:
+> > On 20 February 2015 at 21:50, Bartlomiej Zolnierkiewicz
+> > <b.zolnierkie@samsung.com> wrote:
+> > > Allow driver build for !THERMAL or !CPU_THERMAL cases.
+> > >
+> > > The new dependency rule is the same as the one that CPUFREQ_DT
+> > > option has (for cpufreq-dt driver which has the same issue with
+> > > using of_cpufreq_cooling_register()).
+> > >
+> > > Cc: Kukjin Kim <kgene@kernel.org>
 
-how about:
-	atmel_readl_onchip{b,w,l}
-	atmel_writel_onchip{b,w,l}
+Looks OK to me,
 
+Acked-by: Kukjin Kim <kgene@kernel.org>
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Thanks,
+Kukjin
+
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > Cc: Eduardo Valentin <edubezval@gmail.com>
+> > > Cc: Lukasz Majewski <l.majewski@samsung.com>
+> > > Fixes: 8b2b4a4e5366 ("cpufreq: exynos: allow modular build")
+> > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > ---
+> > >  drivers/cpufreq/Kconfig.arm | 3 ++-
+> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > >
+> > > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> > > index 1b06fc4..f4df4af3 100644
+> > > --- a/drivers/cpufreq/Kconfig.arm
+> > > +++ b/drivers/cpufreq/Kconfig.arm
+> > > @@ -28,7 +28,8 @@ config ARM_VEXPRESS_SPC_CPUFREQ
+> > >  config ARM_EXYNOS_CPUFREQ
+> > >         tristate "SAMSUNG EXYNOS CPUfreq Driver"
+> > >         depends on CPU_EXYNOS4210 || SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
+> > > -       depends on THERMAL
+> > > +       # if CPU_THERMAL is on and THERMAL=m, ARM_EXYNOS_CPUFREQ cannot be =y:
+> > > +       depends on !CPU_THERMAL || THERMAL
+> > >         help
+> > >           This adds the CPUFreq driver for Samsung EXYNOS platforms.
+> > >           Supported SoC versions are:
+> >
+> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> Thank you for the ACK.
+> 
+> Would you pick this patch up or should I resend it to Rafael?
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
