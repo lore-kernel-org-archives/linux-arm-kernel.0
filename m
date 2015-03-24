@@ -1,34 +1,51 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 24 Mar 2015 21:59:17 +0530
-Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Central Direct Memory Access
- Engine driver support
-In-Reply-To: <BN1AFFO11FD023ED3667A2D130D8FEA68BA10D0@BN1AFFO11FD023.protection.gbl>
-References: <1425318926-28081-1-git-send-email-appanad@xilinx.com>
- <BN1AFFO11FD023ED3667A2D130D8FEA68BA10D0@BN1AFFO11FD023.protection.gbl>
-Message-ID: <20150324162917.GE32683@intel.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Mar 2015 12:33:51 -0400 (EDT)
+Subject: [PATCH 2/3] ARM: exynos: move resume code to .text section
+In-Reply-To: <1427213430-28463-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427213430-28463-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427213430-28463-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1503241231161.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 04:27:54PM +0000, Appana Durga Kedareswara Rao wrote:
-> Ping !
-> 
-> > -----Original Message-----
-> > From: Kedareswara rao Appana [mailto:appana.durga.rao at xilinx.com]
-> > Sent: Monday, March 02, 2015 11:25 PM
-> > To: dan.j.williams at intel.com; vinod.koul at intel.com; Michal Simek; Soren
-> > Brinkmann
-> > Cc: dmaengine at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> > kernel at vger.kernel.org; Appana Durga Kedareswara Rao; Anirudha Sarangi;
-> > Srikanth Vemula; Srikanth Thokala
-> > Subject: [PATCH v3 2/2] dma: Add Xilinx AXI Central Direct Memory Access
-> > Engine driver support
-> >
-> > This is the driver for the AXI Central Direct Memory Access (AXI
-> > CDMA) core, which is a soft Xilinx IP core that provides high-bandwidth Direct
-> > Memory Access (DMA) between a memory-mapped source address and a
-> > memory-mapped destination address.
-Somehow I dont seem to have this in my queue, so can you please resend this
-one for me
+On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
 
--- 
-~Vinod
+> This code calls cpu_resume() using a straight branch (b), so
+> now that we have moved cpu_resume() back to .text, this should
+> be moved there as well. Note that all the .data references in
+> the code are already open coded PC relative references.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+You forgot to adjust the code in exynos_cpu_resume_ns referencing 
+cp15_save_power and cp15_save_diag.
+
+
+> ---
+>  arch/arm/mach-exynos/sleep.S | 9 +--------
+>  1 file changed, 1 insertion(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+> index d3583773785e..98fba486fbe5 100644
+> --- a/arch/arm/mach-exynos/sleep.S
+> +++ b/arch/arm/mach-exynos/sleep.S
+> @@ -23,14 +23,7 @@
+>  #define CPU_MASK	0xff0ffff0
+>  #define CPU_CORTEX_A9	0x410fc090
+>  
+> -	/*
+> -	 * The following code is located into the .data section. This is to
+> -	 * allow l2x0_regs_phys to be accessed with a relative load while we
+> -	 * can't rely on any MMU translation. We could have put l2x0_regs_phys
+> -	 * in the .text section as well, but some setups might insist on it to
+> -	 * be truly read-only. (Reference from: arch/arm/kernel/sleep.S)
+> -	 */
+> -	.data
+> +	.text
+>  	.align
+>  
+>  	/*
+> -- 
+> 1.8.3.2
+> 
+> 
