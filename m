@@ -1,119 +1,58 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:34:03 +0800
-Subject: [PATCH v8 09/30] PCI: Introduce pci_host_first_busnr() function
+Date: Tue, 24 Mar 2015 11:34:18 +0800
+Subject: [PATCH v8 24/30] PCI/tegra: Remove redundant tegra_pcie_scan_bus()
 In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
 References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-25-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use it to get the first bus number of the bus
-resource.
+Now pci_scan_root_bus() is almost similar to
+pci_create_root_bus() + pci_scan_child_bus().
+So we could use common pci_scan_root_bus() in
+pci_common_init_dev() to scan pci busses.
+tegra_pcie_scan_bus() is redundant, remove it.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: linux-tegra at vger.kernel.org
 ---
- drivers/pci/pci.h   |   11 +++++++++++
- drivers/pci/probe.c |   19 ++++++++++---------
- 2 files changed, 21 insertions(+), 9 deletions(-)
+ drivers/pci/host/pci-tegra.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 8526790..886d72f 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -337,4 +337,15 @@ static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
- struct pci_host_bridge *pci_create_host_bridge(struct device *parent,
- 		int domain, int bus, struct list_head *resources);
- void pci_free_host_bridge(struct pci_host_bridge *host);
-+
-+static inline int pci_host_first_busnr(struct pci_host_bridge *host)
-+{
-+	struct resource_entry *window;
-+
-+	resource_list_for_each_entry(window, &host->windows)
-+		if (window->res->flags & IORESOURCE_BUS)
-+			return window->res->start;
-+	return -1;
-+}
-+
- #endif /* DRIVERS_PCI_H */
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index d5a12d9..25ac741 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1864,7 +1864,7 @@ void __weak pcibios_remove_bus(struct pci_bus *bus)
- {
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 94e9362..10c0571 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -630,21 +630,6 @@ static int tegra_pcie_map_irq(const struct pci_dev *pdev, u8 slot, u8 pin)
+ 	return irq;
  }
  
--static struct pci_bus *__pci_create_root_bus(int bus,
-+static struct pci_bus *__pci_create_root_bus(
- 		struct pci_host_bridge *bridge, struct pci_ops *ops,
- 		void *sysdata)
+-static struct pci_bus *tegra_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct tegra_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
+-
+-	bus = pci_create_root_bus(pcie->dev, -1, sys->busnr, &tegra_pcie_ops,
+-			sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
+-	pci_scan_child_bus(bus);
+-
+-	return bus;
+-}
+-
+ static irqreturn_t tegra_pcie_isr(int irq, void *arg)
  {
-@@ -1884,9 +1884,10 @@ static struct pci_bus *__pci_create_root_bus(int bus,
+ 	const char *err_msg[] = {
+@@ -1831,7 +1816,6 @@ static int tegra_pcie_enable(struct tegra_pcie *pcie)
+ 	hw.private_data = (void **)&pcie;
+ 	hw.setup = tegra_pcie_setup;
+ 	hw.map_irq = tegra_pcie_map_irq;
+-	hw.scan = tegra_pcie_scan_bus;
+ 	hw.ops = &tegra_pcie_ops;
  
- 	b->sysdata = sysdata;
- 	b->ops = ops;
--	b->number = b->busn_res.start = bus;
-+	b->number = b->busn_res.start =
-+		pci_host_first_busnr(bridge);
- 	pci_bus_assign_domain_nr(b, parent);
--	b2 = pci_find_bus(pci_domain_nr(b), bus);
-+	b2 = pci_find_bus(pci_domain_nr(b), b->number);
- 	if (b2) {
- 		/* If we already got to this bus through a different bridge, ignore it */
- 		dev_dbg(&b2->dev, "bus already known\n");
-@@ -1907,7 +1908,7 @@ static struct pci_bus *__pci_create_root_bus(int bus,
- 
- 	b->dev.class = &pcibus_class;
- 	b->dev.parent = b->bridge;
--	dev_set_name(&b->dev, "%04x:%02x", bridge->domain, bus);
-+	dev_set_name(&b->dev, "%04x:%02x", bridge->domain, b->number);
- 	error = device_register(&b->dev);
- 	if (error)
- 		goto put_dev;
-@@ -1927,7 +1928,7 @@ static struct pci_bus *__pci_create_root_bus(int bus,
- 		res = window->res;
- 		offset = window->offset;
- 		if (res->flags & IORESOURCE_BUS)
--			pci_bus_insert_busn_res(b, bus, res->end);
-+			pci_bus_insert_busn_res(b, b->number, res->end);
- 		else
- 			pci_bus_add_resource(b, res, 0);
- 		if (offset) {
-@@ -1966,7 +1967,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent,
- 	if (!host)
- 		return NULL;
- 
--	host->bus = __pci_create_root_bus(bus, host, ops, sysdata);
-+	host->bus = __pci_create_root_bus(host, ops, sysdata);
- 	if (!host->bus)
- 		pci_free_host_bridge(host);
- 
-@@ -2042,14 +2043,14 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- 			res, ret ? "can not be" : "is");
- }
- 
--static struct pci_bus *__pci_scan_root_bus(int bus,
-+static struct pci_bus *__pci_scan_root_bus(
- 		struct pci_host_bridge *host, struct pci_ops *ops,
- 		void *sysdata)
- {
- 	struct pci_bus *b;
- 	int max;
- 
--	b = __pci_create_root_bus(bus, host, ops, sysdata);
-+	b = __pci_create_root_bus(host, ops, sysdata);
- 	if (!b)
- 		return NULL;
- 
-@@ -2074,7 +2075,7 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int domain,
- 	if (!host)
- 		return NULL;
- 
--	host->bus = __pci_scan_root_bus(bus, host, ops, sysdata);
-+	host->bus = __pci_scan_root_bus(host, ops, sysdata);
- 	if (!host->bus)
- 		pci_free_host_bridge(host);
- 
+ 	pci_common_init_dev(pcie->dev, &hw);
 -- 
 1.7.1
