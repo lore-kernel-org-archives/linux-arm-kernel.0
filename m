@@ -1,130 +1,88 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:34:01 +0800
-Subject: [PATCH v8 07/30] PCI: Add default bus resource in pci_host_bridge
+Date: Tue, 24 Mar 2015 11:34:11 +0800
+Subject: [PATCH v8 17/30] x86/PCI: Refine pci_acpi_scan_root() with generic
+ pci_host_bridge
 In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
 References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-8-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-18-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is no busn resource provided for pci_scan_root_bus(),
-we would insert a default bus resource (root_bus_number, 255)
-in root bus, and update the max bus number we found after
-pci_scan_child_bus(). We also need to hold the default bus
-resource in pci_host_bridge, then we could identify whether
-the new pci host bridge conflict with existing one.
-
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thomas Gleixner <tglx@linutronix.de>
+CC: x86 at kernel.org
 ---
- drivers/pci/host-bridge.c |   20 ++++++++++++++++++++
- drivers/pci/probe.c       |   26 ++++++++++----------------
- include/linux/pci.h       |    2 ++
- 3 files changed, 32 insertions(+), 16 deletions(-)
+ arch/x86/pci/acpi.c |   37 +++++++++++++++++++++----------------
+ 1 files changed, 21 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index 7d52a0a..ecc1a7c 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -19,6 +19,25 @@ static void pci_release_host_bridge_dev(struct device *dev)
- 	kfree(bridge);
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index d2655d5..877acaf 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -349,6 +349,19 @@ static void probe_pci_root_info(struct pci_root_info *info,
+ 			entry->res->name = info->name;
  }
  
-+static void pci_host_update_busn_res(
-+		struct pci_host_bridge *host, int bus,
-+		struct list_head *resources)
++static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
 +{
-+	struct resource_entry *window;
++	struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
 +
-+	resource_list_for_each_entry(window, resources)
-+		if (window->res->flags & IORESOURCE_BUS)
-+			return;
-+
-+	pr_info(
-+	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
-+		host->domain, bus, bus);
-+	host->busn_res.flags = IORESOURCE_BUS;
-+	host->busn_res.start = bus;
-+	host->busn_res.end = 255;
-+	pci_add_resource(resources, &host->busn_res);
++	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
++	return 0;
 +}
 +
- struct pci_host_bridge *pci_create_host_bridge(
- 		struct device *parent, int domain, int bus,
- 		struct list_head *resources)
-@@ -33,6 +52,7 @@ struct pci_host_bridge *pci_create_host_bridge(
- 
- 	host->dev.parent = parent;
- 	INIT_LIST_HEAD(&host->windows);
-+	pci_host_update_busn_res(host, bus, resources);
- 	resource_list_for_each_entry_safe(window, n, resources)
- 		list_move_tail(&window->node, &host->windows);
- 	/*
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 9bc4784..d5a12d9 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2022,6 +2022,12 @@ int pci_bus_update_busn_res_end(struct pci_bus *b, int bus_max)
- 	return ret;
- }
- 
-+static void pci_host_update_busn_res_end(
-+		struct pci_host_bridge *host, int max)
-+{
-+	host->busn_res.end = max;
-+}
++static struct pci_host_bridge_ops pci_host_ops = {
++	.pci_ops = &pci_root_ops,
++	.prepare = pci_host_bridge_prepare,
++};
 +
- void pci_bus_release_busn_res(struct pci_bus *b)
+ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
  {
- 	struct resource *res = &b->busn_res;
-@@ -2040,32 +2046,20 @@ static struct pci_bus *__pci_scan_root_bus(int bus,
- 		struct pci_host_bridge *host, struct pci_ops *ops,
- 		void *sysdata)
- {
--	struct resource_entry *window;
--	bool found = false;
- 	struct pci_bus *b;
- 	int max;
+ 	struct acpi_device *device = root->device;
+@@ -359,6 +372,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	LIST_HEAD(crs_res);
+ 	LIST_HEAD(resources);
+ 	struct pci_bus *bus;
++	struct pci_host_bridge *host = NULL;
+ 	struct pci_sysdata *sd;
+ 	int node;
  
--	resource_list_for_each_entry(window, &host->windows)
--		if (window->res->flags & IORESOURCE_BUS) {
--			found = true;
--			break;
--		}
+@@ -425,14 +439,13 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 
+ 		if (!setup_mcfg_map(info, domain, (u8)root->secondary.start,
+ 				    (u8)root->secondary.end, root->mcfg_addr))
+-			bus = pci_create_root_bus(NULL, domain, busnum,
+-					&pci_root_ops, sd, &resources);
 -
- 	b = __pci_create_root_bus(bus, host, ops, sysdata);
- 	if (!b)
- 		return NULL;
- 
--	if (!found) {
--		dev_info(&b->dev,
--		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
--			bus);
--		pci_bus_insert_busn_res(b, bus, 255);
--	}
--
- 	max = pci_scan_child_bus(b);
- 
--	if (!found)
-+	/* If default busn resource used, update the max bus number */
-+	if (host->busn_res.flags & IORESOURCE_BUS) {
-+		pci_host_update_busn_res_end(host, max);
- 		pci_bus_update_busn_res_end(b, max);
-+	}
- 
- 	return b;
+-		if (bus) {
+-			pci_scan_child_bus(bus);
+-			pci_set_host_bridge_release(
+-				to_pci_host_bridge(bus->bridge),
+-				release_pci_root_info, info);
++			host = pci_scan_host_bridge(NULL, domain, busnum, sd,
++					&resources, &pci_host_ops);
++
++		if (host) {
++			bus = host->bus;
++			pci_set_host_bridge_release(host,
++					release_pci_root_info, info);
+ 		} else {
+ 			resource_list_free(&resources);
+ 			teardown_mcfg_map(info);
+@@ -455,14 +468,6 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	return bus;
  }
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 1542df8..f189dfb 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -404,6 +404,8 @@ struct pci_host_bridge {
- 	int domain;
- 	struct device dev;
- 	struct pci_bus *bus;		/* root bus */
-+	/* we use default bus resource if no bus resource provided */
-+	struct resource busn_res;
- 	struct list_head windows;	/* resource_entry */
- 	void (*release_fn)(struct pci_host_bridge *);
- 	void *release_data;
+ 
+-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+-{
+-	struct pci_sysdata *sd = bridge->bus->sysdata;
+-
+-	ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+-	return 0;
+-}
+-
+ int __init pci_acpi_init(void)
+ {
+ 	struct pci_dev *dev = NULL;
 -- 
 1.7.1
