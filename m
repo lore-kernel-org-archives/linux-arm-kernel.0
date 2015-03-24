@@ -1,83 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 13:50:40 +0100
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <20150324122239.GB3579@e103592.cambridge.arm.com>
-References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150324122239.GB3579@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 24 Mar 2015 21:52:10 +0900
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable HDMI support
+In-Reply-To: <CABxcv==Ko2PUfwuo8D2JDL4iR4+VGvewQpR_RDh9pB4Qbg5c=g@mail.gmail.com>
+References: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
+ <CABxcv==Ko2PUfwuo8D2JDL4iR4+VGvewQpR_RDh9pB4Qbg5c=g@mail.gmail.com>
+Message-ID: <02b201d06631$58129d70$0837d850$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 13:22, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Mar 24, 2015 at 11:16:24AM +0100, Ard Biesheuvel wrote:
->> When building a very large kernel, it is up to the linker to decide
->> when and where to insert stubs to allow calls to functions that are
->> out of range for the ordinary b/bl instructions.
->>
->> However, since the kernel is built as a position dependent binary,
->> these stubs (aka veneers) may contain absolute addresses, which will
->> break such veneer assisted far calls performed with the MMU off.
->>
->> For instance, the call from __enable_mmu() in the .head.text section
->> to __turn_mmu_on() in the .idmap.text section may be turned into
->> something like this:
->>
->> c0008168 <__enable_mmu>:
->> c0008168:       f020 0002       bic.w   r0, r0, #2
->> c000816c:       f420 5080       bic.w   r0, r0, #4096
->> c0008170:       f000 b846       b.w     c0008200 <____turn_mmu_on_veneer>
->> [...]
->> c0008200 <____turn_mmu_on_veneer>:
->> c0008200:       4778            bx      pc
->> c0008202:       46c0            nop
->> c0008204:       e59fc000        ldr     ip, [pc]
->> c0008208:       e12fff1c        bx      ip
->> c000820c:       c13dfae1        teqgt   sp, r1, ror #21
->> [...]
->> c13dfae0 <__turn_mmu_on>:
->> c13dfae0:       4600            mov     r0, r0
->> [...]
->>
->> After adding --pic-veneer to the LDFLAGS, the veneer is emitted like
->> this instead:
->>
->> c0008200 <____turn_mmu_on_veneer>:
->> c0008200:       4778            bx      pc
->> c0008202:       46c0            nop
->> c0008204:       e59fc004        ldr     ip, [pc, #4]
->> c0008208:       e08fc00c        add     ip, pc, ip
->> c000820c:       e12fff1c        bx      ip
->> c0008210:       013d7d31        teqeq   sp, r1, lsr sp
->> c0008214:       00000000        andeq   r0, r0, r0
->>
->> Note that this particular example is best addressed by moving
->> .head.text and .idmap.text closer together, but this issue could
->> potentially affect any code that needs to execute with the
->> MMU off.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Although that fixes the problem, wouldn't this introduce extra potential
-> overhead for every call in the kernel?
->
+Javier Martinez Canilla wrote:
+> 
+> Hello Kukjin,
+> 
+Hi,
 
-It does not change whether a veneer is emitted or not, it only affects
-the PIC nature of it.
-So the overhead is 1 additional word for the add instruction, which I
-think is a small price to pay for correctness, especially considering
-that someone building such a big kernel obviously does not optimize
-for size.
+> On Tue, Mar 17, 2015 at 7:54 PM, Javier Martinez Canillas
+> <javier@dowhile0.org> wrote:
+> > On Fri, Feb 6, 2015 at 6:42 PM, Javier Martinez Canillas
+> > <javier.martinez@collabora.co.uk> wrote:
+> >> Many Exynos boards have an HDMI port so enable Exynos DRM HDMI support.
+> >>
+> >> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >> ---
+> >>
+> >> Exynos DRM HDMI has some issues that were fixed by Andrzej's [0] series.
+> >> So now is safe to HDMI support for Exynos boards.
+> >>
+> >> [0]: https://lkml.org/lkml/2015/2/5/265
+> >>
+> >>  arch/arm/configs/exynos_defconfig | 1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> >> index 70e5d0bdb4e4..e44da52e5223 100644
+> >> --- a/arch/arm/configs/exynos_defconfig
+> >> +++ b/arch/arm/configs/exynos_defconfig
+> >> @@ -120,6 +120,7 @@ CONFIG_REGULATOR_S2MPS11=y
+> >>  CONFIG_REGULATOR_S5M8767=y
+> >>  CONFIG_REGULATOR_TPS65090=y
+> >>  CONFIG_DRM=y
+> >> +CONFIG_DRM_EXYNOS_HDMI=y
+> >>  CONFIG_DRM_BRIDGE=y
+> >>  CONFIG_DRM_PTN3460=y
+> >>  CONFIG_DRM_PS8622=y
+> >> --
+> >
+> > It seems you missed this patch when picking the exynos_defconfig patches.
+> >
+> 
+> Another gentle reminder about this patch.
+> 
+Thanks, will apply tonight ;-)
 
-> How many such veneers get added in the your kernel configuration, and
-> how many are actually necessary (i.e., calls between MMU-off code and
-> elsewhere)?
->
-
-Very few. In addition to the example (which will be addressed in
-another way regardless) there are some resume functions that get
-allocated in .data, and those would need it as well. I have also
-proposed b_far/bl_far macros that could be used there as well.
-
-The primary concern is that you can't really check whether any
-problematic veneers have been emitted, unless all code that may run
-with the MMU off is moved to the idmap.text section.
+- Kukjin
