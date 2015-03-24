@@ -1,52 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 Mar 2015 23:12:12 +0000
-Subject: i.MX6 : all interrupts are only on the first CPU
-In-Reply-To: <CAL8zT=gniU_J-7gVHa3C+FJU_CCMkbiK77-+57vTUjCXQt+KHQ@mail.gmail.com>
-References: <CAL8zT=gniU_J-7gVHa3C+FJU_CCMkbiK77-+57vTUjCXQt+KHQ@mail.gmail.com>
-Message-ID: <20150324231212.GV8656@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 24 Mar 2015 16:23:15 -0700
+Subject: [PATCH v3 1/9] regmap: Introduce regmap_get_max_register.
+In-Reply-To: <5511EDD7.40202@linaro.org>
+References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427236179-18580-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150324223637.GB28997@sirena.org.uk> <5511EDD7.40202@linaro.org>
+Message-ID: <1427239395.12126.22.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 01:52:56PM +0100, Jean-Michel Hautbois wrote:
-> I am currently running a 4.0-rc1 on a custom board, and I am observing
-> something strange, don't know if it is a known fact : all interrupts
-> are fired on the same CPU :
-...
-> /proc/irq/default_smp_affinity -> 3
+On Tue, 2015-03-24 at 23:05 +0000, Srinivas Kandagatla wrote:
+> On 24/03/15 22:36, Mark Brown wrote:
+> >> +int regmap_get_max_register(struct regmap *map)
+> >> +{
+> >> +	return map->max_register ? : -EINVAL;
+> >> +}
+> >
+> > Please write the logic out properly, don't abuse the ternery operator.
+> Am happy to change it to your preference in next version, but this GNU 
+> extensions widely used in the kernel
 > 
-> So, it should balance a bit between both CPUs, or am I
-> misunderstanding something ?
-> Maybe a configuration issue ?
+> $  grep -rR "return.*? :" ./linux | wc -l
+> 115
 
-Only the first CPU in an affinity setting gets the interrupt.  This is
-because I found adding code to the kernel to explicitly distribute the
-interrupts is not as easy as it sounds; there's a fair amount of policy
-involved there, and policy is best left to userspace.
+Double that when you add the ?: variants
 
-There's an irqbalance daemon (which is derived from an older x86 version)
-which the SolidRun guys are using extensively to distribute interrupts
-over the other iMX6 CPUs, which is born out of updates I made to the
-version in Ubuntu 12.04.
+$ git grep -E "return.*\?\s*:" | wc -l
+253
 
-I've been telling people for years to use irqbalanced, but it seems I've
-been ignored... well, we now have one which is suitable for iMX6, but
-only because I did the tiny bit of work to add a few strings to the x86
-version. :)
+There are ~530 uses like:
 
-If you're wondering where policy comes into it - sometimes, it's better
-to leave an interrupt on the same CPU rather than rotating it between
-CPUs, because you get better performance due to cache locality.  Things
-that fall into this are things like network interrupts - so it makes
-sense to distribute a number of network interrupts across different CPU
-cores, but not rotate the network interrupts amongst the cores (which
-would cause cache lines to also rotate.)
-
-Also note that only the primary GIC interrupts can be distributed to
-separate CPUs - downstream interrupt controllers of the GIC (eg, the
-IPU) depend on the routing of the GIC interrupt to which they are
-attached.  Only the top level interrupt controller can select the CPU
-target.  The downstream IRQ controller CPU affinity is meaningless.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	return <foo> ? <foo> :
