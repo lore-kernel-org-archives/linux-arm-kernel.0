@@ -1,29 +1,77 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Mar 2015 09:25:33 +0000
-Subject: [PATCH v6 2/9] ARM: multi_v7_defconfig: Enable support for ST's LPC
- Watchdog
-In-Reply-To: <1427189140-1935-1-git-send-email-lee.jones@linaro.org>
-References: <1427189140-1935-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1427189140-1935-3-git-send-email-lee.jones@linaro.org>
+Date: Tue, 24 Mar 2015 09:25:31 +0000
+Subject: [PATCH v6 0/9] mfd: watchdog: rtc: New driver for ST's LPC IP
+Message-ID: <1427189140-1935-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+[Alessandro: This just needs RTC Acks now]
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index b7e6b6fb..138e68a 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -324,6 +324,7 @@ CONFIG_WATCHDOG=y
- CONFIG_XILINX_WATCHDOG=y
- CONFIG_ARM_SP805_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
-+CONFIG_ST_LPC_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
- CONFIG_MESON_WATCHDOG=y
- CONFIG_MFD_AS3711=y
+ST's Low Power Controller (LPC) controls two devices; watchdog and RTC.
+Only one of the devices can be used at any one time, which is enforced
+by the Device Driver model.
+
+This driver set provides everything you need to choose one (and only
+one) of the LPC devices to run per I/P block, of which there are two
+on the enabled STiH407 h/w.
+
+Version 6:
+ - RTC: GPL v2 => GPL to reflect the information in the header
+ - Applied another Reviewed-by from Guenter
+ 
+Version 5:
+ - Disable WDT clock over suspend
+ - WDT: GPL v2 => GPL to reflect the information in the header
+ - Change module name in Kconfig help and file header
+
+Version 4:
+ - Use {readl,writel}_relaxed() calls
+ - Add Guenter's Reviewed-by
+ - Rebased onto v4.0-rc1
+
+Version 3:
+ - Move Regmap pointer into core device data structure
+ - Remove error message from devm_ioremap_resource
+
+Version 2:
+ - Only calculate keepalive once in probe()
+ - Check for a 0 clk_rate
+ - Set limits using predefined attributes from watchdog_device
+ - CONFIG_PM => CONFIG_SLEEP
+ - Call st_wdog_setup() on resume
+ - Remove MFD driver -- instead rely on driver probing mechanism
+   which continues attempting to bind to different drivers until
+   one does not return -ENODEV
+
+Lee Jones (9):
+  mfd: dt-bindings: Provide human readable defines for LPC mode choosing
+  ARM: multi_v7_defconfig: Enable support for ST's LPC Watchdog
+  ARM: multi_v7_defconfig: Enable support for ST's LPC RTC
+  ARM: STi: DT: STiH407: Add Device Tree node for the LPC
+  watchdog: bindings: Provide ST bindings for ST's LPC Watchdog device
+  watchdog: st_wdt: Add new driver for ST's LPC Watchdog
+  rtc: bindings: Provide ST bindings for ST's LPC RTC device
+  rtc: st: add new driver for ST's LPC RTC
+  MAINTAINERS: Add Watchdog and RTC files to STI's maintainer entry
+
+ .../devicetree/bindings/rtc/rtc-st-lpc.txt         |  25 ++
+ .../devicetree/bindings/watchdog/st_lpc_wdt.txt    |  38 +++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/stih407-family.dtsi              |  20 ++
+ arch/arm/configs/multi_v7_defconfig                |   2 +
+ drivers/rtc/Kconfig                                |  12 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-st-lpc.c                           | 354 +++++++++++++++++++++
+ drivers/watchdog/Kconfig                           |  13 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/st_lpc_wdt.c                      | 344 ++++++++++++++++++++
+ include/dt-bindings/mfd/st-lpc.h                   |  15 +
+ 12 files changed, 827 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/st_lpc_wdt.txt
+ create mode 100644 drivers/rtc/rtc-st-lpc.c
+ create mode 100644 drivers/watchdog/st_lpc_wdt.c
+ create mode 100644 include/dt-bindings/mfd/st-lpc.h
+
 -- 
 1.9.1
