@@ -1,64 +1,100 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 24 Mar 2015 12:30:34 -0400
-Subject: [PATCHv2] ti-soc-thermal: request temperature periodically if hw
- can't do that itself
-In-Reply-To: <20150118202447.GA29014@amd>
-References: <20150103114632.GA21883@amd>
- <20150118202447.GA29014@amd>
-Message-ID: <20150324163032.GA13813@developer.hsd1.ca.comcast.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 24 Mar 2015 21:58:16 +0530
+Subject: [PATCH v5] dma: Add Xilinx AXI Direct Memory Access Engine
+ driver support
+In-Reply-To: <BN1AFFO11FD0176A49A50DC8480B79E879A10D0@BN1AFFO11FD017.protection.gbl>
+References: <6f3b34935c0f405199cacd5312e972ac@BN1BFFO11FD017.protection.gbl>
+ <20150317110739.GE32683@intel.com>
+ <BN1AFFO11FD0176A49A50DC8480B79E879A10D0@BN1AFFO11FD017.protection.gbl>
+Message-ID: <20150324162815.GD32683@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 18, 2015 at 09:24:47PM +0100, Pavel Machek wrote:
+On Mon, Mar 23, 2015 at 04:24:26PM +0000, Appana Durga Kedareswara Rao wrote:
+> > > +static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
+> > > +                                       dma_cookie_t cookie,
+> > > +                                       struct dma_tx_state *txstate) {
+> > > +   struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
+> > > +   enum dma_status ret;
+> > > +   unsigned long flags;
+> > > +
+> > > +   ret = dma_cookie_status(dchan, cookie, txstate);
+> > > +   if (ret != DMA_COMPLETE) {
+> > txstate can be null
 > 
-> When periodic mode is not enabled, it is neccessary to force reads.
+> Ok will modify.
+> It will be something like below
 > 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-This is a malformed patch. here is patch output (or git am)
-patching file drivers/thermal/ti-soc-thermal/ti-bandgap.c
-patch: **** malformed patch at line 68: (english)
-http://www.livejournal.com/~pavelmachek
-
-
-I would really recommend you to use git to send your patches to avoid
-such problems. Can you please resend this patch in its proper format?
-
-
+> ret = dma_cookie_status(dchan, cookie, txstate);
+> if (ret == DMA_COMPLETE || !txstate)
+>         return ret;
+> Calculate residue.
 > 
-> diff --git a/drivers/thermal/ti-soc-thermal/ti-bandgap.c b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> index 634b6ce..2fde78c 100644
-> --- a/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> +++ b/drivers/thermal/ti-soc-thermal/ti-bandgap.c
-> @@ -43,6 +43,8 @@
->  
->  #include "ti-bandgap.h"
->  
-> +static int ti_bandgap_force_single_read(struct ti_bandgap *bgp, int id);
-> +
->  /***   Helper functions to access registers and their bitfields   ***/
->  
->  /**
-> @@ -852,14 +831,21 @@ int ti_bandgap_read_temperature(struct ti_bandgap *bgp, int id,
->  	if (ret)
->  		return ret;
->  
-> +	if (!TI_BANDGAP_HAS(bgp, MODE_CONFIG)) {
-> +		ret = ti_bandgap_force_single_read(bgp, id);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	spin_lock(&bgp->lock);
->  	temp = ti_bandgap_read_temp(bgp, id);
+> Please correct me if I am wrong
+Thats right
+
+> > > +static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan
+> > > +*chan) {
+> > > +   struct xilinx_dma_tx_descriptor *desc;
+> > > +   struct xilinx_dma_tx_segment *segment, *next;
+> > > +   struct xilinx_dma_desc_hw *hw;
+> > > +   unsigned long flags;
+> > > +   u32 residue = 0;
+> > > +
+> > > +   spin_lock_irqsave(&chan->lock, flags);
+> > > +
+> > > +   desc = chan->active_desc;
+> > > +   if (!desc) {
+> > > +           dev_dbg(chan->dev, "no running descriptors\n");
+> > > +           goto out_unlock;
+> > > +   }
+> > > +
+> > > +   if (chan->has_sg) {
+> > > +           list_for_each_entry_safe(segment, next, &desc->segments,
+> > node) {
+> > > +                   hw = &segment->hw;
+> > > +                   residue += (hw->control - hw->status) &
+> > > +                              XILINX_DMA_MAX_TRANS_LEN;
+> > > +           }
+> > why are we calculating residue here?
 > 
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/c2cd4055/attachment.sig>
+> 
+> This API is called from Interrupt handler when the BD(Buffer Descriptor) is
+> Successfully transmitted.
+> Thought of calculating residue here is more accurate than calculating the residue in the
+> tx_status.
+Nope, you need to report reside when asked not precompute!
+
+> This is while preparing the descs, but I see your point.  I will fix
+> it in my next version of the patch.
+> 
+> >
+> > > +   async_tx_ack(&desc->async_tx);
+> > why?
+> 
+> It is not required?
+> As far as I know we should ack the descriptor for Slave dma case right?
+> ( https://www.kernel.org/doc/Documentation/crypto/async-tx-api.txt )
+No you dont, for slave you need to read Documentation/dmaengine/
+
+> > > +static int xilinx_dma_remove(struct platform_device *pdev) {
+> > > +   struct xilinx_dma_device *xdev = platform_get_drvdata(pdev);
+> > > +   int i;
+> > > +
+> > > +   of_dma_controller_free(pdev->dev.of_node);
+> > > +   dma_async_device_unregister(&xdev->common);
+> > > +
+> > > +   for (i = 0; i < XILINX_DMA_MAX_CHANS_PER_DEVICE; i++)
+> > > +           if (xdev->chan[i])
+> > > +                   xilinx_dma_chan_remove(xdev->chan[i]);
+> > > +
+> > at this point your irq is active and tasklet cna still be scheduled
+> 
+> We are freeing the IRQ and killing the tasklet in the chan_remove API why irq is still active at this point of time?
+I missed this  bit, if you are freeing irq explcitly then it should be okay
+
+> I didn't get you.
+> Could you please explain a bit?
+
+-- 
+~Vinod
