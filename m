@@ -1,80 +1,50 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 24 Mar 2015 10:02:32 +0100
-Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-In-Reply-To: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-References: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-Message-ID: <55112828.3010806@samsung.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 24 Mar 2015 10:03:55 +0100
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable HDMI support
+In-Reply-To: <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
+References: <1423244567-24463-1-git-send-email-javier.martinez@collabora.co.uk>
+ <CABxcv=mMD=X=EKOC2sGXcDwMeOmoO6cmVAu=roV_AVqUwG+pXg@mail.gmail.com>
+Message-ID: <CABxcv==Ko2PUfwuo8D2JDL4iR4+VGvewQpR_RDh9pB4Qbg5c=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello Kukjin,
 
-On 2015-03-23 08:27, Tomasz Figa wrote:
-> IOMMU should be able to use single pages as well as bigger blocks, so if
-> higher order allocations fail, we should not affect state of the system,
-> with events such as OOM killer, but rather fall back to order 0
-> allocations.
+On Tue, Mar 17, 2015 at 7:54 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> On Fri, Feb 6, 2015 at 6:42 PM, Javier Martinez Canillas
+> <javier.martinez@collabora.co.uk> wrote:
+>> Many Exynos boards have an HDMI port so enable Exynos DRM HDMI support.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> ---
+>>
+>> Exynos DRM HDMI has some issues that were fixed by Andrzej's [0] series.
+>> So now is safe to HDMI support for Exynos boards.
+>>
+>> [0]: https://lkml.org/lkml/2015/2/5/265
+>>
+>>  arch/arm/configs/exynos_defconfig | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+>> index 70e5d0bdb4e4..e44da52e5223 100644
+>> --- a/arch/arm/configs/exynos_defconfig
+>> +++ b/arch/arm/configs/exynos_defconfig
+>> @@ -120,6 +120,7 @@ CONFIG_REGULATOR_S2MPS11=y
+>>  CONFIG_REGULATOR_S5M8767=y
+>>  CONFIG_REGULATOR_TPS65090=y
+>>  CONFIG_DRM=y
+>> +CONFIG_DRM_EXYNOS_HDMI=y
+>>  CONFIG_DRM_BRIDGE=y
+>>  CONFIG_DRM_PTN3460=y
+>>  CONFIG_DRM_PS8622=y
+>> --
 >
-> This patch changes the behavior of ARM IOMMU DMA allocator to use
-> __GFP_NORETRY, which bypasses OOM invocation, for orders higher than
-> zero and, only if that fails, fall back to normal order 0 allocation
-> which might invoke OOM killer.
+> It seems you missed this patch when picking the exynos_defconfig patches.
 >
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Another gentle reminder about this patch.
 
-> ---
->   arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
->   1 file changed, 21 insertions(+), 6 deletions(-)
->
-> Changes since v1:
-> (https://patchwork.kernel.org/patch/6015921/)
->   - do not clear __GFP_NORETRY, as it might come from the caller,
->   - s/positive order/order higher than 0/.
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 83cd5ac..3f1ac51 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1150,13 +1150,28 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->   	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
->   
->   	while (count) {
-> -		int j, order = __fls(count);
-> +		int j, order;
-> +
-> +		for (order = __fls(count); order > 0; --order) {
-> +			/*
-> +			 * We do not want OOM killer to be invoked as long
-> +			 * as we can fall back to single pages, so we force
-> +			 * __GFP_NORETRY for orders higher than zero.
-> +			 */
-> +			pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
-> +			if (pages[i])
-> +				break;
-> +		}
->   
-> -		pages[i] = alloc_pages(gfp, order);
-> -		while (!pages[i] && order)
-> -			pages[i] = alloc_pages(gfp, --order);
-> -		if (!pages[i])
-> -			goto error;
-> +		if (!pages[i]) {
-> +			/*
-> +			 * Fall back to single page allocation.
-> +			 * Might invoke OOM killer as last resort.
-> +			 */
-> +			pages[i] = alloc_pages(gfp, 0);
-> +			if (!pages[i])
-> +				goto error;
-> +		}
->   
->   		if (order) {
->   			split_page(pages[i], order);
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Best regards,
+Javier
