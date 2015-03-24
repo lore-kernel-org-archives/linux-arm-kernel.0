@@ -1,73 +1,119 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 24 Mar 2015 22:02:56 +0800
-Subject: [patch v11 23/23] ARM64 / ACPI: Don't unflatten device tree if
- acpi=force is passed
-In-Reply-To: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1427205776-5060-24-git-send-email-hanjun.guo@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 24 Mar 2015 15:09:07 +0100
+Subject: [PATCH 2/2] ARM: dts: imx25-karo-tx25: Fix pincontrol definition
+In-Reply-To: <1427206147-19365-1-git-send-email-mpa@pengutronix.de>
+References: <1427206147-19365-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1427206147-19365-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the policy is that once we pass acpi=force in the early
-param, we will not unflatten device tree even if ACPI is disabled
-in ACPI table init fails, so fix the code by comparinging both
-acpi_disabled and param_acpi_force before the device tree is
-unflattened.
+The iomux group nodes have to be in a pinmux category as described in
+the devicetree binding documentation example. The current definitions
+are not parsed by imx25-pinctrl.
 
-CC: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm64/include/asm/acpi.h | 3 +++
- arch/arm64/kernel/acpi.c      | 2 +-
- arch/arm64/kernel/setup.c     | 2 +-
- 3 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx25-karo-tx25.dts | 84 +++++++++++++++++++----------------
+ 1 file changed, 45 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 59c05d8..e1a8965 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -38,6 +38,7 @@ typedef u64 phys_cpuid_t;
- extern int acpi_disabled;
- extern int acpi_noirq;
- extern int acpi_pci_disabled;
-+extern bool param_acpi_force;
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index 9b31faa96377..11344fb27727 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -42,49 +42,55 @@
+ };
  
- /* 1 to indicate PSCI 0.2+ is implemented */
- static inline bool acpi_psci_present(void)
-@@ -91,6 +92,8 @@ void __init acpi_init_cpus(void);
- static inline bool acpi_psci_present(void) { return false; }
- static inline bool acpi_psci_use_hvc(void) { return false; }
- static inline void acpi_init_cpus(void) { }
-+
-+#define param_acpi_force false
- #endif /* CONFIG_ACPI */
+ &iomuxc {
+-	pinctrl_uart1: uart1grp {
+-		fsl,pins = <
+-			MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
+-			MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
+-			MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
+-			MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
+-		>;
++	uart1 {
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
++				MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
++				MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
++				MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
++			>;
++		};
+ 	};
  
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 5819ef7..fe9d8f0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -43,7 +43,7 @@ static int enabled_cpus;
- static bool bootcpu_valid  __initdata;
+-	pinctrl_fec: fecgrp {
+-		fsl,pins = <
+-			MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
+-			MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
+-			MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
+-			MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
+-			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
+-			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
+-			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
+-			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
+-			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
+-			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
+-			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
+-		>;
++	fec {
++		pinctrl_fec: fecgrp {
++			fsl,pins = <
++				MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
++				MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
++				MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
++				MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
++				MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
++				MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
++				MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
++				MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
++				MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
++				MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
++				MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
++			>;
++		};
+ 	};
  
- static bool param_acpi_off __initdata;
--static bool param_acpi_force __initdata;
-+bool param_acpi_force __initdata;
+-	pinctrl_nfc: nfcgrp {
+-		fsl,pins = <
+-			MX25_PAD_NF_CE0__NF_CE0		0x80000000
+-			MX25_PAD_NFWE_B__NFWE_B		0x80000000
+-			MX25_PAD_NFRE_B__NFRE_B		0x80000000
+-			MX25_PAD_NFALE__NFALE		0x80000000
+-			MX25_PAD_NFCLE__NFCLE		0x80000000
+-			MX25_PAD_NFWP_B__NFWP_B		0x80000000
+-			MX25_PAD_NFRB__NFRB		0x80000000
+-			MX25_PAD_D7__D7			0x80000000
+-			MX25_PAD_D6__D6			0x80000000
+-			MX25_PAD_D5__D5			0x80000000
+-			MX25_PAD_D4__D4			0x80000000
+-			MX25_PAD_D3__D3			0x80000000
+-			MX25_PAD_D2__D2			0x80000000
+-			MX25_PAD_D1__D1			0x80000000
+-			MX25_PAD_D0__D0			0x80000000
+-		>;
++	nfc {
++		pinctrl_nfc: nfcgrp {
++			fsl,pins = <
++				MX25_PAD_NF_CE0__NF_CE0		0x80000000
++				MX25_PAD_NFWE_B__NFWE_B		0x80000000
++				MX25_PAD_NFRE_B__NFRE_B		0x80000000
++				MX25_PAD_NFALE__NFALE		0x80000000
++				MX25_PAD_NFCLE__NFCLE		0x80000000
++				MX25_PAD_NFWP_B__NFWP_B		0x80000000
++				MX25_PAD_NFRB__NFRB		0x80000000
++				MX25_PAD_D7__D7			0x80000000
++				MX25_PAD_D6__D6			0x80000000
++				MX25_PAD_D5__D5			0x80000000
++				MX25_PAD_D4__D4			0x80000000
++				MX25_PAD_D3__D3			0x80000000
++				MX25_PAD_D2__D2			0x80000000
++				MX25_PAD_D1__D1			0x80000000
++				MX25_PAD_D0__D0			0x80000000
++			>;
++		};
+ 	};
+ };
  
- static int __init parse_acpi(char *arg)
- {
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index b278311..d60b1ad 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -390,7 +390,7 @@ void __init setup_arch(char **cmdline_p)
- 
- 	early_ioremap_reset();
- 
--	if (acpi_disabled) {
-+	if (acpi_disabled  && !param_acpi_force) {
- 		unflatten_device_tree();
- 		psci_dt_init();
- 		cpu_read_bootcpu_ops();
 -- 
-1.9.1
+2.1.4
