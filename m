@@ -1,60 +1,38 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 24 Mar 2015 18:45:03 +0100
-Subject: [PATCH v3] input: Add support for ChipOne icn8318 based
- touchscreens
-In-Reply-To: <20150322224214.GA9792@dtor-ws>
-References: <1426007133-9606-1-git-send-email-hdegoede@redhat.com>
- <20150322040305.GA40622@dtor-ws> <550EA0E7.30608@redhat.com>
- <20150322224214.GA9792@dtor-ws>
-Message-ID: <5511A29F.1010404@redhat.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Mar 2015 18:48:07 +0100
+Subject: [PATCH] ARM: kvm: assert on HYP section boundaries not actual code
+ size
+Message-ID: <1427219287-21586-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Using ASSERT() with an expression that involves a symbol that
+is only supplied through a PROVIDE() definition in the linker
+script itself is apparently not supported by some older versions
+of binutils.
 
-On 03/22/2015 11:42 PM, Dmitry Torokhov wrote:
-> On Sun, Mar 22, 2015 at 12:00:55PM +0100, Hans de Goede wrote:
->> Hi,
->>
->> On 22-03-15 05:03, Dmitry Torokhov wrote:
->>> Hi Hans,
->>>
->>> On Tue, Mar 10, 2015 at 06:05:33PM +0100, Hans de Goede wrote:
->>>> +	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq,
->>>> +					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
->>>
->>> Shouldn't we let DT data tell us what trigger to use? I.e. just leave
->>> IRQF_ONESHOT here?
->>
->> That is an interesting question, that new data is available is signalled by
->> the irq pin of the chip going low is a property of the chip, not the board
->> layout, so I believe it is best to leave this as is.
->
-> My concern is that even if pin behavior is property of chip maybe on
-> some boards we want to use level-triggered interrupts instead of edge?
-> And if we indeed want to hard-code the trigger then shouldn't the
-> binding document use onecell mapping (so that users do not attempt to
-> configure triggers from DT)?
+So instead, rewrite the expression so that only the section
+boundaries __hyp_idmap_text_start and __hyp_idmap_text_end
+are used. Note that this reverts the fix in 06f75a1f6200
+("ARM, arm64: kvm: get rid of the bounce page") for the ASSERT()
+being triggered erroneously when unrelated linker emitted veneers
+happen to end up in the HYP idmap region.
 
-The number of irq cells is specified by the interrupt controller driver
-rather then by the device binding.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/vmlinux.lds.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->
->>
->> Also note that if we want to get this from devicetree, that simply leaving out the
->> flag is not enough, we must specifically get the data from devicetree and pass
->> it into request_irq AFAICT. So the above would change to:
->>
->> 	irqflags = irqd_get_trigger_type(irq_get_irq_data(client->irq)) | IRQF_ONESHOT,
->> 	error = devm_request_threaded_irq(dev, client->irq, NULL, icn8318_irq, irqflags,
->
-> No, of_irq_get() that i2c core calls before probing driver should
-> already set the trigger type for us. There is no need for the individual
-> drivers to do that.
-
-Ah I see, ok I've just tested removing the IRQF_TRIGGER_FALLING flag and indeed
-things still work fine, so feel free to merge this patch with that flagged dropped.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index 2d760df0d57d..808398ec024e 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -381,5 +381,5 @@ ASSERT((__arch_info_end - __arch_info_begin), "no machine record defined")
+  * and should not cross a page boundary.
+  * The above comment applies as well.
+  */
+-ASSERT((__hyp_idmap_text_start & ~PAGE_MASK) + __hyp_idmap_size <= PAGE_SIZE,
++ASSERT(__hyp_idmap_text_end - (__hyp_idmap_text_start & PAGE_MASK) <= PAGE_SIZE,
+ 	"HYP init code too big or misaligned")
+-- 
+1.8.3.2
