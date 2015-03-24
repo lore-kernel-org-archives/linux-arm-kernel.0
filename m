@@ -1,74 +1,57 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 24 Mar 2015 08:40:13 +0530
-Subject: [PATCH v3 1/6] clk: qcom: Add support for GDSCs
-In-Reply-To: <20150323232335.GA24757@codeaurora.org>
-References: <1426832483-27026-1-git-send-email-rnayak@codeaurora.org>
- <1426832483-27026-2-git-send-email-rnayak@codeaurora.org>
- <550BCE7C.3030000@linaro.org> <550BED93.3000305@codeaurora.org>
- <550BEFE0.1020004@codeaurora.org> <20150323232335.GA24757@codeaurora.org>
-Message-ID: <5510D595.4070008@codeaurora.org>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Tue, 24 Mar 2015 11:33:58 +0800
+Subject: [PATCH v8 04/30] PCI: Move pci_bus_assign_domain_nr() declaration
+ into drivers/pci/pci.h
+In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
+References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-5-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2015 04:53 AM, Stephen Boyd wrote:
-> On 03/20, Rajendra Nayak wrote:
->> []...
->>>>> @@ -0,0 +1,46 @@
->>>>> +/*
->>>>> + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 and
->>>>> + * only version 2 as published by the Free Software Foundation.
->>>>> + *
->>>>> + * This program is distributed in the hope that it will be useful,
->>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>> + * GNU General Public License for more details.
->>>>> + */
->>>>> +
->>>>> +#ifndef __QCOM_GDSC_H__
->>>>> +#define __QCOM_GDSC_H__
->>>>> +
->>>>> +#include <linux/pm_domain.h>
->>>>> +
->>>>> +struct regmap;
->>
->> I realized, after Srini pointed out on irc that this fwd declaration
->> is a complete waste. I'll remove it when I do a repost.
->>
->
-> Why? It's there so that struct regmap is declared instead of
-> being declared inside struct gdsc.
+pci_bus_assign_domain_nr() is only called in probe.c,
+Move pci_bus_assign_domain_nr() declaration into
+drivers/pci/pci.h.
 
-ah, sorry. I completely overlooked the fact that there isn;t a
-#include <linux/regmap.h>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+---
+ drivers/pci/pci.h   |    9 +++++++++
+ include/linux/pci.h |    6 ------
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
->
->>>>> +
->>>>> +/**
->>>>> + * struct gdsc - Globally Distributed Switch Controller
->>>>> + * @pd: generic power domain
->>>>> + * @regmap: regmap for MMIO accesses
->>>>> + * @gdscr: gsdc control register
->>>>> + */
->>>>> +struct gdsc {
->>>>> +    struct generic_pm_domain    pd;
->>>>> +    struct regmap            *regmap;
->>>>> +    unsigned int            gdscr;
->>>>> +};
->>>>> +
->>>>> +#define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
->>>>> +
->>>>> +#ifdef CONFIG_QCOM_GDSC
->>>>> +int gdsc_register(struct device *, struct gdsc **, size_t n, struct
->>>>> regmap *);
->>>>> +void gdsc_unregister(struct device *);
->>>>> +#else
->>>>> +int gdsc_register(struct device *d, struct gdsc **g, size_t n, struct
->>>>> regmap *r)
->
-
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index 4091f82..ba1bcce 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -321,4 +321,13 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
+ }
+ #endif
+ 
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
++#else
++static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
++					struct device *parent)
++{
++}
++#endif
++
+ #endif /* DRIVERS_PCI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 2b575bc..1542df8 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1327,12 +1327,6 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+ {
+ 	return bus->domain_nr;
+ }
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+-#else
+-static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+-					struct device *parent)
+-{
+-}
+ #endif
+ 
+ /* some architectures require additional setup to direct VGA traffic */
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.1
