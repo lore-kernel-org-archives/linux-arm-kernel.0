@@ -1,65 +1,80 @@
-From: jhautbois@gmail.com (Jean-Michel Hautbois)
-Date: Tue, 24 Mar 2015 13:52:56 +0100
-Subject: i.MX6 : all interrupts are only on the first CPU
-Message-ID: <CAL8zT=gniU_J-7gVHa3C+FJU_CCMkbiK77-+57vTUjCXQt+KHQ@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 24 Mar 2015 12:53:41 +0000
+Subject: [Linux-kernel] [PATCH 12/13] mmc: atmel-mci: use endian agnostic
+ IO
+In-Reply-To: <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>	
+ <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
+ <1426774966.22122.47.camel@xylophone.i.decadent.org.uk>
+Message-ID: <55115E55.4090409@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 19/03/15 14:22, Ben Hutchings wrote:
+> On Wed, 2015-03-18 at 15:53 +0000, Ben Dooks wrote:
+>> Change the __raw IO functions to endian agnostic relaxed ones to allow
+>> the driver to function on big endian ARM systems.
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>> --
+>> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> CC: Chris Ball <chris@printf.net>
+>> CC: Ulf Hansson <ulf.hansson@linaro.org>
+>> CC: linux-mmc at vger.kernel.org
+>> ---
+>>  drivers/mmc/host/atmel-mci-regs.h | 9 ++++++++-
+>>  1 file changed, 8 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+>> index c97001e..711bb53 100644
+>> --- a/drivers/mmc/host/atmel-mci-regs.h
+>> +++ b/drivers/mmc/host/atmel-mci-regs.h
+>> @@ -135,10 +135,17 @@
+>>  #define ATMCI_REGS_SIZE		0x100
+>>  
+>>  /* Register access macros */
+>> -#define atmci_readl(port,reg)				\
+>> +#ifdef CONFIG_AVR32
+>> +#define atmci_readl(port,reg)			\
+>>  	__raw_readl((port)->regs + reg)
+>>  #define atmci_writel(port,reg,value)			\
+>>  	__raw_writel((value), (port)->regs + reg)
+>> +#else
+>> +#define atmci_readl(port,reg)			\
+>> +	readl_relaxed((port)->regs + reg)
+>> +#define atmci_writel(port,reg,value)			\
+>> +	writel_relaxed((value), (port)->regs + reg)
+>> +#endif
+> 
+> This pattern is repeated in a lot of drivers; is it worth defining
+> atmel_{read,write}l_relaxed() in a common header?
+> 
+> #ifdef CONFIG_AVR32
+> 
+> /* CPU and peripherals are both big-endian, so don't byte-swap */
+> #define atmel_readl_relaxed(addr)		__raw_readl(addr)
+> #define atmel_writel_relaxed(value, addr)	__raw_writel(value, addr)
+> 
+> #else
+> 
+> /* Peripherals are little-endian, so byte-swap if CPU isn't */
+> #define atmel_readl_relaxed(addr)		readl_relaxed(addr)
+> #define atmel_writel_relaxed(value, addr)	writel_relaxed(value, addr)
+> 
+> #endif
+> 
+> Ben.
 
-It seems to be a dumb question, but couldn't find a correct answer
-right now... so asking seems to be the best option I have.
+Hi, I think it will probably be a good idea to have an avr32/at91
+read/write functions however I will put this forward as a separate
+series as it will require both avr32 and at91 maintainers as well
+as driver updates.
 
-I am currently running a 4.0-rc1 on a custom board, and I am observing
-something strange, don't know if it is a known fact : all interrupts
-are fired on the same CPU :
+how about:
+	atmel_readl_onchip{b,w,l}
+	atmel_writel_onchip{b,w,l}
 
-$> cat /proc/interrupts
-           CPU0       CPU1
- 16:    1071807     986017       GIC  29  twd
- 17:          0          0       GIC  87  i.MX Timer Tick
- 21:         24          0       GIC  65  2010000.ecspi
- 22:        193          0       GIC  58  2020000.serial
- 23:          0          0       GIC  78  2028000.ssi
- 24:          0          0       GIC  79  202c000.ssi
- 25:      17498          0       GIC  44  2040000.vpu
-141:         55          0  gpio-mxc   6  adv7604
-142:          0          0  gpio-mxc   7  adv7604
-283:          0          0       GIC 147  120000.hdmi
-284:          4          0       GIC  34  sdma
-285:        252          0       GIC  72  2184200.usb
-286:     195877          0       GIC 150  2188000.ethernet
-287:          0          0       GIC 151  2188000.ethernet
-288:      31928          0       GIC  56  mmc0
-289:        440          0       GIC  57  mmc1
-290:     204780          0       GIC  69  21a4000.i2c
-291:          0          0       GIC  70  21a8000.i2c
-295:       1842          0       GIC  71  2200000.sata
-298:          0          0       IPU 457  (null)
-299:          0          0       IPU 451  (null)
-300:          0          0       IPU 457  (null)
-301:          0          0       IPU 451  (null)
-302:          0          0       IPU  23  imx_drm
-303:          0          0       IPU  28  imx_drm
-304:          0          0       IPU  23  imx_drm
-305:          0          0       IPU  28  imx_drm
-306:       1941          0       IPU 128
-307:      52779          0       IPU   0
-308:      45126          0       IPU  22
-IPI0:          0          0  CPU wakeup interrupts
-IPI1:          0          0  Timer broadcast interrupts
-IPI2:      49619     108339  Rescheduling interrupts
-IPI3:          0          0  Function call interrupts
-IPI4:         59        956  Single function call interrupts
-IPI5:          0          0  CPU stop interrupts
-IPI6:       1347          0  IRQ work interrupts
-IPI7:          0          0  completion interrupts
 
-/proc/irq/default_smp_affinity -> 3
-
-So, it should balance a bit between both CPUs, or am I
-misunderstanding something ?
-Maybe a configuration issue ?
-
-Thanks,
-JM
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
