@@ -1,63 +1,112 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:33:56 +0800
-Subject: [PATCH v8 02/30] PCI: Remove deprecated pci_scan_bus_parented()
+Date: Tue, 24 Mar 2015 11:34:24 +0800
+Subject: [PATCH v8 30/30] PCI: Clean up CONFIG_PCI_DOMAINS_GENERIC
 In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
 References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-3-git-send-email-wangyijing@huawei.com>
+Message-ID: <1427168064-8657-31-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No one uses pci_scan_bus_parented() any more,
-remove it.
+Now we could clean up CONFIG_PCI_DOMAINS_GENERIC.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/probe.c |   19 -------------------
- include/linux/pci.h |    2 --
- 2 files changed, 0 insertions(+), 21 deletions(-)
+ arch/arm/Kconfig          |    3 ---
+ arch/arm64/Kconfig        |    3 ---
+ drivers/pci/host-bridge.c |   11 ++++++-----
+ drivers/pci/pci.c         |    2 --
+ 4 files changed, 6 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 8ef0375..699a238 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2091,25 +2091,6 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- }
- EXPORT_SYMBOL(pci_scan_root_bus);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a..b5dab6c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1283,9 +1283,6 @@ config PCI_DOMAINS
+ 	bool
+ 	depends on PCI
  
--/* Deprecated; use pci_scan_root_bus() instead */
--struct pci_bus *pci_scan_bus_parented(struct device *parent,
--		int bus, struct pci_ops *ops, void *sysdata)
--{
--	LIST_HEAD(resources);
--	struct pci_bus *b;
+-config PCI_DOMAINS_GENERIC
+-	def_bool PCI_DOMAINS
 -
--	pci_add_resource(&resources, &ioport_resource);
--	pci_add_resource(&resources, &iomem_resource);
--	pci_add_resource(&resources, &busn_resource);
--	b = pci_create_root_bus(parent, bus, ops, sysdata, &resources);
--	if (b)
--		pci_scan_child_bus(b);
--	else
--		pci_free_resource_list(&resources);
--	return b;
--}
--EXPORT_SYMBOL(pci_scan_bus_parented);
+ config PCI_NANOENGINE
+ 	bool "BSE nanoEngine PCI support"
+ 	depends on SA1100_NANOENGINE
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1b8e973..4b1cc27 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -242,9 +242,6 @@ config PCI
+ config PCI_DOMAINS
+ 	def_bool PCI
+ 
+-config PCI_DOMAINS_GENERIC
+-	def_bool PCI
 -
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
- 					void *sysdata)
+ config PCI_SYSCALL
+ 	def_bool PCI
+ 
+diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
+index c78f4d0..18a0f6c 100644
+--- a/drivers/pci/host-bridge.c
++++ b/drivers/pci/host-bridge.c
+@@ -4,6 +4,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
++#include <linux/of_pci.h>
++#include <linux/of.h>
+ #include <linux/module.h>
+ 
+ #include "pci.h"
+@@ -82,12 +84,13 @@ struct pci_host_bridge *pci_create_host_bridge(
+ 	resource_list_for_each_entry_safe(window, n, resources)
+ 		list_move_tail(&window->node, &host->windows);
+ 	/*
+-	 * If support CONFIG_PCI_DOMAINS_GENERIC, use
++	 * If domain == -1, we need to use
+ 	 * pci_host_assign_domain_nr() to update domain
+ 	 * number.
+ 	 */
+ 	host->domain = domain;
+-	pci_host_assign_domain_nr(host);
++	if (host->domain == -1)
++		pci_host_assign_domain_nr(host);
+ 	mutex_lock(&pci_host_mutex);
+ 	list_for_each_entry(tmp, &pci_host_bridge_list, list) {
+ 		if (tmp->domain != host->domain
+@@ -169,7 +172,6 @@ int pci_get_new_domain_nr(void)
+ 	return atomic_inc_return(&__domain_nr);
+ }
+ 
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+ static int pci_assign_domain_nr(struct device *dev)
  {
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 211e9da..36effb8 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -769,8 +769,6 @@ void pcibios_bus_to_resource(struct pci_bus *bus, struct resource *res,
- void pcibios_scan_specific_bus(int busn);
- struct pci_bus *pci_find_bus(int domain, int busnr);
- void pci_bus_add_devices(const struct pci_bus *bus);
--struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus,
--				      struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 				    struct pci_ops *ops, void *sysdata,
+ 	static int use_dt_domains = -1;
+@@ -215,11 +217,10 @@ static int pci_assign_domain_nr(struct device *dev)
+ 	return domain;
+ }
+ #endif
+-#endif
+ 
+ void pci_host_assign_domain_nr(struct pci_host_bridge *host)
+ {
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
++#ifdef CONFIG_PCI_DOMAINS
+ 	host->domain = pci_assign_domain_nr(host->dev.parent);
+ #endif
+ }
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 044801c..5b18429 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -10,8 +10,6 @@
+ #include <linux/kernel.h>
+ #include <linux/delay.h>
+ #include <linux/init.h>
+-#include <linux/of.h>
+-#include <linux/of_pci.h>
+ #include <linux/pci.h>
+ #include <linux/pm.h>
+ #include <linux/slab.h>
 -- 
 1.7.1
