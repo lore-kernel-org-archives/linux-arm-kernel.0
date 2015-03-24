@@ -1,36 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Mar 2015 01:22:08 +0800
-Subject: [PATCH v2 2/3] clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
-In-Reply-To: <1427217729-10017-1-git-send-email-wens@csie.org>
-References: <1427217729-10017-1-git-send-email-wens@csie.org>
-Message-ID: <1427217729-10017-3-git-send-email-wens@csie.org>
+Date: Wed, 25 Mar 2015 01:22:06 +0800
+Subject: [PATCH v2 0/3] clk: sunxi: Add muxable AHB clock to fix hstimer issues
+Message-ID: <1427217729-10017-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pll6 has a /4 output that is used as an input to the ahb mux clock.
+Hi everyone,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/clk/sunxi/clk-sunxi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This is v2 of the sun5i muxable AHB clock series.
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 9f31314a9cd7..7e1e2bd189b6 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1088,11 +1088,12 @@ static const struct divs_data pll5_divs_data __initconst = {
- 
- static const struct divs_data pll6_divs_data __initconst = {
- 	.factors = &sun4i_pll6_data,
--	.ndivs = 3,
-+	.ndivs = 4,
- 	.div = {
- 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
- 		{ .fixed = 2 }, /* P, other */
- 		{ .self = 1 }, /* base factor clock, 2x */
-+		{ .fixed = 4 }, /* pll6 / 4, used as ahb input */
- 	}
- };
- 
+Changes since v1:
+
+  - Dropped patches 1~3 that are merged
+  - Extend comments to clarify what the "base factor clock" refers to,
+    and what the divs clocks outputs should be.
+
+
+This series adds support for the muxable ahb clock on sun5/7i. The mux
+has inputs such as the axi clock, the cpu clock on sun5i, and pll6 with
+various dividers. The goal is to have ahb muxed to pll6, which should
+be a fixed rate albeit configurable clock. This fixes issues with
+cpufreq changing the cpu frequency, which would affect the hstimer
+clocked from ahb.
+
+Patch 1 makes divs clocks explicitly specify in the driver which output
+is the base factor clock, instead of always putting it in last. This is
+done to ensure DT bindings compatibility when we add outputs.
+
+Patch 2 adds the new pll6/4 output, which is used on sun7i as an input
+to ahb mux.
+
+Patch 3 updates the dtsi files with the new drivers.
+
+The series is also available at
+
+    https://github.com/wens/linux/commits/sun5i-ahb-v2
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (3):
+  clk: sunxi: Make divs clocks specify which output is the base factor
+    clock
+  clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
+  ARM: dts: sunxi: Update ahb clocks for sun5i and sun7i
+
+ arch/arm/boot/dts/sun5i.dtsi     | 10 ++++++++--
+ arch/arm/boot/dts/sun7i-a20.dtsi | 13 ++++++++++---
+ drivers/clk/sunxi/clk-sunxi.c    | 38 ++++++++++++++++++++++++++------------
+ 3 files changed, 44 insertions(+), 17 deletions(-)
+
 -- 
 2.1.4
