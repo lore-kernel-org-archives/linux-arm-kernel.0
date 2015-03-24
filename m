@@ -1,27 +1,70 @@
-From: edgar.iglesias@gmail.com (Edgar E. Iglesias)
-Date: Tue, 24 Mar 2015 14:37:49 +1000
-Subject: RPmsg, DMA and ARM64
-Message-ID: <20150324043749.GJ23658@toto>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 Mar 2015 06:17:29 +0100
+Subject: [PATCH 0/5] Driver for pxa architectures
+In-Reply-To: <878uen78u5.fsf@free.fr>
+References: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
+ <201503231604.44551.arnd@arndb.de> <878uen78u5.fsf@free.fr>
+Message-ID: <201503240617.29810.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 23 March 2015, Robert Jarzmik wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> ... removed people not concerned by pxa story ...
+> 
+> >> As for XIP support, I don't have a clear view if it's a requirement for
+> >> multiplatform nor if it works in these builds.
+> >
+> > It would be nice to not have to support both options: if we put pxa into
+> > ARCH_MULTIPLATFORM, I'd like to remove the existing entry from the choice
+> > statement at the same time.
+> Ah I wasn't aware of that ... that will deserve some thought from me ...
 
-I'm trying to run rpmsg and remoteproc on the ZynqMP but hitting an mm error.
-I'm not sure who is breaking the rules, rpmsg or the dma allocators?
+It's not 100% required, but it's what we ended up doing on all other
+platforms.
 
-When rpmsg sets up the virtqueues, it allocates memory with
-dma_alloc_coherent() and initializes a scatterlist with sg_init_one().
-drivers/rpmsg/virtio_rpmsg_bus.c:rpmsg_probe().
-sg_init_one() requires that the memory it gets is virt_addr_valid().
+> >> > I think all of them are theoretically doable, but I wasn't expecting
+> >> > to ever get there.
+> >> Well, that makes me a goal to reach, doesn't it ? I'll stick to optimism here,
+> >> and we'll see within a year how far I manage to go :)
+> >
+> > Fair enough. Any work you do on this is highly appreciated anyway,
+> > regardless of whether you complete it or not. BTW, one thought I had
+> > a while ago was that we can move support for any PXA machines that are
+> > DT enabled into mach-mmp, which hopefully will be fully DT-only and
+> > multiplatform enabled at some point, and we can keep mach-pxa for the
+> > legacy board files if you don't succeed in converting them all.
+> 
+> Actually, this deserves another discussion alltogether. My plan was not to
+> convert all pxa board files to dt support, but all internal SoC IPs drivers +
+> mach/plat support.
+> 
+> Or put another way at the end :
+>  - there will be at least one pxa25x board which is fully DT converted
+>  - there will be at least one pxa27x board which is fully DT converted
+>  - there will be at least one pxa3xx board which is fully DT converted
+> 
+>  - there will be at least one pxa25x board which is not DT converted
+>  - there will be at least one pxa27x board which is not DT converted
+>  - there will be at least one pxa3xx board which is not DT converted
+> 
+> I want to keep the support for both legacy platform_data and DT for pxa
+> architecture. The idea I had was that only fully DT converted machines will
+> benefit from multiplatform support.
 
-The problem I'm seeing is that on arm64, the dma alloc functions can
-return vmalloced (via dma_common_contiguous_remap) memory. This
-then causes havoc when the scatterlist code tries to go virt_to_page
-and back to get hold of a physical adress (sg_phys()).
+I see. On other platforms, we also have board files that are not DT
+but are included in multiplatform. I don't see anything wrong in general.
 
-I couldn't find a definitive answer in the docs, is the arm64 DMA code
-doing the right here when returning vmalloced memory?
+The more important question is whether you want to keep having a single
+kernel capable of running on all PXA machines (DT and ATAGS), while also
+doing a subset of PXA that can be multiplatform with other ARMv5 targets
+like pxa168 (MMP) but excluding the rest of PXA.
 
-Cheers,
-Edgar
+> As for mach-mmp, I don't see how this could work, as there are architecture
+> specific parts that will probably remain, such as the suspend to RAM code
+> (arch/arm/mach-pxa/sleep.S). This might be doable, even if I don't see how.
+
+Those parts could be moved to plat-pxa.
+
+	Arnd
