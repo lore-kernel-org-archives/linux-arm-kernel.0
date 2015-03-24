@@ -1,43 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 Mar 2015 18:16:54 +0000
-Subject: [GIT PULL] arm64 fixes for 4.0-rc6
-Message-ID: <20150324181408.GA2694@e104818-lin.cambridge.arm.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Tue, 24 Mar 2015 18:17:59 +0000
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <CAKv+Gu-LL5JzALPqPnxdVqQ7HUwnJZQ3=GzPk_h1KSUJp2SVAw@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150324122702.GJ14457@ns203013.ovh.net>
+ <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
+ <20150324130511.GK14457@ns203013.ovh.net>
+ <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+ <20150324170543.GL14457@ns203013.ovh.net>
+ <CAKv+Gu-LL5JzALPqPnxdVqQ7HUwnJZQ3=GzPk_h1KSUJp2SVAw@mail.gmail.com>
+Message-ID: <20150324181759.GA2156@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Mar 24, 2015 at 06:40:29PM +0100, Ard Biesheuvel wrote:
+> @Sami, Andy: we need to respin the whole patch, including updated
+> OpenSSL upstream commit id :-(
 
-Please pull the arm64 fixes below. Thanks.
+Sure, I will send v3 once the changes are in OpenSSL. Thanks for testing!
+Do you still prefer everything in one patch?
 
-The following changes since commit bc465aa9d045feb0e13b4a8f32cc33c1943f62d6:
-
-  Linux 4.0-rc5 (2015-03-22 16:50:21 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to f3eab7184ddcd4867cf42e3274ba24a66e1e093d:
-
-  arm64: percpu: Make this_cpu accessors pre-empt safe (2015-03-24 18:02:55 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-- switch_mm() fix where init_mm.pgd ends up in the user TTBR0;
-  swapper_pg_dir is not suitable for user mappings
-- this_cpu accessors fix for preemption safety
-
-----------------------------------------------------------------
-Catalin Marinas (1):
-      arm64: Use the reserved TTBR0 if context switching to the init_mm
-
-Steve Capper (1):
-      arm64: percpu: Make this_cpu accessors pre-empt safe
-
- arch/arm64/include/asm/cmpxchg.h     | 32 +++++++++++++++++++-------
- arch/arm64/include/asm/mmu_context.h |  9 ++++++++
- arch/arm64/include/asm/percpu.h      | 44 +++++++++++++++++++++++++++---------
- 3 files changed, 66 insertions(+), 19 deletions(-)
-
--- 
-Catalin
+Sami
