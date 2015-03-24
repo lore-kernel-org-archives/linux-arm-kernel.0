@@ -1,152 +1,130 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 24 Mar 2015 15:12:22 +0100
-Subject: [PATCH v2] ARM: dts: imx25-pinfunc: Add several pinfunctions
-Message-ID: <1427206342-10672-1-git-send-email-mpa@pengutronix.de>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Tue, 24 Mar 2015 19:54:16 +0530
+Subject: [PATCH v7] ARM: dts: Add HS400 support for exynos5420 and
+ exynos5800
+In-Reply-To: <1426677623-30532-1-git-send-email-alim.akhtar@samsung.com>
+References: <1426677623-30532-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAGOxZ50mcg+ASah5-cm8jY+O+RLJDS8cEJvFPAkMasuq-vcVbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some not yet defined pinfunctions. It also adds two
-comments about mistakes in the i.MX25 reference manual so it is easier
-to spot the difference between reference manual and pinfunction
-definitions.
+Gentle Ping !!
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
-Changes in v2:
- - Rebased onto shawn's imx/dt branch
 
- arch/arm/boot/dts/imx25-pinfunc.h | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+On Wed, Mar 18, 2015 at 4:50 PM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
+> From: Seungwon Jeon <tgih.jun@samsung.com>
+>
+> HS400 timing values are added for SMDK5420, exynos5420-peach-pit
+> and exynos5800-peach-pi boards.
+> This also adds RCLK GPIO line, this gpio should be in pull-down
+> state.
+> This also enables HS400 on peach-pi and this updates the clock frequency
+> to 800MHz to be set as input clock to controller.
+>
+> Signed-off-by: Seungwon Jeon <tgih.jun@samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> [Alim: addressed review comments]
+> Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+> ---
+> Changes in V7:
+>          Add back bus1 pin, which was removed during rebase in v6
+>          as rightly pointed out by Javier[1].
+>
+> Changes in V6:
+>         Rebased on kukjin's for-next branch[0]
+>         (commit: 77105c8 Merge branch 'v4.0-samsung-fixes-2' into for-next)
+>
+> [0]: git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> [1]: http://www.spinics.net/lists/arm-kernel/msg406618.html
+>
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 4 +++-
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi  | 7 +++++++
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts  | 5 ++++-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 7 +++++--
+>  4 files changed, 19 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index 3f4e2fe..0788d08 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -699,8 +699,10 @@
+>         samsung,dw-mshc-ciu-div = <3>;
+>         samsung,dw-mshc-sdr-timing = <0 4>;
+>         samsung,dw-mshc-ddr-timing = <0 2>;
+> +       samsung,dw-mshc-hs400-timing = <0 2>;
+> +       samsung,read-strobe-delay = <90>;
+>         pinctrl-names = "default";
+> -       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>         bus-width = <8>;
+>  };
+>
+> diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> index ba686e4..8b15316 100644
+> --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
+> @@ -201,6 +201,13 @@
+>                         samsung,pin-drv = <3>;
+>                 };
+>
+> +               sd0_rclk: sd0-rclk {
+> +                       samsung,pins = "gpc0-7";
+> +                       samsung,pin-function = <2>;
+> +                       samsung,pin-pud = <1>;
+> +                       samsung,pin-drv = <3>;
+> +               };
+> +
+>                 sd1_cmd: sd1-cmd {
+>                         samsung,pins = "gpc1-1";
+>                         samsung,pin-function = <2>;
+> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> index 7a56852..9103f23 100644
+> --- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+> @@ -80,8 +80,11 @@
+>                 samsung,dw-mshc-ciu-div = <3>;
+>                 samsung,dw-mshc-sdr-timing = <0 4>;
+>                 samsung,dw-mshc-ddr-timing = <0 2>;
+> +               samsung,dw-mshc-hs400-timing = <0 2>;
+> +               samsung,read-strobe-delay = <90>;
+>                 pinctrl-names = "default";
+> -               pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+> +               pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8
+> +                            &sd0_rclk>;
+>                 bus-width = <8>;
+>                 cap-mmc-highspeed;
+>         };
+> diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> index c833bac..412f41d 100644
+> --- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> +++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+> @@ -654,15 +654,18 @@
+>         num-slots = <1>;
+>         broken-cd;
+>         mmc-hs200-1_8v;
+> +       mmc-hs400-1_8v;
+>         cap-mmc-highspeed;
+>         non-removable;
+>         card-detect-delay = <200>;
+> -       clock-frequency = <400000000>;
+> +       clock-frequency = <800000000>;
+>         samsung,dw-mshc-ciu-div = <3>;
+>         samsung,dw-mshc-sdr-timing = <0 4>;
+>         samsung,dw-mshc-ddr-timing = <0 2>;
+> +       samsung,dw-mshc-hs400-timing = <0 2>;
+> +       samsung,read-strobe-delay = <90>;
+>         pinctrl-names = "default";
+> -       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
+> +       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_rclk>;
+>         bus-width = <8>;
+>  };
+>
+> --
+> 1.9.1
+>
 
-diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
-index 58f3ae3544b5..6e0f0f8e2e53 100644
---- a/arch/arm/boot/dts/imx25-pinfunc.h
-+++ b/arch/arm/boot/dts/imx25-pinfunc.h
-@@ -154,20 +154,25 @@
- #define MX25_PAD_D15__D15			0x088 0x280 0x000 0x00 0x000
- #define MX25_PAD_D15__LD16			0x088 0x280 0x000 0x01 0x000
- #define MX25_PAD_D15__GPIO_4_5			0x088 0x280 0x000 0x05 0x000
-+#define MX25_PAD_D15__SDHC1_DAT7		0x088 0x280 0x4d8 0x06 0x000
- 
- #define MX25_PAD_D14__D14			0x08c 0x284 0x000 0x00 0x000
- #define MX25_PAD_D14__LD17			0x08c 0x284 0x000 0x01 0x000
- #define MX25_PAD_D14__GPIO_4_6			0x08c 0x284 0x000 0x05 0x000
-+#define MX25_PAD_D14__SDHC1_DAT6		0x08c 0x284 0x4d4 0x06 0x000
- 
- #define MX25_PAD_D13__D13			0x090 0x288 0x000 0x00 0x000
- #define MX25_PAD_D13__LD18			0x090 0x288 0x000 0x01 0x000
- #define MX25_PAD_D13__GPIO_4_7			0x090 0x288 0x000 0x05 0x000
-+#define MX25_PAD_D13__SDHC1_DAT5		0x090 0x288 0x4d0 0x06 0x000
- 
- #define MX25_PAD_D12__D12			0x094 0x28c 0x000 0x00 0x000
- #define MX25_PAD_D12__GPIO_4_8			0x094 0x28c 0x000 0x05 0x000
-+#define MX25_PAD_D12__SDHC1_DAT4		0x094 0x28c 0x4cc 0x06 0x000
- 
- #define MX25_PAD_D11__D11			0x098 0x290 0x000 0x00 0x000
- #define MX25_PAD_D11__GPIO_4_9			0x098 0x290 0x000 0x05 0x000
-+#define MX25_PAD_D11__USBOTG_PWR		0x098 0x290 0x000 0x06 0x000
- 
- #define MX25_PAD_D10__D10			0x09c 0x294 0x000 0x00 0x000
- #define MX25_PAD_D10__GPIO_4_10			0x09c 0x294 0x000 0x05 0x000
-@@ -233,26 +238,33 @@
- 
- #define MX25_PAD_LD8__LD8			0x0e8 0x2e0 0x000 0x10 0x000
- #define MX25_PAD_LD8__FEC_TX_ERR		0x0e8 0x2e0 0x000 0x15 0x000
-+#define MX25_PAD_LD8__SDHC2_CMD			0x0e8 0x2e0 0x4e0 0x06 0x000
- 
- #define MX25_PAD_LD9__LD9			0x0ec 0x2e4 0x000 0x10 0x000
- #define MX25_PAD_LD9__FEC_COL			0x0ec 0x2e4 0x504 0x15 0x001
-+#define MX25_PAD_LD9__SDHC2_CLK			0x0ec 0x2e4 0x4dc 0x06 0x000
- 
- #define MX25_PAD_LD10__LD10			0x0f0 0x2e8 0x000 0x10 0x000
- #define MX25_PAD_LD10__FEC_RX_ERR		0x0f0 0x2e8 0x518 0x15 0x001
- 
- #define MX25_PAD_LD11__LD11			0x0f4 0x2ec 0x000 0x10 0x000
- #define MX25_PAD_LD11__FEC_RDATA2		0x0f4 0x2ec 0x50c 0x15 0x001
-+#define MX25_PAD_LD11__SDHC2_DAT1		0x0f4 0x2ec 0x4e8 0x06 0x000
- 
- #define MX25_PAD_LD12__LD12			0x0f8 0x2f0 0x000 0x10 0x000
-+#define MX25_PAD_LD12__CSPI2_MOSI		0x0f8 0x2f0 0x4a0 0x02 0x000
- #define MX25_PAD_LD12__FEC_RDATA3		0x0f8 0x2f0 0x510 0x15 0x001
- 
- #define MX25_PAD_LD13__LD13			0x0fc 0x2f4 0x000 0x10 0x000
-+#define MX25_PAD_LD13__CSPI2_MISO		0x0fc 0x2f4 0x49c 0x02 0x000
- #define MX25_PAD_LD13__FEC_TDATA2		0x0fc 0x2f4 0x000 0x15 0x000
- 
- #define MX25_PAD_LD14__LD14			0x100 0x2f8 0x000 0x10 0x000
-+#define MX25_PAD_LD14__CSPI2_SCLK		0x100 0x2f8 0x494 0x02 0x000
- #define MX25_PAD_LD14__FEC_TDATA3		0x100 0x2f8 0x000 0x15 0x000
- 
- #define MX25_PAD_LD15__LD15			0x104 0x2fc 0x000 0x10 0x000
-+#define MX25_PAD_LD15__CSPI2_RDY		0x104 0x2fc 0x498 0x02 0x000
- #define MX25_PAD_LD15__FEC_RX_CLK		0x104 0x2fc 0x514 0x15 0x001
- 
- #define MX25_PAD_HSYNC__HSYNC			0x108 0x300 0x000 0x10 0x000
-@@ -265,6 +277,7 @@
- #define MX25_PAD_LSCLK__GPIO_1_24		0x110 0x308 0x000 0x15 0x000
- 
- #define MX25_PAD_OE_ACD__OE_ACD			0x114 0x30c 0x000 0x10 0x000
-+#define MX25_PAD_OE_ACD__CSPI2_SS0		0x114 0x30c 0x4a4 0x02 0x000
- #define MX25_PAD_OE_ACD__GPIO_1_25		0x114 0x30c 0x000 0x15 0x000
- 
- #define MX25_PAD_CONTRAST__CONTRAST		0x118 0x310 0x000 0x10 0x000
-@@ -278,26 +291,31 @@
- 
- #define MX25_PAD_CSI_D2__CSI_D2			0x120 0x318 0x000 0x10 0x000
- #define MX25_PAD_CSI_D2__UART5_RXD_MUX		0x120 0x318 0x578 0x11 0x001
-+#define MX25_PAD_CSI_D2__SIM1_CLK0		0x120 0x318 0x000 0x04 0x000
- #define MX25_PAD_CSI_D2__GPIO_1_27		0x120 0x318 0x000 0x15 0x000
- #define MX25_PAD_CSI_D2__CSPI3_MOSI		0x120 0x318 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D3__CSI_D3			0x124 0x31c 0x000 0x10 0x000
- #define MX25_PAD_CSI_D3__UART5_TXD_MUX		0x124 0x31c 0x000 0x11 0x000
-+#define MX25_PAD_CSI_D3__SIM1_RST0		0x124 0x31c 0x000 0x04 0x000
- #define MX25_PAD_CSI_D3__GPIO_1_28		0x124 0x31c 0x000 0x15 0x000
- #define MX25_PAD_CSI_D3__CSPI3_MISO		0x124 0x31c 0x4b4 0x17 0x001
- 
- #define MX25_PAD_CSI_D4__CSI_D4			0x128 0x320 0x000 0x10 0x000
- #define MX25_PAD_CSI_D4__UART5_RTS		0x128 0x320 0x574 0x11 0x001
-+#define MX25_PAD_CSI_D4__SIM1_VEN0		0x128 0x320 0x000 0x04 0x000
- #define MX25_PAD_CSI_D4__GPIO_1_29		0x128 0x320 0x000 0x15 0x000
- #define MX25_PAD_CSI_D4__CSPI3_SCLK		0x128 0x320 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D5__CSI_D5			0x12c 0x324 0x000 0x10 0x000
- #define MX25_PAD_CSI_D5__UART5_CTS		0x12c 0x324 0x000 0x11 0x000
-+#define MX25_PAD_CSI_D5__SIM1_TX0		0x12c 0x324 0x000 0x04 0x000
- #define MX25_PAD_CSI_D5__GPIO_1_30		0x12c 0x324 0x000 0x15 0x000
- #define MX25_PAD_CSI_D5__CSPI3_RDY		0x12c 0x324 0x000 0x17 0x000
- 
- #define MX25_PAD_CSI_D6__CSI_D6			0x130 0x328 0x000 0x10 0x000
- #define MX25_PAD_CSI_D6__SDHC2_CMD		0x130 0x328 0x4e0 0x12 0x001
-+#define MX25_PAD_CSI_D6__SIM1_PD0		0x130 0x328 0x000 0x04 0x000
- #define MX25_PAD_CSI_D6__GPIO_1_31		0x130 0x328 0x000 0x15 0x000
- 
- #define MX25_PAD_CSI_D7__CSI_D7			0x134 0x32c 0x000 0x10 0x000
-@@ -476,9 +494,12 @@
- #define MX25_PAD_FEC_RDATA0__GPIO_3_10		0x1dc 0x3d4 0x000 0x15 0x000
- 
- #define MX25_PAD_FEC_RDATA1__FEC_RDATA1		0x1e0 0x3d8 0x000 0x10 0x000
-+/* The imx25 RM appendix describes this mux as CAN1 which is wrong */
-+#define MX25_PAD_FEC_RDATA1__CAN2_TX		0x1e0 0x3d8 0x000 0x14 0x000
- #define MX25_PAD_FEC_RDATA1__GPIO_3_11		0x1e0 0x3d8 0x000 0x15 0x000
- 
- #define MX25_PAD_FEC_RX_DV__FEC_RX_DV		0x1e4 0x3dc 0x000 0x10 0x000
-+/* The imx25 RM appendix describes this mux as CAN1 which is wrong */
- #define MX25_PAD_FEC_RX_DV__CAN2_RX		0x1e4 0x3dc 0x484 0x14 0x000
- #define MX25_PAD_FEC_RX_DV__GPIO_3_12		0x1e4 0x3dc 0x000 0x15 0x000
- 
-@@ -514,10 +535,12 @@
- #define MX25_PAD_GPIO_E__I2C3_CLK		0x204 0x400 0x524 0x11 0x002
- #define MX25_PAD_GPIO_E__LD16			0x204 0x400 0x000 0x12 0x000
- #define MX25_PAD_GPIO_E__AUD7_TXD		0x204 0x400 0x000 0x14 0x000
-+#define MX25_PAD_GPIO_E__UART4_RXD		0x204 0x400 0x570 0x16 0x002
- 
- #define MX25_PAD_GPIO_F__GPIO_F			0x208 0x404 0x000 0x10 0x000
- #define MX25_PAD_GPIO_F__LD17			0x208 0x404 0x000 0x12 0x000
- #define MX25_PAD_GPIO_F__AUD7_TXC		0x208 0x404 0x000 0x14 0x000
-+#define MX25_PAD_GPIO_F__UART4_TXD		0x208 0x404 0x000 0x16 0x000
- 
- #define MX25_PAD_EXT_ARMCLK__EXT_ARMCLK		0x20c 0x000 0x000 0x10 0x000
- #define MX25_PAD_EXT_ARMCLK__GPIO_3_15		0x20c 0x000 0x000 0x15 0x000
+
+
 -- 
-2.1.4
+Regards,
+Alim
