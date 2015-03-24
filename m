@@ -1,70 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 Mar 2015 06:17:29 +0100
-Subject: [PATCH 0/5] Driver for pxa architectures
-In-Reply-To: <878uen78u5.fsf@free.fr>
-References: <1426977868-5414-1-git-send-email-robert.jarzmik@free.fr>
- <201503231604.44551.arnd@arndb.de> <878uen78u5.fsf@free.fr>
-Message-ID: <201503240617.29810.arnd@arndb.de>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Mon, 23 Mar 2015 22:18:04 -0700
+Subject: [PATCH] ARM: cygnus: fix const declaration bcm_cygnus_dt_compat
+In-Reply-To: <1426981535-1800-1-git-send-email-stefan@agner.ch>
+References: <1426981535-1800-1-git-send-email-stefan@agner.ch>
+Message-ID: <5510F38C.6090501@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 March 2015, Robert Jarzmik wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> ... removed people not concerned by pxa story ...
-> 
-> >> As for XIP support, I don't have a clear view if it's a requirement for
-> >> multiplatform nor if it works in these builds.
-> >
-> > It would be nice to not have to support both options: if we put pxa into
-> > ARCH_MULTIPLATFORM, I'd like to remove the existing entry from the choice
-> > statement at the same time.
-> Ah I wasn't aware of that ... that will deserve some thought from me ...
+Hi Stefan,
 
-It's not 100% required, but it's what we ended up doing on all other
-platforms.
+On 15-03-21 04:45 PM, Stefan Agner wrote:
+> The const declaration for char* is actually duplicated, however
+> the array of strings is currently not constant. However, typically
+> the dt_compat array is declared as const char *const. Follow
+> that convention and also add the __initconst macro for constant
+> initialization data.
+>
+Acked-by: Scott Branden <sbranden@broadcom.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> This was uncovered by a LLVM/clang warning:
+> arch/arm/mach-bcm/bcm_cygnus.c:16:19: warning: duplicate 'const' declaration
+> specifier [-Wduplicate-decl-specifier]
+> static const char const *bcm_cygnus_dt_compat[] = {
+>                    ^~~~~~
+> 1 warning generated.
+>
+>   arch/arm/mach-bcm/bcm_cygnus.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-bcm/bcm_cygnus.c b/arch/arm/mach-bcm/bcm_cygnus.c
+> index 30dc58b..7ae894c 100644
+> --- a/arch/arm/mach-bcm/bcm_cygnus.c
+> +++ b/arch/arm/mach-bcm/bcm_cygnus.c
+> @@ -13,7 +13,7 @@
+>
+>   #include <asm/mach/arch.h>
+>
+> -static const char const *bcm_cygnus_dt_compat[] = {
+> +static const char * const bcm_cygnus_dt_compat[] __initconst = {
+>   	"brcm,cygnus",
+>   	NULL,
+>   };
+>
+Thanks for submitting.  We will test this.
 
-> >> > I think all of them are theoretically doable, but I wasn't expecting
-> >> > to ever get there.
-> >> Well, that makes me a goal to reach, doesn't it ? I'll stick to optimism here,
-> >> and we'll see within a year how far I manage to go :)
-> >
-> > Fair enough. Any work you do on this is highly appreciated anyway,
-> > regardless of whether you complete it or not. BTW, one thought I had
-> > a while ago was that we can move support for any PXA machines that are
-> > DT enabled into mach-mmp, which hopefully will be fully DT-only and
-> > multiplatform enabled at some point, and we can keep mach-pxa for the
-> > legacy board files if you don't succeed in converting them all.
-> 
-> Actually, this deserves another discussion alltogether. My plan was not to
-> convert all pxa board files to dt support, but all internal SoC IPs drivers +
-> mach/plat support.
-> 
-> Or put another way at the end :
->  - there will be at least one pxa25x board which is fully DT converted
->  - there will be at least one pxa27x board which is fully DT converted
->  - there will be at least one pxa3xx board which is fully DT converted
-> 
->  - there will be at least one pxa25x board which is not DT converted
->  - there will be at least one pxa27x board which is not DT converted
->  - there will be at least one pxa3xx board which is not DT converted
-> 
-> I want to keep the support for both legacy platform_data and DT for pxa
-> architecture. The idea I had was that only fully DT converted machines will
-> benefit from multiplatform support.
-
-I see. On other platforms, we also have board files that are not DT
-but are included in multiplatform. I don't see anything wrong in general.
-
-The more important question is whether you want to keep having a single
-kernel capable of running on all PXA machines (DT and ATAGS), while also
-doing a subset of PXA that can be multiplatform with other ARMv5 targets
-like pxa168 (MMP) but excluding the rest of PXA.
-
-> As for mach-mmp, I don't see how this could work, as there are architecture
-> specific parts that will probably remain, such as the suspend to RAM code
-> (arch/arm/mach-pxa/sleep.S). This might be doable, even if I don't see how.
-
-Those parts could be moved to plat-pxa.
-
-	Arnd
+Scott
