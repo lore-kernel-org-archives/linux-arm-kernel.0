@@ -1,38 +1,31 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 24 Mar 2015 22:31:20 +0000
-Subject: [PATCH v3 9/9] eeprom: Add to MAINTAINERS for eeprom framework
-In-Reply-To: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Mar 2015 15:36:37 -0700
+Subject: [PATCH v3 1/9] regmap: Introduce regmap_get_max_register.
+In-Reply-To: <1427236179-18580-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427236280-18924-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427236179-18580-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150324223637.GB28997@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MAINTAINERS to eeprom framework.
+On Tue, Mar 24, 2015 at 10:29:39PM +0000, Srinivas Kandagatla wrote:
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> This patch introduces regmap_get_max_register() function which would be
+> used by the infrastructures like eeprom framework built on top of
+> regmap.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d66a97d..ee7ba92 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3657,6 +3657,15 @@ T:	git git://git.alsa-project.org/alsa-kernel.git
- S:	Maintained
- F:	sound/usb/misc/ua101.c
- 
-+EEPROM FRAMEWORK
-+M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+S:	Maintained
-+F:	drivers/eeprom/
-+F:	Documentation/devicetree/bindings/eeprom/
-+F:	include/linux/eeprom-provider.h
-+F:	include/linux/eeprom-consumer.h
-+
- EXTENSIBLE FIRMWARE INTERFACE (EFI)
- M:	Matt Fleming <matt.fleming@intel.com>
- L:	linux-efi at vger.kernel.org
--- 
-1.9.1
+In what way would it be used?
+
+> +int regmap_get_max_register(struct regmap *map)
+> +{
+> +	return map->max_register ? : -EINVAL;
+> +}
+
+Please write the logic out properly, don't abuse the ternery operator.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/02923a85/attachment.sig>
