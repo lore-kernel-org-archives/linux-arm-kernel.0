@@ -1,66 +1,87 @@
-From: george.joseph@fairview5.com (George Joseph)
-Date: Tue, 24 Mar 2015 10:31:35 -0600
-Subject: [PATCH v3 1/1] dts: cubox: Map gpio-keys to gpio3 8
-In-Reply-To: <1427214695-16301-1-git-send-email-george.joseph@fairview5.com>
-References: <1427214695-16301-1-git-send-email-george.joseph@fairview5.com>
-Message-ID: <1427214695-16301-2-git-send-email-george.joseph@fairview5.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Mar 2015 12:42:04 -0400 (EDT)
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1503241239320.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubox has a recessed button between the HDMI and RJ-45 connectors
-that wasn't mapped in the device tree, so I've mapped it to gpio-keys
-BTN_0.
+On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
 
-Signed-off-by: George Joseph <george.joseph@fairview5.com>
-Tested-by: George Joseph <george.joseph@fairview5.com>
----
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+> When building a very large kernel, it is up to the linker to decide
+> when and where to insert stubs to allow calls to functions that are
+> out of range for the ordinary b/bl instructions.
+> 
+> However, since the kernel is built as a position dependent binary,
+> these stubs (aka veneers) may contain absolute addresses, which will
+> break such veneer assisted far calls performed with the MMU off.
+> 
+> For instance, the call from __enable_mmu() in the .head.text section
+> to __turn_mmu_on() in the .idmap.text section may be turned into
+> something like this:
+> 
+> c0008168 <__enable_mmu>:
+> c0008168:       f020 0002       bic.w   r0, r0, #2
+> c000816c:       f420 5080       bic.w   r0, r0, #4096
+> c0008170:       f000 b846       b.w     c0008200 <____turn_mmu_on_veneer>
+> [...]
+> c0008200 <____turn_mmu_on_veneer>:
+> c0008200:       4778            bx      pc
+> c0008202:       46c0            nop
+> c0008204:       e59fc000        ldr     ip, [pc]
+> c0008208:       e12fff1c        bx      ip
+> c000820c:       c13dfae1        teqgt   sp, r1, ror #21
+> [...]
+> c13dfae0 <__turn_mmu_on>:
+> c13dfae0:       4600            mov     r0, r0
+> [...]
+> 
+> After adding --pic-veneer to the LDFLAGS, the veneer is emitted like
+> this instead:
+> 
+> c0008200 <____turn_mmu_on_veneer>:
+> c0008200:       4778            bx      pc
+> c0008202:       46c0            nop
+> c0008204:       e59fc004        ldr     ip, [pc, #4]
+> c0008208:       e08fc00c        add     ip, pc, ip
+> c000820c:       e12fff1c        bx      ip
+> c0008210:       013d7d31        teqeq   sp, r1, lsr sp
+> c0008214:       00000000        andeq   r0, r0, r0
+> 
+> Note that this particular example is best addressed by moving
+> .head.text and .idmap.text closer together, but this issue could
+> potentially affect any code that needs to execute with the
+> MMU off.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 4303bc0..d033bb1 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -41,6 +41,8 @@
-  */
- #include "imx6qdl-microsom.dtsi"
- #include "imx6qdl-microsom-ar8035.dtsi"
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	ir_recv: ir-receiver {
-@@ -104,6 +106,18 @@
- 		spdif-controller = <&spdif>;
- 		spdif-out;
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-0 = <&pinctrl_gpio_key>;
-+		pinctrl-names = "default";
-+
-+		button_0 {
-+			label = "Button 0";
-+			gpios = <&gpio3 8 GPIO_ACTIVE_LOW>;
-+			linux,code = <BTN_0>;
-+		};
-+	};
- };
- 
- &hdmi {
-@@ -208,6 +222,12 @@
- 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
- 			>;
- 		};
-+
-+		pinctrl_gpio_key: gpio-key {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_DA8__GPIO3_IO08	0x17059
-+			>;
-+		};
- 	};
- };
- 
--- 
-2.1.0
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+This is of no consequence when the kernel is still small enough not to 
+require any veneers i.e. 99.99% of the time.  And, as I said, I prefer 
+relying on the linker to insert those veneers as needed rather than 
+using some unconditional far call macros.
+
+
+> ---
+>  arch/arm/Makefile | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index eb7bb511f853..ae5b33527f32 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -13,7 +13,7 @@
+>  # Ensure linker flags are correct
+>  LDFLAGS		:=
+>  
+> -LDFLAGS_vmlinux	:=-p --no-undefined -X
+> +LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
+>  ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
+>  LDFLAGS_vmlinux	+= --be8
+>  LDFLAGS_MODULE	+= --be8
+> -- 
+> 1.8.3.2
+> 
+> 
