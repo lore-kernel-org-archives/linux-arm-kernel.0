@@ -1,58 +1,144 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 24 Mar 2015 11:49:21 -0400 (EDT)
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <CAKv+Gu_kLtCqM1FtFRQdyBkzT3Rdqx90zcPFdtovnGOFf=d+3g@mail.gmail.com>
-References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150324122239.GB3579@e103592.cambridge.arm.com>
- <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
- <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
- <CAKv+Gu_kLtCqM1FtFRQdyBkzT3Rdqx90zcPFdtovnGOFf=d+3g@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1503241125450.27567@knanqh.ubzr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Mar 2015 15:50:07 +0000
+Subject: Master-aware devices and sideband ID data
+Message-ID: <20150324155007.GC23005@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
+Hi all,
 
-> On 24 March 2015 at 16:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
-> >
-> >> On 24 March 2015 at 13:22, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> > How many such veneers get added in the your kernel configuration, and
-> >> > how many are actually necessary (i.e., calls between MMU-off code and
-> >> > elsewhere)?
-> >> >
-> >>
-> >> Very few. In addition to the example (which will be addressed in
-> >> another way regardless) there are some resume functions that get
-> >> allocated in .data, and those would need it as well.
-> >
-> >
-> > What are they? I thought we removed all instances of those already.
-> >
-> >> I have also proposed b_far/bl_far macros that could be used there as
-> >> well.
-> >
-> > Could the automatic veneer insertion replace the unconditional
-> > b_far/bl_far usage?  The former would be preferable to the later.
-> >
-> 
-> Agreed. I am not entirely sure why those functions don't get a veneer.
-> Perhaps simply because .data is not annotated as executable?
-> 
-> Frankly, I don't really understand the purpose of putting those in
-> .data in the first place. but if they need to remain there, I can try
-> to figure out how to get the linker to emit veneers for those as well.
+For some devices, identification of particular masters is critical to
+their operation (e.g. IOMMUs, MSI controllers). The identity of masters
+is determined from sideband signals on the bus, and it may or may not be
+possible to probe and/or configure this information. Worse still, these
+information may be rewritten by intermediate buses, so the
+information for a given master may differ at different points in the bus
+hierarchy.
 
-I'm guilty of introducing the first instance of code in .data back in 
-... hrm ... 1998 or so.  I wasn't as experienced in ARM assembly back 
-then and the resume code needed to fetch its context data while the MMU 
-was off. So the easy way was simply to put the code next to the data 
-block and get its address using adr.
+We currently describe this master information for devices attached to
+IOMMUs, with a master ID being encoded in the iommu-cells. However this
+only covers the ID between the master and its IOMMU(s), and we don't
+currently have a mechanism to describe the master IDs as they are seen
+by devices beyond the IOMMU(s), or in the absence of any IOMMU(s).
 
-These days we know how to write code to obtain position independent 
-memory addresses at run time. One such example is commit b4e6153704 
-where the bl relocation also exceeded its range.  But I thought I had 
-converted all those instances already.
+The following are example of master IDs:
+* PCIe Requester IDs (RIDs) (bus:device.function AKA BDF)
+* SMMU Stream IDs (SIDs)
+* GICv3 ITS Device IDs (DIDs)
+
+In the case of a system with PCIe, SMMU and GICv3, the master IDs are
+rewritten in a chain of RID=>SID=>DID, as in the following diagram:
+
++-------------+
+| PCIe master |
++-------------+
+    ||
+    || Requester ID (RID)
+    || Probeable from RC.
+    \/
++-------------------+
+| PCIe Root Complex |
++-------------------+
+    ||
+    || SMMU Stream ID (SID)
+    || Derived from RID, static non-probeable mapping.
+    \/
++--------------+
+| SMMU (IOMMU) |
++--------------+
+    ||
+    || ITS Device ID (DID)
+    || Derived from SID, static non-probeable mapping.
+    \/
++----------------------------+
+| GICv3 ITS (MSI controller) |
++----------------------------+
+
+In simpler cases, you might have a simpler set of master ID
+translations, e.g. just a DID:
+
++-----------------+
+| Platform device |
++-----------------+
+    ||
+    || ITS Device ID (DID)
+    || Hard-wired on the bus.
+    \/
++----------------------------+
+| GICv3 ITS (MSI controller) |
++----------------------------+
+
+Ignoring current bindings for the moment, I can see how we can describe
+this with a generic master id-binding, with master-id-map along the
+lines of interrupt-map, with a tuple format like:
+<child-id-base child-id-length parent parent-id-base>
+
+For the PCIe example, this would look something like the following (with
+properties omitted for brevity):
+
+PCI: pci at af000000 {
+	...
+	
+	/* Requester ID of PCIe endpoints, implicit at runtime */
+	master-id-cells = <1>;
+
+	/* RIDS idmapped to SIDS @ SMMU */
+	master-id-map = <0 0x10000 &SMMU 0>;
+}
+
+SMMU: iommu at bf000000 {
+	...
+
+	/* SID, derived from RID */
+	master-id-cells = <1>;
+
+	/* 
+	 * For some reason the high bit of the ID was negated.
+	 */
+	master-id-map = <0x0000 0x8000 &ITS 0x0 0x8000>,
+	                <0x8000 0x8000 &ITS 0x0 0x0000>;
+
+};
+
+ITS: its at cf000000 {
+	...
+
+	/* DID, derived from SID */
+	master-id-cells = <2>;
+
+	/* 
+	 * Master traffic not propagated beyond this point, so no
+	 * master-id-ranges
+	 */
+};
+
+For the simpler case, this would look something like:
+
+DEV: device at af000000 {
+	master-id-cells = <1>;
+	master-ids = <0xf>, <0xb>;
+	master-id-map = <0 0xf &ITS 0 0>;
+};
+
+ITS: its at cf000000 {
+	...
+
+	/* DID */
+	master-id-cells = <2>;
+};
 
 
-Nicolas
+However, this conflicts/overlaps with existing bindings (at least iommus
+and msi-parent), and I'm not sure how to reconcile them. Am I missing a
+neat way of describing this that works with the existing bindings?
+
+It's also not clear to me if it's sufficient to have a generic
+"master-ids" property (with the relevant type being implicit from
+context), or if each type of ID needs each type of ID (RID, SID, DID,
+etc) needs its own.
+
+Which other devices out there which require side-band master
+information, and what do they require?
+
+Thanks,
+Mark.
