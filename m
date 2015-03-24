@@ -1,173 +1,79 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:07 +0200
-Subject: [PATCHv2 07/10] arm/dts: dra72-evm.dts: add HDMI
+Date: Tue, 24 Mar 2015 16:55:09 +0200
+Subject: [PATCHv2 09/10] arm: dra7: add DESHDCP clock
 In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-8-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1427208910-17678-10-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DRA72 EVM has a HDMI output. This patch adds the device tree nodes
-required for HDMI.
+Add a new Linux clock for DRA7 based SoCs to control DESHDCP clock.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: devicetree at vger.kernel.org
 ---
- arch/arm/boot/dts/dra72-evm.dts | 110 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 110 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi               |  5 +++++
+ arch/arm/boot/dts/dra7xx-clocks.dtsi      | 10 ++++++++++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  1 +
+ drivers/clk/ti/clk-7xx.c                  |  1 +
+ 4 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra72-evm.dts b/arch/arm/boot/dts/dra72-evm.dts
-index 4d8711713610..c752d7aa302d 100644
---- a/arch/arm/boot/dts/dra72-evm.dts
-+++ b/arch/arm/boot/dts/dra72-evm.dts
-@@ -19,6 +19,10 @@
- 		reg = <0x80000000 0x40000000>; /* 1024 MB */
- 	};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 312ede660b23..c06f30a76f5c 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -123,6 +123,11 @@
+ 							regulator-max-microvolt = <3000000>;
+ 						};
+ 					};
++
++					scm_conf_clocks: clocks {
++						#address-cells = <1>;
++						#size-cells = <0>;
++					};
+ 				};
  
-+	aliases {
-+		display0 = &hdmi0;
-+	};
-+
- 	evm_3v3: fixedregulator-evm_3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "evm_3v3";
-@@ -35,6 +39,51 @@
- 		compatible = "linux,extcon-usb-gpio";
- 		id-gpio = <&pcf_gpio_21 2 GPIO_ACTIVE_HIGH>;
- 	};
-+
-+	hdmi0: connector {
-+		compatible = "hdmi-connector";
-+		label = "hdmi";
-+
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&tpd12s015_out>;
-+			};
-+		};
-+	};
-+
-+	tpd12s015: encoder {
-+		compatible = "ti,tpd12s015";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&tpd12s015_pins>;
-+
-+		gpios = <&pcf_hdmi 4 GPIO_ACTIVE_HIGH>,	/* P4, CT CP HPD */
-+			<&pcf_hdmi 5 GPIO_ACTIVE_HIGH>,	/* P5, LS OE */
-+			<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				tpd12s015_in: endpoint {
-+					remote-endpoint = <&hdmi_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				tpd12s015_out: endpoint {
-+					remote-endpoint = <&hdmi_connector_in>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &dra7_pmx_core {
-@@ -45,6 +94,13 @@
- 		>;
- 	};
- 
-+	i2c5_pins: pinmux_i2c5_pins {
-+		pinctrl-single,pins = <
-+			0x2b4 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr0.i2c5_sda */
-+			0x2b8 (PIN_INPUT | MUX_MODE10) /* mcasp1_axr1.i2c5_scl */
-+		>;
-+	};
-+
- 	nand_default: nand_default {
- 		pinctrl-single,pins = <
- 			0x0	(PIN_INPUT  | MUX_MODE0) /* gpmc_ad0 */
-@@ -144,6 +200,19 @@
- 			0xb8 (PIN_OUTPUT | MUX_MODE1)	/* gpmc_cs2.qspi1_cs0 */
- 		>;
- 	};
-+
-+	hdmi_pins: pinmux_hdmi_pins {
-+		pinctrl-single,pins = <
-+			0x408 (PIN_INPUT | MUX_MODE1) /* i2c2_sda.hdmi1_ddc_scl */
-+			0x40c (PIN_INPUT | MUX_MODE1) /* i2c2_scl.hdmi1_ddc_sda */
-+		>;
-+	};
-+
-+	tpd12s015_pins: pinmux_tpd12s015_pins {
-+		pinctrl-single,pins = <
-+			0x3b8 (PIN_INPUT_PULLDOWN | MUX_MODE14) /* gpio7_12 HPD */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -280,6 +349,27 @@
+ 				dra7_pmx_core: pinmux at 1400 {
+diff --git a/arch/arm/boot/dts/dra7xx-clocks.dtsi b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+index 0d76233840e6..a93754cf5e2f 100644
+--- a/arch/arm/boot/dts/dra7xx-clocks.dtsi
++++ b/arch/arm/boot/dts/dra7xx-clocks.dtsi
+@@ -2057,3 +2057,13 @@
+ 		clocks = <&dpll_usb_ck>;
  	};
  };
- 
-+&i2c5 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_pins>;
-+	clock-frequency = <400000>;
 +
-+	pcf_hdmi: pcf8575 at 26 {
-+		compatible = "nxp,pcf8575";
-+		reg = <0x26>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		/*
-+		 * initial state is used here to keep the mdio interface
-+		 * selected on RU89 through SEL_VIN4_MUX_S0, VIN2_S1 and
-+		 * VIN2_S0 driven high otherwise Ethernet stops working
-+		 * VIN6_SEL_S0 is low, thus selecting McASP3 over VIN6
-+		 */
-+		lines-initial-states = <0x0f2b>;
++&scm_conf_clocks {
++	dss_deshdcp_clk: dss_deshdcp_clk {
++		#clock-cells = <0>;
++		compatible = "ti,gate-clock";
++		clocks = <&l3_iclk_div>;
++		ti,bit-shift = <0>;
++		reg = <0x558>;
 +	};
 +};
-+
- &uart1 {
- 	status = "okay";
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 0411b838b4fa..97e3d7a62729 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -459,6 +459,7 @@ static struct omap_hwmod_opt_clk dss_opt_clks[] = {
+ 	{ .role = "video2_clk", .clk = "dss_video2_clk" },
+ 	{ .role = "video1_clk", .clk = "dss_video1_clk" },
+ 	{ .role = "hdmi_clk", .clk = "dss_hdmi_clk" },
++	{ .role = "hdcp_clk", .clk = "dss_deshdcp_clk" },
  };
-@@ -569,3 +659,23 @@
- 		};
- 	};
+ 
+ static struct omap_hwmod dra7xx_dss_hwmod = {
+diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
+index ee32f4deebf4..7b859ec31a14 100644
+--- a/drivers/clk/ti/clk-7xx.c
++++ b/drivers/clk/ti/clk-7xx.c
+@@ -301,6 +301,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
+ 	DT_CLK("48824000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK("48826000.timer", "timer_sys_ck", "timer_sys_clk_div"),
+ 	DT_CLK(NULL, "sys_clkin", "sys_clkin1"),
++	DT_CLK(NULL, "dss_deshdcp_clk", "dss_deshdcp_clk"),
+ 	{ .node_name = NULL },
  };
-+
-+&dss {
-+	status = "ok";
-+
-+	vdda_video-supply = <&ldo5_reg>;
-+};
-+
-+&hdmi {
-+	status = "ok";
-+	vdda-supply = <&ldo3_reg>;
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_pins>;
-+
-+	port {
-+		hdmi_out: endpoint {
-+			remote-endpoint = <&tpd12s015_in>;
-+		};
-+	};
-+};
+ 
 -- 
 2.3.3
