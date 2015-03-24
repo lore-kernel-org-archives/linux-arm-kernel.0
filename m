@@ -1,64 +1,61 @@
-From: p.pisati@gmail.com (Paolo Pisati)
-Date: Tue, 24 Mar 2015 13:04:47 +0100
-Subject: [PATCH 0/3] CONFIG_DEBUG_SET_MODULE_RONX fixups
-In-Reply-To: <CAGXu5jKKn1f7bnp3Ezsc3o_iqV19Gu62-83ub3s7Rwu=oK7kBA@mail.gmail.com>
-References: <1424902497-32141-1-git-send-email-lauraa@codeaurora.org>
- <CAGXu5jKKn1f7bnp3Ezsc3o_iqV19Gu62-83ub3s7Rwu=oK7kBA@mail.gmail.com>
-Message-ID: <20150324120447.GA3570@luxor.wired.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 24 Mar 2015 12:07:39 +0000
+Subject: [RFC PATCH 0/1] Wrong structure alignment due to compiler
+ attribute "section"
+In-Reply-To: <550E132A.7050304@gmx.de>
+References: <20150304143527.GA5653@e103592.cambridge.arm.com>
+ <54F732DA.2050004@marvell.com>
+ <20150305122606.GC3612@e103592.cambridge.arm.com>
+ <54F8582B.80703@marvell.com>
+ <20150305134733.GE3612@e103592.cambridge.arm.com>
+ <54F8770C.8080709@marvell.com>
+ <20150305173327.GF3612@e103592.cambridge.arm.com>
+ <54F9B36F.8040307@marvell.com> <54F9EFE2.2020205@gmx.de>
+ <550E132A.7050304@gmx.de>
+Message-ID: <20150324120733.GA3579@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 25, 2015 at 02:17:55PM -0800, Kees Cook wrote:
-> On Wed, Feb 25, 2015 at 2:14 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
-> > Hi,
-> >
-> > CONFIG_DEBUG_SET_MODULE_RONX is currently non-functional on arm and arm64
-> > because of changes in behavior of is_module_addr. This series fixes
-> > both arm and arm64 to work correctly and corrects a minor bug
-> > related to section alignment in modules.
-> >
-> > Laura Abbott (3):
-> >   arm64: Don't use is_module_addr in setting page attributes
-> >   arm: Don't use is_module_addr in setting page attributes
-> >   kernel/module.c: Update debug alignment after symtable generation
-> >
-> >  arch/arm/mm/pageattr.c   | 5 ++++-
-> >  arch/arm64/mm/pageattr.c | 5 ++++-
-> >  kernel/module.c          | 2 ++
-> >  3 files changed, 10 insertions(+), 2 deletions(-)
+On Sun, Mar 22, 2015 at 01:56:10AM +0100, Lino Sanfilippo wrote:
+> On 06.03.2015 19:20, Lino Sanfilippo wrote:
+> > 
+> >>>
+> >> 
+> >> Ok, I got a link to the source now. It can be found here:
+> >> 
+> >> http://tp-lab200/release/gcc/temp/internal/2010q4-113-4.4.5/marvell-gcc.src-2010q4-113.tar.bz2
+> >> 
+> > 
+> > 
+> > Sigh. Just realized that the url is not accessible. Will check that on
+> > monday.
+> > 
+> > Lino
+> > 
 > 
-> Thanks for fixing this!
+> Hello Dave,
 > 
-> Out of curiosity, which change broke DEBUG_SET_MODULE_RONX ? (i.e.
-> does this need a CC: stable, and if so, through which release?)
+> sorry for my late reply. But I was a few days out of office and had to
+> contact some people which are not in my departement. The outcome is:
+> there is no public repository in which the source code of that special
+> (buggy) toolchain is available any more. There are newer versions
+> already, but even for those the source code is only accessible for
+> customers (thats what I was told). However the responsible developer
 
-we need it for 3.19.x too:
+(GPL?)
 
-without your patches:
+> could confirm that the wrong alignment I initially reported is indeed a
+> bug in the toolchain which now is fixed in the newer versions.
+> I really would have liked to send you the source, but unfortunately I
+> cant. However thanks again for all your help.
 
-root at beaglebone:~# cat /sys/module/bridge/sections/.text
-0xbf199000
-root at beaglebone:~# cat /sys/module/bridge/sections/.data
-0xbf1ae000
-root at beaglebone:~# grep -e 0xbf199000 -e 0xbf1ae000 /sys/kernel/debug/kernel_page_tables
-0xbf199000-0xbf1b6000         116K     RW x      MEM/CACHED/WBRA
+Never mind -- hopefully this issue was caused by something that got
+fixed upstream meanwhile, or that never went upstream in the first
+place.  Debugging legacy vendor toolchain forks isn't a very interesting
+pursuit...
 
-with you patches:
+We can revisit the issue if it comes up again, but I've not heard
+of any other instances of this type of issue so far.
 
-root at beaglebone:~# cat /sys/module/bridge/sections/.text                                                                                   
-0xbf191000
-root at beaglebone:~# cat /sys/module/bridge/sections/.data
-0xbf1a6000
-root at beaglebone:~# grep -e 0xbf191000 -e 0xbf1a6000 /sys/kernel/debug/kernel_page_tables                                                   
-0xbf191000-0xbf1a2000          68K     ro x      MEM/CACHED/WBRA
-0xbf1a2000-0xbf1a6000          16K     ro NX     MEM/CACHED/WBRA
-0xbf1a6000-0xbf1ae000          32K     RW NX     MEM/CACHED/WBRA
-root at beaglebone:~# uname -a
-Linux beaglebone 3.19.0-9-generic #9~RONXFIX SMP Tue Mar 24 10:34:39 UTC 2015
-armv7l armv7l armv7l GNU/Linux
-root at beaglebone:~#
-
-can you cc: stable@ ?
--- 
-bye,
-p.
+Cheers
+---Dave
