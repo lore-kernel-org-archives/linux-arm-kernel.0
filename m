@@ -1,86 +1,27 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Tue, 24 Mar 2015 11:34:14 +0800
-Subject: [PATCH v8 20/30] PCI: Remove pcibios_root_bridge_prepare() and
- pcibos_set_root_bus_speed()
-In-Reply-To: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427168064-8657-21-git-send-email-wangyijing@huawei.com>
+From: edgar.iglesias@gmail.com (Edgar E. Iglesias)
+Date: Tue, 24 Mar 2015 14:37:49 +1000
+Subject: RPmsg, DMA and ARM64
+Message-ID: <20150324043749.GJ23658@toto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now no one use weak pcibios_root_bridge_prepare() and
-pcibios_set_root_bus_speed, we could clean up them.
+Hi,
 
-Signed-off-by: Yijing Wang <wangyijing@huawei.com>
----
- drivers/pci/host-bridge.c |    4 ----
- drivers/pci/probe.c       |   18 +-----------------
- include/linux/pci.h       |    2 --
- 3 files changed, 1 insertions(+), 23 deletions(-)
+I'm trying to run rpmsg and remoteproc on the ZynqMP but hitting an mm error.
+I'm not sure who is breaking the rules, rpmsg or the dma allocators?
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index b439264..919ba4d 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -110,10 +110,6 @@ struct pci_host_bridge *pci_create_host_bridge(
- 			goto list_del;
- 	}
- 
--	error = pcibios_root_bridge_prepare(host);
--	if (error)
--		goto list_del;
--
- 	error = device_register(&host->dev);
- 	if (error) {
- 		put_device(&host->dev);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index b3d9b1b..7796bf8 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1844,22 +1844,6 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
- }
- EXPORT_SYMBOL_GPL(pci_scan_child_bus);
- 
--/**
-- * pcibios_root_bridge_prepare - Platform-specific host bridge setup.
-- * @bridge: Host bridge to set up.
-- *
-- * Default empty implementation.  Replace with an architecture-specific setup
-- * routine, if necessary.
-- */
--int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	return 0;
--}
--
--void __weak pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
--{
--}
--
- void __weak pcibios_add_bus(struct pci_bus *bus)
- {
- }
-@@ -1896,7 +1880,7 @@ static struct pci_bus *__pci_create_root_bus(
- 
- 	if (bridge->ops && bridge->ops->set_root_bus_speed)
- 		bridge->ops->set_root_bus_speed(bridge);
--	pcibios_set_root_bus_speed(bridge);
-+
- 	device_enable_async_suspend(b->bridge);
- 	pci_set_bus_of_node(b);
- 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 0b921d6..61e0853 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -426,8 +426,6 @@ void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
- 		     void (*release_fn)(struct pci_host_bridge *),
- 		     void *release_data);
- 
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
--
- /*
-  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
-  * to P2P or CardBus bridge windows) go in a table.  Additional ones (for
--- 
-1.7.1
+When rpmsg sets up the virtqueues, it allocates memory with
+dma_alloc_coherent() and initializes a scatterlist with sg_init_one().
+drivers/rpmsg/virtio_rpmsg_bus.c:rpmsg_probe().
+sg_init_one() requires that the memory it gets is virt_addr_valid().
+
+The problem I'm seeing is that on arm64, the dma alloc functions can
+return vmalloced (via dma_common_contiguous_remap) memory. This
+then causes havoc when the scatterlist code tries to go virt_to_page
+and back to get hold of a physical adress (sg_phys()).
+
+I couldn't find a definitive answer in the docs, is the arm64 DMA code
+doing the right here when returning vmalloced memory?
+
+Cheers,
+Edgar
