@@ -1,34 +1,94 @@
-From: eliad@wizery.com (Eliad Peller)
-Date: Tue, 24 Mar 2015 21:24:19 +0200
-Subject: [PATCH v7 0/6] wlcore: add device-tree support
-In-Reply-To: <55114C85.60703@compulab.co.il>
-References: <1426696710-6891-1-git-send-email-eliad@wizery.com>
- <55114C85.60703@compulab.co.il>
-Message-ID: <CAB3XZEd77u36pcqKfMqfUqusHhnFBMJznqRhSL63Yp91y7BXiQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 24 Mar 2015 15:25:25 -0400 (EDT)
+Subject: [PATCH v3] ARM: exynos: move resume code to .text section
+In-Reply-To: <1427223941-26251-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <alpine.LFD.2.11.1503241427280.27567@knanqh.ubzr>
+ <1427223941-26251-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.11.1503241520500.27567@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Nikita,
+On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
 
-On Tue, Mar 24, 2015 at 1:37 PM, Nikita Kiryanov <nikita@compulab.co.il> wrote:
-> Hi Eliad,
->
-> On 03/18/2015 06:38 PM, Eliad Peller wrote:
->>
->> Add device-tree support to the wlcore (wl12xx/wl18xx)
->> driver.
->>
->> Update the current users to use the bindings instead
->> of pdata-quirks.
->>
->> Finally, remove the deprecated wl12xx_platform_data
->> struct (along with the da850 board file code that
->> still uses it)
->
->
-> Tested-by: Nikita Kiryanov <nikita@compulab.co.il>
-> Tested on am437x-gp-evm with WL1835MODCOM8B
->
-thanks for testing it!
+> This code calls cpu_resume() using a straight branch (b), so
+> now that we have moved cpu_resume() back to .text, this should
+> be moved there as well. Any direct references to symbols that will
+> remain in the .data section are replaced with explicit PC-relative
+> references.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Eliad.
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+> ---
+> v3: add missing .align, regroup changes to be more logical
+> v2: keep cp15_save_power and cp15_save_diag in the .data section
+> 
+>  arch/arm/mach-exynos/sleep.S | 31 ++++++++++++++++---------------
+>  1 file changed, 16 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/sleep.S b/arch/arm/mach-exynos/sleep.S
+> index 31d25834b9c4..cf950790fbdc 100644
+> --- a/arch/arm/mach-exynos/sleep.S
+> +++ b/arch/arm/mach-exynos/sleep.S
+> @@ -23,14 +23,7 @@
+>  #define CPU_MASK	0xff0ffff0
+>  #define CPU_CORTEX_A9	0x410fc090
+>  
+> -	/*
+> -	 * The following code is located into the .data section. This is to
+> -	 * allow l2x0_regs_phys to be accessed with a relative load while we
+> -	 * can't rely on any MMU translation. We could have put l2x0_regs_phys
+> -	 * in the .text section as well, but some setups might insist on it to
+> -	 * be truly read-only. (Reference from: arch/arm/kernel/sleep.S)
+> -	 */
+> -	.data
+> +	.text
+>  	.align
+>  
+>  	/*
+> @@ -69,10 +62,12 @@ ENTRY(exynos_cpu_resume_ns)
+>  	cmp	r0, r1
+>  	bne	skip_cp15
+>  
+> -	adr	r0, cp15_save_power
+> +	adr	r0, _cp15_save_power
+>  	ldr	r1, [r0]
+> -	adr	r0, cp15_save_diag
+> +	ldr	r1, [r0, r1]
+> +	adr	r0, _cp15_save_diag
+>  	ldr	r2, [r0]
+> +	ldr	r2, [r0, r2]
+>  	mov	r0, #SMC_CMD_C15RESUME
+>  	dsb
+>  	smc	#0
+> @@ -118,14 +113,20 @@ skip_l2x0:
+>  skip_cp15:
+>  	b	cpu_resume
+>  ENDPROC(exynos_cpu_resume_ns)
+> +
+> +	.align
+> +_cp15_save_power:
+> +	.long	cp15_save_power - .
+> +_cp15_save_diag:
+> +	.long	cp15_save_diag - .
+> +#ifdef CONFIG_CACHE_L2X0
+> +1:	.long	l2x0_saved_regs - .
+> +#endif /* CONFIG_CACHE_L2X0 */
+> +
+> +	.data
+>  	.globl cp15_save_diag
+>  cp15_save_diag:
+>  	.long	0	@ cp15 diagnostic
+>  	.globl cp15_save_power
+>  cp15_save_power:
+>  	.long	0	@ cp15 power control
+> -
+> -#ifdef CONFIG_CACHE_L2X0
+> -	.align
+> -1:	.long	l2x0_saved_regs - .
+> -#endif /* CONFIG_CACHE_L2X0 */
+> -- 
+> 1.8.3.2
+> 
+> 
