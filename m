@@ -1,33 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Mar 2015 08:46:31 +0000
-Subject: [RFC 2/4] arm64: kexec: fix kvm issue
-In-Reply-To: <1427126213.27739.3.camel@infradead.org>
-References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>	
- <1427111639-4575-3-git-send-email-takahiro.akashi@linaro.org>
- <1427126213.27739.3.camel@infradead.org>
-Message-ID: <55112467.207@arm.com>
+From: tsahee@annapurnalabs.com (Tsahee Zidenberg)
+Date: Tue, 24 Mar 2015 10:50:32 +0200
+Subject: [PATCH 1/2] ARM: Alpine: add support for generic pci
+Message-ID: <55112558.9CrgVqMUZd7D6Boo%tsahee@annapurnalabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/15 15:56, Geoff Levand wrote:
-> On Mon, 2015-03-23 at 20:53 +0900, AKASHI Takahiro wrote:
->> The current kvm implementation keeps EL2 vector table installed even
->> when the system is shut down. This prevents kexec from putting the system
->> with kvm back into EL2 when starting a new kernel.
-> 
-> This is a kvm bug fix, so I think the subject should
-> be something like 'arm64/kvm: Fix shutdown issue'.
+The Alpine platform requires generic-pci driver to access the internal pci bus.
 
-Not quite. On its own, this doesn't fix anything in KVM. It simply plugs
-a deficiency in the arm64 kexec implementation. If you want to be
-completely true to the content of the patch, it should read:
+Signed-off-by: Tsahee Zidenberg <tsahee@annapurnalabs.com>
+---
+ arch/arm/mach-alpine/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-"arm64: KVM: Allow EL2 context to be reset on shutdown"
-
-Can we now drop the blame game and get back to the actual code?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-alpine/Kconfig b/arch/arm/mach-alpine/Kconfig
+index 79b2649..2c44b93 100644
+--- a/arch/arm/mach-alpine/Kconfig
++++ b/arch/arm/mach-alpine/Kconfig
+@@ -6,5 +6,7 @@ config ARCH_ALPINE
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select HAVE_SMP
+ 	select MFD_SYSCON
++	select PCI
++	select PCI_HOST_GENERIC
+ 	help
+ 	  This enables support for the Annapurna Labs Alpine V1 boards.
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
