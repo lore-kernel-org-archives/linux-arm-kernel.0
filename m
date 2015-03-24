@@ -1,73 +1,38 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:02 +0200
-Subject: [PATCHv2 02/10] ARM: DRA7: hwmod: add DMM hwmod description
+Date: Tue, 24 Mar 2015 16:55:03 +0200
+Subject: [PATCHv2 03/10] ARM: DRA7: hwmod: set DSS submodule parent hwmods
 In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1427208910-17678-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMM hwmod entries for DRA7. This is identical to DMM on OMAP5.
+Set DSS core hwmod as the parent for all the DSS submodules.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index e8692e7675b8..c236ea9bb940 100644
+index c236ea9bb940..0411b838b4fa 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -49,6 +49,27 @@
-  */
- 
- /*
-+ * 'dmm' class
-+ * instance(s): dmm
-+ */
-+static struct omap_hwmod_class dra7xx_dmm_hwmod_class = {
-+	.name	= "dmm",
-+};
-+
-+/* dmm */
-+static struct omap_hwmod dra7xx_dmm_hwmod = {
-+	.name		= "dmm",
-+	.class		= &dra7xx_dmm_hwmod_class,
-+	.clkdm_name	= "emif_clkdm",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_EMIF_DMM_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_EMIF_DMM_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
-+/*
-  * 'l3' class
-  * instance(s): l3_instr, l3_main_1, l3_main_2
-  */
-@@ -2313,6 +2334,14 @@ static struct omap_hwmod dra7xx_wd_timer2_hwmod = {
-  * Interfaces
-  */
- 
-+/* l3_main_1 -> dmm */
-+static struct omap_hwmod_ocp_if dra7xx_l3_main_1__dmm = {
-+	.master		= &dra7xx_l3_main_1_hwmod,
-+	.slave		= &dra7xx_dmm_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_SDMA,
-+};
-+
- /* l3_main_2 -> l3_instr */
- static struct omap_hwmod_ocp_if dra7xx_l3_main_2__l3_instr = {
- 	.master		= &dra7xx_l3_main_2_hwmod,
-@@ -3265,6 +3294,7 @@ static struct omap_hwmod_ocp_if dra7xx_l4_wkup__wd_timer2 = {
+@@ -521,6 +521,7 @@ static struct omap_hwmod dra7xx_dss_dispc_hwmod = {
+ 		},
+ 	},
+ 	.dev_attr	= &dss_dispc_dev_attr,
++	.parent_hwmod	= &dra7xx_dss_hwmod,
  };
  
- static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
-+	&dra7xx_l3_main_1__dmm,
- 	&dra7xx_l3_main_2__l3_instr,
- 	&dra7xx_l4_cfg__l3_main_1,
- 	&dra7xx_mpu__l3_main_1,
+ /*
+@@ -562,6 +563,7 @@ static struct omap_hwmod dra7xx_dss_hdmi_hwmod = {
+ 	},
+ 	.opt_clks	= dss_hdmi_opt_clks,
+ 	.opt_clks_cnt	= ARRAY_SIZE(dss_hdmi_opt_clks),
++	.parent_hwmod	= &dra7xx_dss_hwmod,
+ };
+ 
+ /*
 -- 
 2.3.3
