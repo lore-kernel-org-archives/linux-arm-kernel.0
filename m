@@ -1,33 +1,96 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Mar 2015 10:01:13 -0700
-Subject: [PATCH 5/7] ARM: dts: enable regulator support for i.MX23/i.MX28
-In-Reply-To: <55110813.7010708@i2se.com>
-References: <1426984203-9133-1-git-send-email-stefan.wahren@i2se.com>
- <1426984203-9133-6-git-send-email-stefan.wahren@i2se.com>
- <20150323060706.GB4946@pengutronix.de>
- <1469391177.549604.1427133274978.JavaMail.open-xchange@oxbaltgw02.schlund.de>
- <20150323183740.GI14954@sirena.org.uk> <55110813.7010708@i2se.com>
-Message-ID: <20150324170113.GO17265@sirena.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 24 Mar 2015 18:05:43 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150324122702.GJ14457@ns203013.ovh.net>
+ <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
+ <20150324130511.GK14457@ns203013.ovh.net>
+ <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+Message-ID: <20150324170543.GL14457@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 07:45:39AM +0100, Stefan Wahren wrote:
-> Am 23.03.2015 um 19:37 schrieb Mark Brown:
+On 15:46 Tue 24 Mar     , Ard Biesheuvel wrote:
+> On 24 March 2015 at 14:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 24 March 2015 at 14:05, Jean-Christophe PLAGNIOL-VILLARD
+> > <plagnioj@jcrosoft.com> wrote:
+> >>  >> +     '&eor   ($t0,$t0,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',   # Sigma0(a)
+> >>> >> +     '&add   ($h,$h,$t1)',                   # h+=Ch(e,f,g)
+> >>> >> +     '&ldr   ($t1,sprintf "[sp,#%d]",4*(($j+1)&15))  if (($j&15)!=15);'.
+> >>> >> +     '&ldr   ($t1,"[$Ktbl]")                         if ($j==15);'.
+> >>> >> +     '&ldr   ($t1,"[sp,#64]")                        if ($j==31)',
+> >>> >> +     '&and   ($t3,$t3,$t2)',                 # (b^c)&=(a^b)
+> >>> >> +     '&add   ($d,$d,$h)',                    # d+=h
+> >>> >> +     '&add   ($h,$h,$t0,"ror#$Sigma0[0]");'. # h+=Sigma0(a)
+> >>> >> +     '&eor   ($t3,$t3,$b)',                  # Maj(a,b,c)
+> >>> >> +     '$j++;  unshift(@V,pop(@V)); ($t2,$t3)=($t3,$t2);'
+> >>> >> +     )
+> >>> >> +}
+> >>> >> +
+> >>> >> +$code.=<<___;
+> >>> >> +#if __ARM_MAX_ARCH__>=7
+> >>> > this will be compile on armv4 but gcc will not allow it
+> >>> >
+> >>> > we need to drop the neon code for older non v7 build
+> >>> >
+> >>>
+> >>> The .arch and .fpu declarations ensure that it can be built regardless
+> >>> of the platform you are compiling for, unless you have a really old
+> >>> toolchain.
+> >> I known but does not work for me
+> >>> The glue code ensures that the module can only be loaded if HWCAP_NEON is set.
+> >>>
+> >>> Did you get errors trying to build it?
+> >>
+> >> yes I do
+> >>
+> >> I use
+> >>
+> >> arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320
+> >> (prerelease)
+> >> Copyright (C) 2013 Free Software Foundation, Inc.
+> >> This is free software; see the source for copying conditions.  There is NO
+> >> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+> >>
+> >> so it's not that old
+> >>
+> >
+> > Could you share the error log please?
+> 
+> OK, I spotted one issue with this code:
+> 
+> arch/arm/crypto/sha256-core.S: Assembler messages:
+> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
+> after fixup
 
-> > This might be the sort of thing normally handled by a system controller,
-> > I have to say I had assumed this had all been discussed in the previous
-> > iterations of this seriee.
+yes exactly
+> 
+> This is caused by the fact that, when building the integer-only code
+> for an older architecture, the conditional compilation produces a
+> slightly bigger preceding function, and the symbol K256 is out of
+> range for the adr instruction.
 
-> sorry, but i missed this important fact.
+Yeap I see that too when debuging
+> 
+> @Jean-Christophe: is that the same problem that you hit?
+> 
+> @Andy: I propose we do something similar as in the bsaes code:
+> 
+> #ifdef __thumb__
+> #define adrl adr
+> #endif
+> 
+> and replace the offending line with
+> 
+> adrl r14,K256
 
-> If you speak of system controller, do you mean the usage of
-> drivers/mfd/syscon.c ?
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/14a7e477/attachment.sig>
+on arm926ejs
+
+Best Regards,
+J.
