@@ -1,31 +1,29 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Mar 2015 15:36:37 -0700
-Subject: [PATCH v3 1/9] regmap: Introduce regmap_get_max_register.
-In-Reply-To: <1427236179-18580-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Tue, 24 Mar 2015 15:37:45 -0700
+Subject: [PATCH v3 2/9] regmap: Introduce regmap_get_reg_stride.
+In-Reply-To: <1427236200-18625-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427236179-18580-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150324223637.GB28997@sirena.org.uk>
+ <1427236200-18625-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150324223745.GC28997@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:29:39PM +0000, Srinivas Kandagatla wrote:
+On Tue, Mar 24, 2015 at 10:30:00PM +0000, Srinivas Kandagatla wrote:
 
-> This patch introduces regmap_get_max_register() function which would be
-> used by the infrastructures like eeprom framework built on top of
-> regmap.
+> + /* regmap_get_reg_stride(): Report the register address stride
+> + *
+> + * Report the register address stride, mainly intended to for use by
+> + * generic infrastructure built on top of regmap.
+> + */
+> +int regmap_get_reg_stride(struct regmap *map)
 
-In what way would it be used?
-
-> +int regmap_get_max_register(struct regmap *map)
-> +{
-> +	return map->max_register ? : -EINVAL;
-> +}
-
-Please write the logic out properly, don't abuse the ternery operator.
+Please fix the indentation for the comment block and add kerneldoc for
+the argument.  This is an exported function so it should also be /** not
+/*
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/02923a85/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/a37136bd/attachment-0001.sig>
