@@ -1,96 +1,81 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 24 Mar 2015 18:05:43 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <20150324122702.GJ14457@ns203013.ovh.net>
- <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
- <20150324130511.GK14457@ns203013.ovh.net>
- <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
- <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
-Message-ID: <20150324170543.GL14457@ns203013.ovh.net>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 24 Mar 2015 18:21:34 +0100
+Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <CALszF6DX2pz_US6uqQwBjmZhfgjw5PP1UAy9H+c-_Kgkk_Z72w@mail.gmail.com>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
+ <CAHp75Vd7+oLiLLuyocYh95TebtocWrRho6xNjuSUt8fYGp8npg@mail.gmail.com>
+ <CALszF6BWuUYRh+3rWnSQLApkAHA5dQXw=6x6D_evRtb+5B_ukA@mail.gmail.com>
+ <CAHp75Vdf6=z1d5+eYJ+QGTko9kkZf-oPfoWaf8FRoTdqcdWxjw@mail.gmail.com>
+ <CALszF6A5Zu7i0hxSLTS-nfOAXmd0__jLjB=fHxK93Ex5Vbi9LA@mail.gmail.com>
+ <550AE41C.8070803@hurleysoftware.com>
+ <CALszF6DX2pz_US6uqQwBjmZhfgjw5PP1UAy9H+c-_Kgkk_Z72w@mail.gmail.com>
+Message-ID: <CALszF6Dg7t9+F9NG+xREPQeaAj7T6D1GuGabkr8EvOAAdtg7yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:46 Tue 24 Mar     , Ard Biesheuvel wrote:
-> On 24 March 2015 at 14:06, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 24 March 2015 at 14:05, Jean-Christophe PLAGNIOL-VILLARD
-> > <plagnioj@jcrosoft.com> wrote:
-> >>  >> +     '&eor   ($t0,$t0,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',   # Sigma0(a)
-> >>> >> +     '&add   ($h,$h,$t1)',                   # h+=Ch(e,f,g)
-> >>> >> +     '&ldr   ($t1,sprintf "[sp,#%d]",4*(($j+1)&15))  if (($j&15)!=15);'.
-> >>> >> +     '&ldr   ($t1,"[$Ktbl]")                         if ($j==15);'.
-> >>> >> +     '&ldr   ($t1,"[sp,#64]")                        if ($j==31)',
-> >>> >> +     '&and   ($t3,$t3,$t2)',                 # (b^c)&=(a^b)
-> >>> >> +     '&add   ($d,$d,$h)',                    # d+=h
-> >>> >> +     '&add   ($h,$h,$t0,"ror#$Sigma0[0]");'. # h+=Sigma0(a)
-> >>> >> +     '&eor   ($t3,$t3,$b)',                  # Maj(a,b,c)
-> >>> >> +     '$j++;  unshift(@V,pop(@V)); ($t2,$t3)=($t3,$t2);'
-> >>> >> +     )
-> >>> >> +}
-> >>> >> +
-> >>> >> +$code.=<<___;
-> >>> >> +#if __ARM_MAX_ARCH__>=7
-> >>> > this will be compile on armv4 but gcc will not allow it
-> >>> >
-> >>> > we need to drop the neon code for older non v7 build
-> >>> >
-> >>>
-> >>> The .arch and .fpu declarations ensure that it can be built regardless
-> >>> of the platform you are compiling for, unless you have a really old
-> >>> toolchain.
-> >> I known but does not work for me
-> >>> The glue code ensures that the module can only be loaded if HWCAP_NEON is set.
-> >>>
-> >>> Did you get errors trying to build it?
-> >>
-> >> yes I do
-> >>
-> >> I use
-> >>
-> >> arm-none-linux-gnueabi-gcc (Sourcery CodeBench Lite 2014.05-29) 4.8.3 20140320
-> >> (prerelease)
-> >> Copyright (C) 2013 Free Software Foundation, Inc.
-> >> This is free software; see the source for copying conditions.  There is NO
-> >> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> >>
-> >> so it's not that old
-> >>
-> >
-> > Could you share the error log please?
-> 
-> OK, I spotted one issue with this code:
-> 
-> arch/arm/crypto/sha256-core.S: Assembler messages:
-> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
-> after fixup
+Hi Peter,
 
-yes exactly
-> 
-> This is caused by the fact that, when building the integer-only code
-> for an older architecture, the conditional compilation produces a
-> slightly bigger preceding function, and the symbol K256 is out of
-> range for the adr instruction.
+2015-03-19 18:35 GMT+01:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> 2015-03-19 15:58 GMT+01:00 Peter Hurley <peter@hurleysoftware.com>:
+>> On 03/19/2015 09:55 AM, Maxime Coquelin wrote:
+>>>>>>> +static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
+>>>>>>> +                           struct ktermios *old)
+>> [...]
+>>>>>>> +       usardiv = (port->uartclk * 25) / (baud * 4);
+>>>>>>> +       mantissa = (usardiv / 100) << USART_BRR_DIV_M_SHIFT;
+>>>>>>> +       fraction = DIV_ROUND_CLOSEST((usardiv % 100) * 16, 100);
+>>>>>>> +       if (fraction & ~USART_BRR_DIV_F_MASK) {
+>>>>>>> +               fraction = 0;
+>>>>>>> +               mantissa += (1 << USART_BRR_DIV_M_SHIFT);
+>>>>>>> +       }
+>> [...]
+>>> Really, I would prefer keeping this fractional divider as it is
+>>> implemented today.
+>>
+>> You have to admit that's basically an unintelligible mess;
+>> how would anyone ever be able to refactor and replace that with a
+>> common divider implementation?
+>>
+>> At the very least, please comment on the formula and format.
+>
+> Ok, I will refactor the implementation, and comment it.
 
-Yeap I see that too when debuging
-> 
-> @Jean-Christophe: is that the same problem that you hit?
-> 
-> @Andy: I propose we do something similar as in the bsaes code:
-> 
-> #ifdef __thumb__
-> #define adrl adr
-> #endif
-> 
-> and replace the offending line with
-> 
-> adrl r14,K256
+The implementation was indeed a mess.
+I found some time to refactor the code, and also added support for 8
+times oversampling (16 by default).
+It will allow to achieve higher speeds, with the side effect of being
+less tolerant to clock deviations.
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+What do you think about the code below?
 
-on arm926ejs
 
-Best Regards,
-J.
+    usartdiv = DIV_ROUND_CLOSEST(port->uartclk, baud);
+
+    /*
+     * The USART supports 16 or 8 times oversampling.
+     * By default we prefer 16 times oversampling, so that the receiver
+     * has a better tolerance to clock deviations.
+     * 8 times oversampling is only used to achieve higher speeds.
+     */
+    if (usartdiv < 16) {
+        oversampling = 8;
+        stm32_set_bits(port, USART_CR1, USART_CR1_OVER8);
+    } else {
+        oversampling = 16;
+        stm32_clr_bits(port, USART_CR1, USART_CR1_OVER8);
+    }
+
+    mantissa = (usartdiv / oversampling) << USART_BRR_DIV_M_SHIFT;
+    fraction = usartdiv % oversampling;
+    writel_relaxed(mantissa | fraction, port->membase + USART_BRR)
+
+Thanks,
+Maxime
+>
+> Regards,
+> Maxime
+>
+>>
+>> Regards,
+>> Peter Hurley
