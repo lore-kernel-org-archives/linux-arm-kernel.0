@@ -1,133 +1,46 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 24 Mar 2015 16:53:30 +0000
-Subject: [PATCH 4.0-rc5 v19 2/6] irqchip: gic: Make gic_raise_softirq FIQ-safe
-In-Reply-To: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
-References: <1427216014-5324-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1427216014-5324-3-git-send-email-daniel.thompson@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 25 Mar 2015 00:53:26 +0800
+Subject: [PATCH resend v2 1/2] ARM: dts: sun4i: a10-lime: Override and remove
+ 1008MHz OPP setting
+In-Reply-To: <1427216007-9185-1-git-send-email-wens@csie.org>
+References: <1427216007-9185-1-git-send-email-wens@csie.org>
+Message-ID: <1427216007-9185-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is currently possible for FIQ handlers to re-enter gic_raise_softirq()
-and lock up.
+The Olimex A10-Lime is known to be unstable when running at 1008MHz.
 
-    	gic_raise_softirq()
-	   lock(x);
--~-> FIQ
-        handle_fiq()
-	   gic_raise_softirq()
-	      lock(x);		<-- Lockup
-
-arch/arm/ uses IPIs to implement arch_irq_work_raise(), thus this issue
-renders it difficult for FIQ handlers to safely defer work to less
-restrictive calling contexts.
-
-This patch fixes the problem by converting the cpu_map_migration_lock
-into a rwlock making it safe to re-enter the function.
-
-Note that having made it safe to re-enter gic_raise_softirq() we no
-longer need to mask interrupts during gic_raise_softirq() because the
-b.L migration is always performed from task context.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/irqchip/irq-gic.c | 38 +++++++++++++++++++++++++-------------
- 1 file changed, 25 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a181b836d5ea..578ffc5ec087 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -75,22 +75,25 @@ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- /*
-  * This lock is used by the big.LITTLE migration code to ensure no IPIs
-  * can be pended on the old core after the map has been updated.
-+ *
-+ * This lock may be locked for reading from both IRQ and FIQ handlers
-+ * and therefore must not be locked for writing when these are enabled.
-  */
- #ifdef CONFIG_BL_SWITCHER
--static DEFINE_RAW_SPINLOCK(cpu_map_migration_lock);
-+static DEFINE_RWLOCK(cpu_map_migration_lock);
+diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+index ab7891c43231..75742f8f96f3 100644
+--- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
++++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
+@@ -56,6 +56,22 @@
+ 	model = "Olimex A10-OLinuXino-LIME";
+ 	compatible = "olimex,a10-olinuxino-lime", "allwinner,sun4i-a10";
  
--static inline void gic_migration_lock(unsigned long *flags)
-+static inline void gic_migration_lock(void)
- {
--	raw_spin_lock_irqsave(&cpu_map_migration_lock, *flags);
-+	read_lock(&cpu_map_migration_lock);
- }
- 
--static inline void gic_migration_unlock(unsigned long flags)
-+static inline void gic_migration_unlock(void)
- {
--	raw_spin_unlock_irqrestore(&cpu_map_migration_lock, flags);
-+	read_unlock(&cpu_map_migration_lock);
- }
- #else
--static inline void gic_migration_lock(unsigned long *flags) {}
--static inline void gic_migration_unlock(unsigned long flags) {}
-+static inline void gic_migration_lock(void) {}
-+static inline void gic_migration_unlock(void) {}
- #endif
- 
- /*
-@@ -647,12 +650,20 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
- #endif
- 
- #ifdef CONFIG_SMP
-+/*
-+ * Raise the specified IPI on all cpus set in mask.
-+ *
-+ * This function is safe to call from all calling contexts, including
-+ * FIQ handlers. It relies on gic_migration_lock() being multiply acquirable
-+ * to avoid deadlocks when the function is re-entered at different
-+ * exception levels.
-+ */
- static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
- 	int cpu;
--	unsigned long flags, map = 0;
-+	unsigned long map = 0;
- 
--	gic_migration_lock(&flags);
-+	gic_migration_lock();
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
-@@ -667,7 +678,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 	/* this always happens on GIC0 */
- 	writel_relaxed(map << 16 | irq, gic_data_dist_base(&gic_data[0]) + GIC_DIST_SOFTINT);
- 
--	gic_migration_unlock(flags);
-+	gic_migration_unlock();
- }
- #endif
- 
-@@ -715,7 +726,8 @@ int gic_get_cpu_id(unsigned int cpu)
-  * Migrate all peripheral interrupts with a target matching the current CPU
-  * to the interface corresponding to @new_cpu_id.  The CPU interface mapping
-  * is also updated.  Targets to other CPU interfaces are unchanged.
-- * This must be called with IRQs locally disabled.
-+ * This must be called from a task context and with IRQ and FIQ locally
-+ * disabled.
-  */
- void gic_migrate_target(unsigned int new_cpu_id)
- {
-@@ -746,9 +758,9 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 	 * pending on the old cpu static. That means we can defer the
- 	 * migration until after we have released the irq_controller_lock.
- 	 */
--	raw_spin_lock(&cpu_map_migration_lock);
-+	write_lock(&cpu_map_migration_lock);
- 	gic_cpu_map[cpu] = 1 << new_cpu_id;
--	raw_spin_unlock(&cpu_map_migration_lock);
-+	write_unlock(&cpu_map_migration_lock);
- 
- 	/*
- 	 * Find all the peripheral interrupts targetting the current
++	cpus {
++		cpu0: cpu at 0 {
++			/*
++			 * The A10-Lime is known to be unstable
++			 * when running at 1008 MHz
++			 */
++			operating-points = <
++				/* kHz    uV */
++				912000  1350000
++				864000  1300000
++				624000  1250000
++				>;
++			cooling-max-level = <2>;
++		};
++	};
++
+ 	soc at 01c00000 {
+ 		emac: ethernet at 01c0b000 {
+ 			pinctrl-names = "default";
 -- 
-2.1.0
+2.1.4
