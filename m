@@ -1,77 +1,39 @@
-From: greg.bellows@linaro.org (Greg Bellows)
-Date: Tue, 24 Mar 2015 09:32:40 -0500
-Subject: [Qemu-devel] [PATCH v5 1/6] target-arm: Store SPSR_EL1 state in
- banked_spsr[1] (SPSR_svc)
-In-Reply-To: <1427130344-27986-2-git-send-email-alex.bennee@linaro.org>
-References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
- <1427130344-27986-2-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAOgzsHUUsZS5hkyPCWer_OurJXy9v5U3g8AjtRV=9uszL4nntg@mail.gmail.com>
+From: jonas@microbit.se (Jonas Andersson)
+Date: Tue, 24 Mar 2015 15:32:08 +0100
+Subject: at91 clocks
+Message-ID: <55117568.6090202@microbit.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 12:05 PM, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> From: Peter Maydell <peter.maydell@linaro.org>
->
-> The AArch64 SPSR_EL1 register is architecturally mandated to
-> be mapped to the AArch32 SPSR_svc register. This means its
-> state should live in QEMU's env->banked_spsr[1] field.
-> Correct the various places in the code that incorrectly
-> put it in banked_spsr[0].
->
-> Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
->
-> diff --git a/target-arm/helper-a64.c b/target-arm/helper-a64.c
-> index 7e0d038..861f6fa 100644
-> --- a/target-arm/helper-a64.c
-> +++ b/target-arm/helper-a64.c
-> @@ -523,7 +523,7 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
->          aarch64_save_sp(env, arm_current_el(env));
->          env->elr_el[new_el] = env->pc;
->      } else {
-> -        env->banked_spsr[0] = cpsr_read(env);
-> +        env->banked_spsr[aarch64_banked_spsr_index(new_el)] = cpsr_read(env);
+Hi all,
 
-Are the other banks (2-5) only used for KVM?  It seems we go out of
-our way to manage this larger SPSR array then not use all of the slots
-in QEMU itself.
+I am working on a system with at91sam9260 soc. Trying to move from 
+kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
 
->          if (!env->thumb) {
->              env->cp15.esr_el[new_el] |= 1 << 25;
->          }
-> diff --git a/target-arm/helper.c b/target-arm/helper.c
-> index 10886c5..d77c6de 100644
-> --- a/target-arm/helper.c
-> +++ b/target-arm/helper.c
-> @@ -2438,7 +2438,7 @@ static const ARMCPRegInfo v8_cp_reginfo[] = {
->      { .name = "SPSR_EL1", .state = ARM_CP_STATE_AA64,
->        .type = ARM_CP_ALIAS,
->        .opc0 = 3, .opc1 = 0, .crn = 4, .crm = 0, .opc2 = 0,
-> -      .access = PL1_RW, .fieldoffset = offsetof(CPUARMState, banked_spsr[0]) },
-> +      .access = PL1_RW, .fieldoffset = offsetof(CPUARMState, banked_spsr[1]) },
->      /* We rely on the access checks not allowing the guest to write to the
->       * state field when SPSel indicates that it's being used as the stack
->       * pointer.
-> diff --git a/target-arm/internals.h b/target-arm/internals.h
-> index bb171a7..2cc3017 100644
-> --- a/target-arm/internals.h
-> +++ b/target-arm/internals.h
-> @@ -82,11 +82,14 @@ static inline void arm_log_exception(int idx)
->
->  /*
->   * For AArch64, map a given EL to an index in the banked_spsr array.
-> + * Note that this mapping and the AArch32 mapping defined in bank_number()
-> + * must agree such that the AArch64<->AArch32 SPSRs have the architecturally
-> + * mandated mapping between each other.
->   */
->  static inline unsigned int aarch64_banked_spsr_index(unsigned int el)
->  {
->      static const unsigned int map[4] = {
-> -        [1] = 0, /* EL1.  */
-> +        [1] = 1, /* EL1.  */
->          [2] = 6, /* EL2.  */
->          [3] = 7, /* EL3.  */
->      };
-> --
-> 2.3.2
->
->
+In my old code i use clk_get() to get pck1 and pllb, set pllb as parent 
+for pck1, set rate for pck1, enable pck1. Extract from 
+/sys/kernel/debug/at91_clk:
+pllb       users= 1 on   96000000 Hz main
+pck1       users= 1 on   12000000 Hz pllb
+
+In my new code i have defined the two clocks in DT:
+         clocks = <&prog1>, <&pllb>;
+         clock-names = "codec", "parent";
+Extract from  /sys/kernel/debug/clk/clk_summary:
+        mainck                             2            2 
+18432000          0 0
+           prog1                           1            1 
+9216000          0 0
+              pck1                         0            0 
+9216000          0 0
+           pllbck                          0            0 0          0 0
+              usbck                        0            0 0          0 0
+                 udpck                     0            0 0          0 0
+                 uhpck                     0            0 0          0 0
+
+I know i probably have to enable pck1 also.
+But my main problem is that I got the wrong frequency and parent of prog1.
+Why?
+
+Thanks
+  Jonas
