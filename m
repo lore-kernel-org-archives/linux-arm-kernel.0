@@ -1,40 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Mar 2015 14:51:04 -0700
-Subject: [PATCH resend v2 0/2] ARM: dts: sunxi: Fix cpufreq instabilities
-In-Reply-To: <1427216007-9185-1-git-send-email-wens@csie.org>
-References: <1427216007-9185-1-git-send-email-wens@csie.org>
-Message-ID: <20150324215104.GA23664@lukather>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 24 Mar 2015 15:11:22 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.1 #3
+Message-ID: <1427235082-27415-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 12:53:25AM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
-> 
-> Here's v2 of the sunxi cpufreq dts fixes, rebased onto v4.0-rc5.
-> I assume you'll fix up the merge conflicts with 4.1 stuff?
-> 
-> The first patch limits the Olimex A10-Lime to 912MHz, as a few people
-> reported on IRC that it was unstable at 1008MHz.
-> 
-> The second patch removes the overclocking settings from sun[457]i dts,
-> so all the boards will be stable, regardless of whether regulators
-> were added or not.
-> 
-> I would like to revisit this after the new OPP bindings are merged
-> and support added to cpufreq-dt.
+The following changes since commit cd590b50a9367b52520f6866b27f72317bb1a07e:
 
-Applied both, thanks!
+  ARM: dts: enable PCIe support for Cygnus (2015-03-13 09:20:47 -0700)
 
-Maxime
+are available in the git repository at:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/0016420b/attachment.sig>
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.1/devicetree-part-3
+
+for you to fetch changes up to 0c02acec74b655fe44b698d293f6f2a9600c4a8b:
+
+  ARM: dts: brcmstb: add IRQ0 controller (2015-03-19 09:34:14 -0700)
+
+----------------------------------------------------------------
+This pull request contains changes to the BCM7445 reference DTS files from
+Brian:
+
+- making a clock-frequency property decimal instead of hexadecimal
+
+- adding the irq0 interrupt controller node to make the reference DTS bootable
+  again
+
+----------------------------------------------------------------
+Brian Norris (2):
+      ARM: dts: brcmstb: un-hexify clock frequency
+      ARM: dts: brcmstb: add IRQ0 controller
+
+ arch/arm/boot/dts/bcm7445.dtsi | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
