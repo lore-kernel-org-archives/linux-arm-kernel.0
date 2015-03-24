@@ -1,59 +1,78 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 23 Mar 2015 22:22:51 -0700
-Subject: [PATCH] ARM: cygnus: fix const declaration bcm_cygnus_dt_compat
-In-Reply-To: <5510F38C.6090501@broadcom.com>
-References: <1426981535-1800-1-git-send-email-stefan@agner.ch>
- <5510F38C.6090501@broadcom.com>
-Message-ID: <5510F4AB.1000101@broadcom.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 24 Mar 2015 07:31:24 +0200
+Subject: [PATCH 2/2] rtc: driver for Conexant Digicolor CX92755 on-chip RTC
+In-Reply-To: <20150323153334.a373431dd5af6b669f716d83@linux-foundation.org>
+References: <fa36a31a1d58d626ca0cb01ca0dece85aa2dfcb9.1427117334.git.baruch@tkos.co.il>
+ <374ef109005ed14c3a0052a9da5226b87f8dc215.1427117334.git.baruch@tkos.co.il>
+ <20150323153334.a373431dd5af6b669f716d83@linux-foundation.org>
+Message-ID: <20150324053124.GN2825@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andrew,
 
-
-On 3/23/2015 10:18 PM, Scott Branden wrote:
-> Hi Stefan,
+On Mon, Mar 23, 2015 at 03:33:34PM -0700, Andrew Morton wrote:
+> On Mon, 23 Mar 2015 15:28:54 +0200 Baruch Siach <baruch@tkos.co.il> wrote:
+> > Add driver for the RTC hardware block on the Conexant CX92755 SoC, from 
+> > the
+> > Digicolor series of SoCs. Tested on the Equinox evaluation board for the
+> > CX92755 chip.
+> > 
+> > ...
+> >
+> > +static int dc_rtc_read(struct dc_rtc *rtc, unsigned long *val)
+> > +{
+> > +	u8 read_cmds[] = {CMD_READ, CMD_NOP};
+> > +	u32 reference, time1, time2;
+> > +	int ret;
+> > +
+> > +	ret = dc_rtc_cmds(rtc, read_cmds, ARRAY_SIZE(read_cmds));
 > 
-> On 15-03-21 04:45 PM, Stefan Agner wrote:
->> The const declaration for char* is actually duplicated, however
->> the array of strings is currently not constant. However, typically
->> the dt_compat array is declared as const char *const. Follow
->> that convention and also add the __initconst macro for constant
->> initialization data.
->>
-> Acked-by: Scott Branden <sbranden@broadcom.com>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->> This was uncovered by a LLVM/clang warning:
->> arch/arm/mach-bcm/bcm_cygnus.c:16:19: warning: duplicate 'const'
->> declaration
->> specifier [-Wduplicate-decl-specifier]
->> static const char const *bcm_cygnus_dt_compat[] = {
->>                    ^~~~~~
->> 1 warning generated.
->>
->>   arch/arm/mach-bcm/bcm_cygnus.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-bcm/bcm_cygnus.c
->> b/arch/arm/mach-bcm/bcm_cygnus.c
->> index 30dc58b..7ae894c 100644
->> --- a/arch/arm/mach-bcm/bcm_cygnus.c
->> +++ b/arch/arm/mach-bcm/bcm_cygnus.c
->> @@ -13,7 +13,7 @@
->>
->>   #include <asm/mach/arch.h>
->>
->> -static const char const *bcm_cygnus_dt_compat[] = {
->> +static const char * const bcm_cygnus_dt_compat[] __initconst = {
->>       "brcm,cygnus",
->>       NULL,
->>   };
->>
-> Thanks for submitting.  We will test this.
+> This is asking the compiler to build read_cmds[] on the stack each time
+> dc_rtc_read() is called.
 > 
-> Scott
+> If we instead create the array at compile time:
+> 
+> +++ a/drivers/rtc/rtc-digicolor.c
+> @@ -42,7 +42,7 @@ struct dc_rtc {
+>  	void __iomem		*regs;
+>  };
+>  
+> -static int dc_rtc_cmds(struct dc_rtc *rtc, u8 *cmds, int len)
+> +static int dc_rtc_cmds(struct dc_rtc *rtc, const u8 *cmds, int len)
+>  {
+>  	u8 val;
+>  	int i, ret;
+> @@ -62,7 +62,7 @@ static int dc_rtc_cmds(struct dc_rtc *rt
+>  
+>  static int dc_rtc_read(struct dc_rtc *rtc, unsigned long *val)
+>  {
+> -	u8 read_cmds[] = {CMD_READ, CMD_NOP};
+> +	static const u8 read_cmds[] = {CMD_READ, CMD_NOP};
+>  	u32 reference, time1, time2;
+>  	int ret;
+>  
+> @@ -86,7 +86,7 @@ static int dc_rtc_read(struct dc_rtc *rt
+>  
+>  static int dc_rtc_write(struct dc_rtc *rtc, u32 val)
+>  {
+> -	u8 write_cmds[] = {CMD_WRITE, CMD_NOP, CMD_RESET, CMD_NOP};
+> +	static const u8 write_cmds[] = {CMD_WRITE, CMD_NOP, CMD_RESET, CMD_NOP};
+>  
+>  	writel_relaxed(val, rtc->regs + DC_RTC_REFERENCE);
+>  	return dc_rtc_cmds(rtc, write_cmds, ARRAY_SIZE(write_cmds));
+> 
+> The code gets a bit smaller and faster:
+> 
+>    text    data     bss     dec     hex filename
+>    1628     400     512    2540     9ec drivers/rtc/rtc-digicolor.o-before
+>    1593     400     536    2529     9e1 drivers/rtc/rtc-digicolor.o-after
 
-Change looks fine and tested fine on Cygnus BCM958300k board. Thanks!
+Thanks for the tip, and for taking the driver through your tree.
 
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Tested-by: Ray Jui <rjui@broadcom.com>
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
