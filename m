@@ -1,58 +1,84 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 24 Mar 2015 16:55:10 +0200
-Subject: [PATCHv2 10/10] CLK: TI: always enable DESHDCP clock
-In-Reply-To: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1427208910-17678-11-git-send-email-tomi.valkeinen@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 24 Mar 2015 14:59:02 +0000
+Subject: linux-next: manual merge of the arm-soc tree with the arm-perf
+ tree
+In-Reply-To: <20150324081610.52b1e92d@canb.auug.org.au>
+References: <20150323113318.0319c248@canb.auug.org.au>	<CAM4voanC-ur=A-UJ+Jw4qECUOnd-gZ2V87794tEVWJOqaqDT+g@mail.gmail.com>	<55102DAF.7050206@arm.com>
+ <20150324081610.52b1e92d@canb.auug.org.au>
+Message-ID: <55117BB6.9050704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DESHDCP clock is needed on DRA7 based SoCs to enable the DSS IP. That
-clock is an odd one, as it is not supposed to be any kind of core clock
-for DSS, and we don't even support HDCP, but the clock is still needed
-even for the HWMOD framework to be able to reset the DSS IP.
+On 23/03/15 21:16, Stephen Rothwell wrote:
+> Hi all,
+>
+> On Mon, 23 Mar 2015 15:13:51 +0000 "Suzuki K. Poulose" <Suzuki.Poulose@arm.com> wrote:
+>>
+>> On 23/03/15 14:41, Abhilash Kesavan wrote:
+>>>
+>>> On Mon, Mar 23, 2015 at 6:03 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>>>>
+>>>> Today's linux-next merge of the arm-soc tree got a conflict in
+>>>> drivers/bus/Kconfig between commit c9966c98697a ("arm-cci: Split the
+>>>> code for PMU vs driver support") from the arm-perf tree and commit
+>>>> 13fbf3c8d0f7 ("drivers: bus: Sort Kconfig entries alphabetically") from
+>>>> the arm-soc tree.
+>>>>
+>>>> I fixed it up (see below) and can carry the fix as necessary (no action
+>>>> is required).
+>>>
+>>> Not sure if this has been reported elsewhere, but I am seeing core
+>>> boot-up failures on the exynos5420 with next-20150323 due to this.
+>>> Your conflict fix is missing the ARM_CCI symbol because of which the
+>>> CCI does not get enabled.
+>>>
+>>> Suzuki, can you confirm ?
+>>
+>> Yes, you are right. We need the config ARM_CCI even now, which enables
+>> the building of the arm-cci.c.
+>>
+>> Stephen,
+>>
+>> We need the following fix on the linux-next.
+>
+> Oops, sorry about that.  I have fixed up the merge resolution for today
+> so that file starts like this:
+>
+> #
+> # Bus Devices
+> #
+>
+> menu "Bus devices"
+>
+> config ARM_CCI
+> 	bool
+>
+> config ARM_CCI400_COMMON
+> 	bool
+> 	select ARM_CCI
+>
+> config ARM_CCI400_PMU
+> 	bool "ARM CCI400 PMU support"
+> 	default y
+> 	depends on ARM || ARM64
+> 	depends on HW_PERF_EVENTS
+> 	select ARM_CCI400_COMMON
+> 	help
+> 	  Support for PMU events monitoring on the ARM CCI cache coherent
+> 	  interconnect.
+>
+> 	  If unsure, say Y
+>
+> config ARM_CCI400_PORT_CTRL
+> 	bool
+> 	depends on ARM && OF && CPU_V7
+> 	select ARM_CCI400_COMMON
+> 	help
+> 	  Low level power management driver for CCI400 cache coherent
+> 	  interconnect for ARM platforms.
 
-As there's no support for multiple core clocks in the HWMOD framework,
-we don't have any obvious place to enable this clock when DSS IP is
-being enabled.
+Looks good.
 
-Furthermore, the HDMI on OMAP5 DSS is the same as on DRA7, and OMAP5
-does not have any such clock configuration bit. This suggests that on
-OMAP5 the DESHDCP clock is always enabled, and for DRA7 we have the
-possibility to gate it.
+Thanks
 
-So, as we don't have any clean way to enable and disable the clock
-based on the need, this patch enables the clock at boot time, making it
-work similarly to OMAP5.
-
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- drivers/clk/ti/clk-7xx.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/ti/clk-7xx.c b/drivers/clk/ti/clk-7xx.c
-index 7b859ec31a14..e132d0677c03 100644
---- a/drivers/clk/ti/clk-7xx.c
-+++ b/drivers/clk/ti/clk-7xx.c
-@@ -308,7 +308,7 @@ static struct ti_dt_clk dra7xx_clks[] = {
- int __init dra7xx_dt_clk_init(void)
- {
- 	int rc;
--	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck;
-+	struct clk *abe_dpll_mux, *sys_clkin2, *dpll_ck, *hdcp_ck;
- 
- 	ti_dt_clocks_register(dra7xx_clks);
- 
-@@ -344,5 +344,10 @@ int __init dra7xx_dt_clk_init(void)
- 	if (rc)
- 		pr_err("%s: failed to set USB_DPLL M2 OUT\n", __func__);
- 
-+	hdcp_ck = clk_get_sys(NULL, "dss_deshdcp_clk");
-+	rc = clk_prepare_enable(hdcp_ck);
-+	if (rc)
-+		pr_err("%s: failed to set dss_deshdcp_clk\n", __func__);
-+
- 	return rc;
- }
--- 
-2.3.3
+Suzuki
