@@ -1,98 +1,149 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 24 Mar 2015 22:30:30 +0000
-Subject: [PATCH v3 5/9] eeprom: Add bindings for simple eeprom framework
+Date: Tue, 24 Mar 2015 22:30:55 +0000
+Subject: [PATCH v3 7/9] eeprom: qfprom: Add Qualcomm QFPROM support.
 In-Reply-To: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427236230-18751-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1427236255-18840-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds bindings for simple eeprom framework which allows eeprom
-consumers to talk to eeprom providers to get access to eeprom cell data.
+This patch adds QFPROM support driver which is used by other drivers
+like thermal sensor and cpufreq.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[Maxime Ripard: intial version of eeprom framework]
+On MSM parts there are some efuses (called qfprom) these fuses store things like
+calibration data, speed bins.. etc. Drivers like cpufreq, thermal sensors would
+read out this data for configuring the driver.
+
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- .../devicetree/bindings/eeprom/eeprom.txt          | 70 ++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+ drivers/eeprom/Kconfig  | 11 +++++++
+ drivers/eeprom/Makefile |  2 ++
+ drivers/eeprom/qfprom.c | 87 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 100 insertions(+)
+ create mode 100644 drivers/eeprom/qfprom.c
 
-diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
+index ad396c1..8fc14d3 100644
+--- a/drivers/eeprom/Kconfig
++++ b/drivers/eeprom/Kconfig
+@@ -23,4 +23,15 @@ config EEPROM_SUNXI_SID
+ 	  This driver can also be built as a module. If so, the module
+ 	  will be called eeprom-sunxi-sid.
+ 
++config QCOM_QFPROM
++	tristate "QCOM QFPROM Support"
++	depends on ARCH_QCOM
++	select REGMAP_MMIO
++	help
++	  Say y here to enable QFPROM support. The QFPROM provides access
++	  functions for QFPROM data to rest of the drivers via eeprom interface.
++
++	  This driver can also be built as a module. If so, the module
++	  will be called eeprom-qfprom.
++
+ endif
+diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
+index 184aa53..4ac437e 100644
+--- a/drivers/eeprom/Makefile
++++ b/drivers/eeprom/Makefile
+@@ -8,3 +8,5 @@ eeprom_core-y			:= core.o
+ # Devices
+ obj-$(CONFIG_EEPROM_SUNXI_SID)	+= eeprom-sunxi-sid.o
+ eeprom-sunxi-sid-y		:= sunxi-sid.o
++obj-$(CONFIG_QCOM_QFPROM)	+= eeprom_qfprom.o
++eeprom_qfprom-y			:= qfprom.o
+diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
 new file mode 100644
-index 0000000..8348d18
+index 0000000..8d5d4d8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-@@ -0,0 +1,70 @@
-+= EEPROM Data Device Tree Bindings =
++++ b/drivers/eeprom/qfprom.c
+@@ -0,0 +1,87 @@
++/*
++ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This binding is intended to represent the location of hardware
-+configuration data stored in EEPROMs.
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/regmap.h>
++#include <linux/platform_device.h>
++#include <linux/eeprom-provider.h>
 +
-+On a significant proportion of boards, the manufacturer has stored
-+some data on an EEPROM-like device, for the OS to be able to retrieve
-+these information and act upon it. Obviously, the OS has to know
-+about where to retrieve these data from, and where they are stored on
-+the storage device.
++static struct regmap_config qfprom_regmap_config = {
++	.reg_bits = 32,
++	.val_bits = 8,
++	.reg_stride = 1,
++};
 +
-+This document is here to document this.
++static struct eeprom_config econfig = {
++	.name = "qfprom",
++};
 +
-+= Data providers =
-+Contains bindings specific to provider drivers and data cells as children
-+to this node.
++static int qfprom_remove(struct platform_device *pdev)
++{
++	struct eeprom_device *eeprom = platform_get_drvdata(pdev);
 +
-+= Data cells =
-+These are the child nodes of the provider which contain data cell
-+information like offset and size in eeprom provider.
++	return eeprom_unregister(eeprom);
++}
 +
-+Required properties:
-+reg:	specifies the offset in byte within that storage device, and the length
-+	in bytes of the data we care about.
-+	There could be more then one offset-length pairs in this property.
++static int qfprom_probe(struct platform_device *pdev)
++{
++	struct resource *res;
++	void __iomem *base;
++	struct device *dev = &pdev->dev;
++	struct eeprom_device *eeprom;
++	struct regmap *regmap;
 +
-+Optional properties:
-+As required by specific data parsers/interpreters.
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
 +
-+For example:
++	qfprom_regmap_config.max_register = resource_size(res) - 1;
 +
-+	/* Provider */
-+	qfprom: qfprom at 00700000 {
-+		compatible 	= "qcom,qfprom";
-+		reg		= <0x00700000 0x1000>;
-+		...
++	regmap = devm_regmap_init_mmio(dev, base,
++					       &qfprom_regmap_config);
++	if (IS_ERR(regmap)) {
++		dev_err(dev, "regmap init failed\n");
++		return PTR_ERR(regmap);
++	}
++	econfig.owner = THIS_MODULE;
++	econfig.dev = dev;
++	eeprom = eeprom_register(&econfig);
++	if (IS_ERR(eeprom))
++		return PTR_ERR(eeprom);
 +
-+		/* Data cells */
-+		tsens_calibration: calib at 404 {
-+			reg = <0x404 0x10>;
-+		};
++	platform_set_drvdata(pdev, eeprom);
++	return 0;
++}
 +
-+		serial_number: sn {
-+			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
++static const struct of_device_id qfprom_of_match[] = {
++	{ .compatible = "qcom,qfprom"},
++	{/* sentinel */},
++};
++MODULE_DEVICE_TABLE(of, qfprom_of_match);
 +
-+		};
-+		...
-+	};
-+
-+= Data consumers =
-+Are device nodes which consume eeprom data cells.
-+
-+Required properties:
-+
-+eeproms: List of phandle and data cell the device might be interested in.
-+
-+Optional properties:
-+
-+eeprom-names: List of data cell name strings sorted in the same order
-+	      as the eeproms property. Consumers drivers will use
-+	      eeprom-names to differentiate between multiple cells,
-+	      and hence being able to know what these cells are for.
-+
-+For example:
-+
-+	tsens {
-+		...
-+		eeproms = <&tsens_calibration>;
-+		eeprom-names = "calibration";
-+	};
++static struct platform_driver qfprom_driver = {
++	.probe = qfprom_probe,
++	.remove = qfprom_remove,
++	.driver = {
++		.name = "qcom,qfprom",
++		.of_match_table = qfprom_of_match,
++	},
++};
++module_platform_driver(qfprom_driver);
++MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
++MODULE_DESCRIPTION("Qualcomm QFPROM driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
