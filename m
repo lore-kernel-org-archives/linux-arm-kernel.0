@@ -1,72 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 11:16:24 +0100
-Subject: [PATCH] ARM: force linker to use PIC veneers
-Message-ID: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 24 Mar 2015 11:26:51 +0100
+Subject: [PATCH v6 10/12] soc/tegra: pmc: move to using a restart handler
+In-Reply-To: <1426672363-30667-11-git-send-email-tomeu.vizoso@collabora.com>
+References: <1426672363-30667-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1426672363-30667-11-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20150324102650.GB18115@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building a very large kernel, it is up to the linker to decide
-when and where to insert stubs to allow calls to functions that are
-out of range for the ordinary b/bl instructions.
+On Wed, Mar 18, 2015 at 10:52:25AM +0100, Tomeu Vizoso wrote:
+> From: David Riley <davidriley@chromium.org>
+> 
+> The pmc driver was previously exporting tegra_pmc_restart, which was
+> assigned to machine_desc.init_machine, taking precedence over the
+> restart handlers registered through register_restart_handler().
+> 
+> Signed-off-by: David Riley <davidriley@chromium.org>
+> [tomeu.vizoso at collabora.com: Rebased]
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/tegra.c |  1 -
+>  drivers/soc/tegra/pmc.c     | 31 +++++++++++++++++++++----------
+>  2 files changed, 21 insertions(+), 11 deletions(-)
 
-However, since the kernel is built as a position dependent binary,
-these stubs (aka veneers) may contain absolute addresses, which will
-break such veneer assisted far calls performed with the MMU off.
+Applied with minor cleanup to the for-4.1/soc branch.
 
-For instance, the call from __enable_mmu() in the .head.text section
-to __turn_mmu_on() in the .idmap.text section may be turned into
-something like this:
-
-c0008168 <__enable_mmu>:
-c0008168:       f020 0002       bic.w   r0, r0, #2
-c000816c:       f420 5080       bic.w   r0, r0, #4096
-c0008170:       f000 b846       b.w     c0008200 <____turn_mmu_on_veneer>
-[...]
-c0008200 <____turn_mmu_on_veneer>:
-c0008200:       4778            bx      pc
-c0008202:       46c0            nop
-c0008204:       e59fc000        ldr     ip, [pc]
-c0008208:       e12fff1c        bx      ip
-c000820c:       c13dfae1        teqgt   sp, r1, ror #21
-[...]
-c13dfae0 <__turn_mmu_on>:
-c13dfae0:       4600            mov     r0, r0
-[...]
-
-After adding --pic-veneer to the LDFLAGS, the veneer is emitted like
-this instead:
-
-c0008200 <____turn_mmu_on_veneer>:
-c0008200:       4778            bx      pc
-c0008202:       46c0            nop
-c0008204:       e59fc004        ldr     ip, [pc, #4]
-c0008208:       e08fc00c        add     ip, pc, ip
-c000820c:       e12fff1c        bx      ip
-c0008210:       013d7d31        teqeq   sp, r1, lsr sp
-c0008214:       00000000        andeq   r0, r0, r0
-
-Note that this particular example is best addressed by moving
-.head.text and .idmap.text closer together, but this issue could
-potentially affect any code that needs to execute with the
-MMU off.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index eb7bb511f853..ae5b33527f32 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -13,7 +13,7 @@
- # Ensure linker flags are correct
- LDFLAGS		:=
- 
--LDFLAGS_vmlinux	:=-p --no-undefined -X
-+LDFLAGS_vmlinux	:=-p --no-undefined -X --pic-veneer
- ifeq ($(CONFIG_CPU_ENDIAN_BE8),y)
- LDFLAGS_vmlinux	+= --be8
- LDFLAGS_MODULE	+= --be8
--- 
-1.8.3.2
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/57a9bb30/attachment-0001.sig>
