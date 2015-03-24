@@ -1,30 +1,138 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Tue, 24 Mar 2015 13:49:00 -0500 (CDT)
-Subject: [PATCH v2] ring-buffer: Replace this_cpu_*() with __this_cpu_*()
-In-Reply-To: <20150319124023.4c1b1094@gandalf.local.home>
-References: <20150316173154.537b80ee@gandalf.local.home>
- <alpine.DEB.2.11.1503170049300.9309@gentwo.org>
- <20150317081341.0f9a8b4c@gandalf.local.home>
- <20150317101113.32f5618a@gandalf.local.home>
- <20150317104038.312e73d1@gandalf.local.home>
- <20150317144701.GJ10068@pengutronix.de>
- <20150317110750.2a0e2b73@gandalf.local.home>
- <alpine.DEB.2.11.1503191120310.26866@gentwo.org>
- <alpine.DEB.2.11.1503191130330.27377@gentwo.org>
- <20150319124023.4c1b1094@gandalf.local.home>
-Message-ID: <alpine.DEB.2.11.1503241347340.32546@gentwo.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 24 Mar 2015 18:51:44 +0000
+Subject: [PATCH 2/2] ARM: cpuidle: Document the code
+In-Reply-To: <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
+References: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
+ <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
+ <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150324185144.GB27311@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Steven Rostedt wrote:
+On Tue, Mar 24, 2015 at 09:54:02AM +0000, Daniel Lezcano wrote:
+> Add kernel-doc format documentation in the code.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  arch/arm/kernel/cpuidle.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+> 
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 2b0dae3..9219613 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -21,6 +21,17 @@ static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
+>  
+>  static struct cpuidle_ops cpuidle_ops[NR_CPUS];
+>  
+> +/*
 
-> On Thu, 19 Mar 2015 11:33:30 -0500 (CDT)
-> Christoph Lameter <cl@linux.com> wrote:
->
-> > If you are redoing it then please get the comments a bit cleared up. The
->
-> What comments should I clear up? This version did not have a comment.
-> It just switched this_cpu_* to __this_cpu_*, and also updated a
-> variable algorithm.
+You miss a star here to comply with kernel-doc (comment valid throughout
+the patch for all functions).
 
-Ok fine if there is no comment.
+> + * arm_cpuidle_simple_enter() - a wrapper to cpu_do_idle()
+> + * @dev: not used
+> + * @drv: not used
+> + * @index: not used
+> + *
+> + * A trivial wrapper to allow the cpu_do_idle function to be assigned as a
+> + * cpuidle callback by matching the function signature.
+> + *
+> + * Returns the index passed as parameter
+> + */
+>  int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>  		struct cpuidle_driver *drv, int index)
+>  {
+> @@ -29,6 +40,16 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>  	return index;
+>  }
+>  
+> +/*
+> + * arm_cpuidle_suspend() - function to enter low power idle states
+> + * @index: an integer used as an identifier for the low level PM callbacks
+> + *
+> + * This function calls the underlying arch specific low level PM code as
+> + * registered at the init time.
+> + *
+> + * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
+> + * callback otherwise.
+> + */
+>  int arm_cpuidle_suspend(int index)
+>  {
+>  	int ret = -EOPNOTSUPP;
+> @@ -40,6 +61,15 @@ int arm_cpuidle_suspend(int index)
+>  	return ret;
+>  }
+>  
+> +/*
+> + * arm_cpuidle_get_ops() - find a registered cpuidle_ops by name
+> + * @method: the method name
+> + *
+> + * Search in the __cpuidle_method_of_table array the cpuidle ops matching the
+> + * method name.
+> + *
+> + * Returns a struct cpuidle_ops pointer, NULL if not found.
+> + */
+>  static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
+>  {
+>  	struct of_cpuidle_method *m = __cpuidle_method_of_table;
+> @@ -51,6 +81,19 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
+>  	return NULL;
+>  }
+>  
+> +/*
+> + * arm_cpuidle_read_ops() - Initialize the cpuidle ops with the device tree
+> + * @dn: a struct device node corresponding to a cpu node
+
+It is a pointer, not a struct.
+
+> + * @cpu: the cpu identifier
+> + *
+> + * Get the method name defined in the 'enabled-method' property, retrieve the
+> + * associated cpuidle_ops and do a struct copy. This copy is needed because all
+> + * cpuidle_ops are tagged __initdata and will be unloaded after the init
+> + * process.
+> + *
+> + * Return 0 on sucess, -ENOENT if no enabled-method is defined, -EOPNOTSUPP if
+> + * no cpuidle_ops is registered for the enabled-method.
+> + */
+>  static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+>  {
+>  	const char *enable_method;
+> @@ -75,6 +118,21 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * arm_cpuidle_init() - Initialize cpuidle_ops for a specific cpu
+> + * @cpu: the cpu to be initialized
+> + *
+> + * Initialize the cpuidle ops with the device for the cpu and then call
+> + * the cpu's idle initialization callback. This may fail if the underlying HW
+> + * is not operational.
+> + *
+> + * Returns:
+> + *  0 on success,
+> + *  -ENODEV if it fails to find the cpu node in the device tree,
+> + *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
+> + *  -ENOENT if it fails to find a enabled-method property,
+
+Ultra-nit: "an enabled-method"
+
+> + *  -ENXIO if the HW reports a failure or a misconfiguration
+
+-ENOMEM is missing.
+
+Apart from these ultraminor changes (and thanks for putting it
+together):
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> + */
+>  int __init arm_cpuidle_init(int cpu)
+>  {
+>  	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
+> -- 
+> 1.9.1
+> 
+> 
