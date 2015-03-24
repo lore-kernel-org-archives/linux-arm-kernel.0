@@ -1,62 +1,42 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 24 Mar 2015 11:30:11 -0400
-Subject: [patch v11 19/23] XEN / ACPI: Make XEN ACPI depend on X86
-In-Reply-To: <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55118303.8060003@oracle.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 24 Mar 2015 16:41:32 +0100
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
+References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150324122239.GB3579@e103592.cambridge.arm.com>
+ <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+ <alpine.LFD.2.11.1503241112420.27567@knanqh.ubzr>
+Message-ID: <CAKv+Gu8ejzFLt50-_XWALQFBENshfAL8SHf+WsfV03vyBsK5wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2015 10:02 AM, Hanjun Guo wrote:
-> When ACPI is enabled on ARM64, XEN ACPI will also compiled
-> into the kernel, but XEN ACPI is x86 dependent, so introduce
-> CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
-> functional on ARM64.
+On 24 March 2015 at 16:16, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Tue, 24 Mar 2015, Ard Biesheuvel wrote:
 >
-> CC: 'Stefano Stabellini' <stefano.stabellini@eu.citrix.com>
-> CC: Julien Grall <julien.grall@linaro.org>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> CC: David Vrabel <david.vrabel@citrix.com>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->   drivers/xen/Kconfig  | 4 ++++
->   drivers/xen/Makefile | 2 +-
->   2 files changed, 5 insertions(+), 1 deletion(-)
+>> On 24 March 2015 at 13:22, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > How many such veneers get added in the your kernel configuration, and
+>> > how many are actually necessary (i.e., calls between MMU-off code and
+>> > elsewhere)?
+>> >
+>>
+>> Very few. In addition to the example (which will be addressed in
+>> another way regardless) there are some resume functions that get
+>> allocated in .data, and those would need it as well.
 >
-> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> index b812462..a31cd29 100644
-> --- a/drivers/xen/Kconfig
-> +++ b/drivers/xen/Kconfig
-> @@ -253,4 +253,8 @@ config XEN_EFI
->   	def_bool y
->   	depends on X86_64 && EFI
->   
-> +config XEN_ACPI
-> +	def_bool y
-> +	depends on X86 && ACPI
-> +
+>
+> What are they? I thought we removed all instances of those already.
+>
 
+It is cpu_resume() and then some mach specific sleep.S files that do a
+relative branch to cpu_resume().
+But it seems cpu_resume() could easily be moved to .text, it's just
+one PC relative load that needs to be rewritten
 
-I think XEN_DOM0 (in arch/x86/xen/Kconfig) should select this option. 
-Otherwise, if it is set to 'n', we won't be able to build enlighten.c 
-(xen_start_kernel() -> xen_acpi_sleep_register() refers to 
-xen_acpi_notify_hypervisor_sleep()).
-
--boris
-
->   endmenu
-> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-> index 2ccd359..f4622ab 100644
-> --- a/drivers/xen/Makefile
-> +++ b/drivers/xen/Makefile
-> @@ -13,7 +13,7 @@ CFLAGS_efi.o				+= -fshort-wchar
->   
->   dom0-$(CONFIG_PCI) += pci.o
->   dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
-> -dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
-> +dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
->   xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
->   dom0-$(CONFIG_X86) += pcpu.o
->   obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
+>> I have also proposed b_far/bl_far macros that could be used there as
+>> well.
+>
+> Could the automatic veneer insertion replace the unconditional
+> b_far/bl_far usage?  The former would be preferable to the later.
+>
+>
+> Nicolas
