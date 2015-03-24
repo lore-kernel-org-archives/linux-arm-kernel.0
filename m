@@ -1,116 +1,323 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Mar 2015 10:54:02 +0100
-Subject: [PATCH 2/2] ARM: cpuidle: Document the code
-In-Reply-To: <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
- <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Mar 2015 10:00:14 +0000
+Subject: [RFC 1/4] arm64: kvm: add a cpu tear-down function
+In-Reply-To: <1427111639-4575-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
+ <1427111639-4575-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <551135AE.1080401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add kernel-doc format documentation in the code.
+Hi Takahiro,
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/kernel/cpuidle.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+On 23/03/15 11:53, AKASHI Takahiro wrote:
+> Cpu must be put back into its initial state, at least, in the
+> following cases in order to shutdown the system and/or re-initialize cpus
+> later on:
+> 1) kexec/kdump
+> 2) cpu hotplug (offline)
+> 3) removing kvm as a module
+> 
+> To address those issues in later patches, this patch adds a tear-down
+> function, kvm_cpu_reset(), that disables D-cache & MMU and restore a vector
+> table to the initial stub at EL2.
 
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 2b0dae3..9219613 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -21,6 +21,17 @@ static const struct of_cpuidle_method __cpuidle_method_of_table_sentinel
- 
- static struct cpuidle_ops cpuidle_ops[NR_CPUS];
- 
-+/*
-+ * arm_cpuidle_simple_enter() - a wrapper to cpu_do_idle()
-+ * @dev: not used
-+ * @drv: not used
-+ * @index: not used
-+ *
-+ * A trivial wrapper to allow the cpu_do_idle function to be assigned as a
-+ * cpuidle callback by matching the function signature.
-+ *
-+ * Returns the index passed as parameter
-+ */
- int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- 		struct cpuidle_driver *drv, int index)
- {
-@@ -29,6 +40,16 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- 	return index;
- }
- 
-+/*
-+ * arm_cpuidle_suspend() - function to enter low power idle states
-+ * @index: an integer used as an identifier for the low level PM callbacks
-+ *
-+ * This function calls the underlying arch specific low level PM code as
-+ * registered at the init time.
-+ *
-+ * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
-+ * callback otherwise.
-+ */
- int arm_cpuidle_suspend(int index)
- {
- 	int ret = -EOPNOTSUPP;
-@@ -40,6 +61,15 @@ int arm_cpuidle_suspend(int index)
- 	return ret;
- }
- 
-+/*
-+ * arm_cpuidle_get_ops() - find a registered cpuidle_ops by name
-+ * @method: the method name
-+ *
-+ * Search in the __cpuidle_method_of_table array the cpuidle ops matching the
-+ * method name.
-+ *
-+ * Returns a struct cpuidle_ops pointer, NULL if not found.
-+ */
- static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
- {
- 	struct of_cpuidle_method *m = __cpuidle_method_of_table;
-@@ -51,6 +81,19 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
- 	return NULL;
- }
- 
-+/*
-+ * arm_cpuidle_read_ops() - Initialize the cpuidle ops with the device tree
-+ * @dn: a struct device node corresponding to a cpu node
-+ * @cpu: the cpu identifier
-+ *
-+ * Get the method name defined in the 'enabled-method' property, retrieve the
-+ * associated cpuidle_ops and do a struct copy. This copy is needed because all
-+ * cpuidle_ops are tagged __initdata and will be unloaded after the init
-+ * process.
-+ *
-+ * Return 0 on sucess, -ENOENT if no enabled-method is defined, -EOPNOTSUPP if
-+ * no cpuidle_ops is registered for the enabled-method.
-+ */
- static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- {
- 	const char *enable_method;
-@@ -75,6 +118,21 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- 	return 0;
- }
- 
-+/*
-+ * arm_cpuidle_init() - Initialize cpuidle_ops for a specific cpu
-+ * @cpu: the cpu to be initialized
-+ *
-+ * Initialize the cpuidle ops with the device for the cpu and then call
-+ * the cpu's idle initialization callback. This may fail if the underlying HW
-+ * is not operational.
-+ *
-+ * Returns:
-+ *  0 on success,
-+ *  -ENODEV if it fails to find the cpu node in the device tree,
-+ *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
-+ *  -ENOENT if it fails to find a enabled-method property,
-+ *  -ENXIO if the HW reports a failure or a misconfiguration
-+ */
- int __init arm_cpuidle_init(int cpu)
- {
- 	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
+Thanks for having a look at this.
+
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c                |   18 ++++++++++++++++
+>  arch/arm/kvm/mmu.c                |   16 +++++++++++++++
+>  arch/arm64/include/asm/kvm_asm.h  |    3 +++
+>  arch/arm64/include/asm/kvm_host.h |   10 +++++++++
+>  arch/arm64/include/asm/kvm_mmu.h  |    3 +++
+>  arch/arm64/include/asm/virt.h     |   11 ++++++++++
+>  arch/arm64/kvm/hyp-init.S         |   41 +++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/hyp.S              |   29 ++++++++++++++++++++++----
+>  8 files changed, 127 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 5560f74..35c8bc0 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -897,6 +897,24 @@ static void cpu_init_hyp_mode(void *dummy)
+>  	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+>  }
+>  
+> +void kvm_cpu_reset(void *dummy)
+
+Given that the notifier introduced in patch #2 lives in the same file,
+this could be made static, couldn't it?
+
+> +{
+> +	phys_addr_t boot_pgd_ptr;
+> +	phys_addr_t phys_idmap_start;
+> +	unsigned long reset_func;
+> +	unsigned long vector_ptr;
+> +
+> +	if (__hyp_get_vectors() == hyp_default_vectors)
+> +		return;
+> +
+> +	reset_func = kvm_reset_func_entry();
+> +	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
+> +	phys_idmap_start = kvm_get_idmap_start();
+> +	vector_ptr = kvm_get_stub_vectors();
+
+Isn't that hyp_default_vectors already?
+
+> +	__cpu_reset_hyp_mode(reset_func,
+> +			     boot_pgd_ptr, phys_idmap_start, vector_ptr);
+> +}
+> +
+>  static int hyp_init_cpu_notify(struct notifier_block *self,
+>  			       unsigned long action, void *cpu)
+>  {
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 3e6859b..428f41c 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -1490,6 +1490,22 @@ phys_addr_t kvm_get_idmap_vector(void)
+>  	return hyp_idmap_vector;
+>  }
+>  
+> +phys_addr_t kvm_get_idmap_start(void)
+> +{
+> +	return hyp_idmap_start;
+> +}
+> +
+> +phys_addr_t kvm_get_stub_vectors(void)
+> +{
+> +	return virt_to_phys(__hyp_stub_vectors);
+> +}
+
+As Geoff already mentioned, this doesn't belong in KVM. But I don't
+think you need it, as explained above.
+
+> +
+> +unsigned long kvm_reset_func_entry(void)
+> +{
+> +	/* VA of __kvm_hyp_reset in trampline code */
+> +	return TRAMPOLINE_VA + (__kvm_hyp_reset - __hyp_idmap_text_start);
+> +}
+
+If you need to compute addresses in the trampoline page, it would be
+better to have a generic macro that takes a kernel VA, and turns it into
+a trampoline VA.
+
+> +
+>  int kvm_mmu_init(void)
+>  {
+>  	int err;
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 4f7310f..97ee2fc 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -116,8 +116,11 @@
+>  struct kvm;
+>  struct kvm_vcpu;
+>  
+> +extern char __hyp_stub_vectors[];
+
+Not a KVM thing (for the same reason).
+
+> +
+>  extern char __kvm_hyp_init[];
+>  extern char __kvm_hyp_init_end[];
+> +extern char __kvm_hyp_reset[];
+>  
+>  extern char __kvm_hyp_vector[];
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 8ac3c70..97f88fe 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -199,6 +199,7 @@ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+>  struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
+>  
+>  u64 kvm_call_hyp(void *hypfn, ...);
+> +void kvm_call_reset(unsigned long reset_func, ...);
+
+You seem to have a single call signature for this function, and have
+defined all the parameters below. You can drop the variadic aspect.
+
+>  void force_vm_exit(const cpumask_t *mask);
+>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>  
+> @@ -223,6 +224,15 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  		     hyp_stack_ptr, vector_ptr);
+>  }
+>  
+> +static inline void __cpu_reset_hyp_mode(unsigned long reset_func,
+> +					phys_addr_t boot_pgd_ptr,
+> +					phys_addr_t phys_idmap_start,
+> +					unsigned long stub_vector_ptr)
+> +{
+> +	kvm_call_reset(reset_func, boot_pgd_ptr,
+> +		       phys_idmap_start, stub_vector_ptr);
+> +}
+> +
+>  struct vgic_sr_vectors {
+>  	void	*save_vgic;
+>  	void	*restore_vgic;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 6458b53..36be582 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -96,6 +96,9 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+>  phys_addr_t kvm_mmu_get_httbr(void);
+>  phys_addr_t kvm_mmu_get_boot_httbr(void);
+>  phys_addr_t kvm_get_idmap_vector(void);
+> +phys_addr_t kvm_get_idmap_start(void);
+> +phys_addr_t kvm_get_stub_vectors(void);
+> +unsigned long kvm_reset_func_entry(void);
+>  int kvm_mmu_init(void);
+>  void kvm_clear_hyp_idmap(void);
+>  
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 3070096..7fcd087 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -61,6 +61,17 @@
+>  #define BOOT_CPU_MODE_EL1	(0xe11)
+>  #define BOOT_CPU_MODE_EL2	(0xe12)
+>  
+> +/*
+> + * HVC_RESET - Reset cpu in EL2 to initial state.
+> + *
+> + * @x0: entry address in trampoline code in va
+> + * @x1: identical mapping page table in pa
+> + * @x2: start address of identical mapping in pa
+> + * @x3: initial stub vector in pa
+> + */
+> +
+> +#define HVC_RESET 5
+> +
+>  #ifndef __ASSEMBLY__
+>  
+>  /*
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index c319116..ca7e6bf 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -115,6 +115,47 @@ target: /* We're now in the trampoline code, switch page tables */
+>  	eret
+>  ENDPROC(__kvm_hyp_init)
+>  
+> +	/*
+> +	 * x0: HYP boot pgd
+> +	 * x1: HYP phys_idmap_start
+> +	 * x2: HYP stub vectors
+> +	 */
+> +ENTRY(__kvm_hyp_reset)
+> +	/* We're in trampoline code in VA */
+> +	/* Invalidate the old TLBs */
+> +	tlbi	alle2
+> +	dsb	sy
+
+Invalidating the TLBs before switching TTBR0_EL2 is unlikely to have the
+effect you want.
+
+> +	/* Switch back to boot page tables */
+> +	msr	ttbr0_el2, x0
+> +	isb
+
+This is the place where you want TLBI to occur.
+
+> +	/* Branch into PA space */
+> +	adr	x0, 1f
+> +	bfi	x1, x0, #0, #PAGE_SHIFT
+> +	br	x1
+> +
+> +	/* We're now in idmap */
+> +1:	/* Invalidate the old TLBs again */
+> +	tlbi	alle2
+> +	dsb	sy
+
+See? This is the only TLBI that actually makes sense. Now, given that
+you are actually disabling the MMU, I'm not sure these TBLIs make much
+sense.
+
+> +	/* Disable MMU */
+> +	mrs	x0, sctlr_el2
+> +	and	x1, x0, #SCTLR_EL2_EE
+> +	orr	x0, x0, x1		// preserve endianness of EL2
+> +	ldr	x1, =SCTLR_EL2_FLAGS
+> +	eor	x1, x1, xzr
+> +	bic	x0, x0, x1		// Clear SCTL_M and etc
+> +	msr	sctlr_el2, x0
+> +	isb
+> +
+> +	/* Switch back to stub vectors */
+> +	msr	vbar_el2, x2
+> +
+> +	eret
+> +ENDPROC(__kvm_hyp_reset)
+> +
+>  	.ltorg
+>  
+>  	.popsection
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index fd085ec..aee75f9 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -1136,6 +1136,11 @@ ENTRY(kvm_call_hyp)
+>  	ret
+>  ENDPROC(kvm_call_hyp)
+>  
+> +ENTRY(kvm_call_reset)
+> +	hvc	#HVC_RESET
+> +	ret
+> +ENDPROC(kvm_call_reset)
+> +
+>  .macro invalid_vector	label, target
+>  	.align	2
+>  \label:
+> @@ -1179,10 +1184,10 @@ el1_sync:					// Guest trapped into EL2
+>  	cmp	x18, #HVC_GET_VECTORS
+>  	b.ne	1f
+>  	mrs	x0, vbar_el2
+> -	b	2f
+> -
+> -1:	/* Default to HVC_CALL_HYP. */
+> +	b	3f
+>  
+> +1:	cmp	x18, #HVC_CALL_HYP
+> +	b.ne	2f
+>  	push	lr, xzr
+>  
+>  	/*
+> @@ -1196,7 +1201,23 @@ el1_sync:					// Guest trapped into EL2
+>  	blr	lr
+>  
+>  	pop	lr, xzr
+> -2:	eret
+> +	b	3f
+> +
+> +	/*
+> +	 * shuffle the parameters and jump into trampline code.
+> +	 */
+> +2:	cmp	x18, #HVC_RESET
+> +	b.ne	3f
+> +
+> +	mov	x18, x0
+> +	mov	x0, x1
+> +	mov	x1, x2
+> +	mov	x2, x3
+> +	mov	x3, x4
+> +	br	x18
+
+I'd rather move the shuffling of the registers before the HVC call.
+
+> +	/* not reach here */
+> +
+> +3:	eret
+>  
+>  el1_trap:
+>  	/*
+> 
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
