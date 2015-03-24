@@ -1,55 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Mar 2015 01:22:06 +0800
-Subject: [PATCH v2 0/3] clk: sunxi: Add muxable AHB clock to fix hstimer issues
-Message-ID: <1427217729-10017-1-git-send-email-wens@csie.org>
+Date: Wed, 25 Mar 2015 01:22:09 +0800
+Subject: [PATCH v2 3/3] ARM: dts: sunxi: Update ahb clocks for sun5i and sun7i
+In-Reply-To: <1427217729-10017-1-git-send-email-wens@csie.org>
+References: <1427217729-10017-1-git-send-email-wens@csie.org>
+Message-ID: <1427217729-10017-4-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The clock driver now supports a muxable ahb clock. Update the dtsi
+with the proper compatible and add the new parent clocks.
 
-This is v2 of the sun5i muxable AHB clock series.
+This also adds the new pll6/4 output for pll6 on sun7i-a20. The
+output is not used on sun4/5i.
 
-Changes since v1:
+Also use assigned-clocks to reparent ahb to pll6. We want ahb to
+have a stable, non-changing clock rate. cpu/axi clock rate changes
+as a result of newly added cpufreq support.
 
-  - Dropped patches 1~3 that are merged
-  - Extend comments to clarify what the "base factor clock" refers to,
-    and what the divs clocks outputs should be.
-
-
-This series adds support for the muxable ahb clock on sun5/7i. The mux
-has inputs such as the axi clock, the cpu clock on sun5i, and pll6 with
-various dividers. The goal is to have ahb muxed to pll6, which should
-be a fixed rate albeit configurable clock. This fixes issues with
-cpufreq changing the cpu frequency, which would affect the hstimer
-clocked from ahb.
-
-Patch 1 makes divs clocks explicitly specify in the driver which output
-is the base factor clock, instead of always putting it in last. This is
-done to ensure DT bindings compatibility when we add outputs.
-
-Patch 2 adds the new pll6/4 output, which is used on sun7i as an input
-to ahb mux.
-
-Patch 3 updates the dtsi files with the new drivers.
-
-The series is also available at
-
-    https://github.com/wens/linux/commits/sun5i-ahb-v2
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (3):
-  clk: sunxi: Make divs clocks specify which output is the base factor
-    clock
-  clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
-  ARM: dts: sunxi: Update ahb clocks for sun5i and sun7i
-
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
  arch/arm/boot/dts/sun5i.dtsi     | 10 ++++++++--
  arch/arm/boot/dts/sun7i-a20.dtsi | 13 ++++++++++---
- drivers/clk/sunxi/clk-sunxi.c    | 38 ++++++++++++++++++++++++++------------
- 3 files changed, 44 insertions(+), 17 deletions(-)
+ 2 files changed, 18 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index e42cbb03620f..df79b4c75b34 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -150,10 +150,16 @@
+ 
+ 		ahb: ahb at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun5i-a13-ahb-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&axi>;
++			clocks = <&axi>, <&cpu>, <&pll6 1>;
+ 			clock-output-names = "ahb";
++			/*
++			 * Use PLL6 as parent, instead of CPU/AXI
++			 * which has rate changes due to cpufreq
++			 */
++			assigned-clocks = <&ahb>;
++			assigned-clock-parents = <&pll6 1>;
+ 		};
+ 
+ 		apb0: apb0 at 01c20054 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 3a8530b79f1c..52538beb969a 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -225,7 +225,8 @@
+ 			compatible = "allwinner,sun4i-a10-pll6-clk";
+ 			reg = <0x01c20028 0x4>;
+ 			clocks = <&osc24M>;
+-			clock-output-names = "pll6_sata", "pll6_other", "pll6";
++			clock-output-names = "pll6_sata", "pll6_other", "pll6",
++					     "pll6_div_4";
+ 		};
+ 
+ 		pll8: clk at 01c20040 {
+@@ -254,10 +255,16 @@
+ 
+ 		ahb: ahb at 01c20054 {
+ 			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-ahb-clk";
++			compatible = "allwinner,sun5i-a13-ahb-clk";
+ 			reg = <0x01c20054 0x4>;
+-			clocks = <&axi>;
++			clocks = <&axi>, <&pll6 3>, <&pll6 1>;
+ 			clock-output-names = "ahb";
++			/*
++			 * Use PLL6 as parent, instead of CPU/AXI
++			 * which has rate changes due to cpufreq
++			 */
++			assigned-clocks = <&ahb>;
++			assigned-clock-parents = <&pll6 3>;
+ 		};
+ 
+ 		ahb_gates: clk at 01c20060 {
 -- 
 2.1.4
