@@ -1,66 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Mar 2015 15:05:29 +0000
-Subject: [PATCH v3 4/4] arm64: dts: add interrupt-affinity property to
- pmu node for juno
-In-Reply-To: <1425642851-27450-5-git-send-email-will.deacon@arm.com>
-References: <1425642851-27450-1-git-send-email-will.deacon@arm.com>
- <1425642851-27450-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20150324150528.GE29342@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 24 Mar 2015 09:08:50 -0600
+Subject: [PATCH] coresight: adding basic support for Spreadtrum SC9836
+In-Reply-To: <1427176113-23411-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1427176113-23411-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkw+dzHU5QtqM-Pw8s-C-K4aqd0ATKd_SidwVf6uqyd9cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding arm-soc folks]
-
-Hi Arnd, Olof,
-
-Could you take this Juno .dts patch via arm-soc for 4.1 please? I'll queue
-the perf code to make use of the new binding, but there's not a strict
-dependency (the interrupt-affinity property will be ignored by older
-kernels).
-
-Cheers,
-
-Will
-
-On Fri, Mar 06, 2015 at 11:54:11AM +0000, Will Deacon wrote:
-> Make the Juno .dts robust against potential reordering of the CPU nodes
-> by adding an explicit interrupt-affinity property to the PMU node. While
-> we're at it, fix the PMU interrupts numbers too.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 23 March 2015 at 23:48, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> Support only for ETB, FUNNEL, STM are included currently.
+> Support for ETM, TPIU and the replicator linked to it are not included in
+> this version patch.
+>
+> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 > ---
->  arch/arm64/boot/dts/arm/juno.dts | 14 ++++++++++----
->  1 file changed, 10 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index 133ee59de2d7..5e9110a3353d 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -120,12 +120,18 @@
->  
->  	pmu {
->  		compatible = "arm,armv8-pmuv3";
-> -		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-> +		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
->  			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-> -			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-> +			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&A57_0>,
-> +				     <&A57_1>,
-> +				     <&A53_0>,
-> +				     <&A53_1>,
-> +				     <&A53_2>,
-> +				     <&A53_3>;
->  	};
->  
->  	/include/ "juno-clocks.dtsi"
-> -- 
-> 2.1.4
-> 
+>  arch/arm64/boot/dts/sprd/sc9836.dtsi | 57 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/sprd/sc9836.dtsi b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> index f92f1b4..2ca80f3 100644
+> --- a/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> +++ b/arch/arm64/boot/dts/sprd/sc9836.dtsi
+> @@ -45,6 +45,63 @@
+>                 };
+>         };
+>
+> +       etb at 10003000 {
+> +               compatible = "arm,coresight-etb10", "arm,primecell";
+> +               reg = <0 0x10003000 0 0x1000>;
+> +               arm,primecell-periphid = <0x0003b907>;
+
+Specifying the primecell id in the device tree like this is usually to
+avoid probing of the memory space by the AMBA mechanic when bus
+components are discovered.  As such components are probed and
+initialised when their drivers are registered with the diver core
+later in the boot process.
+
+Is there a good reason why this is done here?  Especially when the
+funnel and STM don't specify their cell IDs in the DT.
+
+> +               coresight-default-sink;
+
+Please remove the above - this feature no longer exists.
+
+> +               clocks = <&clk26mhz>;
+> +               clock-names = "apb_pclk";
+> +               port {
+> +                       etb_in: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&funnel_out_port0>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       funnel at 10001000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0 0x10001000 0 0x1000>;
+> +               clocks = <&clk26mhz>;
+> +               clock-names = "apb_pclk";
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* funnel output port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               funnel_out_port0: endpoint {
+> +                                       remote-endpoint = <&etb_in>;
+> +                               };
+> +                       };
+> +
+> +                       /* funnel input port 0~3 is reserved for ETMs */
+> +                       port at 1 {
+> +                               reg = <4>;
+> +                               funnel_in_port4: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&stm_out>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       stm at 10006000 {
+> +               compatible = "arm,coresight-stm", "arm,primecell";
+> +               reg = <0 0x10006000 0 0x1000>,
+> +                     <0 0x01000000 0 0x180000>;
+> +               reg-names = "stm-base", "stm-stimulus-base";
+> +               clocks = <&clk26mhz>;
+> +               clock-names = "apb_pclk";
+> +               port {
+> +                       stm_out: endpoint {
+> +                               remote-endpoint = <&funnel_in_port4>;
+> +                       };
+> +               };
+> +       };
+> +
+>         gic: interrupt-controller at 12001000 {
+>                 compatible = "arm,gic-400";
+>                 reg = <0 0x12001000 0 0x1000>,
+> --
+> 1.9.1
+>
