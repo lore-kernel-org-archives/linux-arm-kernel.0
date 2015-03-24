@@ -1,77 +1,53 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 24 Mar 2015 22:02:51 +0800
-Subject: [patch v11 18/23] ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if
- ACPI is enabled on ARM64
+Date: Tue, 24 Mar 2015 22:02:52 +0800
+Subject: [patch v11 19/23] XEN / ACPI: Make XEN ACPI depend on X86
 In-Reply-To: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
 References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1427205776-5060-19-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Al Stone <al.stone@linaro.org>
+When ACPI is enabled on ARM64, XEN ACPI will also compiled
+into the kernel, but XEN ACPI is x86 dependent, so introduce
+CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
+functional on ARM64.
 
-ACPI reduced hardware mode is disabled by default, but ARM64
-can only run properly in ACPI hardware reduced mode, so select
-ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
-
-If the firmware is not using hardware reduced ACPI mode, we
-will disable ACPI to avoid nightmare such as accessing some
-registers which are not available on ARM64.
-
-CC: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Grant Likely <grant.likely@linaro.org>
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Tested-by: Yijing Wang <wangyijing@huawei.com>
-Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
-Tested-by: Jon Masters <jcm@redhat.com>
-Tested-by: Timur Tabi <timur@codeaurora.org>
-Tested-by: Robert Richter <rrichter@cavium.com>
-Acked-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Al Stone <al.stone@linaro.org>
+CC: 'Stefano Stabellini' <stefano.stabellini@eu.citrix.com>
+CC: Julien Grall <julien.grall@linaro.org>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+CC: David Vrabel <david.vrabel@citrix.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/Kconfig       | 1 +
- arch/arm64/kernel/acpi.c | 8 +++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/xen/Kconfig  | 4 ++++
+ drivers/xen/Makefile | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b8e973..d00ab9a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1,5 +1,6 @@
- config ARM64
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index b812462..a31cd29 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -253,4 +253,8 @@ config XEN_EFI
  	def_bool y
-+	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 6468f88..5819ef7 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -303,6 +303,11 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
- 	 */
- 	if (table->revision > 5 ||
- 	    (table->revision == 5 && fadt->minor_revision >= 1)) {
-+		if (!acpi_gbl_reduced_hardware) {
-+			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
-+			goto disable_acpi;
-+		}
+ 	depends on X86_64 && EFI
+ 
++config XEN_ACPI
++	def_bool y
++	depends on X86 && ACPI
 +
- 		/*
- 		 * ACPI 5.1 only has two explicit methods to boot up SMP,
- 		 * PSCI and Parking protocol, but the Parking protocol is
-@@ -319,8 +324,9 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
+ endmenu
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index 2ccd359..f4622ab 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -13,7 +13,7 @@ CFLAGS_efi.o				+= -fshort-wchar
  
- 	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
- 		table->revision, fadt->minor_revision);
--	disable_acpi();
- 
-+disable_acpi:
-+	disable_acpi();
- 	return -EINVAL;
- }
- 
+ dom0-$(CONFIG_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+-dom0-$(CONFIG_ACPI) += acpi.o $(xen-pad-y)
++dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+ xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
+ dom0-$(CONFIG_X86) += pcpu.o
+ obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
 -- 
 1.9.1
