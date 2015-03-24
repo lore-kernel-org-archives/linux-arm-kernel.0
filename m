@@ -1,39 +1,36 @@
-From: jonas@microbit.se (Jonas Andersson)
-Date: Tue, 24 Mar 2015 15:32:08 +0100
-Subject: at91 clocks
-Message-ID: <55117568.6090202@microbit.se>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 24 Mar 2015 14:37:40 +0000
+Subject: [Qemu-devel] [PATCH v5 1/6] target-arm: Store SPSR_EL1 state in
+ banked_spsr[1] (SPSR_svc)
+In-Reply-To: <CAOgzsHUUsZS5hkyPCWer_OurJXy9v5U3g8AjtRV=9uszL4nntg@mail.gmail.com>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+ <1427130344-27986-2-git-send-email-alex.bennee@linaro.org>
+ <CAOgzsHUUsZS5hkyPCWer_OurJXy9v5U3g8AjtRV=9uszL4nntg@mail.gmail.com>
+Message-ID: <CAFEAcA9MCtdK_VicF8tgMmmtuoL0pm4TofLcJbcmir6ApjMf0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 24 March 2015 at 14:32, Greg Bellows <greg.bellows@linaro.org> wrote:
+> On Mon, Mar 23, 2015 at 12:05 PM, Alex Benn?e <alex.bennee@linaro.org> wrote:
+>> From: Peter Maydell <peter.maydell@linaro.org>
 
-I am working on a system with at91sam9260 soc. Trying to move from 
-kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
+>> @@ -523,7 +523,7 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
+>>          aarch64_save_sp(env, arm_current_el(env));
+>>          env->elr_el[new_el] = env->pc;
+>>      } else {
+>> -        env->banked_spsr[0] = cpsr_read(env);
+>> +        env->banked_spsr[aarch64_banked_spsr_index(new_el)] = cpsr_read(env);
+>
+> Are the other banks (2-5) only used for KVM?  It seems we go out of
+> our way to manage this larger SPSR array then not use all of the slots
+> in QEMU itself.
 
-In my old code i use clk_get() to get pck1 and pllb, set pllb as parent 
-for pck1, set rate for pck1, enable pck1. Extract from 
-/sys/kernel/debug/at91_clk:
-pllb       users= 1 on   96000000 Hz main
-pck1       users= 1 on   12000000 Hz pllb
+They're used in AArch32 (where they are the SPSR for various
+32 bit modes). In AArch64 you can access those registers via
+MSR/MRS (we probably haven't implemented those yet because they
+are only accessible at EL2 and above) so hypervisors can do
+worldswitches. But for exception entry and return (which is
+what this code is) we only use SPSR_EL0/SPSR_EL1/SPSR_EL2/SPSR_EL3
+which is a subset of the AArch32 SPSRs.
 
-In my new code i have defined the two clocks in DT:
-         clocks = <&prog1>, <&pllb>;
-         clock-names = "codec", "parent";
-Extract from  /sys/kernel/debug/clk/clk_summary:
-        mainck                             2            2 
-18432000          0 0
-           prog1                           1            1 
-9216000          0 0
-              pck1                         0            0 
-9216000          0 0
-           pllbck                          0            0 0          0 0
-              usbck                        0            0 0          0 0
-                 udpck                     0            0 0          0 0
-                 uhpck                     0            0 0          0 0
-
-I know i probably have to enable pck1 also.
-But my main problem is that I got the wrong frequency and parent of prog1.
-Why?
-
-Thanks
-  Jonas
+-- PMM
