@@ -1,45 +1,33 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 24 Mar 2015 09:31:46 +0100
-Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm: get
- rid of the bounce page"
-In-Reply-To: <20150324004537.GA24816@verge.net.au>
-References: <20150324004537.GA24816@verge.net.au>
-Message-ID: <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Mar 2015 08:46:31 +0000
+Subject: [RFC 2/4] arm64: kexec: fix kvm issue
+In-Reply-To: <1427126213.27739.3.camel@infradead.org>
+References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>	
+ <1427111639-4575-3-git-send-email-takahiro.akashi@linaro.org>
+ <1427126213.27739.3.camel@infradead.org>
+Message-ID: <55112467.207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 01:45, Simon Horman <horms@verge.net.au> wrote:
-> Hi Ard,
->
-> I have observe what appears to be a build regression in next-20150323
-> caused by 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page").
->
-> # make
-> ...
-> arm-unknown-linux-gnueabi-ld:./arch/arm/kernel/vmlinux.lds:546: syntax error
->
-> I have observed this using the cross-compiler that is available on kernel.org:
->
-> https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.6.3/
->
-> # arm-unknown-linux-gnueabi-gcc --version
-> arm-unknown-linux-gnueabi-gcc (GCC) 4.6.3
-> Copyright (C) 2011 Free Software Foundation, Inc.
-> This is free software; see the source for copying conditions.  There is NO
-> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
->
-> # arm-unknown-linux-gnueabi-ld --version
-> GNU ld (GNU Binutils) 2.22
-> Copyright 2011 Free Software Foundation, Inc.
-> This program is free software; you may redistribute it under the terms of
-> the GNU General Public License version 3 or (at your option) a later version.
-> This program has absolutely no warranty.
->
+On 23/03/15 15:56, Geoff Levand wrote:
+> On Mon, 2015-03-23 at 20:53 +0900, AKASHI Takahiro wrote:
+>> The current kvm implementation keeps EL2 vector table installed even
+>> when the system is shut down. This prevents kexec from putting the system
+>> with kvm back into EL2 when starting a new kernel.
+> 
+> This is a kvm bug fix, so I think the subject should
+> be something like 'arm64/kvm: Fix shutdown issue'.
 
-Hi all,
+Not quite. On its own, this doesn't fix anything in KVM. It simply plugs
+a deficiency in the arm64 kexec implementation. If you want to be
+completely true to the content of the patch, it should read:
 
-This is fixed now in next-20150324.
-Sorry for the trouble
+"arm64: KVM: Allow EL2 context to be reset on shutdown"
 
+Can we now drop the blame game and get back to the actual code?
+
+Thanks,
+
+	M.
 -- 
-Ard.
+Jazz is not dead. It just smells funny...
