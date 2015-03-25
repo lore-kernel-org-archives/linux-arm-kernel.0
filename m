@@ -1,64 +1,34 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Wed, 25 Mar 2015 21:33:50 +0000
-Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
-Message-ID: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
+From: mtosatti@redhat.com (Marcelo Tosatti)
+Date: Wed, 25 Mar 2015 18:41:12 -0300
+Subject: [PATCH v2 02/12] KVM: move iodev.h from virt/kvm/ to include/kvm
+In-Reply-To: <5512E992.1020800@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-3-git-send-email-andre.przywara@arm.com>
+ <5512E992.1020800@arm.com>
+Message-ID: <20150325214112.GC3649@amt.cnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the system reset button on the GlobalScale Mirabox.
-The reset button is connected via GPIO so add a gpio-keys entry for
-it in the device tree file.  Patch is based on the implementation
-in armada-370-netgear-rn102.dts but using the GPIO pin specified in
-the original patch by Ezequiel Garcia from 2013.
+On Wed, Mar 25, 2015 at 05:00:02PM +0000, Marc Zyngier wrote:
+> On 23/03/15 15:58, Andre Przywara wrote:
+> > iodev.h contains definitions for the kvm_io_bus framework. This is
+> > needed both by the generic KVM code in virt/kvm as well as by
+> > architecture specific code under arch/. Putting the header file in
+> > virt/kvm and using local includes in the architecture part seems at
+> > least dodgy to me, so let's move the file into include/kvm, so that a
+> > more natural "#include <kvm/iodev.h>" can be used by all of the code.
+> > This also solves a problem later when using struct kvm_io_device
+> > in arm_vgic.h.
+> > Fixing up the FSF address in the GPL header and a wrong include path
+> > on the way.
+> > 
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Paolo, Marcelo: can we have your Ack on this?
+> 
+> Thanks,
 
-Tested with the triggerhappy daemon.
-
-Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
----
- arch/arm/boot/dts/armada-370-mirabox.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index e1b0eb6..41f453d 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -9,6 +9,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- #include "armada-370.dtsi"
- 
-@@ -78,6 +79,18 @@
- 				};
- 			};
- 
-+			gpio-keys {
-+				compatible = "gpio-keys";
-+				pinctrl-0 = <&reset_button_pin>;
-+				pinctrl-names = "default";
-+
-+				reset-button {
-+					label = "Reset Button";
-+					linux,code = <KEY_RESTART>;
-+					gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;
-+				};
-+			};
-+
- 			mdio {
- 				pinctrl-0 = <&mdio_pins>;
- 				pinctrl-names = "default";
-@@ -168,5 +181,10 @@
- 		marvell,pins = "mpp64", "mpp65";
- 		marvell,function = "gpio";
- 	};
-+
-+	reset_button_pin: reset-button-pin {
-+		marvell,pins = "mpp58";
-+		marvell,function = "gpio";
-+	};
- };
- 
--- 
-2.1.4
+Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
