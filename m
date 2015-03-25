@@ -1,111 +1,150 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Mar 2015 08:10:06 +0100
-Subject: [PATCH v3 5/9] eeprom: Add bindings for simple eeprom framework
-In-Reply-To: <1427236230-18751-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Wed, 25 Mar 2015 08:16:30 +0100
+Subject: [PATCH v3 4/9] eeprom: Add a simple EEPROM framework for eeprom
+ consumers
+In-Reply-To: <1427236219-18709-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427236230-18751-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150325071006.GC4946@pengutronix.de>
+ <1427236219-18709-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150325071630.GW9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:30:30PM +0000, Srinivas Kandagatla wrote:
-> This patch adds bindings for simple eeprom framework which allows eeprom
-> consumers to talk to eeprom providers to get access to eeprom cell data.
+On Tue, Mar 24, 2015 at 10:30:19PM +0000, Srinivas Kandagatla wrote:
+> This patch adds just consumers part of the framework just to enable easy
+> review.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of eeprom framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  .../devicetree/bindings/eeprom/eeprom.txt          | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+> Up until now, EEPROM drivers were stored in drivers/misc, where they all had to
+> duplicate pretty much the same code to register a sysfs file, allow in-kernel
+> users to access the content of the devices they were driving, etc.
 > 
-> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-> new file mode 100644
-> index 0000000..8348d18
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-> @@ -0,0 +1,70 @@
-> += EEPROM Data Device Tree Bindings =
-> +
-> +This binding is intended to represent the location of hardware
-> +configuration data stored in EEPROMs.
-> +
-> +On a significant proportion of boards, the manufacturer has stored
-> +some data on an EEPROM-like device, for the OS to be able to retrieve
-> +these information and act upon it. Obviously, the OS has to know
-> +about where to retrieve these data from, and where they are stored on
-> +the storage device.
-> +
-> +This document is here to document this.
-> +
-> += Data providers =
-> +Contains bindings specific to provider drivers and data cells as children
-> +to this node.
-> +
-> += Data cells =
-> +These are the child nodes of the provider which contain data cell
-> +information like offset and size in eeprom provider.
-> +
-> +Required properties:
-> +reg:	specifies the offset in byte within that storage device, and the length
-> +	in bytes of the data we care about.
-> +	There could be more then one offset-length pairs in this property.
-> +
-> +Optional properties:
-> +As required by specific data parsers/interpreters.
-> +
-> +For example:
-> +
-> +	/* Provider */
-> +	qfprom: qfprom at 00700000 {
-> +		compatible 	= "qcom,qfprom";
-> +		reg		= <0x00700000 0x1000>;
-> +		...
-> +
-> +		/* Data cells */
-> +		tsens_calibration: calib at 404 {
-> +			reg = <0x404 0x10>;
-> +		};
-> +
-> +		serial_number: sn {
-> +			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
-> +
-> +		};
-> +		...
-> +	};
-> +
-> += Data consumers =
-> +Are device nodes which consume eeprom data cells.
-> +
-> +Required properties:
-> +
-> +eeproms: List of phandle and data cell the device might be interested in.
-> +
-> +Optional properties:
-> +
-> +eeprom-names: List of data cell name strings sorted in the same order
-> +	      as the eeproms property. Consumers drivers will use
-> +	      eeprom-names to differentiate between multiple cells,
-> +	      and hence being able to know what these cells are for.
-> +
-> +For example:
-> +
-> +	tsens {
-> +		...
-> +		eeproms = <&tsens_calibration>;
-> +		eeprom-names = "calibration";
-> +	};
+> This was also a problem as far as other in-kernel users were involved, since
+> the solutions used were pretty much different from on driver to another, there
+> was a rather big abstraction leak.
+> 
+> This introduction of this framework aims at solving this. It also introduces DT
+> representation for consumer devices to go get the data they require (MAC
+> Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+> 
+> Having regmap interface to this framework would give much better
+> abstraction for eeproms on different buses.
 
-This is somewhat complicated. Also having 'eeprom' in the binding is not
-nice since it could be FRAM or something else. How about:
+Thanks for working on this. This is something that is missing in the
+kernel, it looks very promising to me.
 
-	tsens {
-		calibration = <&tsens_calibration>;
-	};
+Some comments inline
 
+> +static struct eeprom_cell *__eeprom_cell_get(struct device_node *cell_np,
+> +					     const char *ename,
+> +					     struct eeprom_block *blocks,
+> +					     int nblocks)
+> +{
+> +	struct eeprom_cell *cell;
+> +	struct eeprom_device *eeprom = NULL;
+
+No need to initialize.
+
+> +	struct property *prop;
+> +	const __be32 *vp;
+> +	u32 pv;
+> +	int i, rval;
+> +
+> +	mutex_lock(&eeprom_mutex);
+> +
+> +	eeprom = cell_np ? of_eeprom_find(cell_np->parent) : eeprom_find(ename);
+> +	if (!eeprom) {
+> +		mutex_unlock(&eeprom_mutex);
+> +		return ERR_PTR(-EPROBE_DEFER);
+> +	}
+> +
+
+> +/**
+> + * of_eeprom_cell_get(): Get eeprom cell of device form a given index
+> + *
+> + * @dev: Device that will be interacted with
+> + * @index: eeprom index in eeproms property.
+> + *
+> + * The return value will be an ERR_PTR() on error or a valid pointer
+> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
+> + * eeprom_cell_put().
+> + */
+> +struct eeprom_cell *of_eeprom_cell_get(struct device *dev, int index)
+> +{
+
+I think the consumer API could be improved. The dev pointer is only used
+to get the struct device_node out of it, so the device_node could be
+passed in directly. As written in my other mail I think the binding
+would be better like "calibration = <&tsens_calibration>;", so this
+function could be:
+
+of_eeprom_cell_get(struct device_node *np, const char *name)
+
+With this we could also get eeprom cells from subnodes which do not have
+a struct device bound to them.
+
+> +	struct device_node *cell_np;
+> +
+> +	if (!dev || !dev->of_node)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	cell_np = of_parse_phandle(dev->of_node, "eeproms", index);
+> +	if (!cell_np)
+> +		return ERR_PTR(-EPROBE_DEFER);
+
+-EPROBE_DEFER is not appropriate here. If of_parse_phandle fails it
+won't work next time.
+
+> +
+> +	return __eeprom_cell_get(cell_np, NULL, NULL, 0);
+> +}
+> +EXPORT_SYMBOL_GPL(of_eeprom_cell_get);
+> +
+> +/**
+> + * eeprom_cell_write(): Write to a given eeprom cell
+> + *
+> + * @cell: eeprom cell to be written.
+> + * @buf: Buffer to be written.
+> + * @len: length of buffer to be written to eeprom cell.
+> + *
+> + * The return value will be an non zero on error or a zero on successful write.
+
+No, it returns the length.
+
+> + */
+> +int eeprom_cell_write(struct eeprom_cell *cell, const char *buf, ssize_t len)
+> +{
+> +	struct eeprom_device *eeprom = cell->eeprom;
+> +	int i, rc, offset = 0;
+> +
+> +	if (!eeprom || !eeprom->regmap || len != cell->size)
+> +		return -EINVAL;
+> +
+> +	for (i = 0; i < cell->nblocks; i++) {
+> +		rc = regmap_bulk_write(eeprom->regmap, cell->blocks[i].offset,
+> +				 buf + offset,
+> +				 cell->blocks[i].count);
+> +
+> +		if (IS_ERR_VALUE(rc))
+> +			return rc;
+> +
+> +		offset += cell->blocks[i].count;
+> +	}
+> +
+> +	return len;
+> +}
+> +EXPORT_SYMBOL_GPL(eeprom_cell_write);
+> +
+
+> +static inline char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len)
+> +{
+> +	return NULL;
+> +}
+
+The documentation above the real function states that this function
+either returns an ERR_PTR() or a valid pointer. The wrapper should then
+do the same.
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
