@@ -1,53 +1,55 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 26 Mar 2015 05:04:48 +0800
-Subject: [PATCH 2/3] ARM: dts: sun6i: Add cpu clock reference and operating
- points to dtsi
+Date: Thu, 26 Mar 2015 05:04:47 +0800
+Subject: [PATCH 1/3] ARM: dts: sun6i: Set PLL6 as parent to AHB1 clock in AHB1
+ clock node
 In-Reply-To: <1427317489-708-1-git-send-email-wens@csie.org>
 References: <1427317489-708-1-git-send-email-wens@csie.org>
-Message-ID: <1427317489-708-3-git-send-email-wens@csie.org>
+Message-ID: <1427317489-708-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu core is clocked from the "cpu" clock. Add a reference to it
-in the first cpu node. Also add "cpu0" label to the node.
+On sun6i we already have PLL6 as AHB1 clock's parent. However this was
+previously set in the dma controller node, which takes effect when the
+dma controller is probed.
 
-The operating points were taken from the a list compiled by Maxime Ripard,
-which is based on A31 FEX files from the sunxi-boards repository. Not all
-boards have the same settings. The settings in this patch are the ones
-shared by A/B/C revisions, plus the default clock setting from u-boot.
+We want this to take effect as soon as possible, so hrtimer rate
+calculation is correct, and to be sure the AHB1 clock rate remains as
+stable as possible.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun6i-a31.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 6d29eab5fe32..9a68acc1070f 100644
+index 2a37ee93265e..6d29eab5fe32 100644
 --- a/arch/arm/boot/dts/sun6i-a31.dtsi
 +++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -96,10 +96,22 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <0>;
-+			clocks = <&cpu>;
-+			clock-latency = <244144>; /* 8 32k periods */
-+			operating-points = <
-+				/* kHz    uV */
-+				1008000	1200000
-+				864000  1200000
-+				720000  1100000
-+				480000  1000000
-+				>;
-+			#cooling-cells = <2>;
-+			cooling-min-level = <0>;
-+			cooling-max-level = <3>;
+@@ -196,6 +196,14 @@
+ 			reg = <0x01c20054 0x4>;
+ 			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
+ 			clock-output-names = "ahb1";
++
++			/*
++			 * Clock AHB1 from PLL6, instead of CPU/AXI which
++			 * has rate changes due to cpufreq. Also the DMA
++			 * controller requires AHB1 clocked from PLL6.
++			 */
++			assigned-clocks = <&ahb1>;
++			assigned-clock-parents = <&pll6 0>;
  		};
  
- 		cpu at 1 {
+ 		ahb1_gates: clk at 01c20060 {
+@@ -381,10 +389,6 @@
+ 			clocks = <&ahb1_gates 6>;
+ 			resets = <&ahb1_rst 6>;
+ 			#dma-cells = <1>;
+-
+-			/* DMA controller requires AHB1 clocked from PLL6 */
+-			assigned-clocks = <&ahb1>;
+-			assigned-clock-parents = <&pll6 0>;
+ 		};
+ 
+ 		mmc0: mmc at 01c0f000 {
 -- 
 2.1.4
