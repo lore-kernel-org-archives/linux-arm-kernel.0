@@ -1,55 +1,46 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 26 Mar 2015 05:04:47 +0800
-Subject: [PATCH 1/3] ARM: dts: sun6i: Set PLL6 as parent to AHB1 clock in AHB1
- clock node
-In-Reply-To: <1427317489-708-1-git-send-email-wens@csie.org>
-References: <1427317489-708-1-git-send-email-wens@csie.org>
-Message-ID: <1427317489-708-2-git-send-email-wens@csie.org>
+Date: Thu, 26 Mar 2015 05:04:46 +0800
+Subject: [PATCH 0/3] ARM: dts: sun6i: Enable cpufreq support for A31/A31s
+Message-ID: <1427317489-708-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On sun6i we already have PLL6 as AHB1 clock's parent. However this was
-previously set in the dma controller node, which takes effect when the
-dma controller is probed.
+Hi everyone,
 
-We want this to take effect as soon as possible, so hrtimer rate
-calculation is correct, and to be sure the AHB1 clock rate remains as
-stable as possible.
+This series adds the DT parts of cpufreq support, clock references, thermal
+zones and OPPs, for sun6i. This is based on sunxi/for-next (6bcf44d5edfb).
+Required (sun4i-ts) driver support is already in v4.0-rc1.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun6i-a31.dtsi | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+Patch 1 moves the ahb1 assigned-clocks reparenting properties from the dma
+controller node to the ahb1 clock node. This matches what we've done for
+sun5i and sun7i. The purpose of this is to clock ahb1 from a stable clock
+as soon as possible, to prevent hrtimer miscalculation/instability.
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 2a37ee93265e..6d29eab5fe32 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -196,6 +196,14 @@
- 			reg = <0x01c20054 0x4>;
- 			clocks = <&osc32k>, <&osc24M>, <&axi>, <&pll6 0>;
- 			clock-output-names = "ahb1";
-+
-+			/*
-+			 * Clock AHB1 from PLL6, instead of CPU/AXI which
-+			 * has rate changes due to cpufreq. Also the DMA
-+			 * controller requires AHB1 clocked from PLL6.
-+			 */
-+			assigned-clocks = <&ahb1>;
-+			assigned-clock-parents = <&pll6 0>;
- 		};
- 
- 		ahb1_gates: clk at 01c20060 {
-@@ -381,10 +389,6 @@
- 			clocks = <&ahb1_gates 6>;
- 			resets = <&ahb1_rst 6>;
- 			#dma-cells = <1>;
--
--			/* DMA controller requires AHB1 clocked from PLL6 */
--			assigned-clocks = <&ahb1>;
--			assigned-clock-parents = <&pll6 0>;
- 		};
- 
- 		mmc0: mmc at 01c0f000 {
+Patch 2 adds the clock reference and OPPs for the cpu cluster.
+
+Patch 3 adds the thermal zones for CPU passive (cpufreq limiting) cooling.
+
+I've tested this on my Sinlinx SinA31s (not yet mainlined). The highest
+OPP matches the default CPU clock/voltage setting found in mainline
+u-boot. However the Mele I7 fex file specifies a slightly higher voltage
+for 1008 MHz. If the default setting is not stable enough for the Mele
+I7, it should be overridden in the board dts file.
+
+This series does not cover A31/A31s revision D, which seems to have lower
+voltage requirements. At the moment no one has seen them.
+
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (3):
+  ARM: dts: sun6i: Set PLL6 as parent to AHB1 clock in AHB1 clock node
+  ARM: dts: sun6i: Add cpu clock reference and operating points to dtsi
+  ARM: dts: sun6i: Add cpu thermal zones to dtsi
+
+ arch/arm/boot/dts/sun6i-a31.dtsi | 59 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 54 insertions(+), 5 deletions(-)
+
 -- 
 2.1.4
