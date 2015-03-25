@@ -1,52 +1,12 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Mar 2015 18:22:26 +0000
-Subject: =?UTF-8?q?=5BPATCH=20v3=200/*=5D=20serial/amba-pl011=3A=20Activate=20TX=20IRQ=20passively?=
-Message-ID: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+Date: Wed, 25 Mar 2015 18:25:57 +0000
+Subject: [PATCH v3] serial/amba-pl011: Activate TX IRQ passively
+In-Reply-To: <1427307957-2904-1-git-send-email-Dave.Martin@arm.com>
+References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+ <1427307957-2904-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1427307957-2904-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Thanks to Jakub Kici?ski for his bug report and discussion, and for
-showing out how we can manage without the softirq (and providing a
-patch, though merging my rework with it got difficult, so I don't
-include it in the series now).
-
-
-There are two alternate versions of the series threaded from this cover
-letter:
-
- * [PATCH v3] - patch against v4.0-rc5 that supersedes the previous
-        series; this is the less churny option.
-
- * [PATCH v3, tty-next..] - patches against tty-next that
-        modify/partially revert the previous series without needing a
-        rebase.
-
-Take your pick.
-
-
-Changes since v2:
-
- * Remove the optimisation that assumes TXIS stays asserted across port
-   shutdown..startup (thanks to Jakub Kici?ski for spotting this on
-   raspberrypi-2).  This turns out to be untrue in certain situations,
-   namely when the only process with the port open is killed by a
-   signal.  This may indicate a bug in serial_core, but the "correct"
-   behaviour for this case is not completely obvious.
-
-   For this repost, I just revert the optimisation so that the pl011
-   driver doesn't hang in this situation.  It didn't bring much real
-   benefit in any case.
-
- * Remove the tx softirq and rework the code for more intelligible
-   code flow.
-
- * pl011_start_tx() now simply stuffs the FIFO until it's full (in which
-   case the TX IRQ will definitely fire), or until the serial_core
-   circular buffer is empty (in which case we don't care about the
-   interrupt because there is nothing more to send).
-
-
-Original cover letter:
 
 The current PL011 driver transmits a dummy character when the UART
 is opened, to assert the TX IRQ for the first time
@@ -68,16 +28,7 @@ turning subsequent output into garbage until synchronisation
 is reestablished.  (Particularly problematic during boot with systemd.)
 
 To avoid spurious transmissions, this patch removes assumptions about
-whether the TX IRQ will fire until at least one TX IRQ has been seen.
-
-Instead, the UART will unmask the TX IRQ and then slow-start via
-polling and timer-based soft IRQs initially.  If the TTY layer writes
-enough data to fill the FIFO to the interrupt threshold in one go,
-the TX IRQ should assert, at which point the driver changes to
-fully interrupt-driven TX.
-
-In this way, the TX IRQ is activated as a side-effect instead of
-being done deliberately.
+whether the TX IRQ will fire until the FIFO has been filled.
 
 This should also mean that the driver works on the SBSA Generic
 UART[1] (a cut-down PL011) without invasive changes.  The Generic
@@ -88,5 +39,177 @@ UART lacks some features needed for the dummy TX approach to work
     http://infocenter.arm.com/
     (click-thru required :/)
 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |   88 +++++++++++++++++++--------------------
+ 1 file changed, 44 insertions(+), 44 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8d94c19..180b1d2 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -440,8 +440,9 @@ static void pl011_dma_remove(struct uart_amba_port *uap)
+ 		dma_release_channel(uap->dmarx.chan);
+ }
+ 
+-/* Forward declare this for the refill routine */
++/* Forward declare these for the refill routine */
+ static int pl011_dma_tx_refill(struct uart_amba_port *uap);
++static void pl011_start_tx_pio(struct uart_amba_port *uap);
+ 
+ /*
+  * The current DMA TX buffer has been sent.
+@@ -479,14 +480,13 @@ static void pl011_dma_tx_callback(void *data)
+ 		return;
+ 	}
+ 
+-	if (pl011_dma_tx_refill(uap) <= 0) {
++	if (pl011_dma_tx_refill(uap) <= 0)
+ 		/*
+ 		 * We didn't queue a DMA buffer for some reason, but we
+ 		 * have data pending to be sent.  Re-enable the TX IRQ.
+ 		 */
+-		uap->im |= UART011_TXIM;
+-		writew(uap->im, uap->port.membase + UART011_IMSC);
+-	}
++		pl011_start_tx_pio(uap);
++
+ 	spin_unlock_irqrestore(&uap->port.lock, flags);
+ }
+ 
+@@ -1208,15 +1208,23 @@ static void pl011_stop_tx(struct uart_port *port)
+ 	pl011_dma_tx_stop(uap);
+ }
+ 
++static void pl011_tx_chars(struct uart_amba_port *uap, bool from_irq);
++
++/* Start TX with programmed I/O only (no DMA) */
++static void pl011_start_tx_pio(struct uart_amba_port *uap)
++{
++	uap->im |= UART011_TXIM;
++	writew(uap->im, uap->port.membase + UART011_IMSC);
++	pl011_tx_chars(uap, false);
++}
++
+ static void pl011_start_tx(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+ 
+-	if (!pl011_dma_tx_start(uap)) {
+-		uap->im |= UART011_TXIM;
+-		writew(uap->im, uap->port.membase + UART011_IMSC);
+-	}
++	if (!pl011_dma_tx_start(uap))
++		pl011_start_tx_pio(uap);
+ }
+ 
+ static void pl011_stop_rx(struct uart_port *port)
+@@ -1274,16 +1282,29 @@ __acquires(&uap->port.lock)
+ 	spin_lock(&uap->port.lock);
+ }
+ 
+-static void pl011_tx_chars(struct uart_amba_port *uap)
++static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c,
++			  bool from_irq)
++{
++	if (unlikely(!from_irq) &&
++	    readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
++		return false; /* unable to transmit character */
++
++	writew(c, uap->port.membase + UART01x_DR);
++	uap->port.icount.tx++;
++
++	return true;
++}
++
++static void pl011_tx_chars(struct uart_amba_port *uap, bool from_irq)
+ {
+ 	struct circ_buf *xmit = &uap->port.state->xmit;
+-	int count;
++	int count = uap->fifosize >> 1;
+ 
+ 	if (uap->port.x_char) {
+-		writew(uap->port.x_char, uap->port.membase + UART01x_DR);
+-		uap->port.icount.tx++;
++		if (!pl011_tx_char(uap, uap->port.x_char, from_irq))
++			return;
+ 		uap->port.x_char = 0;
+-		return;
++		--count;
+ 	}
+ 	if (uart_circ_empty(xmit) || uart_tx_stopped(&uap->port)) {
+ 		pl011_stop_tx(&uap->port);
+@@ -1294,14 +1315,15 @@ static void pl011_tx_chars(struct uart_amba_port *uap)
+ 	if (pl011_dma_tx_irq(uap))
+ 		return;
+ 
+-	count = uap->fifosize >> 1;
+ 	do {
+-		writew(xmit->buf[xmit->tail], uap->port.membase + UART01x_DR);
+-		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+-		uap->port.icount.tx++;
+-		if (uart_circ_empty(xmit))
++		if (likely(from_irq) && count-- == 0)
++			break;
++
++		if (!pl011_tx_char(uap, xmit->buf[xmit->tail], from_irq))
+ 			break;
+-	} while (--count > 0);
++
++		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
++	} while (!uart_circ_empty(xmit));
+ 
+ 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
+ 		uart_write_wakeup(&uap->port);
+@@ -1373,7 +1395,7 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
+ 				      UART011_CTSMIS|UART011_RIMIS))
+ 				pl011_modem_status(uap);
+ 			if (status & UART011_TXIS)
+-				pl011_tx_chars(uap);
++				pl011_tx_chars(uap, true);
+ 
+ 			if (pass_counter-- == 0)
+ 				break;
+@@ -1577,7 +1599,7 @@ static int pl011_startup(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+-	unsigned int cr, lcr_h, fbrd, ibrd;
++	unsigned int cr;
+ 	int retval;
+ 
+ 	retval = pl011_hwinit(port);
+@@ -1595,30 +1617,8 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
+-	/*
+-	 * Provoke TX FIFO interrupt into asserting. Taking care to preserve
+-	 * baud rate and data format specified by FBRD, IBRD and LCRH as the
+-	 * UART may already be in use as a console.
+-	 */
+ 	spin_lock_irq(&uap->port.lock);
+ 
+-	fbrd = readw(uap->port.membase + UART011_FBRD);
+-	ibrd = readw(uap->port.membase + UART011_IBRD);
+-	lcr_h = readw(uap->port.membase + uap->lcrh_rx);
+-
+-	cr = UART01x_CR_UARTEN | UART011_CR_TXE | UART011_CR_LBE;
+-	writew(cr, uap->port.membase + UART011_CR);
+-	writew(0, uap->port.membase + UART011_FBRD);
+-	writew(1, uap->port.membase + UART011_IBRD);
+-	pl011_write_lcr_h(uap, 0);
+-	writew(0, uap->port.membase + UART01x_DR);
+-	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
+-		barrier();
+-
+-	writew(fbrd, uap->port.membase + UART011_FBRD);
+-	writew(ibrd, uap->port.membase + UART011_IBRD);
+-	pl011_write_lcr_h(uap, lcr_h);
+-
+ 	/* restore RTS and DTR */
+ 	cr = uap->old_cr & (UART011_CR_RTS | UART011_CR_DTR);
+ 	cr |= UART01x_CR_UARTEN | UART011_CR_RXE | UART011_CR_TXE;
 -- 
 1.7.10.4
