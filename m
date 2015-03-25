@@ -1,17 +1,18 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 25 Mar 2015 09:51:39 +0100
-Subject: [PATCH] mmc: sdhci-esdhc-imx: support voltage-range property
-In-Reply-To: <1427204704-17569-1-git-send-email-mkl@pengutronix.de>
-References: <1427204704-17569-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <CAPDyKFpHSeoSBRTqtGX8OmSLh6GBuUnYoWKMRqL3V+s7SZeR_g@mail.gmail.com>
+Date: Wed, 25 Mar 2015 09:52:21 +0100
+Subject: [PATCH 12/13] mmc: atmel-mci: use endian agnostic IO
+In-Reply-To: <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-13-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <CAPDyKFpwZA52zDQCt01xiuFrATu2As5Hm3uLmQQf9kk=hYKfzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 14:45, Marc Kleine-Budde <mkl@pengutronix.de> wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
+On 18 March 2015 at 16:53, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> Change the __raw IO functions to endian agnostic relaxed ones to allow
+> the driver to function on big endian ARM systems.
 >
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
 Thanks! Applied.
 
@@ -19,66 +20,38 @@ Kind regards
 Uffe
 
 
+> --
+> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
+> CC: Chris Ball <chris@printf.net>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: linux-mmc at vger.kernel.org
 > ---
->  Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 4 ++++
->  drivers/mmc/host/sdhci-esdhc-imx.c                      | 6 +++++-
->  2 files changed, 9 insertions(+), 1 deletion(-)
+>  drivers/mmc/host/atmel-mci-regs.h | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> index 9046ba06c47a..415c5575cbf7 100644
-> --- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-> @@ -17,6 +17,10 @@ Optional properties:
->    to select a proper data sampling window in case the clock quality is not good
->    due to signal path is too long on the board. Please refer to eSDHC/uSDHC
->    chapter, DLL (Delay Line) section in RM for details.
-> +- voltage-ranges : Specify the voltage range in case there are software
-> +  transparent level shifters on the outputs of the controller. Two cells are
-> +  required, first cell specifies minimum slot voltage (mV), second cell
-> +  specifies maximum slot voltage (mV). Several ranges could be specified.
+> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+> index c97001e..711bb53 100644
+> --- a/drivers/mmc/host/atmel-mci-regs.h
+> +++ b/drivers/mmc/host/atmel-mci-regs.h
+> @@ -135,10 +135,17 @@
+>  #define ATMCI_REGS_SIZE                0x100
 >
->  Examples:
+>  /* Register access macros */
+> -#define atmci_readl(port,reg)                          \
+> +#ifdef CONFIG_AVR32
+> +#define atmci_readl(port,reg)                  \
+>         __raw_readl((port)->regs + reg)
+>  #define atmci_writel(port,reg,value)                   \
+>         __raw_writel((value), (port)->regs + reg)
+> +#else
+> +#define atmci_readl(port,reg)                  \
+> +       readl_relaxed((port)->regs + reg)
+> +#define atmci_writel(port,reg,value)                   \
+> +       writel_relaxed((value), (port)->regs + reg)
+> +#endif
 >
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 10ef8244a239..a85fb3181ded 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -864,6 +864,7 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
->  #ifdef CONFIG_OF
->  static int
->  sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
-> +                        struct sdhci_host *host,
->                          struct esdhc_platform_data *boarddata)
->  {
->         struct device_node *np = pdev->dev.of_node;
-> @@ -900,11 +901,14 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
->         if (of_property_read_u32(np, "fsl,delay-line", &boarddata->delay_line))
->                 boarddata->delay_line = 0;
->
-> +       mmc_of_parse_voltage(np, &host->ocr_mask);
-> +
->         return 0;
->  }
->  #else
->  static inline int
->  sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
-> +                        struct sdhci_host *host,
->                          struct esdhc_platform_data *boarddata)
->  {
->         return -ENODEV;
-> @@ -999,7 +1003,7 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
->                         host->ioaddr + ESDHC_TUNING_CTRL);
->
->         boarddata = &imx_data->boarddata;
-> -       if (sdhci_esdhc_imx_probe_dt(pdev, boarddata) < 0) {
-> +       if (sdhci_esdhc_imx_probe_dt(pdev, host, boarddata) < 0) {
->                 if (!host->mmc->parent->platform_data) {
->                         dev_err(mmc_dev(host->mmc), "no board data!\n");
->                         err = -EINVAL;
+>  /* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
+>  #ifdef CONFIG_AVR32
 > --
 > 2.1.4
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
