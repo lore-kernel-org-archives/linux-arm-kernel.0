@@ -1,33 +1,50 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:23:26 +0000
-Subject: [PATCH 3/7] ARM: socfpga: support big endian for socfpga
+Date: Wed, 25 Mar 2015 11:23:25 +0000
+Subject: [PATCH 2/7] ARM: socfpga: enable big endian for secondary core(s)
 In-Reply-To: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427282610-10350-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282610-10350-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the debug and platsmp.S are fixed for big endian, the
-architecture can now advertise big endian support.
+Update the secondary code to allow the secondary boot to work when the
+system is running big endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
 CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 CC: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/mach-socfpga/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-socfpga/headsmp.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index b5f8d75..f420a1b 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -1,5 +1,6 @@
- config ARCH_SOCFPGA
- 	bool "Altera SOCFPGA family" if ARCH_MULTI_V7
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select CACHE_L2X0
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+index f65ea0a..a580dcd 100644
+--- a/arch/arm/mach-socfpga/headsmp.S
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -10,6 +10,7 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ #include <asm/memory.h>
++#include <asm/assembler.h>
+ 
+ 	.arch	armv7-a
+ 
+@@ -18,12 +19,14 @@ ENTRY(secondary_trampoline)
+ 	 * Thus, we can just subtract the PAGE_OFFSET to get the physical
+ 	 * address of &cpu1start_addr. This would not work for platforms
+ 	 * where the physical memory does not start at 0x0.
+-	 */
++	*/
++ARM_BE8(setend	be)
+ 	adr	r0, 1f
+ 	ldmia	r0, {r1, r2}
+ 	sub	r2, r2, #PAGE_OFFSET
+ 	ldr	r3, [r2]
+ 	ldr	r4, [r3]
++ARM_BE8(rev	r4, r4)
+ 	bx	r4
+ 
+ 	.align
 -- 
 2.1.4
