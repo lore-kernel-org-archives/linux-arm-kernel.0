@@ -1,72 +1,36 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Mar 2015 10:40:12 +0100
-Subject: [PATCH RFC/RFT 5/6] ARM: Exynos: migrate DCSCB to the new MCPM
- backend abstraction
-In-Reply-To: <alpine.LFD.2.11.1503241913040.27567@knanqh.ubzr>
-References: <1426701893-25589-1-git-send-email-nicolas.pitre@linaro.org>
- <1426701893-25589-6-git-send-email-nicolas.pitre@linaro.org>
- <alpine.LFD.2.11.1503241913040.27567@knanqh.ubzr>
-Message-ID: <5512827C.7020301@linaro.org>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 25 Mar 2015 10:44:42 +0100
+Subject: ARM: KVM/XEN: how should we support virt-what?
+Message-ID: <20150325094440.GB3163@hawk.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2015 12:24 AM, Nicolas Pitre wrote:
-> On Wed, 18 Mar 2015, Nicolas Pitre wrote:
->
->> The custom suspend callback is removed for this change. That includes
->> the dubious call to exynos_cpu_power_up(() that was present at the end
->> of exynos_suspend().
->
-> After testing on actual hardware, it turns out that this call is
-> important.  This patch is therefore amended with the following:
->
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index d4bbbfb5fe..9bdf54795f 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -152,6 +152,12 @@ static int exynos_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
->   	return -ETIMEDOUT; /* timeout */
->   }
->
-> +static void exynos_cpu_is_up(unsigned int cpu, unsigned int cluster)
-> +{
-> +	/* especially when resuming: make sure power control is set */
-> +	exynos_cpu_powerup(cpu, cluster);
-> +}
-> +
->   static const struct mcpm_platform_ops exynos_power_ops = {
->   	.cpu_powerup		= exynos_cpu_powerup,
->   	.cluster_powerup	= exynos_cluster_powerup,
-> @@ -160,6 +166,7 @@ static const struct mcpm_platform_ops exynos_power_ops = {
->   	.cpu_cache_disable	= exynos_cpu_cache_disable,
->   	.cluster_cache_disable	= exynos_cluster_cache_disable,
->   	.wait_for_powerdown	= exynos_wait_for_powerdown,
-> +	.cpu_is_up		= exynos_cpu_is_up,
->   };
->
->   /*
->
-> The whole commit now appears as follows in my git tree:
->
-> commit 0d86b0b4cf869fa48d96bde231b9d04ea68b6422
-> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Date:   Mon Mar 16 17:16:07 2015 -0400
->
->      ARM: Exynos: migrate DCSCB to the new MCPM backend abstraction
->
->      The custom suspend callback is removed for this change. The extra call
->      to exynos_cpu_power_up(() that was present at the end of exynos_suspend()
->      is now relocated to the cpu_is_up callback.
->
->      Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Hello ARM virt maintainers,
 
-Tested on exynos5800 (chromebook2).
+I'd like to start a discussion about supporting virt-what[1]. virt-what
+allows userspace to determine if the system it's running on is running
+in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
+effort tool, see the Caveat emptor in [1], it has become quite a useful
+tool, and is showing up in different places, such as OpenStack. If you
+look at the code[2], specifically [3], then you'll see how it works on
+x86, which is to use the dedicated hypervisor cpuid leaves. I'm
+wondering what equivalent we have, or can develop, for arm.
+Here are some thoughts;
+0) there's already something we can use, and I just need to be told
+   about it.
+1) be as similar as possible to x86 by dedicating some currently
+   undefined sysreg bits. This would take buy-in from lots of parties,
+   so is not likely the way to go.
+2) create a specific DT node that will get exposed through sysfs, or
+   somewhere.
+3) same as (2), but just use the nodes currently in mach-virt's DT
+   as the indication we're a guest. This would just be a heuristic,
+   i.e. "have virtio mmio" && psci.method == hvc, or something,
+   and we'd still need a way to know if we're kvm vs. xen vs. ??.
 
-Tested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Thanks,
+drew 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+[1] http://people.redhat.com/~rjones/virt-what/
+[2] http://git.annexia.org/?p=virt-what.git;a=summary
+[3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
