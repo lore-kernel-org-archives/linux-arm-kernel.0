@@ -1,60 +1,50 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 25 Mar 2015 15:38:57 +0000
-Subject: [patch v11 19/23] XEN / ACPI: Make XEN ACPI depend on X86
-In-Reply-To: <20150325115113.GF24636@arm.com>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-20-git-send-email-hanjun.guo@linaro.org>
- <55118303.8060003@oracle.com>
- <alpine.DEB.2.02.1503241723520.7982@kaball.uk.xensource.com>
- <20150325115113.GF24636@arm.com>
-Message-ID: <alpine.DEB.2.02.1503251538380.7982@kaball.uk.xensource.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Wed, 25 Mar 2015 16:46:05 +0100
+Subject: [PATCH v2 1/2] ARM: dts: imx6: factor out pinmux for edm1 module
+In-Reply-To: <20150324121810.GI28410@dragon>
+References: <1425831960-10259-1-git-send-email-m.grzeschik@pengutronix.de>
+ <20150323151937.GA20161@pengutronix.de>
+ <20150324121810.GI28410@dragon>
+Message-ID: <20150325154605.GG20161@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Mar 2015, Will Deacon wrote:
-> Hi Stefano,
-> 
-> On Tue, Mar 24, 2015 at 05:24:53PM +0000, Stefano Stabellini wrote:
-> > On Tue, 24 Mar 2015, Boris Ostrovsky wrote:
-> > > On 03/24/2015 10:02 AM, Hanjun Guo wrote:
-> > > > When ACPI is enabled on ARM64, XEN ACPI will also compiled
-> > > > into the kernel, but XEN ACPI is x86 dependent, so introduce
-> > > > CONFIG_XEN_ACPI to make it depend on x86 before XEN ACPI is
-> > > > functional on ARM64.
-> > > > 
-> > > > CC: 'Stefano Stabellini' <stefano.stabellini@eu.citrix.com>
-> > > > CC: Julien Grall <julien.grall@linaro.org>
-> > > > CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > > > CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> > > > CC: David Vrabel <david.vrabel@citrix.com>
-> > > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > > ---
-> > > >   drivers/xen/Kconfig  | 4 ++++
-> > > >   drivers/xen/Makefile | 2 +-
-> > > >   2 files changed, 5 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> > > > index b812462..a31cd29 100644
-> > > > --- a/drivers/xen/Kconfig
-> > > > +++ b/drivers/xen/Kconfig
-> > > > @@ -253,4 +253,8 @@ config XEN_EFI
-> > > >   	def_bool y
-> > > >   	depends on X86_64 && EFI
-> > > >   +config XEN_ACPI
-> > > > +	def_bool y
-> > > > +	depends on X86 && ACPI
-> > > > +
+On Tue, Mar 24, 2015 at 08:18:11PM +0800, Shawn Guo wrote:
+> On Mon, Mar 23, 2015 at 04:19:37PM +0100, Michael Grzeschik wrote:
+> > On Sun, Mar 08, 2015 at 05:25:59PM +0100, Michael Grzeschik wrote:
+> > > Thw Wandboard is using the EDM1-CF-IMX6 module which is
+> > > defined under the edm standard.
 > > > 
+> > > http://www.edm-standard.org/
 > > > 
-> > > I think XEN_DOM0 (in arch/x86/xen/Kconfig) should select this option.
-> > > Otherwise, if it is set to 'n', we won't be able to build enlighten.c
-> > > (xen_start_kernel() -> xen_acpi_sleep_register() refers to
-> > > xen_acpi_notify_hypervisor_sleep()).
+> > > As this module is used on more boards this patch moves the default
+> > > pinmux settings into the special file imx6qdl-edm1.dtsi.
 > > > 
+> > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > ---
+> > > - fixed the alphabetical order of the nodes
+> > > - moved MX6QDL_PAD_GPIO_16__ENET_REF_CLK to the board hogpins
+> > > 
+> > >  arch/arm/boot/dts/imx6qdl-edm1.dtsi            | 230 +++++++++++++++++++++++++
+> > >  arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi |   1 +
+> > >  arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi |   1 +
+> > >  arch/arm/boot/dts/imx6qdl-wandboard.dtsi       |  99 +----------
+> > >  4 files changed, 234 insertions(+), 97 deletions(-)
+> > >  create mode 100644 arch/arm/boot/dts/imx6qdl-edm1.dtsi
 > > 
-> > I don't think that it is necessary: XEN_ACPI gets automatically enabled
-> > anyway.
+> > subliminal ping...
 > 
-> In which case, can I have your Ack on this please?
+> Have we got anyone test the patch on Wandboard as requested by rsc [1]?
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+So far, not yet. :/
+
+Could anyone test?
+
+Thanks,
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
