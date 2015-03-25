@@ -1,55 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Mar 2015 14:59:49 +0000
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150325145949.GE26903@localhost>
+Date: Wed, 25 Mar 2015 17:17:35 +0000
+Subject: [patch v11 12/23] ARM64 / ACPI: Parse MADT for SMP initialization
+In-Reply-To: <1427205776-5060-13-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-13-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150325171735.GI14585@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 16134608eecf..fd8434753372 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -49,13 +49,15 @@
->  #ifdef CONFIG_ARM64_64K_PAGES
->  #define BLOCK_SHIFT	PAGE_SHIFT
->  #define BLOCK_SIZE	PAGE_SIZE
-> -#define TABLE_SHIFT	PMD_SHIFT
->  #else
->  #define BLOCK_SHIFT	SECTION_SHIFT
->  #define BLOCK_SIZE	SECTION_SIZE
-> -#define TABLE_SHIFT	PUD_SHIFT
->  #endif
->  
-> +#define TABLE_SHIFT	(BLOCK_SHIFT + PAGE_SHIFT - 3)
-> +#define TABLE_SIZE	(1 << TABLE_SHIFT)
-> +#define TABLE_MASK	(~(TABLE_SIZE - 1))
+On Tue, Mar 24, 2015 at 10:02:45PM +0800, Hanjun Guo wrote:
+> +/**
+> + * acpi_map_gic_cpu_interface - generates a logical cpu number
+> + * and map to MPIDR represented by GICC structure
+> + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
+> + * @enabled: this cpu is enabled or not
+> + *
+> + * Returns the logical cpu number which maps to MPIDR
+> + */
+> +static int __init acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
+
+So here we have an u8 enabled.
+
+> +static int __init
+> +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+> +				const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_interrupt *processor;
 > +
->  #define KERNEL_START	_text
->  #define KERNEL_END	_end
->  
-> @@ -237,7 +239,10 @@ ENTRY(stext)
->  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
->  
->  	adrp	x24, __PHYS_OFFSET
-> -	mov	x23, #KIMAGE_OFFSET
-> +	and	x23, x24, #~TABLE_MASK		// image offset
-> +	and	x24, x24, #TABLE_MASK		// PHYS_OFFSET
-> +	mov	x0, #KIMAGE_OFFSET
-> +	add	x23, x23, x0
+> +	processor = (struct acpi_madt_generic_interrupt *)header;
+> +
+> +	if (BAD_MADT_ENTRY(processor, end))
+> +		return -EINVAL;
+> +
+> +	acpi_table_print_madt_entry(header);
+> +
+> +	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
+> +		processor->flags & ACPI_MADT_ENABLED);
 
-I'm still trying to figure out how this works. Does the code imply that
-the kernel image can only be loaded within a block size of the
-PHYS_OFFSET? If that's the case, it's not too flexible.
+and here processor->flags is u32. Luckily, ACPI_MADT_ENABLED is 1 and we
+don't lose any information. So either make the enabled above a bool or
+simply pass the flags with the check in acpi_map_gic_cpu_interface()
+(personal preference for the latter).
 
-My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
-entirely) or at least compute it at DT parsing time. I'm more inclined
-for making it 0 assuming that it doesn't break anything else (vmemmap
-virtual range may get slightly bigger but still not significant,
-basically max_phys_addr / sizeof(struct page)).
+Apart from this:
 
--- 
-Catalin
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
