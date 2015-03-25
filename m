@@ -1,37 +1,62 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 25 Mar 2015 14:25:29 -0600
-Subject: [PATCH v18 04/11] ARM: cpuidle: Add cpuidle support for QCOM cpus
+Date: Wed, 25 Mar 2015 14:25:32 -0600
+Subject: [PATCH v18 07/11] ARM: dts: qcom: Update power-controller device node
+ for 8064 Krait CPUs
 In-Reply-To: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
 References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1427315136-44321-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1427315136-44321-8-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define ARM_QCOM_CPUIDLE config item to enable cpuidle support.
+Update the SAW2 DT bindings to add qcom,apq8064-saw2-v1.1-cpu compatible
+binding string to configure SPM registers and allow the SPM to put the
+core in deeper idle states when the core is idle.
 
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/cpuidle/Kconfig.arm | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-index 21340e0..325be7f 100644
---- a/drivers/cpuidle/Kconfig.arm
-+++ b/drivers/cpuidle/Kconfig.arm
-@@ -74,3 +74,10 @@ config ARM_MVEBU_V7_CPUIDLE
- 	depends on ARCH_MVEBU && !ARM64
- 	help
- 	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
-+
-+config ARM_QCOM_CPUIDLE
-+	bool "CPU Idle Driver for QCOM processors"
-+	depends on ARCH_QCOM
-+	select ARM_CPUIDLE
-+	help
-+	  Select this to enable cpuidle on QCOM processors.
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index b3154c0..9fd24bc 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -139,26 +139,26 @@
+ 			reg = <0x020b8000 0x1000>, <0x02008000 0x1000>;
+ 		};
+ 
+-		saw0: regulator at 2089000 {
+-			compatible = "qcom,saw2";
++		saw0: power-controller at 2089000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x02089000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
+ 
+-		saw1: regulator at 2099000 {
+-			compatible = "qcom,saw2";
++		saw1: power-controller at 2099000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x02099000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
+ 
+-		saw2: regulator at 20a9000 {
+-			compatible = "qcom,saw2";
++		saw2: power-controller at 20a9000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x020a9000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
+ 
+-		saw3: regulator at 20b9000 {
+-			compatible = "qcom,saw2";
++		saw3: power-controller at 20b9000 {
++			compatible = "qcom,apq8064-saw2-v1.1-cpu", "qcom,saw2";
+ 			reg = <0x020b9000 0x1000>, <0x02009000 0x1000>;
+ 			regulator;
+ 		};
 -- 
 2.1.0
