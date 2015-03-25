@@ -1,61 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Mar 2015 11:38:43 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <2694196.2XPpkm7uxF@vostro.rjw.lan>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150324220253.9595AC407F8@trevor.secretlab.ca>
- <20150325112410.GA24636@arm.com>
- <2694196.2XPpkm7uxF@vostro.rjw.lan>
-Message-ID: <20150325113839.GD24636@arm.com>
+From: mgorman@suse.de (Mel Gorman)
+Date: Wed, 25 Mar 2015 11:49:45 +0000
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+ <54D40DAF.4080609@codeaurora.org>
+ <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
+ <54D534FB.1090101@codeaurora.org>
+ <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+Message-ID: <20150325114945.GK4701@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 11:54:25AM +0000, Rafael J. Wysocki wrote:
-> On Wednesday, March 25, 2015 11:24:11 AM Will Deacon wrote:
-> > On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
-> > > On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
-> > > wrote:
-> > > > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> > > > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> > > > > I am working on it, I do not think it should be a blocking point, patch
-> > > > > coming asap on top of your series.
-> > > > 
-> > > > Well, I don't really want to merge the series without those patches so I
-> > > > do think it blocks the code from getting into mainline.
-> > > 
-> > > Really? It's a pretty minor duplication problem and it's been identified
-> > > as something requiring refactoring to both the ACPI and DT code. It
-> > > isn't at all dangerous. Why is this a blocking point?
-> > 
-> > Because I don't really see a valid excuse not to get this right first time
-> > around. Lorenzo already has patches on top, so we just need a co-ordinated
-> > review effort.
-> > 
-> > I wouldn't accept another patch series that needed minor rework (which by
-> > its very nature is easily addressed), so why should ACPI be treated any
-> > differently?
+On Mon, Mar 23, 2015 at 02:08:12AM -0700, Gregory Fong wrote:
+> Hello,
 > 
-> Not ACPI, but this particular patchset I think.  The problem is that it has
-> already been reviewed and ACKed by multiple people and it would be a shame
-> to require all of those people to do their reviews once again because of
-> that minor rework (which arguably can be done on top of the patchset just
-> fine).
+> On Tue, Feb 10, 2015 at 3:32 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Feb 09, 2015 at 11:55:54AM -0800, Gregory Fong wrote:
+> >> On Fri, Feb 6, 2015 at 1:41 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> >> > So it looks like the lib/show_mem.c does something different
+> >> > #ifdef CONFIG_CMA
+> >> >         printk("%lu pages reserved\n", (reserved - totalcma_pages));
+> >> >         printk("%lu pages cma reserved\n", totalcma_pages);
+> >> > #else
+> >> >         printk("%lu pages reserved\n", reserved);
+> >> > #endif
+> >> >
+> >> >
+> >> > No need to change the name, instead I'd say fix up arm to match what
+> >> > the generic showmem is doing.
+> >>
+> >> The trouble is that lib/show_mem.c and ARM's show_mem use the
+> >> 'reserved' variable to hold different info, which was not a problem I
+> >> was aiming to tackle here, and am not sure I understand what's going
+> >> on well enough to do so.  But let's give it a shot:
+> >>
+> >> In lib/show_mem.c, reserved is calculated by iterating over all online
+> >> nodes, then increasing reserved by (zone->present_pages -
+> >> zone->managed_pages).  This count includes CMA pages and so when
+> >> reserved pages is printed it should be 'reserved' - totalcma_pages, as
+> >> it currently is.
+> >
+> > So, some digging is needed into why the generic version is different.
+> > You have to remember that many of the algorithms for this kind of thing
+> > were based on the x86 implementation, so differences like this are
+> > probably down to ARM being annoyingly overlooked or ignored when generic
+> > changes happen.
+> >
 > 
-> Of course, if the minor rework in question would not involve the need to
-> review things once again, then I agree that it'd be better to do it upfront,
-> but otherwise there's a good reason not to.
+> Revisiting this finally, it looks like this was changed by Mel about a
+> year and a half ago in commit c78e93630d15b5f5774213aad9bdc9f52473a89b
+> "mm: do not walk all of system memory during show_mem"[1], which
+> removes the pfn walk and gets this info from struct zone instead,
+> saving a lot of time.  Is there any reason to not to change the ARM
+> show_mem to do this as well?
 
-Aha, I think this is just a misunderstanding -- I'm certainly not suggesting
-that Hanjun rework the current set! What I *am* asking for is that they go
-into mainline with Lorenzo's patches on top, which means that his series [1]
-needs some review (and I plan to look at it later today).
+I did not read through this thread and only see this mail but AFAIK,
+the same change should be safe on ARM. I simply had no means of testing
+ARM changes and the problem only affected large machines. For all I knew,
+ARM developers really cared about the accuracy of this information so I
+played it safe.
 
-> And, as a maintainer, you can always say "Well, I'm taking this conditional on
-> doing this-and-that on top of it and I won't be taking any more patches from
-> you in the future if that doesn't happen."
-
-I can't really take that stance for a new feature like this.
-
-Will
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333257.html
+-- 
+Mel Gorman
+SUSE Labs
