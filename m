@@ -1,43 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Mar 2015 11:33:01 -0700
-Subject: [PATCH v10 1/2] mfd: AXP20x: Add bindings documentation
-In-Reply-To: <1424431168-25157-2-git-send-email-wens@csie.org>
-References: <1424431168-25157-1-git-send-email-wens@csie.org>
- <1424431168-25157-2-git-send-email-wens@csie.org>
-Message-ID: <20150325183301.GL23664@lukather>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Wed, 25 Mar 2015 20:00:07 +0100
+Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable options to mount a rootfs
+ via NFS
+Message-ID: <1427310007-1022-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 20, 2015 at 07:19:27PM +0800, Chen-Yu Tsai wrote:
-> From: Carlo Caione <carlo@caione.org>
-> 
-> Bindings documentation for the AXP20x driver. In this file also
-> sub-nodes are documented.
-> 
-> Signed-off-by: Carlo Caione <carlo@caione.org>
-> [wens at csie.org: clarify interrupt source for the axp PMIC]
-> [wens at csie.org: explain dcdc-workmode in detail and trim lines to 80 chars]
-> [wens at csie.org: make regulator supplies optional if using unregulated input]
-> [wens at csie.org: use cubieboard2 regulator nodes as example]
-> [wens at csie.org: x-powers,dcdc-workmode default changed to 'current hardware
->                 setting']
-> [wens at csie.org: reorganized regulator related properties into separate
->                 section.]
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This patch enables the needed options to mount a rootfs over
+NFS and also the needed support for automatic configuration
+of IP addresses during boot as needed by NFS.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ arch/arm/configs/exynos_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 72a4fffd603e..02be4c072497 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -36,6 +36,10 @@ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+ CONFIG_NET_KEY=y
+ CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IP_PNP_RARP=y
+ CONFIG_WIRELESS=y
+ CONFIG_CFG80211=y
+ CONFIG_MWIFIEX=y
+@@ -206,6 +210,8 @@ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_CRAMFS=y
+ CONFIG_ROMFS_FS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/fd901d83/attachment.sig>
+2.1.4
