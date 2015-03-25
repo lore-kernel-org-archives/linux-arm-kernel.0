@@ -1,53 +1,46 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Mar 2015 13:00:40 +0100
-Subject: [PATCH 0/2] leds/pwm: don't call pwm_disable when setting
- brightness
-In-Reply-To: <20150325101428.GB32677@pengutronix.de>
-References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20150325101428.GB32677@pengutronix.de>
-Message-ID: <20150325120039.GA16310@ulmo.nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Mar 2015 12:03:58 +0000
+Subject: ARM: KVM/XEN: how should we support virt-what?
+In-Reply-To: <20150325094440.GB3163@hawk.usersys.redhat.com>
+References: <20150325094440.GB3163@hawk.usersys.redhat.com>
+Message-ID: <5512A42E.2070300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 11:14:28AM +0100, Uwe Kleine-K?nig wrote:
-> [Cc: += akpm]
+On 25/03/15 09:44, Andrew Jones wrote:
+> Hello ARM virt maintainers,
 > 
-> On Thu, Feb 12, 2015 at 10:44:48AM +0100, Uwe Kleine-K?nig wrote:
-> > on arm/i.MX28 the leds connected to a pwm are still broken and it's more
-> > than three years ago that I came up with these patches. I still consider
-> > them to do the right thing and they fix a real bug.
-> I'm really frustrated here. I want to fix a real bug, made several
-> suggestions (with patches) how to fix it and still have to include my
-> local patches in each project that uses leds on i.MX28's pwm output.
-> 
-> Thierry, how can we get this resolved?
+> I'd like to start a discussion about supporting virt-what[1]. virt-what
+> allows userspace to determine if the system it's running on is running
+> in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
+> effort tool, see the Caveat emptor in [1], it has become quite a useful
+> tool, and is showing up in different places, such as OpenStack. If you
+> look at the code[2], specifically [3], then you'll see how it works on
+> x86, which is to use the dedicated hypervisor cpuid leaves. I'm
+> wondering what equivalent we have, or can develop, for arm.
+> Here are some thoughts;
+> 0) there's already something we can use, and I just need to be told
+>    about it.
+> 1) be as similar as possible to x86 by dedicating some currently
+>    undefined sysreg bits. This would take buy-in from lots of parties,
+>    so is not likely the way to go.
+> 2) create a specific DT node that will get exposed through sysfs, or
+>    somewhere.
+> 3) same as (2), but just use the nodes currently in mach-virt's DT
+>    as the indication we're a guest. This would just be a heuristic,
+>    i.e. "have virtio mmio" && psci.method == hvc, or something,
+>    and we'd still need a way to know if we're kvm vs. xen vs. ??.
 
-We have a couple of other drivers already solving similar issues. Look
-for example at the pwm-bcm-kona driver. It explicitly sets the duty
-cycle to 0 on ->disable() and then waits for some time before actually
-disabling the clock (specifically to avoid a similar than you seem to
-have on i.MX). See also the notes near the top of the driver source
-file.
+KVM doesn't have any specific DT node so far (at least kvmtool doesn't
+expose anything, and QEMU doesn't seem to do it either).
 
-Another example is pwm-samsung. It also has code specifically aimed at
-making sure the signal doesn't unexpectedly stay high after calling
-pwm_disable(). See also the commit message of:
+You could define KVM as being !Xen by looking for the Xen hypervisor
+node, but that's quite a heuristic.
 
-	6da89312a39b pwm: samsung: Fix output race on disabling
+Overall, I'm quite reluctant to introduce things that would immediately
+become an ABI (cue the recent bogomips flame wars), forming a contract
+between the host userspace and the guest userspace.
 
-Both of these examples sound very similar to what you're describing, so
-I think it'd be best to follow these examples and fix the i.MX driver to
-behave as expected.
-
-Irrespective of the behaviour of current drivers, the assumptions are
-already codified in the user drivers and they all assume that calling
-pwm_disable() means the PWM is off.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/a0804a90/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
