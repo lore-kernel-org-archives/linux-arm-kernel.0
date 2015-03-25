@@ -1,59 +1,46 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Mar 2015 06:28:59 -0700
-Subject: [PATCH v6 7/9] rtc: bindings: Provide ST bindings for ST's LPC
- RTC device
-In-Reply-To: <1427189140-1935-8-git-send-email-lee.jones@linaro.org>
-References: <1427189140-1935-1-git-send-email-lee.jones@linaro.org>
- <1427189140-1935-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <5512B81B.9090306@roeck-us.net>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 25 Mar 2015 21:35:22 +0800
+Subject: [PATCH 3/5] ARM64: kernel: psci: let ACPI probe PSCI version
+In-Reply-To: <1427219940-27201-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1427219940-27201-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1427219940-27201-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5512B99A.3090206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2015 02:25 AM, Lee Jones wrote:
-> On current ST platforms the LPC controls a number of functions including
-> Watchdog and Real Time Clock.  This patch provides the bindings used to
-> configure LPC in RTC mode.
+On 2015/3/25 1:58, Lorenzo Pieralisi wrote:
+> PSCI v0.2+ allows the kernel to probe the PSCI firmware version.
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> This patch replaces the default initialization of PSCI v0.2+
+> functions with code that allows probing PSCI firmware version
+> and initializes PSCI functions accordingly.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 > ---
->   .../devicetree/bindings/rtc/rtc-st-lpc.txt         | 25 ++++++++++++++++++++++
->   1 file changed, 25 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
+
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
+
+>  arch/arm64/kernel/psci.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 >
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-> new file mode 100644
-> index 0000000..aaf9855
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-st-lpc.txt
-> @@ -0,0 +1,25 @@
-> +STMicroelectronics Low Power Controller (LPC) - RTC
-> +===================================================
-> +
-> +LPC currently supports Watchdog OR Real Time Clock functionality.
-> +
-> +[See: ../watchdog/st_lpc_wdt.txt for Watchdog options]
-> +
-> +Required properties
-> +
-> +- compatible 	: Must be one of: "st,stih407-lpc" "st,stih416-lpc"
-> +				  "st,stih415-lpc" "st,stid127-lpc"
-> +- reg		: LPC registers base address + size
-> +- interrupts    : LPC interrupt line number and associated flags
-> +- clocks	: Clock used by LPC device (See: ../clock/clock-bindings.txt)
-> +- st,lpc-mode	: The LPC can run either one of two modes ST_LPC_MODE_RTC [0] or
-> +		  ST_LPC_MODE_WDT [1].  One (and only one) mode must be
-> +		  selected.
-> +
-> +Example:
-> +	lpc at fde05000 {
-> +		compatible	= "st,stih416-lpc-watchdog";
-
-Name mismatch here as well.
-
-Guenter
-
-> +		reg		= <0xfde05000 0x1000>;
-> +		clocks 		= <&clk_s_d3_flexgen CLK_LPC_0>;
-> +		st,lpc-mode	= <ST_LPC_MODE_RTC>;
-> +	};
->
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index 2caac44..ea18cb5 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -439,9 +439,7 @@ int __init psci_acpi_init(void)
+>  	else
+>  		invoke_psci_fn = __invoke_psci_fn_smc;
+>  
+> -	psci_0_2_set_functions();
+> -
+> -	return 0;
+> +	return psci_probe();
+>  }
+>  
+>  #ifdef CONFIG_SMP
