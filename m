@@ -1,80 +1,53 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 25 Mar 2015 21:54:10 +0100
-Subject: [PATCH 6/8] ARM: cpuidle: Enable the ARM64 driver for both
- ARM32/ARM64
-In-Reply-To: <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
-References: <55127A53.8050206@linaro.org>
- <1427274436-21916-1-git-send-email-daniel.lezcano@linaro.org>
- <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1427316850.10958.58.camel@x220>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 26 Mar 2015 05:04:48 +0800
+Subject: [PATCH 2/3] ARM: dts: sun6i: Add cpu clock reference and operating
+ points to dtsi
+In-Reply-To: <1427317489-708-1-git-send-email-wens@csie.org>
+References: <1427317489-708-1-git-send-email-wens@csie.org>
+Message-ID: <1427317489-708-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A few nits are all I spotted.
+The cpu core is clocked from the "cpu" clock. Add a reference to it
+in the first cpu node. Also add "cpu0" label to the node.
 
-On Wed, 2015-03-25 at 10:07 +0100, Daniel Lezcano wrote:
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
+The operating points were taken from the a list compiled by Maxime Ripard,
+which is based on A31 FEX files from the sunxi-boards repository. Not all
+boards have the same settings. The settings in this patch are the ones
+shared by A/B/C revisions, plus the default clock setting from u-boot.
 
-> +config ARM_CPUIDLE
-> +        bool "Generic ARM/ARM64 CPU idle Driver"
-> +        select DT_IDLE_STATES
-> +        help
-> +          Select this to enable generic cpuidle driver for ARM.
-> +          It provides a generic idle driver whose idle states are configured
-> +          at run-time through DT nodes. The CPUidle suspend backend is
-> +          initialized by calling the CPU operations init idle hook
-> +          provided by architecture code.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-Start with a tab instead of 8 spaces, please.
-
-> --- /dev/null
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-
-> +#include <linux/cpuidle.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/cpu_pm.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-
-Is this include actually needed? I haven't tried building this without
-that include, but I spotted nothing obviously module related in this
-file.
-
-> +#include <linux/of.h>
-> +
-> +#include <asm/cpuidle.h>
-> +
-> +#include "dt_idle_states.h"
-
-> +static struct cpuidle_driver arm_idle_driver = {
-> +	.name = "arm_idle",
-> +	.owner = THIS_MODULE,
-
-Since this can only be built in, THIS_MODULE will (basically) be
-equivalent to NULL according to include/linux/export.h. So I suppose
-this line can be dropped.
-
-> +	/*
-> +	 * State at index 0 is standby wfi and considered standard
-> +	 * on all ARM platforms. If in some platforms simple wfi
-> +	 * can't be used as "state 0", DT bindings must be implemented
-> +	 * to work around this issue and allow installing a special
-> +	 * handler for idle state index 0.
-> +	 */
-> +	.states[0] = {
-> +		.enter                  = arm_enter_idle_state,
-> +		.exit_latency           = 1,
-> +		.target_residency       = 1,
-> +		.power_usage		= UINT_MAX,
-> +		.name                   = "WFI",
-> +		.desc                   = "ARM WFI",
-> +	}
-> +};
-
-I did notice that these two nits are already present in
-drivers/cpuidle/cpuidle-arm64.c. But since this patch is not just moving
-that file's content around, you might as well look into those two nits.
-
-
-Paul Bolle
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 6d29eab5fe32..9a68acc1070f 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -96,10 +96,22 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a7";
+ 			device_type = "cpu";
+ 			reg = <0>;
++			clocks = <&cpu>;
++			clock-latency = <244144>; /* 8 32k periods */
++			operating-points = <
++				/* kHz    uV */
++				1008000	1200000
++				864000  1200000
++				720000  1100000
++				480000  1000000
++				>;
++			#cooling-cells = <2>;
++			cooling-min-level = <0>;
++			cooling-max-level = <3>;
+ 		};
+ 
+ 		cpu at 1 {
+-- 
+2.1.4
