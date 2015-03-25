@@ -1,119 +1,53 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:27:51 +0000
-Subject: [PATCH RESEND 6/7] mmc: host: dw_mmc: change idmac descriptor files
- to __le32
-In-Reply-To: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427282872-10563-7-git-send-email-ben.dooks@codethink.co.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 25 Mar 2015 12:54:25 +0100
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150325112410.GA24636@arm.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150324220253.9595AC407F8@trevor.secretlab.ca>
+ <20150325112410.GA24636@arm.com>
+Message-ID: <2694196.2XPpkm7uxF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_mmc driver does not take into account the processor may be in
-big endian when writing the descriptors. Change the descriptors for
-the 32bit IDMA to use __le32 and ensure they are suitably swapped
-before writing.
+On Wednesday, March 25, 2015 11:24:11 AM Will Deacon wrote:
+> On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
+> > On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
+> > wrote:
+> > > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
+> > > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
+> > > > I am working on it, I do not think it should be a blocking point, patch
+> > > > coming asap on top of your series.
+> > > 
+> > > Well, I don't really want to merge the series without those patches so I
+> > > do think it blocks the code from getting into mainline.
+> > 
+> > Really? It's a pretty minor duplication problem and it's been identified
+> > as something requiring refactoring to both the ACPI and DT code. It
+> > isn't at all dangerous. Why is this a blocking point?
+> 
+> Because I don't really see a valid excuse not to get this right first time
+> around. Lorenzo already has patches on top, so we just need a co-ordinated
+> review effort.
+> 
+> I wouldn't accept another patch series that needed minor rework (which by
+> its very nature is easily addressed), so why should ACPI be treated any
+> differently?
 
-Note, this has not been tested as the socfpga driver does not try to
-use idma.
+Not ACPI, but this particular patchset I think.  The problem is that it has
+already been reviewed and ACKed by multiple people and it would be a shame
+to require all of those people to do their reviews once again because of
+that minor rework (which arguably can be done on top of the patchset just
+fine).
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
---
-CC: Linux MCC <linux-mmc@vger.kernel.org>
-CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-CC: Dinh Nguyen <dinguyen@opensource.altera.com>
-CC: Chris Ball <chris@printf.net>
-CC: Ulf Hansson <ulf.hansson@linaro.org>
-CC: Jaehoon Chung <jh80.chung@samsung.com>
-CC: Seungwon Jeon <tgih.jun@samsung.com>
----
- drivers/mmc/host/dw_mmc.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+Of course, if the minor rework in question would not involve the need to
+review things once again, then I agree that it'd be better to do it upfront,
+but otherwise there's a good reason not to.
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 4d2e3c2..12e681c 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -69,7 +69,7 @@ struct idmac_desc_64addr {
- 
- 	u32		des2;	/*Buffer sizes */
- #define IDMAC_64ADDR_SET_BUFFER1_SIZE(d, s) \
--	((d)->des2 = ((d)->des2 & 0x03ffe000) | ((s) & 0x1fff))
-+	((d)->des2 = ((d)->des2 & cpu_to_le32(0x03ffe000)) | ((cpu_to_le32(s)) & cpu_to_le32(0x1fff)))
- 
- 	u32		des3;	/* Reserved */
- 
-@@ -81,7 +81,7 @@ struct idmac_desc_64addr {
- };
- 
- struct idmac_desc {
--	u32		des0;	/* Control Descriptor */
-+	__le32		des0;	/* Control Descriptor */
- #define IDMAC_DES0_DIC	BIT(1)
- #define IDMAC_DES0_LD	BIT(2)
- #define IDMAC_DES0_FD	BIT(3)
-@@ -90,13 +90,13 @@ struct idmac_desc {
- #define IDMAC_DES0_CES	BIT(30)
- #define IDMAC_DES0_OWN	BIT(31)
- 
--	u32		des1;	/* Buffer sizes */
-+	__le32		des1;	/* Buffer sizes */
- #define IDMAC_SET_BUFFER1_SIZE(d, s) \
- 	((d)->des1 = ((d)->des1 & 0x03ffe000) | ((s) & 0x1fff))
- 
--	u32		des2;	/* buffer 1 physical address */
-+	__le32		des2;	/* buffer 1 physical address */
- 
--	u32		des3;	/* buffer 2 physical address */
-+	__le32		des3;	/* buffer 2 physical address */
- };
- #endif /* CONFIG_MMC_DW_IDMAC */
- 
-@@ -477,23 +477,23 @@ static void dw_mci_translate_sglist(struct dw_mci *host, struct mmc_data *data,
- 			 * Set the OWN bit and disable interrupts for this
- 			 * descriptor
- 			 */
--			desc->des0 = IDMAC_DES0_OWN | IDMAC_DES0_DIC |
--						IDMAC_DES0_CH;
-+			desc->des0 = cpu_to_le32(IDMAC_DES0_OWN | IDMAC_DES0_DIC |
-+						 IDMAC_DES0_CH);
- 			/* Buffer length */
- 			IDMAC_SET_BUFFER1_SIZE(desc, length);
- 
- 			/* Physical address to DMA to/from */
--			desc->des2 = mem_addr;
-+			desc->des2 = cpu_to_le32(mem_addr);
- 		}
- 
- 		/* Set first descriptor */
- 		desc = host->sg_cpu;
--		desc->des0 |= IDMAC_DES0_FD;
-+		desc->des0 |= cpu_to_le32(IDMAC_DES0_FD);
- 
- 		/* Set last descriptor */
- 		desc = host->sg_cpu + (i - 1) * sizeof(struct idmac_desc);
--		desc->des0 &= ~(IDMAC_DES0_CH | IDMAC_DES0_DIC);
--		desc->des0 |= IDMAC_DES0_LD;
-+		desc->des0 &= cpu_to_le32(~(IDMAC_DES0_CH | IDMAC_DES0_DIC));
-+		desc->des0 |= cpu_to_le32(IDMAC_DES0_LD);
- 	}
- 
- 	wmb();
-@@ -562,12 +562,12 @@ static int dw_mci_idmac_init(struct dw_mci *host)
- 
- 		/* Forward link the descriptor list */
- 		for (i = 0, p = host->sg_cpu; i < host->ring_size - 1; i++, p++)
--			p->des3 = host->sg_dma + (sizeof(struct idmac_desc) *
--								(i + 1));
-+			p->des3 = cpu_to_le32(host->sg_dma + (sizeof(struct idmac_desc) *
-+							      (i + 1)));
- 
- 		/* Set the last descriptor as the end-of-ring descriptor */
--		p->des3 = host->sg_dma;
--		p->des0 = IDMAC_DES0_ER;
-+		p->des3 = cpu_to_le32(host->sg_dma);
-+		p->des0 = cpu_to_le32(IDMAC_DES0_ER);
- 	}
- 
- 	dw_mci_idmac_reset(host);
+And, as a maintainer, you can always say "Well, I'm taking this conditional on
+doing this-and-that on top of it and I won't be taking any more patches from
+you in the future if that doesn't happen."
+
+
 -- 
-2.1.4
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
