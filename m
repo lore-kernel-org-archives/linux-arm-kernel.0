@@ -1,34 +1,36 @@
-From: leigh@solinno.co.uk (Leigh Brown)
-Date: Wed, 25 Mar 2015 23:00:11 +0000
-Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
-In-Reply-To: <551333D2.8080600@free-electrons.com>
-References: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
- <551333D2.8080600@free-electrons.com>
-Message-ID: <8c59bb2d9802adfc70116df08b61fda1@doppler.thel33t.co.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 26 Mar 2015 04:09:23 +0530
+Subject: [PATCH v1 1/3] phy: phy-core: allow specifying supply at port
+ level
+In-Reply-To: <CAE_wzQ_8YzZwizyozU-0MPLX8-hT1Y1LnfYFg+iEvQgYX7zjFg@mail.gmail.com>
+References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>	<1426886727-537-2-git-send-email-arun.ramamurthy@broadcom.com>	<55133294.4040705@ti.com>
+ <CAE_wzQ_8YzZwizyozU-0MPLX8-hT1Y1LnfYFg+iEvQgYX7zjFg@mail.gmail.com>
+Message-ID: <5513391B.2060505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi,
 
-On 2015-03-25 22:16, Gregory CLEMENT wrote:
-> On 25/03/2015 22:33, Leigh Brown wrote:
->> Add support for the system reset button on the GlobalScale Mirabox.
->> The reset button is connected via GPIO so add a gpio-keys entry for
->> it in the device tree file.  Patch is based on the implementation
->> in armada-370-netgear-rn102.dts but using the GPIO pin specified in
->> the original patch by Ezequiel Garcia from 2013.
+On Thursday 26 March 2015 03:47 AM, Dmitry Torokhov wrote:
+> On Wed, Mar 25, 2015 at 3:11 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+>>> Multi-port phy's may have per-port power supplies. Let's change phy core
+>>> to first attempt to look up the supply at the port level, and then, if
+>>> not found, check parent device.
+>>
+>> Why not just have every port provide the power supply if it needs?
+>> I don't think checking for parent device should be present in the phy-core at
+>> all.
 > 
-> Thanks for your contribution, however the reset button is not always
-> connected to this GPIO. At least on the Mirabox I have the reset button
-> triggers an hardware reset. My concern is that for some board the dts
-> representation would be wrong.
+> We need to do that if we want to keep compatibility with the current
+> DTSes: before this patch the supply would be always looked up on
+> device and not port level.
 
-I wish I had your Mirabox, because having the reset button on a GPIO is
-almost useless :-(
+ah okay.
+so just using regulator_get_optional(&phy->dev, "phy"); should be sufficient
+right? Why do we need regulator_get_optional(phy->dev.parent, "phy");?
 
-However, I have what I have so it would be nice to find a way to support
-it.
-
-Regards,
-
-Leigh.
+Thanks
+Kishon
