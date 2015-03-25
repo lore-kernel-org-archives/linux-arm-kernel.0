@@ -1,35 +1,36 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Mar 2015 15:36:34 +0000
-Subject: RPmsg, DMA and ARM64
-In-Reply-To: <20150324043749.GJ23658@toto>
-References: <20150324043749.GJ23658@toto>
-Message-ID: <20150325153634.GF26903@localhost>
+Date: Wed, 25 Mar 2015 17:29:10 +0000
+Subject: [patch v11 18/23] ARM64 / ACPI: Select
+ ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64
+In-Reply-To: <1427205776-5060-19-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-19-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150325172910.GN14585@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 02:37:49PM +1000, Edgar E. Iglesias wrote:
-> I'm trying to run rpmsg and remoteproc on the ZynqMP but hitting an mm error.
-> I'm not sure who is breaking the rules, rpmsg or the dma allocators?
+On Tue, Mar 24, 2015 at 10:02:51PM +0800, Hanjun Guo wrote:
+> From: Al Stone <al.stone@linaro.org>
 > 
-> When rpmsg sets up the virtqueues, it allocates memory with
-> dma_alloc_coherent() and initializes a scatterlist with sg_init_one().
-> drivers/rpmsg/virtio_rpmsg_bus.c:rpmsg_probe().
-> sg_init_one() requires that the memory it gets is virt_addr_valid().
+> ACPI reduced hardware mode is disabled by default, but ARM64
+> can only run properly in ACPI hardware reduced mode, so select
+> ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on ARM64.
 > 
-> The problem I'm seeing is that on arm64, the dma alloc functions can
-> return vmalloced (via dma_common_contiguous_remap) memory. This
-> then causes havoc when the scatterlist code tries to go virt_to_page
-> and back to get hold of a physical adress (sg_phys()).
+> If the firmware is not using hardware reduced ACPI mode, we
+> will disable ACPI to avoid nightmare such as accessing some
+> registers which are not available on ARM64.
+> 
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+> Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> Tested-by: Yijing Wang <wangyijing@huawei.com>
+> Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
+> Tested-by: Jon Masters <jcm@redhat.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-dma_alloc_coherent may return vmap'ed memory when it needs to create a
-non-cacheable alias.
-
-Is the sg code supposed to be used with coherent DMA allocations? I
-thought it's normally used with the streaming DMA, i.e. standard page
-allocation rather than dma_alloc_coherent().
-
-I'm also not sure why virtio_rpmsg_bus.c needs non-cacheable memory, I
-thought normal cacheable memory would be enough for virtio.
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
