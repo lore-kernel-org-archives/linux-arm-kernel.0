@@ -1,406 +1,242 @@
-From: Minghuan.Lian@freescale.com (Minghuan Lian)
-Date: Wed, 25 Mar 2015 14:42:40 +0800
-Subject: [PATCH 2/3] pci/designware: Add base driver for Designware PCIe
-In-Reply-To: <1427265761-31828-1-git-send-email-Minghuan.Lian@freescale.com>
-References: <1427265761-31828-1-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <1427265761-31828-3-git-send-email-Minghuan.Lian@freescale.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Tue, 24 Mar 2015 23:41:24 -0700
+Subject: [PATCH v4] dt-bindings: brcm: rationalize Broadcom documentation
+ naming
+In-Reply-To: <550F6A5B.8050906@gmail.com>
+References: <1426899982-19733-1-git-send-email-sbranden@broadcom.com>
+ <550F6A5B.8050906@gmail.com>
+Message-ID: <55125894.2070303@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Synopsys Designware IP is shared with couples of platforms
-under multiple architectures. The patch is to provide basic
-architecture-independent Designware PCIe host driver including
-ATU initialization and PCI OPS. Currently, which supports arm
-and arm64 simultaneously.
+Hi Rob,
 
-Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
----
- drivers/pci/host/Kconfig                |   3 +
- drivers/pci/host/Makefile               |   1 +
- drivers/pci/host/pcie-designware-base.c | 282 ++++++++++++++++++++++++++++++++
- drivers/pci/host/pcie-designware-base.h |  62 +++++++
- 4 files changed, 348 insertions(+)
- create mode 100644 drivers/pci/host/pcie-designware-base.c
- create mode 100644 drivers/pci/host/pcie-designware-base.h
+On 15-03-22 06:20 PM, Rob Herring wrote:
+> On 03/20/2015 08:06 PM, Scott Branden wrote:
+>> This patchset attempts to standardize the naming of dt-bindings
+>> documents based on the Broadcom vendor prefix of brcm.
+>>
+>> Although there are no guidelines currently present for how to name
+>> the dt-bindings document the "vendor,binding.txt" style is in use by
+>> some of the other vendors.
+>>
+>> Acked-by: Lee Jones <lee@kernel.org>
+>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>
+> Version history would be nice...
+Yes, I should have added a cover letter but didn't.  The difference 
+between versions was minimal: a spelling correction in the commit 
+message text and a few additional binding files were found that were 
+added between the versions, along with the Ack's.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 7b892a9..f883d47 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -18,6 +18,9 @@ config PCI_MVEBU
- config PCIE_DW
- 	bool
- 
-+config PCIE_DW_BASE
-+	bool
-+
- config PCI_EXYNOS
- 	bool "Samsung Exynos PCIe controller"
- 	depends on SOC_EXYNOS5440
-diff --git a/drivers/pci/host/Makefile b/drivers/pci/host/Makefile
-index e61d91c..47e7fee 100644
---- a/drivers/pci/host/Makefile
-+++ b/drivers/pci/host/Makefile
-@@ -1,3 +1,4 @@
-+obj-$(CONFIG_PCIE_DW_BASE) += pcie-designware-base.o
- obj-$(CONFIG_PCIE_DW) += pcie-designware.o
- obj-$(CONFIG_PCI_DRA7XX) += pci-dra7xx.o
- obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
-diff --git a/drivers/pci/host/pcie-designware-base.c b/drivers/pci/host/pcie-designware-base.c
-new file mode 100644
-index 0000000..f661151
---- /dev/null
-+++ b/drivers/pci/host/pcie-designware-base.c
-@@ -0,0 +1,282 @@
-+/*
-+ * Synopsys Designware PCIe host controller base driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_pci.h>
-+#include <linux/pci.h>
-+#include <linux/pci_regs.h>
-+#include <linux/platform_device.h>
-+
-+#include "pcie-designware-base.h"
-+
-+void dw_pcie_dbi_write(struct dw_pcie_port *pp, u32 value, u32 offset)
-+{
-+	iowrite32(value, pp->dbi + offset);
-+}
-+
-+u32 dw_pcie_dbi_read(struct dw_pcie_port *pp, u32 offset)
-+{
-+	return ioread32(pp->dbi + offset);
-+}
-+
-+int dw_pcie_host_link_up(struct dw_pcie_port *pp)
-+{
-+	if (pp->dw_ops->link_up)
-+		return pp->dw_ops->link_up(pp);
-+	else
-+		return 0;
-+}
-+
-+void dw_pcie_atu_outbound_set(struct dw_pcie_port *pp, int idx, int type,
-+			      u64 cpu_addr, u64 pci_addr, u32 size)
-+{
-+	if (idx >= pp->atu_num)
-+		return;
-+
-+	dw_pcie_dbi_write(pp, PCIE_ATU_REGION_OUTBOUND | idx,
-+			  PCIE_ATU_VIEWPORT);
-+	dw_pcie_dbi_write(pp, lower_32_bits(cpu_addr),
-+			  PCIE_ATU_LOWER_BASE);
-+	dw_pcie_dbi_write(pp, upper_32_bits(cpu_addr),
-+			  PCIE_ATU_UPPER_BASE);
-+	dw_pcie_dbi_write(pp, lower_32_bits(cpu_addr + size - 1),
-+			  PCIE_ATU_LIMIT);
-+	dw_pcie_dbi_write(pp, lower_32_bits(pci_addr),
-+			  PCIE_ATU_LOWER_TARGET);
-+	dw_pcie_dbi_write(pp, upper_32_bits(pci_addr),
-+			  PCIE_ATU_UPPER_TARGET);
-+	dw_pcie_dbi_write(pp, type, PCIE_ATU_CR1);
-+	dw_pcie_dbi_write(pp, PCIE_ATU_ENABLE, PCIE_ATU_CR2);
-+}
-+
-+static void __iomem *
-+dw_pcie_map_bus(struct pci_bus *bus, unsigned int devfn, int offset)
-+{
-+	struct dw_pcie_port *pp = bus->sysdata;
-+	u32 type, busdev;
-+
-+	/* If there is no link, then there is no device */
-+	if (!pci_is_root_bus(bus) && !dw_pcie_host_link_up(pp))
-+		return NULL;
-+
-+	/* access only one slot on each root port */
-+	if (pci_is_root_bus(bus) && devfn > 0)
-+		return NULL;
-+
-+	if (pci_is_root_bus(bus))
-+		return pp->dbi + offset;
-+
-+	busdev = PCIE_ATU_BUS(bus->number) |
-+		 PCIE_ATU_DEV(PCI_SLOT(devfn)) |
-+		 PCIE_ATU_FUNC(PCI_FUNC(devfn));
-+
-+	if (pci_is_root_bus(bus->parent))
-+		type = PCIE_ATU_TYPE_CFG0;
-+	else
-+		type = PCIE_ATU_TYPE_CFG1;
-+
-+	dw_pcie_atu_outbound_set(pp,
-+				 PCIE_ATU_REGION_INDEX0,
-+				 type,
-+				 pp->cfg_addr,
-+				 busdev,
-+				 pp->cfg_size);
-+
-+	return pp->cfg + offset;
-+}
-+
-+static int dw_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
-+			       int where, int size, u32 *val)
-+{
-+	struct dw_pcie_port *pp = bus->sysdata;
-+	int ret;
-+
-+	ret = pci_generic_config_read32(bus, devfn, where, size, val);
-+
-+	if (pp->atu_num == 2 && !pci_is_root_bus(bus))
-+		/* reassign ATU0 to map IO space */
-+		dw_pcie_atu_outbound_set(pp,
-+					 PCIE_ATU_REGION_INDEX0,
-+					 PCIE_ATU_TYPE_IO,
-+					 pp->io_cpu_addr,
-+					 pp->io_pci_addr,
-+					 pp->io_size);
-+
-+	return ret;
-+}
-+
-+static int dw_pcie_config_write(struct pci_bus *bus, unsigned int devfn,
-+			       int where, int size, u32 val)
-+{
-+	struct dw_pcie_port *pp = bus->sysdata;
-+	int ret;
-+
-+	ret = pci_generic_config_write32(bus, devfn, where, size, val);
-+
-+	if (pp->atu_num == 2 && !pci_is_root_bus(bus))
-+		/* reassign ATU0 to map IO space */
-+		dw_pcie_atu_outbound_set(pp,
-+					 PCIE_ATU_REGION_INDEX0,
-+					 PCIE_ATU_TYPE_IO,
-+					 pp->io_cpu_addr,
-+					 pp->io_pci_addr,
-+					 pp->io_size);
-+
-+	return ret;
-+}
-+
-+static struct pci_ops dw_pcie_ops = {
-+	.map_bus = dw_pcie_map_bus,
-+	.read = dw_pcie_config_read,
-+	.write = dw_pcie_config_write,
-+};
-+
-+static int dw_pcie_map_reg(struct dw_pcie_port *pp)
-+{
-+	struct platform_device *pdev = to_platform_device(pp->dev);
-+	struct resource *res;
-+
-+	if (!pp->dbi) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "dbi");
-+		if (!res) {
-+			dev_err(pp->dev, "missing *dbi* reg space\n");
-+			return -ENODEV;
-+		}
-+
-+		pp->dbi = devm_ioremap_resource(pp->dev, res);
-+		if (IS_ERR(pp->dbi))
-+			return PTR_ERR(pp->dbi);
-+	}
-+
-+	if (!pp->cfg) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   "config");
-+		if (!res) {
-+			dev_err(pp->dev, "missing *config* reg space\n");
-+			return -ENODEV;
-+		}
-+
-+		pp->cfg = devm_ioremap_resource(pp->dev, res);
-+		if (IS_ERR(pp->cfg))
-+			return PTR_ERR(pp->cfg);
-+
-+		pp->cfg_addr = res->start;
-+		pp->cfg_size = resource_size(res);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * If ATU number = 2, ATU0 is shared by transaction CFG and IO,
-+ * ATU1 is used for transaction MEM
-+ * If ATU number > 2, ATU0 is used for transaction CFG
-+ * the other ATUs are used for MEM and IO separately.
-+ */
-+static int dw_pcie_atu_init(struct dw_pcie_port *pp,
-+			    struct list_head *res,
-+			    resource_size_t io_base)
-+{
-+	struct resource_entry *window;
-+	struct device *dev = pp->dev;
-+	int idx = 1, ret;
-+
-+	if (pp->atu_num < 2)
-+		pp->atu_num = 2;
-+
-+	resource_list_for_each_entry(window, res) {
-+		struct resource *res = window->res;
-+		unsigned long restype = resource_type(res);
-+
-+		switch (restype) {
-+		case IORESOURCE_IO:
-+			if (pp->atu_num == 2)
-+				idx = 0;
-+
-+			pp->io_cpu_addr = io_base;
-+			pp->io_pci_addr = res->start - window->offset;
-+			pp->io_size = resource_size(res);
-+			dw_pcie_atu_outbound_set(pp,
-+						 idx,
-+						 PCIE_ATU_TYPE_IO,
-+						 pp->io_cpu_addr,
-+						 pp->io_pci_addr,
-+						 pp->io_size);
-+			ret = pci_remap_iospace(res, io_base);
-+			if (ret < 0)
-+				return ret;
-+			idx++;
-+			break;
-+		case IORESOURCE_MEM:
-+			if (pp->atu_num == 2)
-+				idx = 1;
-+
-+			dw_pcie_atu_outbound_set(pp,
-+						 idx,
-+						 PCIE_ATU_TYPE_MEM,
-+						 res->start,
-+						 res->start - window->offset,
-+						 resource_size(res));
-+			idx++;
-+			break;
-+		case IORESOURCE_BUS:
-+			break;
-+		default:
-+			dev_err(dev, "invalid resource %pR\n", res);
-+			return -EINVAL;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+int dw_pcie_port_init(struct dw_pcie_port *pp)
-+{
-+	struct device_node *dn = pp->dev->of_node;
-+	resource_size_t iobase = 0;
-+	struct pci_bus *bus;
-+	int ret;
-+	LIST_HEAD(res);
-+
-+	ret = dw_pcie_map_reg(pp);
-+	if (ret)
-+		return ret;
-+
-+	ret = of_pci_get_host_bridge_resources(dn, 0, 0xff, &res, &iobase);
-+	if (ret)
-+		return ret;
-+
-+	ret = dw_pcie_atu_init(pp, &res, iobase);
-+	if (ret)
-+		return ret;
-+
-+	if (!pp->pci_ops)
-+		pp->pci_ops = &dw_pcie_ops;
-+
-+	if (pp->dw_ops->host_init) {
-+		if (pp->dw_ops->host_init(pp))
-+			return ret;
-+	}
-+
-+	bus = pci_create_root_bus(pp->dev, 0, pp->pci_ops,
-+				  pp, &res);
-+	if (!bus)
-+		return -ENOMEM;
-+
-+	pci_scan_child_bus(bus);
-+	pci_assign_unassigned_bus_resources(bus);
-+	pci_bus_add_devices(bus);
-+
-+	return 0;
-+}
-+
-+MODULE_AUTHOR("Minghuan Lian <Minghuan.Lian@freescale.com>");
-+MODULE_DESCRIPTION("Designware PCIe controller driver with Multiarch support");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/pci/host/pcie-designware-base.h b/drivers/pci/host/pcie-designware-base.h
-new file mode 100644
-index 0000000..dd7a3b3
---- /dev/null
-+++ b/drivers/pci/host/pcie-designware-base.h
-@@ -0,0 +1,62 @@
-+/*
-+ * Synopsys Designware PCIe host controller base driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _PCIE_DESIGNWARE_BASE_H
-+#define _PCIE_DESIGNWARE_BASE_H
-+
-+/* Synopsis specific PCIE configuration registers */
-+#define PCIE_ATU_VIEWPORT		0x900
-+#define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
-+#define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
-+#define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
-+#define PCIE_ATU_CR1			0x904
-+#define PCIE_ATU_TYPE_MEM		(0x0 << 0)
-+#define PCIE_ATU_TYPE_IO		(0x2 << 0)
-+#define PCIE_ATU_TYPE_CFG0		(0x4 << 0)
-+#define PCIE_ATU_TYPE_CFG1		(0x5 << 0)
-+#define PCIE_ATU_CR2			0x908
-+#define PCIE_ATU_ENABLE			(0x1 << 31)
-+#define PCIE_ATU_BAR_MODE_ENABLE	(0x1 << 30)
-+#define PCIE_ATU_LOWER_BASE		0x90C
-+#define PCIE_ATU_UPPER_BASE		0x910
-+#define PCIE_ATU_LIMIT			0x914
-+#define PCIE_ATU_LOWER_TARGET		0x918
-+#define PCIE_ATU_BUS(x)			(((x) & 0xff) << 24)
-+#define PCIE_ATU_DEV(x)			(((x) & 0x1f) << 19)
-+#define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
-+#define PCIE_ATU_UPPER_TARGET		0x91C
-+
-+struct dw_pcie_port;
-+
-+struct dw_host_ops {
-+	int (*link_up)(struct dw_pcie_port *pp);
-+	int (*host_init)(struct dw_pcie_port *pp);
-+};
-+
-+struct dw_pcie_port {
-+	struct device		*dev;
-+	void __iomem		*dbi;
-+	void __iomem		*cfg;
-+	u64			cfg_addr;
-+	u32			cfg_size;
-+	u64			io_cpu_addr;
-+	u64			io_pci_addr;
-+	u32			io_size;
-+	u32			atu_num;
-+	struct dw_host_ops	*dw_ops;
-+	struct pci_ops		*pci_ops;
-+};
-+
-+void dw_pcie_dbi_write(struct dw_pcie_port *pp, u32 value, u32 offset);
-+u32 dw_pcie_dbi_read(struct dw_pcie_port *pp, u32 offset);
-+int dw_pcie_host_link_up(struct dw_pcie_port *pp);
-+void dw_pcie_atu_outbound_set(struct dw_pcie_port *pp, int idx, int type,
-+			      u64 cpu_addr, u64 pci_addr, u32 size);
-+int dw_pcie_port_init(struct dw_pcie_port *pp);
-+
-+#endif /* _PCIE_DESIGNWARE_BASE_H */
--- 
-1.9.1
+>
+> Who did you want to apply this? I can, but I'm worried about merge
+> conflicts here. Hopefully, you're not also doing lots of changes to
+> existing bindings.
+
+Yes, it would be great for you to take care of applying this.  There 
+shouldn't be any merge conflicts as none of these bindings are currently 
+being updated.  I left a clock binding document out of this patchset at 
+Ray Jui is updating/renaming the documentation for that binding in a 
+different patch already.
+
+Thanks,
+  Scott
+
+>
+> Rob
+>
+>> ---
+>>   .../arm/bcm/{brcm,bcm11351-cpu-method => brcm,bcm11351-cpu-method.txt}    | 0
+>>   .../devicetree/bindings/arm/bcm/{bcm11351.txt => brcm,bcm11351.txt}       | 0
+>>   .../devicetree/bindings/arm/bcm/{bcm21664.txt => brcm,bcm21664.txt}       | 0
+>>   .../devicetree/bindings/arm/{bcm2835.txt => bcm/brcm,bcm2835.txt}         | 0
+>>   .../devicetree/bindings/arm/{bcm4708.txt => bcm/brcm,bcm4708.txt}         | 0
+>>   .../devicetree/bindings/arm/bcm/{bcm63138.txt => brcm,bcm63138.txt}       | 0
+>>   .../devicetree/bindings/arm/{brcm-brcmstb.txt => bcm/brcm,brcmstb.txt}    | 0
+>>   Documentation/devicetree/bindings/arm/bcm/{cygnus.txt => brcm,cygnus.txt} | 0
+>>   Documentation/devicetree/bindings/bus/{bcma.txt => brcm,bus-axi.txt}      | 0
+>>   .../devicetree/bindings/clock/{bcm-kona-clock.txt => brcm,kona-ccu.txt}   | 0
+>>   .../devicetree/bindings/dma/{bcm2835-dma.txt => brcm,bcm2835-dma.txt}     | 0
+>>   .../devicetree/bindings/gpio/{gpio-bcm-kona.txt => brcm,kona-gpio.txt}    | 0
+>>   .../devicetree/bindings/i2c/{i2c-bcm-kona.txt => brcm,kona-i2c.txt}       | 0
+>>   Documentation/devicetree/bindings/mfd/{bcm590xx.txt => brcm,bcm59056.txt} | 0
+>>   .../bindings/mips/brcm/{bcm3384-intc.txt => brcm,bcm3384-intc.txt}        | 0
+>>   Documentation/devicetree/bindings/mips/brcm/{bmips.txt => brcm,bmips.txt} | 0
+>>   .../devicetree/bindings/mips/brcm/{cm-dsl.txt => brcm,cm-dsl.txt}         | 0
+>>   Documentation/devicetree/bindings/misc/{smc.txt => brcm,kona-smc.txt}     | 0
+>>   .../devicetree/bindings/mmc/{kona-sdhci.txt => brcm,kona-sdhci.txt}       | 0
+>>   .../bindings/net/{broadcom-sf2.txt => brcm,bcm7445-switch-v4.0.txt}       | 0
+>>   .../devicetree/bindings/net/{broadcom-bcmgenet.txt => brcm,bcmgenet.txt}  | 0
+>>   .../bindings/net/{broadcom-systemport.txt => brcm,systemport.txt}         | 0
+>>   .../bindings/net/{broadcom-mdio-unimac.txt => brcm,unimac-mdio.txt}       | 0
+>>   .../devicetree/bindings/phy/{bcm-phy.txt => brcm,kona-usb2-phy.txt}       | 0
+>>   .../devicetree/bindings/pwm/{bcm-kona-pwm.txt => brcm,kona-pwm.txt}       | 0
+>>   .../{arm/bcm/kona-resetmgr.txt => reset/brcm,bcm21664-resetmgr.txt}       | 0
+>>   .../bindings/serial/{bcm63xx-uart.txt => brcm,bcm6345-uart.txt}           | 0
+>>   .../devicetree/bindings/sound/{bcm2835-i2s.txt => brcm,bcm2835-i2s.txt}   | 0
+>>   .../bindings/{arm/bcm/kona-timer.txt => timer/brcm,kona-timer.txt}        | 0
+>>   .../devicetree/bindings/{mips/brcm/usb.txt => usb/brcm,bcm3384-usb.txt}   | 0
+>>   .../bindings/{arm/bcm/kona-wdt.txt => watchdog/brcm,kona-wdt.txt}         | 0
+>>   31 files changed, 0 insertions(+), 0 deletions(-)
+>>   rename Documentation/devicetree/bindings/arm/bcm/{brcm,bcm11351-cpu-method => brcm,bcm11351-cpu-method.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/bcm/{bcm11351.txt => brcm,bcm11351.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/bcm/{bcm21664.txt => brcm,bcm21664.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/{bcm2835.txt => bcm/brcm,bcm2835.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/{bcm4708.txt => bcm/brcm,bcm4708.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/bcm/{bcm63138.txt => brcm,bcm63138.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/{brcm-brcmstb.txt => bcm/brcm,brcmstb.txt} (100%)
+>>   rename Documentation/devicetree/bindings/arm/bcm/{cygnus.txt => brcm,cygnus.txt} (100%)
+>>   rename Documentation/devicetree/bindings/bus/{bcma.txt => brcm,bus-axi.txt} (100%)
+>>   rename Documentation/devicetree/bindings/clock/{bcm-kona-clock.txt => brcm,kona-ccu.txt} (100%)
+>>   rename Documentation/devicetree/bindings/dma/{bcm2835-dma.txt => brcm,bcm2835-dma.txt} (100%)
+>>   rename Documentation/devicetree/bindings/gpio/{gpio-bcm-kona.txt => brcm,kona-gpio.txt} (100%)
+>>   rename Documentation/devicetree/bindings/i2c/{i2c-bcm-kona.txt => brcm,kona-i2c.txt} (100%)
+>>   rename Documentation/devicetree/bindings/mfd/{bcm590xx.txt => brcm,bcm59056.txt} (100%)
+>>   rename Documentation/devicetree/bindings/mips/brcm/{bcm3384-intc.txt => brcm,bcm3384-intc.txt} (100%)
+>>   rename Documentation/devicetree/bindings/mips/brcm/{bmips.txt => brcm,bmips.txt} (100%)
+>>   rename Documentation/devicetree/bindings/mips/brcm/{cm-dsl.txt => brcm,cm-dsl.txt} (100%)
+>>   rename Documentation/devicetree/bindings/misc/{smc.txt => brcm,kona-smc.txt} (100%)
+>>   rename Documentation/devicetree/bindings/mmc/{kona-sdhci.txt => brcm,kona-sdhci.txt} (100%)
+>>   rename Documentation/devicetree/bindings/net/{broadcom-sf2.txt => brcm,bcm7445-switch-v4.0.txt} (100%)
+>>   rename Documentation/devicetree/bindings/net/{broadcom-bcmgenet.txt => brcm,bcmgenet.txt} (100%)
+>>   rename Documentation/devicetree/bindings/net/{broadcom-systemport.txt => brcm,systemport.txt} (100%)
+>>   rename Documentation/devicetree/bindings/net/{broadcom-mdio-unimac.txt => brcm,unimac-mdio.txt} (100%)
+>>   rename Documentation/devicetree/bindings/phy/{bcm-phy.txt => brcm,kona-usb2-phy.txt} (100%)
+>>   rename Documentation/devicetree/bindings/pwm/{bcm-kona-pwm.txt => brcm,kona-pwm.txt} (100%)
+>>   rename Documentation/devicetree/bindings/{arm/bcm/kona-resetmgr.txt => reset/brcm,bcm21664-resetmgr.txt} (100%)
+>>   rename Documentation/devicetree/bindings/serial/{bcm63xx-uart.txt => brcm,bcm6345-uart.txt} (100%)
+>>   rename Documentation/devicetree/bindings/sound/{bcm2835-i2s.txt => brcm,bcm2835-i2s.txt} (100%)
+>>   rename Documentation/devicetree/bindings/{arm/bcm/kona-timer.txt => timer/brcm,kona-timer.txt} (100%)
+>>   rename Documentation/devicetree/bindings/{mips/brcm/usb.txt => usb/brcm,bcm3384-usb.txt} (100%)
+>>   rename Documentation/devicetree/bindings/{arm/bcm/kona-wdt.txt => watchdog/brcm,kona-wdt.txt} (100%)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm21664.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm21664.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/bcm21664.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm21664.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm2835.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm4708.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm63138.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm63138.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/cygnus.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,cygnus.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/cygnus.txt
+>> rename to Documentation/devicetree/bindings/arm/bcm/brcm,cygnus.txt
+>> diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/brcm,bus-axi.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/bus/bcma.txt
+>> rename to Documentation/devicetree/bindings/bus/brcm,bus-axi.txt
+>> diff --git a/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt b/Documentation/devicetree/bindings/clock/brcm,kona-ccu.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
+>> rename to Documentation/devicetree/bindings/clock/brcm,kona-ccu.txt
+>> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/dma/bcm2835-dma.txt
+>> rename to Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/brcm,kona-gpio.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
+>> rename to Documentation/devicetree/bindings/gpio/brcm,kona-gpio.txt
+>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt b/Documentation/devicetree/bindings/i2c/brcm,kona-i2c.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt
+>> rename to Documentation/devicetree/bindings/i2c/brcm,kona-i2c.txt
+>> diff --git a/Documentation/devicetree/bindings/mfd/bcm590xx.txt b/Documentation/devicetree/bindings/mfd/brcm,bcm59056.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mfd/bcm590xx.txt
+>> rename to Documentation/devicetree/bindings/mfd/brcm,bcm59056.txt
+>> diff --git a/Documentation/devicetree/bindings/mips/brcm/bcm3384-intc.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,bcm3384-intc.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mips/brcm/bcm3384-intc.txt
+>> rename to Documentation/devicetree/bindings/mips/brcm/brcm,bcm3384-intc.txt
+>> diff --git a/Documentation/devicetree/bindings/mips/brcm/bmips.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,bmips.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mips/brcm/bmips.txt
+>> rename to Documentation/devicetree/bindings/mips/brcm/brcm,bmips.txt
+>> diff --git a/Documentation/devicetree/bindings/mips/brcm/cm-dsl.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,cm-dsl.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mips/brcm/cm-dsl.txt
+>> rename to Documentation/devicetree/bindings/mips/brcm/brcm,cm-dsl.txt
+>> diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/brcm,kona-smc.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/misc/smc.txt
+>> rename to Documentation/devicetree/bindings/misc/brcm,kona-smc.txt
+>> diff --git a/Documentation/devicetree/bindings/mmc/kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,kona-sdhci.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mmc/kona-sdhci.txt
+>> rename to Documentation/devicetree/bindings/mmc/brcm,kona-sdhci.txt
+>> diff --git a/Documentation/devicetree/bindings/net/broadcom-sf2.txt b/Documentation/devicetree/bindings/net/brcm,bcm7445-switch-v4.0.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/net/broadcom-sf2.txt
+>> rename to Documentation/devicetree/bindings/net/brcm,bcm7445-switch-v4.0.txt
+>> diff --git a/Documentation/devicetree/bindings/net/broadcom-bcmgenet.txt b/Documentation/devicetree/bindings/net/brcm,bcmgenet.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/net/broadcom-bcmgenet.txt
+>> rename to Documentation/devicetree/bindings/net/brcm,bcmgenet.txt
+>> diff --git a/Documentation/devicetree/bindings/net/broadcom-systemport.txt b/Documentation/devicetree/bindings/net/brcm,systemport.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/net/broadcom-systemport.txt
+>> rename to Documentation/devicetree/bindings/net/brcm,systemport.txt
+>> diff --git a/Documentation/devicetree/bindings/net/broadcom-mdio-unimac.txt b/Documentation/devicetree/bindings/net/brcm,unimac-mdio.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/net/broadcom-mdio-unimac.txt
+>> rename to Documentation/devicetree/bindings/net/brcm,unimac-mdio.txt
+>> diff --git a/Documentation/devicetree/bindings/phy/bcm-phy.txt b/Documentation/devicetree/bindings/phy/brcm,kona-usb2-phy.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/phy/bcm-phy.txt
+>> rename to Documentation/devicetree/bindings/phy/brcm,kona-usb2-phy.txt
+>> diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
+>> rename to Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-resetmgr.txt b/Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/kona-resetmgr.txt
+>> rename to Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
+>> diff --git a/Documentation/devicetree/bindings/serial/bcm63xx-uart.txt b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/serial/bcm63xx-uart.txt
+>> rename to Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
+>> diff --git a/Documentation/devicetree/bindings/sound/bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/sound/bcm2835-i2s.txt
+>> rename to Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-timer.txt b/Documentation/devicetree/bindings/timer/brcm,kona-timer.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/kona-timer.txt
+>> rename to Documentation/devicetree/bindings/timer/brcm,kona-timer.txt
+>> diff --git a/Documentation/devicetree/bindings/mips/brcm/usb.txt b/Documentation/devicetree/bindings/usb/brcm,bcm3384-usb.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/mips/brcm/usb.txt
+>> rename to Documentation/devicetree/bindings/usb/brcm,bcm3384-usb.txt
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt b/Documentation/devicetree/bindings/watchdog/brcm,kona-wdt.txt
+>> similarity index 100%
+>> rename from Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt
+>> rename to Documentation/devicetree/bindings/watchdog/brcm,kona-wdt.txt
+>>
+>
