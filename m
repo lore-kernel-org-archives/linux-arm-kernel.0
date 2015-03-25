@@ -1,254 +1,248 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 25 Mar 2015 17:12:41 +0200
-Subject: [PATCHv5 11/35] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <1426877086-17131-12-git-send-email-t-kristo@ti.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-12-git-send-email-t-kristo@ti.com>
-Message-ID: <5512D069.4080906@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Mar 2015 15:13:56 +0000
+Subject: [PATCH 4/5] ARM64: kernel: acpi: refactor ACPI tables init and
+ checks
+In-Reply-To: <20150325142623.GK24636@arm.com>
+References: <1427219940-27201-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1427219940-27201-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150325142623.GK24636@arm.com>
+Message-ID: <20150325151356.GA21478@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 25, 2015 at 02:26:23PM +0000, Will Deacon wrote:
+> On Tue, Mar 24, 2015 at 05:58:54PM +0000, Lorenzo Pieralisi wrote:
 
-Tony had a small comment about this patch, so I made a slightly modified 
-version where the direct reg access (not through memmap) is dropped; it 
-is no longer needed as the legacy omap3 clock data was moved under TI 
-clock driver. I force pushed this patch to the v5 branch, the modified 
-patch inlined below. Check the implementation for omap2_clk_readl / 
-omap2_clk_writel, and the updated ti_clk_ll_ops.
+[...]
 
--Tero
+> >  void __init acpi_boot_table_init(void)
+> >  {
+> > +	int err;
+> > +
+> >  	/*
+> >  	 * Enable ACPI instead of device tree unless
+> >  	 * - ACPI has been disabled explicitly (acpi=off), or
+> > @@ -278,19 +301,32 @@ void __init acpi_boot_table_init(void)
+> >  	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+> >  		return;
+> >  
+> > +	/*
+> > +	 * ACPI is disabled at this point. Enable it in order to parse
+> > +	 * the ACPI tables and carry out sanity checks
+> > +	 */
+> >  	enable_acpi();
+> >  
+> >  	/* Initialize the ACPI boot-time table parser. */
+> > -	if (acpi_table_init()) {
+> > -		disable_acpi();
+> > -		return;
+> > +	err = acpi_table_init();
+> > +	if (err) {
+> > +		pr_err("Failed to init ACPI tables\n");
+> > +		goto out;
+> >  	}
+> >  
+> > -	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
+> > -		/* disable ACPI if no FADT is found */
+> > +	/*
+> > +	 * Check FADT presence and carry out FADT sanity checks
+> > +	 */
+> > +	err = acpi_fadt_sanity_check();
+> > +
+> > +out:
+> > +	/*
+> > +	 * If ACPI tables are initialized and FADT sanity checks passed,
+> > +	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
+> > +	 * on initialization error.
+> > +	 */
+> > +	if (err)
+> >  		disable_acpi();
+> > -		pr_err("Can't find FADT\n");
+> > -	}
+> 
+> Could you rewrite most of this as:
+> 
+>   enable_acpi();
+>   if (acpi_table_init() || acpi_fadt_sanity_check()) {
+> 	pr_err("Failed to init ACPI tables\n");
+> 	disable_acpi();
+>   }
+> 
+> I think it reads a bit better without the out: label.
 
+Yes it makes sense acpi_fadt_sanity_check() already spits some errors
+but there is not really a point in jumping around.
+
+Here is the updated patch (please note this requires updating patch 5
+too, I will send it inline shortly), thanks.
+
+-- >8 --
+Subject: [PATCH] ARM64: kernel: acpi: refactor ACPI tables init and checks
+
+Current ACPI init code on ARM64 relies on acpi_table_parse() API to
+check if the FADT is present and to carry out sanity checks on that.
+
+The handler passed to the acpi_table_parse() function and used to
+carry out the parsing on the requested table returns a value that is
+ignored by the acpi_table_parse() function, so it is not possible
+to propagate errors back to the acpi_table_parse() caller through
+the handler.
+
+This forces ARM64 ACPI init code to have disable_acpi() calls scattered
+all over the place that makes code unwieldy and not easy to follow.
+
+This patch refactors the ARM64 ACPI init code, by creating a
+self-contained function (ie acpi_fadt_sanity_check()) that carries
+out the required checks on FADT and returns an adequate return value
+to the caller. This allows creating a common error path that disables
+ACPI and makes code more readable and easy to parse and change were
+further checks FADT to be added in the future.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
 ---
- From 0fdee64696a7500bb15f07aa3dfd70a3b27e1c94 Mon Sep 17 00:00:00 2001
-From: Tero Kristo <t-kristo@ti.com>
-Date: Wed, 22 Oct 2014 15:15:36 +0300
-Subject: [PATCH 11/35] ARM: OMAP2+: clock: move clock provider 
-infrastructure
-  to clock driver
+ arch/arm64/kernel/acpi.c | 95 ++++++++++++++++++++++++++++++------------------
+ 1 file changed, 59 insertions(+), 36 deletions(-)
 
-Splits the clock provider init out of the PRM driver and moves it to
-clock driver. This is needed so that once the PRCM drivers are separated,
-they can logically just access the clock driver not needing to go through
-common PRM code. This would be wrong in the case of control module for
-example.
-
-This patch also removes the legacy direct clk_readl / clk_writel support
-(not going through memmaps) as this is no longer needed.
-
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-  arch/arm/mach-omap2/clock.c      |   67 
-++++++++++++++++++++++++++++----------
-  arch/arm/mach-omap2/clock.h      |   21 +++++++++---
-  arch/arm/mach-omap2/prm_common.c |   36 +++++---------------
-  3 files changed, 75 insertions(+), 49 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 6124db5..e320850 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -23,6 +23,7 @@
-  #include <linux/clk-provider.h>
-  #include <linux/io.h>
-  #include <linux/bitops.h>
-+#include <linux/of_address.h>
-  #include <asm/cpu.h>
-
-  #include <trace/events/power.h>
-@@ -72,30 +73,62 @@ struct ti_clk_features ti_clk_features;
-  static bool clkdm_control = true;
-
-  static LIST_HEAD(clk_hw_omap_clocks);
--void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
-+static void __iomem *clk_memmaps[CLK_MAX_MEMMAPS];
-
--void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg)
-+void omap2_clk_memmap_writel(u32 val, void __iomem *reg)
-  {
--	if (clk->flags & MEMMAP_ADDRESSING) {
--		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
--		writel_relaxed(val, clk_memmaps[r->index] + r->offset);
--	} else {
--		writel_relaxed(val, reg);
--	}
-+	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-+
-+	writel_relaxed(val, clk_memmaps[r->index] + r->offset);
-  }
-
--u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
-+u32 omap2_clk_memmap_readl(void __iomem *reg)
-  {
--	u32 val;
-+	struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
-
--	if (clk->flags & MEMMAP_ADDRESSING) {
--		struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
--		val = readl_relaxed(clk_memmaps[r->index] + r->offset);
--	} else {
--		val = readl_relaxed(reg);
--	}
-+	return readl_relaxed(clk_memmaps[r->index] + r->offset);
-+}
-+
-+static struct ti_clk_ll_ops omap_clk_ll_ops = {
-+	.clk_readl = omap2_clk_memmap_readl,
-+	.clk_writel = omap2_clk_memmap_writel,
-+};
-+
-+/**
-+ * omap2_clk_provider_init - initialize a clock provider
-+ * @match_table: DT device table to match for devices to init
-+ * @np: device node pointer for the this clock provider
-+ * @index: index for the clock provider
-+ * @mem: iomem pointer for the clock provider memory area
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index a70f714..172b7c9 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -218,43 +218,60 @@ void __init acpi_init_cpus(void)
+ 	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+ }
+ 
+-static int __init acpi_parse_fadt(struct acpi_table_header *table)
++/*
++ * acpi_fadt_sanity_check() - Check FADT presence and carry out sanity
++ *			      checks on it
 + *
-+ * Initializes a clock provider module (CM/PRM etc.), registering
-+ * the memory mapping at specified index and initializing the
-+ * low level driver infrastructure. Returns 0 in success.
++ * Return 0 on success,  <0 on failure
 + */
-+int __init omap2_clk_provider_init(struct device_node *np, int index,
-+				   void __iomem *mem)
-+{
-+	ti_clk_ll_ops = &omap_clk_ll_ops;
++static int __init acpi_fadt_sanity_check(void)
+ {
+-	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
++	struct acpi_table_header *table;
++	struct acpi_table_fadt *fadt;
++	acpi_status status;
++	acpi_size tbl_size;
++	int ret = 0;
 +
-+	clk_memmaps[index] = mem;
++	/*
++	 * FADT is required on arm64; retrieve it to check its presence
++	 * and carry out revision and ACPI HW reduced compliancy tests
++	 */
++	status = acpi_get_table_with_size(ACPI_SIG_FADT, 0, &table, &tbl_size);
++	if (ACPI_FAILURE(status)) {
++		const char *msg = acpi_format_exception(status);
 +
-+	ti_dt_clk_init_provider(np, index);
++		pr_err("Failed to get FADT table, %s\n", msg);
++		return -ENODEV;
++	}
 +
-+	return 0;
-+}
-+
-+/**
-+ * omap2_clk_legacy_provider_init - initialize a legacy clock provider
-+ * @index: index for the clock provider
-+ * @mem: iomem pointer for the clock provider memory area
++	fadt = (struct acpi_table_fadt *)table;
+ 
+ 	/*
+ 	 * Revision in table header is the FADT Major revision, and there
+ 	 * is a minor revision of FADT which was introduced by ACPI 5.1,
+ 	 * we only deal with ACPI 5.1 or newer revision to get GIC and SMP
+-	 * boot protocol configuration data, or we will disable ACPI.
++	 * boot protocol configuration data.
+ 	 */
+-	if (table->revision > 5 ||
+-	    (table->revision == 5 && fadt->minor_revision >= 1)) {
+-		if (!acpi_gbl_reduced_hardware) {
+-			pr_err("Not hardware reduced ACPI mode, will not be supported\n");
+-			goto disable_acpi;
+-		}
+-
+-		/*
+-		 * ACPI 5.1 only has two explicit methods to boot up SMP,
+-		 * PSCI and Parking protocol, but the Parking protocol is
+-		 * only specified for ARMv7 now, so make PSCI as the only
+-		 * way for the SMP boot protocol before some updates for
+-		 * the Parking protocol spec.
+-		 */
+-		if (acpi_psci_present())
+-			return 0;
+-
+-		pr_warn("No PSCI support, will not bring up secondary CPUs\n");
+-		return -EOPNOTSUPP;
++	if (table->revision < 5 ||
++	   (table->revision == 5 && fadt->minor_revision < 1)) {
++		pr_err("Unsupported FADT revision %d.%d, should be 5.1+\n",
++		       table->revision, fadt->minor_revision);
++		ret = -EINVAL;
++		goto out;
+ 	}
+ 
+-	pr_warn("Unsupported FADT revision %d.%d, should be 5.1+, will disable ACPI\n",
+-		table->revision, fadt->minor_revision);
++	if (!(fadt->flags & ACPI_FADT_HW_REDUCED)) {
++		pr_err("FADT not ACPI hardware reduced compliant\n");
++		ret = -EINVAL;
++	}
+ 
+-disable_acpi:
+-	disable_acpi();
+-	return -EINVAL;
++out:
++	/*
++	 * acpi_get_table_with_size() creates FADT table mapping that
++	 * should be released after parsing and before resuming boot
++	 */
++	early_acpi_os_unmap_memory(table, tbl_size);
++	return ret;
+ }
+ 
+ /*
+@@ -262,9 +279,13 @@ disable_acpi:
+  *	1. find RSDP and get its address, and then find XSDT
+  *	2. extract all tables and checksums them all
+  *	3. check ACPI FADT revision
++ *	4. check ACPI FADT HW reduced flag
+  *
+  * We can parse ACPI boot-time tables such as MADT after
+  * this function is called.
 + *
-+ * Initializes a legacy clock provider memory mapping.
-+ */
-+void __init omap2_clk_legacy_provider_init(int index, void __iomem *mem)
-+{
-+	ti_clk_ll_ops = &omap_clk_ll_ops;
-
--	return val;
-+	clk_memmaps[index] = mem;
-  }
-
-  /*
-diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
-index a56742f..ac2c3d6 100644
---- a/arch/arm/mach-omap2/clock.h
-+++ b/arch/arm/mach-omap2/clock.h
-@@ -220,8 +220,19 @@ void omap2_clk_print_new_rates(const char 
-*hfclkin_ck_name,
-  			       const char *core_ck_name,
-  			       const char *mpu_ck_name);
-
--u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg);
--void omap2_clk_writel(u32 val, struct clk_hw_omap *clk, void __iomem *reg);
-+void omap2_clk_memmap_writel(u32 val, void __iomem *reg);
-+u32 omap2_clk_memmap_readl(void __iomem *reg);
-+
-+static inline u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem 
-*reg)
-+{
-+	return omap2_clk_memmap_readl(reg);
-+}
-+
-+static inline void omap2_clk_writel(u32 val, struct clk_hw_omap *clk,
-+				    void __iomem *reg)
-+{
-+	omap2_clk_memmap_writel(val, reg);
-+}
-
-  extern u16 cpu_mask;
-
-@@ -271,10 +282,12 @@ extern const struct clksel_rate div_1_3_rates[];
-  extern const struct clksel_rate div_1_4_rates[];
-  extern const struct clksel_rate div31_1to31_rates[];
-
--extern void __iomem *clk_memmaps[];
++ * ACPI is enabled on return if ACPI tables initialized and sanity checks
++ * passed, disabled otherwise
+  */
+ void __init acpi_boot_table_init(void)
+ {
+@@ -278,18 +299,20 @@ void __init acpi_boot_table_init(void)
+ 	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+ 		return;
+ 
++	/*
++	 * ACPI is disabled at this point. Enable it in order to parse
++	 * the ACPI tables and carry out sanity checks
++	 */
+ 	enable_acpi();
+ 
+-	/* Initialize the ACPI boot-time table parser. */
+-	if (acpi_table_init()) {
+-		disable_acpi();
+-		return;
+-	}
 -
-  extern int omap2_clkops_enable_clkdm(struct clk_hw *hw);
-  extern void omap2_clkops_disable_clkdm(struct clk_hw *hw);
-
-+int __init omap2_clk_provider_init(struct device_node *np, int index,
-+				   void __iomem *mem);
-+void __init omap2_clk_legacy_provider_init(int index, void __iomem *mem);
-+
-  void __init ti_clk_init_features(void);
-  #endif
-diff --git a/arch/arm/mach-omap2/prm_common.c 
-b/arch/arm/mach-omap2/prm_common.c
-index 8ec5201..1bfd00e 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -677,25 +677,6 @@ static const struct of_device_id 
-omap_prcm_dt_match_table[] = {
-  	{ }
-  };
-
--static struct clk_hw_omap memmap_dummy_ck = {
--	.flags = MEMMAP_ADDRESSING,
--};
--
--static u32 prm_clk_readl(void __iomem *reg)
--{
--	return omap2_clk_readl(&memmap_dummy_ck, reg);
--}
--
--static void prm_clk_writel(u32 val, void __iomem *reg)
--{
--	omap2_clk_writel(val, &memmap_dummy_ck, reg);
--}
--
--static struct ti_clk_ll_ops omap_clk_ll_ops = {
--	.clk_readl = prm_clk_readl,
--	.clk_writel = prm_clk_writel,
--};
--
-  /**
-   * omap_prcm_init - low level init for the PRCM drivers
-   *
-@@ -708,8 +689,7 @@ int __init omap_prcm_init(void)
-  	void __iomem *mem;
-  	const struct of_device_id *match;
-  	const struct omap_prcm_init_data *data;
--
--	ti_clk_ll_ops = &omap_clk_ll_ops;
-+	int ret;
-
-  	for_each_matching_node_and_match(np, omap_prcm_dt_match_table, &match) {
-  		data = match->data;
-@@ -718,8 +698,9 @@ int __init omap_prcm_init(void)
-  		if (!mem)
-  			return -ENOMEM;
-
--		clk_memmaps[data->index] = mem;
--		ti_dt_clk_init_provider(np, data->index);
-+		ret = omap2_clk_provider_init(np, data->index, mem);
-+		if (ret)
-+			return ret;
-  	}
-
-  	return 0;
-@@ -727,11 +708,10 @@ int __init omap_prcm_init(void)
-
-  void __init omap3_prcm_legacy_iomaps_init(void)
-  {
--	ti_clk_ll_ops = &omap_clk_ll_ops;
--
--	clk_memmaps[TI_CLKM_CM] = cm_base + OMAP3430_IVA2_MOD;
--	clk_memmaps[TI_CLKM_PRM] = prm_base + OMAP3430_IVA2_MOD;
--	clk_memmaps[TI_CLKM_SCRM] = omap_ctrl_base_get();
-+	omap2_clk_legacy_provider_init(TI_CLKM_CM, cm_base + OMAP3430_IVA2_MOD);
-+	omap2_clk_legacy_provider_init(TI_CLKM_PRM,
-+				       prm_base + OMAP3430_IVA2_MOD);
-+	omap2_clk_legacy_provider_init(TI_CLKM_SCRM, omap_ctrl_base_get());
-  }
-
-  static int __init prm_late_init(void)
+-	if (acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt)) {
+-		/* disable ACPI if no FADT is found */
++	/*
++	 * If ACPI tables are initialized and FADT sanity checks passed,
++	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
++	 * on initialization error.
++	 */
++	if (acpi_table_init() || acpi_fadt_sanity_check()) {
++		pr_err("Failed to init ACPI tables\n");
+ 		disable_acpi();
+-		pr_err("Can't find FADT\n");
+ 	}
+ }
+ 
 -- 
-1.7.9.5
+2.2.1
