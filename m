@@ -1,210 +1,322 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Wed, 25 Mar 2015 15:10:56 +0200
-Subject: [PATCH 3/6] i2c: qup: Add bam dma capabilities
-In-Reply-To: <1426268992-19298-4-git-send-email-sricharan@codeaurora.org>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-4-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1427289056.25053.21.camel@mm-sol.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Mar 2015 13:20:44 +0000
+Subject: [PATCH 1/5] ACPI: move arm64 GSI IRQ model to generic GSI IRQ
+ layer
+In-Reply-To: <1427219940-27201-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1427219940-27201-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1427219940-27201-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5512B62C.7030500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Sricharan,
-
-On Fri, 2015-03-13 at 23:19 +0530, Sricharan R wrote:
-
-
->  #define QUP_I2C_MASTER_GEN     0x408
-> +#define QUP_I2C_MASTER_CONFIG  0x408
+On 24/03/15 17:58, Lorenzo Pieralisi wrote:
+> The code deployed to implement GSI linux IRQ numbers mapping on arm64 turns
+> out to be generic enough so that it can be moved to ACPI core code along
+> with its respective config option ACPI_GENERIC_GSI selectable on
+> architectures that can reuse the same code.
 > 
-
-Unused.
-
->  #define QUP_READ_LIMIT                 256
-> +#define MX_TX_RX_LEN                   SZ_64K
-> +#define MX_BLOCKS                      (MX_TX_RX_LEN / QUP_READ_LIMIT)
-> +
-> +#define TOUT_MAX                       300 /* Max timeout for 32k tx/tx */
+> Current ACPI IRQ mapping code is not integrated in the kernel IRQ domain
+> infrastructure, in particular there is no way to look-up the
+> IRQ domain associated with a particular interrupt controller, so this
+> first version of GSI generic code carries out the GSI<->IRQ mapping relying
+> on the IRQ default domain which is supposed to be always set on a
+> specific architecture in case the domain structure passed to
+> irq_create/find_mapping() functions is missing.
 > 
-
-seconds, muliseconds?
-
->  struct qup_i2c_config {
->         int tag_ver;
->         int max_freq;
->  };
+> This patch moves the arm64 acpi functions that implement the gsi mappings:
 > 
-> +struct tag {
-
-Please use consistent naming convention.
-
-> +       u8 *start;
-> +       dma_addr_t addr;
-> +};
-> +
->  struct qup_i2c_dev {
->         struct device*dev;
->         void __iomem*base;
-> @@ -157,9 +181,35 @@ struct qup_i2c_dev {
->         /* QUP core errors */
->         u32     qup_err;
+> acpi_gsi_to_irq()
+> acpi_register_gsi()
+> acpi_unregister_gsi()
 > 
-> +       /* dma parameters */
-> +       bool    is_dma;
-> +       struct  dma_pool *dpool;
-> +       struct  tag start_tag;
-> +       struct  tag scratch_tag;
-> +       struct  tag footer_tag;
-> +       struct  dma_chan *dma_tx;
-> +       struct  dma_chan *dma_rx;
-> +       struct  scatterlist *sg_tx;
-> +       struct  scatterlist *sg_rx;
-> +       dma_addr_tsg_tx_phys;
-> +       dma_addr_tsg_rx_phys;
-
-Maybe these could be organized in structure per direction.
-
-> +
->         struct completionxfer;
->  };
+> to ACPI core code. Since the generic GSI<->domain mapping is based on IRQ
+> domains, it can be extended as soon as a way to map an interrupt
+> controller to an IRQ domain is implemented for ACPI in the IRQ domain
+> layer.
 > 
-> +struct i2c_bam_xfer {
+> x86 and ia64 code for GSI mappings cannot rely on the generic GSI
+> layer at present for legacy reasons, so they do not select the
+> ACPI_GENERIC_GSI config options and keep relying on their arch
+> specific GSI mapping layer.
 
-Unused.
+This looks like the right thing to do. I definitely like the sanity
+checking that has been added here.
 
-> +       struct qup_i2c_dev *qup;
-> +       u32 start_len;
-> +
-> +       u32 rx_nents;
-> +       u32 tx_nents;
-> +
-> +       struct dma_async_tx_descriptor *tx_desc;
-> +       dma_cookie_t tx_cookie;
-> +       struct dma_async_tx_descriptor *rx_desc;
-> +       dma_cookie_t rx_cookie;
+FWIW: Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-structure per direction.
+	M.
 
-> +};
-> +
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Jiang Liu <jiang.liu@linux.intel.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/Kconfig        |   1 +
+>  arch/arm64/kernel/acpi.c  |  73 --------------------------------
+>  drivers/acpi/Kconfig      |   3 ++
+>  drivers/acpi/Makefile     |   1 +
+>  drivers/acpi/gsi.c        | 105 ++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic.c |   2 +
+>  6 files changed, 112 insertions(+), 73 deletions(-)
+>  create mode 100644 drivers/acpi/gsi.c
 > 
-
-> +static void bam_i2c_callback(void *data)
-> +{
-
-Please use consistent naming, here and bellow.
-
-> +       struct qup_i2c_dev *qup = data;
-> +
-> +       complete(&qup->xfer);
-> +}
-> +
-> +static int get_start_tag(u8 *tag, struct i2c_msg *msg, int first, int last,
-> +                       int blen)
-> +{
-> +       u8 addr = (msg->addr << 1) | ((msg->flags & I2C_M_RD) == I2C_M_RD);
-> +       u8 op;
-> +       int len = 0;
-> +
-> +       /* always issue stop for each read block */
-> +       if (last) {
-> +               if (msg->flags & I2C_M_RD)
-> +                       op = QUP_TAG_V2_DATARD_STOP;
-> +               else
-> +                       op = QUP_TAG_V2_DATAWR_STOP;
-> +       } else {
-> +               if (msg->flags & I2C_M_RD)
-> +                       op = QUP_TAG_V2_DATARD;
-> +               else
-> +                       op = QUP_TAG_V2_DATAWR;
-> +       }
-> +
-> +       if (msg->flags & I2C_M_TEN) {
-> +               len += 5;
-> +               tag[0] = QUP_TAG_V2_START;
-> +               tag[1] = addr;
-> +               tag[2] = op;
-> +               tag[3] = blen;
-> +
-> +               if (msg->flags & I2C_M_RD && last) {
-> +                       len += 2;
-> +                       tag[4] = QUP_BAM_INPUT_EOT;
-> +                       tag[5] = QUP_BAM_FLUSH_STOP;
-> +               }
-> +       } else {
-> +               if (first) {
-> +                       tag[len++] = QUP_TAG_V2_START;
-> +                       tag[len++] = addr;
-> +               }
-> +
-> +               tag[len++] = op;
-> +               tag[len++] = blen;
-> +
-> +               if (msg->flags & I2C_M_RD & last) {
-> +                       tag[len++] = QUP_BAM_INPUT_EOT;
-> +                       tag[len++] = QUP_BAM_FLUSH_STOP;
-> +               }
-> +       }
-> +
-> +       return len;
-> +}
-
-Maybe could be split to 2 functions?
-
-> -static const struct i2c_algorithm qup_i2c_algo = {
-> +static struct i2c_algorithm qup_i2c_algo = {
-
-Why?
-
->         .master_xfer= qup_i2c_xfer,
->         .functionality= qup_i2c_func,
->  };
-> @@ -839,6 +1136,7 @@ static int qup_i2c_probe(struct platform_device *pdev)
->         u32 clk_freq = 100000;
->         const struct qup_i2c_config *config;
->         const struct of_device_id *of_id;
-> +       int blocks;
-> 
->         qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
->         if (!qup)
-> @@ -875,6 +1173,53 @@ static int qup_i2c_probe(struct platform_device *pdev)
->                 return qup->irq;
->         }
-> 
-> +       if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v2.1.1") ||
-> +               of_device_is_compatible(pdev->dev.of_node,
-> +                       "qcom,i2c-qup-v2.2.1")) {
-
-Logic will be simpler if you check just for version 1 of the controller.
-
-> +               qup->dma_rx = dma_request_slave_channel(&pdev->dev, "bam-rx");
-> +
-
-Please use dma_request_slave_channel_reason.
-
-As Andy noted, please use just "rx", "tx"
-
-> +               if (!qup->dma_rx)
-> +                       return -EPROBE_DEFER;
-
-Don't mask other errors, here and bellow. DMA support should be optional.
-
->                 dev_err(qup->dev, "Could not get core clock\n");
-> @@ -989,6 +1334,14 @@ static int qup_i2c_remove(struct platform_device *pdev)
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index e5aa081..0659db3 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1,5 +1,6 @@
+>  config ARM64
+>  	def_bool y
+> +	select ACPI_GENERIC_GSI if ACPI
+>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>  	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index fe9d8f0..a70f714 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -76,12 +76,6 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>  }
+>  
+>  /*
+> - * Since we're on ARM, the default interrupt routing model
+> - * clearly has to be GIC.
+> - */
+> -enum acpi_irq_model_id acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> -
+> -/*
+>   * __acpi_map_table() will be called before page_init(), so early_ioremap()
+>   * or early_memremap() should be called here to for ACPI table mapping.
+>   */
+> @@ -224,73 +218,6 @@ void __init acpi_init_cpus(void)
+>  	pr_info("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
+>  }
+>  
+> -int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> -{
+> -	*irq = irq_find_mapping(NULL, gsi);
+> -
+> -	return 0;
+> -}
+> -EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> -
+> -/*
+> - * success: return IRQ number (>0)
+> - * failure: return =< 0
+> - */
+> -int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
+> -{
+> -	unsigned int irq;
+> -	unsigned int irq_type;
+> -
+> -	/*
+> -	 * ACPI have no bindings to indicate SPI or PPI, so we
+> -	 * use different mappings from DT in ACPI.
+> -	 *
+> -	 * For FDT
+> -	 * PPI interrupt: in the range [0, 15];
+> -	 * SPI interrupt: in the range [0, 987];
+> -	 *
+> -	 * For ACPI, GSI should be unique so using
+> -	 * the hwirq directly for the mapping:
+> -	 * PPI interrupt: in the range [16, 31];
+> -	 * SPI interrupt: in the range [32, 1019];
+> -	 */
+> -
+> -	if (trigger == ACPI_EDGE_SENSITIVE &&
+> -				polarity == ACPI_ACTIVE_LOW)
+> -		irq_type = IRQ_TYPE_EDGE_FALLING;
+> -	else if (trigger == ACPI_EDGE_SENSITIVE &&
+> -				polarity == ACPI_ACTIVE_HIGH)
+> -		irq_type = IRQ_TYPE_EDGE_RISING;
+> -	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> -				polarity == ACPI_ACTIVE_LOW)
+> -		irq_type = IRQ_TYPE_LEVEL_LOW;
+> -	else if (trigger == ACPI_LEVEL_SENSITIVE &&
+> -				polarity == ACPI_ACTIVE_HIGH)
+> -		irq_type = IRQ_TYPE_LEVEL_HIGH;
+> -	else
+> -		irq_type = IRQ_TYPE_NONE;
+> -
+> -	/*
+> -	 * Since only one GIC is supported in ACPI 5.0, we can
+> -	 * create mapping refer to the default domain
+> -	 */
+> -	irq = irq_create_mapping(NULL, gsi);
+> -	if (!irq)
+> -		return irq;
+> -
+> -	/* Set irq type if specified and different than the current one */
+> -	if (irq_type != IRQ_TYPE_NONE &&
+> -		irq_type != irq_get_trigger_type(irq))
+> -		irq_set_irq_type(irq, irq_type);
+> -	return irq;
+> -}
+> -EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> -
+> -void acpi_unregister_gsi(u32 gsi)
+> -{
+> -}
+> -EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+> -
+>  static int __init acpi_parse_fadt(struct acpi_table_header *table)
 >  {
->         struct qup_i2c_dev *qup = platform_get_drvdata(pdev);
+>  	struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index a8f531e2..ab2cbb5 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -48,6 +48,9 @@ config ACPI_LEGACY_TABLES_LOOKUP
+>  config ARCH_MIGHT_HAVE_ACPI_PDC
+>  	bool
+>  
+> +config ACPI_GENERIC_GSI
+> +	bool
+> +
+>  config ACPI_SYSTEM_POWER_STATES_SUPPORT
+>  	bool
+>  
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index db153c6..8a063e2 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -56,6 +56,7 @@ ifdef CONFIG_ACPI_VIDEO
+>  acpi-y				+= video_detect.o
+>  endif
+>  acpi-y				+= acpi_lpat.o
+> +acpi-$(CONFIG_ACPI_GENERIC_GSI) += gsi.o
+>  
+>  # These are (potentially) separate modules
+>  
+> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+> new file mode 100644
+> index 0000000..38208f2
+> --- /dev/null
+> +++ b/drivers/acpi/gsi.c
+> @@ -0,0 +1,105 @@
+> +/*
+> + * ACPI GSI IRQ layer
+> + *
+> + * Copyright (C) 2015 ARM Ltd.
+> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/acpi.h>
+> +#include <linux/irq.h>
+> +#include <linux/irqdomain.h>
+> +
+> +enum acpi_irq_model_id acpi_irq_model;
+> +
+> +static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+> +{
+> +	switch (polarity) {
+> +	case ACPI_ACTIVE_LOW:
+> +		return trigger == ACPI_EDGE_SENSITIVE ?
+> +		       IRQ_TYPE_EDGE_FALLING :
+> +		       IRQ_TYPE_LEVEL_LOW;
+> +	case ACPI_ACTIVE_HIGH:
+> +		return trigger == ACPI_EDGE_SENSITIVE ?
+> +		       IRQ_TYPE_EDGE_RISING :
+> +		       IRQ_TYPE_LEVEL_HIGH;
+> +	case ACPI_ACTIVE_BOTH:
+> +		if (trigger == ACPI_EDGE_SENSITIVE)
+> +			return IRQ_TYPE_EDGE_BOTH;
+> +	default:
+> +		return IRQ_TYPE_NONE;
+> +	}
+> +}
+> +
+> +/**
+> + * acpi_gsi_to_irq() - Retrieve the linux irq number for a given GSI
+> + * @gsi: GSI IRQ number to map
+> + * @irq: pointer where linux IRQ number is stored
+> + *
+> + * irq location updated with irq value [>0 on success, 0 on failure]
+> + *
+> + * Returns: linux IRQ number on success (>0)
+> + *          -EINVAL on failure
+> + */
+> +int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+> +{
+> +	/*
+> +	 * Only default domain is supported at present, always find
+> +	 * the mapping corresponding to default domain by passing NULL
+> +	 * as irq_domain parameter
+> +	 */
+> +	*irq = irq_find_mapping(NULL, gsi);
+> +	/*
+> +	 * *irq == 0 means no mapping, that should
+> +	 * be reported as a failure
+> +	 */
+> +	return (*irq > 0) ? *irq : -EINVAL;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+> +
+> +/**
+> + * acpi_register_gsi() - Map a GSI to a linux IRQ number
+> + * @dev: device for which IRQ has to be mapped
+> + * @gsi: GSI IRQ number
+> + * @trigger: trigger type of the GSI number to be mapped
+> + * @polarity: polarity of the GSI to be mapped
+> + *
+> + * Returns: a valid linux IRQ number on success
+> + *          -EINVAL on failure
+> + */
+> +int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+> +		      int polarity)
+> +{
+> +	unsigned int irq;
+> +	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+> +
+> +	/*
+> +	 * There is no way at present to look-up the IRQ domain on ACPI,
+> +	 * hence always create mapping referring to the default domain
+> +	 * by passing NULL as irq_domain parameter
+> +	 */
+> +	irq = irq_create_mapping(NULL, gsi);
+> +	if (!irq)
+> +		return -EINVAL;
+> +
+> +	/* Set irq type if specified and different than the current one */
+> +	if (irq_type != IRQ_TYPE_NONE &&
+> +		irq_type != irq_get_trigger_type(irq))
+> +		irq_set_irq_type(irq, irq_type);
+> +	return irq;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_register_gsi);
+> +
+> +/**
+> + * acpi_unregister_gsi() - Free a GSI<->linux IRQ number mapping
+> + * @gsi: GSI IRQ number
+> + */
+> +void acpi_unregister_gsi(u32 gsi)
+> +{
+> +	int irq = irq_find_mapping(NULL, gsi);
+> +
+> +	irq_dispose_mapping(irq);
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index d15a36a..f1efb53 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1189,6 +1189,8 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>  	 */
+>  	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+>  	irq_set_default_host(gic_data[0].domain);
+> +
+> +	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+>  	return 0;
+>  }
+>  #endif
 > 
-> +       dma_pool_free(qup->dpool, qup->start_tag.start,
-> +                                                               qup->start_tag.addr);
-> +       dma_pool_free(qup->dpool, qup->scratch_tag.start,
-> +                                                               qup->scratch_tag.addr);
-> +       dma_pool_free(qup->dpool, qup->footer_tag.start,
-> +                                                               qup->footer_tag.addr);
-> +       dma_pool_destroy(qup->dpool);
 
-Only if is_dma, right?
 
-DMA mapping code omitted from review. I don't understand it well enough, sorry.
-
-Regards,
-Ivan
+-- 
+Jazz is not dead. It just smells funny...
