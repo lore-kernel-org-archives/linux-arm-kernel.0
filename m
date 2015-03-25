@@ -1,36 +1,55 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 25 Mar 2015 10:44:42 +0100
-Subject: ARM: KVM/XEN: how should we support virt-what?
-Message-ID: <20150325094440.GB3163@hawk.usersys.redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Mar 2015 09:48:14 +0000
+Subject: [RFC 1/4] arm64: kvm: add a cpu tear-down function
+In-Reply-To: <55126C6F.2080500@linaro.org>
+References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
+ <1427111639-4575-2-git-send-email-takahiro.akashi@linaro.org>
+ <551135AE.1080401@arm.com> <55126C6F.2080500@linaro.org>
+Message-ID: <5512845E.40804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello ARM virt maintainers,
+Hi Takahiro,
 
-I'd like to start a discussion about supporting virt-what[1]. virt-what
-allows userspace to determine if the system it's running on is running
-in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
-effort tool, see the Caveat emptor in [1], it has become quite a useful
-tool, and is showing up in different places, such as OpenStack. If you
-look at the code[2], specifically [3], then you'll see how it works on
-x86, which is to use the dedicated hypervisor cpuid leaves. I'm
-wondering what equivalent we have, or can develop, for arm.
-Here are some thoughts;
-0) there's already something we can use, and I just need to be told
-   about it.
-1) be as similar as possible to x86 by dedicating some currently
-   undefined sysreg bits. This would take buy-in from lots of parties,
-   so is not likely the way to go.
-2) create a specific DT node that will get exposed through sysfs, or
-   somewhere.
-3) same as (2), but just use the nodes currently in mach-virt's DT
-   as the indication we're a guest. This would just be a heuristic,
-   i.e. "have virtio mmio" && psci.method == hvc, or something,
-   and we'd still need a way to know if we're kvm vs. xen vs. ??.
+On 25/03/15 08:06, AKASHI Takahiro wrote:
+
+>>> +	/* Switch back to boot page tables */
+>>> +	msr	ttbr0_el2, x0
+>>> +	isb
+>>
+>> This is the place where you want TLBI to occur.
+> 
+> Will remove tlbi above and put it here.
+
+There is only need for one TLBI, if at all.
+
+>>> +	/* Branch into PA space */
+>>> +	adr	x0, 1f
+>>> +	bfi	x1, x0, #0, #PAGE_SHIFT
+>>> +	br	x1
+>>> +
+>>> +	/* We're now in idmap */
+>>> +1:	/* Invalidate the old TLBs again */
+>>> +	tlbi	alle2
+>>> +	dsb	sy
+>>
+>> See? This is the only TLBI that actually makes sense. Now, given that
+>> you are actually disabling the MMU, I'm not sure these TBLIs make much
+>> sense.
+> 
+> Probably you're right, but
+> otherwise, I guess, bogus TLB might remain and be used when MMU get enabled again.
+> (MMU setting would be the same across disabling/enabling hyp mode though.)
+
+Anyone enabling the MMU must invalidate the TLB before doing so (we've
+been caught by that before). Invalidation on the way out doesn't hurt,
+but it also give a false sense of security.
+
+I'll leave it up to you.
 
 Thanks,
-drew 
 
-[1] http://people.redhat.com/~rjones/virt-what/
-[2] http://git.annexia.org/?p=virt-what.git;a=summary
-[3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
+	M.
+
+-- 
+Jazz is not dead. It just smells funny...
