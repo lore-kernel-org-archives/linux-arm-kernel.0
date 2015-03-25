@@ -1,128 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Mar 2015 22:19:41 +0100
-Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
-In-Reply-To: <55127E2A.1040300@arm.com>
-References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
- <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
- <20150324232508.7930.89483@quantum>
- <CAMuHMdVRhaZY_y2=1+9sZ-kteiguYGeS62Ka-V1WYnNCq_rgQA@mail.gmail.com>
- <55127E2A.1040300@arm.com>
-Message-ID: <CAMuHMdWY7orzt0ONTzmyG8nSagCM1r1HK=zQHzfttfr6cK7eqA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Mar 2015 14:19:11 -0700
+Subject: [GIT PULL] Allwinner clocks additions for 4.1
+Message-ID: <20150325211911.GA17639@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Mike,
 
-On Wed, Mar 25, 2015 at 10:21 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 25/03/15 04:17, Geert Uytterhoeven wrote:
->> On Wed, Mar 25, 2015 at 12:25 AM, Michael Turquette
->> <mturquette@linaro.org> wrote:
->>> Quoting Geert Uytterhoeven (2015-03-18 12:16:00)
->>>> INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
->>>> disabled causes:
->>>>
->>>>     Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
->>>>
->>>> Currently, the GIC driver cannot enable its module clock for several
->>>> reasons:
->>>>   - It does not use a platform device, so Runtime PM is not an option,
->>>>   - gic_of_init() runs before any clocks are registered, so it cannot
->>>>     explicitly enable the clock,
->>>>   - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
->>>>     doesn't support deferred probing.
->>>>
->>>> Hence we have to keep on relying on the boot loader for enabling the
->>>> module clock.
->>>>
->>>> To prevent the module clock from being disabled when the CCF core thinks
->>>> it is unused, and thus causing a system lock-up, add a quirk to the MSTP
->>>> clock driver to make sure the module clock is never disabled.
->>>>
->>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>> ---
->>>>  drivers/clk/shmobile/clk-mstp.c | 6 ++++++
->>>>  1 file changed, 6 insertions(+)
->>>>
->>>> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
->>>> index 2d2fe773ac8168f9..742af84735a07450 100644
->>>> --- a/drivers/clk/shmobile/clk-mstp.c
->>>> +++ b/drivers/clk/shmobile/clk-mstp.c
->>>> @@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
->>>>         unsigned int i;
->>>>         u32 value;
->>>>
->>>> +       /* INTC-SYS is the module clock of the GIC, and must not be disabled */
->>>> +       if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
->>>> +               pr_debug("MSTP %pC skipping disable\n", hw->clk);
->>>> +               return 0;
->>>> +       }
->>>
->>> Hello Geert,
->>>
->>> This is a bit ugly for three reasons:
->>>
->>> 1) we hit this code for every MSTP clock {en,dis}able call
->>> 2) __clk_get_name is kind of gross
->>
->> Sure, this is ugly. That's why this was an RFC.
->> I was mainly trying to trigger a reply from the GIC maintainers ;-)
->
-> Given that I'm the only GIC-related person on the cc list, I suppose
-> this is puts me on the spot.
-
-> adverse to it. My only gripe is with the undocumented clock property in
-> the binding, and that leads to two questions:
-> This doesn't touch the GIC code at all, so I don't feel completely
-
-The reason no GIC code is touched (for now), is that it's non-trivial to
-fix the GIC driver to handle this.
-
-> adverse to it. My only gripe is with the undocumented clock property in
-> the binding, and that leads to two questions:
-> - the GIC architecture doesn't mention a clock at all, so that's a
-> Renesas special. Do we want to have a vendor-specific property for this?
-> Or does it belong elsewhere?
-
-Apart from being implemented using synchronous logic and thus using a
-clock signal internally, the GIC and its driver don't care about this clock.
-
-When an existing IP module that doesn't care about clocks becomes reused
-on a new SoC, and it now ends up being part of a "PM Domain" (e.g. a Power
-Domain or Clock Domain, or both), this "PM Domain" is a feature of the
-platform, not of the IP module itself (cfr. "(Existing) Device Driver" in [1];
-GIC falls in the same category as the Thermal Module example).
-Hence I don't think it's necessary to mention this in the ARM GIC binding.
-
-> - alternatively, do we want the core GIC code to deal with this? In
-> which case, how do we express the policy?
-
-The proper way to handle this automatically is to add Runtime PM support
-to the driver. However, this requires using a platform device.
-
-I would like to add the clock and GIC dependency on the clock in the DTS now,
-for reasons of DTS stability. But that means I need a temporary workaround
-to avoid the clock from being disabled, until the GIC driver handles this.
-
-I don't expect a fix for the GIC code to just show up magically. I just wanted
-you to be aware of the problem. GIC is not the only problematic module here,
-there are others, cfr. the last slide of [2].
+Here is the pull request for the Allwinner related changes for the 4.1
+merge window.
 
 Thanks!
+Maxime
 
-References:
-Presentations at ELC2015:
-  [1] "Last one out, turn off the lights", by Geert Uytterhoeven
-(http://events.linuxfoundation.org/sites/events/files/slides/Last_One_Out_Turn_Off_The_Lights_Handouts.pdf)
-  [2] "Introduction to Kernel Power Managemen", by Kevin Hilman (still
-to appear at http://events.linuxfoundation.org/events/embedded-linux-conference/program/slides)
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-Gr{oetje,eeting}s,
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-                        Geert
+are available in the git repository at:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.1
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+for you to fetch changes up to f1017969661dd33ead5ba7c3f4a0793c6611441a:
+
+  clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6 (2015-03-25 11:46:41 -0700)
+
+----------------------------------------------------------------
+Allwinner clocks changes for 4.1
+
+The usual round of clock changes for the Allwinner SoCs.
+
+There is nothing really standing out here, but a few changes and fixes, most
+notably to allow the AHB clock to be parented to a PLL, instead of the CPU
+clock to avoid any AHB rate change due to cpufreq.
+
+----------------------------------------------------------------
+Chen-Yu Tsai (7):
+      clk: sunxi: Move USB clocks to separate file
+      clk: sunxi: Add support for sun9i A80 USB clocks and resets
+      clk: sunxi: Add muxable ahb factors clock for sun5i and sun7i
+      clk: sunxi: Add "cpu" to list of protected clocks for sun5i
+      clk: sunxi: Register divs clocks before factor clocks
+      clk: sunxi: Make divs clocks specify which output is the base factor clock
+      clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
+
+ Documentation/devicetree/bindings/clock/sunxi.txt |   3 +
+ drivers/clk/sunxi/Makefile                        |   1 +
+ drivers/clk/sunxi/clk-sunxi.c                     | 185 ++++++++---------
+ drivers/clk/sunxi/clk-usb.c                       | 233 ++++++++++++++++++++++
+ 4 files changed, 319 insertions(+), 103 deletions(-)
+ create mode 100644 drivers/clk/sunxi/clk-usb.c
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/a7821616/attachment-0001.sig>
