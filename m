@@ -1,95 +1,79 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Mar 2015 23:02:00 +0100
-Subject: [PATCH 6/8] ARM: cpuidle: Enable the ARM64 driver for both
- ARM32/ARM64
-In-Reply-To: <1427316850.10958.58.camel@x220>
-References: <55127A53.8050206@linaro.org>	
- <1427274436-21916-1-git-send-email-daniel.lezcano@linaro.org>	
- <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
- <1427316850.10958.58.camel@x220>
-Message-ID: <55133058.6020603@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 26 Mar 2015 03:33:33 +0530
+Subject: [PATCH 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
+In-Reply-To: <550C9134.9020003@broadcom.com>
+References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1426885630-32429-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <20150320212645.GA25405@dtor-ws> <550C9134.9020003@broadcom.com>
+Message-ID: <551330B5.6030901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2015 09:54 PM, Paul Bolle wrote:
-> A few nits are all I spotted.
->
-> On Wed, 2015-03-25 at 10:07 +0100, Daniel Lezcano wrote:
->> --- a/drivers/cpuidle/Kconfig.arm
->> +++ b/drivers/cpuidle/Kconfig.arm
->
->> +config ARM_CPUIDLE
->> +        bool "Generic ARM/ARM64 CPU idle Driver"
->> +        select DT_IDLE_STATES
->> +        help
->> +          Select this to enable generic cpuidle driver for ARM.
->> +          It provides a generic idle driver whose idle states are configured
->> +          at run-time through DT nodes. The CPUidle suspend backend is
->> +          initialized by calling the CPU operations init idle hook
->> +          provided by architecture code.
->
-> Start with a tab instead of 8 spaces, please.
+Hi,
 
-Ok, I will send a fix for that on top of this patch.
+On Saturday 21 March 2015 02:59 AM, Arun Ramamurthy wrote:
+> 
+> 
+> On 15-03-20 02:26 PM, Dmitry Torokhov wrote:
+>> Hi Arun,
+>>
+>> On Fri, Mar 20, 2015 at 02:07:08PM -0700, Arun Ramamurthy wrote:
+>>> Adding devm_of_phy_get_by_index to get phys by supplying an index
+>>> and not a phy name when multiple phys are declared
 
->> --- /dev/null
->> +++ b/drivers/cpuidle/cpuidle-arm.c
->
->> +#include <linux/cpuidle.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/cpu_pm.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->
-> Is this include actually needed? I haven't tried building this without
-> that include, but I spotted nothing obviously module related in this
-> file.
->
->> +#include <linux/of.h>
->> +
->> +#include <asm/cpuidle.h>
->> +
->> +#include "dt_idle_states.h"
->
->> +static struct cpuidle_driver arm_idle_driver = {
->> +	.name = "arm_idle",
->> +	.owner = THIS_MODULE,
->
-> Since this can only be built in, THIS_MODULE will (basically) be
-> equivalent to NULL according to include/linux/export.h. So I suppose
-> this line can be dropped.
+I think a bit more explanation on why get_by_index is needed here.
+>>>
+>>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>>> ---
+>>>   drivers/phy/phy-core.c  | 30 ++++++++++++++++++++++++++++++
+>>>   include/linux/phy/phy.h |  2 ++
+>>>   2 files changed, 32 insertions(+)
+>>>
+>>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>>> index a12d353..0c03876 100644
+>>> --- a/drivers/phy/phy-core.c
+>>> +++ b/drivers/phy/phy-core.c
+>>> @@ -622,6 +622,36 @@ struct phy *devm_of_phy_get(struct device *dev, struct
+>>> device_node *np,
+>>>   EXPORT_SYMBOL_GPL(devm_of_phy_get);
+>>>
+>>>   /**
+>>> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by
+>>> index.
+>>> + * @dev: device that requests this phy
+>>> + * @np: node containing the phy
+>>> + * @index: index of the phy
+>>> + *
+>>> + * Gets the phy using _of_phy_get(), and associates a device with it using
+>>> + * devres. On driver detach, release function is invoked on the devres data,
+>>> + * then, devres data is freed.
+>>> + *
+>>> + */
+>>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node
+>>> *np,
+>>> +                     int index)
+>>> +{
+>>> +    struct phy **ptr, *phy;
+>>> +
+>>> +    ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
+>>> +    if (!ptr)
+>>> +        return ERR_PTR(-ENOMEM);
+>>> +
+>>> +    phy = _of_phy_get(np, index);
+>>> +    if (!IS_ERR(phy)) {
+>>> +        *ptr = phy;
+>>> +        devres_add(dev, ptr);
+>>> +    } else {
+>>> +        devres_free(ptr);
+>>> +    }
+>>> +
+>>> +    return phy;
+>>> +}
+>>
+>> You want EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index); here.
 
-Yeah, THIS_MODULE is present in all drivers. Very likely we can safely 
-remove it.
+Also update the Documentation/phy.txt.
 
->> +	/*
->> +	 * State at index 0 is standby wfi and considered standard
->> +	 * on all ARM platforms. If in some platforms simple wfi
->> +	 * can't be used as "state 0", DT bindings must be implemented
->> +	 * to work around this issue and allow installing a special
->> +	 * handler for idle state index 0.
->> +	 */
->> +	.states[0] = {
->> +		.enter                  = arm_enter_idle_state,
->> +		.exit_latency           = 1,
->> +		.target_residency       = 1,
->> +		.power_usage		= UINT_MAX,
->> +		.name                   = "WFI",
->> +		.desc                   = "ARM WFI",
->> +	}
->> +};
->
-> I did notice that these two nits are already present in
-> drivers/cpuidle/cpuidle-arm64.c. But since this patch is not just moving
-> that file's content around, you might as well look into those two nits.
-
-We can address the module code removal in a separate patchset as this is 
-the case for all the drivers.
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+-Kishon
