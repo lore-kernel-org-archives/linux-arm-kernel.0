@@ -1,68 +1,85 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Mar 2015 05:11:51 +0100
-Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
-In-Reply-To: <20150309092804.GB3427@x1>
-References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
- <20150304120003.GL32624@x1> <20150306190812.11109.82130@quantum>
- <20150309092804.GB3427@x1>
-Message-ID: <CAMuHMdV8_uKQQgYkRPFOBgrqgw_y9A7T84ukfgWZpJmTL0eFCQ@mail.gmail.com>
+Date: Wed, 25 Mar 2015 05:17:36 +0100
+Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
+In-Reply-To: <20150324232508.7930.89483@quantum>
+References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
+ <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
+ <20150324232508.7930.89483@quantum>
+Message-ID: <CAMuHMdVRhaZY_y2=1+9sZ-kteiguYGeS62Ka-V1WYnNCq_rgQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Mike,
 
-On Mon, Mar 9, 2015 at 10:28 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 06 Mar 2015, Mike Turquette wrote:
->> Quoting Lee Jones (2015-03-04 04:00:03)
->> > Mike,
->> >
->> > Do you want me to resend this set with Robert's Reviewed-by applied,
->> > or are you happy to apply it yourself?
+On Wed, Mar 25, 2015 at 12:25 AM, Michael Turquette
+<mturquette@linaro.org> wrote:
+> Quoting Geert Uytterhoeven (2015-03-18 12:16:00)
+>> INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
+>> disabled causes:
 >>
->> No need for the resend. I am hoping for a final review from a DT human.
+>>     Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
 >>
->> This approach looks fine to me. In practice I think it is restricted to
->> hardware blocks that don't exist in DT yet (e.g. no driver, in the case
->> of your interconnect) and that restriction is probably for the best.
+>> Currently, the GIC driver cannot enable its module clock for several
+>> reasons:
+>>   - It does not use a platform device, so Runtime PM is not an option,
+>>   - gic_of_init() runs before any clocks are registered, so it cannot
+>>     explicitly enable the clock,
+>>   - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
+>>     doesn't support deferred probing.
+>>
+>> Hence we have to keep on relying on the boot loader for enabling the
+>> module clock.
+>>
+>> To prevent the module clock from being disabled when the CCF core thinks
+>> it is unused, and thus causing a system lock-up, add a quirk to the MSTP
+>> clock driver to make sure the module clock is never disabled.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  drivers/clk/shmobile/clk-mstp.c | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
+>> index 2d2fe773ac8168f9..742af84735a07450 100644
+>> --- a/drivers/clk/shmobile/clk-mstp.c
+>> +++ b/drivers/clk/shmobile/clk-mstp.c
+>> @@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
+>>         unsigned int i;
+>>         u32 value;
+>>
+>> +       /* INTC-SYS is the module clock of the GIC, and must not be disabled */
+>> +       if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
+>> +               pr_debug("MSTP %pC skipping disable\n", hw->clk);
+>> +               return 0;
+>> +       }
 >
-> Agreed.
+> Hello Geert,
+>
+> This is a bit ugly for three reasons:
+>
+> 1) we hit this code for every MSTP clock {en,dis}able call
+> 2) __clk_get_name is kind of gross
 
-I think this restriction should be documented in the DT binding more clearly,
-as adding a "clk-always-on" node prohibits you from handling the clock
-correctly in
-the future.
+Sure, this is ugly. That's why this was an RFC.
+I was mainly trying to trigger a reply from the GIC maintainers ;-)
 
-Still, for simple devices where you don't have a driver, but have "predictable"
-bindings (e.g. a bus like "simple-pm-bus"), I think it's better to add
-a device node
-for that simple device now, incl. a reference to the clock, and have a simple
-driver that binds to the device, or platform code that looks for a
-compatible node,
-and enables the clock. That way you don't have to make any chances to the DTS
-later, when you'll have a real driver.
+> 3) the enable_count will not be correct. It will be zero but the clock
+> will actually be enabled
 
->> > > v2 => v3:
->> > >   - Ensure DT actually reflects h/w
->> > >     - i.e. Nodes should not contain a mishmash of different IP
->> > >       blocks, but should identify related h/w.  In the current
->> > >       example we use interconnects
->> > >   - Change naming from clkdomain to clk-always-on
->> > >   - Place "do not abuse" warning in documentation
->> > >
->> > > v1 => v2:
->> > >   - Turned the ST specific driver into a generic one
->> > >
->> > > Hardware can have a bunch of clocks which must not be turned off.
->> > > If drivers a) fail to obtain a reference to any of these or b) give
->> > > up a previously obtained reference during suspend, the common clk
->> > > framework will attempt to turn them off and the hardware will
->> > > subsequently die.  The only way to recover from this failure is to
->> > > restart.
->> > >
->> > > To avoid either of these two scenarios from catastrophically
->> > > disabling the running system we have implemented a clock domain
->> > > where clocks are consumed and references are taken, thus preventing
->> > > them from being shut down by the framework.
+That's indeed something I didn't take into account. Will change to just enabling
+the clock from the clock driver.
+
+> Have you considered Lee's series to express these always-on clocks in
+> DT? See,
+>
+> https://lkml.org/lkml/2015/2/24/495
+
+That solution doesn't apply here, as we do have a correct description
+of the hardware
+in DT (after the other patches in the series, like e.g. (courtesy for
+Lee) http://permalink.gmane.org/gmane.linux.power-management.general/58123).
+
+Thanks!
 
 Gr{oetje,eeting}s,
 
