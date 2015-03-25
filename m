@@ -1,87 +1,82 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Wed, 25 Mar 2015 10:58:43 +1100
-Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
- simplicity
-In-Reply-To: <1427168064-8657-20-git-send-email-wangyijing@huawei.com>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
- <1427168064-8657-20-git-send-email-wangyijing@huawei.com>
-Message-ID: <1427241523.2685.18.camel@axtens.net>
+From: roy.qing.li@gmail.com (Li RongQing)
+Date: Wed, 25 Mar 2015 08:01:12 +0800
+Subject: [PATCH] audit.h: remove the macro AUDIT_ARCH_ARMEB definition
+In-Reply-To: <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
+References: <1426827329-27976-1-git-send-email-roy.qing.li@gmail.com>
+ <CAHC9VhR5VcaCtLG9hdVS2gZRWxVmdnpbK+fJwm6wCA8qyLebUQ@mail.gmail.com>
+ <CAJFZqHxdPEhX+9z-FYUMvTF_6LVgK=gOetq0zT4UTZSgUGRqCQ@mail.gmail.com>
+ <CAJFZqHxfq0DSjKn-uqhT+pAeJ9u8ym2Mr=wsqvPyX7sCicPGZA@mail.gmail.com>
+ <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
+Message-ID: <CAJFZqHzxXyuzi7Z9WawYKfFnTMfYfsRL0Qnt276p_t-AV9GB2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-24 at 11:34 +0800, Yijing Wang wrote:
-> Now we could use pci_scan_host_bridge() to scan
-> pci buses, provide powerpc specific pci_host_bridge_ops.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> CC: linuxppc-dev at lists.ozlabs.org
-> ---
->  arch/powerpc/kernel/pci-common.c |   60 +++++++++++++++++++++++--------------
->  1 files changed, 37 insertions(+), 23 deletions(-)
-
-> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
-> index 2c58200..e2b50a2 100644
-> --- a/arch/powerpc/kernel/pci-common.c
-> +++ b/arch/powerpc/kernel/pci-common.c
-> @@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
->  		return ppc_md.pcibios_set_root_bus_speed(bridge);
->  }
->  
-> +static int pci_host_scan_bus(struct pci_host_bridge *host)
-> +{
-> +	int mode = PCI_PROBE_NORMAL;
-> +	struct pci_bus *bus = host->bus;
-> +	struct pci_controller *hose = dev_get_drvdata(&host->dev);
-Is there any reason this isn't *hose = pci_bus_to_host(bus)?
-> +
-> +	/* Get probe mode and perform scan */
-> +	if (hose->dn && ppc_md.pci_probe_mode)
-> +		mode = ppc_md.pci_probe_mode(bus);
-> +
-> +	pr_debug("    probe mode: %d\n", mode);
-> +	if (mode == PCI_PROBE_DEVTREE)
-> +		of_scan_bus(hose->dn, bus);
-> +
-> +	if (mode == PCI_PROBE_NORMAL) {
-> +		pci_bus_update_busn_res_end(bus, 255);
-> +		hose->last_busno = pci_scan_child_bus(bus);
-> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
-> +	}
-> +
-> +	return pci_bus_child_max_busnr(bus);
-> +}
-> +
-I'm having trouble convincing myself that this patch covers every
-variation within our PCI implementations. In particular, there's a
-stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
-identical to this function. Does that implementation need to be cleaned
-up and replaced with this function too?
+On Wed, Mar 25, 2015 at 5:16 AM, Paul Moore <paul@paul-moore.com> wrote:
+> [NOTE: Adding the linux-arm folks to this thread just in case they are
+> interested.]
+>
+> I'm not an ARM expert, but the kernel #define for AUDIT_ARCH_ARMEB
+> (below) seems reasonable to me based on the other audit machine
+> definitions.  There is clearly a mismatch between the kernel and the
+> audit userspace, but I wonder if the issue should be addressed in the
+> userspace tools.  Further, you mention kernel 3.14, what happens with
+> kernel 3.19 and the most recent audit userspace tools?
+>
+>   > grep "AUDIT_ARCH_ARMEB" include/uapi/linux/audit.h
+>   #define AUDIT_ARCH_ARMEB        (EM_ARM)
 
 
-> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
->  		ppc_md.pcibios_fixup_phb(hose);
->  
->  	/* Configure PCI Express settings */
-> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->  		struct pci_bus *child;
-> -		list_for_each_entry(child, &bus->children, node)
-> +		list_for_each_entry(child, &host->bus->children, node)
->  			pcie_bus_configure_settings(child);
->  	}
->  }
-Two things: Firstly, the function uses hose throughout, not host.
-Secondly, you're not deleting the bus variable: what's the purpose of
-this change?
+1.
+if no the below commit, audit-2.3.2 is working;
+but after the below commit, audit-2.3.2 is not working.
 
-Regards,
-Daniel
+commit 2f978366984a418f38fcf44137be1fbc5a89cfd9
+Author: Will Deacon <will.deacon@arm.com>
+Date:   Fri May 4 17:53:52 2012 +0100
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 860 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/3fafd5a7/attachment.sig>
+    ARM: 7412/1: audit: use only AUDIT_ARCH_ARM regardless of endianness
+
+    The machine endianness has no direct correspondence to the syscall ABI,
+    so use only AUDIT_ARCH_ARM when identifying the ABI to the audit tools
+    in userspace.
+
+    Cc: stable at vger.kernel.org
+    Signed-off-by: Will Deacon <will.deacon@arm.com>
+    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index d8dbe9c..9650c14 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -906,12 +906,6 @@ long arch_ptrace(struct task_struct *child, long request,
+        return ret;
+ }
+
+-#ifdef __ARMEB__
+-#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
+-#else
+-#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
+-#endif
+-
+ asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
+ {
+        unsigned long ip;
+@@ -919,7 +913,7 @@ asmlinkage int syscall_trace(int why, struct
+pt_regs *regs, int scno)
+        if (why)
+                audit_syscall_exit(regs);
+        else
+-               audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
++               audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
+                                    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
+
+        if (!test_thread_flag(TIF_SYSCALL_TRACE))
+
+
+2.
+
+The latest audit has the changeset of 931 [Improve ARM and AARCH64 support],
+so audit can work again.
+
+
+-Roy
