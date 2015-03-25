@@ -1,55 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Mar 2015 09:48:14 +0000
-Subject: [RFC 1/4] arm64: kvm: add a cpu tear-down function
-In-Reply-To: <55126C6F.2080500@linaro.org>
-References: <1427111639-4575-1-git-send-email-takahiro.akashi@linaro.org>
- <1427111639-4575-2-git-send-email-takahiro.akashi@linaro.org>
- <551135AE.1080401@arm.com> <55126C6F.2080500@linaro.org>
-Message-ID: <5512845E.40804@arm.com>
+From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
+Date: Wed, 25 Mar 2015 15:28:26 +0530
+Subject: [PATCH] arm64: Implement cpu_relax as yield
+In-Reply-To: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
+References: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
+Message-ID: <CAEgOgz6q_dOUaEvgH=Bnz3pafWtxVx8tYvSM26yX1s=2svUY7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
+Ping!
 
-On 25/03/15 08:06, AKASHI Takahiro wrote:
+Anything I need to do or send to to get a merge on this?
 
->>> +	/* Switch back to boot page tables */
->>> +	msr	ttbr0_el2, x0
->>> +	isb
->>
->> This is the place where you want TLBI to occur.
-> 
-> Will remove tlbi above and put it here.
+Regards,
+Peter
 
-There is only need for one TLBI, if at all.
-
->>> +	/* Branch into PA space */
->>> +	adr	x0, 1f
->>> +	bfi	x1, x0, #0, #PAGE_SHIFT
->>> +	br	x1
->>> +
->>> +	/* We're now in idmap */
->>> +1:	/* Invalidate the old TLBs again */
->>> +	tlbi	alle2
->>> +	dsb	sy
->>
->> See? This is the only TLBI that actually makes sense. Now, given that
->> you are actually disabling the MMU, I'm not sure these TBLIs make much
->> sense.
-> 
-> Probably you're right, but
-> otherwise, I guess, bogus TLB might remain and be used when MMU get enabled again.
-> (MMU setting would be the same across disabling/enabling hyp mode though.)
-
-Anyone enabling the MMU must invalidate the TLB before doing so (we've
-been caught by that before). Invalidation on the way out doesn't hurt,
-but it also give a false sense of security.
-
-I'll leave it up to you.
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead. It just smells funny...
+On Tue, Mar 3, 2015 at 12:49 AM, Peter Crosthwaite
+<peter.crosthwaite@xilinx.com> wrote:
+> ARM64 has the yield nop hint which has the intended semantics of
+> cpu_relax. Implement.
+>
+> The immediate application is ARM CPU emulators. An emulator can take
+> advantage of the yield hint to de-prioritise an emulated CPU in favor
+> of other emulation tasks. QEMU A64 SMP emulation has yield awareness,
+> and sees a significant boot time performance increase with this change.
+>
+> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/processor.h | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index f9be30e..ac2381d 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -126,7 +126,11 @@ extern void release_thread(struct task_struct *);
+>
+>  unsigned long get_wchan(struct task_struct *p);
+>
+> -#define cpu_relax()                    barrier()
+> +static inline void cpu_relax(void)
+> +{
+> +       asm volatile("yield" ::: "memory");
+> +}
+> +
+>  #define cpu_relax_lowlatency()                cpu_relax()
+>
+>  /* Thread switching */
+> --
+> 2.3.0.1.g27a12f1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
