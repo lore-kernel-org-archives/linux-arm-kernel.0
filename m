@@ -1,36 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Mar 2015 11:24:11 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150324220253.9595AC407F8@trevor.secretlab.ca>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
- <20150319101727.GC24556@red-moon> <20150319193927.GG4751@arm.com>
- <20150324220253.9595AC407F8@trevor.secretlab.ca>
-Message-ID: <20150325112410.GA24636@arm.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 25 Mar 2015 11:27:47 +0000
+Subject: [PATCH RESEND 2/7] ARM: socfpga: enable big endian for secondary
+ core(s)
+In-Reply-To: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282872-10563-3-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
-> On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
-> wrote:
-> > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> > > I am working on it, I do not think it should be a blocking point, patch
-> > > coming asap on top of your series.
-> > 
-> > Well, I don't really want to merge the series without those patches so I
-> > do think it blocks the code from getting into mainline.
-> 
-> Really? It's a pretty minor duplication problem and it's been identified
-> as something requiring refactoring to both the ACPI and DT code. It
-> isn't at all dangerous. Why is this a blocking point?
+Update the secondary code to allow the secondary boot to work when the
+system is running big endian.
 
-Because I don't really see a valid excuse not to get this right first time
-around. Lorenzo already has patches on top, so we just need a co-ordinated
-review effort.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+--
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/mach-socfpga/headsmp.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-I wouldn't accept another patch series that needed minor rework (which by
-its very nature is easily addressed), so why should ACPI be treated any
-differently?
-
-Will
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+index f65ea0a..a580dcd 100644
+--- a/arch/arm/mach-socfpga/headsmp.S
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -10,6 +10,7 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ #include <asm/memory.h>
++#include <asm/assembler.h>
+ 
+ 	.arch	armv7-a
+ 
+@@ -18,12 +19,14 @@ ENTRY(secondary_trampoline)
+ 	 * Thus, we can just subtract the PAGE_OFFSET to get the physical
+ 	 * address of &cpu1start_addr. This would not work for platforms
+ 	 * where the physical memory does not start at 0x0.
+-	 */
++	*/
++ARM_BE8(setend	be)
+ 	adr	r0, 1f
+ 	ldmia	r0, {r1, r2}
+ 	sub	r2, r2, #PAGE_OFFSET
+ 	ldr	r3, [r2]
+ 	ldr	r4, [r3]
++ARM_BE8(rev	r4, r4)
+ 	bx	r4
+ 
+ 	.align
+-- 
+2.1.4
