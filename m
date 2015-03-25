@@ -1,28 +1,54 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Mar 2015 16:50:31 +0000
-Subject: [patch v11 07/23] ARM64 / ACPI: Introduce PCI stub functions for
- ACPI
-In-Reply-To: <1427205776-5060-8-git-send-email-hanjun.guo@linaro.org>
+Date: Wed, 25 Mar 2015 16:44:53 +0000
+Subject: [patch v11 04/23] ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+In-Reply-To: <1427205776-5060-5-git-send-email-hanjun.guo@linaro.org>
 References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <20150325165031.GE14585@localhost>
+ <1427205776-5060-5-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150325164453.GC14585@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:02:40PM +0800, Hanjun Guo wrote:
-> CONFIG_ACPI depends CONFIG_PCI on x86 and ia64, in ARM64 server
-> world we will have PCIe in most cases, but some of them may not,
-> make CONFIG_ACPI depend CONFIG_PCI on ARM64 will satisfy both.
+On Tue, Mar 24, 2015 at 10:02:37PM +0800, Hanjun Guo wrote:
+> From: Al Stone <al.stone@linaro.org>
 > 
-> With that case, we need some arch dependent PCI functions to
-> access the config space before the PCI root bridge is created, and
-> pci_acpi_scan_root() to create the PCI root bus. So introduce
-> some stub function here to make ACPI core compile and revisit
-> them later when implemented on ARM64.
+> As we want to get ACPI tables to parse and then use the information
+> for system initialization, we should get the RSDP (Root System
+> Description Pointer) first, it then locates Extended Root Description
+> Table (XSDT) which contains all the 64-bit physical address that
+> pointer to other boot-time tables.
 > 
-> CC: Liviu Dudau <Liviu.Dudau@arm.com>
+> Introduce acpi.c and its related head file in this patch to provide
+> fundamental needs of extern variables and functions for ACPI core,
+> and then get boot-time tables as needed.
+>   - asm/acenv.h for arch specific ACPICA environments and
+>     implementation, It is needed unconditionally by ACPI core;
+>   - asm/acpi.h for arch specific variables and functions needed by
+>     ACPI driver core;
+>   - acpi.c for ARM64 related ACPI implementation for ACPI driver
+>     core;
+> 
+> acpi_boot_table_init() is introduced to get RSDP and boot-time tables,
+> it will be called in setup_arch() before paging_init(), so we should
+> use eary_memremap() mechanism here to get the RSDP and all the table
+> pointers.
+> 
+> FADT Major.Minor version was introduced in ACPI 5.1, it is the same
+> as ACPI version.
+> 
+> In ACPI 5.1, some major gaps are fixed for ARM, such as updates in
+> MADT table for GIC and SMP init, without those updates, we can not
+> get the MPIDR for SMP init, and GICv2/3 related init information, so
+> we can't boot arm64 ACPI properly with table versions predating 5.1.
+> 
+> If firmware provides ACPI tables with ACPI version less than 5.1,
+> OS has no way to retrieve the configuration data that is necessary
+> to init SMP boot protocol and the GIC properly, so disable ACPI if
+> we get an FADT table with version less that 5.1 when acpi_boot_table_init()
+> called.
+> 
 > CC: Catalin Marinas <catalin.marinas@arm.com>
 > CC: Will Deacon <will.deacon@arm.com>
+> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 > Tested-by: Yijing Wang <wangyijing@huawei.com>
 > Tested-by: Mark Langsdorf <mlangsdo@redhat.com>
@@ -30,7 +56,11 @@ On Tue, Mar 24, 2015 at 10:02:40PM +0800, Hanjun Guo wrote:
 > Tested-by: Timur Tabi <timur@codeaurora.org>
 > Tested-by: Robert Richter <rrichter@cavium.com>
 > Acked-by: Robert Richter <rrichter@cavium.com>
-> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+> Acked-by: Olof Johansson <olof@lixom.net>
+> Acked-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Signed-off-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
