@@ -1,46 +1,46 @@
-From: olivier.clergeaud@st.com (Olivier CLERGEAUD)
-Date: Wed, 25 Mar 2015 14:06:44 +0000
-Subject: [PATCH v2 0/6] pinctrl: st: Fix disparity between Pinctrl &
- GPIO in /sysfs
-In-Reply-To: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <9D46209077AA0C4A98CD781BE48184B81EAC58@SAFEX1NODE23.st.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 25 Mar 2015 15:07:25 +0100
+Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+In-Reply-To: <87a9088tam.fsf@free.fr>
+References: <20150216130549.GF14545@x1>
+ <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+ <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
+ <20150217074310.GT14545@x1>
+ <alpine.LFD.2.11.1502171221300.22104@knanqh.ubzr>
+ <20150218080719.GB5781@x1> <87a9088tam.fsf@free.fr>
+Message-ID: <20150325140725.GA11499@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the series:
+On Fri, Feb 20, 2015 at 05:02:57PM +0100, Robert Jarzmik wrote:
+> Lee Jones <lee.jones@linaro.org> writes:
+> >> > Arnd, Greg,
+> >> > 
+> >> >   Perhaps you have some ideas WRT programmables (PLDs/CPLDs/FPGAs)?
+> 
+> Hi Arnd and Greg,
+> 
+> I have this driver I'm upstreaming, which comes out of
+> arch/arm/mach-pxa/lubbock.c. As for the reason it is extracted, see submitted
+> commit [1] for reference.
+> 
+> The main question is : where does it belong in the kernel ?
+> 
+> The driver is :
+>  - for the CPLDs on the Lubbock development platform, which is more or less an
+>    old motherboard for Intel Xscale pxa255 SoC (see [2] for more details)
+>  - these CPLDs control :
+>    - interrupt muxing towards the SoC
+>    - several leds
+>    - switches read back
+>    For the whole patch, see [4]
+> 
+> Lee's position is that it doesn't belong to drivers/mfd, see [3].
+> 
+> So where should I submit it ? And more generally, where should CPLDs drivers be
+> pushed in the kernel tree ?
+> 
+> If there is no solution, I'll fallback through arch/arm/plat-pxa, not very nice,
+> but it has to land somewhere, I don't want lubbock to remain broken.
 
-Acked-by: Olivier Clergeaud <Olivier.clergeaud@st.com>
-
------Original Message-----
-From: Lee Jones [mailto:lee.jones at linaro.org] 
-Sent: mercredi 18 mars 2015 18:21
-To: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linus.walleij at linaro.org; linux-gpio at vger.kernel.org
-Cc: lee.jones at linaro.org; kernel at stlinux.com
-Subject: [PATCH v2 0/6] pinctrl: st: Fix disparity between Pinctrl & GPIO in /sysfs
-
-Version 2:
-  Fixed up Maxime's review comments
-    - Reduce size of char array
-    - Use snprintf()
-  Applied Maxime's Acks 
-
-ST's hardware differentiates between GPIO mode and Pinctrl alternate functions.  When a pin is in GPIO mode, there are dedicated registers to set and obtain direction status.  However, If a pin's alternate function is in use then the direction is set and status is derived from a bunch of syscon registers.  The issue is; until now there was a lack of parity between the two.
-
-Karim BEN BELGACEM (1):
-  ARM: STi: DT: STiH407: Fix retime pin mask for PIO5 and PIO35
-
-Lee Jones (5):
-  pinctrl: st: Introduce a 'get pin function' call
-  pinctrl: st: Move st_get_pio_control() further up the source file
-  pinctrl: st: Supply a GPIO get_direction() call-back
-  pinctrl: st: Show correct pin direction -- even when in GPIO mode
-  pinctrl: st: Display pin's function when printing pinctrl debug
-    information
-
- arch/arm/boot/dts/stih407-pinctrl.dtsi |  2 +
- drivers/pinctrl/pinctrl-st.c           | 83 +++++++++++++++++++++++++++++-----
- 2 files changed, 73 insertions(+), 12 deletions(-)
-
---
-1.9.1
+drivers/platform/arm ?
