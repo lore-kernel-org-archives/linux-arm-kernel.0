@@ -1,95 +1,72 @@
-From: ritesh.list@gmail.com (Ritesh Harjani)
-Date: Thu, 26 Mar 2015 00:09:37 +0530
-Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
- allocations
-In-Reply-To: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-References: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
-Message-ID: <CALk7dXoacMbHKbJZ2UHd0YK9B8rZgATwNpif8cONjGkZj0YTHA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 25 Mar 2015 19:46:16 +0100
+Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
+ Tegra20 multi_v7_defconfig boot
+In-Reply-To: <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
+References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
+ <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
+Message-ID: <CAMuHMdWO9nqtpsvjUdE6KSbiOTfX=7XnzX1QXt06r3W4Et2rDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Paul, Tyler,
 
-On Mon, Mar 23, 2015 at 12:57 PM, Tomasz Figa <tfiga@chromium.org> wrote:
-> IOMMU should be able to use single pages as well as bigger blocks, so if
-> higher order allocations fail, we should not affect state of the system,
-> with events such as OOM killer, but rather fall back to order 0
-> allocations.
->
-> This patch changes the behavior of ARM IOMMU DMA allocator to use
-> __GFP_NORETRY, which bypasses OOM invocation, for orders higher than
-> zero and, only if that fails, fall back to normal order 0 allocation
-> which might invoke OOM killer.
+On Wed, Mar 25, 2015 at 7:28 PM, Tyler Baker <tyler.baker@linaro.org> wrote:
+> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
+>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
+>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
+>> multi_v7_defconfig boot.
+>>
+>> Boot log before:
+>>
+>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+>>
+>> Boot log after:
+>>
+>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
 
-Logical thing to do in IOMMU case :)
->
-> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-> ---
->  arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
->
-> Changes since v1:
-> (https://patchwork.kernel.org/patch/6015921/)
->  - do not clear __GFP_NORETRY, as it might come from the caller,
->  - s/positive order/order higher than 0/.
->
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index 83cd5ac..3f1ac51 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -1150,13 +1150,28 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
->         gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
->
->         while (count) {
-> -               int j, order = __fls(count);
-> +               int j, order;
-> +
-> +               for (order = __fls(count); order > 0; --order) {
-> +                       /*
-> +                        * We do not want OOM killer to be invoked as long
-> +                        * as we can fall back to single pages, so we force
-> +                        * __GFP_NORETRY for orders higher than zero.
-> +                        */
-> +                       pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
-> +                       if (pages[i])
-> +                               break;
-> +               }
->
-> -               pages[i] = alloc_pages(gfp, order);
-> -               while (!pages[i] && order)
-> -                       pages[i] = alloc_pages(gfp, --order);
-> -               if (!pages[i])
-> -                       goto error;
-> +               if (!pages[i]) {
-> +                       /*
-> +                        * Fall back to single page allocation.
-> +                        * Might invoke OOM killer as last resort.
-> +                        */
-> +                       pages[i] = alloc_pages(gfp, 0);
-I think down the code in this while loop, i & count is being
-calculated based on the "order" of allocation in the current
-iteration.
-Since value of order will be automatically 0 here if (!pages[i]) is
-true then, why hard code order to value of 0 here.
-Comment clearly says what this code is doing right?
+So it just hangs when booting the kernel. Do you have any early debugging
+support (earlycon, DEBUG_LL) for your kernel?
 
-I know it is just a minor thing. Don't know if it is relevant.
+>> Any ideas?  Stephen Warren thinks there might be an initcall that might
+>> not check to see what kind of device it's running on.
 
-> +                       if (!pages[i])
-> +                               goto error;
-> +               }
->
->                 if (order) {
->                         split_page(pages[i], order);
-> --
-> 2.2.0.rc0.207.ga3a616c
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Always possible of course, but it didn't trigger on my boneblack.
 
+> Can you try to shift your kernel load address around a bit? From
+> experience with the boards from kernelci.org we find that as the multi
+> v7 kernel size increases they can clobber memory when they get
+> decompressed.
 
-Thanks
-Ritesh
+Kernel size can indeed be an issue. I believe the failure to boot on ape6evm
+from U-Boot mentioned in the commit is caused by that, too.
+Note that the error message only shows up with DEBUG_LL enabled (and
+some manual editing of Kconfig.debug to make that work).
+
+I'll try changing the kernel load address on ape6evm, too.
+
+>> commit 4a3a6f86693922b29cf829c63f652b057f14619e
+>> Author: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Date:   Tue Feb 24 15:14:45 2015 +0100
+>>
+>>     ARM: multi_v7_defconfig: Enable shmobile platforms
+>>
+>>     Enable support for shmobile platforms that became multi-platform aware.
+>>     Several non-critical drivers and subsystems are built as modules, to keep
+>>     kernel size reasonable.
+>>
+>>     Tested on:
+>>       - r8a73a4/ape6evm:
+>>           - U-Boot fails with "Error: unrecognized/unsupported machine ID",
+>>           - kexec works.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
