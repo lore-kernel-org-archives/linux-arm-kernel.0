@@ -1,26 +1,77 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Mar 2015 23:36:52 +0100
-Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
-In-Reply-To: <551333D2.8080600@free-electrons.com>
-References: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
- <551333D2.8080600@free-electrons.com>
-Message-ID: <20150325223652.GC31858@lunn.ch>
+From: dtor@google.com (Dmitry Torokhov)
+Date: Wed, 25 Mar 2015 15:42:53 -0700
+Subject: [PATCH v1 3/3] phy: cygnus-usbphy: Add Broadcom Cygnus USB phy
+ driver
+In-Reply-To: <551336A2.1050704@ti.com>
+References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1426886727-537-4-git-send-email-arun.ramamurthy@broadcom.com>
+ <551336A2.1050704@ti.com>
+Message-ID: <20150325224253.GA16950@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Thanks for your contribution, however the reset button is not always
-> connected to this GPIO. At least on the Mirabox I have the reset button
-> triggers an hardware reset. My concern is that for some board the dts
-> representation would be wrong.
+Hi Kishon,
 
-When looking at WiFi issues, it became clear there are two different
-wifi designs. I would not be too surprised if this reset button
-changed at the same time.
+On Thu, Mar 26, 2015 at 03:58:50AM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
+> 
+> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+> > +struct bcm_phy_driver {
+> > +	void __iomem *usbphy_regs;
+> > +	void __iomem *usb2h_idm_regs;
+> > +	void __iomem *usb2d_idm_regs;
+> > +	struct bcm_phy_instance *ports[MAX_PHY_PORTS];
+> 
+> er.. can't we allocate this dynamically?
 
-Gregory, Leigh, is your wifi on the SDIO bus, or the USB bus?
+The chip has support for only 3 phys, so I believe allocating array of 3
+pointers is simplest.
 
-The mirabox i have has an sdio wifi device. But i cannot easily test
-the reset button, i blew the 5v power rail, so all USB is dead, and my
-rootfs was on mmc, which is implemented via USB :-(
+[...]
 
-       Andrew
+> > +
+> > +static struct phy *bcm_usb_phy_xlate(struct device *dev,
+> > +				     struct of_phandle_args *args)
+> > +{
+> > +	struct bcm_phy_driver *phy_driver = dev_get_drvdata(dev);
+> > +	struct bcm_phy_instance *port = NULL;
+> > +	int i;
+> > +
+> > +	if (!phy_driver)
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	if (WARN_ON(args->args_count != 1))
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	if (WARN_ON(args->args[0] < 0 || args->args[0] > 1))
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(phy_driver->ports); i++) {
+> > +		struct bcm_phy_instance *p = phy_driver->ports[i];
+> > +
+> > +		if (p && p->generic_phy->dev.of_node == args->np) {
+> > +			port = p;
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	if (!port) {
+> > +		dev_err(dev, "Failed to locate phy %s\n", args->np->name);
+> > +		return ERR_PTR(-EINVAL);
+> > +	}
+> > +
+> > +	port->host_mode = args->args[0];
+> > +
+> > +	return port->generic_phy;
+> > +}
+> 
+> The xlate function here shouldn't be needed at all. Use of_phy_simple_xlate
+> instead.
+
+of_phy_simple_xlate() will not allow specifying host vs device mode when
+requesting phy though...
+
+Thanks.
+
+-- 
+Dmitry
