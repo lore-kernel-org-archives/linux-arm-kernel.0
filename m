@@ -1,79 +1,88 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Wed, 25 Mar 2015 16:55:02 +0800
-Subject: [PATCH v8 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify
- code
-In-Reply-To: <1427168064-8657-24-git-send-email-wangyijing@huawei.com>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
- <1427168064-8657-24-git-send-email-wangyijing@huawei.com>
-Message-ID: <551277E6.1010307@huawei.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Mar 2015 10:05:23 +0100
+Subject: [GIT PULL] : ARM cpuidle changes for 4.1
+Message-ID: <55127A53.8050206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas and Jason,
-   Do you have any comment for this patch ? In this series, pci_bus_add_devices()
-has been ripped out from pci_scan_root_bus(), so I think the pci_scan_root_bus() is
-almost the same as pci_create_root_bus + pci_scan_child_bus(). And in this series,
-we try to unexport pci_create_root_bus(). It's even better if you could help test this changes.
 
-Thanks!
-Yijing.
+Hi Rafael,
 
-On 2015/3/24 11:34, Yijing Wang wrote:
-> Mvebu_pcie_scan_bus() is not necessary, we could use
-> pci_common_init_dev() instead of pci_common_init(),
-> and pass the device pointer as the parent. Then
-> pci_scan_root_bus() will be called to scan the pci busses.
-> 
-> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-> CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> CC: Jason Cooper <jason@lakedaemon.net>
-> ---
->  drivers/pci/host/pci-mvebu.c |   18 +-----------------
->  1 files changed, 1 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 0cfc494..d5a2b70 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
->  	return 1;
->  }
->  
-> -static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> -{
-> -	struct mvebu_pcie *pcie = sys_to_pcie(sys);
-> -	struct pci_bus *bus;
-> -
-> -	bus = pci_create_root_bus(&pcie->pdev->dev, -1, sys->busnr,
-> -				  &mvebu_pcie_ops, sys, &sys->resources);
-> -	if (!bus)
-> -		return NULL;
-> -
-> -	pci_scan_child_bus(bus);
-> -
-> -	return bus;
-> -}
-> -
->  static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
->  						 const struct resource *res,
->  						 resource_size_t start,
-> @@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
->  	hw.nr_controllers = 1;
->  	hw.private_data   = (void **)&pcie;
->  	hw.setup          = mvebu_pcie_setup;
-> -	hw.scan           = mvebu_pcie_scan_bus;
->  	hw.map_irq        = of_irq_parse_and_map_pci;
->  	hw.ops            = &mvebu_pcie_ops;
->  	hw.align_resource = mvebu_pcie_align_resource;
->  
-> -	pci_common_init(&hw);
-> +	pci_common_init_dev(&pcie->pdev->dev, &hw);
->  }
->  
->  /*
-> 
+this PR request has the following content:
 
+  - Removed the duplicate header inclusion (Daniel Lezcano).
+
+  - Unified the generic cpuidle ARM driver with ARM64. Each platform can 
+now define their 'enable-method' in the DT thus allowing to split the 
+low level PM code from the generic cpuidle framework (Daniel Lezcano).
+
+  - Allowed the generic ARM cpuidle driver to register per device and 
+prevent to register the cpuidle device when the underlying hardware is 
+misconfigured or an error occurs, thus allowing to fail gracefully 
+(Daniel Lezcano).
+
+Thanks !
+
+   -- Daniel
+
+The following changes since commit bc465aa9d045feb0e13b4a8f32cc33c1943f62d6:
+
+   Linux 4.0-rc5 (2015-03-22 16:50:21 -0700)
+
+are available in the git repository at:
+
+   http://git.linaro.org/people/daniel.lezcano/linux.git cpuidle/4.1
+
+for you to fetch changes up to 9a309d6fd213911321acbfe839e0bdb3a7a9f4bf:
+
+   ARM: cpuidle: Document the code (2015-03-25 09:53:43 +0100)
+
+----------------------------------------------------------------
+Daniel Lezcano (8):
+       ARM: cpuidle: Remove duplicate header inclusion
+       ARM: cpuidle: Add a cpuidle ops structure to be used for DT
+       ARM64: cpuidle: Replace cpu_suspend by the common ARM/ARM64 function
+       ARM64: cpuidle: Rename cpu_init_idle to a common function name
+       ARM64: cpuidle: Remove arm64 reference
+       ARM: cpuidle: Enable the ARM64 driver for both ARM32/ARM64
+       ARM: cpuidle: Register per cpuidle device
+       ARM: cpuidle: Document the code
+
+  arch/arm/include/asm/cpuidle.h                     |  23 
++++++++++++++++++++++++
+  arch/arm/kernel/cpuidle.c                          | 133 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+  arch/arm/mach-davinci/cpuidle.c                    |   1 -
+  arch/arm/mach-imx/cpuidle-imx6q.c                  |   1 -
+  arch/arm/mach-imx/cpuidle-imx6sl.c                 |   1 -
+  arch/arm/mach-imx/cpuidle-imx6sx.c                 |   1 -
+  arch/arm/mach-omap2/cpuidle44xx.c                  |   1 -
+  arch/arm/mach-s3c64xx/cpuidle.c                    |   2 +-
+  arch/arm/mach-tegra/cpuidle-tegra20.c              |   1 -
+  arch/arm/mach-tegra/cpuidle-tegra30.c              |   1 -
+  arch/arm64/configs/defconfig                       |   2 +-
+  arch/arm64/include/asm/cpuidle.h                   |   9 ++++++---
+  arch/arm64/kernel/cpuidle.c                        |   2 +-
+  drivers/cpuidle/Kconfig                            |   7 +------
+  drivers/cpuidle/Kconfig.arm                        |  28 
++++++++++++++++++++---------
+  drivers/cpuidle/Kconfig.arm64                      |  13 -------------
+  drivers/cpuidle/Makefile                           |   5 +----
+  drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} |  83 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------
+  drivers/cpuidle/cpuidle-at91.c                     |   1 -
+  drivers/cpuidle/cpuidle-exynos.c                   |   1 -
+  drivers/cpuidle/cpuidle-kirkwood.c                 |   1 -
+  drivers/cpuidle/cpuidle-ux500.c                    |   1 -
+  drivers/cpuidle/cpuidle-zynq.c                     |   1 -
+  include/asm-generic/vmlinux.lds.h                  |   2 ++
+  24 files changed, 249 insertions(+), 72 deletions(-)
+  delete mode 100644 drivers/cpuidle/Kconfig.arm64
+  rename drivers/cpuidle/{cpuidle-arm64.c => cpuidle-arm.c} (56%)
 
 -- 
-Thanks!
-Yijing
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
