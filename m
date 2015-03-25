@@ -1,242 +1,30 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Tue, 24 Mar 2015 23:41:24 -0700
-Subject: [PATCH v4] dt-bindings: brcm: rationalize Broadcom documentation
- naming
-In-Reply-To: <550F6A5B.8050906@gmail.com>
-References: <1426899982-19733-1-git-send-email-sbranden@broadcom.com>
- <550F6A5B.8050906@gmail.com>
-Message-ID: <55125894.2070303@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 25 Mar 2015 07:49:56 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <20150324181759.GA2156@google.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150324122702.GJ14457@ns203013.ovh.net>
+ <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
+ <20150324130511.GK14457@ns203013.ovh.net>
+ <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+ <20150324170543.GL14457@ns203013.ovh.net>
+ <CAKv+Gu-LL5JzALPqPnxdVqQ7HUwnJZQ3=GzPk_h1KSUJp2SVAw@mail.gmail.com>
+ <20150324181759.GA2156@google.com>
+Message-ID: <CAKv+Gu8LL4s1fz-VtAthraUrD_9xRCkQ-t_fUTyvHGwFtjmrfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 15-03-22 06:20 PM, Rob Herring wrote:
-> On 03/20/2015 08:06 PM, Scott Branden wrote:
->> This patchset attempts to standardize the naming of dt-bindings
->> documents based on the Broadcom vendor prefix of brcm.
->>
->> Although there are no guidelines currently present for how to name
->> the dt-bindings document the "vendor,binding.txt" style is in use by
->> some of the other vendors.
->>
->> Acked-by: Lee Jones <lee@kernel.org>
->> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
->> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
->> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+On 24 March 2015 at 19:17, Sami Tolvanen <samitolvanen@google.com> wrote:
+> On Tue, Mar 24, 2015 at 06:40:29PM +0100, Ard Biesheuvel wrote:
+>> @Sami, Andy: we need to respin the whole patch, including updated
+>> OpenSSL upstream commit id :-(
 >
-> Version history would be nice...
-Yes, I should have added a cover letter but didn't.  The difference 
-between versions was minimal: a spelling correction in the commit 
-message text and a few additional binding files were found that were 
-added between the versions, along with the Ack's.
-
+> Sure, I will send v3 once the changes are in OpenSSL. Thanks for testing!
+> Do you still prefer everything in one patch?
 >
-> Who did you want to apply this? I can, but I'm worried about merge
-> conflicts here. Hopefully, you're not also doing lots of changes to
-> existing bindings.
 
-Yes, it would be great for you to take care of applying this.  There 
-shouldn't be any merge conflicts as none of these bindings are currently 
-being updated.  I left a clock binding document out of this patchset at 
-Ray Jui is updating/renaming the documentation for that binding in a 
-different patch already.
-
-Thanks,
-  Scott
-
->
-> Rob
->
->> ---
->>   .../arm/bcm/{brcm,bcm11351-cpu-method => brcm,bcm11351-cpu-method.txt}    | 0
->>   .../devicetree/bindings/arm/bcm/{bcm11351.txt => brcm,bcm11351.txt}       | 0
->>   .../devicetree/bindings/arm/bcm/{bcm21664.txt => brcm,bcm21664.txt}       | 0
->>   .../devicetree/bindings/arm/{bcm2835.txt => bcm/brcm,bcm2835.txt}         | 0
->>   .../devicetree/bindings/arm/{bcm4708.txt => bcm/brcm,bcm4708.txt}         | 0
->>   .../devicetree/bindings/arm/bcm/{bcm63138.txt => brcm,bcm63138.txt}       | 0
->>   .../devicetree/bindings/arm/{brcm-brcmstb.txt => bcm/brcm,brcmstb.txt}    | 0
->>   Documentation/devicetree/bindings/arm/bcm/{cygnus.txt => brcm,cygnus.txt} | 0
->>   Documentation/devicetree/bindings/bus/{bcma.txt => brcm,bus-axi.txt}      | 0
->>   .../devicetree/bindings/clock/{bcm-kona-clock.txt => brcm,kona-ccu.txt}   | 0
->>   .../devicetree/bindings/dma/{bcm2835-dma.txt => brcm,bcm2835-dma.txt}     | 0
->>   .../devicetree/bindings/gpio/{gpio-bcm-kona.txt => brcm,kona-gpio.txt}    | 0
->>   .../devicetree/bindings/i2c/{i2c-bcm-kona.txt => brcm,kona-i2c.txt}       | 0
->>   Documentation/devicetree/bindings/mfd/{bcm590xx.txt => brcm,bcm59056.txt} | 0
->>   .../bindings/mips/brcm/{bcm3384-intc.txt => brcm,bcm3384-intc.txt}        | 0
->>   Documentation/devicetree/bindings/mips/brcm/{bmips.txt => brcm,bmips.txt} | 0
->>   .../devicetree/bindings/mips/brcm/{cm-dsl.txt => brcm,cm-dsl.txt}         | 0
->>   Documentation/devicetree/bindings/misc/{smc.txt => brcm,kona-smc.txt}     | 0
->>   .../devicetree/bindings/mmc/{kona-sdhci.txt => brcm,kona-sdhci.txt}       | 0
->>   .../bindings/net/{broadcom-sf2.txt => brcm,bcm7445-switch-v4.0.txt}       | 0
->>   .../devicetree/bindings/net/{broadcom-bcmgenet.txt => brcm,bcmgenet.txt}  | 0
->>   .../bindings/net/{broadcom-systemport.txt => brcm,systemport.txt}         | 0
->>   .../bindings/net/{broadcom-mdio-unimac.txt => brcm,unimac-mdio.txt}       | 0
->>   .../devicetree/bindings/phy/{bcm-phy.txt => brcm,kona-usb2-phy.txt}       | 0
->>   .../devicetree/bindings/pwm/{bcm-kona-pwm.txt => brcm,kona-pwm.txt}       | 0
->>   .../{arm/bcm/kona-resetmgr.txt => reset/brcm,bcm21664-resetmgr.txt}       | 0
->>   .../bindings/serial/{bcm63xx-uart.txt => brcm,bcm6345-uart.txt}           | 0
->>   .../devicetree/bindings/sound/{bcm2835-i2s.txt => brcm,bcm2835-i2s.txt}   | 0
->>   .../bindings/{arm/bcm/kona-timer.txt => timer/brcm,kona-timer.txt}        | 0
->>   .../devicetree/bindings/{mips/brcm/usb.txt => usb/brcm,bcm3384-usb.txt}   | 0
->>   .../bindings/{arm/bcm/kona-wdt.txt => watchdog/brcm,kona-wdt.txt}         | 0
->>   31 files changed, 0 insertions(+), 0 deletions(-)
->>   rename Documentation/devicetree/bindings/arm/bcm/{brcm,bcm11351-cpu-method => brcm,bcm11351-cpu-method.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/bcm/{bcm11351.txt => brcm,bcm11351.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/bcm/{bcm21664.txt => brcm,bcm21664.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/{bcm2835.txt => bcm/brcm,bcm2835.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/{bcm4708.txt => bcm/brcm,bcm4708.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/bcm/{bcm63138.txt => brcm,bcm63138.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/{brcm-brcmstb.txt => bcm/brcm,brcmstb.txt} (100%)
->>   rename Documentation/devicetree/bindings/arm/bcm/{cygnus.txt => brcm,cygnus.txt} (100%)
->>   rename Documentation/devicetree/bindings/bus/{bcma.txt => brcm,bus-axi.txt} (100%)
->>   rename Documentation/devicetree/bindings/clock/{bcm-kona-clock.txt => brcm,kona-ccu.txt} (100%)
->>   rename Documentation/devicetree/bindings/dma/{bcm2835-dma.txt => brcm,bcm2835-dma.txt} (100%)
->>   rename Documentation/devicetree/bindings/gpio/{gpio-bcm-kona.txt => brcm,kona-gpio.txt} (100%)
->>   rename Documentation/devicetree/bindings/i2c/{i2c-bcm-kona.txt => brcm,kona-i2c.txt} (100%)
->>   rename Documentation/devicetree/bindings/mfd/{bcm590xx.txt => brcm,bcm59056.txt} (100%)
->>   rename Documentation/devicetree/bindings/mips/brcm/{bcm3384-intc.txt => brcm,bcm3384-intc.txt} (100%)
->>   rename Documentation/devicetree/bindings/mips/brcm/{bmips.txt => brcm,bmips.txt} (100%)
->>   rename Documentation/devicetree/bindings/mips/brcm/{cm-dsl.txt => brcm,cm-dsl.txt} (100%)
->>   rename Documentation/devicetree/bindings/misc/{smc.txt => brcm,kona-smc.txt} (100%)
->>   rename Documentation/devicetree/bindings/mmc/{kona-sdhci.txt => brcm,kona-sdhci.txt} (100%)
->>   rename Documentation/devicetree/bindings/net/{broadcom-sf2.txt => brcm,bcm7445-switch-v4.0.txt} (100%)
->>   rename Documentation/devicetree/bindings/net/{broadcom-bcmgenet.txt => brcm,bcmgenet.txt} (100%)
->>   rename Documentation/devicetree/bindings/net/{broadcom-systemport.txt => brcm,systemport.txt} (100%)
->>   rename Documentation/devicetree/bindings/net/{broadcom-mdio-unimac.txt => brcm,unimac-mdio.txt} (100%)
->>   rename Documentation/devicetree/bindings/phy/{bcm-phy.txt => brcm,kona-usb2-phy.txt} (100%)
->>   rename Documentation/devicetree/bindings/pwm/{bcm-kona-pwm.txt => brcm,kona-pwm.txt} (100%)
->>   rename Documentation/devicetree/bindings/{arm/bcm/kona-resetmgr.txt => reset/brcm,bcm21664-resetmgr.txt} (100%)
->>   rename Documentation/devicetree/bindings/serial/{bcm63xx-uart.txt => brcm,bcm6345-uart.txt} (100%)
->>   rename Documentation/devicetree/bindings/sound/{bcm2835-i2s.txt => brcm,bcm2835-i2s.txt} (100%)
->>   rename Documentation/devicetree/bindings/{arm/bcm/kona-timer.txt => timer/brcm,kona-timer.txt} (100%)
->>   rename Documentation/devicetree/bindings/{mips/brcm/usb.txt => usb/brcm,bcm3384-usb.txt} (100%)
->>   rename Documentation/devicetree/bindings/{arm/bcm/kona-wdt.txt => watchdog/brcm,kona-wdt.txt} (100%)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351-cpu-method.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm11351.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/bcm11351.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm11351.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm21664.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm21664.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/bcm21664.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm21664.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm2835.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm4708.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm4708.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm4708.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm63138.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,bcm63138.txt
->> diff --git a/Documentation/devicetree/bindings/arm/brcm-brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/brcm-brcmstb.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/cygnus.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,cygnus.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/cygnus.txt
->> rename to Documentation/devicetree/bindings/arm/bcm/brcm,cygnus.txt
->> diff --git a/Documentation/devicetree/bindings/bus/bcma.txt b/Documentation/devicetree/bindings/bus/brcm,bus-axi.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/bus/bcma.txt
->> rename to Documentation/devicetree/bindings/bus/brcm,bus-axi.txt
->> diff --git a/Documentation/devicetree/bindings/clock/bcm-kona-clock.txt b/Documentation/devicetree/bindings/clock/brcm,kona-ccu.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/clock/bcm-kona-clock.txt
->> rename to Documentation/devicetree/bindings/clock/brcm,kona-ccu.txt
->> diff --git a/Documentation/devicetree/bindings/dma/bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/dma/bcm2835-dma.txt
->> rename to Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt b/Documentation/devicetree/bindings/gpio/brcm,kona-gpio.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/gpio/gpio-bcm-kona.txt
->> rename to Documentation/devicetree/bindings/gpio/brcm,kona-gpio.txt
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt b/Documentation/devicetree/bindings/i2c/brcm,kona-i2c.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/i2c/i2c-bcm-kona.txt
->> rename to Documentation/devicetree/bindings/i2c/brcm,kona-i2c.txt
->> diff --git a/Documentation/devicetree/bindings/mfd/bcm590xx.txt b/Documentation/devicetree/bindings/mfd/brcm,bcm59056.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mfd/bcm590xx.txt
->> rename to Documentation/devicetree/bindings/mfd/brcm,bcm59056.txt
->> diff --git a/Documentation/devicetree/bindings/mips/brcm/bcm3384-intc.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,bcm3384-intc.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mips/brcm/bcm3384-intc.txt
->> rename to Documentation/devicetree/bindings/mips/brcm/brcm,bcm3384-intc.txt
->> diff --git a/Documentation/devicetree/bindings/mips/brcm/bmips.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,bmips.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mips/brcm/bmips.txt
->> rename to Documentation/devicetree/bindings/mips/brcm/brcm,bmips.txt
->> diff --git a/Documentation/devicetree/bindings/mips/brcm/cm-dsl.txt b/Documentation/devicetree/bindings/mips/brcm/brcm,cm-dsl.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mips/brcm/cm-dsl.txt
->> rename to Documentation/devicetree/bindings/mips/brcm/brcm,cm-dsl.txt
->> diff --git a/Documentation/devicetree/bindings/misc/smc.txt b/Documentation/devicetree/bindings/misc/brcm,kona-smc.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/misc/smc.txt
->> rename to Documentation/devicetree/bindings/misc/brcm,kona-smc.txt
->> diff --git a/Documentation/devicetree/bindings/mmc/kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,kona-sdhci.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mmc/kona-sdhci.txt
->> rename to Documentation/devicetree/bindings/mmc/brcm,kona-sdhci.txt
->> diff --git a/Documentation/devicetree/bindings/net/broadcom-sf2.txt b/Documentation/devicetree/bindings/net/brcm,bcm7445-switch-v4.0.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/net/broadcom-sf2.txt
->> rename to Documentation/devicetree/bindings/net/brcm,bcm7445-switch-v4.0.txt
->> diff --git a/Documentation/devicetree/bindings/net/broadcom-bcmgenet.txt b/Documentation/devicetree/bindings/net/brcm,bcmgenet.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/net/broadcom-bcmgenet.txt
->> rename to Documentation/devicetree/bindings/net/brcm,bcmgenet.txt
->> diff --git a/Documentation/devicetree/bindings/net/broadcom-systemport.txt b/Documentation/devicetree/bindings/net/brcm,systemport.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/net/broadcom-systemport.txt
->> rename to Documentation/devicetree/bindings/net/brcm,systemport.txt
->> diff --git a/Documentation/devicetree/bindings/net/broadcom-mdio-unimac.txt b/Documentation/devicetree/bindings/net/brcm,unimac-mdio.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/net/broadcom-mdio-unimac.txt
->> rename to Documentation/devicetree/bindings/net/brcm,unimac-mdio.txt
->> diff --git a/Documentation/devicetree/bindings/phy/bcm-phy.txt b/Documentation/devicetree/bindings/phy/brcm,kona-usb2-phy.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/phy/bcm-phy.txt
->> rename to Documentation/devicetree/bindings/phy/brcm,kona-usb2-phy.txt
->> diff --git a/Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt b/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/pwm/bcm-kona-pwm.txt
->> rename to Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-resetmgr.txt b/Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/kona-resetmgr.txt
->> rename to Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
->> diff --git a/Documentation/devicetree/bindings/serial/bcm63xx-uart.txt b/Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/serial/bcm63xx-uart.txt
->> rename to Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt
->> diff --git a/Documentation/devicetree/bindings/sound/bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/sound/bcm2835-i2s.txt
->> rename to Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-timer.txt b/Documentation/devicetree/bindings/timer/brcm,kona-timer.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/kona-timer.txt
->> rename to Documentation/devicetree/bindings/timer/brcm,kona-timer.txt
->> diff --git a/Documentation/devicetree/bindings/mips/brcm/usb.txt b/Documentation/devicetree/bindings/usb/brcm,bcm3384-usb.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/mips/brcm/usb.txt
->> rename to Documentation/devicetree/bindings/usb/brcm,bcm3384-usb.txt
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt b/Documentation/devicetree/bindings/watchdog/brcm,kona-wdt.txt
->> similarity index 100%
->> rename from Documentation/devicetree/bindings/arm/bcm/kona-wdt.txt
->> rename to Documentation/devicetree/bindings/watchdog/brcm,kona-wdt.txt
->>
->
+If it is easily done, you could add the .S_swapped file and the
+related Makefile rule in a separate followup patch, yes.
+But then, the second one might still be too big ...
