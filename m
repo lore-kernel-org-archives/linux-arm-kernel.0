@@ -1,45 +1,64 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 25 Mar 2015 17:56:24 -0500
-Subject: [PATCH] ARM: DRA7: Enable Cortex A15 errata 798181
-In-Reply-To: <1427321544-5150-1-git-send-email-nm@ti.com>
-References: <1427321544-5150-1-git-send-email-nm@ti.com>
-Message-ID: <55133D18.9030802@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Mar 2015 00:10:58 +0100
+Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
+In-Reply-To: <b4d74b2eae98b2b9d56a49536a8aa4ff@doppler.thel33t.co.uk>
+References: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
+ <551333D2.8080600@free-electrons.com> <20150325223652.GC31858@lunn.ch>
+ <b4d74b2eae98b2b9d56a49536a8aa4ff@doppler.thel33t.co.uk>
+Message-ID: <55134082.7010404@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2015 05:12 PM, Nishanth Menon wrote:
-> ARM errata 798181 is applicable for DRA7 based devices. So enable
-> the same in the build. Errata extract and workaround information
-> is as below.
+Hi,
+
+On 26/03/2015 00:16, Leigh Brown wrote:
+> Hi Andrew,
 > 
-> On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
-> adequately shooting down all use of the old entries. The
-> ARM_ERRATA_798181 option enables the Linux kernel workaround
-> for this erratum which sends an IPI to the CPUs that are running
-> the same ASID as the one being invalidated.
+> On 2015-03-25 22:36, Andrew Lunn wrote:
+>>> Thanks for your contribution, however the reset button is not always
+>>> connected to this GPIO. At least on the Mirabox I have the reset 
+>>> button
+>>> triggers an hardware reset. My concern is that for some board the dts
+>>> representation would be wrong.
+>>
+>> When looking at WiFi issues, it became clear there are two different
+>> wifi designs. I would not be too surprised if this reset button
+>> changed at the same time.
+>>
+>> Gregory, Leigh, is your wifi on the SDIO bus, or the USB bus?
+>>
+>> The mirabox i have has an sdio wifi device. But i cannot easily test
+>> the reset button, i blew the 5v power rail, so all USB is dead, and my
+>> rootfs was on mmc, which is implemented via USB :-(
 > 
-> Reported-by: Praneeth Kumar Bajjuri <praneeth@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
+> The WiFi on my Mirabox is on the SDIO bus.
 > 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 2b8e47788062..1f78709adb05 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -69,6 +69,7 @@ config SOC_DRA7XX
->  	select ARM_GIC
->  	select HAVE_ARM_ARCH_TIMER
->  	select IRQ_CROSSBAR
-> +	select ARM_ERRATA_798181 if SMP
->  
->  config ARCH_OMAP2PLUS
->  	bool
+> [   29.408420] mwifiex_sdio mmc0:0001:1: WLAN FW already running! Skip 
+> FW dnld
+> [   29.408430] mwifiex_sdio mmc0:0001:1: WLAN FW is active
+> [   29.511297] mwifiex_sdio mmc0:0001:1: driver_version = mwifiex 1.0 
+> (14.66.35.p52)
+
+I think it is the same for me. I brought my Mirabox at ELC, but it is in
+my room and just after ELC I will go to the airport. If I find a plug
+there, I will boot it and I will confirm you, else we will have to wait
+until Friday morning CET.
+
+
+Thanks,
+
+Gregory
+
+
 > 
-I need to drop this patch - sorry for the noise, I had missed an
-internal patch on the same topic.. :(
+> Regards,
+> 
+> Leigh.
+> 
+
 
 -- 
-Regards,
-Nishanth Menon
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
