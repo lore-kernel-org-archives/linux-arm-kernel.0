@@ -1,98 +1,76 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 25 Mar 2015 17:28:28 +0100
-Subject: [PATCH v4 5/6] ARM: dts: vf610: add NAND flash controller peripherial
-In-Reply-To: <1427300909-20825-1-git-send-email-stefan@agner.ch>
-References: <1427300909-20825-1-git-send-email-stefan@agner.ch>
-Message-ID: <1427300909-20825-6-git-send-email-stefan@agner.ch>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 25 Mar 2015 17:37:51 +0100
+Subject: at91 clocks
+In-Reply-To: <55127AA6.5050902@microbit.se>
+References: <55117568.6090202@microbit.se> <20150325013201.3f01fc22@bbrezillon>
+ <55127AA6.5050902@microbit.se>
+Message-ID: <20150325173751.0d6479df@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the NAND flash controller (NFC) peripherial. The driver
-supports the SLC NAND chips found on Freescale's Vybrid Tower System
-Module. The Micron NAND chip on the module needs 4-bit ECC per 512
-byte page. Use 24-bit ECC per 2k page, which is supported by the
-driver.
+Hi Jonas,
 
-Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf610-twr.dts | 44 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vfxxx.dtsi    |  8 ++++++++
- 2 files changed, 52 insertions(+)
+On Wed, 25 Mar 2015 10:06:46 +0100
+Jonas Andersson <jonas@microbit.se> wrote:
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index f64fddc..f42d155 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -287,6 +287,50 @@
- 	status = "okay";
- };
- 
-+&iomuxc {
-+	vf610-twr {
-+		pinctrl_nfc_1: nfcgrp_1 {
-+			fsl,pins = <
-+			VF610_PAD_PTD31__NF_IO15	0x28df
-+			VF610_PAD_PTD30__NF_IO14	0x28df
-+			VF610_PAD_PTD29__NF_IO13	0x28df
-+			VF610_PAD_PTD28__NF_IO12	0x28df
-+			VF610_PAD_PTD27__NF_IO11	0x28df
-+			VF610_PAD_PTD26__NF_IO10	0x28df
-+			VF610_PAD_PTD25__NF_IO9		0x28df
-+			VF610_PAD_PTD24__NF_IO8		0x28df
-+			VF610_PAD_PTD23__NF_IO7		0x28df
-+			VF610_PAD_PTD22__NF_IO6		0x28df
-+			VF610_PAD_PTD21__NF_IO5		0x28df
-+			VF610_PAD_PTD20__NF_IO4		0x28df
-+			VF610_PAD_PTD19__NF_IO3		0x28df
-+			VF610_PAD_PTD18__NF_IO2		0x28df
-+			VF610_PAD_PTD17__NF_IO1		0x28df
-+			VF610_PAD_PTD16__NF_IO0		0x28df
-+			VF610_PAD_PTB24__NF_WE_B	0x28c2
-+			VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+			VF610_PAD_PTB27__NF_RE_B	0x28c2
-+			VF610_PAD_PTC26__NF_RB_B	0x283d
-+			VF610_PAD_PTC27__NF_ALE		0x28c2
-+			VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
-+	};
-+};
-+
-+&nfc {
-+	assigned-clocks = <&clks VF610_CLK_NFC>;
-+	assigned-clock-rates = <33000000>;
-+	nand-bus-width = <16>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	nand-ecc-strength = <24>;
-+	nand-ecc-step-size = <2048>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc_1>;
-+	status = "okay";
-+};
-+
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 32de809..8c85972 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -507,6 +507,14 @@
- 				status = "disabled";
- 			};
- 
-+			nfc: nand at 400e0000 {
-+				compatible = "fsl,vf610-nfc";
-+				reg = <0x400e0000 0x4000>;
-+				interrupts = <83 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_NFC>;
-+				clock-names = "nfc";
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
+> Hi Boris and others,
+> 
+> On 2015-03-25 01:32, Boris Brezillon wrote:
+> > Hi Jonas,
+> >
+> > On Tue, 24 Mar 2015 15:32:08 +0100
+> > Jonas Andersson <jonas@microbit.se> wrote:
+> >
+> >> Hi all,
+> >>
+> >> I am working on a system with at91sam9260 soc. Trying to move from
+> >> kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
+> >>
+> >> In my old code i use clk_get() to get pck1 and pllb, set pllb as parent
+> >> for pck1, set rate for pck1, enable pck1.
+> > How do you do that (clk_set_parent + clk_set_rate) ?
+> > Could you paste your code somewhere ?
+> 
+> Yes, see http://pastie.org/10052161
+
+Your pllb seems to be configured to output a 0Hz rate, and I'm not
+forwarding rate change to prog clk parents yet.
+That's definitely something I should work on, but in the meantime you
+could try to manually set pllb rate.
+
+> 
+> >
+> >> Extract from
+> >> /sys/kernel/debug/at91_clk:
+> >> pllb       users= 1 on   96000000 Hz main
+> >> pck1       users= 1 on   12000000 Hz pllb
+> >>
+> > With the new implementation calling clk_set_rate(pck1, 120000000)
+> > should do the job: it should choose the best parent clk and divisor.
+> 
+> Ok thank you for that information. I tried that now (new code in link 
+> above), and i got a clock output but not exactly my wanted 12MHz. I 
+> measure 9.216MHz at pck1 output.
+> 
+>         mainck                             2            2 
+> 18432000          0 0
+>            prog1                           1            1 
+> 9216000          0 0
+>               pck1                         1            1 
+> 9216000          0 0
+> 
+> pllbck is still unused.
+> 
+> I tried kernel 4.0-rc5 but it hangs in boot after ethernet init.
+
+Is this related to the changes I suggested ?
+
+Best Regards,
+
+Boris
+
+
 -- 
-2.3.3
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
