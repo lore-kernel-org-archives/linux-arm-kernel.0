@@ -1,30 +1,35 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 25 Mar 2015 07:49:56 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <20150324181759.GA2156@google.com>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <20150324122702.GJ14457@ns203013.ovh.net>
- <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
- <20150324130511.GK14457@ns203013.ovh.net>
- <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
- <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
- <20150324170543.GL14457@ns203013.ovh.net>
- <CAKv+Gu-LL5JzALPqPnxdVqQ7HUwnJZQ3=GzPk_h1KSUJp2SVAw@mail.gmail.com>
- <20150324181759.GA2156@google.com>
-Message-ID: <CAKv+Gu8LL4s1fz-VtAthraUrD_9xRCkQ-t_fUTyvHGwFtjmrfw@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 25 Mar 2015 14:57:44 +0800
+Subject: [RESEND PATCH v6 1/2] ARM: hip04: add GPIO configure in hisi_defconfig
+In-Reply-To: <1427266665-226718-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1427266665-226718-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1427266665-226718-2-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 March 2015 at 19:17, Sami Tolvanen <samitolvanen@google.com> wrote:
-> On Tue, Mar 24, 2015 at 06:40:29PM +0100, Ard Biesheuvel wrote:
->> @Sami, Andy: we need to respin the whole patch, including updated
->> OpenSSL upstream commit id :-(
->
-> Sure, I will send v3 once the changes are in OpenSSL. Thanks for testing!
-> Do you still prefer everything in one patch?
->
+From: Zhou Wang <wangzhou.bry@gmail.com>
 
-If it is easily done, you could add the .S_swapped file and the
-related Makefile rule in a separate followup patch, yes.
-But then, the second one might still be too big ...
+The GPIO controller of Hisilicon hip04 Soc uses the IP from Sysnopsis,
+gpio-dwapb.c can be reused to support this GPIO controller. This patch
+adds related configure item in hisi_defconfig.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+---
+ arch/arm/configs/hisi_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
+index c34da58..e7bf486 100644
+--- a/arch/arm/configs/hisi_defconfig
++++ b/arch/arm/configs/hisi_defconfig
+@@ -51,6 +51,7 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_GPIO_DWAPB=y
+ CONFIG_MFD_SYSCON=y
+ CONFIG_POWER_RESET_SYSCON=y
+ CONFIG_DRM=y
+-- 
+1.9.1
