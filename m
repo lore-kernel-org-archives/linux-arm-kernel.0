@@ -1,62 +1,47 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:23:28 +0000
-Subject: [PATCH 5/7] mmc: host: dw_mmc make IO accessors endian agnostic
+Date: Wed, 25 Mar 2015 11:23:27 +0000
+Subject: [PATCH 4/7] clocksource: dw_apb_timer_of: make IO endian agnostic
 In-Reply-To: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427282610-10350-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282610-10350-5-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_mmc driver does not use endian agnostic IO accessors, so fix
-the use of __raw reads and writes to be the relaxed versions.
+The dw_apb_timer_of timer is using __raw_readl to access the timer
+register, which is causing issues when the system is running in
+big endian mode. Fix this by using readl_relaxed() which should
+account for the endian settings.
 
-This fixes the dw_mmc driver initialisation on Altera socfpga in big endian.
+This fixes issues where the time jumps around in the dmesg output
+due to returnling __le32 values.
+
+For an example, these two console lines show time running backwards:
+
+[   49.882572] CPU1: failed to come online
+[   43.282457] Brought up 1 CPUs
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
-CC: Linux MMC <linux-mmc@vger.kernel.org>
+CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+CC: Thomas Gleixner <tglx@linutronix.de>
 CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 CC: Dinh Nguyen <dinguyen@opensource.altera.com>
-CC: Chris Ball <chris@printf.net>
-CC: Ulf Hansson <ulf.hansson@linaro.org>
-CC: Jaehoon Chung <jh80.chung@samsung.com>
-CC: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- drivers/mmc/host/dw_mmc.h | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/clocksource/dw_apb_timer_of.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 18c4afe..46efdc5 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -171,22 +171,22 @@
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index d305fb0..a19a3f6 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -108,7 +108,7 @@ static void __init add_clocksource(struct device_node *source_timer)
  
- /* Register access macros */
- #define mci_readl(dev, reg)			\
--	__raw_readl((dev)->regs + SDMMC_##reg)
-+	readl_relaxed((dev)->regs + SDMMC_##reg)
- #define mci_writel(dev, reg, value)			\
--	__raw_writel((value), (dev)->regs + SDMMC_##reg)
-+	writel_relaxed((value), (dev)->regs + SDMMC_##reg)
+ static u64 notrace read_sched_clock(void)
+ {
+-	return ~__raw_readl(sched_io_base);
++	return ~readl_relaxed(sched_io_base);
+ }
  
- /* 16-bit FIFO access macros */
- #define mci_readw(dev, reg)			\
--	__raw_readw((dev)->regs + SDMMC_##reg)
-+	readw_relaxed((dev)->regs + SDMMC_##reg)
- #define mci_writew(dev, reg, value)			\
--	__raw_writew((value), (dev)->regs + SDMMC_##reg)
-+	writew_relaxed((value), (dev)->regs + SDMMC_##reg)
- 
- /* 64-bit FIFO access macros */
- #ifdef readq
- #define mci_readq(dev, reg)			\
--	__raw_readq((dev)->regs + SDMMC_##reg)
-+	readq_relaxed((dev)->regs + SDMMC_##reg)
- #define mci_writeq(dev, reg, value)			\
--	__raw_writeq((value), (dev)->regs + SDMMC_##reg)
-+	writeq_relaxed((value), (dev)->regs + SDMMC_##reg)
- #else
- /*
-  * Dummy readq implementation for architectures that don't define it.
+ static const struct of_device_id sptimer_ids[] __initconst = {
 -- 
 2.1.4
