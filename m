@@ -1,63 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Mar 2015 17:20:03 +0000
-Subject: Request for additional arm64 branch in linux-next
-Message-ID: <20150325172002.GN24636@arm.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 25 Mar 2015 17:19:30 +0000
+Subject: [Xen-devel] ARM: KVM/XEN: how should we support virt-what?
+In-Reply-To: <1427281736.10784.63.camel@citrix.com>
+References: <20150325094440.GB3163@hawk.usersys.redhat.com>
+ <1427281736.10784.63.camel@citrix.com>
+Message-ID: <alpine.DEB.2.02.1503251718090.7982@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Wed, 25 Mar 2015, Ian Campbell wrote:
+> On Wed, 2015-03-25 at 10:44 +0100, Andrew Jones wrote:
+> > Hello ARM virt maintainers,
+> > 
+> > I'd like to start a discussion about supporting virt-what[1]. virt-what
+> > allows userspace to determine if the system it's running on is running
+> > in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
+> > effort tool, see the Caveat emptor in [1], it has become quite a useful
+> > tool, and is showing up in different places, such as OpenStack. If you
+> > look at the code[2], specifically [3], then you'll see how it works on
+> > x86, which is to use the dedicated hypervisor cpuid leaves. I'm
+> > wondering what equivalent we have, or can develop, for arm.
+> > Here are some thoughts;
+> > 0) there's already something we can use, and I just need to be told
+> >    about it.
+> > 1) be as similar as possible to x86 by dedicating some currently
+> >    undefined sysreg bits. This would take buy-in from lots of parties,
+> >    so is not likely the way to go.
+> > 2) create a specific DT node that will get exposed through sysfs, or
+> >    somewhere.
+> > 3) same as (2), but just use the nodes currently in mach-virt's DT
+> >    as the indication we're a guest. This would just be a heuristic,
+> >    i.e. "have virtio mmio" && psci.method == hvc, or something,
+> >    and we'd still need a way to know if we're kvm vs. xen vs. ??.
+> 
+> FWIW Xen has a specific node,
+> https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/tree/Bindings/arm/xen.txt
+> 
+> Doesn't help you with ACPI systems though. IIRC there will be a Xen
+> table of some sort.
 
-We've got a series of patches introducing ACPI support for arm64 that
-are tentatively targetting the 4.1 merge window. Whilst there are
-face-to-face discussions set to happen in the next day or so around this
-topic, could you please pull this into linux-next under the assumption
-that we decide to go ahead for mainline inclusion?
+This is the Xen specific ACPI table:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/acpi
-
-I've kept the series separate from the usual arm64 branch (for-next/core)
-but they merge without conflicts. Merging with today's next, I see two
-trivial Kconfig conflicts (resolution below).
-
-I'll let you know when the branch is no longer needed.
-
-Thanks,
-
-Will
-
---->8
-
-diff --cc arch/arm64/Kconfig
-index 4085df18e558,0659db374731..0eae06cdac27
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@@ -1,7 -1,9 +1,9 @@@
-  config ARM64
-  	def_bool y
-+ 	select ACPI_GENERIC_GSI if ACPI
-+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- -	select ARCH_BINFMT_ELF_RANDOMIZE_PIE
-  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- +	select ARCH_HAS_ELF_RANDOMIZE
-  	select ARCH_HAS_GCOV_PROFILE_ALL
-  	select ARCH_HAS_SG_CHAIN
-  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-diff --cc drivers/xen/Kconfig
-index afc39ca5cc4f,a31cd29b68a8..31347cd8c046
---- a/drivers/xen/Kconfig
-+++ b/drivers/xen/Kconfig
-@@@ -253,10 -253,8 +253,14 @@@ config XEN_EF
-  	def_bool y
-  	depends on X86_64 && EFI
-  
- +config XEN_AUTO_XLATE
- +	def_bool y
- +	depends on ARM || ARM64 || XEN_PVHVM
- +	help
- +	  Support for auto-translated physmap guests.
- +
-+ config XEN_ACPI
-+ 	def_bool y
-+ 	depends on X86 && ACPI
-+ 
-  endmenu
+http://wiki.xenproject.org/mediawiki/images/c/c4/Xen-environment-table.pdf
