@@ -1,57 +1,25 @@
-From: peter.crosthwaite@xilinx.com (Peter Crosthwaite)
-Date: Wed, 25 Mar 2015 15:28:26 +0530
-Subject: [PATCH] arm64: Implement cpu_relax as yield
-In-Reply-To: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
-References: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
-Message-ID: <CAEgOgz6q_dOUaEvgH=Bnz3pafWtxVx8tYvSM26yX1s=2svUY7Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 Mar 2015 10:10:05 +0000
+Subject: [PATCH v11 0/4] ARM: VDSO
+In-Reply-To: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+References: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
+Message-ID: <20150325101004.GX8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping!
+On Fri, Mar 20, 2015 at 04:13:19PM -0500, Nathan Lynch wrote:
+> Provide fast userspace implementations of gettimeofday and
+> clock_gettime on systems that implement the generic timers extension
+> defined in ARMv7.  This follows the example of arm64 in conception but
+> significantly differs in some aspects of the implementation (C vs
+> assembly, mainly).
 
-Anything I need to do or send to to get a merge on this?
+Okay, having re-read the code, I'm happy with this now.  I'll see about
+testing it out on the platforms I have here in the next few days.  As
+I now have a Cortex A15 platform, I can hopefully also check what effect
+it has there (assuming ethernet gets fixed on it so I can get programs
+onto the platform.)
 
-Regards,
-Peter
-
-On Tue, Mar 3, 2015 at 12:49 AM, Peter Crosthwaite
-<peter.crosthwaite@xilinx.com> wrote:
-> ARM64 has the yield nop hint which has the intended semantics of
-> cpu_relax. Implement.
->
-> The immediate application is ARM CPU emulators. An emulator can take
-> advantage of the yield hint to de-prioritise an emulated CPU in favor
-> of other emulation tasks. QEMU A64 SMP emulation has yield awareness,
-> and sees a significant boot time performance increase with this change.
->
-> Signed-off-by: Peter Crosthwaite <peter.crosthwaite@xilinx.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/processor.h | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-> index f9be30e..ac2381d 100644
-> --- a/arch/arm64/include/asm/processor.h
-> +++ b/arch/arm64/include/asm/processor.h
-> @@ -126,7 +126,11 @@ extern void release_thread(struct task_struct *);
->
->  unsigned long get_wchan(struct task_struct *p);
->
-> -#define cpu_relax()                    barrier()
-> +static inline void cpu_relax(void)
-> +{
-> +       asm volatile("yield" ::: "memory");
-> +}
-> +
->  #define cpu_relax_lowlatency()                cpu_relax()
->
->  /* Thread switching */
-> --
-> 2.3.0.1.g27a12f1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
