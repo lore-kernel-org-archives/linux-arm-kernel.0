@@ -1,35 +1,44 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Mar 2015 17:17:12 -0700
-Subject: [PATCH 3/3] ARM: dts: BCM63xx: add soft-reset node
+Date: Tue, 24 Mar 2015 17:17:10 -0700
+Subject: [PATCH 1/3] Documentation: bindings: add BCM6328-style soft reset
+ binding
 In-Reply-To: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
 References: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1427242632-7971-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1427242632-7971-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the software reset Device Tree node allowing us to software reset a
-BCM63138 device using bcm6328-soft-reset.
+Add a binding document for the BCM6328-style software reset block found
+in MIPS and ARM based Broadcom BCM63xx DSL SoCs.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- arch/arm/boot/dts/bcm63138.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/arm/bcm/bcm63138.txt | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
-index f46329c8ad75..cfd7f67fed02 100644
---- a/arch/arm/boot/dts/bcm63138.dtsi
-+++ b/arch/arm/boot/dts/bcm63138.dtsi
-@@ -114,6 +114,11 @@
- 		#size-cells = <1>;
- 		ranges = <0 0xfffe8000 0x8100>;
+diff --git a/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt b/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+index bd49987a8812..bddf76d8dda4 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/bcm63138.txt
+@@ -7,3 +7,19 @@ following properties:
+ Required root node property:
  
-+		reset: soft-reset at b4 {
-+			compatible = "brcm,bcm6328-soft-reset";
-+			reg = <0xb4 0x4>;
-+		};
+ compatible: should be "brcm,bcm63138"
 +
- 		serial0: serial at 600 {
- 			compatible = "brcm,bcm6345-uart";
- 			reg = <0x600 0x1b>;
++
++reboot node
++-----------
++
++Required properties
++
++- compatible: sould be "brcm,bcm6328-soft-reset"
++- reg: should be the base register addresse and length
++
++Example:
++
++reboot at b0 {
++	compatible = "brcm,bcm6328-soft-reset";
++	reg = <0xb0 0x4>;
++};
 -- 
 2.1.0
