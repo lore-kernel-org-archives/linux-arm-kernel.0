@@ -1,51 +1,50 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 25 Mar 2015 18:32:26 -0500
-Subject: [PATCH] ARM: DRA7: Enable Cortex A15 errata 798181
-In-Reply-To: <1427325909-7014-1-git-send-email-praneeth@ti.com>
-References: <1427325909-7014-1-git-send-email-praneeth@ti.com>
-Message-ID: <5513458A.50001@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 25 Mar 2015 16:39:08 -0700
+Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: sun8i: Add SMP support for the
+ Allwinner A23
+In-Reply-To: <20150319091843.GA4255@lukather>
+References: <1426649042-30547-1-git-send-email-wens@csie.org>
+ <1426649042-30547-3-git-send-email-wens@csie.org>
+ <20150318102939.GP4638@lukather>
+ <CAGb2v65qZBPcury1e-DXwmpJOyS97oWFVisGQKEbTZkc+Z60nQ@mail.gmail.com>
+ <2015031912050362587032@gmail.com> <20150319091843.GA4255@lukather>
+Message-ID: <CAGb2v67R5hcwh7ZjC_7Y2WfRpLArC_KRrAktJw+WjTEucCFWsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2015 06:25 PM, Praneeth Bajjuri wrote:
-> ARM errata 798181 is applicable for OMAP5/DRA7 based devices. So enable
-> the same in the build.
-> 
-> DRA7xx is based on Cortex-A15 r2p2 revision.
-> 
-> ARM Errata extract and workaround information is as below.
-> 
-> On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
-> adequately shooting down all use of the old entries. The
-> ARM_ERRATA_798181 option enables the Linux kernel workaround
-> for this erratum which sends an IPI to the CPUs that are running
-> the same ASID as the one being invalidated.
-> 
-> Signed-off-by: Praneeth Bajjuri <praneeth@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index c7d8d86..3e4b4ae 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -69,6 +69,7 @@ config SOC_DRA7XX
->  	select ARM_GIC
->  	select HAVE_ARM_ARCH_TIMER
->  	select IRQ_CROSSBAR
-> +	select ARM_ERRATA_798181 if SMP
->  
->  config ARCH_OMAP2PLUS
->  	bool
-> 
-Gee thanks and Apologies on missing this patch.
+Hi Maxime,
 
-Acked-by: Nishanth Menon <nm@ti.com>
+On Thu, Mar 19, 2015 at 2:18 AM, maxime.ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Kevin,
+>
+> On Thu, Mar 19, 2015 at 12:05:06PM +0800, kevin.z.m.zh at gmail.com wrote:
+>> >> One question I couldn't find any answer to is that does the SMP bit is
+>> >> set in secondary_startup?
+>> >>
+>> >> I couldn't find where it was set, but it still looks like the right
+>> >> thing to do, so I would expect the code to do that.
+>> >
+>> > I don't see it either. The sun8i code is just the sun6i code with the
+>> > power clamps removed. And sun6i secondary_startup was removed some time
+>> > ago in commit 1146b600044d ("ARM: sunxi: fix build for THUMB2_KERNEL").
+>> >
+>> > ChenYu
+>>
+>> The SMP bit should be set in the function of "__v7_ca7mp_setup", which is located
+>> in the file:
+>> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mm/proc-v7.S?id=refs/tags/v4.0-rc4
+>> I'm not sure if this is your discussion.
+>
+> It is, but I wasn't seeing it called anywhere in the secondary_startup
+> code path.
+>
+> I was expecting a direct call, but it looks like it's a dynamic call,
+> with a function-pointer like call, that is indeed run both in the
+> kernel entry point and the secondary_startup.
+>
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/kernel/head.S?id=refs/tags/v4.0-rc4#n389
 
-Seen on DRA7 only builds, so kinda slipped radar a bit.. verified to
-apply on v4.0-rc1
+Are we waiting for Marc's input on this?
 
--- 
-Regards,
-Nishanth Menon
+ChenYu
