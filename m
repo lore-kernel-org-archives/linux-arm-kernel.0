@@ -1,307 +1,36 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:23:30 +0000
-Subject: [PATCH 7/7] mmc: host: dw_mmc: fix fifo ordering in big endian
-In-Reply-To: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427282610-10350-8-git-send-email-ben.dooks@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 25 Mar 2015 11:24:11 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150324220253.9595AC407F8@trevor.secretlab.ca>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
+ <20150319101727.GC24556@red-moon> <20150319193927.GG4751@arm.com>
+ <20150324220253.9595AC407F8@trevor.secretlab.ca>
+Message-ID: <20150325112410.GA24636@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_mmc driver changes to make the IO accesors endian agnostic did not
-take into account the fifo accesses do not need to be swapped. To fix this
-add a mmci_fifo_read/write wrapper to allow these to be passed through the
-IO without being swapped.
+On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
+> On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
+> wrote:
+> > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
+> > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
+> > > I am working on it, I do not think it should be a blocking point, patch
+> > > coming asap on top of your series.
+> > 
+> > Well, I don't really want to merge the series without those patches so I
+> > do think it blocks the code from getting into mainline.
+> 
+> Really? It's a pretty minor duplication problem and it's been identified
+> as something requiring refactoring to both the ACPI and DT code. It
+> isn't at all dangerous. Why is this a blocking point?
 
-Since these are now specific functions, it would be easier just to store
-the pointer to the fifo registers in the host block instead of the offset
-to them. So change the host->data_offset to host->fifo_reg (which also
-means we catch all the places this is read or written).
+Because I don't really see a valid excuse not to get this right first time
+around. Lorenzo already has patches on top, so we just need a co-ordinated
+review effort.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
---
-CC: Linux MMC <linux-mmc@vger.kernel.org>
-CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
-CC: Dinh Nguyen <dinguyen@opensource.altera.com>
-CC: Chris Ball <chris@printf.net>
-CC: Ulf Hansson <ulf.hansson@linaro.org>
-CC: Jaehoon Chung <jh80.chung@samsung.com>
-CC: Seungwon Jeon <tgih.jun@samsung.com>
----
- drivers/mmc/host/dw_mmc.c  | 59 +++++++++++++++++++---------------------------
- drivers/mmc/host/dw_mmc.h  | 14 +++++++++++
- include/linux/mmc/dw_mmc.h |  4 ++--
- 3 files changed, 40 insertions(+), 37 deletions(-)
+I wouldn't accept another patch series that needed minor rework (which by
+its very nature is easily addressed), so why should ACPI be treated any
+differently?
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 12e681c..98f0c92 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -1685,8 +1685,7 @@ static void dw_mci_push_data16(struct dw_mci *host, void *buf, int cnt)
- 		buf += len;
- 		cnt -= len;
- 		if (host->part_buf_count == 2) {
--			mci_writew(host, DATA(host->data_offset),
--					host->part_buf16);
-+			mci_fifo_writew(host->fifo_reg, host->part_buf16);
- 			host->part_buf_count = 0;
- 		}
- 	}
-@@ -1703,15 +1702,14 @@ static void dw_mci_push_data16(struct dw_mci *host, void *buf, int cnt)
- 			cnt -= len;
- 			/* push data from aligned buffer into fifo */
- 			for (i = 0; i < items; ++i)
--				mci_writew(host, DATA(host->data_offset),
--						aligned_buf[i]);
-+				mci_fifo_writew(host->fifo_reg, aligned_buf[i]);
- 		}
- 	} else
- #endif
- 	{
- 		u16 *pdata = buf;
- 		for (; cnt >= 2; cnt -= 2)
--			mci_writew(host, DATA(host->data_offset), *pdata++);
-+			mci_fifo_writew(host->fifo_reg, *pdata++);
- 		buf = pdata;
- 	}
- 	/* put anything remaining in the part_buf */
-@@ -1720,8 +1718,7 @@ static void dw_mci_push_data16(struct dw_mci *host, void *buf, int cnt)
- 		 /* Push data if we have reached the expected data length */
- 		if ((data->bytes_xfered + init_cnt) ==
- 		    (data->blksz * data->blocks))
--			mci_writew(host, DATA(host->data_offset),
--				   host->part_buf16);
-+			mci_fifo_writew(host->fifo_reg, host->part_buf16);
- 	}
- }
- 
-@@ -1736,8 +1733,7 @@ static void dw_mci_pull_data16(struct dw_mci *host, void *buf, int cnt)
- 			int items = len >> 1;
- 			int i;
- 			for (i = 0; i < items; ++i)
--				aligned_buf[i] = mci_readw(host,
--						DATA(host->data_offset));
-+				aligned_buf[i] = mci_fifo_readw(host->fifo_reg);
- 			/* memcpy from aligned buffer into output buffer */
- 			memcpy(buf, aligned_buf, len);
- 			buf += len;
-@@ -1748,11 +1744,11 @@ static void dw_mci_pull_data16(struct dw_mci *host, void *buf, int cnt)
- 	{
- 		u16 *pdata = buf;
- 		for (; cnt >= 2; cnt -= 2)
--			*pdata++ = mci_readw(host, DATA(host->data_offset));
-+			*pdata++ = mci_fifo_readw(host->fifo_reg);
- 		buf = pdata;
- 	}
- 	if (cnt) {
--		host->part_buf16 = mci_readw(host, DATA(host->data_offset));
-+		host->part_buf16 = mci_fifo_readw(host->fifo_reg);
- 		dw_mci_pull_final_bytes(host, buf, cnt);
- 	}
- }
-@@ -1768,8 +1764,7 @@ static void dw_mci_push_data32(struct dw_mci *host, void *buf, int cnt)
- 		buf += len;
- 		cnt -= len;
- 		if (host->part_buf_count == 4) {
--			mci_writel(host, DATA(host->data_offset),
--					host->part_buf32);
-+			mci_fifo_writel(host->fifo_reg,	host->part_buf32);
- 			host->part_buf_count = 0;
- 		}
- 	}
-@@ -1786,15 +1781,14 @@ static void dw_mci_push_data32(struct dw_mci *host, void *buf, int cnt)
- 			cnt -= len;
- 			/* push data from aligned buffer into fifo */
- 			for (i = 0; i < items; ++i)
--				mci_writel(host, DATA(host->data_offset),
--						aligned_buf[i]);
-+				mci_fifo_writel(host->fifo_reg,	aligned_buf[i]);
- 		}
- 	} else
- #endif
- 	{
- 		u32 *pdata = buf;
- 		for (; cnt >= 4; cnt -= 4)
--			mci_writel(host, DATA(host->data_offset), *pdata++);
-+			mci_fifo_writel(host->fifo_reg, *pdata++);
- 		buf = pdata;
- 	}
- 	/* put anything remaining in the part_buf */
-@@ -1803,8 +1797,7 @@ static void dw_mci_push_data32(struct dw_mci *host, void *buf, int cnt)
- 		 /* Push data if we have reached the expected data length */
- 		if ((data->bytes_xfered + init_cnt) ==
- 		    (data->blksz * data->blocks))
--			mci_writel(host, DATA(host->data_offset),
--				   host->part_buf32);
-+			mci_fifo_writel(host->fifo_reg, host->part_buf32);
- 	}
- }
- 
-@@ -1819,8 +1812,7 @@ static void dw_mci_pull_data32(struct dw_mci *host, void *buf, int cnt)
- 			int items = len >> 2;
- 			int i;
- 			for (i = 0; i < items; ++i)
--				aligned_buf[i] = mci_readl(host,
--						DATA(host->data_offset));
-+				aligned_buf[i] = mci_fifo_readl(host->fifo_reg);
- 			/* memcpy from aligned buffer into output buffer */
- 			memcpy(buf, aligned_buf, len);
- 			buf += len;
-@@ -1831,11 +1823,11 @@ static void dw_mci_pull_data32(struct dw_mci *host, void *buf, int cnt)
- 	{
- 		u32 *pdata = buf;
- 		for (; cnt >= 4; cnt -= 4)
--			*pdata++ = mci_readl(host, DATA(host->data_offset));
-+			*pdata++ = mci_fifo_readl(host->fifo_reg);
- 		buf = pdata;
- 	}
- 	if (cnt) {
--		host->part_buf32 = mci_readl(host, DATA(host->data_offset));
-+		host->part_buf32 = mci_fifo_readl(host->fifo_reg);
- 		dw_mci_pull_final_bytes(host, buf, cnt);
- 	}
- }
-@@ -1852,8 +1844,7 @@ static void dw_mci_push_data64(struct dw_mci *host, void *buf, int cnt)
- 		cnt -= len;
- 
- 		if (host->part_buf_count == 8) {
--			mci_writeq(host, DATA(host->data_offset),
--					host->part_buf);
-+			mci_fifo_writeq(host->fifo_reg,	host->part_buf);
- 			host->part_buf_count = 0;
- 		}
- 	}
-@@ -1870,15 +1861,14 @@ static void dw_mci_push_data64(struct dw_mci *host, void *buf, int cnt)
- 			cnt -= len;
- 			/* push data from aligned buffer into fifo */
- 			for (i = 0; i < items; ++i)
--				mci_writeq(host, DATA(host->data_offset),
--						aligned_buf[i]);
-+				mci_fifo_writeq(host->fifo_reg,	aligned_buf[i]);
- 		}
- 	} else
- #endif
- 	{
- 		u64 *pdata = buf;
- 		for (; cnt >= 8; cnt -= 8)
--			mci_writeq(host, DATA(host->data_offset), *pdata++);
-+			mci_fifo_writeq(host->fifo_reg, *pdata++);
- 		buf = pdata;
- 	}
- 	/* put anything remaining in the part_buf */
-@@ -1887,8 +1877,7 @@ static void dw_mci_push_data64(struct dw_mci *host, void *buf, int cnt)
- 		/* Push data if we have reached the expected data length */
- 		if ((data->bytes_xfered + init_cnt) ==
- 		    (data->blksz * data->blocks))
--			mci_writeq(host, DATA(host->data_offset),
--				   host->part_buf);
-+			mci_fifo_writeq(host->fifo_reg, host->part_buf);
- 	}
- }
- 
-@@ -1903,8 +1892,8 @@ static void dw_mci_pull_data64(struct dw_mci *host, void *buf, int cnt)
- 			int items = len >> 3;
- 			int i;
- 			for (i = 0; i < items; ++i)
--				aligned_buf[i] = mci_readq(host,
--						DATA(host->data_offset));
-+				aligned_buf[i] = mci_fifo_readq(host->fifo_reg);
-+
- 			/* memcpy from aligned buffer into output buffer */
- 			memcpy(buf, aligned_buf, len);
- 			buf += len;
-@@ -1915,11 +1904,11 @@ static void dw_mci_pull_data64(struct dw_mci *host, void *buf, int cnt)
- 	{
- 		u64 *pdata = buf;
- 		for (; cnt >= 8; cnt -= 8)
--			*pdata++ = mci_readq(host, DATA(host->data_offset));
-+			*pdata++ = mci_fifo_readq(host->fifo_reg);
- 		buf = pdata;
- 	}
- 	if (cnt) {
--		host->part_buf = mci_readq(host, DATA(host->data_offset));
-+		host->part_buf = mci_fifo_readq(host->fifo_reg);
- 		dw_mci_pull_final_bytes(host, buf, cnt);
- 	}
- }
-@@ -2731,9 +2720,9 @@ int dw_mci_probe(struct dw_mci *host)
- 	dev_info(host->dev, "Version ID is %04x\n", host->verid);
- 
- 	if (host->verid < DW_MMC_240A)
--		host->data_offset = DATA_OFFSET;
-+		host->fifo_reg = host->regs + DATA_OFFSET;
- 	else
--		host->data_offset = DATA_240A_OFFSET;
-+		host->fifo_reg = host->regs + DATA_240A_OFFSET;
- 
- 	tasklet_init(&host->tasklet, dw_mci_tasklet_func, (unsigned long)host);
- 	ret = devm_request_irq(host->dev, host->irq, dw_mci_interrupt,
-diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-index 46efdc5..2eebe48 100644
---- a/drivers/mmc/host/dw_mmc.h
-+++ b/drivers/mmc/host/dw_mmc.h
-@@ -169,6 +169,16 @@
- #define SDMMC_CTRL_ALL_RESET_FLAGS \
- 	(SDMMC_CTRL_RESET | SDMMC_CTRL_FIFO_RESET | SDMMC_CTRL_DMA_RESET)
- 
-+/* FIFO register access macros. These should not change the data endian-ness
-+ * as they are written to memory to be dealt with by the upper layers */
-+#define mci_fifo_readw(__reg)	__raw_readw(__reg)
-+#define mci_fifo_readl(__reg)	__raw_readl(__reg)
-+#define mci_fifo_readq(__reg)	__raw_readq(__reg)
-+
-+#define mci_fifo_writew(__value, __reg)	__raw_writew(__reg, __value)
-+#define mci_fifo_writel(__value, __reg)	__raw_writel(__reg, __value)
-+#define mci_fifo_writeq(__value, __reg)	__raw_writeq(__reg, __value)
-+
- /* Register access macros */
- #define mci_readl(dev, reg)			\
- 	readl_relaxed((dev)->regs + SDMMC_##reg)
-@@ -200,6 +210,10 @@
- 	(*(volatile u64 __force *)((dev)->regs + SDMMC_##reg))
- #define mci_writeq(dev, reg, value)			\
- 	(*(volatile u64 __force *)((dev)->regs + SDMMC_##reg) = (value))
-+
-+#define __raw_writeq(__value, __reg) \
-+	(*(volatile u64 __force *)(__reg)= (__value))
-+#define __raw_readq(__reg) (*(volatile u64 __force *)(__reg))
- #endif
- 
- extern int dw_mci_probe(struct dw_mci *host);
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 471fb31..49addec 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -44,6 +44,7 @@ struct mmc_data;
-  * struct dw_mci - MMC controller state shared between all slots
-  * @lock: Spinlock protecting the queue and associated data.
-  * @regs: Pointer to MMIO registers.
-+ * @fifo_reg: Pointer to MMIO registers for data FIFO
-  * @sg: Scatterlist entry currently being processed by PIO code, if any.
-  * @sg_miter: PIO mapping scatterlist iterator.
-  * @cur_slot: The slot which is currently using the controller.
-@@ -79,7 +80,6 @@ struct mmc_data;
-  * @current_speed: Configured rate of the controller.
-  * @num_slots: Number of slots available.
-  * @verid: Denote Version ID.
-- * @data_offset: Set the offset of DATA register according to VERID.
-  * @dev: Device associated with the MMC controller.
-  * @pdata: Platform data associated with the MMC controller.
-  * @drv_data: Driver specific data for identified variant of the controller
-@@ -132,6 +132,7 @@ struct dw_mci {
- 	spinlock_t		lock;
- 	spinlock_t		irq_lock;
- 	void __iomem		*regs;
-+	void __iomem		*fifo_reg;
- 
- 	struct scatterlist	*sg;
- 	struct sg_mapping_iter	sg_miter;
-@@ -172,7 +173,6 @@ struct dw_mci {
- 	u32			num_slots;
- 	u32			fifoth_val;
- 	u16			verid;
--	u16			data_offset;
- 	struct device		*dev;
- 	struct dw_mci_board	*pdata;
- 	const struct dw_mci_drv_data	*drv_data;
--- 
-2.1.4
+Will
