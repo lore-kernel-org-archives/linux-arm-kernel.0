@@ -1,54 +1,56 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 25 Mar 2015 18:26:13 +0000
+Date: Wed, 25 Mar 2015 18:26:14 +0000
 Subject: [PATCH v3,
- tty-next.. 0/2] serial/amba-pl011: Activate TX IRQ passively
-In-Reply-To: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+ tty-next.. 1/2] Revert "serial/amba-pl011: Leave the TX IRQ alone
+ when the UART is not open"
+In-Reply-To: <1427307975-2940-1-git-send-email-Dave.Martin@arm.com>
 References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1427307975-2940-1-git-send-email-Dave.Martin@arm.com>
+ <1427307975-2940-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1427307975-2940-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Based on git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git
-tty-next (caa445d))
+This reverts commit f2ee6dfa0e8597eea8b98d240b0033994e20d215.
 
-The current PL011 driver transmits a dummy character when the UART
-is opened, to assert the TX IRQ for the first time
-(see pl011_startup()).  The UART is put in loopback mode temporarily,
-so the receiver presumably shouldn't see anything.
+Jakub Kici?ski observed that this patch can cause the pl011
+driver to hang if if the only process with a pl011 port open is
+killed by a signal, pl011_shutdown() can get called with an
+arbitrary amount of data still in the FIFO.
 
-However...
+Calling _shutdown() with the TX FIFO non-empty is questionable
+behaviour and my itself be a bug.
 
-At least some platforms containing a PL011 send characters down the
-wire even when loopback mode is enabled.  This means that a
-spurious NUL character may be seen at the receiver when the PL011 is
-opened through the TTY layer.
+Since the affected patch was speculative anyway, and brings limited
+benefit, the simplest course is to remove the assumption that TXIS
+will always be left asserted after the port is shut down.
 
-The current code also temporarily sets the baud rate to maximum and
-the character width to the minimum, to that the dummy TX completes
-as quickly as possible.  If this is seen by the receiver it will
-result in a framing error and can knock the receiver out of sync --
-turning subsequent output into garbage until synchronisation
-is reestablished.  (Particularly problematic during boot with systemd.)
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-To avoid spurious transmissions, this patch removes assumptions about
-whether the TX IRQ will fire until the FIFO has been filled.
-
-This should also mean that the driver works on the SBSA Generic
-UART[1] (a cut-down PL011) without invasive changes.  The Generic
-UART lacks some features needed for the dummy TX approach to work
-(FIFO disabling and loopback).
-
-[1] Server Base System Architecture (ARM-DEN-0029-v2.3)
-    http://infocenter.arm.com/
-    (click-thru required :/)
-
-Dave Martin (2):
-  Revert "serial/amba-pl011: Leave the TX IRQ alone when the UART is
-    not open"
-  serial/amba-pl011: Activate TX IRQ passively
-
- drivers/tty/serial/amba-pl011.c |  118 +++++++++------------------------------
- 1 file changed, 27 insertions(+), 91 deletions(-)
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 5a4e9d5..6f5a072 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1639,6 +1639,9 @@ static int pl011_startup(struct uart_port *port)
+ 
+ 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
+ 
++	/* Assume that TX IRQ doesn't work until we see one: */
++	uap->tx_irq_seen = 0;
++
+ 	spin_lock_irq(&uap->port.lock);
+ 
+ 	/* restore RTS and DTR */
+@@ -1702,7 +1705,7 @@ static void pl011_shutdown(struct uart_port *port)
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->im = 0;
+ 	writew(uap->im, uap->port.membase + UART011_IMSC);
+-	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
++	writew(0xffff, uap->port.membase + UART011_ICR);
+ 	spin_unlock_irq(&uap->port.lock);
+ 
+ 	pl011_dma_shutdown(uap);
 -- 
 1.7.10.4
