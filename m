@@ -1,42 +1,88 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 25 Mar 2015 14:25:36 -0600
-Subject: [PATCH v18 11/11] ARM: qcom: Update defconfig to enable cpuidle
+Date: Wed, 25 Mar 2015 14:25:31 -0600
+Subject: [PATCH v18 06/11] ARM: dts: qcom: Add power-controller device node
+ for 8084 Krait CPUs
 In-Reply-To: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
 References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1427315136-44321-12-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1427315136-44321-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update defconfig to allow cpuidle for QCOM cpus.
-
-* Enable QCOM_PM
-* Enable ARM_QCOM_CPUIDLE
+Each Krait CPU in the QCOM 8084 SoC has an SAW power controller to
+regulate the power to the cpu and aide the core in entering idle states.
+Reference the SAW instance and associate the instance with the CPU core.
 
 Cc: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/configs/qcom_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/qcom-apq8084.dtsi | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c7da33..56bda6b 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -30,6 +30,7 @@ CONFIG_CLEANCACHE=y
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_CPU_IDLE=y
-+CONFIG_ARM_QCOM_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-@@ -135,6 +136,7 @@ CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_STAGING=y
- CONFIG_QCOM_GSBI=y
-+CONFIG_QCOM_PM=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_APQ_MMCC_8084=y
- CONFIG_IPQ_GCC_806X=y
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 1f130bc..8fe89a1 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
+@@ -21,6 +21,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc0>;
++			qcom,saw = <&saw0>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -30,6 +31,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc1>;
++			qcom,saw = <&saw1>;
+ 		};
+ 
+ 		cpu at 2 {
+@@ -39,6 +41,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc2>;
++			qcom,saw = <&saw2>;
+ 		};
+ 
+ 		cpu at 3 {
+@@ -48,6 +51,7 @@
+ 			enable-method = "qcom,kpss-acc-v2";
+ 			next-level-cache = <&L2>;
+ 			qcom,acc = <&acc3>;
++			qcom,saw = <&saw3>;
+ 		};
+ 
+ 		L2: l2-cache {
+@@ -144,7 +148,27 @@
+ 			};
+ 		};
+ 
+-		saw_l2: regulator at f9012000 {
++		saw0: power-controller at f9089000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu", "qcom,saw2";
++			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw1: power-controller at f9099000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu", "qcom,saw2";
++			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw2: power-controller at f90a9000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu", "qcom,saw2";
++			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw3: power-controller at f90b9000 {
++			compatible = "qcom,apq8084-saw2-v2.1-cpu", "qcom,saw2";
++			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
++		};
++
++		saw_l2: power-controller at f9012000 {
+ 			compatible = "qcom,saw2";
+ 			reg = <0xf9012000 0x1000>;
+ 			regulator;
 -- 
 2.1.0
