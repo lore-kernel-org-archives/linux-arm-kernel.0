@@ -1,95 +1,67 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Thu, 26 Mar 2015 09:13:51 +1100
-Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
- simplicity
-In-Reply-To: <551266DE.3030609@huawei.com>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
- <1427168064-8657-20-git-send-email-wangyijing@huawei.com>
- <1427241523.2685.18.camel@axtens.net> <551266DE.3030609@huawei.com>
-Message-ID: <1427321631.2575.3.camel@axtens.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 25 Mar 2015 15:14:55 -0700
+Subject: [GIT PULL] Allwinner clocks additions for 4.1
+In-Reply-To: <20150325211911.GA17639@lukather>
+References: <20150325211911.GA17639@lukather>
+Message-ID: <CAPtuhTgo7mv-mNu6jHGXwWsCjjxa6ASiSES7VCpEqzr6dOx1zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yijing,
+On Wed, Mar 25, 2015 at 2:19 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Mike,
+>
+> Here is the pull request for the Allwinner related changes for the 4.1
+> merge window.
 
-I wasn't quite sure I understood your comments, so I was trying to apply
-your patch series and test it, but patch 3 doesn't apply cleanly to
-4.0-rc5 or master. Can you respin the series?
+Pulled.
 
-Thanks,
-Daniel
+Thanks!
+Mike
 
-
-> Hi Daniel, thanks for your review and comments. We want to make a generic pci_host_bridge,
-> which would hold the common host information, for example, pci domain is common info for
-> pci host bridge, this series saved domain in pci_host_bridge, then we no need to
-> extract out domain by pci_bus->sysdata by platform specific pci_domain_nr().
-> Also we store the sysdata in pci_host_bridge, and pci_bus_to_host() is the platform
-> interface, I think use the common interface would be better.
-> 
-> >> +
-> >> +	/* Get probe mode and perform scan */
-> >> +	if (hose->dn && ppc_md.pci_probe_mode)
-> >> +		mode = ppc_md.pci_probe_mode(bus);
-> >> +
-> >> +	pr_debug("    probe mode: %d\n", mode);
-> >> +	if (mode == PCI_PROBE_DEVTREE)
-> >> +		of_scan_bus(hose->dn, bus);
-> >> +
-> >> +	if (mode == PCI_PROBE_NORMAL) {
-> >> +		pci_bus_update_busn_res_end(bus, 255);
-> >> +		hose->last_busno = pci_scan_child_bus(bus);
-> >> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
-> >> +	}
-> >> +
-> >> +	return pci_bus_child_max_busnr(bus);
-> >> +}
-> >> +
-> > I'm having trouble convincing myself that this patch covers every
-> > variation within our PCI implementations. In particular, there's a
-> > stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
-> > identical to this function. Does that implementation need to be cleaned
-> > up and replaced with this function too?
-> > 
-> 
-> This is a pci_host_bridge_ops hook function, which would be called in
-> PCI core, and after applied this series, we only need to call pci_scan_host_bridge()
-> to scan pci devices, and this function is also extracted from the pcibios_scan_phb(),
-> it's not the redundant code.
-> 
-> > 
-> >> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
-> >>  		ppc_md.pcibios_fixup_phb(hose);
-> >>  
-> >>  	/* Configure PCI Express settings */
-> >> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> >> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> >>  		struct pci_bus *child;
-> >> -		list_for_each_entry(child, &bus->children, node)
-> >> +		list_for_each_entry(child, &host->bus->children, node)
-> >>  			pcie_bus_configure_settings(child);
-> >>  	}
-> >>  }
-> > Two things: Firstly, the function uses hose throughout, not host.
-> > Secondly, you're not deleting the bus variable: what's the purpose of
-> > this change?
-> 
-> host is the common pci_host_bridge which is created by PCI core for pci host bridge driver,
-> the hose is the platform data used in powerpc. The purpose of the patch/series is to simplify
-> pci enumeration interface, and try to reduce the weak functions which were used to setup pci bus/devices
-> during PCI enumeration.
-> 
-> > 
-> > Regards,
-> > Daniel
-> > 
-> 
-> 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 860 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150326/97a940dc/attachment.sig>
+>
+> Thanks!
+> Maxime
+>
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+>
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>
+> are available in the git repository at:
+>
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.1
+>
+> for you to fetch changes up to f1017969661dd33ead5ba7c3f4a0793c6611441a:
+>
+>   clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6 (2015-03-25 11:46:41 -0700)
+>
+> ----------------------------------------------------------------
+> Allwinner clocks changes for 4.1
+>
+> The usual round of clock changes for the Allwinner SoCs.
+>
+> There is nothing really standing out here, but a few changes and fixes, most
+> notably to allow the AHB clock to be parented to a PLL, instead of the CPU
+> clock to avoid any AHB rate change due to cpufreq.
+>
+> ----------------------------------------------------------------
+> Chen-Yu Tsai (7):
+>       clk: sunxi: Move USB clocks to separate file
+>       clk: sunxi: Add support for sun9i A80 USB clocks and resets
+>       clk: sunxi: Add muxable ahb factors clock for sun5i and sun7i
+>       clk: sunxi: Add "cpu" to list of protected clocks for sun5i
+>       clk: sunxi: Register divs clocks before factor clocks
+>       clk: sunxi: Make divs clocks specify which output is the base factor clock
+>       clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
+>
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   3 +
+>  drivers/clk/sunxi/Makefile                        |   1 +
+>  drivers/clk/sunxi/clk-sunxi.c                     | 185 ++++++++---------
+>  drivers/clk/sunxi/clk-usb.c                       | 233 ++++++++++++++++++++++
+>  4 files changed, 319 insertions(+), 103 deletions(-)
+>  create mode 100644 drivers/clk/sunxi/clk-usb.c
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
