@@ -1,35 +1,27 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 25 Mar 2015 17:51:57 +0100
-Subject: [PATCH v3 1/2] drm/bridge: dw-hdmi: support optional supply
- regulators
-In-Reply-To: <2619686.csNBBFyt8W@phil>
-References: <4184159.j0iXe39dFB@phil> <2619686.csNBBFyt8W@phil>
-Message-ID: <1427302317.3441.65.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Mar 2015 16:56:34 +0000
+Subject: [PATCH v2 01/12] KVM: Redesign kvm_io_bus_ API to pass VCPU
+ structure to the callbacks.
+In-Reply-To: <1427126309-11223-2-git-send-email-andre.przywara@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <5512E8C2.9010708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 23.03.2015, 19:17 +0100 schrieb Heiko Stuebner:
-> Hi Philipp,
+On 23/03/15 15:58, Andre Przywara wrote:
+> From: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
 > 
-> Am Donnerstag, 12. M?rz 2015, 21:45:19 schrieb Heiko Stuebner:
-> > At least the Rockchip variant of the dw_hdmi can have controllable power
-> > supplies providing 1.0 and 1.8V. Therefore add the possibility for the
-> > generic bridge driver to enable supplies provided by the hw-specific
-> > drivers.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> This is needed in e.g. ARM vGIC emulation, where the MMIO handling
+> depends on the VCPU that does the access.
 > 
-> does this look ok now?
+> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Yes, thank you.
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> And as we talked about in Chemnitz, who will be taking such bridge-related 
-> changes, as you mentioned some last bridge-patches going through Thierry.
-
-Indeed, recent drm/bridge fixes were merged through the drm/panel tree.
-Thierry, will you continue to do that or should I collect the dw_hdmi
-patches?
-
-regards
-Philipp
+	M.
+-- 
+Jazz is not dead. It just smells funny...
