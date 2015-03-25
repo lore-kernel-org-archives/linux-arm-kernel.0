@@ -1,96 +1,210 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 25 Mar 2015 20:55:40 +0800
-Subject: [patch v11 00/23] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <4061891.uxG6kiGRZE@vostro.rjw.lan>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <4061891.uxG6kiGRZE@vostro.rjw.lan>
-Message-ID: <5512B04C.30401@huawei.com>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Wed, 25 Mar 2015 15:10:56 +0200
+Subject: [PATCH 3/6] i2c: qup: Add bam dma capabilities
+In-Reply-To: <1426268992-19298-4-git-send-email-sricharan@codeaurora.org>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+ <1426268992-19298-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1427289056.25053.21.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/25 7:04, Rafael J. Wysocki wrote:
-> On Tuesday, March 24, 2015 10:02:33 PM Hanjun Guo wrote:
->> Some fixes since last version:
->>
->>  - Add a patch 19/23 for disabling ACPI for Xen on ARM64 for now to fix
->>    compile errors on XEN ACPI, Stefano and Julien are ok with this
->>    temporary solution.
->>  - Add patch "ARM64 / ACPI: Don't unflatten device tree if acpi=force 
->>    is passed", which will fix the problem that the device tree will
->>    be unflattened even if acpi=force passed, that will not obey the
->>    policy.
->>  - update patch "irqchip: Add GICv2 specific ACPI boot support",
->>    which will cause compile error on i386 with both DT and ACPI
->>    enabled:
->>
->>    All error/warnings:
->>
->>     In file included from include/linux/acpi_irq.h:4:0,
->>                      from drivers/irqchip/irqchip.c:11:
->>     arch/x86/include/asm/irq.h:35:8: error: unknown type name 'bool'
->>      extern bool handle_irq(unsigned irq, struct pt_regs *regs);
->>             ^
->>     arch/x86/include/asm/irq.h:35:45: warning: 'struct pt_regs' declared 
->>     inside parameter list
->>      extern bool handle_irq(unsigned irq, struct pt_regs *regs);
->>                                                  ^
->>     arch/x86/include/asm/irq.h:35:45: warning: its scope is only this 
->>     definition or declaration, which is probably not what you want
->>     ....
->>
->>    That's because of I include the <asm/irq.h> in <linux/acpi_irq.h>,
->>    and <linux/acpi_irq.h> will be put on the top of all head files,
->>    so use <linux/irq.h> instead of <asm/irq.h> in acpi_irq.h (in
->>    <linux/irq.h>, it will include <linux/*.h> before include
->>    <asm/irq.h>), this is the only update for this patch.
->>
->> Lorenzo will send some cleanup patches on top of this one soon.
->>
->> Thanks
->> Hanjun
->>
->> Al Stone (4):
->>   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
->>   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
->>   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
->>     ARM64
->>   ARM64 / ACPI: additions of ACPI documentation for arm64
->>
->> Graeme Gregory (6):
->>   ACPI: add arm64 to the platforms that use ioremap
->>   ACPI / sleep: Introduce CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
->>   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
->>   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
->>   ARM64 / ACPI: Enable ARM64 in Kconfig
->>   Documentation: ACPI for ARM64
->>
->> Hanjun Guo (10):
->>   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
->>     scanning
->>   ARM64 / ACPI: Introduce PCI stub functions for ACPI
->>   ACPI / table: Print GIC information when MADT is parsed
->>   ARM64 / ACPI: Parse MADT for SMP initialization
->>   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
->>   ACPI / processor: Make it possible to get CPU hardware ID via GICC
->>   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
->>   clocksource / arch_timer: Parse GTDT to initialize arch timer
->>   XEN / ACPI: Make XEN ACPI depend on X86
->>   ARM64 / ACPI: Don't unflatten device tree if acpi=force is passed
->>
->> Mark Salter (2):
->>   ARM64: allow late use of early_ioremap
->>   ACPI: fix acpi_os_ioremap for arm64
->>
->> Tomasz Nowicki (1):
->>   irqchip: Add GICv2 specific ACPI boot support
-> OK, so I don't think there's anything more I need to ACK in this series, so
-> it is now up to the maintainers of ARM64 and the other subsystems involved
-> to decide whether or not to apply it.
->
-> If you need to change any patches that I've already ACKed, please let me know,
-> but otherwise I'm not going to look at this series any more unless specifically
-> requested.
 
-OK, thank you very much!
+Hi Sricharan,
 
-Hanjun
+On Fri, 2015-03-13 at 23:19 +0530, Sricharan R wrote:
+
+
+>  #define QUP_I2C_MASTER_GEN     0x408
+> +#define QUP_I2C_MASTER_CONFIG  0x408
+> 
+
+Unused.
+
+>  #define QUP_READ_LIMIT                 256
+> +#define MX_TX_RX_LEN                   SZ_64K
+> +#define MX_BLOCKS                      (MX_TX_RX_LEN / QUP_READ_LIMIT)
+> +
+> +#define TOUT_MAX                       300 /* Max timeout for 32k tx/tx */
+> 
+
+seconds, muliseconds?
+
+>  struct qup_i2c_config {
+>         int tag_ver;
+>         int max_freq;
+>  };
+> 
+> +struct tag {
+
+Please use consistent naming convention.
+
+> +       u8 *start;
+> +       dma_addr_t addr;
+> +};
+> +
+>  struct qup_i2c_dev {
+>         struct device*dev;
+>         void __iomem*base;
+> @@ -157,9 +181,35 @@ struct qup_i2c_dev {
+>         /* QUP core errors */
+>         u32     qup_err;
+> 
+> +       /* dma parameters */
+> +       bool    is_dma;
+> +       struct  dma_pool *dpool;
+> +       struct  tag start_tag;
+> +       struct  tag scratch_tag;
+> +       struct  tag footer_tag;
+> +       struct  dma_chan *dma_tx;
+> +       struct  dma_chan *dma_rx;
+> +       struct  scatterlist *sg_tx;
+> +       struct  scatterlist *sg_rx;
+> +       dma_addr_tsg_tx_phys;
+> +       dma_addr_tsg_rx_phys;
+
+Maybe these could be organized in structure per direction.
+
+> +
+>         struct completionxfer;
+>  };
+> 
+> +struct i2c_bam_xfer {
+
+Unused.
+
+> +       struct qup_i2c_dev *qup;
+> +       u32 start_len;
+> +
+> +       u32 rx_nents;
+> +       u32 tx_nents;
+> +
+> +       struct dma_async_tx_descriptor *tx_desc;
+> +       dma_cookie_t tx_cookie;
+> +       struct dma_async_tx_descriptor *rx_desc;
+> +       dma_cookie_t rx_cookie;
+
+structure per direction.
+
+> +};
+> +
+> 
+
+> +static void bam_i2c_callback(void *data)
+> +{
+
+Please use consistent naming, here and bellow.
+
+> +       struct qup_i2c_dev *qup = data;
+> +
+> +       complete(&qup->xfer);
+> +}
+> +
+> +static int get_start_tag(u8 *tag, struct i2c_msg *msg, int first, int last,
+> +                       int blen)
+> +{
+> +       u8 addr = (msg->addr << 1) | ((msg->flags & I2C_M_RD) == I2C_M_RD);
+> +       u8 op;
+> +       int len = 0;
+> +
+> +       /* always issue stop for each read block */
+> +       if (last) {
+> +               if (msg->flags & I2C_M_RD)
+> +                       op = QUP_TAG_V2_DATARD_STOP;
+> +               else
+> +                       op = QUP_TAG_V2_DATAWR_STOP;
+> +       } else {
+> +               if (msg->flags & I2C_M_RD)
+> +                       op = QUP_TAG_V2_DATARD;
+> +               else
+> +                       op = QUP_TAG_V2_DATAWR;
+> +       }
+> +
+> +       if (msg->flags & I2C_M_TEN) {
+> +               len += 5;
+> +               tag[0] = QUP_TAG_V2_START;
+> +               tag[1] = addr;
+> +               tag[2] = op;
+> +               tag[3] = blen;
+> +
+> +               if (msg->flags & I2C_M_RD && last) {
+> +                       len += 2;
+> +                       tag[4] = QUP_BAM_INPUT_EOT;
+> +                       tag[5] = QUP_BAM_FLUSH_STOP;
+> +               }
+> +       } else {
+> +               if (first) {
+> +                       tag[len++] = QUP_TAG_V2_START;
+> +                       tag[len++] = addr;
+> +               }
+> +
+> +               tag[len++] = op;
+> +               tag[len++] = blen;
+> +
+> +               if (msg->flags & I2C_M_RD & last) {
+> +                       tag[len++] = QUP_BAM_INPUT_EOT;
+> +                       tag[len++] = QUP_BAM_FLUSH_STOP;
+> +               }
+> +       }
+> +
+> +       return len;
+> +}
+
+Maybe could be split to 2 functions?
+
+> -static const struct i2c_algorithm qup_i2c_algo = {
+> +static struct i2c_algorithm qup_i2c_algo = {
+
+Why?
+
+>         .master_xfer= qup_i2c_xfer,
+>         .functionality= qup_i2c_func,
+>  };
+> @@ -839,6 +1136,7 @@ static int qup_i2c_probe(struct platform_device *pdev)
+>         u32 clk_freq = 100000;
+>         const struct qup_i2c_config *config;
+>         const struct of_device_id *of_id;
+> +       int blocks;
+> 
+>         qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
+>         if (!qup)
+> @@ -875,6 +1173,53 @@ static int qup_i2c_probe(struct platform_device *pdev)
+>                 return qup->irq;
+>         }
+> 
+> +       if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v2.1.1") ||
+> +               of_device_is_compatible(pdev->dev.of_node,
+> +                       "qcom,i2c-qup-v2.2.1")) {
+
+Logic will be simpler if you check just for version 1 of the controller.
+
+> +               qup->dma_rx = dma_request_slave_channel(&pdev->dev, "bam-rx");
+> +
+
+Please use dma_request_slave_channel_reason.
+
+As Andy noted, please use just "rx", "tx"
+
+> +               if (!qup->dma_rx)
+> +                       return -EPROBE_DEFER;
+
+Don't mask other errors, here and bellow. DMA support should be optional.
+
+>                 dev_err(qup->dev, "Could not get core clock\n");
+> @@ -989,6 +1334,14 @@ static int qup_i2c_remove(struct platform_device *pdev)
+>  {
+>         struct qup_i2c_dev *qup = platform_get_drvdata(pdev);
+> 
+> +       dma_pool_free(qup->dpool, qup->start_tag.start,
+> +                                                               qup->start_tag.addr);
+> +       dma_pool_free(qup->dpool, qup->scratch_tag.start,
+> +                                                               qup->scratch_tag.addr);
+> +       dma_pool_free(qup->dpool, qup->footer_tag.start,
+> +                                                               qup->footer_tag.addr);
+> +       dma_pool_destroy(qup->dpool);
+
+Only if is_dma, right?
+
+DMA mapping code omitted from review. I don't understand it well enough, sorry.
+
+Regards,
+Ivan
