@@ -1,165 +1,91 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 24 Mar 2015 18:56:05 -0700
-Subject: [PATCH] regulator: Defer lookup of supply to regulator_get
-Message-ID: <1427248565-9680-1-git-send-email-bjorn.andersson@sonymobile.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 25 Mar 2015 11:53:15 +0800
+Subject: [patch v11 00/23] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <CACVXFVPH1SVFE27Za1yBhe+ipOBXvTc=ybCXUbNCF5kYUFTi3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of resolving regulator supplies during registration move this to
-the time of a consumer retrieving a handle. The benefit is that it's
-possible for one driver to register regulators with internal
-dependencies out of order.
+On Tue, Mar 24, 2015 at 10:02 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> Some fixes since last version:
+>
+>  - Add a patch 19/23 for disabling ACPI for Xen on ARM64 for now to fix
+>    compile errors on XEN ACPI, Stefano and Julien are ok with this
+>    temporary solution.
+>  - Add patch "ARM64 / ACPI: Don't unflatten device tree if acpi=force
+>    is passed", which will fix the problem that the device tree will
+>    be unflattened even if acpi=force passed, that will not obey the
+>    policy.
+>  - update patch "irqchip: Add GICv2 specific ACPI boot support",
+>    which will cause compile error on i386 with both DT and ACPI
+>    enabled:
+>
+>    All error/warnings:
+>
+>     In file included from include/linux/acpi_irq.h:4:0,
+>                      from drivers/irqchip/irqchip.c:11:
+>     arch/x86/include/asm/irq.h:35:8: error: unknown type name 'bool'
+>      extern bool handle_irq(unsigned irq, struct pt_regs *regs);
+>             ^
+>     arch/x86/include/asm/irq.h:35:45: warning: 'struct pt_regs' declared
+>     inside parameter list
+>      extern bool handle_irq(unsigned irq, struct pt_regs *regs);
+>                                                  ^
+>     arch/x86/include/asm/irq.h:35:45: warning: its scope is only this
+>     definition or declaration, which is probably not what you want
+>     ....
+>
+>    That's because of I include the <asm/irq.h> in <linux/acpi_irq.h>,
+>    and <linux/acpi_irq.h> will be put on the top of all head files,
+>    so use <linux/irq.h> instead of <asm/irq.h> in acpi_irq.h (in
+>    <linux/irq.h>, it will include <linux/*.h> before include
+>    <asm/irq.h>), this is the only update for this patch.
+>
+> Lorenzo will send some cleanup patches on top of this one soon.
+>
+> Thanks
+> Hanjun
+>
+> Al Stone (4):
+>   ARM64 / ACPI: Get RSDP and ACPI boot-time tables
+>   ARM64 / ACPI: Introduce early_param "acpi=" to enable/disable ACPI
+>   ARM64 / ACPI: Select ACPI_REDUCED_HARDWARE_ONLY if ACPI is enabled on
+>     ARM64
+>   ARM64 / ACPI: additions of ACPI documentation for arm64
+>
+> Graeme Gregory (6):
+>   ACPI: add arm64 to the platforms that use ioremap
+>   ACPI / sleep: Introduce CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT
+>   ARM64 / ACPI: If we chose to boot from acpi then disable FDT
+>   ARM64 / ACPI: Get PSCI flags in FADT for PSCI init
+>   ARM64 / ACPI: Enable ARM64 in Kconfig
+>   Documentation: ACPI for ARM64
+>
+> Hanjun Guo (10):
+>   ACPI / table: Use pr_debug() instead of pr_info() for MADT table
+>     scanning
+>   ARM64 / ACPI: Introduce PCI stub functions for ACPI
+>   ACPI / table: Print GIC information when MADT is parsed
+>   ARM64 / ACPI: Parse MADT for SMP initialization
+>   ACPI / processor: Introduce phys_cpuid_t for CPU hardware ID
+>   ACPI / processor: Make it possible to get CPU hardware ID via GICC
+>   ARM64 / ACPI: Introduce ACPI_IRQ_MODEL_GIC and register device's gsi
+>   clocksource / arch_timer: Parse GTDT to initialize arch timer
+>   XEN / ACPI: Make XEN ACPI depend on X86
+>   ARM64 / ACPI: Don't unflatten device tree if acpi=force is passed
+>
+> Mark Salter (2):
+>   ARM64: allow late use of early_ioremap
+>   ACPI: fix acpi_os_ioremap for arm64
+>
+> Tomasz Nowicki (1):
+>   irqchip: Add GICv2 specific ACPI boot support
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
- drivers/regulator/core.c         | 92 ++++++++++++++++++++++++----------------
- include/linux/regulator/driver.h |  1 +
- 2 files changed, 57 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
-index f245214..52ddb73 100644
---- a/drivers/regulator/core.c
-+++ b/drivers/regulator/core.c
-@@ -1325,6 +1325,54 @@ static struct regulator_dev *regulator_dev_lookup(struct device *dev,
- 	return NULL;
- }
- 
-+static int regulator_resolve_supply(struct regulator_dev *rdev)
-+{
-+	struct regulator_dev *r;
-+	struct device *dev = rdev->dev.parent;
-+	int ret;
-+
-+	/* No supply to resovle? */
-+	if (!rdev->supply_name)
-+		return 0;
-+
-+	/* Supply already resolved? */
-+	if (rdev->supply)
-+		return 0;
-+
-+	r = regulator_dev_lookup(dev, rdev->supply_name, &ret);
-+	if (ret == -ENODEV) {
-+		/*
-+		 * No supply was specified for this regulator and
-+		 * there will never be one.
-+		 */
-+		return 0;
-+	}
-+
-+	if (!r) {
-+		dev_err(dev, "Failed to resolve %s-supply for %s\n",
-+			rdev->supply_name, rdev->desc->name);
-+		return -EPROBE_DEFER;
-+	}
-+
-+	/* Recursively resolve the supply of the supply */
-+	ret = regulator_resolve_supply(r);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = set_supply(rdev, r);
-+	if (ret < 0)
-+		return ret;
-+
-+	/* Cascade always-on state to supply */
-+	if (_regulator_is_enabled(rdev)) {
-+		ret = regulator_enable(rdev->supply);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
- /* Internal regulator request function */
- static struct regulator *_regulator_get(struct device *dev, const char *id,
- 					bool exclusive, bool allow_dummy)
-@@ -1394,6 +1442,12 @@ found:
- 		goto out;
- 	}
- 
-+	ret = regulator_resolve_supply(rdev);
-+	if (ret < 0) {
-+		regulator = ERR_PTR(ret);
-+		goto out;
-+	}
-+
- 	if (!try_module_get(rdev->owner))
- 		goto out;
- 
-@@ -3545,7 +3599,6 @@ regulator_register(const struct regulator_desc *regulator_desc,
- 	struct regulator_dev *rdev;
- 	struct device *dev;
- 	int ret, i;
--	const char *supply = NULL;
- 
- 	if (regulator_desc == NULL || cfg == NULL)
- 		return ERR_PTR(-EINVAL);
-@@ -3659,41 +3712,10 @@ regulator_register(const struct regulator_desc *regulator_desc,
- 		goto scrub;
- 
- 	if (init_data && init_data->supply_regulator)
--		supply = init_data->supply_regulator;
-+		rdev->supply_name = init_data->supply_regulator;
- 	else if (regulator_desc->supply_name)
--		supply = regulator_desc->supply_name;
--
--	if (supply) {
--		struct regulator_dev *r;
--
--		r = regulator_dev_lookup(dev, supply, &ret);
-+		rdev->supply_name = regulator_desc->supply_name;
- 
--		if (ret == -ENODEV) {
--			/*
--			 * No supply was specified for this regulator and
--			 * there will never be one.
--			 */
--			ret = 0;
--			goto add_dev;
--		} else if (!r) {
--			dev_err(dev, "Failed to find supply %s\n", supply);
--			ret = -EPROBE_DEFER;
--			goto scrub;
--		}
--
--		ret = set_supply(rdev, r);
--		if (ret < 0)
--			goto scrub;
--
--		/* Enable supply if rail is enabled */
--		if (_regulator_is_enabled(rdev)) {
--			ret = regulator_enable(rdev->supply);
--			if (ret < 0)
--				goto scrub;
--		}
--	}
--
--add_dev:
- 	/* add consumers devices */
- 	if (init_data) {
- 		for (i = 0; i < init_data->num_consumer_supplies; i++) {
-@@ -3720,8 +3742,6 @@ unset_supplies:
- 	unset_regulator_supplies(rdev);
- 
- scrub:
--	if (rdev->supply)
--		_regulator_put(rdev->supply);
- 	regulator_ena_gpio_free(rdev);
- 	kfree(rdev->constraints);
- wash:
-diff --git a/include/linux/regulator/driver.h b/include/linux/regulator/driver.h
-index 0f86a182..a15c59d 100644
---- a/include/linux/regulator/driver.h
-+++ b/include/linux/regulator/driver.h
-@@ -371,6 +371,7 @@ struct regulator_dev {
- 	struct device dev;
- 	struct regulation_constraints *constraints;
- 	struct regulator *supply;	/* for tree */
-+	const char *supply_name;
- 	struct regmap *regmap;
- 
- 	struct delayed_work disable_work;
--- 
-1.8.2.2
+On APM mustang and qemu-system-aarch64 with 'acpi=force',
+
+Tested-by: Ming Lei <ming.lei@canonical.com>
+
+
+Thanks,
