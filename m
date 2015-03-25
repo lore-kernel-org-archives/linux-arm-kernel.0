@@ -1,20 +1,61 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 Mar 2015 11:31:51 +0000
-Subject: [PATCH] arm64: Implement cpu_relax as yield
-In-Reply-To: <CAEgOgz6q_dOUaEvgH=Bnz3pafWtxVx8tYvSM26yX1s=2svUY7Q@mail.gmail.com>
-References: <ad93acf5318c404683f5654d6734316e@BL2FFO11FD047.protection.gbl>
- <CAEgOgz6q_dOUaEvgH=Bnz3pafWtxVx8tYvSM26yX1s=2svUY7Q@mail.gmail.com>
-Message-ID: <20150325113150.GC24636@arm.com>
+Date: Wed, 25 Mar 2015 11:38:43 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <2694196.2XPpkm7uxF@vostro.rjw.lan>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150324220253.9595AC407F8@trevor.secretlab.ca>
+ <20150325112410.GA24636@arm.com>
+ <2694196.2XPpkm7uxF@vostro.rjw.lan>
+Message-ID: <20150325113839.GD24636@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 09:58:26AM +0000, Peter Crosthwaite wrote:
-> Ping!
+On Wed, Mar 25, 2015 at 11:54:25AM +0000, Rafael J. Wysocki wrote:
+> On Wednesday, March 25, 2015 11:24:11 AM Will Deacon wrote:
+> > On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
+> > > On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
+> > > wrote:
+> > > > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
+> > > > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
+> > > > > I am working on it, I do not think it should be a blocking point, patch
+> > > > > coming asap on top of your series.
+> > > > 
+> > > > Well, I don't really want to merge the series without those patches so I
+> > > > do think it blocks the code from getting into mainline.
+> > > 
+> > > Really? It's a pretty minor duplication problem and it's been identified
+> > > as something requiring refactoring to both the ACPI and DT code. It
+> > > isn't at all dangerous. Why is this a blocking point?
+> > 
+> > Because I don't really see a valid excuse not to get this right first time
+> > around. Lorenzo already has patches on top, so we just need a co-ordinated
+> > review effort.
+> > 
+> > I wouldn't accept another patch series that needed minor rework (which by
+> > its very nature is easily addressed), so why should ACPI be treated any
+> > differently?
 > 
-> Anything I need to do or send to to get a merge on this?
+> Not ACPI, but this particular patchset I think.  The problem is that it has
+> already been reviewed and ACKed by multiple people and it would be a shame
+> to require all of those people to do their reviews once again because of
+> that minor rework (which arguably can be done on top of the patchset just
+> fine).
+> 
+> Of course, if the minor rework in question would not involve the need to
+> review things once again, then I agree that it'd be better to do it upfront,
+> but otherwise there's a good reason not to.
 
-It's queued for 4.1 and should already be in linux-next.
+Aha, I think this is just a misunderstanding -- I'm certainly not suggesting
+that Hanjun rework the current set! What I *am* asking for is that they go
+into mainline with Lorenzo's patches on top, which means that his series [1]
+needs some review (and I plan to look at it later today).
 
-Cheers,
+> And, as a maintainer, you can always say "Well, I'm taking this conditional on
+> doing this-and-that on top of it and I won't be taking any more patches from
+> you in the future if that doesn't happen."
+
+I can't really take that stance for a new feature like this.
 
 Will
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333257.html
