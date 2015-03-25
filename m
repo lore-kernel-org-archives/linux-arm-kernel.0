@@ -1,26 +1,62 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:27:45 +0000
-Subject: [RESEND] Altera socfpga big endian work 
-Message-ID: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed, 25 Mar 2015 11:27:50 +0000
+Subject: [PATCH RESEND 5/7] mmc: host: dw_mmc make IO accessors endian agnostic
+In-Reply-To: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282872-10563-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series enables the core of the socfpga systen to run in big endian
-mode. It inclusdes support for debug uart, secondary core boot and has
-support for timers and initial conversion patches for the mmc.
+The dw_mmc driver does not use endian agnostic IO accessors, so fix
+the use of __raw reads and writes to be the relaxed versions.
 
-The two drivers that are known to not work are the Ethernet and the
-dwc2 usb. I do not have data for either, so I currently do not know
-if it possible to change the hardware's endian fetch mode.
+This fixes the dw_mmc driver initialisation on Altera socfpga in big endian.
 
-The dwc2 driver on my cyclone5 socfpga board with v4.0-rc5 does not
-work in little endian mode, which makes testing converting the driver
-difficult. The supplied 3.10 kernel does work so it is not down to the
-hardware. It detects the presence of a new device and then fails to
-enumerate it (no other errors shown)
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+--
+CC: Linux MMC <linux-mmc@vger.kernel.org>
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+CC: Chris Ball <chris@printf.net>
+CC: Ulf Hansson <ulf.hansson@linaro.org>
+CC: Jaehoon Chung <jh80.chung@samsung.com>
+CC: Seungwon Jeon <tgih.jun@samsung.com>
+---
+ drivers/mmc/host/dw_mmc.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-This is up on git.baserock.org/delta/linux.git in the branch
-baserock/bjdooks/socfpga-v5
-
-Sorry, this is a resend due to incorrect linux-arm-kernel mailing list
-address.
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 18c4afe..46efdc5 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -171,22 +171,22 @@
+ 
+ /* Register access macros */
+ #define mci_readl(dev, reg)			\
+-	__raw_readl((dev)->regs + SDMMC_##reg)
++	readl_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writel(dev, reg, value)			\
+-	__raw_writel((value), (dev)->regs + SDMMC_##reg)
++	writel_relaxed((value), (dev)->regs + SDMMC_##reg)
+ 
+ /* 16-bit FIFO access macros */
+ #define mci_readw(dev, reg)			\
+-	__raw_readw((dev)->regs + SDMMC_##reg)
++	readw_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writew(dev, reg, value)			\
+-	__raw_writew((value), (dev)->regs + SDMMC_##reg)
++	writew_relaxed((value), (dev)->regs + SDMMC_##reg)
+ 
+ /* 64-bit FIFO access macros */
+ #ifdef readq
+ #define mci_readq(dev, reg)			\
+-	__raw_readq((dev)->regs + SDMMC_##reg)
++	readq_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writeq(dev, reg, value)			\
+-	__raw_writeq((value), (dev)->regs + SDMMC_##reg)
++	writeq_relaxed((value), (dev)->regs + SDMMC_##reg)
+ #else
+ /*
+  * Dummy readq implementation for architectures that don't define it.
+-- 
+2.1.4
