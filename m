@@ -1,50 +1,62 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 25 Mar 2015 11:23:25 +0000
-Subject: [PATCH 2/7] ARM: socfpga: enable big endian for secondary core(s)
+Date: Wed, 25 Mar 2015 11:23:28 +0000
+Subject: [PATCH 5/7] mmc: host: dw_mmc make IO accessors endian agnostic
 In-Reply-To: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427282610-10350-3-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282610-10350-6-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the secondary code to allow the secondary boot to work when the
-system is running big endian.
+The dw_mmc driver does not use endian agnostic IO accessors, so fix
+the use of __raw reads and writes to be the relaxed versions.
+
+This fixes the dw_mmc driver initialisation on Altera socfpga in big endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
+CC: Linux MMC <linux-mmc@vger.kernel.org>
 CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
 CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+CC: Chris Ball <chris@printf.net>
+CC: Ulf Hansson <ulf.hansson@linaro.org>
+CC: Jaehoon Chung <jh80.chung@samsung.com>
+CC: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- arch/arm/mach-socfpga/headsmp.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/mmc/host/dw_mmc.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index f65ea0a..a580dcd 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -10,6 +10,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- #include <asm/memory.h>
-+#include <asm/assembler.h>
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 18c4afe..46efdc5 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -171,22 +171,22 @@
  
- 	.arch	armv7-a
+ /* Register access macros */
+ #define mci_readl(dev, reg)			\
+-	__raw_readl((dev)->regs + SDMMC_##reg)
++	readl_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writel(dev, reg, value)			\
+-	__raw_writel((value), (dev)->regs + SDMMC_##reg)
++	writel_relaxed((value), (dev)->regs + SDMMC_##reg)
  
-@@ -18,12 +19,14 @@ ENTRY(secondary_trampoline)
- 	 * Thus, we can just subtract the PAGE_OFFSET to get the physical
- 	 * address of &cpu1start_addr. This would not work for platforms
- 	 * where the physical memory does not start at 0x0.
--	 */
-+	*/
-+ARM_BE8(setend	be)
- 	adr	r0, 1f
- 	ldmia	r0, {r1, r2}
- 	sub	r2, r2, #PAGE_OFFSET
- 	ldr	r3, [r2]
- 	ldr	r4, [r3]
-+ARM_BE8(rev	r4, r4)
- 	bx	r4
+ /* 16-bit FIFO access macros */
+ #define mci_readw(dev, reg)			\
+-	__raw_readw((dev)->regs + SDMMC_##reg)
++	readw_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writew(dev, reg, value)			\
+-	__raw_writew((value), (dev)->regs + SDMMC_##reg)
++	writew_relaxed((value), (dev)->regs + SDMMC_##reg)
  
- 	.align
+ /* 64-bit FIFO access macros */
+ #ifdef readq
+ #define mci_readq(dev, reg)			\
+-	__raw_readq((dev)->regs + SDMMC_##reg)
++	readq_relaxed((dev)->regs + SDMMC_##reg)
+ #define mci_writeq(dev, reg, value)			\
+-	__raw_writeq((value), (dev)->regs + SDMMC_##reg)
++	writeq_relaxed((value), (dev)->regs + SDMMC_##reg)
+ #else
+ /*
+  * Dummy readq implementation for architectures that don't define it.
 -- 
 2.1.4
