@@ -1,57 +1,95 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Mar 2015 18:32:59 +0000 (UTC)
-Subject: [PATCH] MAINTAINERS: clk: discuss on the linux-clk@vger.kernel.org
- list
-Message-ID: <alpine.DEB.2.02.1503251828240.13341@utopia.booyaka.com>
+From: ritesh.list@gmail.com (Ritesh Harjani)
+Date: Thu, 26 Mar 2015 00:09:37 +0530
+Subject: [PATCH v2] ARM: mm: Do not invoke OOM for higher order IOMMU DMA
+ allocations
+In-Reply-To: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
+References: <1427095620-20994-1-git-send-email-tfiga@chromium.org>
+Message-ID: <CALk7dXoacMbHKbJZ2UHd0YK9B8rZgATwNpif8cONjGkZj0YTHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
-Most Linux clock framework discussions take place on the
-linux-kernel at vger.kernel.org or linux-arm-kernel at lists.infradead.org
-mailing lists.  The volume of unrelated messages on these lists makes
-it difficult for non-maintainers to follow along with discussions.
-Switch the discussion list for clock framework discussions to
-linux-clk at vger.kernel.org.  Also, add linux-clk at vger.kernel.org as a
-mailing list for clock API discussions.
+On Mon, Mar 23, 2015 at 12:57 PM, Tomasz Figa <tfiga@chromium.org> wrote:
+> IOMMU should be able to use single pages as well as bigger blocks, so if
+> higher order allocations fail, we should not affect state of the system,
+> with events such as OOM killer, but rather fall back to order 0
+> allocations.
+>
+> This patch changes the behavior of ARM IOMMU DMA allocator to use
+> __GFP_NORETRY, which bypasses OOM invocation, for orders higher than
+> zero and, only if that fails, fall back to normal order 0 allocation
+> which might invoke OOM killer.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
-Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-Cc: Tero Kristo <t-kristo@ti.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
-Mike/Stephen, want to take this one?
+Logical thing to do in IOMMU case :)
+>
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> ---
+>  arch/arm/mm/dma-mapping.c | 27 +++++++++++++++++++++------
+>  1 file changed, 21 insertions(+), 6 deletions(-)
+>
+> Changes since v1:
+> (https://patchwork.kernel.org/patch/6015921/)
+>  - do not clear __GFP_NORETRY, as it might come from the caller,
+>  - s/positive order/order higher than 0/.
+>
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 83cd5ac..3f1ac51 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1150,13 +1150,28 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+>         gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+>
+>         while (count) {
+> -               int j, order = __fls(count);
+> +               int j, order;
+> +
+> +               for (order = __fls(count); order > 0; --order) {
+> +                       /*
+> +                        * We do not want OOM killer to be invoked as long
+> +                        * as we can fall back to single pages, so we force
+> +                        * __GFP_NORETRY for orders higher than zero.
+> +                        */
+> +                       pages[i] = alloc_pages(gfp | __GFP_NORETRY, order);
+> +                       if (pages[i])
+> +                               break;
+> +               }
+>
+> -               pages[i] = alloc_pages(gfp, order);
+> -               while (!pages[i] && order)
+> -                       pages[i] = alloc_pages(gfp, --order);
+> -               if (!pages[i])
+> -                       goto error;
+> +               if (!pages[i]) {
+> +                       /*
+> +                        * Fall back to single page allocation.
+> +                        * Might invoke OOM killer as last resort.
+> +                        */
+> +                       pages[i] = alloc_pages(gfp, 0);
+I think down the code in this while loop, i & count is being
+calculated based on the "order" of allocation in the current
+iteration.
+Since value of order will be automatically 0 here if (!pages[i]) is
+true then, why hard code order to value of 0 here.
+Comment clearly says what this code is doing right?
 
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+I know it is just a minor thing. Don't know if it is relevant.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 85024e23309f..3ca8ae5aadb0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2551,6 +2551,7 @@ F:	include/linux/cleancache.h
- 
- CLK API
- M:	Russell King <linux@arm.linux.org.uk>
-+L:	linux-clk at vger.kernel.org
- S:	Maintained
- F:	include/linux/clk.h
- 
-@@ -2611,7 +2612,7 @@ F:	drivers/media/platform/coda/
- COMMON CLK FRAMEWORK
- M:	Mike Turquette <mturquette@linaro.org>
- M:	Stephen Boyd <sboyd@codeaurora.org>
--L:	linux-kernel at vger.kernel.org
-+L:	linux-clk at vger.kernel.org
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
- S:	Maintained
- F:	drivers/clk/
--- 
-2.1.4
+> +                       if (!pages[i])
+> +                               goto error;
+> +               }
+>
+>                 if (order) {
+>                         split_page(pages[i], order);
+> --
+> 2.2.0.rc0.207.ga3a616c
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+Thanks
+Ritesh
