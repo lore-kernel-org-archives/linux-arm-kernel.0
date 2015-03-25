@@ -1,40 +1,33 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Wed, 25 Mar 2015 11:08:56 +0000
-Subject: [Xen-devel] ARM: KVM/XEN: how should we support virt-what?
-In-Reply-To: <20150325094440.GB3163@hawk.usersys.redhat.com>
-References: <20150325094440.GB3163@hawk.usersys.redhat.com>
-Message-ID: <1427281736.10784.63.camel@citrix.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 25 Mar 2015 11:23:26 +0000
+Subject: [PATCH 3/7] ARM: socfpga: support big endian for socfpga
+In-Reply-To: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427282610-10350-4-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-03-25 at 10:44 +0100, Andrew Jones wrote:
-> Hello ARM virt maintainers,
-> 
-> I'd like to start a discussion about supporting virt-what[1]. virt-what
-> allows userspace to determine if the system it's running on is running
-> in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
-> effort tool, see the Caveat emptor in [1], it has become quite a useful
-> tool, and is showing up in different places, such as OpenStack. If you
-> look at the code[2], specifically [3], then you'll see how it works on
-> x86, which is to use the dedicated hypervisor cpuid leaves. I'm
-> wondering what equivalent we have, or can develop, for arm.
-> Here are some thoughts;
-> 0) there's already something we can use, and I just need to be told
->    about it.
-> 1) be as similar as possible to x86 by dedicating some currently
->    undefined sysreg bits. This would take buy-in from lots of parties,
->    so is not likely the way to go.
-> 2) create a specific DT node that will get exposed through sysfs, or
->    somewhere.
-> 3) same as (2), but just use the nodes currently in mach-virt's DT
->    as the indication we're a guest. This would just be a heuristic,
->    i.e. "have virtio mmio" && psci.method == hvc, or something,
->    and we'd still need a way to know if we're kvm vs. xen vs. ??.
+Now the debug and platsmp.S are fixed for big endian, the
+architecture can now advertise big endian support.
 
-FWIW Xen has a specific node,
-https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/tree/Bindings/arm/xen.txt
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+--
+CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/mach-socfpga/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Doesn't help you with ACPI systems though. IIRC there will be a Xen
-table of some sort.
-
-Ian.
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index b5f8d75..f420a1b 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_SOCFPGA
+ 	bool "Altera SOCFPGA family" if ARCH_MULTI_V7
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select CACHE_L2X0
+-- 
+2.1.4
