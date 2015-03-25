@@ -1,45 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Mar 2015 14:34:30 -0700
-Subject: [PATCH V3 2/8] ARM: cpuidle: Add a cpuidle ops structure to be
- used for DT
-In-Reply-To: <1426851841-2072-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1426851841-2072-1-git-send-email-daniel.lezcano@linaro.org>
- <1426851841-2072-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150325213430.GA30227@codeaurora.org>
+From: leigh@solinno.co.uk (Leigh Brown)
+Date: Wed, 25 Mar 2015 21:33:50 +0000
+Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
+Message-ID: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/20, Daniel Lezcano wrote:
-> The current state of the different cpuidle drivers is the different PM
-> operations are passed via the platform_data using the platform driver
-> paradigm.
-> 
-> This approach allowed to split the low level PM code from the arch specific
-> and the generic cpuidle code.
-> 
-> Unfortunately there are complaints about this approach as, in the context of the
-> single kernel image, we have multiple drivers loaded in memory for nothing and
-> the platform driver is not adequate for cpuidle.
-> 
-> This patch provides a common interface via cpuidle ops for all new cpuidle
-> driver and a definition for the device tree.
-> 
-> It will allow with the next patches to a have a common definition with ARM64
-> and share the same cpuidle driver.
-> 
-> The code is optimized to use the __init section intensively in order to reduce
-> the memory footprint after the driver is initialized and unify the function
-> names with ARM64.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> Acked-by: Rob Herring <robherring2@gmail.com>
+Add support for the system reset button on the GlobalScale Mirabox.
+The reset button is connected via GPIO so add a gpio-keys entry for
+it in the device tree file.  Patch is based on the implementation
+in armada-370-netgear-rn102.dts but using the GPIO pin specified in
+the original patch by Ezequiel Garcia from 2013.
 
-Thanks for moving to OF tables. We can merge smp ops and cpuidle
-ops later on.
+Tested with the triggerhappy daemon.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+---
+ arch/arm/boot/dts/armada-370-mirabox.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index e1b0eb6..41f453d 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -9,6 +9,7 @@
+  */
+ 
+ /dts-v1/;
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include "armada-370.dtsi"
+ 
+@@ -78,6 +79,18 @@
+ 				};
+ 			};
+ 
++			gpio-keys {
++				compatible = "gpio-keys";
++				pinctrl-0 = <&reset_button_pin>;
++				pinctrl-names = "default";
++
++				reset-button {
++					label = "Reset Button";
++					linux,code = <KEY_RESTART>;
++					gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;
++				};
++			};
++
+ 			mdio {
+ 				pinctrl-0 = <&mdio_pins>;
+ 				pinctrl-names = "default";
+@@ -168,5 +181,10 @@
+ 		marvell,pins = "mpp64", "mpp65";
+ 		marvell,function = "gpio";
+ 	};
++
++	reset_button_pin: reset-button-pin {
++		marvell,pins = "mpp58";
++		marvell,function = "gpio";
++	};
+ };
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.1.4
