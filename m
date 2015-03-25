@@ -1,22 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 Mar 2015 14:10:29 +0000
-Subject: [PATCH 3/4] arm64: move kernel text below PAGE_OFFSET
-In-Reply-To: <1427125016-3873-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150325141029.GC26903@localhost>
+Date: Wed, 25 Mar 2015 16:50:04 +0000
+Subject: [patch v11 05/23] ACPI: fix acpi_os_ioremap for arm64
+In-Reply-To: <1427205776-5060-6-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-6-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <20150325165004.GD14585@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 04:36:55PM +0100, Ard Biesheuvel wrote:
-> This moves the virtual mapping of the kernel Image down into
-> the lower half of the kernel virtual memory range, moving it
-> out of the linear mapping.
+On Tue, Mar 24, 2015 at 10:02:38PM +0800, Hanjun Guo wrote:
+> From: Mark Salter <msalter@redhat.com>
+> 
+> The acpi_os_ioremap() function may be used to map normal RAM or IO
+> regions. The current implementation simply uses ioremap_cache(). This
+> will work for some architectures, but arm64 ioremap_cache() cannot be
+> used to map IO regions which don't support caching. So for arm64, use
+> ioremap() for non-RAM regions.
+> 
+> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Tested-by: Robert Richter <rrichter@cavium.com>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Acked-by: Robert Richter <rrichter@cavium.com>
+> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I wonder whether there would be better code generation with the kernel
-address very high, like the top 64MB. Anyway, having it higher allows us
-to check some top bits of the address and detect whether it's kernel
-text or linear mapping.
-
--- 
-Catalin
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
