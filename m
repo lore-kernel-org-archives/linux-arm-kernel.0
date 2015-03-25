@@ -1,153 +1,107 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 Mar 2015 08:16:30 +0100
-Subject: [PATCH v3 4/9] eeprom: Add a simple EEPROM framework for eeprom
- consumers
-In-Reply-To: <1427236219-18709-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1427236219-18709-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150325071630.GW9742@pengutronix.de>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 25 Mar 2015 15:42:22 +0800
+Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <1427241523.2685.18.camel@axtens.net>
+References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>	
+ <1427168064-8657-20-git-send-email-wangyijing@huawei.com>
+ <1427241523.2685.18.camel@axtens.net>
+Message-ID: <551266DE.3030609@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:30:19PM +0000, Srinivas Kandagatla wrote:
-> This patch adds just consumers part of the framework just to enable easy
-> review.
+On 2015/3/25 7:58, Daniel Axtens wrote:
+> On Tue, 2015-03-24 at 11:34 +0800, Yijing Wang wrote:
+>> Now we could use pci_scan_host_bridge() to scan
+>> pci buses, provide powerpc specific pci_host_bridge_ops.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> CC: linuxppc-dev at lists.ozlabs.org
+>> ---
+>>  arch/powerpc/kernel/pci-common.c |   60 +++++++++++++++++++++++--------------
+>>  1 files changed, 37 insertions(+), 23 deletions(-)
 > 
-> Up until now, EEPROM drivers were stored in drivers/misc, where they all had to
-> duplicate pretty much the same code to register a sysfs file, allow in-kernel
-> users to access the content of the devices they were driving, etc.
+>> diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+>> index 2c58200..e2b50a2 100644
+>> --- a/arch/powerpc/kernel/pci-common.c
+>> +++ b/arch/powerpc/kernel/pci-common.c
+>> @@ -773,6 +773,29 @@ void pcibios_set_root_bus_speed(struct pci_host_bridge *bridge)
+>>  		return ppc_md.pcibios_set_root_bus_speed(bridge);
+>>  }
+>>  
+>> +static int pci_host_scan_bus(struct pci_host_bridge *host)
+>> +{
+>> +	int mode = PCI_PROBE_NORMAL;
+>> +	struct pci_bus *bus = host->bus;
+>> +	struct pci_controller *hose = dev_get_drvdata(&host->dev);
+> Is there any reason this isn't *hose = pci_bus_to_host(bus)?
+
+Hi Daniel, thanks for your review and comments. We want to make a generic pci_host_bridge,
+which would hold the common host information, for example, pci domain is common info for
+pci host bridge, this series saved domain in pci_host_bridge, then we no need to
+extract out domain by pci_bus->sysdata by platform specific pci_domain_nr().
+Also we store the sysdata in pci_host_bridge, and pci_bus_to_host() is the platform
+interface, I think use the common interface would be better.
+
+>> +
+>> +	/* Get probe mode and perform scan */
+>> +	if (hose->dn && ppc_md.pci_probe_mode)
+>> +		mode = ppc_md.pci_probe_mode(bus);
+>> +
+>> +	pr_debug("    probe mode: %d\n", mode);
+>> +	if (mode == PCI_PROBE_DEVTREE)
+>> +		of_scan_bus(hose->dn, bus);
+>> +
+>> +	if (mode == PCI_PROBE_NORMAL) {
+>> +		pci_bus_update_busn_res_end(bus, 255);
+>> +		hose->last_busno = pci_scan_child_bus(bus);
+>> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
+>> +	}
+>> +
+>> +	return pci_bus_child_max_busnr(bus);
+>> +}
+>> +
+> I'm having trouble convincing myself that this patch covers every
+> variation within our PCI implementations. In particular, there's a
+> stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
+> identical to this function. Does that implementation need to be cleaned
+> up and replaced with this function too?
 > 
-> This was also a problem as far as other in-kernel users were involved, since
-> the solutions used were pretty much different from on driver to another, there
-> was a rather big abstraction leak.
+
+This is a pci_host_bridge_ops hook function, which would be called in
+PCI core, and after applied this series, we only need to call pci_scan_host_bridge()
+to scan pci devices, and this function is also extracted from the pcibios_scan_phb(),
+it's not the redundant code.
+
 > 
-> This introduction of this framework aims at solving this. It also introduces DT
-> representation for consumer devices to go get the data they require (MAC
-> Addresses, SoC/Revision ID, part numbers, and so on) from the EEPROMs.
+>> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>>  		ppc_md.pcibios_fixup_phb(hose);
+>>  
+>>  	/* Configure PCI Express settings */
+>> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>  		struct pci_bus *child;
+>> -		list_for_each_entry(child, &bus->children, node)
+>> +		list_for_each_entry(child, &host->bus->children, node)
+>>  			pcie_bus_configure_settings(child);
+>>  	}
+>>  }
+> Two things: Firstly, the function uses hose throughout, not host.
+> Secondly, you're not deleting the bus variable: what's the purpose of
+> this change?
+
+host is the common pci_host_bridge which is created by PCI core for pci host bridge driver,
+the hose is the platform data used in powerpc. The purpose of the patch/series is to simplify
+pci enumeration interface, and try to reduce the weak functions which were used to setup pci bus/devices
+during PCI enumeration.
+
 > 
-> Having regmap interface to this framework would give much better
-> abstraction for eeproms on different buses.
-
-Thanks for working on this. This is something that is missing in the
-kernel, it looks very promising to me.
-
-Some comments inline
-
-> +static struct eeprom_cell *__eeprom_cell_get(struct device_node *cell_np,
-> +					     const char *ename,
-> +					     struct eeprom_block *blocks,
-> +					     int nblocks)
-> +{
-> +	struct eeprom_cell *cell;
-> +	struct eeprom_device *eeprom = NULL;
-
-No need to initialize.
-
-> +	struct property *prop;
-> +	const __be32 *vp;
-> +	u32 pv;
-> +	int i, rval;
-> +
-> +	mutex_lock(&eeprom_mutex);
-> +
-> +	eeprom = cell_np ? of_eeprom_find(cell_np->parent) : eeprom_find(ename);
-> +	if (!eeprom) {
-> +		mutex_unlock(&eeprom_mutex);
-> +		return ERR_PTR(-EPROBE_DEFER);
-> +	}
-> +
-
-> +/**
-> + * of_eeprom_cell_get(): Get eeprom cell of device form a given index
-> + *
-> + * @dev: Device that will be interacted with
-> + * @index: eeprom index in eeproms property.
-> + *
-> + * The return value will be an ERR_PTR() on error or a valid pointer
-> + * to a struct eeprom_cell.  The eeprom_cell will be freed by the
-> + * eeprom_cell_put().
-> + */
-> +struct eeprom_cell *of_eeprom_cell_get(struct device *dev, int index)
-> +{
-
-I think the consumer API could be improved. The dev pointer is only used
-to get the struct device_node out of it, so the device_node could be
-passed in directly. As written in my other mail I think the binding
-would be better like "calibration = <&tsens_calibration>;", so this
-function could be:
-
-of_eeprom_cell_get(struct device_node *np, const char *name)
-
-With this we could also get eeprom cells from subnodes which do not have
-a struct device bound to them.
-
-> +	struct device_node *cell_np;
-> +
-> +	if (!dev || !dev->of_node)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	cell_np = of_parse_phandle(dev->of_node, "eeproms", index);
-> +	if (!cell_np)
-> +		return ERR_PTR(-EPROBE_DEFER);
-
--EPROBE_DEFER is not appropriate here. If of_parse_phandle fails it
-won't work next time.
-
-> +
-> +	return __eeprom_cell_get(cell_np, NULL, NULL, 0);
-> +}
-> +EXPORT_SYMBOL_GPL(of_eeprom_cell_get);
-> +
-> +/**
-> + * eeprom_cell_write(): Write to a given eeprom cell
-> + *
-> + * @cell: eeprom cell to be written.
-> + * @buf: Buffer to be written.
-> + * @len: length of buffer to be written to eeprom cell.
-> + *
-> + * The return value will be an non zero on error or a zero on successful write.
-
-No, it returns the length.
-
-> + */
-> +int eeprom_cell_write(struct eeprom_cell *cell, const char *buf, ssize_t len)
-> +{
-> +	struct eeprom_device *eeprom = cell->eeprom;
-> +	int i, rc, offset = 0;
-> +
-> +	if (!eeprom || !eeprom->regmap || len != cell->size)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < cell->nblocks; i++) {
-> +		rc = regmap_bulk_write(eeprom->regmap, cell->blocks[i].offset,
-> +				 buf + offset,
-> +				 cell->blocks[i].count);
-> +
-> +		if (IS_ERR_VALUE(rc))
-> +			return rc;
-> +
-> +		offset += cell->blocks[i].count;
-> +	}
-> +
-> +	return len;
-> +}
-> +EXPORT_SYMBOL_GPL(eeprom_cell_write);
-> +
-
-> +static inline char *eeprom_cell_read(struct eeprom_cell *cell, ssize_t *len)
-> +{
-> +	return NULL;
-> +}
-
-The documentation above the real function states that this function
-either returns an ERR_PTR() or a valid pointer. The wrapper should then
-do the same.
-
-Sascha
+> Regards,
+> Daniel
+> 
 
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks!
+Yijing
