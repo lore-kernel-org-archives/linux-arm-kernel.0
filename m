@@ -1,31 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 Mar 2015 10:04:40 +0900
-Subject: [PATCH/RFC 1/5] clk: shmobile: rcar-gen2: Add CPG Clock Domain
- support
-In-Reply-To: <20150324230036.7930.50037@quantum>
-References: <1426708017-28885-1-git-send-email-geert+renesas@glider.be>
- <1426708017-28885-2-git-send-email-geert+renesas@glider.be>
- <20150324230036.7930.50037@quantum>
-Message-ID: <20150325010440.GC1767@verge.net.au>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Wed, 25 Mar 2015 09:22:02 +0800
+Subject: [PATCH v8 24/30] PCI/tegra: Remove redundant tegra_pcie_scan_bus()
+In-Reply-To: <20150324123139.GA11625@ulmo.nvidia.com>
+References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
+ <1427168064-8657-25-git-send-email-wangyijing@huawei.com>
+ <20150324123139.GA11625@ulmo.nvidia.com>
+Message-ID: <55120DBA.7080105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Tue, Mar 24, 2015 at 04:00:36PM -0700, Michael Turquette wrote:
-> Quoting Geert Uytterhoeven (2015-03-18 12:46:53)
-> > Add Clock Domain support to the R-Car Gen2 Clock Pulse Generator (CPG)
-> > driver using the generic PM Domain.  This allows to power-manage the
-> > module clocks of SoC devices that are part of the CPG Clock Domain using
-> > Runtime PM, or for system suspend/resume.
-> > 
-> > SoC devices that are part of the CPG Clock Domain and can be
-> > power-managed through their primary clock should be tagged in DT with a
-> > proper "power-domains" property.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 2015/3/24 20:31, Thierry Reding wrote:
+> On Tue, Mar 24, 2015 at 11:34:18AM +0800, Yijing Wang wrote:
+>> Now pci_scan_root_bus() is almost similar to
+>> pci_create_root_bus() + pci_scan_child_bus().
+>> So we could use common pci_scan_root_bus() in
+>> pci_common_init_dev() to scan pci busses.
+>> tegra_pcie_scan_bus() is redundant, remove it.
+>>
+>> Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+>> CC: Thierry Reding <thierry.reding@gmail.com>
+>> CC: linux-tegra at vger.kernel.org
+>> ---
+>>  drivers/pci/host/pci-tegra.c |   16 ----------------
+>>  1 files changed, 0 insertions(+), 16 deletions(-)
 > 
-> Looks good to me. Which tree do you want this patch to go through?
+> Jetson TK1 still boots over NFS root via the onboard PCIe network card
+> with this series applied, so:
+> 
+> Tested-by: Thierry Reding <treding@nvidia.com>
+> Acked-by: Thierry Reding <treding@nvidia.com>
 
-My tree seems reasonable from my point of view.
-Though at this point it would be targeted at v4.2.
+Thanks!
+
+> 
+
+
+-- 
+Thanks!
+Yijing
