@@ -1,24 +1,37 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 26 Mar 2015 03:41:32 +0530
-Subject: [PATCH v1 1/3] phy: phy-core: allow specifying supply at port
- level
-In-Reply-To: <1426886727-537-2-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426886727-537-2-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <55133294.4040705@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 25 Mar 2015 17:12:24 -0500
+Subject: [PATCH] ARM: DRA7: Enable Cortex A15 errata 798181
+Message-ID: <1427321544-5150-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+ARM errata 798181 is applicable for DRA7 based devices. So enable
+the same in the build. Errata extract and workaround information
+is as below.
 
-On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
-> Multi-port phy's may have per-port power supplies. Let's change phy core
-> to first attempt to look up the supply at the port level, and then, if
-> not found, check parent device.
+On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
+adequately shooting down all use of the old entries. The
+ARM_ERRATA_798181 option enables the Linux kernel workaround
+for this erratum which sends an IPI to the CPUs that are running
+the same ASID as the one being invalidated.
 
-Why not just have every port provide the power supply if it needs?
-I don't think checking for parent device should be present in the phy-core at
-all.
+Reported-by: Praneeth Kumar Bajjuri <praneeth@ti.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-Kishon
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 2b8e47788062..1f78709adb05 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -69,6 +69,7 @@ config SOC_DRA7XX
+ 	select ARM_GIC
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select IRQ_CROSSBAR
++	select ARM_ERRATA_798181 if SMP
+ 
+ config ARCH_OMAP2PLUS
+ 	bool
+-- 
+1.7.9.5
