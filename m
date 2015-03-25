@@ -1,65 +1,72 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 25 Mar 2015 10:39:50 +0100
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <55128016.3030903@denx.de>
-References: <55128016.3030903@denx.de>
-Message-ID: <1427276390.2813.7.camel@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Mar 2015 10:40:12 +0100
+Subject: [PATCH RFC/RFT 5/6] ARM: Exynos: migrate DCSCB to the new MCPM
+ backend abstraction
+In-Reply-To: <alpine.LFD.2.11.1503241913040.27567@knanqh.ubzr>
+References: <1426701893-25589-1-git-send-email-nicolas.pitre@linaro.org>
+ <1426701893-25589-6-git-send-email-nicolas.pitre@linaro.org>
+ <alpine.LFD.2.11.1503241913040.27567@knanqh.ubzr>
+Message-ID: <5512827C.7020301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 25.03.2015, 10:29 +0100 schrieb Stefan Roese:
-> Hi!
-> 
-> I'm currently facing a problem in the imx6 PCIe driver. The
-> problem happens, after the Linux imx6 internal watchdog has timed-out
-> and issues a reset (this is intended, as I'm testing this wdog right
-> now). But the next Linux boot hangs in imx6_pcie_assert_core_reset()
-> while accessing a register from the PCIe port logic memory:
-> 
-> 		val = readl(pp->dbi_base + PCIE_PL_PFLR);
-> 
-> The watchdog will issue a new reset once it times out again. But
-> Linux will hang here the next time as well. Only a power-cycle
-> helps. For a test purpose, I've removed the following part from
-> this function:
-> 
-> 	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
-> 	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
-> 		...
-> 	}
-> 
-> Without it, Linux boots up fine. And PCIe also seems to be fully
-> functional.
-> 
-> I have to admit that I have no real insight in the imx6 / DW PCIe
-> driver. So I'm checking with you experts, if you have any ideas why
-> this could be the case? And how this could be solved.
-> 
-> BTW: This happens with v3.19 and v4.0-rc5 on a i.MX6Solo based board
-> (TQMa6S SoM). With no PCIe support enabled in the bootloader (U-Boot).
+On 03/25/2015 12:24 AM, Nicolas Pitre wrote:
+> On Wed, 18 Mar 2015, Nicolas Pitre wrote:
+>
+>> The custom suspend callback is removed for this change. That includes
+>> the dubious call to exynos_cpu_power_up(() that was present at the end
+>> of exynos_suspend().
+>
+> After testing on actual hardware, it turns out that this call is
+> important.  This patch is therefore amended with the following:
+>
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index d4bbbfb5fe..9bdf54795f 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -152,6 +152,12 @@ static int exynos_wait_for_powerdown(unsigned int cpu, unsigned int cluster)
+>   	return -ETIMEDOUT; /* timeout */
+>   }
+>
+> +static void exynos_cpu_is_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	/* especially when resuming: make sure power control is set */
+> +	exynos_cpu_powerup(cpu, cluster);
+> +}
+> +
+>   static const struct mcpm_platform_ops exynos_power_ops = {
+>   	.cpu_powerup		= exynos_cpu_powerup,
+>   	.cluster_powerup	= exynos_cluster_powerup,
+> @@ -160,6 +166,7 @@ static const struct mcpm_platform_ops exynos_power_ops = {
+>   	.cpu_cache_disable	= exynos_cpu_cache_disable,
+>   	.cluster_cache_disable	= exynos_cluster_cache_disable,
+>   	.wait_for_powerdown	= exynos_wait_for_powerdown,
+> +	.cpu_is_up		= exynos_cpu_is_up,
+>   };
+>
+>   /*
+>
+> The whole commit now appears as follows in my git tree:
+>
+> commit 0d86b0b4cf869fa48d96bde231b9d04ea68b6422
+> Author: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Date:   Mon Mar 16 17:16:07 2015 -0400
+>
+>      ARM: Exynos: migrate DCSCB to the new MCPM backend abstraction
+>
+>      The custom suspend callback is removed for this change. The extra call
+>      to exynos_cpu_power_up(() that was present at the end of exynos_suspend()
+>      is now relocated to the cpu_is_up callback.
+>
+>      Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-The problem here is that the LTSSM state machine stays in "Link" state
-after the WD reset and no configuration of the core can happen in this
-state. The path inside the above if clause applies a workaround the get
-LTSSM back into the initial state.
+Tested on exynos5800 (chromebook2).
 
-As this is a bit racy and not the intended way to do things we only
-apply this workaround if we are relatively certain that the PCIe link
-had been enabled without a reset to the core before.
-
-So what you are saying is that after the WD reset the GPR registers are
-cleared? If so we may need to make the logic to decide when to apply
-this WAR a bit smarter.
-
-Generally a lot of those problems can be avoided if you use the WD
-output pin and do a proper power-cycle through the PMIC in case the WD
-triggers. This will also spare you some pain as soon as you enable CPU
-frequency scaling with voltage changes enabled.
-
-Regards,
-Lucas
+Tested-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
