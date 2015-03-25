@@ -1,34 +1,27 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Mar 2015 17:37:48 +0000
-Subject: [PATCH] KVM: arm/arm64: fix MMIO handling on userland induced
- accesses
-In-Reply-To: <1427212996-16844-1-git-send-email-andre.przywara@arm.com>
-References: <1427126309-11223-12-git-send-email-andre.przywara@arm.com>
- <1427212996-16844-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <5512F26C.4080105@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 25 Mar 2015 18:42:44 +0100
+Subject: Request for additional arm64 branch in linux-next
+In-Reply-To: <20150325172002.GN24636@arm.com>
+References: <20150325172002.GN24636@arm.com>
+Message-ID: <20150325174244.GA3318@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/15 16:03, Andre Przywara wrote:
-> The guest is not the only user of the MMIO handling routines, userland
-> can also read and write to those handlers. Since we don't use the
-> KVM iobus framework in this case, we have to set the data pointer to
-> some actual memory before executing the handler routines.
-> This allows to use QEMU as the userland control tool.
+On Wed, Mar 25, 2015 at 05:20:03PM +0000, Will Deacon wrote:
+> Hi Stephen,
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Hi,
-> 
-> just embarrassingly realised that I haven't tested the latest version of this
-> series with QEMU, so this bug slipped me. Sorry for that! I will merge this
-> patch in the next revision of this series (or just send a new version of
-> 11/12).
+> We've got a series of patches introducing ACPI support for arm64 that
 
-I'll squash it into patch #11 when I merge it.
+Oh dear ARM comrades-in-arms, I was hearing rumours and was secretly
+hoping that you would stay sane and not do the colossal mistake x86 did.
 
-Thanks,
+My condolences.
 
-	M.
+Perhaps not all is lost after all...
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
