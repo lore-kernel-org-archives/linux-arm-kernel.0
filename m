@@ -1,56 +1,75 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Mar 2015 18:03:25 +0000 (UTC)
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks Tegra20
- multi_v7_defconfig boot
-Message-ID: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 25 Mar 2015 19:18:19 +0100
+Subject: at91 clocks
+In-Reply-To: <20150325173751.0d6479df@bbrezillon>
+References: <55117568.6090202@microbit.se>
+ <20150325013201.3f01fc22@bbrezillon> <55127AA6.5050902@microbit.se>
+ <20150325173751.0d6479df@bbrezillon>
+Message-ID: <5512FBEB.2060609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 25/03/2015 17:37, Boris Brezillon a ?crit :
+> Hi Jonas,
+> 
+> On Wed, 25 Mar 2015 10:06:46 +0100
+> Jonas Andersson <jonas@microbit.se> wrote:
+> 
+>> Hi Boris and others,
+>>
+>> On 2015-03-25 01:32, Boris Brezillon wrote:
+>>> Hi Jonas,
+>>>
+>>> On Tue, 24 Mar 2015 15:32:08 +0100
+>>> Jonas Andersson <jonas@microbit.se> wrote:
+>>>
+>>>> Hi all,
+>>>>
+>>>> I am working on a system with at91sam9260 soc. Trying to move from
+>>>> kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
+>>>>
+>>>> In my old code i use clk_get() to get pck1 and pllb, set pllb as parent
+>>>> for pck1, set rate for pck1, enable pck1.
+>>> How do you do that (clk_set_parent + clk_set_rate) ?
+>>> Could you paste your code somewhere ?
+>>
+>> Yes, see http://pastie.org/10052161
+> 
+> Your pllb seems to be configured to output a 0Hz rate, and I'm not
+> forwarding rate change to prog clk parents yet.
+> That's definitely something I should work on, but in the meantime you
+> could try to manually set pllb rate.
+> 
+>>
+>>>
+>>>> Extract from
+>>>> /sys/kernel/debug/at91_clk:
+>>>> pllb       users= 1 on   96000000 Hz main
+>>>> pck1       users= 1 on   12000000 Hz pllb
+>>>>
+>>> With the new implementation calling clk_set_rate(pck1, 120000000)
+>>> should do the job: it should choose the best parent clk and divisor.
+>>
+>> Ok thank you for that information. I tried that now (new code in link 
+>> above), and i got a clock output but not exactly my wanted 12MHz. I 
+>> measure 9.216MHz at pck1 output.
+>>
+>>         mainck                             2            2 
+>> 18432000          0 0
+>>            prog1                           1            1 
+>> 9216000          0 0
+>>               pck1                         1            1 
+>> 9216000          0 0
+>>
+>> pllbck is still unused.
+>>
+>> I tried kernel 4.0-rc5 but it hangs in boot after ethernet init.
+> 
+> Is this related to the changes I suggested ?
 
-Hello Geert,
+It seems to be related as I tried to boot an at91sam9260ek with current
+Linus' tree and it doesn't hangs after Ethernet on my side...
 
-Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM: 
-multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20 
-multi_v7_defconfig boot.  
-
-Boot log before:
-
-http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-
-Boot log after:
-
-http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-
-
-Any ideas?  Stephen Warren thinks there might be an initcall that might 
-not check to see what kind of device it's running on.
-
-
-- Paul
-
-commit 4a3a6f86693922b29cf829c63f652b057f14619e
-Author: Geert Uytterhoeven <geert+renesas@glider.be>
-Date:   Tue Feb 24 15:14:45 2015 +0100
-
-    ARM: multi_v7_defconfig: Enable shmobile platforms
-    
-    Enable support for shmobile platforms that became multi-platform aware.
-    Several non-critical drivers and subsystems are built as modules, to keep
-    kernel size reasonable.
-    
-    Tested on:
-      - r8a73a4/ape6evm:
-          - U-Boot fails with "Error: unrecognized/unsupported machine ID",
-          - kexec works.
-      - r8a7740/armadillo:
-          - Hermit boot loader fails (larger image, more memory corruption),
-          - kexec works.
-      - r8a7791/koelsch,
-      - sh73a0/kzm9g:
-          - zImage+DTB from U-Boot needs CONFIG_ARM_ATAG_DTB_COMPAT=n,
-          - kexec works.
-      - am335x/boneblack.
-    
-    Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-    Acked-by: Simon Horman <horms+renesas@verge.net.au>
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Bye,
+-- 
+Nicolas Ferre
