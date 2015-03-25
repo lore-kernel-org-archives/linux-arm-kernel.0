@@ -1,62 +1,83 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 24 Mar 2015 15:02:53 -0700
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150319193927.GG4751@arm.com>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
- <20150319101727.GC24556@red-moon> <20150319193927.GG4751@arm.com>
-Message-ID: <20150324220253.9595AC407F8@trevor.secretlab.ca>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 25 Mar 2015 15:04:51 +0800
+Subject: [RESEND PATCH v3] mtd: hisilicon: add device tree node for NAND
+ controller
+Message-ID: <1427267091-227474-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015 19:39:27 +0000
-, Will Deacon <will.deacon@arm.com>
- wrote:
-> On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> > On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
-> > > On 2015/3/19 3:05, Will Deacon wrote:
-> > > > On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
-> > > >> This patch set already tested on multi platforms:
-> > > >>  - AMD Seattle board;
-> > > >>  - Cavium Thunder board;
-> > > >>  - Huawei D02 board;
-> > > >>  - Qualcomm ARM64 platform
-> > > >>
-> > > >> This version 10 patch set address some minor comments and collect ACKs and
-> > > >> Reviewed-bys for v9:
-> > > >>
-> > > >>  - new Acks from Rafael, Olof, Grant, Lorenzo
-> > > >>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
-> > > >>    but no functional change
-> > > >>  - Remove if(!phys) for early ioremappings
-> > > >>  - Rework sleep function for ARM64
-> > > >>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
-> > > >>  - Disable ACPI if not HW_REDUCED_ACPI compliant
-> > > >>  - Remove the doc of why ACPI on ARM
-> > > > So I've had a look at the current state of this series and I think there
-> > > > are a few immediate things left to do:
-> > > >
-> > > >   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
-> > > >       Catalin
-> > > 
-> > > Sure, it will be done after the confirmation with Ard.
-> > > 
-> > > >
-> > > >   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
-> > > >       so I'm assuming there will be additional patches from them that are
-> > > >       required.
-> > > 
-> > > Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
-> > 
-> > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> > I am working on it, I do not think it should be a blocking point, patch
-> > coming asap on top of your series.
-> 
-> Well, I don't really want to merge the series without those patches so I
-> do think it blocks the code from getting into mainline.
+This patch adds dts support for NAND flash controller of Hisilicon Soc Hip04.
+Now it is based on v4.0-rc5
 
-Really? It's a pretty minor duplication problem and it's been identified
-as something requiring refactoring to both the ACPI and DT code. It
-isn't at all dangerous. Why is this a blocking point?
+Changes in v3:
+- Change E-mail address in signed-off-by to "wangzhou1 at hisilicon.com"
+Changes in v2:
+- Base on v3.19-rc1
+- Use nand-ecc-strength, nand-ecc-step-size to replace hisi,nand-ecc-bits
+Changes in v1:
+- Move partition and other board related information into board dts file:
+  hip04-d01.dts
 
-g.
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+---
+ arch/arm/boot/dts/hip04-d01.dts | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/hip04.dtsi    |  7 +++++++
+ 2 files changed, 34 insertions(+)
+
+diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+index 40a9e33..ba04dd5 100644
+--- a/arch/arm/boot/dts/hip04-d01.dts
++++ b/arch/arm/boot/dts/hip04-d01.dts
+@@ -28,5 +28,32 @@
+ 		uart0: uart at 4007000 {
+ 			status = "ok";
+ 		};
++
++		nand: nand at 4020000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "hw";
++			nand-ecc-strength = <16>;
++			nand-ecc-step-size = <1024>;
++
++			partition at 0 {
++				label = "nand_text";
++				reg = <0x00000000 0x00400000>;
++			};
++
++			partition at 00400000 {
++				label = "nand_monitor";
++				reg = <0x00400000 0x00400000>;
++			};
++
++			partition at 00800000 {
++				label = "nand_kernel";
++				reg = <0x00800000 0x00800000>;
++			};
++
++			partition at 01000000 {
++				label = "nand_fs";
++				reg = <0x01000000 0x1f000000>;
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+index 2388145..ac32fce 100644
+--- a/arch/arm/boot/dts/hip04.dtsi
++++ b/arch/arm/boot/dts/hip04.dtsi
+@@ -269,6 +269,13 @@
+ 			interrupts = <0 372 4>;
+ 		};
+ 
++		nand: nand at 4020000 {
++			compatible = "hisilicon,504-nfc";
++			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
++			interrupts = <0 379 4>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
+ 	};
+ 
+ 	etb at 0,e3c42000 {
+-- 
+1.9.1
