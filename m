@@ -1,47 +1,59 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 25 Mar 2015 15:35:16 +0100
-Subject: Cache line size definition in arch/arm/mm/Kconfig
-Message-ID: <5512C7A4.3000302@free.fr>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 25 Mar 2015 17:02:42 +0200
+Subject: [PATCHv5 27/35] ARM: dts: am33xx: add minimal l4 bus layout with
+ control module support
+In-Reply-To: <20150320233043.GW31346@atomide.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-28-git-send-email-t-kristo@ti.com>
+ <550C9490.3070505@ti.com> <20150320223541.GV31346@atomide.com>
+ <550CABD9.5060000@ti.com> <20150320233043.GW31346@atomide.com>
+Message-ID: <5512CE12.6030301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
-
-AFAICT, L1 cache line size is specified in arch/arm/mm/Kconfig
-
-config ARM_L1_CACHE_SHIFT_6
-	bool
-	default y if CPU_V7
-	help
-	  Setting ARM L1 cache line size to 64 Bytes.
-
-config ARM_L1_CACHE_SHIFT
-	int
-	default 6 if ARM_L1_CACHE_SHIFT_6
-	default 5
-
-
-I'm using a Cortex A9 MPCore. If I'm not mistaken, the cache line size
-is 32 bytes, even though this CPU is ARMv7.
-
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388g/Caccifbd.html
-
-> The Cortex-A9 processor has separate instruction and data caches.
-> The caches have the following features:
+On 03/21/2015 01:30 AM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [150320 16:24]:
+>> On 03/20/2015 05:35 PM, Tony Lindgren wrote:
+>>> * Suman Anna <s-anna@ti.com> [150320 14:44]:
+>>>> On 03/20/2015 01:44 PM, Kristo, Tero wrote:
+>>>>> +			scm: scm at 210000 {
+>>>>> +				compatible = "ti,am3-scm", "simple-bus";
+>>>>> +				reg = <0x210000 0x2000>;
+>>>>> +				#address-cells = <1>;
+>>>>> +				#size-cells = <1>;
+>>>>> +				ranges = <0 0x210000 0x2000>;
+>>>>> +
+>>>>> +				am33xx_pinmux: pinmux at 800 {
+>>>>> +					compatible = "pinctrl-single";
+>>>>> +					reg = <0x800 0x238>;
+>>>>> +					#address-cells = <1>;
+>>>>> +					#size-cells = <0>;
+>>>>> +					pinctrl-single,register-width = <32>;
+>>>>> +					pinctrl-single,function-mask = <0x7f>;
+>>>>> +				};
+>>>>> +
+>>>>> +				scm_conf: scm_conf at 0 {
+>>>>> +					compatible = "syscon";
+>>>>> +					reg = <0x0 0x7fc>;
+>>>>
+>>>> Hmm, you are consolidating the am33xx_control_module and cm nodes, so is
+>>>> this supposed to be 0x800 or 0x7fc? I would think it should be 0x800.
+>>>
+>>> Seems correct to me, it's offset 0, size 0x7fc. So that's the scm_conf
+>>> syscon area before pinctrl-single at 0x44c00000 + 0x210000 + 0.
+>>>
+>>> The io area for pinctrl-single starts at 0x800, so the scm_conf should
+>>> be before it in the dts file.
+>>
+>> Well, I understand that it is how it was before, but we won't be mapping
+>> or covering the last register efuse_sma before the pinctrl cfg
+>> registers. Any reason for just leaving out that register?
 >
->   Each cache can be disabled independently. See System Control Register.
->   Both caches are 4-way set-associative.
->   The cache line length is eight words.
->   On a cache miss, critical word first filling of the cache is performed.
->   You can configure the instruction and data caches independently during implementation to sizes of 16KB, 32KB, or 64KB.
->   To reduce power consumption, the number of full cache reads is reduced by taking advantage of the sequential nature of many cache operations. If a cache read is sequential to the previous cache read, and the read is within the same cache line, only the data RAM set that was previously read is accessed.
+> Oh I see yeah that looks like a bug to me.
+>
+> Tony
+>
 
+Updated this patch in my branch now to make scm_conf area be size 0x800.
 
-How do I set ARM_L1_CACHE_SHIFT_6 to 'n' in my platform Kconfig?
-
-Or perhaps I should "override" ARM_L1_CACHE_SHIFT to 5 (again in
-my platform Kconfig). I don't know the syntax to do that.
-
-Could someone point out the correct way?
-
-Regards.
+-Tero
