@@ -1,17 +1,20 @@
 From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Wed, 25 Mar 2015 20:00:07 +0100
-Subject: [PATCH 1/1] ARM: exynos_defconfig: Enable options to mount a rootfs
- via NFS
-Message-ID: <1427310007-1022-1-git-send-email-javier.martinez@collabora.co.uk>
+Date: Wed, 25 Mar 2015 20:08:24 +0100
+Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable options to mount a
+ rootfs via NFS
+Message-ID: <1427310504-1505-1-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the needed options to mount a rootfs over
-NFS and also the needed support for automatic configuration
-of IP addresses during boot as needed by NFS.
+This patch enables the options to mount a rootfs over NFS and also support
+for automatic configuration of IP addresses during boot as needed by NFS.
 
 Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 ---
+
+Changes since v1:
+ - Found a typo in the changelog after posting the patch. Sorry for the noise.
+
  arch/arm/configs/exynos_defconfig | 6 ++++++
  1 file changed, 6 insertions(+)
 
