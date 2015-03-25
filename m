@@ -1,58 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Mar 2015 13:13:46 -0700
-Subject: [PATCH v2 0/3] clk: sunxi: Add muxable AHB clock to fix hstimer
- issues
-In-Reply-To: <20150325185152.GM23664@lukather>
-References: <1427217729-10017-1-git-send-email-wens@csie.org>
- <20150325185152.GM23664@lukather>
-Message-ID: <CAGb2v66e=ssx=gPMVkc=u0WbhtwCHgbR2Vg3Q3wNTSsBZniaMA@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 25 Mar 2015 21:20:00 +0100 (CET)
+Subject: [PATCH 7/7] ARM: dts: add OPPs for i.MX23/i.MX28
+In-Reply-To: <201503242145.26370.juergen@kreuzholzen.de>
+References: <1426984203-9133-1-git-send-email-stefan.wahren@i2se.com>
+ <1426984203-9133-8-git-send-email-stefan.wahren@i2se.com>
+ <201503242145.26370.juergen@kreuzholzen.de>
+Message-ID: <295486259.670501.1427314800804.JavaMail.open-xchange@oxbaltgw09.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 11:51 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Mar 25, 2015 at 01:22:06AM +0800, Chen-Yu Tsai wrote:
->> Hi everyone,
->>
->> This is v2 of the sun5i muxable AHB clock series.
->>
->> Changes since v1:
->>
->>   - Dropped patches 1~3 that are merged
->>   - Extend comments to clarify what the "base factor clock" refers to,
->>     and what the divs clocks outputs should be.
->>
->>
->> This series adds support for the muxable ahb clock on sun5/7i. The mux
->> has inputs such as the axi clock, the cpu clock on sun5i, and pll6 with
->> various dividers. The goal is to have ahb muxed to pll6, which should
->> be a fixed rate albeit configurable clock. This fixes issues with
->> cpufreq changing the cpu frequency, which would affect the hstimer
->> clocked from ahb.
->>
->> Patch 1 makes divs clocks explicitly specify in the driver which output
->> is the base factor clock, instead of always putting it in last. This is
->> done to ensure DT bindings compatibility when we add outputs.
->>
->> Patch 2 adds the new pll6/4 output, which is used on sun7i as an input
->> to ahb mux.
->>
->> Patch 3 updates the dtsi files with the new drivers.
->>
->> The series is also available at
->>
->>     https://github.com/wens/linux/commits/sun5i-ahb-v2
+Hi Juergen,
+
+> Juergen Borleis <juergen@kreuzholzen.de> hat am 24. M?rz 2015 um 21:45
+> geschrieben:
 >
-> Applied all three. I think it would be great to convert the later SoCs
-> to that too, just to make sure we have the same policy on all SoCs.
+>
+> Stefan Wahren wrote:
+> > [...]
+> 
+> Maybe you should take into account not to reduce VDD below 1.55 V if the SDRAM
+> controller runs above 196 MHz. The i.MX28 datasheet[1] lists these
+> restrictions. VDD powers the SDRAM controller as well. From the datasheet the
+> table "Frequency versus Voltage for EMICLK" shows:
+>
+> EMICLK Fmax (MHz)
+> VDDD (V) DDR2 mDDR
+> --------------------------------
+> 1.550 205.71 205.71
+> 1.450 196.36 196.36
+> 1.350 196.36 196.36
+>
+> jbe
+>
+> [1]
+> i.MX28 Applications
+> Processors for Consumer
+> Products
+> Silicon Version 1.2
+>
+> Document Number: IMX28CEC
+> Rev. 3, 07/2012
 
-For sun6i this is already doable. We just move the assignment from the
-dmaengine node to the clock node.
+thanks for pointing out. I will take care of it.
 
-For sun8i the default divider results in 300 MHz for AHB, which might
-be too fast. And we can't do clock rate assignment yet. The clock
-drivers need to be split out.
-
-For sun9i it is already the default.
-
-ChenYu
+Stefan
