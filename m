@@ -1,47 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 Mar 2015 16:37:30 +0100
-Subject: [PATCH v2 4/6] pinctrl: st: Supply a GPIO get_direction()
- call-back
-In-Reply-To: <1426699279-9258-5-git-send-email-lee.jones@linaro.org>
+Date: Wed, 25 Mar 2015 16:38:38 +0100
+Subject: [PATCH v2 5/6] pinctrl: st: Show correct pin direction -- even
+ when in GPIO mode
+In-Reply-To: <1426699279-9258-6-git-send-email-lee.jones@linaro.org>
 References: <1426699279-9258-1-git-send-email-lee.jones@linaro.org>
- <1426699279-9258-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdb+VLeO5myAqSwRq_ppSxUpOBi3YdTORx6Tk=9GQu=Txw@mail.gmail.com>
+ <1426699279-9258-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdai4Gtif9vUwGW0xc9qpgkf3O4r0Lmm2aJfeL78h0P=rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Mar 18, 2015 at 6:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> ST's hardware differentiates between GPIO mode and Pinctrl alternate
-> functions.  When a pin is in GPIO mode, there are dedicated registers
-> to set and obtain direction status.  However, If a pin's alternate
-> function is in use then the direction is set and status is derived
-> from a bunch of syscon registers.  The issue is; until now there was
-> a lack of parity between the two.
+> Until now ST's pinconf_dbg_show() call-back has displayed the PIO
+> alternate function direction, which is only relevant if a pin is
+> operating in an alternate function mode i.e not GPIO mode.  If a
+> pin is in GPIO mode its direction is both set and status is
+> obtained by a completely different/unrelated bunch of registers.
 >
-> For example:
->
-> Catting the two following information sources could result in
-> conflicting information (output has been snipped for simplicity):
->
->  $ cat /sys/kernel/debug/gpio
->   GPIOs 32-39, platform/961f080.pin-controller-sbc, PIO4:
->    gpio-33  (?                   ) out hi
->
->  $ cat /sys/kernel/debug/pinctrl/<pin-controller>/pinconf-pins
->   pin 33 (PIO4[1]):[OE:0,PU:0,OD:0]
->          [retime:0,invclk:0,clknotdat:0,de:0,rt-clk:0,rt-delay:0]
->
-> In this example GPIO-33 is a GPIO controlled LED, which is set for
-> output, as you'd expect.  However, when the same information is
-> drafted from Pinctrl, it clearly states that OE (Output Enable) is
-> not set i.e. the pin is set for input.  This is because OE normally
-> only represents alternate functions and has no bearing on how the
-> pin operates when in Alt-0 (GPIO mode).
->
-> This patch changes the current semantics and provides a parity link
-> between the two subsystems.  The get_direction() call-back firstly
-> determines which function a pin is operating in, then uses the
-> appropriate helpers for that mode.
+> This change ensures that the correct pin direction is shown, even
+> if a pin is operating in GPIO mode.
 >
 > Reported-by: Olivier Clergeaud <olivier.clergeaud@st.com>
 > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
