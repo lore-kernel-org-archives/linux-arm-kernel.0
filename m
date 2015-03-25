@@ -1,25 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 Mar 2015 10:10:05 +0000
-Subject: [PATCH v11 0/4] ARM: VDSO
-In-Reply-To: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
-References: <1426886003-30123-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <20150325101004.GX8656@n2100.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 Mar 2015 11:14:28 +0100
+Subject: [PATCH 0/2] leds/pwm: don't call pwm_disable when setting
+ brightness
+In-Reply-To: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1423734290-19750-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150325101428.GB32677@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 04:13:19PM -0500, Nathan Lynch wrote:
-> Provide fast userspace implementations of gettimeofday and
-> clock_gettime on systems that implement the generic timers extension
-> defined in ARMv7.  This follows the example of arm64 in conception but
-> significantly differs in some aspects of the implementation (C vs
-> assembly, mainly).
+[Cc: += akpm]
 
-Okay, having re-read the code, I'm happy with this now.  I'll see about
-testing it out on the platforms I have here in the next few days.  As
-I now have a Cortex A15 platform, I can hopefully also check what effect
-it has there (assuming ethernet gets fixed on it so I can get programs
-onto the platform.)
+On Thu, Feb 12, 2015 at 10:44:48AM +0100, Uwe Kleine-K?nig wrote:
+> on arm/i.MX28 the leds connected to a pwm are still broken and it's more
+> than three years ago that I came up with these patches. I still consider
+> them to do the right thing and they fix a real bug.
+I'm really frustrated here. I want to fix a real bug, made several
+suggestions (with patches) how to fix it and still have to include my
+local patches in each project that uses leds on i.MX28's pwm output.
+
+Thierry, how can we get this resolved?
+
+Best regards
+Uwe
+
+> Old threads to this topic include:
+> 
+> 	http://thread.gmane.org/gmane.linux.kernel/1381289
+> 	http://thread.gmane.org/gmane.linux.ports.arm.kernel/282593/focus=282596
+> 	http://thread.gmane.org/gmane.linux.pwm/1749
+> 
+> Uwe Kleine-K?nig (2):
+>   pwm/doc: Clearify that the pin state after pwm_disable is undefined
+>   leds/pwm: Don't disable pwm when setting brightness to 0
+> 
+>  Documentation/pwm.txt   |  5 +++++
+>  drivers/leds/leds-pwm.c | 10 +++++-----
+>  2 files changed, 10 insertions(+), 5 deletions(-)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
