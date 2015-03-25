@@ -1,27 +1,24 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Mar 2015 16:56:34 +0000
-Subject: [PATCH v2 01/12] KVM: Redesign kvm_io_bus_ API to pass VCPU
- structure to the callbacks.
-In-Reply-To: <1427126309-11223-2-git-send-email-andre.przywara@arm.com>
-References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
- <1427126309-11223-2-git-send-email-andre.przywara@arm.com>
-Message-ID: <5512E8C2.9010708@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 25 Mar 2015 09:58:15 -0700
+Subject: [PATCH resend] ASoC: fsl-ssi: Fix bitclock calculation for
+ master mode
+In-Reply-To: <1427121972-5059-1-git-send-email-mkl@pengutronix.de>
+References: <1427121972-5059-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20150325165814.GJ3572@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/15 15:58, Andre Przywara wrote:
-> From: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+On Mon, Mar 23, 2015 at 03:46:12PM +0100, Marc Kleine-Budde wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
 > 
-> This is needed in e.g. ARM vGIC emulation, where the MMIO handling
-> depends on the VCPU that does the access.
-> 
-> Signed-off-by: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Acked-by: Paolo Bonzini <pbonzini@redhat.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> in fsl_ssi_set_bclk we are looking for the best divider by iterating
+> over all possible dividers. The divider is in the range 1..256, so
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/b37dbe63/attachment.sig>
