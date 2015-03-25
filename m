@@ -1,50 +1,114 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 25 Mar 2015 08:03:56 +0100
-Subject: [PATCH 2/2] ARM: cpuidle: Document the code
-In-Reply-To: <20150324185144.GB27311@red-moon>
-References: <20150323225828.GC15435@e102568-lin.cambridge.arm.com>
- <1427190842-30675-1-git-send-email-daniel.lezcano@linaro.org>
- <1427190842-30675-2-git-send-email-daniel.lezcano@linaro.org>
- <20150324185144.GB27311@red-moon>
-Message-ID: <55125DDC.9000901@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 Mar 2015 08:10:06 +0100
+Subject: [PATCH v3 5/9] eeprom: Add bindings for simple eeprom framework
+In-Reply-To: <1427236230-18751-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427236230-18751-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150325071006.GC4946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2015 07:51 PM, Lorenzo Pieralisi wrote:
-> On Tue, Mar 24, 2015 at 09:54:02AM +0000, Daniel Lezcano wrote:
->> Add kernel-doc format documentation in the code.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
+On Tue, Mar 24, 2015 at 10:30:30PM +0000, Srinivas Kandagatla wrote:
+> This patch adds bindings for simple eeprom framework which allows eeprom
+> consumers to talk to eeprom providers to get access to eeprom cell data.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> [Maxime Ripard: intial version of eeprom framework]
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../devicetree/bindings/eeprom/eeprom.txt          | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+> new file mode 100644
+> index 0000000..8348d18
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+> @@ -0,0 +1,70 @@
+> += EEPROM Data Device Tree Bindings =
+> +
+> +This binding is intended to represent the location of hardware
+> +configuration data stored in EEPROMs.
+> +
+> +On a significant proportion of boards, the manufacturer has stored
+> +some data on an EEPROM-like device, for the OS to be able to retrieve
+> +these information and act upon it. Obviously, the OS has to know
+> +about where to retrieve these data from, and where they are stored on
+> +the storage device.
+> +
+> +This document is here to document this.
+> +
+> += Data providers =
+> +Contains bindings specific to provider drivers and data cells as children
+> +to this node.
+> +
+> += Data cells =
+> +These are the child nodes of the provider which contain data cell
+> +information like offset and size in eeprom provider.
+> +
+> +Required properties:
+> +reg:	specifies the offset in byte within that storage device, and the length
+> +	in bytes of the data we care about.
+> +	There could be more then one offset-length pairs in this property.
+> +
+> +Optional properties:
+> +As required by specific data parsers/interpreters.
+> +
+> +For example:
+> +
+> +	/* Provider */
+> +	qfprom: qfprom at 00700000 {
+> +		compatible 	= "qcom,qfprom";
+> +		reg		= <0x00700000 0x1000>;
+> +		...
+> +
+> +		/* Data cells */
+> +		tsens_calibration: calib at 404 {
+> +			reg = <0x404 0x10>;
+> +		};
+> +
+> +		serial_number: sn {
+> +			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
+> +
+> +		};
+> +		...
+> +	};
+> +
+> += Data consumers =
+> +Are device nodes which consume eeprom data cells.
+> +
+> +Required properties:
+> +
+> +eeproms: List of phandle and data cell the device might be interested in.
+> +
+> +Optional properties:
+> +
+> +eeprom-names: List of data cell name strings sorted in the same order
+> +	      as the eeproms property. Consumers drivers will use
+> +	      eeprom-names to differentiate between multiple cells,
+> +	      and hence being able to know what these cells are for.
+> +
+> +For example:
+> +
+> +	tsens {
+> +		...
+> +		eeproms = <&tsens_calibration>;
+> +		eeprom-names = "calibration";
+> +	};
 
-[ ... ]
+This is somewhat complicated. Also having 'eeprom' in the binding is not
+nice since it could be FRAM or something else. How about:
 
->> + * Returns:
->> + *  0 on success,
->> + *  -ENODEV if it fails to find the cpu node in the device tree,
->> + *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
->> + *  -ENOENT if it fails to find a enabled-method property,
->
-> Ultra-nit: "an enabled-method"
->
->> + *  -ENXIO if the HW reports a failure or a misconfiguration
->
-> -ENOMEM is missing.
->
-> Apart from these ultraminor changes (and thanks for putting it
-> together):
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
+	tsens {
+		calibration = <&tsens_calibration>;
+	};
 
-Thanks for review Lorenzo. I fixed the comment and pushed in my tree for 
-4.1.
 
-  -- Daniel
+Sascha
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
