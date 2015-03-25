@@ -1,93 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Mar 2015 05:17:36 +0100
-Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
-In-Reply-To: <20150324232508.7930.89483@quantum>
-References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>
- <1426706164-28309-2-git-send-email-geert+renesas@glider.be>
- <20150324232508.7930.89483@quantum>
-Message-ID: <CAMuHMdVRhaZY_y2=1+9sZ-kteiguYGeS62Ka-V1WYnNCq_rgQA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 24 Mar 2015 23:42:26 -0500
+Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
+ find ports by id
+In-Reply-To: <20150324091540.GU8656@n2100.arm.linux.org.uk>
+References: <1425369592.3146.14.camel@pengutronix.de>
+ <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
+ <1426063881.3101.33.camel@pengutronix.de> <2376013.jScnaqPlDa@phil>
+ <20150324091540.GU8656@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqJCRQx9=pnvxvKP+Ruek1F-0TRJ2rDDHCcVYZ8y=hE=Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Wed, Mar 25, 2015 at 12:25 AM, Michael Turquette
-<mturquette@linaro.org> wrote:
-> Quoting Geert Uytterhoeven (2015-03-18 12:16:00)
->> INTC-SYS is the module clock for the GIC.  Accessing the GIC while it is
->> disabled causes:
+On Tue, Mar 24, 2015 at 4:15 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Mar 23, 2015 at 05:29:02PM +0100, Heiko Stuebner wrote:
+>> Hi Rob, Philipp,
 >>
->>     Unhandled fault: asynchronous external abort (0x1211) at 0x00000000
+>> Am Mittwoch, 11. M?rz 2015, 09:51:21 schrieb Philipp Zabel:
+>> > Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
+>> > > I've only been copied on this latest pull request and a version from
+>> > > March of last year which Grant nak'ed. This series did not go to
+>> > > devicetree list either. I'll take a look at the series.
+>> >
+>> > My bad, I should have copied you, too. Thanks for having a look now.
 >>
->> Currently, the GIC driver cannot enable its module clock for several
->> reasons:
->>   - It does not use a platform device, so Runtime PM is not an option,
->>   - gic_of_init() runs before any clocks are registered, so it cannot
->>     explicitly enable the clock,
->>   - gic_of_init() cannot return -EPROBE_DEFER, as IRQCHIP_DECLARE()
->>     doesn't support deferred probing.
+>> any news on this?
 >>
->> Hence we have to keep on relying on the boot loader for enabling the
->> module clock.
->>
->> To prevent the module clock from being disabled when the CCF core thinks
->> it is unused, and thus causing a system lock-up, add a quirk to the MSTP
->> clock driver to make sure the module clock is never disabled.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->>  drivers/clk/shmobile/clk-mstp.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/drivers/clk/shmobile/clk-mstp.c b/drivers/clk/shmobile/clk-mstp.c
->> index 2d2fe773ac8168f9..742af84735a07450 100644
->> --- a/drivers/clk/shmobile/clk-mstp.c
->> +++ b/drivers/clk/shmobile/clk-mstp.c
->> @@ -62,6 +62,12 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
->>         unsigned int i;
->>         u32 value;
->>
->> +       /* INTC-SYS is the module clock of the GIC, and must not be disabled */
->> +       if (!enable && !strcmp(__clk_get_name(hw->clk), "intc-sys")) {
->> +               pr_debug("MSTP %pC skipping disable\n", hw->clk);
->> +               return 0;
->> +       }
+>> Because it looks like I'll need the of_graph_get_port_by_id functionality in
+>> the short term, it'll be nice to not having to opencode this :-)
 >
-> Hello Geert,
+> Oh hell, you mean this still hasn't been merged for the next merge window?
 >
-> This is a bit ugly for three reasons:
+> What's going on, Grant?
 >
-> 1) we hit this code for every MSTP clock {en,dis}able call
-> 2) __clk_get_name is kind of gross
+> Andrew, can you please take this if we send you the individual patches?
+> If not, I'll merge it into my tree, and send it to Linus myself.  If
+> Grant wakes up, we can address any comments he has at that time by
+> additional patches.  (I'll give Grant an extra few days to reply to
+> this mail...)
 
-Sure, this is ugly. That's why this was an RFC.
-I was mainly trying to trigger a reply from the GIC maintainers ;-)
+I've merged this for 4.1. It is in my for-next branch[1].
 
-> 3) the enable_count will not be correct. It will be zero but the clock
-> will actually be enabled
+Rob
 
-That's indeed something I didn't take into account. Will change to just enabling
-the clock from the clock driver.
-
-> Have you considered Lee's series to express these always-on clocks in
-> DT? See,
->
-> https://lkml.org/lkml/2015/2/24/495
-
-That solution doesn't apply here, as we do have a correct description
-of the hardware
-in DT (after the other patches in the series, like e.g. (courtesy for
-Lee) http://permalink.gmane.org/gmane.linux.power-management.general/58123).
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
