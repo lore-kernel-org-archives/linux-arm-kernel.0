@@ -1,82 +1,75 @@
-From: roy.qing.li@gmail.com (Li RongQing)
-Date: Wed, 25 Mar 2015 08:01:12 +0800
-Subject: [PATCH] audit.h: remove the macro AUDIT_ARCH_ARMEB definition
-In-Reply-To: <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
-References: <1426827329-27976-1-git-send-email-roy.qing.li@gmail.com>
- <CAHC9VhR5VcaCtLG9hdVS2gZRWxVmdnpbK+fJwm6wCA8qyLebUQ@mail.gmail.com>
- <CAJFZqHxdPEhX+9z-FYUMvTF_6LVgK=gOetq0zT4UTZSgUGRqCQ@mail.gmail.com>
- <CAJFZqHxfq0DSjKn-uqhT+pAeJ9u8ym2Mr=wsqvPyX7sCicPGZA@mail.gmail.com>
- <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
-Message-ID: <CAJFZqHzxXyuzi7Z9WawYKfFnTMfYfsRL0Qnt276p_t-AV9GB2A@mail.gmail.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Tue, 24 Mar 2015 17:09:33 -0700
+Subject: [GIT PULL] OMAP2+: TI clock driver changes for 4.1 merge window
+In-Reply-To: <5511B5C1.8080705@ti.com>
+References: <5511B5C1.8080705@ti.com>
+Message-ID: <20150325000933.7930.99952@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 5:16 AM, Paul Moore <paul@paul-moore.com> wrote:
-> [NOTE: Adding the linux-arm folks to this thread just in case they are
-> interested.]
->
-> I'm not an ARM expert, but the kernel #define for AUDIT_ARCH_ARMEB
-> (below) seems reasonable to me based on the other audit machine
-> definitions.  There is clearly a mismatch between the kernel and the
-> audit userspace, but I wonder if the issue should be addressed in the
-> userspace tools.  Further, you mention kernel 3.14, what happens with
-> kernel 3.19 and the most recent audit userspace tools?
->
->   > grep "AUDIT_ARCH_ARMEB" include/uapi/linux/audit.h
->   #define AUDIT_ARCH_ARMEB        (EM_ARM)
+Quoting Tero Kristo (2015-03-24 12:06:41)
+> Hi Mike,
+> 
+> Here are the TI clock driver patches meant for 4.1 merge window.
+> 
+> Some simple data fixes, dm81xx FAPLL changes, and a generic TI clock 
+> driver register access fix taken from the PRCM/SCM set I have posted to 
+> linux-omap list earlier.
 
+Pulled.
 
-1.
-if no the below commit, audit-2.3.2 is working;
-but after the below commit, audit-2.3.2 is not working.
+Thanks,
+Mike
 
-commit 2f978366984a418f38fcf44137be1fbc5a89cfd9
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Fri May 4 17:53:52 2012 +0100
-
-    ARM: 7412/1: audit: use only AUDIT_ARCH_ARM regardless of endianness
-
-    The machine endianness has no direct correspondence to the syscall ABI,
-    so use only AUDIT_ARCH_ARM when identifying the ABI to the audit tools
-    in userspace.
-
-    Cc: stable at vger.kernel.org
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-    Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index d8dbe9c..9650c14 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -906,12 +906,6 @@ long arch_ptrace(struct task_struct *child, long request,
-        return ret;
- }
-
--#ifdef __ARMEB__
--#define AUDIT_ARCH_NR AUDIT_ARCH_ARMEB
--#else
--#define AUDIT_ARCH_NR AUDIT_ARCH_ARM
--#endif
--
- asmlinkage int syscall_trace(int why, struct pt_regs *regs, int scno)
- {
-        unsigned long ip;
-@@ -919,7 +913,7 @@ asmlinkage int syscall_trace(int why, struct
-pt_regs *regs, int scno)
-        if (why)
-                audit_syscall_exit(regs);
-        else
--               audit_syscall_entry(AUDIT_ARCH_NR, scno, regs->ARM_r0,
-+               audit_syscall_entry(AUDIT_ARCH_ARM, scno, regs->ARM_r0,
-                                    regs->ARM_r1, regs->ARM_r2, regs->ARM_r3);
-
-        if (!test_thread_flag(TIF_SYSCALL_TRACE))
-
-
-2.
-
-The latest audit has the changeset of 931 [Improve ARM and AARCH64 support],
-so audit can work again.
-
-
--Roy
+> 
+> -Tero
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>    Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>    git at github.com:t-kristo/linux-pm.git for-4.1-clk-ti
+> 
+> for you to fetch changes up to 9089848d9afa34a796988b5b666c2c4e611ccb61:
+> 
+>    clk: ti: Implement FAPLL set_rate for the PLL (2015-03-24 20:26:14 +0200)
+> 
+> ----------------------------------------------------------------
+> Peter Ujfalusi (2):
+>        clk: ti: clk-3xxx: Correct McBSP related DT clock definitions
+>        clk: ti: clk-3xxx-legacy: Correct McBSP related clock aliases
+> 
+> Suman Anna (4):
+>        clk: ti: OMAP4: Remove the legacy timer DT clock aliases
+>        clk: ti: OMAP5: Correct the DT clock aliases for timers
+>        clk: ti: DRA7: Correct timer_sys_ck clock aliases for Timers
+>        clk: ti: DRA7: Add timer_sys_ck aliases for Timers 13 through 16
+> 
+> Tero Kristo (1):
+>        clk: ti: fix ti_clk_get_reg_addr error handling
+> 
+> Tony Lindgren (3):
+>        clk: ti: Fix FAPLL recalc_rate for rounding errors
+>        clk: ti: Implement FAPLL set_rate for the synthesizer
+>        clk: ti: Implement FAPLL set_rate for the PLL
+> 
+>   drivers/clk/ti/apll.c            |    5 +-
+>   drivers/clk/ti/autoidle.c        |    2 +-
+>   drivers/clk/ti/clk-3xxx-legacy.c |   16 ++-
+>   drivers/clk/ti/clk-3xxx.c        |   19 +--
+>   drivers/clk/ti/clk-44xx.c        |   11 --
+>   drivers/clk/ti/clk-54xx.c        |   22 ++--
+>   drivers/clk/ti/clk-7xx.c         |   18 ++-
+>   drivers/clk/ti/clk.c             |    7 +-
+>   drivers/clk/ti/divider.c         |    4 +-
+>   drivers/clk/ti/dpll.c            |    6 +-
+>   drivers/clk/ti/fapll.c           |  270 
+> ++++++++++++++++++++++++++++++++++++--
+>   drivers/clk/ti/gate.c            |    4 +-
+>   drivers/clk/ti/interface.c       |    2 +-
+>   drivers/clk/ti/mux.c             |    4 +-
+>   14 files changed, 318 insertions(+), 72 deletions(-)
