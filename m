@@ -1,50 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Mar 2015 16:39:08 -0700
-Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: sun8i: Add SMP support for the
- Allwinner A23
-In-Reply-To: <20150319091843.GA4255@lukather>
-References: <1426649042-30547-1-git-send-email-wens@csie.org>
- <1426649042-30547-3-git-send-email-wens@csie.org>
- <20150318102939.GP4638@lukather>
- <CAGb2v65qZBPcury1e-DXwmpJOyS97oWFVisGQKEbTZkc+Z60nQ@mail.gmail.com>
- <2015031912050362587032@gmail.com> <20150319091843.GA4255@lukather>
-Message-ID: <CAGb2v67R5hcwh7ZjC_7Y2WfRpLArC_KRrAktJw+WjTEucCFWsQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 26 Mar 2015 05:14:07 +0530
+Subject: [PATCH v1 1/3] phy: phy-core: allow specifying supply at port
+ level
+In-Reply-To: <20150325224921.GB16950@dtor-ws>
+References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1426886727-537-2-git-send-email-arun.ramamurthy@broadcom.com>
+ <55133294.4040705@ti.com>
+ <CAE_wzQ_8YzZwizyozU-0MPLX8-hT1Y1LnfYFg+iEvQgYX7zjFg@mail.gmail.com>
+ <5513391B.2060505@ti.com> <20150325224921.GB16950@dtor-ws>
+Message-ID: <55134847.3060304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Hi,
 
-On Thu, Mar 19, 2015 at 2:18 AM, maxime.ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Kevin,
->
-> On Thu, Mar 19, 2015 at 12:05:06PM +0800, kevin.z.m.zh at gmail.com wrote:
->> >> One question I couldn't find any answer to is that does the SMP bit is
->> >> set in secondary_startup?
->> >>
->> >> I couldn't find where it was set, but it still looks like the right
->> >> thing to do, so I would expect the code to do that.
->> >
->> > I don't see it either. The sun8i code is just the sun6i code with the
->> > power clamps removed. And sun6i secondary_startup was removed some time
->> > ago in commit 1146b600044d ("ARM: sunxi: fix build for THUMB2_KERNEL").
->> >
->> > ChenYu
+On Thursday 26 March 2015 04:19 AM, Dmitry Torokhov wrote:
+> On Thu, Mar 26, 2015 at 04:09:23AM +0530, Kishon Vijay Abraham I wrote:
+>> Hi,
 >>
->> The SMP bit should be set in the function of "__v7_ca7mp_setup", which is located
->> in the file:
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mm/proc-v7.S?id=refs/tags/v4.0-rc4
->> I'm not sure if this is your discussion.
->
-> It is, but I wasn't seeing it called anywhere in the secondary_startup
-> code path.
->
-> I was expecting a direct call, but it looks like it's a dynamic call,
-> with a function-pointer like call, that is indeed run both in the
-> kernel entry point and the secondary_startup.
->
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/kernel/head.S?id=refs/tags/v4.0-rc4#n389
+>> On Thursday 26 March 2015 03:47 AM, Dmitry Torokhov wrote:
+>>> On Wed, Mar 25, 2015 at 3:11 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> Hi,
+>>>>
+>>>> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+>>>>> Multi-port phy's may have per-port power supplies. Let's change phy core
+>>>>> to first attempt to look up the supply at the port level, and then, if
+>>>>> not found, check parent device.
+>>>>
+>>>> Why not just have every port provide the power supply if it needs?
+>>>> I don't think checking for parent device should be present in the phy-core at
+>>>> all.
+>>>
+>>> We need to do that if we want to keep compatibility with the current
+>>> DTSes: before this patch the supply would be always looked up on
+>>> device and not port level.
+>>
+>> ah okay.
+>> so just using regulator_get_optional(&phy->dev, "phy"); should be sufficient
+> 
+> This is for regulators specified at port level (&phy->dev represents
+> port).
+> 
+>> right? Why do we need regulator_get_optional(phy->dev.parent, "phy");?
+>>
+> 
+> This is for compatibility with old multi-port bindings where supply is
+> specified at parent device level and phy_create() is called with dev and
+> node that is not NULL and not the same as dev->of_node. I have no idea
+> if such bindings exist in wild, but wanted to keep them working given
+> stated DT stability rules.
 
-Are we waiting for Marc's input on this?
+Such a binding doesn't exist. So let's keep only the
+regulator_get_optional(&phy->dev, "phy"); part. Only TI SoCs and recently
+sun9i started using phy-supply and none of them use multi-phy PHY provider.
 
-ChenYu
+Thanks
+Kishon
