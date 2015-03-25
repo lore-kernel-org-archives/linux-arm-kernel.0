@@ -1,78 +1,57 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Wed, 25 Mar 2015 11:28:03 -0700
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
-Message-ID: <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 25 Mar 2015 18:32:59 +0000 (UTC)
+Subject: [PATCH] MAINTAINERS: clk: discuss on the linux-clk@vger.kernel.org
+ list
+Message-ID: <alpine.DEB.2.02.1503251828240.13341@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Hello Geert,
->
-> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
-> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
-> multi_v7_defconfig boot.
->
-> Boot log before:
->
-> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->
-> Boot log after:
->
-> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->
->
-> Any ideas?  Stephen Warren thinks there might be an initcall that might
-> not check to see what kind of device it's running on.
+Most Linux clock framework discussions take place on the
+linux-kernel at vger.kernel.org or linux-arm-kernel at lists.infradead.org
+mailing lists.  The volume of unrelated messages on these lists makes
+it difficult for non-maintainers to follow along with discussions.
+Switch the discussion list for clock framework discussions to
+linux-clk at vger.kernel.org.  Also, add linux-clk at vger.kernel.org as a
+mailing list for clock API discussions.
 
-Can you try to shift your kernel load address around a bit? From
-experience with the boards from kernelci.org we find that as the multi
-v7 kernel size increases they can clobber memory when they get
-decompressed.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+Mike/Stephen, want to take this one?
 
->
->
-> - Paul
->
-> commit 4a3a6f86693922b29cf829c63f652b057f14619e
-> Author: Geert Uytterhoeven <geert+renesas@glider.be>
-> Date:   Tue Feb 24 15:14:45 2015 +0100
->
->     ARM: multi_v7_defconfig: Enable shmobile platforms
->
->     Enable support for shmobile platforms that became multi-platform aware.
->     Several non-critical drivers and subsystems are built as modules, to keep
->     kernel size reasonable.
->
->     Tested on:
->       - r8a73a4/ape6evm:
->           - U-Boot fails with "Error: unrecognized/unsupported machine ID",
->           - kexec works.
->       - r8a7740/armadillo:
->           - Hermit boot loader fails (larger image, more memory corruption),
->           - kexec works.
->       - r8a7791/koelsch,
->       - sh73a0/kzm9g:
->           - zImage+DTB from U-Boot needs CONFIG_ARM_ATAG_DTB_COMPAT=n,
->           - kexec works.
->       - am335x/boneblack.
->
->     Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->     Acked-by: Simon Horman <horms+renesas@verge.net.au>
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Cheers,
-
-Tyler
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 85024e23309f..3ca8ae5aadb0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2551,6 +2551,7 @@ F:	include/linux/cleancache.h
+ 
+ CLK API
+ M:	Russell King <linux@arm.linux.org.uk>
++L:	linux-clk at vger.kernel.org
+ S:	Maintained
+ F:	include/linux/clk.h
+ 
+@@ -2611,7 +2612,7 @@ F:	drivers/media/platform/coda/
+ COMMON CLK FRAMEWORK
+ M:	Mike Turquette <mturquette@linaro.org>
+ M:	Stephen Boyd <sboyd@codeaurora.org>
+-L:	linux-kernel at vger.kernel.org
++L:	linux-clk at vger.kernel.org
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+ S:	Maintained
+ F:	drivers/clk/
+-- 
+2.1.4
