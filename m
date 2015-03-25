@@ -1,88 +1,80 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 25 Mar 2015 14:25:30 -0600
-Subject: [PATCH v18 05/11] ARM: dts: qcom: Add power-controller device node
- for 8074 Krait CPUs
-In-Reply-To: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
-References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1427315136-44321-6-git-send-email-lina.iyer@linaro.org>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 25 Mar 2015 21:54:10 +0100
+Subject: [PATCH 6/8] ARM: cpuidle: Enable the ARM64 driver for both
+ ARM32/ARM64
+In-Reply-To: <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
+References: <55127A53.8050206@linaro.org>
+ <1427274436-21916-1-git-send-email-daniel.lezcano@linaro.org>
+ <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1427316850.10958.58.camel@x220>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each Krait CPU in the QCOM 8074/8974 SoC has an SAW power controller to
-regulate the power to the cpu and aide the core in entering idle states.
-Reference the SAW instance and associate the instance with the CPU core.
+A few nits are all I spotted.
 
-Cc: Kumar Gala <galak@codeaurora.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+On Wed, 2015-03-25 at 10:07 +0100, Daniel Lezcano wrote:
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec1..ea8c214 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -21,6 +21,7 @@
- 			reg = <0>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc0>;
-+			qcom,saw = <&saw0>;
- 		};
- 
- 		cpu at 1 {
-@@ -30,6 +31,7 @@
- 			reg = <1>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc1>;
-+			qcom,saw = <&saw1>;
- 		};
- 
- 		cpu at 2 {
-@@ -39,6 +41,7 @@
- 			reg = <2>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc2>;
-+			qcom,saw = <&saw2>;
- 		};
- 
- 		cpu at 3 {
-@@ -48,6 +51,7 @@
- 			reg = <3>;
- 			next-level-cache = <&L2>;
- 			qcom,acc = <&acc3>;
-+			qcom,saw = <&saw3>;
- 		};
- 
- 		L2: l2-cache {
-@@ -144,7 +148,27 @@
- 			};
- 		};
- 
--		saw_l2: regulator at f9012000 {
-+		saw0: power-controller at f9089000 {
-+			compatible = "qcom,msm8974-saw2-v2.1-cpu", "qcom,saw2";
-+			reg = <0xf9089000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw1: power-controller at f9099000 {
-+			compatible = "qcom,msm8974-saw2-v2.1-cpu", "qcom,saw2";
-+			reg = <0xf9099000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw2: power-controller at f90a9000 {
-+			compatible = "qcom,msm8974-saw2-v2.1-cpu", "qcom,saw2";
-+			reg = <0xf90a9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw3: power-controller at f90b9000 {
-+			compatible = "qcom,msm8974-saw2-v2.1-cpu", "qcom,saw2";
-+			reg = <0xf90b9000 0x1000>, <0xf9009000 0x1000>;
-+		};
-+
-+		saw_l2: power-controller at f9012000 {
- 			compatible = "qcom,saw2";
- 			reg = <0xf9012000 0x1000>;
- 			regulator;
--- 
-2.1.0
+> +config ARM_CPUIDLE
+> +        bool "Generic ARM/ARM64 CPU idle Driver"
+> +        select DT_IDLE_STATES
+> +        help
+> +          Select this to enable generic cpuidle driver for ARM.
+> +          It provides a generic idle driver whose idle states are configured
+> +          at run-time through DT nodes. The CPUidle suspend backend is
+> +          initialized by calling the CPU operations init idle hook
+> +          provided by architecture code.
+
+Start with a tab instead of 8 spaces, please.
+
+> --- /dev/null
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+
+> +#include <linux/cpuidle.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+
+Is this include actually needed? I haven't tried building this without
+that include, but I spotted nothing obviously module related in this
+file.
+
+> +#include <linux/of.h>
+> +
+> +#include <asm/cpuidle.h>
+> +
+> +#include "dt_idle_states.h"
+
+> +static struct cpuidle_driver arm_idle_driver = {
+> +	.name = "arm_idle",
+> +	.owner = THIS_MODULE,
+
+Since this can only be built in, THIS_MODULE will (basically) be
+equivalent to NULL according to include/linux/export.h. So I suppose
+this line can be dropped.
+
+> +	/*
+> +	 * State at index 0 is standby wfi and considered standard
+> +	 * on all ARM platforms. If in some platforms simple wfi
+> +	 * can't be used as "state 0", DT bindings must be implemented
+> +	 * to work around this issue and allow installing a special
+> +	 * handler for idle state index 0.
+> +	 */
+> +	.states[0] = {
+> +		.enter                  = arm_enter_idle_state,
+> +		.exit_latency           = 1,
+> +		.target_residency       = 1,
+> +		.power_usage		= UINT_MAX,
+> +		.name                   = "WFI",
+> +		.desc                   = "ARM WFI",
+> +	}
+> +};
+
+I did notice that these two nits are already present in
+drivers/cpuidle/cpuidle-arm64.c. But since this patch is not just moving
+that file's content around, you might as well look into those two nits.
+
+
+Paul Bolle
