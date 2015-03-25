@@ -1,29 +1,35 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Mar 2015 17:17:09 -0700
-Subject: [PATCH 0/3] power: reset: BCM63xx reboot support
-Message-ID: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
+Date: Tue, 24 Mar 2015 17:17:12 -0700
+Subject: [PATCH 3/3] ARM: dts: BCM63xx: add soft-reset node
+In-Reply-To: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
+References: <1427242632-7971-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1427242632-7971-4-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add the software reset Device Tree node allowing us to software reset a
+BCM63138 device using bcm6328-soft-reset.
 
-This patch series adds support for the BCM6328-style software reset hardware
-block commonly found on Broadcom BCM63xx DSL SoCs.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/bcm63138.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Thanks!
-
-Florian Fainelli (3):
-  Documentation: bindings: add BCM6328-style soft reset binding
-  power: reset: add Broadcom BCM63xx software reset driver
-  ARM: dts: BCM63xx: add soft-reset node
-
- .../devicetree/bindings/arm/bcm/bcm63138.txt       | 16 +++++
- arch/arm/boot/dts/bcm63138.dtsi                    |  5 ++
- drivers/power/reset/Kconfig                        |  7 ++
- drivers/power/reset/Makefile                       |  1 +
- drivers/power/reset/bcm63xx-reboot.c               | 80 ++++++++++++++++++++++
- 5 files changed, 109 insertions(+)
- create mode 100644 drivers/power/reset/bcm63xx-reboot.c
-
+diff --git a/arch/arm/boot/dts/bcm63138.dtsi b/arch/arm/boot/dts/bcm63138.dtsi
+index f46329c8ad75..cfd7f67fed02 100644
+--- a/arch/arm/boot/dts/bcm63138.dtsi
++++ b/arch/arm/boot/dts/bcm63138.dtsi
+@@ -114,6 +114,11 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0xfffe8000 0x8100>;
+ 
++		reset: soft-reset at b4 {
++			compatible = "brcm,bcm6328-soft-reset";
++			reg = <0xb4 0x4>;
++		};
++
+ 		serial0: serial at 600 {
+ 			compatible = "brcm,bcm6345-uart";
+ 			reg = <0x600 0x1b>;
 -- 
 2.1.0
