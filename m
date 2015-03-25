@@ -1,92 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 25 Mar 2015 15:04:28 -0700
-Subject: [PATCH v2 0/3] clk: sunxi: Add muxable AHB clock to fix hstimer
- issues
-In-Reply-To: <20150325215309.GN23664@lukather>
-References: <1427217729-10017-1-git-send-email-wens@csie.org>
- <20150325185152.GM23664@lukather>
- <CAGb2v66e=ssx=gPMVkc=u0WbhtwCHgbR2Vg3Q3wNTSsBZniaMA@mail.gmail.com>
- <20150325215309.GN23664@lukather>
-Message-ID: <CAGb2v66JqdGLZSAtAds+On3vBe-9Z=o7eQM0MPh42A5jx1fO-g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 Mar 2015 15:07:46 -0700
+Subject: [PATCH 0/3] ARM: dts: sun6i: Enable cpufreq support for A31/A31s
+In-Reply-To: <1427317489-708-1-git-send-email-wens@csie.org>
+References: <1427317489-708-1-git-send-email-wens@csie.org>
+Message-ID: <20150325220746.GQ23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 2:53 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Mar 25, 2015 at 01:13:46PM -0700, Chen-Yu Tsai wrote:
->> On Wed, Mar 25, 2015 at 11:51 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > On Wed, Mar 25, 2015 at 01:22:06AM +0800, Chen-Yu Tsai wrote:
->> >> Hi everyone,
->> >>
->> >> This is v2 of the sun5i muxable AHB clock series.
->> >>
->> >> Changes since v1:
->> >>
->> >>   - Dropped patches 1~3 that are merged
->> >>   - Extend comments to clarify what the "base factor clock" refers to,
->> >>     and what the divs clocks outputs should be.
->> >>
->> >>
->> >> This series adds support for the muxable ahb clock on sun5/7i. The mux
->> >> has inputs such as the axi clock, the cpu clock on sun5i, and pll6 with
->> >> various dividers. The goal is to have ahb muxed to pll6, which should
->> >> be a fixed rate albeit configurable clock. This fixes issues with
->> >> cpufreq changing the cpu frequency, which would affect the hstimer
->> >> clocked from ahb.
->> >>
->> >> Patch 1 makes divs clocks explicitly specify in the driver which output
->> >> is the base factor clock, instead of always putting it in last. This is
->> >> done to ensure DT bindings compatibility when we add outputs.
->> >>
->> >> Patch 2 adds the new pll6/4 output, which is used on sun7i as an input
->> >> to ahb mux.
->> >>
->> >> Patch 3 updates the dtsi files with the new drivers.
->> >>
->> >> The series is also available at
->> >>
->> >>     https://github.com/wens/linux/commits/sun5i-ahb-v2
->> >
->> > Applied all three. I think it would be great to convert the later SoCs
->> > to that too, just to make sure we have the same policy on all SoCs.
->>
->> For sun6i this is already doable. We just move the assignment from the
->> dmaengine node to the clock node.
->
-> Yep.
+On Thu, Mar 26, 2015 at 05:04:46AM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
+> 
+> This series adds the DT parts of cpufreq support, clock references, thermal
+> zones and OPPs, for sun6i. This is based on sunxi/for-next (6bcf44d5edfb).
+> Required (sun4i-ts) driver support is already in v4.0-rc1.
+> 
+> Patch 1 moves the ahb1 assigned-clocks reparenting properties from the dma
+> controller node to the ahb1 clock node. This matches what we've done for
+> sun5i and sun7i. The purpose of this is to clock ahb1 from a stable clock
+> as soon as possible, to prevent hrtimer miscalculation/instability.
+> 
+> Patch 2 adds the clock reference and OPPs for the cpu cluster.
+> 
+> Patch 3 adds the thermal zones for CPU passive (cpufreq limiting) cooling.
+> 
+> I've tested this on my Sinlinx SinA31s (not yet mainlined). The highest
+> OPP matches the default CPU clock/voltage setting found in mainline
+> u-boot. However the Mele I7 fex file specifies a slightly higher voltage
+> for 1008 MHz. If the default setting is not stable enough for the Mele
+> I7, it should be overridden in the board dts file.
+> 
+> This series does not cover A31/A31s revision D, which seems to have lower
+> voltage requirements. At the moment no one has seen them.
 
-Sent out a patch as part of the sun6i cpufreq series.
+Applied all three, thanks!
+Maxime
 
->> For sun8i the default divider results in 300 MHz for AHB, which might
->> be too fast.
->
-> I guess you're talking about AHB1? APB2 should be muxed to PLL6 as
-> well.
-
-Ah, AHB1 yes. Is APB2 muxed from OSC 24MHz too slow?
-
->> And we can't do clock rate assignment yet. The clock drivers need
->> to be split out.
->
-> Why?
-
-The clock rate is propagated down the tree from the root OSC 24M
-clock. Unfortunately it is registered after all the A23 clocks,
-due to the way the sunxi clock driver works. So at the time the
-AHB1 clock is registered, the parent clocks all have rate=0,
-as there is no proper reference value for all the factor clocks
-to calculate their rates.
-
-ChenYu
-
->> For sun9i it is already the default.
->
-> Perfect.
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/e3de4ba7/attachment.sig>
