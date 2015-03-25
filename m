@@ -1,67 +1,96 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 25 Mar 2015 15:14:55 -0700
-Subject: [GIT PULL] Allwinner clocks additions for 4.1
-In-Reply-To: <20150325211911.GA17639@lukather>
-References: <20150325211911.GA17639@lukather>
-Message-ID: <CAPtuhTgo7mv-mNu6jHGXwWsCjjxa6ASiSES7VCpEqzr6dOx1zw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 25 Mar 2015 23:16:50 +0100
+Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
+In-Reply-To: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
+References: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
+Message-ID: <551333D2.8080600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 2:19 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Mike,
->
-> Here is the pull request for the Allwinner related changes for the 4.1
-> merge window.
+Hi Leigh,
 
-Pulled.
+On 25/03/2015 22:33, Leigh Brown wrote:
+> Add support for the system reset button on the GlobalScale Mirabox.
+> The reset button is connected via GPIO so add a gpio-keys entry for
+> it in the device tree file.  Patch is based on the implementation
+> in armada-370-netgear-rn102.dts but using the GPIO pin specified in
+> the original patch by Ezequiel Garcia from 2013.
+> 
 
-Thanks!
-Mike
+Thanks for your contribution, however the reset button is not always
+connected to this GPIO. At least on the Mirabox I have the reset button
+triggers an hardware reset. My concern is that for some board the dts
+representation would be wrong.
 
->
-> Thanks!
-> Maxime
->
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
->
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
->
-> are available in the git repository at:
->
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-clocks-for-4.1
->
-> for you to fetch changes up to f1017969661dd33ead5ba7c3f4a0793c6611441a:
->
->   clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6 (2015-03-25 11:46:41 -0700)
->
-> ----------------------------------------------------------------
-> Allwinner clocks changes for 4.1
->
-> The usual round of clock changes for the Allwinner SoCs.
->
-> There is nothing really standing out here, but a few changes and fixes, most
-> notably to allow the AHB clock to be parented to a PLL, instead of the CPU
-> clock to avoid any AHB rate change due to cpufreq.
->
-> ----------------------------------------------------------------
-> Chen-Yu Tsai (7):
->       clk: sunxi: Move USB clocks to separate file
->       clk: sunxi: Add support for sun9i A80 USB clocks and resets
->       clk: sunxi: Add muxable ahb factors clock for sun5i and sun7i
->       clk: sunxi: Add "cpu" to list of protected clocks for sun5i
->       clk: sunxi: Register divs clocks before factor clocks
->       clk: sunxi: Make divs clocks specify which output is the base factor clock
->       clk: sunxi: Add pll6 / 4 clock output to sun4i-a10-pll6
->
->  Documentation/devicetree/bindings/clock/sunxi.txt |   3 +
->  drivers/clk/sunxi/Makefile                        |   1 +
->  drivers/clk/sunxi/clk-sunxi.c                     | 185 ++++++++---------
->  drivers/clk/sunxi/clk-usb.c                       | 233 ++++++++++++++++++++++
->  4 files changed, 319 insertions(+), 103 deletions(-)
->  create mode 100644 drivers/clk/sunxi/clk-usb.c
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+I am not really against this patch, first because it is possible that the
+board I got was an exception, but as we don't have any feedback from GlobalScale,
+it is hard to figure out. Then, I am not sure that exposing this reset button
+when it was not trigger by software was a problem. I have to test it and also
+think about it.
+
+I would like to have the opinion of other people about it.
+
+
+Thanks,
+
+Gregory
+
+
+
+> Tested with the triggerhappy daemon.
+> 
+> Signed-off-by: Leigh Brown <leigh@solinno.co.uk>
+> ---
+>  arch/arm/boot/dts/armada-370-mirabox.dts | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+> index e1b0eb6..41f453d 100644
+> --- a/arch/arm/boot/dts/armada-370-mirabox.dts
+> +++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+> @@ -9,6 +9,7 @@
+>   */
+>  
+>  /dts-v1/;
+> +#include <dt-bindings/input/input.h>
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include "armada-370.dtsi"
+>  
+> @@ -78,6 +79,18 @@
+>  				};
+>  			};
+>  
+> +			gpio-keys {
+> +				compatible = "gpio-keys";
+> +				pinctrl-0 = <&reset_button_pin>;
+> +				pinctrl-names = "default";
+> +
+> +				reset-button {
+> +					label = "Reset Button";
+> +					linux,code = <KEY_RESTART>;
+> +					gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;
+> +				};
+> +			};
+> +
+>  			mdio {
+>  				pinctrl-0 = <&mdio_pins>;
+>  				pinctrl-names = "default";
+> @@ -168,5 +181,10 @@
+>  		marvell,pins = "mpp64", "mpp65";
+>  		marvell,function = "gpio";
+>  	};
+> +
+> +	reset_button_pin: reset-button-pin {
+> +		marvell,pins = "mpp58";
+> +		marvell,function = "gpio";
+> +	};
+>  };
+>  
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
