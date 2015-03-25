@@ -1,46 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 24 Mar 2015 23:42:26 -0500
-Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
- find ports by id
-In-Reply-To: <20150324091540.GU8656@n2100.arm.linux.org.uk>
-References: <1425369592.3146.14.camel@pengutronix.de>
- <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
- <1426063881.3101.33.camel@pengutronix.de> <2376013.jScnaqPlDa@phil>
- <20150324091540.GU8656@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqJCRQx9=pnvxvKP+Ruek1F-0TRJ2rDDHCcVYZ8y=hE=Xg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Mar 2015 21:50:54 -0700
+Subject: [PATCH] regulator: Defer lookup of supply to regulator_get
+In-Reply-To: <1427248565-9680-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1427248565-9680-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20150325045054.GA31311@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 4:15 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 23, 2015 at 05:29:02PM +0100, Heiko Stuebner wrote:
->> Hi Rob, Philipp,
->>
->> Am Mittwoch, 11. M?rz 2015, 09:51:21 schrieb Philipp Zabel:
->> > Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
->> > > I've only been copied on this latest pull request and a version from
->> > > March of last year which Grant nak'ed. This series did not go to
->> > > devicetree list either. I'll take a look at the series.
->> >
->> > My bad, I should have copied you, too. Thanks for having a look now.
->>
->> any news on this?
->>
->> Because it looks like I'll need the of_graph_get_port_by_id functionality in
->> the short term, it'll be nice to not having to opencode this :-)
->
-> Oh hell, you mean this still hasn't been merged for the next merge window?
->
-> What's going on, Grant?
->
-> Andrew, can you please take this if we send you the individual patches?
-> If not, I'll merge it into my tree, and send it to Linus myself.  If
-> Grant wakes up, we can address any comments he has at that time by
-> additional patches.  (I'll give Grant an extra few days to reply to
-> this mail...)
+On Tue, Mar 24, 2015 at 06:56:05PM -0700, Bjorn Andersson wrote:
+> Instead of resolving regulator supplies during registration move this to
+> the time of a consumer retrieving a handle. The benefit is that it's
+> possible for one driver to register regulators with internal
+> dependencies out of order.
 
-I've merged this for 4.1. It is in my for-next branch[1].
-
-Rob
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
+This looks basically sensible (as we discussed in person) - I'd like to
+poke at this on some systems I've got back home to make sure I'm happy
+with the debugging output and so on but I'm not expecting any problems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150324/6b134006/attachment.sig>
