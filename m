@@ -1,49 +1,95 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 25 Mar 2015 22:00:02 +0000 (UTC)
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 25 Mar 2015 23:02:00 +0100
+Subject: [PATCH 6/8] ARM: cpuidle: Enable the ARM64 driver for both
+ ARM32/ARM64
+In-Reply-To: <1427316850.10958.58.camel@x220>
+References: <55127A53.8050206@linaro.org>	
+ <1427274436-21916-1-git-send-email-daniel.lezcano@linaro.org>	
+ <1427274436-21916-6-git-send-email-daniel.lezcano@linaro.org>
+ <1427316850.10958.58.camel@x220>
+Message-ID: <55133058.6020603@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler
-
-On Wed, 25 Mar 2015, Tyler Baker wrote:
-
-> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
+On 03/25/2015 09:54 PM, Paul Bolle wrote:
+> A few nits are all I spotted.
 >
-> > Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
-> > multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
-> > multi_v7_defconfig boot.
-> >
-> > Boot log before:
-> >
-> > http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-> >
-> > Boot log after:
-> >
-> > http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-> >
-> >
-> > Any ideas?  Stephen Warren thinks there might be an initcall that might
-> > not check to see what kind of device it's running on.
-> 
-> Can you try to shift your kernel load address around a bit? From
-> experience with the boards from kernelci.org we find that as the multi
-> v7 kernel size increases they can clobber memory when they get
-> decompressed.
+> On Wed, 2015-03-25 at 10:07 +0100, Daniel Lezcano wrote:
+>> --- a/drivers/cpuidle/Kconfig.arm
+>> +++ b/drivers/cpuidle/Kconfig.arm
+>
+>> +config ARM_CPUIDLE
+>> +        bool "Generic ARM/ARM64 CPU idle Driver"
+>> +        select DT_IDLE_STATES
+>> +        help
+>> +          Select this to enable generic cpuidle driver for ARM.
+>> +          It provides a generic idle driver whose idle states are configured
+>> +          at run-time through DT nodes. The CPUidle suspend backend is
+>> +          initialized by calling the CPU operations init idle hook
+>> +          provided by architecture code.
+>
+> Start with a tab instead of 8 spaces, please.
 
-Thanks, that was it:
+Ok, I will send a fix for that on top of this patch.
 
-http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+>> --- /dev/null
+>> +++ b/drivers/cpuidle/cpuidle-arm.c
+>
+>> +#include <linux/cpuidle.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/cpu_pm.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>
+> Is this include actually needed? I haven't tried building this without
+> that include, but I spotted nothing obviously module related in this
+> file.
+>
+>> +#include <linux/of.h>
+>> +
+>> +#include <asm/cpuidle.h>
+>> +
+>> +#include "dt_idle_states.h"
+>
+>> +static struct cpuidle_driver arm_idle_driver = {
+>> +	.name = "arm_idle",
+>> +	.owner = THIS_MODULE,
+>
+> Since this can only be built in, THIS_MODULE will (basically) be
+> equivalent to NULL according to include/linux/export.h. So I suppose
+> this line can be dropped.
 
-Should have guessed when absolutely no debug output was emitted by the 
-board...
+Yeah, THIS_MODULE is present in all drivers. Very likely we can safely 
+remove it.
 
-Sorry for the false alarm, Geert!
+>> +	/*
+>> +	 * State at index 0 is standby wfi and considered standard
+>> +	 * on all ARM platforms. If in some platforms simple wfi
+>> +	 * can't be used as "state 0", DT bindings must be implemented
+>> +	 * to work around this issue and allow installing a special
+>> +	 * handler for idle state index 0.
+>> +	 */
+>> +	.states[0] = {
+>> +		.enter                  = arm_enter_idle_state,
+>> +		.exit_latency           = 1,
+>> +		.target_residency       = 1,
+>> +		.power_usage		= UINT_MAX,
+>> +		.name                   = "WFI",
+>> +		.desc                   = "ARM WFI",
+>> +	}
+>> +};
+>
+> I did notice that these two nits are already present in
+> drivers/cpuidle/cpuidle-arm64.c. But since this patch is not just moving
+> that file's content around, you might as well look into those two nits.
+
+We can address the module code removal in a separate patchset as this is 
+the case for all the drivers.
 
 
-- Paul
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
