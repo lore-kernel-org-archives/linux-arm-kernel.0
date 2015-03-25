@@ -1,59 +1,133 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 Mar 2015 10:16:43 -0500
-Subject: [GIT PULL v2] of: Add of-graph helpers to loop over endpoints and
- find ports by id
-In-Reply-To: <1427274927.3441.21.camel@pengutronix.de>
-References: <1425369592.3146.14.camel@pengutronix.de>
- <CAL_Jsq+s5RN+7z8Q5N1VghxaQ_ajQmBddtWOTovLoVJjb_6uDw@mail.gmail.com>
- <1426063881.3101.33.camel@pengutronix.de> <2376013.jScnaqPlDa@phil>
- <20150324091540.GU8656@n2100.arm.linux.org.uk>
- <CAL_JsqJCRQx9=pnvxvKP+Ruek1F-0TRJ2rDDHCcVYZ8y=hE=Xg@mail.gmail.com>
- <1427274927.3441.21.camel@pengutronix.de>
-Message-ID: <CAL_JsqKB=LiQ1_Z6+xNVh3XxDX6Rwcf3LX3Y8TdZ+D0B+6-gTA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 25 Mar 2015 15:22:13 +0000
+Subject: [PATCH 5/5] ARM64: kernel: acpi: honour acpi=force command line
+ parameter
+In-Reply-To: <5512BE9F.8070305@huawei.com>
+References: <1427219940-27201-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1427219940-27201-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <5512BE9F.8070305@huawei.com>
+Message-ID: <20150325152213.GB21478@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 4:15 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Hi Rob,
->
-> Am Dienstag, den 24.03.2015, 23:42 -0500 schrieb Rob Herring:
->> On Tue, Mar 24, 2015 at 4:15 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Mon, Mar 23, 2015 at 05:29:02PM +0100, Heiko Stuebner wrote:
->> >> Hi Rob, Philipp,
->> >>
->> >> Am Mittwoch, 11. M?rz 2015, 09:51:21 schrieb Philipp Zabel:
->> >> > Am Dienstag, den 10.03.2015, 14:05 -0500 schrieb Rob Herring:
->> >> > > I've only been copied on this latest pull request and a version from
->> >> > > March of last year which Grant nak'ed. This series did not go to
->> >> > > devicetree list either. I'll take a look at the series.
->> >> >
->> >> > My bad, I should have copied you, too. Thanks for having a look now.
->> >>
->> >> any news on this?
->> >>
->> >> Because it looks like I'll need the of_graph_get_port_by_id functionality in
->> >> the short term, it'll be nice to not having to opencode this :-)
->> >
->> > Oh hell, you mean this still hasn't been merged for the next merge window?
->> >
->> > What's going on, Grant?
->> >
->> > Andrew, can you please take this if we send you the individual patches?
->> > If not, I'll merge it into my tree, and send it to Linus myself.  If
->> > Grant wakes up, we can address any comments he has at that time by
->> > additional patches.  (I'll give Grant an extra few days to reply to
->> > this mail...)
->>
->> I've merged this for 4.1. It is in my for-next branch[1].
->>
->> Rob
->>
->> [1] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
->
-> Thank you. Can I have your ok to merge the same into a pull requests
-> going out to the drm subsystem tree?
+Hi Will,
 
-Sure.
+On Wed, Mar 25, 2015 at 01:56:47PM +0000, Hanjun Guo wrote:
+> On 2015/3/25 1:58, Lorenzo Pieralisi wrote:
+> > If acpi=force is passed on the command line, it forces ACPI to be
+> > the only available boot method, hence it must be left enabled even
+> > if the initialization and sanity checks on ACPI tables fails.
+> >
+> > This patch refactors ACPI initialization to prevent disabling ACPI
+> > if acpi=force is passed on the command line.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
 
-Rob
+As mentioned, here is the update version for this patch:
+
+-- >8 --
+Subject: [PATCH] ARM64: kernel: acpi: honour acpi=force command line parameter
+
+If acpi=force is passed on the command line, it forces ACPI to be
+the only available boot method, hence it must be left enabled even
+if the initialization and sanity checks on ACPI tables fails.
+
+This patch refactors ACPI initialization to prevent disabling ACPI
+if acpi=force is passed on the command line.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/acpi.h |  3 ---
+ arch/arm64/kernel/acpi.c      | 16 ++++++++++++----
+ arch/arm64/kernel/setup.c     |  2 +-
+ 3 files changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index e1a8965..59c05d8 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -38,7 +38,6 @@ typedef u64 phys_cpuid_t;
+ extern int acpi_disabled;
+ extern int acpi_noirq;
+ extern int acpi_pci_disabled;
+-extern bool param_acpi_force;
+ 
+ /* 1 to indicate PSCI 0.2+ is implemented */
+ static inline bool acpi_psci_present(void)
+@@ -92,8 +91,6 @@ void __init acpi_init_cpus(void);
+ static inline bool acpi_psci_present(void) { return false; }
+ static inline bool acpi_psci_use_hvc(void) { return false; }
+ static inline void acpi_init_cpus(void) { }
+-
+-#define param_acpi_force false
+ #endif /* CONFIG_ACPI */
+ 
+ #endif /*_ASM_ACPI_H*/
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 172b7c9..cd60329 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -43,7 +43,7 @@ static int enabled_cpus;
+ static bool bootcpu_valid  __initdata;
+ 
+ static bool param_acpi_off __initdata;
+-bool param_acpi_force __initdata;
++static bool param_acpi_force __initdata;
+ 
+ static int __init parse_acpi(char *arg)
+ {
+@@ -284,8 +284,13 @@ out:
+  * We can parse ACPI boot-time tables such as MADT after
+  * this function is called.
+  *
+- * ACPI is enabled on return if ACPI tables initialized and sanity checks
+- * passed, disabled otherwise
++ * On return ACPI is enabled if either:
++ *
++ * - ACPI tables are initialized and sanity checks passed
++ * - acpi=force was passed in the command line and ACPI was not disabled
++ *   explicitly through acpi=off command line parameter
++ *
++ * ACPI is disabled on function return otherwise
+  */
+ void __init acpi_boot_table_init(void)
+ {
+@@ -309,10 +314,13 @@ void __init acpi_boot_table_init(void)
+ 	 * If ACPI tables are initialized and FADT sanity checks passed,
+ 	 * leave ACPI enabled and carry on booting; otherwise disable ACPI
+ 	 * on initialization error.
++	 * If acpi=force was passed on the command line it forces ACPI
++	 * to be enabled even if its initialization failed.
+ 	 */
+ 	if (acpi_table_init() || acpi_fadt_sanity_check()) {
+ 		pr_err("Failed to init ACPI tables\n");
+-		disable_acpi();
++		if (!param_acpi_force)
++			disable_acpi();
+ 	}
+ }
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index d60b1ad..b278311 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -390,7 +390,7 @@ void __init setup_arch(char **cmdline_p)
+ 
+ 	early_ioremap_reset();
+ 
+-	if (acpi_disabled  && !param_acpi_force) {
++	if (acpi_disabled) {
+ 		unflatten_device_tree();
+ 		psci_dt_init();
+ 		cpu_read_bootcpu_ops();
+-- 
+2.2.1
