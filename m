@@ -1,46 +1,36 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 25 Mar 2015 12:04:34 +0100
-Subject: [PATCH v2] ARM: dts: imx25-pinfunc: Add several pinfunctions
-In-Reply-To: <20150324200220.GW5664@pengutronix.de>
-References: <1427206342-10672-1-git-send-email-mpa@pengutronix.de>
- <20150324200220.GW5664@pengutronix.de>
-Message-ID: <20150325110434.GC5024@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 Mar 2015 12:09:02 +0100
+Subject: [PATCH 2/2] ARM: dts: imx25-karo-tx25: Fix pincontrol definition
+In-Reply-To: <20150325110237.GB5024@pengutronix.de>
+References: <1427206147-19365-1-git-send-email-mpa@pengutronix.de>
+ <1427206147-19365-2-git-send-email-mpa@pengutronix.de>
+ <20150324195046.GU5664@pengutronix.de>
+ <20150325110237.GB5024@pengutronix.de>
+Message-ID: <20150325110902.GH32677@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 09:02:20PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Markus,
-> 
-> On Tue, Mar 24, 2015 at 03:12:22PM +0100, Markus Pargmann wrote:
-> > +/* The imx25 RM appendix describes this mux as CAN1 which is wrong */
-> > +#define MX25_PAD_FEC_RDATA1__CAN2_TX		0x1e0 0x3d8 0x000 0x14 0x000
-> What about
-> 
-> 	/*
-> 	 * According to the i.MX25 Reference manual (IMX25RM, Rev. 2,
-> 	 * 01/2011) this is CAN1_TX but that's wrong.
-> 	 */
-> 
-> ? It doesn't fit in a single line, but it's still reconstructable in
-> case Freescale publishes a Rev 3 which is wrong in a different way :-)
+Hello Markus,
 
-Although I am not expecting a new revision of the reference manual it's
-a good idea to state the reference manual revision in the comment.
-Thanks, will fix that.
+On Wed, Mar 25, 2015 at 12:02:37PM +0100, Markus Pargmann wrote:
+> On Tue, Mar 24, 2015 at 08:50:46PM +0100, Uwe Kleine-K?nig wrote:
+> > I think this grouping is a relict from the time when we considered to
+> > list the groups in the imx$num.dtsi? I would prefer to "fix" the driver
+> > to work with the way imx25-karo-tx25 presents the pinmuxing because I
+> > don't see the motivation for this extra grouping. (So let us define the
+> > current method of imx25-karo-tx25 as the good one to follow if you ask
+> > me.)
+> 
+> But the binding for the pinctrl unit is already defined. I am not sure
+> about the policy for changing devicetree bindings. I thought it should
+> be avoided?
+Allowing more valid definitions shouldn't be a problem, should it?
+So don't rip out parsing groups within a namespace, just complement it
+with support for namespace-less groups
 
-Best regards,
-
-Markus
+Best regards
+Uwe
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150325/188d7fcb/attachment.sig>
