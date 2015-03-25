@@ -1,35 +1,46 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 25 Mar 2015 14:57:44 +0800
-Subject: [RESEND PATCH v6 1/2] ARM: hip04: add GPIO configure in hisi_defconfig
-In-Reply-To: <1427266665-226718-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1427266665-226718-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1427266665-226718-2-git-send-email-wangzhou1@hisilicon.com>
+Date: Wed, 25 Mar 2015 14:57:43 +0800
+Subject: [RESEND PATCH v6 0/2] ARM: hip04: add GPIO support
+Message-ID: <1427266665-226718-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhou Wang <wangzhou.bry@gmail.com>
+This series add the support for the GPIOs of Hisilicon Soc hip04. Hip04 uses
+synopsis' GPIO IP, and we use the dwapb GPIO driver here. This series add the
+corresponding dts. The default value of ARCH_NR_GPIOS is used to find gpio
+base here.
 
-The GPIO controller of Hisilicon hip04 Soc uses the IP from Sysnopsis,
-gpio-dwapb.c can be reused to support this GPIO controller. This patch
-adds related configure item in hisi_defconfig.
+Now this patchset is based on v4.0-rc5
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
----
- arch/arm/configs/hisi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Change in v6:
+- Change E-mail address in signed-off-by to "wangzhou1 at hisilicon.com"
+Change in v5:
+- Base on v3.19-rc1
+- Just use default value of ARCH_NR_GPIOS to find gpio base. Remove the new
+  added patch(3/4) in v4.
+Change in v4:
+- Delete "default 128 if ARCH_HIP04" in arch/arm/Kconfig
+- add a new patch to support find GPIO base number in increasing order
+- add gpio-number-forward property in snps gpio binding doc
+Change in v3:
+- Move CONFIG_GPIO_DWAPB to hisi_defconfig
+- Add CONFIG_GPIOLIB, CONFIG_GPIO_SYSFS in hisi_defconfig
+Change in v2:
+- Add select GPIO_DWAPB in arch/arm/mach-hisi/Kconfig
 
-diff --git a/arch/arm/configs/hisi_defconfig b/arch/arm/configs/hisi_defconfig
-index c34da58..e7bf486 100644
---- a/arch/arm/configs/hisi_defconfig
-+++ b/arch/arm/configs/hisi_defconfig
-@@ -51,6 +51,7 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_GENERIC_PLATFORM=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_GPIO_DWAPB=y
- CONFIG_MFD_SYSCON=y
- CONFIG_POWER_RESET_SYSCON=y
- CONFIG_DRM=y
+Link for v4:
+- http://www.spinics.net/lists/arm-kernel/msg383883.html
+Link for v3:
+- http://www.spinics.net/lists/devicetree/msg60324.html
+
+
+Zhou Wang (2):
+  ARM: hip04: add GPIO configure in hisi_defconfig
+  ARM: dts: hip04: add GPIO pieces
+
+ arch/arm/boot/dts/hip04.dtsi    | 75 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/hisi_defconfig |  1 +
+ 2 files changed, 76 insertions(+)
+
 -- 
 1.9.1
