@@ -1,232 +1,112 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 26 Mar 2015 11:38:07 +0530
-Subject: [PATCH 3/6] i2c: qup: Add bam dma capabilities
-In-Reply-To: <1427289056.25053.21.camel@mm-sol.com>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-4-git-send-email-sricharan@codeaurora.org>
- <1427289056.25053.21.camel@mm-sol.com>
-Message-ID: <5513A247.5030503@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Mar 2015 07:09:02 +0100
+Subject: [PATCH 0/4] RFC: split text and linear mappings using tagged
+ pointers
+In-Reply-To: <20150326012622.GB1676@flaeskesteg-linux.cambridge.arm.com>
+References: <20150317164353.GN23340@leverpostej>
+ <1427125016-3873-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150326012622.GB1676@flaeskesteg-linux.cambridge.arm.com>
+Message-ID: <CAKv+Gu-i89Vh0hRdYfXF+pTdRgMx==ARt4g2UH-2ji=JedoSHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivan,
+On 26 March 2015 at 02:26, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+> Hi Ard,
+>
+> On Mon, Mar 23, 2015 at 03:36:52PM +0000, Ard Biesheuvel wrote:
+> > This implements a split mapping of the kernel Image using the AArch64
+> > tagged pointers feature. The kernel text is emitted with bit 56 cleared,
+> > which can be used by the virt to phys translation to choose one translation
+> > regime or another.
+>
+> This looks neat!
+>
+> I definitely want to see the linear mapping decoupled from the text mapping,
+> but I'm rather worried by the prospect of tagged pointers in the kernel (there
+> are a lot of edge cases for those w.r.t. the preservations of the tag bits),
+> and if possible I'd like to avoid their use. I think that we can achieve the
+> same effect by reorganising the VA layout within the 56 bits we have to play
+> with.
+>
 
-On 03/25/2015 06:40 PM, Ivan T. Ivanov wrote:
->
-> Hi Sricharan,
->
-> On Fri, 2015-03-13 at 23:19 +0530, Sricharan R wrote:
->
->
->>   #define QUP_I2C_MASTER_GEN     0x408
->> +#define QUP_I2C_MASTER_CONFIG  0x408
->>
->
-> Unused.
->
-Ok, will remove it
->>   #define QUP_READ_LIMIT                 256
->> +#define MX_TX_RX_LEN                   SZ_64K
->> +#define MX_BLOCKS                      (MX_TX_RX_LEN / QUP_READ_LIMIT)
->> +
->> +#define TOUT_MAX                       300 /* Max timeout for 32k tx/tx */
->>
->
-> seconds, muliseconds?
->
-  Ok. Will add milliseconds.
->>   struct qup_i2c_config {
->>          int tag_ver;
->>          int max_freq;
->>   };
->>
->> +struct tag {
->
-> Please use consistent naming convention.
->
-ok.
->> +       u8 *start;
->> +       dma_addr_t addr;
->> +};
->> +
->>   struct qup_i2c_dev {
->>          struct device*dev;
->>          void __iomem*base;
->> @@ -157,9 +181,35 @@ struct qup_i2c_dev {
->>          /* QUP core errors */
->>          u32     qup_err;
->>
->> +       /* dma parameters */
->> +       bool    is_dma;
->> +       struct  dma_pool *dpool;
->> +       struct  tag start_tag;
->> +       struct  tag scratch_tag;
->> +       struct  tag footer_tag;
->> +       struct  dma_chan *dma_tx;
->> +       struct  dma_chan *dma_rx;
->> +       struct  scatterlist *sg_tx;
->> +       struct  scatterlist *sg_rx;
->> +       dma_addr_tsg_tx_phys;
->> +       dma_addr_tsg_rx_phys;
->
-> Maybe these could be organized in structure per direction.
->
-ok, will group it.
->> +
->>          struct completionxfer;
->>   };
->>
->> +struct i2c_bam_xfer {
->
-> Unused.
->
-  Right. Will remove the whole thing. Thanks.
->> +       struct qup_i2c_dev *qup;
->> +       u32 start_len;
->> +
->> +       u32 rx_nents;
->> +       u32 tx_nents;
->> +
->> +       struct dma_async_tx_descriptor *tx_desc;
->> +       dma_cookie_t tx_cookie;
->> +       struct dma_async_tx_descriptor *rx_desc;
->> +       dma_cookie_t rx_cookie;
->
-> structure per direction.
->
->> +};
->> +
->>
-  Infact should be removed.
->
->> +static void bam_i2c_callback(void *data)
->> +{
->
-> Please use consistent naming, here and bellow.
->
-ok, will change.
->> +       struct qup_i2c_dev *qup = data;
->> +
->> +       complete(&qup->xfer);
->> +}
->> +
->> +static int get_start_tag(u8 *tag, struct i2c_msg *msg, int first, int last,
->> +                       int blen)
->> +{
->> +       u8 addr = (msg->addr << 1) | ((msg->flags & I2C_M_RD) == I2C_M_RD);
->> +       u8 op;
->> +       int len = 0;
->> +
->> +       /* always issue stop for each read block */
->> +       if (last) {
->> +               if (msg->flags & I2C_M_RD)
->> +                       op = QUP_TAG_V2_DATARD_STOP;
->> +               else
->> +                       op = QUP_TAG_V2_DATAWR_STOP;
->> +       } else {
->> +               if (msg->flags & I2C_M_RD)
->> +                       op = QUP_TAG_V2_DATARD;
->> +               else
->> +                       op = QUP_TAG_V2_DATAWR;
->> +       }
->> +
->> +       if (msg->flags & I2C_M_TEN) {
->> +               len += 5;
->> +               tag[0] = QUP_TAG_V2_START;
->> +               tag[1] = addr;
->> +               tag[2] = op;
->> +               tag[3] = blen;
->> +
->> +               if (msg->flags & I2C_M_RD && last) {
->> +                       len += 2;
->> +                       tag[4] = QUP_BAM_INPUT_EOT;
->> +                       tag[5] = QUP_BAM_FLUSH_STOP;
->> +               }
->> +       } else {
->> +               if (first) {
->> +                       tag[len++] = QUP_TAG_V2_START;
->> +                       tag[len++] = addr;
->> +               }
->> +
->> +               tag[len++] = op;
->> +               tag[len++] = blen;
->> +
->> +               if (msg->flags & I2C_M_RD & last) {
->> +                       tag[len++] = QUP_BAM_INPUT_EOT;
->> +                       tag[len++] = QUP_BAM_FLUSH_STOP;
->> +               }
->> +       }
->> +
->> +       return len;
->> +}
->
-> Maybe could be split to 2 functions?
->
-hmm, ok will split couple of small ones.
->> -static const struct i2c_algorithm qup_i2c_algo = {
->> +static struct i2c_algorithm qup_i2c_algo = {
->
-> Why?
->
-  oops. Should not have been changed. Will fix.
->>          .master_xfer= qup_i2c_xfer,
->>          .functionality= qup_i2c_func,
->>   };
->> @@ -839,6 +1136,7 @@ static int qup_i2c_probe(struct platform_device *pdev)
->>          u32 clk_freq = 100000;
->>          const struct qup_i2c_config *config;
->>          const struct of_device_id *of_id;
->> +       int blocks;
->>
->>          qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
->>          if (!qup)
->> @@ -875,6 +1173,53 @@ static int qup_i2c_probe(struct platform_device *pdev)
->>                  return qup->irq;
->>          }
->>
->> +       if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v2.1.1") ||
->> +               of_device_is_compatible(pdev->dev.of_node,
->> +                       "qcom,i2c-qup-v2.2.1")) {
->
-> Logic will be simpler if you check just for version 1 of the controller.
-  yes. Will fix it.
->
->> +               qup->dma_rx = dma_request_slave_channel(&pdev->dev, "bam-rx");
->> +
->
-> Please use dma_request_slave_channel_reason.
->
-> As Andy noted, please use just "rx", "tx"
->
-ok. will change it.
->> +               if (!qup->dma_rx)
->> +                       return -EPROBE_DEFER;
->
-> Don't mask other errors, here and bellow. DMA support should be optional.
->
-  Ok, will fix here.
->>                  dev_err(qup->dev, "Could not get core clock\n");
->> @@ -989,6 +1334,14 @@ static int qup_i2c_remove(struct platform_device *pdev)
->>   {
->>          struct qup_i2c_dev *qup = platform_get_drvdata(pdev);
->>
->> +       dma_pool_free(qup->dpool, qup->start_tag.start,
->> +                                                               qup->start_tag.addr);
->> +       dma_pool_free(qup->dpool, qup->scratch_tag.start,
->> +                                                               qup->scratch_tag.addr);
->> +       dma_pool_free(qup->dpool, qup->footer_tag.start,
->> +                                                               qup->footer_tag.addr);
->> +       dma_pool_destroy(qup->dpool);
->
-> Only if is_dma, right?
->
-Right. Will add the check.
-> DMA mapping code omitted from review. I don't understand it well enough, sorry.
->
-   Ok, thanks for reviewing the rest.
+Yes, it was nice as an experiment, but it breaks down in plenty of
+unexpected places. It appears that this
 
-Regards,
-  Sricharan
+-#define __virt_to_phys(x)      (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
++#define __virt_to_phys(x) ({                                           \
++       long __x = (long)(x) - PAGE_OFFSET;                             \
++       __x >= 0 ? (phys_addr_t)(__x + PHYS_OFFSET) :                   \
++                  (phys_addr_t)(__x + PHYS_OFFSET + image_offset); })
++
 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
-member of Code Aurora Forum, hosted by The Linux Foundation
+is really all we need.
+
+>
+> Nit: please s/translation regime/mapping/ (or some other wording to that
+> effect) for these patches; the architectural definition of "translation regime"
+> differs from what you're referring to here, and we should avoid overloading
+> that terminology.
+>
+
+Ah ok. I thought it had a nice ring to it :-)
+
+
+> > The purpose is to allow PHYS_OFFSET to start at an arbitrary offset below
+> > the kernel image, so that memory below the kernel Image can be used, allowing
+> > the Image to be loaded anywhere in physical memory.
+> >
+> > This series moves the kernel text right below PAGE_OFFSET, next to the modules
+> > area. PHYS_OFFSET is chosen to be a suitable aligned boundary somewhere below
+> > the kernel Image (1 GB or 512 MB depending on chosen page size).
+> >
+> > Output from a QEMU/EFI boot:
+> >
+> > System RAM:
+> >  memory[0x0]  [0x00000040000000-0x000000bfffffff], 0x80000000 bytes flags: 0x0
+> >
+> > Kernel image:
+> >  reserved[0x0]        [0x0000005f680000-0x0000005fe68fff], 0x7e9000 bytes flags: 0x0
+> >
+> > Virtual kernel memory layout:
+> >     vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
+> >     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+> >               0xffffffbdc1000000 - 0xffffffbdc3000000   (    32 MB actual)
+> >     fixed   : 0xffffffbff69fd000 - 0xffffffbff6c00000   (  2060 KB)
+> >     PCI I/O : 0xffffffbff6e00000 - 0xffffffbff7e00000   (    16 MB)
+> >     modules : 0xffffffbff8000000 - 0xffffffbffc000000   (    64 MB)
+> >     memory  : 0xffffffc000000000 - 0xffffffc080000000   (  2048 MB)
+> >       .init : 0xfeffffbffc783000 - 0xfeffffbffc7c6000   (   268 KB)
+> >       .text : 0xfeffffbffc080000 - 0xfeffffbffc782344   (  7177 KB)
+> >       .data : 0xfeffffbffc7ca000 - 0xfeffffbffc830c00   (   411 KB)
+> >
+> > Note that this time, no relocations were harmed in the making of these
+> > patches. With added relocation support, it should be possible to move
+> > the combined modules and kernel text anywhere in the vmalloc area (for
+> > kaslr)
+> >
+> > There are probably some places where the cleared bit 56 in the virtual
+> > address may cause trouble. Known problem is the module loader, but there
+> > are surely others.
+> >
+> >
+> > Ard Biesheuvel (4):
+> >   arm64: use tagged pointers to distinguish kernel text from the linear
+> >     mapping
+> >   arm64: fixmap: move translation tables to dedicated region
+> >   arm64: move kernel text below PAGE_OFFSET
+> >   arm64: align PHYS_OFFSET to block size
+> >
+> >  arch/arm64/include/asm/linkage.h       |  2 ++
+> >  arch/arm64/include/asm/memory.h        | 27 +++++++++++++++++--
+> >  arch/arm64/include/asm/pgtable-hwdef.h |  1 +
+> >  arch/arm64/kernel/head.S               | 48 +++++++++++++++++++++++++---------
+> >  arch/arm64/kernel/vmlinux.lds.S        | 19 +++++++++-----
+> >  arch/arm64/mm/mmu.c                    | 21 +++++++++------
+> >  arch/arm64/mm/proc.S                   |  3 ++-
+> >  7 files changed, 91 insertions(+), 30 deletions(-)
+> >
+> > --
+> > 1.8.3.2
+> >
+> >
