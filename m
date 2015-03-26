@@ -1,87 +1,113 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 25 Mar 2015 17:04:32 -0700
-Subject: [PATCH 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
-In-Reply-To: <551330B5.6030901@ti.com>
-References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426885630-32429-2-git-send-email-arun.ramamurthy@broadcom.com>
- <20150320212645.GA25405@dtor-ws> <550C9134.9020003@broadcom.com>
- <551330B5.6030901@ti.com>
-Message-ID: <55134D10.2070805@broadcom.com>
+Date: Wed, 25 Mar 2015 17:04:57 -0700
+Subject: [PATCH v1 2/3] Phy: DT binding documentation for Broadcom Cygnus
+ USB PHY driver
+In-Reply-To: <551333DA.6080700@ti.com>
+References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1426886727-537-3-git-send-email-arun.ramamurthy@broadcom.com>
+ <551333DA.6080700@ti.com>
+Message-ID: <55134D29.80708@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 15-03-25 03:03 PM, Kishon Vijay Abraham I wrote:
+On 15-03-25 03:16 PM, Kishon Vijay Abraham I wrote:
 > Hi,
 >
-> On Saturday 21 March 2015 02:59 AM, Arun Ramamurthy wrote:
+> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+>> Broadcom's Cygnus chip has a USB 2.0 host controller connected to
+>> three separate phys. One of the phs (port 2) is also connectd to
+>> a usb 2.0 device controller
 >>
+>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 >>
->> On 15-03-20 02:26 PM, Dmitry Torokhov wrote:
->>> Hi Arun,
->>>
->>> On Fri, Mar 20, 2015 at 02:07:08PM -0700, Arun Ramamurthy wrote:
->>>> Adding devm_of_phy_get_by_index to get phys by supplying an index
->>>> and not a phy name when multiple phys are declared
+>> ---
+>>   .../bindings/phy/brcm,cygnus-usb-phy.txt           | 65 ++++++++++++++++++++++
+>>   1 file changed, 65 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>> new file mode 100644
+>> index 0000000..002bd59
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>> @@ -0,0 +1,65 @@
+>> +BROADCOM CYGNUS USB PHY
+>> +
+>> +Required Properties:
+>> +	- compatible:  brcm,cygnus-usb-phy
+>> +	- reg : usbphy_regs - Base address of phy registers
+>> +			usb2h_idm_regs - Base address of host idm registers
+>> +			usb2d_idm_regs - Base address of device idm registers
 >
-> I think a bit more explanation on why get_by_index is needed here.
-Thanks Kison. Can you be more specific? I am unsure of what more I can 
-explain here.
->>>>
->>>> Reviewed-by: Ray Jui <rjui@broadcom.com>
->>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->>>> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
->>>> ---
->>>>    drivers/phy/phy-core.c  | 30 ++++++++++++++++++++++++++++++
->>>>    include/linux/phy/phy.h |  2 ++
->>>>    2 files changed, 32 insertions(+)
->>>>
->>>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->>>> index a12d353..0c03876 100644
->>>> --- a/drivers/phy/phy-core.c
->>>> +++ b/drivers/phy/phy-core.c
->>>> @@ -622,6 +622,36 @@ struct phy *devm_of_phy_get(struct device *dev, struct
->>>> device_node *np,
->>>>    EXPORT_SYMBOL_GPL(devm_of_phy_get);
->>>>
->>>>    /**
->>>> + * devm_of_phy_get_by_index() - lookup and obtain a reference to a phy by
->>>> index.
->>>> + * @dev: device that requests this phy
->>>> + * @np: node containing the phy
->>>> + * @index: index of the phy
->>>> + *
->>>> + * Gets the phy using _of_phy_get(), and associates a device with it using
->>>> + * devres. On driver detach, release function is invoked on the devres data,
->>>> + * then, devres data is freed.
->>>> + *
->>>> + */
->>>> +struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node
->>>> *np,
->>>> +                     int index)
->>>> +{
->>>> +    struct phy **ptr, *phy;
->>>> +
->>>> +    ptr = devres_alloc(devm_phy_release, sizeof(*ptr), GFP_KERNEL);
->>>> +    if (!ptr)
->>>> +        return ERR_PTR(-ENOMEM);
->>>> +
->>>> +    phy = _of_phy_get(np, index);
->>>> +    if (!IS_ERR(phy)) {
->>>> +        *ptr = phy;
->>>> +        devres_add(dev, ptr);
->>>> +    } else {
->>>> +        devres_free(ptr);
->>>> +    }
->>>> +
->>>> +    return phy;
->>>> +}
->>>
->>> You want EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index); here.
+> where is #phy-cells documented?
+I dont follow, isnt phy-cells a standard binding, what documentation is 
+required?
+>> +The node that uses the phy must provide one integers, 0 for device and 1 for host
 >
-> Also update the Documentation/phy.txt.
+>> +
+>> +NOTE: port 0 and port 1 are host only and port 2 can be configured for host or device.
+>> +
+>> +Example of phy :
+>> +	usbphy0: usbphy at 0x0301c000 {
+>> +		compatible = "brcm,cygnus-usb-phy";
+>> +		reg = <0x0301c000 0x2000>,
+>> +		      <0x18115000 0x1000>,
+>> +		      <0x18111000 0x1000>;
+>> +		status = "okay";
+>> +
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		usbphy0_0: usbphy0 at 0 {
+>> +			#phy-cells = <1>;
+>> +			reg = <0>;
+>> +			status = "okay";
+>> +			phy-supply = <&vbus_p0>;
+>> +		};
+>> +
+>> +		usbphy0_1: usbphy0 at 1 {
+>> +			#phy-cells = <1>;
+>> +			reg = <1>;
+>> +			status = "okay";
+>> +		};
+>> +
+>> +		usbphy0_2: usbphy0 at 2 {
+>> +			#phy-cells = <1>;
+>> +			reg = <2>;
+>> +			status = "okay";
+>> +			phy-supply = <&vbus_p2>;
+>> +		};
+>> +	};
+>> +
+>> +Example of node using the phy:
+>> +
+>> +	/* This nodes declares all three ports as host */
+>> +	
+>> +	ehci0: usb at 0x18048000 {
+>> +		compatible = "generic-ehci";
+>> +		reg = <0x18048000 0x100>;
+>> +		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>> +		phys = <&usbphy0_0 1 &usbphy0_1 1 &usbphy0_2 1>;
+>> +		phy-names = "usb","usb","usb";
+>
+> is it on purpose you use the same name for phy-names? it is wrong though.
+Kishon, I did use the same names on purpose. The phy-names are actually 
+irrelevant because I used the new api I created 
+devm_of_phy_get_by_index. I actually wasnt sure if  should take out the 
+phy-name field altogether or leave it as phy-names = "usb" for 
+compatibility with other bindings. What are your thoughts?
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	/* This node declares port 2 phy
+>> +	and configures it for device */
+>
+> please use standard multi-line comment format.
 >
 Ok will do.
-> -Kishon
+> Thanks
+> Kishon
 >
