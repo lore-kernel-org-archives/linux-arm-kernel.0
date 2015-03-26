@@ -1,30 +1,83 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 26 Mar 2015 17:29:40 +0530
-Subject: [PATCH 0/3] clockevents: Manage device's state separately for core
-In-Reply-To: <CAKohpok1RL8RnT1K+k=Bv23bgnGyny9fMhB=wGn_9yO4VgJUsg@mail.gmail.com>
-References: <cover.1425037853.git.viresh.kumar@linaro.org>
- <CAKohpok+bfVVm-6fW5+tJCOKQA+dY=8zHykdyJEcUNbgGQyrcQ@mail.gmail.com>
- <20150310130541.GA26185@gmail.com>
- <CAKohpok1RL8RnT1K+k=Bv23bgnGyny9fMhB=wGn_9yO4VgJUsg@mail.gmail.com>
-Message-ID: <CAKohpomX1Uc7HAzrXkATEUjh6iTrkFWF4t5GTB48=pK2GEXThg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Mar 2015 12:00:26 +0000
+Subject: [PATCH V2] ARM: BCM5301X: Implement SMP support
+In-Reply-To: <1427030415-31721-1-git-send-email-zajec5@gmail.com>
+References: <1424385148-15026-1-git-send-email-zajec5@gmail.com>
+ <1427030415-31721-1-git-send-email-zajec5@gmail.com>
+Message-ID: <20150326120026.GF8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 March 2015 at 14:44, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 10 March 2015 at 18:35, Ingo Molnar <mingo@kernel.org> wrote:
->
->> Yeah, so I'd like PeterZ to ACK/NAK this approach before I move
->> forward with the patches - but he's on the road right now, so it
->> will take a week I suspect.
->
-> Hi Ingo,
->
-> Now that Peter has already Acked them, will you be taking these as
-> is or want some rework to be done before that ?
+On Sun, Mar 22, 2015 at 02:20:15PM +0100, Rafa? Mi?ecki wrote:
+> +/*
+> + * BCM5301X specific entry point for secondary CPUs.
+> + */
+> +ENTRY(bcm5301x_secondary_startup)
+> +	mrc	p15, 0, r0, c0, c0, 5
+> +	and	r0, r0, #15
+> +	adr	r4, 1f
+> +	ldmia	r4, {r5, r6}
+> +	sub	r4, r4, r5
+> +	add	r6, r6, r4
+> +pen:	ldr	r7, [r6]
+> +	cmp	r7, r0
+> +	bne	pen
+> +
+> +	/*
+> +	 * In case L1 cache has unpredictable contents at power-up
+> +	 * clean its contents without flushing.
+> +	 */
+> +	bl      v7_invalidate_l1
+> +
+> +	mov	r0, #0
+> +	mcr	p15, 0, r0, c7, c5, 0	/* Invalidate icache */
+> +	dsb
+> +	isb
 
-Hi Ingo,
+So if your I-cache contains unpredictable contents, how do you execute
+the code to this point?  Shouldn't the I-cache invalidate be the very
+first instruction you execute followed by the dsb and isb (oh, and iirc
+it ignores the value in the register).
 
-Gentle reminder ping !! :)
+In the case where a CPU has unpredictable contents at power up, the
+ARM ARM requires that an implementation specific sequence is followed
+to initialise the caches.  I doubt that such a sequence includes testing
+a pen value.
 
---
-viresh
+> +	sysram_base_addr = of_iomap(node, 0);
+> +	if (!sysram_base_addr) {
+> +		pr_warn("Failed to map sysram\n");
+> +		return;
+> +	}
+> +
+> +	writel(virt_to_phys(entry_point), sysram_base_addr + SOC_ROM_LUT_OFF);
+> +
+> +	dsb_sev();	/* Exit WFI */
+
+Which WFI?  This seems to imply that you have some kind of initial
+firmware.  If so, that should be taking care of the cache initialisation,
+not the kernel.
+
+> +	mb();		/* make sure write buffer is drained */
+
+writel() already ensures that.
+
+> +	/*
+> +	 * The secondary processor is waiting to be released from
+> +	 * the holding pen - release it, then wait for it to flag
+> +	 * that it has been released by resetting pen_release.
+> +	 *
+> +	 * Note that "pen_release" is the hardware CPU ID, whereas
+> +	 * "cpu" is Linux's internal ID.
+> +	 */
+> +	write_pen_release(cpu_logical_map(cpu));
+> +
+> +	 /* Send the secondary CPU SEV */
+> +	dsb_sev();
+
+If you even need any of the pen code, if you're having to send a SEV here,
+wouldn't having a WFE in the pen assembly loop above be a good idea?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
