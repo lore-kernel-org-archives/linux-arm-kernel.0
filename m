@@ -1,115 +1,71 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 26 Mar 2015 20:49:56 +0200
-Subject: [PATCHv5 11/35] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <20150326173013.GH31346@atomide.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-12-git-send-email-t-kristo@ti.com>
- <5512D069.4080906@ti.com> <20150325231659.GD31346@atomide.com>
- <5513B426.1070205@ti.com> <5513E59F.3020204@ti.com>
- <20150326173013.GH31346@atomide.com>
-Message-ID: <551454D4.5020404@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Mar 2015 19:50:06 +0100
+Subject: ARM: KVM/XEN: how should we support virt-what?
+In-Reply-To: <CAKv+Gu9fzhfu7nJQ9GYvPr33OcY3RP4Ssyx_0o7q-Cw4g8_5Bg@mail.gmail.com>
+References: <20150325094440.GB3163@hawk.usersys.redhat.com>
+ <20150326090150.GA3073@hawk.usersys.redhat.com>
+ <alpine.DEB.2.02.1503261843410.9516@kaball.uk.xensource.com>
+ <CAKv+Gu9fzhfu7nJQ9GYvPr33OcY3RP4Ssyx_0o7q-Cw4g8_5Bg@mail.gmail.com>
+Message-ID: <CAKv+Gu9YcrO=c0OWD2P6AXjMxPyaz=LhtB81FiCijAEC=XuW6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 07:30 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [150326 03:55]:
->> On 03/26/2015 09:24 AM, Tero Kristo wrote:
->>> On 03/26/2015 01:17 AM, Tony Lindgren wrote:
->>>> * Tero Kristo <t-kristo@ti.com> [150325 08:12]:
->>>>>
->>>>> Splits the clock provider init out of the PRM driver and moves it to
->>>>> clock driver. This is needed so that once the PRCM drivers are
->>>>> separated,
->>>>> they can logically just access the clock driver not needing to go
->>>>> through
->>>>> common PRM code. This would be wrong in the case of control module for
->>>>> example.
->>>> ...
->>>>
->>>>> --- a/arch/arm/mach-omap2/clock.c
->>>>> +++ b/arch/arm/mach-omap2/clock.c
->>>> ...
->>>>> -u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
->>>>> +u32 omap2_clk_memmap_readl(void __iomem *reg)
->>>>>   {
->>>>> -    u32 val;
->>>>> +    struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
->>>>>
->>>>> -    if (clk->flags & MEMMAP_ADDRESSING) {
->>>>> -        struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
->>>>> -        val = readl_relaxed(clk_memmaps[r->index] + r->offset);
->>>>> -    } else {
->>>>> -        val = readl_relaxed(reg);
->>>>> -    }
->>>>> +    return readl_relaxed(clk_memmaps[r->index] + r->offset);
->>>>> +}
->>>>
->>>> The cast from void __iomem *reg to struct clk_omap_reg *r looks still
->>>> nasty.. Why don't you add the IO address into struct clk_omap_reg:
->>>>
->>>> struct clk_omap_reg {
->>>>     u16 offset;
->>>>     u16 index;
->>>>     struct regmap *regmap;
->>>>     void __iomem *addr;
->>>> };
->>>> ...
->>>>
->>>> Then populate it during init and then have the clock code use it
->>>> directly if available? Then it seems you would not need the
->>>> static struct clk_iomap *clk_memmaps[CLK_MAX_MEMMAPS] at all?
+On 26 March 2015 at 19:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 26 March 2015 at 19:45, Stefano Stabellini
+> <stefano.stabellini@eu.citrix.com> wrote:
+>> On Thu, 26 Mar 2015, Andrew Jones wrote:
+>>> On Wed, Mar 25, 2015 at 10:44:42AM +0100, Andrew Jones wrote:
+>>> > Hello ARM virt maintainers,
+>>> >
+>>> > I'd like to start a discussion about supporting virt-what[1]. virt-what
+>>> > allows userspace to determine if the system it's running on is running
+>>> > in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
+>>> > effort tool, see the Caveat emptor in [1], it has become quite a useful
+>>> > tool, and is showing up in different places, such as OpenStack. If you
+>>> > look at the code[2], specifically [3], then you'll see how it works on
+>>> > x86, which is to use the dedicated hypervisor cpuid leaves. I'm
+>>> > wondering what equivalent we have, or can develop, for arm.
+>>> > Here are some thoughts;
+>>> > 0) there's already something we can use, and I just need to be told
+>>> >    about it.
+>>> > 1) be as similar as possible to x86 by dedicating some currently
+>>> >    undefined sysreg bits. This would take buy-in from lots of parties,
+>>> >    so is not likely the way to go.
+>>> > 2) create a specific DT node that will get exposed through sysfs, or
+>>> >    somewhere.
+>>> > 3) same as (2), but just use the nodes currently in mach-virt's DT
+>>> >    as the indication we're a guest. This would just be a heuristic,
+>>> >    i.e. "have virtio mmio" && psci.method == hvc, or something,
+>>> >    and we'd still need a way to know if we're kvm vs. xen vs. ??.
+>>> >
+>>> > Thanks,
+>>> > drew
+>>> >
+>>> > [1] http://people.redhat.com/~rjones/virt-what/
+>>> > [2] http://git.annexia.org/?p=virt-what.git;a=summary
+>>> > [3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
 >>>
->>> Doing a change like this should probably be planned, but it is a larger
->>> modification. Currently none of the low-level clock APIs support this,
->>> but instead expect a direct iomem pointer against which they can do
->>> arithmetic operations. The major problem is the companion clocks, which
->>> just XOR some bits in the registers to get ICLK / IDLEST register offset
->> >from FCLK.
+>>> Thanks everyone for their responses. So, the current summary seems to
+>>> be;
+>>> 1) Xen has both a DT node and an ACPI table, virt-what can learn how
+>>>    to probe those.
+>>> 2) We don't have anything yet for KVM, and we're reluctant to create a
+>>>    specific DT node. Anyway, we'd still need to address ACPI booted
+>>>    guests some other way.
 >>>
->>> So, for now, clock code just uses the void __iomem pointer as a storage
->>> class for struct clk_omap_reg, on which arithmetic operations can be done.
->
-> Well how about keep the check if (clk->flags & MEMMAP_ADDRESSING) at
-> least? Maybe WARN_ON(!(clk->flags & MEMMAP_ADDRESSING))?
->
-> Otherwise this could be a nightmare to debug if anything goes wrong.
-
-Yea, adding a warning is a good idea for now, I'll do this update 
-tomorrow morning.
-
--Tero
-
->
->> I did this change as a trial, and this is the diff required to get it
->> working:
+>>> For a short-term, DT-only, approach we could go with a heuristic, one
+>>> that includes Marc's "if hypervisor node exists, then xen, else kvm"
+>>> condition.
+>>>
+>>> How about SMBIOS for a long-term solution that works for both DT and
+>>> ACPI? We're not populating SMBIOS for arm guests yet in qemu, but now
+>>> that AAVMF has fw_cfg, we should be able to. On x86 we already have
+>>> smbios populated from qemu, although not in a way that allows us to
+>>> determine kvm vs. xen vs. tcg.
 >>
->>   arch/arm/mach-omap2/clkt_iclk.c |   20 ++++++++---------
->>   arch/arm/mach-omap2/clock.c     |   47
->> +++++++++++++++++----------------------
->>   arch/arm/mach-omap2/clock.h     |    8 +++----
->>   arch/arm/mach-omap2/clock2430.c |    5 +++--
->>   arch/arm/mach-omap2/clock34xx.c |   36 ++++++++++++++----------------
->>   arch/arm/mach-omap2/clock3517.c |   20 ++++++++---------
->>   arch/arm/mach-omap2/cm.h        |    4 +++-
->>   arch/arm/mach-omap2/cm2xxx.c    |    9 +++-----
->>   arch/arm/mach-omap2/cm3xxx.c    |   10 +++------
->>   drivers/clk/ti/clk.c            |   10 +++++----
->>   drivers/clk/ti/divider.c        |   24 ++++++++++++++------
->>   drivers/clk/ti/dpll.c           |   11 ++++-----
->>   drivers/clk/ti/gate.c           |   21 +++++++++++------
->>   drivers/clk/ti/interface.c      |    9 ++++----
->>   drivers/clk/ti/mux.c            |   22 ++++++++++++------
->>   include/linux/clk/ti.h          |    5 +++--
->>   16 files changed, 137 insertions(+), 124 deletions(-)
+>> I don't think that SMBIOS works with DT.
 >>
->> I think we should probably keep this out of this set now and do this while
->> moving the OMAP core clock support code under clock driver... just to keep
->> it more easily manageable.
 >
-> OK fine with me to do that as a follow-up patch.
->
-> Regards,
->
-> Tony
->
+> SMBIOS works fine with DT
+
+... but it needs UEFI ...
