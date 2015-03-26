@@ -1,45 +1,57 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 27 Mar 2015 10:02:01 +0800
-Subject: [PATCH v2] cpufreq: hisilicon: add acpu driver
-In-Reply-To: <55141412.6040600@arm.com>
-References: <1427370486-14823-1-git-send-email-leo.yan@linaro.org>
- <55141412.6040600@arm.com>
-Message-ID: <20150327020201.GB4902@leoy-linaro>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 26 Mar 2015 18:41:44 +0100
+Subject: [GIT PULL 1/2] ARM: rockchip: soc code changes for 4.1
+In-Reply-To: <2684132.lK2CyBin0M@diego>
+References: <2684132.lK2CyBin0M@diego>
+Message-ID: <9711811.dP5TtE1nVp@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Sudeep,
-
-Thanks for reviewing.
-
-On Thu, Mar 26, 2015 at 02:13:38PM +0000, Sudeep Holla wrote:
+Am Mittwoch, 18. M?rz 2015, 17:41:15 schrieb Heiko St?bner:
+> Hi Arnd, Olof,
 > 
-> On 26/03/15 11:48, Leo Yan wrote:
-> >+static int __init hisi_acpu_cpufreq_driver_init(void)
-> >+{
-> >+	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
-> >+	struct platform_device *pdev;
-> >+
-> >+	if (!of_machine_is_compatible("hisilicon,hi6220"))
-> >+		return -ENODEV;
-> >+
-> >+	pdev = platform_device_register_full(&devinfo);
-> >+	return PTR_ERR_OR_ZERO(pdev);
+> some soc code changes for 4.1 . I hope the tag explains it, so please pull
+
+as heard in Arnd's talk on ELC yesterday, I'm supposed to ping after one week 
+of inactivity, so any news on these two pulls? :-)
+
+
+Thanks
+Heiko
+
 > 
-> Since you are not using anything other than name, you can simplify it
-> further by something like:
-> 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0)
-
-Will use this way and resend patch.
-
-> And IMO it need not be a separate driver too, you can add this in mach
-> if it exists(i.e. arm32 though not recommended) or clock code that
-> registers cpu clock. Thoughts ?
-
-This driver will be firstly used for hikey board w/t ARMv8 SoC and i
-prefer de-couple the cpufreq driver w/t clk driver. w/t this cpufreq
-driver, we can easily enhance it and init SoC's specific operations
-for later more hisilicon SoCs.
-
-Thanks,
-Leo Yan
+> 
+> Thanks
+> Heiko
+> 
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
+> tags/v4.1-rockchip-soc1
+> 
+> for you to fetch changes up to a0307d186f5015ee3d77e209e5c06190cbf02478:
+> 
+>   ARM: rockchip: disable watchdog during suspend (2015-03-11 22:41:02 +0100)
+> 
+> ----------------------------------------------------------------
+> Some suspend improvements reducing resume time and making sure the
+> watchdog does not reset after 12 hours and a change to constify and
+> staticize some smp parts.
+> 
+> ----------------------------------------------------------------
+> Chris Zhong (2):
+>       ARM: rockchip: decrease the wait time for resume
+>       ARM: rockchip: disable watchdog during suspend
+> 
+> Krzysztof Kozlowski (1):
+>       ARM: rockchip: Constify struct regmap_config and staticize local
+> function
+> 
+>  arch/arm/mach-rockchip/platsmp.c |  4 ++--
+>  arch/arm/mach-rockchip/pm.c      | 14 +++++++++++---
+>  arch/arm/mach-rockchip/pm.h      |  6 ++++++
+>  3 files changed, 19 insertions(+), 5 deletions(-)
