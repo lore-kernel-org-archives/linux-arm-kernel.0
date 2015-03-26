@@ -1,31 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Mar 2015 13:49:33 +0000
-Subject: Request for additional arm64 branch in linux-next
-In-Reply-To: <20150326111055.273aa644@canb.auug.org.au>
-References: <20150325172002.GN24636@arm.com>
- <20150326111055.273aa644@canb.auug.org.au>
-Message-ID: <20150326134932.GD2805@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 26 Mar 2015 13:51:44 +0000
+Subject: [PATCH v3 0/4] clk: st: New always-on clock domain
+In-Reply-To: <CAMuHMdV8_uKQQgYkRPFOBgrqgw_y9A7T84ukfgWZpJmTL0eFCQ@mail.gmail.com>
+References: <1424799222-9301-1-git-send-email-lee.jones@linaro.org>
+ <20150304120003.GL32624@x1> <20150306190812.11109.82130@quantum>
+ <20150309092804.GB3427@x1>
+ <CAMuHMdV8_uKQQgYkRPFOBgrqgw_y9A7T84ukfgWZpJmTL0eFCQ@mail.gmail.com>
+Message-ID: <20150326135144.GI5951@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 12:10:55AM +0000, Stephen Rothwell wrote:
-> On Wed, 25 Mar 2015 17:20:03 +0000 Will Deacon <will.deacon@arm.com> wrote:
-> > We've got a series of patches introducing ACPI support for arm64 that
-> > are tentatively targetting the 4.1 merge window. Whilst there are
-> > face-to-face discussions set to happen in the next day or so around this
-> > topic, could you please pull this into linux-next under the assumption
-> > that we decide to go ahead for mainline inclusion?
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/acpi
-> > 
-> > I've kept the series separate from the usual arm64 branch (for-next/core)
-> > but they merge without conflicts. Merging with today's next, I see two
-> > trivial Kconfig conflicts (resolution below).
+On Wed, 25 Mar 2015, Geert Uytterhoeven wrote:
+
+> Hi Lee,
 > 
-> Added from today (and thanks for the hints).  Will this be merged via
-> another tree, or go directly to Linus?
+> On Mon, Mar 9, 2015 at 10:28 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Fri, 06 Mar 2015, Mike Turquette wrote:
+> >> Quoting Lee Jones (2015-03-04 04:00:03)
+> >> > Mike,
+> >> >
+> >> > Do you want me to resend this set with Robert's Reviewed-by applied,
+> >> > or are you happy to apply it yourself?
+> >>
+> >> No need for the resend. I am hoping for a final review from a DT human.
+> >>
+> >> This approach looks fine to me. In practice I think it is restricted to
+> >> hardware blocks that don't exist in DT yet (e.g. no driver, in the case
+> >> of your interconnect) and that restriction is probably for the best.
+> >
+> > Agreed.
+> 
+> I think this restriction should be documented in the DT binding more clearly,
+> as adding a "clk-always-on" node prohibits you from handling the clock
+> correctly in
+> the future.
 
-Thank, Stephen. Yes, we've been collecting Acks for a while now, so the
-plan is to send this to Linus as an extra arm64 pull request.
+Would you mind taking the time to explain what you think those
+limitations are?
 
-Will
+> Still, for simple devices where you don't have a driver, but have "predictable"
+> bindings (e.g. a bus like "simple-pm-bus"), I think it's better to add
+> a device node
+> for that simple device now, incl. a reference to the clock, and have a simple
+> driver that binds to the device, or platform code that looks for a
+> compatible node,
+> and enables the clock. That way you don't have to make any chances to the DTS
+> later, when you'll have a real driver.
+> 
+> >> > > v2 => v3:
+> >> > >   - Ensure DT actually reflects h/w
+> >> > >     - i.e. Nodes should not contain a mishmash of different IP
+> >> > >       blocks, but should identify related h/w.  In the current
+> >> > >       example we use interconnects
+> >> > >   - Change naming from clkdomain to clk-always-on
+> >> > >   - Place "do not abuse" warning in documentation
+> >> > >
+> >> > > v1 => v2:
+> >> > >   - Turned the ST specific driver into a generic one
+> >> > >
+> >> > > Hardware can have a bunch of clocks which must not be turned off.
+> >> > > If drivers a) fail to obtain a reference to any of these or b) give
+> >> > > up a previously obtained reference during suspend, the common clk
+> >> > > framework will attempt to turn them off and the hardware will
+> >> > > subsequently die.  The only way to recover from this failure is to
+> >> > > restart.
+> >> > >
+> >> > > To avoid either of these two scenarios from catastrophically
+> >> > > disabling the running system we have implemented a clock domain
+> >> > > where clocks are consumed and references are taken, thus preventing
+> >> > > them from being shut down by the framework.
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
