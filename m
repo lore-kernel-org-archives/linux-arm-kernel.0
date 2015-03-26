@@ -1,82 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 26 Mar 2015 12:57:34 -0600
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
- <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
- <55137098.4030903@wwwdotorg.org>
- <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
-Message-ID: <5514569E.2030406@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 Mar 2015 14:00:24 -0500
+Subject: [PATCH v4] dt-bindings: brcm: rationalize Broadcom documentation
+ naming
+In-Reply-To: <55125894.2070303@broadcom.com>
+References: <1426899982-19733-1-git-send-email-sbranden@broadcom.com>
+ <550F6A5B.8050906@gmail.com> <55125894.2070303@broadcom.com>
+Message-ID: <CAL_JsqLGz59fyC6h7XEh=UHOCzgTUY0Y2TSrZTHmv4U8nBpunw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 12:35 PM, Paul Walmsley wrote:
-> On Wed, 25 Mar 2015, Stephen Warren wrote:
+On Wed, Mar 25, 2015 at 1:41 AM, Scott Branden <sbranden@broadcom.com> wrote:
+> Hi Rob,
 >
->> On 03/25/2015 04:00 PM, Paul Walmsley wrote:
->>> On Wed, 25 Mar 2015, Tyler Baker wrote:
->>>> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
->>>>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
->>>>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
->>>>> multi_v7_defconfig boot.
->>>>>
->>>>> Boot log before:
->>>>>
->>>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->>>>>
->>>>> Boot log after:
->>>>>
->>>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->>>>>
->>>>>
->>>>> Any ideas?  Stephen Warren thinks there might be an initcall that might
->>>>> not check to see what kind of device it's running on.
->>>>
->>>> Can you try to shift your kernel load address around a bit? From
->>>> experience with the boards from kernelci.org we find that as the multi
->>>> v7 kernel size increases they can clobber memory when they get
->>>> decompressed.
->>>
->>> Thanks, that was it:
->>>
->>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->>>
->>> Should have guessed when absolutely no debug output was emitted by the
->>> board...
->>>
->>> Sorry for the false alarm, Geert!
+> On 15-03-22 06:20 PM, Rob Herring wrote:
 >>
->> Interesting. Do the values in U-Boot's default environment work
->> correctly
+>> On 03/20/2015 08:06 PM, Scott Branden wrote:
+>>>
+>>> This patchset attempts to standardize the naming of dt-bindings
+>>> documents based on the Broadcom vendor prefix of brcm.
+>>>
+>>> Although there are no guidelines currently present for how to name
+>>> the dt-bindings document the "vendor,binding.txt" style is in use by
+>>> some of the other vendors.
+>>>
+>>> Acked-by: Lee Jones <lee@kernel.org>
+>>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+>>> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
+>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>>
+>>
+>> Version history would be nice...
 >
-> No idea, I haven't tried.  (The load addresses I used are observable in
-> the boot logs above.)
-
-Sure. I was hoping you'd try it out since you already had the setup to 
-repro the issue.
-
-It'd be good if your test-bed used the built-in U-Boot variables too, so 
-we're testing them.
-
->> ("env default -f -a" will reset the environment to default, in
->> case some old values are saved in flash); I put some effort into picking
->> them so I really hope they work! ${kernel_addr_r}, ${fdt_addr_r},
->> ${ramdisk_addr_r}.
+> Yes, I should have added a cover letter but didn't.  The difference between
+> versions was minimal: a spelling correction in the commit message text and a
+> few additional binding files were found that were added between the
+> versions, along with the Ack's.
 >
-> According to the tegra20-common.h file in the u-boot source here,
-> kernel_addr_r is 0x01000000 and fdt_addr_r is 0x02000000.  If one assumes
-> the problem is that the kernel decompressor is overwriting the DTB, then
-> I suspect they wouldn't work either, since the gap between the addresses
-> is the same as what I used (0x01000000).
+>>
+>> Who did you want to apply this? I can, but I'm worried about merge
+>> conflicts here. Hopefully, you're not also doing lots of changes to
+>> existing bindings.
+>
+>
+> Yes, it would be great for you to take care of applying this.  There
+> shouldn't be any merge conflicts as none of these bindings are currently
+> being updated.  I left a clock binding document out of this patchset at Ray
+> Jui is updating/renaming the documentation for that binding in a different
+> patch already.
 
-I expect the issue is more how close the uncompressed kernel and/or DTB 
-are to the start of RAM (where the decompressor writes to). IIRC, if the 
-decompressor is going to overwrite the compressed kernel during 
-decompression, it moves itself first. I can't remember where the 
-destination of the move is, but perhaps the relocation can over-write 
-the DTB. By pushing the location of the compressed kernel away from the 
-start of RAM, this relocation won't happen. IIRC when the decompression 
-happens, or relocation prior to decompression, there's no protection of 
-the DTB being overwritten.
+Okay, thanks. I've applied it.
+
+Rob
