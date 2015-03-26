@@ -1,42 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 15:05:58 +0000
-Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
-In-Reply-To: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
-References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150326150558.GK8656@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Mar 2015 15:13:41 +0000
+Subject: [patch v11 13/23] ACPI / processor: Introduce phys_cpuid_t for
+ CPU hardware ID
+In-Reply-To: <551381CD.5010804@huawei.com>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-14-git-send-email-hanjun.guo@linaro.org>
+ <20150325172109.GJ14585@localhost> <551381CD.5010804@huawei.com>
+Message-ID: <20150326151341.GH2805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 02:12:52PM +0300, Andrey Ryabinin wrote:
-> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
-> split this is not so, because 2*TASK_SIZE overflows 32 bits,
-> so the actual value of ELF_ET_DYN_BASE is:
-> 	(2 * TASK_SIZE / 3) = 0x2a000000
+On Thu, Mar 26, 2015 at 03:49:33AM +0000, Hanjun Guo wrote:
+> On 2015/3/26 1:21, Catalin Marinas wrote:
+> > On Tue, Mar 24, 2015 at 10:02:46PM +0800, Hanjun Guo wrote:
+> >> CPU hardware ID (phys_id) is defined as u32 in structure acpi_processor,
+> >> but phys_id is used as int in acpi processor driver, so it will lead to
+> >> some inconsistence for the drivers.
+> >>
+> >> Furthermore, to cater for ACPI arch ports that implement 64 bits CPU
+> >> ids a generic CPU physical id type is required.
+> >>
+> >> So introduce typedef u32 phys_cpuid_t in a common file, and introduce
+> >> a macro PHYS_CPUID_INVALID as (phys_cpuid_t)(-1) if it's not defined
+> >> by other archs, this will solve the inconsistence in acpi processor driver,
+> >> and will prepare for the ACPI on ARM64 for the 64 bit CPU hardware ID
+> >> in the following patch.
+> >>
+> >> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+> >> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+> >> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> >> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> >> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> [hj: reworked cpu physid map return codes]
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> > BTW, am I still the author of this patch? If yes, it's missing a From:
+> > line.
 > 
-> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
-> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
-> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
-> as it fails to map shadow memory.
-> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
-> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
-> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
-> 
-> Fix overflow by dividing TASK_SIZE prior to multiplying.
-> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
-> 	(TASK_SIZE / 3 * 2) = 0x7f555554
-> 
-> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
-> 
-> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-> Reported-by: Maria Guseva <m.guseva@samsung.com>
-> Cc: stable at vger.kernel.org
+> Oops, you should be the author, can Will fix this in his tree?
 
-Who's handling this patch?  I'm guessing it should be me, so if it could
-find its way into my patch system for when I next apply a bunch of patches,
-that'd be good.
+Fixed.
 
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Will
