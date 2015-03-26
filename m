@@ -1,78 +1,66 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 26 Mar 2015 09:13:10 -0700
-Subject: String literals in __init functions
-In-Reply-To: <5513FE2F.3040306@free.fr>
-References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
- <5513FE2F.3040306@free.fr>
-Message-ID: <1427386390.15849.13.camel@perches.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 26 Mar 2015 16:23:36 +0000
+Subject: [PATCH v3 3/9] eeprom: Add a simple EEPROM framework for eeprom
+ providers
+In-Reply-To: <20150324225317.GD28997@sirena.org.uk>
+References: <1427236116-18531-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1427236208-18667-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150324225317.GD28997@sirena.org.uk>
+Message-ID: <55143288.4040604@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-26 at 13:40 +0100, Mason wrote:
-> On 25/03/2015 19:01, Joe Perches wrote:
-> > On Wed, 2015-03-25 at 18:56 +0100, Mason wrote:
-> >
-> >> AFAIU, functions only used at system init are tagged __init to have
-> >> the linker store them in a separate .init.text section, so memory can
-> >> be reclaimed once initialization is complete. Is that correct?
-> >>
-> >> The corresponding tag for data is __initdata (section .init.data)
-> >>
-> >> I started wondering if the string literals used in an __init functions
-> >> were automatically marked __initdata.
-> >>
-> >> Looking at the objdump output, I see that the string literals are,
-> >> in fact, stored in the .rodata section. I suppose that .rodata is NOT
-> >> reclaimed after init?
-> >>
-> >> This way seems to work:
-> >>
-> >> static       char XyZa[] __initdata  = KERN_ALERT "foo";
-> >> static const char XyZb[] __initconst = KERN_ALERT "bar";
-> >> void __init XyZc(void) { printk(XyZa); printk(XyZb); }
-> >>
-> >> $ arm-linux-gnueabihf-objdump -xd arch/arm/mach-tangox/time.o | grep XyZ
-> >> 00000000 l     O .init.data	00000006 XyZa
-> >> 00000000 l     O .init.rodata	00000006 XyZb
-> >> 00000000 g     F .init.text	00000028 XyZc
-> >> 00000000 <XyZc>:
-> >>
-> >> $ arm-linux-gnueabihf-objdump -xd vmlinux | grep XyZ
-> >> c021e360 l     O .init.data	00000006 XyZa
-> >> c0220090 l     O .init.data	00000006 XyZb
-> >> c020d928 g     F .init.text	00000028 XyZc
-> >> c020d928 <XyZc>:
-> >>
-> >> c020d928 <XyZc>:
-> >> c020d928:       e1a0c00d        mov     ip, sp
-> >> c020d92c:       e92dd800        push    {fp, ip, lr, pc}
-> >> c020d930:       e24cb004        sub     fp, ip, #4
-> >> c020d934:       e30e0360        movw    r0, #58208      ; 0xe360
-> >> c020d938:       e34c0021        movt    r0, #49185      ; 0xc021
-> >> c020d93c:       ebfe00c9        bl      c018dc68 <printk>
-> >> c020d940:       e3000090        movw    r0, #144        ; 0x90
-> >> c020d944:       e34c0022        movt    r0, #49186      ; 0xc022
-> >> c020d948:       ebfe00c6        bl      c018dc68 <printk>
-> >> c020d94c:       e89da800        ldm     sp, {fp, sp, pc}
-> >>
-> >> Did I miss something in init.h?
-> >> Or should it be done like above to reclaim string literals?
-> >
-> > No, you didn't miss anything.
-> >
-> > One proposal:
-> >
-> > https://lkml.org/lkml/2014/8/21/255
-> 
-> Thanks for the link!
-> 
-> Here's the equivalent gmane link for my own reference:
-> http://thread.gmane.org/gmane.linux.kernel/1771969
-> 
-> Basically, if I understand correctly, Ingo NAKed the patch, saying
-> this should be done automatically by the toolchain. That would make
-> for an interesting side-project...
 
-True.  It's probably not feasible though.
 
-Tracking string deduplication/reuse would be pretty difficult.
+On 24/03/15 22:53, Mark Brown wrote:
+> On Tue, Mar 24, 2015 at 10:30:08PM +0000, Srinivas Kandagatla wrote:
+>
+>> +static ssize_t bin_attr_eeprom_write(struct file *filp, struct kobject *kobj,
+>> +				     struct bin_attribute *attr,
+>> +				     char *buf, loff_t offset, size_t count)
+>> +{
+>> +	struct device *dev = container_of(kobj, struct device, kobj);
+>> +	struct eeprom_device *eeprom = to_eeprom(dev);
+>> +	int rc;
+>> +
+>> +	if (offset > eeprom->size)
+>> +		return -EINVAL;
+>> +
+>> +	if (offset + count > eeprom->size)
+>> +		count = eeprom->size - offset;
+>> +
+>> +	rc = regmap_bulk_write(eeprom->regmap, offset,
+>> +			       buf, count/eeprom->stride);
+>
+> Are you sure that this and the read interface should be using the bulk
+> interface and not the raw interface - do we want the byte swapping that
+> the bulk interface provides?
+>
+You are correct, byte swapping is not really needed in this cases.
+It should read/write data as it is.
+
+I will fix it in next version.
+
+> I'm also not entirely able to convince myself that the above error
+> checks and code line up with what I'd expect the userspace ABI to be, we
+> seem to be treating offset as both a byte offset into the data (which is
+> what I'd expect the userspace ABI to do) and a word based index into the
+> data (which is what the regmap API is doing).  For example with 16 bit
+> words offset 2 will start at the 5th byte of data but if userspace seeks
+> to offset 5 it will get the 11th byte and onwards.
+
+Thanks for spotting this, Yes, the offset from userspace should be 
+treated as byte oriented and the offset to regmap as word based index 
+into the data.
+Yes, logic here needs a fix to handle data correctly.
+
+>
+> The stride and the word size are separate, they will frequently line up
+> for memory mapped devices but typically won't for other devices.  I
+> think you need more data mangling to handle this robustly.
+Yes, I agree I will address this too in next version.
+
+thanks,
+srini
+
+>
