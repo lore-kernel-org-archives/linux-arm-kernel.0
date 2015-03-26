@@ -1,96 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Mar 2015 22:10:14 +0000
-Subject: [PATCH v1] arm64:mm: enable the kernel execute attribute for
- HEAD_TEXT segment
-In-Reply-To: <1427378028-126465-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1427378028-126465-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <20150326221014.GA1696@flaeskesteg-linux.aus.arm.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 26 Mar 2015 15:15:57 -0700
+Subject: String literals in __init functions
+In-Reply-To: <1427407120.15849.34.camel@perches.com>
+References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
+ <5513FE2F.3040306@free.fr> <1427386390.15849.13.camel@perches.com>
+ <CA+rthh9Fb2q+O_wicc6eNcbo6SzwOVZed=tnThJLF-xuoQ-+Cw@mail.gmail.com>
+ <1427392393.15849.16.camel@perches.com>
+ <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
+ <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
+ <1427407120.15849.34.camel@perches.com>
+Message-ID: <20150326151557.61dfad84272aff10aaa4eba7@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 01:53:48PM +0000, Zhichang Yuan wrote:
-> From: yuanzhichang <yuanzhichang@hisilicon.com>
+On Thu, 26 Mar 2015 14:58:40 -0700 Joe Perches <joe@perches.com> wrote:
+
+> > I'd have thought that a function-wide
+> > 	__attribute__((__string_section__(foo))
+> > wouldn't be a ton of work to implement.
 > 
-> In the patch whose title is "add better page protections to arm64"
-> (commit da141706aea52c1a9fbd28cb8d289b78819f5436), The direct mapping
-> page table entries for HEAD_TEXT segment were configured as PAGE_KERNEL,
-> without the executable attribute. But when the secondary CPUs are booting
-> based on spin-table mechanism, some functions in head.S are needed to run.
-
-In mainline today, the only functions I see in head.S before the .section
-change (and hence are not executable) are:
-
-* stext
-* __vet_fdt
-* __create_page_tables
-* __mmap_switched
-
-These are never executed by secondary CPUs. So your problem does not seem to be
-related to functions falling withing HEAD_TEXT -- all other functions in head.S
-are placed in .text, and thus will be executable regardless.
-
-If you had a problem with spin-table, then I don't see why it wouldn't also
-apply to PSCI -- in both cases we go via secondary_startup before we enable the
-MMU.
-
-So I suspect that you have another bug, and some layout change (or difference
-in maintenance) is masking that when the better protections are enabled. It's
-also possible that we have a bug in the logic updating the page tables.
-
-Have you actually seen an issue, or was this theoretical?
-
-What exactly do you see happen when booting secondary CPUs?
-
-Do you see the issue in mainline?
-
-> Only PAGE_KERNEL dosen't work for this case.
-> This patch will configure the page attributes as PAGE_KERNEL_EXEC for
-> HEAD_TEXT segment.
-
-I don't see how this should be necessary.  All the text in that section should
-only be executed on the first CPU, prior to permissions being applied, and
-prior to the MMU being enabled.
-
-> Signed-off-by: Zhichang Yuan <yuanzhichang@hisilicon.com>
-> ---
->  arch/arm64/mm/mmu.c | 24 ++++++++++++++++++------
->  1 file changed, 18 insertions(+), 6 deletions(-)
+> Maybe not.
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index c6daaf6..ad08dfd 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -305,8 +305,8 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
->  	 * for now. This will get more fine grained later once all memory
->  	 * is mapped
->  	 */
-> -	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> -	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
-> +	phys_addr_t kernel_x_start = round_down(__pa(_text), SECTION_SIZE);
-> +	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+> Could some future version of gcc move string constants
+> in a function to a specific section marked in a manner
+> similar to what Andrew described above?
 
-As mentioned above, none of the text in this section needs to be run with the
-MMU on. So I don't think this is necessary.
+One thing which might complexicate this is
 
->  
->  	if (end < kernel_x_start) {
->  		create_mapping(start, __phys_to_virt(start),
-> @@ -315,6 +315,18 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
->  		create_mapping(start, __phys_to_virt(start),
->  			end - start, PAGE_KERNEL);
->  	} else {
-> +	/*
-> +	 * At this moment, the text segment must reside in valid physical
-> +	 * memory section range to make sure the text are totally mapped. 
-> +	 * If mapping from non-section aligned address is support, then
-> +	 * _text can be used here directly in replace to kernel_x_start.
-> +	 */
-> +		phys_addr_t max_left, min_right;
-> +
-> +		max_left = max(kernel_x_start, start);
-> +		min_right = min(kernel_x_end, end);
-> +		BUG_ON(max_left != kernel_x_start || min_right != kernel_x_end);
+void foo()
+{
+	p("bar");
+}
 
-Huh?
+void  __attribute__((__string_section__(.init.rodata)) zot()
+{
+	p("bar");
+}
 
-Mark.
+It would be silly to create two instances of "bar".
+
+Change it thusly:
+
+
+#define __mark_str(str) \
+	({ static const char var[] __attribute__((__section__(".init.string"))) = str; var; })
+
+void foo()
+{
+	p("bar");
+}
+
+void zot()
+{
+	p(__mark_str("bar"));
+}
+
+
+and we indeed get two copies of "bar".
+
+It would be nice not to do that, but I guess that losing this
+optimization is a reasonable compromise.
