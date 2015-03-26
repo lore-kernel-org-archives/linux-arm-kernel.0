@@ -1,82 +1,22 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 27 Mar 2015 02:19:25 +0900
-Subject: [PATCH v4 0/4] ARM: EXYNOS: cpuidle: add AFTR mode support for
- Exynos3250
-In-Reply-To: <550A5A94.2080207@samsung.com>
-References: <1426694453-3242-1-git-send-email-b.zolnierkie@samsung.com>
- <550A5A94.2080207@samsung.com>
-Message-ID: <55143F9D.9060100@kernel.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 26 Mar 2015 17:20:34 +0000
+Subject: [PATCH v5 4/6] target-arm: kvm64 sync FP register state
+In-Reply-To: <1427130344-27986-5-git-send-email-alex.bennee@linaro.org>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+ <1427130344-27986-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA8i8tptcox=PhUHqSWhBaSu0RyoeFKQoT_GvH_6A5oHcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/19/15 14:11, Chanwoo Choi wrote:
-> Hi Bartlomiej,
-> 
-Hi,
+On 23 March 2015 at 17:05, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> +    /* Advanced SIMD and FP registers
+> +     * We map Qn = regs[2n+1]:regs[2n]
+> +     */
+> +    for (i = 0; i < 32; i++) {
+> +        int rd = i << 1;
+> +        float128 fp_val = make_float128(env->vfp.regs[rd + 1],
+> +                                        env->vfp.regs[rd]);
 
-> I tested this patch-set for AFTR mode.
-> When CPU1 is offline state, I checked that CPU0 enter the AFTR mode.
-> 
-> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-Thanks for your test.
+float128 is part of softfloat; it doesn't really belong here...
 
-> Best Regards,
-> Chanwoo Choi
-> 
-> On 03/19/2015 01:00 AM, Bartlomiej Zolnierkiewicz wrote:
->> Hi,
->>
->> This patch series adds support for AFTR idle mode on boards with
->> Exynos3250 SoC and allows EXYNOS cpuidle driver usage on these
->> boards.
->>
->> It has been tested on Samsung Rinato board (Gear 2).
->>
->> Depends on:
->> - for-next branch (commit: 77105c882ba6) of linux-samsung.git
->>   kernel tree
->>
->> Changes since v3:
->> - enhanced patch description for patch #1
->> - added Reviewed-by/Tested-by tags from Krzysztof
->> - enhanced C2_STATE BOOT mode flag comment
->> - moved exynos_{set,clear}_boot_flag() to firmware.c
->> - added patch description to patch #3
->>
->> Changes since v2:
->> - rebased on top of for-next branch (commit: 77105c882ba6) of
->>   linux-samsung.git kernel tree
->>
->> Changes since v1:
->> - rebased on top of for-next branch (commit: ce275c369a0b) of
->>   linux-samsung.git kernel tree
->> - fixed lockup on hotplug by using dsb_sev() instead of IPI in
->>   exynos_boot_secondary() on Exynos3250
->>
->> Best regards,
->> --
->> Bartlomiej Zolnierkiewicz
->> Samsung R&D Institute Poland
->> Samsung Electronics
->>
->>
->> Bartlomiej Zolnierkiewicz (4):
->>   ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
->>   ARM: EXYNOS: add code for setting/clearing boot flag
->>   ARM: EXYNOS: cpuidle: add AFTR mode support for Exynos3250
->>   ARM: EXYNOS: cpuidle: allow driver usage on Exynos3250 SoC
->>
->>  arch/arm/mach-exynos/common.h   |  6 ++++++
->>  arch/arm/mach-exynos/exynos.c   |  1 +
->>  arch/arm/mach-exynos/firmware.c | 33 ++++++++++++++++++++++++++++++++-
->>  arch/arm/mach-exynos/platsmp.c  | 23 ++++++++++++++++++++---
->>  arch/arm/mach-exynos/pm.c       | 12 +++++++++++-
->>  arch/arm/mach-exynos/regs-pmu.h |  3 +++
->>  arch/arm/mach-exynos/smc.h      |  9 +++++++++
->>  7 files changed, 82 insertions(+), 5 deletions(-)
-
-Applied this whole series.
-
-Thanks,
-Kukjin
+-- PMM
