@@ -1,71 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Mar 2015 10:24:17 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150324220253.9595AC407F8@trevor.secretlab.ca>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150318190509.GM10863@arm.com> <550A4BFD.4070804@huawei.com>
- <20150319101727.GC24556@red-moon> <20150319193927.GG4751@arm.com>
- <20150324220253.9595AC407F8@trevor.secretlab.ca>
-Message-ID: <20150326102417.GA10949@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Mar 2015 10:39:52 +0000
+Subject: [PATCH/RFC 1/5] clk: shmobile: mstp: Never disable INTC-SYS
+In-Reply-To: <CAMuHMdWY7orzt0ONTzmyG8nSagCM1r1HK=zQHzfttfr6cK7eqA@mail.gmail.com>
+References: <1426706164-28309-1-git-send-email-geert+renesas@glider.be>	<1426706164-28309-2-git-send-email-geert+renesas@glider.be>	<20150324232508.7930.89483@quantum>	<CAMuHMdVRhaZY_y2=1+9sZ-kteiguYGeS62Ka-V1WYnNCq_rgQA@mail.gmail.com>	<55127E2A.1040300@arm.com>
+ <CAMuHMdWY7orzt0ONTzmyG8nSagCM1r1HK=zQHzfttfr6cK7eqA@mail.gmail.com>
+Message-ID: <5513E1F8.9020104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
-> On Thu, 19 Mar 2015 19:39:27 +0000
-> , Will Deacon <will.deacon@arm.com>
->  wrote:
-> > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> > > On Thu, Mar 19, 2015 at 04:09:33AM +0000, Hanjun Guo wrote:
-> > > > On 2015/3/19 3:05, Will Deacon wrote:
-> > > > > On Wed, Mar 11, 2015 at 12:39:26PM +0000, Hanjun Guo wrote:
-> > > > >> This patch set already tested on multi platforms:
-> > > > >>  - AMD Seattle board;
-> > > > >>  - Cavium Thunder board;
-> > > > >>  - Huawei D02 board;
-> > > > >>  - Qualcomm ARM64 platform
-> > > > >>
-> > > > >> This version 10 patch set address some minor comments and collect ACKs and
-> > > > >> Reviewed-bys for v9:
-> > > > >>
-> > > > >>  - new Acks from Rafael, Olof, Grant, Lorenzo
-> > > > >>  - new way to handle typdef phys_cpuid_t which suggested by Rafael,
-> > > > >>    but no functional change
-> > > > >>  - Remove if(!phys) for early ioremappings
-> > > > >>  - Rework sleep function for ARM64
-> > > > >>  - Introduce linux/acpi_irq.h to hold acpi_irq_init()
-> > > > >>  - Disable ACPI if not HW_REDUCED_ACPI compliant
-> > > > >>  - Remove the doc of why ACPI on ARM
-> > > > > So I've had a look at the current state of this series and I think there
-> > > > > are a few immediate things left to do:
-> > > > >
-> > > > >   (1) Resolve the acpi=force cmdline issue highlighted by Lorenzo and
-> > > > >       Catalin
-> > > > 
-> > > > Sure, it will be done after the confirmation with Ard.
-> > > > 
-> > > > >
-> > > > >   (2) I believe Sudeep and Lorenzo have concerns about patch 13 (SMP init),
-> > > > >       so I'm assuming there will be additional patches from them that are
-> > > > >       required.
-> > > > 
-> > > > Sorry, I assume that it is about the print information for PSCI absent for SMP init, right?
-> > > 
-> > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> > > I am working on it, I do not think it should be a blocking point, patch
-> > > coming asap on top of your series.
-> > 
-> > Well, I don't really want to merge the series without those patches so I
-> > do think it blocks the code from getting into mainline.
+Hi Geert,
+
+On 25/03/15 21:19, Geert Uytterhoeven wrote:
+
+[...]
+
+>> adverse to it. My only gripe is with the undocumented clock property in
+>> the binding, and that leads to two questions:
+>> This doesn't touch the GIC code at all, so I don't feel completely
 > 
-> Really? It's a pretty minor duplication problem and it's been identified
-> as something requiring refactoring to both the ACPI and DT code. It
-> isn't at all dangerous. Why is this a blocking point?
+> The reason no GIC code is touched (for now), is that it's non-trivial to
+> fix the GIC driver to handle this.
 
-The SMP init ACPI/DT consolidation, in particular in relation to cpu_ops may
-not be a blocking point, but it is not a whim either and it deserves some
-thought.
+Indeed.  The interrupt controller is basically the first device to be
+activated in the life of the system, and I can see a nasty chicken and
+egg problem creeping up if you're trying to do clock management in a
+generic way at that level.
 
-I will post a patch asap and the ACPI parking protocol support patches
-strictly depend on this clean-up to be completed.
+>> adverse to it. My only gripe is with the undocumented clock property in
+>> the binding, and that leads to two questions:
+>> - the GIC architecture doesn't mention a clock at all, so that's a
+>> Renesas special. Do we want to have a vendor-specific property for this?
+>> Or does it belong elsewhere?
+> 
+> Apart from being implemented using synchronous logic and thus using a
+> clock signal internally, the GIC and its driver don't care about this clock.
+> 
+> When an existing IP module that doesn't care about clocks becomes reused
+> on a new SoC, and it now ends up being part of a "PM Domain" (e.g. a Power
+> Domain or Clock Domain, or both), this "PM Domain" is a feature of the
+> platform, not of the IP module itself (cfr. "(Existing) Device Driver" in [1];
+> GIC falls in the same category as the Thermal Module example).
+> Hence I don't think it's necessary to mention this in the ARM GIC binding.
+> 
+>> - alternatively, do we want the core GIC code to deal with this? In
+>> which case, how do we express the policy?
+> 
+> The proper way to handle this automatically is to add Runtime PM support
+> to the driver. However, this requires using a platform device.
+> 
+> I would like to add the clock and GIC dependency on the clock in the DTS now,
+> for reasons of DTS stability. But that means I need a temporary workaround
+> to avoid the clock from being disabled, until the GIC driver handles this.
+> 
+> I don't expect a fix for the GIC code to just show up magically. I just wanted
+> you to be aware of the problem. GIC is not the only problematic module here,
+> there are others, cfr. the last slide of [2].
 
-Lorenzo
+As long as there is an agreement from the DT people on the presence of
+that extra property in the GIC node, I'm happy with that. I'd like it to
+be documented though.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
