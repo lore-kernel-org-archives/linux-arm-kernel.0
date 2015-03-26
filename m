@@ -1,54 +1,62 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 26 Mar 2015 14:50:19 +0530
-Subject: [PATCH v4 8/8] arm: dts: qcom: Add #power-domain-cells property
-In-Reply-To: <1427361619-20360-1-git-send-email-rnayak@codeaurora.org>
-References: <1427361619-20360-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1427361619-20360-9-git-send-email-rnayak@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 26 Mar 2015 10:43:02 +0100
+Subject: [PATCH 4/7] clocksource: dw_apb_timer_of: make IO endian agnostic
+In-Reply-To: <1427282610-10350-5-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282610-10350-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1427282610-10350-5-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5513D4A6.9070301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
-implement gdsc powerdomains. Add the #power-domain-cells property
-to them.
+On 03/25/2015 12:23 PM, Ben Dooks wrote:
+> The dw_apb_timer_of timer is using __raw_readl to access the timer
+> register, which is causing issues when the system is running in
+> big endian mode. Fix this by using readl_relaxed() which should
+> account for the endian settings.
+>
+> This fixes issues where the time jumps around in the dmesg output
+> due to returnling __le32 values.
+>
+> For an example, these two console lines show time running backwards:
+>
+> [   49.882572] CPU1: failed to come online
+> [   43.282457] Brought up 1 CPUs
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm/boot/dts/qcom-apq8084.dtsi | 1 +
- arch/arm/boot/dts/qcom-msm8974.dtsi | 2 ++
- 2 files changed, 3 insertions(+)
+Hi Ben,
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 1f130bc..55c281c 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -183,6 +183,7 @@
- 			compatible = "qcom,gcc-apq8084";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index e265ec1..6184d32 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -179,6 +179,7 @@
- 			compatible = "qcom,gcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-@@ -186,6 +187,7 @@
- 			compatible = "qcom,mmcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfd8c0000 0x6000>;
- 		};
- 
+Through which tree this patch is supposed to go ?
+
+
+> --
+> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+> CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+> ---
+>   drivers/clocksource/dw_apb_timer_of.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+> index d305fb0..a19a3f6 100644
+> --- a/drivers/clocksource/dw_apb_timer_of.c
+> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> @@ -108,7 +108,7 @@ static void __init add_clocksource(struct device_node *source_timer)
+>
+>   static u64 notrace read_sched_clock(void)
+>   {
+> -	return ~__raw_readl(sched_io_base);
+> +	return ~readl_relaxed(sched_io_base);
+>   }
+>
+>   static const struct of_device_id sptimer_ids[] __initconst = {
+>
+
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
