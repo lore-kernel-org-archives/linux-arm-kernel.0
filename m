@@ -1,156 +1,61 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Mar 2015 10:50:02 +0100
-Subject: [PATCH v3  04/15] clocksource: Add ARM System timer driver
-In-Reply-To: <1426197361-19290-5-git-send-email-maxime.coquelin@st.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-5-git-send-email-maxime.coquelin@st.com>
-Message-ID: <5513D64A.7060702@linaro.org>
+Date: Thu, 26 Mar 2015 10:54:46 +0100
+Subject: [PATCH 06/13] ARM: at91: PIT: make IO endian agnostic
+In-Reply-To: <550FF8B3.2080708@atmel.com>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-7-git-send-email-ben.dooks@codethink.co.uk>
+ <550FF8B3.2080708@atmel.com>
+Message-ID: <5513D766.8020908@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/2015 10:55 PM, Maxime Coquelin wrote:
-> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On 03/23/2015 12:27 PM, Nicolas Ferre wrote:
+> Le 18/03/2015 16:53, Ben Dooks a ?crit :
+>> Fix the use of __raw IO accessor with the readl/writel_relaxed versions
+>> to allow the code to be used on a system running in big endian.
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>> --
+>> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> CC: Thomas Gleixner <tglx@linutronix.de>
+>> CC: Linux Kernel <linux-kernel@vger.kernel.org>
+>> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+>> CC: Andrew Victor <linux@maxim.org.za>
+>> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
 >
-> This patch adds clocksource support for ARMv7-M's System timer,
-> also known as SysTick.
+> Yes:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 >
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Daniel, do you want to take it?
 
-Hi Maxime,
+Yep.
 
-the driver looks good. Three comments below.
-
-   -- Daniel
-
-> ---
->   drivers/clocksource/Kconfig          |  7 ++++
->   drivers/clocksource/Makefile         |  1 +
->   drivers/clocksource/armv7m_systick.c | 78 ++++++++++++++++++++++++++++++++++++
->   3 files changed, 86 insertions(+)
->   create mode 100644 drivers/clocksource/armv7m_systick.c
+>> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+>> ---
+>>   drivers/clocksource/timer-atmel-pit.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/timer-atmel-pit.c b/drivers/clocksource/timer-atmel-pit.c
+>> index b5b4d45..c0304ff 100644
+>> --- a/drivers/clocksource/timer-atmel-pit.c
+>> +++ b/drivers/clocksource/timer-atmel-pit.c
+>> @@ -61,12 +61,12 @@ static inline struct pit_data *clkevt_to_pit_data(struct clock_event_device *clk
+>>
+>>   static inline unsigned int pit_read(void __iomem *base, unsigned int reg_offset)
+>>   {
+>> -	return __raw_readl(base + reg_offset);
+>> +	return readl_relaxed(base + reg_offset);
+>>   }
+>>
+>>   static inline void pit_write(void __iomem *base, unsigned int reg_offset, unsigned long value)
+>>   {
+>> -	__raw_writel(value, base + reg_offset);
+>> +	writel_relaxed(value, base + reg_offset);
+>>   }
+>>
+>>   /*
+>>
 >
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 1c2506f..b82e58b 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -134,6 +134,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->   	help
->   	 Use ARM global timer clock source as sched_clock
->
-> +config ARMV7M_SYSTICK
-> +	bool
-> +	select CLKSRC_OF if OF
-> +	select CLKSRC_MMIO
-> +	help
-> +	  This options enables support for the ARMv7M system timer unit
-> +
->   config ATMEL_PIT
->   	select CLKSRC_OF if OF
->   	def_bool SOC_AT91SAM9 || SOC_SAMA5
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 752d5c7..1c9a643 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -44,6 +44,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
->
->   obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->   obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-> +obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
->   obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
->   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
->   obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-> diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-> new file mode 100644
-> index 0000000..23d8249
-> --- /dev/null
-> +++ b/drivers/clocksource/armv7m_systick.c
-> @@ -0,0 +1,78 @@
-> +/*
-> + * Copyright (C) Maxime Coquelin 2015
-> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> + * License terms:  GNU General Public License (GPL), version 2
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/clocksource.h>
-> +#include <linux/clockchips.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clk.h>
-> +#include <linux/bitops.h>
-> +
-> +#define SYST_CSR	0x00
-> +#define SYST_RVR	0x04
-> +#define SYST_CVR	0x08
-> +#define SYST_CALIB	0x0c
-> +
-> +#define SYST_CSR_ENABLE BIT(0)
-> +
-> +#define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
-> +
-> +static void __init system_timer_of_register(struct device_node *np)
-> +{
-> +	struct clk *clk;
-> +	void __iomem *base;
-> +	u32 rate = 0;
-> +	int ret;
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		pr_warn("system-timer: invalid base address\n");
-> +		return;
-> +	}
-> +
-> +	clk = of_clk_get(np, 0);
-> +	if (!IS_ERR(clk)) {
-> +		ret = clk_prepare_enable(clk);
-> +		if (ret) {
-> +			clk_put(clk);
-> +			goto out_unmap;
-> +		}
-> +
-> +		rate = clk_get_rate(clk);
-> +	}
-> +
-> +	/* If no clock found, try to get clock-frequency property */
-> +	if (!rate) {
-> +		ret = of_property_read_u32(np, "clock-frequency", &rate);
-> +		if (ret)
-> +			goto out_unmap;
-
-Shouldn't be 'goto out_clk_disable' ?
-
-> +	}
-> +
-> +	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-> +	writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
-> +
-> +	ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer", rate,
-> +			200, 24, clocksource_mmio_readl_down);
-> +	if (ret) {
-> +		pr_err("failed to init clocksource (%d)\n", ret);
-> +		goto out_clk_disable;
-> +	}
-> +
-> +	pr_info("ARM System timer initialized as clocksource\n");
-> +
-> +	return;
-> +
-> +out_clk_disable:
-> +	if (!IS_ERR(clk))
-
-Why do you need this check ?
-
-It isn't missing a clk_put ?
-
-> +		clk_disable_unprepare(clk);
-> +out_unmap:
-> +	iounmap(base);
-> +	WARN(ret, "ARM System timer register failed (%d)\n", ret);
-> +}
-> +
-> +CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-> +			system_timer_of_register);
 >
 
 
