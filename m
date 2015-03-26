@@ -1,41 +1,33 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Thu, 26 Mar 2015 18:19:09 +0300
-Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
-In-Reply-To: <20150326150558.GK8656@n2100.arm.linux.org.uk>
-References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
- <20150326150558.GK8656@n2100.arm.linux.org.uk>
-Message-ID: <5514236D.50808@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Mar 2015 15:20:43 +0000
+Subject: [PATCH 2/3] pm: domains: factor out code to get the generic PM
+ domain from a struct device
+In-Reply-To: <5429586.AxdftPXcBp@vostro.rjw.lan>
+References: <20150320171941.GK8656@n2100.arm.linux.org.uk>
+ <CAPDyKFrpM0TYnNvAX8Jw6zUAekh0=XXMJyxWxSgKSao=TQf62Q@mail.gmail.com>
+ <20150323151740.GR8656@n2100.arm.linux.org.uk>
+ <5429586.AxdftPXcBp@vostro.rjw.lan>
+Message-ID: <20150326152043.GL8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 06:05 PM, Russell King - ARM Linux wrote:
-> On Fri, Mar 20, 2015 at 02:12:52PM +0300, Andrey Ryabinin wrote:
->> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
->> split this is not so, because 2*TASK_SIZE overflows 32 bits,
->> so the actual value of ELF_ET_DYN_BASE is:
->> 	(2 * TASK_SIZE / 3) = 0x2a000000
->>
->> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
->> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
->> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
->> as it fails to map shadow memory.
->> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
->> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
->> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
->>
->> Fix overflow by dividing TASK_SIZE prior to multiplying.
->> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
->> 	(TASK_SIZE / 3 * 2) = 0x7f555554
->>
->> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
->>
->> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
->> Reported-by: Maria Guseva <m.guseva@samsung.com>
->> Cc: stable at vger.kernel.org
+On Tue, Mar 24, 2015 at 01:29:05AM +0100, Rafael J. Wysocki wrote:
+> On Monday, March 23, 2015 03:17:40 PM Russell King - ARM Linux wrote:
+> > Rafael, please merge these three as we previously agreed.  Thanks.
 > 
-> Who's handling this patch?  I'm guessing it should be me, so if it could
-> find its way into my patch system for when I next apply a bunch of patches,
-> that'd be good.
-> 
+> I said I would do that, didn't I?
 
-It's already there. Patch number - 8320/1.
+I wasn't sure if you were going to hold back on it as a result of Uwe's
+comments.
+
+> I've applied this series plus https://patchwork.kernel.org/patch/6056201/
+> and https://patchwork.kernel.org/patch/6057441/ on top of that.
+> Please let me know if you need anything more from the core.
+
+I'll replicate what you've applied and test it here (build in progress...)
+
+Thanks!
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
