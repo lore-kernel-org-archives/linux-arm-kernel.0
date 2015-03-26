@@ -1,9 +1,9 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 26 Mar 2015 13:43:14 +0100
-Subject: [PATCH 11/16] iommu/msm: Make use of domain_alloc and domain_free
+Date: Thu, 26 Mar 2015 13:43:15 +0100
+Subject: [PATCH 12/16] iommu/shmobile: Make use of domain_alloc and domain_free
 In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
 References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <1427373799-18662-12-git-send-email-joro@8bytes.org>
+Message-ID: <1427373799-18662-13-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,178 +14,135 @@ replacement for domain_init/domain_destroy.
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/iommu/msm_iommu.c | 73 +++++++++++++++++++++++------------------------
- 1 file changed, 36 insertions(+), 37 deletions(-)
+ drivers/iommu/shmobile-iommu.c | 39 +++++++++++++++++++++++----------------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index e1b0537..15a2063 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -52,8 +52,14 @@ DEFINE_SPINLOCK(msm_iommu_lock);
- struct msm_priv {
- 	unsigned long *pgtable;
- 	struct list_head list_attached;
+diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
+index f1b0077..a028751 100644
+--- a/drivers/iommu/shmobile-iommu.c
++++ b/drivers/iommu/shmobile-iommu.c
+@@ -42,11 +42,17 @@ struct shmobile_iommu_domain {
+ 	spinlock_t map_lock;
+ 	spinlock_t attached_list_lock;
+ 	struct list_head attached_list;
 +	struct iommu_domain domain;
  };
  
-+static struct msm_priv *to_msm_priv(struct iommu_domain *dom)
+ static struct shmobile_iommu_archdata *ipmmu_archdata;
+ static struct kmem_cache *l1cache, *l2cache;
+ 
++static struct shmobile_iommu_domain *to_sh_domain(struct iommu_domain *dom)
 +{
-+	return container_of(dom, struct msm_priv, domain);
++	return container_of(dom, struct shmobile_iommu_domain, domain);
 +}
 +
- static int __enable_clocks(struct msm_iommu_drvdata *drvdata)
+ static int pgtable_alloc(struct shmobile_iommu_domain_pgtable *pgtable,
+ 			 struct kmem_cache *cache, size_t size)
  {
- 	int ret;
-@@ -79,7 +85,7 @@ static void __disable_clocks(struct msm_iommu_drvdata *drvdata)
- 
- static int __flush_iotlb(struct iommu_domain *domain)
- {
--	struct msm_priv *priv = domain->priv;
-+	struct msm_priv *priv = to_msm_priv(domain);
- 	struct msm_iommu_drvdata *iommu_drvdata;
- 	struct msm_iommu_ctx_drvdata *ctx_drvdata;
- 	int ret = 0;
-@@ -209,10 +215,14 @@ static void __program_context(void __iomem *base, int ctx, phys_addr_t pgtable)
- 	SET_M(base, ctx, 1);
+@@ -82,31 +88,33 @@ static void pgtable_write(struct shmobile_iommu_domain_pgtable *pgtable,
+ 				   sizeof(val) * count, DMA_TO_DEVICE);
  }
  
--static int msm_iommu_domain_init(struct iommu_domain *domain)
-+static struct iommu_domain *msm_iommu_domain_alloc(unsigned type)
+-static int shmobile_iommu_domain_init(struct iommu_domain *domain)
++static struct iommu_domain *shmobile_iommu_domain_alloc(unsigned type)
  {
--	struct msm_priv *priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	struct msm_priv *priv;
+ 	struct shmobile_iommu_domain *sh_domain;
+ 	int i, ret;
  
+-	sh_domain = kmalloc(sizeof(*sh_domain), GFP_KERNEL);
 +	if (type != IOMMU_DOMAIN_UNMANAGED)
 +		return NULL;
 +
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
- 		goto fail_nomem;
- 
-@@ -224,20 +234,19 @@ static int msm_iommu_domain_init(struct iommu_domain *domain)
- 		goto fail_nomem;
- 
- 	memset(priv->pgtable, 0, SZ_16K);
--	domain->priv = priv;
- 
--	domain->geometry.aperture_start = 0;
--	domain->geometry.aperture_end   = (1ULL << 32) - 1;
--	domain->geometry.force_aperture = true;
-+	priv->domain.geometry.aperture_start = 0;
-+	priv->domain.geometry.aperture_end   = (1ULL << 32) - 1;
-+	priv->domain.geometry.force_aperture = true;
- 
++	sh_domain = kzalloc(sizeof(*sh_domain), GFP_KERNEL);
+ 	if (!sh_domain)
+-		return -ENOMEM;
++		return NULL;
+ 	ret = pgtable_alloc(&sh_domain->l1, l1cache, L1_SIZE);
+ 	if (ret < 0) {
+ 		kfree(sh_domain);
+-		return ret;
++		return NULL;
+ 	}
+ 	for (i = 0; i < L1_LEN; i++)
+ 		sh_domain->l2[i].pgtable = NULL;
+ 	spin_lock_init(&sh_domain->map_lock);
+ 	spin_lock_init(&sh_domain->attached_list_lock);
+ 	INIT_LIST_HEAD(&sh_domain->attached_list);
+-	domain->priv = sh_domain;
 -	return 0;
-+	return &priv->domain;
- 
- fail_nomem:
- 	kfree(priv);
--	return -ENOMEM;
-+	return NULL;
++	return &sh_domain->domain;
  }
  
--static void msm_iommu_domain_destroy(struct iommu_domain *domain)
-+static void msm_iommu_domain_free(struct iommu_domain *domain)
+-static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
++static void shmobile_iommu_domain_free(struct iommu_domain *domain)
  {
- 	struct msm_priv *priv;
- 	unsigned long flags;
-@@ -245,20 +254,17 @@ static void msm_iommu_domain_destroy(struct iommu_domain *domain)
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
  	int i;
  
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
--	priv = domain->priv;
--	domain->priv = NULL;
-+	priv = to_msm_priv(domain);
- 
--	if (priv) {
--		fl_table = priv->pgtable;
-+	fl_table = priv->pgtable;
- 
--		for (i = 0; i < NUM_FL_PTE; i++)
--			if ((fl_table[i] & 0x03) == FL_TYPE_TABLE)
--				free_page((unsigned long) __va(((fl_table[i]) &
--								FL_BASE_MASK)));
-+	for (i = 0; i < NUM_FL_PTE; i++)
-+		if ((fl_table[i] & 0x03) == FL_TYPE_TABLE)
-+			free_page((unsigned long) __va(((fl_table[i]) &
-+							FL_BASE_MASK)));
- 
--		free_pages((unsigned long)priv->pgtable, get_order(SZ_16K));
--		priv->pgtable = NULL;
--	}
-+	free_pages((unsigned long)priv->pgtable, get_order(SZ_16K));
-+	priv->pgtable = NULL;
- 
- 	kfree(priv);
- 	spin_unlock_irqrestore(&msm_iommu_lock, flags);
-@@ -276,9 +282,9 @@ static int msm_iommu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
- 
--	priv = domain->priv;
-+	priv = to_msm_priv(domain);
- 
--	if (!priv || !dev) {
-+	if (!dev) {
- 		ret = -EINVAL;
- 		goto fail;
+ 	for (i = 0; i < L1_LEN; i++) {
+@@ -115,14 +123,13 @@ static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
  	}
-@@ -330,9 +336,9 @@ static void msm_iommu_detach_dev(struct iommu_domain *domain,
+ 	pgtable_free(&sh_domain->l1, l1cache, L1_SIZE);
+ 	kfree(sh_domain);
+-	domain->priv = NULL;
+ }
+ 
+ static int shmobile_iommu_attach_device(struct iommu_domain *domain,
+ 					struct device *dev)
+ {
+ 	struct shmobile_iommu_archdata *archdata = dev->archdata.iommu;
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
+ 	int ret = -EBUSY;
+ 
+ 	if (!archdata)
+@@ -151,7 +158,7 @@ static void shmobile_iommu_detach_device(struct iommu_domain *domain,
+ 					 struct device *dev)
+ {
+ 	struct shmobile_iommu_archdata *archdata = dev->archdata.iommu;
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
+ 
+ 	if (!archdata)
+ 		return;
+@@ -214,7 +221,7 @@ static int shmobile_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 			      phys_addr_t paddr, size_t size, int prot)
+ {
+ 	struct shmobile_iommu_domain_pgtable l2 = { .pgtable = NULL };
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
+ 	unsigned int l1index, l2index;
  	int ret;
  
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
--	priv = domain->priv;
-+	priv = to_msm_priv(domain);
+@@ -258,7 +265,7 @@ static size_t shmobile_iommu_unmap(struct iommu_domain *domain,
+ 				   unsigned long iova, size_t size)
+ {
+ 	struct shmobile_iommu_domain_pgtable l2 = { .pgtable = NULL };
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
+ 	unsigned int l1index, l2index;
+ 	uint32_t l2entry = 0;
+ 	size_t ret = 0;
+@@ -298,7 +305,7 @@ done:
+ static phys_addr_t shmobile_iommu_iova_to_phys(struct iommu_domain *domain,
+ 					       dma_addr_t iova)
+ {
+-	struct shmobile_iommu_domain *sh_domain = domain->priv;
++	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
+ 	uint32_t l1entry = 0, l2entry = 0;
+ 	unsigned int l1index, l2index;
  
--	if (!priv || !dev)
-+	if (!dev)
- 		goto fail;
+@@ -355,8 +362,8 @@ static int shmobile_iommu_add_device(struct device *dev)
+ }
  
- 	iommu_drvdata = dev_get_drvdata(dev->parent);
-@@ -382,11 +388,7 @@ static int msm_iommu_map(struct iommu_domain *domain, unsigned long va,
- 		goto fail;
- 	}
- 
--	priv = domain->priv;
--	if (!priv) {
--		ret = -EINVAL;
--		goto fail;
--	}
-+	priv = to_msm_priv(domain);
- 
- 	fl_table = priv->pgtable;
- 
-@@ -484,10 +486,7 @@ static size_t msm_iommu_unmap(struct iommu_domain *domain, unsigned long va,
- 
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
- 
--	priv = domain->priv;
--
--	if (!priv)
--		goto fail;
-+	priv = to_msm_priv(domain);
- 
- 	fl_table = priv->pgtable;
- 
-@@ -566,7 +565,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 
- 	spin_lock_irqsave(&msm_iommu_lock, flags);
- 
--	priv = domain->priv;
-+	priv = to_msm_priv(domain);
- 	if (list_empty(&priv->list_attached))
- 		goto fail;
- 
-@@ -674,8 +673,8 @@ fail:
- 
- static const struct iommu_ops msm_iommu_ops = {
- 	.capable = msm_iommu_capable,
--	.domain_init = msm_iommu_domain_init,
--	.domain_destroy = msm_iommu_domain_destroy,
-+	.domain_alloc = msm_iommu_domain_alloc,
-+	.domain_free = msm_iommu_domain_free,
- 	.attach_dev = msm_iommu_attach_dev,
- 	.detach_dev = msm_iommu_detach_dev,
- 	.map = msm_iommu_map,
+ static const struct iommu_ops shmobile_iommu_ops = {
+-	.domain_init = shmobile_iommu_domain_init,
+-	.domain_destroy = shmobile_iommu_domain_destroy,
++	.domain_alloc = shmobile_iommu_domain_alloc,
++	.domain_free = shmobile_iommu_domain_free,
+ 	.attach_dev = shmobile_iommu_attach_device,
+ 	.detach_dev = shmobile_iommu_detach_device,
+ 	.map = shmobile_iommu_map,
 -- 
 1.9.1
