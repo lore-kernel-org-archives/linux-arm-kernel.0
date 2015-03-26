@@ -1,95 +1,119 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 26 Mar 2015 13:43:05 +0100
-Subject: [PATCH 02/16] iommu: Introduce iommu domain types
-In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <1427373799-18662-3-git-send-email-joro@8bytes.org>
+Date: Thu, 26 Mar 2015 13:43:03 +0100
+Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
+Message-ID: <1427373799-18662-1-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joerg Roedel <jroedel@suse.de>
+Changes v1-v2:
 
-This allows to handle domains differently based on their
-type in the future. An IOMMU driver can implement certain
-optimizations for DMA-API domains for example.
+	* Rebased to v4.0-rc5
+	* Converted domain-types to a bit-field
 
-The domain types can be extended later and some of the
-existing domain attributes can be migrated to become domain
-flags.
+Hi,
 
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
----
- drivers/iommu/iommu.c |  5 +++--
- include/linux/iommu.h | 27 ++++++++++++++++++++++++++-
- 2 files changed, 29 insertions(+), 3 deletions(-)
+here is patch-set to replace the existing domain_init and
+domain_destroy iommu-ops with the new domain_alloc and
+domain_free callbacks
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 11de262..4920605 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -909,14 +909,15 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
- 	ops = bus->iommu_ops;
- 
- 	if (ops->domain_alloc)
--		domain = ops->domain_alloc();
-+		domain = ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
- 	else
- 		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
- 
- 	if (!domain)
- 		return NULL;
- 
--	domain->ops = bus->iommu_ops;
-+	domain->ops  = bus->iommu_ops;
-+	domain->type = IOMMU_DOMAIN_UNMANAGED;
- 
- 	if (ops->domain_init && domain->ops->domain_init(domain))
- 		goto out_free;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 69d1d12..72d03fe 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -51,7 +51,32 @@ struct iommu_domain_geometry {
- 	bool force_aperture;       /* DMA only allowed in mappable range? */
- };
- 
-+/* Domain feature flags */
-+#define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
-+#define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
-+					      implementation              */
-+#define __IOMMU_DOMAIN_PT	(1U << 2)  /* Domain is identity mapped   */
-+
-+/*
-+ * This are the possible domain-types
-+ *
-+ *	IOMMU_DOMAIN_BLOCKED	- All DMA is blocked, can be used to isolate
-+ *				  devices
-+ *	IOMMU_DOMAIN_IDENTITY	- DMA addresses are system physical addresses
-+ *	IOMMU_DOMAIN_UNMANAGED	- DMA mappings managed by IOMMU-API user, used
-+ *				  for VMs
-+ *	IOMMU_DOMAIN_DMA	- Internally used for DMA-API implementations.
-+ *				  This flag allows IOMMU drivers to implement
-+ *				  certain optimizations for these domains
-+ */
-+#define IOMMU_DOMAIN_BLOCKED	(0U)
-+#define IOMMU_DOMAIN_IDENTITY	(__IOMMU_DOMAIN_PT)
-+#define IOMMU_DOMAIN_UNMANAGED	(__IOMMU_DOMAIN_PAGING)
-+#define IOMMU_DOMAIN_DMA	(__IOMMU_DOMAIN_PAGING |	\
-+				 __IOMMU_DOMAIN_DMA_API)
-+
- struct iommu_domain {
-+	unsigned type;
- 	const struct iommu_ops *ops;
- 	void *priv;
- 	iommu_fault_handler_t handler;
-@@ -117,7 +142,7 @@ struct iommu_ops {
- 	void (*domain_destroy)(struct iommu_domain *domain);
- 
- 	/* Domain allocation and freeing by the iommu driver */
--	struct iommu_domain *(*domain_alloc)(void);
-+	struct iommu_domain *(*domain_alloc)(unsigned iommu_domain_type);
- 	void (*domain_free)(struct iommu_domain *);
- 
- 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
+The new callbacks move the allocation of iommu domains into
+the iommu driver, allowing them to put a generic
+iommu_domain struct into their own domain struct. This makes
+domain handling in the drivers more cache efficient and
+prepares the introduction of default domains in another
+patch-set.
+
+While at it, this patch-set also introduces domain types.
+These are internal to the iommu core code for now, there are
+three of them:
+
+	* DMA-API domains
+	* Identity mapped domains
+	* Domains unmanaged by the iommu-core, used for
+	  iommu-api so that the users can create their own
+	  mappings
+
+The patches have been compile tested for x86, ARM and PPC
+and runtime tested on x86 (Intel VT-d and AMD IOMMU).
+
+Please review.
+
+Thanks,
+
+	Joerg
+
+Joerg Roedel (15):
+  iommu: Introduce domain_alloc and domain_free iommu_ops
+  iommu: Introduce iommu domain types
+  iommu/amd: Make use of domain_alloc and domain_free
+  iommu/vt-d: Make use of domain_alloc and domain_free
+  iommu/omap: Make use of domain_alloc and domain_free
+  iommu/arm-smmu: Make use of domain_alloc and domain_free
+  iommu/exynos: Make use of domain_alloc and domain_free
+  iommu/tegra-smmu: Make use of domain_alloc and domain_free
+  iommu/tegra-gart: Make use of domain_alloc and domain_free
+  iommu/msm: Make use of domain_alloc and domain_free
+  iommu/shmobile: Make use of domain_alloc and domain_free
+  iommu/ipmmu-vmsa: Make use of domain_alloc and domain_free
+  iommu/rockchip: Make use of domain_alloc and domain_free
+  iommu/fsl: Make use of domain_alloc and domain_free
+  iommu: Remove domain_init and domain_free iommu_ops
+
+ drivers/iommu/amd_iommu.c       | 84 +++++++++++++++++++++------------------
+ drivers/iommu/amd_iommu_types.h |  7 ++--
+ drivers/iommu/arm-smmu.c        | 46 +++++++++++++---------
+ drivers/iommu/exynos-iommu.c    | 87 ++++++++++++++++++++++-------------------
+ drivers/iommu/fsl_pamu_domain.c | 60 +++++++++++++++-------------
+ drivers/iommu/fsl_pamu_domain.h |  2 +-
+ drivers/iommu/intel-iommu.c     | 48 +++++++++++++----------
+ drivers/iommu/iommu.c           | 20 ++--------
+ drivers/iommu/ipmmu-vmsa.c      | 43 +++++++++++---------
+ drivers/iommu/msm_iommu.c       | 73 +++++++++++++++++-----------------
+ drivers/iommu/omap-iommu.c      | 49 +++++++++++++----------
+ drivers/iommu/rockchip-iommu.c  | 40 +++++++++++--------
+ drivers/iommu/shmobile-iommu.c  | 40 +++++++++++--------
+ drivers/iommu/tegra-gart.c      | 67 +++++++++++++++++++++----------
+ drivers/iommu/tegra-smmu.c      | 41 ++++++++++---------
+ include/linux/iommu.h           | 17 ++++++--
+ 16 files changed, 407 insertions(+), 317 deletions(-)
+
+-- 
+1.8.4.5
+Joerg Roedel (16):
+  iommu: Introduce domain_alloc and domain_free iommu_ops
+  iommu: Introduce iommu domain types
+  iommu: Only allow iommu_map/unmap for paging domains
+  iommu/amd: Make use of domain_alloc and domain_free
+  iommu/vt-d: Make use of domain_alloc and domain_free
+  iommu/omap: Make use of domain_alloc and domain_free
+  iommu/arm-smmu: Make use of domain_alloc and domain_free
+  iommu/exynos: Make use of domain_alloc and domain_free
+  iommu/tegra-smmu: Make use of domain_alloc and domain_free
+  iommu/tegra-gart: Make use of domain_alloc and domain_free
+  iommu/msm: Make use of domain_alloc and domain_free
+  iommu/shmobile: Make use of domain_alloc and domain_free
+  iommu/ipmmu-vmsa: Make use of domain_alloc and domain_free
+  iommu/rockchip: Make use of domain_alloc and domain_free
+  iommu/fsl: Make use of domain_alloc and domain_free
+  iommu: Remove domain_init and domain_free iommu_ops
+
+ drivers/iommu/amd_iommu.c       | 84 +++++++++++++++++++++------------------
+ drivers/iommu/amd_iommu_types.h |  7 ++--
+ drivers/iommu/arm-smmu.c        | 46 +++++++++++++---------
+ drivers/iommu/exynos-iommu.c    | 87 ++++++++++++++++++++++-------------------
+ drivers/iommu/fsl_pamu_domain.c | 60 +++++++++++++++-------------
+ drivers/iommu/fsl_pamu_domain.h |  2 +-
+ drivers/iommu/intel-iommu.c     | 48 +++++++++++++----------
+ drivers/iommu/iommu.c           | 26 +++++-------
+ drivers/iommu/ipmmu-vmsa.c      | 41 ++++++++++---------
+ drivers/iommu/msm_iommu.c       | 73 +++++++++++++++++-----------------
+ drivers/iommu/omap-iommu.c      | 49 +++++++++++++----------
+ drivers/iommu/rockchip-iommu.c  | 40 +++++++++++--------
+ drivers/iommu/shmobile-iommu.c  | 39 ++++++++++--------
+ drivers/iommu/tegra-gart.c      | 67 +++++++++++++++++++++----------
+ drivers/iommu/tegra-smmu.c      | 41 ++++++++++---------
+ include/linux/iommu.h           | 33 ++++++++++++++--
+ 16 files changed, 427 insertions(+), 316 deletions(-)
+
 -- 
 1.9.1
