@@ -1,29 +1,30 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 11:22:54 +0000
-Subject: [PATCH 0/8] sa11x0 PCMCIA updates
-Message-ID: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
+Date: Thu, 26 Mar 2015 11:36:48 +0000
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <20150325104603.GA3560@e103592.cambridge.arm.com>
+References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150324122239.GB3579@e103592.cambridge.arm.com>
+ <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+ <20150324135439.GC3579@e103592.cambridge.arm.com>
+ <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
+ <20150325104603.GA3560@e103592.cambridge.arm.com>
+Message-ID: <20150326113648.GC8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a collection of patches which cleans up and updates the SA11x0
-and PXA2xx socket drivers, particularly converting them to the devm_*
-APIs to ensure that resources are properly cleaned up.
+On Wed, Mar 25, 2015 at 10:46:14AM +0000, Dave Martin wrote:
+> Hmmm, you seem to be right.
+> 
+> Thumb has no bx <label> instruction, and veneers introduced by ld are
+> always ARM code, so this looks tricky to avoid without patching ld.
+> 
+> As you observe, this only impacts large kernels anyway.
+> 
+> So,
+> 
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-I've stopped short of totally converting sa1111_generic as there are
-some corner cases where we want to initialise only socket 1, but not
-socket 0, which would require further testing to ensure that these
-changes are correct.
-
-I will be testing the sa11x0 changes later today, but as I gave most
-of my PXA2xx platforms to Robert, I need Robert to test this on the
-Lubbock.
-
- drivers/pcmcia/pxa2xx_base.c    | 17 +++++------------
- drivers/pcmcia/sa1100_generic.c |  2 --
- drivers/pcmcia/sa1111_generic.c | 14 +++++++-------
- drivers/pcmcia/sa11xx_base.c    | 17 ++---------------
- drivers/pcmcia/soc_common.h     |  1 -
- 5 files changed, 14 insertions(+), 37 deletions(-)
+Someone needs to check what the result is like for older CPUs too.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
