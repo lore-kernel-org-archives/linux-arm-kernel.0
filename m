@@ -1,37 +1,115 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 27 Mar 2015 03:09:11 +1030
-Subject: [PATCH 2/6] ARM: dts exynos5420 update the cooling cells for core cpu0
+Date: Fri, 27 Mar 2015 03:09:12 +1030
+Subject: [PATCH 3/6] ARM:dts exynos5422 Update the thermal sensor for tmu_cpu0
 In-Reply-To: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
 References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1427387955-5129-3-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1427387955-5129-4-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update the cooling level for cpu0 to avoid following message.
+Move the registration of thermal sensors for tmu_cpu0 from exynos5420.dtsi
+to exynos5-cpu-thermal.dtsi, to avoid duplicate registration of the sensors.
 
-root at odroidxu3:~# dmesg | grep ther
-[    0.241511] /thermal-zones/cpu-thermal/cooling-maps/map0:
-			 could not get #cooling-cells for /cpus/cpu at 0
+Tested on OdroidXU3 board.
 
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/exynos5-cpu-thermal.dtsi | 58 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5420.dtsi          |  4 ---
+ arch/arm/boot/dts/exynos5422-odroidxu3.dts |  1 +
+ 3 files changed, 59 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
 
+diff --git a/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi b/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
+new file mode 100644
+index 0000000..8fede70
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5-cpu-thermal.dtsi
+@@ -0,0 +1,58 @@
++/*
++ * Device tree sources for Exynos5 thermal zone
++ *
++ * Copyright (c) 2014 Lukasz Majewski <l.majewski@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <dt-bindings/thermal/thermal.h>
++
++/ {
++	thermal-zones {
++		cpu0_thermal: cpu0-thermal {
++			thermal-sensors = <&tmu_cpu0>;
++			polling-delay-passive = <0>;
++			polling-delay = <0>;
++			trips {
++				cpu_alert0: cpu-alert-0 {
++					temperature = <48000>; /* ms */
++					hysteresis = <3000>; /* ms */
++					type = "active";
++				};
++				cpu_alert1: cpu-alert-1 {
++					temperature = <53000>; /* ms */
++					hysteresis = <3000>; /* ms */
++					type = "active";
++				};
++				cpu_alert2: cpu-alert-2 {
++					temperature = <59000>; /* ms */
++					hysteresis = <3000>; /* ms */
++					type = "active";
++				};
++				cpu_crit0: cpu-crit-0 {
++					temperature = <75000>; /* ms */
++					hysteresis = <0>; /* ms */
++					type = "critical";
++				};
++			};
++			cooling-maps {
++				map0 {
++				     trip = <&cpu_alert0>;
++				     cooling-device = <&fan0 0 1>;
++				};
++				map1 {
++				     trip = <&cpu_alert1>;
++				     cooling-device = <&fan0 1 2>;
++				};
++				map2 {
++				     trip = <&cpu_alert2>;
++				     cooling-device = <&fan0 2 3>;
++				};
++			};
++		};
++	};
++};
 diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c0e98cf..6b49f3c 100644
+index 6b49f3c..eb0f16c 100644
 --- a/arch/arm/boot/dts/exynos5420.dtsi
 +++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -61,6 +61,10 @@
- 			reg = <0x0>;
- 			clock-frequency = <1800000000>;
- 			cci-control-port = <&cci_control1>;
-+
-+			cooling-min-level = <10>;
-+			cooling-max-level = <7>;
-+			#cooling-cells = <2>; /* min followed by max */
- 		};
+@@ -827,10 +827,6 @@
+ 	};
  
- 		cpu1: cpu at 1 {
+ 	thermal-zones {
+-		cpu0_thermal: cpu0-thermal {
+-			thermal-sensors = <&tmu_cpu0>;
+-			#include "exynos5420-trip-points.dtsi"
+-		};
+ 		cpu1_thermal: cpu1-thermal {
+ 		       thermal-sensors = <&tmu_cpu1>;
+ 		       #include "exynos5420-trip-points.dtsi"
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+index eaec006..c8b3e3e 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
+@@ -12,6 +12,7 @@
+ 
+ /dts-v1/;
+ #include "exynos5800.dtsi"
++#include "exynos5-cpu-thermal.dtsi"
+ 
+ / {
+ 	model = "Hardkernel Odroid XU3";
 -- 
 1.9.1
