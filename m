@@ -1,43 +1,73 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 26 Mar 2015 11:58:05 +0000
-Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
-In-Reply-To: <20150326114955.GE8656@n2100.arm.linux.org.uk>
-References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
- <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
- <5513F0D9.5080807@arm.com> <20150326114955.GE8656@n2100.arm.linux.org.uk>
-Message-ID: <5513F44D.1060405@arm.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Thu, 26 Mar 2015 12:58:22 +0100
+Subject: [RFC 6/6] mmc: atmel-mci: use atmel_io.h to provide on-chip IO
+In-Reply-To: <1427370354-21247-7-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427370354-21247-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1427370354-21247-7-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20150326115821.GE16148@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Around Thu 26 Mar 2015 11:45:54 +0000 or thereabout, Ben Dooks wrote:
+> Use <linux/atmel_io.h> to provide IO accessors which work on both
+> AVR32 and ARM for on-chip peripherals.
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
+> CC: Chris Ball <chris@printf.net>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: linux-mmc at vger.kernel.org
+> ---
+>  drivers/mmc/host/atmel-mci-regs.h | 11 ++---------
+>  drivers/mmc/host/atmel-mci.c      |  1 +
+>  2 files changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/atmel-mci-regs.h b/drivers/mmc/host/atmel-mci-regs.h
+> index 711bb53..2293f2c 100644
+> --- a/drivers/mmc/host/atmel-mci-regs.h
+> +++ b/drivers/mmc/host/atmel-mci-regs.h
+> @@ -135,17 +135,10 @@
+>  #define ATMCI_REGS_SIZE		0x100
+>  
+>  /* Register access macros */
+> -#ifdef CONFIG_AVR32
+>  #define atmci_readl(port,reg)			\
+> -	__raw_readl((port)->regs + reg)
+> +	atmel_oc_readl((port)->regs + reg)
+>  #define atmci_writel(port,reg,value)			\
+> -	__raw_writel((value), (port)->regs + reg)
+> -#else
+> -#define atmci_readl(port,reg)			\
+> -	readl_relaxed((port)->regs + reg)
+> -#define atmci_writel(port,reg,value)			\
+> -	writel_relaxed((value), (port)->regs + reg)
+> -#endif
+> +	atmel_oc_writel((value), (port)->regs + reg)
 
+Defines are utilized in the header file, but ...
 
-On 26/03/15 11:49, Russell King - ARM Linux wrote:
-> On Thu, Mar 26, 2015 at 11:43:21AM +0000, Sudeep Holla wrote:
->> I tried using this driver and found that AMBA driver expects apb_clk
->> without which probe fails. Though your example have it, it's not
->> explicit from the binding. Also AMBA binding expects the primecell id in
->> the binding.
->
-> That's optional:
->
-> Optional properties:
->
-> - arm,primecell-periphid : Value to override the h/w value with
->
-> It's only required when the hardware doesn't provide the correct value.
->
+>  
+>  /* On AVR chips the Peripheral DMA Controller is not connected to MCI. */
+>  #ifdef CONFIG_AVR32
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 03d7c75..49de0d7 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -37,6 +37,7 @@
+>  
+>  #include <linux/atmel-mci.h>
+>  #include <linux/atmel_pdc.h>
+> +#include <linux/atmel_io.h>
 
-Ah sorry my bad, I meant the compatible(somehow left this word at the
-end of earlier email - it should have been" .. AMBA binding expects the
-primecell id in the binding compatible")
+... you include the required header file in the source file instead.
 
-- compatible : should be a specific name for the peripheral and
-	"arm,primecell". The specific name will match the ARM
-	engineering name for the logic block in the form: "arm,pl???"
+Also, a follow-up patch could remove the atmci_{read,write}{l,w} defines
+completely.
 
-So I wanted to make sure either we follow that here(unlikely as ARM is
-not publishing this as standard primecell yet) or specify that it's
-exception here.
-
-Regards,
-Sudeep
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pinctrl/consumer.h>
+-- 
+mvh
+Hans-Christian Egtvedt
