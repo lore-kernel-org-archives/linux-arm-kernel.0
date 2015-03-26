@@ -1,24 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 07:23:07 +0100
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <20150325141409.GD26903@localhost>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325141409.GD26903@localhost>
-Message-ID: <CAKv+Gu_RRCLGfHiZ35pHCNHp_=Sx1063dzAhpxWkn2kP0waQfw@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 26 Mar 2015 08:24:05 +0100
+Subject: [PATCH] ARM: dts: vf610: fix missing irqs
+Message-ID: <1427354645-16629-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2015 at 15:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
->> This aligns PHYS_OFFSET down to an alignment that allows system
->> RAM to be mapped using the largest blocks available, i.e., 1 GB
->> blocks on 4 KB pages or 512 MB blocks on 64 KB pages.
->
-> Does this assume that the platform RAM starts at such block aligned
-> addresses? If not, is the unaligned range ignored?
->
+While adding the MSCM interrupt router, all interrupts have been moved
+to vfxxx.dtsi again. However, some properties got lost. Readd the
+missing interrupt properties.
 
-No, it doesn't. The unaligned range is not mapped by the early code
-(it only maps from the start of image)
-Later on, it just maps whatever is in the DT nodes.
+Offending commit:
+97e6466ab9 ("ARM: dts: vf610: add Miscellaneous System Control Module (MSCM)"
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 899645d..f9bef55 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -377,6 +377,7 @@
+ 			src: src at 4006e000 {
+ 				compatible = "fsl,vf610-src", "syscon";
+ 				reg = <0x4006e000 0x1000>;
++				interrupts = <96 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 
+ 			gpc: gpc at 4006c000 {
+@@ -419,6 +420,7 @@
+ 				snvsrtc: snvs-rtc-lp at 34 {
+ 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+ 					reg = <0x34 0x58>;
++					interrupts = <100 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks VF610_CLK_SNVS>;
+ 					clock-names = "snvs-rtc";
+ 				};
+-- 
+2.3.3
