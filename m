@@ -1,44 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 15:26:07 +0000
-Subject: RPmsg, DMA and ARM64
-In-Reply-To: <20150324043749.GJ23658@toto>
-References: <20150324043749.GJ23658@toto>
-Message-ID: <20150326152607.GM8656@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Mar 2015 08:22:04 -0700
+Subject: [PATCH v2 3/7] dmaengine: Add driver for TI DMA crossbar on DRA7x
+In-Reply-To: <5513FC22.2030304@ti.com>
+References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
+ <1426080210-841-4-git-send-email-peter.ujfalusi@ti.com>
+ <20150326105603.GK32683@intel.com> <5513FC22.2030304@ti.com>
+Message-ID: <20150326152204.GF31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 02:37:49PM +1000, Edgar E. Iglesias wrote:
-> I'm trying to run rpmsg and remoteproc on the ZynqMP but hitting an mm error.
-> I'm not sure who is breaking the rules, rpmsg or the dma allocators?
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150326 05:32]:
+> On 03/26/2015 12:56 PM, Vinod Koul wrote:
+> >> +
+> >> +static void ti_dma_xbar_free(struct device *dev, void *route_data)
+> >> +{
+> >> +	struct ti_dma_xbar_data *xbar = dev_get_drvdata(dev);
+> >> +	struct ti_dma_xbar_map *map = route_data;
+> >> +
+> >> +	dev_dbg(dev, "Unmapping XBAR%d (was routed to %d)\n",
+> >> +		map->xbar_in, map->xbar_out);
+> >> +
+> >> +	regmap_write(xbar->regmap, map->xbar_out * 2, 0);
+> > just out of curiosity how much do you save using regmap :)
 > 
-> When rpmsg sets up the virtqueues, it allocates memory with
-> dma_alloc_coherent() and initializes a scatterlist with sg_init_one().
-> drivers/rpmsg/virtio_rpmsg_bus.c:rpmsg_probe().
-> sg_init_one() requires that the memory it gets is virt_addr_valid().
-> 
-> The problem I'm seeing is that on arm64, the dma alloc functions can
-> return vmalloced (via dma_common_contiguous_remap) memory. This
-> then causes havoc when the scatterlist code tries to go virt_to_page
-> and back to get hold of a physical adress (sg_phys()).
+> good point, not much I guess. I had it implemented w/o regmap as well, but
+> thought why not use regmap if it is available.
 
-dma_alloc_coherent() is permitted to remap the memory which it returns;
-it's allowed not to be part of the linear mapping.  The underlying
-memory could even be sourced from highmem and mapped in on demand.
+Regmap is nice for slow devices and devices in a shared register
+range like the omap syscon general area. For normal use, there's
+quite a bit of overhead with regmap compared to just read/write :)
 
-This means that using virt_to_page() et.al. on the return value from
-dma_alloc_coherent() is not permitted.
+Regards,
 
-The only way to pass such memory using scatterlists is by doing:
-
-	sg_init_table(sg, 1);
-	sg_dma_address(sg) = addr;
-	sg_dma_length(sg) = length;
-
-Such a scatterlist must _never_ have the dma_(map|unmap|sync)_sg*()
-functions called on it - the only operations which would be permissible
-is to walk the scatterlist, and access it using the standard DMA
-accessors sg_dma_address() and sg_dma_length().
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Tony
