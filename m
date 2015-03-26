@@ -1,100 +1,48 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Mar 2015 09:17:10 +0800
-Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
- simplicity
-In-Reply-To: <1427321631.2575.3.camel@axtens.net>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>		
- <1427168064-8657-20-git-send-email-wangyijing@huawei.com>	
- <1427241523.2685.18.camel@axtens.net> <551266DE.3030609@huawei.com>
- <1427321631.2575.3.camel@axtens.net>
-Message-ID: <55135E16.6060909@huawei.com>
+Date: Thu, 26 Mar 2015 09:18:59 +0800
+Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
+In-Reply-To: <20150325192331.GG25884@l.oracle.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
+ <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
+ <20150312193505.GB7346@google.com> <55024D35.6050509@huawei.com>
+ <CAErSpo4T7f9PNVMLrQbCvW2a=HnRauQR2eBz6H69B7Q2=ELNWw@mail.gmail.com>
+ <20150313140132.GH5378@l.oracle.com>
+ <CAErSpo69ytCxBK5AD79Nz05wy=GwzcOGV7WkiKFxpLDH4wtJXw@mail.gmail.com>
+ <20150325192331.GG25884@l.oracle.com>
+Message-ID: <55135E83.3040804@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/26 6:13, Daniel Axtens wrote:
-> Hi Yijing,
+>>>> That seems OK to me.  Probably still wrong, but no worse than it was before.
+>>>
+>>> Interesting. The mechanism for PCI passthrough can either synthesize
+>>> and PCI bus number starting at zero (so first device is always 0:0:0.0)
+>>> or it can replicate the backend PCI topology. That means you
+>>> could have segment values passed in, so: ab:ff:00.1). I've to admin
+>>> I hadn't tried the 'physical' replication on an machine with
+>>> domains (err, segments).
+>>>
+>>> Is there an git tree with this so I can just try it out?
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
+>> pci/enumeration-yw6 has similar code (it exports the single
 > 
-> I wasn't quite sure I understood your comments, so I was trying to apply
-> your patch series and test it, but patch 3 doesn't apply cleanly to
-> 4.0-rc5 or master. Can you respin the series?
+> I presume now it is bjorn/pci/enumeration-yw8 ? Going to test this out
+> this week.
 
-Hi Daniel,
-   Could you pull the series from Bjorn's git tree ? The URL is
-https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/enumeration-yw8
+Yes, it's the latest version. thanks!
 
-Thanks!
-Yijing.
-
+>> busn_resource and makes xen use it).  That should be functionally
+>> identical to what v4.0-rc1 does.
+>>
+>> Yijing hasn't posted the static busn_res proposal above yet, so I
+>> don't have a branch with that in it.
+>>
+>> Bjorn
 > 
-> Thanks,
-> Daniel
-> 
-> 
->> Hi Daniel, thanks for your review and comments. We want to make a generic pci_host_bridge,
->> which would hold the common host information, for example, pci domain is common info for
->> pci host bridge, this series saved domain in pci_host_bridge, then we no need to
->> extract out domain by pci_bus->sysdata by platform specific pci_domain_nr().
->> Also we store the sysdata in pci_host_bridge, and pci_bus_to_host() is the platform
->> interface, I think use the common interface would be better.
->>
->>>> +
->>>> +	/* Get probe mode and perform scan */
->>>> +	if (hose->dn && ppc_md.pci_probe_mode)
->>>> +		mode = ppc_md.pci_probe_mode(bus);
->>>> +
->>>> +	pr_debug("    probe mode: %d\n", mode);
->>>> +	if (mode == PCI_PROBE_DEVTREE)
->>>> +		of_scan_bus(hose->dn, bus);
->>>> +
->>>> +	if (mode == PCI_PROBE_NORMAL) {
->>>> +		pci_bus_update_busn_res_end(bus, 255);
->>>> +		hose->last_busno = pci_scan_child_bus(bus);
->>>> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
->>>> +	}
->>>> +
->>>> +	return pci_bus_child_max_busnr(bus);
->>>> +}
->>>> +
->>> I'm having trouble convincing myself that this patch covers every
->>> variation within our PCI implementations. In particular, there's a
->>> stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
->>> identical to this function. Does that implementation need to be cleaned
->>> up and replaced with this function too?
->>>
->>
->> This is a pci_host_bridge_ops hook function, which would be called in
->> PCI core, and after applied this series, we only need to call pci_scan_host_bridge()
->> to scan pci devices, and this function is also extracted from the pcibios_scan_phb(),
->> it's not the redundant code.
->>
->>>
->>>> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
->>>>  		ppc_md.pcibios_fixup_phb(hose);
->>>>  
->>>>  	/* Configure PCI Express settings */
->>>> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>>> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>>>  		struct pci_bus *child;
->>>> -		list_for_each_entry(child, &bus->children, node)
->>>> +		list_for_each_entry(child, &host->bus->children, node)
->>>>  			pcie_bus_configure_settings(child);
->>>>  	}
->>>>  }
->>> Two things: Firstly, the function uses hose throughout, not host.
->>> Secondly, you're not deleting the bus variable: what's the purpose of
->>> this change?
->>
->> host is the common pci_host_bridge which is created by PCI core for pci host bridge driver,
->> the hose is the platform data used in powerpc. The purpose of the patch/series is to simplify
->> pci enumeration interface, and try to reduce the weak functions which were used to setup pci bus/devices
->> during PCI enumeration.
->>
->>>
->>> Regards,
->>> Daniel
->>>
->>
->>
+> .
 > 
 
 
