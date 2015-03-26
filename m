@@ -1,57 +1,41 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 26 Mar 2015 22:28:37 +0100
-Subject: [PATCH v2] amba-pl011: simplify TX handling
-In-Reply-To: <1426636967-9124-1-git-send-email-moorray3@wp.pl>
-References: <1426636967-9124-1-git-send-email-moorray3@wp.pl>
-Message-ID: <20150326212837.GA21648@kroah.com>
+Date: Thu, 26 Mar 2015 22:30:14 +0100
+Subject: [PATCH v3 0/*] serial/amba-pl011: Activate TX IRQ passively
+In-Reply-To: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150326213014.GA21687@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 18, 2015 at 01:02:47AM +0100, Jakub Kicinski wrote:
-> From: Jakub Kicinski <kubakici@wp.pl>
+On Wed, Mar 25, 2015 at 06:22:26PM +0000, Dave Martin wrote:
+> Thanks to Jakub Kici?ski for his bug report and discussion, and for
+> showing out how we can manage without the softirq (and providing a
+> patch, though merging my rework with it got difficult, so I don't
+> include it in the series now).
 > 
-> Since pre-git era PL011 used an elaborate scheme to load data
-> to TX FIFO.  Only TX IRQ handler was loading data into the FIFO,
-> which required the IRQ to fire before any transmission started
-> (to load the first batch of characters).  Initial IRQ was fired
-> by putting UART into loopback mode and writing an arbitrary
-> character during .startup().
 > 
-> Unfortunately some PL011-compatible UART (most notably BCM2708
-> in Raspberry Pi) would transmit the arbitrary character even
-> though the device was in loopback mode.  Commit 734745caeb9f
-> ("serial/amba-pl011: Activate TX IRQ passively") solved this
-> issue by loading the first batch explicitly from .start_tx()
-> handler.  It employed quite a complex scheme involving IRQ
-> counting and a delayed work.
+> There are two alternate versions of the series threaded from this cover
+> letter:
 > 
-> f2ee6dfa0e85 ("serial/amba-pl011: Leave the TX IRQ alone when
-> the UART is not open") was an attempt to optimise the loading
-> by assuming that when the device is opened second time TX IRQ
-> from the previous transmission will still be pending.  This
-> assumption is incorrect if the device is closed with FIFO full
-> because FIFO will be programmatically flushed and therefore no
-> IRQ will be pending on next .open().
+>  * [PATCH v3] - patch against v4.0-rc5 that supersedes the previous
+>         series; this is the less churny option.
 > 
-> This patch simplifies the code and fixes above problem. It should
-> also make things a bit more efficient as the FIFO was not filled
-> properly after the driver seen more than two IRQs.
+>  * [PATCH v3, tty-next..] - patches against tty-next that
+>         modify/partially revert the previous series without needing a
+>         rebase.
 > 
-> Fixes: f2ee6dfa0e85 ("serial/amba-pl011: Leave the TX IRQ alone when the UART is not open")
-> Signed-off-by: Jakub Kicinski <kubakici@wp.pl>
-> ---
-> v2:
->  - don't try to load FIFO from outside of IRQ handler
->    if IRQ is unmasked (change to pl011_start_tx_pio());
->  - don't check for FIFO_FULL at the end of load from IRQ;
->  - remove unnecessary newlines.
-> ---
->  drivers/tty/serial/amba-pl011.c | 113 +++++++++++++---------------------------
->  1 file changed, 35 insertions(+), 78 deletions(-)
+> Take your pick.
 
-As I think this does much the same thing Dave Martin's patch does, I
-want him to ack this before I can accept it.
+I have no idea what you want me to do here, sorry.
 
-thanks,
+I need to apply patches to tty-next, I can't do anything against a
+"clean" 4.0-rc5 as your patches are already in tty-next.
+
+And I can't tell the two series apart here...
+
+Can you just resend what you want me to apply to tty-next and we can go
+from there?
+
+confused,
 
 greg k-h
