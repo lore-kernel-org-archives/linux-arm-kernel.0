@@ -1,46 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 15:46:18 +0000
-Subject: [PATCH v3  10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <5511ABAA.2010303@hurleysoftware.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
- <5511ABAA.2010303@hurleysoftware.com>
-Message-ID: <20150326154618.GO8656@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Mar 2015 16:53:56 +0100
+Subject: [PATCH 09/13] thermal: of: always set sensor related callbacks
+In-Reply-To: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1427385240-6086-10-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 02:23:38PM -0400, Peter Hurley wrote:
-> Hi Maxime,
-> 
-> On 03/12/2015 05:55 PM, Maxime Coquelin wrote:
-> > +static unsigned int stm32_get_mctrl(struct uart_port *port)
-> > +{
-> > +	/*
-> > +	 * This routine is used for geting signals of: DTR, DCD, DSR, RI,
-> > +	 * and CTS/RTS
+Now that the thermal core treats -ENOSYS like the callbacks were
+not present at all we no longer have to overwrite the ops during
+runtime but instead can always set them and return -ENOSYS if no
+sensor is registered.
 
-It's also worth noting that this comment is wrong.  This is used to get
-the state of DCD, DSR, RI and CTS.  DTR and RTS are *not* included
-because the core tracks their state.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/thermal/of-thermal.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-...
-
-> > +	stm32port->clk = devm_clk_get(&pdev->dev, NULL);
-> > +
-> > +	if (WARN_ON(IS_ERR(stm32port->clk)))
-> 
-> Do you really need a stack trace here? Could this be dev_err() instead?
-> 
-> > +		return -EINVAL;
-
-Also, propagate the error code.
-
-> > +
-> > +	/* ensure that clk rate is correct by enabling the clk */
-> > +	clk_prepare_enable(stm32port->clk);
-
-And remember to check the return value of clk_prepare_enable().
-
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index b39e22f..df14fdd 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -91,7 +91,7 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
+ {
+ 	struct __thermal_zone *data = tz->devdata;
+ 
+-	if (!data->ops->get_temp)
++	if (!data->ops)
+ 		return -EINVAL;
+ 
+ 	return data->ops->get_temp(data->sensor_data, temp);
+@@ -178,7 +178,7 @@ static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
+ 	struct __thermal_zone *data = tz->devdata;
+ 
+ 	if (!data->ops || !data->ops->set_emul_temp)
+-		return -EINVAL;
++		return -ENOSYS;
+ 
+ 	return data->ops->set_emul_temp(data->sensor_data, temp);
+ }
+@@ -189,8 +189,8 @@ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
+ 	struct __thermal_zone *data = tz->devdata;
+ 	int r;
+ 
+-	if (!data->ops->get_trend)
+-		return -EINVAL;
++	if (!data->ops || !data->ops->get_trend)
++		return -ENOSYS;
+ 
+ 	r = data->ops->get_trend(data->sensor_data, trip, trend);
+ 	if (r)
+@@ -366,6 +366,10 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
+ }
+ 
+ static struct thermal_zone_device_ops of_thermal_ops = {
++	.get_temp = of_thermal_get_temp,
++	.get_trend = of_thermal_get_trend,
++	.set_emul_temp = of_thermal_set_emul_temp,
++
+ 	.get_mode = of_thermal_get_mode,
+ 	.set_mode = of_thermal_set_mode,
+ 
+@@ -399,13 +403,13 @@ thermal_zone_of_add_sensor(struct device_node *zone,
+ 	if (!ops)
+ 		return ERR_PTR(-EINVAL);
+ 
++	if (!ops->get_temp)
++		return ERR_PTR(-EINVAL);
++
+ 	mutex_lock(&tzd->lock);
+ 	tz->ops = ops;
+ 	tz->sensor_data = data;
+ 
+-	tzd->ops->get_temp = of_thermal_get_temp;
+-	tzd->ops->get_trend = of_thermal_get_trend;
+-	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
+ 	mutex_unlock(&tzd->lock);
+ 
+ 	return tzd;
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
