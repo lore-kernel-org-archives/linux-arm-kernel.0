@@ -1,31 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Mar 2015 12:03:12 -0700
-Subject: [PATCH V2 2/2] ARM: dts: am57xx-beagle-x15: Add thermal map to
- include fan and tmp102
-In-Reply-To: <20150324151736.GE29155@developer.hsd1.ca.comcast.net>
-References: <1427139579-4215-1-git-send-email-nm@ti.com>
- <1427139579-4215-3-git-send-email-nm@ti.com>
- <20150324151736.GE29155@developer.hsd1.ca.comcast.net>
-Message-ID: <20150326190311.GE10805@atomide.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 26 Mar 2015 20:17:26 +0100
+Subject: Need a phy function to enable / disable usb squelch detection
+Message-ID: <55145B46.9020501@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eduardo Valentin <edubezval@gmail.com> [150324 08:17]:
-> On Mon, Mar 23, 2015 at 02:39:39PM -0500, Nishanth Menon wrote:
-> > BeagleBoard-X15 has capability for a fan and has an onboard TMP102
-> > temperature sensor as well. This allows us to create a new thermal
-> > zone (called, un-imaginatively "board"), and allows us to use some
-> > active cooling as temperatures start edge upward in the system by
-> > creating a new alert temperature (emperically 50C) for cpu.
-> > 
-> > NOTE: Fan is NOT mounted by default on the platform, in such a case,
-> > all we end up doing is switch on a regulator and leak very minimal
-> > current.
-> > 
-> > Signed-off-by: Nishanth Menon <nm@ti.com>
-> 
-> Acked-by: Eduardo Valentin <edubezval@gmail.com>
+Hi Kishon,
 
-Applying both of these into omap-for-v4.1/fixes-not-urgent thanks.
+I've been debugging why some devices do not work with
+the musb otg controller found on Allwinner SoC-s, and the
+conclusion is not good, the Android kernel does a
+poke to the phy before releasing the usb reset.
 
-Tony
+Now you did not want me to introduce any sunxi specific /
+private phy functions in my initial patch-series for adding
+sunxi support, but in this case I do not really see an
+alternative, as this is a very platform specific hack
+to work around an issue with the phy-s squelch detection
+which causes it to see a squelch when reset is released
+switching it to high speed mode when a lo speed device
+is connected, after which things fall apart.
+
+I'm open to some generic solution for this, but I do
+not see one myself.
+
+Thanks & Regards,
+
+Hans
+
+p.s.
+
+A review of my existing sun4i-usb-phy otg support work
+would be appreciated, this squelch thing is best left
+as a fix on top.
