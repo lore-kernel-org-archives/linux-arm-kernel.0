@@ -1,62 +1,99 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Mar 2015 17:38:23 +0000
-Subject: [PATCH 1/3] ARM: at91/dt: sama5d3 fill in mmc1 and default disabled
-In-Reply-To: <1427391505-29129-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427391505-29129-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427391505-29129-2-git-send-email-ben.dooks@codethink.co.uk>
+From: lho@apm.com (Loc Ho)
+Date: Thu, 26 Mar 2015 10:39:17 -0700
+Subject: [PATCH v6 0/4] edac: Add APM X-Gene SoC EDAC driver
+In-Reply-To: <1426573821-1937-1-git-send-email-lho@apm.com>
+References: <1426573821-1937-1-git-send-email-lho@apm.com>
+Message-ID: <CAPw-ZTkOOh=1GgDBQ4a9KoWVA9B7GPXddwNx=VBjVTo44wYdug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmc1 channel is not populated on the SAM5D3 Xplained board, however
-it is enabled and therefore the driver is attaching to it.
+Hi Doug,
 
-The node configuration for mmc1 is missing, so add an mmc1 node in the
-device tree so add the basic node, set it to default it to disabled. Also
-add the vmmc and also the necessary slot configuration if this node
-where to be enabled to avoid the following warnings from the driver.
+Any comment with v6 of the APM EDAC driver?
 
-atmel_mci f8000000.mmc: No vmmc regulator found
-atmel_mci f8000000.mmc: No vqmmc regulator found
+-Loc
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
---
-CC: linux-arm-kernel at lists.infradead.org
-CC: Andrew Victor <linux@maxim.org.za>
-CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-CC: Rob Herring <robh+dt@kernel.org>
-CC: Pawel Moll <pawel.moll@arm.com>
-CC: Mark Rutland <mark.rutland@arm.com>
-CC: Ian Campbell <ijc+devicetree@hellion.org.uk>
-CC: Kumar Gala <galak@codeaurora.org>
-CC: Russell King <linux@arm.linux.org.uk>
-CC: linux-arm-kernel at lists.infradead.org
-CC: devicetree at vger.kernel.org
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index fec1fca..652c4dd 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -43,6 +43,17 @@
- 				};
- 			};
- 
-+			mmc1: mmc at f8000000 {
-+				vmmc-supply = <&vcc_3v3_reg>;
-+				vqmmc-supply = <&vcc_3v3_reg>;
-+				status = "disabled";
-+				slot at 0 {
-+					reg = <0>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioE 1 GPIO_ACTIVE_LOW>;
-+				};
-+			};
-+
- 			spi0: spi at f0004000 {
- 				cs-gpios = <&pioD 13 0>, <0>, <0>, <&pioD 16 0>;
- 				status = "okay";
--- 
-2.1.4
+On Mon, Mar 16, 2015 at 11:30 PM, Loc Ho <lho@apm.com> wrote:
+> This patch adds support for the APM X-Gene SoC EDAC driver for DT.
+>
+> v6:
+> * Rebase to 4.0.0-rc3
+> * Add memory scrub stub function and enable ARM64 EDAC support patch
+> * Add bit definition defines for L2RTOS registers
+> * Remove un-necessary clearing of all L1/L2 software generated registers
+> * Remove wrong notification of LSU un-correctable error
+> * Change L2 reporting of un-correcable error to correctable error
+> * Change clearing of the L2C L2RTO registers
+> * Add support for L2 HW version 1 and version 2 or above
+> * Add support for L3 HW version 1 and version 2 or above
+>
+> v5:
+> * Rebase to 3.17.rc1 (next)
+> * Update binding documentation for additional SoC node binding resource
+> * Enable MCU correctable and uncorrectable interrupts if not enabled by
+>   firmware
+> * Enable top level interrupt only after all MCU registered. Otherwise,
+>   error interrupt will never get cleared by the corresponding MCU.
+> * Remove clearing of L1 and L2 errors during initialization time. Otherwise,
+>   they will not be captured between firmware booting and error configuration.
+> * Add capture and clearing SoC register bus errors
+> * Add register bus resource to SoC DT node
+>
+> v4:
+> * Fix PMD l1/l2 error reading address due to wrong variable type
+> * Fix clearing of software generated and HW errors for l1/l2
+>
+> v3:
+> * Update binding documentation for PMD DT node and exampples
+> * Add binding documentation for SoC DT node
+> * Change MC, PMD, and L3C driver error injection to use debugfs
+> * Add missing IRQ for MC correctable error (code and DT)
+> * Use true/false where appropriate instead 1/0
+> * Add bit definition for L1 MMUESR register and fully decode this error
+> * Remove the un-necessary dev variable from xgene_edac_pmd_ctx structure
+> * Add check for disabled PMD (code and DT)
+> * Switch to edac_printk instead pr_err
+> * Some minor comments update
+>
+> v2:
+> * Add EDAC entry in MAINTAINERS for APM EDAC driver
+> * Remove the MC scrub patch
+> * Remove the word 'Caches' from Kconfig
+> * Change all MASK defines to use BIT(x)
+> * Update comment or remove them
+> * Wrap error injection code around CONFIG_EDAC_DEBUG
+> * Change function name xgene_edac_mc_hw_init to xgene_edac_mc_irq_ctl
+> * Change all function XXX_hw_init to XXX_hw_ctl
+> * Fix typo 'activie'
+> * Move calling function edac_mc_alloc after resource retrieval
+> * Check for NULL on platform_get_resource return if reference directly
+> * Add documentation for struct xgene_edac_pmd_ctx
+> * Move L1 and L2 check out of function xgene_edac_pmd_check to its own
+>   functions
+> * Use for loop for configure each CPU of an PMD
+> * Replace /2 by >> 1
+> * Remove unnecessary comment on edac_device_add_device failure
+> * Make mem_err_ip static const
+> * Unwind EDAC register correctly if failed
+> ---
+> Loc Ho (5):
+>   arm64: Enable EDAC on ARM64
+>   MAINTAINERS: Add entry for APM X-Gene SoC EDAC driver
+>   Documentation: Add documentation for the APM X-Gene SoC EDAC DTS
+>     binding
+>   edac: Add APM X-Gene SoC EDAC driver
+>   arm64: Add APM X-Gene SoC EDAC DTS entries
+>
+>  .../devicetree/bindings/edac/apm-xgene-edac.txt    |   82 +
+>  MAINTAINERS                                        |    8 +
+>  arch/arm64/Kconfig                                 |    1 +
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi             |   98 +
+>  arch/arm64/include/asm/edac.h                      |   31 +
+>  drivers/edac/Kconfig                               |    9 +-
+>  drivers/edac/Makefile                              |    1 +
+>  drivers/edac/xgene_edac.c                          | 2183 ++++++++++++++++++++
+>  8 files changed, 2412 insertions(+), 1 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+>  create mode 100644 arch/arm64/include/asm/edac.h
+>  create mode 100644 drivers/edac/xgene_edac.c
+>
