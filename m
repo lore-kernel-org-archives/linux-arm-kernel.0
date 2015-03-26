@@ -1,67 +1,95 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 26 Mar 2015 12:41:13 +0000
-Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
- destroyed
-In-Reply-To: <20150325215940.GE3649@amt.cnet>
-References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
- <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
- <5512EBB9.2050304@arm.com> <20150325215940.GE3649@amt.cnet>
-Message-ID: <5513FE69.9050401@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 26 Mar 2015 13:43:05 +0100
+Subject: [PATCH 02/16] iommu: Introduce iommu domain types
+In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+Message-ID: <1427373799-18662-3-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcelo,
+From: Joerg Roedel <jroedel@suse.de>
 
-On 25/03/15 21:59, Marcelo Tosatti wrote:
-> On Wed, Mar 25, 2015 at 05:09:13PM +0000, Marc Zyngier wrote:
->> On 23/03/15 15:58, Andre Przywara wrote:
->>> In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
->>> especially before calling kvm_arch_destroy_vm(). To avoid
->>> unregistering devices from the already destroyed bus, let's mark
->>> the bus with NULL to let other users know it has been destroyed
->>> already.
->>> This avoids a crash on a VM shutdown with the VGIC using the
->>> kvm_io_bus later (the unregistering is in there to be able to roll
->>> back a faulting init).
->>>
->>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>
->> That seems sensible, but I don't see why nobody else hits that. What are
->> we doing differently?
+This allows to handle domains differently based on their
+type in the future. An IOMMU driver can implement certain
+optimizations for DMA-API domains for example.
 
-So I checked the other users of kvm_io_bus, none of them seems to
-explicitly unregister the kvm_io_bus devices they registered before if
-the VM goes down. They all rely on the whole kvm_io_bus being brought
-down eventually, so there is no need for an explicit unregister.
-The only point they do unregister is when cleaning up after init fails
-in the middle.
-So I changed my code to match that behaviour: cleaning up in init and
-leaving the VM destruction case alone.
-This lets me get rid of that patch and actually removes more code in one
-of the following patches.
+The domain types can be extended later and some of the
+existing domain attributes can be migrated to become domain
+flags.
 
-> It should be valid to call kvm_io_bus_unregister_dev after
-> kvm_io_bus_destroy.
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/iommu/iommu.c |  5 +++--
+ include/linux/iommu.h | 27 ++++++++++++++++++++++++++-
+ 2 files changed, 29 insertions(+), 3 deletions(-)
 
-AFAICS it's not.
-kvm_io_bus_unregister_dev reads like this:
-        bus = kvm->buses[bus_idx];
-        r = -ENOENT;
-        for (i = 0; i < bus->dev_count; i++)
-So having the actual bus freed already before would lead to an invalid
-dereference. As stated above no-one seems to use it like this at the
-moment. Shall I make a (separate) patch to fix that theoretical case?
-Setting the pointer values to NULL after kfree() and checking them in
-kvm_io_bus_unregister_dev()? What about other functions using the buses?
-
-> 
-> Are you patching it to handle NULL kvm->buses[bus_idx] ?
-
-No, I handle this is my VGIC clean up function, so that it doesn't try
-to call kvm_io_bus_unregister_dev if the bus is already down. But that
-will go away with the change mentioned above.
-
-I will check back with Marc how to actually merge those fixes in.
-
-Cheers,
-Andre.
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 11de262..4920605 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -909,14 +909,15 @@ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
+ 	ops = bus->iommu_ops;
+ 
+ 	if (ops->domain_alloc)
+-		domain = ops->domain_alloc();
++		domain = ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
+ 	else
+ 		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+ 
+ 	if (!domain)
+ 		return NULL;
+ 
+-	domain->ops = bus->iommu_ops;
++	domain->ops  = bus->iommu_ops;
++	domain->type = IOMMU_DOMAIN_UNMANAGED;
+ 
+ 	if (ops->domain_init && domain->ops->domain_init(domain))
+ 		goto out_free;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 69d1d12..72d03fe 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -51,7 +51,32 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
+ };
+ 
++/* Domain feature flags */
++#define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
++#define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
++					      implementation              */
++#define __IOMMU_DOMAIN_PT	(1U << 2)  /* Domain is identity mapped   */
++
++/*
++ * This are the possible domain-types
++ *
++ *	IOMMU_DOMAIN_BLOCKED	- All DMA is blocked, can be used to isolate
++ *				  devices
++ *	IOMMU_DOMAIN_IDENTITY	- DMA addresses are system physical addresses
++ *	IOMMU_DOMAIN_UNMANAGED	- DMA mappings managed by IOMMU-API user, used
++ *				  for VMs
++ *	IOMMU_DOMAIN_DMA	- Internally used for DMA-API implementations.
++ *				  This flag allows IOMMU drivers to implement
++ *				  certain optimizations for these domains
++ */
++#define IOMMU_DOMAIN_BLOCKED	(0U)
++#define IOMMU_DOMAIN_IDENTITY	(__IOMMU_DOMAIN_PT)
++#define IOMMU_DOMAIN_UNMANAGED	(__IOMMU_DOMAIN_PAGING)
++#define IOMMU_DOMAIN_DMA	(__IOMMU_DOMAIN_PAGING |	\
++				 __IOMMU_DOMAIN_DMA_API)
++
+ struct iommu_domain {
++	unsigned type;
+ 	const struct iommu_ops *ops;
+ 	void *priv;
+ 	iommu_fault_handler_t handler;
+@@ -117,7 +142,7 @@ struct iommu_ops {
+ 	void (*domain_destroy)(struct iommu_domain *domain);
+ 
+ 	/* Domain allocation and freeing by the iommu driver */
+-	struct iommu_domain *(*domain_alloc)(void);
++	struct iommu_domain *(*domain_alloc)(unsigned iommu_domain_type);
+ 	void (*domain_free)(struct iommu_domain *);
+ 
+ 	int (*attach_dev)(struct iommu_domain *domain, struct device *dev);
+-- 
+1.9.1
