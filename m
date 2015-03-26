@@ -1,82 +1,36 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Mar 2015 16:53:56 +0100
-Subject: [PATCH 09/13] thermal: of: always set sensor related callbacks
+Date: Thu, 26 Mar 2015 16:53:50 +0100
+Subject: [PATCH 03/13] thermal: remove useless call to
+ thermal_zone_device_set_polling
 In-Reply-To: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
 References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1427385240-6086-10-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1427385240-6086-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the thermal core treats -ENOSYS like the callbacks were
-not present at all we no longer have to overwrite the ops during
-runtime but instead can always set them and return -ENOSYS if no
-sensor is registered.
+When the thermal zone has no get_temp callback then thermal_zone_device_register()
+calls thermal_zone_device_set_polling() with a polling delay of 0. This
+only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
+is a no-op. Remove it.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/thermal/of-thermal.c | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
+ drivers/thermal/thermal_core.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
-index b39e22f..df14fdd 100644
---- a/drivers/thermal/of-thermal.c
-+++ b/drivers/thermal/of-thermal.c
-@@ -91,7 +91,7 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
- {
- 	struct __thermal_zone *data = tz->devdata;
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index c735ac4c..dcea909 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
  
--	if (!data->ops->get_temp)
-+	if (!data->ops)
- 		return -EINVAL;
+ 	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
  
- 	return data->ops->get_temp(data->sensor_data, temp);
-@@ -178,7 +178,7 @@ static int of_thermal_set_emul_temp(struct thermal_zone_device *tz,
- 	struct __thermal_zone *data = tz->devdata;
+-	if (!tz->ops->get_temp)
+-		thermal_zone_device_set_polling(tz, 0);
+-
+ 	thermal_zone_device_update(tz);
  
- 	if (!data->ops || !data->ops->set_emul_temp)
--		return -EINVAL;
-+		return -ENOSYS;
- 
- 	return data->ops->set_emul_temp(data->sensor_data, temp);
- }
-@@ -189,8 +189,8 @@ static int of_thermal_get_trend(struct thermal_zone_device *tz, int trip,
- 	struct __thermal_zone *data = tz->devdata;
- 	int r;
- 
--	if (!data->ops->get_trend)
--		return -EINVAL;
-+	if (!data->ops || !data->ops->get_trend)
-+		return -ENOSYS;
- 
- 	r = data->ops->get_trend(data->sensor_data, trip, trend);
- 	if (r)
-@@ -366,6 +366,10 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
- }
- 
- static struct thermal_zone_device_ops of_thermal_ops = {
-+	.get_temp = of_thermal_get_temp,
-+	.get_trend = of_thermal_get_trend,
-+	.set_emul_temp = of_thermal_set_emul_temp,
-+
- 	.get_mode = of_thermal_get_mode,
- 	.set_mode = of_thermal_set_mode,
- 
-@@ -399,13 +403,13 @@ thermal_zone_of_add_sensor(struct device_node *zone,
- 	if (!ops)
- 		return ERR_PTR(-EINVAL);
- 
-+	if (!ops->get_temp)
-+		return ERR_PTR(-EINVAL);
-+
- 	mutex_lock(&tzd->lock);
- 	tz->ops = ops;
- 	tz->sensor_data = data;
- 
--	tzd->ops->get_temp = of_thermal_get_temp;
--	tzd->ops->get_trend = of_thermal_get_trend;
--	tzd->ops->set_emul_temp = of_thermal_set_emul_temp;
- 	mutex_unlock(&tzd->lock);
- 
- 	return tzd;
+ 	return tz;
 -- 
 2.1.4
