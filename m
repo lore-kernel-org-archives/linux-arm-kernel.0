@@ -1,60 +1,51 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 27 Mar 2015 03:09:15 +1030
-Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to control
- the pwm-fan
-In-Reply-To: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
-References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 27 Mar 2015 01:50:50 +0900
+Subject: [PATCH v2 1/1] ARM: exynos_defconfig: Enable options to mount
+ a rootfs via NFS
+In-Reply-To: <1427310504-1505-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1427310504-1505-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <551438EA.3010509@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Below changes depend on following patch.
-https://patchwork.kernel.org/patch/5944061/
+On 03/26/15 04:08, Javier Martinez Canillas wrote:
+> This patch enables the options to mount a rootfs over NFS and also support
+> for automatic configuration of IP addresses during boot as needed by NFS.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+> 
+> Changes since v1:
+>  - Found a typo in the changelog after posting the patch. Sorry for the noise.
+> 
+>  arch/arm/configs/exynos_defconfig | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+> index 72a4fffd603e..02be4c072497 100644
+> --- a/arch/arm/configs/exynos_defconfig
+> +++ b/arch/arm/configs/exynos_defconfig
+> @@ -36,6 +36,10 @@ CONFIG_PACKET=y
+>  CONFIG_UNIX=y
+>  CONFIG_NET_KEY=y
+>  CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+> +CONFIG_IP_PNP_BOOTP=y
+> +CONFIG_IP_PNP_RARP=y
+>  CONFIG_WIRELESS=y
+>  CONFIG_CFG80211=y
+>  CONFIG_MWIFIEX=y
+> @@ -206,6 +210,8 @@ CONFIG_TMPFS=y
+>  CONFIG_TMPFS_POSIX_ACL=y
+>  CONFIG_CRAMFS=y
+>  CONFIG_ROMFS_FS=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_ROOT_NFS=y
+>  CONFIG_NLS_CODEPAGE_437=y
+>  CONFIG_NLS_ASCII=y
+>  CONFIG_NLS_ISO8859_1=y
 
-Update the pwm_config with duty then update the pwm_disable
-to poweroff the cpu fan.
+Applied, thanks.
 
-Tested on OdroidXU3 board.
-
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- drivers/hwmon/pwm-fan.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 7c83dc4..f25c841 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	int ret = 0;
- 
- 	mutex_lock(&ctx->lock);
-+
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
- 
--	if (pwm == 0) {
--		pwm_disable(ctx->pwm);
--		goto exit_set_pwm;
--	}
--
- 	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
- 	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
- 	if (ret)
- 		goto exit_set_pwm_err;
- 
-+	if (pwm == 0)
-+		pwm_disable(ctx->pwm);
-+
- 	if (ctx->pwm_value == 0) {
- 		ret = pwm_enable(ctx->pwm);
- 		if (ret)
- 			goto exit_set_pwm_err;
- 	}
- 
--exit_set_pwm:
- 	ctx->pwm_value = pwm;
- exit_set_pwm_err:
- 	mutex_unlock(&ctx->lock);
--- 
-1.9.1
+- Kukjin
