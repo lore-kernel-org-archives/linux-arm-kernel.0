@@ -1,43 +1,64 @@
-From: dtor@google.com (Dmitry Torokhov)
-Date: Thu, 26 Mar 2015 16:07:07 -0700
-Subject: [PATCH 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
-In-Reply-To: <55134D10.2070805@broadcom.com>
-References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426885630-32429-2-git-send-email-arun.ramamurthy@broadcom.com>
- <20150320212645.GA25405@dtor-ws> <550C9134.9020003@broadcom.com>
- <551330B5.6030901@ti.com> <55134D10.2070805@broadcom.com>
-Message-ID: <20150326230707.GB18887@dtor-ws>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 27 Mar 2015 00:40:54 +0100
+Subject: Propagating clock rate constraints
+Message-ID: <20150327004054.2f6f34ee@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 05:04:32PM -0700, Arun Ramamurthy wrote:
-> 
-> 
-> On 15-03-25 03:03 PM, Kishon Vijay Abraham I wrote:
-> >Hi,
-> >
-> >On Saturday 21 March 2015 02:59 AM, Arun Ramamurthy wrote:
-> >>
-> >>
-> >>On 15-03-20 02:26 PM, Dmitry Torokhov wrote:
-> >>>Hi Arun,
-> >>>
-> >>>On Fri, Mar 20, 2015 at 02:07:08PM -0700, Arun Ramamurthy wrote:
-> >>>>Adding devm_of_phy_get_by_index to get phys by supplying an index
-> >>>>and not a phy name when multiple phys are declared
-> >
-> >I think a bit more explanation on why get_by_index is needed here.
-> Thanks Kison. Can you be more specific? I am unsure of what more I
-> can explain here.
+Hello,
 
-We just need to mention that some generic drivers, such as ehci, may use
-multiple phys, and for such drivers referencing phy(s) by name(s) does
-not make sense. Instead of inventing elaborate naming schemes and
-producing custom code to iterate over names, such drivers are better of
-using nameless phy bindings and using this newly introduced API to
-iterate through them.
+I recently had a problem with the at91 clk implementation: the
+programmable clock driver is not forwarding set_rate() requests to its
+parent, meaning that, if the PLLB is set to 0, it will choose another
+parent which might be inappropriate to generate the requested clock.
+ITOH, if we authorize forwarding set_rate requests without taking care
+of constraints imposed by other users of the PLLB we might end-up
+with a erroneous rate for the USB clock.
 
-Thanks.
+I thought using set_rate_range() would be a good idea to address this
+issue, but apparently rate constraints are not propagated to parent
+clocks, and PLLB is never exposed to devices (it is accessed through
+clk muxers, divisors, etc).
+
+Is there a plan to support propagating rate constraints to parent
+clocks ?
+
+Here is an example where propagating rate constraints would be useful:
+
+The USB controller wants a 48MHz clock and the audio controller needs a
+programmable clock running at 12MHz.
+
+1/ The USB driver calls set_rate() on the USB clock, which in turn
+   configures the PLLB to generate a 96MHz signal and sets its divisor
+   to 2.
+   Then it should call set_rate_range(usb_clk, 48Mhz, 48MHz) to prevent
+   anyone from messing up with his USB clock.
+
+2/ The audio controller calls set_rate on the prog clock, which in
+   turn configures the PLLB to generate a 12MHz.
+   Since nobody explicitly set a constraint on the PLLB, the set_rate()
+   call should work, right ?
+   If it works, after this call, the USB clk will generate a 6MHz
+   signal instead of 48MHz one. 
+
+
+I started to look at how rate constraint propagation could be handled:
+here [1] is a quick&dirty/untested patch adding several things to deal
+with such cases.
+The idea is to declare each clock as a clk user of its parent, and then
+modify rate range appropriately so that all children clk constraints are
+taken into account by the parent clock when a rate change is requested.
+
+Anyway, just tell me if you're already working on a solution for this
+problem or if you need any help with that ?
+
+Best Regards,
+
+Boris
+
+[1]http://code.bulix.org/dcm4c8-88137
 
 -- 
-Dmitry
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
