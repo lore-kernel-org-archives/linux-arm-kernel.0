@@ -1,98 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Mar 2015 15:15:10 +0000
-Subject: [patch v11 12/23] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <20150325171735.GI14585@localhost>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-13-git-send-email-hanjun.guo@linaro.org>
- <20150325171735.GI14585@localhost>
-Message-ID: <20150326151510.GI2805@arm.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 26 Mar 2015 18:19:09 +0300
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+In-Reply-To: <20150326150558.GK8656@n2100.arm.linux.org.uk>
+References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+ <20150326150558.GK8656@n2100.arm.linux.org.uk>
+Message-ID: <5514236D.50808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 05:17:35PM +0000, Catalin Marinas wrote:
-> On Tue, Mar 24, 2015 at 10:02:45PM +0800, Hanjun Guo wrote:
-> > +/**
-> > + * acpi_map_gic_cpu_interface - generates a logical cpu number
-> > + * and map to MPIDR represented by GICC structure
-> > + * @mpidr: CPU's hardware id to register, MPIDR represented in MADT
-> > + * @enabled: this cpu is enabled or not
-> > + *
-> > + * Returns the logical cpu number which maps to MPIDR
-> > + */
-> > +static int __init acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
+On 03/26/2015 06:05 PM, Russell King - ARM Linux wrote:
+> On Fri, Mar 20, 2015 at 02:12:52PM +0300, Andrey Ryabinin wrote:
+>> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+>> split this is not so, because 2*TASK_SIZE overflows 32 bits,
+>> so the actual value of ELF_ET_DYN_BASE is:
+>> 	(2 * TASK_SIZE / 3) = 0x2a000000
+>>
+>> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+>> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+>> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+>> as it fails to map shadow memory.
+>> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+>> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+>> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
+>>
+>> Fix overflow by dividing TASK_SIZE prior to multiplying.
+>> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+>> 	(TASK_SIZE / 3 * 2) = 0x7f555554
+>>
+>> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
+>>
+>> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+>> Reported-by: Maria Guseva <m.guseva@samsung.com>
+>> Cc: stable at vger.kernel.org
 > 
-> So here we have an u8 enabled.
+> Who's handling this patch?  I'm guessing it should be me, so if it could
+> find its way into my patch system for when I next apply a bunch of patches,
+> that'd be good.
 > 
-> > +static int __init
-> > +acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-> > +				const unsigned long end)
-> > +{
-> > +	struct acpi_madt_generic_interrupt *processor;
-> > +
-> > +	processor = (struct acpi_madt_generic_interrupt *)header;
-> > +
-> > +	if (BAD_MADT_ENTRY(processor, end))
-> > +		return -EINVAL;
-> > +
-> > +	acpi_table_print_madt_entry(header);
-> > +
-> > +	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
-> > +		processor->flags & ACPI_MADT_ENABLED);
-> 
-> and here processor->flags is u32. Luckily, ACPI_MADT_ENABLED is 1 and we
-> don't lose any information. So either make the enabled above a bool or
-> simply pass the flags with the check in acpi_map_gic_cpu_interface()
-> (personal preference for the latter).
 
-I've applied the following patch on top of the series.
-
-Will
-
---->8
-
-commit 8ef320319592693f4a6286d80df210fd47b3e356
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Thu Mar 26 15:09:20 2015 +0000
-
-    ARM64 / ACPI: fix usage of acpi_map_gic_cpu_interface
-    
-    acpi_parse_gic_cpu_interface calls acpi_map_gic_cpu_interface by both
-    passing a 32-bit value in the u8 enabled parameter and then subsequently
-    ignoring its return value.
-    
-    Sort it out.
-    
-    Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index cd60329da8c4..07649e413244 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -103,9 +103,12 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
-  *
-  * Returns the logical cpu number which maps to MPIDR
-  */
--static int __init acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
-+static int __init
-+acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- {
- 	int i;
-+	u64 mpidr = processor->arm_mpidr & MPIDR_HWID_BITMASK;
-+	bool enabled = !!(processor->flags & ACPI_MADT_ENABLED);
- 
- 	if (mpidr == INVALID_HWID) {
- 		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
-@@ -178,11 +181,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
- 		return -EINVAL;
- 
- 	acpi_table_print_madt_entry(header);
--
--	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
--		processor->flags & ACPI_MADT_ENABLED);
--
--	return 0;
-+	return acpi_map_gic_cpu_interface(processor);
- }
- 
- /* Parse GIC cpu interface entries in MADT for SMP init */
+It's already there. Patch number - 8320/1.
