@@ -1,41 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 26 Mar 2015 22:30:14 +0100
-Subject: [PATCH v3 0/*] serial/amba-pl011: Activate TX IRQ passively
-In-Reply-To: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
-References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150326213014.GA21687@kroah.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 26 Mar 2015 22:38:54 +0100
+Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+In-Reply-To: <20150325140725.GA11499@kroah.com> (Greg Kroah-Hartman's message
+ of "Wed, 25 Mar 2015 15:07:25 +0100")
+References: <20150216130549.GF14545@x1>
+ <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
+ <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
+ <20150217074310.GT14545@x1>
+ <alpine.LFD.2.11.1502171221300.22104@knanqh.ubzr>
+ <20150218080719.GB5781@x1> <87a9088tam.fsf@free.fr>
+ <20150325140725.GA11499@kroah.com>
+Message-ID: <871tkbxwup.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 06:22:26PM +0000, Dave Martin wrote:
-> Thanks to Jakub Kici?ski for his bug report and discussion, and for
-> showing out how we can manage without the softirq (and providing a
-> patch, though merging my rework with it got difficult, so I don't
-> include it in the series now).
-> 
-> 
-> There are two alternate versions of the series threaded from this cover
-> letter:
-> 
->  * [PATCH v3] - patch against v4.0-rc5 that supersedes the previous
->         series; this is the less churny option.
-> 
->  * [PATCH v3, tty-next..] - patches against tty-next that
->         modify/partially revert the previous series without needing a
->         rebase.
-> 
-> Take your pick.
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
 
-I have no idea what you want me to do here, sorry.
+> On Fri, Feb 20, 2015 at 05:02:57PM +0100, Robert Jarzmik wrote:
+>> If there is no solution, I'll fallback through arch/arm/plat-pxa, not very nice,
+>> but it has to land somewhere, I don't want lubbock to remain broken.
+>
+> drivers/platform/arm ?
+Most certainly.
 
-I need to apply patches to tty-next, I can't do anything against a
-"clean" 4.0-rc5 as your patches are already in tty-next.
+I'll submit that to drivers/platform/arm/pxa, and maintain that pxa tree. As for
+drivers/platform/arm, do you want also maintainers to step up, or will you take
+the review/merge burden ?
 
-And I can't tell the two series apart here...
+Cheers.
 
-Can you just resend what you want me to apply to tty-next and we can go
-from there?
-
-confused,
-
-greg k-h
+-- 
+Robert
