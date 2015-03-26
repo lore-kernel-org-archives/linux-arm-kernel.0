@@ -1,31 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 11:36:48 +0000
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <20150325104603.GA3560@e103592.cambridge.arm.com>
-References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150324122239.GB3579@e103592.cambridge.arm.com>
- <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
- <20150324135439.GC3579@e103592.cambridge.arm.com>
- <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
- <20150325104603.GA3560@e103592.cambridge.arm.com>
-Message-ID: <20150326113648.GC8656@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 26 Mar 2015 11:38:33 +0000
+Subject: [PATCH 07/13] clocksource: tcb_clksrc: make IO endian agnostic
+In-Reply-To: <5513E8A1.1050809@atmel.com>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-8-git-send-email-ben.dooks@codethink.co.uk>
+ <5513D7AA.8030008@linaro.org> <5513E8A1.1050809@atmel.com>
+Message-ID: <5513EFB9.702@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 10:46:14AM +0000, Dave Martin wrote:
-> Hmmm, you seem to be right.
+On 26/03/15 11:08, Nicolas Ferre wrote:
+> Le 26/03/2015 10:55, Daniel Lezcano a ?crit :
+>> On 03/18/2015 04:53 PM, Ben Dooks wrote:
+>>> Change the __raw read and write to use readl/writel_relaxed to make the
+>>> code endian agnostic.
+>>>
+>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>
+>> Nicolas,
+>>
+>> what about this one ? Do you ack it ?
 > 
-> Thumb has no bx <label> instruction, and veneers introduced by ld are
-> always ARM code, so this looks tricky to avoid without patching ld.
+> Yes:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 > 
-> As you observe, this only impacts large kernels anyway.
+> We were discussing about having a common macro for this... But we will
+> think more about it later.
 > 
-> So,
-> 
-> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+> So, let's go for it.
 
-Someone needs to check what the result is like for older CPUs too.
+I will be sending out a series for this soon, I think I've got all
+the items sorted.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
