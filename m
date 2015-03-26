@@ -1,30 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 15:31:01 +0000
-Subject: [PATCH 1/2] ARM: dts: hummingboard: enable PCF8523 RTC support
-In-Reply-To: <20150324121430.GH28410@dragon>
-References: <E1YSWZG-0002As-7I@rmk-PC.arm.linux.org.uk>
- <20150324121430.GH28410@dragon>
-Message-ID: <20150326153101.GN8656@n2100.arm.linux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 26 Mar 2015 21:02:21 +0530
+Subject: [PATCH v2 1/7] dmaengine: of_dma: Support for DMA routers
+In-Reply-To: <5513F77A.4030005@ti.com>
+References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
+ <1426080210-841-2-git-send-email-peter.ujfalusi@ti.com>
+ <20150326105018.GJ32683@intel.com> <5513F77A.4030005@ti.com>
+Message-ID: <20150326153221.GM32683@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 08:14:31PM +0800, Shawn Guo wrote:
-> On Mon, Mar 02, 2015 at 08:03:54PM +0000, Russell King wrote:
-> > Enable the commented out PCF8523 RTC support for Hummingboard pro
-> > base boards.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> > For acks please.
+On Thu, Mar 26, 2015 at 02:11:38PM +0200, Peter Ujfalusi wrote:
+> On 03/26/2015 12:50 PM, Vinod Koul wrote:
+> > On Wed, Mar 11, 2015 at 03:23:24PM +0200, Peter Ujfalusi wrote:
+> >> DMA routers are transparent devices used to mux DMA requests from
+> >> peripherals to DMA controllers. They are used when the SoC integrates more
+> >> devices with DMA requests then their controller can handle.
+> >> DRA7x is one example of such SoC, where the sDMA can hanlde 128 DMA request
+> >> lines, but in SoC level it has 205 DMA requests.
+> >>
+> >> The of_dma_router will be registered as of_dma_controller with special
+> >> xlate function and additional parameters and the code will translate and
+> >> requests a DMA channel from the real DMA controller.
+> >> This way the router can be transparent for the system while remaining generic
+> >> enough to be used in different environments.
+> >>
+> > Looks fine, was expecting a Documentation updates as well, but that can come
+> > as follow up patch too
 > 
-> Russell,
+> I have added the DT binding document since this series adds support for
+> routers for platforms booting with DT:
 > 
-> What do you mean by "For acks please"?  Not for apply?  I'm asking if I
-> should pick up the patches.
-
-I think you can - I don't have anything else outstanding at the moment
-for the DTS.
+> Documentation/devicetree/bindings/dma/dma.txt | 28 ++++++++
+I meant the update to Documnetation/dmanegine/ for routers :)
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+~Vinod
