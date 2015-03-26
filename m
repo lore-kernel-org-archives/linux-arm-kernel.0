@@ -1,89 +1,54 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Thu, 26 Mar 2015 10:13:29 +0800
-Subject: [RESEND PATCH v3] mtd: hisilicon: add device tree node for NAND
- controller
-In-Reply-To: <1427267091-227474-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1427267091-227474-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <CAD6h2NQr_Z600vC+7RRuLgoGvV4MCXz8TAd4C5eCnqbA0ZdPWw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 Mar 2015 20:36:08 -0600
+Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
+ Tegra20 multi_v7_defconfig boot
+In-Reply-To: <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
+ <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
+ <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
+Message-ID: <55137098.4030903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2015 at 15:04, Zhou Wang <wangzhou1@hisilicon.com> wrote:
-> This patch adds dts support for NAND flash controller of Hisilicon Soc Hip04.
-> Now it is based on v4.0-rc5
->
-> Changes in v3:
-> - Change E-mail address in signed-off-by to "wangzhou1 at hisilicon.com"
-> Changes in v2:
-> - Base on v3.19-rc1
-> - Use nand-ecc-strength, nand-ecc-step-size to replace hisi,nand-ecc-bits
-> Changes in v1:
-> - Move partition and other board related information into board dts file:
->   hip04-d01.dts
->
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> ---
->  arch/arm/boot/dts/hip04-d01.dts | 27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/hip04.dtsi    |  7 +++++++
->  2 files changed, 34 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
-> index 40a9e33..ba04dd5 100644
-> --- a/arch/arm/boot/dts/hip04-d01.dts
-> +++ b/arch/arm/boot/dts/hip04-d01.dts
-> @@ -28,5 +28,32 @@
->                 uart0: uart at 4007000 {
->                         status = "ok";
->                 };
-> +
-> +               nand: nand at 4020000 {
-> +                       nand-bus-width = <8>;
-> +                       nand-ecc-mode = "hw";
-> +                       nand-ecc-strength = <16>;
-> +                       nand-ecc-step-size = <1024>;
-> +
-> +                       partition at 0 {
-> +                               label = "nand_text";
-> +                               reg = <0x00000000 0x00400000>;
-> +                       };
-> +
-> +                       partition at 00400000 {
-> +                               label = "nand_monitor";
-> +                               reg = <0x00400000 0x00400000>;
-> +                       };
-> +
-> +                       partition at 00800000 {
-> +                               label = "nand_kernel";
-> +                               reg = <0x00800000 0x00800000>;
-> +                       };
-> +
-> +                       partition at 01000000 {
-> +                               label = "nand_fs";
-> +                               reg = <0x01000000 0x1f000000>;
-> +                       };
-> +               };
->         };
->  };
-> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-> index 2388145..ac32fce 100644
-> --- a/arch/arm/boot/dts/hip04.dtsi
-> +++ b/arch/arm/boot/dts/hip04.dtsi
-> @@ -269,6 +269,13 @@
->                         interrupts = <0 372 4>;
->                 };
->
-> +               nand: nand at 4020000 {
-> +                       compatible = "hisilicon,504-nfc";
-> +                       reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
-> +                       interrupts = <0 379 4>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +               };
->         };
->
->         etb at 0,e3c42000 {
-> --
-> 1.9.1
->
+On 03/25/2015 04:00 PM, Paul Walmsley wrote:
+> Hi Tyler
+> 
+> On Wed, 25 Mar 2015, Tyler Baker wrote:
+> 
+>> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
+>>
+>>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
+>>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
+>>> multi_v7_defconfig boot.
+>>>
+>>> Boot log before:
+>>>
+>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+>>>
+>>> Boot log after:
+>>>
+>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+>>>
+>>>
+>>> Any ideas?  Stephen Warren thinks there might be an initcall that might
+>>> not check to see what kind of device it's running on.
+>>
+>> Can you try to shift your kernel load address around a bit? From
+>> experience with the boards from kernelci.org we find that as the multi
+>> v7 kernel size increases they can clobber memory when they get
+>> decompressed.
+> 
+> Thanks, that was it:
+> 
+> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+> 
+> Should have guessed when absolutely no debug output was emitted by the 
+> board...
+> 
+> Sorry for the false alarm, Geert!
 
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Interesting. Do the values in U-Boot's default environment work
+correctly ("env default -f -a" will reset the environment to default, in
+case some old values are saved in flash); I put some effort into picking
+them so I really hope they work! ${kernel_addr_r}, ${fdt_addr_r},
+${ramdisk_addr_r}.
