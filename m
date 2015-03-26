@@ -1,85 +1,60 @@
-From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 25 Mar 2015 17:06:11 -0700
-Subject: [PATCH v1 3/3] phy: cygnus-usbphy: Add Broadcom Cygnus USB phy
- driver
-In-Reply-To: <55134C3E.4060400@ti.com>
-References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426886727-537-4-git-send-email-arun.ramamurthy@broadcom.com>
- <551336A2.1050704@ti.com> <20150325224253.GA16950@dtor-ws>
- <55134C3E.4060400@ti.com>
-Message-ID: <55134D73.7060507@broadcom.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 26 Mar 2015 11:10:55 +1100
+Subject: Request for additional arm64 branch in linux-next
+In-Reply-To: <20150325172002.GN24636@arm.com>
+References: <20150325172002.GN24636@arm.com>
+Message-ID: <20150326111055.273aa644@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Will,
 
+On Wed, 25 Mar 2015 17:20:03 +0000 Will Deacon <will.deacon@arm.com> wrote:
+>
+> We've got a series of patches introducing ACPI support for arm64 that
+> are tentatively targetting the 4.1 merge window. Whilst there are
+> face-to-face discussions set to happen in the next day or so around this
+> topic, could you please pull this into linux-next under the assumption
+> that we decide to go ahead for mainline inclusion?
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/acpi
+> 
+> I've kept the series separate from the usual arm64 branch (for-next/core)
+> but they merge without conflicts. Merging with today's next, I see two
+> trivial Kconfig conflicts (resolution below).
 
-On 15-03-25 05:01 PM, Kishon Vijay Abraham I wrote:
->
->
-> On Thursday 26 March 2015 04:12 AM, Dmitry Torokhov wrote:
->> Hi Kishon,
->>
->> On Thu, Mar 26, 2015 at 03:58:50AM +0530, Kishon Vijay Abraham I wrote:
->>> Hi,
->>>
->>> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
->>>> +struct bcm_phy_driver {
->>>> +	void __iomem *usbphy_regs;
->>>> +	void __iomem *usb2h_idm_regs;
->>>> +	void __iomem *usb2d_idm_regs;
->>>> +	struct bcm_phy_instance *ports[MAX_PHY_PORTS];
->>>
->>> er.. can't we allocate this dynamically?
->>
->> The chip has support for only 3 phys, so I believe allocating array of 3
->> pointers is simplest.
->>
->> [...]
->>
->>>> +
->>>> +static struct phy *bcm_usb_phy_xlate(struct device *dev,
->>>> +				     struct of_phandle_args *args)
->>>> +{
->>>> +	struct bcm_phy_driver *phy_driver = dev_get_drvdata(dev);
->>>> +	struct bcm_phy_instance *port = NULL;
->>>> +	int i;
->>>> +
->>>> +	if (!phy_driver)
->>>> +		return ERR_PTR(-EINVAL);
->>>> +
->>>> +	if (WARN_ON(args->args_count != 1))
->>>> +		return ERR_PTR(-EINVAL);
->>>> +
->>>> +	if (WARN_ON(args->args[0] < 0 || args->args[0] > 1))
->>>> +		return ERR_PTR(-EINVAL);
->>>> +
->>>> +	for (i = 0; i < ARRAY_SIZE(phy_driver->ports); i++) {
->>>> +		struct bcm_phy_instance *p = phy_driver->ports[i];
->>>> +
->>>> +		if (p && p->generic_phy->dev.of_node == args->np) {
->>>> +			port = p;
->>>> +			break;
->>>> +		}
->>>> +	}
->>>> +
->>>> +	if (!port) {
->>>> +		dev_err(dev, "Failed to locate phy %s\n", args->np->name);
->>>> +		return ERR_PTR(-EINVAL);
->>>> +	}
->>>> +
->>>> +	port->host_mode = args->args[0];
->>>> +
->>>> +	return port->generic_phy;
->>>> +}
->>>
->>> The xlate function here shouldn't be needed at all. Use of_phy_simple_xlate
->>> instead.
->>
->> of_phy_simple_xlate() will not allow specifying host vs device mode when
->> requesting phy though...
->
-> indeed!
->
-Kishon, to confirm , are the xlate function and the MAX_PHY_PORTS ok or 
-are you recommending changes? Thanks
->
+Added from today (and thanks for the hints).  Will this be merged via
+another tree, or go directly to Linus?
+
+> I'll let you know when the branch is no longer needed.
+
+Excellent.
+
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgment of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
+
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+        Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
+-- 
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150326/9a4a128c/attachment.sig>
