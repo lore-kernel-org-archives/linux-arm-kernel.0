@@ -1,28 +1,166 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Thu, 26 Mar 2015 17:11:17 +0000
-Subject: [linux-sunxi] [PATCH resend v2 1/2] ARM: dts: sun4i: a10-lime:
- Override and remove 1008MHz OPP setting
-In-Reply-To: <1427216007-9185-2-git-send-email-wens@csie.org>
-References: <1427216007-9185-1-git-send-email-wens@csie.org>
- <1427216007-9185-2-git-send-email-wens@csie.org>
-Message-ID: <55143DB5.5050108@gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 26 Mar 2015 17:11:42 +0000
+Subject: [PATCH v5 2/6] target-arm: kvm: save/restore mp state
+In-Reply-To: <1427130344-27986-3-git-send-email-alex.bennee@linaro.org>
+References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
+ <1427130344-27986-3-git-send-email-alex.bennee@linaro.org>
+Message-ID: <CAFEAcA9fj1zJjjdVgyFdHQOi36YSgm5fFWiJ-_bSQ2xb+zv3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/15 16:53, Chen-Yu Tsai wrote:
-> The Olimex A10-Lime is known to be unstable when running at 1008MHz.
+On 23 March 2015 at 17:05, Alex Benn?e <alex.bennee@linaro.org> wrote:
+> This adds the saving and restore of the current Multi-Processing state
+> of the machine. While the KVM_GET/SET_MP_STATE API exposes a number of
+> potential states for x86 we only use two for ARM. Either the process is
+> running or not. We then save this state into the cpu_powered TCG state
+> to avoid changing the serialisation format.
+>
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> ---
+> v2
+>   - make mpstate field runtime dependant (kvm_enabled())
+>   - drop initial KVM_CAP_MP_STATE requirement
+>   - re-use cpu_powered instead of new field
+>
+> v4
+>   - s/HALTED/STOPPED/
+>   - move code from machine.c to kvm.
+>
+> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+> index 72c1fa1..a74832c 100644
+> --- a/target-arm/kvm.c
+> +++ b/target-arm/kvm.c
+> @@ -458,6 +458,46 @@ void kvm_arm_reset_vcpu(ARMCPU *cpu)
+>      }
+>  }
+>
+> +/*
+> + * Update KVM's MP_STATE based on what QEMU thinks it is
+> + */
+> +int kvm_arm_sync_mpstate_to_kvm(ARMCPU *cpu)
+> +{
+> +    if (kvm_check_extension(CPU(cpu)->kvm_state, KVM_CAP_MP_STATE)) {
 
-> +			operating-points = <
-> +				/* kHz    uV */
-> +				912000  1350000
-> +				864000  1300000
+Doing the ioctl to check the extension every time isn't great.
+Look at the way ppc and s390 do a cap check at init time and
+cache the answer.
 
-If we're dropping the top speed to 912 in the kernel, should we do the 
-same in u-boot?
+> +        struct kvm_mp_state mp_state = {
+> +            .mp_state =
+> +            cpu->powered_off ? KVM_MP_STATE_STOPPED : KVM_MP_STATE_RUNNABLE
+> +        };
+> +        int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_SET_MP_STATE, &mp_state);
+> +        if (ret) {
+> +            fprintf(stderr, "%s: failed to set MP_STATE %d/%s\n",
+> +                    __func__, ret, strerror(ret));
+> +            return -1;
+> +        }
+> +    }
+> +
+> +    return 0;
+> +}
+> +
+> +/*
+> + * Sync the KVM MP_STATE into QEMU
+> + */
+> +int kvm_arm_sync_mpstate_to_qemu(ARMCPU *cpu)
+> +{
+> +    if (kvm_check_extension(CPU(cpu)->kvm_state, KVM_CAP_MP_STATE)) {
+> +        struct kvm_mp_state mp_state;
+> +        int ret = kvm_vcpu_ioctl(CPU(cpu), KVM_GET_MP_STATE, &mp_state);
+> +        if (ret) {
+> +            fprintf(stderr, "%s: failed to get MP_STATE %d/%s\n",
+> +                    __func__, ret, strerror(ret));
+> +            abort();
+> +        }
+> +        cpu->powered_off = (mp_state.mp_state == KVM_MP_STATE_STOPPED);
+> +    }
+> +
+> +    return 0;
+> +}
+> +
+>  void kvm_arch_pre_run(CPUState *cs, struct kvm_run *run)
+>  {
+>  }
+> diff --git a/target-arm/kvm32.c b/target-arm/kvm32.c
+> index 94030d1..49b6bab 100644
+> --- a/target-arm/kvm32.c
+> +++ b/target-arm/kvm32.c
+> @@ -356,6 +356,8 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          return EINVAL;
+>      }
+>
+> +    kvm_arm_sync_mpstate_to_kvm(cpu);
+> +
+>      return ret;
+>  }
+>
+> @@ -427,5 +429,7 @@ int kvm_arch_get_registers(CPUState *cs)
+>       */
+>      write_list_to_cpustate(cpu);
+>
+> +    kvm_arm_sync_mpstate_to_qemu(cpu);
+> +
+>      return 0;
+>  }
+> diff --git a/target-arm/kvm64.c b/target-arm/kvm64.c
+> index 8cf3a62..fed03f2 100644
+> --- a/target-arm/kvm64.c
+> +++ b/target-arm/kvm64.c
+> @@ -211,6 +211,8 @@ int kvm_arch_put_registers(CPUState *cs, int level)
+>          return EINVAL;
+>      }
+>
+> +    kvm_arm_sync_mpstate_to_kvm(cpu);
+> +
+>      /* TODO:
+>       * FP state
+>       */
+> @@ -310,6 +312,8 @@ int kvm_arch_get_registers(CPUState *cs)
+>       */
+>      write_list_to_cpustate(cpu);
+>
+> +    kvm_arm_sync_mpstate_to_qemu(cpu);
+> +
+>      /* TODO: other registers */
+>      return ret;
+>  }
+> diff --git a/target-arm/kvm_arm.h b/target-arm/kvm_arm.h
+> index 455dea3..7b75758 100644
+> --- a/target-arm/kvm_arm.h
+> +++ b/target-arm/kvm_arm.h
+> @@ -162,6 +162,24 @@ typedef struct ARMHostCPUClass {
+>   */
+>  bool kvm_arm_get_host_cpu_features(ARMHostCPUClass *ahcc);
+>
+> +
+> +/**
+> + * kvm_arm_sync_mpstate_to_kvm
+> + * @cpu: ARMCPU
+> + *
+> + * If supported set the KVM MP_STATE based on QEMUs migration data.
 
-I was already planning on sending a patch to add the 912MHz setting to 
-u-boot due to sun7i requesting CONFIG_CLK_FULL_SPEED of 912 but getting 
-overclocked to 960 instead. I can easily do this at the same time.
+Apostrophes (again!). And the reference to migration data
+here is spurious.
 
-Rgds,
-Iain
+
+> + */
+> +int kvm_arm_sync_mpstate_to_kvm(ARMCPU *cpu);
+> +
+> +/**
+> + * kvm_arm_sync_mpstate_to_qemu
+> + * @cpu: ARMCPU
+> + *
+> + * If supported get the MP_STATE from KVM and store in QEMUs migration
+> + * data.
+> + */
+> +int kvm_arm_sync_mpstate_to_qemu(ARMCPU *cpu);
+> +
+>  #endif
+>
+>  #endif
+> --
+> 2.3.2
+
+-- PMM
