@@ -1,44 +1,106 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 26 Mar 2015 17:26:32 +0000
-Subject: [PATCH v5 6/6] target-arm: cpu.h document why env->spsr exists
-In-Reply-To: <1427130344-27986-7-git-send-email-alex.bennee@linaro.org>
-References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
- <1427130344-27986-7-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA_x5SGWcB1qgUKCTO+6SXVh9m1PXhHmwOzYOsVz9fK_sg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Mar 2015 10:30:14 -0700
+Subject: [PATCHv5 11/35] ARM: OMAP2+: clock: move clock provider
+ infrastructure to clock driver
+In-Reply-To: <5513E59F.3020204@ti.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-12-git-send-email-t-kristo@ti.com>
+ <5512D069.4080906@ti.com> <20150325231659.GD31346@atomide.com>
+ <5513B426.1070205@ti.com> <5513E59F.3020204@ti.com>
+Message-ID: <20150326173013.GH31346@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2015 at 17:05, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> I was getting very confused about the duplication of state so wanted to
-> make it explicit.
->
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> diff --git a/target-arm/cpu.h b/target-arm/cpu.h
-> index 083211c..6dc1799 100644
-> --- a/target-arm/cpu.h
-> +++ b/target-arm/cpu.h
-> @@ -155,6 +155,11 @@ typedef struct CPUARMState {
->         This contains all the other bits.  Use cpsr_{read,write} to access
->         the whole CPSR.  */
->      uint32_t uncached_cpsr;
-> +    /* The spsr is a alias for spsr_elN where N is the current
-> +     * exception level.
+* Tero Kristo <t-kristo@ti.com> [150326 03:55]:
+> On 03/26/2015 09:24 AM, Tero Kristo wrote:
+> >On 03/26/2015 01:17 AM, Tony Lindgren wrote:
+> >>* Tero Kristo <t-kristo@ti.com> [150325 08:12]:
+> >>>
+> >>>Splits the clock provider init out of the PRM driver and moves it to
+> >>>clock driver. This is needed so that once the PRCM drivers are
+> >>>separated,
+> >>>they can logically just access the clock driver not needing to go
+> >>>through
+> >>>common PRM code. This would be wrong in the case of control module for
+> >>>example.
+> >>...
+> >>
+> >>>--- a/arch/arm/mach-omap2/clock.c
+> >>>+++ b/arch/arm/mach-omap2/clock.c
+> >>...
+> >>>-u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
+> >>>+u32 omap2_clk_memmap_readl(void __iomem *reg)
+> >>>  {
+> >>>-    u32 val;
+> >>>+    struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+> >>>
+> >>>-    if (clk->flags & MEMMAP_ADDRESSING) {
+> >>>-        struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
+> >>>-        val = readl_relaxed(clk_memmaps[r->index] + r->offset);
+> >>>-    } else {
+> >>>-        val = readl_relaxed(reg);
+> >>>-    }
+> >>>+    return readl_relaxed(clk_memmaps[r->index] + r->offset);
+> >>>+}
+> >>
+> >>The cast from void __iomem *reg to struct clk_omap_reg *r looks still
+> >>nasty.. Why don't you add the IO address into struct clk_omap_reg:
+> >>
+> >>struct clk_omap_reg {
+> >>    u16 offset;
+> >>    u16 index;
+> >>    struct regmap *regmap;
+> >>    void __iomem *addr;
+> >>};
+> >>...
+> >>
+> >>Then populate it during init and then have the clock code use it
+> >>directly if available? Then it seems you would not need the
+> >>static struct clk_iomap *clk_memmaps[CLK_MAX_MEMMAPS] at all?
+> >
+> >Doing a change like this should probably be planned, but it is a larger
+> >modification. Currently none of the low-level clock APIs support this,
+> >but instead expect a direct iomem pointer against which they can do
+> >arithmetic operations. The major problem is the companion clocks, which
+> >just XOR some bits in the registers to get ICLK / IDLEST register offset
+> >from FCLK.
+> >
+> >So, for now, clock code just uses the void __iomem pointer as a storage
+> >class for struct clk_omap_reg, on which arithmetic operations can be done.
 
-This comment is still wrong.
+Well how about keep the check if (clk->flags & MEMMAP_ADDRESSING) at
+least? Maybe WARN_ON(!(clk->flags & MEMMAP_ADDRESSING))?
 
-> It is provided for here so the TCG msr/mrs
-> +     * implementation can access one register.
+Otherwise this could be a nightmare to debug if anything goes wrong.
+ 
+> I did this change as a trial, and this is the diff required to get it
+> working:
+> 
+>  arch/arm/mach-omap2/clkt_iclk.c |   20 ++++++++---------
+>  arch/arm/mach-omap2/clock.c     |   47
+> +++++++++++++++++----------------------
+>  arch/arm/mach-omap2/clock.h     |    8 +++----
+>  arch/arm/mach-omap2/clock2430.c |    5 +++--
+>  arch/arm/mach-omap2/clock34xx.c |   36 ++++++++++++++----------------
+>  arch/arm/mach-omap2/clock3517.c |   20 ++++++++---------
+>  arch/arm/mach-omap2/cm.h        |    4 +++-
+>  arch/arm/mach-omap2/cm2xxx.c    |    9 +++-----
+>  arch/arm/mach-omap2/cm3xxx.c    |   10 +++------
+>  drivers/clk/ti/clk.c            |   10 +++++----
+>  drivers/clk/ti/divider.c        |   24 ++++++++++++++------
+>  drivers/clk/ti/dpll.c           |   11 ++++-----
+>  drivers/clk/ti/gate.c           |   21 +++++++++++------
+>  drivers/clk/ti/interface.c      |    9 ++++----
+>  drivers/clk/ti/mux.c            |   22 ++++++++++++------
+>  include/linux/clk/ti.h          |    5 +++--
+>  16 files changed, 137 insertions(+), 124 deletions(-)
+> 
+> I think we should probably keep this out of this set now and do this while
+> moving the OMAP core clock support code under clock driver... just to keep
+> it more easily manageable.
 
-...and this is wrong too.
+OK fine with me to do that as a follow-up patch.
 
-> Care needs to be taken
-> +     * to ensure the banked_spsr[] is also updated.
-> +     */
->      uint32_t spsr;
->
->      /* Banked registers.  */
+Regards,
 
-I think it would be better to just drop this patch, really...
-
--- PMM
+Tony
