@@ -1,113 +1,78 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Mar 2015 16:53:51 +0100
-Subject: [PATCH 04/13] thermal: Fix not emulating critical temperatures
-In-Reply-To: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
-References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1427385240-6086-5-git-send-email-s.hauer@pengutronix.de>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 26 Mar 2015 09:13:10 -0700
+Subject: String literals in __init functions
+In-Reply-To: <5513FE2F.3040306@free.fr>
+References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
+ <5513FE2F.3040306@free.fr>
+Message-ID: <1427386390.15849.13.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit e6e238c38 (thermal: sysfs: Add a new sysfs node emul_temp for
-thermal emulation)  promised not to emulate critical temperatures,
-but the check for critical temperatures is broken in multiple ways:
+On Thu, 2015-03-26 at 13:40 +0100, Mason wrote:
+> On 25/03/2015 19:01, Joe Perches wrote:
+> > On Wed, 2015-03-25 at 18:56 +0100, Mason wrote:
+> >
+> >> AFAIU, functions only used at system init are tagged __init to have
+> >> the linker store them in a separate .init.text section, so memory can
+> >> be reclaimed once initialization is complete. Is that correct?
+> >>
+> >> The corresponding tag for data is __initdata (section .init.data)
+> >>
+> >> I started wondering if the string literals used in an __init functions
+> >> were automatically marked __initdata.
+> >>
+> >> Looking at the objdump output, I see that the string literals are,
+> >> in fact, stored in the .rodata section. I suppose that .rodata is NOT
+> >> reclaimed after init?
+> >>
+> >> This way seems to work:
+> >>
+> >> static       char XyZa[] __initdata  = KERN_ALERT "foo";
+> >> static const char XyZb[] __initconst = KERN_ALERT "bar";
+> >> void __init XyZc(void) { printk(XyZa); printk(XyZb); }
+> >>
+> >> $ arm-linux-gnueabihf-objdump -xd arch/arm/mach-tangox/time.o | grep XyZ
+> >> 00000000 l     O .init.data	00000006 XyZa
+> >> 00000000 l     O .init.rodata	00000006 XyZb
+> >> 00000000 g     F .init.text	00000028 XyZc
+> >> 00000000 <XyZc>:
+> >>
+> >> $ arm-linux-gnueabihf-objdump -xd vmlinux | grep XyZ
+> >> c021e360 l     O .init.data	00000006 XyZa
+> >> c0220090 l     O .init.data	00000006 XyZb
+> >> c020d928 g     F .init.text	00000028 XyZc
+> >> c020d928 <XyZc>:
+> >>
+> >> c020d928 <XyZc>:
+> >> c020d928:       e1a0c00d        mov     ip, sp
+> >> c020d92c:       e92dd800        push    {fp, ip, lr, pc}
+> >> c020d930:       e24cb004        sub     fp, ip, #4
+> >> c020d934:       e30e0360        movw    r0, #58208      ; 0xe360
+> >> c020d938:       e34c0021        movt    r0, #49185      ; 0xc021
+> >> c020d93c:       ebfe00c9        bl      c018dc68 <printk>
+> >> c020d940:       e3000090        movw    r0, #144        ; 0x90
+> >> c020d944:       e34c0022        movt    r0, #49186      ; 0xc022
+> >> c020d948:       ebfe00c6        bl      c018dc68 <printk>
+> >> c020d94c:       e89da800        ldm     sp, {fp, sp, pc}
+> >>
+> >> Did I miss something in init.h?
+> >> Or should it be done like above to reclaim string literals?
+> >
+> > No, you didn't miss anything.
+> >
+> > One proposal:
+> >
+> > https://lkml.org/lkml/2014/8/21/255
+> 
+> Thanks for the link!
+> 
+> Here's the equivalent gmane link for my own reference:
+> http://thread.gmane.org/gmane.linux.kernel/1771969
+> 
+> Basically, if I understand correctly, Ingo NAKed the patch, saying
+> this should be done automatically by the toolchain. That would make
+> for an interesting side-project...
 
-- The code should only accept an emulated temperature when the emulated
-  temperature is lower than the critical temperature. Instead the code
-  accepts an emulated temperature whenever the real temperature is lower
-  than the critical temperature. This makes no sense and trying to
-  emulate a temperature higher than the critical temperature halts the
-  system.
-- When trying to emulate a higher-than-critical temperature we should either
-  limit the emulated temperature to the maximum non critical temperature
-  or refuse to emulate this temperature. Instead the code just silently
-  ignores the emulated temperature and continues with the real temperature.
+True.  It's probably not feasible though.
 
-This patch moves the test for illegal emulated temperature to the sysfs
-write function so that we can properly refuse illegal temperatures here.
-Trying to write illegal temperatures results in an error message. While
-at it use IS_ENABLED() instead of #ifdefs.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/thermal/thermal_core.c | 46 ++++++++++++++++++++++--------------------
- 1 file changed, 24 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index dcea909..ebca854 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -414,11 +414,6 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
- int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
- {
- 	int ret = -EINVAL;
--#ifdef CONFIG_THERMAL_EMULATION
--	int count;
--	unsigned long crit_temp = -1UL;
--	enum thermal_trip_type type;
--#endif
- 
- 	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
- 		goto exit;
-@@ -426,25 +421,10 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
- 	mutex_lock(&tz->lock);
- 
- 	ret = tz->ops->get_temp(tz, temp);
--#ifdef CONFIG_THERMAL_EMULATION
--	if (!tz->emul_temperature)
--		goto skip_emul;
--
--	for (count = 0; count < tz->trips; count++) {
--		ret = tz->ops->get_trip_type(tz, count, &type);
--		if (!ret && type == THERMAL_TRIP_CRITICAL) {
--			ret = tz->ops->get_trip_temp(tz, count, &crit_temp);
--			break;
--		}
--	}
--
--	if (ret)
--		goto skip_emul;
- 
--	if (*temp < crit_temp)
-+	if (IS_ENABLED(CONFIG_THERMAL_EMULATION) && tz->emul_temperature)
- 		*temp = tz->emul_temperature;
--skip_emul:
--#endif
-+
- 	mutex_unlock(&tz->lock);
- exit:
- 	return ret;
-@@ -788,10 +768,32 @@ emul_temp_store(struct device *dev, struct device_attribute *attr,
- 	struct thermal_zone_device *tz = to_thermal_zone(dev);
- 	int ret = 0;
- 	unsigned long temperature;
-+	int trip;
-+	unsigned long crit_temp;
-+	enum thermal_trip_type type;
- 
- 	if (kstrtoul(buf, 10, &temperature))
- 		return -EINVAL;
- 
-+	for (trip = 0; trip < tz->trips; trip++) {
-+		ret = tz->ops->get_trip_type(tz, trip, &type);
-+		if (ret)
-+			return ret;
-+
-+		if (type != THERMAL_TRIP_CRITICAL)
-+			continue;
-+
-+		ret = tz->ops->get_trip_temp(tz, trip, &crit_temp);
-+		if (ret)
-+			return ret;
-+
-+		if (temperature >= crit_temp) {
-+			dev_err(&tz->device, "Will not emulate critical temperature %luC (tcrit=%luC)\n",
-+					temperature / 1000, crit_temp / 1000);
-+			return -EINVAL;
-+		}
-+	}
-+
- 	if (!tz->ops->set_emul_temp) {
- 		mutex_lock(&tz->lock);
- 		tz->emul_temperature = temperature;
--- 
-2.1.4
+Tracking string deduplication/reuse would be pretty difficult.
