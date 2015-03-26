@@ -1,103 +1,60 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 27 Mar 2015 03:09:14 +1030
-Subject: [PATCH 5/6] pwm: samsung: Fix output race on disabling
+Date: Fri, 27 Mar 2015 03:09:15 +1030
+Subject: [PATCH 6/6] hwmon: pwm-fan: Update the duty cycle inorder to control
+ the pwm-fan
 In-Reply-To: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
 References: <1427387955-5129-1-git-send-email-linux.amoon@gmail.com>
-Message-ID: <1427387955-5129-6-git-send-email-linux.amoon@gmail.com>
+Message-ID: <1427387955-5129-7-git-send-email-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Below changes depend on following patch.
+https://patchwork.kernel.org/patch/5944061/
 
-When disabling the samsung PWM the output state remains at the level it
-was in the end of a pwm cycle. In other words, calling pwm_disable when
-at 100% duty will keep the output active, while at all other setting the
-output will go/stay inactive. On top of that the samsung PWM settings are
-double-buffered, which means the new settings only get applied at the
-start of a new PWM cycle.
+Update the pwm_config with duty then update the pwm_disable
+to poweroff the cpu fan.
 
-This results in a race if the PWM is at 100% duty and a driver calls:
-  pwm_config (pwm, 0, period);
-  pwm_disable (pwm);
+Tested on OdroidXU3 board.
 
-In this case the PWMs output will unexpectedly stay active, unless a new
-PWM cycle happened to start between the register writes in _config and
-_disable. As far as i can tell this is a regression introduced by 3bdf878,
-before that a call to pwm_config would call pwm_samsung_enable which,
-while heavy-handed, made sure the expected settings were live.
-
-To resolve this, while not re-introducing the issues 3bdf878 (flickering
-as the PWM got reset while in a PWM cycle). Only force an update of the
-settings when at 100% duty, which shouldn't have a noticeable effect on
-the output but is enough to ensure the behaviour is as expected on
-disable.
-
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
- drivers/pwm/pwm-samsung.c | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ drivers/hwmon/pwm-fan.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pwm/pwm-samsung.c b/drivers/pwm/pwm-samsung.c
-index 3e9b583..649f6c4 100644
---- a/drivers/pwm/pwm-samsung.c
-+++ b/drivers/pwm/pwm-samsung.c
-@@ -269,12 +269,31 @@ static void pwm_samsung_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
- }
+diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+index 7c83dc4..f25c841 100644
+--- a/drivers/hwmon/pwm-fan.c
++++ b/drivers/hwmon/pwm-fan.c
+@@ -44,26 +44,24 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+ 	int ret = 0;
  
-+static void pwm_samsung_manual_update(struct samsung_pwm_chip *chip,
-+				      struct pwm_device *pwm)
-+{
-+	unsigned int tcon_chan = to_tcon_channel(pwm->hwpwm);
-+	u32 tcon;
-+	unsigned long flags;
+ 	mutex_lock(&ctx->lock);
 +
-+	spin_lock_irqsave(&samsung_pwm_lock, flags);
-+
-+	tcon = readl(chip->base + REG_TCON);
-+	tcon |= TCON_MANUALUPDATE(tcon_chan);
-+	writel(tcon, chip->base + REG_TCON);
-+
-+	tcon &= ~TCON_MANUALUPDATE(tcon_chan);
-+	writel(tcon, chip->base + REG_TCON);
-+
-+	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
-+}
-+
- static int pwm_samsung_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			      int duty_ns, int period_ns)
- {
- 	struct samsung_pwm_chip *our_chip = to_samsung_pwm_chip(chip);
- 	struct samsung_pwm_channel *chan = pwm_get_chip_data(pwm);
--	u32 tin_ns = chan->tin_ns, tcnt, tcmp;
-+	u32 tin_ns = chan->tin_ns, tcnt, tcmp, oldtcmp;
+ 	if (ctx->pwm_value == pwm)
+ 		goto exit_set_pwm_err;
  
- 	/*
- 	 * We currently avoid using 64bit arithmetic by using the
-@@ -288,6 +307,7 @@ static int pwm_samsung_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return 0;
+-	if (pwm == 0) {
+-		pwm_disable(ctx->pwm);
+-		goto exit_set_pwm;
+-	}
+-
+ 	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+ 	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+ 	if (ret)
+ 		goto exit_set_pwm_err;
  
- 	tcnt = readl(our_chip->base + REG_TCNTB(pwm->hwpwm));
-+	oldtcmp = readl(our_chip->base + REG_TCMPB(pwm->hwpwm));
- 
- 	/* We need tick count for calculation, not last tick. */
- 	++tcnt;
-@@ -335,6 +355,15 @@ static int pwm_samsung_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	writel(tcnt, our_chip->base + REG_TCNTB(pwm->hwpwm));
- 	writel(tcmp, our_chip->base + REG_TCMPB(pwm->hwpwm));
- 
-+	/* In case the PWM is currently at 100% duty, force a manual update
-+	 * to prevent the signal staying high in the pwm is disabled shortly
-+	 * afer this update (before it autoreloaded the new values) .
-+	 */
-+	if (oldtcmp == (u32) -1) {
-+		dev_dbg(our_chip->chip.dev, "Forcing manual update");
-+		pwm_samsung_manual_update(our_chip, pwm);
-+	}
++	if (pwm == 0)
++		pwm_disable(ctx->pwm);
 +
- 	chan->period_ns = period_ns;
- 	chan->tin_ns = tin_ns;
- 	chan->duty_ns = duty_ns;
+ 	if (ctx->pwm_value == 0) {
+ 		ret = pwm_enable(ctx->pwm);
+ 		if (ret)
+ 			goto exit_set_pwm_err;
+ 	}
+ 
+-exit_set_pwm:
+ 	ctx->pwm_value = pwm;
+ exit_set_pwm_err:
+ 	mutex_unlock(&ctx->lock);
 -- 
 1.9.1
