@@ -1,85 +1,31 @@
-From: yuanzhichang@hisilicon.com (Zhichang Yuan)
-Date: Thu, 26 Mar 2015 21:53:48 +0800
-Subject: [PATCH v1] arm64:mm: enable the kernel execute attribute for
- HEAD_TEXT segment
-Message-ID: <1427378028-126465-1-git-send-email-yuanzhichang@hisilicon.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Mar 2015 13:49:33 +0000
+Subject: Request for additional arm64 branch in linux-next
+In-Reply-To: <20150326111055.273aa644@canb.auug.org.au>
+References: <20150325172002.GN24636@arm.com>
+ <20150326111055.273aa644@canb.auug.org.au>
+Message-ID: <20150326134932.GD2805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yuanzhichang <yuanzhichang@hisilicon.com>
+On Thu, Mar 26, 2015 at 12:10:55AM +0000, Stephen Rothwell wrote:
+> On Wed, 25 Mar 2015 17:20:03 +0000 Will Deacon <will.deacon@arm.com> wrote:
+> > We've got a series of patches introducing ACPI support for arm64 that
+> > are tentatively targetting the 4.1 merge window. Whilst there are
+> > face-to-face discussions set to happen in the next day or so around this
+> > topic, could you please pull this into linux-next under the assumption
+> > that we decide to go ahead for mainline inclusion?
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/acpi
+> > 
+> > I've kept the series separate from the usual arm64 branch (for-next/core)
+> > but they merge without conflicts. Merging with today's next, I see two
+> > trivial Kconfig conflicts (resolution below).
+> 
+> Added from today (and thanks for the hints).  Will this be merged via
+> another tree, or go directly to Linus?
 
-In the patch whose title is "add better page protections to arm64"
-(commit da141706aea52c1a9fbd28cb8d289b78819f5436), The direct mapping
-page table entries for HEAD_TEXT segment were configured as PAGE_KERNEL,
-without the executable attribute. But when the secondary CPUs are booting
-based on spin-table mechanism, some functions in head.S are needed to run.
-Only PAGE_KERNEL dosen't work for this case.
-This patch will configure the page attributes as PAGE_KERNEL_EXEC for
-HEAD_TEXT segment.
+Thank, Stephen. Yes, we've been collecting Acks for a while now, so the
+plan is to send this to Linus as an extra arm64 pull request.
 
-Signed-off-by: Zhichang Yuan <yuanzhichang@hisilicon.com>
----
- arch/arm64/mm/mmu.c | 24 ++++++++++++++++++------
- 1 file changed, 18 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c6daaf6..ad08dfd 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -305,8 +305,8 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
- 	 * for now. This will get more fine grained later once all memory
- 	 * is mapped
- 	 */
--	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
--	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
-+	phys_addr_t kernel_x_start = round_down(__pa(_text), SECTION_SIZE);
-+	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
- 
- 	if (end < kernel_x_start) {
- 		create_mapping(start, __phys_to_virt(start),
-@@ -315,6 +315,18 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
- 		create_mapping(start, __phys_to_virt(start),
- 			end - start, PAGE_KERNEL);
- 	} else {
-+	/*
-+	 * At this moment, the text segment must reside in valid physical
-+	 * memory section range to make sure the text are totally mapped. 
-+	 * If mapping from non-section aligned address is support, then
-+	 * _text can be used here directly in replace to kernel_x_start.
-+	 */
-+		phys_addr_t max_left, min_right;
-+
-+		max_left = max(kernel_x_start, start);
-+		min_right = min(kernel_x_end, end);
-+		BUG_ON(max_left != kernel_x_start || min_right != kernel_x_end);
-+
- 		if (start < kernel_x_start)
- 			create_mapping(start, __phys_to_virt(start),
- 				kernel_x_start - start,
-@@ -394,12 +406,12 @@ void __init fixup_executable(void)
- {
- #ifdef CONFIG_DEBUG_RODATA
- 	/* now that we are actually fully mapped, make the start/end more fine grained */
--	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
--		unsigned long aligned_start = round_down(__pa(_stext),
-+	if (!IS_ALIGNED((unsigned long)_text, SECTION_SIZE)) {
-+		unsigned long aligned_start = round_down(__pa(_text),
- 							SECTION_SIZE);
- 
- 		create_mapping(aligned_start, __phys_to_virt(aligned_start),
--				__pa(_stext) - aligned_start,
-+				__pa(_text) - aligned_start,
- 				PAGE_KERNEL);
- 	}
- 
-@@ -418,7 +430,7 @@ void mark_rodata_ro(void)
- {
- 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
- 				(unsigned long)_etext - (unsigned long)_stext,
--				PAGE_KERNEL_EXEC | PTE_RDONLY);
-+				(PAGE_KERNEL_EXEC | PTE_RDONLY) & ~PTE_WRITE);
- 
- }
- #endif
--- 
-1.9.1
+Will
