@@ -1,39 +1,87 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 26 Mar 2015 14:32:58 +0200
-Subject: [PATCH v2 4/7] dmaengine: omap-dma: Use defines for dma channels
- and request count
-In-Reply-To: <20150326105712.GL32683@intel.com>
-References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
- <1426080210-841-5-git-send-email-peter.ujfalusi@ti.com>
- <20150326105712.GL32683@intel.com>
-Message-ID: <5513FC7A.7090708@ti.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 26 Mar 2015 13:40:15 +0100
+Subject: String literals in __init functions
+In-Reply-To: <1427306517.2717.0.camel@perches.com>
+References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
+Message-ID: <5513FE2F.3040306@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 12:57 PM, Vinod Koul wrote:
-> On Wed, Mar 11, 2015 at 03:23:27PM +0200, Peter Ujfalusi wrote:
->> Instead of magic numbers in the code, use define for number of logical DMA
->> channels and DMA requests.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->>  drivers/dma/omap-dma.c | 7 +++++--
->>  1 file changed, 5 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
->> index 7dd6dd121681..56c33e93dd24 100644
->> --- a/drivers/dma/omap-dma.c
->> +++ b/drivers/dma/omap-dma.c
->> @@ -22,6 +22,9 @@
->>  
->>  #include "virt-dma.h"
->>  
->> +#define OMAP_SDMA_REQUESTS	127
->> +#define OMAP_SDMA_CHANNELS	32
-> Again why dont we put these things in DT ?
+On 25/03/2015 19:01, Joe Perches wrote:
 
-They are in DT, the next patch will take the needed information from there and
-uses these values as fallback values in case they are missing for some reason.
+> On Wed, 2015-03-25 at 18:56 +0100, Mason wrote:
+>
+>> AFAIU, functions only used at system init are tagged __init to have
+>> the linker store them in a separate .init.text section, so memory can
+>> be reclaimed once initialization is complete. Is that correct?
+>>
+>> The corresponding tag for data is __initdata (section .init.data)
+>>
+>> I started wondering if the string literals used in an __init functions
+>> were automatically marked __initdata.
+>>
+>> Looking at the objdump output, I see that the string literals are,
+>> in fact, stored in the .rodata section. I suppose that .rodata is NOT
+>> reclaimed after init?
+>>
+>> This way seems to work:
+>>
+>> static       char XyZa[] __initdata  = KERN_ALERT "foo";
+>> static const char XyZb[] __initconst = KERN_ALERT "bar";
+>> void __init XyZc(void) { printk(XyZa); printk(XyZb); }
+>>
+>> $ arm-linux-gnueabihf-objdump -xd arch/arm/mach-tangox/time.o | grep XyZ
+>> 00000000 l     O .init.data	00000006 XyZa
+>> 00000000 l     O .init.rodata	00000006 XyZb
+>> 00000000 g     F .init.text	00000028 XyZc
+>> 00000000 <XyZc>:
+>>
+>> $ arm-linux-gnueabihf-objdump -xd vmlinux | grep XyZ
+>> c021e360 l     O .init.data	00000006 XyZa
+>> c0220090 l     O .init.data	00000006 XyZb
+>> c020d928 g     F .init.text	00000028 XyZc
+>> c020d928 <XyZc>:
+>>
+>> c020d928 <XyZc>:
+>> c020d928:       e1a0c00d        mov     ip, sp
+>> c020d92c:       e92dd800        push    {fp, ip, lr, pc}
+>> c020d930:       e24cb004        sub     fp, ip, #4
+>> c020d934:       e30e0360        movw    r0, #58208      ; 0xe360
+>> c020d938:       e34c0021        movt    r0, #49185      ; 0xc021
+>> c020d93c:       ebfe00c9        bl      c018dc68 <printk>
+>> c020d940:       e3000090        movw    r0, #144        ; 0x90
+>> c020d944:       e34c0022        movt    r0, #49186      ; 0xc022
+>> c020d948:       ebfe00c6        bl      c018dc68 <printk>
+>> c020d94c:       e89da800        ldm     sp, {fp, sp, pc}
+>>
+>> Did I miss something in init.h?
+>> Or should it be done like above to reclaim string literals?
+>
+> No, you didn't miss anything.
+>
+> One proposal:
+>
+> https://lkml.org/lkml/2014/8/21/255
 
--- 
-P?ter
+Thanks for the link!
+
+Here's the equivalent gmane link for my own reference:
+http://thread.gmane.org/gmane.linux.kernel/1771969
+
+Basically, if I understand correctly, Ingo NAKed the patch, saying
+this should be done automatically by the toolchain. That would make
+for an interesting side-project...
+
+For the record, I wrote a trivial wrapper for my limited use-case.
+
+#define printk_init(format, ...) do { \
+   static char fmt[] __initdata = format; printk(fmt, ## __VA_ARGS__); \
+} while(0)
+
+(I dislike the "statement-in-expression" extension, because vim thinks
+there's a syntax error, and flashes a bright red block.)
+
+https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
+https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
+
+Regards.
