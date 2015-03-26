@@ -1,60 +1,24 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 07:22:03 +0100
+Date: Thu, 26 Mar 2015 07:23:07 +0100
 Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <20150325145949.GE26903@localhost>
+In-Reply-To: <20150325141409.GD26903@localhost>
 References: <20150317164353.GN23340@leverpostej>
  <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
-Message-ID: <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
+ <20150325141409.GD26903@localhost>
+Message-ID: <CAKv+Gu_RRCLGfHiZ35pHCNHp_=Sx1063dzAhpxWkn2kP0waQfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
+On 25 March 2015 at 15:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
 > On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 16134608eecf..fd8434753372 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -49,13 +49,15 @@
->>  #ifdef CONFIG_ARM64_64K_PAGES
->>  #define BLOCK_SHIFT  PAGE_SHIFT
->>  #define BLOCK_SIZE   PAGE_SIZE
->> -#define TABLE_SHIFT  PMD_SHIFT
->>  #else
->>  #define BLOCK_SHIFT  SECTION_SHIFT
->>  #define BLOCK_SIZE   SECTION_SIZE
->> -#define TABLE_SHIFT  PUD_SHIFT
->>  #endif
->>
->> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
->> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
->> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
->> +
->>  #define KERNEL_START _text
->>  #define KERNEL_END   _end
->>
->> @@ -237,7 +239,10 @@ ENTRY(stext)
->>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>
->>       adrp    x24, __PHYS_OFFSET
->> -     mov     x23, #KIMAGE_OFFSET
->> +     and     x23, x24, #~TABLE_MASK          // image offset
->> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
->> +     mov     x0, #KIMAGE_OFFSET
->> +     add     x23, x23, x0
+>> This aligns PHYS_OFFSET down to an alignment that allows system
+>> RAM to be mapped using the largest blocks available, i.e., 1 GB
+>> blocks on 4 KB pages or 512 MB blocks on 64 KB pages.
 >
-> I'm still trying to figure out how this works. Does the code imply that
-> the kernel image can only be loaded within a block size of the
-> PHYS_OFFSET? If that's the case, it's not too flexible.
+> Does this assume that the platform RAM starts at such block aligned
+> addresses? If not, is the unaligned range ignored?
 >
 
-For now, yes.
-
-> My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
-> entirely) or at least compute it at DT parsing time. I'm more inclined
-> for making it 0 assuming that it doesn't break anything else (vmemmap
-> virtual range may get slightly bigger but still not significant,
-> basically max_phys_addr / sizeof(struct page)).
->
-
-Making it zero would be an improvement, I suppose
+No, it doesn't. The unaligned range is not mapped by the early code
+(it only maps from the start of image)
+Later on, it just maps whatever is in the DT nodes.
