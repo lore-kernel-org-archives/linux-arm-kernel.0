@@ -1,45 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 13:24:01 +0100
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <20150326122203.GG8656@n2100.arm.linux.org.uk>
-References: <1427192184-31261-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150324122239.GB3579@e103592.cambridge.arm.com>
- <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
- <20150324135439.GC3579@e103592.cambridge.arm.com>
- <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
- <20150325104603.GA3560@e103592.cambridge.arm.com>
- <20150326113648.GC8656@n2100.arm.linux.org.uk>
- <CAKv+Gu8ktOUcQrGOwMfbt8s2QG+RFdnKBykVfhXPTLSUFtWQyA@mail.gmail.com>
- <20150326122203.GG8656@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu-ctXuiM2mcgbqfkBkP_96tivjac0jv+XJ48XSpqRf=Yg@mail.gmail.com>
+From: mgorman@suse.de (Mel Gorman)
+Date: Thu, 26 Mar 2015 12:30:29 +0000
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150326114612.GD8656@n2100.arm.linux.org.uk>
+References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+ <54D40DAF.4080609@codeaurora.org>
+ <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
+ <54D534FB.1090101@codeaurora.org>
+ <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+ <20150326114612.GD8656@n2100.arm.linux.org.uk>
+Message-ID: <20150326123028.GM4701@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2015 at 13:22, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Mar 26, 2015 at 01:20:16PM +0100, Ard Biesheuvel wrote:
->> On 26 March 2015 at 12:36, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Wed, Mar 25, 2015 at 10:46:14AM +0000, Dave Martin wrote:
->> >> Hmmm, you seem to be right.
->> >>
->> >> Thumb has no bx <label> instruction, and veneers introduced by ld are
->> >> always ARM code, so this looks tricky to avoid without patching ld.
->> >>
->> >> As you observe, this only impacts large kernels anyway.
->> >>
->> >> So,
->> >>
->> >> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
->> >
->> > Someone needs to check what the result is like for older CPUs too.
->> >
->>
->> Any specific concerns? The --pic-veneer switch dates back to 2009, so
->> it's been around for a while
->
-> BX.  Not every CPU supports BX.
->
+On Thu, Mar 26, 2015 at 11:46:12AM +0000, Russell King - ARM Linux wrote:
+> <SNIP>
+> 
+> Looking at Mel's commit, I don't see a reason why we couldn't use that
+> solution - it gets rid of walking the page array, which has been fraught
+> in the past due to ARM having platforms which have holes in their
+> physical memory.
+> 
+> We could try that solution - I don't see much downside to it.  Most of
+> that information is as debug information for MM stuff anyway, and IMHO
 
-The bx is used for the Thumb -> ARM switch inside the veneer only, so
-if you build for ARM these won't appear in the output
+>From an MM perspective, I can tell you that the information is close to
+useless for debugging anything. It's why I ditched it in that commit and
+AFAIK, no one has ever cared.
+
+> 8<===
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] ARM: switch to use the generic show_mem() implementation
+> 
+> Switch ARM to use the generic show_mem() implementation, which displays
+> the statistics from the mm zone rather than walking the page arrays.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+If this builds, boots and sysrq-m works as expected then for what it's worth
+
+Acked-by: Mel Gorman <mgorman <mgorman@suse.de>
+
+-- 
+Mel Gorman
+SUSE Labs
