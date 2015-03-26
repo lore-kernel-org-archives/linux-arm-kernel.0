@@ -1,597 +1,82 @@
-From: xuyiping@hisilicon.com (YiPing Xu)
-Date: Thu, 26 Mar 2015 17:14:22 +0800
-Subject: [PATCH v1 1/2] thermal: hisilicon: add new hisilicon thermal
- sensor driver
-In-Reply-To: <1427269825-11324-2-git-send-email-kong.kongxinwei@hisilicon.com>
-References: <1427269825-11324-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1427269825-11324-2-git-send-email-kong.kongxinwei@hisilicon.com>
-Message-ID: <5513CDEE.8000807@hisilicon.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 26 Mar 2015 14:50:11 +0530
+Subject: [PATCH v4 0/8] Add support for QCOM GDSCs
+Message-ID: <1427361619-20360-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/3/25 15:50, Xinwei Kong ??:
-> From: kongxinwei <kong.kongxinwei@hisilicon.com>
->
-> This patch adds the support for hisilicon thermal sensor, within
-> hisilicon SoC. there will register sensors for thermal framework
-> and use device tree to bind cooling device.
->
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
-> ---
->   drivers/thermal/Kconfig        |   8 +
->   drivers/thermal/Makefile       |   1 +
->   drivers/thermal/hisi_thermal.c | 526 +++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 535 insertions(+)
->   create mode 100644 drivers/thermal/hisi_thermal.c
->
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index af40db0..81aee01 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -136,6 +136,14 @@ config THERMAL_EMULATION
->   	  because userland can easily disable the thermal policy by simply
->   	  flooding this sysfs node with low temperature values.
->
-> +config HISI_THERMAL
-> +	tristate "Hisilicon thermal driver"
-> +	depends on ARCH_HISI && CPU_THERMAL && OF
-> +	help
-> +	  Enable this to plug hisilicon's thermal sensor driver into the Linux
-> +	  thermal framework. cpufreq is used as the cooling device to throttle
-> +	  CPUs when the passive trip is crossed.
-> +
->   config IMX_THERMAL
->   	tristate "Temperature sensor driver for Freescale i.MX SoCs"
->   	depends on CPU_THERMAL
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index fa0dc48..08ae7ac 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -39,3 +39,4 @@ obj-$(CONFIG_TI_SOC_THERMAL)	+= ti-soc-thermal/
->   obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
->   obj-$(CONFIG_ST_THERMAL)	+= st/
->   obj-$(CONFIG_TEGRA_SOCTHERM)	+= tegra_soctherm.o
-> +obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
-> diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
-> new file mode 100644
-> index 0000000..8edf83a
-> --- /dev/null
-> +++ b/drivers/thermal/hisi_thermal.c
+GDSCs (Global Distributed Switch Controllers) control switches
+that supply power to an on-chip power domain and hence can be
+programmed in SW to safely power collapse and restore power to the
+respective PDs. They are part of a considerable number of recent QCOM
+SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
+and are part of the Clock control block.
 
-    are you sure all the SOCs in hisilicon use the same thermal IP ?
+The series implements support for GDSC using the genpd framework
+modelling these as SW controllable power domains.
 
-    if not, this driver should not use the "hisi_" prefix.
+* Patch 3/8 has a dependency on 8916 GCC support series [1]
+* Client drivers which plan to use GDSC can refer to
+  Documentation/devicetree/bindings/power/power_domain.txt to know
+  how to hook up the power domain for the device through DT
+* Runtime PM specific documentation can be found in
+  Documentation/power/runtime_pm.txt
 
-> @@ -0,0 +1,526 @@
-> +/*
-> + * Hisilicon thermal sensor driver
-> + *
-> + * Copyright (c) 2014-2015 Hisilicon Limited.
-> + * Copyright (c) 2014-2015 Linaro Limited.
-> + *
-> + * Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> + * Leo Yan <leo.yan@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/cpu_cooling.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/thermal.h>
-> +#include <linux/types.h>
-> +
-> +#include "thermal_core.h"
-> +
-> +#define TEMP0_LAG			(0x0)
-> +#define TEMP0_TH			(0x4)
-> +#define TEMP0_RST_TH			(0x8)
-> +#define TEMP0_CFG			(0xC)
-> +#define TEMP0_EN			(0x10)
-> +#define TEMP0_INT_EN			(0x14)
-> +#define TEMP0_INT_CLR			(0x18)
-> +#define TEMP0_RST_MSK			(0x1C)
-> +#define TEMP0_RAW_INT			(0x20)
-> +#define TEMP0_MSK_INT			(0x24)
-> +#define TEMP0_VALUE			(0x28)
-> +
-> +#define HISI_TEMP_BASE			(-60)
-> +#define HISI_TEMP_RESET			(100000)
-> +#define HISI_TEMP_PASSIVE		(85000)
-> +
-> +#define HISI_MAX_SENSORS		4
-> +
-> +struct hisi_thermal_sensor {
-> +	struct hisi_thermal_data *thermal;
-> +	struct thermal_zone_device *tzd;
-> +	const struct thermal_trip *trip;
-> +
-> +	uint32_t id;
-> +	uint32_t thres_temp, reset_temp;
-> +};
-> +
-> +struct hisi_thermal_data {
-> +	struct platform_device *pdev;
-> +	struct clk *clk;
-> +
-> +	int irq, irq_bind_sensor;
-> +	bool irq_enabled;
-> +
-> +	unsigned int sensors_num;
-> +	long sensor_temp[HISI_MAX_SENSORS];
-> +	struct hisi_thermal_sensor sensors[HISI_MAX_SENSORS];
-> +
-> +	void __iomem *regs;
-> +};
-> +
-> +static DEFINE_SPINLOCK(thermal_lock);
-> +
+Changes since v3:
+* static inline'd gdsc_register/unregister stubs
+* error check fixes in gdsc_register
+* dropped oxili_gdsc for 8916 as its broken and needs additional
+WA's not part of this series
+* split dts and driver changes into seperate patches
+* Updated and included Stephanes patch to add gdscs to apq8084 mmcc
+in the series
 
-    "thermal_lock" should be defined in "hisi_thermal_data" to support 
-multi device instance.
+Changes since v2:
+* gdsc_unregister added
+* gdsc_register/unregister introduced in patch 1/6
 
-> +/* in millicelsius */
-> +static inline int _step_to_temp(int step)
-> +{
-> +	/*
-> +	 * Every step equals (1 * 200) / 255 celsius, and finally
-> +	 * need convert to millicelsius.
-> +	 */
-> +	return (HISI_TEMP_BASE + (step * 200 / 255)) * 1000;
-> +}
-> +
-> +static inline int _temp_to_step(int temp)
-> +{
-> +	return ((temp / 1000 - HISI_TEMP_BASE) * 255 / 200);
-> +}
-> +
-> +static long hisi_thermal_get_sensor_temp(struct hisi_thermal_data *data,
-> +					 struct hisi_thermal_sensor *sensor)
-> +{
-> +	unsigned long flags;
-> +	int val;
-> +
-> +	spin_lock_irqsave(&thermal_lock, flags);
-> +
-> +	/* disable module firstly */
-> +	writel(0x0, data->regs + TEMP0_EN);
-> +
-> +	/* select sensor id */
-> +	writel((sensor->id << 12), data->regs + TEMP0_CFG);
-> +
-> +	/* enable module */
-> +	writel(0x1, data->regs + TEMP0_EN);
-> +
-> +	mdelay(5);
-> +
-> +	val = readl(data->regs + TEMP0_VALUE);
-> +	val = _step_to_temp(val);
-> +
-> +	/* adjust for negative value */
-> +	val = (val < 0) ? 0 : val;
-> +
-> +	spin_unlock_irqrestore(&thermal_lock, flags);
-> +
-> +	return val;
-> +}
-> +
-> +static void hisi_thermal_bind_irq(struct hisi_thermal_data *data)
-> +{
-> +	struct hisi_thermal_sensor *sensor;
-> +	unsigned long flags;
-> +
-> +	sensor = &data->sensors[data->irq_bind_sensor];
-> +
-> +	spin_lock_irqsave(&thermal_lock, flags);
-> +
-> +	/* setting the hdak time */
-> +	writel(0x0, data->regs + TEMP0_CFG);
-> +
-> +	/* disable module firstly */
-> +	writel(0x0, data->regs + TEMP0_RST_MSK);
-> +	writel(0x0, data->regs + TEMP0_EN);
-> +
-> +	/* select sensor id */
-> +	writel((sensor->id << 12), data->regs + TEMP0_CFG);
-> +
-> +	/* enable for interrupt */
-> +	writel(_temp_to_step(sensor->thres_temp)
-> +			| 0x0FFFFFF00, data->regs + TEMP0_TH);
-> +
-> +	writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
-> +
-> +	/* enable module */
-> +	writel(0x1, data->regs + TEMP0_RST_MSK);
-> +	writel(0x1, data->regs + TEMP0_EN);
-> +
-> +	writel(0x0, data->regs + TEMP0_INT_CLR);
-> +	writel(0x1, data->regs + TEMP0_INT_EN);
-> +
-> +	mdelay(5);
-> +
-> +	spin_unlock_irqrestore(&thermal_lock, flags);
-> +
-> +}
-> +
-> +static void hisi_thermal_enable_sensor(struct hisi_thermal_data *data)
-> +{
-> +	struct hisi_thermal_sensor *sensor;
-> +	unsigned long flags;
-> +
-> +	sensor = &data->sensors[data->irq_bind_sensor];
-> +
-> +	spin_lock_irqsave(&thermal_lock, flags);
-> +
-> +	/* setting the hdak time */
-> +	writel(0x0, data->regs + TEMP0_CFG);
-> +
-> +	/* disable module firstly */
-> +	writel(0x0, data->regs + TEMP0_RST_MSK);
-> +	writel(0x0, data->regs + TEMP0_EN);
-> +
-> +	/* select sensor id */
-> +	writel((sensor->id << 12), data->regs + TEMP0_CFG);
-> +
-> +	/* enable for interrupt */
-> +	writel(_temp_to_step(sensor->thres_temp)
-> +			| 0x0FFFFFF00, data->regs + TEMP0_TH);
-> +
-> +	writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
-> +
-> +	/* enable module */
-> +	writel(0x1, data->regs + TEMP0_RST_MSK);
-> +	writel(0x1, data->regs + TEMP0_EN);
-> +
-> +	writel(0x0, data->regs + TEMP0_INT_CLR);
-> +	writel(0x1, data->regs + TEMP0_INT_EN);
-> +
-> +	mdelay(5);
-> +
-> +	spin_unlock_irqrestore(&thermal_lock, flags);
-> +
-> +}
-> +
-> +static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
-> +{
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&thermal_lock, flags);
-> +
-> +	/* disable sensor module */
-> +	writel(0x0, data->regs + TEMP0_INT_EN);
-> +	writel(0x0, data->regs + TEMP0_RST_MSK);
-> +	writel(0x0, data->regs + TEMP0_EN);
-> +
-> +	spin_unlock_irqrestore(&thermal_lock, flags);
-> +
-> +}
-> +
-> +static int hisi_thermal_get_temp(void *_sensor, long *temp)
-> +{
-> +	struct hisi_thermal_sensor *sensor = _sensor;
-> +	struct hisi_thermal_data *data = sensor->thermal;
-> +
-> +	int sensor_id = 0, i;
-> +	long max_temp = 0;
-> +
-> +	*temp = hisi_thermal_get_sensor_temp(data, sensor);
-> +
-> +	data->sensor_temp[sensor->id] = *temp;
-> +
-> +	for (i = 0; i < HISI_MAX_SENSORS; i++) {
-> +		if (data->sensor_temp[i] >= max_temp) {
-> +			max_temp = data->sensor_temp[i];
-> +			sensor_id = i;
-> +		}
-> +	}
-> +
-> +	data->irq_bind_sensor = sensor_id;
-> +
-> +	dev_dbg(&data->pdev->dev, "id=%d, irq=%d, temp=%ld, thres=%d\n",
-> +		sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
-> +
-> +	/*
-> +	 * Bind irq to sensor for two cases:
-> +	 *   Reenable alarm IRQ if temperature below threshold;
-> +	 *   if irq has been enabled, always set it;
-> +	 */
-> +	if (!data->irq_enabled && max_temp < sensor->thres_temp) {
-> +		data->irq_enabled = true;
-> +		hisi_thermal_bind_irq(data);
-> +	} else if (data->irq_enabled)
-> +		hisi_thermal_bind_irq(data);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct thermal_zone_of_device_ops hisi_of_thermal_ops = {
-> +	.get_temp = hisi_thermal_get_temp,
-> +};
-> +
-> +static irqreturn_t hisi_thermal_alarm_irq(int irq, void *dev)
-> +{
-> +	struct hisi_thermal_data *data = dev;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&thermal_lock, flags);
-> +
-> +	/* disable interrupt */
-> +	writel(0x0, data->regs + TEMP0_INT_EN);
-> +	writel(0x1, data->regs + TEMP0_INT_CLR);
-> +
-> +	spin_unlock_irqrestore(&thermal_lock, flags);
-> +	data->irq_enabled = false;
-> +
-> +	return IRQ_WAKE_THREAD;
-> +}
-> +
-> +static irqreturn_t hisi_thermal_alarm_irq_thread(int irq, void *dev)
-> +{
-> +	struct hisi_thermal_data *data = dev;
-> +	struct hisi_thermal_sensor *sensor;
-> +	int i;
-> +
-> +	sensor = &data->sensors[data->irq_bind_sensor];
-> +
-> +	dev_crit(&data->pdev->dev, "THERMAL ALARM: T > %d\n",
-> +		 sensor->thres_temp / 1000);
-> +
-> +	for (i = 0; i < data->sensors_num; i++)
-> +		thermal_zone_device_update(data->sensors[i].tzd);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static int hisi_thermal_init_sensor(struct platform_device *pdev,
-> +					struct device_node *np,
-> +					struct hisi_thermal_data *data,
-> +					int index)
-> +{
-> +	struct hisi_thermal_sensor *sensor;
-> +	int ret, i;
-> +
-> +	sensor = &data->sensors[index];
-> +
-> +	ret = of_property_read_u32(np, "hisilicon,tsensor-id",
-> +					&sensor->id);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to get id %d: %d\n", index, ret);
-> +		return ret;
-> +	}
-> +
-> +	sensor->thermal = data;
-> +	sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, sensor->id,
-> +				sensor, &hisi_of_thermal_ops);
-> +	if (IS_ERR(sensor->tzd)) {
-> +		ret = PTR_ERR(sensor->tzd);
-> +		dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
-> +			sensor->id, ret);
-> +		return ret;
-> +	}
-> +
-> +	sensor->trip = of_thermal_get_trip_points(sensor->tzd);
-> +
-> +	for (i = 0; i < of_thermal_get_ntrips(sensor->tzd); i++) {
-> +		if (sensor->trip[i].type == THERMAL_TRIP_PASSIVE) {
-> +			sensor->thres_temp = sensor->trip[i].temperature;
-> +			break;
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int hisi_thermal_get_sensor_data(struct platform_device *pdev)
-> +{
-> +	struct hisi_thermal_data *data = platform_get_drvdata(pdev);
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *child_np;
-> +	int ret, i, index;
-> +
-> +	/* sensor initialization */
-> +	index = 0;
-> +	for_each_child_of_node(np, child_np) {
-> +
-> +		if (index >= HISI_MAX_SENSORS) {
-> +			dev_err(&pdev->dev, "unsupported sensor number\n");
-> +			ret = -EINVAL;
-> +			goto err_init_sensors;
-> +		}
-> +
-> +		ret = hisi_thermal_init_sensor(pdev, child_np, data, index);
-> +		if (ret)
-> +			goto err_init_sensors;
-> +
-> +		index++;
-> +	}
-> +
-> +	data->sensors_num = index;
-> +	return 0;
-> +
-> +err_init_sensors:
-> +	for (i = 0; i < index; i++)
-> +		thermal_zone_of_sensor_unregister(&pdev->dev,
-> +				data->sensors[i].tzd);
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id of_hisi_thermal_match[] = {
-> +	{ .compatible = "hisilicon,tsensor" },
-> +	{ /* end */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, of_hisi_thermal_match);
-> +
-> +static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
-> +				       bool on)
-> +{
-> +	struct thermal_zone_device *tzd = sensor->tzd;
-> +
-> +	tzd->ops->set_mode(tzd,
-> +		on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
-> +}
-> +
-> +static int hisi_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct hisi_thermal_data *data;
-> +	struct resource *res;
-> +	int i;
-> +	int ret;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	data->pdev = pdev;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(data->regs)) {
-> +		dev_err(&pdev->dev, "failed to get io address\n");
-> +		return PTR_ERR(data->regs);
-> +	}
-> +
-> +	data->irq = platform_get_irq(pdev, 0);
-> +	if (data->irq < 0)
-> +		return data->irq;
-> +
-> +	ret = devm_request_threaded_irq(&pdev->dev, data->irq,
-> +			hisi_thermal_alarm_irq, hisi_thermal_alarm_irq_thread,
-> +			0, "hisi_thermal", data);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, data);
-> +
-> +	data->clk = devm_clk_get(&pdev->dev, "thermal_clk");
-> +	if (IS_ERR(data->clk)) {
-> +		ret = PTR_ERR(data->clk);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(&pdev->dev,
-> +				"failed to get thermal clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	/* enable clock for thermal */
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = hisi_thermal_get_sensor_data(pdev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to get sensor data\n");
-> +		goto err_get_sensor_data;
-> +		return ret;
-> +	}
-> +
-> +	hisi_thermal_enable_sensor(data);
-> +	data->irq_enabled = true;
-> +
-> +	for (i = 0; i < data->sensors_num; i++)
-> +		hisi_thermal_toggle_sensor(&data->sensors[i], true);
-> +
-> +	return 0;
-> +
-> +err_get_sensor_data:
-> +	clk_disable_unprepare(data->clk);
-> +	return ret;
-> +}
-> +
-> +static int hisi_thermal_remove(struct platform_device *pdev)
-> +{
-> +	struct hisi_thermal_data *data = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < data->sensors_num; i++) {
-> +		struct hisi_thermal_sensor *sensor = &data->sensors[i];
-> +
-> +		hisi_thermal_toggle_sensor(sensor, false);
-> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-> +	}
-> +
-> +	hisi_thermal_disable_sensor(data);
-> +	clk_disable_unprepare(data->clk);
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int hisi_thermal_suspend(struct device *dev)
-> +{
-> +	struct hisi_thermal_data *data = dev_get_drvdata(dev);
-> +
-> +	hisi_thermal_disable_sensor(data);
-> +	data->irq_enabled = false;
-> +
-> +	clk_disable_unprepare(data->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int hisi_thermal_resume(struct device *dev)
-> +{
-> +	struct hisi_thermal_data *data = dev_get_drvdata(dev);
-> +
-> +	clk_prepare_enable(data->clk);
-> +
-> +	data->irq_enabled = true;
-> +	hisi_thermal_enable_sensor(data);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(hisi_thermal_pm_ops,
-> +			 hisi_thermal_suspend, hisi_thermal_resume);
-> +
-> +static struct platform_driver hisi_thermal_driver = {
-> +	.driver = {
-> +		.name	= "hisi_thermal",
-> +		.owner  = THIS_MODULE,
-> +		.pm	= &hisi_thermal_pm_ops,
-> +		.of_match_table = of_hisi_thermal_match,
-> +	},
-> +	.probe		= hisi_thermal_probe,
-> +	.remove		= hisi_thermal_remove,
-> +};
-> +
-> +static int __init hisi_thermal_init(void)
-> +{
-> +	return platform_driver_register(&hisi_thermal_driver);
-> +}
-> +
-> +static void __exit hisi_thermal_exit(void)
-> +{
-> +	platform_driver_unregister(&hisi_thermal_driver);
-> +}
-> +
-> +late_initcall(hisi_thermal_init);
-> +module_exit(hisi_thermal_exit);
-> +
-> +MODULE_AUTHOR("Xinwei Kong <kong.kongxinwei@hisilicon.com>");
-> +MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
-> +MODULE_DESCRIPTION("Hisilicon thermal driver");
-> +MODULE_LICENSE("GPL v2");
->
+Changes since v1:
+* added err checks for regmap apis
+* added gdsc_register() in gdsc.c
+
+[1] https://lkml.org/lkml/2015/3/18/408
+
+Rajendra Nayak (4):
+  clk: qcom: gdsc: Prepare common clk probe to register gdscs
+  clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+  clk: qcom: gdsc: Add GDSCs in apq8084 GCC
+  arm: dts: qcom: Add #power-domain-cells property
+
+Stephane Viau (1):
+  clk: qcom: gdsc: Add GDSCs in apq8084 MMCC
+
+Stephen Boyd (3):
+  clk: qcom: Add support for GDSCs
+  clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+  clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
+
+ arch/arm/boot/dts/qcom-apq8084.dtsi           |   1 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi           |   2 +
+ drivers/clk/qcom/Kconfig                      |  10 ++
+ drivers/clk/qcom/Makefile                     |   1 +
+ drivers/clk/qcom/common.c                     |  16 ++-
+ drivers/clk/qcom/common.h                     |   2 +
+ drivers/clk/qcom/gcc-apq8084.c                |  38 ++++++
+ drivers/clk/qcom/gcc-msm8916.c                |  38 ++++++
+ drivers/clk/qcom/gcc-msm8974.c                |  14 +++
+ drivers/clk/qcom/gdsc.c                       | 167 ++++++++++++++++++++++++++
+ drivers/clk/qcom/gdsc.h                       |  45 +++++++
+ drivers/clk/qcom/mmcc-apq8084.c               |  56 ++++++++-
+ drivers/clk/qcom/mmcc-msm8974.c               |  54 +++++++++
+ include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 +
+ include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 ++
+ include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
+ include/dt-bindings/clock/qcom,mmcc-apq8084.h |   8 ++
+ include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 ++
+ 18 files changed, 475 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/qcom/gdsc.c
+ create mode 100644 drivers/clk/qcom/gdsc.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
