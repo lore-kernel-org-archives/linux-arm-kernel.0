@@ -1,56 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 16:15:05 +0000
-Subject: RPmsg, DMA and ARM64
-In-Reply-To: <20150326160136.GC30197@toto>
-References: <20150324043749.GJ23658@toto>
- <20150326152607.GM8656@n2100.arm.linux.org.uk>
- <20150326160136.GC30197@toto>
-Message-ID: <20150326161505.GR8656@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Mar 2015 16:54:00 +0100
+Subject: [PATCH 13/13] thermal: of: implement .set_trips for device tree
+ thermal zones
+In-Reply-To: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1427385240-6086-14-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 02:01:36AM +1000, Edgar E. Iglesias wrote:
-> On Thu, Mar 26, 2015 at 03:26:07PM +0000, Russell King - ARM Linux wrote:
-> > The only way to pass such memory using scatterlists is by doing:
-> > 
-> > 	sg_init_table(sg, 1);
-> > 	sg_dma_address(sg) = addr;
-> > 	sg_dma_length(sg) = length;
-> > 
-> > Such a scatterlist must _never_ have the dma_(map|unmap|sync)_sg*()
-> > functions called on it - the only operations which would be permissible
-> > is to walk the scatterlist, and access it using the standard DMA
-> > accessors sg_dma_address() and sg_dma_length().
-> 
-> I'll have a closer look and see if I can change rpmsg to deal with
-> this.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/thermal/of-thermal.c | 12 ++++++++++++
+ include/linux/thermal.h      |  1 +
+ 2 files changed, 13 insertions(+)
 
-Thanks - I should point out too that when accessing the scatterlist for
-DMA purposes, using the accessors I mentioned above is a must - especially
-as we're now getting IOMMUs on ARM.
-
-This is because of a subtlety of the DMA streaming API.
-
-The reason is that sg_dma_length(sg) may not be equal to sg->length -
-IOMMUs (as part of dma_map_sg()) are permitted to coalesce entries
-together by using their remapping abilities, which can result in fewer
-scatterlist entries being needed.
-
-It's also important to realise that dma_map_sg() returns the number of
-scatterlist entries to be walked for DMA purposes, rather than the nents
-passed into dma_map_sg() should _not_ be used.  It's the same reason -
-if coalescing has occurred, the return value will be smaller, telling
-you how many scatterlist entries are to be walked.
-
-Finally, it's important to realise that when such coalescing occurs,
-the values you have in sg_dma_address() and sg_dma_length() may _not_
-correspond with the struct page in the entry.  In other words, you
-can't expect to be able to switch between DMA and PIO and use the
-same scatterlist entry, and expect to hit the same memory.
-
-I suspect a lot of ARM driver authors are not aware of these finer
-points.
-
+diff --git a/drivers/thermal/of-thermal.c b/drivers/thermal/of-thermal.c
+index 9b63193..a3de5de 100644
+--- a/drivers/thermal/of-thermal.c
++++ b/drivers/thermal/of-thermal.c
+@@ -97,6 +97,17 @@ static int of_thermal_get_temp(struct thermal_zone_device *tz,
+ 	return data->ops->get_temp(data->sensor_data, temp);
+ }
+ 
++static int of_thermal_set_trips(struct thermal_zone_device *tz,
++			       unsigned long low, unsigned long high)
++{
++	struct __thermal_zone *data = tz->devdata;
++
++	if (!data->ops || !data->ops->set_trips)
++		return -ENOSYS;
++
++	return data->ops->set_trips(data->sensor_data, low, high);
++}
++
+ /**
+  * of_thermal_get_ntrips - function to export number of available trip
+  *			   points.
+@@ -367,6 +378,7 @@ static int of_thermal_get_crit_temp(struct thermal_zone_device *tz,
+ 
+ static const struct thermal_zone_device_ops of_thermal_ops = {
+ 	.get_temp = of_thermal_get_temp,
++	.set_trips = of_thermal_set_trips,
+ 	.get_trend = of_thermal_get_trend,
+ 	.set_emul_temp = of_thermal_set_emul_temp,
+ 
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index b870702..84a5b5d 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -276,6 +276,7 @@ struct thermal_genl_event {
+  */
+ struct thermal_zone_of_device_ops {
+ 	int (*get_temp)(void *, unsigned long *);
++	int (*set_trips)(void *, unsigned long, unsigned long);
+ 	int (*get_trend)(void *, int trend, enum thermal_trend *);
+ 	int (*set_emul_temp)(void *, unsigned long);
+ };
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
