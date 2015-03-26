@@ -1,37 +1,68 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Mar 2015 11:38:33 +0000
-Subject: [PATCH 07/13] clocksource: tcb_clksrc: make IO endian agnostic
-In-Reply-To: <5513E8A1.1050809@atmel.com>
-References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
- <1426693992-31163-8-git-send-email-ben.dooks@codethink.co.uk>
- <5513D7AA.8030008@linaro.org> <5513E8A1.1050809@atmel.com>
-Message-ID: <5513EFB9.702@codethink.co.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 26 Mar 2015 11:43:21 +0000
+Subject: [PATCH v7 2/7] mailbox: arm_mhu: add driver for ARM MHU controller
+In-Reply-To: <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+References: <1425466367-30556-1-git-send-email-vincent.yang@socionext.com>
+ <1425466884-30648-1-git-send-email-vincent.yang@socionext.com>
+Message-ID: <5513F0D9.5080807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/15 11:08, Nicolas Ferre wrote:
-> Le 26/03/2015 10:55, Daniel Lezcano a ?crit :
->> On 03/18/2015 04:53 PM, Ben Dooks wrote:
->>> Change the __raw read and write to use readl/writel_relaxed to make the
->>> code endian agnostic.
->>>
->>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>
->> Nicolas,
->>
->> what about this one ? Do you ack it ?
-> 
-> Yes:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> We were discussing about having a common macro for this... But we will
-> think more about it later.
-> 
-> So, let's go for it.
 
-I will be sending out a series for this soon, I think I've got all
-the items sorted.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+On 04/03/15 11:01, Vincent Yang wrote:
+> From: Jassi Brar <jaswinder.singh@linaro.org>
+>
+> Add driver for the ARM Primecell Message-Handling-Unit(MHU) controller.
+>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> Signed-off-by: Andy Green <andy.green@linaro.org>
+> Signed-off-by: Vincent Yang <vincent.yang@socionext.com>
+> Signed-off-by: Tetsuya Nuriya <nuriya.tetsuya@socionext.com>
+> ---
+>   .../devicetree/bindings/mailbox/arm-mhu.txt        |  43 +++++
+>   drivers/mailbox/Kconfig                            |   9 +
+>   drivers/mailbox/Makefile                           |   2 +
+>   drivers/mailbox/arm_mhu.c                          | 195 +++++++++++++++++++++
+>   4 files changed, 249 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+>   create mode 100644 drivers/mailbox/arm_mhu.c
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/arm-mhu.txt b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+> new file mode 100644
+> index 0000000..4971f03
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/arm-mhu.txt
+> @@ -0,0 +1,43 @@
+> +ARM MHU Mailbox Driver
+> +======================
+> +
+> +The ARM's Message-Handling-Unit (MHU) is a mailbox controller that has
+> +3 independent channels/links to communicate with remote processor(s).
+> + MHU links are hardwired on a platform. A link raises interrupt for any
+> +received data. However, there is no specified way of knowing if the sent
+> +data has been read by the remote. This driver assumes the sender polls
+> +STAT register and the remote clears it after having read the data.
+> +The last channel is specified to be a 'Secure' resource, hence can't be
+> +used by Linux running NS.
+> +
+> +Mailbox Device Node:
+> +====================
+> +
+> +Required properties:
+> +--------------------
+> +- compatible:		Shall be "arm,mhu" & "arm,primecell"
+> +- reg:			Contains the mailbox register address range (base
+> +			address and length)
+> +- #mbox-cells		Shall be 1 - the index of the channel needed.
+> +- interrupts:		Contains the interrupt information corresponding to
+> +			each of the 3 links of MHU.
+> +
+
+I tried using this driver and found that AMBA driver expects apb_clk
+without which probe fails. Though your example have it, it's not
+explicit from the binding. Also AMBA binding expects the primecell id in
+the binding.
+
+Regards,
+Sudeep
