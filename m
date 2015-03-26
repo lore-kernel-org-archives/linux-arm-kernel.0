@@ -1,48 +1,35 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Mar 2015 09:18:59 +0800
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <20150325192331.GG25884@l.oracle.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
- <20150312193505.GB7346@google.com> <55024D35.6050509@huawei.com>
- <CAErSpo4T7f9PNVMLrQbCvW2a=HnRauQR2eBz6H69B7Q2=ELNWw@mail.gmail.com>
- <20150313140132.GH5378@l.oracle.com>
- <CAErSpo69ytCxBK5AD79Nz05wy=GwzcOGV7WkiKFxpLDH4wtJXw@mail.gmail.com>
- <20150325192331.GG25884@l.oracle.com>
-Message-ID: <55135E83.3040804@huawei.com>
+Date: Thu, 26 Mar 2015 09:21:06 +0800
+Subject: [PATCH v8 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify
+ code
+In-Reply-To: <20150325174321.4a5bc25d@free-electrons.com>
+References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>
+ <1427168064-8657-24-git-send-email-wangyijing@huawei.com>
+ <551277E6.1010307@huawei.com> <20150325174321.4a5bc25d@free-electrons.com>
+Message-ID: <55135F02.40506@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> That seems OK to me.  Probably still wrong, but no worse than it was before.
->>>
->>> Interesting. The mechanism for PCI passthrough can either synthesize
->>> and PCI bus number starting at zero (so first device is always 0:0:0.0)
->>> or it can replicate the backend PCI topology. That means you
->>> could have segment values passed in, so: ab:ff:00.1). I've to admin
->>> I hadn't tried the 'physical' replication on an machine with
->>> domains (err, segments).
->>>
->>> Is there an git tree with this so I can just try it out?
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
->> pci/enumeration-yw6 has similar code (it exports the single
+On 2015/3/26 0:43, Thomas Petazzoni wrote:
+> Dear Yijing Wang,
 > 
-> I presume now it is bjorn/pci/enumeration-yw8 ? Going to test this out
-> this week.
-
-Yes, it's the latest version. thanks!
-
->> busn_resource and makes xen use it).  That should be functionally
->> identical to what v4.0-rc1 does.
->>
->> Yijing hasn't posted the static busn_res proposal above yet, so I
->> don't have a branch with that in it.
->>
->> Bjorn
+> On Wed, 25 Mar 2015 16:55:02 +0800, Yijing Wang wrote:
 > 
-> .
+>>    Do you have any comment for this patch ? In this series, pci_bus_add_devices()
+>> has been ripped out from pci_scan_root_bus(), so I think the pci_scan_root_bus() is
+>> almost the same as pci_create_root_bus + pci_scan_child_bus(). And in this series,
+>> we try to unexport pci_create_root_bus(). It's even better if you could help test this changes.
+> 
+> I'm away this week for ELC, but I promise to test you patch series on
+> mvebu hardware next week.
+> 
+
+That's ok, thanks very much!
+
+
+> Best regards,
+> 
+> Thomas
 > 
 
 
