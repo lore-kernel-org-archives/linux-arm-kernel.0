@@ -1,79 +1,47 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 26 Mar 2015 14:39:58 +0100
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <CAJ+vNU3inhq+zva2Df1upw=i7b==Ksd2gzfcQ2x3JKPGEjGQ3g@mail.gmail.com>
-References: <55128016.3030903@denx.de>
- <1427276390.2813.7.camel@pengutronix.de> <55128EC8.6080805@denx.de>
- <1427367975.3378.6.camel@pengutronix.de>
- <CAJ+vNU3inhq+zva2Df1upw=i7b==Ksd2gzfcQ2x3JKPGEjGQ3g@mail.gmail.com>
-Message-ID: <1427377198.3378.16.camel@pengutronix.de>
+From: mgorman@suse.de (Mel Gorman)
+Date: Thu, 26 Mar 2015 13:47:47 +0000
+Subject: [PATCH] ARM: print cma-reserved pages from show_mem
+In-Reply-To: <20150326132258.GH8656@n2100.arm.linux.org.uk>
+References: <1423092164-9145-1-git-send-email-gregory.0xf0@gmail.com>
+ <54D40DAF.4080609@codeaurora.org>
+ <CADtm3G7ROX4CrxSKRvTKcjqCiX=uJQZ=Q5izH8pS61z4jfumLg@mail.gmail.com>
+ <54D534FB.1090101@codeaurora.org>
+ <CADtm3G7CUYUUbmTrWiudQ5j-wX9hu86Ox8TkB+FnXwEvjb=xeg@mail.gmail.com>
+ <20150210113230.GJ8656@n2100.arm.linux.org.uk>
+ <CADtm3G64rPf7O76xUbLwqsqTkJxdGJMT9sHj810xPuThDA0ddg@mail.gmail.com>
+ <20150326114612.GD8656@n2100.arm.linux.org.uk>
+ <20150326123028.GM4701@suse.de>
+ <20150326132258.GH8656@n2100.arm.linux.org.uk>
+Message-ID: <20150326134747.GN4701@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+On Thu, Mar 26, 2015 at 01:22:59PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 26, 2015 at 12:30:29PM +0000, Mel Gorman wrote:
+> > On Thu, Mar 26, 2015 at 11:46:12AM +0000, Russell King - ARM Linux wrote:
+> > > <SNIP>
+> > > 
+> > > Looking at Mel's commit, I don't see a reason why we couldn't use that
+> > > solution - it gets rid of walking the page array, which has been fraught
+> > > in the past due to ARM having platforms which have holes in their
+> > > physical memory.
+> > > 
+> > > We could try that solution - I don't see much downside to it.  Most of
+> > > that information is as debug information for MM stuff anyway, and IMHO
+> > 
+> > >From an MM perspective, I can tell you that the information is close to
+> > useless for debugging anything. It's why I ditched it in that commit and
+> > AFAIK, no one has ever cared.
+> 
+> In that case, is there much point to show_mem()?  Is it something which
+> should be considered for removal?
+> 
+> If code serves no useful purpose anymore, we really ought to have a way
 
-Am Donnerstag, den 26.03.2015, 06:23 -0700 schrieb Tim Harvey:
-> On Thu, Mar 26, 2015 at 4:06 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Am Mittwoch, den 25.03.2015, 11:32 +0100 schrieb Stefan Roese:
-> > Okay, I've looked a bit into this and it seems there is no easy solution
-> > available. It is really unfortunate that the WD reset doesn't reset the
-> > GPR registers. Also I have no idea if the WD reset properly resets the
-> > PCIe core, as the reset signal of this core is only wired to the POR
-> > line.
-> >
-> > To fix this (almost) properly we would have to change the complete init
-> > order of the core, which isn't an easy task, as experience has shown
-> > that even small changes in that area can prevent the link from coming up
-> > under certain circumstances.
-> >
-> > Which brings me back to my earlier assertion that WD reset should really
-> > be done through the PMIC. That's yet another case of a WD making the
-> > overall system more instable.
-> >
-> > I think the easiest workaround for now is to detect the WD reset in your
-> > bootloader and bash the expected default values into the GPR bits.
-> >
-> > Regards,
-> > Lucas
-> 
-> Lucas,
-> 
-> There are many boards out there that unfortunately don't reset PMIC's
-> properly, IMHO due to a confusing reference design from Freescale.
-> 
-> Using the WDOGx_WRSR register we can detect the reason for reset:
->  Bit 4 - POR - Power on reset
->  Bit 1 - TOUT - Watchdog timeout
->  Bit 0 - SFTW - Software reset (used in machine_restart)
-> 
-> Can we reset the GPR registers based on bits 0 or 1 set, or use these
-> as further qualifiers in the WAR?
-> 
-Doing it in the kernel is too late. This WAR is specifically to work
-around bootloaders leaving the PCI link running when jumping into the
-kernel. We use the GPR bits to detect if the bootloader has touched the
-PCIe core. Unfortunately we see the same signature if the kernel touched
-PCIe and the system got reset by the WD.
-
-If we reset the GPR bits depending on the reset reason register in the
-kernel we have no way to know if the bootloader has touched the PCIe
-core after a WD reset (in which case we still need to apply the WAR). So
-the only way to keep the WAR working while cleaning out bad WD reset
-behavior is to reset the GPR bits in the bootloader, before the
-bootloader itself may touch the PCIe core.
-
-It may be possible to come up with a solution for this in the kernel by
-looking at the PCIe clock status when entering the kernel, but this
-means that we scatter even more WAR code for the bad Freescale PCIe
-integration throughout the kernel, as such code has to go into the
-platform as we don't have the required information at hand in the PCI
-driver. So I'm not really thrilled by thinking about doing it in the
-kernel.
-
-Regards,
-Lucas
+Sorry I was not clear. show_mem itself is useful, the shared and
+non-shared values that commit c78e93630d15b5f5774213aad9bdc9f52473a89b
+removed are not.
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Mel Gorman
+SUSE Labs
