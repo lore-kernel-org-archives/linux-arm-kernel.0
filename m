@@ -1,208 +1,68 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Mar 2015 13:06:30 +0000
-Subject: [PATCH 2/3] dmaengine: at_hdmac: use __le32 for descriptor writes
-In-Reply-To: <1427375191-1467-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427375191-1467-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427375191-1467-3-git-send-email-ben.dooks@codethink.co.uk>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Thu, 26 Mar 2015 13:19:14 +0000
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <CAKv+Gu9CDnFSiRrntzTDZDFhb3Cq1M-Dt_xKxvNUszZJpSrzpg@mail.gmail.com>
+References: <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+ <20150324135439.GC3579@e103592.cambridge.arm.com>
+ <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
+ <20150325104603.GA3560@e103592.cambridge.arm.com>
+ <20150326113648.GC8656@n2100.arm.linux.org.uk>
+ <CAKv+Gu8ktOUcQrGOwMfbt8s2QG+RFdnKBykVfhXPTLSUFtWQyA@mail.gmail.com>
+ <20150326122203.GG8656@n2100.arm.linux.org.uk>
+ <CAKv+Gu-ctXuiM2mcgbqfkBkP_96tivjac0jv+XJ48XSpqRf=Yg@mail.gmail.com>
+ <20150326125334.GA27016@e103592.cambridge.arm.com>
+ <CAKv+Gu9CDnFSiRrntzTDZDFhb3Cq1M-Dt_xKxvNUszZJpSrzpg@mail.gmail.com>
+Message-ID: <20150326131913.GA6140@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure the at_hdmac driver writes descriptors out in the
-peripheral's little endian format when the cpu is running
-in big endian.
+On Thu, Mar 26, 2015 at 01:05:09PM +0000, Ard Biesheuvel wrote:
+> On 26 March 2015 at 13:53, Dave P Martin <Dave.Martin@arm.com> wrote:
+> > On Thu, Mar 26, 2015 at 12:24:01PM +0000, Ard Biesheuvel wrote:
+> >> On 26 March 2015 at 13:22, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > On Thu, Mar 26, 2015 at 01:20:16PM +0100, Ard Biesheuvel wrote:
+> >
+> > [...]
+> >
+> >> >> Any specific concerns? The --pic-veneer switch dates back to 2009, so
+> >> >> it's been around for a while
+> >> >
+> >> > BX.  Not every CPU supports BX.
+> >> >
+> >>
+> >> The bx is used for the Thumb -> ARM switch inside the veneer only, so
+> >> if you build for ARM these won't appear in the output
+> >
+> > Agreed that's what's _supposed_ to happen.
+> >
+> > Note that --use-blx is an override and might introduce BXs into a kernel
+> > that otherwise doesn't have them.  But in any case, this option doesn't
+> > show a benefit for the scenario under discussion, hence my dropping the
+> > request (conditional on THUMB2_KERNEL in any case).
+> >
+> 
+> Actually, i am not quite sure. I hadn't realised that there is no
+> branch-without-link counterpart of 'blx <label>' so even if I still
+> potted a number of bx pc/nop sequences, I can't really say if there
+> were quite as many as before.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
---
-CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-CC: Dan Williams <dan.j.williams@intel.com>
-CC: Vinod Koul <vinod.koul@intel.com>
-CC: linux-arm-kernel at lists.infradead.org
-CC: dmaengine at vger.kernel.org
----
- drivers/dma/at_hdmac.c      | 74 ++++++++++++++++++++++-----------------------
- drivers/dma/at_hdmac_regs.h | 13 ++++----
- 2 files changed, 44 insertions(+), 43 deletions(-)
+Where not out of range, the compiler should just branch to the
+destination, with no veneer.  This would apply to optimised tail-
+calls, for example -- but with an ordinary branch, not BX.  The
+linker would only ever fix it up as B{L}X for one of two reasons:
+either the destination is in a different instruction set, or
+Thumb code is branching to a veneer (veneers are always ARM).
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 1e1a4c5..174858b 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -190,7 +190,7 @@ static void atc_desc_chain(struct at_desc **first, struct at_desc **prev,
- 		*first = desc;
- 	} else {
- 		/* inform the HW lli about chaining */
--		(*prev)->lli.dscr = desc->txd.phys;
-+		(*prev)->lli.dscr = cpu_to_le32(desc->txd.phys);
- 		/* insert the link descriptor to the LD ring */
- 		list_add_tail(&desc->desc_node,
- 				&(*first)->tx_list);
-@@ -249,13 +249,13 @@ static struct at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
- 	struct at_desc  *desc, *_desc, *child, *desc_cur = NULL;
- 
- 	list_for_each_entry_safe(desc, _desc, &atchan->active_list, desc_node) {
--		if (desc->lli.dscr == dscr_addr) {
-+		if (le32_to_cpu(desc->lli.dscr) == dscr_addr) {
- 			desc_cur = desc;
- 			break;
- 		}
- 
- 		list_for_each_entry(child, &desc->tx_list, desc_node) {
--			if (child->lli.dscr == dscr_addr) {
-+			if (le32_to_cpu(child->lli.dscr) == dscr_addr) {
- 				desc_cur = child;
- 				break;
- 			}
-@@ -300,7 +300,7 @@ static int atc_get_bytes_left(struct dma_chan *chan)
- 			goto out;
- 		}
- 
--		count = (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
-+		count = (le32_to_cpu(desc_cur->lli.ctrla) & ATC_BTSIZE_MAX)
- 			<< desc_first->tx_width;
- 		if (atchan->remain_desc < count) {
- 			ret = -EINVAL;
-@@ -647,10 +647,10 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 		if (!desc)
- 			goto err_desc_get;
- 
--		desc->lli.saddr = src + offset;
--		desc->lli.daddr = dest + offset;
--		desc->lli.ctrla = ctrla | xfer_count;
--		desc->lli.ctrlb = ctrlb;
-+		desc->lli.saddr = cpu_to_le32(src + offset);
-+		desc->lli.daddr = cpu_to_le32(dest + offset);
-+		desc->lli.ctrla = cpu_to_le32(ctrla | xfer_count);
-+		desc->lli.ctrlb = cpu_to_le32(ctrlb);
- 
- 		desc->txd.cookie = 0;
- 
-@@ -746,12 +746,12 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			if (unlikely(mem & 3 || len & 3))
- 				mem_width = 0;
- 
--			desc->lli.saddr = mem;
--			desc->lli.daddr = reg;
--			desc->lli.ctrla = ctrla
--					| ATC_SRC_WIDTH(mem_width)
--					| len >> mem_width;
--			desc->lli.ctrlb = ctrlb;
-+			desc->lli.saddr = cpu_to_le32(mem);
-+			desc->lli.daddr = cpu_to_le32(reg);
-+			desc->lli.ctrla = cpu_to_le32(ctrla
-+						      | ATC_SRC_WIDTH(mem_width)
-+						      | len >> mem_width);
-+			desc->lli.ctrlb = cpu_to_le32(ctrlb);
- 
- 			atc_desc_chain(&first, &prev, desc);
- 			total_len += len;
-@@ -786,12 +786,12 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			if (unlikely(mem & 3 || len & 3))
- 				mem_width = 0;
- 
--			desc->lli.saddr = reg;
--			desc->lli.daddr = mem;
--			desc->lli.ctrla = ctrla
--					| ATC_DST_WIDTH(mem_width)
--					| len >> reg_width;
--			desc->lli.ctrlb = ctrlb;
-+			desc->lli.saddr = cpu_to_le32(reg);
-+			desc->lli.daddr = cpu_to_le32(mem);
-+			desc->lli.ctrla = cpu_to_le32(ctrla
-+						      | ATC_DST_WIDTH(mem_width)
-+						      | len >> reg_width);
-+			desc->lli.ctrlb = cpu_to_le32(ctrlb);
- 
- 			atc_desc_chain(&first, &prev, desc);
- 			total_len += len;
-@@ -864,25 +864,25 @@ atc_dma_cyclic_fill_desc(struct dma_chan *chan, struct at_desc *desc,
- 
- 	switch (direction) {
- 	case DMA_MEM_TO_DEV:
--		desc->lli.saddr = buf_addr + (period_len * period_index);
--		desc->lli.daddr = sconfig->dst_addr;
--		desc->lli.ctrla = ctrla;
--		desc->lli.ctrlb = ATC_DST_ADDR_MODE_FIXED
--				| ATC_SRC_ADDR_MODE_INCR
--				| ATC_FC_MEM2PER
--				| ATC_SIF(atchan->mem_if)
--				| ATC_DIF(atchan->per_if);
-+		desc->lli.saddr = cpu_to_le32(buf_addr + (period_len * period_index));
-+		desc->lli.daddr = cpu_to_le32(sconfig->dst_addr);
-+		desc->lli.ctrla = cpu_to_le32(ctrla);
-+		desc->lli.ctrlb = cpu_to_le32(ATC_DST_ADDR_MODE_FIXED
-+					      | ATC_SRC_ADDR_MODE_INCR
-+					      | ATC_FC_MEM2PER
-+					      | ATC_SIF(atchan->mem_if)
-+					      | ATC_DIF(atchan->per_if));
- 		break;
- 
- 	case DMA_DEV_TO_MEM:
--		desc->lli.saddr = sconfig->src_addr;
--		desc->lli.daddr = buf_addr + (period_len * period_index);
--		desc->lli.ctrla = ctrla;
--		desc->lli.ctrlb = ATC_DST_ADDR_MODE_INCR
--				| ATC_SRC_ADDR_MODE_FIXED
--				| ATC_FC_PER2MEM
--				| ATC_SIF(atchan->per_if)
--				| ATC_DIF(atchan->mem_if);
-+		desc->lli.saddr = cpu_to_le32(sconfig->src_addr);
-+		desc->lli.daddr = cpu_to_le32(buf_addr + (period_len * period_index));
-+		desc->lli.ctrla = cpu_to_le32(ctrla);
-+		desc->lli.ctrlb = cpu_to_le32(ATC_DST_ADDR_MODE_INCR
-+					      | ATC_SRC_ADDR_MODE_FIXED
-+					      | ATC_FC_PER2MEM
-+					      | ATC_SIF(atchan->per_if)
-+					      | ATC_DIF(atchan->mem_if));
- 		break;
- 
- 	default:
-@@ -960,7 +960,7 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 	}
- 
- 	/* lets make a cyclic list */
--	prev->lli.dscr = first->txd.phys;
-+	prev->lli.dscr = cpu_to_le32(first->txd.phys);
- 
- 	/* First descriptor of the chain embedds additional information */
- 	first->txd.cookie = -EBUSY;
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index b4d0a54..a79c4b4 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -170,9 +170,9 @@ struct at_lli {
- 	dma_addr_t	saddr;
- 	dma_addr_t	daddr;
- 	/* value that may get written back: */
--	u32		ctrla;
-+	__le32		ctrla;
- 	/* more values that are not changed by hardware */
--	u32		ctrlb;
-+	__le32		ctrlb;
- 	dma_addr_t	dscr;	/* chain to next lli */
- };
- 
-@@ -377,8 +377,9 @@ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
- {
- 	dev_crit(chan2dev(&atchan->chan_common),
- 		 "  desc: s0x%x d0x%x ctrl0x%x:0x%x l0x%x\n",
--		 lli->saddr, lli->daddr,
--		 lli->ctrla, lli->ctrlb, lli->dscr);
-+		 le32_to_cpu(lli->saddr), le32_to_cpu(lli->daddr),
-+		 le32_to_cpu(lli->ctrla), le32_to_cpu(lli->ctrlb),
-+		 le32_to_cpu(lli->dscr));
- }
- 
- 
-@@ -443,8 +444,8 @@ static void set_desc_eol(struct at_desc *desc)
- {
- 	u32 ctrlb = desc->lli.ctrlb;
- 
--	ctrlb &= ~ATC_IEN;
--	ctrlb |= ATC_SRC_DSCR_DIS | ATC_DST_DSCR_DIS;
-+	ctrlb &= cpu_to_le32(~ATC_IEN);
-+	ctrlb |= cpu_to_le32(ATC_SRC_DSCR_DIS | ATC_DST_DSCR_DIS);
- 
- 	desc->lli.ctrlb = ctrlb;
- 	desc->lli.dscr = 0;
--- 
-2.1.4
+THUMB2_KERNEL generates a kernel which is very nearly 100% Thumb
+code, so BX should be very rare when veneers are not involved.
+
+> > Ard, can you should build a couple of !THUMB2_KERNEL/pre-v5
+> > configurations with your change and check, just to be sure?
+> >
+> 
+> Will do.
+> 
+
+Cheers
+---Dave
