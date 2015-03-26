@@ -1,26 +1,78 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 26 Mar 2015 15:53:40 +0100
-Subject: [PATCH v2 0/5] ARM: sunxi: SRAM mapping support
-Message-ID: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
+Date: Thu, 26 Mar 2015 15:53:44 +0100
+Subject: [PATCH v2 4/5] ARM: dts: sun7i: Add A20 SRAM and SRAM controller
+In-Reply-To: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
+References: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1427381625-6942-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Here is v2 of my cleaned up version of Maxime's sunxi SRAM controller driver.
+The A20 has a few SRAM that can be mapped either to a device or to the CPU,
+with the mapping being controlled by a SRAM controller.
 
-Changes since v1:
-- Make the SUNXI_SRAM Kconfig option hidden, enabled by default if ARCH_SUNXI
-- Fix some typos in the comments in the dts file, both in the example in the
-  devicetree-binding documentation, as well as in the actual dts files
-- Drop the bogus change to drivers/net/ethernet/stmicro/stmmac/Kconfig
+Since most of the time these SRAM won't be accessible by the CPU,
+we can't use the mmio-sram driver and compatible.
 
-Since this is a prereq for my musb work, if there are no objections then I
-would like to see this go upstream soon.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[hdegoede at redhat.com: Do not change soc node name, change compatible to
+ sun4i-a10-sram-controller to match the driver change]
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-Since it only touches sunxi files (and one Makefile), it is probably best if
-this all goes upstream through Maxime.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 465a19f..e6f4a33 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -529,12 +529,46 @@
+ 		};
+ 	};
+ 
++	/*
++	 * Note we use the address where the mmio registers start, not where
++	 * the SRAM blocks start, this cannot be changed because that would be
++	 * a devicetree ABI change.
++	 */
+ 	soc at 01c00000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		sram at 00000000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00000000 0x4000>;
++			allwinner,sram-name = "A1";
++		};
++
++		sram at 00004000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00004000 0x4000>;
++			allwinner,sram-name = "A2";
++		};
++
++		sram at 00008000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00008000 0x4000>;
++			allwinner,sram-name = "A3-A4";
++		};
++
++		sram at 00010000 {
++			compatible = "allwinner,sun4i-a10-sram";
++			reg = <0x00010000 0x1000>;
++			allwinner,sram-name = "D";
++		};
++
++		sram-controller at 01c00000 {
++			compatible = "allwinner,sun4i-a10-sram-controller";
++			reg = <0x01c00000 0x30>;
++		};
++
+ 		nmi_intc: interrupt-controller at 01c00030 {
+ 			compatible = "allwinner,sun7i-a20-sc-nmi";
+ 			interrupt-controller;
+-- 
+2.3.3
