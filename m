@@ -1,162 +1,60 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Mar 2015 14:20:07 +0800
-Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
- simplicity
-In-Reply-To: <1427347180.2575.91.camel@axtens.net>
-References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>			
- <1427168064-8657-20-git-send-email-wangyijing@huawei.com>		
- <1427241523.2685.18.camel@axtens.net> <551266DE.3030609@huawei.com>	
- <1427321631.2575.3.camel@axtens.net> <55135E16.6060909@huawei.com>
- <1427347180.2575.91.camel@axtens.net>
-Message-ID: <5513A517.8080205@huawei.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 26 Mar 2015 07:22:03 +0100
+Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
+In-Reply-To: <20150325145949.GE26903@localhost>
+References: <20150317164353.GN23340@leverpostej>
+ <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20150325145949.GE26903@localhost>
+Message-ID: <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/26 13:19, Daniel Axtens wrote:
-> Hi Yijing,
-> 
-> Pulled.
-> 
-> I'm now getting build errors:
-> 
-> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c: In function 'pcibios_scan_phb':
-> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c:1638:14: error: 'bus' undeclared (first use in this function)
-> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c:1638:14: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> That relates to your changes to pcibios_scan_phb:
-> -       struct pci_bus *bus;
-> +       struct pci_host_bridge *host;
-> clashing with line 1638:
-> 	hose->bus = bus;
-> which occurs later in the same unction.
-> 
-> If I fix that, I'll get more errors with lines in that function that
-> still reference hose instead of host.
-> 
-> As well as line 1638, there's still big chunks of the function that
-> reference hose, for example:
-> 
-> 	/* Get some IO space for the new PHB */
-> 	pcibios_setup_phb_io_space(hose);
-> 
-> 	/* Wire up PHB bus resources */
-> 	pcibios_setup_phb_resources(hose, &resources);
-> 
-> 	hose->busn.start = hose->first_busno;
-> 	hose->busn.end	 = hose->last_busno;
-> 	hose->busn.flags = IORESOURCE_BUS;
-> 	pci_add_resource(&resources, &hose->busn);
-> 
-> 	pci_host_ops.pci_ops = hose->ops;
-> 
-> 
-> Basically, the changes in PowerPC need to be quite a bit more through
-> just to get the changes to build.
-> 
-> I'm keen to work on simplifying PCI code in PowerPC, but at this point,
-> it will need a lot more work before it's ready to go in.
-
-Hi Daniel, I'm really so sorry about that, I will update it today.
-
-Thanks!
-Yijing.
-
-> 
-> Regards,
-> Daniel
-> 
-> 
-> On Thu, 2015-03-26 at 09:17 +0800, Yijing Wang wrote:
->> On 2015/3/26 6:13, Daniel Axtens wrote:
->>> Hi Yijing,
->>>
->>> I wasn't quite sure I understood your comments, so I was trying to apply
->>> your patch series and test it, but patch 3 doesn't apply cleanly to
->>> 4.0-rc5 or master. Can you respin the series?
+On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
+>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>> index 16134608eecf..fd8434753372 100644
+>> --- a/arch/arm64/kernel/head.S
+>> +++ b/arch/arm64/kernel/head.S
+>> @@ -49,13 +49,15 @@
+>>  #ifdef CONFIG_ARM64_64K_PAGES
+>>  #define BLOCK_SHIFT  PAGE_SHIFT
+>>  #define BLOCK_SIZE   PAGE_SIZE
+>> -#define TABLE_SHIFT  PMD_SHIFT
+>>  #else
+>>  #define BLOCK_SHIFT  SECTION_SHIFT
+>>  #define BLOCK_SIZE   SECTION_SIZE
+>> -#define TABLE_SHIFT  PUD_SHIFT
+>>  #endif
 >>
->> Hi Daniel,
->>    Could you pull the series from Bjorn's git tree ? The URL is
->> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/enumeration-yw8
+>> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
+>> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
+>> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
+>> +
+>>  #define KERNEL_START _text
+>>  #define KERNEL_END   _end
 >>
->> Thanks!
->> Yijing.
+>> @@ -237,7 +239,10 @@ ENTRY(stext)
+>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
 >>
->>>
->>> Thanks,
->>> Daniel
->>>
->>>
->>>> Hi Daniel, thanks for your review and comments. We want to make a generic pci_host_bridge,
->>>> which would hold the common host information, for example, pci domain is common info for
->>>> pci host bridge, this series saved domain in pci_host_bridge, then we no need to
->>>> extract out domain by pci_bus->sysdata by platform specific pci_domain_nr().
->>>> Also we store the sysdata in pci_host_bridge, and pci_bus_to_host() is the platform
->>>> interface, I think use the common interface would be better.
->>>>
->>>>>> +
->>>>>> +	/* Get probe mode and perform scan */
->>>>>> +	if (hose->dn && ppc_md.pci_probe_mode)
->>>>>> +		mode = ppc_md.pci_probe_mode(bus);
->>>>>> +
->>>>>> +	pr_debug("    probe mode: %d\n", mode);
->>>>>> +	if (mode == PCI_PROBE_DEVTREE)
->>>>>> +		of_scan_bus(hose->dn, bus);
->>>>>> +
->>>>>> +	if (mode == PCI_PROBE_NORMAL) {
->>>>>> +		pci_bus_update_busn_res_end(bus, 255);
->>>>>> +		hose->last_busno = pci_scan_child_bus(bus);
->>>>>> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
->>>>>> +	}
->>>>>> +
->>>>>> +	return pci_bus_child_max_busnr(bus);
->>>>>> +}
->>>>>> +
->>>>> I'm having trouble convincing myself that this patch covers every
->>>>> variation within our PCI implementations. In particular, there's a
->>>>> stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
->>>>> identical to this function. Does that implementation need to be cleaned
->>>>> up and replaced with this function too?
->>>>>
->>>>
->>>> This is a pci_host_bridge_ops hook function, which would be called in
->>>> PCI core, and after applied this series, we only need to call pci_scan_host_bridge()
->>>> to scan pci devices, and this function is also extracted from the pcibios_scan_phb(),
->>>> it's not the redundant code.
->>>>
->>>>>
->>>>>> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
->>>>>>  		ppc_md.pcibios_fixup_phb(hose);
->>>>>>  
->>>>>>  	/* Configure PCI Express settings */
->>>>>> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>>>>> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>>>>>  		struct pci_bus *child;
->>>>>> -		list_for_each_entry(child, &bus->children, node)
->>>>>> +		list_for_each_entry(child, &host->bus->children, node)
->>>>>>  			pcie_bus_configure_settings(child);
->>>>>>  	}
->>>>>>  }
->>>>> Two things: Firstly, the function uses hose throughout, not host.
->>>>> Secondly, you're not deleting the bus variable: what's the purpose of
->>>>> this change?
->>>>
->>>> host is the common pci_host_bridge which is created by PCI core for pci host bridge driver,
->>>> the hose is the platform data used in powerpc. The purpose of the patch/series is to simplify
->>>> pci enumeration interface, and try to reduce the weak functions which were used to setup pci bus/devices
->>>> during PCI enumeration.
->>>>
->>>>>
->>>>> Regards,
->>>>> Daniel
->>>>>
->>>>
->>>>
->>>
->>
->>
-> 
+>>       adrp    x24, __PHYS_OFFSET
+>> -     mov     x23, #KIMAGE_OFFSET
+>> +     and     x23, x24, #~TABLE_MASK          // image offset
+>> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
+>> +     mov     x0, #KIMAGE_OFFSET
+>> +     add     x23, x23, x0
+>
+> I'm still trying to figure out how this works. Does the code imply that
+> the kernel image can only be loaded within a block size of the
+> PHYS_OFFSET? If that's the case, it's not too flexible.
+>
 
+For now, yes.
 
--- 
-Thanks!
-Yijing
+> My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
+> entirely) or at least compute it at DT parsing time. I'm more inclined
+> for making it 0 assuming that it doesn't break anything else (vmemmap
+> virtual range may get slightly bigger but still not significant,
+> basically max_phys_addr / sizeof(struct page)).
+>
+
+Making it zero would be an improvement, I suppose
