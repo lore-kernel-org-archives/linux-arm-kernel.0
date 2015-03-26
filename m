@@ -1,30 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 Mar 2015 21:53:08 +0000
-Subject: [PATCH v3 09/11] KVM: arm/arm64: merge GICv3 RD_base and
- SGI_base register frames
-In-Reply-To: <1427380778-942-10-git-send-email-andre.przywara@arm.com>
-References: <1427380778-942-1-git-send-email-andre.przywara@arm.com>
- <1427380778-942-10-git-send-email-andre.przywara@arm.com>
-Message-ID: <20150326215308.74b994ff@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 26 Mar 2015 14:58:40 -0700
+Subject: String literals in __init functions
+In-Reply-To: <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
+References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
+ <5513FE2F.3040306@free.fr> <1427386390.15849.13.camel@perches.com>
+ <CA+rthh9Fb2q+O_wicc6eNcbo6SzwOVZed=tnThJLF-xuoQ-+Cw@mail.gmail.com>
+ <1427392393.15849.16.camel@perches.com>
+ <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
+ <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
+Message-ID: <1427407120.15849.34.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Mar 2015 14:39:36 +0000
-Andre Przywara <andre.przywara@arm.com> wrote:
+(adding gcc at gcc.gnu.org)
 
-> Currently we handle the redistributor registers in two separate MMIO
-> regions, one for the overall behaviour and SPIs and one for the
-> SGIs/PPIs. That latter forces the creation of _two_ KVM I/O bus
-> devices for each redistributor.
-> Since the spec mandates those two pages to be contigious, we could as
-> well merge them and save the churn with the second KVM I/O bus device.
+On Thu, 2015-03-26 at 14:40 -0700, Andrew Morton wrote:
+> On Thu, 26 Mar 2015 21:49:06 +0100 Mathias Krause <minipli@googlemail.com> wrote:
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > Andrew, what's your opinion on such a patch set? Do you too think it's
+> > useful? Or do you share Ingo's fear about the additional maintenance
+> > burden?
+> 
+> I don't think the burden would be toooo high, although it will mess the
+> code up a bit.
 
-I wonder why we didn't have it that way the first place...
+I think it's overall a pretty low cost one-time pass
+that Mathias has nearly completely automated.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Even if a future version of gcc implements string
+constants in specific sections, the code isn't
+difficult to understand or maintain for older versions.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> The post-build checking for section reference mismatches will help,
+> although that seems to have got itself turned off (what happened
+> there?).
+
+I think the modprobe message works well.
+What do you think missing?
+
+> Did anyone ask the gcc developers?
+
+Not to my knowledge.
+
+> I'd have thought that a function-wide
+> 	__attribute__((__string_section__(foo))
+> wouldn't be a ton of work to implement.
+
+Maybe not.
+
+Could some future version of gcc move string constants
+in a function to a specific section marked in a manner
+similar to what Andrew described above?
