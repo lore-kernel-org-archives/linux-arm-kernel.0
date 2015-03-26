@@ -1,101 +1,218 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 26 Mar 2015 12:06:15 +0100
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <55128EC8.6080805@denx.de>
-References: <55128016.3030903@denx.de>
- <1427276390.2813.7.camel@pengutronix.de> <55128EC8.6080805@denx.de>
-Message-ID: <1427367975.3378.6.camel@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 26 Mar 2015 12:08:17 +0100
+Subject: [PATCH 07/13] clocksource: tcb_clksrc: make IO endian agnostic
+In-Reply-To: <5513D7AA.8030008@linaro.org>
+References: <1426693992-31163-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1426693992-31163-8-git-send-email-ben.dooks@codethink.co.uk>
+ <5513D7AA.8030008@linaro.org>
+Message-ID: <5513E8A1.1050809@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 25.03.2015, 11:32 +0100 schrieb Stefan Roese:
-> On 25.03.2015 10:39, Lucas Stach wrote:
-> > Am Mittwoch, den 25.03.2015, 10:29 +0100 schrieb Stefan Roese:
-> >> Hi!
-> >>
-> >> I'm currently facing a problem in the imx6 PCIe driver. The
-> >> problem happens, after the Linux imx6 internal watchdog has timed-out
-> >> and issues a reset (this is intended, as I'm testing this wdog right
-> >> now). But the next Linux boot hangs in imx6_pcie_assert_core_reset()
-> >> while accessing a register from the PCIe port logic memory:
-> >>
-> >> 		val = readl(pp->dbi_base + PCIE_PL_PFLR);
-> >>
-> >> The watchdog will issue a new reset once it times out again. But
-> >> Linux will hang here the next time as well. Only a power-cycle
-> >> helps. For a test purpose, I've removed the following part from
-> >> this function:
-> >>
-> >> 	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
-> >> 	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
-> >> 		...
-> >> 	}
-> >>
-> >> Without it, Linux boots up fine. And PCIe also seems to be fully
-> >> functional.
-> >>
-> >> I have to admit that I have no real insight in the imx6 / DW PCIe
-> >> driver. So I'm checking with you experts, if you have any ideas why
-> >> this could be the case? And how this could be solved.
-> >>
-> >> BTW: This happens with v3.19 and v4.0-rc5 on a i.MX6Solo based board
-> >> (TQMa6S SoM). With no PCIe support enabled in the bootloader (U-Boot).
-> >
-> > The problem here is that the LTSSM state machine stays in "Link" state
-> > after the WD reset and no configuration of the core can happen in this
-> > state. The path inside the above if clause applies a workaround the get
-> > LTSSM back into the initial state.
-> >
-> > As this is a bit racy and not the intended way to do things we only
-> > apply this workaround if we are relatively certain that the PCIe link
-> > had been enabled without a reset to the core before.
+Le 26/03/2015 10:55, Daniel Lezcano a ?crit :
+> On 03/18/2015 04:53 PM, Ben Dooks wrote:
+>> Change the __raw read and write to use readl/writel_relaxed to make the
+>> code endian agnostic.
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > 
-> Thanks for the explanation.
+> Nicolas,
 > 
-> > So what you are saying is that after the WD reset the GPR registers are
-> > cleared?
-> 
-> No, they are not cleared.
-> 
-> After a power-on reset, these are the GPR values:
-> gpr1=48401005 gpr12=0f000000
-> 
-> Here the values after a "normal" reset issued via the reboot command:
-> gpr1=48441005 gpr12=0f004090
-> 
-> This is because of the shutdown handler calling
-> imx6_pcie_assert_core_reset().
-> 
-> Now after the watchdog reset, its a bit different:
-> gpr1=48411005 gpr12=0f004490
-> 
-> So this is only time (in my test cases), that the if clause is
-> entered (and hangs).
-> 
-> > If so we may need to make the logic to decide when to apply
-> > this WAR a bit smarter.
-> 
-Okay, I've looked a bit into this and it seems there is no easy solution
-available. It is really unfortunate that the WD reset doesn't reset the
-GPR registers. Also I have no idea if the WD reset properly resets the
-PCIe core, as the reset signal of this core is only wired to the POR
-line.
+> what about this one ? Do you ack it ?
 
-To fix this (almost) properly we would have to change the complete init
-order of the core, which isn't an easy task, as experience has shown
-that even small changes in that area can prevent the link from coming up
-under certain circumstances.
+Yes:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Which brings me back to my earlier assertion that WD reset should really
-be done through the PMIC. That's yet another case of a WD making the
-overall system more instable.
+We were discussing about having a common macro for this... But we will
+think more about it later.
 
-I think the easiest workaround for now is to detect the WD reset in your
-bootloader and bash the expected default values into the GPR bits.
+So, let's go for it.
 
-Regards,
-Lucas
+Bye,
+
+
+>> --
+>> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> CC: Thomas Gleixner <tglx@linutronix.de>
+>> CC: Linux Kernel <linux-kernel@vger.kernel.org>
+>> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+>> CC: Andrew Victor <linux@maxim.org.za>
+>> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+>> ---
+>>   drivers/clocksource/tcb_clksrc.c | 66 ++++++++++++++++++++++------------------
+>>   1 file changed, 37 insertions(+), 29 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+>> index 8bdbc45..0f819dd3 100644
+>> --- a/drivers/clocksource/tcb_clksrc.c
+>> +++ b/drivers/clocksource/tcb_clksrc.c
+>> @@ -41,6 +41,14 @@
+>>
+>>   static void __iomem *tcaddr;
+>>
+>> +#ifdef CONFIG_AVR32
+>> +#define tcb_readl	__raw_readl
+>> +#define tcb_writel	__raw_writel
+>> +#else
+>> +#define tcb_readl	readl_relaxed
+>> +#define tcb_writel	writel_relaxed
+>> +#endif
+>> +
+>>   static cycle_t tc_get_cycles(struct clocksource *cs)
+>>   {
+>>   	unsigned long	flags;
+>> @@ -48,9 +56,9 @@ static cycle_t tc_get_cycles(struct clocksource *cs)
+>>
+>>   	raw_local_irq_save(flags);
+>>   	do {
+>> -		upper = __raw_readl(tcaddr + ATMEL_TC_REG(1, CV));
+>> -		lower = __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>> -	} while (upper != __raw_readl(tcaddr + ATMEL_TC_REG(1, CV)));
+>> +		upper = tcb_readl(tcaddr + ATMEL_TC_REG(1, CV));
+>> +		lower = tcb_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>> +	} while (upper != tcb_readl(tcaddr + ATMEL_TC_REG(1, CV)));
+>>
+>>   	raw_local_irq_restore(flags);
+>>   	return (upper << 16) | lower;
+>> @@ -58,7 +66,7 @@ static cycle_t tc_get_cycles(struct clocksource *cs)
+>>
+>>   static cycle_t tc_get_cycles32(struct clocksource *cs)
+>>   {
+>> -	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>> +	return tcb_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>>   }
+>>
+>>   static struct clocksource clksrc = {
+>> @@ -98,8 +106,8 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>
+>>   	if (tcd->clkevt.mode == CLOCK_EVT_MODE_PERIODIC
+>>   			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+>> -		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>> -		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+>> +		tcb_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>> +		tcb_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+>>   		clk_disable(tcd->clk);
+>>   	}
+>>
+>> @@ -112,16 +120,16 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>   		clk_enable(tcd->clk);
+>>
+>>   		/* slow clock, count up to RC, then irq and restart */
+>> -		__raw_writel(timer_clock
+>> +		tcb_writel(timer_clock
+>>   				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+>>   				regs + ATMEL_TC_REG(2, CMR));
+>> -		__raw_writel((32768 + HZ/2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
+>> +		tcb_writel((32768 + HZ/2) / HZ, tcaddr + ATMEL_TC_REG(2, RC));
+>>
+>>   		/* Enable clock and interrupts on RC compare */
+>> -		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+>> +		tcb_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+>>
+>>   		/* go go gadget! */
+>> -		__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+>> +		tcb_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+>>   				regs + ATMEL_TC_REG(2, CCR));
+>>   		break;
+>>
+>> @@ -129,10 +137,10 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>   		clk_enable(tcd->clk);
+>>
+>>   		/* slow clock, count up to RC, then irq and stop */
+>> -		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+>> +		tcb_writel(timer_clock | ATMEL_TC_CPCSTOP
+>>   				| ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+>>   				regs + ATMEL_TC_REG(2, CMR));
+>> -		__raw_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+>> +		tcb_writel(ATMEL_TC_CPCS, regs + ATMEL_TC_REG(2, IER));
+>>
+>>   		/* set_next_event() configures and starts the timer */
+>>   		break;
+>> @@ -144,10 +152,10 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+>>
+>>   static int tc_next_event(unsigned long delta, struct clock_event_device *d)
+>>   {
+>> -	__raw_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
+>> +	tcb_writel(delta, tcaddr + ATMEL_TC_REG(2, RC));
+>>
+>>   	/* go go gadget! */
+>> -	__raw_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+>> +	tcb_writel(ATMEL_TC_CLKEN | ATMEL_TC_SWTRG,
+>>   			tcaddr + ATMEL_TC_REG(2, CCR));
+>>   	return 0;
+>>   }
+>> @@ -169,7 +177,7 @@ static irqreturn_t ch2_irq(int irq, void *handle)
+>>   	struct tc_clkevt_device	*dev = handle;
+>>   	unsigned int		sr;
+>>
+>> -	sr = __raw_readl(dev->regs + ATMEL_TC_REG(2, SR));
+>> +	sr = tcb_readl(dev->regs + ATMEL_TC_REG(2, SR));
+>>   	if (sr & ATMEL_TC_CPCS) {
+>>   		dev->clkevt.event_handler(&dev->clkevt);
+>>   		return IRQ_HANDLED;
+>> @@ -221,43 +229,43 @@ static int __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>>   static void __init tcb_setup_dual_chan(struct atmel_tc *tc, int mck_divisor_idx)
+>>   {
+>>   	/* channel 0:  waveform mode, input mclk/8, clock TIOA0 on overflow */
+>> -	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
+>> +	tcb_writel(mck_divisor_idx			/* likely divide-by-8 */
+>>   			| ATMEL_TC_WAVE
+>>   			| ATMEL_TC_WAVESEL_UP		/* free-run */
+>>   			| ATMEL_TC_ACPA_SET		/* TIOA0 rises at 0 */
+>>   			| ATMEL_TC_ACPC_CLEAR,		/* (duty cycle 50%) */
+>>   			tcaddr + ATMEL_TC_REG(0, CMR));
+>> -	__raw_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
+>> -	__raw_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
+>> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+>> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+>> +	tcb_writel(0x0000, tcaddr + ATMEL_TC_REG(0, RA));
+>> +	tcb_writel(0x8000, tcaddr + ATMEL_TC_REG(0, RC));
+>> +	tcb_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+>> +	tcb_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+>>
+>>   	/* channel 1:  waveform mode, input TIOA0 */
+>> -	__raw_writel(ATMEL_TC_XC1			/* input: TIOA0 */
+>> +	tcb_writel(ATMEL_TC_XC1			/* input: TIOA0 */
+>>   			| ATMEL_TC_WAVE
+>>   			| ATMEL_TC_WAVESEL_UP,		/* free-run */
+>>   			tcaddr + ATMEL_TC_REG(1, CMR));
+>> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
+>> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
+>> +	tcb_writel(0xff, tcaddr + ATMEL_TC_REG(1, IDR));	/* no irqs */
+>> +	tcb_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(1, CCR));
+>>
+>>   	/* chain channel 0 to channel 1*/
+>> -	__raw_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
+>> +	tcb_writel(ATMEL_TC_TC1XC1S_TIOA0, tcaddr + ATMEL_TC_BMR);
+>>   	/* then reset all the timers */
+>> -	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+>> +	tcb_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+>>   }
+>>
+>>   static void __init tcb_setup_single_chan(struct atmel_tc *tc, int mck_divisor_idx)
+>>   {
+>>   	/* channel 0:  waveform mode, input mclk/8 */
+>> -	__raw_writel(mck_divisor_idx			/* likely divide-by-8 */
+>> +	tcb_writel(mck_divisor_idx			/* likely divide-by-8 */
+>>   			| ATMEL_TC_WAVE
+>>   			| ATMEL_TC_WAVESEL_UP,		/* free-run */
+>>   			tcaddr + ATMEL_TC_REG(0, CMR));
+>> -	__raw_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+>> -	__raw_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+>> +	tcb_writel(0xff, tcaddr + ATMEL_TC_REG(0, IDR));	/* no irqs */
+>> +	tcb_writel(ATMEL_TC_CLKEN, tcaddr + ATMEL_TC_REG(0, CCR));
+>>
+>>   	/* then reset all the timers */
+>> -	__raw_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+>> +	tcb_writel(ATMEL_TC_SYNC, tcaddr + ATMEL_TC_BCR);
+>>   }
+>>
+>>   static int __init tcb_clksrc_init(void)
+>>
+> 
+> 
+
+
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Nicolas Ferre
