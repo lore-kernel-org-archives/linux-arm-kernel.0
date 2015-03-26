@@ -1,15 +1,14 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Mar 2015 18:02:09 +0000
-Subject: [PATCH] dma: at_hdmac: use __le32 for dma addresses
-Message-ID: <1427392929-10578-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Thu, 26 Mar 2015 18:08:53 +0000
+Subject: [PATCH] dma: at_xdmac: use __le32 for dma addresses
+Message-ID: <1427393333-14473-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at_dmac uses a lli structure with a mix of dma_addr_t and
-__le32 in it. As Russell King pointed out, dma_addr_t could be
-a non 32-bit size depending on the kernel configuration. Change
-all references of this to __le32 to better match the hardware
-representation.
+The at_xdmac uses a lli structure with a mix of dma_addr_t and __le32
+in it. As Russell King pointed out, dma_addr_t could be a non 32-bit
+size depending on the kernel configuration. Change all references of
+this to __le32 to better match the hardware representation.
 
 Note, this does nothing to fix the discussion of dma vs physical
 addresses also brought up during these discussions.
@@ -26,29 +25,26 @@ CC: Vinod Koul <vinod.koul@intel.com>
 CC: linux-arm-kernel at lists.infradead.org
 CC: dmaengine at vger.kernel.org
 ---
- drivers/dma/at_hdmac_regs.h | 6 +++---
+ drivers/dma/at_xdmac.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index bd4d174..b246beb 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -167,13 +167,13 @@
- /* LLI == Linked List Item; aka DMA buffer descriptor */
- struct at_lli {
- 	/* values that are not changed by hardware */
--	dma_addr_t	saddr;
--	dma_addr_t	daddr;
-+	__le32		saddr;
-+	__le32		daddr;
- 	/* value that may get written back: */
- 	__le32		ctrla;
- 	/* more values that are not changed by hardware */
- 	__le32		ctrlb;
--	dma_addr_t	dscr;	/* chain to next lli */
-+	__le32		dscr;	/* chain to next lli */
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 65a37be..d9dd71c 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -231,10 +231,10 @@ struct at_xdmac {
+ 
+ /* Linked List Descriptor */
+ struct at_xdmac_lld {
+-	dma_addr_t	mbr_nda;	/* Next Descriptor Member */
++	__le32		mbr_nda;	/* Next Descriptor Member */
+ 	__le32		mbr_ubc;	/* Microblock Control Member */
+-	dma_addr_t	mbr_sa;		/* Source Address Member */
+-	dma_addr_t	mbr_da;		/* Destination Address Member */
++	__le32		mbr_sa;		/* Source Address Member */
++	__le32		mbr_da;		/* Destination Address Member */
+ 	__le32		mbr_cfg;	/* Configuration Register */
  };
  
- /**
 -- 
 2.1.4
