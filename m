@@ -1,54 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 26 Mar 2015 14:00:24 -0500
-Subject: [PATCH v4] dt-bindings: brcm: rationalize Broadcom documentation
- naming
-In-Reply-To: <55125894.2070303@broadcom.com>
-References: <1426899982-19733-1-git-send-email-sbranden@broadcom.com>
- <550F6A5B.8050906@gmail.com> <55125894.2070303@broadcom.com>
-Message-ID: <CAL_JsqLGz59fyC6h7XEh=UHOCzgTUY0Y2TSrZTHmv4U8nBpunw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Mar 2015 12:03:12 -0700
+Subject: [PATCH V2 2/2] ARM: dts: am57xx-beagle-x15: Add thermal map to
+ include fan and tmp102
+In-Reply-To: <20150324151736.GE29155@developer.hsd1.ca.comcast.net>
+References: <1427139579-4215-1-git-send-email-nm@ti.com>
+ <1427139579-4215-3-git-send-email-nm@ti.com>
+ <20150324151736.GE29155@developer.hsd1.ca.comcast.net>
+Message-ID: <20150326190311.GE10805@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 1:41 AM, Scott Branden <sbranden@broadcom.com> wrote:
-> Hi Rob,
->
-> On 15-03-22 06:20 PM, Rob Herring wrote:
->>
->> On 03/20/2015 08:06 PM, Scott Branden wrote:
->>>
->>> This patchset attempts to standardize the naming of dt-bindings
->>> documents based on the Broadcom vendor prefix of brcm.
->>>
->>> Although there are no guidelines currently present for how to name
->>> the dt-bindings document the "vendor,binding.txt" style is in use by
->>> some of the other vendors.
->>>
->>> Acked-by: Lee Jones <lee@kernel.org>
->>> Acked-by: Florian Fainelli <f.fainelli@gmail.com>
->>> Acked-by: Gregory Fong <gregory.0xf0@gmail.com>
->>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
->>
->>
->> Version history would be nice...
->
-> Yes, I should have added a cover letter but didn't.  The difference between
-> versions was minimal: a spelling correction in the commit message text and a
-> few additional binding files were found that were added between the
-> versions, along with the Ack's.
->
->>
->> Who did you want to apply this? I can, but I'm worried about merge
->> conflicts here. Hopefully, you're not also doing lots of changes to
->> existing bindings.
->
->
-> Yes, it would be great for you to take care of applying this.  There
-> shouldn't be any merge conflicts as none of these bindings are currently
-> being updated.  I left a clock binding document out of this patchset at Ray
-> Jui is updating/renaming the documentation for that binding in a different
-> patch already.
+* Eduardo Valentin <edubezval@gmail.com> [150324 08:17]:
+> On Mon, Mar 23, 2015 at 02:39:39PM -0500, Nishanth Menon wrote:
+> > BeagleBoard-X15 has capability for a fan and has an onboard TMP102
+> > temperature sensor as well. This allows us to create a new thermal
+> > zone (called, un-imaginatively "board"), and allows us to use some
+> > active cooling as temperatures start edge upward in the system by
+> > creating a new alert temperature (emperically 50C) for cpu.
+> > 
+> > NOTE: Fan is NOT mounted by default on the platform, in such a case,
+> > all we end up doing is switch on a regulator and leak very minimal
+> > current.
+> > 
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
+> 
+> Acked-by: Eduardo Valentin <edubezval@gmail.com>
 
-Okay, thanks. I've applied it.
+Applying both of these into omap-for-v4.1/fixes-not-urgent thanks.
 
-Rob
+Tony
