@@ -1,38 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Mar 2015 22:04:52 +0000
-Subject: [PATCH 0/5] arm64: Patching branches for fun and profit
-In-Reply-To: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
-References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150326220452.GB23836@arm.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 26 Mar 2015 23:05:52 +0100
+Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <20150326154618.GO8656@n2100.arm.linux.org.uk>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
+ <5511ABAA.2010303@hurleysoftware.com>
+ <20150326154618.GO8656@n2100.arm.linux.org.uk>
+Message-ID: <CALszF6CPRqB-wOfyM6QuN3v7GNRbsaHtPv82okiLcNekoBQ2tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 01:59:31PM +0000, Marc Zyngier wrote:
-> The current alternative instruction framework is not kind to branches,
-> potentially leading to all kind of hacks in the code that uses
-> alternatives. This series expands it to deal with immediate branches
-> (for a start), and applies it to the VGIC world switch.
-> 
-> Patch #1 adds the required infrastructure to extract the immediate
-> from an instruction.
-> 
-> Patch #2 allows the use of an immediate b or bl instruction as an
-> alternative, computing the target branch as the instruction is being
-> patched in.
-> 
-> Patch #3 defines a feature framework that works exactly like the CPU
-> errata infrastructure (and shares a lot with it).
-> 
-> Patch #4 adds detection of the system register GICv3 CPU interface.
-> 
-> Patch #5 enables dynamic patching of the KVM code.
-> 
-> This has been tested with GICv3 on a FastModel.
+2015-03-26 16:46 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Mar 24, 2015 at 02:23:38PM -0400, Peter Hurley wrote:
+>> Hi Maxime,
+>>
+>> On 03/12/2015 05:55 PM, Maxime Coquelin wrote:
+>> > +static unsigned int stm32_get_mctrl(struct uart_port *port)
+>> > +{
+>> > +   /*
+>> > +    * This routine is used for geting signals of: DTR, DCD, DSR, RI,
+>> > +    * and CTS/RTS
+>
+> It's also worth noting that this comment is wrong.  This is used to get
+> the state of DCD, DSR, RI and CTS.  DTR and RTS are *not* included
+> because the core tracks their state.
 
-Modulo my one minor comment:
+OK, thanks for pointing this.
+I will fix the comment in the v4.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> ...
+>
+>> > +   stm32port->clk = devm_clk_get(&pdev->dev, NULL);
+>> > +
+>> > +   if (WARN_ON(IS_ERR(stm32port->clk)))
+>>
+>> Do you really need a stack trace here? Could this be dev_err() instead?
+>>
+>> > +           return -EINVAL;
+>
+> Also, propagate the error code.
+Ok.
 
-for the series.
+>
+>> > +
+>> > +   /* ensure that clk rate is correct by enabling the clk */
+>> > +   clk_prepare_enable(stm32port->clk);
+>
+> And remember to check the return value of clk_prepare_enable().
+I will.
 
-Will
+Thanks for the review,
+Maxime
+
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
