@@ -1,76 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 Mar 2015 22:19:55 +0000
-Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
- alternative instruction
-In-Reply-To: <20150326220323.GA23836@arm.com>
-References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
- <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
- <20150326220323.GA23836@arm.com>
-Message-ID: <20150326221955.4b8fe6f0@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 26 Mar 2015 23:22:18 +0100
+Subject: [PATCH v2] coresight: moving to new "hwtracing" directory
+In-Reply-To: <1426870883-12169-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1426870883-12169-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <20150326222218.GA13240@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Mar 2015 22:03:23 +0000
-Will Deacon <will.deacon@arm.com> wrote:
-
-> On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
-> > Since all immediate branches are PC-relative on Aarch64, these
-> > instructions cannot be used as an alternative with the simplistic
-> > approach we currently have (the immediate has been computed from
-> > the .altinstr_replacement section, and end-up being completely off
-> > if we insert it directly).
-> > 
-> > This patch handles the b and bl instructions in a different way,
-> > using the insn framework to recompute the immediate, and generate
-> > the right displacement.
-> > 
-> > Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 53 insertions(+), 2 deletions(-)
+On Fri, Mar 20, 2015 at 11:01:23AM -0600, Mathieu Poirier wrote:
+> Keeping drivers related to HW tracing on ARM, i.e coresight,
+> under "drivers/coresight" doesn't make sense when other
+> architectures start rolling out technologies of the same
+> nature.
 > 
-> [...]
+> As such creating a new "drivers/hwtracing" directory where all
+> drivers of the same kind can reside, reducing namespace
+> pollution under "drivers/".
 > 
-> >  static int __apply_alternatives(void *alt_region)
-> >  {
-> >  	struct alt_instr *alt;
-> > @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
-> >  	u8 *origptr, *replptr;
-> >  
-> >  	for (alt = region->begin; alt < region->end; alt++) {
-> > +		u32 insn;
-> > +		int i;
-> > +
-> >  		if (!cpus_have_cap(alt->cpufeature))
-> >  			continue;
-> >  
-> > -		BUG_ON(alt->alt_len > alt->orig_len);
-> > +		BUG_ON(alt->alt_len != alt->orig_len);
-> >  
-> >  		pr_info_once("patching kernel code\n");
-> >  
-> >  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
-> >  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
-> > -		memcpy(origptr, replptr, alt->alt_len);
-> > +
-> > +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
-> > +			insn = get_alt_insn(origptr + i, replptr + i);
-> > +			*(u32 *)(origptr + i) = insn;
-> 
-> My brain's not firing on all cylinders right now, but do you need a
-> cpu_to_le32 here?
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> ---
+> Change for v2:
+>  - generated patch with -M option 
+> ---
+>  MAINTAINERS                                              | 2 +-
+>  arch/arm/Kconfig.debug                                   | 2 +-
+>  arch/arm64/Kconfig.debug                                 | 2 +-
+>  drivers/Makefile                                         | 2 +-
+>  drivers/{ => hwtracing}/coresight/Kconfig                | 0
+>  drivers/{ => hwtracing}/coresight/Makefile               | 0
+>  drivers/{ => hwtracing}/coresight/coresight-etb10.c      | 0
+>  drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c   | 0
+>  drivers/{ => hwtracing}/coresight/coresight-etm.h        | 0
+>  drivers/{ => hwtracing}/coresight/coresight-etm3x.c      | 0
+>  drivers/{ => hwtracing}/coresight/coresight-funnel.c     | 0
+>  drivers/{ => hwtracing}/coresight/coresight-priv.h       | 0
+>  drivers/{ => hwtracing}/coresight/coresight-replicator.c | 0
+>  drivers/{ => hwtracing}/coresight/coresight-tmc.c        | 0
+>  drivers/{ => hwtracing}/coresight/coresight-tpiu.c       | 0
+>  drivers/{ => hwtracing}/coresight/coresight.c            | 0
+>  drivers/{ => hwtracing}/coresight/of_coresight.c         | 0
+>  17 files changed, 4 insertions(+), 4 deletions(-)
+>  rename drivers/{ => hwtracing}/coresight/Kconfig (100%)
+>  rename drivers/{ => hwtracing}/coresight/Makefile (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-etb10.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-etm.h (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-etm3x.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-funnel.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-priv.h (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-replicator.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-tmc.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight-tpiu.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/coresight.c (100%)
+>  rename drivers/{ => hwtracing}/coresight/of_coresight.c (100%)
 
-I'm not 100% awake myself (probably some acute form of firmwaritis),
-but I suspect you're quite right (get_alt_insn calls aarch64_insn_read,
-which does a le32_to_cpu). Obviously, we need to revert the conversion
-when writing the instruction back.
+I'm fine with this, but it doesn't apply to my tree, so I can't add it
+:(
 
-Do you want a fixup on top of this, or would you prefer me to respin
-the series?
+Fix it up and resend?
 
-Thanks,
+thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+greg k-h
