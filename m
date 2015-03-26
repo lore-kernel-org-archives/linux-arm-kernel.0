@@ -1,33 +1,34 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 26 Mar 2015 22:38:54 +0100
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <20150325140725.GA11499@kroah.com> (Greg Kroah-Hartman's message
- of "Wed, 25 Mar 2015 15:07:25 +0100")
-References: <20150216130549.GF14545@x1>
- <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
- <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
- <20150217074310.GT14545@x1>
- <alpine.LFD.2.11.1502171221300.22104@knanqh.ubzr>
- <20150218080719.GB5781@x1> <87a9088tam.fsf@free.fr>
- <20150325140725.GA11499@kroah.com>
-Message-ID: <871tkbxwup.fsf@free.fr>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 26 Mar 2015 14:40:58 -0700
+Subject: String literals in __init functions
+In-Reply-To: <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
+References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
+ <5513FE2F.3040306@free.fr> <1427386390.15849.13.camel@perches.com>
+ <CA+rthh9Fb2q+O_wicc6eNcbo6SzwOVZed=tnThJLF-xuoQ-+Cw@mail.gmail.com>
+ <1427392393.15849.16.camel@perches.com>
+ <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
+Message-ID: <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+On Thu, 26 Mar 2015 21:49:06 +0100 Mathias Krause <minipli@googlemail.com> wrote:
 
-> On Fri, Feb 20, 2015 at 05:02:57PM +0100, Robert Jarzmik wrote:
->> If there is no solution, I'll fallback through arch/arm/plat-pxa, not very nice,
->> but it has to land somewhere, I don't want lubbock to remain broken.
->
-> drivers/platform/arm ?
-Most certainly.
+> Andrew, what's your opinion on such a patch set? Do you too think it's
+> useful? Or do you share Ingo's fear about the additional maintenance
+> burden?
 
-I'll submit that to drivers/platform/arm/pxa, and maintain that pxa tree. As for
-drivers/platform/arm, do you want also maintainers to step up, or will you take
-the review/merge burden ?
+I don't think the burden would be toooo high, although it will mess the
+code up a bit.
 
-Cheers.
+The post-build checking for section reference mismatches will help,
+although that seems to have got itself turned off (what happened
+there?).
 
--- 
-Robert
+Did anyone look at writing a postprocessor for the .s files?  It
+doesn't look like it will be too hard from an initial peek.
+
+Did anyone ask the gcc developers?  I'd have thought that a function-wide
+
+	__attribute__((__string_section__(foo))
+
+wouldn't be a ton of work to implement.
