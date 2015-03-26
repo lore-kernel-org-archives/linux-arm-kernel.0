@@ -1,82 +1,42 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 26 Mar 2015 15:53:45 +0100
-Subject: [PATCH v2 5/5] net: allwinner: emac: Claim our SRAM
-In-Reply-To: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
-References: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1427381625-6942-6-git-send-email-hdegoede@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Mar 2015 15:05:58 +0000
+Subject: [PATCH] arm: fix integer overflow in ELF_ET_DYN_BASE
+In-Reply-To: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+References: <1426849972-19606-1-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150326150558.GK8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Fri, Mar 20, 2015 at 02:12:52PM +0300, Andrey Ryabinin wrote:
+> Usually ELF_ET_DYN_BASE is 2/3 of TASK_SIZE. With 3G/1G user/kernel
+> split this is not so, because 2*TASK_SIZE overflows 32 bits,
+> so the actual value of ELF_ET_DYN_BASE is:
+> 	(2 * TASK_SIZE / 3) = 0x2a000000
+> 
+> When ASLR is disabled PIE binaries will load at ELF_ET_DYN_BASE address.
+> On 32bit platforms AddressSanitzer uses addresses [0x20000000 - 0x40000000]
+> for shadow memory [1]. So ASan doesn't work for PIE binaries when ASLR disabled
+> as it fails to map shadow memory.
+> Also after Kees's 'split ET_DYN ASLR from mmap ASLR' patchset PIE binaries
+> has a high chance of loading somewhere in between [0x2a000000 - 0x40000000]
+> even if ASLR enabled. This makes ASan with PIE absolutely incompatible.
+> 
+> Fix overflow by dividing TASK_SIZE prior to multiplying.
+> After this patch ELF_ET_DYN_BASE equals to (for CONFIG_VMSPLIT_3G=y):
+> 	(TASK_SIZE / 3 * 2) = 0x7f555554
+> 
+> [1] https://code.google.com/p/address-sanitizer/wiki/AddressSanitizerAlgorithm#Mapping
+> 
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
+> Reported-by: Maria Guseva <m.guseva@samsung.com>
+> Cc: stable at vger.kernel.org
 
-The SRAM the EMAC is using might not have been mapped accordingly by the
-bootloader, preventing the EMAC to work properly.
+Who's handling this patch?  I'm guessing it should be me, so if it could
+find its way into my patch system for when I next apply a bunch of patches,
+that'd be good.
 
-Ask for that SRAM to be mapped at probe time to make sure that this never
-happens.
+Thanks.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[hdegoede at redhat.com: Make sure SUNXI_SRAM gets enabled in Kconfig]
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/net/ethernet/allwinner/sun4i-emac.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/allwinner/sun4i-emac.c b/drivers/net/ethernet/allwinner/sun4i-emac.c
-index f3470d9..9d0136b 100644
---- a/drivers/net/ethernet/allwinner/sun4i-emac.c
-+++ b/drivers/net/ethernet/allwinner/sun4i-emac.c
-@@ -29,6 +29,8 @@
- #include <linux/platform_device.h>
- #include <linux/phy.h>
- 
-+#include <linux/soc/sunxi/sunxi_sram.h>
-+
- #include "sun4i-emac.h"
- 
- #define DRV_NAME		"sun4i-emac"
-@@ -857,11 +859,15 @@ static int emac_probe(struct platform_device *pdev)
- 
- 	clk_prepare_enable(db->clk);
- 
-+	ret = sunxi_sram_claim(SUNXI_SRAM_EMAC, "emac");
-+	if (ret)
-+		dev_warn(&pdev->dev, "Couldn't map SRAM to device\n");
-+
- 	db->phy_node = of_parse_phandle(np, "phy", 0);
- 	if (!db->phy_node) {
- 		dev_err(&pdev->dev, "no associated PHY\n");
- 		ret = -ENODEV;
--		goto out;
-+		goto out_release_sram;
- 	}
- 
- 	/* Read MAC-address from DT */
-@@ -893,7 +899,7 @@ static int emac_probe(struct platform_device *pdev)
- 	if (ret) {
- 		dev_err(&pdev->dev, "Registering netdev failed!\n");
- 		ret = -ENODEV;
--		goto out;
-+		goto out_release_sram;
- 	}
- 
- 	dev_info(&pdev->dev, "%s: at %p, IRQ %d MAC: %pM\n",
-@@ -901,6 +907,8 @@ static int emac_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
-+out_release_sram:
-+	sunxi_sram_release(SUNXI_SRAM_EMAC);
- out:
- 	dev_err(db->dev, "not found (%d).\n", ret);
- 
-@@ -914,6 +922,7 @@ static int emac_remove(struct platform_device *pdev)
- 	struct net_device *ndev = platform_get_drvdata(pdev);
- 
- 	unregister_netdev(ndev);
-+	sunxi_sram_release(SUNXI_SRAM_EMAC);
- 	free_netdev(ndev);
- 
- 	dev_dbg(&pdev->dev, "released and freed device\n");
 -- 
-2.3.3
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
