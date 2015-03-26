@@ -1,48 +1,53 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Thu, 26 Mar 2015 15:30:44 +0800
-Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
- pci_scan_bus_parented()
-In-Reply-To: <20150325192331.GG25884@l.oracle.com>
-References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
- <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
- <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
- <20150312193505.GB7346@google.com> <55024D35.6050509@huawei.com>
- <CAErSpo4T7f9PNVMLrQbCvW2a=HnRauQR2eBz6H69B7Q2=ELNWw@mail.gmail.com>
- <20150313140132.GH5378@l.oracle.com>
- <CAErSpo69ytCxBK5AD79Nz05wy=GwzcOGV7WkiKFxpLDH4wtJXw@mail.gmail.com>
- <20150325192331.GG25884@l.oracle.com>
-Message-ID: <5513B5A4.1070209@huawei.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 26 Mar 2015 09:59:50 +0200
+Subject: [PATCH v2 1/2] watchdog: digicolor: document device tree binding
+Message-ID: <a4554d0a61c62b85a7d66b6e3d16d07f8a498025.1427356791.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> Is there an git tree with this so I can just try it out?
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
->> pci/enumeration-yw6 has similar code (it exports the single
-> 
-> I presume now it is bjorn/pci/enumeration-yw8 ? Going to test this out
-> this week.
+Add a device tree binding documentation to the watchdog hardware block on the
+Conexant CX92755 SoC. The CX92755 is from the Digicolor SoCs series. Other SoCs
+in that series may share the same hardware block.
 
-Hi Konrad, I fixed two issues found by Tomasz and Daniel for the current v8 version.
-I posted out the latest v9 in my github tree. Could you pull this series from my
-github tree ?
-The URL is: https://github.com/YijingWang/linux-pci.git enumer9
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+   No change
+---
+ .../devicetree/bindings/watchdog/digicolor-wdt.txt | 25 ++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/digicolor-wdt.txt
 
-Thanks!
-Yijing.
-
->> busn_resource and makes xen use it).  That should be functionally
->> identical to what v4.0-rc1 does.
->>
->> Yijing hasn't posted the static busn_res proposal above yet, so I
->> don't have a branch with that in it.
->>
->> Bjorn
-> 
-> .
-> 
-
-
+diff --git a/Documentation/devicetree/bindings/watchdog/digicolor-wdt.txt b/Documentation/devicetree/bindings/watchdog/digicolor-wdt.txt
+new file mode 100644
+index 000000000000..a882967e17d4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/digicolor-wdt.txt
+@@ -0,0 +1,25 @@
++Conexant Digicolor SoCs Watchdog timer
++
++The watchdog functionality in Conexant Digicolor SoCs relies on the so called
++"Agent Communication" block. This block includes the eight programmable system
++timer counters. The first timer (called "Timer A") is the only one that can be
++used as watchdog.
++
++Required properties:
++
++- compatible : Should be "cnxt,cx92755-wdt"
++- reg : Specifies base physical address and size of the registers
++- clocks : phandle; specifies the clock that drives the timer
++
++Optional properties:
++
++- timeout-sec : Contains the watchdog timeout in seconds
++
++Example:
++
++	watchdog at f0000fc0 {
++		compatible = "cnxt,cx92755-wdt";
++		reg = <0xf0000fc0 0x8>;
++		clocks = <&main_clk>;
++		timeout-sec = <15>;
++	};
 -- 
-Thanks!
-Yijing
+2.1.4
