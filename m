@@ -1,71 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 19:50:06 +0100
-Subject: ARM: KVM/XEN: how should we support virt-what?
-In-Reply-To: <CAKv+Gu9fzhfu7nJQ9GYvPr33OcY3RP4Ssyx_0o7q-Cw4g8_5Bg@mail.gmail.com>
-References: <20150325094440.GB3163@hawk.usersys.redhat.com>
- <20150326090150.GA3073@hawk.usersys.redhat.com>
- <alpine.DEB.2.02.1503261843410.9516@kaball.uk.xensource.com>
- <CAKv+Gu9fzhfu7nJQ9GYvPr33OcY3RP4Ssyx_0o7q-Cw4g8_5Bg@mail.gmail.com>
-Message-ID: <CAKv+Gu9YcrO=c0OWD2P6AXjMxPyaz=LhtB81FiCijAEC=XuW6g@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 Mar 2015 19:55:37 +0100
+Subject: [PATCH 04/13] thermal: Fix not emulating critical temperatures
+In-Reply-To: <55144C5B.7070208@ti.com>
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-5-git-send-email-s.hauer@pengutronix.de>
+ <55144C5B.7070208@ti.com>
+Message-ID: <20150326185537.GM9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2015 at 19:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 26 March 2015 at 19:45, Stefano Stabellini
-> <stefano.stabellini@eu.citrix.com> wrote:
->> On Thu, 26 Mar 2015, Andrew Jones wrote:
->>> On Wed, Mar 25, 2015 at 10:44:42AM +0100, Andrew Jones wrote:
->>> > Hello ARM virt maintainers,
->>> >
->>> > I'd like to start a discussion about supporting virt-what[1]. virt-what
->>> > allows userspace to determine if the system it's running on is running
->>> > in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
->>> > effort tool, see the Caveat emptor in [1], it has become quite a useful
->>> > tool, and is showing up in different places, such as OpenStack. If you
->>> > look at the code[2], specifically [3], then you'll see how it works on
->>> > x86, which is to use the dedicated hypervisor cpuid leaves. I'm
->>> > wondering what equivalent we have, or can develop, for arm.
->>> > Here are some thoughts;
->>> > 0) there's already something we can use, and I just need to be told
->>> >    about it.
->>> > 1) be as similar as possible to x86 by dedicating some currently
->>> >    undefined sysreg bits. This would take buy-in from lots of parties,
->>> >    so is not likely the way to go.
->>> > 2) create a specific DT node that will get exposed through sysfs, or
->>> >    somewhere.
->>> > 3) same as (2), but just use the nodes currently in mach-virt's DT
->>> >    as the indication we're a guest. This would just be a heuristic,
->>> >    i.e. "have virtio mmio" && psci.method == hvc, or something,
->>> >    and we'd still need a way to know if we're kvm vs. xen vs. ??.
->>> >
->>> > Thanks,
->>> > drew
->>> >
->>> > [1] http://people.redhat.com/~rjones/virt-what/
->>> > [2] http://git.annexia.org/?p=virt-what.git;a=summary
->>> > [3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
->>>
->>> Thanks everyone for their responses. So, the current summary seems to
->>> be;
->>> 1) Xen has both a DT node and an ACPI table, virt-what can learn how
->>>    to probe those.
->>> 2) We don't have anything yet for KVM, and we're reluctant to create a
->>>    specific DT node. Anyway, we'd still need to address ACPI booted
->>>    guests some other way.
->>>
->>> For a short-term, DT-only, approach we could go with a heuristic, one
->>> that includes Marc's "if hypervisor node exists, then xen, else kvm"
->>> condition.
->>>
->>> How about SMBIOS for a long-term solution that works for both DT and
->>> ACPI? We're not populating SMBIOS for arm guests yet in qemu, but now
->>> that AAVMF has fw_cfg, we should be able to. On x86 we already have
->>> smbios populated from qemu, although not in a way that allows us to
->>> determine kvm vs. xen vs. tcg.
->>
->> I don't think that SMBIOS works with DT.
->>
->
-> SMBIOS works fine with DT
++Cc Amit who implemented the emulation code.
 
-... but it needs UEFI ...
+On Thu, Mar 26, 2015 at 02:13:47PM -0400, Carlos Hernandez wrote:
+> On 03/26/2015 11:53 AM, Sascha Hauer wrote:
+> >- The code should only accept an emulated temperature when the emulated
+> >   temperature is lower than the critical temperature. Instead the code
+> 
+> Why?
+> Emulating temperatures higher than critical temperature is useful
+> for testing. For instance it allows one to validate that critical
+> action (i.e. shutdown) is triggered.
+
+Not emulating critical temperatures was the intention of the original
+patch adding the emulation code, but it was implemented wrongly. I just
+fix to the intended behaviour.
+However, I also find emulating critical temperatures useful. I could
+also remove the check instead of fixing it if we can agree on that
+behaviour.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
