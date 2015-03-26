@@ -1,30 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 27 Mar 2015 00:47:39 +0100
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <871tkbxwup.fsf@free.fr>
-References: <20150216130549.GF14545@x1>
- <1170550770.470129293.1424093248596.JavaMail.root@zimbra1-e1.priv.proxad.net>
- <20150216162712.GR14545@x1> <87fva5a4i2.fsf@free.fr>
- <20150217074310.GT14545@x1>
- <alpine.LFD.2.11.1502171221300.22104@knanqh.ubzr>
- <20150218080719.GB5781@x1> <87a9088tam.fsf@free.fr>
- <20150325140725.GA11499@kroah.com> <871tkbxwup.fsf@free.fr>
-Message-ID: <20150326234739.GA28519@kroah.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Thu, 26 Mar 2015 16:55:05 -0700
+Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
+Message-ID: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 10:38:54PM +0100, Robert Jarzmik wrote:
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
-> 
-> > On Fri, Feb 20, 2015 at 05:02:57PM +0100, Robert Jarzmik wrote:
-> >> If there is no solution, I'll fallback through arch/arm/plat-pxa, not very nice,
-> >> but it has to land somewhere, I don't want lubbock to remain broken.
-> >
-> > drivers/platform/arm ?
-> Most certainly.
-> 
-> I'll submit that to drivers/platform/arm/pxa, and maintain that pxa tree. As for
-> drivers/platform/arm, do you want also maintainers to step up, or will you take
-> the review/merge burden ?
+From: ismail <ismail@broadcom.com>
 
-I have enough review/merge burden to do anything with ARM, sorry.
+Update the thread running index before issuing the
+GO command to the DMAC.
+
+Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+---
+ drivers/dma/pl330.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+index 0e1f567..631642d 100644
+--- a/drivers/dma/pl330.c
++++ b/drivers/dma/pl330.c
+@@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
+ 	/* Set to generate interrupts for SEV */
+ 	writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
+ 
++	thrd->req_running = idx;
++
+ 	/* Only manager can execute GO */
+ 	_execute_DBGINSN(thrd, insn, true);
+ 
+-	thrd->req_running = idx;
+-
+ 	return true;
+ }
+ 
+-- 
+2.3.3
