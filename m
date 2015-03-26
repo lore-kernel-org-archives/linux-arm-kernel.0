@@ -1,59 +1,84 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 26 Mar 2015 23:05:52 +0100
-Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <20150326154618.GO8656@n2100.arm.linux.org.uk>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
- <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
- <5511ABAA.2010303@hurleysoftware.com>
- <20150326154618.GO8656@n2100.arm.linux.org.uk>
-Message-ID: <CALszF6CPRqB-wOfyM6QuN3v7GNRbsaHtPv82okiLcNekoBQ2tQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Mar 2015 22:06:32 +0000
+Subject: [PATCH v3 10/11] KVM: arm/arm64: prepare GICv3 emulation to use
+ kvm_io_bus MMIO handling
+In-Reply-To: <1427380778-942-11-git-send-email-andre.przywara@arm.com>
+References: <1427380778-942-1-git-send-email-andre.przywara@arm.com>
+ <1427380778-942-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150326220632.64ee91ec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-26 16:46 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Mar 24, 2015 at 02:23:38PM -0400, Peter Hurley wrote:
->> Hi Maxime,
->>
->> On 03/12/2015 05:55 PM, Maxime Coquelin wrote:
->> > +static unsigned int stm32_get_mctrl(struct uart_port *port)
->> > +{
->> > +   /*
->> > +    * This routine is used for geting signals of: DTR, DCD, DSR, RI,
->> > +    * and CTS/RTS
->
-> It's also worth noting that this comment is wrong.  This is used to get
-> the state of DCD, DSR, RI and CTS.  DTR and RTS are *not* included
-> because the core tracks their state.
+On Thu, 26 Mar 2015 14:39:37 +0000
+Andre Przywara <andre.przywara@arm.com> wrote:
 
-OK, thanks for pointing this.
-I will fix the comment in the v4.
+> Using the framework provided by the recent vgic.c changes, we
+> register a kvm_io_bus device on mapping the virtual GICv3 resources.
+> The distributor mapping is pretty straight forward, but the
+> redistributors need some more love, since they need to be tagged with
+> the respective redistributor (read: VCPU) they are connected with.
+> We use the kvm_io_bus framework to register one devices per VCPU.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h      |    1 +
+>  virt/kvm/arm/vgic-v3-emul.c |   39 ++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 39 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 4523984..d6705f4 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -252,6 +252,7 @@ struct vgic_dist {
+>  
+>  	struct vgic_vm_ops	vm_ops;
+>  	struct vgic_io_device	dist_iodev;
+> +	struct vgic_io_device	*redist_iodevs;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+> index 2f03a36..eb1a797 100644
+> --- a/virt/kvm/arm/vgic-v3-emul.c
+> +++ b/virt/kvm/arm/vgic-v3-emul.c
+> @@ -758,6 +758,9 @@ static int vgic_v3_map_resources(struct kvm *kvm,
+>  {
+>  	int ret = 0;
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	gpa_t rdbase = dist->vgic_redist_base;
+> +	struct vgic_io_device *iodevs = NULL;
+> +	int i;
+>  
+>  	if (!irqchip_in_kernel(kvm))
+>  		return 0;
+> @@ -783,7 +786,41 @@ static int vgic_v3_map_resources(struct kvm *kvm,
+>  		goto out;
+>  	}
+>  
+> -	kvm->arch.vgic.ready = true;
+> +	ret = vgic_register_kvm_io_dev(kvm, dist->vgic_dist_base,
+> +				       GIC_V3_DIST_SIZE, vgic_v3_dist_ranges,
+> +				       -1, &dist->dist_iodev);
 
->
-> ...
->
->> > +   stm32port->clk = devm_clk_get(&pdev->dev, NULL);
->> > +
->> > +   if (WARN_ON(IS_ERR(stm32port->clk)))
->>
->> Do you really need a stack trace here? Could this be dev_err() instead?
->>
->> > +           return -EINVAL;
->
-> Also, propagate the error code.
-Ok.
+> +	if (ret)
+> +		goto out;
+> +
+> +	iodevs = kcalloc(dist->nr_cpus, sizeof(iodevs[0]), GFP_KERNEL);
+> +	if (!iodevs) {
+> +		ret = -ENOMEM;
+> +		goto out_unregister;
+> +	}
+> +
+> +	for (i = 0; i < dist->nr_cpus; i++) {
+> +		ret = vgic_register_kvm_io_dev(kvm, rdbase,
+> +					       SZ_128K, vgic_redist_ranges,
+> +					       i, &iodevs[i]);
 
->
->> > +
->> > +   /* ensure that clk rate is correct by enabling the clk */
->> > +   clk_prepare_enable(stm32port->clk);
->
-> And remember to check the return value of clk_prepare_enable().
-I will.
+This looks really weird. You seems to be mapping all redistributors at
+the same IPA. Have you actually tested this with an SMP guest?
 
-Thanks for the review,
-Maxime
+Or maybe I don't get how this works?
 
->
-> --
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
