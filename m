@@ -1,73 +1,48 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 26 Mar 2015 14:28:37 +0100
-Subject: =?UTF-8?Q?soc=5Fid=20content=20according=20to=20specification?=
-Message-ID: <9d1696d88282248ea76104d232119d05@agner.ch>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 26 Mar 2015 06:23:55 -0700
+Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
+ reset
+In-Reply-To: <1427367975.3378.6.camel@pengutronix.de>
+References: <55128016.3030903@denx.de> <1427276390.2813.7.camel@pengutronix.de>
+ <55128EC8.6080805@denx.de> <1427367975.3378.6.camel@pengutronix.de>
+Message-ID: <CAJ+vNU3inhq+zva2Df1upw=i7b==Ksd2gzfcQ2x3JKPGEjGQ3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Thu, Mar 26, 2015 at 4:06 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Mittwoch, den 25.03.2015, 11:32 +0100 schrieb Stefan Roese:
+> Okay, I've looked a bit into this and it seems there is no easy solution
+> available. It is really unfortunate that the WD reset doesn't reset the
+> GPR registers. Also I have no idea if the WD reset properly resets the
+> PCIe core, as the reset signal of this core is only wired to the POR
+> line.
+>
+> To fix this (almost) properly we would have to change the complete init
+> order of the core, which isn't an easy task, as experience has shown
+> that even small changes in that area can prevent the link from coming up
+> under certain circumstances.
+>
+> Which brings me back to my earlier assertion that WD reset should really
+> be done through the PMIC. That's yet another case of a WD making the
+> overall system more instable.
+>
+> I think the easiest workaround for now is to detect the WD reset in your
+> bootloader and bash the expected default values into the GPR bits.
+>
+> Regards,
+> Lucas
 
-While looking into current sysfs soc bus implementations (in preparation
-for adding such an implementation for the Freescale Vybrid SoC), I
-discovered different interpretations of the "soc_id" field between
-SoC's.
+Lucas,
 
-The sysfs Documentation says
-(Documentation/ABI/testing/sysfs-devices-soc):
-<quote>
-What:		/sys/devices/socX/soc_id
-Date:		January 2012
-contact:	Lee Jones <lee.jones@linaro.org>
-Description:
-		Read-only attribute supported by most SoCs. In the case of
-		ST-Ericsson's chips this contains the SoC serial number.
-</quote>
+There are many boards out there that unfortunately don't reset PMIC's
+properly, IMHO due to a confusing reference design from Freescale.
 
-The name of the file "soc_id" is open for different interpretation: Is
-the soc_id the identification of the SoC "type" or the identification of
-the SoC "instance"? The description suggests that the second is the idea
-behind soc_id (SoC serial number). IMHO, in that case, soc_uid would
-have been more descriptive.
+Using the WDOGx_WRSR register we can detect the reason for reset:
+ Bit 4 - POR - Power on reset
+ Bit 1 - TOUT - Watchdog timeout
+ Bit 0 - SFTW - Software reset (used in machine_restart)
 
-However, lets have a look at the implementations (the ones I caught at
-first sight):
+Can we reset the GPR registers based on bits 0 or 1 set, or use these
+as further qualifiers in the WAR?
 
-2012 Feb:
-eda413c228e2 ("ARM: ux500: export System-on-Chip information ux500 via
-sysfs")
-=> 160-bit hexadecimal unique ID
-
-2013 March:
-d591fdf8e23e ("ARM: tegra: expose chip ID and revision")
-=> 8-bit unsigned chip ID (e.g. 32 for Tegra 2, 48 Tegra 3...)
-
-2013 Jul:
-00f7dc636366 ("ARM: zynq: Add support for SOC_BUS")
-=> 5-bit hexadecimal "device code id" (the register also says "PS Family
-IDCODE")
-
-2013 Aug:
-a28875462bd4 ("ARM: imx6: report soc info via soc device")
-=> string representing SoC type
-
-2013 Nov:
-b19e11fbb2d4 ("ARM: ep93xx: use soc bus")
-=> 128-bit hexadecimal unique ID
-
-2014 March:
-56a705a48eae ("ARM: mvebu: Add a SOC bus device entry")
-=> 16-bit hexadecimal PCI-E device ID?
-
-2014 Aug:
-e4e3a37d3316 ("ARM: clps711x: Add SOC BUS support")
-=> 32-bit hexadecimal unique ID
-
-So we have currently 7 implementations, of which 4 implement an ID per
-SoC type and 3 an ID per SoC instance.
-
-I think for the long run it would be nice if we can agree on what the
-API exactly asks for and fix the wrong implementations accordingly. Any
-thoughts on this? 
-
---
-Stefan
+Tim
