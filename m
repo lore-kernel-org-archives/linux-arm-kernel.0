@@ -1,87 +1,67 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 26 Mar 2015 13:40:15 +0100
-Subject: String literals in __init functions
-In-Reply-To: <1427306517.2717.0.camel@perches.com>
-References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
-Message-ID: <5513FE2F.3040306@free.fr>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 26 Mar 2015 12:41:13 +0000
+Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
+ destroyed
+In-Reply-To: <20150325215940.GE3649@amt.cnet>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
+ <5512EBB9.2050304@arm.com> <20150325215940.GE3649@amt.cnet>
+Message-ID: <5513FE69.9050401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/2015 19:01, Joe Perches wrote:
+Hi Marcelo,
 
-> On Wed, 2015-03-25 at 18:56 +0100, Mason wrote:
->
->> AFAIU, functions only used at system init are tagged __init to have
->> the linker store them in a separate .init.text section, so memory can
->> be reclaimed once initialization is complete. Is that correct?
+On 25/03/15 21:59, Marcelo Tosatti wrote:
+> On Wed, Mar 25, 2015 at 05:09:13PM +0000, Marc Zyngier wrote:
+>> On 23/03/15 15:58, Andre Przywara wrote:
+>>> In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
+>>> especially before calling kvm_arch_destroy_vm(). To avoid
+>>> unregistering devices from the already destroyed bus, let's mark
+>>> the bus with NULL to let other users know it has been destroyed
+>>> already.
+>>> This avoids a crash on a VM shutdown with the VGIC using the
+>>> kvm_io_bus later (the unregistering is in there to be able to roll
+>>> back a faulting init).
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 >>
->> The corresponding tag for data is __initdata (section .init.data)
->>
->> I started wondering if the string literals used in an __init functions
->> were automatically marked __initdata.
->>
->> Looking at the objdump output, I see that the string literals are,
->> in fact, stored in the .rodata section. I suppose that .rodata is NOT
->> reclaimed after init?
->>
->> This way seems to work:
->>
->> static       char XyZa[] __initdata  = KERN_ALERT "foo";
->> static const char XyZb[] __initconst = KERN_ALERT "bar";
->> void __init XyZc(void) { printk(XyZa); printk(XyZb); }
->>
->> $ arm-linux-gnueabihf-objdump -xd arch/arm/mach-tangox/time.o | grep XyZ
->> 00000000 l     O .init.data	00000006 XyZa
->> 00000000 l     O .init.rodata	00000006 XyZb
->> 00000000 g     F .init.text	00000028 XyZc
->> 00000000 <XyZc>:
->>
->> $ arm-linux-gnueabihf-objdump -xd vmlinux | grep XyZ
->> c021e360 l     O .init.data	00000006 XyZa
->> c0220090 l     O .init.data	00000006 XyZb
->> c020d928 g     F .init.text	00000028 XyZc
->> c020d928 <XyZc>:
->>
->> c020d928 <XyZc>:
->> c020d928:       e1a0c00d        mov     ip, sp
->> c020d92c:       e92dd800        push    {fp, ip, lr, pc}
->> c020d930:       e24cb004        sub     fp, ip, #4
->> c020d934:       e30e0360        movw    r0, #58208      ; 0xe360
->> c020d938:       e34c0021        movt    r0, #49185      ; 0xc021
->> c020d93c:       ebfe00c9        bl      c018dc68 <printk>
->> c020d940:       e3000090        movw    r0, #144        ; 0x90
->> c020d944:       e34c0022        movt    r0, #49186      ; 0xc022
->> c020d948:       ebfe00c6        bl      c018dc68 <printk>
->> c020d94c:       e89da800        ldm     sp, {fp, sp, pc}
->>
->> Did I miss something in init.h?
->> Or should it be done like above to reclaim string literals?
->
-> No, you didn't miss anything.
->
-> One proposal:
->
-> https://lkml.org/lkml/2014/8/21/255
+>> That seems sensible, but I don't see why nobody else hits that. What are
+>> we doing differently?
 
-Thanks for the link!
+So I checked the other users of kvm_io_bus, none of them seems to
+explicitly unregister the kvm_io_bus devices they registered before if
+the VM goes down. They all rely on the whole kvm_io_bus being brought
+down eventually, so there is no need for an explicit unregister.
+The only point they do unregister is when cleaning up after init fails
+in the middle.
+So I changed my code to match that behaviour: cleaning up in init and
+leaving the VM destruction case alone.
+This lets me get rid of that patch and actually removes more code in one
+of the following patches.
 
-Here's the equivalent gmane link for my own reference:
-http://thread.gmane.org/gmane.linux.kernel/1771969
+> It should be valid to call kvm_io_bus_unregister_dev after
+> kvm_io_bus_destroy.
 
-Basically, if I understand correctly, Ingo NAKed the patch, saying
-this should be done automatically by the toolchain. That would make
-for an interesting side-project...
+AFAICS it's not.
+kvm_io_bus_unregister_dev reads like this:
+        bus = kvm->buses[bus_idx];
+        r = -ENOENT;
+        for (i = 0; i < bus->dev_count; i++)
+So having the actual bus freed already before would lead to an invalid
+dereference. As stated above no-one seems to use it like this at the
+moment. Shall I make a (separate) patch to fix that theoretical case?
+Setting the pointer values to NULL after kfree() and checking them in
+kvm_io_bus_unregister_dev()? What about other functions using the buses?
 
-For the record, I wrote a trivial wrapper for my limited use-case.
+> 
+> Are you patching it to handle NULL kvm->buses[bus_idx] ?
 
-#define printk_init(format, ...) do { \
-   static char fmt[] __initdata = format; printk(fmt, ## __VA_ARGS__); \
-} while(0)
+No, I handle this is my VGIC clean up function, so that it doesn't try
+to call kvm_io_bus_unregister_dev if the bus is already down. But that
+will go away with the change mentioned above.
 
-(I dislike the "statement-in-expression" extension, because vim thinks
-there's a syntax error, and flashes a bright red block.)
+I will check back with Marc how to actually merge those fixes in.
 
-https://gcc.gnu.org/onlinedocs/cpp/Variadic-Macros.html
-https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
-
-Regards.
+Cheers,
+Andre.
