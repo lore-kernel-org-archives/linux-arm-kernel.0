@@ -1,175 +1,162 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 07:20:38 +0100
-Subject: [PATCH 2/4] arm64: fixmap: move translation tables to dedicated
- region
-In-Reply-To: <20150326012808.GD1676@flaeskesteg-linux.cambridge.arm.com>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-3-git-send-email-ard.biesheuvel@linaro.org>
- <20150326012808.GD1676@flaeskesteg-linux.cambridge.arm.com>
-Message-ID: <CAKv+Gu-wibouuV7mZHPycofPk3xT=LEEAPoxKWkEX9u+7u+sWA@mail.gmail.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 26 Mar 2015 14:20:07 +0800
+Subject: [PATCH v8 19/30] powerpc/pci: Use pci_scan_host_bridge() for
+ simplicity
+In-Reply-To: <1427347180.2575.91.camel@axtens.net>
+References: <1427168064-8657-1-git-send-email-wangyijing@huawei.com>			
+ <1427168064-8657-20-git-send-email-wangyijing@huawei.com>		
+ <1427241523.2685.18.camel@axtens.net> <551266DE.3030609@huawei.com>	
+ <1427321631.2575.3.camel@axtens.net> <55135E16.6060909@huawei.com>
+ <1427347180.2575.91.camel@axtens.net>
+Message-ID: <5513A517.8080205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2015 at 02:28, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Ard,
->
-> On Mon, Mar 23, 2015 at 03:36:54PM +0000, Ard Biesheuvel wrote:
->> This moves the fixmap translation tables to a dedicated region
->> in the linker map. This is needed for a split kernel text from
->> the linear mapping, to ensure that the contents of the tables
->> rely on a single translation regime.
->
-> I'm not sure what you mean by this. Could you elaborate?
->
-> What problem would we have if we didn't have this section, and how does this
-> section solve that?
->
+On 2015/3/26 13:19, Daniel Axtens wrote:
+> Hi Yijing,
+> 
+> Pulled.
+> 
+> I'm now getting build errors:
+> 
+> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c: In function 'pcibios_scan_phb':
+> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c:1638:14: error: 'bus' undeclared (first use in this function)
+> /scratch/dja/linux-patches/arch/powerpc/kernel/pci-common.c:1638:14: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> That relates to your changes to pcibios_scan_phb:
+> -       struct pci_bus *bus;
+> +       struct pci_host_bridge *host;
+> clashing with line 1638:
+> 	hose->bus = bus;
+> which occurs later in the same unction.
+> 
+> If I fix that, I'll get more errors with lines in that function that
+> still reference hose instead of host.
+> 
+> As well as line 1638, there's still big chunks of the function that
+> reference hose, for example:
+> 
+> 	/* Get some IO space for the new PHB */
+> 	pcibios_setup_phb_io_space(hose);
+> 
+> 	/* Wire up PHB bus resources */
+> 	pcibios_setup_phb_resources(hose, &resources);
+> 
+> 	hose->busn.start = hose->first_busno;
+> 	hose->busn.end	 = hose->last_busno;
+> 	hose->busn.flags = IORESOURCE_BUS;
+> 	pci_add_resource(&resources, &hose->busn);
+> 
+> 	pci_host_ops.pci_ops = hose->ops;
+> 
+> 
+> Basically, the changes in PowerPC need to be quite a bit more through
+> just to get the changes to build.
+> 
+> I'm keen to work on simplifying PCI code in PowerPC, but at this point,
+> it will need a lot more work before it's ready to go in.
 
-The pgd manipulation code is riddled with va/pa and pa/va
-translations, and uses both statically and dynamically allocated
-pages. Untangling all of that is not so easy, and it is simpler just
-to refer to those regions through the linear mapping exclusively.
+Hi Daniel, I'm really so sorry about that, I will update it today.
 
-> Regardless, I have some comments on the implementation below.
->
->> Also make the population of the translation levels conditional,
->> so that the kernel text can share some levels of translation if
->> needed.
->
-> I guess you mean shared with the tables for the text mapping?
->
-> Please word this to be explicit w.r.t. what is shared between whom, and when.
->
+Thanks!
+Yijing.
 
-Yes. Currently, the address space is split down the middle, so fixmap
-and linear always live in regions that are disjoint all the way up to
-different root pgdir entries. Once that changes, the fixmap code needs
-to be prepared for any of the levels it needs to populated having
-already been populated.
-
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/linkage.h |  2 ++
->>  arch/arm64/kernel/vmlinux.lds.S  | 15 ++++++++++-----
->>  arch/arm64/mm/mmu.c              | 15 +++++++++------
->>  3 files changed, 21 insertions(+), 11 deletions(-)
+> 
+> Regards,
+> Daniel
+> 
+> 
+> On Thu, 2015-03-26 at 09:17 +0800, Yijing Wang wrote:
+>> On 2015/3/26 6:13, Daniel Axtens wrote:
+>>> Hi Yijing,
+>>>
+>>> I wasn't quite sure I understood your comments, so I was trying to apply
+>>> your patch series and test it, but patch 3 doesn't apply cleanly to
+>>> 4.0-rc5 or master. Can you respin the series?
 >>
->> diff --git a/arch/arm64/include/asm/linkage.h b/arch/arm64/include/asm/linkage.h
->> index 636c1bced7d4..dc9354de6f52 100644
->> --- a/arch/arm64/include/asm/linkage.h
->> +++ b/arch/arm64/include/asm/linkage.h
->> @@ -4,4 +4,6 @@
->>  #define __ALIGN              .align 4
->>  #define __ALIGN_STR  ".align 4"
+>> Hi Daniel,
+>>    Could you pull the series from Bjorn's git tree ? The URL is
+>> https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git pci/enumeration-yw8
 >>
->> +#define __pgdir              __attribute__((__section__(".pgdir")))
->
-> It would be nice for this to also provide page alignment, like
-> __page_aligned_bss that this replaces uses of.
->
-
-I thought it wasn't necessary, because we allocate a full page for the
-highest level, but we should probably not rely on that.
-
->> +
->>  #endif
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 434ef407ef0f..d3885043f0b7 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -149,11 +149,16 @@ SECTIONS
+>> Thanks!
+>> Yijing.
 >>
->>       BSS_SECTION(0, 0, 0)
+>>>
+>>> Thanks,
+>>> Daniel
+>>>
+>>>
+>>>> Hi Daniel, thanks for your review and comments. We want to make a generic pci_host_bridge,
+>>>> which would hold the common host information, for example, pci domain is common info for
+>>>> pci host bridge, this series saved domain in pci_host_bridge, then we no need to
+>>>> extract out domain by pci_bus->sysdata by platform specific pci_domain_nr().
+>>>> Also we store the sysdata in pci_host_bridge, and pci_bus_to_host() is the platform
+>>>> interface, I think use the common interface would be better.
+>>>>
+>>>>>> +
+>>>>>> +	/* Get probe mode and perform scan */
+>>>>>> +	if (hose->dn && ppc_md.pci_probe_mode)
+>>>>>> +		mode = ppc_md.pci_probe_mode(bus);
+>>>>>> +
+>>>>>> +	pr_debug("    probe mode: %d\n", mode);
+>>>>>> +	if (mode == PCI_PROBE_DEVTREE)
+>>>>>> +		of_scan_bus(hose->dn, bus);
+>>>>>> +
+>>>>>> +	if (mode == PCI_PROBE_NORMAL) {
+>>>>>> +		pci_bus_update_busn_res_end(bus, 255);
+>>>>>> +		hose->last_busno = pci_scan_child_bus(bus);
+>>>>>> +		pci_bus_update_busn_res_end(bus, hose->last_busno);
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return pci_bus_child_max_busnr(bus);
+>>>>>> +}
+>>>>>> +
+>>>>> I'm having trouble convincing myself that this patch covers every
+>>>>> variation within our PCI implementations. In particular, there's a
+>>>>> stanza in of_scan_pci_bridge in kernel/pci_of_scan.c that's almost
+>>>>> identical to this function. Does that implementation need to be cleaned
+>>>>> up and replaced with this function too?
+>>>>>
+>>>>
+>>>> This is a pci_host_bridge_ops hook function, which would be called in
+>>>> PCI core, and after applied this series, we only need to call pci_scan_host_bridge()
+>>>> to scan pci devices, and this function is also extracted from the pcibios_scan_phb(),
+>>>> it's not the redundant code.
+>>>>
+>>>>>
+>>>>>> @@ -1641,9 +1655,9 @@ void pcibios_scan_phb(struct pci_controller *hose)
+>>>>>>  		ppc_md.pcibios_fixup_phb(hose);
+>>>>>>  
+>>>>>>  	/* Configure PCI Express settings */
+>>>>>> -	if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>>>>> +	if (host->bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>>>>>  		struct pci_bus *child;
+>>>>>> -		list_for_each_entry(child, &bus->children, node)
+>>>>>> +		list_for_each_entry(child, &host->bus->children, node)
+>>>>>>  			pcie_bus_configure_settings(child);
+>>>>>>  	}
+>>>>>>  }
+>>>>> Two things: Firstly, the function uses hose throughout, not host.
+>>>>> Secondly, you're not deleting the bus variable: what's the purpose of
+>>>>> this change?
+>>>>
+>>>> host is the common pci_host_bridge which is created by PCI core for pci host bridge driver,
+>>>> the hose is the platform data used in powerpc. The purpose of the patch/series is to simplify
+>>>> pci enumeration interface, and try to reduce the weak functions which were used to setup pci bus/devices
+>>>> during PCI enumeration.
+>>>>
+>>>>>
+>>>>> Regards,
+>>>>> Daniel
+>>>>>
+>>>>
+>>>>
+>>>
 >>
->> -     . = ALIGN(PAGE_SIZE);
->> -     idmap_pg_dir = .;
->> -     . += IDMAP_DIR_SIZE;
->> -     swapper_pg_dir = .;
->> -     . += SWAPPER_DIR_SIZE;
->> +     .pgdir : {
->> +             . = ALIGN(PAGE_SIZE);
->> +             __pgdir_start = .;
->> +             idmap_pg_dir = .;
->> +             . += IDMAP_DIR_SIZE;
->> +             *(.pgdir)
->> +             swapper_pg_dir = .;
->> +             . += SWAPPER_DIR_SIZE;
->> +             __pgdir_stop = .;
->
-> Nit: __pgdir_end would be consitent with our other vmlinux.lds.S symbols.
->
-
-Right
-
->> +     }
 >>
->>       _end = .;
->>
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 43496748e3d9..bb3ce41130f3 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -549,12 +549,12 @@ void vmemmap_free(unsigned long start, unsigned long end)
->>  }
->>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
->>
->> -static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
->> +static pte_t bm_pte[PTRS_PER_PTE] __pgdir;
->>  #if CONFIG_ARM64_PGTABLE_LEVELS > 2
->> -static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> +static pmd_t bm_pmd[PTRS_PER_PMD] __pgdir;
->>  #endif
->>  #if CONFIG_ARM64_PGTABLE_LEVELS > 3
->> -static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
->> +static pud_t bm_pud[PTRS_PER_PUD] __pgdir;
->>  #endif
->
-> These used to be zeroed (by the bss init code in head.S), but now they won't
-> be, and as they live after all the initialized data they could contain garbage
-> if we're unlucky. So I suspect this is broken.
->
-
-Actually, they are in this case, as the init code zeroes from the
-beginning of idmap to the end of swapper :-)
-But that is something that should be more explicit I guess
-
-I was wondering if we should worry about doing the zeroing with the
-caches off, which is not needed for fixmap
-
-> If we zero these before use then that's fine. We could define the swapper and
-> idmap similarly in this C file for consistency (we zero those in head.S). That
-> would bring all the page table allocations into the same file, and .pgdir could
-> be simpler:
->
->         .pgdir {
->                 . = ALIGN(PAGE_SIZE);
->                 __pgdir_start = .;
->                 *(.pgdir)
->                 __pgdir_end = .;
->         }
->
->>
->>  static inline pud_t * fixmap_pud(unsigned long addr)
->> @@ -592,11 +592,14 @@ void __init early_fixmap_init(void)
->>       unsigned long addr = FIXADDR_START;
->>
->>       pgd = pgd_offset_k(addr);
->> -     pgd_populate(&init_mm, pgd, bm_pud);
->> +     if (pgd_none(*pgd))
->> +             pgd_populate(&init_mm, pgd, bm_pud);
->>       pud = pud_offset(pgd, addr);
->> -     pud_populate(&init_mm, pud, bm_pmd);
->> +     if (pud_none(*pud))
->> +             pud_populate(&init_mm, pud, bm_pmd);
->>       pmd = pmd_offset(pud, addr);
->> -     pmd_populate_kernel(&init_mm, pmd, bm_pte);
->> +     if (pmd_none(*pmd))
->> +             pmd_populate_kernel(&init_mm, pmd, bm_pte);
->
-> It's a bit confusing to have this change in the same patch as the other
-> changes, given that this shouldn't be required yet. It might make more sense
-> for this to live in the patch moving the text mapping.
->
+> 
 
 
-ok
+-- 
+Thanks!
+Yijing
