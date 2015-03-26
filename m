@@ -1,92 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Mar 2015 14:19:57 +0000
-Subject: [PATCH 2/3] mfd: qcom_rpm: add support for IPQ8064
-In-Reply-To: <20150319100454.GA3318@x1>
-References: <1416512485-7292-1-git-send-email-joshc@codeaurora.org>
- <1416512485-7292-3-git-send-email-joshc@codeaurora.org>
- <20150319100454.GA3318@x1>
-Message-ID: <20150326141957.GP5951@x1>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Mar 2015 14:22:26 +0000
+Subject: [PATCH 3/4] clk: hisi: add stub clk driver
+In-Reply-To: <1427368419-22222-4-git-send-email-leo.yan@linaro.org>
+References: <1427368419-22222-1-git-send-email-leo.yan@linaro.org>
+ <1427368419-22222-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <20150326142226.GJ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Lee Jones wrote:
+On Thu, Mar 26, 2015 at 07:13:38PM +0800, Leo Yan wrote:
+> +static unsigned long hisi_stub_clk_recalc_rate(struct clk_hw *hw,
+> +		unsigned long parent_rate)
+> +{
+...
+> +	BUG_ON(!stub_clk->lock);
+...
 
-> On Thu, 20 Nov 2014, Josh Cartwright wrote:
-> 
-> > The IPQ8064 also includes an RPM following the same message structure as
-> > other chips.  In addition, it supports a few new resource types to
-> > support the NSS fabric clocks and the SMB208/SMB209 regulators found on
-> > the reference boards.
-> > 
-> > Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> > ---
-> >  drivers/mfd/qcom_rpm.c | 41 +++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 41 insertions(+)
-> 
-> Applied with Stephen's Ack.
+> +static int hisi_stub_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                    unsigned long parent_rate)
+> +{
+...
+> +	BUG_ON(!stub_clk->lock);
+...
 
-I have unapplied this one too, as it depends on the other one.
+> +static long hisi_stub_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +		unsigned long *parent_rate)
+> +{
+...
+> +	BUG_ON(!stub_clk->lock);
+...
 
-> > diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
-> > index 0dd7a6fe..5ead23b 100644
-> > --- a/drivers/mfd/qcom_rpm.c
-> > +++ b/drivers/mfd/qcom_rpm.c
-> > @@ -324,10 +324,51 @@ static const struct qcom_rpm_data msm8960_template = {
-> >  	.n_resources = ARRAY_SIZE(msm8960_rpm_resource_table),
-> >  };
-> >  
-> > +static const struct qcom_rpm_resource ipq806x_rpm_resource_table[] = {
-> > +	[QCOM_RPM_CXO_CLK] =			{ 25, 9, 5, 1 },
-> > +	[QCOM_RPM_PXO_CLK] =			{ 26, 10, 6, 1 },
-> > +	[QCOM_RPM_APPS_FABRIC_CLK] =		{ 27, 11, 8, 1 },
-> > +	[QCOM_RPM_SYS_FABRIC_CLK] =		{ 28, 12, 9, 1 },
-> > +	[QCOM_RPM_NSS_FABRIC_0_CLK] =		{ 29, 13, 10, 1 },
-> > +	[QCOM_RPM_DAYTONA_FABRIC_CLK] =		{ 30, 14, 11, 1 },
-> > +	[QCOM_RPM_SFPB_CLK] =			{ 31, 15, 12, 1 },
-> > +	[QCOM_RPM_CFPB_CLK] =			{ 32, 16, 13, 1 },
-> > +	[QCOM_RPM_NSS_FABRIC_1_CLK] =		{ 33, 17, 14, 1 },
-> > +	[QCOM_RPM_EBI1_CLK] =			{ 34, 18, 16, 1 },
-> > +	[QCOM_RPM_APPS_FABRIC_HALT] =		{ 35, 19, 18, 2 },
-> > +	[QCOM_RPM_APPS_FABRIC_MODE] =		{ 37, 20, 19, 3 },
-> > +	[QCOM_RPM_APPS_FABRIC_IOCTL] =		{ 40, 21, 20, 1 },
-> > +	[QCOM_RPM_APPS_FABRIC_ARB] =		{ 41, 22, 21, 12 },
-> > +	[QCOM_RPM_SYS_FABRIC_HALT] =		{ 53, 23, 22, 2 },
-> > +	[QCOM_RPM_SYS_FABRIC_MODE] =		{ 55, 24, 23, 3 },
-> > +	[QCOM_RPM_SYS_FABRIC_IOCTL] =		{ 58, 25, 24, 1 },
-> > +	[QCOM_RPM_SYS_FABRIC_ARB] =		{ 59, 26, 25, 30 },
-> > +	[QCOM_RPM_MM_FABRIC_HALT] =		{ 89, 27, 26, 2 },
-> > +	[QCOM_RPM_MM_FABRIC_MODE] =		{ 91, 28, 27, 3 },
-> > +	[QCOM_RPM_MM_FABRIC_IOCTL] =		{ 94, 29, 28, 1 },
-> > +	[QCOM_RPM_MM_FABRIC_ARB] =		{ 95, 30, 29, 2 },
-> > +	[QCOM_RPM_CXO_BUFFERS] =		{ 209, 33, 31, 1 },
-> > +	[QCOM_RPM_USB_OTG_SWITCH] =		{ 210, 34, 32, 1 },
-> > +	[QCOM_RPM_HDMI_SWITCH] =		{ 211, 35, 33, 1 },
-> > +	[QCOM_RPM_DDR_DMM] =			{ 212, 36, 34, 2 },
-> > +	[QCOM_RPM_VDDMIN_GPIO] =		{ 215, 40, 39, 1 },
-> > +	[QCOM_RPM_SMB208_S1a] =			{ 216, 41, 90, 2 },
-> > +	[QCOM_RPM_SMB208_S1b] =			{ 218, 43, 91, 2 },
-> > +	[QCOM_RPM_SMB208_S2a] =			{ 220, 45, 92, 2 },
-> > +	[QCOM_RPM_SMB208_S2b] =			{ 222, 47, 93, 2 },
-> > +};
-> > +
-> > +static const struct qcom_rpm_data ipq806x_template = {
-> > +	.version = 3,
-> > +	.resource_table = ipq806x_rpm_resource_table,
-> > +	.n_resources = ARRAY_SIZE(ipq806x_rpm_resource_table),
-> > +};
-> > +
-> >  static const struct of_device_id qcom_rpm_of_match[] = {
-> >  	{ .compatible = "qcom,rpm-apq8064", .data = &apq8064_template },
-> >  	{ .compatible = "qcom,rpm-msm8660", .data = &msm8660_template },
-> >  	{ .compatible = "qcom,rpm-msm8960", .data = &msm8960_template },
-> > +	{ .compatible = "qcom,rpm-ipq8064", .data = &ipq806x_template },
-> >  	{ }
-> >  };
-> >  MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
-> 
+> +static struct clk_ops hisi_stub_clk_ops = {
+> +	.recalc_rate	= hisi_stub_clk_recalc_rate,
+> +	.round_rate	= hisi_stub_clk_round_rate,
+> +	.set_rate	= hisi_stub_clk_set_rate,
+> +};
+...
+> +static struct clk *_register_stub_clk(struct device *dev, unsigned int id,
+> +	const char *name, const char *parent_name, unsigned long flags,
+> +	spinlock_t *lock)
+> +{
+> +	struct hisi_stub_clk *stub_clk;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	stub_clk = kzalloc(sizeof(*stub_clk), GFP_KERNEL);
+> +	if (!stub_clk) {
+> +		pr_err("%s: fail to alloc stub clk!\n", __func__);
+> +		return ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	init.name = name;
+> +	init.ops = &hisi_stub_clk_ops;
+> +	init.parent_names = parent_name ? &parent_name : NULL;
+> +	init.num_parents = parent_name ? 1 : 0;
+> +	init.flags = flags;
+> +
+> +	stub_clk->hw.init = &init;
+> +	stub_clk->id = id;
+> +	stub_clk->lock = lock;
+
+Under what scenario is it safe to call _register_stub_clk() with a NULL
+lock argument?
+
+If lock is NULL, then every function callable via the ops structure
+will bug.
+
+Rather than doing a test in each method function, do it in
+_register_stub_clk() - this means we aren't waiting for a NULL pointer
+deref when one of these method functions gets called.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
