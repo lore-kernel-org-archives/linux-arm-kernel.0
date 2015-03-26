@@ -1,57 +1,30 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 26 Mar 2015 11:24:08 +0000
-Subject: [PATCH 8/8] pcmcia: soc_common: remove skt_dev_info's clk pointer
-In-Reply-To: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
-References: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
-Message-ID: <E1Yb5tQ-0006IP-6H@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 Mar 2015 11:22:54 +0000
+Subject: [PATCH 0/8] sa11x0 PCMCIA updates
+Message-ID: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer need to store the clk pointer in struct skt_dev_info as we
-no longer need to remember the clk pointer for the cleanup paths.
+Here's a collection of patches which cleans up and updates the SA11x0
+and PXA2xx socket drivers, particularly converting them to the devm_*
+APIs to ensure that resources are properly cleaned up.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/pcmcia/pxa2xx_base.c | 1 -
- drivers/pcmcia/sa11xx_base.c | 1 -
- drivers/pcmcia/soc_common.h  | 1 -
- 3 files changed, 3 deletions(-)
+I've stopped short of totally converting sa1111_generic as there are
+some corner cases where we want to initialise only socket 1, but not
+socket 0, which would require further testing to ensure that these
+changes are correct.
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index dfcf07828605..1b2c58dd43cf 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -308,7 +308,6 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 		return -ENOMEM;
- 
- 	sinfo->nskt = ops->nr;
--	sinfo->clk = clk;
- 
- 	/* Initialize processor specific parameters */
- 	for (i = 0; i < ops->nr; i++) {
-diff --git a/drivers/pcmcia/sa11xx_base.c b/drivers/pcmcia/sa11xx_base.c
-index 815b6950975c..9f6ec87b9f9e 100644
---- a/drivers/pcmcia/sa11xx_base.c
-+++ b/drivers/pcmcia/sa11xx_base.c
-@@ -233,7 +233,6 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- 		return -ENOMEM;
- 
- 	sinfo->nskt = nr;
--	sinfo->clk = clk;
- 
- 	/* Initialize processor specific parameters */
- 	for (i = 0; i < nr; i++) {
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index e6fcbea5b682..94762a54d731 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -68,7 +68,6 @@ struct soc_pcmcia_socket {
- 
- struct skt_dev_info {
- 	int nskt;
--	struct clk *clk;
- 	struct soc_pcmcia_socket skt[0];
- };
- 
+I will be testing the sa11x0 changes later today, but as I gave most
+of my PXA2xx platforms to Robert, I need Robert to test this on the
+Lubbock.
+
+ drivers/pcmcia/pxa2xx_base.c    | 17 +++++------------
+ drivers/pcmcia/sa1100_generic.c |  2 --
+ drivers/pcmcia/sa1111_generic.c | 14 +++++++-------
+ drivers/pcmcia/sa11xx_base.c    | 17 ++---------------
+ drivers/pcmcia/soc_common.h     |  1 -
+ 5 files changed, 14 insertions(+), 37 deletions(-)
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
