@@ -1,113 +1,64 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 26 Mar 2015 21:07:27 +0530
-Subject: [PATCH v2 3/7] dmaengine: Add driver for TI DMA crossbar on DRA7x
-In-Reply-To: <5513FC22.2030304@ti.com>
-References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
- <1426080210-841-4-git-send-email-peter.ujfalusi@ti.com>
- <20150326105603.GK32683@intel.com> <5513FC22.2030304@ti.com>
-Message-ID: <20150326153727.GN32683@intel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 26 Mar 2015 16:28:27 +0100
+Subject: at91 clocks
+In-Reply-To: <5513D701.2080201@microbit.se>
+References: <55117568.6090202@microbit.se> <20150325013201.3f01fc22@bbrezillon>
+ <55127AA6.5050902@microbit.se> <20150325173751.0d6479df@bbrezillon>
+ <5513D701.2080201@microbit.se>
+Message-ID: <20150326162827.041c051a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 02:31:30PM +0200, Peter Ujfalusi wrote:
-> On 03/26/2015 12:56 PM, Vinod Koul wrote:
-> >> +#define TI_XBAR_OUTPUTS	127
-> >> +#define TI_XBAR_INPUTS	256
-> > Ideally this should be moved to DT. Will next revision of this chip always
-> > support these output and inputs?
+Hi Jonas,
+
+On Thu, 26 Mar 2015 10:53:05 +0100
+Jonas Andersson <jonas@microbit.se> wrote:
+
+> Hi Boris and others,
 > 
-> They are coming from DT. I'm using these as fall back values in case we can
-> not get this from DT and a warning will be printed in case if this unlikely
-> event happens.
-Oops missed, that. Looks fine then
+> >>>> Hi all,
+> >>>>
+> >>>> I am working on a system with at91sam9260 soc. Trying to move from
+> >>>> kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
+> >>>>
+> >>>> In my old code i use clk_get() to get pck1 and pllb, set pllb as parent
+> >>>> for pck1, set rate for pck1, enable pck1.
+> >>> How do you do that (clk_set_parent + clk_set_rate) ?
+> >>> Could you paste your code somewhere ?
+> >> Yes, see http://pastie.org/10052161
+
+Could you paste the new version of your code (the one with clk_set_rate
+on pllb) ?
+
+> > Your pllb seems to be configured to output a 0Hz rate, and I'm not
+> > forwarding rate change to prog clk parents yet.
+> > That's definitely something I should work on, but in the meantime you
+> > could try to manually set pllb rate.
+> 
+> I tried to set pllb rate to 96MHz but it still shows 0Hz. |clk_set_rate 
+> returns 0|.
+
+Have you tested pllb pointer value ? As you can see here [1], the CCF
+is not complaining when you pass a NULL pointer.
 
 > 
-> >> +
-> >> +static DEFINE_IDR(map_idr);
-> >> +
-> >> +struct ti_dma_xbar_data {
-> >> +	struct dma_router dmarouter;
-> >> +	struct regmap *regmap;
-> >> +
-> >> +	uint safe_val; /* Value to rest the crossbar lines */
-> >> +	uint xbar_requests; /* number of DMA requests connected to XBAR */
-> >> +	uint dma_requests; /* number of DMA requests forwarded to DMA */
-> >> +
-> >> +	void __iomem *iomem;
-> >> +};
-> >> +
-> >> +struct ti_dma_xbar_map {
-> >> +	int xbar_in;
-> >> +	int xbar_out;
-> >> +};
-> >> +
-> >> +static void ti_dma_xbar_free(struct device *dev, void *route_data)
-> >> +{
-> >> +	struct ti_dma_xbar_data *xbar = dev_get_drvdata(dev);
-> >> +	struct ti_dma_xbar_map *map = route_data;
-> >> +
-> >> +	dev_dbg(dev, "Unmapping XBAR%d (was routed to %d)\n",
-> >> +		map->xbar_in, map->xbar_out);
-> >> +
-> >> +	regmap_write(xbar->regmap, map->xbar_out * 2, 0);
-> > just out of curiosity how much do you save using regmap :)
-> 
-> good point, not much I guess. I had it implemented w/o regmap as well, but
-> thought why not use regmap if it is available.
-Yes but there is overhead involved in setting it up. I though you have some
-latency issues. It is okay to have it :)
-Cache is anyways fastest :)
+> >
+> >> I tried kernel 4.0-rc5 but it hangs in boot after ethernet init. 
+> > Is this related to the changes I suggested ?
+> >
+> No, it doesnt work before changes. I will try to get it running later, 
+> direct from linus tree without modifications..
 
-> >> +static int ti_dma_xbar_probe(struct platform_device *pdev)
-> >> +{
-> >> +	struct device_node *node = pdev->dev.of_node;
-> >> +	struct device_node *dma_node;
-> >> +	struct ti_dma_xbar_data *xbar;
-> >> +	struct resource *res;
-> >> +	void __iomem *iomem;
-> >> +	int i, ret;
-> >> +
-> >> +	if (!node)
-> >> +		return -ENODEV;
-> >> +
-> >> +	dma_node = of_parse_phandle(node, "dma-device", 0);
-> >> +	if (!dma_node) {
-> >> +		dev_err(&pdev->dev, "Can't get target DMA node\n");
-> >> +		return -ENODEV;
-> >> +	}
-> >> +
-> >> +	xbar = devm_kzalloc(&pdev->dev, sizeof(*xbar), GFP_KERNEL);
-> >> +	if (!xbar)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	if (of_property_read_u32(dma_node, "dma-requests",
-> >> +				 &xbar->dma_requests)) {
-> >> +		dev_info(&pdev->dev,
-> >> +			 "Missing XBAR output information, using %u.\n",
-> >> +			 TI_XBAR_OUTPUTS);
-> >> +		xbar->dma_requests = TI_XBAR_OUTPUTS;
-> >> +	}
-> >> +	of_node_put(dma_node);
-> > _put here?
-> 
-> The code takes the real dma controller's node and it should be put back after
-> I have got the information I needed from it (number of DMA requests).
-> 
-> > 
-> >> +int omap_dmaxbar_init(void)
-> >> +{
-> >> +	return platform_driver_register(&ti_dma_xbar_driver);
-> >> +}
-> >> +arch_initcall(omap_dmaxbar_init);
-> > why arch_initcall?
-> 
-> It should be on the same init level as the real DMA controller. omap-dma at
-> the moment, but in some platforms this can work with the edma as well.
-> Since all device in the system (well most of them anyway) uses DMA it is
-> better to not delay their probe with deferring because the crossbar driver is
-> still not loaded
-Deferring if resources not available is the right thing and helps you get rid
-of init level ordering magic...
+This might not be related to your clock problem then. Have your tried
+to boot 4.0-rc4 ?
+
+Best Regards,
+
+Boris
+
+[1]http://lxr.free-electrons.com/source/drivers/clk/clk.c#L1535
 
 -- 
-~Vinod
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
