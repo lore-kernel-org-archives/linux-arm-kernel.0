@@ -1,56 +1,68 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 26 Mar 2015 11:45:51 +0000
-Subject: [RFC 3/6] clocksource: tcb_clksrc: use atmel_io.h to provide on-chip
- IO
+Date: Thu, 26 Mar 2015 11:45:49 +0000
+Subject: [RFC 1/6] atmel: add atmel_io.h
 In-Reply-To: <1427370354-21247-1-git-send-email-ben.dooks@codethink.co.uk>
 References: <1427370354-21247-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1427370354-21247-4-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1427370354-21247-2-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use <linux/atmel_io.h> to provide IO accessors which work on both
-AVR32 and ARM for on-chip peripherals.
+The AVR32 and ARM (AT91) architectures share a number of drivers which
+need to access the on chip peripherals. The current drivers work with
+the default endian configuration, however it is possilbe to run some of
+the ATMEL ARM architectures in big endian mode.
+
+If we change the drivers from __raw to _relaxed IO accesors then the ARM
+side works but the AVR32 will not. The _relaxed assume the bus is little
+endian and the __raw are native. The AVR32 is native big endian so these
+are not the right functions.
+
+To sort this out, and avoid a number of drivers having #ifdef for the
+AVR32 case we add <linux/atmel_io.h> to provide some AT91/AVR32 independant
+IO accessor functions.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 --
-CC: Daniel Lezcano <daniel.lezcano@linaro.org>
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Linux Kernel <linux-kernel@vger.kernel.org>
-CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+CC: Haavard Skinnemoen <hskinnemoen@gmail.com>
+CC: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 CC: Andrew Victor <linux@maxim.org.za>
 CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+CC: linux-arm-kernel at lists.infradead.org
 ---
- drivers/clocksource/tcb_clksrc.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ include/linux/atmel_io.h | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 include/linux/atmel_io.h
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 0f819dd3..b25416d 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -9,6 +9,7 @@
- #include <linux/ioport.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/atmel_io.h>
- #include <linux/atmel_tc.h>
- 
- 
-@@ -41,13 +42,8 @@
- 
- static void __iomem *tcaddr;
- 
--#ifdef CONFIG_AVR32
--#define tcb_readl	__raw_readl
--#define tcb_writel	__raw_writel
--#else
--#define tcb_readl	readl_relaxed
--#define tcb_writel	writel_relaxed
--#endif
-+#define tcb_readl	atmel_oc_readl
-+#define tcb_writel	atmel_oc_writel
- 
- static cycle_t tc_get_cycles(struct clocksource *cs)
- {
+diff --git a/include/linux/atmel_io.h b/include/linux/atmel_io.h
+new file mode 100644
+index 0000000..1234e88
+--- /dev/null
++++ b/include/linux/atmel_io.h
+@@ -0,0 +1,25 @@
++/* Atmel AT91/AVR32 independant IO
++ *
++ * Copyright 2015 Codethink Ltd.
++ * Ben Dooks <ben.dooks@codethink.co.uk>
++ *
++ * Provide architecture indendant, endian-safe IO accessor functions
++ */
++
++#ifdef CONFIG_AVR32
++/* For AVR32 the readl and writel relaxed will do an extra byte reverse
++ * as the peripherals are already in the same endian-ness as the CPU and
++ * readl/writel assume little endian where the CPU is big endian
++ */
++#define atmel_oc_readl	__raw_readl
++#define atmel_oc_writel	__raw_writel
++
++#define atmel_oc_readw	__raw_readw
++#define atmel_oc_writew	__raw_writew
++#else
++#define atmel_oc_readl	readl_relaxed
++#define atmel_oc_writel	writel_relaxed
++
++#define atmel_oc_readw	readw_relaxed
++#define atmel_oc_writew	writew_relaxed
++#endif
 -- 
 2.1.4
