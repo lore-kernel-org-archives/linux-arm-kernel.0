@@ -1,90 +1,121 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 27 Mar 2015 07:01:10 +0800
-Subject: [patch v11 12/23] ARM64 / ACPI: Parse MADT for SMP initialization
-In-Reply-To: <20150326211239.GA23660@arm.com>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-13-git-send-email-hanjun.guo@linaro.org>
- <20150325171735.GI14585@localhost> <20150326151510.GI2805@arm.com>
- <551462A2.4070308@linaro.org> <20150326211239.GA23660@arm.com>
-Message-ID: <55148FB6.1030106@linaro.org>
+From: dtor@google.com (Dmitry Torokhov)
+Date: Thu, 26 Mar 2015 16:02:17 -0700
+Subject: [PATCH v1 2/3] Phy: DT binding documentation for Broadcom Cygnus
+ USB PHY driver
+In-Reply-To: <55134D29.80708@broadcom.com>
+References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
+ <1426886727-537-3-git-send-email-arun.ramamurthy@broadcom.com>
+ <551333DA.6080700@ti.com> <55134D29.80708@broadcom.com>
+Message-ID: <20150326230217.GA18887@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?03?27? 05:12, Will Deacon wrote:
-> On Thu, Mar 26, 2015 at 07:48:50PM +0000, Hanjun Guo wrote:
->> On 2015?03?26? 23:15, Will Deacon wrote:
->>> commit 8ef320319592693f4a6286d80df210fd47b3e356
->>> Author: Will Deacon <will.deacon@arm.com>
->>> Date:   Thu Mar 26 15:09:20 2015 +0000
->>>
->>>       ARM64 / ACPI: fix usage of acpi_map_gic_cpu_interface
->>>
->>>       acpi_parse_gic_cpu_interface calls acpi_map_gic_cpu_interface by both
->>>       passing a 32-bit value in the u8 enabled parameter and then subsequently
->>>       ignoring its return value.
->>>
->>>       Sort it out.
->>>
->>>       Reported-by: Catalin Marinas <catalin.marinas@arm.com>
->>>       Signed-off-by: Will Deacon <will.deacon@arm.com>
->>>
->>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->>> index cd60329da8c4..07649e413244 100644
->>> --- a/arch/arm64/kernel/acpi.c
->>> +++ b/arch/arm64/kernel/acpi.c
->>> @@ -103,9 +103,12 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
->>>     *
->>>     * Returns the logical cpu number which maps to MPIDR
->>>     */
->>> -static int __init acpi_map_gic_cpu_interface(u64 mpidr, u8 enabled)
->>> +static int __init
->>> +acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->>
->> How about just replace u8 with u32? This function has its purpose to
->> be lived, on x86/ia64, ACPI core will get the physcal cpu ID via
->> ACPI handle, then pass it to the arch specific mapping function
->> to map the physcal cpu ID with logical cpu ID for the new added
->> CPU, so when ACPI based CPU hot-plug is introduced on ARM64, we
->> need to go back to that solution.
->
-> If/when that happens, we can change things then. Right now, this is a static
-> function with one caller. One step at a time, please.
->
->>>    {
->>>    	int i;
->>> +	u64 mpidr = processor->arm_mpidr & MPIDR_HWID_BITMASK;
->>> +	bool enabled = !!(processor->flags & ACPI_MADT_ENABLED);
->>>
->>>    	if (mpidr == INVALID_HWID) {
->>>    		pr_info("Skip MADT cpu entry with invalid MPIDR\n");
->>> @@ -178,11 +181,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
->>>    		return -EINVAL;
->>>
->>>    	acpi_table_print_madt_entry(header);
->>> -
->>> -	acpi_map_gic_cpu_interface(processor->arm_mpidr & MPIDR_HWID_BITMASK,
->>> -		processor->flags & ACPI_MADT_ENABLED);
->>> -
->>> -	return 0;
->>> +	return acpi_map_gic_cpu_interface(processor);
->>
->> I don't think we need to return the error value here, in ACPI
->> core, it will stop the MADT scanning once it returned the error
->> value, but actually we can skip some disabled GICC (cpu) entries
->> and find all the enabled ones in MADT, for example,
->>
->> cpu0 entry, with flag enabled
->> cpu1 entry, disabled  - if we return the error value, table scanning
->>                           will stop
->> cpu2 entry, enabled   - and this cpu will be ignored
->
-> Then send me a patch making acpi_map_gic_cpu_interface have a void return
-> type. Ignoring the return type is usually a good way to introduce subtle
-> bugs.
+Hi Arun,
 
-OK, I will, and I will cleanup the comments for this function too.
+On Wed, Mar 25, 2015 at 05:04:57PM -0700, Arun Ramamurthy wrote:
+> 
+> 
+> On 15-03-25 03:16 PM, Kishon Vijay Abraham I wrote:
+> >Hi,
+> >
+> >On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+> >>Broadcom's Cygnus chip has a USB 2.0 host controller connected to
+> >>three separate phys. One of the phs (port 2) is also connectd to
+> >>a usb 2.0 device controller
+> >>
+> >>Reviewed-by: Ray Jui <rjui@broadcom.com>
+> >>Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> >>Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+> >>
+> >>---
+> >>  .../bindings/phy/brcm,cygnus-usb-phy.txt           | 65 ++++++++++++++++++++++
+> >>  1 file changed, 65 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+> >>
+> >>diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+> >>new file mode 100644
+> >>index 0000000..002bd59
+> >>--- /dev/null
+> >>+++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+> >>@@ -0,0 +1,65 @@
+> >>+BROADCOM CYGNUS USB PHY
+> >>+
+> >>+Required Properties:
+> >>+	- compatible:  brcm,cygnus-usb-phy
+> >>+	- reg : usbphy_regs - Base address of phy registers
+> >>+			usb2h_idm_regs - Base address of host idm registers
+> >>+			usb2d_idm_regs - Base address of device idm registers
+> >
+> >where is #phy-cells documented?
+> I dont follow, isnt phy-cells a standard binding, what documentation
+> is required?
+> >>+The node that uses the phy must provide one integers, 0 for device and 1 for host
+> >
 
-Need some sleep first...
+"The node that uses phy must specify whether it should be configured as
+host or device in the second cell of phy specification."
 
-Thanks
-Hanjun
+By the way, can we use not integers but symbolic constants for host and
+device mode?
+
+> >>+
+> >>+NOTE: port 0 and port 1 are host only and port 2 can be configured for host or device.
+> >>+
+> >>+Example of phy :
+> >>+	usbphy0: usbphy at 0x0301c000 {
+> >>+		compatible = "brcm,cygnus-usb-phy";
+> >>+		reg = <0x0301c000 0x2000>,
+> >>+		      <0x18115000 0x1000>,
+> >>+		      <0x18111000 0x1000>;
+> >>+		status = "okay";
+> >>+
+> >>+		#address-cells = <1>;
+> >>+		#size-cells = <0>;
+> >>+		usbphy0_0: usbphy0 at 0 {
+> >>+			#phy-cells = <1>;
+> >>+			reg = <0>;
+> >>+			status = "okay";
+> >>+			phy-supply = <&vbus_p0>;
+> >>+		};
+> >>+
+> >>+		usbphy0_1: usbphy0 at 1 {
+> >>+			#phy-cells = <1>;
+> >>+			reg = <1>;
+> >>+			status = "okay";
+> >>+		};
+> >>+
+> >>+		usbphy0_2: usbphy0 at 2 {
+> >>+			#phy-cells = <1>;
+> >>+			reg = <2>;
+> >>+			status = "okay";
+> >>+			phy-supply = <&vbus_p2>;
+> >>+		};
+> >>+	};
+> >>+
+> >>+Example of node using the phy:
+> >>+
+> >>+	/* This nodes declares all three ports as host */
+> >>+	
+> >>+	ehci0: usb at 0x18048000 {
+> >>+		compatible = "generic-ehci";
+> >>+		reg = <0x18048000 0x100>;
+> >>+		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+> >>+		phys = <&usbphy0_0 1 &usbphy0_1 1 &usbphy0_2 1>;
+> >>+		phy-names = "usb","usb","usb";
+> >
+> >is it on purpose you use the same name for phy-names? it is wrong though.
+> Kishon, I did use the same names on purpose. The phy-names are
+> actually irrelevant because I used the new api I created
+> devm_of_phy_get_by_index. I actually wasnt sure if  should take out
+> the phy-name field altogether or leave it as phy-names = "usb" for
+> compatibility with other bindings.
+
+There is no issue of compatibility as existing mappings would only use 1
+phy and we'll pick it up when getting phy by index. I think we should
+simply drop phy-names altogether as driver does not use this property
+anymore.
+
+Thanks.
+
+-- 
+Dmitry
