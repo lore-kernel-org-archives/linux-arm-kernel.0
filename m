@@ -1,67 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 Mar 2015 18:35:41 +0000 (UTC)
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <55137098.4030903@wwwdotorg.org>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
- <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
- <55137098.4030903@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 26 Mar 2015 18:45:07 +0000
+Subject: ARM: KVM/XEN: how should we support virt-what?
+In-Reply-To: <20150326090150.GA3073@hawk.usersys.redhat.com>
+References: <20150325094440.GB3163@hawk.usersys.redhat.com>
+ <20150326090150.GA3073@hawk.usersys.redhat.com>
+Message-ID: <alpine.DEB.2.02.1503261843410.9516@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Mar 2015, Stephen Warren wrote:
-
-> On 03/25/2015 04:00 PM, Paul Walmsley wrote:
-> > On Wed, 25 Mar 2015, Tyler Baker wrote:
-> >> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
-> >>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
-> >>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
-> >>> multi_v7_defconfig boot.
-> >>>
-> >>> Boot log before:
-> >>>
-> >>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105514_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325105514/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-> >>>
-> >>> Boot log after:
-> >>>
-> >>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325105350_4a3a6f86693922b29cf829c63f652b057f14619e/20150325105350/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
-> >>>
-> >>>
-> >>> Any ideas?  Stephen Warren thinks there might be an initcall that might
-> >>> not check to see what kind of device it's running on.
-> >>
-> >> Can you try to shift your kernel load address around a bit? From
-> >> experience with the boards from kernelci.org we find that as the multi
-> >> v7 kernel size increases they can clobber memory when they get
-> >> decompressed.
+On Thu, 26 Mar 2015, Andrew Jones wrote:
+> On Wed, Mar 25, 2015 at 10:44:42AM +0100, Andrew Jones wrote:
+> > Hello ARM virt maintainers,
 > > 
-> > Thanks, that was it:
+> > I'd like to start a discussion about supporting virt-what[1]. virt-what
+> > allows userspace to determine if the system it's running on is running
+> > in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
+> > effort tool, see the Caveat emptor in [1], it has become quite a useful
+> > tool, and is showing up in different places, such as OpenStack. If you
+> > look at the code[2], specifically [3], then you'll see how it works on
+> > x86, which is to use the dedicated hypervisor cpuid leaves. I'm
+> > wondering what equivalent we have, or can develop, for arm.
+> > Here are some thoughts;
+> > 0) there's already something we can use, and I just need to be told
+> >    about it.
+> > 1) be as similar as possible to x86 by dedicating some currently
+> >    undefined sysreg bits. This would take buy-in from lots of parties,
+> >    so is not likely the way to go.
+> > 2) create a specific DT node that will get exposed through sysfs, or
+> >    somewhere.
+> > 3) same as (2), but just use the nodes currently in mach-virt's DT
+> >    as the indication we're a guest. This would just be a heuristic,
+> >    i.e. "have virtio mmio" && psci.method == hvc, or something,
+> >    and we'd still need a way to know if we're kvm vs. xen vs. ??.
 > > 
-> > http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
+> > Thanks,
+> > drew 
 > > 
-> > Should have guessed when absolutely no debug output was emitted by the 
-> > board...
-> > 
-> > Sorry for the false alarm, Geert!
+> > [1] http://people.redhat.com/~rjones/virt-what/
+> > [2] http://git.annexia.org/?p=virt-what.git;a=summary
+> > [3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
 > 
-> Interesting. Do the values in U-Boot's default environment work
-> correctly
+> Thanks everyone for their responses. So, the current summary seems to
+> be;
+> 1) Xen has both a DT node and an ACPI table, virt-what can learn how
+>    to probe those.
+> 2) We don't have anything yet for KVM, and we're reluctant to create a
+>    specific DT node. Anyway, we'd still need to address ACPI booted
+>    guests some other way.
+> 
+> For a short-term, DT-only, approach we could go with a heuristic, one
+> that includes Marc's "if hypervisor node exists, then xen, else kvm"
+> condition.
+> 
+> How about SMBIOS for a long-term solution that works for both DT and
+> ACPI? We're not populating SMBIOS for arm guests yet in qemu, but now
+> that AAVMF has fw_cfg, we should be able to. On x86 we already have
+> smbios populated from qemu, although not in a way that allows us to
+> determine kvm vs. xen vs. tcg.
 
-No idea, I haven't tried.  (The load addresses I used are observable in 
-the boot logs above.)
-
-> ("env default -f -a" will reset the environment to default, in
-> case some old values are saved in flash); I put some effort into picking
-> them so I really hope they work! ${kernel_addr_r}, ${fdt_addr_r},
-> ${ramdisk_addr_r}.
-
-According to the tegra20-common.h file in the u-boot source here, 
-kernel_addr_r is 0x01000000 and fdt_addr_r is 0x02000000.  If one assumes 
-the problem is that the kernel decompressor is overwriting the DTB, then 
-I suspect they wouldn't work either, since the gap between the addresses 
-is the same as what I used (0x01000000).
+I don't think that SMBIOS works with DT.
 
 
-- Paul
+> Any other suggestions?
+> 
+> drew
+> 
