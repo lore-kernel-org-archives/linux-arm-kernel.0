@@ -1,113 +1,85 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 25 Mar 2015 17:04:57 -0700
-Subject: [PATCH v1 2/3] Phy: DT binding documentation for Broadcom Cygnus
- USB PHY driver
-In-Reply-To: <551333DA.6080700@ti.com>
+Date: Wed, 25 Mar 2015 17:06:11 -0700
+Subject: [PATCH v1 3/3] phy: cygnus-usbphy: Add Broadcom Cygnus USB phy
+ driver
+In-Reply-To: <55134C3E.4060400@ti.com>
 References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426886727-537-3-git-send-email-arun.ramamurthy@broadcom.com>
- <551333DA.6080700@ti.com>
-Message-ID: <55134D29.80708@broadcom.com>
+ <1426886727-537-4-git-send-email-arun.ramamurthy@broadcom.com>
+ <551336A2.1050704@ti.com> <20150325224253.GA16950@dtor-ws>
+ <55134C3E.4060400@ti.com>
+Message-ID: <55134D73.7060507@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 15-03-25 03:16 PM, Kishon Vijay Abraham I wrote:
-> Hi,
+On 15-03-25 05:01 PM, Kishon Vijay Abraham I wrote:
 >
-> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
->> Broadcom's Cygnus chip has a USB 2.0 host controller connected to
->> three separate phys. One of the phs (port 2) is also connectd to
->> a usb 2.0 device controller
+>
+> On Thursday 26 March 2015 04:12 AM, Dmitry Torokhov wrote:
+>> Hi Kishon,
 >>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
+>> On Thu, Mar 26, 2015 at 03:58:50AM +0530, Kishon Vijay Abraham I wrote:
+>>> Hi,
+>>>
+>>> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
+>>>> +struct bcm_phy_driver {
+>>>> +	void __iomem *usbphy_regs;
+>>>> +	void __iomem *usb2h_idm_regs;
+>>>> +	void __iomem *usb2d_idm_regs;
+>>>> +	struct bcm_phy_instance *ports[MAX_PHY_PORTS];
+>>>
+>>> er.. can't we allocate this dynamically?
 >>
->> ---
->>   .../bindings/phy/brcm,cygnus-usb-phy.txt           | 65 ++++++++++++++++++++++
->>   1 file changed, 65 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>> The chip has support for only 3 phys, so I believe allocating array of 3
+>> pointers is simplest.
 >>
->> diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
->> new file mode 100644
->> index 0000000..002bd59
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
->> @@ -0,0 +1,65 @@
->> +BROADCOM CYGNUS USB PHY
->> +
->> +Required Properties:
->> +	- compatible:  brcm,cygnus-usb-phy
->> +	- reg : usbphy_regs - Base address of phy registers
->> +			usb2h_idm_regs - Base address of host idm registers
->> +			usb2d_idm_regs - Base address of device idm registers
+>> [...]
+>>
+>>>> +
+>>>> +static struct phy *bcm_usb_phy_xlate(struct device *dev,
+>>>> +				     struct of_phandle_args *args)
+>>>> +{
+>>>> +	struct bcm_phy_driver *phy_driver = dev_get_drvdata(dev);
+>>>> +	struct bcm_phy_instance *port = NULL;
+>>>> +	int i;
+>>>> +
+>>>> +	if (!phy_driver)
+>>>> +		return ERR_PTR(-EINVAL);
+>>>> +
+>>>> +	if (WARN_ON(args->args_count != 1))
+>>>> +		return ERR_PTR(-EINVAL);
+>>>> +
+>>>> +	if (WARN_ON(args->args[0] < 0 || args->args[0] > 1))
+>>>> +		return ERR_PTR(-EINVAL);
+>>>> +
+>>>> +	for (i = 0; i < ARRAY_SIZE(phy_driver->ports); i++) {
+>>>> +		struct bcm_phy_instance *p = phy_driver->ports[i];
+>>>> +
+>>>> +		if (p && p->generic_phy->dev.of_node == args->np) {
+>>>> +			port = p;
+>>>> +			break;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>> +	if (!port) {
+>>>> +		dev_err(dev, "Failed to locate phy %s\n", args->np->name);
+>>>> +		return ERR_PTR(-EINVAL);
+>>>> +	}
+>>>> +
+>>>> +	port->host_mode = args->args[0];
+>>>> +
+>>>> +	return port->generic_phy;
+>>>> +}
+>>>
+>>> The xlate function here shouldn't be needed at all. Use of_phy_simple_xlate
+>>> instead.
+>>
+>> of_phy_simple_xlate() will not allow specifying host vs device mode when
+>> requesting phy though...
 >
-> where is #phy-cells documented?
-I dont follow, isnt phy-cells a standard binding, what documentation is 
-required?
->> +The node that uses the phy must provide one integers, 0 for device and 1 for host
+> indeed!
 >
->> +
->> +NOTE: port 0 and port 1 are host only and port 2 can be configured for host or device.
->> +
->> +Example of phy :
->> +	usbphy0: usbphy at 0x0301c000 {
->> +		compatible = "brcm,cygnus-usb-phy";
->> +		reg = <0x0301c000 0x2000>,
->> +		      <0x18115000 0x1000>,
->> +		      <0x18111000 0x1000>;
->> +		status = "okay";
->> +
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		usbphy0_0: usbphy0 at 0 {
->> +			#phy-cells = <1>;
->> +			reg = <0>;
->> +			status = "okay";
->> +			phy-supply = <&vbus_p0>;
->> +		};
->> +
->> +		usbphy0_1: usbphy0 at 1 {
->> +			#phy-cells = <1>;
->> +			reg = <1>;
->> +			status = "okay";
->> +		};
->> +
->> +		usbphy0_2: usbphy0 at 2 {
->> +			#phy-cells = <1>;
->> +			reg = <2>;
->> +			status = "okay";
->> +			phy-supply = <&vbus_p2>;
->> +		};
->> +	};
->> +
->> +Example of node using the phy:
->> +
->> +	/* This nodes declares all three ports as host */
->> +	
->> +	ehci0: usb at 0x18048000 {
->> +		compatible = "generic-ehci";
->> +		reg = <0x18048000 0x100>;
->> +		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->> +		phys = <&usbphy0_0 1 &usbphy0_1 1 &usbphy0_2 1>;
->> +		phy-names = "usb","usb","usb";
->
-> is it on purpose you use the same name for phy-names? it is wrong though.
-Kishon, I did use the same names on purpose. The phy-names are actually 
-irrelevant because I used the new api I created 
-devm_of_phy_get_by_index. I actually wasnt sure if  should take out the 
-phy-name field altogether or leave it as phy-names = "usb" for 
-compatibility with other bindings. What are your thoughts?
->> +		status = "okay";
->> +	};
->> +
->> +	/* This node declares port 2 phy
->> +	and configures it for device */
->
-> please use standard multi-line comment format.
->
-Ok will do.
-> Thanks
-> Kishon
+Kishon, to confirm , are the xlate function and the MAX_PHY_PORTS ok or 
+are you recommending changes? Thanks
 >
