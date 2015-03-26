@@ -1,36 +1,29 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 26 Mar 2015 16:53:50 +0100
-Subject: [PATCH 03/13] thermal: remove useless call to
- thermal_zone_device_set_polling
+Date: Thu, 26 Mar 2015 16:53:49 +0100
+Subject: [PATCH 02/13] thermal: trivial: fix typo in comment
 In-Reply-To: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
 References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1427385240-6086-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1427385240-6086-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the thermal zone has no get_temp callback then thermal_zone_device_register()
-calls thermal_zone_device_set_polling() with a polling delay of 0. This
-only cancels the poll_queue. Since the poll_queue hasn't been scheduled this
-is a no-op. Remove it.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/thermal/thermal_core.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/thermal/thermal_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index c735ac4c..dcea909 100644
+index 0e4ad7c..c735ac4c 100644
 --- a/drivers/thermal/thermal_core.c
 +++ b/drivers/thermal/thermal_core.c
-@@ -1571,9 +1571,6 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
+@@ -402,7 +402,7 @@ static void handle_thermal_trip(struct thermal_zone_device *tz, int trip)
+ }
  
- 	INIT_DELAYED_WORK(&(tz->poll_queue), thermal_zone_device_check);
- 
--	if (!tz->ops->get_temp)
--		thermal_zone_device_set_polling(tz, 0);
--
- 	thermal_zone_device_update(tz);
- 
- 	return tz;
+ /**
+- * thermal_zone_get_temp() - returns its the temperature of thermal zone
++ * thermal_zone_get_temp() - returns the temperature of a thermal zone
+  * @tz: a valid pointer to a struct thermal_zone_device
+  * @temp: a valid pointer to where to store the resulting temperature.
+  *
 -- 
 2.1.4
