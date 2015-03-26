@@ -1,47 +1,48 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Thu, 26 Mar 2015 09:31:50 +0200
-Subject: [PATCH 2/6] i2c: qup: Add V2 tags support
-In-Reply-To: <55139CD4.5040100@codeaurora.org>
-References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
- <1426268992-19298-3-git-send-email-sricharan@codeaurora.org>
- <1427286263.25053.18.camel@mm-sol.com> <55139CD4.5040100@codeaurora.org>
-Message-ID: <1427355110.7093.1.camel@mm-sol.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Thu, 26 Mar 2015 15:30:44 +0800
+Subject: [PATCH v6 04/30] xen/PCI: Don't use deprecated function
+ pci_scan_bus_parented()
+In-Reply-To: <20150325192331.GG25884@l.oracle.com>
+References: <1425868467-9667-1-git-send-email-wangyijing@huawei.com>
+ <1425868467-9667-5-git-send-email-wangyijing@huawei.com>
+ <20150311223211.GB1082@google.com> <55017CA5.2010502@huawei.com>
+ <20150312193505.GB7346@google.com> <55024D35.6050509@huawei.com>
+ <CAErSpo4T7f9PNVMLrQbCvW2a=HnRauQR2eBz6H69B7Q2=ELNWw@mail.gmail.com>
+ <20150313140132.GH5378@l.oracle.com>
+ <CAErSpo69ytCxBK5AD79Nz05wy=GwzcOGV7WkiKFxpLDH4wtJXw@mail.gmail.com>
+ <20150325192331.GG25884@l.oracle.com>
+Message-ID: <5513B5A4.1070209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
-
-On Thu, 2015-03-26 at 11:14 +0530, Sricharan R wrote:
+>>> Is there an git tree with this so I can just try it out?
+>>
+>> git://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git
+>> pci/enumeration-yw6 has similar code (it exports the single
 > 
-> > > +       if (msg->flags & I2C_M_RD)
-> > > +               qup->rx_tag_len = (qup->blocks << 1);
-> > 
-> > here again.
-> > 
-> hmm, why not shift ?
+> I presume now it is bjorn/pci/enumeration-yw8 ? Going to test this out
+> this week.
 
-Because it makes reading code harder and because compiler
- is smart enough to choose appropriate instruction for
-underling CPU architecture.
+Hi Konrad, I fixed two issues found by Tomasz and Daniel for the current v8 version.
+I posted out the latest v9 in my github tree. Could you pull this series from my
+github tree ?
+The URL is: https://github.com/YijingWang/linux-pci.git enumer9
 
-> > > +       else
-> > > +               qup->rx_tag_len = 0;
-> > > +}
-> > > +
-> > > +static u32 qup_i2c_xfer_data(struct qup_i2c_dev *qup, int len,
-> > > +                                                               u8 *buf, int last)
-> > > +{
-> > 
-> > I think that xfer is too vague in this case, prefer write or send.
-> > 
-> ok. Will change it to send.
-> > > +       static u32 val, idx;
-> > 
-> > static? please fix.
->   That was intentional. Using to pack tag and data in to one word across
->   two calls. So preserving val, idx across calls.
+Thanks!
+Yijing.
 
-Sorry this is no go! Reorganize the code, please.
+>> busn_resource and makes xen use it).  That should be functionally
+>> identical to what v4.0-rc1 does.
+>>
+>> Yijing hasn't posted the static busn_res proposal above yet, so I
+>> don't have a branch with that in it.
+>>
+>> Bjorn
+> 
+> .
+> 
 
-Regards,
-Ivan
+
+-- 
+Thanks!
+Yijing
