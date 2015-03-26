@@ -1,89 +1,202 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Mar 2015 20:09:09 +0000
-Subject: [PATCHv2 2/2] mfd: qcom_rpm: add support for IPQ8064
-In-Reply-To: <1427394566-24327-3-git-send-email-sboyd@codeaurora.org>
-References: <1427394566-24327-1-git-send-email-sboyd@codeaurora.org>
- <1427394566-24327-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150326200909.GT5951@x1>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 26 Mar 2015 21:19:58 +0100
+Subject: [PATCH v3 04/15] clocksource: Add ARM System timer driver
+In-Reply-To: <5513D64A.7060702@linaro.org>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-5-git-send-email-maxime.coquelin@st.com>
+ <5513D64A.7060702@linaro.org>
+Message-ID: <CALszF6CtEf0w8AoaMwFzn34ACMjkW6obT5_MrduBdUOm7T=zNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Mar 2015, Stephen Boyd wrote:
+Hi Daniel,
 
-> From: Josh Cartwright <joshc@codeaurora.org>
-> 
-> The IPQ8064 also includes an RPM following the same message structure as
-> other chips.  In addition, it supports a few new resource types to
-> support the NSS fabric clocks and the SMB208/SMB209 regulators found on
-> the reference boards.
-> 
-> Signed-off-by: Josh Cartwright <joshc@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/mfd/qcom_rpm.c | 41 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
+  Thanks for the review. Please find my answers below.
 
-Thanks for re-basing.  Patch applied.
+2015-03-26 10:50 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 03/12/2015 10:55 PM, Maxime Coquelin wrote:
+>>
+>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>>
+>> This patch adds clocksource support for ARMv7-M's System timer,
+>> also known as SysTick.
+>>
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>
+>
+> Hi Maxime,
+>
+> the driver looks good. Three comments below.
+>
+>   -- Daniel
+>
+>
+>> ---
+>>   drivers/clocksource/Kconfig          |  7 ++++
+>>   drivers/clocksource/Makefile         |  1 +
+>>   drivers/clocksource/armv7m_systick.c | 78
+>> ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 86 insertions(+)
+>>   create mode 100644 drivers/clocksource/armv7m_systick.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 1c2506f..b82e58b 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -134,6 +134,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+>>         help
+>>          Use ARM global timer clock source as sched_clock
+>>
+>> +config ARMV7M_SYSTICK
+>> +       bool
+>> +       select CLKSRC_OF if OF
+>> +       select CLKSRC_MMIO
+>> +       help
+>> +         This options enables support for the ARMv7M system timer unit
+>> +
+>>   config ATMEL_PIT
+>>         select CLKSRC_OF if OF
+>>         def_bool SOC_AT91SAM9 || SOC_SAMA5
+>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>> index 752d5c7..1c9a643 100644
+>> --- a/drivers/clocksource/Makefile
+>> +++ b/drivers/clocksource/Makefile
+>> @@ -44,6 +44,7 @@ obj-$(CONFIG_MTK_TIMER)               += mtk_timer.o
+>>
+>>   obj-$(CONFIG_ARM_ARCH_TIMER)          += arm_arch_timer.o
+>>   obj-$(CONFIG_ARM_GLOBAL_TIMER)                += arm_global_timer.o
+>> +obj-$(CONFIG_ARMV7M_SYSTICK)           += armv7m_systick.o
+>>   obj-$(CONFIG_CLKSRC_METAG_GENERIC)    += metag_generic.o
+>>   obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST) += dummy_timer.o
+>>   obj-$(CONFIG_ARCH_KEYSTONE)           += timer-keystone.o
+>> diff --git a/drivers/clocksource/armv7m_systick.c
+>> b/drivers/clocksource/armv7m_systick.c
+>> new file mode 100644
+>> index 0000000..23d8249
+>> --- /dev/null
+>> +++ b/drivers/clocksource/armv7m_systick.c
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * Copyright (C) Maxime Coquelin 2015
+>> + * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> + * License terms:  GNU General Public License (GPL), version 2
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/clocksource.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/bitops.h>
+>> +
+>> +#define SYST_CSR       0x00
+>> +#define SYST_RVR       0x04
+>> +#define SYST_CVR       0x08
+>> +#define SYST_CALIB     0x0c
+>> +
+>> +#define SYST_CSR_ENABLE BIT(0)
+>> +
+>> +#define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
+>> +
+>> +static void __init system_timer_of_register(struct device_node *np)
+>> +{
+>> +       struct clk *clk;
+>> +       void __iomem *base;
+>> +       u32 rate = 0;
+>> +       int ret;
+>> +
+>> +       base = of_iomap(np, 0);
+>> +       if (!base) {
+>> +               pr_warn("system-timer: invalid base address\n");
+>> +               return;
+>> +       }
+>> +
+>> +       clk = of_clk_get(np, 0);
+>> +       if (!IS_ERR(clk)) {
+>> +               ret = clk_prepare_enable(clk);
+>> +               if (ret) {
+>> +                       clk_put(clk);
+>> +                       goto out_unmap;
+>> +               }
+>> +
+>> +               rate = clk_get_rate(clk);
+>> +       }
+>> +
+>> +       /* If no clock found, try to get clock-frequency property */
+>> +       if (!rate) {
+>> +               ret = of_property_read_u32(np, "clock-frequency", &rate);
+>> +               if (ret)
+>> +                       goto out_unmap;
+>
+>
+> Shouldn't be 'goto out_clk_disable' ?
 
-> diff --git a/drivers/mfd/qcom_rpm.c b/drivers/mfd/qcom_rpm.c
-> index f696328c2933..12e324319573 100644
-> --- a/drivers/mfd/qcom_rpm.c
-> +++ b/drivers/mfd/qcom_rpm.c
-> @@ -323,10 +323,51 @@ static const struct qcom_rpm_data msm8960_template = {
->  	.n_resources = ARRAY_SIZE(msm8960_rpm_resource_table),
->  };
->  
-> +static const struct qcom_rpm_resource ipq806x_rpm_resource_table[] = {
-> +	[QCOM_RPM_CXO_CLK] =			{ 25, 9, 5, 1 },
-> +	[QCOM_RPM_PXO_CLK] =			{ 26, 10, 6, 1 },
-> +	[QCOM_RPM_APPS_FABRIC_CLK] =		{ 27, 11, 8, 1 },
-> +	[QCOM_RPM_SYS_FABRIC_CLK] =		{ 28, 12, 9, 1 },
-> +	[QCOM_RPM_NSS_FABRIC_0_CLK] =		{ 29, 13, 10, 1 },
-> +	[QCOM_RPM_DAYTONA_FABRIC_CLK] =		{ 30, 14, 11, 1 },
-> +	[QCOM_RPM_SFPB_CLK] =			{ 31, 15, 12, 1 },
-> +	[QCOM_RPM_CFPB_CLK] =			{ 32, 16, 13, 1 },
-> +	[QCOM_RPM_NSS_FABRIC_1_CLK] =		{ 33, 17, 14, 1 },
-> +	[QCOM_RPM_EBI1_CLK] =			{ 34, 18, 16, 1 },
-> +	[QCOM_RPM_APPS_FABRIC_HALT] =		{ 35, 19, 18, 2 },
-> +	[QCOM_RPM_APPS_FABRIC_MODE] =		{ 37, 20, 19, 3 },
-> +	[QCOM_RPM_APPS_FABRIC_IOCTL] =		{ 40, 21, 20, 1 },
-> +	[QCOM_RPM_APPS_FABRIC_ARB] =		{ 41, 22, 21, 12 },
-> +	[QCOM_RPM_SYS_FABRIC_HALT] =		{ 53, 23, 22, 2 },
-> +	[QCOM_RPM_SYS_FABRIC_MODE] =		{ 55, 24, 23, 3 },
-> +	[QCOM_RPM_SYS_FABRIC_IOCTL] =		{ 58, 25, 24, 1 },
-> +	[QCOM_RPM_SYS_FABRIC_ARB] =		{ 59, 26, 25, 30 },
-> +	[QCOM_RPM_MM_FABRIC_HALT] =		{ 89, 27, 26, 2 },
-> +	[QCOM_RPM_MM_FABRIC_MODE] =		{ 91, 28, 27, 3 },
-> +	[QCOM_RPM_MM_FABRIC_IOCTL] =		{ 94, 29, 28, 1 },
-> +	[QCOM_RPM_MM_FABRIC_ARB] =		{ 95, 30, 29, 2 },
-> +	[QCOM_RPM_CXO_BUFFERS] =		{ 209, 33, 31, 1 },
-> +	[QCOM_RPM_USB_OTG_SWITCH] =		{ 210, 34, 32, 1 },
-> +	[QCOM_RPM_HDMI_SWITCH] =		{ 211, 35, 33, 1 },
-> +	[QCOM_RPM_DDR_DMM] =			{ 212, 36, 34, 2 },
-> +	[QCOM_RPM_VDDMIN_GPIO] =		{ 215, 40, 39, 1 },
-> +	[QCOM_RPM_SMB208_S1a] =			{ 216, 41, 90, 2 },
-> +	[QCOM_RPM_SMB208_S1b] =			{ 218, 43, 91, 2 },
-> +	[QCOM_RPM_SMB208_S2a] =			{ 220, 45, 92, 2 },
-> +	[QCOM_RPM_SMB208_S2b] =			{ 222, 47, 93, 2 },
-> +};
-> +
-> +static const struct qcom_rpm_data ipq806x_template = {
-> +	.version = 3,
-> +	.resource_table = ipq806x_rpm_resource_table,
-> +	.n_resources = ARRAY_SIZE(ipq806x_rpm_resource_table),
-> +};
-> +
->  static const struct of_device_id qcom_rpm_of_match[] = {
->  	{ .compatible = "qcom,rpm-apq8064", .data = &apq8064_template },
->  	{ .compatible = "qcom,rpm-msm8660", .data = &msm8660_template },
->  	{ .compatible = "qcom,rpm-msm8960", .data = &msm8960_template },
-> +	{ .compatible = "qcom,rpm-ipq8064", .data = &ipq806x_template },
->  	{ }
->  };
->  MODULE_DEVICE_TABLE(of, qcom_rpm_of_match);
+No, because I assumed !rate means we failed to get the clock.
+Actually, clk_get_rate could return 0, so relying on rate value is not safe.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I propose to get clock-frequency property if IS_ERR(clk).
+
+Is it fine for you?
+
+>
+>> +       }
+>> +
+>> +       writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
+>> +       writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
+>> +
+>> +       ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer",
+>> rate,
+>> +                       200, 24, clocksource_mmio_readl_down);
+>> +       if (ret) {
+>> +               pr_err("failed to init clocksource (%d)\n", ret);
+>> +               goto out_clk_disable;
+>> +       }
+>> +
+>> +       pr_info("ARM System timer initialized as clocksource\n");
+>> +
+>> +       return;
+>> +
+>> +out_clk_disable:
+>> +       if (!IS_ERR(clk))
+>
+>
+> Why do you need this check ?
+
+To handle the case were no clock was found, but a clk-frequency value
+was provided.
+
+>
+> It isn't missing a clk_put ?
+
+Right, thanks for spotting this.
+
+I wonder if it makes sense to implement the error path.
+If we fail to initialize the clocksource, the system will be unusable.
+
+Maybe I should just perform a BUG_ON() in the error cases, as most of
+the other clocksource drivers do.
+What is your view?
+
+Regards,
+Maxime
+
+>
+>> +               clk_disable_unprepare(clk);
+>> +out_unmap:
+>> +       iounmap(base);
+>> +       WARN(ret, "ARM System timer register failed (%d)\n", ret);
+>> +}
+>> +
+>> +CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
+>> +                       system_timer_of_register);
+>>
+>
+>
+> --
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
