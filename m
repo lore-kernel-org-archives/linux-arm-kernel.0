@@ -1,34 +1,24 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 26 Mar 2015 14:40:58 -0700
-Subject: String literals in __init functions
-In-Reply-To: <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
-References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
- <5513FE2F.3040306@free.fr> <1427386390.15849.13.camel@perches.com>
- <CA+rthh9Fb2q+O_wicc6eNcbo6SzwOVZed=tnThJLF-xuoQ-+Cw@mail.gmail.com>
- <1427392393.15849.16.camel@perches.com>
- <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
-Message-ID: <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 Mar 2015 21:46:20 +0000
+Subject: [PATCH v3 08/11] KVM: arm/arm64: prepare GICv2 emulation to be
+ handled by kvm_io_bus
+In-Reply-To: <1427380778-942-9-git-send-email-andre.przywara@arm.com>
+References: <1427380778-942-1-git-send-email-andre.przywara@arm.com>
+ <1427380778-942-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150326214620.35406305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Mar 2015 21:49:06 +0100 Mathias Krause <minipli@googlemail.com> wrote:
+On Thu, 26 Mar 2015 14:39:35 +0000
+Andre Przywara <andre.przywara@arm.com> wrote:
 
-> Andrew, what's your opinion on such a patch set? Do you too think it's
-> useful? Or do you share Ingo's fear about the additional maintenance
-> burden?
+> Using the framework provided by the recent vgic.c changes we register
+> a kvm_io_bus device when initializing the virtual GICv2.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-I don't think the burden would be toooo high, although it will mess the
-code up a bit.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-The post-build checking for section reference mismatches will help,
-although that seems to have got itself turned off (what happened
-there?).
-
-Did anyone look at writing a postprocessor for the .s files?  It
-doesn't look like it will be too hard from an initial peek.
-
-Did anyone ask the gcc developers?  I'd have thought that a function-wide
-
-	__attribute__((__string_section__(foo))
-
-wouldn't be a ton of work to implement.
+	M.
+-- 
+Jazz is not dead. It just smells funny.
