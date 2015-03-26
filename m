@@ -1,42 +1,348 @@
-From: b52261@freescale.com (Jianwei Wang)
-Date: Thu, 26 Mar 2015 13:37:04 +0800
-Subject: [PATCH v3 3/4] arm/dts/ls1021a: Add DCU dts node
-In-Reply-To: <1427348225-40731-1-git-send-email-b52261@freescale.com>
-References: <1427348225-40731-1-git-send-email-b52261@freescale.com>
-Message-ID: <1427348225-40731-3-git-send-email-b52261@freescale.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 26 Mar 2015 11:14:52 +0530
+Subject: [PATCH 2/6] i2c: qup: Add V2 tags support
+In-Reply-To: <1427286263.25053.18.camel@mm-sol.com>
+References: <1426268992-19298-1-git-send-email-sricharan@codeaurora.org>
+ <1426268992-19298-3-git-send-email-sricharan@codeaurora.org>
+ <1427286263.25053.18.camel@mm-sol.com>
+Message-ID: <55139CD4.5040100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DCU node, DCU is a display controller of Freescale
-named 2D-ACE.
+Hi Ivan,
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <b52261@freescale.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On 03/25/2015 05:54 PM, Ivan T. Ivanov wrote:
+>
+> Hi Sricharan,
+>
+> On Fri, 2015-03-13 at 23:19 +0530, Sricharan R wrote:
+>> From: Andy Gross <agross@codeaurora.org>
+>>
+>> QUP from version 2.1.1 onwards, supports a new format of
+>> i2c command tags. Tag codes instructs the controller to
+>> perform a operation like read/write. This new tagging version
+>> supports bam dma and transfers of more than 256 bytes without 'stop'
+>> in between. Adding the support for the same.
+>>
+>> For each block a data_write/read tag and data_len tag is added to
+>> the output fifo. For the final block of data write_stop/read_stop
+>> tag is used.
+>>
+>> Signed-off-by: Andy Gross <agross@codeaurora.org>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>   drivers/i2c/busses/i2c-qup.c | 342 ++++++++++++++++++++++++++++++++++++++-----
+>>
+>
+> <snip>
+>
+>> +#define I2C_QUP_CLK_MAX_FREQ           3400000
+>
+> unused?
+>
+Ok, will remove this.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..6d6e3e2 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -383,6 +383,16 @@
- 				 <&platform_clk 1>;
- 		};
- 
-+		dcu: dcu at 2ce0000 {
-+			compatible = "fsl,ls1021a-dcu";
-+			reg = <0x0 0x2ce0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 0>;
-+			clock-names = "dcu";
-+			big-endian;
-+			status = "disabled";
-+		};
-+
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
+>> +
+>>   /* Status, Error flags */
+>>   #define I2C_STATUS_WR_BUFFER_FULL      BIT(0)
+>>   #define I2C_STATUS_BUS_ACTIVE          BIT(8)
+>> @@ -99,6 +117,11 @@
+>>
+>>   #define QUP_READ_LIMIT                 256
+>>
+>> +struct qup_i2c_config {
+>> +       int tag_ver;
+>> +       int max_freq;
+>> +};
+>> +
+>
+> Do you really need this one. It is referenced only during probe,
+> but information contained in is already available by other means.
+>
+Ok, agree that this can be removed and the information can be fixed
+for V1 version and same for the rest of the other versions. That would
+need to use compatible check though.
+>
+>>   struct qup_i2c_dev {
+>>          struct device*dev;
+>>          void __iomem*base;
+>> @@ -112,9 +135,20 @@ struct qup_i2c_dev {
+>>          int     in_fifo_sz;
+>>          int     out_blk_sz;
+>>          int     in_blk_sz;
+>> -
+>> +       int     blocks;
+>> +       u8      *block_tag_len;
+>> +       int     *block_data_len;
+>
+> Maybe these could be organized in struct?
+>
+ok, will group it.
+> <snip>
+>
+>>
+>> +static void qup_i2c_create_tag_v2(struct qup_i2c_dev *qup,
+>> +                                               struct i2c_msg *msg)
+>> +{
+>> +       u16 addr = (msg->addr << 1) | ((msg->flags & I2C_M_RD) == I2C_M_RD);
+>> +       int len = 0, prev_len = 0;
+>> +       int blocks = 0;
+>> +       int rem;
+>> +       int block_len = 0;
+>> +       int data_len;
+>> +
+>> +       qup->block_pos = 0;
+>> +       qup->pos = 0;
+>> +       qup->blocks = (msg->len + QUP_READ_LIMIT - 1) / (QUP_READ_LIMIT);
+>
+> Braces around QUP_READ_LIMIT are not needed.
+>
+ok.
+>> +       rem = msg->len % QUP_READ_LIMIT;
+>> +
+>> +       /* 2 tag bytes for each block + 2 extra bytes for first block */
+>> +       qup->tags = kzalloc((qup->blocks << 1) + 2, GFP_KERNEL);
+>
+> Don't play tricks with shifts, just use multiplication.
+>
+why ?
+>> +       qup->block_tag_len = kzalloc(qup->blocks, GFP_KERNEL);
+>> +       qup->block_data_len = kzalloc(sizeof(int) * qup->blocks, GFP_KERNEL);
+>
+> Better use sizeof(*qup->block_data_len).
+>
+ok.
+>> +
+>> +       while (blocks < qup->blocks) {
+>> +               /* 0 is used to specify a READ_LIMIT of 256 bytes */
+>> +               data_len = (blocks < (qup->blocks - 1)) ? 0 : rem;
+>> +
+>> +               /* Send START and ADDR bytes only for the first block */
+>> +               if (!blocks) {
+>> +                       qup->tags[len++] = QUP_TAG_V2_START;
+>> +
+>> +                       if (qup->is_hs) {
+>> +                               qup->tags[len++] = QUP_TAG_V2_HS;
+>> +                               qup->tags[len++] = QUP_TAG_V2_START;
+>
+> Is this second QUP_TAG_V2_START intentional?
+>
+  Yes, for HS mode 2 start tags are required.
+>> +                       }
+>> +
+>> +                       qup->tags[len++] = addr & 0xff;
+>> +                       if (msg->flags & I2C_M_TEN)
+>> +                               qup->tags[len++] = addr >> 8;
+>> +               }
+>> +
+>> +               /* Send _STOP commands for the last block */
+>> +               if (blocks == (qup->blocks - 1)) {
+>> +                       if (msg->flags & I2C_M_RD)
+>> +                               qup->tags[len++] = QUP_TAG_V2_DATARD_STOP;
+>> +                       else
+>> +                               qup->tags[len++] = QUP_TAG_V2_DATAWR_STOP;
+>> +               } else {
+>> +                       if (msg->flags & I2C_M_RD)
+>> +                               qup->tags[len++] = QUP_TAG_V2_DATARD;
+>> +                       else
+>> +                               qup->tags[len++] = QUP_TAG_V2_DATAWR;
+>> +               }
+>> +
+>> +               qup->tags[len++] = data_len;
+>> +               block_len = len - prev_len;
+>> +               prev_len = len;
+>> +               qup->block_tag_len[blocks] = block_len;
+>> +
+>> +               if (!data_len)
+>> +                       qup->block_data_len[blocks] = QUP_READ_LIMIT;
+>> +               else
+>> +                       qup->block_data_len[blocks] = data_len;
+>> +
+>> +               qup->tags_pos = 0;
+>> +               blocks++;
+>> +       }
+>> +
+>> +       qup->tx_tag_len = len;
+>> +
+>> +       if (msg->flags & I2C_M_RD)
+>> +               qup->rx_tag_len = (qup->blocks << 1);
+>
+> here again.
+>
+hmm, why not shift ?
+>> +       else
+>> +               qup->rx_tag_len = 0;
+>> +}
+>> +
+>> +static u32 qup_i2c_xfer_data(struct qup_i2c_dev *qup, int len,
+>> +                                                               u8 *buf, int last)
+>> +{
+>
+> I think that xfer is too vague in this case, prefer write or send.
+>
+ok. Will change it to send.
+>> +       static u32 val, idx;
+>
+> static? please fix.
+  That was intentional. Using to pack tag and data in to one word across
+  two calls. So preserving val, idx across calls.
+>
+>> +       u32  t, rem, pos = 0;
+>> +
+>> +       rem = len - pos + idx;
+>> +
+>> +       while (rem) {
+>> +               if (qup_i2c_wait_ready(qup, QUP_OUT_FULL, 0, 4)) {
+>> +                       dev_err(qup->dev, "timeout for fifo out full");
+>> +                       break;
+>> +               }
+>> +
+>> +               t = (rem >= 4) ? 4 : rem;
+>> +
+>> +               while (idx < t)
+>> +                       val |= buf[pos++] << (idx++ << 3);
+>
+> here again, multiplication or shift?
+>
+  I felt shifts should be readable. No ?
+>> +
+>> +               if (t == 4) {
+>> +                       writel(val, qup->base + QUP_OUT_FIFO_BASE);
+>> +                       idx = val = 0;
+>> +               }
+>> +
+>> +               rem = len - pos;
+>> +       }
+>> +
+>
+> What will happen if they are less than 4 bytes to send?
+>
+It gets written over in the next call and gets written here itself if it 
+is the last block of data.
+>> +       if (last) {
+>> +               writel(val, qup->base + QUP_OUT_FIFO_BASE);
+>> +               idx = val = 0;
+>> +       }
+>> +
+>> +       return 0;
+>> +}
+>> +
+>>
+>
+> <snip>
+>
+>>
+>> -static void qup_i2c_issue_read(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+>> +static void qup_i2c_issue_read_v1(struct qup_i2c_dev *qup, struct
+>> +                                               i2c_msg *msg)
+>
+> Please, move struct on the same line as i2c_msg.
+>
+ok.
+
+>>   {
+>>          u32 addr, len, val;
+>>
+>> @@ -395,24 +576,33 @@ static void qup_i2c_issue_read(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+>>          /* 0 is used to specify a length 256 (QUP_READ_LIMIT) */
+>>          len = (msg->len == QUP_READ_LIMIT) ? 0 : msg->len;
+>>
+>> -       val = ((QUP_TAG_REC | len) << QUP_MSW_SHIFT) | QUP_TAG_START | addr;
+>> +       val = ((QUP_TAG_REC | len) << QUP_MSW_SHIFT) | QUP_TAG_START |
+>> +                       addr;
+>
+> Unrelated change?
+  hmm. Must have come for adjusting 80 chars. Will remove this here.
+>
+>>          writel(val, qup->base + QUP_OUT_FIFO_BASE);
+>>   }
+>>
+>>
+>
+> <snip>
+>
+>>
+>> +static void qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup, struct
+>> +                                       i2c_msg *msg)
+>> +{
+>> +       u32 val;
+>> +       int idx;
+>> +       int pos = 0;
+>
+>> +       int total = qup->block_data_len[qup->block_pos] + 2;
+>
+> Could we  have at least comment what is this +2?
+>
+  Ok. The +2 is for the read tags that are extra bytes read for each
+  block. Will add comment for that.
+
+> <snip>
+>
+>> +
+>> +static void qup_i2c_read_fifo(struct qup_i2c_dev *qup, struct i2c_msg
+>> +                                                                       *msg)
+>
+> Bad indent?
+>
+  ok. Will fix it.
+> <snip>
+>
+>
+>> +static const struct qup_i2c_config configs[] = {
+>> +       { 0, 400000, },
+>> +       { 1, 3400000, },
+>> +};
+>> +
+>> +static const struct of_device_id qup_i2c_dt_match[] = {
+>> +       { .compatible = "qcom,i2c-qup-v1.1.1", .data = &configs[0] },
+>> +       { .compatible = "qcom,i2c-qup-v2.1.1", .data = &configs[1] },
+>> +       { .compatible = "qcom,i2c-qup-v2.2.1", .data = &configs[1] },
+>> +       {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, qup_i2c_dt_match);
+>> +
+>>   static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+>>   {
+>>          u32 config;
+>> @@ -579,6 +837,8 @@ static int qup_i2c_probe(struct platform_device *pdev)
+>>          int ret, fs_div, hs_div;
+>>          int src_clk_freq;
+>>          u32 clk_freq = 100000;
+>> +       const struct qup_i2c_config *config;
+>> +       const struct of_device_id *of_id;
+>>
+>>          qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
+>>          if (!qup)
+>> @@ -590,8 +850,15 @@ static int qup_i2c_probe(struct platform_device *pdev)
+>>
+>>          of_property_read_u32(node, "clock-frequency", &clk_freq);
+>>
+>> -       /* We support frequencies up to FAST Mode (400KHz) */
+>> -       if (!clk_freq || clk_freq > 400000) {
+>> +       of_id = of_match_node(qup_i2c_dt_match, node);
+>> +       if (!of_id)
+>> +               return -EINVAL;
+>
+> this could not happen.
+>
+  Correct. Will remove it.
+>> +
+>> +       config = of_id->data;
+>> +       qup->use_v2_tags = !!config->tag_ver;
+>> +
+>> +       /* We support frequencies up to HIGH SPEED Mode (3400KHz) */
+>> +       if (!clk_freq || clk_freq > config->max_freq) {
+>
+> Looks like if controller is v > 1 it supports I2C_QUP_CLK_MAX_FREQ.
+> I don't see need for struct qup_i2c_config.
+>
+Ok, this can removed if compatible check is used to differentiate 
+between V1 and rest of the versions.
+
+Regards,
+  Sricharan
+
+
 -- 
-2.1.0.27.g96db324
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a 
+member of Code Aurora Forum, hosted by The Linux Foundation
