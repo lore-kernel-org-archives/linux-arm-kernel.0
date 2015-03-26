@@ -1,23 +1,60 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 26 Mar 2015 23:01:13 +0100
-Subject: [PATCH] serial: imx: protect Soft Reset of port with lock
-In-Reply-To: <1426228691-20529-1-git-send-email-jiada_wang@mentor.com>
-References: <1426228691-20529-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <20150326220113.GA24630@kroah.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Mar 2015 22:03:23 +0000
+Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
+ alternative instruction
+In-Reply-To: <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
+References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
+ <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150326220323.GA23836@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 13, 2015 at 03:38:11PM +0900, Jiada Wang wrote:
-> Previously Soft Reset (clear of SRST bit in UCR2 register)
-> of UART in startup is not protected by lock, which may have race
-> with console_write, as console_write may occur at anytime even
-> when UART port is shutdown.
+On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
+> Since all immediate branches are PC-relative on Aarch64, these
+> instructions cannot be used as an alternative with the simplistic
+> approach we currently have (the immediate has been computed from
+> the .altinstr_replacement section, and end-up being completely off
+> if we insert it directly).
 > 
-> To avoid this race, protect Soft reset of UART port with spin_lock.
+> This patch handles the b and bl instructions in a different way,
+> using the insn framework to recompute the immediate, and generate
+> the right displacement.
 > 
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/tty/serial/imx.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+>  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 53 insertions(+), 2 deletions(-)
 
-Doesn't apply to my tree :(
+[...]
+
+>  static int __apply_alternatives(void *alt_region)
+>  {
+>  	struct alt_instr *alt;
+> @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
+>  	u8 *origptr, *replptr;
+>  
+>  	for (alt = region->begin; alt < region->end; alt++) {
+> +		u32 insn;
+> +		int i;
+> +
+>  		if (!cpus_have_cap(alt->cpufeature))
+>  			continue;
+>  
+> -		BUG_ON(alt->alt_len > alt->orig_len);
+> +		BUG_ON(alt->alt_len != alt->orig_len);
+>  
+>  		pr_info_once("patching kernel code\n");
+>  
+>  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
+>  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
+> -		memcpy(origptr, replptr, alt->alt_len);
+> +
+> +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
+> +			insn = get_alt_insn(origptr + i, replptr + i);
+> +			*(u32 *)(origptr + i) = insn;
+
+My brain's not firing on all cylinders right now, but do you need a
+cpu_to_le32 here?
+
+Will
