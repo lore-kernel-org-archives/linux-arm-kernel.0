@@ -1,35 +1,96 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 26 Mar 2015 17:12:48 +0000
-Subject: [PATCH v5 3/6] hw/intc: arm_gic_kvm.c restore config first
-In-Reply-To: <1427130344-27986-4-git-send-email-alex.bennee@linaro.org>
-References: <1427130344-27986-1-git-send-email-alex.bennee@linaro.org>
- <1427130344-27986-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <CAFEAcA9vEAMfAEa4z+mH1a7X0+UtjXba6kbVxHUSh4_Xrq4=Ng@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Mar 2015 18:16:19 +0100
+Subject: [PATCH] ARM: mvebu: GPIO reset on GlobalScale Mirabox
+In-Reply-To: <55134082.7010404@free-electrons.com>
+References: <1427319230-2500-1-git-send-email-leigh@solinno.co.uk>
+ <551333D2.8080600@free-electrons.com> <20150325223652.GC31858@lunn.ch>
+ <b4d74b2eae98b2b9d56a49536a8aa4ff@doppler.thel33t.co.uk>
+ <55134082.7010404@free-electrons.com>
+Message-ID: <55143EE3.4040201@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2015 at 17:05, Alex Benn?e <alex.bennee@linaro.org> wrote:
-> As there is logic to deal with the difference between edge and level
-> triggered interrupts in the kernel we must ensure it knows the
-> configuration of the IRQs before we restore the pending state.
->
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> diff --git a/hw/intc/arm_gic_kvm.c b/hw/intc/arm_gic_kvm.c
-> index 0d20750..e2512f1 100644
-> --- a/hw/intc/arm_gic_kvm.c
-> +++ b/hw/intc/arm_gic_kvm.c
-> @@ -370,6 +370,11 @@ static void kvm_arm_gic_put(GICState *s)
->       * the appropriate CPU interfaces in the kernel) */
->      kvm_dist_put(s, 0x800, 8, s->num_irq, translate_targets);
->
-> +    /* irq_state[n].trigger -> GICD_ICFGRn
-> +     * (restore targets before pending IRQs so we treat level/edge
-> +     * correctly */
-> +    kvm_dist_put(s, 0xc00, 2, s->num_irq, translate_trigger);
+On 26/03/2015 00:10, Gregory CLEMENT wrote:
+> Hi,
+> 
+> On 26/03/2015 00:16, Leigh Brown wrote:
+>> Hi Andrew,
+>>
+>> On 2015-03-25 22:36, Andrew Lunn wrote:
+>>>> Thanks for your contribution, however the reset button is not always
+>>>> connected to this GPIO. At least on the Mirabox I have the reset 
+>>>> button
+>>>> triggers an hardware reset. My concern is that for some board the dts
+>>>> representation would be wrong.
+>>>
+>>> When looking at WiFi issues, it became clear there are two different
+>>> wifi designs. I would not be too surprised if this reset button
+>>> changed at the same time.
+>>>
+>>> Gregory, Leigh, is your wifi on the SDIO bus, or the USB bus?
+>>>
+>>> The mirabox i have has an sdio wifi device. But i cannot easily test
+>>> the reset button, i blew the 5v power rail, so all USB is dead, and my
+>>> rootfs was on mmc, which is implemented via USB :-(
+>>
+>> The WiFi on my Mirabox is on the SDIO bus.
+>>
+>> [   29.408420] mwifiex_sdio mmc0:0001:1: WLAN FW already running! Skip 
+>> FW dnld
+>> [   29.408430] mwifiex_sdio mmc0:0001:1: WLAN FW is active
+>> [   29.511297] mwifiex_sdio mmc0:0001:1: driver_version = mwifiex 1.0 
+>> (14.66.35.p52)
+> 
+> I think it is the same for me. I brought my Mirabox at ELC, but it is in
+> my room and just after ELC I will go to the airport. If I find a plug
+> there, I will boot it and I will confirm you, else we will have to wait
+> until Friday morning CET.
 
-You don't seem to have acted on Christoffer's query in v4
-about this comment...
+So I checked and I confirm that the Wifi is on the SDIO bus.
 
--- PMM
+Going back to how representing the reset button. We have several option:
+
+1. Modifying the file armada-370-mirabox.dts as done in this patch.
+
+2. Introduce a armada-370-mirabox.dtsi file and adding two new dts file using this
+one for each variation of the Mirabox
+
+3. Using the Transaction Device Tree + Overlays framwork and creating a device tree
+fragment.
+
+
+I already commented about the 1.
+
+For 2., it seems overkill for me and we need to be able to make difference with the
+different flavor of the board, which doesn't seem possible now.
+
+The 3. could be a good solution, but there is some pending question as where to store
+this DT fragment and as for 2., how to recognize the board.
+
+
+Thanks,
+
+Gregory
+
+
+> 
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+>>
+>> Regards,
+>>
+>> Leigh.
+>>
+> 
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
