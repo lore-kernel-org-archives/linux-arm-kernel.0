@@ -1,31 +1,90 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 17:06:13 +0000
-Subject: [PATCH 2/3] dmaengine: at_hdmac: use __le32 for descriptor writes
-In-Reply-To: <1427375191-1467-3-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427375191-1467-1-git-send-email-ben.dooks@codethink.co.uk>
- <1427375191-1467-3-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20150326170613.GB19688@n2100.arm.linux.org.uk>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Thu, 26 Mar 2015 17:06:41 +0000
+Subject: [PATCH 1/2] sunxi: a20-LIME2 update regulator description
+Message-ID: <55143CA1.7000606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 01:06:30PM +0000, Ben Dooks wrote:
-> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-> index b4d0a54..a79c4b4 100644
-> --- a/drivers/dma/at_hdmac_regs.h
-> +++ b/drivers/dma/at_hdmac_regs.h
-> @@ -170,9 +170,9 @@ struct at_lli {
->  	dma_addr_t	saddr;
->  	dma_addr_t	daddr;
->  	/* value that may get written back: */
-> -	u32		ctrla;
-> +	__le32		ctrla;
->  	/* more values that are not changed by hardware */
-> -	u32		ctrlb;
-> +	__le32		ctrlb;
->  	dma_addr_t	dscr;	/* chain to next lli */
+configure regulators as per the manufacturers recomendations from their
+3.4.x fex file.
 
-This suffers from the same brokenness.
+this is necessary to prevent operating points in the dtsi selecting
+inappropriate values and causing the board to lockup
 
+Signed-off-by: Iain Paton <ipaton0@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 34 +++++++++++++++++--------
+ 1 file changed, 24 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+index 5e57157..704df28 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -123,41 +123,55 @@
+ 		ldo24in-supply = <&reg_axp_ipsout>;
+ 		ldo3in-supply = <&reg_axp_ipsout>;
+ 
++		x-powers,dcdc-freq = <1500>;
++
+ 		regulators {
+ 			vdd_rtc: ldo1 {
+ 				regulator-min-microvolt = <1300000>;
+ 				regulator-max-microvolt = <1300000>;
+ 				regulator-always-on;
++				regulator-name="vdd_rtc";
+ 			};
+ 
+ 			avcc: ldo2 {
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3300000>;
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
+ 				regulator-always-on;
++				regulator-name="avcc";
+ 			};
+ 
+ 			vcc_csi0: ldo3 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <3500000>;
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
+ 				regulator-always-on;
++				regulator-name="vcc_csi0";
+ 			};
+ 
+ 			vcc_csi1: ldo4 {
+-				regulator-min-microvolt = <1250000>;
+-				regulator-max-microvolt = <3300000>;
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
+ 				regulator-always-on;
++				regulator-name="vcc_csi1";
++			};
++
++			ldo5 {
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-name="reg_unused";
+ 			};
+ 
+ 			vdd_cpu: dcdc2 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <2275000>;
++				regulator-min-microvolt = <1050000>;
++				regulator-max-microvolt = <1450000>;
+ 				regulator-always-on;
++				regulator-name="vdd_cpu";
+ 			};
+ 
+ 			vdd_int: dcdc3 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <3500000>;
++				regulator-min-microvolt = <1300000>;
++				regulator-max-microvolt = <1300000>;
+ 				regulator-always-on;
++				regulator-name="vdd_int";
+ 			};
+ 		};
+ 	};
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.3
