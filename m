@@ -1,112 +1,175 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 26 Mar 2015 07:09:02 +0100
-Subject: [PATCH 0/4] RFC: split text and linear mappings using tagged
- pointers
-In-Reply-To: <20150326012622.GB1676@flaeskesteg-linux.cambridge.arm.com>
+Date: Thu, 26 Mar 2015 07:20:38 +0100
+Subject: [PATCH 2/4] arm64: fixmap: move translation tables to dedicated
+ region
+In-Reply-To: <20150326012808.GD1676@flaeskesteg-linux.cambridge.arm.com>
 References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150326012622.GB1676@flaeskesteg-linux.cambridge.arm.com>
-Message-ID: <CAKv+Gu-i89Vh0hRdYfXF+pTdRgMx==ARt4g2UH-2ji=JedoSHw@mail.gmail.com>
+ <1427125016-3873-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20150326012808.GD1676@flaeskesteg-linux.cambridge.arm.com>
+Message-ID: <CAKv+Gu-wibouuV7mZHPycofPk3xT=LEEAPoxKWkEX9u+7u+sWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2015 at 02:26, Mark Rutland <mark.rutland@arm.com> wrote:
->
+On 26 March 2015 at 02:28, Mark Rutland <mark.rutland@arm.com> wrote:
 > Hi Ard,
 >
-> On Mon, Mar 23, 2015 at 03:36:52PM +0000, Ard Biesheuvel wrote:
-> > This implements a split mapping of the kernel Image using the AArch64
-> > tagged pointers feature. The kernel text is emitted with bit 56 cleared,
-> > which can be used by the virt to phys translation to choose one translation
-> > regime or another.
+> On Mon, Mar 23, 2015 at 03:36:54PM +0000, Ard Biesheuvel wrote:
+>> This moves the fixmap translation tables to a dedicated region
+>> in the linker map. This is needed for a split kernel text from
+>> the linear mapping, to ensure that the contents of the tables
+>> rely on a single translation regime.
 >
-> This looks neat!
+> I'm not sure what you mean by this. Could you elaborate?
 >
-> I definitely want to see the linear mapping decoupled from the text mapping,
-> but I'm rather worried by the prospect of tagged pointers in the kernel (there
-> are a lot of edge cases for those w.r.t. the preservations of the tag bits),
-> and if possible I'd like to avoid their use. I think that we can achieve the
-> same effect by reorganising the VA layout within the 56 bits we have to play
-> with.
+> What problem would we have if we didn't have this section, and how does this
+> section solve that?
 >
 
-Yes, it was nice as an experiment, but it breaks down in plenty of
-unexpected places. It appears that this
+The pgd manipulation code is riddled with va/pa and pa/va
+translations, and uses both statically and dynamically allocated
+pages. Untangling all of that is not so easy, and it is simpler just
+to refer to those regions through the linear mapping exclusively.
 
--#define __virt_to_phys(x)      (((phys_addr_t)(x) - PAGE_OFFSET + PHYS_OFFSET))
-+#define __virt_to_phys(x) ({                                           \
-+       long __x = (long)(x) - PAGE_OFFSET;                             \
-+       __x >= 0 ? (phys_addr_t)(__x + PHYS_OFFSET) :                   \
-+                  (phys_addr_t)(__x + PHYS_OFFSET + image_offset); })
-+
-
-is really all we need.
-
+> Regardless, I have some comments on the implementation below.
 >
-> Nit: please s/translation regime/mapping/ (or some other wording to that
-> effect) for these patches; the architectural definition of "translation regime"
-> differs from what you're referring to here, and we should avoid overloading
-> that terminology.
+>> Also make the population of the translation levels conditional,
+>> so that the kernel text can share some levels of translation if
+>> needed.
+>
+> I guess you mean shared with the tables for the text mapping?
+>
+> Please word this to be explicit w.r.t. what is shared between whom, and when.
 >
 
-Ah ok. I thought it had a nice ring to it :-)
+Yes. Currently, the address space is split down the middle, so fixmap
+and linear always live in regions that are disjoint all the way up to
+different root pgdir entries. Once that changes, the fixmap code needs
+to be prepared for any of the levels it needs to populated having
+already been populated.
+
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/linkage.h |  2 ++
+>>  arch/arm64/kernel/vmlinux.lds.S  | 15 ++++++++++-----
+>>  arch/arm64/mm/mmu.c              | 15 +++++++++------
+>>  3 files changed, 21 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/linkage.h b/arch/arm64/include/asm/linkage.h
+>> index 636c1bced7d4..dc9354de6f52 100644
+>> --- a/arch/arm64/include/asm/linkage.h
+>> +++ b/arch/arm64/include/asm/linkage.h
+>> @@ -4,4 +4,6 @@
+>>  #define __ALIGN              .align 4
+>>  #define __ALIGN_STR  ".align 4"
+>>
+>> +#define __pgdir              __attribute__((__section__(".pgdir")))
+>
+> It would be nice for this to also provide page alignment, like
+> __page_aligned_bss that this replaces uses of.
+>
+
+I thought it wasn't necessary, because we allocate a full page for the
+highest level, but we should probably not rely on that.
+
+>> +
+>>  #endif
+>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> index 434ef407ef0f..d3885043f0b7 100644
+>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> @@ -149,11 +149,16 @@ SECTIONS
+>>
+>>       BSS_SECTION(0, 0, 0)
+>>
+>> -     . = ALIGN(PAGE_SIZE);
+>> -     idmap_pg_dir = .;
+>> -     . += IDMAP_DIR_SIZE;
+>> -     swapper_pg_dir = .;
+>> -     . += SWAPPER_DIR_SIZE;
+>> +     .pgdir : {
+>> +             . = ALIGN(PAGE_SIZE);
+>> +             __pgdir_start = .;
+>> +             idmap_pg_dir = .;
+>> +             . += IDMAP_DIR_SIZE;
+>> +             *(.pgdir)
+>> +             swapper_pg_dir = .;
+>> +             . += SWAPPER_DIR_SIZE;
+>> +             __pgdir_stop = .;
+>
+> Nit: __pgdir_end would be consitent with our other vmlinux.lds.S symbols.
+>
+
+Right
+
+>> +     }
+>>
+>>       _end = .;
+>>
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index 43496748e3d9..bb3ce41130f3 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -549,12 +549,12 @@ void vmemmap_free(unsigned long start, unsigned long end)
+>>  }
+>>  #endif       /* CONFIG_SPARSEMEM_VMEMMAP */
+>>
+>> -static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+>> +static pte_t bm_pte[PTRS_PER_PTE] __pgdir;
+>>  #if CONFIG_ARM64_PGTABLE_LEVELS > 2
+>> -static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
+>> +static pmd_t bm_pmd[PTRS_PER_PMD] __pgdir;
+>>  #endif
+>>  #if CONFIG_ARM64_PGTABLE_LEVELS > 3
+>> -static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+>> +static pud_t bm_pud[PTRS_PER_PUD] __pgdir;
+>>  #endif
+>
+> These used to be zeroed (by the bss init code in head.S), but now they won't
+> be, and as they live after all the initialized data they could contain garbage
+> if we're unlucky. So I suspect this is broken.
+>
+
+Actually, they are in this case, as the init code zeroes from the
+beginning of idmap to the end of swapper :-)
+But that is something that should be more explicit I guess
+
+I was wondering if we should worry about doing the zeroing with the
+caches off, which is not needed for fixmap
+
+> If we zero these before use then that's fine. We could define the swapper and
+> idmap similarly in this C file for consistency (we zero those in head.S). That
+> would bring all the page table allocations into the same file, and .pgdir could
+> be simpler:
+>
+>         .pgdir {
+>                 . = ALIGN(PAGE_SIZE);
+>                 __pgdir_start = .;
+>                 *(.pgdir)
+>                 __pgdir_end = .;
+>         }
+>
+>>
+>>  static inline pud_t * fixmap_pud(unsigned long addr)
+>> @@ -592,11 +592,14 @@ void __init early_fixmap_init(void)
+>>       unsigned long addr = FIXADDR_START;
+>>
+>>       pgd = pgd_offset_k(addr);
+>> -     pgd_populate(&init_mm, pgd, bm_pud);
+>> +     if (pgd_none(*pgd))
+>> +             pgd_populate(&init_mm, pgd, bm_pud);
+>>       pud = pud_offset(pgd, addr);
+>> -     pud_populate(&init_mm, pud, bm_pmd);
+>> +     if (pud_none(*pud))
+>> +             pud_populate(&init_mm, pud, bm_pmd);
+>>       pmd = pmd_offset(pud, addr);
+>> -     pmd_populate_kernel(&init_mm, pmd, bm_pte);
+>> +     if (pmd_none(*pmd))
+>> +             pmd_populate_kernel(&init_mm, pmd, bm_pte);
+>
+> It's a bit confusing to have this change in the same patch as the other
+> changes, given that this shouldn't be required yet. It might make more sense
+> for this to live in the patch moving the text mapping.
+>
 
 
-> > The purpose is to allow PHYS_OFFSET to start at an arbitrary offset below
-> > the kernel image, so that memory below the kernel Image can be used, allowing
-> > the Image to be loaded anywhere in physical memory.
-> >
-> > This series moves the kernel text right below PAGE_OFFSET, next to the modules
-> > area. PHYS_OFFSET is chosen to be a suitable aligned boundary somewhere below
-> > the kernel Image (1 GB or 512 MB depending on chosen page size).
-> >
-> > Output from a QEMU/EFI boot:
-> >
-> > System RAM:
-> >  memory[0x0]  [0x00000040000000-0x000000bfffffff], 0x80000000 bytes flags: 0x0
-> >
-> > Kernel image:
-> >  reserved[0x0]        [0x0000005f680000-0x0000005fe68fff], 0x7e9000 bytes flags: 0x0
-> >
-> > Virtual kernel memory layout:
-> >     vmalloc : 0xffffff8000000000 - 0xffffffbdbfff0000   (   246 GB)
-> >     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-> >               0xffffffbdc1000000 - 0xffffffbdc3000000   (    32 MB actual)
-> >     fixed   : 0xffffffbff69fd000 - 0xffffffbff6c00000   (  2060 KB)
-> >     PCI I/O : 0xffffffbff6e00000 - 0xffffffbff7e00000   (    16 MB)
-> >     modules : 0xffffffbff8000000 - 0xffffffbffc000000   (    64 MB)
-> >     memory  : 0xffffffc000000000 - 0xffffffc080000000   (  2048 MB)
-> >       .init : 0xfeffffbffc783000 - 0xfeffffbffc7c6000   (   268 KB)
-> >       .text : 0xfeffffbffc080000 - 0xfeffffbffc782344   (  7177 KB)
-> >       .data : 0xfeffffbffc7ca000 - 0xfeffffbffc830c00   (   411 KB)
-> >
-> > Note that this time, no relocations were harmed in the making of these
-> > patches. With added relocation support, it should be possible to move
-> > the combined modules and kernel text anywhere in the vmalloc area (for
-> > kaslr)
-> >
-> > There are probably some places where the cleared bit 56 in the virtual
-> > address may cause trouble. Known problem is the module loader, but there
-> > are surely others.
-> >
-> >
-> > Ard Biesheuvel (4):
-> >   arm64: use tagged pointers to distinguish kernel text from the linear
-> >     mapping
-> >   arm64: fixmap: move translation tables to dedicated region
-> >   arm64: move kernel text below PAGE_OFFSET
-> >   arm64: align PHYS_OFFSET to block size
-> >
-> >  arch/arm64/include/asm/linkage.h       |  2 ++
-> >  arch/arm64/include/asm/memory.h        | 27 +++++++++++++++++--
-> >  arch/arm64/include/asm/pgtable-hwdef.h |  1 +
-> >  arch/arm64/kernel/head.S               | 48 +++++++++++++++++++++++++---------
-> >  arch/arm64/kernel/vmlinux.lds.S        | 19 +++++++++-----
-> >  arch/arm64/mm/mmu.c                    | 21 +++++++++------
-> >  arch/arm64/mm/proc.S                   |  3 ++-
-> >  7 files changed, 91 insertions(+), 30 deletions(-)
-> >
-> > --
-> > 1.8.3.2
-> >
-> >
+ok
