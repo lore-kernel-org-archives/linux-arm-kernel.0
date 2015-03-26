@@ -1,148 +1,104 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 26 Mar 2015 13:43:15 +0100
-Subject: [PATCH 12/16] iommu/shmobile: Make use of domain_alloc and domain_free
+Date: Thu, 26 Mar 2015 13:43:19 +0100
+Subject: [PATCH 16/16] iommu: Remove domain_init and domain_free iommu_ops
 In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
 References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <1427373799-18662-13-git-send-email-joro@8bytes.org>
+Message-ID: <1427373799-18662-17-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joerg Roedel <jroedel@suse.de>
 
-Implement domain_alloc and domain_free iommu-ops as a
-replacement for domain_init/domain_destroy.
+All drivers have been converted to the new domain_alloc and
+domain_free iommu-ops. So remove the old ones and get rid of
+iommu_domain->priv too, as this is no longer needed when the
+struct iommu_domain is embedded in the private structures of
+the iommu drivers.
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/iommu/shmobile-iommu.c | 39 +++++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 16 deletions(-)
+ drivers/iommu/iommu.c | 30 ++----------------------------
+ include/linux/iommu.h |  3 ---
+ 2 files changed, 2 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/iommu/shmobile-iommu.c b/drivers/iommu/shmobile-iommu.c
-index f1b0077..a028751 100644
---- a/drivers/iommu/shmobile-iommu.c
-+++ b/drivers/iommu/shmobile-iommu.c
-@@ -42,11 +42,17 @@ struct shmobile_iommu_domain {
- 	spinlock_t map_lock;
- 	spinlock_t attached_list_lock;
- 	struct list_head attached_list;
-+	struct iommu_domain domain;
- };
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 656b949..d4f527e 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -900,51 +900,25 @@ EXPORT_SYMBOL_GPL(iommu_set_fault_handler);
  
- static struct shmobile_iommu_archdata *ipmmu_archdata;
- static struct kmem_cache *l1cache, *l2cache;
- 
-+static struct shmobile_iommu_domain *to_sh_domain(struct iommu_domain *dom)
-+{
-+	return container_of(dom, struct shmobile_iommu_domain, domain);
-+}
-+
- static int pgtable_alloc(struct shmobile_iommu_domain_pgtable *pgtable,
- 			 struct kmem_cache *cache, size_t size)
+ struct iommu_domain *iommu_domain_alloc(struct bus_type *bus)
  {
-@@ -82,31 +88,33 @@ static void pgtable_write(struct shmobile_iommu_domain_pgtable *pgtable,
- 				   sizeof(val) * count, DMA_TO_DEVICE);
+-	const struct iommu_ops *ops;
+ 	struct iommu_domain *domain;
+ 
+ 	if (bus == NULL || bus->iommu_ops == NULL)
+ 		return NULL;
+ 
+-	ops = bus->iommu_ops;
+-
+-	if (ops->domain_alloc)
+-		domain = ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
+-	else
+-		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
+-
++	domain = bus->iommu_ops->domain_alloc(IOMMU_DOMAIN_UNMANAGED);
+ 	if (!domain)
+ 		return NULL;
+ 
+ 	domain->ops  = bus->iommu_ops;
+ 	domain->type = IOMMU_DOMAIN_UNMANAGED;
+ 
+-	if (ops->domain_init && domain->ops->domain_init(domain))
+-		goto out_free;
+-
+ 	return domain;
+-
+-out_free:
+-	if (ops->domain_free)
+-		ops->domain_free(domain);
+-	else
+-		kfree(domain);
+-
+-	return NULL;
  }
+ EXPORT_SYMBOL_GPL(iommu_domain_alloc);
  
--static int shmobile_iommu_domain_init(struct iommu_domain *domain)
-+static struct iommu_domain *shmobile_iommu_domain_alloc(unsigned type)
+ void iommu_domain_free(struct iommu_domain *domain)
  {
- 	struct shmobile_iommu_domain *sh_domain;
- 	int i, ret;
- 
--	sh_domain = kmalloc(sizeof(*sh_domain), GFP_KERNEL);
-+	if (type != IOMMU_DOMAIN_UNMANAGED)
-+		return NULL;
-+
-+	sh_domain = kzalloc(sizeof(*sh_domain), GFP_KERNEL);
- 	if (!sh_domain)
--		return -ENOMEM;
-+		return NULL;
- 	ret = pgtable_alloc(&sh_domain->l1, l1cache, L1_SIZE);
- 	if (ret < 0) {
- 		kfree(sh_domain);
--		return ret;
-+		return NULL;
- 	}
- 	for (i = 0; i < L1_LEN; i++)
- 		sh_domain->l2[i].pgtable = NULL;
- 	spin_lock_init(&sh_domain->map_lock);
- 	spin_lock_init(&sh_domain->attached_list_lock);
- 	INIT_LIST_HEAD(&sh_domain->attached_list);
--	domain->priv = sh_domain;
--	return 0;
-+	return &sh_domain->domain;
+-	const struct iommu_ops *ops = domain->ops;
+-
+-	if (likely(ops->domain_destroy != NULL))
+-		ops->domain_destroy(domain);
+-
+-	if (ops->domain_free)
+-		ops->domain_free(domain);
+-	else
+-		kfree(domain);
++	domain->ops->domain_free(domain);
  }
+ EXPORT_SYMBOL_GPL(iommu_domain_free);
  
--static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
-+static void shmobile_iommu_domain_free(struct iommu_domain *domain)
- {
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 	int i;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 72d03fe..0546b87 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -78,7 +78,6 @@ struct iommu_domain_geometry {
+ struct iommu_domain {
+ 	unsigned type;
+ 	const struct iommu_ops *ops;
+-	void *priv;
+ 	iommu_fault_handler_t handler;
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
+@@ -138,8 +137,6 @@ enum iommu_attr {
+  */
+ struct iommu_ops {
+ 	bool (*capable)(enum iommu_cap);
+-	int (*domain_init)(struct iommu_domain *domain);
+-	void (*domain_destroy)(struct iommu_domain *domain);
  
- 	for (i = 0; i < L1_LEN; i++) {
-@@ -115,14 +123,13 @@ static void shmobile_iommu_domain_destroy(struct iommu_domain *domain)
- 	}
- 	pgtable_free(&sh_domain->l1, l1cache, L1_SIZE);
- 	kfree(sh_domain);
--	domain->priv = NULL;
- }
- 
- static int shmobile_iommu_attach_device(struct iommu_domain *domain,
- 					struct device *dev)
- {
- 	struct shmobile_iommu_archdata *archdata = dev->archdata.iommu;
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 	int ret = -EBUSY;
- 
- 	if (!archdata)
-@@ -151,7 +158,7 @@ static void shmobile_iommu_detach_device(struct iommu_domain *domain,
- 					 struct device *dev)
- {
- 	struct shmobile_iommu_archdata *archdata = dev->archdata.iommu;
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 
- 	if (!archdata)
- 		return;
-@@ -214,7 +221,7 @@ static int shmobile_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 			      phys_addr_t paddr, size_t size, int prot)
- {
- 	struct shmobile_iommu_domain_pgtable l2 = { .pgtable = NULL };
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 	unsigned int l1index, l2index;
- 	int ret;
- 
-@@ -258,7 +265,7 @@ static size_t shmobile_iommu_unmap(struct iommu_domain *domain,
- 				   unsigned long iova, size_t size)
- {
- 	struct shmobile_iommu_domain_pgtable l2 = { .pgtable = NULL };
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 	unsigned int l1index, l2index;
- 	uint32_t l2entry = 0;
- 	size_t ret = 0;
-@@ -298,7 +305,7 @@ done:
- static phys_addr_t shmobile_iommu_iova_to_phys(struct iommu_domain *domain,
- 					       dma_addr_t iova)
- {
--	struct shmobile_iommu_domain *sh_domain = domain->priv;
-+	struct shmobile_iommu_domain *sh_domain = to_sh_domain(domain);
- 	uint32_t l1entry = 0, l2entry = 0;
- 	unsigned int l1index, l2index;
- 
-@@ -355,8 +362,8 @@ static int shmobile_iommu_add_device(struct device *dev)
- }
- 
- static const struct iommu_ops shmobile_iommu_ops = {
--	.domain_init = shmobile_iommu_domain_init,
--	.domain_destroy = shmobile_iommu_domain_destroy,
-+	.domain_alloc = shmobile_iommu_domain_alloc,
-+	.domain_free = shmobile_iommu_domain_free,
- 	.attach_dev = shmobile_iommu_attach_device,
- 	.detach_dev = shmobile_iommu_detach_device,
- 	.map = shmobile_iommu_map,
+ 	/* Domain allocation and freeing by the iommu driver */
+ 	struct iommu_domain *(*domain_alloc)(unsigned iommu_domain_type);
 -- 
 1.9.1
