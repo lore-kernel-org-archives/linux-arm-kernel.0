@@ -1,83 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 Mar 2015 12:00:26 +0000
-Subject: [PATCH V2] ARM: BCM5301X: Implement SMP support
-In-Reply-To: <1427030415-31721-1-git-send-email-zajec5@gmail.com>
-References: <1424385148-15026-1-git-send-email-zajec5@gmail.com>
- <1427030415-31721-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20150326120026.GF8656@n2100.arm.linux.org.uk>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 26 Mar 2015 14:11:38 +0200
+Subject: [PATCH v2 1/7] dmaengine: of_dma: Support for DMA routers
+In-Reply-To: <20150326105018.GJ32683@intel.com>
+References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
+ <1426080210-841-2-git-send-email-peter.ujfalusi@ti.com>
+ <20150326105018.GJ32683@intel.com>
+Message-ID: <5513F77A.4030005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 22, 2015 at 02:20:15PM +0100, Rafa? Mi?ecki wrote:
-> +/*
-> + * BCM5301X specific entry point for secondary CPUs.
-> + */
-> +ENTRY(bcm5301x_secondary_startup)
-> +	mrc	p15, 0, r0, c0, c0, 5
-> +	and	r0, r0, #15
-> +	adr	r4, 1f
-> +	ldmia	r4, {r5, r6}
-> +	sub	r4, r4, r5
-> +	add	r6, r6, r4
-> +pen:	ldr	r7, [r6]
-> +	cmp	r7, r0
-> +	bne	pen
-> +
-> +	/*
-> +	 * In case L1 cache has unpredictable contents at power-up
-> +	 * clean its contents without flushing.
-> +	 */
-> +	bl      v7_invalidate_l1
-> +
-> +	mov	r0, #0
-> +	mcr	p15, 0, r0, c7, c5, 0	/* Invalidate icache */
-> +	dsb
-> +	isb
+On 03/26/2015 12:50 PM, Vinod Koul wrote:
+> On Wed, Mar 11, 2015 at 03:23:24PM +0200, Peter Ujfalusi wrote:
+>> DMA routers are transparent devices used to mux DMA requests from
+>> peripherals to DMA controllers. They are used when the SoC integrates more
+>> devices with DMA requests then their controller can handle.
+>> DRA7x is one example of such SoC, where the sDMA can hanlde 128 DMA request
+>> lines, but in SoC level it has 205 DMA requests.
+>>
+>> The of_dma_router will be registered as of_dma_controller with special
+>> xlate function and additional parameters and the code will translate and
+>> requests a DMA channel from the real DMA controller.
+>> This way the router can be transparent for the system while remaining generic
+>> enough to be used in different environments.
+>>
+> Looks fine, was expecting a Documentation updates as well, but that can come
+> as follow up patch too
 
-So if your I-cache contains unpredictable contents, how do you execute
-the code to this point?  Shouldn't the I-cache invalidate be the very
-first instruction you execute followed by the dsb and isb (oh, and iirc
-it ignores the value in the register).
+I have added the DT binding document since this series adds support for
+routers for platforms booting with DT:
 
-In the case where a CPU has unpredictable contents at power up, the
-ARM ARM requires that an implementation specific sequence is followed
-to initialise the caches.  I doubt that such a sequence includes testing
-a pen value.
-
-> +	sysram_base_addr = of_iomap(node, 0);
-> +	if (!sysram_base_addr) {
-> +		pr_warn("Failed to map sysram\n");
-> +		return;
-> +	}
-> +
-> +	writel(virt_to_phys(entry_point), sysram_base_addr + SOC_ROM_LUT_OFF);
-> +
-> +	dsb_sev();	/* Exit WFI */
-
-Which WFI?  This seems to imply that you have some kind of initial
-firmware.  If so, that should be taking care of the cache initialisation,
-not the kernel.
-
-> +	mb();		/* make sure write buffer is drained */
-
-writel() already ensures that.
-
-> +	/*
-> +	 * The secondary processor is waiting to be released from
-> +	 * the holding pen - release it, then wait for it to flag
-> +	 * that it has been released by resetting pen_release.
-> +	 *
-> +	 * Note that "pen_release" is the hardware CPU ID, whereas
-> +	 * "cpu" is Linux's internal ID.
-> +	 */
-> +	write_pen_release(cpu_logical_map(cpu));
-> +
-> +	 /* Send the secondary CPU SEV */
-> +	dsb_sev();
-
-If you even need any of the pen code, if you're having to send a SEV here,
-wouldn't having a WFE in the pen assembly loop above be a good idea?
+Documentation/devicetree/bindings/dma/dma.txt | 28 ++++++++
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+P?ter
