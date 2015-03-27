@@ -1,37 +1,39 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 27 Mar 2015 16:37:13 +0100
-Subject: [PATCH] i2c: cadence: Handling Slave monitor mode
-In-Reply-To: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
-References: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
-Message-ID: <20150327153713.GC27238@katana>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Mar 2015 15:37:04 +0000
+Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
+In-Reply-To: <20150327153131.GK12400@redacted.bos.redhat.com>
+References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
+ <20150327153131.GK12400@redacted.bos.redhat.com>
+Message-ID: <55157920.3050003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 09:48:15PM +0530, Nava kishore Manne wrote:
-> In slave monitor mode, the I2C interface is set up as a master and
-> continues to attempt a transfer to a particular slave until the
-> slave device responds with an ACK.
+On 27/03/15 15:31, Kyle McMartin wrote:
+> On Thu, Mar 26, 2015 at 05:25:21PM +0900, AKASHI Takahiro wrote:
+>> 1) Call kvm_cpu_reset() on non-boot cpus in reboot notifier
+>>    We don't have to do so in kexec-specific case. But the current code runs
+>>    the function on each cpu for safety since we use a general reboot hook.
+>> 2) Flush D$ in kvm_cpu_reset()
+>>    Currently doesn't do so because all the cpus are just going to shut down,
+>>    and we actually flush D$ on boot cpu in Geoff's cpu_reset().
+>> 3) Compatibility with arm implementation
+>>    Frediano[2] is no longer working on this issue on arm as he left his
+>>    company. But my approach here is based on a generic interface and can be
+>>    applied to arm in a similar way.
+>>
 > 
-> Added this feature for zero length transfers enable the controller
-> for slave monitor interrupt and get the status. Disable the slave
-> monitor mode feature upon successful handling.
+> i'm hitting this when rebooting with your patchset applied...
 > 
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> Acked-by: Harini Katakam <harinik@xilinx.com>
+> Rebooting.
+> [  236.260863] Kernel panic - not syncing: HYP panic:
+> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
 
-I am not sure this is going to work.
+It would be interesting if you could find out what you have at offset
+0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
+help much).
 
-How often is this access tried when there is no device? It should be
-tried only once.
+Thanks,
 
-Those 0byte messages can be read or write, so transferring one bit, one
-could say. I assume this one can only read? (which is not a show-stopper
-but the cases should be handled)
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/d0a9ab91/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
