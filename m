@@ -1,53 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Mar 2015 10:06:12 +0000
-Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
- get rid of the bounce page"
-In-Reply-To: <20150327002554.GA5527@verge.net.au>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
-Message-ID: <20150327100612.GB1562@arm.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 27 Mar 2015 11:08:32 +0100
+Subject: [PATCH] net: fec: setup right value for mdio hold time
+Message-ID: <1427450912-9793-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
-> On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
-> > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
-> > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
-> > >> > I think we now have a new error: (seen with omap2plus_defconfig)
-> > >> > on next-20150324 :
-> > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
-> > >> > referenced in expression
-> > >> > make: *** [vmlinux] Error 1
-> > >>
-> > >> Thanks, I am seeing that too.
-> > >>
-> > >> My armchair suggestion is that the following should be reverted.
-> > >>
-> > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
-> > >
-> > > Can you try again with the latest -next please? We've merged an additional
-> > > patch aimed at sorting this out. Reverting isn't really an option, as
-> > > there's an awful lot of code that depends on the bounce page removal.
-> > 
-> > Here are the kernelci.org -next results[1], if you click the build
-> > status you can dig down into the build failures. next-20150326 has now
-> > hit a compiler bug, Arnd mentioned he was looking into this issue.
-> 
-> I have confirmed that next-20150326 does not compile without
-> the following reverted:
-> 
-> 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
-> e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
+The FEC modules used on i.MX28 and newer have a register to tune the MDIO
+output hold time that should be at least 10 ns. Up to now this value was not
+explicitly set and so resulted in less hold time if the fec clock was
+faster than 100 MHz.
 
-Thanks for testing this and sorry for the continued breakage. Which
-toolchain did you say you were using? Ard has some more patches trying to
-fix this, but none of our toolchains seem to tickle the issue.
+This was noticed on an i.MX28 machine that uses an input clock of ~150
+Mhz which resulted in unreliable communication with a Marvell switch.
 
-Will
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/net/ethernet/freescale/fec_main.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 78e1ce09b1ab..f6a3a7abd468 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1954,6 +1954,7 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	struct fec_enet_private *fep = netdev_priv(ndev);
+ 	struct device_node *node;
+ 	int err = -ENXIO, i;
++	u32 mii_speed, holdtime;
+ 
+ 	/*
+ 	 * The i.MX28 dual fec interfaces are not equal.
+@@ -1991,10 +1992,33 @@ static int fec_enet_mii_init(struct platform_device *pdev)
+ 	 * Reference Manual has an error on this, and gets fixed on i.MX6Q
+ 	 * document.
+ 	 */
+-	fep->phy_speed = DIV_ROUND_UP(clk_get_rate(fep->clk_ipg), 5000000);
++	mii_speed = DIV_ROUND_UP(clk_get_rate(fep->clk_ipg), 5000000);
+ 	if (fep->quirks & FEC_QUIRK_ENET_MAC)
+-		fep->phy_speed--;
+-	fep->phy_speed <<= 1;
++		mii_speed--;
++	if (mii_speed > 63) {
++		dev_err(&pdev->dev,
++			"fec clock (%lu) to fast to get right mii speed\n",
++			clk_get_rate(fep->clk_ipg));
++		err = -EINVAL;
++		goto err_out;
++	}
++
++	/*
++	 * The i.MX28 and i.MX6 types have another filed in the MSCR (aka
++	 * MII_SPEED) register that defines the MDIO output hold time. Earlier
++	 * versions are RAZ there, so just ignore the difference and write the
++	 * register always.
++	 * The minimal hold time according to IEE802.3 (clause 22) is 10 ns.
++	 * HOLDTIME + 1 is the number of clk cycles the fec is holding the
++	 * output.
++	 * The HOLDTIME bitfield takes values between 0 and 7 (inclusive).
++	 * Given that ceil(clkrate / 5000000) <= 64, the calculation for
++	 * holdtime cannot result in a value greater than 3.
++	 */
++	holdtime = DIV_ROUND_UP(clk_get_rate(fep->clk_ipg), 100000000) - 1;
++
++	fep->phy_speed = mii_speed << 1 | holdtime << 8;
++
+ 	writel(fep->phy_speed, fep->hwp + FEC_MII_SPEED);
+ 
+ 	fep->mii_bus = mdiobus_alloc();
+-- 
+2.1.4
