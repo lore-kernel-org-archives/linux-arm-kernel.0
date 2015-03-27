@@ -1,54 +1,64 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 27 Mar 2015 14:59:30 +0000
-Subject: [PATCH v4 1/2] Revert "serial/amba-pl011: Leave the TX IRQ alone when
- the UART is not open"
-In-Reply-To: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
-References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1427468371-11915-2-git-send-email-Dave.Martin@arm.com>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Fri, 27 Mar 2015 08:18:54 -0700
+Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm: get
+ rid of the bounce page"
+In-Reply-To: <20150327100612.GB1562@arm.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+Message-ID: <CANMBJr4hcRC14KUUVJDGNeuT+_e45BPNfNSbzpzY021pq2XwYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit f2ee6dfa0e8597eea8b98d240b0033994e20d215.
+On 27 March 2015 at 03:06, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
+>> On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
+>> > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
+>> > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
+>> > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
+>> > >> > I think we now have a new error: (seen with omap2plus_defconfig)
+>> > >> > on next-20150324 :
+>> > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
+>> > >> > referenced in expression
+>> > >> > make: *** [vmlinux] Error 1
+>> > >>
+>> > >> Thanks, I am seeing that too.
+>> > >>
+>> > >> My armchair suggestion is that the following should be reverted.
+>> > >>
+>> > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+>> > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
+>> > >
+>> > > Can you try again with the latest -next please? We've merged an additional
+>> > > patch aimed at sorting this out. Reverting isn't really an option, as
+>> > > there's an awful lot of code that depends on the bounce page removal.
+>> >
+>> > Here are the kernelci.org -next results[1], if you click the build
+>> > status you can dig down into the build failures. next-20150326 has now
+>> > hit a compiler bug, Arnd mentioned he was looking into this issue.
+>>
+>> I have confirmed that next-20150326 does not compile without
+>> the following reverted:
+>>
+>> 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
+>> e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+>> 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
+>
+> Thanks for testing this and sorry for the continued breakage. Which
+> toolchain did you say you were using? Ard has some more patches trying to
+> fix this, but none of our toolchains seem to tickle the issue.
 
-Jakub Kici?ski observed that this patch can cause the pl011
-driver to hang if if the only process with a pl011 port open is
-killed by a signal, pl011_shutdown() can get called with an
-arbitrary amount of data still in the FIFO.
+I am able to reproduce with this toolchain[1].
 
-Calling _shutdown() with the TX FIFO non-empty is questionable
-behaviour and my itself be a bug.
+>
+> Will
 
-Since the affected patch was speculative anyway, and brings limited
-benefit, the simplest course is to remove the assumption that TXIS
-will always be left asserted after the port is shut down.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- drivers/tty/serial/amba-pl011.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 5a4e9d5..6f5a072 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1639,6 +1639,9 @@ static int pl011_startup(struct uart_port *port)
- 
- 	writew(uap->vendor->ifls, uap->port.membase + UART011_IFLS);
- 
-+	/* Assume that TX IRQ doesn't work until we see one: */
-+	uap->tx_irq_seen = 0;
-+
- 	spin_lock_irq(&uap->port.lock);
- 
- 	/* restore RTS and DTR */
-@@ -1702,7 +1705,7 @@ static void pl011_shutdown(struct uart_port *port)
- 	spin_lock_irq(&uap->port.lock);
- 	uap->im = 0;
- 	writew(uap->im, uap->port.membase + UART011_IMSC);
--	writew(0xffff & ~UART011_TXIS, uap->port.membase + UART011_ICR);
-+	writew(0xffff, uap->port.membase + UART011_ICR);
- 	spin_unlock_irq(&uap->port.lock);
- 
- 	pl011_dma_shutdown(uap);
--- 
-1.7.10.4
+[1] http://releases.linaro.org/12.10/components/toolchain/binaries/gcc-linaro-arm-linux-gnueabihf-4.7-2012.10-20121022_linux.tar.bz2
+
+Tyler
