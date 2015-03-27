@@ -1,48 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Mar 2015 17:50:05 +0000
-Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
-In-Reply-To: <20150327174044.GL12400@redacted.bos.redhat.com>
-References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
- <20150327153131.GK12400@redacted.bos.redhat.com> <55157920.3050003@arm.com>
- <20150327174044.GL12400@redacted.bos.redhat.com>
-Message-ID: <5515984D.2020801@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 27 Mar 2015 10:53:18 -0700
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+In-Reply-To: <2a81c738-f7e2-4387-b04c-05c9892ba8e4@BN1AFFO11FD026.protection.gbl>
+References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+ <20150308190012.GV28806@sirena.org.uk>
+ <2a81c738-f7e2-4387-b04c-05c9892ba8e4@BN1AFFO11FD026.protection.gbl>
+Message-ID: <20150327175318.GG1743@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/03/15 17:40, Kyle McMartin wrote:
-> On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
->>> [  236.260863] Kernel panic - not syncing: HYP panic:
->>> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
->>
->> It would be interesting if you could find out what you have at offset
->> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
->> help much).
->>
-> 
-> Given the alignment, i'm going to assume i'm looking at the right thing:
-> 
-> 0000000000000820 <__kvm_hyp_reset>:
->      820:       d51c2000        msr     ttbr0_el2, x0
->      824:       d5033fdf        isb
->      828:       d50c871f        tlbi    alle2
->      82c:       d5033f9f        dsb     sy
->      830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
->      834:       b3403c01        bfxil   x1, x0, #0, #16
->      838:       d61f0020        br      x1
->      83c:       d53c1000        mrs     x0, sctlr_el2
-> 
-> but it seems fairly implausible to be trapping on ADR x0, 1f...
+On Fri, Mar 27, 2015 at 11:55:49AM +0100, Michal Simek wrote:
 
-... unless you've just switched TTBR0_EL2 to something slightly
-inappropriate, and conveniently flushed the TLBs. Also, having 0 as the
-exception class is fairly indicative you've fetched some crap, which
-reinforce my idea that the page tables are pointing to nowhere-land.
+Please fix your mail client to word wrap within paragraphs at less than
+80 columns - this makes your mails easier to read and reply to.
 
-I'll try to review the patches next week, maybe I'll spot something by
-inspection.
+> On 03/08/2015 08:00 PM, Mark Brown wrote:
+> > On Fri, Jan 16, 2015 at 01:55:14PM +0100, Michal Simek wrote:
+> >> Use standard num-cs binding property and setup
+> >> "xlnx,num-ss-bits" as deprecated.
 
-Thanks,
+> > Why?  These properties mean different things - num-cs is a bit confused
+> > and is the total number of available chip selects for the system (which
+> > could include GPIOs) while num-ss-bits is the size of the bitfield
+> > (which could include things not actually mapped out properly/successfully 
+> > or something if the hardware designers were feeling particularly inspired).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> I was checking meaning of num-ss-bits and meaning is Number of slaves (taking
+> explanation from Vivado 2014.4) Range 1-32.
+> http://www.xilinx.com/support/documentation/ip_documentation/axi_spi/v1_02_a/axi_spi_ds742.pdf
+> Table 1 - page 4
+
+> Checking through the hw design every pin is connected to device to do chip select.
+> That's why I think that num-cs (based on spi-bus.txt) is the right property.
+
+Remember that we can at least in theory have additional chip selects
+that aren't controlled by the IP block but are instead GPIOs.  There's
+also some potential confusion for users between the number of chip
+selects in use in a given system and the size of the bitfield that the
+driver needs to take care of.
+
+> > I'm not convinced num-cs ever made any sense.
+
+> Does it mean that num-cs property used by 11 SPI drivers is just incorrect?
+
+> Based on Documentation/devicetree/bindings/spi/spi-bus.txt it is the part of binding
+> - num-cs : total number of chipselects
+
+> Please let me know what you think.
+
+I don't think it has any value.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/fcc8a0f3/attachment-0001.sig>
