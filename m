@@ -1,49 +1,43 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 27 Mar 2015 13:35:50 +0200
-Subject: [PATCH 0/5] dmaengine: Fix memory leak amongs virt-dma users
-Message-ID: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+Date: Fri, 27 Mar 2015 13:35:52 +0200
+Subject: [PATCH 2/5] dmaengine: omap-dma: Fix memory leak when terminating
+ running transfer
+In-Reply-To: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1427456155-28990-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In omap_dma_start_desc the vdesc->node is removed from the virt-dma
+framework managed lists (to be precise from the desc_issued list).
+If a terminate_all comes before the transfer finishes the omap_desc will
+not be freed up because it is not in any of the lists and we stopped the
+DMA channel so the transfer will not going to complete.
+There is no special sequence for leaking memory when using cyclic (audio)
+transfer: with every start and stop of a cyclic transfer the driver leaks
+struct omap_desc worth of memory.
 
-Due to the implementation of some of the drivers using virt-dma they leak memory
-by design.
-All it takes is to stop a transfer which is not yet completed, this includes
-cyclic (audio) channels also.
-These drivers tend to remove the vdesc->node from the virt-dma lists when they
-start the transfer. In terminate all vchan_get_all_descriptors() will not find
-the transfer which is still running (not in any of the lists) so the free_desc
-callback will not be called on them leaving us with memory leak.
+Free up the allocated memory directly in omap_dma_terminate_all() since the
+framework will not going to do that for us.
 
-There are other drivers leaking memory IMHO, but I was not sure how to fix them:
-sun6i-dma,
-sa11x0-dma,
-k3dma
-
-Others are already doing something to prevent the leak by either directly
-freeing the desc or by adding back the vdesc->node to a list.
-
-Regards,
-Peter
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+CC: <stable@vger.kernel.org>
+CC: <linux-omap@vger.kernel.org>
 ---
-Peter Ujfalusi (4):
-  dmaengine: omap-dma: Fix memory leak when terminating running transfer
-  dmaengine: bcm2835-dma: Fix memory leak when stopping a running
-    transfer
-  dmaengine: hsu: Fix memory leak when stopping a running transfer
-  dmaengine: moxart-dma: Fix memory leak when stopping a running
-    transfer
+ drivers/dma/omap-dma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Petr Kulhavy (1):
-  dmaengine: edma: fix memory leak when terminating running transfers
-
- drivers/dma/bcm2835-dma.c | 1 +
- drivers/dma/edma.c        | 7 +++++++
- drivers/dma/hsu/hsu.c     | 5 ++++-
- drivers/dma/moxart-dma.c  | 4 +++-
- drivers/dma/omap-dma.c    | 1 +
- 5 files changed, 16 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+index 1e646d6c8230..6a4c378ee432 100644
+--- a/drivers/dma/omap-dma.c
++++ b/drivers/dma/omap-dma.c
+@@ -1002,6 +1002,7 @@ static int omap_dma_terminate_all(struct dma_chan *chan)
+ 	 * c->desc is NULL and exit.)
+ 	 */
+ 	if (c->desc) {
++		omap_dma_desc_free(&c->desc->vd);
+ 		c->desc = NULL;
+ 		/* Avoid stopping the dma twice */
+ 		if (!c->paused)
 -- 
 2.3.3
