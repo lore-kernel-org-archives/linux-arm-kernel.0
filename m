@@ -1,92 +1,86 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Mar 2015 12:03:43 +0100
-Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
-In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <20150327110341.GC5440@ulmo.nvidia.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Mar 2015 11:08:59 +0000
+Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
+ alternative instruction
+In-Reply-To: <1427452942.2658.3.camel@linaro.org>
+References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>	
+ <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>	
+ <20150326220323.GA23836@arm.com> <20150326221955.4b8fe6f0@arm.com>
+ <1427452942.2658.3.camel@linaro.org>
+Message-ID: <55153A4B.9020204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 01:43:03PM +0100, Joerg Roedel wrote:
-> Changes v1-v2:
-> 
-> 	* Rebased to v4.0-rc5
-> 	* Converted domain-types to a bit-field
-> 
-> Hi,
-> 
-> here is patch-set to replace the existing domain_init and
-> domain_destroy iommu-ops with the new domain_alloc and
-> domain_free callbacks
-> 
-> The new callbacks move the allocation of iommu domains into
-> the iommu driver, allowing them to put a generic
-> iommu_domain struct into their own domain struct. This makes
-> domain handling in the drivers more cache efficient and
-> prepares the introduction of default domains in another
-> patch-set.
-> 
-> While at it, this patch-set also introduces domain types.
-> These are internal to the iommu core code for now, there are
-> three of them:
-> 
-> 	* DMA-API domains
-> 	* Identity mapped domains
-> 	* Domains unmanaged by the iommu-core, used for
-> 	  iommu-api so that the users can create their own
-> 	  mappings
-> 
-> The patches have been compile tested for x86, ARM and PPC
-> and runtime tested on x86 (Intel VT-d and AMD IOMMU).
-> 
-> Please review.
-> 
-> Thanks,
-> 
-> 	Joerg
-> 
-> Joerg Roedel (15):
->   iommu: Introduce domain_alloc and domain_free iommu_ops
->   iommu: Introduce iommu domain types
->   iommu/amd: Make use of domain_alloc and domain_free
->   iommu/vt-d: Make use of domain_alloc and domain_free
->   iommu/omap: Make use of domain_alloc and domain_free
->   iommu/arm-smmu: Make use of domain_alloc and domain_free
->   iommu/exynos: Make use of domain_alloc and domain_free
->   iommu/tegra-smmu: Make use of domain_alloc and domain_free
->   iommu/tegra-gart: Make use of domain_alloc and domain_free
->   iommu/msm: Make use of domain_alloc and domain_free
->   iommu/shmobile: Make use of domain_alloc and domain_free
->   iommu/ipmmu-vmsa: Make use of domain_alloc and domain_free
->   iommu/rockchip: Make use of domain_alloc and domain_free
->   iommu/fsl: Make use of domain_alloc and domain_free
->   iommu: Remove domain_init and domain_free iommu_ops
-> 
->  drivers/iommu/amd_iommu.c       | 84 +++++++++++++++++++++------------------
->  drivers/iommu/amd_iommu_types.h |  7 ++--
->  drivers/iommu/arm-smmu.c        | 46 +++++++++++++---------
->  drivers/iommu/exynos-iommu.c    | 87 ++++++++++++++++++++++-------------------
->  drivers/iommu/fsl_pamu_domain.c | 60 +++++++++++++++-------------
->  drivers/iommu/fsl_pamu_domain.h |  2 +-
->  drivers/iommu/intel-iommu.c     | 48 +++++++++++++----------
->  drivers/iommu/iommu.c           | 20 ++--------
->  drivers/iommu/ipmmu-vmsa.c      | 43 +++++++++++---------
->  drivers/iommu/msm_iommu.c       | 73 +++++++++++++++++-----------------
->  drivers/iommu/omap-iommu.c      | 49 +++++++++++++----------
->  drivers/iommu/rockchip-iommu.c  | 40 +++++++++++--------
->  drivers/iommu/shmobile-iommu.c  | 40 +++++++++++--------
->  drivers/iommu/tegra-gart.c      | 67 +++++++++++++++++++++----------
->  drivers/iommu/tegra-smmu.c      | 41 ++++++++++---------
->  include/linux/iommu.h           | 17 ++++++--
->  16 files changed, 407 insertions(+), 317 deletions(-)
+Hi Tixy,
 
-The core and Tegra bits:
+On 27/03/15 10:42, Jon Medhurst (Tixy) wrote:
+> On Thu, 2015-03-26 at 22:19 +0000, Marc Zyngier wrote:
+>> On Thu, 26 Mar 2015 22:03:23 +0000
+>> Will Deacon <will.deacon@arm.com> wrote:
+>>
+>>> On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
+>>>> Since all immediate branches are PC-relative on Aarch64, these
+>>>> instructions cannot be used as an alternative with the simplistic
+>>>> approach we currently have (the immediate has been computed from
+>>>> the .altinstr_replacement section, and end-up being completely off
+>>>> if we insert it directly).
+>>>>
+>>>> This patch handles the b and bl instructions in a different way,
+>>>> using the insn framework to recompute the immediate, and generate
+>>>> the right displacement.
+>>>>
+>>>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
+>>>>  1 file changed, 53 insertions(+), 2 deletions(-)
+>>>
+>>> [...]
+>>>
+>>>>  static int __apply_alternatives(void *alt_region)
+>>>>  {
+>>>>  	struct alt_instr *alt;
+>>>> @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
+>>>>  	u8 *origptr, *replptr;
+>>>>  
+>>>>  	for (alt = region->begin; alt < region->end; alt++) {
+>>>> +		u32 insn;
+>>>> +		int i;
+>>>> +
+>>>>  		if (!cpus_have_cap(alt->cpufeature))
+>>>>  			continue;
+>>>>  
+>>>> -		BUG_ON(alt->alt_len > alt->orig_len);
+>>>> +		BUG_ON(alt->alt_len != alt->orig_len);
+>>>>  
+>>>>  		pr_info_once("patching kernel code\n");
+>>>>  
+>>>>  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
+>>>>  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
+>>>> -		memcpy(origptr, replptr, alt->alt_len);
+>>>> +
+>>>> +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
+>>>> +			insn = get_alt_insn(origptr + i, replptr + i);
+>>>> +			*(u32 *)(origptr + i) = insn;
+>>>
+>>> My brain's not firing on all cylinders right now, but do you need a
+>>> cpu_to_le32 here?
+>>
+>> I'm not 100% awake myself (probably some acute form of firmwaritis),
+>> but I suspect you're quite right (get_alt_insn calls aarch64_insn_read,
+>> which does a le32_to_cpu). Obviously, we need to revert the conversion
+>> when writing the instruction back.
+> 
+> Isn't aarch64_insn_write the inverse of aarch64_insn_read and more
+> correct than using cpu_to_le32?
 
-Tested-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/c24e3013/attachment-0001.sig>
+You're perfectly right, and you've actually uncovered a bug: if we have
+CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA, we'd end up trying
+to patch the read-only mapping, with disastrous results,
+aarch64_insn_write does the right thing, so we might as well use that.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
