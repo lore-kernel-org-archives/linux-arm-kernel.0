@@ -1,26 +1,36 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Fri, 27 Mar 2015 11:22:30 +0100
-Subject: ARM: dts: Fix wrong SoC type to build devicetrees for i.MX27
-Message-ID: <201503271122.30489.jbe@pengutronix.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 27 Mar 2015 12:21:45 +0200
+Subject: gpio-syscon for Keystone 2 - DT bindings mismatch code
+ expectation?
+In-Reply-To: <CACRpkdYVkdLEEae8JHSsBEtMyhMx0yqN8RLhP2reoV+r5gA+JA@mail.gmail.com>
+References: <20150323215545.GT8656@n2100.arm.linux.org.uk>
+ <CACRpkdYVkdLEEae8JHSsBEtMyhMx0yqN8RLhP2reoV+r5gA+JA@mail.gmail.com>
+Message-ID: <55152F39.5090805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch cb612390e5469 "Only build dtb if associated Arch and/or SoC is enabled"
-uses the wrong SoC name which prevents i.MX27 related devicetrees
-from build.
-    
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+On 03/27/2015 12:12 PM, Linus Walleij wrote:
+> On Mon, Mar 23, 2015 at 10:55 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>
+>> Linus, Grygorii,
+>>
+>> I'm trying to understand what's happening to make Keystone2 print
+>> this at boot:
+>>
+>> gpio-syscon soc:keystone_dsp_gpio at 02620240: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 2620244: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 2620248: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 262024c: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 2620250: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 2620254: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 2620258: can't read the dir register offset!
+>> gpio-syscon soc:keystone_dsp_gpio at 262025c: can't read the dir register offset!
+>
+> Grygorii are you looking into this?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b8dcec..992ea0b063d5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -215,7 +215,7 @@ dtb-$(CONFIG_SOC_IMX25) += \
- 	imx25-eukrea-mbimxsd25-baseboard-dvi-vga.dtb \
- 	imx25-karo-tx25.dtb \
- 	imx25-pdk.dtb
--dtb-$(CONFIG_SOC_IMX31) += \
-+dtb-$(CONFIG_SOC_IMX27) += \
- 	imx27-apf27.dtb \
- 	imx27-apf27dev.dtb \
- 	imx27-eukrea-mbimxsd27-baseboard.dtb \
+Yes. Seems you've found the patch already )
+https://lkml.org/lkml/2015/3/24/908
+
+regards,
+-grygorii
