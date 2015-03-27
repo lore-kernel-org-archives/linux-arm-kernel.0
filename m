@@ -1,290 +1,156 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Fri, 27 Mar 2015 21:52:35 +0800
-Subject: [PATCH v2 6/7] ARM: zx: enable SMP and hotplug for zx296702
+Date: Fri, 27 Mar 2015 21:52:36 +0800
+Subject: [PATCH v2 7/7] ARM: zx: Add basic defconfig support for ZX296702
 In-Reply-To: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
 References: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
-Message-ID: <1427464356-20112-7-git-send-email-jun.nie@linaro.org>
+Message-ID: <1427464356-20112-8-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring up the secondary core. Enable hotplug with supporting
-powering off secondary core.
+Add basic defconfig support to zx SOC, including uart, mmc
+ and other common config
 
 Signed-off-by: Jun Nie <jun.nie@linaro.org>
 ---
- arch/arm/mach-zx/Makefile  |   1 +
- arch/arm/mach-zx/core.h    |  19 +++++
- arch/arm/mach-zx/headsmp.S |  32 ++++++++
- arch/arm/mach-zx/platsmp.c | 189 +++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 241 insertions(+)
- create mode 100644 arch/arm/mach-zx/core.h
- create mode 100644 arch/arm/mach-zx/headsmp.S
- create mode 100644 arch/arm/mach-zx/platsmp.c
+ arch/arm/configs/zx_defconfig | 130 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 130 insertions(+)
+ create mode 100644 arch/arm/configs/zx_defconfig
 
-diff --git a/arch/arm/mach-zx/Makefile b/arch/arm/mach-zx/Makefile
-index 7a541c7..7c2edf6 100644
---- a/arch/arm/mach-zx/Makefile
-+++ b/arch/arm/mach-zx/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_SOC_ZX296702) += zx296702.o
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/mach-zx/core.h b/arch/arm/mach-zx/core.h
+diff --git a/arch/arm/configs/zx_defconfig b/arch/arm/configs/zx_defconfig
 new file mode 100644
-index 0000000..3efe8e0
+index 0000000..e3447fc
 --- /dev/null
-+++ b/arch/arm/mach-zx/core.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __MACH_ZX_CORE_H
-+#define __MACH_ZX_CORE_H
-+
-+extern void zx_resume_jump(void);
-+extern size_t zx_suspend_iram_sz;
-+extern unsigned long zx_secondary_startup_pa;
-+
-+void zx_secondary_startup(void);
-+
-+#endif /* __MACH_ZX_CORE_H */
-diff --git a/arch/arm/mach-zx/headsmp.S b/arch/arm/mach-zx/headsmp.S
-new file mode 100644
-index 0000000..c0fece0
---- /dev/null
-+++ b/arch/arm/mach-zx/headsmp.S
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+	.align 3
-+
-+/* It runs from physical address */
-+ENTRY(zx_resume_jump)
-+	adr	r1, zx_secondary_startup_pa
-+	ldr	r0, [r1]
-+	bx	r0
-+ENDPROC(zx_resume_jump)
-+
-+ENTRY(zx_secondary_startup_pa)
-+	.word	zx_secondary_startup_pa
-+
-+ENTRY(zx_suspend_iram_sz)
-+        .word	. - zx_resume_jump
-+ENDPROC(zx_secondary_startup_pa)
-+
-+
-+ENTRY(zx_secondary_startup)
-+	bl	v7_invalidate_l1
-+	b	secondary_startup
-+ENDPROC(zx_secondary_startup)
-diff --git a/arch/arm/mach-zx/platsmp.c b/arch/arm/mach-zx/platsmp.c
-new file mode 100644
-index 0000000..a369398
---- /dev/null
-+++ b/arch/arm/mach-zx/platsmp.c
-@@ -0,0 +1,189 @@
-+/*
-+ * Copyright 2014 Linaro Ltd.
-+ * Copyright (C) 2014 ZTE Corporation.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/jiffies.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/smp.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include <asm/fncpy.h>
-+#include <asm/proc-fns.h>
-+#include <asm/smp_scu.h>
-+#include <asm/smp_plat.h>
-+
-+#include "core.h"
-+
-+#define AON_SYS_CTRL_RESERVED1		0xa8
-+
-+#define BUS_MATRIX_REMAP_CONFIG		0x00
-+
-+#define PCU_CPU0_CTRL			0x00
-+#define PCU_CPU1_CTRL			0x04
-+#define PCU_CPU1_ST			0x0c
-+#define PCU_GLOBAL_CTRL			0x14
-+#define PCU_EXPEND_CONTROL		0x34
-+
-+#define ZX_IRAM_BASE			0x00200000
-+
-+static void __iomem *pcu_base;
-+static void __iomem *matrix_base;
-+static void __iomem *scu_base;
-+
-+void __init zx_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *np;
-+	unsigned long base = 0;
-+	void __iomem *aonsysctrl_base;
-+	void __iomem *sys_iram;
-+
-+	base = scu_a9_get_base();
-+	scu_base = ioremap(base, SZ_256);
-+	if (!scu_base) {
-+		pr_err("%s: failed to map scu\n", __func__);
-+		return;
-+	}
-+
-+	scu_enable(scu_base);
-+
-+	np = of_find_compatible_node(NULL, NULL, "zte,sysctrl");
-+	if (!np) {
-+		pr_err("%s: failed to find sysctrl node\n", __func__);
-+		return;
-+	}
-+
-+	aonsysctrl_base = of_iomap(np, 0);
-+	if (!aonsysctrl_base) {
-+		pr_err("%s: failed to map aonsysctrl\n", __func__);
-+		of_node_put(np);
-+		return;
-+	}
-+
-+	/*
-+	 * Write the address of secondary startup into the
-+	 * system-wide flags register. The BootMonitor waits
-+	 * until it receives a soft interrupt, and then the
-+	 * secondary CPU branches to this address.
-+	 */
-+	__raw_writel(virt_to_phys(zx_secondary_startup),
-+		     aonsysctrl_base + AON_SYS_CTRL_RESERVED1);
-+
-+	iounmap(aonsysctrl_base);
-+	of_node_put(np);
-+
-+	np = of_find_compatible_node(NULL, NULL, "zte,zx296702-pcu");
-+	pcu_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	WARN_ON(!pcu_base);
-+
-+	np = of_find_compatible_node(NULL, NULL, "zte,zx-bus-matrix");
-+	matrix_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	WARN_ON(!matrix_base);
-+
-+	/* Map the first 4 KB IRAM for suspend usage */
-+	sys_iram = __arm_ioremap_exec(ZX_IRAM_BASE, PAGE_SIZE, false);
-+	zx_secondary_startup_pa = virt_to_phys(zx_secondary_startup);
-+	fncpy(sys_iram, &zx_resume_jump, zx_suspend_iram_sz);
-+}
-+
-+static int zx_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	static bool first_boot = true;
-+
-+	if (first_boot) {
-+		arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-+		first_boot = false;
-+		return 0;
-+	}
-+
-+	/* Swap the base address mapping between IRAM and IROM */
-+	writel_relaxed(0x1, matrix_base + BUS_MATRIX_REMAP_CONFIG);
-+
-+	/* Power on CPU1 */
-+	writel_relaxed(0x0, pcu_base + PCU_CPU1_CTRL);
-+
-+	/* Wait for power on ack */
-+	while (readl_relaxed(pcu_base + PCU_CPU1_ST) & 0x4)
-+		cpu_relax();
-+
-+	/* Swap back the mapping of IRAM and IROM */
-+	writel_relaxed(0x0, matrix_base + BUS_MATRIX_REMAP_CONFIG);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+static inline void cpu_enter_lowpower(void)
-+{
-+	unsigned int v;
-+
-+	asm volatile(
-+		"mcr	p15, 0, %1, c7, c5, 0\n"
-+	"	mcr	p15, 0, %1, c7, c10, 4\n"
-+	/*
-+	 * Turn off coherency
-+	 */
-+	"	mrc	p15, 0, %0, c1, c0, 1\n"
-+	"	bic	%0, %0, %3\n"
-+	"	mcr	p15, 0, %0, c1, c0, 1\n"
-+	"	mrc	p15, 0, %0, c1, c0, 0\n"
-+	"	bic	%0, %0, %2\n"
-+	"	mcr	p15, 0, %0, c1, c0, 0\n"
-+	  : "=&r" (v)
-+	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-+	  : "cc");
-+}
-+
-+static int zx_cpu_kill(unsigned int cpu)
-+{
-+	unsigned long timeout = jiffies + msecs_to_jiffies(2000);
-+
-+	writel_relaxed(0x2, pcu_base + PCU_CPU1_CTRL);
-+
-+	while ((readl_relaxed(pcu_base + PCU_CPU1_ST) & 0x3) != 0x0) {
-+		if (time_after(jiffies, timeout)) {
-+			pr_err("*** cpu1 poweroff timeout\n");
-+			break;
-+		}
-+	}
-+	return 1;
-+}
-+
-+static void zx_cpu_die(unsigned int cpu)
-+{
-+	scu_power_mode(scu_base, SCU_PM_POWEROFF);
-+	cpu_enter_lowpower();
-+
-+	while (1)
-+		cpu_do_idle();
-+}
-+#endif
-+
-+static void zx_secondary_init(unsigned int cpu)
-+{
-+	scu_power_mode(scu_base, SCU_PM_NORMAL);
-+}
-+
-+struct smp_operations zx_smp_ops __initdata = {
-+	.smp_prepare_cpus	= zx_smp_prepare_cpus,
-+	.smp_secondary_init	= zx_secondary_init,
-+	.smp_boot_secondary	= zx_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill		= zx_cpu_kill,
-+	.cpu_die		= zx_cpu_die,
-+#endif
-+};
-+
-+CPU_METHOD_OF_DECLARE(zx_smp, "zte,zx296702-smp", &zx_smp_ops);
++++ b/arch/arm/configs/zx_defconfig
+@@ -0,0 +1,130 @@
++CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
++CONFIG_CGROUP_DEBUG=y
++CONFIG_CGROUP_FREEZER=y
++CONFIG_CGROUP_CPUACCT=y
++CONFIG_RESOURCE_COUNTERS=y
++CONFIG_CGROUP_SCHED=y
++CONFIG_RT_GROUP_SCHED=y
++CONFIG_NAMESPACES=y
++CONFIG_USER_NS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE="/home/niej/git/linux/initramfs.cpio.gz"
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_SLAB=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_CFQ is not set
++CONFIG_ARCH_ZX=y
++CONFIG_SOC_ZX296702=y
++# CONFIG_SWP_EMULATE is not set
++CONFIG_ARM_ERRATA_754322=y
++CONFIG_ARM_ERRATA_775420=y
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT=y
++CONFIG_AEABI=y
++CONFIG_KSM=y
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_HIBERNATION=y
++CONFIG_PM_RUNTIME=y
++CONFIG_PM_DEBUG=y
++CONFIG_SUSPEND_TIME=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_CMDLINE="console=ttyAMA0,115200 debug earlyprintk root=/dev/ram rw rootwait"
++#CONFIG_NET is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_DMA_CMA=y
++CONFIG_CMA_SIZE_MBYTES=192
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=1
++CONFIG_BLK_DEV_RAM_SIZE=8192
++CONFIG_UID_STAT=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_CHR_DEV_SCH=y
++CONFIG_SCSI_MULTI_LUN=y
++CONFIG_MD=y
++CONFIG_BLK_DEV_DM=y
++CONFIG_DM_CRYPT=y
++CONFIG_DM_UEVENT=y
++CONFIG_DM_VERITY=y
++CONFIG_NETDEVICES=y
++# CONFIG_INPUT_MOUSE is not set
++CONFIG_SERIO=y
++CONFIG_SERIO_LIBPS2=y
++CONFIG_SPI=y
++CONFIG_LOGO=y
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_CONSOLE_POLL=y
++CONFIG_SERIAL_AMBA_PL011=y
++CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_HWMON is not set
++# CONFIG_USB_SUPPORT is not set
++CONFIG_MMC=y
++CONFIG_MMC_UNSAFE_RESUME=y
++CONFIG_MMC_BLOCK_MINORS=16
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_IDMAC=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_FS_POSIX_ACL=y
++CONFIG_EXT4_FS_SECURITY=y
++CONFIG_EXT4_DEBUG=y
++CONFIG_FUSE_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=936
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++#CONFIG_NFS_FS is not set
++CONFIG_NLS_CODEPAGE_936=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
++CONFIG_PRINTK_TIME=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DEBUG_INFO=y
++CONFIG_FRAME_WARN=4096
++CONFIG_DEBUG_FS=y
++CONFIG_DEBUG_MEMORY_INIT=y
++CONFIG_PANIC_TIMEOUT=5
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_SCHEDSTATS=y
++CONFIG_TIMER_STATS=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_SPINLOCK=y
++CONFIG_DEBUG_MUTEXES=y
++CONFIG_RCU_CPU_STALL_TIMEOUT=60
++# CONFIG_FTRACE is not set
++CONFIG_KGDB=y
++CONFIG_KGDB_KDB=y
++# CONFIG_ARM_UNWIND is not set
++CONFIG_DEBUG_PREEMPT=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_STACKTRACE=y
++CONFIG_DEBUG_ZTE_ZX=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_LZO=y
++CONFIG_GPIOLIB=y
 -- 
 1.9.1
