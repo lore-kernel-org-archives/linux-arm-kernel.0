@@ -1,78 +1,97 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 27 Mar 2015 10:08:42 +0800
-Subject: [PATCH 3/4] clk: hisi: add stub clk driver
-In-Reply-To: <20150326142226.GJ8656@n2100.arm.linux.org.uk>
-References: <1427368419-22222-1-git-send-email-leo.yan@linaro.org>
- <1427368419-22222-4-git-send-email-leo.yan@linaro.org>
- <20150326142226.GJ8656@n2100.arm.linux.org.uk>
-Message-ID: <20150327020842.GD4902@leoy-linaro>
+From: tiejun.chen@intel.com (Chen, Tiejun)
+Date: Fri, 27 Mar 2015 10:10:46 +0800
+Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
+ destroyed
+In-Reply-To: <20150327013151.GA2882@amt.cnet>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
+ <5512EBB9.2050304@arm.com> <20150327013151.GA2882@amt.cnet>
+Message-ID: <5514BC26.3080103@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 02:22:26PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 26, 2015 at 07:13:38PM +0800, Leo Yan wrote:
-> > +static unsigned long hisi_stub_clk_recalc_rate(struct clk_hw *hw,
-> > +		unsigned long parent_rate)
-> > +{
-> ...
-> > +	BUG_ON(!stub_clk->lock);
-> ...
-> 
-> > +static int hisi_stub_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-> > +                    unsigned long parent_rate)
-> > +{
-> ...
-> > +	BUG_ON(!stub_clk->lock);
-> ...
-> 
-> > +static long hisi_stub_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> > +		unsigned long *parent_rate)
-> > +{
-> ...
-> > +	BUG_ON(!stub_clk->lock);
-> ...
-> 
-> > +static struct clk_ops hisi_stub_clk_ops = {
-> > +	.recalc_rate	= hisi_stub_clk_recalc_rate,
-> > +	.round_rate	= hisi_stub_clk_round_rate,
-> > +	.set_rate	= hisi_stub_clk_set_rate,
-> > +};
-> ...
-> > +static struct clk *_register_stub_clk(struct device *dev, unsigned int id,
-> > +	const char *name, const char *parent_name, unsigned long flags,
-> > +	spinlock_t *lock)
-> > +{
-> > +	struct hisi_stub_clk *stub_clk;
-> > +	struct clk *clk;
-> > +	struct clk_init_data init;
-> > +
-> > +	stub_clk = kzalloc(sizeof(*stub_clk), GFP_KERNEL);
-> > +	if (!stub_clk) {
-> > +		pr_err("%s: fail to alloc stub clk!\n", __func__);
-> > +		return ERR_PTR(-ENOMEM);
-> > +	}
-> > +
-> > +	init.name = name;
-> > +	init.ops = &hisi_stub_clk_ops;
-> > +	init.parent_names = parent_name ? &parent_name : NULL;
-> > +	init.num_parents = parent_name ? 1 : 0;
-> > +	init.flags = flags;
-> > +
-> > +	stub_clk->hw.init = &init;
-> > +	stub_clk->id = id;
-> > +	stub_clk->lock = lock;
-> 
-> Under what scenario is it safe to call _register_stub_clk() with a NULL
-> lock argument?
-> 
-> If lock is NULL, then every function callable via the ops structure
-> will bug.
-> 
-> Rather than doing a test in each method function, do it in
-> _register_stub_clk() - this means we aren't waiting for a NULL pointer
-> deref when one of these method functions gets called.
+On 2015/3/27 9:31, Marcelo Tosatti wrote:
+> On Wed, Mar 25, 2015 at 05:09:13PM +0000, Marc Zyngier wrote:
+>> On 23/03/15 15:58, Andre Przywara wrote:
+>>> In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
+>>> especially before calling kvm_arch_destroy_vm(). To avoid
+>>> unregistering devices from the already destroyed bus, let's mark
+>>> the bus with NULL to let other users know it has been destroyed
+>>> already.
+>>> This avoids a crash on a VM shutdown with the VGIC using the
+>>> kvm_io_bus later (the unregistering is in there to be able to roll
+>>> back a faulting init).
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>
+>> That seems sensible, but I don't see why nobody else hits that. What are
+>> we doing differently?
+>>
+>> Otherwise,
+>>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Paolo, Marcelo, can we have your Ack on this?
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+>>> ---
+>>>   virt/kvm/kvm_main.c |    4 +++-
+>>>   1 file changed, 3 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+>>> index 8c7ab0b..6f164eb 100644
+>>> --- a/virt/kvm/kvm_main.c
+>>> +++ b/virt/kvm/kvm_main.c
+>>> @@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
+>>>   	list_del(&kvm->vm_list);
+>>>   	spin_unlock(&kvm_lock);
+>>>   	kvm_free_irq_routing(kvm);
+>>> -	for (i = 0; i < KVM_NR_BUSES; i++)
+>>> +	for (i = 0; i < KVM_NR_BUSES; i++) {
+>>>   		kvm_io_bus_destroy(kvm->buses[i]);
+>>> +		kvm->buses[i] = NULL;
 
-Will fix to check lock pointer in the function _register_stub_clk().
+Could we fold this line into a common like,
 
-Thanks,
-Leo Yan
+@@ -596,7 +597,6 @@ static void kvm_destroy_devices(struct kvm *kvm)
+
+  static void kvm_destroy_vm(struct kvm *kvm)
+  {
+-       int i;
+         struct mm_struct *mm = kvm->mm;
+
+         kvm_arch_sync_events(kvm);
+@@ -604,8 +604,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
+         list_del(&kvm->vm_list);
+         spin_unlock(&kvm_lock);
+         kvm_free_irq_routing(kvm);
+-       for (i = 0; i < KVM_NR_BUSES; i++)
+-               kvm_io_bus_destroy(kvm->buses[i]);
++       kvm_destroy_all_io_bus(kvm);
+         kvm_coalesced_mmio_free(kvm);
+  #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
+         mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
+@@ -2943,6 +2942,16 @@ static void kvm_io_bus_destroy(struct kvm_io_bus 
+*bus)
+         kfree(bus);
+  }
+
++static void kvm_destroy_all_io_bus(struct kvm *kvm)
++{
++       int i;
++
++       for (i = 0; i < KVM_NR_BUSES; i++) {
++           kvm_io_bus_destroy(kvm->buses[i]);
++           kvm->buses[i] = NULL;
++       }
++}
++
+  static inline int kvm_io_bus_cmp(const struct kvm_io_range *r1,
+                                   const struct kvm_io_range *r2)
+  {
+
+Thanks
+Tiejun
