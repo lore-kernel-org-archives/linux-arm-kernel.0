@@ -1,139 +1,168 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Mar 2015 16:57:36 +0100
-Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on Exynos5250
- and other
-Message-ID: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 27 Mar 2015 17:00:46 +0100
+Subject: [PATCH v3 11/11] KVM: arm/arm64: rework MMIO abort handling to
+ use KVM MMIO bus
+In-Reply-To: <1427380778-942-12-git-send-email-andre.przywara@arm.com>
+References: <1427380778-942-1-git-send-email-andre.przywara@arm.com>
+ <1427380778-942-12-git-send-email-andre.przywara@arm.com>
+Message-ID: <20150327160046.GB5121@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding display power domain for Exynos5250 in commit
-2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
-display on Chromebook Snow and others stopped working after boot.
+On Thu, Mar 26, 2015 at 02:39:38PM +0000, Andre Przywara wrote:
+> Currently we have struct kvm_exit_mmio for encapsulating MMIO abort
+> data to be passed on from syndrome decoding all the way down to the
+> VGIC register handlers. Now as we switch the MMIO handling to be
+> routed through the KVM MMIO bus, it does not make sense anymore to
+> use that structure already from the beginning. So we put the data into
+> kvm_run very early and use that encapsulation till the MMIO bus call.
+> Then we fill kvm_exit_mmio in the VGIC only, making it a VGIC private
+> structure. On that way we replace the data buffer in that structure
+> with a pointer pointing to a single location in kvm_run, so we get
+> rid of some copying on the way.
+> With all of the virtual GIC emulation code now being registered with
+> the kvm_io_bus, we can remove all of the old MMIO handling code and
+> its dispatching functionality.
+> 
+> I didn't bother to rename kvm_exit_mmio (to vgic_mmio or something),
+> because that touches a lot of code lines without any good reason.
+> 
+> This is based on an original patch by Nikolay.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Cc: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+> ---
+>  arch/arm/include/asm/kvm_mmio.h   |   22 ---------
+>  arch/arm/kvm/mmio.c               |   60 ++++++++++++++++++-------
+>  arch/arm64/include/asm/kvm_mmio.h |   22 ---------
+>  include/kvm/arm_vgic.h            |    6 ---
+>  virt/kvm/arm/vgic-v2-emul.c       |   21 +--------
+>  virt/kvm/arm/vgic-v3-emul.c       |   35 ---------------
+>  virt/kvm/arm/vgic.c               |   89 ++-----------------------------------
+>  virt/kvm/arm/vgic.h               |   13 +++---
+>  8 files changed, 57 insertions(+), 211 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
+> index 3f83db2..d8e90c8 100644
+> --- a/arch/arm/include/asm/kvm_mmio.h
+> +++ b/arch/arm/include/asm/kvm_mmio.h
+> @@ -28,28 +28,6 @@ struct kvm_decode {
+>  	bool sign_extend;
+>  };
+>  
+> -/*
+> - * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
+> - * which is an anonymous type. Use our own type instead.
+> - */
+> -struct kvm_exit_mmio {
+> -	phys_addr_t	phys_addr;
+> -	u8		data[8];
+> -	u32		len;
+> -	bool		is_write;
+> -	void		*private;
+> -};
+> -
+> -static inline void kvm_prepare_mmio(struct kvm_run *run,
+> -				    struct kvm_exit_mmio *mmio)
+> -{
+> -	run->mmio.phys_addr	= mmio->phys_addr;
+> -	run->mmio.len		= mmio->len;
+> -	run->mmio.is_write	= mmio->is_write;
+> -	memcpy(run->mmio.data, mmio->data, mmio->len);
+> -	run->exit_reason	= KVM_EXIT_MMIO;
+> -}
+> -
+>  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa);
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 5d3bfc0..bb2ab44 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -122,7 +122,7 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  }
+>  
+>  static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+> -		      struct kvm_exit_mmio *mmio)
+> +		      struct kvm_run *run)
+>  {
+>  	unsigned long rt;
+>  	int len;
+> @@ -148,9 +148,9 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	sign_extend = kvm_vcpu_dabt_issext(vcpu);
+>  	rt = kvm_vcpu_dabt_get_rd(vcpu);
+>  
+> -	mmio->is_write = is_write;
+> -	mmio->phys_addr = fault_ipa;
+> -	mmio->len = len;
+> +	run->mmio.is_write = is_write;
+> +	run->mmio.phys_addr = fault_ipa;
+> +	run->mmio.len = len;
+>  	vcpu->arch.mmio_decode.sign_extend = sign_extend;
+>  	vcpu->arch.mmio_decode.rt = rt;
+>  
+> @@ -162,23 +162,49 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	return 0;
+>  }
+>  
+> +/**
+> + * handle_kernel_mmio - handle an in-kernel MMIO access
+> + * @vcpu:	pointer to the vcpu performing the access
+> + * @run:	pointer to the kvm_run structure
+> + *
+> + * returns true if the MMIO access has been performed in kernel space,
+> + * and false if it needs to be emulated in user space.
+> + */
+> +static bool handle_kernel_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	int ret;
+> +
+> +	if (run->mmio.is_write) {
+> +		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, run->mmio.phys_addr,
+> +				       run->mmio.len, run->mmio.data);
+> +
+> +	} else {
+> +		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, run->mmio.phys_addr,
+> +				      run->mmio.len, run->mmio.data);
+> +	}
+> +	if (!ret) {
+> +		kvm_handle_mmio_return(vcpu, run);
+> +		return true;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa)
+>  {
+> -	struct kvm_exit_mmio mmio;
+>  	unsigned long data;
+>  	unsigned long rt;
+>  	int ret;
+>  
+>  	/*
+> -	 * Prepare MMIO operation. First stash it in a private
+> -	 * structure that we can use for in-kernel emulation. If the
+> -	 * kernel can't handle it, copy it into run->mmio and let user
+> -	 * space do its magic.
+> +	 * Prepare MMIO operation. First put the MMIO data into run->mmio.
+> +	 * Then try if some in-kernel emulation feels responsible, otherwise
+> +	 * let user space do its magic.
+>  	 */
+>  
+>  	if (kvm_vcpu_dabt_isvalid(vcpu)) {
+> -		ret = decode_hsr(vcpu, fault_ipa, &mmio);
+> +		ret = decode_hsr(vcpu, fault_ipa, run);
 
-The reason for this suggested Andrzej Hajda: the DP clock was disabled.
-This clock is required by Display Port and is enabled by bootloader.
-However when FIMD driver probing was deferred, the display power domain
-was turned off. This effectively reset the value of DP clock enable
-register.
+hmm, this does feel rather obtrusive, because as Marc pointed out the
+run structure can be modified from userspace.  So a patch that comes
+along later and assumes that run->mmio.len is something sane from the
+HSR will break catastrophically.  So I think it'd be better to use a
+privat kernel struct for this.
 
-When exynos-dp is later probed, the clock is not enabled and display is
-not properly configured:
 
-exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-exynos-dp 145b0000.dp-controller: unable to config video
+Otherwise, this looks good to me!
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
-Cc: <stable@vger.kernel.org>
-
----
-
-This should fix issue reported by Javier [1][2].
-
-Tested on Chromebook Snow (Exynos 5250). More testing would be great,
-especially on other Exynos 5xxx products.
-
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/43889
-[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/400290
----
- drivers/gpu/drm/exynos/exynos_dp_core.c  | 10 ++++++++++
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 19 +++++++++++++++++++
- include/video/samsung_fimd.h             |  6 ++++++
- 3 files changed, 35 insertions(+)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index bf17a60b40ed..1dbfba58f909 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -32,10 +32,16 @@
- #include <drm/bridge/ptn3460.h>
- 
- #include "exynos_dp_core.h"
-+#include "exynos_drm_fimd.h"
- 
- #define ctx_from_connector(c)	container_of(c, struct exynos_dp_device, \
- 					connector)
- 
-+static inline struct exynos_drm_crtc *dp_to_crtc(struct exynos_dp_device *dp)
-+{
-+	return to_exynos_crtc(dp->encoder->crtc);
-+}
-+
- static inline struct exynos_dp_device *
- display_to_dp(struct exynos_drm_display *d)
- {
-@@ -1070,6 +1076,8 @@ static void exynos_dp_poweron(struct exynos_dp_device *dp)
- 		}
- 	}
- 
-+	fimd_dp_clock_enable(dp_to_crtc(dp), true);
-+
- 	clk_prepare_enable(dp->clock);
- 	exynos_dp_phy_init(dp);
- 	exynos_dp_init_dp(dp);
-@@ -1094,6 +1102,8 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
- 	exynos_dp_phy_exit(dp);
- 	clk_disable_unprepare(dp->clock);
- 
-+	fimd_dp_clock_enable(dp_to_crtc(dp), false);
-+
- 	if (dp->panel) {
- 		if (drm_panel_unprepare(dp->panel))
- 			DRM_ERROR("failed to turnoff the panel\n");
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index c300e22da8ac..bdf0818dc8f5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -32,6 +32,7 @@
- #include "exynos_drm_fbdev.h"
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_iommu.h"
-+#include "exynos_drm_fimd.h"
- 
- /*
-  * FIMD stands for Fully Interactive Mobile Display and
-@@ -1231,6 +1232,24 @@ static int fimd_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable)
-+{
-+	struct fimd_context *ctx = crtc->ctx;
-+	u32 val;
-+
-+	/*
-+	 * Only Exynos 5250, 5260, 5410 and 542x requires enabling DP/MIE
-+	 * clock. On these SoCs the bootloader may enable it but any
-+	 * power domain off/on will reset it to disable state.
-+	 */
-+	if (ctx->driver_data != &exynos5_fimd_driver_data)
-+		return;
-+
-+	val = enable ? DP_MIE_CLK_DP_ENABLE : DP_MIE_CLK_DISABLE;
-+	writel(DP_MIE_CLK_DP_ENABLE, ctx->regs + DP_MIE_CLKCON);
-+}
-+EXPORT_SYMBOL_GPL(fimd_dp_clock_enable);
-+
- struct platform_driver fimd_driver = {
- 	.probe		= fimd_probe,
- 	.remove		= fimd_remove,
-diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
-index a20e4a3a8b15..847a0a2b399c 100644
---- a/include/video/samsung_fimd.h
-+++ b/include/video/samsung_fimd.h
-@@ -436,6 +436,12 @@
- #define BLENDCON_NEW_8BIT_ALPHA_VALUE		(1 << 0)
- #define BLENDCON_NEW_4BIT_ALPHA_VALUE		(0 << 0)
- 
-+/* Display port clock control */
-+#define DP_MIE_CLKCON				0x27c
-+#define DP_MIE_CLK_DISABLE			0x0
-+#define DP_MIE_CLK_DP_ENABLE			0x2
-+#define DP_MIE_CLK_MIE_ENABLE			0x3
-+
- /* Notes on per-window bpp settings
-  *
-  * Value	Win0	 Win1	  Win2	   Win3	    Win 4
--- 
-1.9.1
+Thanks,
+-Christoffer
