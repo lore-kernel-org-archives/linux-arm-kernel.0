@@ -1,88 +1,49 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 27 Mar 2015 07:32:34 -0400
-Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <CALszF6Ds5b9V35iuSzxnOYDL2sD3psYfYp3b+6a-2Atse6_w3Q@mail.gmail.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>	<1426197361-19290-11-git-send-email-maxime.coquelin@st.com>	<5511ABAA.2010303@hurleysoftware.com>
- <CALszF6Ds5b9V35iuSzxnOYDL2sD3psYfYp3b+6a-2Atse6_w3Q@mail.gmail.com>
-Message-ID: <55153FD2.7070304@hurleysoftware.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 27 Mar 2015 13:35:50 +0200
+Subject: [PATCH 0/5] dmaengine: Fix memory leak amongs virt-dma users
+Message-ID: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 06:03 PM, Maxime Coquelin wrote:
->>> +static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
->>> +                         struct ktermios *old)
->>> +{
->>> +     unsigned int baud;
->>> +     u32 usardiv, mantissa, fraction;
->>> +     tcflag_t cflag;
->>> +     u32 cr1, cr2, cr3;
->>> +     unsigned long flags;
->>> +
->>> +     baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
->>> +     cflag = termios->c_cflag;
->>> +
->>> +     spin_lock_irqsave(&port->lock, flags);
->>> +
->>> +     /* Stop serial port and reset value */
->>> +     writel_relaxed(0, port->membase + USART_CR1);
->>> +
->>> +     cr1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE | USART_CR1_RXNEIE;
->>> +
->>> +     if (cflag & CSTOPB)
->>> +             cr2 = USART_CR2_STOP_2B;
->>> +
->>> +     if (cflag & PARENB) {
->>> +             cr1 |= USART_CR1_PCE;
->>> +             if ((cflag & CSIZE) == CS8)
->>> +                     cr1 |= USART_CR1_M;
->>> +     }
->>> +
->>> +     if (cflag & PARODD)
->>> +             cr1 |= USART_CR1_PS;
->>> +
->>> +     if (cflag & CRTSCTS)
->>> +             cr3 = USART_CR3_RTSE | USART_CR3_CTSE;
->>
->> If this means autoflow control, then you need to define
->> throttle()/unthrottle() methods, otherwise the serial core won't
->> be able to throttle the remote when input buffers are about
->> to overflow.
->>
->> And you should only enable the autoCTS and let the serial
->> core enable autoRTS through set_mctrl(TIOCM_RTS).
->>
->> Just let me know if you need more info about how to do this.
-> 
-> Ok, let's see if I have well understood.
-> 
-> USART_CR3_RTSE should be set/cleared in set_mctrl(), depending on
-> TIOCM_RTS  value.
-> The throttle callback should disable the rx interrupt, and the
-> unthrottle enable it.
-> For CTS, it should be enabled in set_termios() if CRTSCTS, as done here.
-> 
-> Am I right?
+Hi,
 
-Yeah, basically. You also have to indicate to the serial core that you
-require throttle/unthrottle handling in this mode by setting port->status.
+Due to the implementation of some of the drivers using virt-dma they leak memory
+by design.
+All it takes is to stop a transfer which is not yet completed, this includes
+cyclic (audio) channels also.
+These drivers tend to remove the vdesc->node from the virt-dma lists when they
+start the transfer. In terminate all vchan_get_all_descriptors() will not find
+the transfer which is still running (not in any of the lists) so the free_desc
+callback will not be called on them leaving us with memory leak.
 
-Your set_termios() method would look like:
+There are other drivers leaking memory IMHO, but I was not sure how to fix them:
+sun6i-dma,
+sa11x0-dma,
+k3dma
 
-	port->status &= ~(UPSTAT_AUTOCTS | UPSTAT_AUTORTS);
-	if (cflag & CRTSCTS) {
-		port->status |= UPSTAT_AUTOCTS | UPSTAT_AUTORTS;
-		cr3 = USART_CR3_CTSE;
-	}
-
-and your set_mctrl() method would look like:
-
-	if ((mctrl & TIOCM_RTS) && (port->status & UPSTAT_AUTORTS))
-		stm32_set_bits(port, USART_CR3, USART_CR3_RTSE);
-	else
-		stm32_clear_bits(port, USART_CR3, USART_CR3_RTSE);
-
-The UPSTAT_AUTOCTS doesn't really do anything right now but please
-use it anyway to indicate this driver has that functionality.
+Others are already doing something to prevent the leak by either directly
+freeing the desc or by adding back the vdesc->node to a list.
 
 Regards,
-Peter Hurley
+Peter
+---
+Peter Ujfalusi (4):
+  dmaengine: omap-dma: Fix memory leak when terminating running transfer
+  dmaengine: bcm2835-dma: Fix memory leak when stopping a running
+    transfer
+  dmaengine: hsu: Fix memory leak when stopping a running transfer
+  dmaengine: moxart-dma: Fix memory leak when stopping a running
+    transfer
+
+Petr Kulhavy (1):
+  dmaengine: edma: fix memory leak when terminating running transfers
+
+ drivers/dma/bcm2835-dma.c | 1 +
+ drivers/dma/edma.c        | 7 +++++++
+ drivers/dma/hsu/hsu.c     | 5 ++++-
+ drivers/dma/moxart-dma.c  | 4 +++-
+ drivers/dma/omap-dma.c    | 1 +
+ 5 files changed, 16 insertions(+), 2 deletions(-)
+
+-- 
+2.3.3
