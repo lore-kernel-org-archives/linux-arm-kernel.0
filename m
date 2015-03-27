@@ -1,66 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Mar 2015 16:35:50 +0000
-Subject: Reading twd_base at run-time
-In-Reply-To: <55158261.9010108@free.fr>
-References: <55158261.9010108@free.fr>
-Message-ID: <551586E6.3020200@arm.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Mar 2015 11:38:49 -0500 (CDT)
+Subject: [GIT PULL] qcom defconfig changes for 4.1-1
+Message-ID: <alpine.DEB.2.02.1503271137360.17255@galak-ubuntu.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mason,
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-On 27/03/15 16:16, Mason wrote:
-> Hello everyone,
-> 
-> In arch/arm/kernel/smp_twd.c, twd_local_timer_register() receives a
-> struct twd_local_timer argument, which specifies
-> 
->    1) the physical address of twd_base
->    2) the twd interrupt number
-> 
-> There's a helper to fill out the static struct: DEFINE_TWD_LOCAL_TIMER()
-> 
-> But it seems to me (please correct me if I'm wrong) that the address
-> of twd_base can be read at run-time, making it one less parameter to
-> specify by hand at compile-time (with the risk that a HW engineer
-> change the address in the next chip with no warning).
+   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-The main problem with that is that said HW engineer has ^%$%^%-up
-PERIPHBASE, and that you can't trust it. I've seen a number of these
-kicking around.
+are available in the git repository at:
 
-> Here's an incomplete patch to express my intent:
-> 
-> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-> index 6591e26..5177db8 100644
-> --- a/arch/arm/kernel/smp_twd.c
-> +++ b/arch/arm/kernel/smp_twd.c
-> @@ -369,14 +369,14 @@ out_free:
->          return err;
->   }
->   
-> -int __init twd_local_timer_register(struct twd_local_timer *tlt)
-> +int __init twd_local_timer_register(void)
->   {
->          if (twd_base || twd_evt)
->                  return -EBUSY;
->   
-> -       twd_ppi = tlt->res[1].start;
-> +       twd_ppi = 29;
->   
-> -       twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
-> +       twd_base = ioremap(scu_a9_get_base() + 0x600, 0x10);
->          if (!twd_base)
->                  return -ENOMEM;
->   
-> 
-> As far as I can tell, all platforms use 29 for twd_ppi, but I can make
-> sure if people agree this patch is indeed an improvement.
+   git://git.kernel.org/pub/scm/linux/kernel/git/galak/linux-qcom.git tags/qcom-defconfig-for-4.1-1
 
-I don't think we'll see that many new platforms not using DT, so this
-would effectively remove one line from the helper, and generate a bit of
-churn on platforms that are usually left in a dusty corner...
+for you to fetch changes up to dc344b62121c4e2ba5bd9d5bf7a2b4ce5f0487ce:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+   ARM: qcom: Increase MMC_BLOCK_MINORS in defconfig (2015-03-25 16:16:59 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based defconfig Updates for v4.1-1
+
+* Increase MMC_BLOCK_MINORS to 32 since qcom platforms have more than
+   16 partitions
+
+----------------------------------------------------------------
+Georgi Djakov (1):
+       ARM: qcom: Increase MMC_BLOCK_MINORS in defconfig
+
+Rajendra Nayak (1):
+       arm: qcom: Enable lpass clock driver in defconfig
+
+Stephen Boyd (1):
+       arm: qcom: Update defconfig
+
+  arch/arm/configs/qcom_defconfig | 9 +++++----
+  1 file changed, 5 insertions(+), 4 deletions(-)
+
+--
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
