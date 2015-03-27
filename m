@@ -1,68 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Mar 2015 14:16:19 +0100
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
- <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
-Message-ID: <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 27 Mar 2015 14:29:35 +0100
+Subject: exynos5800-peach-pi: suspend/resume (still) broken
+In-Reply-To: <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
+References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>	<550953ED.10508@collabora.co.uk>	<CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>	<550C47ED.3010301@collabora.co.uk>	<CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
+ <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
+Message-ID: <55155B3F.2010704@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 March 2015 at 07:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
->>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->>> index 16134608eecf..fd8434753372 100644
->>> --- a/arch/arm64/kernel/head.S
->>> +++ b/arch/arm64/kernel/head.S
->>> @@ -49,13 +49,15 @@
->>>  #ifdef CONFIG_ARM64_64K_PAGES
->>>  #define BLOCK_SHIFT  PAGE_SHIFT
->>>  #define BLOCK_SIZE   PAGE_SIZE
->>> -#define TABLE_SHIFT  PMD_SHIFT
->>>  #else
->>>  #define BLOCK_SHIFT  SECTION_SHIFT
->>>  #define BLOCK_SIZE   SECTION_SIZE
->>> -#define TABLE_SHIFT  PUD_SHIFT
->>>  #endif
->>>
->>> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
->>> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
->>> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
->>> +
->>>  #define KERNEL_START _text
->>>  #define KERNEL_END   _end
->>>
->>> @@ -237,7 +239,10 @@ ENTRY(stext)
->>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->>>
->>>       adrp    x24, __PHYS_OFFSET
->>> -     mov     x23, #KIMAGE_OFFSET
->>> +     and     x23, x24, #~TABLE_MASK          // image offset
->>> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
->>> +     mov     x0, #KIMAGE_OFFSET
->>> +     add     x23, x23, x0
->>
->> I'm still trying to figure out how this works. Does the code imply that
->> the kernel image can only be loaded within a block size of the
->> PHYS_OFFSET? If that's the case, it's not too flexible.
->>
->
-> For now, yes.
->
->> My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
->> entirely) or at least compute it at DT parsing time. I'm more inclined
->> for making it 0 assuming that it doesn't break anything else (vmemmap
->> virtual range may get slightly bigger but still not significant,
->> basically max_phys_addr / sizeof(struct page)).
->>
->
-> Making it zero would be an improvement, I suppose
+Hello Abhilash,
 
-Actually, wouldn't that reintroduce a similar VA range problem to the
-one I fixed the other day?
+On 03/20/2015 06:40 PM, Abhilash Kesavan wrote:
+> 
+> Regarding the mdma0 disablement, it looks like for the system to
+> suspend properly the mdma0 pclk needs to stay on.
+> 
 
-On Seattle, with its DRAM at 0x80_0000_0000, you wouldn't have enough
-space after PAGE_OFFSET
+I had time today again to work on this issue and the best
+place I found to enable and disable the mdma0 clock is in
+exynos5420_pm_{prepare,resume}. Please let me know if you
+have a better idea of where the clock should be managed.
+
+I'll send a RFC patch-set soon.
+
+> Regards,
+> Abhilash
+
+Best regards,
+Javier
