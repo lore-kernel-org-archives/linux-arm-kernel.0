@@ -1,57 +1,78 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 26 Mar 2015 18:41:44 +0100
-Subject: [GIT PULL 1/2] ARM: rockchip: soc code changes for 4.1
-In-Reply-To: <2684132.lK2CyBin0M@diego>
-References: <2684132.lK2CyBin0M@diego>
-Message-ID: <9711811.dP5TtE1nVp@phil>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 27 Mar 2015 10:08:42 +0800
+Subject: [PATCH 3/4] clk: hisi: add stub clk driver
+In-Reply-To: <20150326142226.GJ8656@n2100.arm.linux.org.uk>
+References: <1427368419-22222-1-git-send-email-leo.yan@linaro.org>
+ <1427368419-22222-4-git-send-email-leo.yan@linaro.org>
+ <20150326142226.GJ8656@n2100.arm.linux.org.uk>
+Message-ID: <20150327020842.GD4902@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 18. M?rz 2015, 17:41:15 schrieb Heiko St?bner:
-> Hi Arnd, Olof,
+On Thu, Mar 26, 2015 at 02:22:26PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 26, 2015 at 07:13:38PM +0800, Leo Yan wrote:
+> > +static unsigned long hisi_stub_clk_recalc_rate(struct clk_hw *hw,
+> > +		unsigned long parent_rate)
+> > +{
+> ...
+> > +	BUG_ON(!stub_clk->lock);
+> ...
 > 
-> some soc code changes for 4.1 . I hope the tag explains it, so please pull
+> > +static int hisi_stub_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +                    unsigned long parent_rate)
+> > +{
+> ...
+> > +	BUG_ON(!stub_clk->lock);
+> ...
+> 
+> > +static long hisi_stub_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> > +		unsigned long *parent_rate)
+> > +{
+> ...
+> > +	BUG_ON(!stub_clk->lock);
+> ...
+> 
+> > +static struct clk_ops hisi_stub_clk_ops = {
+> > +	.recalc_rate	= hisi_stub_clk_recalc_rate,
+> > +	.round_rate	= hisi_stub_clk_round_rate,
+> > +	.set_rate	= hisi_stub_clk_set_rate,
+> > +};
+> ...
+> > +static struct clk *_register_stub_clk(struct device *dev, unsigned int id,
+> > +	const char *name, const char *parent_name, unsigned long flags,
+> > +	spinlock_t *lock)
+> > +{
+> > +	struct hisi_stub_clk *stub_clk;
+> > +	struct clk *clk;
+> > +	struct clk_init_data init;
+> > +
+> > +	stub_clk = kzalloc(sizeof(*stub_clk), GFP_KERNEL);
+> > +	if (!stub_clk) {
+> > +		pr_err("%s: fail to alloc stub clk!\n", __func__);
+> > +		return ERR_PTR(-ENOMEM);
+> > +	}
+> > +
+> > +	init.name = name;
+> > +	init.ops = &hisi_stub_clk_ops;
+> > +	init.parent_names = parent_name ? &parent_name : NULL;
+> > +	init.num_parents = parent_name ? 1 : 0;
+> > +	init.flags = flags;
+> > +
+> > +	stub_clk->hw.init = &init;
+> > +	stub_clk->id = id;
+> > +	stub_clk->lock = lock;
+> 
+> Under what scenario is it safe to call _register_stub_clk() with a NULL
+> lock argument?
+> 
+> If lock is NULL, then every function callable via the ops structure
+> will bug.
+> 
+> Rather than doing a test in each method function, do it in
+> _register_stub_clk() - this means we aren't waiting for a NULL pointer
+> deref when one of these method functions gets called.
 
-as heard in Arnd's talk on ELC yesterday, I'm supposed to ping after one week 
-of inactivity, so any news on these two pulls? :-)
+Will fix to check lock pointer in the function _register_stub_clk().
 
-
-Thanks
-Heiko
-
-> 
-> 
-> Thanks
-> Heiko
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git
-> tags/v4.1-rockchip-soc1
-> 
-> for you to fetch changes up to a0307d186f5015ee3d77e209e5c06190cbf02478:
-> 
->   ARM: rockchip: disable watchdog during suspend (2015-03-11 22:41:02 +0100)
-> 
-> ----------------------------------------------------------------
-> Some suspend improvements reducing resume time and making sure the
-> watchdog does not reset after 12 hours and a change to constify and
-> staticize some smp parts.
-> 
-> ----------------------------------------------------------------
-> Chris Zhong (2):
->       ARM: rockchip: decrease the wait time for resume
->       ARM: rockchip: disable watchdog during suspend
-> 
-> Krzysztof Kozlowski (1):
->       ARM: rockchip: Constify struct regmap_config and staticize local
-> function
-> 
->  arch/arm/mach-rockchip/platsmp.c |  4 ++--
->  arch/arm/mach-rockchip/pm.c      | 14 +++++++++++---
->  arch/arm/mach-rockchip/pm.h      |  6 ++++++
->  3 files changed, 19 insertions(+), 5 deletions(-)
+Thanks,
+Leo Yan
