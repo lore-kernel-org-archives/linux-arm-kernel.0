@@ -1,30 +1,44 @@
-From: jonas@microbit.se (Jonas Andersson)
-Date: Fri, 27 Mar 2015 10:28:37 +0100
-Subject: at91 clocks
-In-Reply-To: <5512FBEB.2060609@atmel.com>
-References: <55117568.6090202@microbit.se>
- <20150325013201.3f01fc22@bbrezillon> <55127AA6.5050902@microbit.se>
- <20150325173751.0d6479df@bbrezillon> <5512FBEB.2060609@atmel.com>
-Message-ID: <551522C5.50202@microbit.se>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Mar 2015 09:33:14 +0000
+Subject: [PATCH v2 12/12] KVM: arm/arm64: remove now obsolete VGIC specific
+ MMIO handling code
+In-Reply-To: <1427126309-11223-13-git-send-email-andre.przywara@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <551523DA.9000705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On 23/03/15 15:58, Andre Przywara wrote:
+> With all of the virtual GIC emulation code now being registered with
+> the kvm_io_bus, we can remove all of the old MMIO handling code and
+> its dispatching functionality.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/arm_vgic.h      |    2 --
+>  virt/kvm/arm/vgic-v2-emul.c |   19 ------------
+>  virt/kvm/arm/vgic-v3-emul.c |   39 ------------------------
+>  virt/kvm/arm/vgic.c         |   71 -------------------------------------------
+>  virt/kvm/arm/vgic.h         |    5 ---
+>  5 files changed, 136 deletions(-)
 
-On 2015-03-25 19:18, Nicolas Ferre wrote:
-> I tried kernel 4.0-rc5 but it hangs in boot after ethernet init.
->> Is this related to the changes I suggested ?
-> It seems to be related as I tried to boot an at91sam9260ek with current
-> Linus' tree and it doesn't hangs after Ethernet on my side...
->
-Could you send me your dts and .config? I can not boot any unmodified 
-4.0 rc on my board. Tested rc1, rc4, rc5, HEAD.
+Hi Andre,
 
-Output
-...
-[    1.730000] macb fffc4000.ethernet eth0: attached PHY driver [Generic 
-PHY] (mii_bus:phy_addr=fffc4000.etherne:00, irq=-1)
-[   82.570000] random: nonblocking pool is initialized
+I've given this some more thoughts, and one thing really worries me. Up
+to now, we've only filled the vcpu->run structure when we were about to
+give it to userspace, and would never use it ourselves.
 
-Best regards
-  Jonas
+Now, we seem to be using much more extensively at various points in the
+code. What if userspace changes it under our feet? What guarantee do we
+have that this is always safe?
+
+That makes me feel very uncomfortable. I'd rather see an intermediate
+structure being used to pass the parameters around, and only fill run at
+the last moment. I'd probably sleep better... ;-)
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
