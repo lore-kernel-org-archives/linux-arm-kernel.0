@@ -1,45 +1,43 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Mar 2015 14:54:10 +0100
-Subject: at91 clocks
-In-Reply-To: <55155262.9030501@microbit.se>
-References: <55117568.6090202@microbit.se> <20150325013201.3f01fc22@bbrezillon>
- <55127AA6.5050902@microbit.se> <20150325173751.0d6479df@bbrezillon>
- <5513D701.2080201@microbit.se> <20150326162827.041c051a@bbrezillon>
- <55152F3E.60004@microbit.se> <20150327132003.6caf3689@bbrezillon>
- <20150327132543.08ad636c@bbrezillon> <55155262.9030501@microbit.se>
-Message-ID: <20150327145410.39873958@bbrezillon>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Fri, 27 Mar 2015 19:36:02 +0530
+Subject: exynos5800-peach-pi: suspend/resume (still) broken
+In-Reply-To: <55155B3F.2010704@collabora.co.uk>
+References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>
+ <550953ED.10508@collabora.co.uk>
+ <CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>
+ <550C47ED.3010301@collabora.co.uk>
+ <CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
+ <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
+ <55155B3F.2010704@collabora.co.uk>
+Message-ID: <CAM4voanJNJPMdBx5okcVYhqKyzKTctZddvV-XpWzPrA8Og_7oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Mar 2015 13:51:46 +0100
-Jonas Andersson <jonas@microbit.se> wrote:
+Hello Javier,
 
-> Hi Boris,
-> On 2015-03-27 13:25, Boris Brezillon wrote:
-> > On Fri, 27 Mar 2015 13:20:03 +0100
-> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> >
-> >
-> >>> I tested with IS_ERR, changed this to IS_ERR_OR_NULL, but the pointer is ok.
-> >> Can you print clk_get_rate(parent_clk) result ?
-> > Could you also paste me the whole clk_summary content ?
-> >
-> >
-> http://pastie.org/10057268
+On Fri, Mar 27, 2015 at 6:59 PM, Javier Martinez Canillas
+<javier.martinez@collabora.co.uk> wrote:
+> Hello Abhilash,
+>
+> On 03/20/2015 06:40 PM, Abhilash Kesavan wrote:
+>>
+>> Regarding the mdma0 disablement, it looks like for the system to
+>> suspend properly the mdma0 pclk needs to stay on.
+>>
+>
+> I had time today again to work on this issue and the best
+> place I found to enable and disable the mdma0 clock is in
+> exynos5420_pm_{prepare,resume}. Please let me know if you
+> have a better idea of where the clock should be managed.
+>
 
-Could you try with this patch [1] ?
-Anyway, I don't understand why clk_set_rate returns 0 even when it
-fails to set the appropriate rate.
-Could you add some traces in drivers/clk/at91/clk-pll.c
-(clk_pll_round_rate, clk_pll_set_rate and clk_pll_get_best_div_mul) ?
+Modifying exynos5420_clk_suspend in
+drivers/clk/samsung/clk-exynos5420.c would be another way to go,
+however I have not tested if this actually works.
 
-Thanks,
+> I'll send a RFC patch-set soon.
 
-Boris
+Thanks for the effort.
 
-[1]http://code.bulix.org/gxxhc4-88138
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Abhilash
