@@ -1,36 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Mar 2015 22:55:23 -0700
-Subject: [PATCH 0/3] arm: msm: Use timer DT node for qcom watchdog config
-In-Reply-To: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
-References: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
-Message-ID: <20150327055523.GC5625@codeaurora.org>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 27 Mar 2015 14:55:17 +0900
+Subject: [PATCH v4 1/4] mmc: dw_mmc: Don't try to enable the CD until we're
+ sure we're not deferring
+In-Reply-To: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
+Message-ID: <5514F0C5.7080509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20, Mathieu Olivari wrote:
-> This change is done as a follow-up to the following thread:
-> https://lkml.org/lkml/2014/10/1/436
-> 
-> qcom-wdt is currently assuming the presence of a dedicated node in DT
-> to gets its configuration. However, on msm architecture, the watchdog is
-> usually part of the timer block. So this patch-set is changing the driver
-> and slightly enhancing the timer DT bindings to provide the relevant clocks
-> and interrupts.
-> 
-> Mathieu Olivari (3):
->   watchdog: qcom: use timer devicetree binding
->   ARM: qcom: add description of KPSS WDT for IPQ8064
->   ARM: msm: add watchdog entries to DT timer binding doc
-> 
->  Documentation/devicetree/bindings/arm/msm/timer.txt | 16 +++++++++++++---
->  arch/arm/boot/dts/qcom-ipq8064.dtsi                 | 14 +++++++++++++-
->  drivers/watchdog/qcom-wdt.c                         | 21 +++++++++++++++------
->  3 files changed, 41 insertions(+), 10 deletions(-)
-> 
+Hi, Doug.
 
-Can this patchset be applied? Or should we resend with collected
-acks?
+This patch is not related with [patch 2/4~4/4].
+"[PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()" is discussing..
+So i think if you're ok, i will pick this one [PATCH v4 1/4]. how about?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards,
+Jaehoon Chung
+
+On 03/12/2015 07:15 AM, Doug Anderson wrote:
+> If dw_mci_init_slot() returns that we got a probe deferral then it may
+> leave slot->mmc as NULL.  That will cause dw_mci_enable_cd() to crash
+> when it calls mmc_gpio_get_cd().
+> 
+> Fix this by moving the call of dw_mci_enable_cd() until we're sure
+> that we're good.  Note that if we have more than one slot and one
+> defers (but the others don't) things won't work so well.  ...but
+> that's not a new thing and everyone has already agreed that multislot
+> support ought to be removed from dw_mmc eventually anyway since it is
+> unused, untested, and you can see several bugs like this by inspecting
+> the code.
+> 
+> Fixes: bcafaf5470f0 ("mmc: dw_mmc: Only enable CD after setup and only if needed")
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v4:
+> - Defer vs. card detect fix patch new for v4.
+> 
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  drivers/mmc/host/dw_mmc.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 47dfd0e..e2811cf 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -2863,9 +2863,6 @@ int dw_mci_probe(struct dw_mci *host)
+>  			init_slots++;
+>  	}
+>  
+> -	/* Now that slots are all setup, we can enable card detect */
+> -	dw_mci_enable_cd(host);
+> -
+>  	if (init_slots) {
+>  		dev_info(host->dev, "%d slots initialized\n", init_slots);
+>  	} else {
+> @@ -2874,6 +2871,9 @@ int dw_mci_probe(struct dw_mci *host)
+>  		goto err_dmaunmap;
+>  	}
+>  
+> +	/* Now that slots are all setup, we can enable card detect */
+> +	dw_mci_enable_cd(host);
+> +
+>  	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
+>  		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
+>  
+> 
