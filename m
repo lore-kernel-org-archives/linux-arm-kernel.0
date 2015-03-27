@@ -1,31 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 26 Mar 2015 22:48:21 -0700
-Subject: [PATCH v2 2/2] watchdog: digicolor: driver for Conexant Digicolor
- CX92755 SoC
-In-Reply-To: <CAM=Q2ctS6_=pzW2H+Yd3nEBgF269vfdh8yV3NbnWFP7b-MWLbA@mail.gmail.com>
-References: <a4554d0a61c62b85a7d66b6e3d16d07f8a498025.1427356791.git.baruch@tkos.co.il>	<148dd2d6912211bc468c30acf85a463192576039.1427356791.git.baruch@tkos.co.il>
- <CAM=Q2ctS6_=pzW2H+Yd3nEBgF269vfdh8yV3NbnWFP7b-MWLbA@mail.gmail.com>
-Message-ID: <5514EF25.4000400@roeck-us.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Mar 2015 22:55:23 -0700
+Subject: [PATCH 0/3] arm: msm: Use timer DT node for qcom watchdog config
+In-Reply-To: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
+References: <1424485176-8348-1-git-send-email-mathieu@codeaurora.org>
+Message-ID: <20150327055523.GC5625@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 10:40 PM, Shubhrajyoti Datta wrote:
->
->     +
->     +static int dc_restart_handler(struct notifier_block *this, unsigned long mode,
->     +                             void *cmd)
->     +{
->     +       struct dc_wdt *wdt = container_of(this, struct dc_wdt, restart_handler);
->     +
->     +       dc_wdt_set(wdt, 1);
->     +       /* wait for reset to assert... */
->     +       mdelay(500);
->
->
-> How is the 500 calculated ?
-> Also is it possible to sleep here?
->
-sleep: No. It would also be pretty pointless, since this is after all the very last step
-of rebooting the system.
+On 02/20, Mathieu Olivari wrote:
+> This change is done as a follow-up to the following thread:
+> https://lkml.org/lkml/2014/10/1/436
+> 
+> qcom-wdt is currently assuming the presence of a dedicated node in DT
+> to gets its configuration. However, on msm architecture, the watchdog is
+> usually part of the timer block. So this patch-set is changing the driver
+> and slightly enhancing the timer DT bindings to provide the relevant clocks
+> and interrupts.
+> 
+> Mathieu Olivari (3):
+>   watchdog: qcom: use timer devicetree binding
+>   ARM: qcom: add description of KPSS WDT for IPQ8064
+>   ARM: msm: add watchdog entries to DT timer binding doc
+> 
+>  Documentation/devicetree/bindings/arm/msm/timer.txt | 16 +++++++++++++---
+>  arch/arm/boot/dts/qcom-ipq8064.dtsi                 | 14 +++++++++++++-
+>  drivers/watchdog/qcom-wdt.c                         | 21 +++++++++++++++------
+>  3 files changed, 41 insertions(+), 10 deletions(-)
+> 
 
-Guenter
+Can this patchset be applied? Or should we resend with collected
+acks?
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
