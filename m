@@ -1,51 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 27 Mar 2015 14:26:51 +0200
-Subject: [PATCH v3 5/7] dmaengine: omap-dma: Take DMA request number from DT
- if it is available
-In-Reply-To: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1427459213-14611-6-git-send-email-peter.ujfalusi@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 27 Mar 2015 13:28:23 +0100
+Subject: [PATCH v2 1/3] ARM: EXYNOS: Handle of of_iomap() failure
+Message-ID: <1427459305-26625-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the dma-requests property from DT to get the number of DMA requests.
-In case of legacy boot or failure to find the property, use the default
-127 as number of requests.
+Prevent possible NULL pointer dereference if of_iomap() fails. Handle
+the error by skipping such power domain.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
 ---
- drivers/dma/omap-dma.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+Changes since v1:
+1. Add missing kfree() of domain name (allocated with kstrdup()).
+---
+ arch/arm/mach-exynos/pm_domains.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-index 56c33e93dd24..2b30acaa721f 100644
---- a/drivers/dma/omap-dma.c
-+++ b/drivers/dma/omap-dma.c
-@@ -34,6 +34,7 @@ struct omap_dmadev {
- 	const struct omap_dma_reg *reg_map;
- 	struct omap_system_dma_plat_info *plat;
- 	bool legacy;
-+	unsigned dma_requests;
- 	spinlock_t irq_lock;
- 	uint32_t irq_enable_mask;
- 	struct omap_chan *lch_map[OMAP_SDMA_CHANNELS];
-@@ -1118,7 +1119,16 @@ static int omap_dma_probe(struct platform_device *pdev)
- 
- 	tasklet_init(&od->task, omap_dma_sched, (unsigned long)od);
- 
--	for (i = 0; i < OMAP_SDMA_REQUESTS; i++) {
-+	if (!pdev->dev.of_node || of_property_read_u32(pdev->dev.of_node,
-+						       "dma-requests",
-+						       &od->dma_requests)) {
-+		dev_info(&pdev->dev,
-+			 "Missing dma-requests property, using %u.\n",
-+			 OMAP_SDMA_REQUESTS);
-+		od->dma_requests = OMAP_SDMA_REQUESTS;
-+	}
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index cbe56b35aea0..14622b5f4481 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -138,6 +138,14 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
+ 		pd->name = pd->pd.name;
+ 		pd->base = of_iomap(np, 0);
++		if (!pd->base) {
++			dev_warn(&pdev->dev, "Failed to map memory\n");
++			kfree(pd->pd.name);
++			kfree(pd);
++			of_node_put(np);
++			continue;
++		}
 +
-+	for (i = 0; i < od->dma_requests; i++) {
- 		rc = omap_dma_chan_init(od, i);
- 		if (rc) {
- 			omap_dma_free(od);
+ 		pd->pd.power_off = exynos_pd_power_off;
+ 		pd->pd.power_on = exynos_pd_power_on;
+ 
 -- 
-2.3.3
+1.9.1
