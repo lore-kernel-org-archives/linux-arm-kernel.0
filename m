@@ -1,163 +1,85 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 27 Mar 2015 14:32:40 +0100
-Subject: [PATCH 6/6] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock/reset controllers
-In-Reply-To: <1426754530-3137-7-git-send-email-s.hauer@pengutronix.de>
-References: <1426754530-3137-1-git-send-email-s.hauer@pengutronix.de>
- <1426754530-3137-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <55155BF8.7080402@gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 27 Mar 2015 21:40:26 +0800
+Subject: [patch v11 13/23] ACPI / processor: Introduce phys_cpuid_t for
+ CPU hardware ID
+In-Reply-To: <551381CD.5010804@huawei.com>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-14-git-send-email-hanjun.guo@linaro.org>
+ <20150325172109.GJ14585@localhost> <551381CD.5010804@huawei.com>
+Message-ID: <55155DCA.3060006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2015?03?26? 11:49, Hanjun Guo wrote:
+> On 2015/3/26 1:21, Catalin Marinas wrote:
+>> On Tue, Mar 24, 2015 at 10:02:46PM +0800, Hanjun Guo wrote:
+>>> CPU hardware ID (phys_id) is defined as u32 in structure acpi_processor,
+>>> but phys_id is used as int in acpi processor driver, so it will lead to
+>>> some inconsistence for the drivers.
+>>>
+>>> Furthermore, to cater for ACPI arch ports that implement 64 bits CPU
+>>> ids a generic CPU physical id type is required.
+>>>
+>>> So introduce typedef u32 phys_cpuid_t in a common file, and introduce
+>>> a macro PHYS_CPUID_INVALID as (phys_cpuid_t)(-1) if it's not defined
+>>> by other archs, this will solve the inconsistence in acpi processor driver,
+>>> and will prepare for the ACPI on ARM64 for the 64 bit CPU hardware ID
+>>> in the following patch.
+>>>
+>>> CC: Rafael J Wysocki <rjw@rjwysocki.net>
+>>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Reviewed-by: Grant Likely <grant.likely@linaro.org>
+>>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> [hj: reworked cpu physid map return codes]
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> BTW, am I still the author of this patch? If yes, it's missing a From:
+>> line.
+>
+> Oops, you should be the author, can Will fix this in his tree?
+>
+>>
+>>> --- a/drivers/acpi/acpi_processor.c
+>>> +++ b/drivers/acpi/acpi_processor.c
+>>> @@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
+>>>   	acpi_status status;
+>>>   	int ret;
+>>>
+>>> -	if (pr->phys_id == -1)
+>>> +	if (pr->phys_id == PHYS_CPUID_INVALID)
+>>>   		return -ENODEV;
+>> If PHYS_CPUID_INVALID is the same as INVALID_HWID, we should get rid of
+>> the latter in the arm64 code (as a subsequent clean-up patch).
+>
+> OK, I'm preparing a patch set to introduce invalid_phys_cpuid() and invalid_logical_cpuid()
+> to remove the direct comparison of PHYS_CPUID_INVALID and -1 in ACPI processor drivers,
+> which is suggested by Rafael, I will cleanup PHYS_CPUID_INVALID in this patch set.
 
+I met difficulty to do so, because we use
 
-On 19/03/15 09:42, Sascha Hauer wrote:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
++#ifndef PHYS_CPUID_INVALID
++typedef u32 phys_cpuid_t;
++#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
++#endif
 
-The patch should have a text as description.
+in the common head file linux/acpi.h, we need macro
+PHYS_CPUID_INVALID to identify if phys_cpuid_t is typedefed
+for different arch, so if we want remove PHYS_CPUID_INVALID
+for ARM64, we need to got back to typedef phys_cpuid_t for
+each arch using ACPI. which means that
 
-Thanks,
-Matthias
++typedef u32 phys_cpuid_t;  for ia64 and x86,
 
-> ---
->  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  | 23 +++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,infracfg.txt    | 30 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,pericfg.txt     | 30 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,topckgen.txt    | 23 +++++++++++++++++
->  4 files changed, 106 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> new file mode 100644
-> index 0000000..5af6d73
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-> @@ -0,0 +1,23 @@
-> +Mediatek apmixedsys controller
-> +==============================
-> +
-> +The Mediatek apmixedsys controller provides the PLLs to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +	- "mediatek,mt8135-apmixedsys"
-> +	- "mediatek,mt8173-apmixedsys"
-> +- #clock-cells: Must be 1
-> +
-> +The apmixedsys controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +apmixedsys: apmixedsys at 10209000 {
-> +	compatible = "mediatek,mt8173-apmixedsys";
-> +	reg = <0 0x10209000 0 0x1000>;
-> +	#clock-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-> new file mode 100644
-> index 0000000..684da473
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-> @@ -0,0 +1,30 @@
-> +Mediatek infracfg controller
-> +============================
-> +
-> +The Mediatek infracfg controller provides various clocks and reset
-> +outputs to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +	- "mediatek,mt8135-infracfg", "syscon"
-> +	- "mediatek,mt8173-infracfg", "syscon"
-> +- #clock-cells: Must be 1
-> +- #reset-cells: Must be 1
-> +
-> +The infracfg controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +Also it uses the common reset controller binding from
-> +Documentation/devicetree/bindings/reset/reset.txt.
-> +The available reset outputs are defined in
-> +dt-bindings/reset-controller/mt*-resets.h
-> +
-> +Example:
-> +
-> +infracfg: infracfg at 10001000 {
-> +	compatible = "mediatek,mt8173-infracfg", "syscon";
-> +	reg = <0 0x10001000 0 0x1000>;
-> +	#clock-cells = <1>;
-> +	#reset-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-> new file mode 100644
-> index 0000000..fdb45c6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-> @@ -0,0 +1,30 @@
-> +Mediatek pericfg controller
-> +===========================
-> +
-> +The Mediatek pericfg controller provides various clocks and reset
-> +outputs to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +	- "mediatek,mt8135-pericfg", "syscon"
-> +	- "mediatek,mt8173-pericfg", "syscon"
-> +- #clock-cells: Must be 1
-> +- #reset-cells: Must be 1
-> +
-> +The pericfg controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +Also it uses the common reset controller binding from
-> +Documentation/devicetree/bindings/reset/reset.txt.
-> +The available reset outputs are defined in
-> +dt-bindings/reset-controller/mt*-resets.h
-> +
-> +Example:
-> +
-> +pericfg: pericfg at 10003000 {
-> +	compatible = "mediatek,mt8173-pericfg", "syscon";
-> +	reg = <0 0x10003000 0 0x1000>;
-> +	#clock-cells = <1>;
-> +	#reset-cells = <1>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-> new file mode 100644
-> index 0000000..a425248
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-> @@ -0,0 +1,23 @@
-> +Mediatek topckgen controller
-> +============================
-> +
-> +The Mediatek topckgen controller provides various clocks to the system.
-> +
-> +Required Properties:
-> +
-> +- compatible: Should be:
-> +	- "mediatek,mt8135-topckgen"
-> +	- "mediatek,mt8173-topckgen"
-> +- #clock-cells: Must be 1
-> +
-> +The topckgen controller uses the common clk binding from
-> +Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-> +
-> +Example:
-> +
-> +topckgen: topckgen at 10000000 {
-> +	compatible = "mediatek,mt8173-topckgen";
-> +	reg = <0 0x10000000 0 0x1000>;
-> +	#clock-cells = <1>;
-> +};
-> 
+and
++typedef u64 phys_cpuid_t;  for arm64
+
+and
++#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
+in this linux/acpi.h for common use.
+
+Rafael, would you mind doing so?
+
+Thanks
+Hanjun
