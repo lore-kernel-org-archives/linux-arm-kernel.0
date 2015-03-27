@@ -1,41 +1,34 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Mar 2015 21:13:11 +0900
-Subject: [PATCH] ARM: kvm: round HYP section to page size instead of log2
- upper bound
-In-Reply-To: <CAKv+Gu9wAY5sx0=zvGpZwEjjO0oBbUpAHawMmRZ6nQUasj+Q1A@mail.gmail.com>
-References: <1427451481-16053-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427451481-16053-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150327110919.GC1562@arm.com>
- <CAKv+Gu9wAY5sx0=zvGpZwEjjO0oBbUpAHawMmRZ6nQUasj+Q1A@mail.gmail.com>
-Message-ID: <20150327121311.GA16077@verge.net.au>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 27 Mar 2015 20:14:35 +0800
+Subject: [PATCH 1/2] ARM64 / ACPI: Ignore the return error value of
+ acpi_map_gic_cpu_interface()
+Message-ID: <1427458476-20140-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard, Hi Will,
+MADT table scannig will stopped once it gets the errors
+returned by the handler, which is acpi_map_gic_cpu_interface()
+in for ARM64, so Ignore the return error value to search for
+all enabled CPUs for SMP init.
 
-On Fri, Mar 27, 2015 at 12:12:00PM +0100, Ard Biesheuvel wrote:
-> On 27 March 2015 at 12:09, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Mar 27, 2015 at 10:18:01AM +0000, Ard Biesheuvel wrote:
-> >> Older binutils do not support expressions involving the values of
-> >> external symbols so just round up the HYP region to the page size.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > Thanks Ard. I managed to reproduce the failures in -next, and this solves
-> > the problem for me (the only toolchain that chokes seems to be the one on
-> > kernel.org, unfortunately).
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ arch/arm64/kernel/acpi.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-For the record that is the one I am using.
-
-> > I'll push an updated branch after a bit more testing. Let's not touch this
-> > file ever again :)
-
-:)
-
-> Fingers crossed ...
-
-I have tested this patch applied on top of next-20150326 and the build
-problem I observed is gone. I have also tested that the resulting kernel
-boots on a range of Renesas boards.
-
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 07649e4..c263cba 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -181,7 +181,8 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+ 		return -EINVAL;
+ 
+ 	acpi_table_print_madt_entry(header);
+-	return acpi_map_gic_cpu_interface(processor);
++	acpi_map_gic_cpu_interface(processor);
++	return 0;
+ }
+ 
+ /* Parse GIC cpu interface entries in MADT for SMP init */
+-- 
+1.9.1
