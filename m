@@ -1,23 +1,139 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 27 Mar 2015 08:46:57 -0700
-Subject: [PATCH v4 1/4] mmc: dw_mmc: Don't try to enable the CD until
- we're sure we're not deferring
-In-Reply-To: <5514F0C5.7080509@samsung.com>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
- <5514F0C5.7080509@samsung.com>
-Message-ID: <CAD=FV=XFjTGkzwgySAFKUtpgNLZEe_ovAR+CnjLB6k8U_GMc6g@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 27 Mar 2015 16:57:36 +0100
+Subject: [RFT PATCH] drm/exynos: Enable DP clock to fix display on Exynos5250
+ and other
+Message-ID: <1427471856-20918-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+After adding display power domain for Exynos5250 in commit
+2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+display on Chromebook Snow and others stopped working after boot.
 
-On Thu, Mar 26, 2015 at 10:55 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
-> Hi, Doug.
->
-> This patch is not related with [patch 2/4~4/4].
-> "[PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()" is discussing..
-> So i think if you're ok, i will pick this one [PATCH v4 1/4]. how about?
+The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+This clock is required by Display Port and is enabled by bootloader.
+However when FIMD driver probing was deferred, the display power domain
+was turned off. This effectively reset the value of DP clock enable
+register.
 
-Please take it and send it to Ulf as soon as you can.  It is only
-related in that the later patches in this series suddenly make the
-rk3288-evb start deferring and that causes a crash without this patch.
+When exynos-dp is later probed, the clock is not enabled and display is
+not properly configured:
+
+exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+exynos-dp 145b0000.dp-controller: unable to config video
+
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+Cc: <stable@vger.kernel.org>
+
+---
+
+This should fix issue reported by Javier [1][2].
+
+Tested on Chromebook Snow (Exynos 5250). More testing would be great,
+especially on other Exynos 5xxx products.
+
+[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/43889
+[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/400290
+---
+ drivers/gpu/drm/exynos/exynos_dp_core.c  | 10 ++++++++++
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c | 19 +++++++++++++++++++
+ include/video/samsung_fimd.h             |  6 ++++++
+ 3 files changed, 35 insertions(+)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
+index bf17a60b40ed..1dbfba58f909 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp_core.c
++++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
+@@ -32,10 +32,16 @@
+ #include <drm/bridge/ptn3460.h>
+ 
+ #include "exynos_dp_core.h"
++#include "exynos_drm_fimd.h"
+ 
+ #define ctx_from_connector(c)	container_of(c, struct exynos_dp_device, \
+ 					connector)
+ 
++static inline struct exynos_drm_crtc *dp_to_crtc(struct exynos_dp_device *dp)
++{
++	return to_exynos_crtc(dp->encoder->crtc);
++}
++
+ static inline struct exynos_dp_device *
+ display_to_dp(struct exynos_drm_display *d)
+ {
+@@ -1070,6 +1076,8 @@ static void exynos_dp_poweron(struct exynos_dp_device *dp)
+ 		}
+ 	}
+ 
++	fimd_dp_clock_enable(dp_to_crtc(dp), true);
++
+ 	clk_prepare_enable(dp->clock);
+ 	exynos_dp_phy_init(dp);
+ 	exynos_dp_init_dp(dp);
+@@ -1094,6 +1102,8 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
+ 	exynos_dp_phy_exit(dp);
+ 	clk_disable_unprepare(dp->clock);
+ 
++	fimd_dp_clock_enable(dp_to_crtc(dp), false);
++
+ 	if (dp->panel) {
+ 		if (drm_panel_unprepare(dp->panel))
+ 			DRM_ERROR("failed to turnoff the panel\n");
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+index c300e22da8ac..bdf0818dc8f5 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+@@ -32,6 +32,7 @@
+ #include "exynos_drm_fbdev.h"
+ #include "exynos_drm_crtc.h"
+ #include "exynos_drm_iommu.h"
++#include "exynos_drm_fimd.h"
+ 
+ /*
+  * FIMD stands for Fully Interactive Mobile Display and
+@@ -1231,6 +1232,24 @@ static int fimd_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable)
++{
++	struct fimd_context *ctx = crtc->ctx;
++	u32 val;
++
++	/*
++	 * Only Exynos 5250, 5260, 5410 and 542x requires enabling DP/MIE
++	 * clock. On these SoCs the bootloader may enable it but any
++	 * power domain off/on will reset it to disable state.
++	 */
++	if (ctx->driver_data != &exynos5_fimd_driver_data)
++		return;
++
++	val = enable ? DP_MIE_CLK_DP_ENABLE : DP_MIE_CLK_DISABLE;
++	writel(DP_MIE_CLK_DP_ENABLE, ctx->regs + DP_MIE_CLKCON);
++}
++EXPORT_SYMBOL_GPL(fimd_dp_clock_enable);
++
+ struct platform_driver fimd_driver = {
+ 	.probe		= fimd_probe,
+ 	.remove		= fimd_remove,
+diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
+index a20e4a3a8b15..847a0a2b399c 100644
+--- a/include/video/samsung_fimd.h
++++ b/include/video/samsung_fimd.h
+@@ -436,6 +436,12 @@
+ #define BLENDCON_NEW_8BIT_ALPHA_VALUE		(1 << 0)
+ #define BLENDCON_NEW_4BIT_ALPHA_VALUE		(0 << 0)
+ 
++/* Display port clock control */
++#define DP_MIE_CLKCON				0x27c
++#define DP_MIE_CLK_DISABLE			0x0
++#define DP_MIE_CLK_DP_ENABLE			0x2
++#define DP_MIE_CLK_MIE_ENABLE			0x3
++
+ /* Notes on per-window bpp settings
+  *
+  * Value	Win0	 Win1	  Win2	   Win3	    Win 4
+-- 
+1.9.1
