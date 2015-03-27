@@ -1,37 +1,40 @@
-From: jonas@microbit.se (Jonas Andersson)
-Date: Fri, 27 Mar 2015 15:42:06 +0100
-Subject: at91 clocks
-In-Reply-To: <20150327145410.39873958@bbrezillon>
-References: <55117568.6090202@microbit.se>	<20150325013201.3f01fc22@bbrezillon>	<55127AA6.5050902@microbit.se>	<20150325173751.0d6479df@bbrezillon>	<5513D701.2080201@microbit.se>	<20150326162827.041c051a@bbrezillon>	<55152F3E.60004@microbit.se>	<20150327132003.6caf3689@bbrezillon>	<20150327132543.08ad636c@bbrezillon>	<55155262.9030501@microbit.se>
- <20150327145410.39873958@bbrezillon>
-Message-ID: <55156C3E.9000203@microbit.se>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 27 Mar 2015 14:51:34 +0000
+Subject: [PATCH v3 0/*] serial/amba-pl011: Activate TX IRQ passively
+In-Reply-To: <20150326213014.GA21687@kroah.com>
+References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+ <20150326213014.GA21687@kroah.com>
+Message-ID: <20150327145118.GA1711@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Thu, Mar 26, 2015 at 10:30:14PM +0100, Greg Kroah-Hartman wrote:
+> On Wed, Mar 25, 2015 at 06:22:26PM +0000, Dave Martin wrote:
 
-On 2015-03-27 14:54, Boris Brezillon wrote:
->>>
->>> Could you also paste me the whole clk_summary content ?
->>>
->>>
->> http://pastie.org/10057268
-> Could you try with this patch [1] ?
+[...]
 
-Yes, it works now! Thank you.
+> > Take your pick.
+> 
+> I have no idea what you want me to do here, sorry.
+> 
+> I need to apply patches to tty-next, I can't do anything against a
+> "clean" 4.0-rc5 as your patches are already in tty-next.
+> 
+> And I can't tell the two series apart here...
+> 
+> Can you just resend what you want me to apply to tty-next and we can go
+> from there?
 
-> Anyway, I don't understand why clk_set_rate returns 0 even when it
-> fails to set the appropriate rate.
-> Could you add some traces in drivers/clk/at91/clk-pll.c
-> (clk_pll_round_rate, clk_pll_set_rate and clk_pll_get_best_div_mul) ?
+Apologies, this was a misguided attempt on my part to be helpful.
 
-Yes I'll try to do it on Monday next week.
+I will post a v4 shortly, which changes nothing except for rebasing to
+tty-next and clarifying the commit message on the second patch.
 
-> Thanks,
->
-> Boris
->
-> [1]http://code.bulix.org/gxxhc4-88138
->
-Best regards
-  Jonas
+Note that I haven't seen any feedback from rmk since v1 (which, for
+good reasons, he wasn't keen on).
+
+I believe these patches resolve all issues reported so far by other
+testers.
+
+Cheers
+---Dave
