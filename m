@@ -1,112 +1,30 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Fri, 27 Mar 2015 10:58:53 +0000
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-Message-ID: <551537ED.7060402@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 27 Mar 2015 11:59:48 +0100
+Subject: [PATCH 09/16] iommu/tegra-smmu: Make use of domain_alloc and
+ domain_free
+In-Reply-To: <1427373799-18662-10-git-send-email-joro@8bytes.org>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+ <1427373799-18662-10-git-send-email-joro@8bytes.org>
+Message-ID: <20150327105946.GA5440@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add pmic regulator definitions matching the manufacturers 3.4.x fex
-file.
+On Thu, Mar 26, 2015 at 01:43:12PM +0100, Joerg Roedel wrote:
+> From: Joerg Roedel <jroedel@suse.de>
+> 
+> Implement domain_alloc and domain_free iommu-ops as a
+> replacement for domain_init/domain_destroy.
+> 
+> Signed-off-by: Joerg Roedel <jroedel@suse.de>
+> ---
+>  drivers/iommu/tegra-smmu.c | 41 +++++++++++++++++++++++------------------
+>  1 file changed, 23 insertions(+), 18 deletions(-)
 
-Signed-off-by: Iain Paton <ipaton0@gmail.com>
----
-
-As this file belongs to Hans and he decided not to use axp209.dtsi in
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
-then I won't add it here.
-
- arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 68 ++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-index 31dc2f1..f7a8fcc 100644
---- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-@@ -67,6 +67,15 @@
- 			default-state = "on";
- 		};
- 	};
-+
-+	reg_axp_ipsout: axp_ipsout {
-+		compatible = "regulator-fixed";
-+		regulator-name = "axp-ipsout";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
- };
- 
- &ahci {
-@@ -97,10 +106,69 @@
- 	axp209: pmic at 34 {
- 		compatible = "x-powers,axp209";
- 		reg = <0x34>;
-+		interrupt-parent = <&intc>;
- 		interrupts = <0>;
- 
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
-+
-+		acin-supply = <&reg_axp_ipsout>;
-+		vin2-supply = <&reg_axp_ipsout>;
-+		vin3-supply = <&reg_axp_ipsout>;
-+		ldo24in-supply = <&reg_axp_ipsout>;
-+		ldo3in-supply = <&reg_axp_ipsout>;
-+
-+		x-powers,dcdc-freq = <1500>;
-+
-+		regulators {
-+			vdd_rtc: ldo1 {
-+				regulator-min-microvolt = <1300000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+				regulator-name="vdd_rtc";
-+			};
-+
-+			avcc: ldo2 {
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+				regulator-name="avcc";
-+			};
-+
-+			vcc_csi0: ldo3 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-name="vcc_csi0";
-+			};
-+
-+			vcc_csi1: ldo4 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-name="vcc_csi1";
-+			};
-+
-+			ldo5 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-name="reg_unused";
-+			};
-+
-+			vdd_cpu: dcdc2 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <1550000>;
-+				regulator-always-on;
-+				regulator-name="vdd_cpu";
-+			};
-+
-+			vdd_int: dcdc3 {
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-always-on;
-+				regulator-name="vdd_int";
-+			};
-+		};
- 	};
- };
- 
--- 
-2.1.3
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/c7aaad2f/attachment.sig>
