@@ -1,28 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Mar 2015 11:14:30 +0100
-Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
-In-Reply-To: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
-References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <CACRpkdZgcVe+5_N5oia8UFNxLYQ-au=Sh3Og-iJg9bbuThY-Rw@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 27 Mar 2015 10:18:14 +0000
+Subject: [PATCH 01/13] thermal: Make temperatures consistently unsigned
+ long
+In-Reply-To: <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de> (Sascha
+ Hauer's message of "Thu, 26 Mar 2015 16:53:48 +0100")
+References: <1427385240-6086-1-git-send-email-s.hauer@pengutronix.de>
+ <1427385240-6086-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <9hhzj6y217d.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 24, 2015 at 4:26 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
+Hi Sascha,
 
-> 0 is used in all pinfunction definitions when a config register is not
-> available, for example imx25-pinfunc.h. If a configuration value is used
-> for such a pinfunction the driver will always write it to the
-> configuration register if it is not -1. For a 0 configuration register
-> the configuration value is written to offset 0x0. This can lead to a
-> crashing/hanging system without any warning message.
+Sascha Hauer <s.hauer@pengutronix.de> writes:
+
+> The thermal framework uses int, long and unsigned long for temperatures
+> in millicelsius. The majority of functions uses unsigned long, so change
+> the remaining functions to use this type aswell.
 >
-> This patch checks for 0 config register and sets the internal value to
-> -1. If the configuration value is not NO_PADCTL this leads to an error
-> message that applying the configuration failed.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+I'd suggest changing to long instead. It would allow the use of the
+thermal framework in environments where temperatures are below 0C -
+quite easily reached in many parts of the world.
+
+Regards,
+Punit
+
+> ---
+>  drivers/thermal/thermal_core.c | 10 +++++-----
+>  include/linux/thermal.h        |  6 +++---
+>  2 files changed, 8 insertions(+), 8 deletions(-)
 >
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-Stefan, Uwe: can you look at this patch.
-
-Yours,
-Linus Walleij
+[...]
