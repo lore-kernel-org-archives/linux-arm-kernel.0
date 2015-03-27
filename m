@@ -1,72 +1,66 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Mar 2015 20:55:09 +0900
-Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
- get rid of the bounce page"
-In-Reply-To: <20150327100612.GB1562@arm.com>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
- <20150327100612.GB1562@arm.com>
-Message-ID: <20150327115505.GA18822@verge.net.au>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 27 Mar 2015 12:56:43 +0100
+Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
+In-Reply-To: <20150327104134.GW32677@pengutronix.de>
+References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
+ <139dc298c0914b3536445dddd37be286@agner.ch>
+ <20150327104134.GW32677@pengutronix.de>
+Message-ID: <499f4d7a167f8f41a319dd939869abba@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 10:06:12AM +0000, Will Deacon wrote:
-> On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
-> > On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
-> > > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
-> > > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
-> > > >> > I think we now have a new error: (seen with omap2plus_defconfig)
-> > > >> > on next-20150324 :
-> > > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
-> > > >> > referenced in expression
-> > > >> > make: *** [vmlinux] Error 1
-> > > >>
-> > > >> Thanks, I am seeing that too.
-> > > >>
-> > > >> My armchair suggestion is that the following should be reverted.
-> > > >>
-> > > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> > > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
-> > > >
-> > > > Can you try again with the latest -next please? We've merged an additional
-> > > > patch aimed at sorting this out. Reverting isn't really an option, as
-> > > > there's an awful lot of code that depends on the bounce page removal.
-> > > 
-> > > Here are the kernelci.org -next results[1], if you click the build
-> > > status you can dig down into the build failures. next-20150326 has now
-> > > hit a compiler bug, Arnd mentioned he was looking into this issue.
-> > 
-> > I have confirmed that next-20150326 does not compile without
-> > the following reverted:
-> > 
-> > 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
-> > e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> > 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
-> 
-> Thanks for testing this and sorry for the continued breakage. Which
-> toolchain did you say you were using? Ard has some more patches trying to
-> fix this, but none of our toolchains seem to tickle the issue.
+On 2015-03-27 11:41, Uwe Kleine-K?nig wrote:
+> On Fri, Mar 27, 2015 at 11:32:31AM +0100, Stefan Agner wrote:
+>> On 2015-03-24 16:26, Markus Pargmann wrote:
+>> > 0 is used in all pinfunction definitions when a config register is not
+>> > available, for example imx25-pinfunc.h. If a configuration value is used
+>> > for such a pinfunction the driver will always write it to the
+>> > configuration register if it is not -1. For a 0 configuration register
+>> > the configuration value is written to offset 0x0. This can lead to a
+>> > crashing/hanging system without any warning message.
+>>
+>> 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
+>> the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
+>> actually works.
+>>
+>> What is a bit a bummer is that we now have different meanings of 0,
+>> depending on the field:
+>> - For the first field (mux), 0 is a valid offset
+>> - For the second field (config), 0 means not valid
+>>
+>> However, I can't think of a easy solution which would solve this in a
+>> cleaner mannor... Maybe a comment in the function header how the 5 u32's
+>> are intepreted would appropriate?
+> That means that on Vybrid you need to write to offset 0 a config value?
+> Or not?
 
-It seems that a fix has emerged (thanks! local testing looks good so far)
-but for the record I am using the arm (32) tool chain for x86_84
-on kernel.org.
+Vybrid has a shared conf/mux_reg, hence the SHARE_MUX_CONF_REG is set.
+Vybrid need to write to offset 0, and is using the conf_reg as offset
+value in imx_pinconf_set:
+...
+	for (i = 0; i < num_configs; i++) {
+		if (info->flags & SHARE_MUX_CONF_REG) {
+			u32 reg;
+			reg = readl(ipctl->base + pin_reg->conf_reg);
+			reg &= ~0xffff;
+			reg |= configs[i];
+			writel(reg, ipctl->base + pin_reg->conf_reg);
+		} else {
 
-https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.6.3/
 
-# arm-unknown-linux-gnueabi-gcc --version
-arm-unknown-linux-gnueabi-gcc (GCC) 4.6.3
-Copyright (C) 2011 Free Software Foundation, Inc.
-This is free software; see the source for copying conditions.  There is NO
-warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+However, that conf_reg value is derived from mux_reg. This is what is
+done at that if in that patch. Original code:
+		if (info->flags & SHARE_MUX_CONF_REG)
+			conf_reg = mux_reg;
+		else
+			conf_reg = be32_to_cpu(*list++);
 
-# arm-unknown-linux-gnueabi-ld --version
-GNU ld (GNU Binutils) 2.22
-Copyright 2011 Free Software Foundation, Inc.
-This program is free software; you may redistribute it under the terms of
-the GNU General Public License version 3 or (at your option) a later version.
-This program has absolutely no warranty.
+
+So, due to that, this patch does not affect the value computed for
+conf_reg on Vybrid devices (a value of 0 is still possible for Vybrid).
+Hence, everything should work fine... The different interpretation of
+the value "0" for the regs is somewhat confusing, but probably
+unavoidable without DT changes....
+
+--
+Stefan
