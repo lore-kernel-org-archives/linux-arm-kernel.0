@@ -1,69 +1,124 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Fri, 27 Mar 2015 14:55:17 +0900
-Subject: [PATCH v4 1/4] mmc: dw_mmc: Don't try to enable the CD until we're
- sure we're not deferring
-In-Reply-To: <1426112117-18220-1-git-send-email-dianders@chromium.org>
-References: <1426112117-18220-1-git-send-email-dianders@chromium.org>
-Message-ID: <5514F0C5.7080509@samsung.com>
+From: a0393675@ti.com (Keerthy)
+Date: Fri, 27 Mar 2015 11:32:36 +0530
+Subject: [PATCH V2 1/2] ARM: dts: DRA7: Add bandgap and related thermal
+ nodes
+In-Reply-To: <1427139579-4215-2-git-send-email-nm@ti.com>
+References: <1427139579-4215-1-git-send-email-nm@ti.com>
+ <1427139579-4215-2-git-send-email-nm@ti.com>
+Message-ID: <5514F27C.7070904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Doug.
 
-This patch is not related with [patch 2/4~4/4].
-"[PATCH v4 2/4] mmc: core: Add mmc_regulator_set_vqmmc()" is discussing..
-So i think if you're ok, i will pick this one [PATCH v4 1/4]. how about?
 
-Best Regards,
-Jaehoon Chung
-
-On 03/12/2015 07:15 AM, Doug Anderson wrote:
-> If dw_mci_init_slot() returns that we got a probe deferral then it may
-> leave slot->mmc as NULL.  That will cause dw_mci_enable_cd() to crash
-> when it calls mmc_gpio_get_cd().
-> 
-> Fix this by moving the call of dw_mci_enable_cd() until we're sure
-> that we're good.  Note that if we have more than one slot and one
-> defers (but the others don't) things won't work so well.  ...but
-> that's not a new thing and everyone has already agreed that multislot
-> support ought to be removed from dw_mmc eventually anyway since it is
-> unused, untested, and you can see several bugs like this by inspecting
-> the code.
-> 
-> Fixes: bcafaf5470f0 ("mmc: dw_mmc: Only enable CD after setup and only if needed")
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+On Tuesday 24 March 2015 01:09 AM, Nishanth Menon wrote:
+> From: Keerthy <j-keerthy@ti.com>
+>
+> Add bandgap and related thermal nodes. The patch adds 5 thermal
+> sensors. Only one cooling device for mpu as of now. The sensors are
+> the exact same on both dra72 and dra7. Introduce CPU, GPU, core nodes
+> for the moment as they are direct reuse of OMAP5 entities.
+>
+> NOTE: OMAP4 has a finer counter granularity, which allows for a delay
+> of 1000ms in the thermal zone polling intervals. DRA7 have different
+> counter mechanism, which allows at maximum a 500ms timer. Adjust the
+> cpu thermal zone accordingly for DRA7.
+>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> [t-kristo at ti.com: few reuse from OMAP5 entities]
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 > ---
-> Changes in v4:
-> - Defer vs. card detect fix patch new for v4.
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  drivers/mmc/host/dw_mmc.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 47dfd0e..e2811cf 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2863,9 +2863,6 @@ int dw_mci_probe(struct dw_mci *host)
->  			init_slots++;
->  	}
->  
-> -	/* Now that slots are all setup, we can enable card detect */
-> -	dw_mci_enable_cd(host);
-> -
->  	if (init_slots) {
->  		dev_info(host->dev, "%d slots initialized\n", init_slots);
->  	} else {
-> @@ -2874,6 +2871,9 @@ int dw_mci_probe(struct dw_mci *host)
->  		goto err_dmaunmap;
->  	}
->  
-> +	/* Now that slots are all setup, we can enable card detect */
-> +	dw_mci_enable_cd(host);
+> Changes since V1:
+> 	- omap5-cpu-thermal.dtsi dropped
+> 	- approach similar to omap5
+> 	- added core and gpu thermal dtsi(they can be reused)
+> 	- Squashed patch #1 from v1 to patch #2 - this patch.
+> 	- Not carrying forward ack due to change
+
+Thanks for updating Nishanth. Looks good to me.
+
+- Keerthy
+
+>
+> V1: http://marc.info/?t=142688102700006&r=1&w=2
+>
+>   arch/arm/boot/dts/dra7.dtsi   |   23 +++++++++++++++++++++++
+>   arch/arm/boot/dts/dra72x.dtsi |    5 +++++
+>   arch/arm/boot/dts/dra74x.dtsi |    5 +++++
+>   3 files changed, 33 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index eea4a54d6cb3..2d6a7e3e001f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -177,6 +177,18 @@
+>   			};
+>   		};
+>
+> +		bandgap: bandgap at 4a0021e0 {
+> +			reg = <0x4a0021e0 0xc
+> +				0x4a00232c 0xc
+> +				0x4a002380 0x2c
+> +				0x4a0023C0 0x3c
+> +				0x4a002564 0x8
+> +				0x4a002574 0x50>;
+> +				compatible = "ti,dra752-bandgap";
+> +				interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
+> +				#thermal-sensor-cells = <1>;
+> +		};
 > +
->  	if (host->quirks & DW_MCI_QUIRK_IDMAC_DTO)
->  		dev_info(host->dev, "Internal DMAC interrupt fix enabled.\n");
->  
-> 
+>   		cm_core_aon: cm_core_aon at 4a005000 {
+>   			compatible = "ti,dra7-cm-core-aon";
+>   			reg = <0x4a005000 0x2000>;
+> @@ -1419,6 +1431,17 @@
+>   			status = "disabled";
+>   		};
+>   	};
+> +
+> +	thermal_zones: thermal-zones {
+> +		#include "omap4-cpu-thermal.dtsi"
+> +		#include "omap5-gpu-thermal.dtsi"
+> +		#include "omap5-core-thermal.dtsi"
+> +	};
+> +
+> +};
+> +
+> +&cpu_thermal {
+> +	polling-delay = <500>; /* milliseconds */
+>   };
+>
+>   /include/ "dra7xx-clocks.dtsi"
+> diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+> index e5a3d23a3df1..6ac8e3601499 100644
+> --- a/arch/arm/boot/dts/dra72x.dtsi
+> +++ b/arch/arm/boot/dts/dra72x.dtsi
+> @@ -20,6 +20,11 @@
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a15";
+>   			reg = <0>;
+> +
+> +			/* cooling options */
+> +			cooling-min-level = <0>;
+> +			cooling-max-level = <2>;
+> +			#cooling-cells = <2>; /* min followed by max */
+>   		};
+>   	};
+>
+> diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+> index 10173fab1a15..eef981f4bcd5 100644
+> --- a/arch/arm/boot/dts/dra74x.dtsi
+> +++ b/arch/arm/boot/dts/dra74x.dtsi
+> @@ -31,6 +31,11 @@
+>   			clock-names = "cpu";
+>
+>   			clock-latency = <300000>; /* From omap-cpufreq driver */
+> +
+> +			/* cooling options */
+> +			cooling-min-level = <0>;
+> +			cooling-max-level = <2>;
+> +			#cooling-cells = <2>; /* min followed by max */
+>   		};
+>   		cpu at 1 {
+>   			device_type = "cpu";
+>
