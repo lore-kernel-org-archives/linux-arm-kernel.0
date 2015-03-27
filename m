@@ -1,31 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Mar 2015 09:37:19 +0100
-Subject: [PATCH] pinctrl: mvebu: add suspend/resume support to Armada XP
- pinctrl driver
-In-Reply-To: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdZ_2FJLJJaDuqw=9cxxJwacz06KssfSK_HVg2jZ6E-6eQ@mail.gmail.com>
+Date: Fri, 27 Mar 2015 10:00:31 +0100
+Subject: [PATCH 35/35 linux-next] pinctrl: constify of_device_id array
+In-Reply-To: <1426535949-26107-4-git-send-email-fabf@skynet.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-4-git-send-email-fabf@skynet.be>
+Message-ID: <CACRpkdZbvHxtupVsXJwK8-XZ-dOScgpWFJWPExQ5U44FRXZymw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 11:30 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Mon, Mar 16, 2015 at 8:59 PM, Fabian Frederick <fabf@skynet.be> wrote:
 
-> This commit adds suspend/resume support to the Armada XP pinctrl
-> driver, by simply saving and restoring the MPP registers.
+> of_device_id is always used as const.
+> (See driver.of_match_table and open firmware functions)
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Fabian Frederick <fabf@skynet.be>
 
-Patch applied, but:
-
->  static void __iomem *mpp_base;
-> +static u32 *mpp_saved_regs;
-
-I didn't notice this singleton design pattern in this driver before :(
-I see the legacy Dove driver have a few more.
-
-Can we have a mvebu refactoring patch bringing these things into a state
-container? Like a per-subdriver kmalloc:ed struct foo_state {}?
+Patch applied with the ACKs. Had to do some fixup on some
+MTK controllers, no big deal.
 
 Yours,
 Linus Walleij
