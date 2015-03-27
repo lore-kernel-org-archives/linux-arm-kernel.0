@@ -1,53 +1,31 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 27 Mar 2015 15:35:00 -0500
-Subject: [PATCH] ARM: DRA7: Enable Cortex A15 errata 798181
-In-Reply-To: <20150326173515.GB10805@atomide.com>
-References: <1427325909-7014-1-git-send-email-praneeth@ti.com>
- <5513458A.50001@ti.com> <20150326173515.GB10805@atomide.com>
-Message-ID: <5515BEF4.7030201@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Mar 2015 20:47:54 +0000
+Subject: [PATCH v3 0/*] serial/amba-pl011: Activate TX IRQ passively
+In-Reply-To: <20150327145118.GA1711@e103592.cambridge.arm.com>
+References: <1427307746-2811-1-git-send-email-Dave.Martin@arm.com>
+ <20150326213014.GA21687@kroah.com>
+ <20150327145118.GA1711@e103592.cambridge.arm.com>
+Message-ID: <20150327204753.GC4019@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 12:35 PM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [150325 16:32]:
->> On 03/25/2015 06:25 PM, Praneeth Bajjuri wrote:
->>> ARM errata 798181 is applicable for OMAP5/DRA7 based devices. So enable
->>> the same in the build.
->>>
->>> DRA7xx is based on Cortex-A15 r2p2 revision.
->>>
->>> ARM Errata extract and workaround information is as below.
->>>
->>> On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
->>> adequately shooting down all use of the old entries. The
->>> ARM_ERRATA_798181 option enables the Linux kernel workaround
->>> for this erratum which sends an IPI to the CPUs that are running
->>> the same ASID as the one being invalidated.
->>>
->>> Signed-off-by: Praneeth Bajjuri <praneeth@ti.com>
->>> ---
->>>  arch/arm/mach-omap2/Kconfig |    1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index c7d8d86..3e4b4ae 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -69,6 +69,7 @@ config SOC_DRA7XX
->>>  	select ARM_GIC
->>>  	select HAVE_ARM_ARCH_TIMER
->>>  	select IRQ_CROSSBAR
->>> +	select ARM_ERRATA_798181 if SMP
->>>  
->>>  config ARCH_OMAP2PLUS
->>>  	bool
->>>
->> Gee thanks and Apologies on missing this patch.
->>
->> Acked-by: Nishanth Menon <nm@ti.com>
->>
->> Seen on DRA7 only builds, so kinda slipped radar a bit.. verified to
->> apply on v4.0-rc1
-> 
-> Is this needed as a fix for v4.0-rc series or can this wait for v4.1?
-I think we can wait till 4.1
+On Fri, Mar 27, 2015 at 02:51:34PM +0000, Dave Martin wrote:
+> Note that I haven't seen any feedback from rmk since v1 (which, for
+> good reasons, he wasn't keen on).
+
+Yea, I'm really struggling dealing with email; I can spend an entire day
+on email and feel like I've made zero progress without having touched the
+kernel source once.  It will be totally random which emails I reply to.
+I've long since given up using any Cc or To as an indication whether it's
+important, that's too unreliable.
+
+This month, 1/7th of all email received has not even been read... and
+some of that's stuff I've thought "I really need to look back at that."
+
+There's just too much irrelevant email coming into my mailbox.
+
+Sorry.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
