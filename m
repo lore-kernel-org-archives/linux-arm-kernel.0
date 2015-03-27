@@ -1,75 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Mar 2015 12:06:01 +0000
-Subject: Cache line size definition in arch/arm/mm/Kconfig
-In-Reply-To: <5515423E.4020802@free.fr>
-References: <5512C7A4.3000302@free.fr>
- <5515423E.4020802@free.fr>
-Message-ID: <20150327120601.GB4019@n2100.arm.linux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 27 Mar 2015 21:13:11 +0900
+Subject: [PATCH] ARM: kvm: round HYP section to page size instead of log2
+ upper bound
+In-Reply-To: <CAKv+Gu9wAY5sx0=zvGpZwEjjO0oBbUpAHawMmRZ6nQUasj+Q1A@mail.gmail.com>
+References: <1427451481-16053-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427451481-16053-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150327110919.GC1562@arm.com>
+ <CAKv+Gu9wAY5sx0=zvGpZwEjjO0oBbUpAHawMmRZ6nQUasj+Q1A@mail.gmail.com>
+Message-ID: <20150327121311.GA16077@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 12:42:54PM +0100, Mason wrote:
-> On 25/03/2015 15:35, Mason wrote:
-> 
-> >AFAICT, L1 cache line size is specified in arch/arm/mm/Kconfig
-> >
-> >config ARM_L1_CACHE_SHIFT_6
-> >     bool
-> >     default y if CPU_V7
-> >     help
-> >       Setting ARM L1 cache line size to 64 Bytes.
-> >
-> >config ARM_L1_CACHE_SHIFT
-> >     int
-> >     default 6 if ARM_L1_CACHE_SHIFT_6
-> >     default 5
-> >
-> >
-> >I'm using a Cortex A9 MPCore. If I'm not mistaken, the cache line size
-> >is 32 bytes, even though this CPU is ARMv7.
-> >
-> >http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388g/Caccifbd.html
-> >
-> >>The Cortex-A9 processor has separate instruction and data caches.
-> >>The caches have the following features:
+Hi Ard, Hi Will,
+
+On Fri, Mar 27, 2015 at 12:12:00PM +0100, Ard Biesheuvel wrote:
+> On 27 March 2015 at 12:09, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Mar 27, 2015 at 10:18:01AM +0000, Ard Biesheuvel wrote:
+> >> Older binutils do not support expressions involving the values of
+> >> external symbols so just round up the HYP region to the page size.
 > >>
-> >>  Each cache can be disabled independently. See System Control Register.
-> >>  Both caches are 4-way set-associative.
-> >>  The cache line length is eight words.
-> >>  On a cache miss, critical word first filling of the cache is performed.
-> >>  You can configure the instruction and data caches independently during implementation to sizes of 16KB, 32KB, or 64KB.
-> >>  To reduce power consumption, the number of full cache reads is reduced by taking advantage of the sequential nature of many cache operations. If a cache read is sequential to the previous cache read, and the read is within the same cache line, only the data RAM set that was previously read is accessed.
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > >
-> >How do I set ARM_L1_CACHE_SHIFT_6 to 'n' in my platform Kconfig?
-> >
-> >Or perhaps I should "override" ARM_L1_CACHE_SHIFT to 5 (again in
-> >my platform Kconfig). I don't know the syntax to do that.
-> >
-> >Could someone point out the correct way?
-> 
-> Would someone care to comment? :-)
+> > Thanks Ard. I managed to reproduce the failures in -next, and this solves
+> > the problem for me (the only toolchain that chokes seems to be the one on
+> > kernel.org, unfortunately).
 
-No :)
+For the record that is the one I am using.
 
-What you've found is the _static_ L1 cache line size setting, which is
-used at _compile_ time to align structures while building.  To allow
-maximum flexibility - and because there are 64-byte cache line ARMv7
-implementations around - we have decided that the _compile time_
-cache line size will be 64 bytes.
+> > I'll push an updated branch after a bit more testing. Let's not touch this
+> > file ever again :)
 
-As far as cache operations are concerned, they will know the correct
-cache line size for the CPU which they're running on, so the code
-will adapt.
+:)
 
-It has the side effect that some allocators also assume that the L1
-cache line size is 64 bytes.
+> Fingers crossed ...
 
-It's better to have a larger than necessary cache line size than a
-smaller one, because a larger one is automatically aligned to the
-smaller sizes.
+I have tested this patch applied on top of next-20150326 and the build
+problem I observed is gone. I have also tested that the resulting kernel
+boots on a range of Renesas boards.
 
-In other words, this is totally intentional.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
