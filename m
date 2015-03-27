@@ -1,65 +1,59 @@
-From: mtosatti@redhat.com (Marcelo Tosatti)
-Date: Thu, 26 Mar 2015 22:31:51 -0300
-Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
- destroyed
-In-Reply-To: <5512EBB9.2050304@arm.com>
-References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
- <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
- <5512EBB9.2050304@arm.com>
-Message-ID: <20150327013151.GA2882@amt.cnet>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 27 Mar 2015 09:48:34 +0800
+Subject: [PATCH 1/4] clk: hisi: add API for allocation clk data struct
+In-Reply-To: <20150326141834.GI8656@n2100.arm.linux.org.uk>
+References: <1427368419-22222-1-git-send-email-leo.yan@linaro.org>
+ <1427368419-22222-2-git-send-email-leo.yan@linaro.org>
+ <20150326141834.GI8656@n2100.arm.linux.org.uk>
+Message-ID: <20150327014834.GA4902@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 05:09:13PM +0000, Marc Zyngier wrote:
-> On 23/03/15 15:58, Andre Przywara wrote:
-> > In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
-> > especially before calling kvm_arch_destroy_vm(). To avoid
-> > unregistering devices from the already destroyed bus, let's mark
-> > the bus with NULL to let other users know it has been destroyed
-> > already.
-> > This avoids a crash on a VM shutdown with the VGIC using the
-> > kvm_io_bus later (the unregistering is in there to be able to roll
-> > back a faulting init).
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> That seems sensible, but I don't see why nobody else hits that. What are
-> we doing differently?
-> 
-> Otherwise,
-> 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Paolo, Marcelo, can we have your Ack on this?
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> > ---
-> >  virt/kvm/kvm_main.c |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > index 8c7ab0b..6f164eb 100644
-> > --- a/virt/kvm/kvm_main.c
-> > +++ b/virt/kvm/kvm_main.c
-> > @@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
-> >  	list_del(&kvm->vm_list);
-> >  	spin_unlock(&kvm_lock);
-> >  	kvm_free_irq_routing(kvm);
-> > -	for (i = 0; i < KVM_NR_BUSES; i++)
-> > +	for (i = 0; i < KVM_NR_BUSES; i++) {
-> >  		kvm_io_bus_destroy(kvm->buses[i]);
-> > +		kvm->buses[i] = NULL;
-> > +	}
-> >  	kvm_coalesced_mmio_free(kvm);
-> >  #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
-> >  	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
-> > 
-> 
-> 
-> -- 
-> Jazz is not dead. It just smells funny...
+hi Russell,
 
-Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
+On Thu, Mar 26, 2015 at 02:18:34PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Mar 26, 2015 at 07:13:36PM +0800, Leo Yan wrote:
+> > +struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
+> > +					     int nr_clks)
+> > +{
+> > +	struct hisi_clock_data *clk_data;
+> > +	void __iomem *base;
+> > +
+> > +	if (np) {
+> > +		base = of_iomap(np, 0);
+> > +		if (!base) {
+> > +			pr_err("failed to map Hisilicon clock registers\n");
+> > +			return NULL;
+> > +		}
+> > +		printk("%s: base %p\n", __func__, base);
+> 
+> Did you leave your debugging in?
+
+Sorry, will remove it.
+
+> > +	} else {
+> > +		pr_err("failed to find Hisilicon clock node in DTS\n");
+> > +		return NULL;
+> > +	}
+> 
+> I know you're mostly only moving this code, but it would be far better if
+> it were written:
+> 
+> 	if (!np) {
+> 		pr_err("failed to find Hisilicon clock node in DTS\n");
+> 		return NULL;
+> 	}
+> 
+> 	base = of_iomap(np, 0);
+> 	if (!base) {
+> 		pr_err("failed to map Hisilicon clock registers\n");
+> 		return NULL;
+> 	}
+> 
+> Possibly do this first as a separate patch, and then move the code.
+
+Will do this.
+
+> -- 
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
