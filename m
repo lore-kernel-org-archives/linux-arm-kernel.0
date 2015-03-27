@@ -1,39 +1,39 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 27 Mar 2015 00:17:59 -0700
-Subject: [PATCH] MAINTAINERS: clk: discuss on the
- linux-clk@vger.kernel.org list
-In-Reply-To: <alpine.DEB.2.02.1503251828240.13341@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503251828240.13341@utopia.booyaka.com>
-Message-ID: <20150327071759.GA18059@codeaurora.org>
+Date: Fri, 27 Mar 2015 00:19:35 -0700
+Subject: [PATCH 32/35 linux-next] clk: constify of_device_id array
+In-Reply-To: <386731024.185864.1427020449384.open-xchange@webmail.nmp.proximus.be>
+References: <1426533469-25458-1-git-send-email-fabf@skynet.be>
+ <1426535949-26107-1-git-send-email-fabf@skynet.be>
+ <20150318141509.7930.28419@quantum>
+ <386731024.185864.1427020449384.open-xchange@webmail.nmp.proximus.be>
+Message-ID: <20150327071935.GB18059@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25, Paul Walmsley wrote:
+On 03/22, Fabian Frederick wrote:
 > 
-> Most Linux clock framework discussions take place on the
-> linux-kernel at vger.kernel.org or linux-arm-kernel at lists.infradead.org
-> mailing lists.  The volume of unrelated messages on these lists makes
-> it difficult for non-maintainers to follow along with discussions.
-> Switch the discussion list for clock framework discussions to
-> linux-clk at vger.kernel.org.  Also, add linux-clk at vger.kernel.org as a
-> mailing list for clock API discussions.
 > 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-> Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> ---
+> > On 18 March 2015 at 15:15 Michael Turquette <mturquette@linaro.org> wrote:
+> >
+> >
+> > Quoting Fabian Frederick (2015-03-16 12:59:06)
+> > > of_device_id is always used as const.
+> > > (See driver.of_match_table and open firmware functions)
+> > >
+> > > Signed-off-by: Fabian Frederick <fabf@skynet.be>
+> >
+> > Acked-by: Michael Turquette <mturquette@linaro.org>
+> 
+> Thanks :)
+> 
+> btw, something I forgot to mention in changelog is the __initdata -> __initconst
+> for ti_clkdm_match_table[]
+> 
+> I can send it again with a new changelog if necessary ...
+> 
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-
-Mike or I will pick this up for 4.1
+Did you want us to take this through clk-next? If so please
+resend with the new commit text.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
