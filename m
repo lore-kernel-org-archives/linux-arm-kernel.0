@@ -1,40 +1,74 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 27 Mar 2015 11:41:34 +0100
-Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
-In-Reply-To: <139dc298c0914b3536445dddd37be286@agner.ch>
-References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
- <139dc298c0914b3536445dddd37be286@agner.ch>
-Message-ID: <20150327104134.GW32677@pengutronix.de>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 27 Mar 2015 10:42:22 +0000
+Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
+ alternative instruction
+In-Reply-To: <20150326221955.4b8fe6f0@arm.com>
+References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
+ <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
+ <20150326220323.GA23836@arm.com> <20150326221955.4b8fe6f0@arm.com>
+Message-ID: <1427452942.2658.3.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 11:32:31AM +0100, Stefan Agner wrote:
-> On 2015-03-24 16:26, Markus Pargmann wrote:
-> > 0 is used in all pinfunction definitions when a config register is not
-> > available, for example imx25-pinfunc.h. If a configuration value is used
-> > for such a pinfunction the driver will always write it to the
-> > configuration register if it is not -1. For a 0 configuration register
-> > the configuration value is written to offset 0x0. This can lead to a
-> > crashing/hanging system without any warning message.
+On Thu, 2015-03-26 at 22:19 +0000, Marc Zyngier wrote:
+> On Thu, 26 Mar 2015 22:03:23 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
 > 
-> 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
-> the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
-> actually works.
+> > On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
+> > > Since all immediate branches are PC-relative on Aarch64, these
+> > > instructions cannot be used as an alternative with the simplistic
+> > > approach we currently have (the immediate has been computed from
+> > > the .altinstr_replacement section, and end-up being completely off
+> > > if we insert it directly).
+> > > 
+> > > This patch handles the b and bl instructions in a different way,
+> > > using the insn framework to recompute the immediate, and generate
+> > > the right displacement.
+> > > 
+> > > Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
+> > >  1 file changed, 53 insertions(+), 2 deletions(-)
+> > 
+> > [...]
+> > 
+> > >  static int __apply_alternatives(void *alt_region)
+> > >  {
+> > >  	struct alt_instr *alt;
+> > > @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
+> > >  	u8 *origptr, *replptr;
+> > >  
+> > >  	for (alt = region->begin; alt < region->end; alt++) {
+> > > +		u32 insn;
+> > > +		int i;
+> > > +
+> > >  		if (!cpus_have_cap(alt->cpufeature))
+> > >  			continue;
+> > >  
+> > > -		BUG_ON(alt->alt_len > alt->orig_len);
+> > > +		BUG_ON(alt->alt_len != alt->orig_len);
+> > >  
+> > >  		pr_info_once("patching kernel code\n");
+> > >  
+> > >  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
+> > >  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
+> > > -		memcpy(origptr, replptr, alt->alt_len);
+> > > +
+> > > +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
+> > > +			insn = get_alt_insn(origptr + i, replptr + i);
+> > > +			*(u32 *)(origptr + i) = insn;
+> > 
+> > My brain's not firing on all cylinders right now, but do you need a
+> > cpu_to_le32 here?
 > 
-> What is a bit a bummer is that we now have different meanings of 0,
-> depending on the field:
-> - For the first field (mux), 0 is a valid offset
-> - For the second field (config), 0 means not valid
-> 
-> However, I can't think of a easy solution which would solve this in a
-> cleaner mannor... Maybe a comment in the function header how the 5 u32's
-> are intepreted would appropriate?
-That means that on Vybrid you need to write to offset 0 a config value?
-Or not?
+> I'm not 100% awake myself (probably some acute form of firmwaritis),
+> but I suspect you're quite right (get_alt_insn calls aarch64_insn_read,
+> which does a le32_to_cpu). Obviously, we need to revert the conversion
+> when writing the instruction back.
 
-Best regards
-Uwe
+Isn't aarch64_insn_write the inverse of aarch64_insn_read and more
+correct than using cpu_to_le32?
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tixy
