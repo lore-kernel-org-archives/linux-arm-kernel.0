@@ -1,66 +1,26 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 27 Mar 2015 12:42:54 +0100
-Subject: Cache line size definition in arch/arm/mm/Kconfig
-In-Reply-To: <5512C7A4.3000302@free.fr>
-References: <5512C7A4.3000302@free.fr>
-Message-ID: <5515423E.4020802@free.fr>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 27 Mar 2015 20:43:34 +0900
+Subject: [PATCH 0/4] kbuild: refactor Makefile inclusion
+Message-ID: <1427456618-23830-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/2015 15:35, Mason wrote:
+Masahiro Yamada (4):
+  kbuild: use relative path to include Makefile
+  kbuild: use relative path more to include Makefile
+  kbuild: include $(src)/Makefile rather than $(obj)/Makefile
+  kbuild: ia64: use $(src)/Makefile.gate rather than particular path
 
-> AFAICT, L1 cache line size is specified in arch/arm/mm/Kconfig
->
-> config ARM_L1_CACHE_SHIFT_6
->      bool
->      default y if CPU_V7
->      help
->        Setting ARM L1 cache line size to 64 Bytes.
->
-> config ARM_L1_CACHE_SHIFT
->      int
->      default 6 if ARM_L1_CACHE_SHIFT_6
->      default 5
->
->
-> I'm using a Cortex A9 MPCore. If I'm not mistaken, the cache line size
-> is 32 bytes, even though this CPU is ARMv7.
->
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388g/Caccifbd.html
->
->> The Cortex-A9 processor has separate instruction and data caches.
->> The caches have the following features:
->>
->>   Each cache can be disabled independently. See System Control Register.
->>   Both caches are 4-way set-associative.
->>   The cache line length is eight words.
->>   On a cache miss, critical word first filling of the cache is performed.
->>   You can configure the instruction and data caches independently during implementation to sizes of 16KB, 32KB, or 64KB.
->>   To reduce power consumption, the number of full cache reads is reduced by taking advantage of the sequential nature of many cache operations. If a cache read is sequential to the previous cache read, and the read is within the same cache line, only the data RAM set that was previously read is accessed.
->
-> How do I set ARM_L1_CACHE_SHIFT_6 to 'n' in my platform Kconfig?
->
-> Or perhaps I should "override" ARM_L1_CACHE_SHIFT to 5 (again in
-> my platform Kconfig). I don't know the syntax to do that.
->
-> Could someone point out the correct way?
+ Makefile                  | 22 ++++++++++------------
+ arch/arm/boot/Makefile    |  2 +-
+ arch/ia64/kernel/Makefile |  2 +-
+ arch/mips/Makefile        |  2 +-
+ arch/um/Makefile          |  6 +++---
+ arch/x86/Makefile         |  2 +-
+ arch/x86/Makefile.um      |  2 +-
+ scripts/Makefile.dtbinst  |  2 +-
+ scripts/Makefile.fwinst   |  2 +-
+ 9 files changed, 20 insertions(+), 22 deletions(-)
 
-Would someone care to comment? :-)
-
-Someone mentioned that some implementations prefetch 64 bytes from
-L2D into L1D, so it might make sense to align "hot" data to 64 bytes
-to benefit from this mechanism?
-
-It seems we might waste a few hundred/thousand bytes if aligning to
-cache line is a frequent operation, though.
-
-On a tangential note, it seems likely that Linux could determine the
-size of L1 at run-time, by poking the right implementation-specific
-register. Is it not better to get the information at run-time, rather
-than as a compile-time constant?
-
-(I have the same general question about PERIPH_BASE, patch incoming.)
-
-Thoughts?
-
-Regards.
+-- 
+1.9.1
