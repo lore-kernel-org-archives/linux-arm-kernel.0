@@ -1,85 +1,117 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 27 Mar 2015 21:40:26 +0800
-Subject: [patch v11 13/23] ACPI / processor: Introduce phys_cpuid_t for
- CPU hardware ID
-In-Reply-To: <551381CD.5010804@huawei.com>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
- <1427205776-5060-14-git-send-email-hanjun.guo@linaro.org>
- <20150325172109.GJ14585@localhost> <551381CD.5010804@huawei.com>
-Message-ID: <55155DCA.3060006@linaro.org>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 27 Mar 2015 14:45:13 +0100
+Subject: Cache line size definition in arch/arm/mm/Kconfig
+In-Reply-To: <20150327120601.GB4019@n2100.arm.linux.org.uk>
+References: <5512C7A4.3000302@free.fr> <5515423E.4020802@free.fr>
+ <20150327120601.GB4019@n2100.arm.linux.org.uk>
+Message-ID: <55155EE9.6020600@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?03?26? 11:49, Hanjun Guo wrote:
-> On 2015/3/26 1:21, Catalin Marinas wrote:
->> On Tue, Mar 24, 2015 at 10:02:46PM +0800, Hanjun Guo wrote:
->>> CPU hardware ID (phys_id) is defined as u32 in structure acpi_processor,
->>> but phys_id is used as int in acpi processor driver, so it will lead to
->>> some inconsistence for the drivers.
->>>
->>> Furthermore, to cater for ACPI arch ports that implement 64 bits CPU
->>> ids a generic CPU physical id type is required.
->>>
->>> So introduce typedef u32 phys_cpuid_t in a common file, and introduce
->>> a macro PHYS_CPUID_INVALID as (phys_cpuid_t)(-1) if it's not defined
->>> by other archs, this will solve the inconsistence in acpi processor driver,
->>> and will prepare for the ACPI on ARM64 for the 64 bit CPU hardware ID
->>> in the following patch.
->>>
->>> CC: Rafael J Wysocki <rjw@rjwysocki.net>
->>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Reviewed-by: Grant Likely <grant.likely@linaro.org>
->>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->>> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>> [hj: reworked cpu physid map return codes]
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> BTW, am I still the author of this patch? If yes, it's missing a From:
->> line.
->
-> Oops, you should be the author, can Will fix this in his tree?
->
+On 27/03/2015 13:06, Russell King - ARM Linux wrote:
+> On Fri, Mar 27, 2015 at 12:42:54PM +0100, Mason wrote:
+>> On 25/03/2015 15:35, Mason wrote:
 >>
->>> --- a/drivers/acpi/acpi_processor.c
->>> +++ b/drivers/acpi/acpi_processor.c
->>> @@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
->>>   	acpi_status status;
->>>   	int ret;
+>>> AFAICT, L1 cache line size is specified in arch/arm/mm/Kconfig
 >>>
->>> -	if (pr->phys_id == -1)
->>> +	if (pr->phys_id == PHYS_CPUID_INVALID)
->>>   		return -ENODEV;
->> If PHYS_CPUID_INVALID is the same as INVALID_HWID, we should get rid of
->> the latter in the arm64 code (as a subsequent clean-up patch).
+>>> config ARM_L1_CACHE_SHIFT_6
+>>>      bool
+>>>      default y if CPU_V7
+>>>      help
+>>>        Setting ARM L1 cache line size to 64 Bytes.
+>>>
+>>> config ARM_L1_CACHE_SHIFT
+>>>      int
+>>>      default 6 if ARM_L1_CACHE_SHIFT_6
+>>>      default 5
+>>>
+>>>
+>>> I'm using a Cortex A9 MPCore. If I'm not mistaken, the cache line size
+>>> is 32 bytes, even though this CPU is ARMv7.
+>>>
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0388g/Caccifbd.html
+>>>
+>>>> The Cortex-A9 processor has separate instruction and data caches.
+>>>> The caches have the following features:
+>>>>
+>>>>   Each cache can be disabled independently. See System Control Register.
+>>>>   Both caches are 4-way set-associative.
+>>>>   The cache line length is eight words.
+>>>>   On a cache miss, critical word first filling of the cache is performed.
+>>>>   You can configure the instruction and data caches independently during implementation to sizes of 16KB, 32KB, or 64KB.
+>>>>   To reduce power consumption, the number of full cache reads is reduced by taking advantage of the sequential nature of many cache operations. If a cache read is sequential to the previous cache read, and the read is within the same cache line, only the data RAM set that was previously read is accessed.
+>>>
+>>> How do I set ARM_L1_CACHE_SHIFT_6 to 'n' in my platform Kconfig?
+>>>
+>>> Or perhaps I should "override" ARM_L1_CACHE_SHIFT to 5 (again in
+>>> my platform Kconfig). I don't know the syntax to do that.
+>>>
+>>> Could someone point out the correct way?
+>>
+>> Would someone care to comment? :-)
 >
-> OK, I'm preparing a patch set to introduce invalid_phys_cpuid() and invalid_logical_cpuid()
-> to remove the direct comparison of PHYS_CPUID_INVALID and -1 in ACPI processor drivers,
-> which is suggested by Rafael, I will cleanup PHYS_CPUID_INVALID in this patch set.
+> No :)
 
-I met difficulty to do so, because we use
+I'm glad that you've decided to disagree with yourself! :-)
 
-+#ifndef PHYS_CPUID_INVALID
-+typedef u32 phys_cpuid_t;
-+#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
-+#endif
+> What you've found is the _static_ L1 cache line size setting, which is
+> used at _compile_ time to align structures while building.  To allow
+> maximum flexibility - and because there are 64-byte cache line ARMv7
+> implementations around - we have decided that the _compile time_
+> cache line size will be 64 bytes.
 
-in the common head file linux/acpi.h, we need macro
-PHYS_CPUID_INVALID to identify if phys_cpuid_t is typedefed
-for different arch, so if we want remove PHYS_CPUID_INVALID
-for ARM64, we need to got back to typedef phys_cpuid_t for
-each arch using ACPI. which means that
+Right, I had a complete brain malfunction there. Compiler needs to be
+told the cache line size to properly align relevant objects.
 
-+typedef u32 phys_cpuid_t;  for ia64 and x86,
+> As far as cache operations are concerned, they will know the correct
+> cache line size for the CPU which they're running on, so the code
+> will adapt.
+>
+> It has the side effect that some allocators also assume that the L1
+> cache line size is 64 bytes.
+>
+> It's better to have a larger than necessary cache line size than a
+> smaller one, because a larger one is automatically aligned to the
+> smaller sizes.
+>
+> In other words, this is totally intentional.
 
-and
-+typedef u64 phys_cpuid_t;  for arm64
+I don't understand why I should not override ARM_L1_CACHE_SHIFT to 5
+in my platform-specific Kconfig, since I know I have a 32-byte cache
+line size?
 
-and
-+#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
-in this linux/acpi.h for common use.
 
-Rafael, would you mind doing so?
+Oh and while I have your attention ;-) I have alignment-related
+questions about clocksource_mmio_init() (commit 442c8176d2) wrt
+Thomas Gleixner's 369db4c952 patch. (I think the two patches
+do not play nice.)
 
-Thanks
-Hanjun
+369db4c952 moved some struct clocksource fields around to group
+hot fields in a single cache line at the beginning of the struct,
+and marked the struct as cache aligned. This works as expected
+with static structures.
+
+However, I don't think it works as expected with dynamically
+allocated struct clocksource. It seems to me (and I may very
+well be wrong!) that struct clocksource_mmio should have the
+clksrc field at the beginning of the struct, and we should
+use an allocation function that returns cache aligned memory?
+
+struct clocksource_mmio {
+	struct clocksource clksrc;
+	void __iomem *reg;
+};
+
+   cs = kmagic_cache_alloc(sizeof *cs, GFP_KERNEL);
+
+That way clksrc would effectively be cache aligned, right?
+
+
+One thing that caught me off-guard: when CONFIG_ARCH_CLOCKSOURCE_DATA
+and CONFIG_CLOCKSOURCE_WATCHDOG are undefined, struct clocksource
+weighs 80 bytes on a 32-bit system. I would expect the "reg" field
+at the end to "fit in the hole", but in fact, gcc seems to "stretch"
+struct clocksource before considering other fields. This may be a
+bug in gcc's extension?
+
+Regards.
