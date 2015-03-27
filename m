@@ -1,35 +1,149 @@
-From: kmcmarti@redhat.com (Kyle McMartin)
-Date: Fri, 27 Mar 2015 13:40:44 -0400
-Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
-In-Reply-To: <55157920.3050003@arm.com>
-References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
- <20150327153131.GK12400@redacted.bos.redhat.com>
- <55157920.3050003@arm.com>
-Message-ID: <20150327174044.GL12400@redacted.bos.redhat.com>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Fri, 27 Mar 2015 17:42:24 +0000
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150327174055.1a2dc194@north>
+References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
+ <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
+ <20150327174055.1a2dc194@north>
+Message-ID: <20150327174223.GA12666@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
-> > [  236.260863] Kernel panic - not syncing: HYP panic:
-> > [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
+[Resend -- apologies again for any duplicates received]
+
+On Fri, Mar 27, 2015 at 05:40:55PM +0100, Jakub Kicinski wrote:
+> On Fri, 27 Mar 2015 14:59:31 +0000, Dave Martin wrote:
+> > Commit 734745c serial/amba-pl011: Activate TX IRQ passively
+> > adds some unnecessary complexity and overhead in the form of
+> > a softirq mechanism for transmitting in the absence of interrupts.
+> > 
+> > After some discussion [1], this turns out to be unnecessary.
+> > 
+> > This patch simplifies the code flow to reduce the reliance on
+> > subtle behaviour and avoid fragility under future maintenance.
+> > 
+> > To this end, the TX softirq mechanism is removed and instead
+> > pl011_start_tx() will now simply stuff the FIFO until full
+> > (guaranteeing future TX IRQs), or until there are no more chars
+> > to write (in which case we don't care whether an IRQ happens).
+> > 
+> > [1] Thanks to Jakub Kicinski for his input and similar patch.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  drivers/tty/serial/amba-pl011.c |  119 +++++++++------------------------------
+> >  1 file changed, 26 insertions(+), 93 deletions(-)
+> > 
+> > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+
+[...]
+
+> > -
+> > -	/*
+> > -	 * If the FIFO is full we're guaranteed a TX IRQ at some later point,
+> > -	 * and can't transmit immediately in any case:
+> > -	 */
+> > -	if (unlikely(uap->tx_irq_seen < 2 &&
+> > -		     readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF))
+> > -		return false;
+> > +	int count = uap->fifosize >> 1;
 > 
-> It would be interesting if you could find out what you have at offset
-> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
-> help much).
+> Dave, I'd prefer if you kept my .prev_from_irq thing.  If .start_tx()
+> races with the IRQ we may have a situation where the IRQ arrives
+> but .start_tx() already filled the FIFO.  The guarantee of half of the
+> FIFO being empty will not hold in this case.  That's why I use the
+> guarantee only if the previous load was also from FIFO.
+
+I thought about this, but I think port->lock prevents this from
+happening.  I was overly defensive about this in the earlier versions
+of the patches, and that made the code a fair bit more complicated...
+I was hoping it could just go away ;)
+
+
+In pl011_int(), we have
+
+-8<-
+
+spin_lock_irqsave(&uap->port.lock, flags);
+
+[...]
+
+while (status = readw(uap->port.membase + UART012_MIS), status != 0) {
+
+[...]
+
+	if (status & UART011_TXIS)
+		pl011_tx_chars(uap, true);
+
+} while (status != 0);
+
+[...]
+
+spin_unlock_irqrestore(&uap->port.lock, flags);
+
+->8-
+
+
+serial_core always holds port->lock around _start_tx(), so it should be
+impossible for any part of _start_tx() to run in parallel with this.  If
+TXIS is asserted and nothing can write the FIFO in the meantime, then
+that should mean that the FIFO is definitely half-empty on entry to
+pl011_tx_chars(..., from_irq=true) -- this is also why it's safe for
+pl011_int() to loop and potentially make repeated calls to
+pl011_tx_chars().
+
+Can you see a way this could break, or does this reasoning sound good to
+you?
+
+	do {
 > 
+> >  	if (uap->port.x_char) {
+> > -		pl011_tx_char(uap, uap->port.x_char);
+> > +		if (!pl011_tx_char(uap, uap->port.x_char, from_irq))
+> > +			return;
+> >  		uap->port.x_char = 0;
+> >  		--count;
+> >  	}
+> >  	if (uart_circ_empty(xmit) || uart_tx_stopped(&uap->port)) {
+> >  		pl011_stop_tx(&uap->port);
+> > -		goto done;
+> > +		return;
+> >  	}
+> >  
+> >  	/* If we are using DMA mode, try to send some characters. */
+> >  	if (pl011_dma_tx_irq(uap))
+> > -		goto done;
+> > +		return;
+> >  
+> > -	while (count-- > 0 && pl011_tx_char(uap, xmit->buf[xmit->tail])) {
+> > -		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+> > -		if (uart_circ_empty(xmit))
+> > +	do {
+> > +		if (likely(from_irq) && count-- == 0)
+> >  			break;
+> > -	}
+> > +
+> > +		if (!pl011_tx_char(uap, xmit->buf[xmit->tail], from_irq))
+> > +			break;
+> > +
+> > +		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+> > +	} while (!uart_circ_empty(xmit));
+> 
+> If you add the .prev_* this loop will become even more ugly.  Feel free
+> to copy my code wherever you see fit.
 
-Given the alignment, i'm going to assume i'm looking at the right thing:
+My main reason for refactoring this loop was to split up the complex
+termination condition.  Possibly replacing from_irq with from_irq &&
+prev_from_irq in the loop would do the trick, but only of this change
+is really needed...
 
-0000000000000820 <__kvm_hyp_reset>:
-     820:       d51c2000        msr     ttbr0_el2, x0
-     824:       d5033fdf        isb
-     828:       d50c871f        tlbi    alle2
-     82c:       d5033f9f        dsb     sy
-     830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
-     834:       b3403c01        bfxil   x1, x0, #0, #16
-     838:       d61f0020        br      x1
-     83c:       d53c1000        mrs     x0, sctlr_el2
 
-but it seems fairly implausible to be trapping on ADR x0, 1f...
+Can you see any other problems?
 
---Kyle
+There's nothing wrong with additional patches going on top of this,
+but I've been giving Greg the runaround and don't want to keep
+respinning the whole thing unless really necessary...
+
+Cheers
+---Dave
