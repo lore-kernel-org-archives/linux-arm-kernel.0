@@ -1,36 +1,39 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 Mar 2015 12:21:45 +0200
-Subject: gpio-syscon for Keystone 2 - DT bindings mismatch code
- expectation?
-In-Reply-To: <CACRpkdYVkdLEEae8JHSsBEtMyhMx0yqN8RLhP2reoV+r5gA+JA@mail.gmail.com>
-References: <20150323215545.GT8656@n2100.arm.linux.org.uk>
- <CACRpkdYVkdLEEae8JHSsBEtMyhMx0yqN8RLhP2reoV+r5gA+JA@mail.gmail.com>
-Message-ID: <55152F39.5090805@ti.com>
+From: jonas@microbit.se (Jonas Andersson)
+Date: Fri, 27 Mar 2015 11:21:50 +0100
+Subject: at91 clocks
+In-Reply-To: <20150326162827.041c051a@bbrezillon>
+References: <55117568.6090202@microbit.se>	<20150325013201.3f01fc22@bbrezillon>	<55127AA6.5050902@microbit.se>	<20150325173751.0d6479df@bbrezillon>	<5513D701.2080201@microbit.se>
+ <20150326162827.041c051a@bbrezillon>
+Message-ID: <55152F3E.60004@microbit.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2015 12:12 PM, Linus Walleij wrote:
-> On Mon, Mar 23, 2015 at 10:55 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->
->> Linus, Grygorii,
->>
->> I'm trying to understand what's happening to make Keystone2 print
->> this at boot:
->>
->> gpio-syscon soc:keystone_dsp_gpio at 02620240: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 2620244: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 2620248: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 262024c: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 2620250: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 2620254: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 2620258: can't read the dir register offset!
->> gpio-syscon soc:keystone_dsp_gpio at 262025c: can't read the dir register offset!
->
-> Grygorii are you looking into this?
+Hi Boris,
 
-Yes. Seems you've found the patch already )
-https://lkml.org/lkml/2015/3/24/908
+On 2015-03-26 16:28, Boris Brezillon wrote:
+>>>>>> Hi all,
+>>>>>>
+>>>>>> I am working on a system with at91sam9260 soc. Trying to move from
+>>>>>> kernel 3.17.4 to 3.19.2. I have problem with pck1 clock.
+>>>>>>
+>>>>>> In my old code i use clk_get() to get pck1 and pllb, set pllb as parent
+>>>>>> for pck1, set rate for pck1, enable pck1.
+>>>>> How do you do that (clk_set_parent + clk_set_rate) ?
+>>>>> Could you paste your code somewhere ?
+>>>> Yes, see http://pastie.org/10052161
+> Could you paste the new version of your code (the one with clk_set_rate
+> on pllb) ?
+Added this at http://pastie.org/10057041
+>>> Your pllb seems to be configured to output a 0Hz rate, and I'm not
+>>> forwarding rate change to prog clk parents yet.
+>>> That's definitely something I should work on, but in the meantime you
+>>> could try to manually set pllb rate.
+>> I tried to set pllb rate to 96MHz but it still shows 0Hz. |clk_set_rate
+>> returns 0|.
+> Have you tested pllb pointer value ? As you can see here [1], the CCF
+> is not complaining when you pass a NULL pointer.
 
-regards,
--grygorii
+I tested with IS_ERR, changed this to IS_ERR_OR_NULL, but the pointer is ok.
+
+Best regards
+  Jonas
