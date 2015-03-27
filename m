@@ -1,165 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Mar 2015 17:08:08 +0100
-Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on Exynos5250
- and other
-Message-ID: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 27 Mar 2015 17:16:33 +0100
+Subject: Reading twd_base at run-time
+Message-ID: <55158261.9010108@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After adding display power domain for Exynos5250 in commit
-2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
-display on Chromebook Snow and others stopped working after boot.
+Hello everyone,
 
-The reason for this suggested Andrzej Hajda: the DP clock was disabled.
-This clock is required by Display Port and is enabled by bootloader.
-However when FIMD driver probing was deferred, the display power domain
-was turned off. This effectively reset the value of DP clock enable
-register.
+In arch/arm/kernel/smp_twd.c, twd_local_timer_register() receives a
+struct twd_local_timer argument, which specifies
 
-When exynos-dp is later probed, the clock is not enabled and display is
-not properly configured:
+   1) the physical address of twd_base
+   2) the twd interrupt number
 
-exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-exynos-dp 145b0000.dp-controller: unable to config video
+There's a helper to fill out the static struct: DEFINE_TWD_LOCAL_TIMER()
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
-Cc: <stable@vger.kernel.org>
+But it seems to me (please correct me if I'm wrong) that the address
+of twd_base can be read at run-time, making it one less parameter to
+specify by hand at compile-time (with the risk that a HW engineer
+change the address in the next chip with no warning).
 
----
+Here's an incomplete patch to express my intent:
 
-This should fix issue reported by Javier [1][2].
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 6591e26..5177db8 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -369,14 +369,14 @@ out_free:
+         return err;
+  }
+  
+-int __init twd_local_timer_register(struct twd_local_timer *tlt)
++int __init twd_local_timer_register(void)
+  {
+         if (twd_base || twd_evt)
+                 return -EBUSY;
+  
+-       twd_ppi = tlt->res[1].start;
++       twd_ppi = 29;
+  
+-       twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
++       twd_base = ioremap(scu_a9_get_base() + 0x600, 0x10);
+         if (!twd_base)
+                 return -ENOMEM;
+  
 
-Tested on Chromebook Snow (Exynos 5250). More testing would be great,
-especially on other Exynos 5xxx products.
+As far as I can tell, all platforms use 29 for twd_ppi, but I can make
+sure if people agree this patch is indeed an improvement.
 
-[1] http://thread.gmane.org/gmane.linux.kernel.samsung-soc/43889
-[2] http://thread.gmane.org/gmane.linux.ports.arm.kernel/400290
-
-Changes since v1:
-1. Added missing exynos_drm_fimd.h.
----
- drivers/gpu/drm/exynos/exynos_dp_core.c  | 10 ++++++++++
- drivers/gpu/drm/exynos/exynos_drm_fimd.c | 19 +++++++++++++++++++
- drivers/gpu/drm/exynos/exynos_drm_fimd.h | 15 +++++++++++++++
- include/video/samsung_fimd.h             |  6 ++++++
- 4 files changed, 50 insertions(+)
- create mode 100644 drivers/gpu/drm/exynos/exynos_drm_fimd.h
-
-diff --git a/drivers/gpu/drm/exynos/exynos_dp_core.c b/drivers/gpu/drm/exynos/exynos_dp_core.c
-index bf17a60b40ed..1dbfba58f909 100644
---- a/drivers/gpu/drm/exynos/exynos_dp_core.c
-+++ b/drivers/gpu/drm/exynos/exynos_dp_core.c
-@@ -32,10 +32,16 @@
- #include <drm/bridge/ptn3460.h>
- 
- #include "exynos_dp_core.h"
-+#include "exynos_drm_fimd.h"
- 
- #define ctx_from_connector(c)	container_of(c, struct exynos_dp_device, \
- 					connector)
- 
-+static inline struct exynos_drm_crtc *dp_to_crtc(struct exynos_dp_device *dp)
-+{
-+	return to_exynos_crtc(dp->encoder->crtc);
-+}
-+
- static inline struct exynos_dp_device *
- display_to_dp(struct exynos_drm_display *d)
- {
-@@ -1070,6 +1076,8 @@ static void exynos_dp_poweron(struct exynos_dp_device *dp)
- 		}
- 	}
- 
-+	fimd_dp_clock_enable(dp_to_crtc(dp), true);
-+
- 	clk_prepare_enable(dp->clock);
- 	exynos_dp_phy_init(dp);
- 	exynos_dp_init_dp(dp);
-@@ -1094,6 +1102,8 @@ static void exynos_dp_poweroff(struct exynos_dp_device *dp)
- 	exynos_dp_phy_exit(dp);
- 	clk_disable_unprepare(dp->clock);
- 
-+	fimd_dp_clock_enable(dp_to_crtc(dp), false);
-+
- 	if (dp->panel) {
- 		if (drm_panel_unprepare(dp->panel))
- 			DRM_ERROR("failed to turnoff the panel\n");
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-index c300e22da8ac..bdf0818dc8f5 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
-@@ -32,6 +32,7 @@
- #include "exynos_drm_fbdev.h"
- #include "exynos_drm_crtc.h"
- #include "exynos_drm_iommu.h"
-+#include "exynos_drm_fimd.h"
- 
- /*
-  * FIMD stands for Fully Interactive Mobile Display and
-@@ -1231,6 +1232,24 @@ static int fimd_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable)
-+{
-+	struct fimd_context *ctx = crtc->ctx;
-+	u32 val;
-+
-+	/*
-+	 * Only Exynos 5250, 5260, 5410 and 542x requires enabling DP/MIE
-+	 * clock. On these SoCs the bootloader may enable it but any
-+	 * power domain off/on will reset it to disable state.
-+	 */
-+	if (ctx->driver_data != &exynos5_fimd_driver_data)
-+		return;
-+
-+	val = enable ? DP_MIE_CLK_DP_ENABLE : DP_MIE_CLK_DISABLE;
-+	writel(DP_MIE_CLK_DP_ENABLE, ctx->regs + DP_MIE_CLKCON);
-+}
-+EXPORT_SYMBOL_GPL(fimd_dp_clock_enable);
-+
- struct platform_driver fimd_driver = {
- 	.probe		= fimd_probe,
- 	.remove		= fimd_remove,
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.h b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-new file mode 100644
-index 000000000000..b4fcaa568456
---- /dev/null
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.h
-@@ -0,0 +1,15 @@
-+/*
-+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#ifndef _EXYNOS_DRM_FIMD_H_
-+#define _EXYNOS_DRM_FIMD_H_
-+
-+extern void fimd_dp_clock_enable(struct exynos_drm_crtc *crtc, bool enable);
-+
-+#endif /* _EXYNOS_DRM_FIMD_H_ */
-diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
-index a20e4a3a8b15..847a0a2b399c 100644
---- a/include/video/samsung_fimd.h
-+++ b/include/video/samsung_fimd.h
-@@ -436,6 +436,12 @@
- #define BLENDCON_NEW_8BIT_ALPHA_VALUE		(1 << 0)
- #define BLENDCON_NEW_4BIT_ALPHA_VALUE		(0 << 0)
- 
-+/* Display port clock control */
-+#define DP_MIE_CLKCON				0x27c
-+#define DP_MIE_CLK_DISABLE			0x0
-+#define DP_MIE_CLK_DP_ENABLE			0x2
-+#define DP_MIE_CLK_MIE_ENABLE			0x3
-+
- /* Notes on per-window bpp settings
-  *
-  * Value	Win0	 Win1	  Win2	   Win3	    Win 4
--- 
-1.9.1
+Regards.
