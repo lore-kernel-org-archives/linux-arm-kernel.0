@@ -1,74 +1,45 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Mar 2015 14:15:04 +0000
-Subject: [PATCH 3/4] irqchip: gicv3-its: Fix PROP/PEND and BASE/CBASE confusion
+Date: Fri, 27 Mar 2015 14:15:02 +0000
+Subject: [PATCH 1/4] irqchip: gicv3-its: Fix encoding of collection's target
+ redistributor
 In-Reply-To: <1427465705-17126-1-git-send-email-marc.zyngier@arm.com>
 References: <1427465705-17126-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1427465705-17126-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1427465705-17126-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ITS driver sometime mixes up the use of GICR_PROPBASE bitfields
-for the GICR_PENDBASE register, and GITS_BASER for GICR_CBASE.
+With a monolithic GICv3, redistributors are addressed using a linear
+number, while a distributed implementation uses physical addresses.
 
-This does not lead to any observable bug because similar bits are
-at the same location, but this just make the code even harder to
-understand...
+When encoding a target address into a command, we strip the lower
+16 bits, as redistributors are always 64kB aligned. This works
+perfectly well with a distributed implementation, but has the
+silly effect of always encoding target 0 in the monolithic case
+(unless you have more than 64k CPUs, of course).
 
-This patch provides the required #defines and fixes the mixup.
+The obvious fix is to shift the linear target number by 16 when
+computing the target address, so that we don't loose any precious
+bit.
 
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Tested-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   |  6 +++---
- include/linux/irqchip/arm-gic-v3.h | 13 +++++++++++++
- 2 files changed, 16 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index fa0c436..56353f6 100644
+index 596b0a9..7318dba 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -986,8 +986,8 @@ static void its_cpu_init_lpis(void)
+@@ -1026,7 +1026,7 @@ static void its_cpu_init_collection(void)
+ 			 * This ITS wants a linear CPU number.
+ 			 */
+ 			target = readq_relaxed(gic_data_rdist_rd_base() + GICR_TYPER);
+-			target = GICR_TYPER_CPU_NUMBER(target);
++			target = GICR_TYPER_CPU_NUMBER(target) << 16;
+ 		}
  
- 	/* set PENDBASE */
- 	val = (page_to_phys(pend_page) |
--	       GICR_PROPBASER_InnerShareable |
--	       GICR_PROPBASER_WaWb);
-+	       GICR_PENDBASER_InnerShareable |
-+	       GICR_PENDBASER_WaWb);
- 
- 	writeq_relaxed(val, rbase + GICR_PENDBASER);
- 
-@@ -1425,7 +1425,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	writeq_relaxed(0, its->base + GITS_CWRITER);
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
--	if ((tmp ^ baser) & GITS_BASER_SHAREABILITY_MASK) {
-+	if ((tmp ^ baser) & GITS_CBASER_SHAREABILITY_MASK) {
- 		pr_info("ITS: using cache flushing for cmd queue\n");
- 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
- 	}
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 781974a..826a4bd 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -128,6 +128,19 @@
- #define GICR_PROPBASER_RaWaWb		(7U << 7)
- #define GICR_PROPBASER_IDBITS_MASK	(0x1f)
- 
-+#define GICR_PENDBASER_NonShareable	(0U << 10)
-+#define GICR_PENDBASER_InnerShareable	(1U << 10)
-+#define GICR_PENDBASER_OuterShareable	(2U << 10)
-+#define GICR_PENDBASER_SHAREABILITY_MASK (3UL << 10)
-+#define GICR_PENDBASER_nCnB		(0U << 7)
-+#define GICR_PENDBASER_nC		(1U << 7)
-+#define GICR_PENDBASER_RaWt		(2U << 7)
-+#define GICR_PENDBASER_RaWb		(3U << 7)
-+#define GICR_PENDBASER_WaWt		(4U << 7)
-+#define GICR_PENDBASER_WaWb		(5U << 7)
-+#define GICR_PENDBASER_RaWaWt		(6U << 7)
-+#define GICR_PENDBASER_RaWaWb		(7U << 7)
-+
- /*
-  * Re-Distributor registers, offsets from SGI_base
-  */
+ 		/* Perform collection mapping */
 -- 
 2.1.4
