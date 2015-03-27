@@ -1,53 +1,35 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Mar 2015 20:21:26 +0100
-Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
-References: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5515ADB6.6050204@collabora.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Mar 2015 20:22:30 +0000
+Subject: [PATCH v3 6/7] dmaengine: omap-dma: Remove mapping between
+ virtual channels and requests
+In-Reply-To: <1427459213-14611-7-git-send-email-peter.ujfalusi@ti.com>
+References: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427459213-14611-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150327202230.GA4027@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Fri, Mar 27, 2015 at 02:26:52PM +0200, Peter Ujfalusi wrote:
+> Do not direct map the virtual channels to sDMA request number. When the
+> sDMA is behind of a crossbar this direct mapping can cause situations when
+> certain channel can not be requested since the crossbar request number
+> will no longer match with the sDMA request line.
+> The direct mapping for virtual channels with HW request lines will make it
+> harder to implement MEM_TO_MEM mode for the driver.
 
-On 03/27/2015 05:08 PM, Krzysztof Kozlowski wrote:
-> After adding display power domain for Exynos5250 in commit
-> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
-> display on Chromebook Snow and others stopped working after boot.
-> 
-> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
-> This clock is required by Display Port and is enabled by bootloader.
-> However when FIMD driver probing was deferred, the display power domain
-> was turned off. This effectively reset the value of DP clock enable
-> register.
-> 
-> When exynos-dp is later probed, the clock is not enabled and display is
-> not properly configured:
-> 
-> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
-> exynos-dp 145b0000.dp-controller: unable to config video
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
-> Cc: <stable@vger.kernel.org>
-> 
-> ---
-> 
-> This should fix issue reported by Javier [1][2].
->
+There's no point having 127 virtual DMA channels then... is there?
+We might as well reduce the number down to a more reasonable set
+rather than wasting memory.
 
-I tested this patch and does indeed solves both issues I reported
-The exynos-dp probe deferral does not make the display to not be
-working and also disabling and enabling the display with:
+> @@ -1049,7 +1050,6 @@ static int omap_dma_chan_init(struct omap_dmadev *od, int dma_sig)
+>  		return -ENOMEM;
+>  
+>  	c->reg_map = od->reg_map;
+> -	c->dma_sig = dma_sig;
 
-with /sys/devices/platform/exynos-drm/graphics/fb0/blank works.
+That's the only user of dma_sig in this function.  Why not remove it from
+the function prototype and its caller?
 
-Thanks a lot for fixing this issue.
-
-On an Exynos5250 Snow Chromebook:
-
-Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
