@@ -1,51 +1,63 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 27 Mar 2015 17:16:33 +0100
-Subject: Reading twd_base at run-time
-Message-ID: <55158261.9010108@free.fr>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 27 Mar 2015 11:22:30 -0500
+Subject: [PATCH v18 01/11] ARM: qcom: Add Subsystem Power Manager (SPM)
+ driver
+In-Reply-To: <1427315136-44321-2-git-send-email-lina.iyer@linaro.org>
+References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
+ <1427315136-44321-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <A4C16C5A-C9AA-4860-B425-CC3C91D228D3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
 
-In arch/arm/kernel/smp_twd.c, twd_local_timer_register() receives a
-struct twd_local_timer argument, which specifies
+On Mar 25, 2015, at 3:25 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
 
-   1) the physical address of twd_base
-   2) the twd interrupt number
+> SPM is a hardware block that controls the peripheral logic surrounding
+> the application cores (cpu/l$). When the core executes WFI instruction,
+> the SPM takes over the putting the core in low power state as
+> configured. The wake up for the SPM is an interrupt at the GIC, which
+> then completes the rest of low power mode sequence and brings the core
+> out of low power mode.
+> 
+> The SPM has a set of control registers that configure the SPMs
+> individually based on the type of the core and the runtime conditions.
+> SPM is a finite state machine block to which a sequence is provided and
+> it interprets the bytes and executes them in sequence. Each low power
+> mode that the core can enter into is provided to the SPM as a sequence.
+> 
+> Configure the SPM to set the core (cpu or L2) into its low power mode,
+> the index of the first command in the sequence is set in the SPM_CTL
+> register. When the core executes ARM wfi instruction, it triggers the
+> SPM state machine to start executing from that index. The SPM state
+> machine waits until the interrupt occurs and starts executing the rest
+> of the sequence until it hits the end of the sequence. The end of the
+> sequence jumps the core out of its low power mode.
+> 
+> Add support for an idle driver to set up the SPM to place the core in
+> Standby or Standalone power collapse mode when the core is idle.
+> 
+> Based on work by: Mahesh Sivasubramanian <msivasub@codeaurora.org>,
+> Ai Li <ali@codeaurora.org>, Praveen Chidambaram <pchidamb@codeaurora.org>
+> Original tree available at -
+> git://codeaurora.org/quic/la/kernel/msm-3.10.git
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+> drivers/soc/qcom/Kconfig  |   7 +
+> drivers/soc/qcom/Makefile |   1 +
+> drivers/soc/qcom/spm.c    | 385 ++++++++++++++++++++++++++++++++++++++++++++++
+> 3 files changed, 393 insertions(+)
+> create mode 100644 drivers/soc/qcom/spm.c
 
-There's a helper to fill out the static struct: DEFINE_TWD_LOCAL_TIMER()
+Acked-by: Kumar Gala <galak@codeaurora.org>
 
-But it seems to me (please correct me if I'm wrong) that the address
-of twd_base can be read at run-time, making it one less parameter to
-specify by hand at compile-time (with the risk that a HW engineer
-change the address in the next chip with no warning).
+- k
 
-Here's an incomplete patch to express my intent:
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 6591e26..5177db8 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -369,14 +369,14 @@ out_free:
-         return err;
-  }
-  
--int __init twd_local_timer_register(struct twd_local_timer *tlt)
-+int __init twd_local_timer_register(void)
-  {
-         if (twd_base || twd_evt)
-                 return -EBUSY;
-  
--       twd_ppi = tlt->res[1].start;
-+       twd_ppi = 29;
-  
--       twd_base = ioremap(tlt->res[0].start, resource_size(&tlt->res[0]));
-+       twd_base = ioremap(scu_a9_get_base() + 0x600, 0x10);
-         if (!twd_base)
-                 return -ENOMEM;
-  
-
-As far as I can tell, all platforms use 29 for twd_ppi, but I can make
-sure if people agree this patch is indeed an improvement.
-
-Regards.
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
