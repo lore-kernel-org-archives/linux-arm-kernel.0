@@ -1,83 +1,66 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Fri, 27 Mar 2015 11:25:04 +0100
-Subject: ARM: KVM/XEN: how should we support virt-what?
-In-Reply-To: <CAKv+Gu9YcrO=c0OWD2P6AXjMxPyaz=LhtB81FiCijAEC=XuW6g@mail.gmail.com>
-References: <20150325094440.GB3163@hawk.usersys.redhat.com>
- <20150326090150.GA3073@hawk.usersys.redhat.com>
- <alpine.DEB.2.02.1503261843410.9516@kaball.uk.xensource.com>
- <CAKv+Gu9fzhfu7nJQ9GYvPr33OcY3RP4Ssyx_0o7q-Cw4g8_5Bg@mail.gmail.com>
- <CAKv+Gu9YcrO=c0OWD2P6AXjMxPyaz=LhtB81FiCijAEC=XuW6g@mail.gmail.com>
-Message-ID: <20150327102503.GA3120@hawk.usersys.redhat.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 27 Mar 2015 11:32:31 +0100
+Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
+In-Reply-To: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
+References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <139dc298c0914b3536445dddd37be286@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 07:50:06PM +0100, Ard Biesheuvel wrote:
-> On 26 March 2015 at 19:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 26 March 2015 at 19:45, Stefano Stabellini
-> > <stefano.stabellini@eu.citrix.com> wrote:
-> >> On Thu, 26 Mar 2015, Andrew Jones wrote:
-> >>> On Wed, Mar 25, 2015 at 10:44:42AM +0100, Andrew Jones wrote:
-> >>> > Hello ARM virt maintainers,
-> >>> >
-> >>> > I'd like to start a discussion about supporting virt-what[1]. virt-what
-> >>> > allows userspace to determine if the system it's running on is running
-> >>> > in a guest, and of what type (KVM, Xen, etc.). Despite it being a best
-> >>> > effort tool, see the Caveat emptor in [1], it has become quite a useful
-> >>> > tool, and is showing up in different places, such as OpenStack. If you
-> >>> > look at the code[2], specifically [3], then you'll see how it works on
-> >>> > x86, which is to use the dedicated hypervisor cpuid leaves. I'm
-> >>> > wondering what equivalent we have, or can develop, for arm.
-> >>> > Here are some thoughts;
-> >>> > 0) there's already something we can use, and I just need to be told
-> >>> >    about it.
-> >>> > 1) be as similar as possible to x86 by dedicating some currently
-> >>> >    undefined sysreg bits. This would take buy-in from lots of parties,
-> >>> >    so is not likely the way to go.
-> >>> > 2) create a specific DT node that will get exposed through sysfs, or
-> >>> >    somewhere.
-> >>> > 3) same as (2), but just use the nodes currently in mach-virt's DT
-> >>> >    as the indication we're a guest. This would just be a heuristic,
-> >>> >    i.e. "have virtio mmio" && psci.method == hvc, or something,
-> >>> >    and we'd still need a way to know if we're kvm vs. xen vs. ??.
-> >>> >
-> >>> > Thanks,
-> >>> > drew
-> >>> >
-> >>> > [1] http://people.redhat.com/~rjones/virt-what/
-> >>> > [2] http://git.annexia.org/?p=virt-what.git;a=summary
-> >>> > [3] http://git.annexia.org/?p=virt-what.git;a=blob_plain;f=virt-what-cpuid-helper.c;hb=HEAD
-> >>>
-> >>> Thanks everyone for their responses. So, the current summary seems to
-> >>> be;
-> >>> 1) Xen has both a DT node and an ACPI table, virt-what can learn how
-> >>>    to probe those.
-> >>> 2) We don't have anything yet for KVM, and we're reluctant to create a
-> >>>    specific DT node. Anyway, we'd still need to address ACPI booted
-> >>>    guests some other way.
-> >>>
-> >>> For a short-term, DT-only, approach we could go with a heuristic, one
-> >>> that includes Marc's "if hypervisor node exists, then xen, else kvm"
-> >>> condition.
-> >>>
-> >>> How about SMBIOS for a long-term solution that works for both DT and
-> >>> ACPI? We're not populating SMBIOS for arm guests yet in qemu, but now
-> >>> that AAVMF has fw_cfg, we should be able to. On x86 we already have
-> >>> smbios populated from qemu, although not in a way that allows us to
-> >>> determine kvm vs. xen vs. tcg.
-> >>
-> >> I don't think that SMBIOS works with DT.
-> >>
-> >
-> > SMBIOS works fine with DT
+On 2015-03-24 16:26, Markus Pargmann wrote:
+> 0 is used in all pinfunction definitions when a config register is not
+> available, for example imx25-pinfunc.h. If a configuration value is used
+> for such a pinfunction the driver will always write it to the
+> configuration register if it is not -1. For a 0 configuration register
+> the configuration value is written to offset 0x0. This can lead to a
+> crashing/hanging system without any warning message.
+
+0 is a valid offset for Vybrid's mux register, however, since Vybrid set
+the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
+actually works.
+
+What is a bit a bummer is that we now have different meanings of 0,
+depending on the field:
+- For the first field (mux), 0 is a valid offset
+- For the second field (config), 0 means not valid
+
+However, I can't think of a easy solution which would solve this in a
+cleaner mannor... Maybe a comment in the function header how the 5 u32's
+are intepreted would appropriate?
+
+
+--
+Stefan
+
 > 
-> ... but it needs UEFI ...
-
-Yes. Perhaps the short-term solution will be a long-term solution for
-DT-only, non-UEFI guests, but we can do better for the guests with UEFI,
-that may or may not be ACPI, by using SMBIOS.
-
-Unless somebody objects to either/both of these paths, then I guess
-we'll start heading down them both.
-
-Thanks,
-drew
+> This patch checks for 0 config register and sets the internal value to
+> -1. If the configuration value is not NO_PADCTL this leads to an error
+> message that applying the configuration failed.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/pinctrl/freescale/pinctrl-imx.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c
+> b/drivers/pinctrl/freescale/pinctrl-imx.c
+> index 448f10986c28..2cc400b0a26b 100644
+> --- a/drivers/pinctrl/freescale/pinctrl-imx.c
+> +++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+> @@ -542,10 +542,13 @@ static int imx_pinctrl_parse_groups(struct
+> device_node *np,
+>  		struct imx_pin_reg *pin_reg;
+>  		struct imx_pin *pin = &grp->pins[i];
+>  
+> -		if (info->flags & SHARE_MUX_CONF_REG)
+> +		if (info->flags & SHARE_MUX_CONF_REG) {
+>  			conf_reg = mux_reg;
+> -		else
+> +		} else {
+>  			conf_reg = be32_to_cpu(*list++);
+> +			if (!conf_reg)
+> +				conf_reg = -1;
+> +		}
+>  
+>  		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+>  		pin_reg = &info->pin_regs[pin_id];
