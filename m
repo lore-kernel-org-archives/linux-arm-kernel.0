@@ -1,69 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Mar 2015 19:07:00 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <20150324122702.GJ14457@ns203013.ovh.net>
- <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
- <20150324130511.GK14457@ns203013.ovh.net>
- <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
- <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
- <5515342F.6010703@openssl.org>
- <CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
-Message-ID: <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Fri, 27 Mar 2015 19:10:40 +0100
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150327174223.GA12666@e103592.cambridge.arm.com>
+References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
+ <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
+ <20150327174055.1a2dc194@north>
+ <20150327174223.GA12666@e103592.cambridge.arm.com>
+Message-ID: <20150327191040.1119319d@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2015 at 11:44, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 27 March 2015 at 11:42, Andy Polyakov <appro@openssl.org> wrote:
->>>> Could you share the error log please?
->>>
->>> OK, I spotted one issue with this code:
->>>
->>> arch/arm/crypto/sha256-core.S: Assembler messages:
->>> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
->>> after fixup
->>>
->>> This is caused by the fact that, when building the integer-only code
->>> for an older architecture, the conditional compilation produces a
->>> slightly bigger preceding function, and the symbol K256 is out of
->>> range for the adr instruction.
->>>
->>> @Jean-Christophe: is that the same problem that you hit?
->>>
->>> @Andy: I propose we do something similar as in the bsaes code:
->>>
->>> #ifdef __thumb__
->>> #define adrl adr
->>> #endif
->>>
->>> and replace the offending line with
->>>
->>> adrl r14,K256
->>
->> Sorry about delay. Yes, that would do. I did test all combinations, but
->> all "my" combinations, i.e. without __KERNEL__ defined :-( And without
->> __KERNEL__ there are few extra instructions in integer-only subroutine
->> that "push" instruction in question code toward higher address, so that
->> constant was ffffefc0, which can be encoded. Anyway, I've chosen to add
->> that #define next to .thumb directive. See attached.
->>
->> Ard, you have mentioned that you've verified it on big-endian, but I've
->> spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
->> guess that it worked for you either because it was NEON that was tested
->> (it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
->> case it uses endian-neutral byte-by-byte data load). Can you confirm either?
->>
->
-> I need to double check that, but my suspicion is that it was the latter.
+On Fri, 27 Mar 2015 17:42:24 +0000, Dave P Martin wrote:
+> [Resend -- apologies again for any duplicates received]
+> 
+> On Fri, Mar 27, 2015 at 05:40:55PM +0100, Jakub Kicinski wrote:
+> > On Fri, 27 Mar 2015 14:59:31 +0000, Dave Martin wrote:
+> > > Commit 734745c serial/amba-pl011: Activate TX IRQ passively
+> > > adds some unnecessary complexity and overhead in the form of
+> > > a softirq mechanism for transmitting in the absence of interrupts.
+> > > 
+> > > After some discussion [1], this turns out to be unnecessary.
+> > > 
+> > > This patch simplifies the code flow to reduce the reliance on
+> > > subtle behaviour and avoid fragility under future maintenance.
+> > > 
+> > > To this end, the TX softirq mechanism is removed and instead
+> > > pl011_start_tx() will now simply stuff the FIFO until full
+> > > (guaranteeing future TX IRQs), or until there are no more chars
+> > > to write (in which case we don't care whether an IRQ happens).
+> > > 
+> > > [1] Thanks to Jakub Kicinski for his input and similar patch.
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > ---
+> > >  drivers/tty/serial/amba-pl011.c |  119 +++++++++------------------------------
+> > >  1 file changed, 26 insertions(+), 93 deletions(-)
+> > > 
+> > > diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> 
+> [...]
+> 
+> > > -
+> > > -	/*
+> > > -	 * If the FIFO is full we're guaranteed a TX IRQ at some later point,
+> > > -	 * and can't transmit immediately in any case:
+> > > -	 */
+> > > -	if (unlikely(uap->tx_irq_seen < 2 &&
+> > > -		     readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF))
+> > > -		return false;
+> > > +	int count = uap->fifosize >> 1;
+> > 
+> > Dave, I'd prefer if you kept my .prev_from_irq thing.  If .start_tx()
+> > races with the IRQ we may have a situation where the IRQ arrives
+> > but .start_tx() already filled the FIFO.  The guarantee of half of the
+> > FIFO being empty will not hold in this case.  That's why I use the
+> > guarantee only if the previous load was also from FIFO.
+> 
+> I thought about this, but I think port->lock prevents this from
+> happening.  I was overly defensive about this in the earlier versions
+> of the patches, and that made the code a fair bit more complicated...
+> I was hoping it could just go away ;)
+> 
+> 
+> In pl011_int(), we have
+> 
+> -8<-
+> 
+> spin_lock_irqsave(&uap->port.lock, flags);
+> 
+> [...]
+> 
+> while (status = readw(uap->port.membase + UART012_MIS), status != 0) {
+> 
+> [...]
+> 
+> 	if (status & UART011_TXIS)
+> 		pl011_tx_chars(uap, true);
+> 
+> } while (status != 0);
+> 
+> [...]
+> 
+> spin_unlock_irqrestore(&uap->port.lock, flags);
+> 
+> ->8-
+> 
+> 
+> serial_core always holds port->lock around _start_tx(), so it should be
+> impossible for any part of _start_tx() to run in parallel with this.  If
+> TXIS is asserted and nothing can write the FIFO in the meantime, then
+> that should mean that the FIFO is definitely half-empty on entry to
+> pl011_tx_chars(..., from_irq=true) -- this is also why it's safe for
+> pl011_int() to loop and potentially make repeated calls to
+> pl011_tx_chars().
+> 
+> Can you see a way this could break, or does this reasoning sound good to
+> you?
 
-Indeed, if I build for v7 I get
+It doesn't have to run in parallel, perhaps using the word "race" was
+not entirely justified on my side.  Sorry if my English is not
+super-clear ;)  Even when the accesses are serialized the problem
+remains.
 
-[    0.269418] 00000000: 4e a5 c5 08 a6 56 6e 76 24 05 43 f8 fe b0 6f d4
-[    0.275261] 00000010: 57 77 7b e3 95 49 c4 01 64 36 af da 65 d2 33 0e
-[    0.281031] alg: hash: Test 1 failed for sha224-asm
-[    0.285315] 00000000: 9d 6a 5d e9 e1 6c 39 99 c7 14 84 0f 47 77 1f 36
-[    0.290912] 00000010: dc c2 97 a7 bd ef aa c3 6c 95 15 ae
+ - start_tx() runs holding the lock,
+ - IRQ fires and waits for the lock,
+ - start_tx() exists and releases the lock,
+ - IRQ handler grabs the lock and proceeds even though FIFO is full.
 
-which is indeed the integer code failing, and your attached patch fixes it.
+I think this would require some adverse condition to trigger (high load
++ high baudrate) or IRQ pending during first unmask (which I think
+shouldn't happen, but hey, let's not trust HW too much...).
