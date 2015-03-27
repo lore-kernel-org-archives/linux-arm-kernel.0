@@ -1,45 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 27 Mar 2015 09:25:54 +0900
-Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
- get rid of the bounce page"
-In-Reply-To: <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
-Message-ID: <20150327002554.GA5527@verge.net.au>
+From: Peter.Chen@freescale.com (Peter Chen)
+Date: Fri, 27 Mar 2015 01:21:41 +0000
+Subject: Need a phy function to enable / disable usb squelch detection
+In-Reply-To: <55145B46.9020501@redhat.com>
+References: <55145B46.9020501@redhat.com>
+Message-ID: <BN3PR0301MB08495F972481336D9DA86A8A81090@BN3PR0301MB0849.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
-> On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
-> >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
-> >> > I think we now have a new error: (seen with omap2plus_defconfig)
-> >> > on next-20150324 :
-> >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
-> >> > referenced in expression
-> >> > make: *** [vmlinux] Error 1
-> >>
-> >> Thanks, I am seeing that too.
-> >>
-> >> My armchair suggestion is that the following should be reverted.
-> >>
-> >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
-> >
-> > Can you try again with the latest -next please? We've merged an additional
-> > patch aimed at sorting this out. Reverting isn't really an option, as
-> > there's an awful lot of code that depends on the bounce page removal.
+ 
+> Hi Kishon,
 > 
-> Here are the kernelci.org -next results[1], if you click the build
-> status you can dig down into the build failures. next-20150326 has now
-> hit a compiler bug, Arnd mentioned he was looking into this issue.
+> I've been debugging why some devices do not work with the musb otg
+> controller found on Allwinner SoC-s, and the conclusion is not good, the
+> Android kernel does a poke to the phy before releasing the usb reset.
+> 
+> Now you did not want me to introduce any sunxi specific / private phy
+> functions in my initial patch-series for adding sunxi support, but in this case I do
+> not really see an alternative, as this is a very platform specific hack to work
+> around an issue with the phy-s squelch detection which causes it to see a
+> squelch when reset is released switching it to high speed mode when a lo
+> speed device is connected, after which things fall apart.
+> 
 
-I have confirmed that next-20150326 does not compile without
-the following reverted:
+The nofity_connect API at struct usb_phy may satisfy your requirement,
+it will be called after bus rest has finished.
 
-12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
-e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
+Peter
