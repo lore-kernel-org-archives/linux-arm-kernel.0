@@ -1,76 +1,70 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 27 Mar 2015 22:08:06 +0100
-Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
- nodes
-In-Reply-To: <20150323183211.GB1128@katana>
-References: <55097C46.9010605@gmail.com> <20150318140037.GE3580@katana>
- <550A05E5.3050100@gmail.com> <20150319100944.GA914@katana>
- <550AEF9D.6090307@wwwdotorg.org> <20150319160208.GF7657@katana>
- <550B3725.10209@gmail.com> <20150320101925.GC2071@katana>
- <20150321210028.GA1078@katana> <550EBDBC.9000903@gmail.com>
- <20150323183211.GB1128@katana>
-Message-ID: <5515C6B6.7080903@gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Sat, 28 Mar 2015 02:41:53 +0530
+Subject: arm64 kexec hang
+In-Reply-To: <1427477015.27739.30.camel@infradead.org>
+References: <1427477015.27739.30.camel@infradead.org>
+Message-ID: <5515C799.8010600@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.03.2015 19:32, Wolfram Sang wrote:
->> If modifying i2c-mux-pinctrl to respect the sub-bus status property is
->> such a big issue, I'd rather leave the driver as is and expose all
->> sub-busses to userspace.
+Hi Geoff,
+
+On Friday 27 March 2015 10:53 PM, Geoff Levand wrote:
+> Hi Pratyush,
 >
-> Well, dunno what 'big issue' is in your book :) What definately needs to
-> be done is:
+> On Wed, 2015-03-25 at 15:55 +0530, Pratyush Anand wrote:
+>> So with following changes kexec load seems to complete without any
+>> error. However, kexec reboot does not work yet, Nothing after bye
+>> message :( (1st kernel booted with maxcpus=1)
+>
+> 'Bye!' doesn't mean much, other than the first kernel has
+> almost shutdown.  I recommend for debugging you either define
+> ARM64_DEBUG_PORT for the kexec-tools build, or have a suitable
+> earlyprintk= on the kernel command line.  See the read_sink()
+> routine in kexec-arm64.c.
+>
 
-Wolfram,
+Well, I was already using earlycon and it did not print anything after 
+*Bye*.
 
-I had a look at the code in question again and prepared some patches
-to return ERR_PTRs from i2c_add_mux_adapter(), rework users to check
-for IS_ERR() and finally skip i2c_add_adapter for the OF disabled case.
+I got OCD-H and is able to track the flow atleast and to see when it dies.
 
-I have them compile-tested but I don't have any hardware available
-right now.
+So, it all goes like machine_kexec ->..... -> arm64_kexec_kimage_start 
+-> purgatory_start -> purgatory -> printf ... -> putchar
 
-Anyway, I still have some questions.
+Here it dies (goes to el2_sync_invalid) as arm64_sink does not seem to 
+be correct. arm64_sink is (-1) 0xffffffffffffffff. I also tried by just 
+returning from printf without doing anything, still it goes to 
+el2_sync_invalid (may be from some other location).
 
-> * handle "status" at mux-core level, not mux-driver
+I will try to see tomorrow why arm64_sink is wrong and why did not it 
+work if printf was null.
 
-I get that.. but:
+just for info: is_hyp_mode_available is true in my case.
 
-> * that probably needs us to convert i2c_add_mux_adapter() to return
->    ERR_PTRs instead of NULL, so we can distinguish the "disabled" case
+~Pratyush
 
-What do you want to return from i2c_add_mux_adapter() if you find an OF
-disabled child node?
 
-AFAIKS, there is no explicit errno for a disabled device (node) so all
-I can imagine here is to return either the &priv->adap before actually
-calling i2c_add_adapter on it or NULL now that we explicitly check for
-errors.
-
-> * that would mean to fix all existing users
-
-If we choose to return NULL, those users who can deal with a
-missing/disabled sub-bus on the mux can check with IS_ERR()
-the others should check with IS_ERR_OR_NULL().
-
-We could also choose to return some other errno (-ENODEV maybe)
-but still we'd have to double-check that return value on i2c-mux-pinctrl
-and the others too if we don't care that i2c_add_adapter() wasn't
-called for a mux.
-
-> That's all not groundbreaking stuff, but needs caution and thoroughness.
-> There might be some gory details left, though...
-
-As I said before, the intention was not disable a possible i2c bus that
-can be dynamically added/removed on that specific Dove SBC/CM-A510
-board but to have a single i2c-mux-pinctrl in the SoC dtsi just because
-the SoC has the optional i2c bus muxing.
-
-While thinking about it (and I still think of it as a 'big issue'
-compared to the intention of the initial patch) I came to the
-conclusion that I should maybe just go for a board-specific
-i2c-mux-pinctrl node instead of adding it to the SoC dtsi. That will
-also avoid doubled i2c busses on boards with just the default i2c
-option.
-
-Sebastian
+> Either of these will output something like this from the
+> purgatory code:
+>
+>    I'm in purgatory
+>    purgatory: kernel_entry: 0000000080080000
+>    purgatory: dtb:          0000000080760000
+>
+> Another option is to add my 'debugging: early putc' patch,
+> build the kernel with ARM64_DEBUG_PORT defined for your
+>   board.  This will output 'stext' when the second
+> stage kernel is entered
+>
+> The kexec --lite option will bypass purgatory and should just
+> show 'stext'.
+>
+> -Geoff
+>
+>
+> _______________________________________________
+> kexec mailing list
+> kexec at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/kexec
+>
