@@ -1,28 +1,73 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Mar 2015 13:25:43 +0100
-Subject: at91 clocks
-In-Reply-To: <20150327132003.6caf3689@bbrezillon>
-References: <55117568.6090202@microbit.se> <20150325013201.3f01fc22@bbrezillon>
- <55127AA6.5050902@microbit.se> <20150325173751.0d6479df@bbrezillon>
- <5513D701.2080201@microbit.se> <20150326162827.041c051a@bbrezillon>
- <55152F3E.60004@microbit.se> <20150327132003.6caf3689@bbrezillon>
-Message-ID: <20150327132543.08ad636c@bbrezillon>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 27 Mar 2015 14:26:46 +0200
+Subject: [PATCH v3 0/7] dmaengine/dra7x: DMA router (crossbar support)
+Message-ID: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Mar 2015 13:20:03 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi,
 
+Vinod: is it OK if I send the Documnetation/dmanegine/ update a bit later when
+we agree on what form it should be?
 
-> > 
-> > I tested with IS_ERR, changed this to IS_ERR_OR_NULL, but the pointer is ok.
-> 
-> Can you print clk_get_rate(parent_clk) result ?
+Changes since v2:
+- not using regmap for the TI crossbar driver.
 
-Could you also paste me the whole clk_summary content ?
+Changes since v1:
+- Comments from Russell King and  Paul Bolle addressed:
+ - Use the added defined in the omap-dma changes
+ - MODULE_* removed from the ti-dma-crossbar driver.
+- DMA router documentation: do not limit the #dma-cells to be the same as the
+  dma controller's #dma-cells. It might be possible to have a router which needs
+  more information than the DMA controller (direct request pairing for example)
+- Use defines in the ti-dma-crossbar driver
+- Binding document for the ti-dma-crossbar driver
 
+Intro mail from v1:
+
+The series adds support for DMA router type of devices. They are used in SoCs
+which has more peripherals with DMA request lines than the DMA controller can
+handle.
+The router itself is not part of the DMA controller and it's operation should be
+transparent (as it is in the HW) for the SW stack.
+
+This series takes into accound the comments Sricharan received for his version
+of the crossbar driver:
+https://lkml.org/lkml/2014/3/7/199
+
+This implementation is not tied to any DMA driver so it is possible to use the
+framework by other vendors, also ACPI version of binding can be easy enough to
+be added.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  dmaengine: of_dma: Support for DMA routers
+  Documentation: devicetree: dma: Binding documentation for TI DMA
+    crossbar
+  dmaengine: Add driver for TI DMA crossbar on DRA7x
+  dmaengine: omap-dma: Use defines for dma channels and request count
+  dmaengine: omap-dma: Take DMA request number from DT if it is
+    available
+  dmaengine: omap-dma: Remove mapping between virtual channels and
+    requests
+  ARM: DTS: dra7x: Integrate sDMA crossbar
+
+ Documentation/devicetree/bindings/dma/dma.txt      |  28 ++++
+ .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  52 ++++++
+ arch/arm/boot/dts/dra7.dtsi                        |  57 ++++---
+ drivers/dma/Kconfig                                |   4 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/dmaengine.c                            |   7 +
+ drivers/dma/of-dma.c                               |  92 +++++++++++
+ drivers/dma/omap-dma.c                             |  25 ++-
+ drivers/dma/ti-dma-crossbar.c                      | 179 +++++++++++++++++++++
+ include/linux/dmaengine.h                          |  17 ++
+ include/linux/of_dma.h                             |  21 +++
+ 11 files changed, 455 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+ create mode 100644 drivers/dma/ti-dma-crossbar.c
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.3.3
