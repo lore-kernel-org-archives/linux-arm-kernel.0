@@ -1,131 +1,92 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 27 Mar 2015 12:02:03 +0100
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <551537ED.7060402@gmail.com>
-References: <551537ED.7060402@gmail.com>
-Message-ID: <551538AB.50207@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 27 Mar 2015 12:03:43 +0100
+Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
+In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+Message-ID: <20150327110341.GC5440@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Iain,
+On Thu, Mar 26, 2015 at 01:43:03PM +0100, Joerg Roedel wrote:
+> Changes v1-v2:
+> 
+> 	* Rebased to v4.0-rc5
+> 	* Converted domain-types to a bit-field
+> 
+> Hi,
+> 
+> here is patch-set to replace the existing domain_init and
+> domain_destroy iommu-ops with the new domain_alloc and
+> domain_free callbacks
+> 
+> The new callbacks move the allocation of iommu domains into
+> the iommu driver, allowing them to put a generic
+> iommu_domain struct into their own domain struct. This makes
+> domain handling in the drivers more cache efficient and
+> prepares the introduction of default domains in another
+> patch-set.
+> 
+> While at it, this patch-set also introduces domain types.
+> These are internal to the iommu core code for now, there are
+> three of them:
+> 
+> 	* DMA-API domains
+> 	* Identity mapped domains
+> 	* Domains unmanaged by the iommu-core, used for
+> 	  iommu-api so that the users can create their own
+> 	  mappings
+> 
+> The patches have been compile tested for x86, ARM and PPC
+> and runtime tested on x86 (Intel VT-d and AMD IOMMU).
+> 
+> Please review.
+> 
+> Thanks,
+> 
+> 	Joerg
+> 
+> Joerg Roedel (15):
+>   iommu: Introduce domain_alloc and domain_free iommu_ops
+>   iommu: Introduce iommu domain types
+>   iommu/amd: Make use of domain_alloc and domain_free
+>   iommu/vt-d: Make use of domain_alloc and domain_free
+>   iommu/omap: Make use of domain_alloc and domain_free
+>   iommu/arm-smmu: Make use of domain_alloc and domain_free
+>   iommu/exynos: Make use of domain_alloc and domain_free
+>   iommu/tegra-smmu: Make use of domain_alloc and domain_free
+>   iommu/tegra-gart: Make use of domain_alloc and domain_free
+>   iommu/msm: Make use of domain_alloc and domain_free
+>   iommu/shmobile: Make use of domain_alloc and domain_free
+>   iommu/ipmmu-vmsa: Make use of domain_alloc and domain_free
+>   iommu/rockchip: Make use of domain_alloc and domain_free
+>   iommu/fsl: Make use of domain_alloc and domain_free
+>   iommu: Remove domain_init and domain_free iommu_ops
+> 
+>  drivers/iommu/amd_iommu.c       | 84 +++++++++++++++++++++------------------
+>  drivers/iommu/amd_iommu_types.h |  7 ++--
+>  drivers/iommu/arm-smmu.c        | 46 +++++++++++++---------
+>  drivers/iommu/exynos-iommu.c    | 87 ++++++++++++++++++++++-------------------
+>  drivers/iommu/fsl_pamu_domain.c | 60 +++++++++++++++-------------
+>  drivers/iommu/fsl_pamu_domain.h |  2 +-
+>  drivers/iommu/intel-iommu.c     | 48 +++++++++++++----------
+>  drivers/iommu/iommu.c           | 20 ++--------
+>  drivers/iommu/ipmmu-vmsa.c      | 43 +++++++++++---------
+>  drivers/iommu/msm_iommu.c       | 73 +++++++++++++++++-----------------
+>  drivers/iommu/omap-iommu.c      | 49 +++++++++++++----------
+>  drivers/iommu/rockchip-iommu.c  | 40 +++++++++++--------
+>  drivers/iommu/shmobile-iommu.c  | 40 +++++++++++--------
+>  drivers/iommu/tegra-gart.c      | 67 +++++++++++++++++++++----------
+>  drivers/iommu/tegra-smmu.c      | 41 ++++++++++---------
+>  include/linux/iommu.h           | 17 ++++++--
+>  16 files changed, 407 insertions(+), 317 deletions(-)
 
-On 27-03-15 11:58, Iain Paton wrote:
-> add pmic regulator definitions matching the manufacturers 3.4.x fex
-> file.
->
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
-> ---
->
-> As this file belongs to Hans and he decided not to use axp209.dtsi in
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
-> then I won't add it here.
+The core and Tegra bits:
 
-That was because using it was breaking stuff, but now that we know better
-which regulators are used for what, and which one we most add an always-on;
-property too, I would greatly prefer you to acually use axp209.dtsi, see
-e.g. the sun5i-a13-utoo-p66.dts file where I'm using it.
-
-Can you please respin this patch using axp209.dtsi?
-
-Also please do not add nodes for unused regulators, like the ldo-s for the csi-s.
-
-Thanks & Regards,
-
-Hans
-
-
->
->   arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts | 68 ++++++++++++++++++++++++++
->   1 file changed, 68 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> index 31dc2f1..f7a8fcc 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts
-> @@ -67,6 +67,15 @@
->   			default-state = "on";
->   		};
->   	};
-> +
-> +	reg_axp_ipsout: axp_ipsout {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "axp-ipsout";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-always-on;
-> +	};
-> +
->   };
->
->   &ahci {
-> @@ -97,10 +106,69 @@
->   	axp209: pmic at 34 {
->   		compatible = "x-powers,axp209";
->   		reg = <0x34>;
-> +		interrupt-parent = <&intc>;
->   		interrupts = <0>;
->
->   		interrupt-controller;
->   		#interrupt-cells = <1>;
-> +
-> +		acin-supply = <&reg_axp_ipsout>;
-> +		vin2-supply = <&reg_axp_ipsout>;
-> +		vin3-supply = <&reg_axp_ipsout>;
-> +		ldo24in-supply = <&reg_axp_ipsout>;
-> +		ldo3in-supply = <&reg_axp_ipsout>;
-> +
-> +		x-powers,dcdc-freq = <1500>;
-> +
-> +		regulators {
-> +			vdd_rtc: ldo1 {
-> +				regulator-min-microvolt = <1300000>;
-> +				regulator-max-microvolt = <1300000>;
-> +				regulator-always-on;
-> +				regulator-name="vdd_rtc";
-> +			};
-> +
-> +			avcc: ldo2 {
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3000000>;
-> +				regulator-always-on;
-> +				regulator-name="avcc";
-> +			};
-> +
-> +			vcc_csi0: ldo3 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-always-on;
-> +				regulator-name="vcc_csi0";
-> +			};
-> +
-> +			vcc_csi1: ldo4 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-always-on;
-> +				regulator-name="vcc_csi1";
-> +			};
-> +
-> +			ldo5 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-name="reg_unused";
-> +			};
-> +
-> +			vdd_cpu: dcdc2 {
-> +				regulator-min-microvolt = <1250000>;
-> +				regulator-max-microvolt = <1550000>;
-> +				regulator-always-on;
-> +				regulator-name="vdd_cpu";
-> +			};
-> +
-> +			vdd_int: dcdc3 {
-> +				regulator-min-microvolt = <1250000>;
-> +				regulator-max-microvolt = <1250000>;
-> +				regulator-always-on;
-> +				regulator-name="vdd_int";
-> +			};
-> +		};
->   	};
->   };
->
->
+Tested-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/c24e3013/attachment-0001.sig>
