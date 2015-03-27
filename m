@@ -1,159 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Mar 2015 13:09:25 +0000
-Subject: [PATCH v3 5/5] arm64: KVM: Switch vgic save/restore to
- alternative_insn
-In-Reply-To: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
-References: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1427461765-14462-6-git-send-email-marc.zyngier@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Mar 2015 14:16:19 +0100
+Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
+In-Reply-To: <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
+References: <20150317164353.GN23340@leverpostej>
+ <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20150325145949.GE26903@localhost>
+ <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
+Message-ID: <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we configured the world-switch by having a small array
-of pointers to the save and restore functions, depending on the
-GIC used on the platform.
+On 26 March 2015 at 07:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
+>>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+>>> index 16134608eecf..fd8434753372 100644
+>>> --- a/arch/arm64/kernel/head.S
+>>> +++ b/arch/arm64/kernel/head.S
+>>> @@ -49,13 +49,15 @@
+>>>  #ifdef CONFIG_ARM64_64K_PAGES
+>>>  #define BLOCK_SHIFT  PAGE_SHIFT
+>>>  #define BLOCK_SIZE   PAGE_SIZE
+>>> -#define TABLE_SHIFT  PMD_SHIFT
+>>>  #else
+>>>  #define BLOCK_SHIFT  SECTION_SHIFT
+>>>  #define BLOCK_SIZE   SECTION_SIZE
+>>> -#define TABLE_SHIFT  PUD_SHIFT
+>>>  #endif
+>>>
+>>> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
+>>> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
+>>> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
+>>> +
+>>>  #define KERNEL_START _text
+>>>  #define KERNEL_END   _end
+>>>
+>>> @@ -237,7 +239,10 @@ ENTRY(stext)
+>>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
+>>>
+>>>       adrp    x24, __PHYS_OFFSET
+>>> -     mov     x23, #KIMAGE_OFFSET
+>>> +     and     x23, x24, #~TABLE_MASK          // image offset
+>>> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
+>>> +     mov     x0, #KIMAGE_OFFSET
+>>> +     add     x23, x23, x0
+>>
+>> I'm still trying to figure out how this works. Does the code imply that
+>> the kernel image can only be loaded within a block size of the
+>> PHYS_OFFSET? If that's the case, it's not too flexible.
+>>
+>
+> For now, yes.
+>
+>> My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
+>> entirely) or at least compute it at DT parsing time. I'm more inclined
+>> for making it 0 assuming that it doesn't break anything else (vmemmap
+>> virtual range may get slightly bigger but still not significant,
+>> basically max_phys_addr / sizeof(struct page)).
+>>
+>
+> Making it zero would be an improvement, I suppose
 
-Loading these values each time is a bit silly (they never change),
-and it makes sense to rely on the instruction patching instead.
+Actually, wouldn't that reintroduce a similar VA range problem to the
+one I fixed the other day?
 
-This leads to a nice cleanup of the code.
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h   |  5 -----
- arch/arm64/include/asm/kvm_host.h | 23 -----------------------
- arch/arm64/kernel/asm-offsets.c   |  1 -
- arch/arm64/kvm/hyp.S              | 18 ++++--------------
- virt/kvm/arm/vgic.c               |  3 ---
- 5 files changed, 4 insertions(+), 46 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 41008cd..2fcad3b 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -225,11 +225,6 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- 	return 0;
- }
- 
--static inline void vgic_arch_setup(const struct vgic_params *vgic)
--{
--	BUG_ON(vgic->type != VGIC_V2);
--}
--
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 8ac3c70..b0aa3a4 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -228,29 +228,6 @@ struct vgic_sr_vectors {
- 	void	*restore_vgic;
- };
- 
--static inline void vgic_arch_setup(const struct vgic_params *vgic)
--{
--	extern struct vgic_sr_vectors __vgic_sr_vectors;
--
--	switch(vgic->type)
--	{
--	case VGIC_V2:
--		__vgic_sr_vectors.save_vgic	= __save_vgic_v2_state;
--		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v2_state;
--		break;
--
--#ifdef CONFIG_ARM_GIC_V3
--	case VGIC_V3:
--		__vgic_sr_vectors.save_vgic	= __save_vgic_v3_state;
--		__vgic_sr_vectors.restore_vgic	= __restore_vgic_v3_state;
--		break;
--#endif
--
--	default:
--		BUG();
--	}
--}
--
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 14dd3d1..cf9d97b 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -128,7 +128,6 @@ int main(void)
-   DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
-   DEFINE(VGIC_SAVE_FN,		offsetof(struct vgic_sr_vectors, save_vgic));
-   DEFINE(VGIC_RESTORE_FN,	offsetof(struct vgic_sr_vectors, restore_vgic));
--  DEFINE(VGIC_SR_VECTOR_SZ,	sizeof(struct vgic_sr_vectors));
-   DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
-   DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
-   DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 5befd01..0d55a53 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -17,8 +17,10 @@
- 
- #include <linux/linkage.h>
- 
-+#include <asm/alternative-asm.h>
- #include <asm/asm-offsets.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/fpsimdmacros.h>
-@@ -808,10 +810,7 @@
-  * Call into the vgic backend for state saving
-  */
- .macro save_vgic_state
--	adr	x24, __vgic_sr_vectors
--	ldr	x24, [x24, VGIC_SAVE_FN]
--	kern_hyp_va	x24
--	blr	x24
-+	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
- 	mrs	x24, hcr_el2
- 	mov	x25, #HCR_INT_OVERRIDE
- 	neg	x25, x25
-@@ -828,10 +827,7 @@
- 	orr	x24, x24, #HCR_INT_OVERRIDE
- 	orr	x24, x24, x25
- 	msr	hcr_el2, x24
--	adr	x24, __vgic_sr_vectors
--	ldr	x24, [x24, #VGIC_RESTORE_FN]
--	kern_hyp_va	x24
--	blr	x24
-+	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
- .endm
- 
- .macro save_timer_state
-@@ -1062,12 +1058,6 @@ ENTRY(__kvm_flush_vm_context)
- 	ret
- ENDPROC(__kvm_flush_vm_context)
- 
--	// struct vgic_sr_vectors __vgi_sr_vectors;
--	.align 3
--ENTRY(__vgic_sr_vectors)
--	.skip	VGIC_SR_VECTOR_SZ
--ENDPROC(__vgic_sr_vectors)
--
- __kvm_hyp_panic:
- 	// Guess the context by looking at VTTBR:
- 	// If zero, then we're already a host.
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 0cc6ab6..23d3c81 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1903,9 +1903,6 @@ int kvm_vgic_hyp_init(void)
- 		goto out_free_irq;
- 	}
- 
--	/* Callback into for arch code for setup */
--	vgic_arch_setup(vgic);
--
- 	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
- 
- 	return 0;
--- 
-2.1.4
+On Seattle, with its DRAM at 0x80_0000_0000, you wouldn't have enough
+space after PAGE_OFFSET
