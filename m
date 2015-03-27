@@ -1,50 +1,39 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 27 Mar 2015 14:01:58 +0200
-Subject: [PATCH 4/5] dmaengine: hsu: Fix memory leak when stopping a
- running transfer
-In-Reply-To: <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
-References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
- <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1427457718.14897.428.camel@linux.intel.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri, 27 Mar 2015 13:04:41 +0100
+Subject: [PATCH v2] ARM: dts: vf610: fix missing irqs
+Message-ID: <1427457881-14132-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-03-27 at 13:35 +0200, Peter Ujfalusi wrote:
-> The vd->node is removed from the lists when the transfer started so the
-> vchan_get_all_descriptors() will not find it. This results memory leak.
-> 
+While adding the MSCM interrupt router, all interrupts have been moved
+to vfxxx.dtsi again. However, some properties got lost. Readd the
+missing interrupt properties.
 
-Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Fixes: 97e6466ab9d0 ("ARM: dts: vf610: add Miscellaneous System Control Module (MSCM)")
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Though this one would go via Greg's tty tree (Cc'ed) I think.
-It becomes to regular work flow after 4.1-rc1.
-
-
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> CC: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-
-> ---
->  drivers/dma/hsu/hsu.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/hsu/hsu.c b/drivers/dma/hsu/hsu.c
-> index 683ba9b62795..d1864bda008f 100644
-> --- a/drivers/dma/hsu/hsu.c
-> +++ b/drivers/dma/hsu/hsu.c
-> @@ -387,7 +387,10 @@ static int hsu_dma_terminate_all(struct dma_chan *chan)
->  	spin_lock_irqsave(&hsuc->vchan.lock, flags);
->  
->  	hsu_dma_stop_channel(hsuc);
-> -	hsuc->desc = NULL;
-> +	if (hsuc->desc) {
-> +		hsu_dma_desc_free(&hsuc->desc->vchan);
-> +		hsuc->desc = NULL;
-> +	}
->  
->  	vchan_get_all_descriptors(&hsuc->vchan, &head);
->  	spin_unlock_irqrestore(&hsuc->vchan.lock, flags);
-
-
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 899645d..f9bef55 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -377,6 +377,7 @@
+ 			src: src at 4006e000 {
+ 				compatible = "fsl,vf610-src", "syscon";
+ 				reg = <0x4006e000 0x1000>;
++				interrupts = <96 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 
+ 			gpc: gpc at 4006c000 {
+@@ -419,6 +420,7 @@
+ 				snvsrtc: snvs-rtc-lp at 34 {
+ 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+ 					reg = <0x34 0x58>;
++					interrupts = <100 IRQ_TYPE_LEVEL_HIGH>;
+ 					clocks = <&clks VF610_CLK_SNVS>;
+ 					clock-names = "snvs-rtc";
+ 				};
 -- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+2.3.3
