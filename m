@@ -1,21 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Mar 2015 10:04:39 +0100
-Subject: [PATCH 0/2] tc3589x OF only enforcement
-In-Reply-To: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZC-+fZXRAqnir2+pyq-es=-zA9jS2qGUiOF75KqzSLqQ@mail.gmail.com>
+Date: Fri, 27 Mar 2015 10:07:29 +0100
+Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
+In-Reply-To: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+Message-ID: <CACRpkdapp8vGFHJA+WrZzRk503zoAzrz3HaVGYXH+CHRDaLaDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 3:52 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Mar 20, 2015 at 8:12 PM, Alexander Stein <alexanders83@web.de> wrote:
 
-> These two patches removes the non-DT probe/config path from the
-> TC3589x driver. I suggest merging both through the MFD tree if
-> Dmitry can ACK the input patch.
+> This adds the callback for set_multiple.
+> As this controller has a separate set and clear register, we can't write
+> directly to PIO_ODSR as this would required a cached variable and would
+> race with at91_gpio_set.
+> So build masks for the PIO_SODR and PIO_CODR registers and write them
+> together.
+>
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+> This was tested by using an own test driver which uses
+> gpiod_set_array_cansleep to set multiple GPIOs at once.
 
-Lee it seems Dmitry ACKed these patches, can you merge those
-two patches into MFD? I don't think there will be any cross-tree deps
-so you can just carry them  in MFD without any immutable branch business.
+I remember J-C brought this up ages ago, so I hope he will be delighted
+to see we can now, FINALLY, do this!
+
+J-C can I have your review on this?
 
 Yours,
 Linus Walleij
