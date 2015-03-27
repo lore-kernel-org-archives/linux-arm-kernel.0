@@ -1,139 +1,167 @@
-From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
-Date: Fri, 27 Mar 2015 17:40:55 +0100
-Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
- handling
-In-Reply-To: <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
-References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
- <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150327174055.1a2dc194@north>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 27 Mar 2015 09:47:44 -0700
+Subject: [PATCH 1/2] input: keypad: tc3589x: localize platform data
+In-Reply-To: <20150319163856.GF30732@dtor-ws>
+References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
+ <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
+ <20150319163856.GF30732@dtor-ws>
+Message-ID: <20150327164744.GA17364@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Mar 2015 14:59:31 +0000, Dave Martin wrote:
-> Commit 734745c serial/amba-pl011: Activate TX IRQ passively
-> adds some unnecessary complexity and overhead in the form of
-> a softirq mechanism for transmitting in the absence of interrupts.
+On Thu, Mar 19, 2015 at 09:38:56AM -0700, Dmitry Torokhov wrote:
+> Hi Linus,
 > 
-> After some discussion [1], this turns out to be unnecessary.
+> On Thu, Mar 19, 2015 at 03:52:44PM +0100, Linus Walleij wrote:
+> > This driver can only get its platform data from the device tree,
+> > and all platforms using it does that. Localize the platform data
+> > for the keypad. A later patch will enforce the device tree / OF
+> > dependence.
+> > 
+> > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > Dmitry it would be great if you could ACK this patch so Lee can
+> > take it with the other patch through MFD.
 > 
-> This patch simplifies the code flow to reduce the reliance on
-> subtle behaviour and avoid fragility under future maintenance.
+> It looks like if you are making this OF-only you can get rid of pdata
+> altogether and parse the OF data directly into the keypad. But that can
+> be done later.
 > 
-> To this end, the TX softirq mechanism is removed and instead
-> pl011_start_tx() will now simply stuff the FIFO until full
-> (guaranteeing future TX IRQs), or until there are no more chars
-> to write (in which case we don't care whether an IRQ happens).
-> 
-> [1] Thanks to Jakub Kici?ski for his input and similar patch.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  drivers/tty/serial/amba-pl011.c |  119 +++++++++------------------------------
->  1 file changed, 26 insertions(+), 93 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 6f5a072..f5bd842 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-<snip>
-> @@ -1247,87 +1243,54 @@ __acquires(&uap->port.lock)
->  	spin_lock(&uap->port.lock);
->  }
->  
-> -/*
-> - * Transmit a character
-> - * There must be at least one free entry in the TX FIFO to accept the char.
-> - *
-> - * Returns true if the FIFO might have space in it afterwards;
-> - * returns false if the FIFO definitely became full.
-> - */
-> -static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c)
-> +static bool pl011_tx_char(struct uart_amba_port *uap, unsigned char c,
-> +			  bool from_irq)
->  {
-> +	if (unlikely(!from_irq) &&
-> +	    readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
-> +		return false; /* unable to transmit character */
-> +
->  	writew(c, uap->port.membase + UART01x_DR);
->  	uap->port.icount.tx++;
->  
-> -	if (likely(uap->tx_irq_seen > 1))
-> -		return true;
-> -
-> -	return !(readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF);
-> +	return true;
->  }
->  
-> -static bool pl011_tx_chars(struct uart_amba_port *uap)
-> +static void pl011_tx_chars(struct uart_amba_port *uap, bool from_irq)
->  {
->  	struct circ_buf *xmit = &uap->port.state->xmit;
-> -	int count;
-> -
-> -	if (unlikely(uap->tx_irq_seen < 2))
-> -		/*
-> -		 * Initial FIFO fill level unknown: we must check TXFF
-> -		 * after each write, so just try to fill up the FIFO.
-> -		 */
-> -		count = uap->fifosize;
-> -	else /* tx_irq_seen >= 2 */
-> -		/*
-> -		 * FIFO initially at least half-empty, so we can simply
-> -		 * write half the FIFO without polling TXFF.
-> -
-> -		 * Note: the *first* TX IRQ can still race with
-> -		 * pl011_start_tx_pio(), which can result in the FIFO
-> -		 * being fuller than expected in that case.
-> -		 */
-> -		count = uap->fifosize >> 1;
-> -
-> -	/*
-> -	 * If the FIFO is full we're guaranteed a TX IRQ at some later point,
-> -	 * and can't transmit immediately in any case:
-> -	 */
-> -	if (unlikely(uap->tx_irq_seen < 2 &&
-> -		     readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF))
-> -		return false;
-> +	int count = uap->fifosize >> 1;
+> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
-Dave, I'd prefer if you kept my .prev_from_irq thing.  If .start_tx()
-races with the IRQ we may have a situation where the IRQ arrives
-but .start_tx() already filled the FIFO.  The guarantee of half of the
-FIFO being empty will not hold in this case.  That's why I use the
-guarantee only if the previous load was also from FIFO.
+Hmm, just noticed an issue:
 
->  	if (uap->port.x_char) {
-> -		pl011_tx_char(uap, uap->port.x_char);
-> +		if (!pl011_tx_char(uap, uap->port.x_char, from_irq))
-> +			return;
->  		uap->port.x_char = 0;
->  		--count;
->  	}
->  	if (uart_circ_empty(xmit) || uart_tx_stopped(&uap->port)) {
->  		pl011_stop_tx(&uap->port);
-> -		goto done;
-> +		return;
->  	}
->  
->  	/* If we are using DMA mode, try to send some characters. */
->  	if (pl011_dma_tx_irq(uap))
-> -		goto done;
-> +		return;
->  
-> -	while (count-- > 0 && pl011_tx_char(uap, xmit->buf[xmit->tail])) {
-> -		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-> -		if (uart_circ_empty(xmit))
-> +	do {
-> +		if (likely(from_irq) && count-- == 0)
->  			break;
-> -	}
-> +
-> +		if (!pl011_tx_char(uap, xmit->buf[xmit->tail], from_irq))
-> +			break;
-> +
-> +		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
-> +	} while (!uart_circ_empty(xmit));
+> >  
+> >  	keypad = kzalloc(sizeof(struct tc_keypad), GFP_KERNEL);
+> > +	keypad->board = tc3589x_keypad_of_probe(&pdev->dev);
+> > +	if (IS_ERR(keypad->board)) {
+> > +		dev_err(&pdev->dev, "invalid keypad platform data\n");
+> > +		return PTR_ERR(keypad->board);
+> > +	}
+> > +
+> >  	input = input_allocate_device();
+> >  	if (!keypad || !input) {
+> >  		dev_err(&pdev->dev, "failed to allocate keypad memory\n");
 
-If you add the .prev_* this loop will become even more ugly.  Feel free
-to copy my code wherever you see fit.
+You slid of prasing right in between memory allocation and checking if
+it succeeded, so there is a potential oops and memory leak now.
+
+I want to commit the version of the patch below, holler if you disagree.
+Note that I reverted much of plat -> board renames to keep the patch
+small.
+
+Thanks.
+
+-- 
+Dmitry
+
+
+Input: tc3589x - localize platform data
+
+From: Linus Walleij <linus.walleij@linaro.org>
+
+This driver can only get its platform data from the device tree, and all
+platforms using it do that. Localize the platform data for the keypad. A
+later patch will enforce the device tree / OF dependence.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ drivers/input/keyboard/tc3589x-keypad.c |   33 ++++++++++++++++++++++++-------
+ include/linux/mfd/tc3589x.h             |   23 ----------------------
+ 2 files changed, 26 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
+index 5639325..ae90df3 100644
+--- a/drivers/input/keyboard/tc3589x-keypad.c
++++ b/drivers/input/keyboard/tc3589x-keypad.c
+@@ -70,6 +70,28 @@
+ #define TC3589x_KBD_INT_CLR	0x1
+ 
+ /**
++ * struct tc35893_keypad_platform_data - platform specific keypad data
++ * @keymap_data:        matrix scan code table for keycodes
++ * @krow:               mask for available rows, value is 0xFF
++ * @kcol:               mask for available columns, value is 0xFF
++ * @debounce_period:    platform specific debounce time
++ * @settle_time:        platform specific settle down time
++ * @irqtype:            type of interrupt, falling or rising edge
++ * @enable_wakeup:      specifies if keypad event can wake up system from sleep
++ * @no_autorepeat:      flag for auto repetition
++ */
++struct tc3589x_keypad_platform_data {
++	const struct matrix_keymap_data *keymap_data;
++	u8                      krow;
++	u8                      kcol;
++	u8                      debounce_period;
++	u8                      settle_time;
++	unsigned long           irqtype;
++	bool                    enable_wakeup;
++	bool                    no_autorepeat;
++};
++
++/**
+  * struct tc_keypad - data structure used by keypad driver
+  * @tc3589x:    pointer to tc35893
+  * @input:      pointer to input device object
+@@ -363,13 +385,10 @@ static int tc3589x_keypad_probe(struct platform_device *pdev)
+ 	const struct tc3589x_keypad_platform_data *plat;
+ 	int error, irq;
+ 
+-	plat = tc3589x->pdata->keypad;
+-	if (!plat) {
+-		plat = tc3589x_keypad_of_probe(&pdev->dev);
+-		if (IS_ERR(plat)) {
+-			dev_err(&pdev->dev, "invalid keypad platform data\n");
+-			return PTR_ERR(plat);
+-		}
++	plat = tc3589x_keypad_of_probe(&pdev->dev);
++	if (IS_ERR(plat)) {
++		dev_err(&pdev->dev, "invalid keypad platform data\n");
++		return PTR_ERR(plat);
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+diff --git a/include/linux/mfd/tc3589x.h b/include/linux/mfd/tc3589x.h
+index c203c9c..468c31a 100644
+--- a/include/linux/mfd/tc3589x.h
++++ b/include/linux/mfd/tc3589x.h
+@@ -140,36 +140,13 @@ extern int tc3589x_set_bits(struct tc3589x *tc3589x, u8 reg, u8 mask, u8 val);
+ #define TC_KPD_DEBOUNCE_PERIOD  0xA3
+ #define TC_KPD_SETTLE_TIME      0xA3
+ 
+-/**
+- * struct tc35893_platform_data - data structure for platform specific data
+- * @keymap_data:        matrix scan code table for keycodes
+- * @krow:               mask for available rows, value is 0xFF
+- * @kcol:               mask for available columns, value is 0xFF
+- * @debounce_period:    platform specific debounce time
+- * @settle_time:        platform specific settle down time
+- * @irqtype:            type of interrupt, falling or rising edge
+- * @enable_wakeup:      specifies if keypad event can wake up system from sleep
+- * @no_autorepeat:      flag for auto repetition
+- */
+-struct tc3589x_keypad_platform_data {
+-	const struct matrix_keymap_data *keymap_data;
+-	u8                      krow;
+-	u8                      kcol;
+-	u8                      debounce_period;
+-	u8                      settle_time;
+-	unsigned long           irqtype;
+-	bool                    enable_wakeup;
+-	bool                    no_autorepeat;
+-};
+ 
+ /**
+  * struct tc3589x_platform_data - TC3589x platform data
+  * @block: bitmask of blocks to enable (use TC3589x_BLOCK_*)
+- * @keypad: keypad-specific platform data
+  */
+ struct tc3589x_platform_data {
+ 	unsigned int block;
+-	const struct tc3589x_keypad_platform_data *keypad;
+ };
+ 
+ #endif
