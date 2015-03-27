@@ -1,67 +1,72 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Fri, 27 Mar 2015 12:54:23 +0100
-Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
-In-Reply-To: <20150327101152.GB16851@odux.rfo.atmel.com>
-References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
- <20150327101152.GB16851@odux.rfo.atmel.com>
-Message-ID: <4728260.M5jZylgLPj@kongar>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 27 Mar 2015 20:55:09 +0900
+Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
+ get rid of the bounce page"
+In-Reply-To: <20150327100612.GB1562@arm.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+Message-ID: <20150327115505.GA18822@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ludovic,
-
-On Friday 27 March 2015, 11:11:52 wrote Ludovic Desroches:
-> On Fri, Mar 20, 2015 at 08:12:00PM +0100, Alexander Stein wrote:
-> > This adds the callback for set_multiple.
-> > As this controller has a separate set and clear register, we can't write
-> > directly to PIO_ODSR as this would required a cached variable and would
-> > race with at91_gpio_set.
-> > So build masks for the PIO_SODR and PIO_CODR registers and write them
-> > together.
-> 
-> Sure seems safer and easier to use SODR and CODR.
-> 
+On Fri, Mar 27, 2015 at 10:06:12AM +0000, Will Deacon wrote:
+> On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
+> > On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
+> > > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
+> > > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
+> > > >> > I think we now have a new error: (seen with omap2plus_defconfig)
+> > > >> > on next-20150324 :
+> > > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
+> > > >> > referenced in expression
+> > > >> > make: *** [vmlinux] Error 1
+> > > >>
+> > > >> Thanks, I am seeing that too.
+> > > >>
+> > > >> My armchair suggestion is that the following should be reverted.
+> > > >>
+> > > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> > > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
+> > > >
+> > > > Can you try again with the latest -next please? We've merged an additional
+> > > > patch aimed at sorting this out. Reverting isn't really an option, as
+> > > > there's an awful lot of code that depends on the bounce page removal.
+> > > 
+> > > Here are the kernelci.org -next results[1], if you click the build
+> > > status you can dig down into the build failures. next-20150326 has now
+> > > hit a compiler bug, Arnd mentioned he was looking into this issue.
 > > 
-> > Signed-off-by: Alexander Stein <alexanders83@web.de>
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> A question below.
-> 
-> > ---
-> > This was tested by using an own test driver which uses
-> > gpiod_set_array_cansleep to set multiple GPIOs at once.
+> > I have confirmed that next-20150326 does not compile without
+> > the following reverted:
 > > 
-> >  drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> > 
-> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> > index f4cd0b9..a882523 100644
-> > --- a/drivers/pinctrl/pinctrl-at91.c
-> > +++ b/drivers/pinctrl/pinctrl-at91.c
-> > @@ -1330,6 +1330,33 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
-> >  	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
-> >  }
-> >  
-> > +static void at91_gpio_set_multiple(struct gpio_chip *chip,
-> > +				      unsigned long *mask, unsigned long *bits)
-> > +{
-> > +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> > +	void __iomem *pio = at91_gpio->regbase;
-> > +	unsigned long set_mask;
-> > +	unsigned long clear_mask;
-> > +	size_t i;
-> > +
-> > +	set_mask = 0;
-> > +	clear_mask = 0;
-> > +
-> > +	for (i = 0; i < chip->ngpio; i++) {
-> > +		if (*mask == 0)
-> > +			break;
-> > +		if (__test_and_clear_bit(i, mask)) {
+> > 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
+> > e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> > 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
 > 
-> For my knowledge, why do you need to clear the mask?
+> Thanks for testing this and sorry for the continued breakage. Which
+> toolchain did you say you were using? Ard has some more patches trying to
+> fix this, but none of our toolchains seem to tickle the issue.
 
-I tried to do the same as mpc8xxx_gpio_set_multiple. I think the reason is that an empty mask will quit that loop potentially earlier.
+It seems that a fix has emerged (thanks! local testing looks good so far)
+but for the record I am using the arm (32) tool chain for x86_84
+on kernel.org.
 
-Best regards,
-Alexander
+https://www.kernel.org/pub/tools/crosstool/files/bin/x86_64/4.6.3/
+
+# arm-unknown-linux-gnueabi-gcc --version
+arm-unknown-linux-gnueabi-gcc (GCC) 4.6.3
+Copyright (C) 2011 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+# arm-unknown-linux-gnueabi-ld --version
+GNU ld (GNU Binutils) 2.22
+Copyright 2011 Free Software Foundation, Inc.
+This program is free software; you may redistribute it under the terms of
+the GNU General Public License version 3 or (at your option) a later version.
+This program has absolutely no warranty.
