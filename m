@@ -1,66 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Mar 2015 13:28:25 +0100
-Subject: [PATCH v2 3/3] ARM: EXYNOS: Add missing of_node_put() when parsing
- power domains
+Date: Fri, 27 Mar 2015 13:28:24 +0100
+Subject: [PATCH v2 2/3] ARM: EXYNOS: Handle of_find_device_by_node and kstrdup
+ failures
 In-Reply-To: <1427459305-26625-1-git-send-email-k.kozlowski@samsung.com>
 References: <1427459305-26625-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1427459305-26625-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1427459305-26625-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing of_node_put() to:
-1. Error return path if allocating memory for exynos_pm_domain failed.
-2. Second iteration over power domains if a child domain was not present
-   or was incomplete.
+Prevent possible NULL pointer dereference of pointer returned by
+of_find_device_by_node(). Handle this by skipping such power domain.
+
+Additionally fail the init on kstrdup() failure. Such case is actually
+not fatal because the name for power domain allocated by kstrdup() is
+used only in printk. Still as a precaution handle this as an error
+condition.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reported-by: Karol Wrona <k.wrona@samsung.com>
 
 ---
 Changes since v1:
-1. New patch.
+None.
 ---
- arch/arm/mach-exynos/pm_domains.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 61c32ccc9f7a..1a90c5da2fd7 100644
+index 14622b5f4481..61c32ccc9f7a 100644
 --- a/arch/arm/mach-exynos/pm_domains.c
 +++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -138,6 +138,7 @@ static __init int exynos4_pm_init_power_domain(void)
- 		if (!pd) {
- 			pr_err("%s: failed to allocate memory for domain\n",
- 					__func__);
+@@ -126,6 +126,12 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		struct device *dev;
+ 
+ 		pdev = of_find_device_by_node(np);
++		if (!pdev) {
++			pr_err("%s: failed to find device for node %s\n",
++					__func__, np->name);
 +			of_node_put(np);
- 			return -ENOMEM;
++			continue;
++		}
+ 		dev = &pdev->dev;
+ 
+ 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
+@@ -136,6 +142,12 @@ static __init int exynos4_pm_init_power_domain(void)
  		}
  
-@@ -209,15 +210,15 @@ no_clk:
- 		args.args_count = 0;
- 		child_domain = of_genpd_get_from_provider(&args);
- 		if (!child_domain)
--			continue;
-+			goto next_pd;
- 
- 		if (of_parse_phandle_with_args(np, "power-domains",
- 					 "#power-domain-cells", 0, &args) != 0)
--			continue;
-+			goto next_pd;
- 
- 		parent_domain = of_genpd_get_from_provider(&args);
- 		if (!parent_domain)
--			continue;
-+			goto next_pd;
- 
- 		if (pm_genpd_add_subdomain(parent_domain, child_domain))
- 			pr_warn("%s failed to add subdomain: %s\n",
-@@ -225,6 +226,7 @@ no_clk:
- 		else
- 			pr_info("%s has as child subdomain: %s.\n",
- 				parent_domain->name, child_domain->name);
-+next_pd:
- 		of_node_put(np);
- 	}
- 
+ 		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
++		if (!pd->pd.name) {
++			kfree(pd);
++			of_node_put(np);
++			return -ENOMEM;
++		}
++
+ 		pd->name = pd->pd.name;
+ 		pd->base = of_iomap(np, 0);
+ 		if (!pd->base) {
 -- 
 1.9.1
