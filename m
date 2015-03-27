@@ -1,116 +1,62 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 27 Mar 2015 15:06:59 +0200
-Subject: [PATCHv5 11/35] ARM: OMAP2+: clock: move clock provider
- infrastructure to clock driver
-In-Reply-To: <20150326173013.GH31346@atomide.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-12-git-send-email-t-kristo@ti.com>
- <5512D069.4080906@ti.com> <20150325231659.GD31346@atomide.com>
- <5513B426.1070205@ti.com> <5513E59F.3020204@ti.com>
- <20150326173013.GH31346@atomide.com>
-Message-ID: <551555F3.2000805@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 Mar 2015 13:09:20 +0000
+Subject: [PATCH v3 0/5] arm64: Patching branches for fun and profit
+Message-ID: <1427461765-14462-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 07:30 PM, Tony Lindgren wrote:
-> * Tero Kristo <t-kristo@ti.com> [150326 03:55]:
->> On 03/26/2015 09:24 AM, Tero Kristo wrote:
->>> On 03/26/2015 01:17 AM, Tony Lindgren wrote:
->>>> * Tero Kristo <t-kristo@ti.com> [150325 08:12]:
->>>>>
->>>>> Splits the clock provider init out of the PRM driver and moves it to
->>>>> clock driver. This is needed so that once the PRCM drivers are
->>>>> separated,
->>>>> they can logically just access the clock driver not needing to go
->>>>> through
->>>>> common PRM code. This would be wrong in the case of control module for
->>>>> example.
->>>> ...
->>>>
->>>>> --- a/arch/arm/mach-omap2/clock.c
->>>>> +++ b/arch/arm/mach-omap2/clock.c
->>>> ...
->>>>> -u32 omap2_clk_readl(struct clk_hw_omap *clk, void __iomem *reg)
->>>>> +u32 omap2_clk_memmap_readl(void __iomem *reg)
->>>>>   {
->>>>> -    u32 val;
->>>>> +    struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
->>>>>
->>>>> -    if (clk->flags & MEMMAP_ADDRESSING) {
->>>>> -        struct clk_omap_reg *r = (struct clk_omap_reg *)&reg;
->>>>> -        val = readl_relaxed(clk_memmaps[r->index] + r->offset);
->>>>> -    } else {
->>>>> -        val = readl_relaxed(reg);
->>>>> -    }
->>>>> +    return readl_relaxed(clk_memmaps[r->index] + r->offset);
->>>>> +}
->>>>
->>>> The cast from void __iomem *reg to struct clk_omap_reg *r looks still
->>>> nasty.. Why don't you add the IO address into struct clk_omap_reg:
->>>>
->>>> struct clk_omap_reg {
->>>>     u16 offset;
->>>>     u16 index;
->>>>     struct regmap *regmap;
->>>>     void __iomem *addr;
->>>> };
->>>> ...
->>>>
->>>> Then populate it during init and then have the clock code use it
->>>> directly if available? Then it seems you would not need the
->>>> static struct clk_iomap *clk_memmaps[CLK_MAX_MEMMAPS] at all?
->>>
->>> Doing a change like this should probably be planned, but it is a larger
->>> modification. Currently none of the low-level clock APIs support this,
->>> but instead expect a direct iomem pointer against which they can do
->>> arithmetic operations. The major problem is the companion clocks, which
->>> just XOR some bits in the registers to get ICLK / IDLEST register offset
->> >from FCLK.
->>>
->>> So, for now, clock code just uses the void __iomem pointer as a storage
->>> class for struct clk_omap_reg, on which arithmetic operations can be done.
->
-> Well how about keep the check if (clk->flags & MEMMAP_ADDRESSING) at
-> least? Maybe WARN_ON(!(clk->flags & MEMMAP_ADDRESSING))?
->
-> Otherwise this could be a nightmare to debug if anything goes wrong.
+The current alternative instruction framework is not kind to branches,
+potentially leading to all kind of hacks in the code that uses
+alternatives. This series expands it to deal with immediate branches
+(for a start), and applies it to the VGIC world switch.
 
-Ok, force update pushed to branch now, the patch is basically pretty 
-much to the format where it was before this discussion, with the 
-addition of WARN_ON_ONCE in case MEMMAP_ADDRESSING is missing.
+Patch #1 adds the required infrastructure to extract the immediate
+from an instruction.
 
--Tero
+Patch #2 allows the use of an immediate b or bl instruction as an
+alternative, computing the target branch as the instruction is being
+patched in.
 
->
->> I did this change as a trial, and this is the diff required to get it
->> working:
->>
->>   arch/arm/mach-omap2/clkt_iclk.c |   20 ++++++++---------
->>   arch/arm/mach-omap2/clock.c     |   47
->> +++++++++++++++++----------------------
->>   arch/arm/mach-omap2/clock.h     |    8 +++----
->>   arch/arm/mach-omap2/clock2430.c |    5 +++--
->>   arch/arm/mach-omap2/clock34xx.c |   36 ++++++++++++++----------------
->>   arch/arm/mach-omap2/clock3517.c |   20 ++++++++---------
->>   arch/arm/mach-omap2/cm.h        |    4 +++-
->>   arch/arm/mach-omap2/cm2xxx.c    |    9 +++-----
->>   arch/arm/mach-omap2/cm3xxx.c    |   10 +++------
->>   drivers/clk/ti/clk.c            |   10 +++++----
->>   drivers/clk/ti/divider.c        |   24 ++++++++++++++------
->>   drivers/clk/ti/dpll.c           |   11 ++++-----
->>   drivers/clk/ti/gate.c           |   21 +++++++++++------
->>   drivers/clk/ti/interface.c      |    9 ++++----
->>   drivers/clk/ti/mux.c            |   22 ++++++++++++------
->>   include/linux/clk/ti.h          |    5 +++--
->>   16 files changed, 137 insertions(+), 124 deletions(-)
->>
->> I think we should probably keep this out of this set now and do this while
->> moving the OMAP core clock support code under clock driver... just to keep
->> it more easily manageable.
->
-> OK fine with me to do that as a follow-up patch.
->
-> Regards,
->
-> Tony
->
+Patch #3 defines a feature framework that works exactly like the CPU
+errata infrastructure (and shares a lot with it).
+
+Patch #4 adds detection of the system register GICv3 CPU interface.
+
+Patch #5 enables dynamic patching of the KVM code.
+
+This has been tested with GICv3 on a FastModel.
+
+* From v1:
+- Fixed missing cpu_to_le32 when writing back the instruction
+- Added Will's Acks.
+
+* From v2:
+- Replaced cpu_to_le32 with aarch_write_insn, which is the proper API
+  and takes care of the potential pitfall if the text is read-only.
+  Thanks to Tixy for suggesting this.
+
+Marc Zyngier (5):
+  arm64: insn: Add aarch64_insn_decode_immediate
+  arm64: alternative: Allow immediate branch as alternative instruction
+  arm64: Extract feature parsing code from cpu_errata.c
+  arm64: alternative: Introduce feature for GICv3 CPU interface
+  arm64: KVM: Switch vgic save/restore to alternative_insn
+
+ arch/arm/include/asm/kvm_host.h     |  5 ---
+ arch/arm64/include/asm/cpufeature.h | 23 ++++++++++-
+ arch/arm64/include/asm/insn.h       |  1 +
+ arch/arm64/include/asm/kvm_host.h   | 23 -----------
+ arch/arm64/kernel/Makefile          |  2 +-
+ arch/arm64/kernel/alternative.c     | 55 ++++++++++++++++++++++++-
+ arch/arm64/kernel/asm-offsets.c     |  1 -
+ arch/arm64/kernel/cpu_errata.c      | 36 ++---------------
+ arch/arm64/kernel/cpufeature.c      | 63 +++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpuinfo.c         |  1 +
+ arch/arm64/kernel/insn.c            | 81 +++++++++++++++++++++++++++++--------
+ arch/arm64/kvm/hyp.S                | 18 ++-------
+ virt/kvm/arm/vgic.c                 |  3 --
+ 13 files changed, 214 insertions(+), 98 deletions(-)
+ create mode 100644 arch/arm64/kernel/cpufeature.c
+
+-- 
+2.1.4
