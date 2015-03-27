@@ -1,57 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Mar 2015 11:44:45 +0100
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <5515342F.6010703@openssl.org>
-References: <20150316154835.GA31336@google.com>
- <20150323135009.GB820@google.com>
- <20150324122702.GJ14457@ns203013.ovh.net>
- <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
- <20150324130511.GK14457@ns203013.ovh.net>
- <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
- <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
- <5515342F.6010703@openssl.org>
-Message-ID: <CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Fri, 27 Mar 2015 11:52:04 +0100
+Subject: [RFC] i.MX25/35/SDHCI: switch off DMA usage
+Message-ID: <201503271152.04348.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2015 at 11:42, Andy Polyakov <appro@openssl.org> wrote:
->>> Could you share the error log please?
->>
->> OK, I spotted one issue with this code:
->>
->> arch/arm/crypto/sha256-core.S: Assembler messages:
->> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
->> after fixup
->>
->> This is caused by the fact that, when building the integer-only code
->> for an older architecture, the conditional compilation produces a
->> slightly bigger preceding function, and the symbol K256 is out of
->> range for the adr instruction.
->>
->> @Jean-Christophe: is that the same problem that you hit?
->>
->> @Andy: I propose we do something similar as in the bsaes code:
->>
->> #ifdef __thumb__
->> #define adrl adr
->> #endif
->>
->> and replace the offending line with
->>
->> adrl r14,K256
->
-> Sorry about delay. Yes, that would do. I did test all combinations, but
-> all "my" combinations, i.e. without __KERNEL__ defined :-( And without
-> __KERNEL__ there are few extra instructions in integer-only subroutine
-> that "push" instruction in question code toward higher address, so that
-> constant was ffffefc0, which can be encoded. Anyway, I've chosen to add
-> that #define next to .thumb directive. See attached.
->
-> Ard, you have mentioned that you've verified it on big-endian, but I've
-> spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
-> guess that it worked for you either because it was NEON that was tested
-> (it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
-> case it uses endian-neutral byte-by-byte data load). Can you confirm either?
->
+DMA and the required overhead on very small data blocks seems an expensive
+operation. Due to erratum ENGCM07207 for i.MX25 and i.MX35 SoCs the
+support for multiblock transfers is disabled which results into a huge
+amount of single 512 byte sector transfers and interrupts. This slows down
+the transmission speed to below 500 kiB/s (even at 50 MHz SD card clock).
+Using PIO instead of DMA to avoid ENGCM07207 happens and re-enabling
+multiblock transfers again improve the transmission capability up to about
+2.5 MiB/s.
 
-I need to double check that, but my suspicion is that it was the latter.
+I'm still not sure if ENGCM07207 is related to DMA only and can not happen
+when PIO is used instead. Someone out there with experience regarding this
+topic?
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 10ef8244a239..f5fd569a17c3 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -976,8 +976,8 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 
+ 	if (imx_data->socdata->flags & ESDHC_FLAG_ENGCM07207)
+ 		/* Fix errata ENGcm07207 present on i.MX25 and i.MX35 */
+-		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+-			| SDHCI_QUIRK_BROKEN_ADMA;
++		host->quirks |=
++			SDHCI_QUIRK_BROKEN_ADMA | SDHCI_QUIRK_BROKEN_DMA;
+ 
+ 	/*
+ 	 * The imx6q ROM code will change the default watermark level setting
+-- 
+1.7.10.4
+
+Juergen
