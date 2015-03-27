@@ -1,33 +1,31 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Mar 2015 22:46:34 -0700
-Subject: [PATCH] clk: qcom: Fix ipq806x LCC frequency tables
-In-Reply-To: <20150303001024.GA31275@kwestfie-linux.qualcomm.com>
-References: <1425008264-18875-1-git-send-email-sboyd@codeaurora.org>
- <20150303001024.GA31275@kwestfie-linux.qualcomm.com>
-Message-ID: <20150327054634.GA5625@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 26 Mar 2015 22:48:21 -0700
+Subject: [PATCH v2 2/2] watchdog: digicolor: driver for Conexant Digicolor
+ CX92755 SoC
+In-Reply-To: <CAM=Q2ctS6_=pzW2H+Yd3nEBgF269vfdh8yV3NbnWFP7b-MWLbA@mail.gmail.com>
+References: <a4554d0a61c62b85a7d66b6e3d16d07f8a498025.1427356791.git.baruch@tkos.co.il>	<148dd2d6912211bc468c30acf85a463192576039.1427356791.git.baruch@tkos.co.il>
+ <CAM=Q2ctS6_=pzW2H+Yd3nEBgF269vfdh8yV3NbnWFP7b-MWLbA@mail.gmail.com>
+Message-ID: <5514EF25.4000400@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02, Kenneth Westfield wrote:
-> On Thu, Feb 26, 2015 at 07:37:44PM -0800, Stephen Boyd wrote:
-> > These frequency tables list the wrong rates. Either they don't
-> > have the correct frequency at all, or they're specified in kHz
-> > instead of Hz. Fix it.
-> > 
-> > Fixes: c99e515a92e9 "clk: qcom: Add IPQ806X LPASS clock controller (LCC) driver"
-> > Cc: Kenneth Westfield <kwestfie@codeaurora.org>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  drivers/clk/qcom/lcc-ipq806x.c | 18 +++++++++---------
-> >  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> Verified audio functionality on the Storm board (w/o SPDIF).
-> 
-> Tested-by: Kenneth Westfield <kwestfie@codeaurora.org>
-> 
+On 03/26/2015 10:40 PM, Shubhrajyoti Datta wrote:
+>
+>     +
+>     +static int dc_restart_handler(struct notifier_block *this, unsigned long mode,
+>     +                             void *cmd)
+>     +{
+>     +       struct dc_wdt *wdt = container_of(this, struct dc_wdt, restart_handler);
+>     +
+>     +       dc_wdt_set(wdt, 1);
+>     +       /* wait for reset to assert... */
+>     +       mdelay(500);
+>
+>
+> How is the 500 calculated ?
+> Also is it possible to sleep here?
+>
+sleep: No. It would also be pretty pointless, since this is after all the very last step
+of rebooting the system.
 
-Applied to clk-next
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Guenter
