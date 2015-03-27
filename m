@@ -1,90 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Mar 2015 12:14:28 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod data changes for AM43xx and DRA7xx
- for v4.1
-In-Reply-To: <alpine.DEB.2.02.1503271008120.25612@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1503271008120.25612@utopia.booyaka.com>
-Message-ID: <20150327191428.GF10805@atomide.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Fri, 27 Mar 2015 20:21:26 +0100
+Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on
+ Exynos5250 and other
+In-Reply-To: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+References: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5515ADB6.6050204@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150327 03:09]:
-> Hi Tony,
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.1/omap-hwmod-a
-> 
-> for you to fetch changes up to edec17863362e0106b9e6b2f83237c7bd535e346:
-> 
->   ARM: DRA7: hwmod: Fix the hwmod class for GPTimer4 (2015-03-24 11:52:50 -0600)
-> 
-> ----------------------------------------------------------------
-> OMAP hwmod data changes for AM43xx and DRA7xx for v4.1
-> 
-> Add support for the AM43xx HDQ/1-wire driver and fix the GPTIMER data
-> for DRA7xx.
-> 
-> Note that I do not have AM43xx nor DRA7xx boards, and cannot test these
-> patches on those platforms.
-> 
-> Basic build, boot, and PM test logs are available at:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.1/20150324185246/
+Hello Krzysztof,
 
-Pulling into omap-for-v4.1/soc thanks.
+On 03/27/2015 05:08 PM, Krzysztof Kozlowski wrote:
+> After adding display power domain for Exynos5250 in commit
+> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+> display on Chromebook Snow and others stopped working after boot.
+> 
+> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+> This clock is required by Display Port and is enabled by bootloader.
+> However when FIMD driver probing was deferred, the display power domain
+> was turned off. This effectively reset the value of DP clock enable
+> register.
+> 
+> When exynos-dp is later probed, the clock is not enabled and display is
+> not properly configured:
+> 
+> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+> exynos-dp 145b0000.dp-controller: unable to config video
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+> Cc: <stable@vger.kernel.org>
+> 
+> ---
+> 
+> This should fix issue reported by Javier [1][2].
+>
 
-Tony
- 
-> ----------------------------------------------------------------
-> Sourav Poddar (1):
->       ARM: OMAP2: hwmod: AM43XX: Add hwmod support for HDQ-1W
-> 
-> Suman Anna (2):
->       ARM: DRA7: hwmod: Add data for GPTimers 13 through 16
->       ARM: DRA7: hwmod: Fix the hwmod class for GPTimer4
-> 
->  arch/arm/mach-omap2/omap_hwmod_43xx_data.c |  36 +++++++++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 113 +++++++++++++++++++++++++----
->  arch/arm/mach-omap2/prcm43xx.h             |   1 +
->  3 files changed, 134 insertions(+), 16 deletions(-)
-> 
-> 
-> 
-> vmlinux object size
-> (delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539)):
->    text     data      bss    total  kernel
->       0        0        0        0  omap1_defconfig
->       0        0        0        0  omap1_defconfig_1510innovator_only
->       0        0        0        0  omap1_defconfig_5912osk_only
->       0     +800        0     +800  multi_v7_defconfig
->       0     +920        0     +920  omap2plus_defconfig
->       0        0        0        0  omap2plus_defconfig_2430sdp_only
->       0        0        0        0  omap2plus_defconfig_am33xx_only
->       0     +256        0     +256  omap2plus_defconfig_am43xx_only
->       0     +928        0     +928  omap2plus_defconfig_cpupm
->       0     +704        0     +704  omap2plus_defconfig_dra7xx_only
->       0        0        0        0  omap2plus_defconfig_n800_multi_omap2xxx
->       0        0        0        0  omap2plus_defconfig_n800_only_a
->       0     +896        0     +896  omap2plus_defconfig_no_pm
->       0        0        0        0  omap2plus_defconfig_omap2_4_only
->       0        0        0        0  omap2plus_defconfig_omap3_4_only
->       0        0        0        0  omap2plus_defconfig_omap5_only
->       0        0        0        0  rmk_omap3430_ldp_allnoconfig
->       0        0        0        0  rmk_omap3430_ldp_oldconfig
->       0        0        0        0  rmk_omap4430_sdp_allnoconfig
->       0        0        0        0  rmk_omap4430_sdp_oldconfig
-> 
-> Boot-time memory difference
-> (delta in bytes from test_v4.0-rc1 (c517d838eb7d07bbe9507871fab3931deccff539))
->   avail  rsrvd   high  freed  board          kconfig
->  -117772k -13300k      .  -168k  2420n800       omap2plus_defconfig_n800_only_a
->     -4k     4k      .      .  37xxevm        omap2plus_defconfig
->     -4k     4k      .      .  4430es2panda   omap2plus_defconfig
->     -4k     4k      .      .  4460pandaes    omap2plus_defconfig
->     -4k     4k      .      .  5430es2sbct54  omap2plus_defconfig
-> 
+I tested this patch and does indeed solves both issues I reported
+The exynos-dp probe deferral does not make the display to not be
+working and also disabling and enabling the display with:
+
+with /sys/devices/platform/exynos-drm/graphics/fb0/blank works.
+
+Thanks a lot for fixing this issue.
+
+On an Exynos5250 Snow Chromebook:
+
+Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+
+Best regards,
+Javier
