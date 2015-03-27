@@ -1,59 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 Mar 2015 14:38:49 -0700
-Subject: [PATCH] ARM: DRA7: Enable Cortex A15 errata 798181
-In-Reply-To: <5515BEF4.7030201@ti.com>
-References: <1427325909-7014-1-git-send-email-praneeth@ti.com>
- <5513458A.50001@ti.com> <20150326173515.GB10805@atomide.com>
- <5515BEF4.7030201@ti.com>
-Message-ID: <20150327213848.GG10805@atomide.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 27 Mar 2015 23:36:04 +0100
+Subject: [PATCH 1/4] net/macb: only probe queues once and use stored values
+In-Reply-To: <09960ba7389058e026b73409018fe1ee61d6dc57.1427469791.git.nicolas.ferre@atmel.com>
+References: <cover.1427469791.git.nicolas.ferre@atmel.com>
+ <09960ba7389058e026b73409018fe1ee61d6dc57.1427469791.git.nicolas.ferre@atmel.com>
+Message-ID: <20150327233604.79dfdef3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [150327 13:35]:
-> On 03/26/2015 12:35 PM, Tony Lindgren wrote:
-> > * Nishanth Menon <nm@ti.com> [150325 16:32]:
-> >> On 03/25/2015 06:25 PM, Praneeth Bajjuri wrote:
-> >>> ARM errata 798181 is applicable for OMAP5/DRA7 based devices. So enable
-> >>> the same in the build.
-> >>>
-> >>> DRA7xx is based on Cortex-A15 r2p2 revision.
-> >>>
-> >>> ARM Errata extract and workaround information is as below.
-> >>>
-> >>> On Cortex-A15 (r0p0..r3p2) the TLBI*IS/DSB operations are not
-> >>> adequately shooting down all use of the old entries. The
-> >>> ARM_ERRATA_798181 option enables the Linux kernel workaround
-> >>> for this erratum which sends an IPI to the CPUs that are running
-> >>> the same ASID as the one being invalidated.
-> >>>
-> >>> Signed-off-by: Praneeth Bajjuri <praneeth@ti.com>
-> >>> ---
-> >>>  arch/arm/mach-omap2/Kconfig |    1 +
-> >>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> >>> index c7d8d86..3e4b4ae 100644
-> >>> --- a/arch/arm/mach-omap2/Kconfig
-> >>> +++ b/arch/arm/mach-omap2/Kconfig
-> >>> @@ -69,6 +69,7 @@ config SOC_DRA7XX
-> >>>  	select ARM_GIC
-> >>>  	select HAVE_ARM_ARCH_TIMER
-> >>>  	select IRQ_CROSSBAR
-> >>> +	select ARM_ERRATA_798181 if SMP
-> >>>  
-> >>>  config ARCH_OMAP2PLUS
-> >>>  	bool
-> >>>
-> >> Gee thanks and Apologies on missing this patch.
-> >>
-> >> Acked-by: Nishanth Menon <nm@ti.com>
-> >>
-> >> Seen on DRA7 only builds, so kinda slipped radar a bit.. verified to
-> >> apply on v4.0-rc1
-> > 
-> > Is this needed as a fix for v4.0-rc series or can this wait for v4.1?
-> I think we can wait till 4.1
+Hi Nicolas,
 
-OK thanks applying into omap-for-v4.1/fixes-not-urgent.
+On Fri, 27 Mar 2015 16:34:09 +0100
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-Tony 
+> When merging at91_ether and macb driver during 421d9df0628b (net/macb: merge
+> at91_ether driver into macb driver) the probe function has been split. The code
+> dealing with initialization of queues is now moved in macb_init() which needs
+> information computed in the parent macb_probe() function.
+> So, add the queue_mask information to the private structure and use it when
+> needed in macb_init().
+
+Just to be sure: this is not a bug fix, right ?
+It just improves the initialization process by calling
+macb_probe_queues only once (in macb_probe).
+
+Anyway, once you've addressed Cyrille's comment, you can add my
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/net/ethernet/cadence/macb.c | 9 ++++-----
+>  drivers/net/ethernet/cadence/macb.h | 1 +
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index a0a04b3638e6..b710768172d9 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -2180,7 +2180,7 @@ static void macb_probe_queues(void __iomem *mem,
+>  static int macb_init(struct platform_device *pdev)
+>  {
+>  	struct net_device *dev = platform_get_drvdata(pdev);
+> -	unsigned int hw_q, queue_mask, q, num_queues;
+> +	unsigned int hw_q, q;
+>  	struct macb *bp = netdev_priv(dev);
+>  	struct macb_queue *queue;
+>  	int err;
+> @@ -2226,10 +2226,8 @@ static int macb_init(struct platform_device *pdev)
+>  	 * register mapping but we don't want to test the queue index then
+>  	 * compute the corresponding register offset at run time.
+>  	 */
+> -	macb_probe_queues(bp->regs, &queue_mask, &num_queues);
+> -
+> -	for (hw_q = 0, q = 0; hw_q < MACB_MAX_QUEUES; ++hw_q) {
+> -		if (!(queue_mask & (1 << hw_q)))
+> +	for (hw_q = 0, q = 0; hw_q < bp->num_queues; ++hw_q) {
+> +		if (!(bp->queue_mask & (1 << hw_q)))
+>  			continue;
+>  
+>  		queue = &bp->queues[q];
+> @@ -2715,6 +2713,7 @@ static int macb_probe(struct platform_device *pdev)
+>  	bp->dev = dev;
+>  	bp->regs = mem;
+>  	bp->num_queues = num_queues;
+> +	bp->queue_mask = queue_mask;
+>  	spin_lock_init(&bp->lock);
+>  
+>  	platform_set_drvdata(pdev, dev);
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index bc6e35c40822..0b6afac91bfe 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -785,6 +785,7 @@ struct macb {
+>  	size_t			rx_buffer_size;
+>  
+>  	unsigned int		num_queues;
+> +	unsigned int		queue_mask;
+>  	struct macb_queue	queues[MACB_MAX_QUEUES];
+>  
+>  	spinlock_t		lock;
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
