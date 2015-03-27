@@ -1,59 +1,101 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 27 Mar 2015 13:28:24 +0100
-Subject: [PATCH v2 2/3] ARM: EXYNOS: Handle of_find_device_by_node and kstrdup
- failures
-In-Reply-To: <1427459305-26625-1-git-send-email-k.kozlowski@samsung.com>
-References: <1427459305-26625-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1427459305-26625-2-git-send-email-k.kozlowski@samsung.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 27 Mar 2015 13:30:07 +0100
+Subject: [PATCH v3 10/15] serial: stm32-usart: Add STM32 USART Driver
+In-Reply-To: <55153FD2.7070304@hurleysoftware.com>
+References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>
+ <1426197361-19290-11-git-send-email-maxime.coquelin@st.com>
+ <5511ABAA.2010303@hurleysoftware.com>
+ <CALszF6Ds5b9V35iuSzxnOYDL2sD3psYfYp3b+6a-2Atse6_w3Q@mail.gmail.com>
+ <55153FD2.7070304@hurleysoftware.com>
+Message-ID: <CALszF6DGyeJRFRFwPCH53KcqODccgwQmQBSFQr0t6MREF_L3WQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent possible NULL pointer dereference of pointer returned by
-of_find_device_by_node(). Handle this by skipping such power domain.
+2015-03-27 12:32 GMT+01:00 Peter Hurley <peter@hurleysoftware.com>:
+> On 03/26/2015 06:03 PM, Maxime Coquelin wrote:
+>>>> +static void stm32_set_termios(struct uart_port *port, struct ktermios *termios,
+>>>> +                         struct ktermios *old)
+>>>> +{
+>>>> +     unsigned int baud;
+>>>> +     u32 usardiv, mantissa, fraction;
+>>>> +     tcflag_t cflag;
+>>>> +     u32 cr1, cr2, cr3;
+>>>> +     unsigned long flags;
+>>>> +
+>>>> +     baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk / 16);
+>>>> +     cflag = termios->c_cflag;
+>>>> +
+>>>> +     spin_lock_irqsave(&port->lock, flags);
+>>>> +
+>>>> +     /* Stop serial port and reset value */
+>>>> +     writel_relaxed(0, port->membase + USART_CR1);
+>>>> +
+>>>> +     cr1 = USART_CR1_TE | USART_CR1_RE | USART_CR1_UE | USART_CR1_RXNEIE;
+>>>> +
+>>>> +     if (cflag & CSTOPB)
+>>>> +             cr2 = USART_CR2_STOP_2B;
+>>>> +
+>>>> +     if (cflag & PARENB) {
+>>>> +             cr1 |= USART_CR1_PCE;
+>>>> +             if ((cflag & CSIZE) == CS8)
+>>>> +                     cr1 |= USART_CR1_M;
+>>>> +     }
+>>>> +
+>>>> +     if (cflag & PARODD)
+>>>> +             cr1 |= USART_CR1_PS;
+>>>> +
+>>>> +     if (cflag & CRTSCTS)
+>>>> +             cr3 = USART_CR3_RTSE | USART_CR3_CTSE;
+>>>
+>>> If this means autoflow control, then you need to define
+>>> throttle()/unthrottle() methods, otherwise the serial core won't
+>>> be able to throttle the remote when input buffers are about
+>>> to overflow.
+>>>
+>>> And you should only enable the autoCTS and let the serial
+>>> core enable autoRTS through set_mctrl(TIOCM_RTS).
+>>>
+>>> Just let me know if you need more info about how to do this.
+>>
+>> Ok, let's see if I have well understood.
+>>
+>> USART_CR3_RTSE should be set/cleared in set_mctrl(), depending on
+>> TIOCM_RTS  value.
+>> The throttle callback should disable the rx interrupt, and the
+>> unthrottle enable it.
+>> For CTS, it should be enabled in set_termios() if CRTSCTS, as done here.
+>>
+>> Am I right?
+>
+> Yeah, basically. You also have to indicate to the serial core that you
+> require throttle/unthrottle handling in this mode by setting port->status.
+>
+> Your set_termios() method would look like:
+>
+>         port->status &= ~(UPSTAT_AUTOCTS | UPSTAT_AUTORTS);
+>         if (cflag & CRTSCTS) {
+>                 port->status |= UPSTAT_AUTOCTS | UPSTAT_AUTORTS;
+>                 cr3 = USART_CR3_CTSE;
+>         }
+>
+> and your set_mctrl() method would look like:
+>
+>         if ((mctrl & TIOCM_RTS) && (port->status & UPSTAT_AUTORTS))
+>                 stm32_set_bits(port, USART_CR3, USART_CR3_RTSE);
+>         else
+>                 stm32_clear_bits(port, USART_CR3, USART_CR3_RTSE);
+>
+> The UPSTAT_AUTOCTS doesn't really do anything right now but please
+> use it anyway to indicate this driver has that functionality.
 
-Additionally fail the init on kstrdup() failure. Such case is actually
-not fatal because the name for power domain allocated by kstrdup() is
-used only in printk. Still as a precaution handle this as an error
-condition.
+Ok, thanks for your support.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I will implement this in the v4.
 
----
-Changes since v1:
-None.
----
- arch/arm/mach-exynos/pm_domains.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Regards,
+Maxime
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 14622b5f4481..61c32ccc9f7a 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -126,6 +126,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 		struct device *dev;
- 
- 		pdev = of_find_device_by_node(np);
-+		if (!pdev) {
-+			pr_err("%s: failed to find device for node %s\n",
-+					__func__, np->name);
-+			of_node_put(np);
-+			continue;
-+		}
- 		dev = &pdev->dev;
- 
- 		pd = kzalloc(sizeof(*pd), GFP_KERNEL);
-@@ -136,6 +142,12 @@ static __init int exynos4_pm_init_power_domain(void)
- 		}
- 
- 		pd->pd.name = kstrdup(dev_name(dev), GFP_KERNEL);
-+		if (!pd->pd.name) {
-+			kfree(pd);
-+			of_node_put(np);
-+			return -ENOMEM;
-+		}
-+
- 		pd->name = pd->pd.name;
- 		pd->base = of_iomap(np, 0);
- 		if (!pd->base) {
--- 
-1.9.1
+>
+> Regards,
+> Peter Hurley
+>
