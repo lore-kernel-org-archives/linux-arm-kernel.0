@@ -1,42 +1,149 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 26 Mar 2015 16:55:05 -0700
-Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
-Message-ID: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Mar 2015 01:01:03 +0100
+Subject: [PATCH] ARM: force linker to use PIC veneers
+In-Reply-To: <20150326131913.GA6140@e103592.cambridge.arm.com>
+References: <CAKv+Gu-MpvAnkEd2L_OPGpDv5cnCZACvzuQ9LbG8O5kjDRQUwQ@mail.gmail.com>
+ <20150324135439.GC3579@e103592.cambridge.arm.com>
+ <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
+ <20150325104603.GA3560@e103592.cambridge.arm.com>
+ <20150326113648.GC8656@n2100.arm.linux.org.uk>
+ <CAKv+Gu8ktOUcQrGOwMfbt8s2QG+RFdnKBykVfhXPTLSUFtWQyA@mail.gmail.com>
+ <20150326122203.GG8656@n2100.arm.linux.org.uk>
+ <CAKv+Gu-ctXuiM2mcgbqfkBkP_96tivjac0jv+XJ48XSpqRf=Yg@mail.gmail.com>
+ <20150326125334.GA27016@e103592.cambridge.arm.com>
+ <CAKv+Gu9CDnFSiRrntzTDZDFhb3Cq1M-Dt_xKxvNUszZJpSrzpg@mail.gmail.com>
+ <20150326131913.GA6140@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8Wr7MY6ogMjNFBDU=GMgYrFga7CD5-kf2msSH5vk+ubQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ismail <ismail@broadcom.com>
+On 26 March 2015 at 14:19, Dave P Martin <Dave.Martin@arm.com> wrote:
+> On Thu, Mar 26, 2015 at 01:05:09PM +0000, Ard Biesheuvel wrote:
+>> On 26 March 2015 at 13:53, Dave P Martin <Dave.Martin@arm.com> wrote:
+>> > On Thu, Mar 26, 2015 at 12:24:01PM +0000, Ard Biesheuvel wrote:
+>> >> On 26 March 2015 at 13:22, Russell King - ARM Linux
+>> >> <linux@arm.linux.org.uk> wrote:
+>> >> > On Thu, Mar 26, 2015 at 01:20:16PM +0100, Ard Biesheuvel wrote:
+>> >
+>> > [...]
+>> >
+>> >> >> Any specific concerns? The --pic-veneer switch dates back to 2009, so
+>> >> >> it's been around for a while
+>> >> >
+>> >> > BX.  Not every CPU supports BX.
+>> >> >
+>> >>
+>> >> The bx is used for the Thumb -> ARM switch inside the veneer only, so
+>> >> if you build for ARM these won't appear in the output
+>> >
+>> > Agreed that's what's _supposed_ to happen.
+>> >
+>> > Note that --use-blx is an override and might introduce BXs into a kernel
+>> > that otherwise doesn't have them.  But in any case, this option doesn't
+>> > show a benefit for the scenario under discussion, hence my dropping the
+>> > request (conditional on THUMB2_KERNEL in any case).
+>> >
+>>
+>> Actually, i am not quite sure. I hadn't realised that there is no
+>> branch-without-link counterpart of 'blx <label>' so even if I still
+>> potted a number of bx pc/nop sequences, I can't really say if there
+>> were quite as many as before.
+>
+> Where not out of range, the compiler should just branch to the
+> destination, with no veneer.  This would apply to optimised tail-
+> calls, for example -- but with an ordinary branch, not BX.  The
+> linker would only ever fix it up as B{L}X for one of two reasons:
+> either the destination is in a different instruction set, or
+> Thumb code is branching to a veneer (veneers are always ARM).
+>
+> THUMB2_KERNEL generates a kernel which is very nearly 100% Thumb
+> code, so BX should be very rare when veneers are not involved.
+>
+>> > Ard, can you should build a couple of !THUMB2_KERNEL/pre-v5
+>> > configurations with your change and check, just to be sure?
+>> >
+>>
+>> Will do.
+>>
+>
 
-Update the thread running index before issuing the
-GO command to the DMAC.
+ARM kernel with --pic-veneer:
+=============================
+$ readelf -A vmlinux
+Attribute Section: aeabi
+File Attributes
+  Tag_CPU_name: "4T"
+  Tag_CPU_arch: v4T
+  Tag_ARM_ISA_use: Yes
+  Tag_THUMB_ISA_use: Thumb-1
+  [...]
 
-Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
----
- drivers/dma/pl330.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+$ size vmlinux
+   text   data    bss    dec    hex filename
+38287123 13496224 9589540 61372887 3a879d7 vmlinux
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index 0e1f567..631642d 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
- 	/* Set to generate interrupts for SEV */
- 	writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
- 
-+	thrd->req_running = idx;
-+
- 	/* Only manager can execute GO */
- 	_execute_DBGINSN(thrd, insn, true);
- 
--	thrd->req_running = idx;
--
- 	return true;
- }
- 
--- 
-2.3.3
+$ grep -c veneer System.map
+493
+
+Veneers look like this:
+
+c247d53c <__sys_write_veneer>:
+c247d53c:       e59fc000        ldr     ip, [pc]
+c247d540:       e08ff00c        add     pc, pc, ip
+c247d544:       fdd3aa8c        .word   0xfdd3aa8c
+
+c247d548 <__init_rt_rq_veneer>:
+c247d548:       e59fc000        ldr     ip, [pc]
+c247d54c:       e08ff00c        add     pc, pc, ip
+c247d550:       fdbf9600        .word   0xfdbf9600
+
+c247d554 <__read_boot_clock_veneer>:
+c247d554:       e59fc000        ldr     ip, [pc]
+c247d558:       e08ff00c        add     pc, pc, ip
+c247d55c:       fdb91310        .word   0xfdb91310
+
+Thumb2 kernel with --pic-veneer
+===============================
+Attribute Section: aeabi
+File Attributes
+  Tag_CPU_name: "7-A"
+  Tag_CPU_arch: v7
+  Tag_CPU_arch_profile: Application
+  Tag_ARM_ISA_use: Yes
+  Tag_THUMB_ISA_use: Thumb-2
+  [...]
+
+$ size vmlinux
+   text   data    bss    dec    hex filename
+29353740 13644128 9614052 52611920 322cb50 vmlinux
+
+$ grep -c veneer System.map
+1928
+
+Veneers look like this:
+
+c014f9d8 <____down_interruptible_veneer>:
+c014f9d8:       e59fc004        ldr     ip, [pc, #4]
+c014f9dc:       e08fc00c        add     ip, pc, ip
+c014f9e0:       e12fff1c        bx      ip
+c014f9e4:       0128de45        .word   0x0128de45
+
+c014f9e8 <___raw_write_unlock_veneer>:
+c014f9e8:       4778            bx      pc
+c014f9ea:       46c0            nop
+c014f9ec:       e59fc004        ldr     ip, [pc, #4]
+c014f9f0:       e08fc00c        add     ip, pc, ip
+c014f9f4:       e12fff1c        bx      ip
+c014f9f8:       012901e1        .word   0x012901e1
+
+c014f9fc <____mutex_unlock_slowpath_veneer>:
+c014f9fc:       e59fc004        ldr     ip, [pc, #4]
+c014fa00:       e08fc00c        add     ip, pc, ip
+c014fa04:       e12fff1c        bx      ip
+c014fa08:       0128d8e1        .word   0x0128d8e1
+
+$ arm-linux-gnueabihf-objdump -d vmlinux |grep -E bx\\s+pc -c
+319
+
+This number does not change when adding --use-blx, so there is probably not
+much point in adding it.
