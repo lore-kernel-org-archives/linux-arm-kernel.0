@@ -1,32 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Mar 2015 12:00:33 +0000
-Subject: [PATCH 0/2] tc3589x OF only enforcement
-In-Reply-To: <CACRpkdZC-+fZXRAqnir2+pyq-es=-zA9jS2qGUiOF75KqzSLqQ@mail.gmail.com>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZC-+fZXRAqnir2+pyq-es=-zA9jS2qGUiOF75KqzSLqQ@mail.gmail.com>
-Message-ID: <20150327120033.GF15988@x1>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 27 Mar 2015 14:01:58 +0200
+Subject: [PATCH 4/5] dmaengine: hsu: Fix memory leak when stopping a
+ running transfer
+In-Reply-To: <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427456155-28990-5-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1427457718.14897.428.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Mar 2015, Linus Walleij wrote:
-
-> On Thu, Mar 19, 2015 at 3:52 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, 2015-03-27 at 13:35 +0200, Peter Ujfalusi wrote:
+> The vd->node is removed from the lists when the transfer started so the
+> vchan_get_all_descriptors() will not find it. This results memory leak.
 > 
-> > These two patches removes the non-DT probe/config path from the
-> > TC3589x driver. I suggest merging both through the MFD tree if
-> > Dmitry can ACK the input patch.
+
+Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+Though this one would go via Greg's tty tree (Cc'ed) I think.
+It becomes to regular work flow after 4.1-rc1.
+
+
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> CC: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+> ---
+>  drivers/dma/hsu/hsu.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> Lee it seems Dmitry ACKed these patches, can you merge those
-> two patches into MFD? I don't think there will be any cross-tree deps
-> so you can just carry them  in MFD without any immutable branch business.
+> diff --git a/drivers/dma/hsu/hsu.c b/drivers/dma/hsu/hsu.c
+> index 683ba9b62795..d1864bda008f 100644
+> --- a/drivers/dma/hsu/hsu.c
+> +++ b/drivers/dma/hsu/hsu.c
+> @@ -387,7 +387,10 @@ static int hsu_dma_terminate_all(struct dma_chan *chan)
+>  	spin_lock_irqsave(&hsuc->vchan.lock, flags);
+>  
+>  	hsu_dma_stop_channel(hsuc);
+> -	hsuc->desc = NULL;
+> +	if (hsuc->desc) {
+> +		hsu_dma_desc_free(&hsuc->desc->vchan);
+> +		hsuc->desc = NULL;
+> +	}
+>  
+>  	vchan_get_all_descriptors(&hsuc->vchan, &head);
+>  	spin_unlock_irqrestore(&hsuc->vchan.lock, flags);
 
-Change of plan.  20f02d6 scuppers you plans unfortunately.  Probably
-best if this goes in via the Input tree.
-
-Both patches unapplied.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
