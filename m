@@ -1,59 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Mar 2015 11:13:20 +0000
-Subject: [PATCH 0/3] Improve dw-hdmi CTS/N setting
-Message-ID: <20150327111320.GA4019@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 27 Mar 2015 11:13:45 +0000
+Subject: [PATCH 1/3] drm: bridge/dw_hdmi: combine
+ hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
+In-Reply-To: <20150327111320.GA4019@n2100.arm.linux.org.uk>
+References: <20150327111320.GA4019@n2100.arm.linux.org.uk>
+Message-ID: <E1YbSCv-0007yz-Qj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+Combine these two functions into a single implementation.  These two
+functions are called consecutively anyway.  Idea from a patch by
+Yakir Yang.
 
-This is a mini-series to try and move audio support for the Designware
-HDMI bridge along.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/bridge/dw_hdmi.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
 
-There are two known versions of the Designware HDMI audio:
-
-- The Rockchip version, which is based upon feeding the HDMI block I2S
-  stream(s), which doesn't have any on-board DMA support.
-- The Freescale version, which only has AHB DMA support.
-
-There are two drivers around at present, one which I've had which is
-ALSA based due to its simplicity for the Freescale version of the IP,
-and one which is ASoC based from Yakir Yang for the Rockchip version.
-
-There is some commonality between the two drivers - for example, the
-setup of the CTS/N values is very similar, although not identical.
-
-I have been reviewing (when time permits) the patches from Yakir Yang,
-and making recommendations to try and extract the common parts of the
-driver.  This is the patch set I came up with (mentioned in
-20150202130920.GC8656 at n2100.arm.linux.org.uk).
-
-Yakir merged some of my ideas into his patch set - for example, Yakir
-Yang's "drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
-hdmi_regenerate_cts()" is very close to the version which I came up
-with.
-
-Yakir Yang didn't include the mutex patch, which I've included here -
-it really is necessary because we have potentially two different
-threads which can change the CTS/N values - a change of the video mode
-vs a change in the audio driver.
-
-The last patch is adjusting the CTS/N setting order - I have only gone
-as far as what we know works for iMX6, and this is also identical to
-Yakir Yang's patch.
-
-The identical nature is hardly surprising; my patches were derived from
-a previous set of his patches (which I acknowledge in the commit messages)
-and I detailed in the above message what I wanted to see.
-
-What I would like to see is that - as we are effectively in agreement
-over two of these patches - we get these patches merged rather than
-having to repeatedly see them.  If there's any objection, please let me
-know, otherwise I'll collect acks and send them to David.
-
- drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++---------------
- 1 file changed, 19 insertions(+), 15 deletions(-)
-
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index cd6a70647e32..78363552d80e 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -177,19 +177,16 @@ static void hdmi_mask_writeb(struct dw_hdmi *hdmi, u8 data, unsigned int reg,
+ 	hdmi_modb(hdmi, data << shift, mask, reg);
+ }
+ 
+-static void hdmi_set_clock_regenerator_n(struct dw_hdmi *hdmi,
+-					 unsigned int value)
++static void hdmi_set_cts_n(struct dw_hdmi *hdmi, unsigned int cts,
++			   unsigned int n)
+ {
+-	hdmi_writeb(hdmi, value & 0xff, HDMI_AUD_N1);
+-	hdmi_writeb(hdmi, (value >> 8) & 0xff, HDMI_AUD_N2);
+-	hdmi_writeb(hdmi, (value >> 16) & 0x0f, HDMI_AUD_N3);
++	hdmi_writeb(hdmi, n & 0xff, HDMI_AUD_N1);
++	hdmi_writeb(hdmi, (n >> 8) & 0xff, HDMI_AUD_N2);
++	hdmi_writeb(hdmi, (n >> 16) & 0x0f, HDMI_AUD_N3);
+ 
+ 	/* nshift factor = 0 */
+ 	hdmi_modb(hdmi, 0, HDMI_AUD_CTS3_N_SHIFT_MASK, HDMI_AUD_CTS3);
+-}
+ 
+-static void hdmi_regenerate_cts(struct dw_hdmi *hdmi, unsigned int cts)
+-{
+ 	/* Must be set/cleared first */
+ 	hdmi_modb(hdmi, 0, HDMI_AUD_CTS3_CTS_MANUAL, HDMI_AUD_CTS3);
+ 
+@@ -355,8 +352,7 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+ 		__func__, hdmi->sample_rate, hdmi->ratio,
+ 		pixel_clk, clk_n, clk_cts);
+ 
+-	hdmi_set_clock_regenerator_n(hdmi, clk_n);
+-	hdmi_regenerate_cts(hdmi, clk_cts);
++	hdmi_set_cts_n(hdmi, clk_cts, clk_n);
+ }
+ 
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
