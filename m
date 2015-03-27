@@ -1,26 +1,62 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 27 Mar 2015 22:46:57 +0530
-Subject: [PATCH] clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for
- defining features
-In-Reply-To: <20150227074601.GO7789@pengutronix.de>
-References: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>
- <20150227074601.GO7789@pengutronix.de>
-Message-ID: <CAKohpokxaGDYv8B-_UiFU+rmbbMerRZLJyJ9=-YHF2KurX6k8A@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Mar 2015 17:19:46 +0000
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct iommu_ops
+Message-ID: <20150327171946.GL1562@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2015 at 13:16, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Viresh,
->
-> On Fri, Feb 27, 2015 at 11:12:33AM +0530, Viresh Kumar wrote:
->> We have used CLOCK_EVT_MODE_PERIODIC instead of CLOCK_EVT_FEAT_PERIODIC while
->> defining features. Fix it.
->>
->> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
->> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Makes sense, thanks for catching.
->
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Hi Joerg,
 
-@Daniel: Have you applied this one ?
+Please can you pull the following IOMMU changes for 4.1? They move the
+per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
+IOMMUs such as the ARM SMMU to support different page sizes within a
+given SoC.
+
+Cheers,
+
+Will
+
+--->8
+
+The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+
+  Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/pgsize
+
+for you to fetch changes up to 0232a7bfdab918a0cfdc7545abf09e359eb8c32c:
+
+  iommu: of: enforce const-ness of struct iommu_ops (2015-03-20 17:39:34 +0000)
+
+----------------------------------------------------------------
+Robin Murphy (1):
+      iommu: of: enforce const-ness of struct iommu_ops
+
+Will Deacon (2):
+      iommu: remove unused priv field from struct iommu_ops
+      iommu: move pgsize_bitmap from struct iommu_ops to struct iommu_domain
+
+ arch/arm/include/asm/dma-mapping.h   |  2 +-
+ arch/arm/mm/dma-mapping.c            |  6 +++---
+ arch/arm64/include/asm/dma-mapping.h |  3 ++-
+ drivers/iommu/amd_iommu.c            |  2 +-
+ drivers/iommu/arm-smmu.c             | 12 +++++-------
+ drivers/iommu/exynos-iommu.c         |  3 ++-
+ drivers/iommu/intel-iommu.c          |  2 +-
+ drivers/iommu/iommu.c                | 16 ++++++++--------
+ drivers/iommu/ipmmu-vmsa.c           |  2 +-
+ drivers/iommu/msm_iommu.c            |  3 ++-
+ drivers/iommu/of_iommu.c             | 12 ++++++------
+ drivers/iommu/omap-iommu.c           |  3 ++-
+ drivers/iommu/rockchip-iommu.c       |  2 +-
+ drivers/iommu/shmobile-iommu.c       |  2 +-
+ drivers/iommu/tegra-gart.c           |  2 +-
+ drivers/iommu/tegra-smmu.c           |  3 +--
+ drivers/of/platform.c                |  2 +-
+ drivers/vfio/vfio_iommu_type1.c      |  2 +-
+ include/linux/dma-mapping.h          |  2 +-
+ include/linux/iommu.h                |  6 +-----
+ include/linux/of_iommu.h             |  8 ++++----
+ 21 files changed, 46 insertions(+), 49 deletions(-)
