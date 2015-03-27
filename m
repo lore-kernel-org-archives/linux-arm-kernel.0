@@ -1,86 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Mar 2015 11:08:59 +0000
-Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
- alternative instruction
-In-Reply-To: <1427452942.2658.3.camel@linaro.org>
-References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>	
- <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>	
- <20150326220323.GA23836@arm.com> <20150326221955.4b8fe6f0@arm.com>
- <1427452942.2658.3.camel@linaro.org>
-Message-ID: <55153A4B.9020204@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Mar 2015 11:09:20 +0000
+Subject: [PATCH] ARM: kvm: round HYP section to page size instead of log2
+ upper bound
+In-Reply-To: <1427451481-16053-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427451481-16053-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427451481-16053-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150327110919.GC1562@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tixy,
-
-On 27/03/15 10:42, Jon Medhurst (Tixy) wrote:
-> On Thu, 2015-03-26 at 22:19 +0000, Marc Zyngier wrote:
->> On Thu, 26 Mar 2015 22:03:23 +0000
->> Will Deacon <will.deacon@arm.com> wrote:
->>
->>> On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
->>>> Since all immediate branches are PC-relative on Aarch64, these
->>>> instructions cannot be used as an alternative with the simplistic
->>>> approach we currently have (the immediate has been computed from
->>>> the .altinstr_replacement section, and end-up being completely off
->>>> if we insert it directly).
->>>>
->>>> This patch handles the b and bl instructions in a different way,
->>>> using the insn framework to recompute the immediate, and generate
->>>> the right displacement.
->>>>
->>>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
->>>>  1 file changed, 53 insertions(+), 2 deletions(-)
->>>
->>> [...]
->>>
->>>>  static int __apply_alternatives(void *alt_region)
->>>>  {
->>>>  	struct alt_instr *alt;
->>>> @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
->>>>  	u8 *origptr, *replptr;
->>>>  
->>>>  	for (alt = region->begin; alt < region->end; alt++) {
->>>> +		u32 insn;
->>>> +		int i;
->>>> +
->>>>  		if (!cpus_have_cap(alt->cpufeature))
->>>>  			continue;
->>>>  
->>>> -		BUG_ON(alt->alt_len > alt->orig_len);
->>>> +		BUG_ON(alt->alt_len != alt->orig_len);
->>>>  
->>>>  		pr_info_once("patching kernel code\n");
->>>>  
->>>>  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
->>>>  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
->>>> -		memcpy(origptr, replptr, alt->alt_len);
->>>> +
->>>> +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
->>>> +			insn = get_alt_insn(origptr + i, replptr + i);
->>>> +			*(u32 *)(origptr + i) = insn;
->>>
->>> My brain's not firing on all cylinders right now, but do you need a
->>> cpu_to_le32 here?
->>
->> I'm not 100% awake myself (probably some acute form of firmwaritis),
->> but I suspect you're quite right (get_alt_insn calls aarch64_insn_read,
->> which does a le32_to_cpu). Obviously, we need to revert the conversion
->> when writing the instruction back.
+On Fri, Mar 27, 2015 at 10:18:01AM +0000, Ard Biesheuvel wrote:
+> Older binutils do not support expressions involving the values of
+> external symbols so just round up the HYP region to the page size.
 > 
-> Isn't aarch64_insn_write the inverse of aarch64_insn_read and more
-> correct than using cpu_to_le32?
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-You're perfectly right, and you've actually uncovered a bug: if we have
-CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA, we'd end up trying
-to patch the read-only mapping, with disastrous results,
-aarch64_insn_write does the right thing, so we might as well use that.
+Thanks Ard. I managed to reproduce the failures in -next, and this solves
+the problem for me (the only toolchain that chokes seems to be the one on
+kernel.org, unfortunately).
 
-Thanks,
+I'll push an updated branch after a bit more testing. Let's not touch this
+file ever again :)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
+
+> ---
+>  arch/arm/kernel/vmlinux.lds.S | 31 +------------------------------
+>  arch/arm/kvm/init.S           |  3 ---
+>  2 files changed, 1 insertion(+), 33 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index 808398ec024e..f2db429ea75d 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -12,26 +12,6 @@
+>  #include <asm/pgtable.h>
+>  #endif
+>  
+> -/*
+> - * Poor man's version of LOG2CEIL(), which is
+> - * not available in binutils before v2.24.
+> - */
+> -#define LOG2_ROUNDUP(size) (		\
+> -	__LOG2_ROUNDUP(size,  2)	\
+> -	__LOG2_ROUNDUP(size,  3)	\
+> -	__LOG2_ROUNDUP(size,  4)	\
+> -	__LOG2_ROUNDUP(size,  5)	\
+> -	__LOG2_ROUNDUP(size,  6)	\
+> -	__LOG2_ROUNDUP(size,  7)	\
+> -	__LOG2_ROUNDUP(size,  8)	\
+> -	__LOG2_ROUNDUP(size,  9)	\
+> -	__LOG2_ROUNDUP(size, 10)	\
+> -	__LOG2_ROUNDUP(size, 11)	\
+> -	12)
+> -
+> -#define __LOG2_ROUNDUP(size, order)	\
+> -	(size) <= (1 << order) ? order :
+> -
+>  #define PROC_INFO							\
+>  	. = ALIGN(4);							\
+>  	VMLINUX_SYMBOL(__proc_info_begin) = .;				\
+> @@ -43,20 +23,11 @@
+>  	VMLINUX_SYMBOL(__idmap_text_start) = .;				\
+>  	*(.idmap.text)							\
+>  	VMLINUX_SYMBOL(__idmap_text_end) = .;				\
+> -	. = ALIGN(1 << LOG2_ROUNDUP(__hyp_idmap_size));			\
+> +	. = ALIGN(PAGE_SIZE);						\
+>  	VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;			\
+>  	*(.hyp.idmap.text)						\
+>  	VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+>  
+> -/*
+> - * If the HYP idmap .text section is populated, it needs to be positioned
+> - * such that it will not cross a page boundary in the final output image.
+> - * So align it to the section size rounded up to the next power of 2.
+> - * If __hyp_idmap_size is undefined, the section will be empty so define
+> - * it as 0 in that case.
+> - */
+> -PROVIDE(__hyp_idmap_size = 0);
+> -
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  #define ARM_CPU_DISCARD(x)
+>  #define ARM_CPU_KEEP(x)		x
+> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+> index 11fb1d56f449..3988e72d16ff 100644
+> --- a/arch/arm/kvm/init.S
+> +++ b/arch/arm/kvm/init.S
+> @@ -157,6 +157,3 @@ target:	@ We're now in the trampoline code, switch page tables
+>  __kvm_hyp_init_end:
+>  
+>  	.popsection
+> -
+> -	.global	__hyp_idmap_size
+> -	.set	__hyp_idmap_size, __kvm_hyp_init_end - __kvm_hyp_init
+> -- 
+> 1.8.3.2
+> 
