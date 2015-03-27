@@ -1,49 +1,69 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Mar 2015 18:58:25 +0100
-Subject: [PATCH v18 04/11] ARM: cpuidle: Add cpuidle support for QCOM cpus
-In-Reply-To: <1427315136-44321-5-git-send-email-lina.iyer@linaro.org>
-References: <1427315136-44321-1-git-send-email-lina.iyer@linaro.org>
- <1427315136-44321-5-git-send-email-lina.iyer@linaro.org>
-Message-ID: <55159A41.4010700@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Mar 2015 19:07:00 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150324122702.GJ14457@ns203013.ovh.net>
+ <CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>
+ <20150324130511.GK14457@ns203013.ovh.net>
+ <CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+ <5515342F.6010703@openssl.org>
+ <CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
+Message-ID: <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2015 09:25 PM, Lina Iyer wrote:
-> Define ARM_QCOM_CPUIDLE config item to enable cpuidle support.
+On 27 March 2015 at 11:44, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 27 March 2015 at 11:42, Andy Polyakov <appro@openssl.org> wrote:
+>>>> Could you share the error log please?
+>>>
+>>> OK, I spotted one issue with this code:
+>>>
+>>> arch/arm/crypto/sha256-core.S: Assembler messages:
+>>> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
+>>> after fixup
+>>>
+>>> This is caused by the fact that, when building the integer-only code
+>>> for an older architecture, the conditional compilation produces a
+>>> slightly bigger preceding function, and the symbol K256 is out of
+>>> range for the adr instruction.
+>>>
+>>> @Jean-Christophe: is that the same problem that you hit?
+>>>
+>>> @Andy: I propose we do something similar as in the bsaes code:
+>>>
+>>> #ifdef __thumb__
+>>> #define adrl adr
+>>> #endif
+>>>
+>>> and replace the offending line with
+>>>
+>>> adrl r14,K256
+>>
+>> Sorry about delay. Yes, that would do. I did test all combinations, but
+>> all "my" combinations, i.e. without __KERNEL__ defined :-( And without
+>> __KERNEL__ there are few extra instructions in integer-only subroutine
+>> that "push" instruction in question code toward higher address, so that
+>> constant was ffffefc0, which can be encoded. Anyway, I've chosen to add
+>> that #define next to .thumb directive. See attached.
+>>
+>> Ard, you have mentioned that you've verified it on big-endian, but I've
+>> spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
+>> guess that it worked for you either because it was NEON that was tested
+>> (it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
+>> case it uses endian-neutral byte-by-byte data load). Can you confirm either?
+>>
 >
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> I need to double check that, but my suspicion is that it was the latter.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Indeed, if I build for v7 I get
 
-> ---
->   drivers/cpuidle/Kconfig.arm | 7 +++++++
->   1 file changed, 7 insertions(+)
->
-> diff --git a/drivers/cpuidle/Kconfig.arm b/drivers/cpuidle/Kconfig.arm
-> index 21340e0..325be7f 100644
-> --- a/drivers/cpuidle/Kconfig.arm
-> +++ b/drivers/cpuidle/Kconfig.arm
-> @@ -74,3 +74,10 @@ config ARM_MVEBU_V7_CPUIDLE
->   	depends on ARCH_MVEBU && !ARM64
->   	help
->   	  Select this to enable cpuidle on Armada 370, 38x and XP processors.
-> +
-> +config ARM_QCOM_CPUIDLE
-> +	bool "CPU Idle Driver for QCOM processors"
-> +	depends on ARCH_QCOM
-> +	select ARM_CPUIDLE
-> +	help
-> +	  Select this to enable cpuidle on QCOM processors.
->
+[    0.269418] 00000000: 4e a5 c5 08 a6 56 6e 76 24 05 43 f8 fe b0 6f d4
+[    0.275261] 00000010: 57 77 7b e3 95 49 c4 01 64 36 af da 65 d2 33 0e
+[    0.281031] alg: hash: Test 1 failed for sha224-asm
+[    0.285315] 00000000: 9d 6a 5d e9 e1 6c 39 99 c7 14 84 0f 47 77 1f 36
+[    0.290912] 00000010: dc c2 97 a7 bd ef aa c3 6c 95 15 ae
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+which is indeed the integer code failing, and your attached patch fixes it.
