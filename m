@@ -1,30 +1,78 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Fri, 27 Mar 2015 14:29:35 +0100
-Subject: exynos5800-peach-pi: suspend/resume (still) broken
-In-Reply-To: <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
-References: <CAMAWPa_r04tAXAXosmLk+DfwvQV0qpD+=8O7T_pwFTAozcjOgQ@mail.gmail.com>	<550953ED.10508@collabora.co.uk>	<CAM4voakvhHuVXLY2DmdGexfrqSYUqhXhg1krLwO4CCxjHQ1NCw@mail.gmail.com>	<550C47ED.3010301@collabora.co.uk>	<CAM4voamLt=6dSY-DwDb+c=KRwDWAvjvzUUnno+=+1svDqf41Qg@mail.gmail.com>
- <CAM4voanUg87=Ya6azGCRz8r2=WJ0wi4ktqdn6GD6ULJsnLUMmw@mail.gmail.com>
-Message-ID: <55155B3F.2010704@collabora.co.uk>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 27 Mar 2015 14:32:16 +0100
+Subject: [PATCH 3/6] clk: mediatek: Add reset controller support
+In-Reply-To: <1426754530-3137-4-git-send-email-s.hauer@pengutronix.de>
+References: <1426754530-3137-1-git-send-email-s.hauer@pengutronix.de>
+ <1426754530-3137-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <55155BE0.8060601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
 
-On 03/20/2015 06:40 PM, Abhilash Kesavan wrote:
+
+On 19/03/15 09:42, Sascha Hauer wrote:
+> The pericfg and infracfg units also provide reset lines to several
+> other SoC internal units. Add support for the reset controller.
+
+This messages is a bit confusing, could you explain better what the patch does and how this interacts with pericfg and infracfg?
+
 > 
-> Regarding the mdma0 disablement, it looks like for the system to
-> suspend properly the mdma0 pclk needs to stay on.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/clk/mediatek/Makefile  |  1 +
+>  drivers/clk/mediatek/clk-mtk.h | 10 +++++
+>  drivers/clk/mediatek/reset.c   | 99 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 110 insertions(+)
+>  create mode 100644 drivers/clk/mediatek/reset.c
 > 
+> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> index c384e97..0b6f1c3 100644
+> --- a/drivers/clk/mediatek/Makefile
+> +++ b/drivers/clk/mediatek/Makefile
+> @@ -1 +1,2 @@
+>  obj-y += clk-mtk.o clk-pll.o clk-gate.o
+> +obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> index 5aaba81..5a6b5dd 100644
+> --- a/drivers/clk/mediatek/clk-mtk.h
+> +++ b/drivers/clk/mediatek/clk-mtk.h
+> @@ -152,4 +152,14 @@ void __init mtk_clk_register_plls(struct device_node *node,
+>  		const struct mtk_pll_data *plls, int num_plls,
+>  		struct clk_onecell_data *clk_data);
+>  
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +void mtk_register_reset_controller(struct device_node *np,
+> +			unsigned int num_regs, int regofs);
+> +#else
+> +static inline void mtk_register_reset_controller(struct device_node *np,
+> +			unsigned int num_regs, int regofs)
+> +{
+> +}
+> +#endif
+> +
+>  #endif /* __DRV_CLK_MTK_H */
+> diff --git a/drivers/clk/mediatek/reset.c b/drivers/clk/mediatek/reset.c
+> new file mode 100644
+> index 0000000..3a85a53
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/reset.c
+> @@ -0,0 +1,99 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-I had time today again to work on this issue and the best
-place I found to enable and disable the mdma0 clock is in
-exynos5420_pm_{prepare,resume}. Please let me know if you
-have a better idea of where the clock should be managed.
+Do we need this?
 
-I'll send a RFC patch-set soon.
-
-> Regards,
-> Abhilash
-
-Best regards,
-Javier
+Cheers,
+Matthias
