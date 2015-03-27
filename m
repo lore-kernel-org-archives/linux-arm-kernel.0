@@ -1,74 +1,55 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 27 Mar 2015 10:42:22 +0000
-Subject: [PATCH 2/5] arm64: alternative: Allow immediate branch as
- alternative instruction
-In-Reply-To: <20150326221955.4b8fe6f0@arm.com>
-References: <1426773576-14062-1-git-send-email-marc.zyngier@arm.com>
- <1426773576-14062-3-git-send-email-marc.zyngier@arm.com>
- <20150326220323.GA23836@arm.com> <20150326221955.4b8fe6f0@arm.com>
-Message-ID: <1427452942.2658.3.camel@linaro.org>
+From: appro@openssl.org (Andy Polyakov)
+Date: Fri, 27 Mar 2015 11:42:55 +0100
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>	<20150323135009.GB820@google.com>	<20150324122702.GJ14457@ns203013.ovh.net>	<CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>	<20150324130511.GK14457@ns203013.ovh.net>	<CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>
+ <CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>
+Message-ID: <5515342F.6010703@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-26 at 22:19 +0000, Marc Zyngier wrote:
-> On Thu, 26 Mar 2015 22:03:23 +0000
-> Will Deacon <will.deacon@arm.com> wrote:
+>> Could you share the error log please?
 > 
-> > On Thu, Mar 19, 2015 at 01:59:33PM +0000, Marc Zyngier wrote:
-> > > Since all immediate branches are PC-relative on Aarch64, these
-> > > instructions cannot be used as an alternative with the simplistic
-> > > approach we currently have (the immediate has been computed from
-> > > the .altinstr_replacement section, and end-up being completely off
-> > > if we insert it directly).
-> > > 
-> > > This patch handles the b and bl instructions in a different way,
-> > > using the insn framework to recompute the immediate, and generate
-> > > the right displacement.
-> > > 
-> > > Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/alternative.c | 55 +++++++++++++++++++++++++++++++++++++++--
-> > >  1 file changed, 53 insertions(+), 2 deletions(-)
-> > 
-> > [...]
-> > 
-> > >  static int __apply_alternatives(void *alt_region)
-> > >  {
-> > >  	struct alt_instr *alt;
-> > > @@ -40,16 +83,24 @@ static int __apply_alternatives(void *alt_region)
-> > >  	u8 *origptr, *replptr;
-> > >  
-> > >  	for (alt = region->begin; alt < region->end; alt++) {
-> > > +		u32 insn;
-> > > +		int i;
-> > > +
-> > >  		if (!cpus_have_cap(alt->cpufeature))
-> > >  			continue;
-> > >  
-> > > -		BUG_ON(alt->alt_len > alt->orig_len);
-> > > +		BUG_ON(alt->alt_len != alt->orig_len);
-> > >  
-> > >  		pr_info_once("patching kernel code\n");
-> > >  
-> > >  		origptr = (u8 *)&alt->orig_offset + alt->orig_offset;
-> > >  		replptr = (u8 *)&alt->alt_offset + alt->alt_offset;
-> > > -		memcpy(origptr, replptr, alt->alt_len);
-> > > +
-> > > +		for (i = 0; i < alt->alt_len; i += sizeof(insn)) {
-> > > +			insn = get_alt_insn(origptr + i, replptr + i);
-> > > +			*(u32 *)(origptr + i) = insn;
-> > 
-> > My brain's not firing on all cylinders right now, but do you need a
-> > cpu_to_le32 here?
+> OK, I spotted one issue with this code:
 > 
-> I'm not 100% awake myself (probably some acute form of firmwaritis),
-> but I suspect you're quite right (get_alt_insn calls aarch64_insn_read,
-> which does a le32_to_cpu). Obviously, we need to revert the conversion
-> when writing the instruction back.
+> arch/arm/crypto/sha256-core.S: Assembler messages:
+> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
+> after fixup
+> 
+> This is caused by the fact that, when building the integer-only code
+> for an older architecture, the conditional compilation produces a
+> slightly bigger preceding function, and the symbol K256 is out of
+> range for the adr instruction.
+> 
+> @Jean-Christophe: is that the same problem that you hit?
+> 
+> @Andy: I propose we do something similar as in the bsaes code:
+> 
+> #ifdef __thumb__
+> #define adrl adr
+> #endif
+> 
+> and replace the offending line with
+> 
+> adrl r14,K256
 
-Isn't aarch64_insn_write the inverse of aarch64_insn_read and more
-correct than using cpu_to_le32?
+Sorry about delay. Yes, that would do. I did test all combinations, but
+all "my" combinations, i.e. without __KERNEL__ defined :-( And without
+__KERNEL__ there are few extra instructions in integer-only subroutine
+that "push" instruction in question code toward higher address, so that
+constant was ffffefc0, which can be encoded. Anyway, I've chosen to add
+that #define next to .thumb directive. See attached.
 
--- 
-Tixy
+Ard, you have mentioned that you've verified it on big-endian, but I've
+spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
+guess that it worked for you either because it was NEON that was tested
+(it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
+case it uses endian-neutral byte-by-byte data load). Can you confirm either?
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: sha256-armv4.diff
+Type: text/x-patch
+Size: 838 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150327/6d108844/attachment.bin>
