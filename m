@@ -1,68 +1,118 @@
 From: jun.nie@linaro.org (Jun Nie)
-Date: Fri, 27 Mar 2015 21:52:29 +0800
-Subject: [PATCH v2 0/7] Basic support to ZTE ZX296702
-Message-ID: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
+Date: Fri, 27 Mar 2015 21:52:30 +0800
+Subject: [PATCH v2 1/7] ARM: zx: add basic support for ZTE ZX296702
+In-Reply-To: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
+References: <1427464356-20112-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <1427464356-20112-2-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2 changes vs V1:
-  - Remove private L2 cache code and reuse existing code
-  - Reuse pl011 low level debug code
-  - Revise dts names and doc
-  - Polish clock driver
-  - Add SMP method and support 2nd core powering off
+Add basic code for ZTE ZX296702 platform.
 
-Jun Nie (7):
-  ARM: zx: add basic support for ZTE ZX296702
-  MAINTAINERS: add entry for ARM ZTE architecture
-  ARM: zx: add low level debug support for zx296702
-  ARM: dts: zx: add an initial zx296702 dts and doc
-  clk: zx: add clock support to zx296702
-  ARM: zx: enable SMP and hotplug for zx296702
-  ARM: zx: Add basic defconfig support to ZX296702
-
- Documentation/devicetree/bindings/arm/zte.txt      |  15 +
- .../devicetree/bindings/clock/zx296702-clk.txt     |  35 ++
- Documentation/devicetree/bindings/serial/pl011.txt |   2 +-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- MAINTAINERS                                        |   9 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Kconfig.debug                             |  14 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/zx296702-ad1.dts                 |  48 ++
- arch/arm/boot/dts/zx296702.dtsi                    | 139 +++++
- arch/arm/configs/zx_defconfig                      | 130 ++++
- arch/arm/include/debug/pl01x.S                     |   7 +
- arch/arm/mach-zx/Kconfig                           |  18 +
- arch/arm/mach-zx/Makefile                          |   2 +
- arch/arm/mach-zx/core.h                            |  19 +
- arch/arm/mach-zx/headsmp.S                         |  32 +
- arch/arm/mach-zx/platsmp.c                         | 189 ++++++
- arch/arm/mach-zx/zx296702.c                        |  31 +
- drivers/clk/Makefile                               |   1 +
- drivers/clk/zte/Makefile                           |   2 +
- drivers/clk/zte/clk-pll.c                          | 180 ++++++
- drivers/clk/zte/clk-zx296702.c                     | 658 +++++++++++++++++++++
- drivers/clk/zte/clk.h                              |  30 +
- include/dt-bindings/clock/zx296702-clock.h         | 162 +++++
- 25 files changed, 1727 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/zte.txt
- create mode 100644 Documentation/devicetree/bindings/clock/zx296702-clk.txt
- create mode 100644 arch/arm/boot/dts/zx296702-ad1.dts
- create mode 100644 arch/arm/boot/dts/zx296702.dtsi
- create mode 100644 arch/arm/configs/zx_defconfig
+Signed-off-by: Jun Nie <jun.nie@linaro.org>
+---
+ arch/arm/Kconfig            |  2 ++
+ arch/arm/Makefile           |  1 +
+ arch/arm/mach-zx/Kconfig    | 18 ++++++++++++++++++
+ arch/arm/mach-zx/Makefile   |  1 +
+ arch/arm/mach-zx/zx296702.c | 31 +++++++++++++++++++++++++++++++
+ 5 files changed, 53 insertions(+)
  create mode 100644 arch/arm/mach-zx/Kconfig
  create mode 100644 arch/arm/mach-zx/Makefile
- create mode 100644 arch/arm/mach-zx/core.h
- create mode 100644 arch/arm/mach-zx/headsmp.S
- create mode 100644 arch/arm/mach-zx/platsmp.c
  create mode 100644 arch/arm/mach-zx/zx296702.c
- create mode 100644 drivers/clk/zte/Makefile
- create mode 100644 drivers/clk/zte/clk-pll.c
- create mode 100644 drivers/clk/zte/clk-zx296702.c
- create mode 100644 drivers/clk/zte/clk.h
- create mode 100644 include/dt-bindings/clock/zx296702-clock.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9f1f09a..7516833 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -967,6 +967,8 @@ source "arch/arm/mach-vt8500/Kconfig"
+ 
+ source "arch/arm/mach-w90x900/Kconfig"
+ 
++source "arch/arm/mach-zx/Kconfig"
++
+ source "arch/arm/mach-zynq/Kconfig"
+ 
+ # Definitions to make life easier
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 7f99cd6..33b1588 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -204,6 +204,7 @@ machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+ machine-$(CONFIG_ARCH_VT8500)		+= vt8500
+ machine-$(CONFIG_ARCH_W90X900)		+= w90x900
++machine-$(CONFIG_ARCH_ZX)		+= zx
+ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
+ machine-$(CONFIG_PLAT_SPEAR)		+= spear
+ 
+diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
+new file mode 100644
+index 0000000..8bd4eb7
+--- /dev/null
++++ b/arch/arm/mach-zx/Kconfig
+@@ -0,0 +1,18 @@
++menuconfig ARCH_ZX
++	bool "ZTE ZX family" if ARCH_MULTI_V7
++	help
++	  Support for ZTE ZX-based family of processors. TV
++	  set-top-box processor is supported. More will be
++	  added soon.
++
++if ARCH_ZX
++
++config SOC_ZX296702
++	bool "Enable support for ZX296702 SoC"
++	select ARM_GIC
++	select ARM_GLOBAL_TIMER
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	help
++	  Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
++endif
+diff --git a/arch/arm/mach-zx/Makefile b/arch/arm/mach-zx/Makefile
+new file mode 100644
+index 0000000..7a541c7
+--- /dev/null
++++ b/arch/arm/mach-zx/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_SOC_ZX296702) += zx296702.o
+diff --git a/arch/arm/mach-zx/zx296702.c b/arch/arm/mach-zx/zx296702.c
+new file mode 100644
+index 0000000..b6e5dc2
+--- /dev/null
++++ b/arch/arm/mach-zx/zx296702.c
+@@ -0,0 +1,31 @@
++/*
++ * Copyright 2014 Linaro Ltd.
++ * Copyright (C) 2014 ZTE Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++
++static const char *zx296702_dt_compat[] __initconst = {
++	"zte,zx296702",
++	NULL,
++};
++
++static void __init zx296702_init_machine(void)
++{
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++DT_MACHINE_START(ZX, "ZTE ZX296702 (Device Tree)")
++	.init_machine   = zx296702_init_machine,
++	.dt_compat	= zx296702_dt_compat,
++	.l2c_aux_val    = 0x30400000,
++	.l2c_aux_mask   = 0xfeffffff,
++MACHINE_END
 -- 
 1.9.1
