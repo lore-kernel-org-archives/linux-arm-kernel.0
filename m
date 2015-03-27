@@ -1,28 +1,65 @@
-From: Peter.Chen@freescale.com (Peter Chen)
-Date: Fri, 27 Mar 2015 01:21:41 +0000
-Subject: Need a phy function to enable / disable usb squelch detection
-In-Reply-To: <55145B46.9020501@redhat.com>
-References: <55145B46.9020501@redhat.com>
-Message-ID: <BN3PR0301MB08495F972481336D9DA86A8A81090@BN3PR0301MB0849.namprd03.prod.outlook.com>
+From: mtosatti@redhat.com (Marcelo Tosatti)
+Date: Thu, 26 Mar 2015 22:31:51 -0300
+Subject: [PATCH v2 06/12] KVM: mark kvm->buses as empty once they were
+ destroyed
+In-Reply-To: <5512EBB9.2050304@arm.com>
+References: <1427126309-11223-1-git-send-email-andre.przywara@arm.com>
+ <1427126309-11223-7-git-send-email-andre.przywara@arm.com>
+ <5512EBB9.2050304@arm.com>
+Message-ID: <20150327013151.GA2882@amt.cnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> Hi Kishon,
+On Wed, Mar 25, 2015 at 05:09:13PM +0000, Marc Zyngier wrote:
+> On 23/03/15 15:58, Andre Przywara wrote:
+> > In kvm_destroy_vm() we call kvm_io_bus_destroy() pretty early,
+> > especially before calling kvm_arch_destroy_vm(). To avoid
+> > unregistering devices from the already destroyed bus, let's mark
+> > the bus with NULL to let other users know it has been destroyed
+> > already.
+> > This avoids a crash on a VM shutdown with the VGIC using the
+> > kvm_io_bus later (the unregistering is in there to be able to roll
+> > back a faulting init).
+> > 
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > 
-> I've been debugging why some devices do not work with the musb otg
-> controller found on Allwinner SoC-s, and the conclusion is not good, the
-> Android kernel does a poke to the phy before releasing the usb reset.
+> That seems sensible, but I don't see why nobody else hits that. What are
+> we doing differently?
 > 
-> Now you did not want me to introduce any sunxi specific / private phy
-> functions in my initial patch-series for adding sunxi support, but in this case I do
-> not really see an alternative, as this is a very platform specific hack to work
-> around an issue with the phy-s squelch detection which causes it to see a
-> squelch when reset is released switching it to high speed mode when a lo
-> speed device is connected, after which things fall apart.
+> Otherwise,
 > 
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Paolo, Marcelo, can we have your Ack on this?
+> 
+> Thanks,
+> 
+> 	M.
+> 
+> > ---
+> >  virt/kvm/kvm_main.c |    4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> > index 8c7ab0b..6f164eb 100644
+> > --- a/virt/kvm/kvm_main.c
+> > +++ b/virt/kvm/kvm_main.c
+> > @@ -604,8 +604,10 @@ static void kvm_destroy_vm(struct kvm *kvm)
+> >  	list_del(&kvm->vm_list);
+> >  	spin_unlock(&kvm_lock);
+> >  	kvm_free_irq_routing(kvm);
+> > -	for (i = 0; i < KVM_NR_BUSES; i++)
+> > +	for (i = 0; i < KVM_NR_BUSES; i++) {
+> >  		kvm_io_bus_destroy(kvm->buses[i]);
+> > +		kvm->buses[i] = NULL;
+> > +	}
+> >  	kvm_coalesced_mmio_free(kvm);
+> >  #if defined(CONFIG_MMU_NOTIFIER) && defined(KVM_ARCH_WANT_MMU_NOTIFIER)
+> >  	mmu_notifier_unregister(&kvm->mmu_notifier, kvm->mm);
+> > 
+> 
+> 
+> -- 
+> Jazz is not dead. It just smells funny...
 
-The nofity_connect API at struct usb_phy may satisfy your requirement,
-it will be called after bus rest has finished.
-
-Peter
+Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
