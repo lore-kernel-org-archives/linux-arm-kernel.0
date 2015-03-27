@@ -1,101 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Mar 2015 12:12:00 +0100
-Subject: [PATCH] ARM: kvm: round HYP section to page size instead of log2
- upper bound
-In-Reply-To: <20150327110919.GC1562@arm.com>
-References: <1427451481-16053-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427451481-16053-2-git-send-email-ard.biesheuvel@linaro.org>
- <20150327110919.GC1562@arm.com>
-Message-ID: <CAKv+Gu9wAY5sx0=zvGpZwEjjO0oBbUpAHawMmRZ6nQUasj+Q1A@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 Mar 2015 11:13:20 +0000
+Subject: [PATCH 0/3] Improve dw-hdmi CTS/N setting
+Message-ID: <20150327111320.GA4019@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2015 at 12:09, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Mar 27, 2015 at 10:18:01AM +0000, Ard Biesheuvel wrote:
->> Older binutils do not support expressions involving the values of
->> external symbols so just round up the HYP region to the page size.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
-> Thanks Ard. I managed to reproduce the failures in -next, and this solves
-> the problem for me (the only toolchain that chokes seems to be the one on
-> kernel.org, unfortunately).
->
-> I'll push an updated branch after a bit more testing. Let's not touch this
-> file ever again :)
->
+All,
 
-Fingers crossed ...
+This is a mini-series to try and move audio support for the Designware
+HDMI bridge along.
 
->> ---
->>  arch/arm/kernel/vmlinux.lds.S | 31 +------------------------------
->>  arch/arm/kvm/init.S           |  3 ---
->>  2 files changed, 1 insertion(+), 33 deletions(-)
->>
->> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
->> index 808398ec024e..f2db429ea75d 100644
->> --- a/arch/arm/kernel/vmlinux.lds.S
->> +++ b/arch/arm/kernel/vmlinux.lds.S
->> @@ -12,26 +12,6 @@
->>  #include <asm/pgtable.h>
->>  #endif
->>
->> -/*
->> - * Poor man's version of LOG2CEIL(), which is
->> - * not available in binutils before v2.24.
->> - */
->> -#define LOG2_ROUNDUP(size) (         \
->> -     __LOG2_ROUNDUP(size,  2)        \
->> -     __LOG2_ROUNDUP(size,  3)        \
->> -     __LOG2_ROUNDUP(size,  4)        \
->> -     __LOG2_ROUNDUP(size,  5)        \
->> -     __LOG2_ROUNDUP(size,  6)        \
->> -     __LOG2_ROUNDUP(size,  7)        \
->> -     __LOG2_ROUNDUP(size,  8)        \
->> -     __LOG2_ROUNDUP(size,  9)        \
->> -     __LOG2_ROUNDUP(size, 10)        \
->> -     __LOG2_ROUNDUP(size, 11)        \
->> -     12)
->> -
->> -#define __LOG2_ROUNDUP(size, order)  \
->> -     (size) <= (1 << order) ? order :
->> -
->>  #define PROC_INFO                                                    \
->>       . = ALIGN(4);                                                   \
->>       VMLINUX_SYMBOL(__proc_info_begin) = .;                          \
->> @@ -43,20 +23,11 @@
->>       VMLINUX_SYMBOL(__idmap_text_start) = .;                         \
->>       *(.idmap.text)                                                  \
->>       VMLINUX_SYMBOL(__idmap_text_end) = .;                           \
->> -     . = ALIGN(1 << LOG2_ROUNDUP(__hyp_idmap_size));                 \
->> +     . = ALIGN(PAGE_SIZE);                                           \
->>       VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;                     \
->>       *(.hyp.idmap.text)                                              \
->>       VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
->>
->> -/*
->> - * If the HYP idmap .text section is populated, it needs to be positioned
->> - * such that it will not cross a page boundary in the final output image.
->> - * So align it to the section size rounded up to the next power of 2.
->> - * If __hyp_idmap_size is undefined, the section will be empty so define
->> - * it as 0 in that case.
->> - */
->> -PROVIDE(__hyp_idmap_size = 0);
->> -
->>  #ifdef CONFIG_HOTPLUG_CPU
->>  #define ARM_CPU_DISCARD(x)
->>  #define ARM_CPU_KEEP(x)              x
->> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
->> index 11fb1d56f449..3988e72d16ff 100644
->> --- a/arch/arm/kvm/init.S
->> +++ b/arch/arm/kvm/init.S
->> @@ -157,6 +157,3 @@ target:   @ We're now in the trampoline code, switch page tables
->>  __kvm_hyp_init_end:
->>
->>       .popsection
->> -
->> -     .global __hyp_idmap_size
->> -     .set    __hyp_idmap_size, __kvm_hyp_init_end - __kvm_hyp_init
->> --
->> 1.8.3.2
->>
+There are two known versions of the Designware HDMI audio:
+
+- The Rockchip version, which is based upon feeding the HDMI block I2S
+  stream(s), which doesn't have any on-board DMA support.
+- The Freescale version, which only has AHB DMA support.
+
+There are two drivers around at present, one which I've had which is
+ALSA based due to its simplicity for the Freescale version of the IP,
+and one which is ASoC based from Yakir Yang for the Rockchip version.
+
+There is some commonality between the two drivers - for example, the
+setup of the CTS/N values is very similar, although not identical.
+
+I have been reviewing (when time permits) the patches from Yakir Yang,
+and making recommendations to try and extract the common parts of the
+driver.  This is the patch set I came up with (mentioned in
+20150202130920.GC8656 at n2100.arm.linux.org.uk).
+
+Yakir merged some of my ideas into his patch set - for example, Yakir
+Yang's "drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
+hdmi_regenerate_cts()" is very close to the version which I came up
+with.
+
+Yakir Yang didn't include the mutex patch, which I've included here -
+it really is necessary because we have potentially two different
+threads which can change the CTS/N values - a change of the video mode
+vs a change in the audio driver.
+
+The last patch is adjusting the CTS/N setting order - I have only gone
+as far as what we know works for iMX6, and this is also identical to
+Yakir Yang's patch.
+
+The identical nature is hardly surprising; my patches were derived from
+a previous set of his patches (which I acknowledge in the commit messages)
+and I detailed in the above message what I wanted to see.
+
+What I would like to see is that - as we are effectively in agreement
+over two of these patches - we get these patches merged rather than
+having to repeatedly see them.  If there's any objection, please let me
+know, otherwise I'll collect acks and send them to David.
+
+ drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
