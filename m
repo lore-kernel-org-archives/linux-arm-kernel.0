@@ -1,48 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 27 Mar 2015 10:48:42 +0100
-Subject: at91 clocks
-In-Reply-To: <551522C5.50202@microbit.se>
-References: <55117568.6090202@microbit.se>
- <20150325013201.3f01fc22@bbrezillon> <55127AA6.5050902@microbit.se>
- <20150325173751.0d6479df@bbrezillon> <5512FBEB.2060609@atmel.com>
- <551522C5.50202@microbit.se>
-Message-ID: <5515277A.7050107@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Mar 2015 10:06:12 +0000
+Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
+ get rid of the bounce page"
+In-Reply-To: <20150327002554.GA5527@verge.net.au>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+Message-ID: <20150327100612.GB1562@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/03/2015 10:28, Jonas Andersson a ?crit :
-> Hi Nicolas,
+On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
+> On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
+> > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
+> > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
+> > >> > I think we now have a new error: (seen with omap2plus_defconfig)
+> > >> > on next-20150324 :
+> > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
+> > >> > referenced in expression
+> > >> > make: *** [vmlinux] Error 1
+> > >>
+> > >> Thanks, I am seeing that too.
+> > >>
+> > >> My armchair suggestion is that the following should be reverted.
+> > >>
+> > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
+> > >
+> > > Can you try again with the latest -next please? We've merged an additional
+> > > patch aimed at sorting this out. Reverting isn't really an option, as
+> > > there's an awful lot of code that depends on the bounce page removal.
+> > 
+> > Here are the kernelci.org -next results[1], if you click the build
+> > status you can dig down into the build failures. next-20150326 has now
+> > hit a compiler bug, Arnd mentioned he was looking into this issue.
 > 
-> On 2015-03-25 19:18, Nicolas Ferre wrote:
->> I tried kernel 4.0-rc5 but it hangs in boot after ethernet init.
->>> Is this related to the changes I suggested ?
->> It seems to be related as I tried to boot an at91sam9260ek with current
->> Linus' tree and it doesn't hangs after Ethernet on my side...
->>
-> Could you send me your dts and .config? I can not boot any unmodified 
-> 4.0 rc on my board. Tested rc1, rc4, rc5, HEAD.
-
-Yes: here are they:
-at91sam9260ek.dts
-http://paste.debian.net/163475/
-
-.config
-http://paste.debian.net/163477/
-
-Best regards,
-
-> Output
-> ...
-> [    1.730000] macb fffc4000.ethernet eth0: attached PHY driver [Generic 
-> PHY] (mii_bus:phy_addr=fffc4000.etherne:00, irq=-1)
-> [   82.570000] random: nonblocking pool is initialized
+> I have confirmed that next-20150326 does not compile without
+> the following reverted:
 > 
-> Best regards
->   Jonas
-> 
-> 
-> 
+> 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
+> e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
 
+Thanks for testing this and sorry for the continued breakage. Which
+toolchain did you say you were using? Ard has some more patches trying to
+fix this, but none of our toolchains seem to tickle the issue.
 
--- 
-Nicolas Ferre
+Will
