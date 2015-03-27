@@ -1,59 +1,45 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Fri, 27 Mar 2015 09:48:34 +0800
-Subject: [PATCH 1/4] clk: hisi: add API for allocation clk data struct
-In-Reply-To: <20150326141834.GI8656@n2100.arm.linux.org.uk>
-References: <1427368419-22222-1-git-send-email-leo.yan@linaro.org>
- <1427368419-22222-2-git-send-email-leo.yan@linaro.org>
- <20150326141834.GI8656@n2100.arm.linux.org.uk>
-Message-ID: <20150327014834.GA4902@leoy-linaro>
+Date: Fri, 27 Mar 2015 10:02:01 +0800
+Subject: [PATCH v2] cpufreq: hisilicon: add acpu driver
+In-Reply-To: <55141412.6040600@arm.com>
+References: <1427370486-14823-1-git-send-email-leo.yan@linaro.org>
+ <55141412.6040600@arm.com>
+Message-ID: <20150327020201.GB4902@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Russell,
+hi Sudeep,
 
-On Thu, Mar 26, 2015 at 02:18:34PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 26, 2015 at 07:13:36PM +0800, Leo Yan wrote:
-> > +struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
-> > +					     int nr_clks)
-> > +{
-> > +	struct hisi_clock_data *clk_data;
-> > +	void __iomem *base;
-> > +
-> > +	if (np) {
-> > +		base = of_iomap(np, 0);
-> > +		if (!base) {
-> > +			pr_err("failed to map Hisilicon clock registers\n");
-> > +			return NULL;
-> > +		}
-> > +		printk("%s: base %p\n", __func__, base);
-> 
-> Did you leave your debugging in?
+Thanks for reviewing.
 
-Sorry, will remove it.
+On Thu, Mar 26, 2015 at 02:13:38PM +0000, Sudeep Holla wrote:
+> 
+> On 26/03/15 11:48, Leo Yan wrote:
+> >+static int __init hisi_acpu_cpufreq_driver_init(void)
+> >+{
+> >+	struct platform_device_info devinfo = { .name = "cpufreq-dt", };
+> >+	struct platform_device *pdev;
+> >+
+> >+	if (!of_machine_is_compatible("hisilicon,hi6220"))
+> >+		return -ENODEV;
+> >+
+> >+	pdev = platform_device_register_full(&devinfo);
+> >+	return PTR_ERR_OR_ZERO(pdev);
+> 
+> Since you are not using anything other than name, you can simplify it
+> further by something like:
+> 	platform_device_register_simple("cpufreq-dt", -1, NULL, 0)
 
-> > +	} else {
-> > +		pr_err("failed to find Hisilicon clock node in DTS\n");
-> > +		return NULL;
-> > +	}
-> 
-> I know you're mostly only moving this code, but it would be far better if
-> it were written:
-> 
-> 	if (!np) {
-> 		pr_err("failed to find Hisilicon clock node in DTS\n");
-> 		return NULL;
-> 	}
-> 
-> 	base = of_iomap(np, 0);
-> 	if (!base) {
-> 		pr_err("failed to map Hisilicon clock registers\n");
-> 		return NULL;
-> 	}
-> 
-> Possibly do this first as a separate patch, and then move the code.
+Will use this way and resend patch.
 
-Will do this.
+> And IMO it need not be a separate driver too, you can add this in mach
+> if it exists(i.e. arm32 though not recommended) or clock code that
+> registers cpu clock. Thoughts ?
 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-> according to speedtest.net.
+This driver will be firstly used for hikey board w/t ARMv8 SoC and i
+prefer de-couple the cpufreq driver w/t clk driver. w/t this cpufreq
+driver, we can easily enhance it and init SoC's specific operations
+for later more hisilicon SoCs.
+
+Thanks,
+Leo Yan
