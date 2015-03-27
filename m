@@ -1,67 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 Mar 2015 20:53:01 +0000
-Subject: Reading twd_base at run-time
-In-Reply-To: <5515BEA5.6040307@free.fr>
-References: <55158261.9010108@free.fr> <551586E6.3020200@arm.com>
- <5515BEA5.6040307@free.fr>
-Message-ID: <20150327205301.GD4019@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 27 Mar 2015 22:08:06 +0100
+Subject: [PATCH v3 1/4] i2c: mux-pinctrl: Rework to honor disabled child
+ nodes
+In-Reply-To: <20150323183211.GB1128@katana>
+References: <55097C46.9010605@gmail.com> <20150318140037.GE3580@katana>
+ <550A05E5.3050100@gmail.com> <20150319100944.GA914@katana>
+ <550AEF9D.6090307@wwwdotorg.org> <20150319160208.GF7657@katana>
+ <550B3725.10209@gmail.com> <20150320101925.GC2071@katana>
+ <20150321210028.GA1078@katana> <550EBDBC.9000903@gmail.com>
+ <20150323183211.GB1128@katana>
+Message-ID: <5515C6B6.7080903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 09:33:41PM +0100, Mason wrote:
-> Heya,
-> 
-> On 27/03/2015 17:35, Marc Zyngier wrote:
-> 
-> > Hi Mason,
-> > 
-> > On 27/03/15 16:16, Mason wrote:
-> >
-> >> In arch/arm/kernel/smp_twd.c, twd_local_timer_register() receives a
-> >> struct twd_local_timer argument, which specifies
-> >>
-> >>    1) the physical address of twd_base
-> >>    2) the twd interrupt number
-> >>
-> >> There's a helper to fill out the static struct: DEFINE_TWD_LOCAL_TIMER()
-> >>
-> >> But it seems to me (please correct me if I'm wrong) that the address
-> >> of twd_base can be read at run-time, making it one less parameter to
-> >> specify by hand at compile-time (with the risk that a HW engineer
-> >> change the address in the next chip with no warning).
-> > 
-> > The main problem with that is that said HW engineer has ^%$%^%-up
-> > PERIPHBASE, and that you can't trust it. I've seen a number of these
-> > kicking around.
-> 
-> I don't understand your remark, perhaps mine was unclear?
+On 23.03.2015 19:32, Wolfram Sang wrote:
+>> If modifying i2c-mux-pinctrl to respect the sub-bus status property is
+>> such a big issue, I'd rather leave the driver as is and expose all
+>> sub-busses to userspace.
+>
+> Well, dunno what 'big issue' is in your book :) What definately needs to
+> be done is:
 
-Mark's reply seems clear to me.
+Wolfram,
 
-> The value of PERIPHBASE is left to the implementer, right?
-> So the HW engineer picks addrA for revA, then changes his
-> mind for revB, and picks addrB. No screw-up there, right?
-> 
-> The problem comes when said engineer forgets to notify the
-> grunts in software that they're supposed to change
-> #define PERIPH_BASE ADDR_A
-> to
-> #define PERIPH_BASE ADDR_B
-> in the header files for revB.
-> 
-> Looking up PERIPH_BASE at run-time through cp15 solves that
-> particular issue. Do you disagree?
+I had a look at the code in question again and prepared some patches
+to return ERR_PTRs from i2c_add_mux_adapter(), rework users to check
+for IS_ERR() and finally skip i2c_add_adapter for the OF disabled case.
 
-That's one scenario.  Here's the scenario Mark is describing - one which
-has real-world examples:
+I have them compile-tested but I don't have any hardware available
+right now.
 
-Hardware engineer picks address A for rev A and sets CP15 to address A.
-Everything works.  Hardware engineer then picks address B for rev B, but
-forgets to update CP15.  It breaks.
+Anyway, I still have some questions.
 
-If it's in DT, it can be fixed.  It should be there anyway as part of
-the hardware description.  DT is a description of the hardware.
+> * handle "status" at mux-core level, not mux-driver
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I get that.. but:
+
+> * that probably needs us to convert i2c_add_mux_adapter() to return
+>    ERR_PTRs instead of NULL, so we can distinguish the "disabled" case
+
+What do you want to return from i2c_add_mux_adapter() if you find an OF
+disabled child node?
+
+AFAIKS, there is no explicit errno for a disabled device (node) so all
+I can imagine here is to return either the &priv->adap before actually
+calling i2c_add_adapter on it or NULL now that we explicitly check for
+errors.
+
+> * that would mean to fix all existing users
+
+If we choose to return NULL, those users who can deal with a
+missing/disabled sub-bus on the mux can check with IS_ERR()
+the others should check with IS_ERR_OR_NULL().
+
+We could also choose to return some other errno (-ENODEV maybe)
+but still we'd have to double-check that return value on i2c-mux-pinctrl
+and the others too if we don't care that i2c_add_adapter() wasn't
+called for a mux.
+
+> That's all not groundbreaking stuff, but needs caution and thoroughness.
+> There might be some gory details left, though...
+
+As I said before, the intention was not disable a possible i2c bus that
+can be dynamically added/removed on that specific Dove SBC/CM-A510
+board but to have a single i2c-mux-pinctrl in the SoC dtsi just because
+the SoC has the optional i2c bus muxing.
+
+While thinking about it (and I still think of it as a 'big issue'
+compared to the intention of the initial patch) I came to the
+conclusion that I should maybe just go for a board-specific
+i2c-mux-pinctrl node instead of adding it to the SoC dtsi. That will
+also avoid doubled i2c busses on boards with just the default i2c
+option.
+
+Sebastian
