@@ -1,128 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Mar 2015 11:53:17 +0000
-Subject: [PATCH 2/2] mfd: tc3589x: enforce device-tree only mode
-In-Reply-To: <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <1426776765-18812-3-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150327115317.GE15988@x1>
+From: alexanders83@web.de (Alexander Stein)
+Date: Fri, 27 Mar 2015 12:54:23 +0100
+Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
+In-Reply-To: <20150327101152.GB16851@odux.rfo.atmel.com>
+References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+ <20150327101152.GB16851@odux.rfo.atmel.com>
+Message-ID: <4728260.M5jZylgLPj@kongar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Mar 2015, Linus Walleij wrote:
+Hello Ludovic,
 
-> All systems using the TC3589x multifunction expander uses
-> devicetree, so don't clutter the place with a lot of
-> and assume it is there.
+On Friday 27 March 2015, 11:11:52 wrote Ludovic Desroches:
+> On Fri, Mar 20, 2015 at 08:12:00PM +0100, Alexander Stein wrote:
+> > This adds the callback for set_multiple.
+> > As this controller has a separate set and clear register, we can't write
+> > directly to PIO_ODSR as this would required a cached variable and would
+> > race with at91_gpio_set.
+> > So build masks for the PIO_SODR and PIO_CODR registers and write them
+> > together.
 > 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/gpio/Kconfig                    | 1 +
->  drivers/gpio/gpio-tc3589x.c             | 3 ---
->  drivers/input/keyboard/tc3589x-keypad.c | 9 ---------
->  drivers/mfd/Kconfig                     | 1 +
->  drivers/mfd/tc3589x.c                   | 9 ---------
->  5 files changed, 2 insertions(+), 21 deletions(-)
+> Sure seems safer and easier to use SODR and CODR.
+> 
+> > 
+> > Signed-off-by: Alexander Stein <alexanders83@web.de>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> A question below.
+> 
+> > ---
+> > This was tested by using an own test driver which uses
+> > gpiod_set_array_cansleep to set multiple GPIOs at once.
+> > 
+> >  drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> > 
+> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> > index f4cd0b9..a882523 100644
+> > --- a/drivers/pinctrl/pinctrl-at91.c
+> > +++ b/drivers/pinctrl/pinctrl-at91.c
+> > @@ -1330,6 +1330,33 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
+> >  	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
+> >  }
+> >  
+> > +static void at91_gpio_set_multiple(struct gpio_chip *chip,
+> > +				      unsigned long *mask, unsigned long *bits)
+> > +{
+> > +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> > +	void __iomem *pio = at91_gpio->regbase;
+> > +	unsigned long set_mask;
+> > +	unsigned long clear_mask;
+> > +	size_t i;
+> > +
+> > +	set_mask = 0;
+> > +	clear_mask = 0;
+> > +
+> > +	for (i = 0; i < chip->ngpio; i++) {
+> > +		if (*mask == 0)
+> > +			break;
+> > +		if (__test_and_clear_bit(i, mask)) {
+> 
+> For my knowledge, why do you need to clear the mask?
 
-Applied, thanks.
+I tried to do the same as mpc8xxx_gpio_set_multiple. I think the reason is that an empty mask will quit that loop potentially earlier.
 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index c1e2ca3d9a51..dc1aaa83a347 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -669,6 +669,7 @@ config GPIO_STP_XWAY
->  config GPIO_TC3589X
->  	bool "TC3589X GPIOs"
->  	depends on MFD_TC3589X
-> +	depends on OF_GPIO
->  	select GPIOLIB_IRQCHIP
->  	help
->  	  This enables support for the GPIOs found on the TC3589X
-> diff --git a/drivers/gpio/gpio-tc3589x.c b/drivers/gpio/gpio-tc3589x.c
-> index 11aed2671065..31b244cffabb 100644
-> --- a/drivers/gpio/gpio-tc3589x.c
-> +++ b/drivers/gpio/gpio-tc3589x.c
-> @@ -260,10 +260,7 @@ static int tc3589x_gpio_probe(struct platform_device *pdev)
->  	tc3589x_gpio->chip.ngpio = tc3589x->num_gpio;
->  	tc3589x_gpio->chip.dev = &pdev->dev;
->  	tc3589x_gpio->chip.base = -1;
-> -
-> -#ifdef CONFIG_OF_GPIO
->  	tc3589x_gpio->chip.of_node = np;
-> -#endif
->  
->  	/* Bring the GPIO module out of reset */
->  	ret = tc3589x_set_bits(tc3589x, TC3589x_RSTCTRL,
-> diff --git a/drivers/input/keyboard/tc3589x-keypad.c b/drivers/input/keyboard/tc3589x-keypad.c
-> index 0ccc7de9b59d..08e62e6aeb1b 100644
-> --- a/drivers/input/keyboard/tc3589x-keypad.c
-> +++ b/drivers/input/keyboard/tc3589x-keypad.c
-> @@ -318,7 +318,6 @@ static void tc3589x_keypad_close(struct input_dev *input)
->  	tc3589x_keypad_disable(keypad);
->  }
->  
-> -#ifdef CONFIG_OF
->  static const struct tc3589x_keypad_platform_data *
->  tc3589x_keypad_of_probe(struct device *dev)
->  {
-> @@ -368,14 +367,6 @@ tc3589x_keypad_of_probe(struct device *dev)
->  
->  	return plat;
->  }
-> -#else
-> -static inline const struct tc3589x_keypad_platform_data *
-> -tc3589x_keypad_of_probe(struct device *dev)
-> -{
-> -	return ERR_PTR(-ENODEV);
-> -}
-> -#endif
-> -
->  
->  static int tc3589x_keypad_probe(struct platform_device *pdev)
->  {
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 38356e39adba..476e63745742 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1210,6 +1210,7 @@ config MFD_TIMBERDALE
->  config MFD_TC3589X
->  	bool "Toshiba TC35892 and variants"
->  	depends on I2C=y
-> +	depends on OF
->  	select MFD_CORE
->  	help
->  	  Support for the Toshiba TC35892 and variants I/O Expander.
-> diff --git a/drivers/mfd/tc3589x.c b/drivers/mfd/tc3589x.c
-> index aacb3720065c..cf356395c9e9 100644
-> --- a/drivers/mfd/tc3589x.c
-> +++ b/drivers/mfd/tc3589x.c
-> @@ -318,7 +318,6 @@ static int tc3589x_device_init(struct tc3589x *tc3589x)
->  	return ret;
->  }
->  
-> -#ifdef CONFIG_OF
->  static const struct of_device_id tc3589x_match[] = {
->  	/* Legacy compatible string */
->  	{ .compatible = "tc3589x", .data = (void *) TC3589X_UNKNOWN },
-> @@ -359,14 +358,6 @@ tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
->  
->  	return pdata;
->  }
-> -#else
-> -static inline struct tc3589x_platform_data *
-> -tc3589x_of_probe(struct device *dev, enum tc3589x_version *version)
-> -{
-> -	dev_err(dev, "no device tree support\n");
-> -	return ERR_PTR(-ENODEV);
-> -}
-> -#endif
->  
->  static int tc3589x_probe(struct i2c_client *i2c,
->  				   const struct i2c_device_id *id)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+Alexander
