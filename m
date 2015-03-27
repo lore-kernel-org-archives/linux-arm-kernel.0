@@ -1,30 +1,45 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 Mar 2015 10:07:29 +0100
-Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
-In-Reply-To: <1426878721-2618-1-git-send-email-alexanders83@web.de>
-References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
-Message-ID: <CACRpkdapp8vGFHJA+WrZzRk503zoAzrz3HaVGYXH+CHRDaLaDg@mail.gmail.com>
+Date: Fri, 27 Mar 2015 10:15:13 +0100
+Subject: configuration for nc pins without pull
+In-Reply-To: <20150322100059.GH5664@pengutronix.de>
+References: <20150322100059.GH5664@pengutronix.de>
+Message-ID: <CACRpkda2UHv5oe1z-48SDiYUH1BzVsJS-V4CRKcmjTfn=o=O7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 8:12 PM, Alexander Stein <alexanders83@web.de> wrote:
+On Sun, Mar 22, 2015 at 11:00 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-> This adds the callback for set_multiple.
-> As this controller has a separate set and clear register, we can't write
-> directly to PIO_ODSR as this would required a cached variable and would
-> race with at91_gpio_set.
-> So build masks for the PIO_SODR and PIO_CODR registers and write them
-> together.
+> for a machine I want to configure a pin that is actually not connected
+> to minimize floating. (I think this is sensible, isn't it?)
+
+Yup, and Russell gave an excellent summary of why.
+
+> For the pinctrl I can use a hog group of the pinctrl device. At least
+> one of the pins doesn't have a pullup/pulldown configuration though, so
+> I want to mux it to its gpio function and set the gpio to output and the
+> desired value.
 >
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> ---
-> This was tested by using an own test driver which uses
-> gpiod_set_array_cansleep to set multiple GPIOs at once.
+> Is there something nicer than defining an always-on regulator with gpios
+> = <&gpio4 3 0> to accomplish that without additional code?
 
-I remember J-C brought this up ages ago, so I hope he will be delighted
-to see we can now, FINALLY, do this!
+As explained in
+Documentation/pinctrl.txt, section "GPIO mode pitfalls" like 788
+this is not really "GPIO", it is a way of controlling the electric state
+of the pin using software, it's just the hardware designers idea of the
+use case that it is "GPIO", it is not what a software engineer would call
+GPIO.
 
-J-C can I have your review on this?
+If the controller support GENERIC_PINCONF I suggest implementing
+PIN_CONFIG_OUTPUT from include/linux/pinctrl/pinconf-generic.h
+which is more or less for exactly this purpose.
+
+It will bring the pin into "GPIO mode" by poking the right registers but
+what is really happening is a non-GPIO usecase on the pin control
+side of things.
+
+This should be done using a hog on the device tree and
+output-low; or output-high; using the generic pinctrl bindings.
 
 Yours,
 Linus Walleij
