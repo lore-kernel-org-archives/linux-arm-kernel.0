@@ -1,124 +1,134 @@
-From: a0393675@ti.com (Keerthy)
-Date: Fri, 27 Mar 2015 11:32:36 +0530
-Subject: [PATCH V2 1/2] ARM: dts: DRA7: Add bandgap and related thermal
- nodes
-In-Reply-To: <1427139579-4215-2-git-send-email-nm@ti.com>
-References: <1427139579-4215-1-git-send-email-nm@ti.com>
- <1427139579-4215-2-git-send-email-nm@ti.com>
-Message-ID: <5514F27C.7070904@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 27 Mar 2015 07:05:34 +0100
+Subject: [PATCH v8]: clk: Add common clock support for Mediatek MT8135
+ and MT8173
+In-Reply-To: <1426754530-3137-1-git-send-email-s.hauer@pengutronix.de>
+References: <1426754530-3137-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150327060534.GF4946@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Mike, Stephen,
 
+Any chance to get this forward please?
 
-On Tuesday 24 March 2015 01:09 AM, Nishanth Menon wrote:
-> From: Keerthy <j-keerthy@ti.com>
->
-> Add bandgap and related thermal nodes. The patch adds 5 thermal
-> sensors. Only one cooling device for mpu as of now. The sensors are
-> the exact same on both dra72 and dra7. Introduce CPU, GPU, core nodes
-> for the moment as they are direct reuse of OMAP5 entities.
->
-> NOTE: OMAP4 has a finer counter granularity, which allows for a delay
-> of 1000ms in the thermal zone polling intervals. DRA7 have different
-> counter mechanism, which allows at maximum a 500ms timer. Adjust the
-> cpu thermal zone accordingly for DRA7.
->
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> [t-kristo at ti.com: few reuse from OMAP5 entities]
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> ---
-> Changes since V1:
-> 	- omap5-cpu-thermal.dtsi dropped
-> 	- approach similar to omap5
-> 	- added core and gpu thermal dtsi(they can be reused)
-> 	- Squashed patch #1 from v1 to patch #2 - this patch.
-> 	- Not carrying forward ack due to change
+Sascha
 
-Thanks for updating Nishanth. Looks good to me.
+On Thu, Mar 19, 2015 at 09:42:04AM +0100, Sascha Hauer wrote:
+> 
+> The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
+> 
+>   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v8
+> 
+> for you to fetch changes up to 54449c74078c9d93619757c7a91b820eaa28c0f4:
+> 
+>   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-19 09:15:33 +0100)
+> 
+> ----------------------------------------------------------------
+> This patchset contains the initial common clock support for Mediatek SoCs.
+> Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
+> and clock gates.
+> 
+> Changes in v8:
+> - add patch to allow to put parent_name arrays in __initconst
+> - put parent_name arrays into __initconst
+> 
+> Changes in v7:
+> - fix duplicate definition/declaration of mtk_register_reset_controller
+> - fix pd_reg offset of tvdpll
+> - make clk initialization arrays const
+> 
+> Changes in v6:
+> - rework PLL support, only a fraction of original size now
+> - Move binding docs to Documentation/devicetree/bindings/arm/mediatek since
+>   the units are not really clock specific (they contain reset controllers)
+> 
+> Changes in v5:
+> - Add reset controller support for pericfg/infracfg
+> - Use regmap for the gates
+> - remove now unnecessary spinlock for the gates
+> - Add PMIC wrapper support as of v3
+> 
+> Changes in v4:
+> - Support MT8173 platform.
+> - Re-ordered patchset. driver/clk/Makefile in 2nd patch.
+> - Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from
+>   clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
+> - Refine code. Rmove unnessacary debug information and unsed defines,
+>   add prefix "mtk_" for static functions.
+> - Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on
+>   gate/mux/fixed-factor.
+> - Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
+> - Example above include a node for the clock controller itself, followed
+>   by the i2c controller example above.
+> 
+> Changes in v3:
+> - Rebase to 3.19-rc1.
+> - Refine code. Remove unneed functions, debug logs and comments, and fine tune
+>   error logs.
+> 
+> Changes in v2:
+> - Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
+> 
+> ----------------------------------------------------------------
+> James Liao (3):
+>       clk: mediatek: Add initial common clock support for Mediatek SoCs.
+>       clk: mediatek: Add basic clocks for Mediatek MT8135.
+>       clk: mediatek: Add basic clocks for Mediatek MT8173.
+> 
+> Sascha Hauer (3):
+>       clk: make strings in parent name arrays const
+>       clk: mediatek: Add reset controller support
+>       dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers
+> 
+>  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  23 +
+>  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  30 +
+>  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  30 +
+>  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  23 +
+>  drivers/clk/Makefile                               |   1 +
+>  drivers/clk/clk-composite.c                        |   2 +-
+>  drivers/clk/clk-mux.c                              |   4 +-
+>  drivers/clk/mediatek/Makefile                      |   4 +
+>  drivers/clk/mediatek/clk-gate.c                    | 137 ++++
+>  drivers/clk/mediatek/clk-gate.h                    |  49 ++
+>  drivers/clk/mediatek/clk-mt8135.c                  | 640 ++++++++++++++++
+>  drivers/clk/mediatek/clk-mt8173.c                  | 826 +++++++++++++++++++++
+>  drivers/clk/mediatek/clk-mtk.c                     | 197 +++++
+>  drivers/clk/mediatek/clk-mtk.h                     | 165 ++++
+>  drivers/clk/mediatek/clk-pll.c                     | 325 ++++++++
+>  drivers/clk/mediatek/reset.c                       |  99 +++
+>  include/dt-bindings/clock/mt8135-clk.h             | 190 +++++
+>  include/dt-bindings/clock/mt8173-clk.h             | 231 ++++++
+>  .../dt-bindings/reset-controller/mt8135-resets.h   |  64 ++
+>  .../dt-bindings/reset-controller/mt8173-resets.h   |  63 ++
+>  include/linux/clk-provider.h                       |   8 +-
+>  21 files changed, 3104 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
+>  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
+>  create mode 100644 drivers/clk/mediatek/Makefile
+>  create mode 100644 drivers/clk/mediatek/clk-gate.c
+>  create mode 100644 drivers/clk/mediatek/clk-gate.h
+>  create mode 100644 drivers/clk/mediatek/clk-mt8135.c
+>  create mode 100644 drivers/clk/mediatek/clk-mt8173.c
+>  create mode 100644 drivers/clk/mediatek/clk-mtk.c
+>  create mode 100644 drivers/clk/mediatek/clk-mtk.h
+>  create mode 100644 drivers/clk/mediatek/clk-pll.c
+>  create mode 100644 drivers/clk/mediatek/reset.c
+>  create mode 100644 include/dt-bindings/clock/mt8135-clk.h
+>  create mode 100644 include/dt-bindings/clock/mt8173-clk.h
+>  create mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
+>  create mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
+> 
+> 
 
-- Keerthy
-
->
-> V1: http://marc.info/?t=142688102700006&r=1&w=2
->
->   arch/arm/boot/dts/dra7.dtsi   |   23 +++++++++++++++++++++++
->   arch/arm/boot/dts/dra72x.dtsi |    5 +++++
->   arch/arm/boot/dts/dra74x.dtsi |    5 +++++
->   3 files changed, 33 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index eea4a54d6cb3..2d6a7e3e001f 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -177,6 +177,18 @@
->   			};
->   		};
->
-> +		bandgap: bandgap at 4a0021e0 {
-> +			reg = <0x4a0021e0 0xc
-> +				0x4a00232c 0xc
-> +				0x4a002380 0x2c
-> +				0x4a0023C0 0x3c
-> +				0x4a002564 0x8
-> +				0x4a002574 0x50>;
-> +				compatible = "ti,dra752-bandgap";
-> +				interrupts = <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
-> +				#thermal-sensor-cells = <1>;
-> +		};
-> +
->   		cm_core_aon: cm_core_aon at 4a005000 {
->   			compatible = "ti,dra7-cm-core-aon";
->   			reg = <0x4a005000 0x2000>;
-> @@ -1419,6 +1431,17 @@
->   			status = "disabled";
->   		};
->   	};
-> +
-> +	thermal_zones: thermal-zones {
-> +		#include "omap4-cpu-thermal.dtsi"
-> +		#include "omap5-gpu-thermal.dtsi"
-> +		#include "omap5-core-thermal.dtsi"
-> +	};
-> +
-> +};
-> +
-> +&cpu_thermal {
-> +	polling-delay = <500>; /* milliseconds */
->   };
->
->   /include/ "dra7xx-clocks.dtsi"
-> diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
-> index e5a3d23a3df1..6ac8e3601499 100644
-> --- a/arch/arm/boot/dts/dra72x.dtsi
-> +++ b/arch/arm/boot/dts/dra72x.dtsi
-> @@ -20,6 +20,11 @@
->   			device_type = "cpu";
->   			compatible = "arm,cortex-a15";
->   			reg = <0>;
-> +
-> +			/* cooling options */
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <2>;
-> +			#cooling-cells = <2>; /* min followed by max */
->   		};
->   	};
->
-> diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
-> index 10173fab1a15..eef981f4bcd5 100644
-> --- a/arch/arm/boot/dts/dra74x.dtsi
-> +++ b/arch/arm/boot/dts/dra74x.dtsi
-> @@ -31,6 +31,11 @@
->   			clock-names = "cpu";
->
->   			clock-latency = <300000>; /* From omap-cpufreq driver */
-> +
-> +			/* cooling options */
-> +			cooling-min-level = <0>;
-> +			cooling-max-level = <2>;
-> +			#cooling-cells = <2>; /* min followed by max */
->   		};
->   		cpu at 1 {
->   			device_type = "cpu";
->
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
