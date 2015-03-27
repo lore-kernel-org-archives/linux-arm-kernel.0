@@ -1,161 +1,31 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 27 Mar 2015 09:36:37 +0100
-Subject: [PATCH v3 04/15] clocksource: Add ARM System timer driver
-In-Reply-To: <CALszF6CtEf0w8AoaMwFzn34ACMjkW6obT5_MrduBdUOm7T=zNw@mail.gmail.com>
-References: <1426197361-19290-1-git-send-email-maxime.coquelin@st.com>	<1426197361-19290-5-git-send-email-maxime.coquelin@st.com>	<5513D64A.7060702@linaro.org>
- <CALszF6CtEf0w8AoaMwFzn34ACMjkW6obT5_MrduBdUOm7T=zNw@mail.gmail.com>
-Message-ID: <55151695.5050203@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 27 Mar 2015 09:37:19 +0100
+Subject: [PATCH] pinctrl: mvebu: add suspend/resume support to Armada XP
+ pinctrl driver
+In-Reply-To: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1426761047-3103-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdZ_2FJLJJaDuqw=9cxxJwacz06KssfSK_HVg2jZ6E-6eQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/26/2015 09:19 PM, Maxime Coquelin wrote:
-> Hi Daniel,
+On Thu, Mar 19, 2015 at 11:30 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+
+> This commit adds suspend/resume support to the Armada XP pinctrl
+> driver, by simply saving and restoring the MPP registers.
 >
->    Thanks for the review. Please find my answers below.
->
-> 2015-03-26 10:50 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
->> On 03/12/2015 10:55 PM, Maxime Coquelin wrote:
->>>
->>> From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>>
->>> This patch adds clocksource support for ARMv7-M's System timer,
->>> also known as SysTick.
->>>
->>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->>
->>
->> Hi Maxime,
->>
->> the driver looks good. Three comments below.
->>
->>    -- Daniel
->>
->>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-[ ... ]
+Patch applied, but:
 
->>> +static void __init system_timer_of_register(struct device_node *np)
->>> +{
->>> +       struct clk *clk;
->>> +       void __iomem *base;
->>> +       u32 rate = 0;
->>> +       int ret;
->>> +
->>> +       base = of_iomap(np, 0);
->>> +       if (!base) {
->>> +               pr_warn("system-timer: invalid base address\n");
->>> +               return;
->>> +       }
->>> +
->>> +       clk = of_clk_get(np, 0);
->>> +       if (!IS_ERR(clk)) {
->>> +               ret = clk_prepare_enable(clk);
->>> +               if (ret) {
->>> +                       clk_put(clk);
->>> +                       goto out_unmap;
->>> +               }
->>> +
->>> +               rate = clk_get_rate(clk);
->>> +       }
->>> +
->>> +       /* If no clock found, try to get clock-frequency property */
->>> +       if (!rate) {
->>> +               ret = of_property_read_u32(np, "clock-frequency", &rate);
->>> +               if (ret)
->>> +                       goto out_unmap;
->>
->>
->> Shouldn't be 'goto out_clk_disable' ?
->
-> No, because I assumed !rate means we failed to get the clock.
-> Actually, clk_get_rate could return 0, so relying on rate value is not safe.
->
-> I propose to get clock-frequency property if IS_ERR(clk).
->
-> Is it fine for you?
+>  static void __iomem *mpp_base;
+> +static u32 *mpp_saved_regs;
 
-Why not invert the conditions ? If the 'clock-frequency' is specified in 
-the DT then it overrides the clk_get_rate(). So the resulting code will be:
+I didn't notice this singleton design pattern in this driver before :(
+I see the legacy Dove driver have a few more.
 
-ret = of_property_read_u32(np, "clock-frequency", &rate);
-if (ret) {
-	clk = of_clk_get(np, 0);
-	if (IS_ERR(clk))
-		goto out_unmap;
+Can we have a mvebu refactoring patch bringing these things into a state
+container? Like a per-subdriver kmalloc:ed struct foo_state {}?
 
-	ret = clk_prepare_enable(clk);
-	if (ret)
-		goto out_clk_put;
-
-	rate = clk_get_rate(clk);
-	if (!rate)
-		goto out_clk_unprepare;
-}
-
-
-
->>> +       }
->>> +
->>> +       writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
->>> +       writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
->>> +
->>> +       ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer",
->>> rate,
->>> +                       200, 24, clocksource_mmio_readl_down);
->>> +       if (ret) {
->>> +               pr_err("failed to init clocksource (%d)\n", ret);
->>> +               goto out_clk_disable;
->>> +       }
->>> +
->>> +       pr_info("ARM System timer initialized as clocksource\n");
->>> +
->>> +       return;
->>> +
->>> +out_clk_disable:
->>> +       if (!IS_ERR(clk))
->>
->>
->> Why do you need this check ?
->
-> To handle the case were no clock was found, but a clk-frequency value
-> was provided.
->
->>
->> It isn't missing a clk_put ?
->
-> Right, thanks for spotting this.
->
-> I wonder if it makes sense to implement the error path.
-> If we fail to initialize the clocksource, the system will be unusable.
->
-> Maybe I should just perform a BUG_ON() in the error cases, as most of
-> the other clocksource drivers do.
-> What is your view?
-
-I prefer to not BUG_ON in the init functions because it already happen 
-that drivers were bugging at init time and when a driver was reused on 
-another platform with several timers available, the board was not able 
-to boot because one timer was not used, hence not defined in the DT. I 
-don't know if that could be the case for this platform but I prefer to 
-keep thing going smoothly and return from init even if that lead to a 
-kernel hang. Of course, the errors must be displayed (pr_warn, pr_err, 
-pr_notice, etc ...).
-
->>
->>> +               clk_disable_unprepare(clk);
->>> +out_unmap:
->>> +       iounmap(base);
->>> +       WARN(ret, "ARM System timer register failed (%d)\n", ret);
-
-pr_warn
-
-Thanks
-
-   -- Daniel
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Yours,
+Linus Walleij
