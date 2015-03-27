@@ -1,56 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 27 Mar 2015 13:35:51 +0200
-Subject: [PATCH 1/5] dmaengine: edma: fix memory leak when terminating running
- transfers
+Date: Fri, 27 Mar 2015 13:35:53 +0200
+Subject: [PATCH 3/5] dmaengine: bcm2835-dma: Fix memory leak when stopping a
+ running transfer
 In-Reply-To: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1427456155-28990-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Petr Kulhavy <petr@barix.com>
+The vd->node is removed from the lists when the transfer started so the
+vchan_get_all_descriptors() will not find it. This results memory leak.
 
-If edma_terminate_all() was called while a transfer was running (i.e. after
-edma_execute() but before edma_callback()) the echan->edesc was not freed.
-
-This was due to the fact that a running transfer is on none of the
-vchan lists: desc_submitted, desc_issued, desc_completed (edma_execute()
-removes it from the desc_issued list), so the vchan_dma_desc_free_list()
-called at the end of edma_terminate_all() didn't find it and didn't free it.
-
-This bug was found on an AM1808 based hardware (very similar to da850evm,
-however using the second MMC/SD controller), where intense operations on the SD
-card wasted the device 128MB RAM within a couple of days.
-
-Peter Ujfalusi:
-The issue is even more severe since it affects cyclic (audio) transfers as
-well. In this case starting/stopping audio will results memory leak.
-
-Signed-off-by: Petr Kulhavy <petr@barix.com>
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-CC: <stable@vger.kernel.org>
-CC: <linux-omap@vger.kernel.org>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+CC: Lee Jones <lee@kernel.org>
 ---
- drivers/dma/edma.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/dma/bcm2835-dma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 741baa68365c..984c2b12dae3 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -268,6 +268,13 @@ static int edma_terminate_all(struct dma_chan *chan)
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 0723096fb50a..c92d6a70ccf3 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -475,6 +475,7 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
+ 	 * c->desc is NULL and exit.)
  	 */
- 	if (echan->edesc) {
- 		int cyclic = echan->edesc->cyclic;
-+
-+		/*
-+		 * free the running request descriptor
-+		 * since it is not in any of the vdesc lists
-+		 */
-+		edma_desc_free(&echan->edesc->vdesc);
-+
- 		echan->edesc = NULL;
- 		edma_stop(echan->ch_num);
- 		/* Move the cyclic channel back to default queue */
+ 	if (c->desc) {
++		bcm2835_dma_desc_free(&c->desc->vd);
+ 		c->desc = NULL;
+ 		bcm2835_dma_abort(c->chan_base);
+ 
 -- 
 2.3.3
