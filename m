@@ -1,58 +1,129 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 28 Mar 2015 12:34:09 +0000
-Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <20150325113839.GD24636@arm.com>
-References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
- <20150324220253.9595AC407F8@trevor.secretlab.ca>
- <20150325112410.GA24636@arm.com> <2694196.2XPpkm7uxF@vostro.rjw.lan>
- <20150325113839.GD24636@arm.com>
-Message-ID: <20150328123409.95225C4079E@trevor.secretlab.ca>
+Date: Sat, 28 Mar 2015 13:41:56 +0000
+Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
+In-Reply-To: <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
+ <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150328134157.000A3C40AE0@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Mar 2015 11:38:43 +0000
-, Will Deacon <will.deacon@arm.com>
+On Tue,  3 Mar 2015 10:32:24 +0100
+, Linus Walleij <linus.walleij@linaro.org>
  wrote:
-> On Wed, Mar 25, 2015 at 11:54:25AM +0000, Rafael J. Wysocki wrote:
-> > On Wednesday, March 25, 2015 11:24:11 AM Will Deacon wrote:
-> > > On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
-> > > > On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
-> > > > wrote:
-> > > > > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
-> > > > > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
-> > > > > > I am working on it, I do not think it should be a blocking point, patch
-> > > > > > coming asap on top of your series.
-> > > > > 
-> > > > > Well, I don't really want to merge the series without those patches so I
-> > > > > do think it blocks the code from getting into mainline.
-> > > > 
-> > > > Really? It's a pretty minor duplication problem and it's been identified
-> > > > as something requiring refactoring to both the ACPI and DT code. It
-> > > > isn't at all dangerous. Why is this a blocking point?
-> > > 
-> > > Because I don't really see a valid excuse not to get this right first time
-> > > around. Lorenzo already has patches on top, so we just need a co-ordinated
-> > > review effort.
-> > > 
-> > > I wouldn't accept another patch series that needed minor rework (which by
-> > > its very nature is easily addressed), so why should ACPI be treated any
-> > > differently?
-> > 
-> > Not ACPI, but this particular patchset I think.  The problem is that it has
-> > already been reviewed and ACKed by multiple people and it would be a shame
-> > to require all of those people to do their reviews once again because of
-> > that minor rework (which arguably can be done on top of the patchset just
-> > fine).
-> > 
-> > Of course, if the minor rework in question would not involve the need to
-> > review things once again, then I agree that it'd be better to do it upfront,
-> > but otherwise there's a good reason not to.
+> This defines a new compatible option for MFD devices "simple-mfd" that will
+> make the OF core spawn child devices for all subnodes of that MFD device.
+> It is optional but handy for things like syscon and possibly other
+> simpler MFD devices.
 > 
-> Aha, I think this is just a misunderstanding -- I'm certainly not suggesting
-> that Hanjun rework the current set! What I *am* asking for is that they go
-> into mainline with Lorenzo's patches on top, which means that his series [1]
-> needs some review (and I plan to look at it later today).
+> Since there was no file to put the documentation in, I took this opportunity
+> to make a small writeup on MFD devices and add the compatible definition
+> there.
+> 
+> Suggested-by: Lee Jones <lee.jones@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Devicetree <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I make the patch to the OF core in this one, it makes much more sense since
+> it's a oneliner
+> 
+> Lee: this is a (tested!) implementation of your suggestion for simple-mfd.
+> If you can eventually ACK this from the MFD side, I think it should be
+> funneled through the ARM SoC tree.
+> 
+> Grant/Rob: if either of you can ACK the change to the OF core likewise it can
+> be taken through ARM SoC.
+> 
+> DT binings maintainers: there is some background discussion on this here:
+> http://marc.info/?l=linux-arm-kernel&m=142486676603889&w=2
+> http://marc.info/?l=devicetree&m=142166313621469&w=2
+> ---
+>  Documentation/devicetree/bindings/mfd/mfd.txt | 40 +++++++++++++++++++++++++++
+>  drivers/of/platform.c                         |  1 +
+>  2 files changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/mfd.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/mfd.txt b/Documentation/devicetree/bindings/mfd/mfd.txt
+> new file mode 100644
+> index 000000000000..cc057438abe8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/mfd.txt
+> @@ -0,0 +1,40 @@
+> +Multi-Function Devices (MFD)
+> +
+> +These devices comprise a nexus for heterogeneous hardware blocks spawning
+> +multiple child devices.
+> +
+> +A typical MFD can be:
+> +
+> +- A mixed signal ASIC on an external bus, sometimes a PMIC (power management
+> +  integrated circuit) that is manufactured in a lower technology node (rough
+> +  silicon) that handles analog drivers for things like audio amplifiers, LED
+> +  drivers, level shifters, PHY (physical interfaces to things like USB or
+> +  ethernet), regulators etc.
+> +
+> +- A range of memory registers containing "miscellaneous system registers" also
+> +  known as a system controller "syscon" or any other memory range containing a
+> +  mix of unrelated registers.
+> +
+> +Optional properties:
+> +
+> +- compatible : "simple-mfd" - this signifies that the operating system should
+> +  spawn child devices for all the subnodes of the MFD device akin to how
+> +  "simple-bus" inidicates when to spawn children for a simple memory-mapped
+> +  bus. For more complex devices, when the nexus driver has to probe registers
+> +  to figure out what children exist etc, this should not be used. In the latter
+> +  case the child devices will be instantiated by the operating system.
+> +
+> +Example:
+> +
+> +foo at 1000 {
+> +		compatible = "syscon", "simple-mfd";
+> +		reg = <0x010000 0x1000>;
+> +
+> +		led at 08.0 {
+> +			compatible = "register-bit-led";
+> +			offset = <0x08>;
+> +			mask = <0x01>;
+> +			label = "myled";
+> +			default-state = "on";
+> +		};
+> +};
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index b189733a1539..969ba4e1460c 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -26,6 +26,7 @@
+>  
+>  const struct of_device_id of_default_bus_match_table[] = {
+>  	{ .compatible = "simple-bus", },
+> +	{ .compatible = "simple-mfd", },
+>  #ifdef CONFIG_ARM_AMBA
+>  	{ .compatible = "arm,amba-bus", },
+>  #endif /* CONFIG_ARM_AMBA */
 
-Okay, thanks for the clarification.
+Alright, so:
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
+However, I think this is going to lead to a future problem. It solves
+the immediate case of getting an MFD device to be auto populated when
+the kernel doesn't need to immediately do something. However, I can
+forsee a situation where the device can be supported by simple-mfd, but
+at some point it is discovered that better features can be enabled if
+the mfd device has a proper driver.
+
+If/when we get into that situation, the above still works, but we're
+going to need to add a blacklist match table so that simple-mfd can be
+overridden by a more-specific compatible value. I don't have any
+problems with doing that, but someone needs to implement it.
 
 g.
