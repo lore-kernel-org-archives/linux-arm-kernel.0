@@ -1,18 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 Mar 2015 21:57:25 -0600
-Subject: [PATCH 3/5] dmaengine: bcm2835-dma: Fix memory leak when stopping
- a running transfer
-In-Reply-To: <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
-References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
- <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <551626A5.3080509@wwwdotorg.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 27 Mar 2015 22:24:22 -0600
+Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
+In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+Message-ID: <1427516662.3643.906.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2015 05:35 AM, Peter Ujfalusi wrote:
-> The vd->node is removed from the lists when the transfer started so the
-> vchan_get_all_descriptors() will not find it. This results memory leak.
+On Thu, 2015-03-26 at 13:43 +0100, Joerg Roedel wrote:
+> Changes v1-v2:
+> 
+> 	* Rebased to v4.0-rc5
+> 	* Converted domain-types to a bit-field
+> 
+> Hi,
+> 
+> here is patch-set to replace the existing domain_init and
+> domain_destroy iommu-ops with the new domain_alloc and
+> domain_free callbacks
+> 
+> The new callbacks move the allocation of iommu domains into
+> the iommu driver, allowing them to put a generic
+> iommu_domain struct into their own domain struct. This makes
+> domain handling in the drivers more cache efficient and
+> prepares the introduction of default domains in another
+> patch-set.
+> 
+> While at it, this patch-set also introduces domain types.
+> These are internal to the iommu core code for now, there are
+> three of them:
+> 
+> 	* DMA-API domains
+> 	* Identity mapped domains
+> 	* Domains unmanaged by the iommu-core, used for
+> 	  iommu-api so that the users can create their own
+> 	  mappings
+> 
+> The patches have been compile tested for x86, ARM and PPC
+> and runtime tested on x86 (Intel VT-d and AMD IOMMU).
+> 
+> Please review.
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-(I'm just assuming the explanation makes sense and is correct; more of a
-not-a-NAK so it doesn't look like a lack of response!)
+For 1-5,16
+
+Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
+
+My only comment/question is whether you'd want to consider using
+ERR_PTR() return values from domain_alloc().  It's an alloc functions,
+so NULL == -ENOMEM is pretty standard, but we could at least have the
+interface to the iommu driver return more info even if we continue to
+mask that as NULL out to the IOMMU API users for now.  Thanks,
+
+Alex
