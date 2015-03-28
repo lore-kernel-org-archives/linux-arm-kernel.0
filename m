@@ -1,28 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 28 Mar 2015 16:33:02 +0100
-Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
-In-Reply-To: <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
-References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
- <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
-Message-ID: <201503281633.02801.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 28 Mar 2015 15:58:22 +0000
+Subject: [PATCH V6] kbuild: dtbs_install: new make target
+In-Reply-To: <20150328132320.GA24391@n2100.arm.linux.org.uk>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
+ <20150328132320.GA24391@n2100.arm.linux.org.uk>
+Message-ID: <20150328155822.GA25778@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
-> Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
-> Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
-> usb2 host.
+Russell,
+
+On Sat, Mar 28, 2015 at 01:23:20PM +0000, Russell King - ARM Linux wrote:
+> Okay, I'm digging up an old version of this patch - v7 was merged but
+> I find *nowhere* where that version was posted to people involved in
+> this discussion.
+
+fwiw, I just went through my archive of patch submissions:
+
+$ ls ~/projects/linux/dtbs_install/
+v2  v3  v4  v5  v6
+$
+
+I never wrote a v7.  :-(  Regardless,
+
+> The reason is that I would've commented on v7, because of this stupid
+> thing (which is now in scripts/Makefile.dtbsinst):
 > 
-> The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
-> different enough to merit its own driver. Also, this driver uses the
-> generic phy infrastructure.
+> +       $(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
+> +       $(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
+> +       $(Q)mkdir -p $(INSTALL_DTBS_PATH)
+> 
+> What gives any kernel installation target the right to move a directory
+> out of the way?
+> 
+> Let's say that you do this:
+> 
+> 	make install INSTALL_PATH=$sys_root/boot
+> 	make dtbs_install INSTALL_DTBS_PATH=$sys_root/boot
+> 
+> The result is that dtbs_install thinks it has the right to rename that
+> boot directory to boot.old, create a new one, and place the DTBs in
+> there, thereby leaving you with no kernel to boot - and if you run it
+> again, it _deletes_ the original directory.
+> 
+> No *other* kernel install target has this behaviour, not even 'make
+> modules_installl'.  This is stupid and dangerous behaviour.  At the
+> very least, this behaviour should be *well* documented.
 
-Hi,
+you are correct.  This should be fixed.
 
-the register set looks very similar to MXS one indeed. How is it different 
-please ?
+thx,
 
-The driver looks OK.
-
-Best regards,
-Marek Vasut
+Jason.
