@@ -1,629 +1,554 @@
-From: xuyiping@hisilicon.com (YiPing Xu)
-Date: Sat, 28 Mar 2015 08:58:41 +0800
-Subject: [PATCH v1 1/2] thermal: hisilicon: add new hisilicon thermal
- sensor driver
-In-Reply-To: <55151538.3020204@hisilicon.com>
-References: <1427269825-11324-1-git-send-email-kong.kongxinwei@hisilicon.com>
- <1427269825-11324-2-git-send-email-kong.kongxinwei@hisilicon.com>
- <5513CDEE.8000807@hisilicon.com> <55151538.3020204@hisilicon.com>
-Message-ID: <5515FCC1.2060302@hisilicon.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Sat, 28 Mar 2015 01:13:13 +0000
+Subject: [PATCH v3a 11/11] KVM: arm/arm64: rework MMIO abort handling to use
+ KVM MMIO bus
+In-Reply-To: <20150327160046.GB5121@cbox>
+References: <20150327160046.GB5121@cbox>
+Message-ID: <1427505193-32749-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2015/3/27 16:30, Xinwei Kong ??:
->
->
-> On 2015/3/26 17:14, YiPing Xu wrote:
->> ? 2015/3/25 15:50, Xinwei Kong ??:
->>> From: kongxinwei <kong.kongxinwei@hisilicon.com>
->>>
->>> This patch adds the support for hisilicon thermal sensor, within
->>> hisilicon SoC. there will register sensors for thermal framework
->>> and use device tree to bind cooling device.
->>>
->>> Signed-off-by: Leo Yan <leo.yan@linaro.org>
->>> Signed-off-by: kongxinwei <kong.kongxinwei@hisilicon.com>
->>> ---
->>>    drivers/thermal/Kconfig        |   8 +
->>>    drivers/thermal/Makefile       |   1 +
->>>    drivers/thermal/hisi_thermal.c | 526 +++++++++++++++++++++++++++++++++++++++++
->>>    3 files changed, 535 insertions(+)
->>>    create mode 100644 drivers/thermal/hisi_thermal.c
->>>
->>> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
->>> index af40db0..81aee01 100644
->>> --- a/drivers/thermal/Kconfig
->>> +++ b/drivers/thermal/Kconfig
->>> @@ -136,6 +136,14 @@ config THERMAL_EMULATION
->>>          because userland can easily disable the thermal policy by simply
->>>          flooding this sysfs node with low temperature values.
->>>
->>> +config HISI_THERMAL
->>> +    tristate "Hisilicon thermal driver"
->>> +    depends on ARCH_HISI && CPU_THERMAL && OF
->>> +    help
->>> +      Enable this to plug hisilicon's thermal sensor driver into the Linux
->>> +      thermal framework. cpufreq is used as the cooling device to throttle
->>> +      CPUs when the passive trip is crossed.
->>> +
->>>    config IMX_THERMAL
->>>        tristate "Temperature sensor driver for Freescale i.MX SoCs"
->>>        depends on CPU_THERMAL
->>> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
->>> index fa0dc48..08ae7ac 100644
->>> --- a/drivers/thermal/Makefile
->>> +++ b/drivers/thermal/Makefile
->>> @@ -39,3 +39,4 @@ obj-$(CONFIG_TI_SOC_THERMAL)    += ti-soc-thermal/
->>>    obj-$(CONFIG_INT340X_THERMAL)  += int340x_thermal/
->>>    obj-$(CONFIG_ST_THERMAL)    += st/
->>>    obj-$(CONFIG_TEGRA_SOCTHERM)    += tegra_soctherm.o
->>> +obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
->>> diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
->>> new file mode 100644
->>> index 0000000..8edf83a
->>> --- /dev/null
->>> +++ b/drivers/thermal/hisi_thermal.c
->>
->>     are you sure all the SOCs in hisilicon use the same thermal IP ?
->>
->>     if not, this driver should not use the "hisi_" prefix.
->
-> We can use this hisi thermal driver framework to satisfy diff thermal
-> IP, all of SoC will use this drvier by adding a struct about diff IP.
-> We may talk about hisi thermal diff IP how to satisfy this driver.
->
-> Thanks
-> Xinwei
->
->>
->>> @@ -0,0 +1,526 @@
->>> +/*
->>> + * Hisilicon thermal sensor driver
->>> + *
->>> + * Copyright (c) 2014-2015 Hisilicon Limited.
->>> + * Copyright (c) 2014-2015 Linaro Limited.
->>> + *
->>> + * Xinwei Kong <kong.kongxinwei@hisilicon.com>
->>> + * Leo Yan <leo.yan@linaro.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>> + * kind, whether express or implied; without even the implied warranty
->>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +
->>> +#include <linux/cpu_cooling.h>
->>> +#include <linux/cpufreq.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/device.h>
->>> +#include <linux/init.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/io.h>
->>> +#include <linux/kernel.h>
->>> +#include <linux/mfd/syscon.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_device.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/regmap.h>
->>> +#include <linux/slab.h>
->>> +#include <linux/thermal.h>
->>> +#include <linux/types.h>
->>> +
->>> +#include "thermal_core.h"
->>> +
->>> +#define TEMP0_LAG            (0x0)
->>> +#define TEMP0_TH            (0x4)
->>> +#define TEMP0_RST_TH            (0x8)
->>> +#define TEMP0_CFG            (0xC)
->>> +#define TEMP0_EN            (0x10)
->>> +#define TEMP0_INT_EN            (0x14)
->>> +#define TEMP0_INT_CLR            (0x18)
->>> +#define TEMP0_RST_MSK            (0x1C)
->>> +#define TEMP0_RAW_INT            (0x20)
->>> +#define TEMP0_MSK_INT            (0x24)
->>> +#define TEMP0_VALUE            (0x28)
->>> +
->>> +#define HISI_TEMP_BASE            (-60)
->>> +#define HISI_TEMP_RESET            (100000)
->>> +#define HISI_TEMP_PASSIVE        (85000)
->>> +
->>> +#define HISI_MAX_SENSORS        4
->>> +
->>> +struct hisi_thermal_sensor {
->>> +    struct hisi_thermal_data *thermal;
->>> +    struct thermal_zone_device *tzd;
->>> +    const struct thermal_trip *trip;
->>> +
->>> +    uint32_t id;
->>> +    uint32_t thres_temp, reset_temp;
->>> +};
->>> +
->>> +struct hisi_thermal_data {
->>> +    struct platform_device *pdev;
->>> +    struct clk *clk;
->>> +
->>> +    int irq, irq_bind_sensor;
->>> +    bool irq_enabled;
->>> +
->>> +    unsigned int sensors_num;
->>> +    long sensor_temp[HISI_MAX_SENSORS];
->>> +    struct hisi_thermal_sensor sensors[HISI_MAX_SENSORS];
->>> +
->>> +    void __iomem *regs;
->>> +};
->>> +
->>> +static DEFINE_SPINLOCK(thermal_lock);
->>> +
->>
->>     "thermal_lock" should be defined in "hisi_thermal_data" to support multi device instance.
->>
->
-> ok,good comments
->
->>> +/* in millicelsius */
->>> +static inline int _step_to_temp(int step)
->>> +{
->>> +    /*
->>> +     * Every step equals (1 * 200) / 255 celsius, and finally
->>> +     * need convert to millicelsius.
->>> +     */
->>> +    return (HISI_TEMP_BASE + (step * 200 / 255)) * 1000;
->>> +}
->>> +
->>> +static inline int _temp_to_step(int temp)
->>> +{
->>> +    return ((temp / 1000 - HISI_TEMP_BASE) * 255 / 200);
->>> +}
->>> +
->>> +static long hisi_thermal_get_sensor_temp(struct hisi_thermal_data *data,
->>> +                     struct hisi_thermal_sensor *sensor)
->>> +{
->>> +    unsigned long flags;
->>> +    int val;
->>> +
->>> +    spin_lock_irqsave(&thermal_lock, flags);
->>> +
->>> +    /* disable module firstly */
->>> +    writel(0x0, data->regs + TEMP0_EN);
->>> +
->>> +    /* select sensor id */
->>> +    writel((sensor->id << 12), data->regs + TEMP0_CFG);
->>> +
->>> +    /* enable module */
->>> +    writel(0x1, data->regs + TEMP0_EN);
->>> +
->>> +    mdelay(5);
->>> +
->>> +    val = readl(data->regs + TEMP0_VALUE);
->>> +    val = _step_to_temp(val);
->>> +
->>> +    /* adjust for negative value */
->>> +    val = (val < 0) ? 0 : val;
->>> +
->>> +    spin_unlock_irqrestore(&thermal_lock, flags);
->>> +
->>> +    return val;
->>> +}
->>> +
->>> +static void hisi_thermal_bind_irq(struct hisi_thermal_data *data)
->>> +{
->>> +    struct hisi_thermal_sensor *sensor;
->>> +    unsigned long flags;
->>> +
->>> +    sensor = &data->sensors[data->irq_bind_sensor];
->>> +
->>> +    spin_lock_irqsave(&thermal_lock, flags);
->>> +
->>> +    /* setting the hdak time */
->>> +    writel(0x0, data->regs + TEMP0_CFG);
->>> +
->>> +    /* disable module firstly */
->>> +    writel(0x0, data->regs + TEMP0_RST_MSK);
->>> +    writel(0x0, data->regs + TEMP0_EN);
->>> +
->>> +    /* select sensor id */
->>> +    writel((sensor->id << 12), data->regs + TEMP0_CFG);
->>> +
->>> +    /* enable for interrupt */
->>> +    writel(_temp_to_step(sensor->thres_temp)
->>> +            | 0x0FFFFFF00, data->regs + TEMP0_TH);
->>> +
->>> +    writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
->>> +
->>> +    /* enable module */
->>> +    writel(0x1, data->regs + TEMP0_RST_MSK);
->>> +    writel(0x1, data->regs + TEMP0_EN);
->>> +
->>> +    writel(0x0, data->regs + TEMP0_INT_CLR);
->>> +    writel(0x1, data->regs + TEMP0_INT_EN);
->>> +
->>> +    mdelay(5);
->>> +
->>> +    spin_unlock_irqrestore(&thermal_lock, flags);
->>> +
->>> +}
->>> +
->>> +static void hisi_thermal_enable_sensor(struct hisi_thermal_data *data)
->>> +{
->>> +    struct hisi_thermal_sensor *sensor;
->>> +    unsigned long flags;
->>> +
->>> +    sensor = &data->sensors[data->irq_bind_sensor];
->>> +
->>> +    spin_lock_irqsave(&thermal_lock, flags);
->>> +
->>> +    /* setting the hdak time */
->>> +    writel(0x0, data->regs + TEMP0_CFG);
->>> +
->>> +    /* disable module firstly */
->>> +    writel(0x0, data->regs + TEMP0_RST_MSK);
->>> +    writel(0x0, data->regs + TEMP0_EN);
->>> +
->>> +    /* select sensor id */
->>> +    writel((sensor->id << 12), data->regs + TEMP0_CFG);
->>> +
->>> +    /* enable for interrupt */
->>> +    writel(_temp_to_step(sensor->thres_temp)
->>> +            | 0x0FFFFFF00, data->regs + TEMP0_TH);
->>> +
->>> +    writel(_temp_to_step(HISI_TEMP_RESET), data->regs + TEMP0_RST_TH);
->>> +
->>> +    /* enable module */
->>> +    writel(0x1, data->regs + TEMP0_RST_MSK);
->>> +    writel(0x1, data->regs + TEMP0_EN);
->>> +
->>> +    writel(0x0, data->regs + TEMP0_INT_CLR);
->>> +    writel(0x1, data->regs + TEMP0_INT_EN);
->>> +
->>> +    mdelay(5);
->>> +
->>> +    spin_unlock_irqrestore(&thermal_lock, flags);
->>> +
+Currently we have struct kvm_exit_mmio for encapsulating MMIO abort
+data to be passed on from syndrome decoding all the way down to the
+VGIC register handlers. Now as we switch the MMIO handling to be
+routed through the KVM MMIO bus, it does not make sense anymore to
+use that structure already from the beginning. So we keep the data in
+local variables until we put them into the kvm_io_bus framework.
+Then we fill kvm_exit_mmio in the VGIC only, making it a VGIC private
+structure. On that way we replace the data buffer in that structure
+with a pointer pointing to a single location in a local variable, so
+we get rid of some copying on the way.
+With all of the virtual GIC emulation code now being registered with
+the kvm_io_bus, we can remove all of the old MMIO handling code and
+its dispatching functionality.
 
-       Why take a 5ms delay in spin_lock_irq context ?
+I didn't bother to rename kvm_exit_mmio (to vgic_mmio or something),
+because that touches a lot of code lines without any good reason.
 
-       Could we use mutex or other synchronization api here?
+This is based on an original patch by Nikolay.
 
-       For TEMP0_INT_EN, TEMP0_RST_MSK, we can use 
-disable_irq(THERM_IRQ) instead.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Cc: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+---
+Hi,
 
->>> +}
->>> +
->>> +static void hisi_thermal_disable_sensor(struct hisi_thermal_data *data)
->>> +{
->>> +    unsigned long flags;
->>> +
->>> +    spin_lock_irqsave(&thermal_lock, flags);
->>> +
->>> +    /* disable sensor module */
->>> +    writel(0x0, data->regs + );
->>> +    writel(0x0, data->regs + TEMP0_RST_MSK);
->>> +    writel(0x0, data->regs + TEMP0_EN);
->>> +
->>> +    spin_unlock_irqrestore(&thermal_lock, flags);
->>> +
->>> +}
->>> +
->>> +static int hisi_thermal_get_temp(void *_sensor, long *temp)
->>> +{
->>> +    struct hisi_thermal_sensor *sensor = _sensor;
->>> +    struct hisi_thermal_data *data = sensor->thermal;
->>> +
->>> +    int sensor_id = 0, i;
->>> +    long max_temp = 0;
->>> +
->>> +    *temp = hisi_thermal_get_sensor_temp(data, sensor);
->>> +
->>> +    data->sensor_temp[sensor->id] = *temp;
->>> +
->>> +    for (i = 0; i < HISI_MAX_SENSORS; i++) {
->>> +        if (data->sensor_temp[i] >= max_temp) {
->>> +            max_temp = data->sensor_temp[i];
->>> +            sensor_id = i;
->>> +        }
->>> +    }
->>> +
->>> +    data->irq_bind_sensor = sensor_id;
->>> +
->>> +    dev_dbg(&data->pdev->dev, "id=%d, irq=%d, temp=%ld, thres=%d\n",
->>> +        sensor->id, data->irq_enabled, *temp, sensor->thres_temp);
->>> +
->>> +    /*
->>> +     * Bind irq to sensor for two cases:
->>> +     *   Reenable alarm IRQ if temperature below threshold;
->>> +     *   if irq has been enabled, always set it;
->>> +     */
->>> +    if (!data->irq_enabled && max_temp < sensor->thres_temp) {
->>> +        data->irq_enabled = true;
->>> +        hisi_thermal_bind_irq(data);
->>> +    } else if (data->irq_enabled)
->>> +        hisi_thermal_bind_irq(data);
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static struct thermal_zone_of_device_ops hisi_of_thermal_ops = {
->>> +    .get_temp = hisi_thermal_get_temp,
->>> +};
->>> +
->>> +static irqreturn_t hisi_thermal_alarm_irq(int irq, void *dev)
->>> +{
->>> +    struct hisi_thermal_data *data = dev;
->>> +    unsigned long flags;
->>> +
->>> +    spin_lock_irqsave(&thermal_lock, flags);
->>> +
->>> +    /* disable interrupt */
->>> +    writel(0x0, data->regs + TEMP0_INT_EN);
->>> +    writel(0x1, data->regs + TEMP0_INT_CLR);
->>> +
->>> +    spin_unlock_irqrestore(&thermal_lock, flags);
->>> +    data->irq_enabled = false;
->>> +
->>> +    return IRQ_WAKE_THREAD;
->>> +}
->>> +
->>> +static irqreturn_t hisi_thermal_alarm_irq_thread(int irq, void *dev)
->>> +{
->>> +    struct hisi_thermal_data *data = dev;
->>> +    struct hisi_thermal_sensor *sensor;
->>> +    int i;
->>> +
->>> +    sensor = &data->sensors[data->irq_bind_sensor];
->>> +
->>> +    dev_crit(&data->pdev->dev, "THERMAL ALARM: T > %d\n",
->>> +         sensor->thres_temp / 1000);
->>> +
->>> +    for (i = 0; i < data->sensors_num; i++)
->>> +        thermal_zone_device_update(data->sensors[i].tzd);
->>> +
->>> +    return IRQ_HANDLED;
->>> +}
->>> +
->>> +static int hisi_thermal_init_sensor(struct platform_device *pdev,
->>> +                    struct device_node *np,
->>> +                    struct hisi_thermal_data *data,
->>> +                    int index)
->>> +{
->>> +    struct hisi_thermal_sensor *sensor;
->>> +    int ret, i;
->>> +
->>> +    sensor = &data->sensors[index];
->>> +
->>> +    ret = of_property_read_u32(np, "hisilicon,tsensor-id",
->>> +                    &sensor->id);
->>> +    if (ret) {
->>> +        dev_err(&pdev->dev, "failed to get id %d: %d\n", index, ret);
->>> +        return ret;
->>> +    }
->>> +
->>> +    sensor->thermal = data;
->>> +    sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev, sensor->id,
->>> +                sensor, &hisi_of_thermal_ops);
->>> +    if (IS_ERR(sensor->tzd)) {
->>> +        ret = PTR_ERR(sensor->tzd);
->>> +        dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
->>> +            sensor->id, ret);
->>> +        return ret;
->>> +    }
->>> +
->>> +    sensor->trip = of_thermal_get_trip_points(sensor->tzd);
->>> +
->>> +    for (i = 0; i < of_thermal_get_ntrips(sensor->tzd); i++) {
->>> +        if (sensor->trip[i].type == THERMAL_TRIP_PASSIVE) {
->>> +            sensor->thres_temp = sensor->trip[i].temperature;
->>> +            break;
->>> +        }
->>> +    }
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static int hisi_thermal_get_sensor_data(struct platform_device *pdev)
->>> +{
->>> +    struct hisi_thermal_data *data = platform_get_drvdata(pdev);
->>> +    struct device_node *np = pdev->dev.of_node;
->>> +    struct device_node *child_np;
->>> +    int ret, i, index;
->>> +
->>> +    /* sensor initialization */
->>> +    index = 0;
->>> +    for_each_child_of_node(np, child_np) {
->>> +
->>> +        if (index >= HISI_MAX_SENSORS) {
->>> +            dev_err(&pdev->dev, "unsupported sensor number\n");
->>> +            ret = -EINVAL;
->>> +            goto err_init_sensors;
->>> +        }
->>> +
->>> +        ret = hisi_thermal_init_sensor(pdev, child_np, data, index);
->>> +        if (ret)
->>> +            goto err_init_sensors;
->>> +
->>> +        index++;
->>> +    }
->>> +
->>> +    data->sensors_num = index;
->>> +    return 0;
->>> +
->>> +err_init_sensors:
->>> +    for (i = 0; i < index; i++)
->>> +        thermal_zone_of_sensor_unregister(&pdev->dev,
->>> +                data->sensors[i].tzd);
->>> +    return ret;
->>> +}
->>> +
->>> +static const struct of_device_id of_hisi_thermal_match[] = {
->>> +    { .compatible = "hisilicon,tsensor" },
->>> +    { /* end */ }
->>> +};
->>> +MODULE_DEVICE_TABLE(of, of_hisi_thermal_match);
->>> +
->>> +static void hisi_thermal_toggle_sensor(struct hisi_thermal_sensor *sensor,
->>> +                       bool on)
->>> +{
->>> +    struct thermal_zone_device *tzd = sensor->tzd;
->>> +
->>> +    tzd->ops->set_mode(tzd,
->>> +        on ? THERMAL_DEVICE_ENABLED : THERMAL_DEVICE_DISABLED);
->>> +}
->>> +
->>> +static int hisi_thermal_probe(struct platform_device *pdev)
->>> +{
->>> +    struct hisi_thermal_data *data;
->>> +    struct resource *res;
->>> +    int i;
->>> +    int ret;
->>> +
->>> +    data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->>> +    if (!data)
->>> +        return -ENOMEM;
->>> +
->>> +    data->pdev = pdev;
->>> +
->>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>> +    data->regs = devm_ioremap_resource(&pdev->dev, res);
->>> +    if (IS_ERR(data->regs)) {
->>> +        dev_err(&pdev->dev, "failed to get io address\n");
->>> +        return PTR_ERR(data->regs);
->>> +    }
->>> +
->>> +    data->irq = platform_get_irq(pdev, 0);
->>> +    if (data->irq < 0)
->>> +        return data->irq;
->>> +
->>> +    ret = devm_request_threaded_irq(&pdev->dev, data->irq,
->>> +            hisi_thermal_alarm_irq, hisi_thermal_alarm_irq_thread,
->>> +            0, "hisi_thermal", data);
->>> +    if (ret < 0) {
->>> +        dev_err(&pdev->dev, "failed to request alarm irq: %d\n", ret);
->>> +        return ret;
->>> +    }
->>> +
->>> +    platform_set_drvdata(pdev, data);
->>> +
->>> +    data->clk = devm_clk_get(&pdev->dev, "thermal_clk");
->>> +    if (IS_ERR(data->clk)) {
->>> +        ret = PTR_ERR(data->clk);
->>> +        if (ret != -EPROBE_DEFER)
->>> +            dev_err(&pdev->dev,
->>> +                "failed to get thermal clk: %d\n", ret);
->>> +        return ret;
->>> +    }
->>> +
->>> +    /* enable clock for thermal */
->>> +    ret = clk_prepare_enable(data->clk);
->>> +    if (ret) {
->>> +        dev_err(&pdev->dev, "failed to enable thermal clk: %d\n", ret);
->>> +        return ret;
->>> +    }
->>> +
->>> +    ret = hisi_thermal_get_sensor_data(pdev);
->>> +    if (ret) {
->>> +        dev_err(&pdev->dev, "failed to get sensor data\n");
->>> +        goto err_get_sensor_data;
->>> +        return ret;
->>> +    }
->>> +
->>> +    hisi_thermal_enable_sensor(data);
->>> +    data->irq_enabled = true;
->>> +
->>> +    for (i = 0; i < data->sensors_num; i++)
->>> +        hisi_thermal_toggle_sensor(&data->sensors[i], true);
->>> +
->>> +    return 0;
->>> +
->>> +err_get_sensor_data:
->>> +    clk_disable_unprepare(data->clk);
->>> +    return ret;
->>> +}
->>> +
->>> +static int hisi_thermal_remove(struct platform_device *pdev)
->>> +{
->>> +    struct hisi_thermal_data *data = platform_get_drvdata(pdev);
->>> +    int i;
->>> +
->>> +    for (i = 0; i < data->sensors_num; i++) {
->>> +        struct hisi_thermal_sensor *sensor = &data->sensors[i];
->>> +
->>> +        hisi_thermal_toggle_sensor(sensor, false);
->>> +        thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
->>> +    }
->>> +
->>> +    hisi_thermal_disable_sensor(data);
->>> +    clk_disable_unprepare(data->clk);
->>> +    return 0;
->>> +}
->>> +
->>> +#ifdef CONFIG_PM_SLEEP
->>> +static int hisi_thermal_suspend(struct device *dev)
->>> +{
->>> +    struct hisi_thermal_data *data = dev_get_drvdata(dev);
->>> +
->>> +    hisi_thermal_disable_sensor(data);
->>> +    data->irq_enabled = false;
->>> +
->>> +    clk_disable_unprepare(data->clk);
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static int hisi_thermal_resume(struct device *dev)
->>> +{
->>> +    struct hisi_thermal_data *data = dev_get_drvdata(dev);
->>> +
->>> +    clk_prepare_enable(data->clk);
->>> +
->>> +    data->irq_enabled = true;
->>> +    hisi_thermal_enable_sensor(data);
->>> +
->>> +    return 0;
->>> +}
->>> +#endif
->>> +
->>> +static SIMPLE_DEV_PM_OPS(hisi_thermal_pm_ops,
->>> +             hisi_thermal_suspend, hisi_thermal_resume);
->>> +
->>> +static struct platform_driver hisi_thermal_driver = {
->>> +    .driver = {
->>> +        .name    = "hisi_thermal",
->>> +        .owner  = THIS_MODULE,
->>> +        .pm    = &hisi_thermal_pm_ops,
->>> +        .of_match_table = of_hisi_thermal_match,
->>> +    },
->>> +    .probe        = hisi_thermal_probe,
->>> +    .remove        = hisi_thermal_remove,
->>> +};
->>> +
->>> +static int __init hisi_thermal_init(void)
->>> +{
->>> +    return platform_driver_register(&hisi_thermal_driver);
->>> +}
->>> +
->>> +static void __exit hisi_thermal_exit(void)
->>> +{
->>> +    platform_driver_unregister(&hisi_thermal_driver);
->>> +}
->>> +
->>> +late_initcall(hisi_thermal_init);
->>> +module_exit(hisi_thermal_exit);
->>> +
->>> +MODULE_AUTHOR("Xinwei Kong <kong.kongxinwei@hisilicon.com>");
->>> +MODULE_AUTHOR("Leo Yan <leo.yan@linaro.org>");
->>> +MODULE_DESCRIPTION("Hisilicon thermal driver");
->>> +MODULE_LICENSE("GPL v2");
->>>
->>
->>
->>
->> .
->>
->
->
-> .
->
+this is a new version of PATCH v3 11/11, which does not use kvm_run
+in the write case anymore. That should fix the problem that Marc and
+Christoffer mentioned. The trick is to not use a structure at all,
+but instead just pass on the needed values as parameters. By folding
+handle_kernel_mmio() into io_mem_abort() we save some code and avoid
+passing too many parameters.
+As this is the last patch and the only one changed, I just send out
+this one and rely on v3 for the other patches. If a complete respin
+on the list is preferred, let me know.
+
+Cheers,
+Andre.
+
+ arch/arm/include/asm/kvm_mmio.h   |   22 ---------
+ arch/arm/kvm/mmio.c               |   64 ++++++++++++++-----------
+ arch/arm64/include/asm/kvm_mmio.h |   22 ---------
+ include/kvm/arm_vgic.h            |    6 ---
+ virt/kvm/arm/vgic-v2-emul.c       |   21 +--------
+ virt/kvm/arm/vgic-v3-emul.c       |   35 --------------
+ virt/kvm/arm/vgic.c               |   93 ++++---------------------------------
+ virt/kvm/arm/vgic.h               |   13 ++++--
+ 8 files changed, 55 insertions(+), 221 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
+index 3f83db2..d8e90c8 100644
+--- a/arch/arm/include/asm/kvm_mmio.h
++++ b/arch/arm/include/asm/kvm_mmio.h
+@@ -28,28 +28,6 @@ struct kvm_decode {
+ 	bool sign_extend;
+ };
+ 
+-/*
+- * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
+- * which is an anonymous type. Use our own type instead.
+- */
+-struct kvm_exit_mmio {
+-	phys_addr_t	phys_addr;
+-	u8		data[8];
+-	u32		len;
+-	bool		is_write;
+-	void		*private;
+-};
+-
+-static inline void kvm_prepare_mmio(struct kvm_run *run,
+-				    struct kvm_exit_mmio *mmio)
+-{
+-	run->mmio.phys_addr	= mmio->phys_addr;
+-	run->mmio.len		= mmio->len;
+-	run->mmio.is_write	= mmio->is_write;
+-	memcpy(run->mmio.data, mmio->data, mmio->len);
+-	run->exit_reason	= KVM_EXIT_MMIO;
+-}
+-
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa);
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 5d3bfc0..974b1c6 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -121,12 +121,11 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	return 0;
+ }
+ 
+-static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+-		      struct kvm_exit_mmio *mmio)
++static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
+ {
+ 	unsigned long rt;
+-	int len;
+-	bool is_write, sign_extend;
++	int access_size;
++	bool sign_extend;
+ 
+ 	if (kvm_vcpu_dabt_isextabt(vcpu)) {
+ 		/* cache operation on I/O addr, tell guest unsupported */
+@@ -140,17 +139,15 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ 		return 1;
+ 	}
+ 
+-	len = kvm_vcpu_dabt_get_as(vcpu);
+-	if (unlikely(len < 0))
+-		return len;
++	access_size = kvm_vcpu_dabt_get_as(vcpu);
++	if (unlikely(access_size < 0))
++		return access_size;
+ 
+-	is_write = kvm_vcpu_dabt_iswrite(vcpu);
++	*is_write = kvm_vcpu_dabt_iswrite(vcpu);
+ 	sign_extend = kvm_vcpu_dabt_issext(vcpu);
+ 	rt = kvm_vcpu_dabt_get_rd(vcpu);
+ 
+-	mmio->is_write = is_write;
+-	mmio->phys_addr = fault_ipa;
+-	mmio->len = len;
++	*len = access_size;
+ 	vcpu->arch.mmio_decode.sign_extend = sign_extend;
+ 	vcpu->arch.mmio_decode.rt = rt;
+ 
+@@ -165,20 +162,20 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa)
+ {
+-	struct kvm_exit_mmio mmio;
+ 	unsigned long data;
+ 	unsigned long rt;
+ 	int ret;
++	bool is_write;
++	int len;
++	u8 data_buf[8];
+ 
+ 	/*
+-	 * Prepare MMIO operation. First stash it in a private
+-	 * structure that we can use for in-kernel emulation. If the
+-	 * kernel can't handle it, copy it into run->mmio and let user
+-	 * space do its magic.
++	 * Prepare MMIO operation. First decode the syndrome data we get
++	 * from the CPU. Then try if some in-kernel emulation feels
++	 * responsible, otherwise let user space do its magic.
+ 	 */
+-
+ 	if (kvm_vcpu_dabt_isvalid(vcpu)) {
+-		ret = decode_hsr(vcpu, fault_ipa, &mmio);
++		ret = decode_hsr(vcpu, &is_write, &len);
+ 		if (ret)
+ 			return ret;
+ 	} else {
+@@ -188,21 +185,34 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 
+ 	rt = vcpu->arch.mmio_decode.rt;
+ 
+-	if (mmio.is_write) {
+-		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt),
+-					       mmio.len);
++	if (is_write) {
++		data = vcpu_data_guest_to_host(vcpu, *vcpu_reg(vcpu, rt), len);
++
++		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
++		mmio_write_buf(data_buf, len, data);
+ 
+-		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, mmio.len,
+-			       fault_ipa, data);
+-		mmio_write_buf(mmio.data, mmio.len, data);
++		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, fault_ipa, len,
++				       data_buf);
+ 	} else {
+-		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, mmio.len,
++		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, len,
+ 			       fault_ipa, 0);
++
++		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, fault_ipa, len,
++				      data_buf);
+ 	}
+ 
+-	if (vgic_handle_mmio(vcpu, run, &mmio))
++	/* Now prepare kvm_run for the potential return to userland. */
++	run->mmio.is_write	= is_write;
++	run->mmio.phys_addr	= fault_ipa;
++	run->mmio.len		= len;
++	memcpy(run->mmio.data, data_buf, len);
++
++	if (!ret) {
++		/* We handled the access successfully in the kernel. */
++		kvm_handle_mmio_return(vcpu, run);
+ 		return 1;
++	}
+ 
+-	kvm_prepare_mmio(run, &mmio);
++	run->exit_reason	= KVM_EXIT_MMIO;
+ 	return 0;
+ }
+diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
+index 9f52beb..889c908 100644
+--- a/arch/arm64/include/asm/kvm_mmio.h
++++ b/arch/arm64/include/asm/kvm_mmio.h
+@@ -31,28 +31,6 @@ struct kvm_decode {
+ 	bool sign_extend;
+ };
+ 
+-/*
+- * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
+- * which is an anonymous type. Use our own type instead.
+- */
+-struct kvm_exit_mmio {
+-	phys_addr_t	phys_addr;
+-	u8		data[8];
+-	u32		len;
+-	bool		is_write;
+-	void		*private;
+-};
+-
+-static inline void kvm_prepare_mmio(struct kvm_run *run,
+-				    struct kvm_exit_mmio *mmio)
+-{
+-	run->mmio.phys_addr	= mmio->phys_addr;
+-	run->mmio.len		= mmio->len;
+-	run->mmio.is_write	= mmio->is_write;
+-	memcpy(run->mmio.data, mmio->data, mmio->len);
+-	run->exit_reason	= KVM_EXIT_MMIO;
+-}
+-
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index d6705f4..16ec2c8 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -140,8 +140,6 @@ struct vgic_params {
+ };
+ 
+ struct vgic_vm_ops {
+-	bool	(*handle_mmio)(struct kvm_vcpu *, struct kvm_run *,
+-			       struct kvm_exit_mmio *);
+ 	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
+ 	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
+ 	int	(*init_model)(struct kvm *);
+@@ -313,8 +311,6 @@ struct vgic_cpu {
+ 
+ struct kvm;
+ struct kvm_vcpu;
+-struct kvm_run;
+-struct kvm_exit_mmio;
+ 
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+ int kvm_vgic_hyp_init(void);
+@@ -330,8 +326,6 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
+-bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-		      struct kvm_exit_mmio *mmio);
+ 
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+index 7460b37..1390797 100644
+--- a/virt/kvm/arm/vgic-v2-emul.c
++++ b/virt/kvm/arm/vgic-v2-emul.c
+@@ -404,24 +404,6 @@ static const struct vgic_io_range vgic_dist_ranges[] = {
+ 	{}
+ };
+ 
+-static bool vgic_v2_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-				struct kvm_exit_mmio *mmio)
+-{
+-	unsigned long base = vcpu->kvm->arch.vgic.vgic_dist_base;
+-
+-	if (!is_in_range(mmio->phys_addr, mmio->len, base,
+-			 KVM_VGIC_V2_DIST_SIZE))
+-		return false;
+-
+-	/* GICv2 does not support accesses wider than 32 bits */
+-	if (mmio->len > 4) {
+-		kvm_inject_dabt(vcpu, mmio->phys_addr);
+-		return true;
+-	}
+-
+-	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_dist_ranges, base);
+-}
+-
+ static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+@@ -580,7 +562,6 @@ void vgic_v2_init_emulation(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	dist->vm_ops.handle_mmio = vgic_v2_handle_mmio;
+ 	dist->vm_ops.queue_sgi = vgic_v2_queue_sgi;
+ 	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
+ 	dist->vm_ops.init_model = vgic_v2_init_model;
+@@ -690,6 +671,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 	struct kvm_vcpu *vcpu, *tmp_vcpu;
+ 	struct vgic_dist *vgic;
+ 	struct kvm_exit_mmio mmio;
++	u32 data;
+ 
+ 	offset = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
+ 	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
+@@ -711,6 +693,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 
+ 	mmio.len = 4;
+ 	mmio.is_write = is_write;
++	mmio.data = &data;
+ 	if (is_write)
+ 		mmio_data_write(&mmio, ~0, *reg);
+ 	switch (attr->group) {
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index eb1a797..e9c3a7a 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -708,40 +708,6 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+ 	{},
+ };
+ 
+-/*
+- * This function splits accesses between the distributor and the two
+- * redistributor parts (private/SPI). As each redistributor is accessible
+- * from any CPU, we have to determine the affected VCPU by taking the faulting
+- * address into account. We then pass this VCPU to the handler function via
+- * the private parameter.
+- */
+-#define SGI_BASE_OFFSET SZ_64K
+-static bool vgic_v3_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-				struct kvm_exit_mmio *mmio)
+-{
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+-	unsigned long dbase = dist->vgic_dist_base;
+-	unsigned long rdbase = dist->vgic_redist_base;
+-	int nrcpus = atomic_read(&vcpu->kvm->online_vcpus);
+-	int vcpu_id;
+-
+-	if (is_in_range(mmio->phys_addr, mmio->len, dbase, GIC_V3_DIST_SIZE)) {
+-		return vgic_handle_mmio_range(vcpu, run, mmio,
+-					      vgic_v3_dist_ranges, dbase);
+-	}
+-
+-	if (!is_in_range(mmio->phys_addr, mmio->len, rdbase,
+-	    GIC_V3_REDIST_SIZE * nrcpus))
+-		return false;
+-
+-	vcpu_id = (mmio->phys_addr - rdbase) / GIC_V3_REDIST_SIZE;
+-	rdbase += (vcpu_id * GIC_V3_REDIST_SIZE);
+-	mmio->private = kvm_get_vcpu(vcpu->kvm, vcpu_id);
+-
+-	return vgic_handle_mmio_range(vcpu, run, mmio, vgic_redist_ranges,
+-				      rdbase);
+-}
+-
+ static bool vgic_v3_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ {
+ 	if (vgic_queue_irq(vcpu, 0, irq)) {
+@@ -861,7 +827,6 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 
+-	dist->vm_ops.handle_mmio = vgic_v3_handle_mmio;
+ 	dist->vm_ops.queue_sgi = vgic_v3_queue_sgi;
+ 	dist->vm_ops.add_sgi_source = vgic_v3_add_sgi_source;
+ 	dist->vm_ops.init_model = vgic_v3_init_model;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index e968179..b70174e 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -758,7 +758,6 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
+ 			       unsigned long offset,
+ 			       const struct vgic_io_range *range)
+ {
+-	u32 *data32 = (void *)mmio->data;
+ 	struct kvm_exit_mmio mmio32;
+ 	bool ret;
+ 
+@@ -775,70 +774,17 @@ static bool call_range_handler(struct kvm_vcpu *vcpu,
+ 	mmio32.private = mmio->private;
+ 
+ 	mmio32.phys_addr = mmio->phys_addr + 4;
+-	if (mmio->is_write)
+-		*(u32 *)mmio32.data = data32[1];
++	mmio32.data = &((u32 *)mmio->data)[1];
+ 	ret = range->handle_mmio(vcpu, &mmio32, offset + 4);
+-	if (!mmio->is_write)
+-		data32[1] = *(u32 *)mmio32.data;
+ 
+ 	mmio32.phys_addr = mmio->phys_addr;
+-	if (mmio->is_write)
+-		*(u32 *)mmio32.data = data32[0];
++	mmio32.data = &((u32 *)mmio->data)[0];
+ 	ret |= range->handle_mmio(vcpu, &mmio32, offset);
+-	if (!mmio->is_write)
+-		data32[0] = *(u32 *)mmio32.data;
+ 
+ 	return ret;
+ }
+ 
+ /**
+- * vgic_handle_mmio_range - handle an in-kernel MMIO access
+- * @vcpu:	pointer to the vcpu performing the access
+- * @run:	pointer to the kvm_run structure
+- * @mmio:	pointer to the data describing the access
+- * @ranges:	array of MMIO ranges in a given region
+- * @mmio_base:	base address of that region
+- *
+- * returns true if the MMIO access could be performed
+- */
+-bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-			    struct kvm_exit_mmio *mmio,
+-			    const struct vgic_io_range *ranges,
+-			    unsigned long mmio_base)
+-{
+-	const struct vgic_io_range *range;
+-	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+-	bool updated_state;
+-	unsigned long offset;
+-
+-	offset = mmio->phys_addr - mmio_base;
+-	range = vgic_find_range(ranges, mmio->len, offset);
+-	if (unlikely(!range || !range->handle_mmio)) {
+-		pr_warn("Unhandled access %d %08llx %d\n",
+-			mmio->is_write, mmio->phys_addr, mmio->len);
+-		return false;
+-	}
+-
+-	spin_lock(&vcpu->kvm->arch.vgic.lock);
+-	offset -= range->base;
+-	if (vgic_validate_access(dist, range, offset)) {
+-		updated_state = call_range_handler(vcpu, mmio, offset, range);
+-	} else {
+-		if (!mmio->is_write)
+-			memset(mmio->data, 0, mmio->len);
+-		updated_state = false;
+-	}
+-	spin_unlock(&vcpu->kvm->arch.vgic.lock);
+-	kvm_prepare_mmio(run, mmio);
+-	kvm_handle_mmio_return(vcpu, run);
+-
+-	if (updated_state)
+-		vgic_kick_vcpus(vcpu->kvm);
+-
+-	return true;
+-}
+-
+-/**
+  * vgic_handle_mmio_access - handle an in-kernel MMIO access
+  * This is called by the read/write KVM IO device wrappers below.
+  * @vcpu:	pointer to the vcpu performing the access
+@@ -873,23 +819,24 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	mmio.phys_addr = addr;
+ 	mmio.len = len;
+ 	mmio.is_write = is_write;
+-	if (is_write)
+-		memcpy(mmio.data, val, len);
++	mmio.data = val;
+ 	mmio.private = iodev->redist_vcpu;
+ 
+ 	spin_lock(&dist->lock);
+ 	offset -= range->base;
+ 	if (vgic_validate_access(dist, range, offset)) {
+ 		updated_state = call_range_handler(vcpu, &mmio, offset, range);
+-		if (!is_write)
+-			memcpy(val, mmio.data, len);
+ 	} else {
+ 		if (!is_write)
+ 			memset(val, 0, len);
+ 		updated_state = false;
+ 	}
+ 	spin_unlock(&dist->lock);
+-	kvm_prepare_mmio(run, &mmio);
++	run->mmio.is_write	= is_write;
++	run->mmio.len		= len;
++	run->mmio.phys_addr	= addr;
++	memcpy(run->mmio.data, val, len);
++
+ 	kvm_handle_mmio_return(vcpu, run);
+ 
+ 	if (updated_state)
+@@ -898,30 +845,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
+ 
+-/**
+- * vgic_handle_mmio - handle an in-kernel MMIO access for the GIC emulation
+- * @vcpu:      pointer to the vcpu performing the access
+- * @run:       pointer to the kvm_run structure
+- * @mmio:      pointer to the data describing the access
+- *
+- * returns true if the MMIO access has been performed in kernel space,
+- * and false if it needs to be emulated in user space.
+- * Calls the actual handling routine for the selected VGIC model.
+- */
+-bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-		      struct kvm_exit_mmio *mmio)
+-{
+-	if (!irqchip_in_kernel(vcpu->kvm))
+-		return false;
+-
+-	/*
+-	 * This will currently call either vgic_v2_handle_mmio() or
+-	 * vgic_v3_handle_mmio(), which in turn will call
+-	 * vgic_handle_mmio_range() defined above.
+-	 */
+-	return vcpu->kvm->arch.vgic.vm_ops.handle_mmio(vcpu, run, mmio);
+-}
+-
+ static int vgic_handle_mmio_read(struct kvm_vcpu *vcpu,
+ 				 struct kvm_io_device *this,
+ 				 gpa_t addr, int len, void *val)
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index 28fa3aa..0df74cb 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -59,6 +59,14 @@ void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq);
+ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu);
+ 
++struct kvm_exit_mmio {
++	phys_addr_t	phys_addr;
++	void		*data;
++	u32		len;
++	bool		is_write;
++	void		*private;
++};
++
+ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+ 		     phys_addr_t offset, int mode);
+ bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+@@ -99,11 +107,6 @@ const
+ struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
+ 				      int len, gpa_t offset);
+ 
+-bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
+-			    struct kvm_exit_mmio *mmio,
+-			    const struct vgic_io_range *ranges,
+-			    unsigned long mmio_base);
+-
+ bool vgic_handle_enable_reg(struct kvm *kvm, struct kvm_exit_mmio *mmio,
+ 			    phys_addr_t offset, int vcpu_id, int access);
+ 
+-- 
+1.7.9.5
