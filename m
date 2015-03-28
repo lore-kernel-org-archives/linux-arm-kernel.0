@@ -1,141 +1,67 @@
-From: dobatog@gmail.com (Gabriel Dobato)
-Date: Sat, 28 Mar 2015 21:47:20 +0100
-Subject: Ask for help: ARM: mvebu: add NAND support for dove
-Message-ID: <55171358.5070200@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 28 Mar 2015 22:38:24 +0100
+Subject: [PATCH 4/8] pcmcia: pxa2xx: convert memory allocation to devm_*
+ API
+In-Reply-To: <E1Yb5t5-0006I8-Oi@rmk-PC.arm.linux.org.uk> (Russell King's
+ message of "Thu, 26 Mar 2015 11:23:47 +0000")
+References: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
+ <E1Yb5t5-0006I8-Oi@rmk-PC.arm.linux.org.uk>
+Message-ID: <87zj6wvm3z.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Russell King <rmk+kernel@arm.linux.org.uk> writes:
 
-I am trying to set the Nand in a CM-510 Compulab based board (4.0-rc5).
+> Convert the pxa2xx socket driver memory allocation to use devm_kzalloc()
+> to simplify the cleanup path.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/pcmcia/pxa2xx_base.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
+> index 197c77a64ce0..dfcf07828605 100644
+> --- a/drivers/pcmcia/pxa2xx_base.c
+> +++ b/drivers/pcmcia/pxa2xx_base.c
+> @@ -302,7 +302,8 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+>  
+>  	pxa2xx_drv_pcmcia_ops(ops);
+>  
+> -	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
+> +	sinfo = devm_kzalloc(&pdev->dev, SKT_DEV_INFO_SIZE(ops->nr),
+There is a typo here : &pdev->dev should be &dev->dev.
 
-As pxa3xx-nand driver supports NFCv1 (PXA3xx) and NFCv2 (Armada 370/XP), 
-  I think that it should work more or less with Dove SoC (NFCv1) that is 
-similar enough.
+Now given that fix, you can add my :
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Until now, I've only added the correspondent node in dove.dtsi and the 
-partitions in dove-cm-a510.dts ( it should be updated in the patch 
-series that Sebastian Hesselbarth submitted ) :
+This test of mine is rather cheap :
+ - it relies on 4.0-rc4
+ - I don't have any PCMCIA card to insert in the lubbock, hence the "cheap"
+ - I judge that pcmcia is working because :
+   - cat /proc/iomem gives:
+     10000000-10001fff : sa1111
+       10000400-100005ff : 0400
+       10000800-100009ff : 0800
+       10000a00-10000bff : 0a00
+         10000a00-10000bff : sa1111-ps2
+       10000c00-10000dff : 0c00
+         10000c00-10000dff : sa1111-ps2
+       10001600-100017ff : irq
+       10001800-100019ff : 1800
+         10001800-100019ff : sa1111-pcmcia
+    - I don't see any error message in kernel log
 
----
-  arch/arm/boot/dts/dove-cm-a510.dts | 17 +++++++++++++++++
-  arch/arm/boot/dts/dove.dtsi        | 16 ++++++++++++++++
-  2 files changed, 33 insertions(+)
+As a side note mainly to myself, the pcmcia is broken on pxa2xx architectures
+and panics the kernel at boot time because :
+ - in drivers/pcmcia/sa1111_lubbock.c I see :
+   pcmcia_lubbock_init()
+     pxa2xx_configure_sockets(&sadev->dev);
+       here it is expected that platform_data contains the pcmcia ops, but it's
+       NULL, and the dereferencing in pxa2xx_configure_sockets() of ops->first
+       panics.
 
-diff --git a/arch/arm/boot/dts/dove-cm-a510.dts 
-b/arch/arm/boot/dts/dove-cm-a510.dts
-index 50c0d69..36cf10d 100644
---- a/arch/arm/boot/dts/dove-cm-a510.dts
-+++ b/arch/arm/boot/dts/dove-cm-a510.dts
-@@ -36,3 +36,20 @@
-  &i2c0 {
-           status = "okay";
-  };
-+
-+&nand  {
-+          status = "okay";
-+          num-cs = <1>;
-+          partition at 0 {
-+                 label = "uImage";
-+                 reg = <0x000000000000 0x000000400000>;
-+          };
-+          partition at 400000 {
-+                 label = "Rootfs";
-+                 reg = <0x000000400000 0x00001FC00000>;
-+          };
-+};
-+
-+
-+
-+
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index a5441d5..7e71f45 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -380,6 +380,22 @@
-                                 status = "disabled";
-                         };
+Cheers.
 
-+                       nand: nand at c0000 {
-+                                compatible = "marvell,armada370-nand";
-+                                #address-cells = <1>;
-+                                #size-cells = <1>;
-+                                reg= <0xc0000 0x60>;
-+                                interrupts = <3>;
-+                                clocks = <&core_clk 0>;
-+                                pinctrl-0 = <&pmx_nand>;
-+                                pinctrl-names = "default";
-+                                marvell,nand-keep-config;
-+                                marvell,nand-enable-arbiter;
-+                                nand-on-flash-bbt;
-+                        };
-+
-+
-+
-                         thermal: thermal-diode at d001c {
-                                 compatible = "marvell,dove-thermal";
-                                 reg = <0xd001c 0x0c>, <0xd005c 0x08>;
 -- 
-1.9.1
-
-
-Int the boot trace, the Nand is detected:
-
-...
-brd: module loaded
-loop: module loaded
-mtip32xx Version 1.3.1
-pxa3xx-nand f10c0000.nand: This platform can't do DMA on this device
-nand: device found, Manufacturer ID: 0xec, Chip ID: 0xdc
-nand: Samsung NAND 512MiB 3,3V 8-bit
-nand: 512 MiB, SLC, erase size: 128 KiB, page size: 2048, OOB size: 64
-pxa3xx-nand f10c0000.nand: ECC strength 16, ECC step size 2048
-Scanning device for bad blocks
-random: nonblocking pool is initialized
-Bad eraseblock 1692 at 0x00000d380000
-Bad eraseblock 2395 at 0x000012b60000
-Bad eraseblock 3877 at 0x00001e4a0000
-2 ofpart partitions found on MTD device pxa3xx_nand-0
-Creating 2 MTD partitions on "pxa3xx_nand-0":
-0x000000000000-0x000020000000 : "uImage"
-0x000000400000-0x000020000000 : "rootfs"
-jme: JMicron JMC2XX ethernet driver version 1.0.8
-libphy: orion_mdio_bus: probed
-mv643xx_eth: MV-643xx 10/100/1000 ethernet driver version 1.4
-mv643xx_eth_port mv643xx_eth_port.0 eth0: port 0 with MAC address 
-00:01:c0:15:83:8e
-usbcore: registered new interface driver smsc95xx
-...
-
-root at debug:~# cat /proc/mtd
-dev:    size   erasesize  name
-mtd0: 20000000 00020000 "uImage"
-mtd1: 1fc00000 00020000 "rootfs"
-
-....
-
-
-However, if I try to read/write into the mtd partitions, I can not, 
-there are errors:
-
-root at debug:~# nandwrite -p /dev/mtd0 /uImage
-Writing at 0x00000000
-pxa3xx-nand f10c0000.nand: Wait time out!!!
-
-root at debug:~# flash_erase /dev/mtd0 0 0
-Erasing 128 Kibyte @ 0 --  0 % complete pxa3xx-nand f10c0000.nand: Wait 
-time out!!!
-
-root at debug:~# cat /dev/mtd0
-pxa3xx-nand f10c0000.nand: Wait time out!!!
-
-
-
-AFAIK, the clock frequency of Dove Nand controller is different, so 
-maybe is necessary to adapt timings... and I suppose something else...
-
-I really appreciate any kind of help or advise .
-
-Thank you.
-
-Gabriel Dobato
+Robert
