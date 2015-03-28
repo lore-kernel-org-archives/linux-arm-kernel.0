@@ -1,119 +1,58 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sat, 28 Mar 2015 15:01:38 +0100
-Subject: [PATCH V2] ARM: BCM5301X: Add DT for Asus RT-AC68U
-In-Reply-To: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
-References: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1427551298-25048-1-git-send-email-zajec5@gmail.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 28 Mar 2015 12:34:09 +0000
+Subject: [PATCH v10 00/21] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <20150325113839.GD24636@arm.com>
+References: <1426077587-1561-1-git-send-email-hanjun.guo@linaro.org>
+ <20150324220253.9595AC407F8@trevor.secretlab.ca>
+ <20150325112410.GA24636@arm.com> <2694196.2XPpkm7uxF@vostro.rjw.lan>
+ <20150325113839.GD24636@arm.com>
+Message-ID: <20150328123409.95225C4079E@trevor.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts | 83 +++++++++++++++++++++++++++++
- 2 files changed, 84 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+On Wed, 25 Mar 2015 11:38:43 +0000
+, Will Deacon <will.deacon@arm.com>
+ wrote:
+> On Wed, Mar 25, 2015 at 11:54:25AM +0000, Rafael J. Wysocki wrote:
+> > On Wednesday, March 25, 2015 11:24:11 AM Will Deacon wrote:
+> > > On Tue, Mar 24, 2015 at 10:02:53PM +0000, Grant Likely wrote:
+> > > > On Thu, 19 Mar 2015 19:39:27 +0000 , Will Deacon <will.deacon@arm.com>
+> > > > wrote:
+> > > > > On Thu, Mar 19, 2015 at 10:17:27AM +0000, Lorenzo Pieralisi wrote:
+> > > > > > Not only that, Sudeep has a patch to consolidate DT and ACPI SMP code,
+> > > > > > I am working on it, I do not think it should be a blocking point, patch
+> > > > > > coming asap on top of your series.
+> > > > > 
+> > > > > Well, I don't really want to merge the series without those patches so I
+> > > > > do think it blocks the code from getting into mainline.
+> > > > 
+> > > > Really? It's a pretty minor duplication problem and it's been identified
+> > > > as something requiring refactoring to both the ACPI and DT code. It
+> > > > isn't at all dangerous. Why is this a blocking point?
+> > > 
+> > > Because I don't really see a valid excuse not to get this right first time
+> > > around. Lorenzo already has patches on top, so we just need a co-ordinated
+> > > review effort.
+> > > 
+> > > I wouldn't accept another patch series that needed minor rework (which by
+> > > its very nature is easily addressed), so why should ACPI be treated any
+> > > differently?
+> > 
+> > Not ACPI, but this particular patchset I think.  The problem is that it has
+> > already been reviewed and ACKed by multiple people and it would be a shame
+> > to require all of those people to do their reviews once again because of
+> > that minor rework (which arguably can be done on top of the patchset just
+> > fine).
+> > 
+> > Of course, if the minor rework in question would not involve the need to
+> > review things once again, then I agree that it'd be better to do it upfront,
+> > but otherwise there's a good reason not to.
+> 
+> Aha, I think this is just a misunderstanding -- I'm certainly not suggesting
+> that Hanjun rework the current set! What I *am* asking for is that they go
+> into mainline with Lorenzo's patches on top, which means that his series [1]
+> needs some review (and I plan to look at it later today).
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4e1b387..7c1ca2a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b.dtb \
- 	bcm2835-rpi-b-plus.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
-+	bcm4708-asus-rt-ac68u.dtb \
- 	bcm4708-buffalo-wzr-1750dhp.dtb \
- 	bcm4708-luxul-xwc-1000.dtb \
- 	bcm4708-netgear-r6250.dtb \
-diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-new file mode 100644
-index 0000000..8b62836
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
-@@ -0,0 +1,83 @@
-+/*
-+ * Broadcom BCM470X / BCM5301X ARM platform code.
-+ * DTS for Asus RT-AC68U
-+ *
-+ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
-+ *
-+ * Licensed under the GNU/GPL. See COPYING for details.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm4708.dtsi"
-+
-+/ {
-+	compatible = "asus,rt-ac68u", "brcm,bcm4708";
-+	model = "Asus RT-AC68U (BCM4708)";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		usb2 {
-+			label = "bcm53xx:blue:usb2";
-+			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+
-+		power {
-+			label = "bcm53xx:blue:power";
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		logo {
-+			label = "bcm53xx:white:logo";
-+			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		usb3 {
-+			label = "bcm53xx:blue:usb3";
-+			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger = "default-off";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		brightness {
-+			label = "Backlight";
-+			linux,code = <KEY_BRIGHTNESS_ZERO>;
-+			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		restart {
-+			label = "Reset";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		rfkill {
-+			label = "WiFi";
-+			linux,code = <KEY_RFKILL>;
-+			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
--- 
-1.8.4.5
+Okay, thanks for the clarification.
+
+g.
