@@ -1,71 +1,48 @@
-From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
-Date: Sat, 28 Mar 2015 12:37:44 +0200
-Subject: [PATCH] crypto/arm: accelerated SHA-512 using ARM generic ASM
- and NEON
-In-Reply-To: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <55168478.4030202@iki.fi>
+From: ipaton0@gmail.com (Iain Paton)
+Date: Sat, 28 Mar 2015 11:53:06 +0000
+Subject: [PATCH] sunxi: a10-lime: add regulator nodes
+In-Reply-To: <551538AB.50207@redhat.com>
+References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
+Message-ID: <55169622.5070007@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.03.2015 09:28, Ard Biesheuvel wrote:
-> This updates the SHA-512 NEON module with the faster and more
-> versatile implementation from the OpenSSL project. It consists
-> of both a NEON and a generic ASM version of the core SHA-512
-> transform, where the NEON version reverts to the ASM version
-> when invoked in non-process context.
+On 27/03/15 11:02, Hans de Goede wrote:
+> Hi Iain,
 > 
-> Performance relative to the generic implementation (measured
-> using tcrypt.ko mode=306 sec=1 running on a Cortex-A57 under
-> KVM):
+> On 27-03-15 11:58, Iain Paton wrote:
+>> add pmic regulator definitions matching the manufacturers 3.4.x fex
+>> file.
+>>
+>> Signed-off-by: Iain Paton <ipaton0@gmail.com>
+>> ---
+>>
+>> As this file belongs to Hans and he decided not to use axp209.dtsi in
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
+>> then I won't add it here.
 > 
-> 	input size	block size	asm	neon	old neon
+> That was because using it was breaking stuff, but now that we know better
+> which regulators are used for what, and which one we most add an always-on;
+> property too, I would greatly prefer you to acually use axp209.dtsi, see
+> e.g. the sun5i-a13-utoo-p66.dts file where I'm using it.
 > 
-> 	16		16		1.39	2.54	2.21
-> 	64		16		1.32	2.33	2.09
-> 	64		64		1.38	2.53	2.19
-> 	256		16		1.31	2.28	2.06
-> 	256		64		1.38	2.54	2.25
-> 	256		256		1.40	2.77	2.39
-> 	1024		16		1.29	2.22	2.01
-> 	1024		256		1.40	2.82	2.45
-> 	1024		1024		1.41	2.93	2.53
-> 	2048		16		1.33	2.21	2.00
-> 	2048		256		1.40	2.84	2.46
-> 	2048		1024		1.41	2.96	2.55
-> 	2048		2048		1.41	2.98	2.56
-> 	4096		16		1.34	2.20	1.99
-> 	4096		256		1.40	2.84	2.46
-> 	4096		1024		1.41	2.97	2.56
-> 	4096		4096		1.41	3.01	2.58
-> 	8192		16		1.34	2.19	1.99
-> 	8192		256		1.40	2.85	2.47
-> 	8192		1024		1.41	2.98	2.56
-> 	8192		4096		1.41	2.71	2.59
-> 	8192		8192		1.51	3.51	2.69
+> Can you please respin this patch using axp209.dtsi?
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This should get the same treatment as Sami's sha56 version: I would like
-> to wait until the OpenSSL source file hits the upstream repository so that
-> I can refer to its sha1 hash in the commit log.
-> 
->  arch/arm/crypto/Kconfig               |    2 -
->  arch/arm/crypto/Makefile              |    8 +-
->  arch/arm/crypto/sha512-armv4.pl       |  656 ++++++++++++
->  arch/arm/crypto/sha512-armv7-neon.S   |  455 ---------
->  arch/arm/crypto/sha512-core.S_shipped | 1814 +++++++++++++++++++++++++++++++++
->  arch/arm/crypto/sha512.h              |   14 +
->  arch/arm/crypto/sha512_glue.c         |  255 +++++
->  arch/arm/crypto/sha512_neon_glue.c    |  155 +--
->  8 files changed, 2762 insertions(+), 597 deletions(-)
->  create mode 100644 arch/arm/crypto/sha512-armv4.pl
->  delete mode 100644 arch/arm/crypto/sha512-armv7-neon.S
+> Also please do not add nodes for unused regulators, like the ldo-s for the csi-s.
 
-Acked-by: Jussi Kivilinna <jussi.kivilinna@iki.fi>
+You would prefer that the csi is broken on the lime then?  Unlike the cubieboards, 
+ldo3 & ldo4 really are used on the olimex boards. So it seems that as yet you still 
+don't know enough about which regulators are used, or you wouldn't be asking for 
+that.
 
->  create mode 100644 arch/arm/crypto/sha512-core.S_shipped
->  create mode 100644 arch/arm/crypto/sha512.h
->  create mode 100644 arch/arm/crypto/sha512_glue.c
-> 
+That's the major disadvantage of axp209.dtsi, the regulator node isn't describing 
+the pmic at all. Instead it's describing the stuff connected to the pmic outputs, 
+which is undeniably board specific and therefore totally unsuitable for a generic
+file. Leading to every board needing to override everything regardless.
+
+So no, I'm not going to respin the patch. I strongly believe using axp209.dtsi is 
+the wrong thing to do here.
+If that means the patch doesn't make it in, then so be it.
+
+Rgds,
+Iain
