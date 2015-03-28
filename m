@@ -1,54 +1,108 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 27 Mar 2015 22:24:22 -0600
-Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
-In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <1427516662.3643.906.camel@redhat.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Sat, 28 Mar 2015 15:00:56 +0800
+Subject: [RESEND PATCH v3] mtd: hisilicon: add device tree node for NAND
+ controller
+In-Reply-To: <20150327173504.GY32500@ld-irv-0074>
+References: <1427267091-227474-1-git-send-email-wangzhou1@hisilicon.com>
+ <20150327173504.GY32500@ld-irv-0074>
+Message-ID: <551651A8.3030307@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-03-26 at 13:43 +0100, Joerg Roedel wrote:
-> Changes v1-v2:
+On 2015/3/28 1:35, Brian Norris wrote:
+> This would go through your arm-soc submaintainer; i.e., Wei Xu
 > 
-> 	* Rebased to v4.0-rc5
-> 	* Converted domain-types to a bit-field
-> 
-> Hi,
-> 
-> here is patch-set to replace the existing domain_init and
-> domain_destroy iommu-ops with the new domain_alloc and
-> domain_free callbacks
-> 
-> The new callbacks move the allocation of iommu domains into
-> the iommu driver, allowing them to put a generic
-> iommu_domain struct into their own domain struct. This makes
-> domain handling in the drivers more cache efficient and
-> prepares the introduction of default domains in another
-> patch-set.
-> 
-> While at it, this patch-set also introduces domain types.
-> These are internal to the iommu core code for now, there are
-> three of them:
-> 
-> 	* DMA-API domains
-> 	* Identity mapped domains
-> 	* Domains unmanaged by the iommu-core, used for
-> 	  iommu-api so that the users can create their own
-> 	  mappings
-> 
-> The patches have been compile tested for x86, ARM and PPC
-> and runtime tested on x86 (Intel VT-d and AMD IOMMU).
-> 
-> Please review.
+> But FWIW...
 
-For 1-5,16
+Yes, I will ping him to check the patch.
 
-Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
+> 
+> On Wed, Mar 25, 2015 at 03:04:51PM +0800, Zhou Wang wrote:
+>> This patch adds dts support for NAND flash controller of Hisilicon Soc Hip04.
+>> Now it is based on v4.0-rc5
+>>
+>> Changes in v3:
+>> - Change E-mail address in signed-off-by to "wangzhou1 at hisilicon.com"
+>> Changes in v2:
+>> - Base on v3.19-rc1
+>> - Use nand-ecc-strength, nand-ecc-step-size to replace hisi,nand-ecc-bits
+>> Changes in v1:
+>> - Move partition and other board related information into board dts file:
+>>   hip04-d01.dts
+>>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>> ---
+>>  arch/arm/boot/dts/hip04-d01.dts | 27 +++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/hip04.dtsi    |  7 +++++++
+>>  2 files changed, 34 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/hip04-d01.dts b/arch/arm/boot/dts/hip04-d01.dts
+>> index 40a9e33..ba04dd5 100644
+>> --- a/arch/arm/boot/dts/hip04-d01.dts
+>> +++ b/arch/arm/boot/dts/hip04-d01.dts
+>> @@ -28,5 +28,32 @@
+>>  		uart0: uart at 4007000 {
+>>  			status = "ok";
+>>  		};
+>> +
+>> +		nand: nand at 4020000 {
+>> +			nand-bus-width = <8>;
+>> +			nand-ecc-mode = "hw";
+>> +			nand-ecc-strength = <16>;
+>> +			nand-ecc-step-size = <1024>;
+>> +
+>> +			partition at 0 {
+>> +				label = "nand_text";
+>> +				reg = <0x00000000 0x00400000>;
+>> +			};
+>> +
+>> +			partition at 00400000 {
+>> +				label = "nand_monitor";
+>> +				reg = <0x00400000 0x00400000>;
+>> +			};
+>> +
+>> +			partition at 00800000 {
+>> +				label = "nand_kernel";
+>> +				reg = <0x00800000 0x00800000>;
+>> +			};
+>> +
+>> +			partition at 01000000 {
+>> +				label = "nand_fs";
+>> +				reg = <0x01000000 0x1f000000>;
+>> +			};
+>> +		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
+>> index 2388145..ac32fce 100644
+>> --- a/arch/arm/boot/dts/hip04.dtsi
+>> +++ b/arch/arm/boot/dts/hip04.dtsi
+>> @@ -269,6 +269,13 @@
+>>  			interrupts = <0 372 4>;
+>>  		};
+>>  
+>> +		nand: nand at 4020000 {
+>> +			compatible = "hisilicon,504-nfc";
+>> +			reg = <0x4020000 0x10000>, <0x5000000 0x1000>;
+>> +			interrupts = <0 379 4>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +		};
+> 
+> Seems reasonable and matches the binding we already accepted, so:
+> 
+> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+> 
 
-My only comment/question is whether you'd want to consider using
-ERR_PTR() return values from domain_alloc().  It's an alloc functions,
-so NULL == -ENOMEM is pretty standard, but we could at least have the
-interface to the iommu driver return more info even if we continue to
-mask that as NULL out to the IOMMU API users for now.  Thanks,
+Thanks,
+Zhou
 
-Alex
+>>  	};
+>>  
+>>  	etb at 0,e3c42000 {
+>> -- 
+>> 1.9.1
+>>
+> 
+> .
+> 
