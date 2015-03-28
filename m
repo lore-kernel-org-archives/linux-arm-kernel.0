@@ -1,74 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 28 Mar 2015 09:02:29 -0700
-Subject: [GIT PULL 1/2] omap non-urgent fixes for v4.1
-Message-ID: <pull-1427494738-793290>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sat, 28 Mar 2015 17:37:05 +0100
+Subject: [PATCH] clk: samsung: exynos4: Disable ARMCLK down feature on
+ Exynos4210 SoC
+In-Reply-To: <1430933.sM2tQimLcT@amdc1032>
+References: <1430933.sM2tQimLcT@amdc1032>
+Message-ID: <CAJKOXPc_M=rY0aYpE_bhfa6Ku-E09UZ5YXXF3uH9ENTbPJsqMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+2015-03-27 17:27 GMT+01:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> Commit 42773b28e71d ("clk: samsung: exynos4: Enable ARMCLK
+> down feature") enabled ARMCLK down feature on all Exynos4
+> SoCs.  Unfortunately on Exynos4210 SoC ARMCLK down feature
+> causes a lockup when ondemand cpufreq governor is used.
+> Fix it by limiting ARMCLK down feature to Exynos4x12 SoCs.
+>
+> This patch was tested on:
+> - Exynos4210 SoC based Trats board
+> - Exynos4210 SoC based Origen board
+> - Exynos4412 SoC based Trats2 board
+> - Exynos4412 SoC based Odroid-U3 board
+>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Daniel Drake <drake@endlessm.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Fixes: 42773b28e71d ("clk: samsung: exynos4: Enable ARMCLK down feature")
+> Cc: <stable@vger.kernel.org> # v3.17+
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c |   11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-0
-
-for you to fetch changes up to 209431eff8afb928d72200c79153165c7d860ca0:
-
-  ARM: DRA7: Enable Cortex A15 errata 798181 (2015-03-27 14:38:03 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps that were not considered urgent enough for the -rc cycle.
-
-This is mostly to enable errata 798181 and thermal support for dra7,
-configure ocp2scp for am437x, remove dead code for OMAP4_ERRATA_I688
-and fix build warnings for omap1510 only config.
-
-----------------------------------------------------------------
-Felipe Balbi (1):
-      MAINTAINERS: add OMAP defconfigs under OMAP SUPPORT
-
-Keerthy (1):
-      ARM: dts: DRA7: Add bandgap and related thermal nodes
-
-Kishon Vijay Abraham I (2):
-      ARM: dts: am4372: Add "ti,am437x-ocp2scp" as compatible string for OCP2SCP
-      bus: ocp2scp: SYNC2 value should be changed to 0x6
-
-Nishanth Menon (1):
-      ARM: dts: am57xx-beagle-x15: Add thermal map to include fan and tmp102
-
-Paul Walmsley (1):
-      ARM: OMAP1: PM: fix some build warnings on 1510-only Kconfigs
-
-Praneeth Bajjuri (1):
-      ARM: DRA7: Enable Cortex A15 errata 798181
-
-Stefan Agner (1):
-      ARM: OMAP2+: remove superfluous NULL pointer check
-
-Stefan Hengelein (1):
-      ARM: OMAP4: remove dead kconfig option OMAP4_ERRATA_I688
-
-Tony Lindgren (1):
-      Merge branch 'omap-for-v4.1/ocp2scp' into omap-for-v4.1/fixes-not-urgent
-
- .../devicetree/bindings/bus/omap-ocp2scp.txt       |  3 +-
- MAINTAINERS                                        |  2 +
- arch/arm/boot/dts/am4372.dtsi                      |  4 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts            | 49 +++++++++++++++
- arch/arm/boot/dts/dra7.dtsi                        | 23 ++++++++
- arch/arm/boot/dts/dra72x.dtsi                      |  5 ++
- arch/arm/boot/dts/dra74x.dtsi                      |  5 ++
- arch/arm/boot/dts/omap4-cpu-thermal.dtsi           |  4 +-
- arch/arm/mach-omap1/pm.c                           | 51 ++++++++--------
- arch/arm/mach-omap2/Kconfig                        | 22 +------
- arch/arm/mach-omap2/common.c                       |  1 -
- arch/arm/mach-omap2/common.h                       |  3 -
- arch/arm/mach-omap2/io.c                           |  2 -
- arch/arm/mach-omap2/mux.c                          |  2 +-
- arch/arm/mach-omap2/omap-secure.h                  |  7 ---
- arch/arm/mach-omap2/omap4-common.c                 | 69 ----------------------
- arch/arm/mach-omap2/sleep44xx.S                    |  2 -
- drivers/bus/omap-ocp2scp.c                         | 34 +++++++++++
- 18 files changed, 151 insertions(+), 137 deletions(-)
+Best regards,
+Krzysztof
