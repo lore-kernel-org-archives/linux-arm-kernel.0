@@ -1,31 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 28 Mar 2015 14:24:02 +0100
-Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
-In-Reply-To: <87fv8pwmm0.fsf@free.fr>
-References: <20150216130549.GF14545@x1> <201503280335.16280.arnd@arndb.de>
- <87fv8pwmm0.fsf@free.fr>
-Message-ID: <201503281424.02583.arnd@arndb.de>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sat, 28 Mar 2015 13:37:19 +0000
+Subject: [PATCH] dtbsinstall: don't move target directory out of the way
+In-Reply-To: <20150328132320.GA24391@n2100.arm.linux.org.uk>
+References: <20150328132320.GA24391@n2100.arm.linux.org.uk>
+Message-ID: <E1YbqvP-000283-5m@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 28 March 2015, Robert Jarzmik wrote:
-> It's not as much a problem as a generic question : does a driver belong to
-> arch/* ?
-> 
-> Personaly it would have been far simpler for me to have it through the pxa tree,
-> but I want to be sure it's the right place. Others will follow, pxa mainstone is
-> such a candidate.
-> 
-> I was thinking so far that arch/arm/mach-* was for machine description,
-> ie. wirings, interconnections, initial setup etc ... The "driver" part, ie. code
-> really driving dynamics in IPs was as per my understanding in drivers/...
-> 
-> Now I can create arch/arm/mach-pxa/lubbock_cplds.c, that won't make any
-> difference to me, provided that it's the right thing to do.
+No other kernel installation target moves the target directory out of
+the way, even deleting an old version of it.  These are destructive
+operations, ones which the kernel build system should not be making.
 
-If we had a lot of these, we would probably put them somewhere under drivers.
-and find a maintainer for them. Given that this is an exceptional case for
-an older machine, my feeling is that leaving the code in mach-pxa is the least
-effort for now.
+Remove this behaviour.
 
-	Arnd
+If this behaviour is required at installation time, this should be
+done by the installation external to the kernel makefiles, just like
+it would be done for 'make modules_install'.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ scripts/Makefile.dtbinst | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/scripts/Makefile.dtbinst b/scripts/Makefile.dtbinst
+index 909ed7a2ac61..e0254058b0e9 100644
+--- a/scripts/Makefile.dtbinst
++++ b/scripts/Makefile.dtbinst
+@@ -23,8 +23,6 @@ include $(srctree)/$(obj)/Makefile
+ PHONY += __dtbs_install_prep
+ __dtbs_install_prep:
+ ifeq ("$(dtbinst-root)", "$(obj)")
+-	$(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
+-	$(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
+ 	$(Q)mkdir -p $(INSTALL_DTBS_PATH)
+ endif
+ 
+-- 
+1.8.3.1
