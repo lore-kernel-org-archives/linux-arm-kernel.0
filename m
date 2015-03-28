@@ -1,97 +1,71 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 28 Mar 2015 11:24:22 +0100
-Subject: [PATCH v3 3/3] pinctrl: Add support for Meson8b
-In-Reply-To: <20150328100643.GA21693@gmail.com>
-References: <1426800852-1235-1-git-send-email-carlo@caione.org>
- <1426800852-1235-4-git-send-email-carlo@caione.org>
- <20150328100643.GA21693@gmail.com>
-Message-ID: <CAOQ7t2bpsoB-kTjwnydLccNf056j3J5D35jsYRNUo6f5PF-pbQ@mail.gmail.com>
+From: jussi.kivilinna@iki.fi (Jussi Kivilinna)
+Date: Sat, 28 Mar 2015 12:37:44 +0200
+Subject: [PATCH] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <55168478.4030202@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 28, 2015 at 11:06 AM, Beniamino Galvani <b.galvani@gmail.com> wrote:
-> On Thu, Mar 19, 2015 at 10:34:12PM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> This patch adds support for the AmLogic Meson8b SoC.
->>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->>  drivers/pinctrl/meson/Makefile          |   2 +-
->>  drivers/pinctrl/meson/pinctrl-meson.c   |   4 +
->>  drivers/pinctrl/meson/pinctrl-meson.h   |   1 +
->>  drivers/pinctrl/meson/pinctrl-meson8b.c | 900 ++++++++++++++++++++++++++++++++
->>  include/dt-bindings/gpio/meson8b-gpio.h |  32 ++
->>  5 files changed, 938 insertions(+), 1 deletion(-)
->>  create mode 100644 drivers/pinctrl/meson/pinctrl-meson8b.c
->>  create mode 100644 include/dt-bindings/gpio/meson8b-gpio.h
->>
->> [...]
->>
->> +static struct meson_bank meson8b_banks[] = {
->> +     /*   name    first                      last                   pullen  pull    dir     out     in  */
->> +     BANK("X",    PIN(GPIOX_0, 0),           PIN(GPIOX_21, 0),      4,  0,  4,  0,  0,  0,  1,  0,  2,  0),
->> +     BANK("Y",    PIN(GPIOY_0, 0),           PIN(GPIOY_14, 0),      3,  0,  3,  0,  3,  0,  4,  0,  5,  0),
->> +     BANK("DV",   PIN(GPIODV_9, 0),          PIN(GPIODV_29, 0),     0,  0,  0,  0,  7,  0,  8,  0,  9,  0),
->> +     BANK("H",    PIN(GPIOH_0, 0),           PIN(GPIOH_9, 0),       1, 16,  1, 16,  9, 19, 10, 19, 11, 19),
->> +     BANK("CARD", PIN(CARD_0, 0),            PIN(CARD_6, 0),        2, 20,  2, 20,  0, 22,  1, 22,  2, 22),
->> +     BANK("BOOT", PIN(BOOT_0, 0),            PIN(BOOT_18, 0),       2,  0,  2,  0,  9,  0, 10,  0, 11,  0),
->> +     BANK("DIF",  PIN(DIF_0_P, DIF_OFF),     PIN(DIF_4_N, DIF_OFF), 5,  8,  5,  8, 12, 12, 13, 12, 14, 12),
->> +};
->
-> So DIF pins belong to the standard domain and this is ok since they
-> use the same range of registers of other non-AO pins, but see below...
->
->> +
->> +static struct meson_bank meson8b_ao_banks[] = {
->> +     /*   name    first                  last                      pullen  pull    dir     out     in  */
->> +     BANK("AO",   PIN(GPIOAO_0, AO_OFF), PIN(GPIO_TEST_N, AO_OFF), 0,  0,  0, 16,  0,  0,  0, 16,  1,  0),
->> +};
->> +
->>
->> [...]
->>
->> --- /dev/null
->> +++ b/include/dt-bindings/gpio/meson8b-gpio.h
->> @@ -0,0 +1,32 @@
->> +
->> +#ifndef _DT_BINDINGS_MESON8B_GPIO_H
->> +#define _DT_BINDINGS_MESON8B_GPIO_H
->> +
->> +#include <dt-bindings/gpio/meson8-gpio.h>
->> +
->> +/* GPIO Bank DIF */
->> +#define DIF_0_P              0
->> +#define DIF_0_N              1
->> +#define DIF_1_P              2
->> +#define DIF_1_N              3
->> +#define DIF_2_P              4
->> +#define DIF_2_N              5
->> +#define DIF_3_P              6
->> +#define DIF_3_N              7
->> +#define DIF_4_P              8
->> +#define DIF_4_N              9
->> +
->> +#endif /* _DT_BINDINGS_MESON8B_GPIO_H */
->
-> ... however these definitions start from 0 and thus overlap with the
-> definitions in meson8-gpio.h.
->
-> This means that the following GPIO specifier in a DTS:
->
->    gpios = <&gpio DIF_0_P GPIO_ACTIVE_HIGH>
->
-> has the same effect as
->
->    gpios = <&gpio GPIOX_0 GPIO_ACTIVE_HIGH>
->
-> I think that DIF_* pins should have a different numbering, for example
-> starting just after the end of the last non-AO pin. AO pin should also
-> be shifted accordingly.
+On 28.03.2015 09:28, Ard Biesheuvel wrote:
+> This updates the SHA-512 NEON module with the faster and more
+> versatile implementation from the OpenSSL project. It consists
+> of both a NEON and a generic ASM version of the core SHA-512
+> transform, where the NEON version reverts to the ASM version
+> when invoked in non-process context.
+> 
+> Performance relative to the generic implementation (measured
+> using tcrypt.ko mode=306 sec=1 running on a Cortex-A57 under
+> KVM):
+> 
+> 	input size	block size	asm	neon	old neon
+> 
+> 	16		16		1.39	2.54	2.21
+> 	64		16		1.32	2.33	2.09
+> 	64		64		1.38	2.53	2.19
+> 	256		16		1.31	2.28	2.06
+> 	256		64		1.38	2.54	2.25
+> 	256		256		1.40	2.77	2.39
+> 	1024		16		1.29	2.22	2.01
+> 	1024		256		1.40	2.82	2.45
+> 	1024		1024		1.41	2.93	2.53
+> 	2048		16		1.33	2.21	2.00
+> 	2048		256		1.40	2.84	2.46
+> 	2048		1024		1.41	2.96	2.55
+> 	2048		2048		1.41	2.98	2.56
+> 	4096		16		1.34	2.20	1.99
+> 	4096		256		1.40	2.84	2.46
+> 	4096		1024		1.41	2.97	2.56
+> 	4096		4096		1.41	3.01	2.58
+> 	8192		16		1.34	2.19	1.99
+> 	8192		256		1.40	2.85	2.47
+> 	8192		1024		1.41	2.98	2.56
+> 	8192		4096		1.41	2.71	2.59
+> 	8192		8192		1.51	3.51	2.69
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> This should get the same treatment as Sami's sha56 version: I would like
+> to wait until the OpenSSL source file hits the upstream repository so that
+> I can refer to its sha1 hash in the commit log.
+> 
+>  arch/arm/crypto/Kconfig               |    2 -
+>  arch/arm/crypto/Makefile              |    8 +-
+>  arch/arm/crypto/sha512-armv4.pl       |  656 ++++++++++++
+>  arch/arm/crypto/sha512-armv7-neon.S   |  455 ---------
+>  arch/arm/crypto/sha512-core.S_shipped | 1814 +++++++++++++++++++++++++++++++++
+>  arch/arm/crypto/sha512.h              |   14 +
+>  arch/arm/crypto/sha512_glue.c         |  255 +++++
+>  arch/arm/crypto/sha512_neon_glue.c    |  155 +--
+>  8 files changed, 2762 insertions(+), 597 deletions(-)
+>  create mode 100644 arch/arm/crypto/sha512-armv4.pl
+>  delete mode 100644 arch/arm/crypto/sha512-armv7-neon.S
 
-Right. Fix in v4.
+Acked-by: Jussi Kivilinna <jussi.kivilinna@iki.fi>
 
-Thanks for the review.
-
--- 
-Carlo Caione
+>  create mode 100644 arch/arm/crypto/sha512-core.S_shipped
+>  create mode 100644 arch/arm/crypto/sha512.h
+>  create mode 100644 arch/arm/crypto/sha512_glue.c
+> 
