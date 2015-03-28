@@ -1,5 +1,5 @@
 From: xweikong@hotmail.com (Xinwei Kong)
-Date: Sun, 29 Mar 2015 00:00:38 +0800
+Date: Sun, 29 Mar 2015 00:01:04 +0800
 Subject: [PATCH v1 1/2] thermal: hisilicon: add new hisilicon thermal
  sensor driver
 In-Reply-To: <5515FCC1.2060302@hisilicon.com>
@@ -7,7 +7,7 @@ References: <1427269825-11324-1-git-send-email-kong.kongxinwei@hisilicon.com>
  <1427269825-11324-2-git-send-email-kong.kongxinwei@hisilicon.com>
  <5513CDEE.8000807@hisilicon.com> <55151538.3020204@hisilicon.com>
  <5515FCC1.2060302@hisilicon.com>
-Message-ID: <BLU436-SMTP167FD742B217F14F25E1EF2C1F70@phx.gbl>
+Message-ID: <BLU436-SMTP24648E33E078BFAED1BD4E4C1F70@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
