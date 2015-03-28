@@ -1,73 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Mar 2015 22:06:23 +0000
-Subject: [PATCH 4/8] pcmcia: pxa2xx: convert memory allocation to devm_*
- API
-In-Reply-To: <87zj6wvm3z.fsf@free.fr>
-References: <20150326112254.GZ8656@n2100.arm.linux.org.uk>
- <E1Yb5t5-0006I8-Oi@rmk-PC.arm.linux.org.uk>
- <87zj6wvm3z.fsf@free.fr>
-Message-ID: <20150328220623.GA24899@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 28 Mar 2015 23:10:22 +0100
+Subject: [RFC PATCH 0/6] SHA-256/512 glue code consolidation
+Message-ID: <1427580628-7128-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 28, 2015 at 10:38:24PM +0100, Robert Jarzmik wrote:
-> Russell King <rmk+kernel@arm.linux.org.uk> writes:
-> 
-> > Convert the pxa2xx socket driver memory allocation to use devm_kzalloc()
-> > to simplify the cleanup path.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/pcmcia/pxa2xx_base.c | 8 +++-----
-> >  1 file changed, 3 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-> > index 197c77a64ce0..dfcf07828605 100644
-> > --- a/drivers/pcmcia/pxa2xx_base.c
-> > +++ b/drivers/pcmcia/pxa2xx_base.c
-> > @@ -302,7 +302,8 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
-> >  
-> >  	pxa2xx_drv_pcmcia_ops(ops);
-> >  
-> > -	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
-> > +	sinfo = devm_kzalloc(&pdev->dev, SKT_DEV_INFO_SIZE(ops->nr),
-> There is a typo here : &pdev->dev should be &dev->dev.
-> 
-> Now given that fix, you can add my :
-> Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> 
-> This test of mine is rather cheap :
->  - it relies on 4.0-rc4
->  - I don't have any PCMCIA card to insert in the lubbock, hence the "cheap"
->  - I judge that pcmcia is working because :
->    - cat /proc/iomem gives:
->      10000000-10001fff : sa1111
->        10000400-100005ff : 0400
->        10000800-100009ff : 0800
->        10000a00-10000bff : 0a00
->          10000a00-10000bff : sa1111-ps2
->        10000c00-10000dff : 0c00
->          10000c00-10000dff : sa1111-ps2
->        10001600-100017ff : irq
->        10001800-100019ff : 1800
->          10001800-100019ff : sa1111-pcmcia
->     - I don't see any error message in kernel log
-> 
-> As a side note mainly to myself, the pcmcia is broken on pxa2xx architectures
-> and panics the kernel at boot time because :
->  - in drivers/pcmcia/sa1111_lubbock.c I see :
->    pcmcia_lubbock_init()
->      pxa2xx_configure_sockets(&sadev->dev);
->        here it is expected that platform_data contains the pcmcia ops, but it's
->        NULL, and the dereferencing in pxa2xx_configure_sockets() of ops->first
->        panics.
+Hello all,
 
-I guess it's broken as a result of 5b703683b6cc3cb97bbe6b1b14898b273eb59279
-which added that call without really understanding the call path.  I
-don't see any solution other than partially reverting that commit.
-As can be seen from the commit message, this was done blindly with no
-testing - so it's no surprise that it broke.
+After working on various flavors of SHA over the past week, I noticed there
+is a fair amount of duplication, not only of true boiler plate but also of
+glue code that is not entirely non-trivial.
+
+So this series proposes a way to cut down on that: I implemented generic
+glue for SHA-256 and SHA-512, and ported the generic implementations to
+use it. The last two patches are examples of non-trivial uses of it.
+Patch #5 ports the arm64 SHA-256 Crypto Extensions to use it: this code
+needs to enable and disable the NEON before and after using it, and has
+an implementation of the padding in asm for inputs that are round multiples
+of the block size. The final patch is the same core code as the patch
+I sent yesterday, but this time with most of the redundant glue removed.
+
+Comments, suggestions etc are highly appreciated!
+
+Regards,
+Ard.
+
+
+Ard Biesheuvel (6):
+  crypto: sha512: implement base layer for SHA-512
+  crypto: sha512-generic: move to generic glue implementation
+  crypto: sha256: implement base layer for SHA-256
+  crypto: sha256-generic: move to generic glue implementation
+  arm64/crypto: move ARMv8 SHA-224/256 driver to SHA-256 base layer
+  arm/crypto: accelerated SHA-512 using ARM generic ASM and NEON
+
+ arch/arm/crypto/Kconfig               |    8 +
+ arch/arm/crypto/Makefile              |    8 +-
+ arch/arm/crypto/sha512-armv4.pl       |  656 ++++++++++++
+ arch/arm/crypto/sha512-core.S_shipped | 1814 +++++++++++++++++++++++++++++++++
+ arch/arm/crypto/sha512-glue.c         |  137 +++
+ arch/arm/crypto/sha512-neon-glue.c    |  111 ++
+ arch/arm/crypto/sha512.h              |    8 +
+ arch/arm64/crypto/Kconfig             |    1 +
+ arch/arm64/crypto/sha2-ce-core.S      |   11 +-
+ arch/arm64/crypto/sha2-ce-glue.c      |  211 +---
+ crypto/Kconfig                        |    9 +
+ crypto/Makefile                       |    2 +
+ crypto/sha256_base.c                  |  138 +++
+ crypto/sha256_generic.c               |  131 +--
+ crypto/sha512_base.c                  |  143 +++
+ crypto/sha512_generic.c               |  117 +--
+ include/crypto/sha.h                  |   37 +
+ 17 files changed, 3142 insertions(+), 400 deletions(-)
+ create mode 100644 arch/arm/crypto/sha512-armv4.pl
+ create mode 100644 arch/arm/crypto/sha512-core.S_shipped
+ create mode 100644 arch/arm/crypto/sha512-glue.c
+ create mode 100644 arch/arm/crypto/sha512-neon-glue.c
+ create mode 100644 arch/arm/crypto/sha512.h
+ create mode 100644 crypto/sha256_base.c
+ create mode 100644 crypto/sha512_base.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.2
