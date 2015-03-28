@@ -1,7 +1,9 @@
 From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sat, 28 Mar 2015 14:52:52 +0100
-Subject: [PATCH] ARM: BCM5301X: Add DT for Asus RT-AC68U
-Message-ID: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
+Date: Sat, 28 Mar 2015 15:01:38 +0100
+Subject: [PATCH V2] ARM: BCM5301X: Add DT for Asus RT-AC68U
+In-Reply-To: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
+References: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1427551298-25048-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +15,14 @@ Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
  create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4e1b387..3da7bec 100644
+index 4e1b387..7c1ca2a 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
 @@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
  	bcm2835-rpi-b.dtb \
  	bcm2835-rpi-b-plus.dtb
  dtb-$(CONFIG_ARCH_BCM_5301X) += \
-+	bcm4708-asus-rt-ac68u.dts \
++	bcm4708-asus-rt-ac68u.dtb \
  	bcm4708-buffalo-wzr-1750dhp.dtb \
  	bcm4708-luxul-xwc-1000.dtb \
  	bcm4708-netgear-r6250.dtb \
