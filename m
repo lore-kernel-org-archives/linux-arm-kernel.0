@@ -1,44 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 Mar 2015 13:23:20 +0000
-Subject: [PATCH V6] kbuild: dtbs_install: new make target
-In-Reply-To: <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
-References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
- <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
-Message-ID: <20150328132320.GA24391@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 28 Mar 2015 14:24:02 +0100
+Subject: [PATCH v4 2/4] mfd: lubbock_cplds: add lubbock IO board
+In-Reply-To: <87fv8pwmm0.fsf@free.fr>
+References: <20150216130549.GF14545@x1> <201503280335.16280.arnd@arndb.de>
+ <87fv8pwmm0.fsf@free.fr>
+Message-ID: <201503281424.02583.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, I'm digging up an old version of this patch - v7 was merged but
-I find *nowhere* where that version was posted to people involved in
-this discussion.
+On Saturday 28 March 2015, Robert Jarzmik wrote:
+> It's not as much a problem as a generic question : does a driver belong to
+> arch/* ?
+> 
+> Personaly it would have been far simpler for me to have it through the pxa tree,
+> but I want to be sure it's the right place. Others will follow, pxa mainstone is
+> such a candidate.
+> 
+> I was thinking so far that arch/arm/mach-* was for machine description,
+> ie. wirings, interconnections, initial setup etc ... The "driver" part, ie. code
+> really driving dynamics in IPs was as per my understanding in drivers/...
+> 
+> Now I can create arch/arm/mach-pxa/lubbock_cplds.c, that won't make any
+> difference to me, provided that it's the right thing to do.
 
-The reason is that I would've commented on v7, because of this stupid
-thing (which is now in scripts/Makefile.dtbsinst):
+If we had a lot of these, we would probably put them somewhere under drivers.
+and find a maintainer for them. Given that this is an exceptional case for
+an older machine, my feeling is that leaving the code in mach-pxa is the least
+effort for now.
 
-+       $(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
-+       $(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
-+       $(Q)mkdir -p $(INSTALL_DTBS_PATH)
-
-What gives any kernel installation target the right to move a directory
-out of the way?
-
-Let's say that you do this:
-
-	make install INSTALL_PATH=$sys_root/boot
-	make dtbs_install INSTALL_DTBS_PATH=$sys_root/boot
-
-The result is that dtbs_install thinks it has the right to rename that
-boot directory to boot.old, create a new one, and place the DTBs in
-there, thereby leaving you with no kernel to boot - and if you run it
-again, it _deletes_ the original directory.
-
-No *other* kernel install target has this behaviour, not even 'make
-modules_installl'.  This is stupid and dangerous behaviour.  At the
-very least, this behaviour should be *well* documented.
-
-Linus, will you take a patch to remove the lines moving a pre-existing
-INSTALL_DTBS_PATH directory out of the way?
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
