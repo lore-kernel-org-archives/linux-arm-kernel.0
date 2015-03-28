@@ -1,32 +1,18 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 28 Mar 2015 08:51:55 +0530
-Subject: [PATCH] cpufreq: exynos: remove dead ->need_apll_change method
-In-Reply-To: <2557080.JPtuM0lETZ@amdc1032>
-References: <2557080.JPtuM0lETZ@amdc1032>
-Message-ID: <CAKohpokU=1XM2BHsF-vLizAbLqdkCb5ZwHmeP_O4kD6xnuLyQA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 27 Mar 2015 21:57:25 -0600
+Subject: [PATCH 3/5] dmaengine: bcm2835-dma: Fix memory leak when stopping
+ a running transfer
+In-Reply-To: <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <551626A5.3080509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 March 2015 at 22:02, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> Commit 26ab1c62b6e1 ("cpufreq: exynos5250: Set APLL rate
-> using CCF API") removed the last user of ->need_apll_change
-> method.  Remove it and then cleanup exynos_cpufreq_scale()
-> accordingly.
->
-> This patch was tested on Exynos4412 SoC based Trats2 board.
->
-> There should be no functional changes caused by this patch.
->
-> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> Cc: Lukasz Majewski <l.majewski@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/cpufreq/exynos-cpufreq.c |   30 +++---------------------------
->  drivers/cpufreq/exynos-cpufreq.h |    1 -
->  2 files changed, 3 insertions(+), 28 deletions(-)
+On 03/27/2015 05:35 AM, Peter Ujfalusi wrote:
+> The vd->node is removed from the lists when the transfer started so the
+> vchan_get_all_descriptors() will not find it. This results memory leak.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-@Kukjin: please take it through your tree.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+(I'm just assuming the explanation makes sense and is correct; more of a
+not-a-NAK so it doesn't look like a lack of response!)
