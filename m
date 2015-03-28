@@ -1,39 +1,117 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sat, 28 Mar 2015 13:37:19 +0000
-Subject: [PATCH] dtbsinstall: don't move target directory out of the way
-In-Reply-To: <20150328132320.GA24391@n2100.arm.linux.org.uk>
-References: <20150328132320.GA24391@n2100.arm.linux.org.uk>
-Message-ID: <E1YbqvP-000283-5m@rmk-PC.arm.linux.org.uk>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 28 Mar 2015 14:52:52 +0100
+Subject: [PATCH] ARM: BCM5301X: Add DT for Asus RT-AC68U
+Message-ID: <1427550772-23293-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No other kernel installation target moves the target directory out of
-the way, even deleting an old version of it.  These are destructive
-operations, ones which the kernel build system should not be making.
-
-Remove this behaviour.
-
-If this behaviour is required at installation time, this should be
-done by the installation external to the kernel makefiles, just like
-it would be done for 'make modules_install'.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- scripts/Makefile.dtbinst | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts | 83 +++++++++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
 
-diff --git a/scripts/Makefile.dtbinst b/scripts/Makefile.dtbinst
-index 909ed7a2ac61..e0254058b0e9 100644
---- a/scripts/Makefile.dtbinst
-+++ b/scripts/Makefile.dtbinst
-@@ -23,8 +23,6 @@ include $(srctree)/$(obj)/Makefile
- PHONY += __dtbs_install_prep
- __dtbs_install_prep:
- ifeq ("$(dtbinst-root)", "$(obj)")
--	$(Q)if [ -d $(INSTALL_DTBS_PATH).old ]; then rm -rf $(INSTALL_DTBS_PATH).old; fi
--	$(Q)if [ -d $(INSTALL_DTBS_PATH) ]; then mv $(INSTALL_DTBS_PATH) $(INSTALL_DTBS_PATH).old; fi
- 	$(Q)mkdir -p $(INSTALL_DTBS_PATH)
- endif
- 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4e1b387..3da7bec 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b.dtb \
+ 	bcm2835-rpi-b-plus.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
++	bcm4708-asus-rt-ac68u.dts \
+ 	bcm4708-buffalo-wzr-1750dhp.dtb \
+ 	bcm4708-luxul-xwc-1000.dtb \
+ 	bcm4708-netgear-r6250.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+new file mode 100644
+index 0000000..8b62836
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+@@ -0,0 +1,83 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Asus RT-AC68U
++ *
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "asus,rt-ac68u", "brcm,bcm4708";
++	model = "Asus RT-AC68U (BCM4708)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		usb2 {
++			label = "bcm53xx:blue:usb2";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		power {
++			label = "bcm53xx:blue:power";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		logo {
++			label = "bcm53xx:white:logo";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		usb3 {
++			label = "bcm53xx:blue:usb3";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		brightness {
++			label = "Backlight";
++			linux,code = <KEY_BRIGHTNESS_ZERO>;
++			gpios = <&chipcommon 5 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
-1.8.3.1
+1.8.4.5
