@@ -1,82 +1,53 @@
-From: juergen@kreuzholzen.de (Juergen Borleis)
-Date: Sun, 29 Mar 2015 16:40:53 +0200
-Subject: [PATCH 7/7] ARM: dts: add OPPs for i.MX23/i.MX28
-In-Reply-To: <1470793430.944631.1427565192794.JavaMail.open-xchange@oxbaltgw00.schlund.de>
-References: <1470793430.944631.1427565192794.JavaMail.open-xchange@oxbaltgw00.schlund.de>
-Message-ID: <201503291640.56538.juergen@kreuzholzen.de>
+From: stockhausen@collogia.de (Markus Stockhausen)
+Date: Sun, 29 Mar 2015 16:05:57 +0000
+Subject: AW: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
+In-Reply-To: <CAKv+Gu9kMPM2t5r8pgdw=Cc5juGTxCeJJc1L-yBy6AS_A2UUAA@mail.gmail.com>
+References: <1427580628-7128-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427580628-7128-2-git-send-email-ard.biesheuvel@linaro.org>
+ <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A1E8@EXCHANGE.collogia.de>,
+ <CAKv+Gu9kMPM2t5r8pgdw=Cc5juGTxCeJJc1L-yBy6AS_A2UUAA@mail.gmail.com>
+Message-ID: <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A36E@EXCHANGE.collogia.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
-
-Stefan Wahren wrote:
-> > Juergen Borleis <juergen@kreuzholzen.de> hat am 24. M?rz 2015 um 21:45
-> > geschrieben:
-> >
-> > Stefan Wahren wrote:
-> > > [...]
-> > > diff --git a/arch/arm/boot/dts/imx28.dtsi
-> > > b/arch/arm/boot/dts/imx28.dtsi index 98c1be6..21c1921 100644
-> > > --- a/arch/arm/boot/dts/imx28.dtsi
-> > > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > > @@ -38,12 +38,23 @@
-> > > };
-> > >
-> > > cpus {
-> > > - #address-cells = <0>;
-> > > + #address-cells = <1>;
-> > > #size-cells = <0>;
-> > >
-> > > - cpu {
-> > > + cpu at 0 {
-> > > compatible = "arm,arm926ej-s";
-> > > device_type = "cpu";
-> > > + reg = <0x0>;
-> > > + operating-points = <
-> > > + /* kHz uV */
-> > > + 261819 1350000
-> > > + 360000 1350000
-> > > + 392728 1450000
-> > > + 454737 1550000
-> > > + >;
-> > > + clocks = <&clks 4>;
-> > > + clock-latency = <61036>; /* two CLK32 periods */
-> > > + cpu-supply = <&reg_vddd>;
-> > > };
-> > > };
-> >
-> > Maybe you should take into account not to reduce VDD below 1.55 V if the
-> > SDRAM controller runs above 196 MHz. The i.MX28 datasheet[1] lists these
-> > restrictions. VDD powers the SDRAM controller as well. From the datasheet
-> > the table "Frequency versus Voltage for EMICLK" shows:
-> >
-> > EMICLK Fmax (MHz)
-> > VDDD (V) DDR2 mDDR
-> > --------------------------------
-> > 1.550 205.71 205.71
-> > 1.450 196.36 196.36
-> > 1.350 196.36 196.36
-> >
-> > jbe
-> >
-> > [1]
-> > i.MX28 Applications
-> > Processors for Consumer
-> > Products
-> > Silicon Version 1.2
-> >
-> > Document Number: IMX28CEC
-> > Rev. 3, 07/2012
+> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
+> Gesendet: Sonntag, 29. M?rz 2015 12:38
+> An: Markus Stockhausen
+> Cc: linux-arm-kernel at lists.infradead.org; linux-crypto at vger.kernel.org; samitolvanen at google.com; herbert at gondor.apana.org.au; jussi.kivilinna at iki.fi
+> Betreff: Re: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
+> 
+>>> ...
+>>> +int sha512_base_do_update(struct shash_desc *desc, const u8 *data,
+>>> +                         unsigned int len, sha512_block_fn *block_fn, void *p)
+>>> +{
+>>> +       struct sha512_state *sctx = shash_desc_ctx(desc);
+>>> +       unsigned int partial = sctx->count[0] % SHA512_BLOCK_SIZE;
+>>> +
+>>> +       sctx->count[0] += len;
+>>> +       if (sctx->count[0] < len)
+>>> +               sctx->count[1]++;
+>>>
+>> You should check if early kick out at this point if the buffer won't be filled up
+>> is faster than first taking care about big data. That can improve performance
+>> for small blocks while large blocks might be unaffected.
+>>
+>>> +
+>>> +       if ((partial + len) >= SHA512_BLOCK_SIZE) {
 >
-> the only chance that i see to meet this constraint without introducing a
-> new cpufreq driver is to change clock ref_cpu
-> and ref_emi.
->
-> Do you think this solution of a virtual clock [1] can be applied here, too?
+>Isn't this early kickout? The if is only entered if there is enough
+>data to run the block function, otherwise it is a straight memcpy. I
+>could add an unlikely() here to favor the small data case
 
-This would imply we can change the SDRAM timing at run-time on the fly. IMHO 
-that is not possible (at least not easy). I think when the driver detects the 
-SDRAM controller runs above 196 MHz the clock for the CPU core can still be 
-changed, but VDD must be kept at 1.55 V.
+I did my tests only on low end hardware. 32bit PPC e500 single core 800MHz
+256K cache. Maybe it prefers early return statements. 
 
-Juergen
+Additionally I ended up clearing the context in the finish function with a 
+simple inlined 32bit writes loop. Everything else (e.g. memzero) resulted in 
+slower processing. Don't know what your clearing syntax will produce after
+compilation.
+
+Markus
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: InterScan_Disclaimer.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150329/a78a9aaf/attachment.txt>
