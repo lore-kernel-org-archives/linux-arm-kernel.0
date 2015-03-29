@@ -1,66 +1,41 @@
-From: ykaneko0929@gmail.com (Yoshihiro Kaneko)
-Date: Sun, 29 Mar 2015 22:22:13 +0900
-Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Remove MSIOF address from
- device tree
-In-Reply-To: <1426430633-3867-1-git-send-email-ykaneko0929@gmail.com>
-References: <1426430633-3867-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAH1o70JyBbmQ9vDrpamtL=09nq64B9RM1asWOWRXEL0LdgrxMQ@mail.gmail.com>
+From: appro@openssl.org (Andy Polyakov)
+Date: Sun, 29 Mar 2015 15:27:24 +0200
+Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
+References: <20150316154835.GA31336@google.com>	<20150323135009.GB820@google.com>	<20150324122702.GJ14457@ns203013.ovh.net>	<CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>	<20150324130511.GK14457@ns203013.ovh.net>	<CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>	<CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>	<5515342F.6010703@openssl.org>	<CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
+ <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
+Message-ID: <5517FDBC.7030008@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert-san,
+>>>> arch/arm/crypto/sha256-core.S: Assembler messages:
+>>>> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
+>>>> after fixup
+>>>>
+>>>> This is caused by the fact that, when building the integer-only code
+>>>> for an older architecture, the conditional compilation produces a
+>>>> slightly bigger preceding function, and the symbol K256 is out of
+>>>> range for the adr instruction.
+>>>>
+>>>> ... and replace the offending line with
+>>>>
+>>>> adrl r14,K256
+>>>
+>>> Ard, you have mentioned that you've verified it on big-endian, but I've
+>>> spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
+>>> guess that it worked for you either because it was NEON that was tested
+>>> (it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
+>>> case it uses endian-neutral byte-by-byte data load). Can you confirm either?
+> 
+> Indeed, if I build for v7 I get
+> 
+> [    0.269418] 00000000: 4e a5 c5 08 a6 56 6e 76 24 05 43 f8 fe b0 6f d4
+> [    0.275261] 00000010: 57 77 7b e3 95 49 c4 01 64 36 af da 65 d2 33 0e
+> [    0.281031] alg: hash: Test 1 failed for sha224-asm
+> [    0.285315] 00000000: 9d 6a 5d e9 e1 6c 39 99 c7 14 84 0f 47 77 1f 36
+> [    0.290912] 00000010: dc c2 97 a7 bd ef aa c3 6c 95 15 ae
+> 
+> which is indeed the integer code failing, and your attached patch fixes it.
 
-I'm wondering if you could find a moment to look over this patch.
-
-Regards,
-Kaneko
-
-2015-03-15 23:43 GMT+09:00 Yoshihiro Kaneko <ykaneko0929@gmail.com>:
-> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
->
-> MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
-> MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
->
-> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> ---
->
-> This patch is based on devel branch of Simon Horman's renesas tree.
->
->  arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 4696062..3e9f824 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1288,7 +1288,7 @@
->
->         msiof0: spi at e6e20000 {
->                 compatible = "renesas,msiof-r8a7791";
-> -               reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
-> +               reg = <0 0xe6e20000 0 0x0064>;
->                 interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
->                 dmas = <&dmac0 0x51>, <&dmac0 0x52>;
-> @@ -1300,7 +1300,7 @@
->
->         msiof1: spi at e6e10000 {
->                 compatible = "renesas,msiof-r8a7791";
-> -               reg = <0 0xe6e10000 0 0x0064>, <0 0xe7e10000 0 0x0064>;
-> +               reg = <0 0xe6e10000 0 0x0064>;
->                 interrupts = <0 157 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp2_clks R8A7791_CLK_MSIOF1>;
->                 dmas = <&dmac0 0x55>, <&dmac0 0x56>;
-> @@ -1312,7 +1312,7 @@
->
->         msiof2: spi at e6e00000 {
->                 compatible = "renesas,msiof-r8a7791";
-> -               reg = <0 0xe6e00000 0 0x0064>, <0 0xe7e00000 0 0x0064>;
-> +               reg = <0 0xe6e00000 0 0x0064>;
->                 interrupts = <0 158 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp2_clks R8A7791_CLK_MSIOF2>;
->                 dmas = <&dmac0 0x41>, <&dmac0 0x42>;
-> --
-> 1.9.1
->
+Committed as
+http://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=51f8d095562f36cdaa6893597b5c609e943b0565.
