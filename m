@@ -1,53 +1,114 @@
-From: stockhausen@collogia.de (Markus Stockhausen)
-Date: Sun, 29 Mar 2015 16:05:57 +0000
-Subject: AW: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
-In-Reply-To: <CAKv+Gu9kMPM2t5r8pgdw=Cc5juGTxCeJJc1L-yBy6AS_A2UUAA@mail.gmail.com>
-References: <1427580628-7128-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427580628-7128-2-git-send-email-ard.biesheuvel@linaro.org>
- <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A1E8@EXCHANGE.collogia.de>,
- <CAKv+Gu9kMPM2t5r8pgdw=Cc5juGTxCeJJc1L-yBy6AS_A2UUAA@mail.gmail.com>
-Message-ID: <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A36E@EXCHANGE.collogia.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 29 Mar 2015 20:09:34 +0200
+Subject: [PATCH 1/2] mmc: Add support for marking hpi as broken through
+ devicetree
+Message-ID: <1427652575-12642-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Von: Ard Biesheuvel [ard.biesheuvel at linaro.org]
-> Gesendet: Sonntag, 29. M?rz 2015 12:38
-> An: Markus Stockhausen
-> Cc: linux-arm-kernel at lists.infradead.org; linux-crypto at vger.kernel.org; samitolvanen at google.com; herbert at gondor.apana.org.au; jussi.kivilinna at iki.fi
-> Betreff: Re: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
-> 
->>> ...
->>> +int sha512_base_do_update(struct shash_desc *desc, const u8 *data,
->>> +                         unsigned int len, sha512_block_fn *block_fn, void *p)
->>> +{
->>> +       struct sha512_state *sctx = shash_desc_ctx(desc);
->>> +       unsigned int partial = sctx->count[0] % SHA512_BLOCK_SIZE;
->>> +
->>> +       sctx->count[0] += len;
->>> +       if (sctx->count[0] < len)
->>> +               sctx->count[1]++;
->>>
->> You should check if early kick out at this point if the buffer won't be filled up
->> is faster than first taking care about big data. That can improve performance
->> for small blocks while large blocks might be unaffected.
->>
->>> +
->>> +       if ((partial + len) >= SHA512_BLOCK_SIZE) {
->
->Isn't this early kickout? The if is only entered if there is enough
->data to run the block function, otherwise it is a straight memcpy. I
->could add an unlikely() here to favor the small data case
+The eMMC on a tablet I've will stop working / communicating as soon as
+the kernel executes:
 
-I did my tests only on low end hardware. 32bit PPC e500 single core 800MHz
-256K cache. Maybe it prefers early return statements. 
+		mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+ 				EXT_CSD_HPI_MGMT, 1,
+ 				card->ext_csd.generic_cmd6_time);
 
-Additionally I ended up clearing the context in the finish function with a 
-simple inlined 32bit writes loop. Everything else (e.g. memzero) resulted in 
-slower processing. Don't know what your clearing syntax will produce after
-compilation.
+There seems to be no way to reliable identify eMMC-s which have a broken
+hpi implementation, but at least for eMMC's which are soldered onto a board
+we can work around this by specifying that hpi is broken in devicetree.
 
-Markus
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: InterScan_Disclaimer.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150329/a78a9aaf/attachment.txt>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ Documentation/devicetree/bindings/mmc/mmc-card.txt | 31 ++++++++++++++++++++++
+ drivers/mmc/core/mmc.c                             | 10 ++++++-
+ 2 files changed, 40 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/mmc-card.txt
+
+diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt b/Documentation/devicetree/bindings/mmc/mmc-card.txt
+new file mode 100644
+index 0000000..0cc67fb
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
+@@ -0,0 +1,31 @@
++mmc-card / eMMC bindings
++------------------------
++
++This documents describes the devicetree bindings for a mmc-host controller
++child node describing a mmc-card / an eMMC, see "Use of Function subnodes"
++in mmc.txt
++
++Required properties:
++-compatible : Must be "mmc-card"
++-reg        : Must be <0>
++
++Optional properties:
++-broken-hpi : Use this to indicate that the mmc-card has a broken hpi
++              implementation, and that hpi should not be used
++
++Example:
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins_a>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++
++	mmmcard: mmccard at 0 {
++		reg = <0>;
++		compatible = "mmc-card";
++		broken-hpi;
++	};
++};
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 1d41e85..8d18920 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/err.h>
++#include <linux/of.h>
+ #include <linux/slab.h>
+ #include <linux/stat.h>
+ #include <linux/pm_runtime.h>
+@@ -336,6 +337,8 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+ {
+ 	int err = 0, idx;
+ 	unsigned int part_size;
++	struct device_node *np = card->dev.of_node;
++	bool broken_hpi = false;
+ 
+ 	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
+ 	card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
+@@ -349,6 +352,9 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+ 		}
+ 	}
+ 
++	if (np && of_device_is_compatible(np, "mmc-card"))
++		broken_hpi = of_property_read_bool(np, "broken-hpi");
++
+ 	/*
+ 	 * The EXT_CSD format is meant to be forward compatible. As long
+ 	 * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
+@@ -494,7 +500,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+ 		}
+ 
+ 		/* check whether the eMMC card supports HPI */
+-		if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
++		if (!broken_hpi && (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1)) {
+ 			card->ext_csd.hpi = 1;
+ 			if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x2)
+ 				card->ext_csd.hpi_cmd =	MMC_STOP_TRANSMISSION;
+@@ -1251,6 +1257,8 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+ 		card->ocr = ocr;
+ 		card->type = MMC_TYPE_MMC;
+ 		card->rca = 1;
++		/* Also gets done by mmc_add_card, but we need early access */
++		card->dev.of_node = mmc_of_find_child_device(host, 0);
+ 		memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
+ 	}
+ 
+-- 
+2.3.4
