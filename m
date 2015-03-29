@@ -1,72 +1,133 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 29 Mar 2015 00:50:57 +0100
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <55169622.5070007@gmail.com>
-References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
- <55169622.5070007@gmail.com>
-Message-ID: <55173E61.6040408@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 29 Mar 2015 03:45:33 +0200
+Subject: [PATCH] clk: at91: usb: propagate rate modification to the parent clk
+Message-ID: <1427593533-9019-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The at91sam9n12 and at91sam9x5 usb clocks do not propagate rate
+modification requests to their parents.
+This causes a bug when the PLLB is left uninitialized by the bootloader
+(PLL multiplier set to 0, or in other words, PLL rate = 0 Hz).
 
-On 03/28/2015 12:53 PM, Iain Paton wrote:
-> On 27/03/15 11:02, Hans de Goede wrote:
->> Hi Iain,
->>
->> On 27-03-15 11:58, Iain Paton wrote:
->>> add pmic regulator definitions matching the manufacturers 3.4.x fex
->>> file.
->>>
->>> Signed-off-by: Iain Paton <ipaton0@gmail.com>
->>> ---
->>>
->>> As this file belongs to Hans and he decided not to use axp209.dtsi in
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
->>> then I won't add it here.
->>
->> That was because using it was breaking stuff, but now that we know better
->> which regulators are used for what, and which one we most add an always-on;
->> property too, I would greatly prefer you to acually use axp209.dtsi, see
->> e.g. the sun5i-a13-utoo-p66.dts file where I'm using it.
->>
->> Can you please respin this patch using axp209.dtsi?
->>
->> Also please do not add nodes for unused regulators, like the ldo-s for the csi-s.
->
-> You would prefer that the csi is broken on the lime then?  Unlike the cubieboards,
-> ldo3 & ldo4 really are used on the olimex boards.
+Implement the determinate_rate method and propagate the change rate
+request to the parent clk.
 
-So your olimex boards have camera sensors attached? Because if not then csi is not
-used at all.
+Cc: <stable@vger.kernel.org> # v3.14+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Bo Shen <voice.shen@atmel.com>
+Tested-by: Bo Shen <voice.shen@atmel.com>
+---
+ drivers/clk/at91/clk-usb.c | 64 +++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 49 insertions(+), 15 deletions(-)
 
-> So it seems that as yet you still
-> don't know enough about which regulators are used, or you wouldn't be asking for
-> that.
-
-It would seem that you do not know what csi is for ...
-
-> That's the major disadvantage of axp209.dtsi, the regulator node isn't describing
-> the pmic at all. Instead it's describing the stuff connected to the pmic outputs,
-
-Not it is not, not anymore it is just a skeleton creating the regulator nodes
-so that you can address them by reference as is now the norm for configuring
-nodes in a dts. Have you actually looked at the current axp209.dtsi it does
-not contain any assumptions about how the regulators are used.
-
-> which is undeniably board specific and therefore totally unsuitable for a generic
-> file. Leading to every board needing to override everything regardless.
->
-> So no, I'm not going to respin the patch. I strongly believe using axp209.dtsi is
-> the wrong thing to do here.
-> If that means the patch doesn't make it in, then so be it.
-
-Please take a look at sun5i-a13-utoo-p66.dts, if you do something
-similar like that, then ldo 3 and 4 will get disabled, please run
-some tests this way, then I expect that you will see that everything still
-works fine without them enabled, and if not you can easily enable them the
-same way the other regulators are enabled in sun5i-a13-utoo-p66.dts
-
-Regards,
-
-Hans
+diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
+index a23ac0c..0b7c3e8 100644
+--- a/drivers/clk/at91/clk-usb.c
++++ b/drivers/clk/at91/clk-usb.c
+@@ -56,22 +56,55 @@ static unsigned long at91sam9x5_clk_usb_recalc_rate(struct clk_hw *hw,
+ 	return DIV_ROUND_CLOSEST(parent_rate, (usbdiv + 1));
+ }
+ 
+-static long at91sam9x5_clk_usb_round_rate(struct clk_hw *hw, unsigned long rate,
+-					  unsigned long *parent_rate)
++static long at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
++					      unsigned long rate,
++					      unsigned long min_rate,
++					      unsigned long max_rate,
++					      unsigned long *best_parent_rate,
++					      struct clk_hw **best_parent_hw)
+ {
+-	unsigned long div;
++	struct clk *parent = NULL;
++	long best_rate = -EINVAL;
++	unsigned long tmp_rate;
++	int best_diff = -1;
++	int tmp_diff;
++	int i;
+ 
+-	if (!rate)
+-		return -EINVAL;
++	for (i = 0; i < __clk_get_num_parents(hw->clk); i++) {
++		int div;
+ 
+-	if (rate >= *parent_rate)
+-		return *parent_rate;
++		parent = clk_get_parent_by_index(hw->clk, i);
++		if (!parent)
++			continue;
++
++		for (div = 1; div < SAM9X5_USB_MAX_DIV + 2; div++) {
++			unsigned long tmp_parent_rate;
++
++			tmp_parent_rate = rate * div;
++			tmp_parent_rate = __clk_round_rate(parent,
++							   tmp_parent_rate);
++			tmp_rate = DIV_ROUND_CLOSEST(tmp_parent_rate, div);
++			if (tmp_rate < rate)
++				tmp_diff = rate - tmp_rate;
++			else
++				tmp_diff = tmp_rate - rate;
++
++			if (best_diff < 0 || best_diff > tmp_diff) {
++				best_rate = tmp_rate;
++				best_diff = tmp_diff;
++				*best_parent_rate = tmp_parent_rate;
++				*best_parent_hw = __clk_get_hw(parent);
++			}
++
++			if (!best_diff || tmp_rate < rate)
++				break;
++		}
+ 
+-	div = DIV_ROUND_CLOSEST(*parent_rate, rate);
+-	if (div > SAM9X5_USB_MAX_DIV + 1)
+-		div = SAM9X5_USB_MAX_DIV + 1;
++		if (!best_diff)
++			break;
++	}
+ 
+-	return DIV_ROUND_CLOSEST(*parent_rate, div);
++	return best_rate;
+ }
+ 
+ static int at91sam9x5_clk_usb_set_parent(struct clk_hw *hw, u8 index)
+@@ -121,7 +154,7 @@ static int at91sam9x5_clk_usb_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ static const struct clk_ops at91sam9x5_usb_ops = {
+ 	.recalc_rate = at91sam9x5_clk_usb_recalc_rate,
+-	.round_rate = at91sam9x5_clk_usb_round_rate,
++	.determine_rate = at91sam9x5_clk_usb_determine_rate,
+ 	.get_parent = at91sam9x5_clk_usb_get_parent,
+ 	.set_parent = at91sam9x5_clk_usb_set_parent,
+ 	.set_rate = at91sam9x5_clk_usb_set_rate,
+@@ -159,7 +192,7 @@ static const struct clk_ops at91sam9n12_usb_ops = {
+ 	.disable = at91sam9n12_clk_usb_disable,
+ 	.is_enabled = at91sam9n12_clk_usb_is_enabled,
+ 	.recalc_rate = at91sam9x5_clk_usb_recalc_rate,
+-	.round_rate = at91sam9x5_clk_usb_round_rate,
++	.determine_rate = at91sam9x5_clk_usb_determine_rate,
+ 	.set_rate = at91sam9x5_clk_usb_set_rate,
+ };
+ 
+@@ -179,7 +212,8 @@ at91sam9x5_clk_register_usb(struct at91_pmc *pmc, const char *name,
+ 	init.ops = &at91sam9x5_usb_ops;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+-	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
++	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
++		     CLK_SET_RATE_PARENT;
+ 
+ 	usb->hw.init = &init;
+ 	usb->pmc = pmc;
+@@ -207,7 +241,7 @@ at91sam9n12_clk_register_usb(struct at91_pmc *pmc, const char *name,
+ 	init.ops = &at91sam9n12_usb_ops;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+-	init.flags = CLK_SET_RATE_GATE;
++	init.flags = CLK_SET_RATE_GATE | CLK_SET_RATE_PARENT;
+ 
+ 	usb->hw.init = &init;
+ 	usb->pmc = pmc;
+-- 
+1.9.1
