@@ -1,110 +1,151 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 29 Mar 2015 12:20:33 +0200
-Subject: Fwd: Ask for help: ARM: mvebu: add NAND support for dove
-In-Reply-To: <551714F8.2050401@gmail.com>
-References: <551713D8.3060809@gmail.com> <551714F8.2050401@gmail.com>
-Message-ID: <5517D1F1.6000309@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 29 Mar 2015 12:38:11 +0200
+Subject: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
+In-Reply-To: <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A1E8@EXCHANGE.collogia.de>
+References: <1427580628-7128-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427580628-7128-2-git-send-email-ard.biesheuvel@linaro.org>
+ <12EF8D94C6F8734FB2FF37B9FBEDD1735FC8A1E8@EXCHANGE.collogia.de>
+Message-ID: <CAKv+Gu9kMPM2t5r8pgdw=Cc5juGTxCeJJc1L-yBy6AS_A2UUAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.03.2015 21:54, Gabriel Dobato wrote:
-> I am trying to set the Nand in a CM-510 Compulab based board (4.0-rc5).
+On 29 March 2015 at 10:29, Markus Stockhausen <stockhausen@collogia.de> wrote:
+>> Von: linux-crypto-owner at vger.kernel.org [linux-crypto-owner at vger.kernel.org]&quot; im Auftrag von &quot;Ard Biesheuvel [ard.biesheuvel at linaro.org]
+>> Gesendet: Samstag, 28. M?rz 2015 23:10
+>> An: linux-arm-kernel at lists.infradead.org; linux-crypto at vger.kernel.org; samitolvanen at google.com; herbert at gondor.apana.org.au; jussi.kivilinna at iki.fi
+>> Cc: Ard Biesheuvel
+>> Betreff: [RFC PATCH 1/6] crypto: sha512: implement base layer for SHA-512
+>>
+>> To reduce the number of copies of boilerplate code throughout
+>> the tree, this patch implements generic glue for the SHA-512
+>> algorithm. This allows a specific arch or hardware implementation
+>> to only implement the special handling that it needs.
 >
-> As pxa3xx-nand driver supports NFCv1 (PXA3xx) and NFCv2 (Armada 370/XP),
-> I think that it should work more or less with Dove SoC (NFCv1) that is
-> similar enough.
-
-Gabriel,
-
-I haven't compared Dove NFC with the one from PXA3xx or Armada 370/XP
-in detail, yet. I doubt that it will be fully compatible with Armada
-370/XP as you state it is NFCv2 above.
-
-> Until now, I've only added the correspondent node in dove.dtsi and the
-> partitions in dove-cm-a510.dts ( it should be updated in the patch
-> series that Sebastian Hesselbarth submitted ) :
-
-We'll deal with it as soon as the i2c-mux thing is worked out.
-
-> ---
->   arch/arm/boot/dts/dove-cm-a510.dts | 17 +++++++++++++++++
->   arch/arm/boot/dts/dove.dtsi        | 16 ++++++++++++++++
->   2 files changed, 33 insertions(+)
+> Hi Ard,
 >
-> diff --git a/arch/arm/boot/dts/dove-cm-a510.dts
-> b/arch/arm/boot/dts/dove-cm-a510.dts
-> index 50c0d69..36cf10d 100644
-> --- a/arch/arm/boot/dts/dove-cm-a510.dts
-> +++ b/arch/arm/boot/dts/dove-cm-a510.dts
-> @@ -36,3 +36,20 @@
->   &i2c0 {
->            status = "okay";
->   };
-> +
-> +&nand  {
-> +          status = "okay";
-> +          num-cs = <1>;
-> +          partition at 0 {
-> +                 label = "uImage";
-> +                 reg = <0x000000000000 0x000000400000>;
-
-#address-cells and #size-cells of &nand below is <1> each, so above
-should be 32b values. If it would be 64b it would have to be split
-into two 32b values anyway.
-
-> +          };
-> +          partition at 400000 {
-> +                 label = "Rootfs";
-> +                 reg = <0x000000400000 0x00001FC00000>;
-> +          };
-> +};
-> +
-> +
-> +
-> +
-
-Please avoid adding extra whitespaces.
-
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index a5441d5..7e71f45 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -380,6 +380,22 @@
->                                  status = "disabled";
->                          };
+> Implementing a common layer is a very good idea - I didn't like to
+> implement the glue code once again for some recently developed
+> PPC crypto modules. From my very short crypto experience I was
+> surprised that my optimized implementations degraded disproportional
+> for small calculations in the <=256byte update scenarios in contrast to
+> some very old basic implementations. Below you will find some hints,
+> that might fit your implementation too. Thus all new implementations
+> based on your framework could benefit immediately.
 >
-> +                       nand: nand at c0000 {
-> +                                compatible = "marvell,armada370-nand";
 
-As said above, I doubt Dove NFC is fully compatible with Armada 370 NFC.
-Ezequiel can tell for sure, as he probably knows Marvell NFC best.
+Thanks for taking a look!
 
-> +                                #address-cells = <1>;
-> +                                #size-cells = <1>;
-> +                                reg= <0xc0000 0x60>;
-> +                                interrupts = <3>;
-> +                                clocks = <&core_clk 0>;
+>> ...
+>> +int sha384_base_init(struct shash_desc *desc)
+>> +{
+>> +       struct sha512_state *sctx = shash_desc_ctx(desc);
+>> +
+>> +       *sctx = (struct sha512_state){
+>> +               .state = {
+>> +                       SHA384_H0, SHA384_H1, SHA384_H2, SHA384_H3,
+>> +                       SHA384_H4, SHA384_H5, SHA384_H6, SHA384_H7,
+>> +               }
+>> +       };
+>> +       return 0;
+>> +}
+>
+> IIRC the above code will initialize the whole context including the 64/128
+> byte buffer. Direct assignment of the 8 hashes was faster in my case.
+>
 
-There is a clock gate for NFC, check Dove FS, Clock Gating Control
-register, bit 10. Above should be:
+Ah, I missed that. I will change it.
 
-	clocks = <&gate_clk 10>;
+>> ...
+>> +int sha512_base_do_update(struct shash_desc *desc, const u8 *data,
+>> +                         unsigned int len, sha512_block_fn *block_fn, void *p)
+>> +{
+>> +       struct sha512_state *sctx = shash_desc_ctx(desc);
+>> +       unsigned int partial = sctx->count[0] % SHA512_BLOCK_SIZE;
+>> +
+>> +       sctx->count[0] += len;
+>> +       if (sctx->count[0] < len)
+>> +               sctx->count[1]++;
+>
+> You should check if early kick out at this point if the buffer won't be filled up
+> is faster than first taking care about big data. That can improve performance
+> for small blocks while large blocks might be unaffected.
+>
+>> +
+>> +       if ((partial + len) >= SHA512_BLOCK_SIZE) {
 
-> +                                pinctrl-0 = <&pmx_nand>;
-> +                                pinctrl-names = "default";
-> +                                marvell,nand-keep-config;
-> +                                marvell,nand-enable-arbiter;
+Isn't this early kickout? The if is only entered if there is enough
+data to run the block function, otherwise it is a straight memcpy. I
+could add an unlikely() here to favor the small data case
 
-I haven't checked the foo-arbiter property, but are you sure it is
-available on Dove?
 
-Sebastian
+>> +               int blocks;
+>> +
+>> +               if (partial) {
+>> +                       int p = SHA512_BLOCK_SIZE - partial;
+>> +
+>> +                       memcpy(sctx->buf + partial, data, p);
+>> +                       data += p;
+>> +                       len -= p;
+>> +               }
+>> +
+>> +               blocks = len / SHA512_BLOCK_SIZE;
+>> +               len %= SHA512_BLOCK_SIZE;
+>> +
+>> +               block_fn(blocks, data, sctx->state,
+>> +                        partial ? sctx->buf : NULL, p);
+>> +               data += blocks * SHA512_BLOCK_SIZE;
+>> +               partial = 0;
+>> +       }
+>> +       if (len)
+>> +               memcpy(sctx->buf + partial, data, len);
+>> +
+>> +       return 0;
+>> +}
+>> +EXPORT_SYMBOL(sha512_base_do_update);
+>> +
+>> +int sha512_base_do_finalize(struct shash_desc *desc, sha512_block_fn *block_fn,
+>> +                           void *p)
+>> +{
+>> +       static const u8 padding[SHA512_BLOCK_SIZE] = { 0x80, };
+>> +
+>> +       struct sha512_state *sctx = shash_desc_ctx(desc);
+>> +       unsigned int padlen;
+>> +       __be64 bits[2];
+>> +
+>> +       padlen = SHA512_BLOCK_SIZE -
+>> +                (sctx->count[0] + sizeof(bits)) % SHA512_BLOCK_SIZE;
+>> +
+>> +       bits[0] = cpu_to_be64(sctx->count[1] << 3 |
+>> +                             sctx->count[0] >> 61);
+>> +       bits[1] = cpu_to_be64(sctx->count[0] << 3);
+>> +
+>> +       sha512_base_do_update(desc, padding, padlen, block_fn, p);
+>
+> I know that this is the most intuitive and straight implementation for handling
+> finalization. Nevertheless the maybe a little obscure generic md5 algorithm
+> gives best in class performance for hash finalization of small input data.
+>
 
-> +                                nand-on-flash-bbt;
-> +                        };
-> +
-> +
-> +
->                          thermal: thermal-diode at d001c {
->                                  compatible = "marvell,dove-thermal";
->                                  reg = <0xd001c 0x0c>, <0xd005c 0x08>;
+Well, memcpy'ing a buffer consisting almost entirely of zeroes doesn't
+quite feel right, indeed.
+I will instead follow the md5 suggestion
+
+> For comparison: From the raw numbers the sha1-ppc-spe assembler module
+> written by me is only 10% faster than the old sha1-popwerpc assembler module.
+> Both are simple assembler algorithms without hardware acceleration. For large
+> blocks I gain another 8% by avoding function calls because the core module
+> may process several blocks. But for small single block updates the above glue
+> code optimizations gave
+>
+> 16byte block single update: +24%
+> 64byte block single update: +16%
+> 256byte block single update +12%
+>
+> Considering CPU assisted SHA calculations that percentage may be even higher.
+>
+> Maybe worth the effort ...
+>
+
+Absolutely!
+
+Thanks again
