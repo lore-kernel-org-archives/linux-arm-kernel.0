@@ -1,26 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Mar 2015 13:56:18 -0700
-Subject: [PATCH] arm64: juno: Fix misleading name of UART reference clock
-In-Reply-To: <1426595741-6213-1-git-send-email-Dave.Martin@arm.com>
-References: <1426595741-6213-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150329205618.GA13301@localhost>
+Date: Sun, 29 Mar 2015 13:58:27 -0700
+Subject: [GIT PULL] SoCFPGA late fix for v4.0
+In-Reply-To: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
+References: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20150329205827.GC13301@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 12:35:41PM +0000, Dave Martin wrote:
-> The UART reference clock speed is 7273.8 kHz, not 72738 kHz.
+On Thu, Mar 19, 2015 at 01:45:19PM -0500, dinguyen at opensource.altera.com wrote:
+> Hi Arnd, Kevin and Olof,
 > 
-> Dots aren't usually used in node names even though ePAPR permits
-> them.  However, this can easily be avoided by expressing the
-> frequency in Hz, not kHz.
+> Please pull this 1 patch that fixes SPI. If it's too late for v4.0, then
+> this patch can go in for v4.1.
 > 
-> This patch changes the name to refclk7273800hz, reflecting the
-> actual clock speed.
+> Thanks,
 > 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+> 
+>   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fix_for_v4.0_2
+> 
+> for you to fetch changes up to 1ac31de744202a3a14601170a57f155b4a8d2c21:
+> 
+>   ARM: socfpga: dts: fix spi1 interrupt (2015-03-19 10:51:15 -0500)
 
-Applied.
+Merged, thanks.
 
 
 -Olof
