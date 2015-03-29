@@ -1,23 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Sun, 29 Mar 2015 13:41:01 -0700 (PDT)
-Subject: [PATCH] net: fec: setup right value for mdio hold time
-In-Reply-To: <1427450912-9793-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1427450912-9793-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150329.134101.916097441015561162.davem@davemloft.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 29 Mar 2015 13:34:41 -0700
+Subject: [PATCH V6] kbuild: dtbs_install: new make target
+In-Reply-To: <20150328155822.GA25778@io.lakedaemon.net>
+References: <1384201760-16785-1-git-send-email-jason@lakedaemon.net>
+ <1385942188-21831-1-git-send-email-jason@lakedaemon.net>
+ <20150328132320.GA24391@n2100.arm.linux.org.uk>
+ <20150328155822.GA25778@io.lakedaemon.net>
+Message-ID: <CAOesGMh4Xyyn5mDDo5_88pvZgdVJ-33UYvm8Y_9UNALfsqrytg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Date: Fri, 27 Mar 2015 11:08:32 +0100
+On Sat, Mar 28, 2015 at 8:58 AM, Jason Cooper <jason@lakedaemon.net> wrote:
+> Russell,
+>
+> On Sat, Mar 28, 2015 at 01:23:20PM +0000, Russell King - ARM Linux wrote:
+>> Okay, I'm digging up an old version of this patch - v7 was merged but
+>> I find *nowhere* where that version was posted to people involved in
+>> this discussion.
+>
+> fwiw, I just went through my archive of patch submissions:
+>
+> $ ls ~/projects/linux/dtbs_install/
+> v2  v3  v4  v5  v6
+> $
+>
+> I never wrote a v7.  :-(  Regardless,
 
-> The FEC modules used on i.MX28 and newer have a register to tune the MDIO
-> output hold time that should be at least 10 ns. Up to now this value was not
-> explicitly set and so resulted in less hold time if the fec clock was
-> faster than 100 MHz.
-> 
-> This was noticed on an i.MX28 machine that uses an input clock of ~150
-> Mhz which resulted in unreliable communication with a Marvell switch.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+It was posted by Grant, and posted to LKML, devicetree@ and
+linux-kbuild. The patch was directly cc:d to Jason, Michal Marek,
+Russell and Rob Herring.
 
-Applied.
+
+-Olof
