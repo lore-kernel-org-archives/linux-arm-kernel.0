@@ -1,66 +1,51 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 29 Mar 2015 03:48:48 +0200
-Subject: [PATCH] clk: check ->determine/round_rate() return value in
- clk_calc_new_rates
-Message-ID: <1427593728-9366-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Sun, 29 Mar 2015 03:53:43 +0200
+Subject: [PATCH] clk: at91: pll: fix input range validity check
+Message-ID: <1427594023-9697-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-->determine_rate() and ->round_rate() can return the closest rate to the
-requested one or an error code.
-clk_calc_new_rates is assuming these functions can't return a negative
-value, which leads to a undefined behavior when the clk implementation
-returns such an error code.
-Fix this by returning NULL in case ->determine_rate() or ->round_rate()
-returned an error code.
+The PLL impose a certain input range to work correctly, but it appears that
+this input range does not apply on the input clock (or parent clock) but
+on the input clock after it has passed the PLL divisor.
+Fix the implementation accordingly.
 
+Cc: <stable@vger.kernel.org> # v3.14+
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Jonas Andersson <jonas@microbit.se>
 ---
- drivers/clk/clk.c | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+ drivers/clk/at91/clk-pll.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 237f23f..b59c1b4 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1580,6 +1580,7 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
- 	unsigned long min_rate;
- 	unsigned long max_rate;
- 	int p_index = 0;
-+	long ret;
+diff --git a/drivers/clk/at91/clk-pll.c b/drivers/clk/at91/clk-pll.c
+index 6ec79db..cbbe403 100644
+--- a/drivers/clk/at91/clk-pll.c
++++ b/drivers/clk/at91/clk-pll.c
+@@ -173,8 +173,7 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
+ 	int i = 0;
  
- 	/* sanity */
- 	if (IS_ERR_OR_NULL(clk))
-@@ -1595,15 +1596,23 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *clk,
- 	/* find the closest rate and parent clk/rate */
- 	if (clk->ops->determine_rate) {
- 		parent_hw = parent ? parent->hw : NULL;
--		new_rate = clk->ops->determine_rate(clk->hw, rate,
--						    min_rate,
--						    max_rate,
--						    &best_parent_rate,
--						    &parent_hw);
-+		ret = clk->ops->determine_rate(clk->hw, rate,
-+					       min_rate,
-+					       max_rate,
-+					       &best_parent_rate,
-+					       &parent_hw);
-+		if (ret < 0)
-+			return NULL;
+ 	/* Check if parent_rate is a valid input rate */
+-	if (parent_rate < characteristics->input.min ||
+-	    parent_rate > characteristics->input.max)
++	if (parent_rate < characteristics->input.min)
+ 		return -ERANGE;
+ 
+ 	/*
+@@ -187,6 +186,15 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
+ 	if (!mindiv)
+ 		mindiv = 1;
+ 
++	if (parent_rate > characteristics->input.max) {
++		tmpdiv = DIV_ROUND_UP(parent_rate, characteristics->input.max);
++		if (tmpdiv > PLL_DIV_MAX)
++			return -ERANGE;
 +
-+		new_rate = ret;
- 		parent = parent_hw ? parent_hw->core : NULL;
- 	} else if (clk->ops->round_rate) {
--		new_rate = clk->ops->round_rate(clk->hw, rate,
--						&best_parent_rate);
-+		ret = clk->ops->round_rate(clk->hw, rate,
-+					   &best_parent_rate);
-+		if (ret < 0)
-+			return NULL;
++		if (tmpdiv > mindiv)
++			mindiv = tmpdiv;
++	}
 +
-+		new_rate = ret;
- 		if (new_rate < min_rate || new_rate > max_rate)
- 			return NULL;
- 	} else if (!parent || !(clk->flags & CLK_SET_RATE_PARENT)) {
+ 	/*
+ 	 * Calculate the maximum divider which is limited by PLL register
+ 	 * layout (limited by the MUL or DIV field size).
 -- 
 1.9.1
