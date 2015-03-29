@@ -1,19 +1,65 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 29 Mar 2015 20:13:50 +0200
-Subject: [PATCH 0/1] ARM: dts: sun5i: Enable touchscreen on Utoo P66
-Message-ID: <1427652831-12838-1-git-send-email-hdegoede@redhat.com>
+Date: Sun, 29 Mar 2015 20:13:51 +0200
+Subject: [PATCH] ARM: dts: sun5i: Enable touchscreen on Utoo P66
+In-Reply-To: <1427652831-12838-1-git-send-email-hdegoede@redhat.com>
+References: <1427652831-12838-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1427652831-12838-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Add a node for the chipone-icn8318 touchscreen found on the Utoo P66 tablet.
 
-The driver for the chipone icn8318 touchscreen found on the Utoo P66 tablet
-has been queued up by Dmitry for merging into 4.1 :
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-https://git.kernel.org/cgit/linux/kernel/git/dtor/input.git/commit/drivers/input?h=next&id=a93ad65d37
-
-Can you please add this patch to your dts tree for 4.1 ?
-
-Thanks & Regards,
-
-Hans
+diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+index 0f0a411..d1d4d30 100644
+--- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
++++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+@@ -50,6 +50,7 @@
+ #include "sunxi-common-regulators.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
+ 
+ / {
+@@ -93,6 +94,20 @@
+ 	pinctrl-0 = <&i2c1_pins_a>;
+ 	status = "okay";
+ 
++	chipone_icn8318 at 40 {
++		compatible = "chipone,icn8318";
++		reg = <0x40>;
++		interrupt-parent = <&pio>;
++		interrupts = <9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
++		pinctrl-names = "default";
++		pinctrl-0 = <&ts_wake_pin_p66>;
++		wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
++		touchscreen-size-x = <800>;
++		touchscreen-size-y = <480>;
++		touchscreen-inverted-x;
++		touchscreen-swapped-x-y;
++	};
++
+ 	pcf8563: rtc at 51 {
+ 		compatible = "nxp,pcf8563";
+ 		reg = <0x51>;
+@@ -152,6 +167,13 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
+ 
++	ts_wake_pin_p66: ts_wake_pin at 0 {
++		allwinner,pins = "PB3";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb0_vbus_pin_a: usb0_vbus_pin at 0 {
+ 		allwinner,pins = "PB4";
+ 		allwinner,function = "gpio_out";
+-- 
+2.3.4
