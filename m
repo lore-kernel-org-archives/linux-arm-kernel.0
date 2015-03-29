@@ -1,41 +1,48 @@
 From: appro@openssl.org (Andy Polyakov)
-Date: Sun, 29 Mar 2015 15:27:24 +0200
-Subject: [PATCHv2] arm: crypto: Add optimized SHA-256/224
-In-Reply-To: <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
-References: <20150316154835.GA31336@google.com>	<20150323135009.GB820@google.com>	<20150324122702.GJ14457@ns203013.ovh.net>	<CAKv+Gu-j8m7NAYHL8swjwJ0as6TzNyjqhk0Tp1QhDhH=E78K3Q@mail.gmail.com>	<20150324130511.GK14457@ns203013.ovh.net>	<CAKv+Gu8Px6dYKdrVFyh_5WN3sEAGYy0fv0qHONJ5x+68YZjCOQ@mail.gmail.com>	<CAKv+Gu_4G69JZJPex_=1xOZ4z5Fxtht4YG4G=TnYrkXPuiXvFg@mail.gmail.com>	<5515342F.6010703@openssl.org>	<CAKv+Gu9MzR682Zd7NJ0A+HNU8xv=KOEe1vvN1_kgjrWcWzsZsg@mail.gmail.com>
- <CAKv+Gu-_=FfAdyQKD2FFafJ0_OjcuiYRi8AVhxKsRKnTX6NOTA@mail.gmail.com>
-Message-ID: <5517FDBC.7030008@openssl.org>
+Date: Sun, 29 Mar 2015 16:07:02 +0200
+Subject: [PATCH] crypto/arm: accelerated SHA-512 using ARM generic ASM
+ and NEON
+In-Reply-To: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1427527726-25022-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <55180706.9030104@openssl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>> arch/arm/crypto/sha256-core.S: Assembler messages:
->>>> arch/arm/crypto/sha256-core.S:1847: Error: invalid constant (ffffefb0)
->>>> after fixup
->>>>
->>>> This is caused by the fact that, when building the integer-only code
->>>> for an older architecture, the conditional compilation produces a
->>>> slightly bigger preceding function, and the symbol K256 is out of
->>>> range for the adr instruction.
->>>>
->>>> ... and replace the offending line with
->>>>
->>>> adrl r14,K256
->>>
->>> Ard, you have mentioned that you've verified it on big-endian, but I've
->>> spotted little-endian dependency (see #ifndef __ARMEB__ in attached). I
->>> guess that it worked for you either because it was NEON that was tested
->>> (it does work as is) or __LINUX_ARM_ARCH__ was less than 7 (in which
->>> case it uses endian-neutral byte-by-byte data load). Can you confirm either?
+> This updates the SHA-512 NEON module with the faster and more
+> versatile implementation from the OpenSSL project. It consists
+> of both a NEON and a generic ASM version of the core SHA-512
+> transform, where the NEON version reverts to the ASM version
+> when invoked in non-process context.
 > 
-> Indeed, if I build for v7 I get
+> Performance relative to the generic implementation (measured
+> using tcrypt.ko mode=306 sec=1 running on a Cortex-A57 under
+> KVM):
 > 
-> [    0.269418] 00000000: 4e a5 c5 08 a6 56 6e 76 24 05 43 f8 fe b0 6f d4
-> [    0.275261] 00000010: 57 77 7b e3 95 49 c4 01 64 36 af da 65 d2 33 0e
-> [    0.281031] alg: hash: Test 1 failed for sha224-asm
-> [    0.285315] 00000000: 9d 6a 5d e9 e1 6c 39 99 c7 14 84 0f 47 77 1f 36
-> [    0.290912] 00000010: dc c2 97 a7 bd ef aa c3 6c 95 15 ae
+> 	input size	block size	asm	neon	old neon
 > 
-> which is indeed the integer code failing, and your attached patch fixes it.
+> 	8192		8192		1.51	3.51	2.69
 
-Committed as
-http://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=51f8d095562f36cdaa6893597b5c609e943b0565.
+One should keep in mind that improvement coefficients vary greatly from
+platform to platform. Normally you *should* observe higher coefficients
+in asm column and *can* observe smaller differences between "neon" and
+"old neon". BTW, 1.51 is unexpectedly low, I wonder which compiler
+version stands for 1.0? Nor can I replicate difference between "neon"
+and "old neon", I get smaller difference, 17%, on Cortex-A57. Well, I'm
+comparing in user-land, but it shouldn't be that significant at large
+blocks...
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> This should get the same treatment as Sami's sha56 version: I would like
+> to wait until the OpenSSL source file hits the upstream repository so that
+> I can refer to its sha1 hash in the commit log.
+
+Update is committed as
+http://git.openssl.org/gitweb/?p=openssl.git;a=commitdiff;h=b1a5d1c652086257930a1f62ae51c9cdee654b2c.
+Note that the file I've initially sent privately was a little bit off.
+Sorry about that. But that little bit is just a commentary update that
+adds performance result for Cortex-A15. So that kernel patch as
+originally posted is 100% functionally equivalent.
+
+Cheers.
