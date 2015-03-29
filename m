@@ -1,31 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Mar 2015 13:58:27 -0700
-Subject: [GIT PULL] SoCFPGA late fix for v4.0
-In-Reply-To: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1426790719-21636-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150329205827.GC13301@localhost>
+Date: Sun, 29 Mar 2015 13:59:35 -0700
+Subject: [GIT PULL] omap fixes for v4.0-rc cycle
+In-Reply-To: <20150319204922.GV5140@atomide.com>
+References: <20150319204922.GV5140@atomide.com>
+Message-ID: <20150329205935.GD13301@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 01:45:19PM -0500, dinguyen at opensource.altera.com wrote:
-> Hi Arnd, Kevin and Olof,
+On Thu, Mar 19, 2015 at 01:49:23PM -0700, Tony Lindgren wrote:
+> The following changes since commit 5b7610f235627878617648a99dd1442997f1c889:
 > 
-> Please pull this 1 patch that fixes SPI. If it's too late for v4.0, then
-> this patch can go in for v4.1.
-> 
-> Thanks,
-> 
-> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
-> 
->   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+>   ARM: OMAP2+: Fix wl12xx on dm3730-evm with mainline u-boot (2015-03-06 10:37:34 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.rocketboards.org/linux-socfpga-next.git tags/socfpga_fix_for_v4.0_2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/fixes-v4.0-rc4
 > 
-> for you to fetch changes up to 1ac31de744202a3a14601170a57f155b4a8d2c21:
+> for you to fetch changes up to 599c376c49323127c9bdbb0fa61a3d4743819bc2:
 > 
->   ARM: socfpga: dts: fix spi1 interrupt (2015-03-19 10:51:15 -0500)
+>   ARM: dts: Fix gpio interrupts for dm816x (2015-03-18 13:41:34 -0700)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for the -rc cycle:
+> 
+> - Fix a device tree based booting vs legacy booting regression for
+>   omap3 crypto hardware by adding the missing DMA channels.
+> 
+> - Fix /sys/bus/soc/devices/soc0/family for am33xx devices.
+> 
+> - Fix two timer issues that can cause hangs if the timer related
+>   hwmod data is missing like it often initially is for new SoCs.
+> 
+> - Remove pcie hwmods entry from dts as that causes runtime PM to
+>   fail for the PHYs.
+> 
+> - A paper bag type dts configuration fix for dm816x GPIO
+>   interrupts that I just noticed. This is most of the changes
+>   diffstat wise, but as it's a basic feature for connecting
+>   devices and things work otherwise, it should be fixed.
 
 Merged, thanks.
 
