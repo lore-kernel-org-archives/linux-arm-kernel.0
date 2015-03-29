@@ -1,26 +1,23 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 29 Mar 2015 22:06:18 +0200
-Subject: [PATCH v3] ARM: dts: imx25-pinfunc: Add several pinfunctions
-In-Reply-To: <1427659235-30800-1-git-send-email-mpa@pengutronix.de>
-References: <1427659235-30800-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150329200618.GM32677@pengutronix.de>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 29 Mar 2015 13:41:01 -0700 (PDT)
+Subject: [PATCH] net: fec: setup right value for mdio hold time
+In-Reply-To: <1427450912-9793-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1427450912-9793-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20150329.134101.916097441015561162.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Markus,
+From: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Date: Fri, 27 Mar 2015 11:08:32 +0100
 
-On Sun, Mar 29, 2015 at 10:00:35PM +0200, Markus Pargmann wrote:
-> This patch adds some not yet defined pinfunctions. It also adds two
-> comments about mistakes in the i.MX25 reference manual so it is easier
-> to spot the difference between reference manual and pinfunction
-> definitions.
+> The FEC modules used on i.MX28 and newer have a register to tune the MDIO
+> output hold time that should be at least 10 ns. Up to now this value was not
+> explicitly set and so resulted in less hold time if the fec clock was
+> faster than 100 MHz.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> This was noticed on an i.MX28 machine that uses an input clock of ~150
+> Mhz which resulted in unreliable communication with a Marvell switch.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thanks for addressing my comments, best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Applied.
