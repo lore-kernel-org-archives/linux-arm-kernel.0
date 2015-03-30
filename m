@@ -1,18 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 30 Mar 2015 13:50:55 +0800
-Subject: [PATCH v3] ARM: dts: imx25-pinfunc: Add several pinfunctions
-In-Reply-To: <1427659235-30800-1-git-send-email-mpa@pengutronix.de>
-References: <1427659235-30800-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150330055053.GQ28410@dragon>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 30 Mar 2015 13:54:22 +0800
+Subject: [PATCH v3] cpufreq: hisilicon: add acpu driver
+In-Reply-To: <CAKohpomCQos+a8rjZa=B=jmhffi-qWrjz_nSZ_i68fxnJ5ioVA@mail.gmail.com>
+References: <1427693197-12290-1-git-send-email-leo.yan@linaro.org>
+ <CAKohpomCQos+a8rjZa=B=jmhffi-qWrjz_nSZ_i68fxnJ5ioVA@mail.gmail.com>
+Message-ID: <20150330055422.GB30058@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 29, 2015 at 10:00:35PM +0200, Markus Pargmann wrote:
-> This patch adds some not yet defined pinfunctions. It also adds two
-> comments about mistakes in the i.MX25 reference manual so it is easier
-> to spot the difference between reference manual and pinfunction
-> definitions.
+On Mon, Mar 30, 2015 at 11:04:08AM +0530, Viresh Kumar wrote:
+> On 30 March 2015 at 10:56, Leo Yan <leo.yan@linaro.org> wrote:
+> > Add acpu driver for hisilicon SoC, acpu is application processor
+> > subsystem. Currently the acpu has the coupled clock domain for two
+> > clusters, so this driver will directly use cpufreq-dt driver as
+> > backend.
+> >
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  drivers/cpufreq/Kconfig.arm         |  9 ++++++++
+> >  drivers/cpufreq/Makefile            |  1 +
+> >  drivers/cpufreq/hisi-acpu-cpufreq.c | 42 +++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 52 insertions(+)
+> >  create mode 100644 drivers/cpufreq/hisi-acpu-cpufreq.c
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Applied, thanks.
+Thanks, Viresh.
