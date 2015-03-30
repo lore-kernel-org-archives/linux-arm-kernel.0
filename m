@@ -1,57 +1,144 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Mar 2015 15:31:17 +0200
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <20150330132617.GI24899@n2100.arm.linux.org.uk>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz>
- <20150330132617.GI24899@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 30 Mar 2015 15:31:48 +0200
+Subject: [PATCH 1/2] mmc: Add support for marking hpi as broken through
+ devicetree
+In-Reply-To: <CAPDyKFp8bNYNgNW0u-JCN4ay0UM7JEdkdW48VRsCmu+JWpJgEA@mail.gmail.com>
+References: <1427652575-12642-1-git-send-email-hdegoede@redhat.com>
+ <CAPDyKFp8bNYNgNW0u-JCN4ay0UM7JEdkdW48VRsCmu+JWpJgEA@mail.gmail.com>
+Message-ID: <55195044.3050901@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 15:26, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
->> Is this a limitation of a particular ARM ABI or a limitation of a state
->> of the art ARM linker or something else?
->
-> It's a limitation of the ARM ISA.
->
-> Normal PC-relative branches, which are emitted by the C compiler, can
-> branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
-> offset is not representable in the instruction.
->
-> To get around that "modern" linkers are able to insert stubs as
-> necessary inbetween the object .text sections to extend the range of
-> these branches (by emitting a chunk of code possibly with some data to
-> extend the range of the branch.)
->
-> Obviously, gcc can't know before hand that the sum total of all the
-> small object files is going to cause problems, so the compiler can't
-> do this on an "as necessary basis".
->
-> For most practical kernels, this is not a problem; they normally fit
-> within the PC-relative range.  However, the exception is allyesconfig.
->
-> The question is: how far do we go with allyesconfig... do we want it
-> to work, or is reaching the final link sufficient?  If we do tweak
-> stuff to allow the link to work, are we going to try running it?
->
+Hi,
 
-That is an excellent question, hence the RFC in the subject line.
+On 30-03-15 11:14, Ulf Hansson wrote:
+> On 29 March 2015 at 20:09, Hans de Goede <hdegoede@redhat.com> wrote:
+>> The eMMC on a tablet I've will stop working / communicating as soon as
+>> the kernel executes:
+>>
+>>                  mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>                                  EXT_CSD_HPI_MGMT, 1,
+>>                                  card->ext_csd.generic_cmd6_time);
+>>
+>> There seems to be no way to reliable identify eMMC-s which have a broken
+>> hpi implementation, but at least for eMMC's which are soldered onto a board
+>> we can work around this by specifying that hpi is broken in devicetree.
+>
+> Seems like a reasonable approach!
+>
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   Documentation/devicetree/bindings/mmc/mmc-card.txt | 31 ++++++++++++++++++++++
+>>   drivers/mmc/core/mmc.c                             | 10 ++++++-
+>>   2 files changed, 40 insertions(+), 1 deletion(-)
+>>   create mode 100644 Documentation/devicetree/bindings/mmc/mmc-card.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt b/Documentation/devicetree/bindings/mmc/mmc-card.txt
+>> new file mode 100644
+>> index 0000000..0cc67fb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
+>> @@ -0,0 +1,31 @@
+>> +mmc-card / eMMC bindings
+>> +------------------------
+>> +
+>> +This documents describes the devicetree bindings for a mmc-host controller
+>> +child node describing a mmc-card / an eMMC, see "Use of Function subnodes"
+>> +in mmc.txt
+>> +
+>> +Required properties:
+>> +-compatible : Must be "mmc-card"
+>> +-reg        : Must be <0>
+>
+> Instead of using a compatible, why can we just use "reg = <0>"?
 
-Note that the other patch, the one against kallsyms, addresses the
-issue where the distance between the beginning of .text and the end of
-.init.text  exceeds this limit, which is not as unlikely as the issue
-that this patch addresses, where just drivers/built-in.o in isolation
-already exceeds this limit.
+Yes we could do that, but using a compatible is sort of the standard way
+to ensure that the contents of the node match the same binding rules as
+the code parsing the node. e.g. i2c child nodes also have a compatible string,
+as does the oob irq info for broadcom sdio wifi cards, which is the one
+existing user of mmc host child nodes I'm aware of.
 
-So I am quite happy to drop this, especially as we can add
--ffunction-sections as well. (Haven't tested this myself though: after
-building allyesconfig on my poor laptop a couple of times, I am
-sending it on a well deserved vacation for the rest of the week)
+Regards,
 
-Thanks,
-Ard.
+Hans
+
+
+>
+>> +
+>> +Optional properties:
+>> +-broken-hpi : Use this to indicate that the mmc-card has a broken hpi
+>> +              implementation, and that hpi should not be used
+>> +
+>> +Example:
+>> +
+>> +&mmc2 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&mmc2_pins_a>;
+>> +       vmmc-supply = <&reg_vcc3v3>;
+>> +       bus-width = <8>;
+>> +       non-removable;
+>> +       status = "okay";
+>> +
+>> +       mmmcard: mmccard at 0 {
+>> +               reg = <0>;
+>> +               compatible = "mmc-card";
+>> +               broken-hpi;
+>> +       };
+>> +};
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index 1d41e85..8d18920 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -11,6 +11,7 @@
+>>    */
+>>
+>>   #include <linux/err.h>
+>> +#include <linux/of.h>
+>>   #include <linux/slab.h>
+>>   #include <linux/stat.h>
+>>   #include <linux/pm_runtime.h>
+>> @@ -336,6 +337,8 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+>>   {
+>>          int err = 0, idx;
+>>          unsigned int part_size;
+>> +       struct device_node *np = card->dev.of_node;
+>> +       bool broken_hpi = false;
+>>
+>>          /* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
+>>          card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
+>> @@ -349,6 +352,9 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+>>                  }
+>>          }
+>>
+>> +       if (np && of_device_is_compatible(np, "mmc-card"))
+>> +               broken_hpi = of_property_read_bool(np, "broken-hpi");
+>> +
+>>          /*
+>>           * The EXT_CSD format is meant to be forward compatible. As long
+>>           * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
+>> @@ -494,7 +500,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+>>                  }
+>>
+>>                  /* check whether the eMMC card supports HPI */
+>> -               if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
+>> +               if (!broken_hpi && (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1)) {
+>>                          card->ext_csd.hpi = 1;
+>>                          if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x2)
+>>                                  card->ext_csd.hpi_cmd = MMC_STOP_TRANSMISSION;
+>> @@ -1251,6 +1257,8 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>>                  card->ocr = ocr;
+>>                  card->type = MMC_TYPE_MMC;
+>>                  card->rca = 1;
+>> +               /* Also gets done by mmc_add_card, but we need early access */
+>> +               card->dev.of_node = mmc_of_find_child_device(host, 0);
+>>                  memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
+>>          }
+>>
+>> --
+>> 2.3.4
+>>
+>
+> Kind regards
+> Uffe
+>
