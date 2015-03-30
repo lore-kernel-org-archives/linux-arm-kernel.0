@@ -1,42 +1,35 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 30 Mar 2015 13:39:31 +0300
-Subject: [PATCH 3/3] ARM: pxa: declare battery device on poodle
-In-Reply-To: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
-References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1427711971-8164-3-git-send-email-dbaryshkov@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 30 Mar 2015 12:43:01 +0200
+Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
+ device ID string
+In-Reply-To: <20150330103659.GD17971@leverpostej>
+References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
+ <20150330103659.GD17971@leverpostej>
+Message-ID: <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare a battery platform device for SL-5600 (poodle) platform.
+On 30 March 2015 at 12:37, Mark Rutland <mark.rutland@arm.com> wrote:
+> For DT patches, please send to devicetree at vger.kernel.org; this affects
+> more than just ARM.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-pxa/poodle.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Ofc, sorry.
 
-diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 596e756..90d679a 100644
---- a/arch/arm/mach-pxa/poodle.c
-+++ b/arch/arm/mach-pxa/poodle.c
-@@ -466,6 +466,11 @@ static struct platform_device poodle_power_device = {
- 	.dev.platform_data	= &poodle_power_data,
- };
- 
-+static struct platform_device poodle_battery_device = {
-+	.name			= "poodle-battery",
-+	.id			= -1,
-+};
-+
- static struct platform_device *devices[] __initdata = {
- 	&poodle_locomo_device,
- 	&poodle_scoop_device,
-@@ -474,6 +479,7 @@ static struct platform_device *devices[] __initdata = {
- 	&sharpsl_nand_device,
- 	&sharpsl_rom_device,
- 	&poodle_power_device,
-+	&poodle_battery_device,
- };
- 
- static struct i2c_board_info __initdata poodle_i2c_devices[] = {
--- 
-2.1.4
+
+> On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
+>> Device vendors often assign IDs to their devices to allow comparing
+>> firmware image with device model. This is required to prevent users
+>> from flashing incompatible image and soft-bricking device.
+>> Add device_id property to DTs to allow user space (and optionally
+>> bootloader) verifying firmware images.
+>
+> This sounds like exactly what the "model" property is meant to be (per
+> ePAPR) -- a string that specifices the manufacturer's model number of
+> the device, ideally in "manufacturer,model" format.
+
+What if manufacturer decided to use some totally unfriendly ID for
+their low-level (firmware upgrade) model identification? I can't
+really see us using
+model = "U12H245T00_NETGEAR"
+which would mean nothing compared to the current friendly:
+model = "Netgear R6250 V1 (BCM4708)"
