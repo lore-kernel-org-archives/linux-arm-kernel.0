@@ -1,44 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 30 Mar 2015 11:58:10 +0200
-Subject: [PATCH/RFC 1/5] clk: shmobile: rcar-gen2: Add CPG Clock Domain
- support
-In-Reply-To: <20150325010440.GC1767@verge.net.au>
-References: <1426708017-28885-1-git-send-email-geert+renesas@glider.be>
- <1426708017-28885-2-git-send-email-geert+renesas@glider.be>
- <20150324230036.7930.50037@quantum>
- <20150325010440.GC1767@verge.net.au>
-Message-ID: <CAMuHMdUKjYH9U_o2q9maxCUfvijP=EpX=NUVGOnp=qOF7BHUOw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 30 Mar 2015 11:58:20 +0200
+Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
+In-Reply-To: <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
+References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
+ <139dc298c0914b3536445dddd37be286@agner.ch>
+ <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
+Message-ID: <20150330095820.GD17728@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 2:04 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Mar 24, 2015 at 04:00:36PM -0700, Michael Turquette wrote:
->> Quoting Geert Uytterhoeven (2015-03-18 12:46:53)
->> > Add Clock Domain support to the R-Car Gen2 Clock Pulse Generator (CPG)
->> > driver using the generic PM Domain.  This allows to power-manage the
->> > module clocks of SoC devices that are part of the CPG Clock Domain using
->> > Runtime PM, or for system suspend/resume.
->> >
->> > SoC devices that are part of the CPG Clock Domain and can be
->> > power-managed through their primary clock should be tagged in DT with a
->> > proper "power-domains" property.
->> >
->> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Looks good to me. Which tree do you want this patch to go through?
->
-> My tree seems reasonable from my point of view.
-> Though at this point it would be targeted at v4.2.
+On Mon, Mar 30, 2015 at 11:40:47AM +0200, Linus Walleij wrote:
+> On Fri, Mar 27, 2015 at 11:32 AM, Stefan Agner <stefan@agner.ch> wrote:
+> > On 2015-03-24 16:26, Markus Pargmann wrote:
+> 
+> >> 0 is used in all pinfunction definitions when a config register is not
+> >> available, for example imx25-pinfunc.h. If a configuration value is used
+> >> for such a pinfunction the driver will always write it to the
+> >> configuration register if it is not -1. For a 0 configuration register
+> >> the configuration value is written to offset 0x0. This can lead to a
+> >> crashing/hanging system without any warning message.
+> >
+> > 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
+> > the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
+> > actually works.
+> >
+> > What is a bit a bummer is that we now have different meanings of 0,
+> > depending on the field:
+> > - For the first field (mux), 0 is a valid offset
+> > - For the second field (config), 0 means not valid
+> 
+> What is generally scary about DTS files is that the DT formats
+> are not ruled by a context-free grammar.
+> 
+> There were attempts to formalize some bindings using BNF
+> but they seems to have been given up.
+> 
+> We need to combat this by trying to be strict and logic ...
+> I can't really understand from the discussion here whether
+> the patch should be applied or not, so I'm not applying it
+> until Stefan | Uwe gives an explicit ACK.
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Definitely. Please give Laurent some time to comment.
+I just have a small bad feeling because -1 and 0 both mean "no config
+register". But that is a problem already there without Markus' patch.
+And I see that this patch really fixes a problem. As Stefan sait it
+should be fine for Vybrid I think applying it is the right thing to do
+here.
 
-Gr{oetje,eeting}s,
+Best regards
+Uwe
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
