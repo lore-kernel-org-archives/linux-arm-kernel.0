@@ -1,36 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Mar 2015 18:43:15 +0100
-Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
-In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <20150330174315.GD15655@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 30 Mar 2015 18:45:40 +0100
+Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
+In-Reply-To: <20150317172418.GX8399@arm.com>
+References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <7hh9try12u.fsf@deeprootsystems.com>
+ <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
+ <20150313174002.GA1763@e102568-lin.cambridge.arm.com>
+ <7hd24cpj8m.fsf@deeprootsystems.com>
+ <20150317172418.GX8399@arm.com>
+Message-ID: <20150330174540.GB11684@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
-
-On Thu, Mar 26, 2015 at 12:43:03PM +0000, Joerg Roedel wrote:
-> Changes v1-v2:
+On Tue, Mar 17, 2015 at 05:24:18PM +0000, Will Deacon wrote:
+> On Fri, Mar 13, 2015 at 11:31:37PM +0000, Kevin Hilman wrote:
+> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> > 
+> > > On Thu, Mar 12, 2015 at 01:18:54PM +0000, Ashwin Chaugule wrote:
+> > >> On 11 March 2015 at 12:02, Kevin Hilman <khilman@kernel.org> wrote:
+> > >> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+> > >> >
+> > >> >> When a CPU is being profiled through PMU events and it enters suspend
+> > >> >> or idle states, the PMU registers content can be lost, which means that
+> > >> >> counters that were relied upon on power down entry are reset on power
+> > >> >> up to values that are incosistent with the profile session.
+> > >> >>
+> > >> >> This patch adds a CPU PM notifier to arm64 perf code, that detects
+> > >> >> on entry if events are being monitored, and if so, it returns
+> > >> >> failure to the CPU PM notification chain, causing the suspend
+> > >> >> thread or the idle thread to abort power down, therefore preventing
+> > >> >> registers content loss.
+> > >> >>
+> > >> >> By triggering CPU PM notification failure this patch prevents
+> > >> >> suspending a system if the suspend thread is being profiled and
+> > >> >> it also prevents entering idle deep states on cores that have profile
+> > >> >> events in use, somehow limiting power management capabilities when
+> > >> >> there are active perf sessions.
+> > >> >
+> > >> > I guess that's one choice.  Couldn't you also stop the PMU and
+> > >> > save/restore it's context in the notifiers? so that you wouldn't affect
+> > >> > PM capabilities?
+> > >> >
+> > >> > That would imply that you lose the ability to profile after a certain
+> > >> > point in suspend/idle, but maybe that's a better trade off than having
+> > >> > profiling disable certain PM features?
+> > >> 
+> > >> I had something like that a few years ago on the Kraits and Scorpions [1].
+> > >
+> > > That's another option, but the point is understanding how we want to
+> > > tackle the issue, by preventing power down or by restoring the
+> > > PMU registers.
+> > 
+> > Personally, I think the save/restore approach is preferred.  IMO, it's
+> > more intuitive from the perspective of a user who doesn't understand all
+> > the mechanics and also actually allows you to profile most of the
+> > low-power paths and still actually hit the low power states.
 > 
-> 	* Rebased to v4.0-rc5
-> 	* Converted domain-types to a bit-field
+> I agree that save/restore is the nicest thing to do, but until we have a
+> generic description of the power-domains in device-tree I really don't want
+> PMU-specific hacks in the arch code to deal with this (since many platforms
+> do not lose PMU state over suspend).
 > 
-> Hi,
-> 
-> here is patch-set to replace the existing domain_init and
-> domain_destroy iommu-ops with the new domain_alloc and
-> domain_free callbacks
+> What Lorenzo is proposing is a stop-gap to prevent perf silently losing its
+> state on platforms where the register contents is lost.
 
-Whilst I'm still a bit worried about the ability of the IOMMU driver to do
-very much in the ->domain_alloc callback (since we don't know which IOMMU
-instance the domain is for), it doesn't leave us any worse off than we
-currently are.
+Yes, that's exactly the goal. I am fine either way, at the moment we are
+not in a position to define whether a core loses the PMU context, that's
+certain.
 
-So, for the arm-smmu patch and the core IOMMU changes:
+I am not sure to understand why people want the core to really go
+to shutdown and save/restore perf context if perf is on (eg profiling a
+cpu for cache stats, clearly powering down a core biases the results
+and might even obfuscate them).
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+It is not an easy call. If we go for this patch approach I am happy to
+rebase and retest the series again, for power domains I fear we have to
+wait given the sheer amount of changes in ARM CPUidle world at the moment,
+too much stuff going on there.
 
-Hopefully this doesn't conflict too badly with my outstanding arm-smmu
-pull requests to you, but do shout if you have any trouble.
-
-Will
+Lorenzo
