@@ -1,30 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Mar 2015 17:07:44 +0100
-Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
- handling
-In-Reply-To: <20150330162652.0f0c7a18@north>
-References: <20150327191040.1119319d@north>
- <20150330122840.GA22949@e103592.cambridge.arm.com>
- <20150330162652.0f0c7a18@north>
-Message-ID: <20150330160743.GD22949@e103592.cambridge.arm.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 31 Mar 2015 01:07:41 +0900
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 04:26:52PM +0200, Jakub Kicinski wrote:
-> On Mon, 30 Mar 2015 13:28:40 +0100, Dave Martin wrote:
+Hi Javier,
 
-[...]
+Please see my comments inline.
 
-> > TXIS reflects the live status of the FIFO, except that it is
-> > "spuriously" deasserted betweem reset/clear of the interrupt and the
-> > first TX IRQ, even though the FIFO may be empty.
-> 
-> I missed that IRQ is cleared by writing data.
+2015-03-31 0:53 GMT+09:00 Javier Martinez Canillas
+<javier.martinez@collabora.co.uk>:
+[snip]
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 07d666cc6a29..2d39b629144a 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -151,6 +151,7 @@ enum exynos5x_plls {
+>
+>  static void __iomem *reg_base;
+>  static enum exynos5x_soc exynos5x_soc;
+> +struct samsung_clk_provider *ctx;
 
-No worries, it took me a fair while to be sure of that myself.  The TRM
-is not very clear on it.
+static
 
-Thanks for the careful review.
+>
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct samsung_clk_reg_dump *exynos5x_save;
+> @@ -275,8 +276,18 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
+>         { .offset = GATE_IP_PERIC,              .value = 0xffffffff, },
+>  };
+>
+> +/*
+> + * list of clocks that have to be kept enabled during suspend/resume cycle.
+> + */
+> +static unsigned int exynos5x_clk_suspend[] = {
 
-Cheers
----Dave
+static const
+
+> +       CLK_MDMA0,
+> +};
+> +
+>  static int exynos5420_clk_suspend(void)
+>  {
+> +       int i;
+> +       struct clk *clk;
+> +
+>         samsung_clk_save(reg_base, exynos5x_save,
+>                                 ARRAY_SIZE(exynos5x_clk_regs));
+>
+> @@ -287,11 +298,24 @@ static int exynos5420_clk_suspend(void)
+>         samsung_clk_restore(reg_base, exynos5420_set_clksrc,
+>                                 ARRAY_SIZE(exynos5420_set_clksrc));
+>
+> +       for (i = 0; i < ARRAY_SIZE(exynos5x_clk_suspend); i++) {
+> +               clk = samsung_clk_lookup(ctx, exynos5x_clk_suspend[i]);
+
+If look-up speed is important here, maybe all the relevant clocks
+could be looked up once at initialization time and just prepared and
+enabled here?
+
+Best regards,
+Tomasz
