@@ -1,99 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Mar 2015 16:13:50 -0700
-Subject: [PATCH 1/2] sunxi: a20-LIME2 update regulator description
-In-Reply-To: <55143CA1.7000606@gmail.com>
-References: <55143CA1.7000606@gmail.com>
-Message-ID: <20150330231350.GA23664@lukather>
+Date: Mon, 30 Mar 2015 16:17:04 -0700
+Subject: [PATCH 2/2] sunxi: a20-LIME2 define board specific operating
+ points
+In-Reply-To: <55143D0D.6030104@gmail.com>
+References: <55143D0D.6030104@gmail.com>
+Message-ID: <20150330231704.GB23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Mar 26, 2015 at 05:08:29PM +0000, Iain Paton wrote:
+> these settings override the inappropriate ones in the dtsi with the
+> manufacturers provided settings from their 3.4.x fex file for this board
 
-On Thu, Mar 26, 2015 at 05:06:41PM +0000, Iain Paton wrote:
-> configure regulators as per the manufacturers recomendations from their
-> 3.4.x fex file.
-> 
-> this is necessary to prevent operating points in the dtsi selecting
-> inappropriate values and causing the board to lockup
+Inappropriate how?
+
 > 
 > Signed-off-by: Iain Paton <ipaton0@gmail.com>
 > ---
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 34 +++++++++++++++++--------
->  1 file changed, 24 insertions(+), 10 deletions(-)
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
 > diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> index 5e57157..704df28 100644
+> index 704df28..f74f81e 100644
 > --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
 > +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -123,41 +123,55 @@
->  		ldo24in-supply = <&reg_axp_ipsout>;
->  		ldo3in-supply = <&reg_axp_ipsout>;
+> @@ -83,6 +83,25 @@
+>  	status = "okay";
+>  };
 >  
-> +		x-powers,dcdc-freq = <1500>;
+> +&cpu0 {
+> +	cpu-supply = <&vdd_cpu>;
+> +	clocks = <&cpu>;
+> +	clock-latency = <244144>; /* 8 32k periods */
+
+This is already defined in the DTSI
+
+> +	operating-points = <
+> +		/* kHz    uV */
+> +		1008000 1450000
+> +		912000  1425000
+> +		864000  1350000
+> +		720000  1250000
+> +		528000  1150000
+> +		312000  1100000
+> +		144000  1050000
+> +		>;
+
+I'd rather have a better common operating points set and change that
+to accomodate all boards, rather than duplicating that information
+everywhere.
+
+> +	#cooling-cells = <2>;
+
+This is also defined in the DTSI.
+
+> +	cooling-min-level = <0>;
+> +	cooling-max-level = <6>;
+> +};
 > +
->  		regulators {
->  			vdd_rtc: ldo1 {
->  				regulator-min-microvolt = <1300000>;
->  				regulator-max-microvolt = <1300000>;
->  				regulator-always-on;
-> +				regulator-name="vdd_rtc";
->  			};
->  
->  			avcc: ldo2 {
-> -				regulator-min-microvolt = <1800000>;
-> -				regulator-max-microvolt = <3300000>;
-> +				regulator-min-microvolt = <3000000>;
-> +				regulator-max-microvolt = <3000000>;
->  				regulator-always-on;
-> +				regulator-name="avcc";
->  			};
->  
->  			vcc_csi0: ldo3 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <3500000>;
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
->  				regulator-always-on;
-> +				regulator-name="vcc_csi0";
->  			};
->  
->  			vcc_csi1: ldo4 {
-> -				regulator-min-microvolt = <1250000>;
-> -				regulator-max-microvolt = <3300000>;
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
->  				regulator-always-on;
-> +				regulator-name="vcc_csi1";
-> +			};
-> +
-> +			ldo5 {
-> +				regulator-min-microvolt = <2800000>;
-> +				regulator-max-microvolt = <2800000>;
-> +				regulator-name="reg_unused";
->  			};
->  
->  			vdd_cpu: dcdc2 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <2275000>;
-> +				regulator-min-microvolt = <1050000>;
-> +				regulator-max-microvolt = <1450000>;
->  				regulator-always-on;
-> +				regulator-name="vdd_cpu";
->  			};
->  
->  			vdd_int: dcdc3 {
-> -				regulator-min-microvolt = <700000>;
-> -				regulator-max-microvolt = <3500000>;
-> +				regulator-min-microvolt = <1300000>;
-> +				regulator-max-microvolt = <1300000>;
->  				regulator-always-on;
-> +				regulator-name="vdd_int";
+>  &ehci0 {
+>  	status = "okay";
+>  };
+> -- 
+> 2.1.3
+> 
 
-Could you use the axp DTSI please?
-
-That will remove most of the chunk defined in there.
-
-Thanks!
+Thanks,
 Maxime
 
 -- 
@@ -106,4 +78,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/55a47e9b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/a0160020/attachment.sig>
