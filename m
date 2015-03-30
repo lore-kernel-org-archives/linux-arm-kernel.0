@@ -1,118 +1,58 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 30 Mar 2015 22:58:22 +0100
-Subject: [PATCH v4 07/10] eeprom: qfprom: Add Qualcomm QFPROM support.
-In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427752702-17345-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 31 Mar 2015 00:58:23 +0300
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: add EtherAVB clock
+In-Reply-To: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+Message-ID: <2142150.nOzfK74FZR@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds QFPROM support driver which is used by other drivers
-like thermal sensor and cpufreq.
+Add the EtherAVB clock to the R8A7790 device tree.
 
-On MSM parts there are some efuses (called qfprom) these fuses store things like
-calibration data, speed bins.. etc. Drivers like cpufreq, thermal sensors would
-read out this data for configuring the driver.
+Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- drivers/eeprom/Kconfig  | 15 +++++++++++++++
- drivers/eeprom/Makefile |  4 ++++
- drivers/eeprom/qfprom.c | 51 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 70 insertions(+)
- create mode 100644 drivers/eeprom/qfprom.c
+ arch/arm/boot/dts/r8a7790.dtsi            |    8 +++++---
+ include/dt-bindings/clock/r8a7790-clock.h |    1 +
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/eeprom/Kconfig b/drivers/eeprom/Kconfig
-index 15985e1..8fcde9b 100644
---- a/drivers/eeprom/Kconfig
-+++ b/drivers/eeprom/Kconfig
-@@ -8,3 +8,18 @@ menuconfig EEPROM
- 	  from both the Linux Kernel and the userspace.
- 
- 	  If unsure, say no.
-+
-+if EEPROM
-+
-+config QCOM_QFPROM
-+	tristate "QCOM QFPROM Support"
-+	depends on ARCH_QCOM
-+	select REGMAP_MMIO
-+	help
-+	  Say y here to enable QFPROM support. The QFPROM provides access
-+	  functions for QFPROM data to rest of the drivers via eeprom interface.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called eeprom-qfprom.
-+
-+endif
-diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
-index 6812bbe..819476c 100644
---- a/drivers/eeprom/Makefile
-+++ b/drivers/eeprom/Makefile
-@@ -5,3 +5,7 @@
- obj-$(CONFIG_EEPROM)		+= eeprom_core.o
- eeprom_core-y			:= core.o
- eeprom_core-y			+= eeprom-mmio.o
-+
-+# Devices
-+obj-$(CONFIG_QCOM_QFPROM)	+= eeprom_qfprom.o
-+eeprom_qfprom-y			:= qfprom.o
-diff --git a/drivers/eeprom/qfprom.c b/drivers/eeprom/qfprom.c
-new file mode 100644
-index 0000000..011bdf1
---- /dev/null
-+++ b/drivers/eeprom/qfprom.c
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include "eeprom-mmio.h"
-+
-+static struct regmap_config qfprom_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 8,
-+	.reg_stride = 1,
-+};
-+
-+static struct eeprom_config econfig = {
-+	.name = "qfprom",
-+	.owner = THIS_MODULE,
-+};
-+
-+static struct eeprom_mmio_data qfprom_data = {
-+	.eeprom_config = &econfig,
-+	.regmap_config = &qfprom_regmap_config,
-+};
-+
-+static const struct of_device_id qfprom_of_match[] = {
-+	{ .compatible = "qcom,qfprom", .data = &qfprom_data},
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, qfprom_of_match);
-+
-+static struct platform_driver qfprom_driver = {
-+	.probe = eeprom_mmio_probe,
-+	.remove = eeprom_mmio_remove,
-+	.driver = {
-+		.name = "qcom,qfprom",
-+		.of_match_table = qfprom_of_match,
-+	},
-+};
-+module_platform_driver(qfprom_driver);
-+MODULE_AUTHOR("Srinivas Kandagatla <srinivas.kandagatla@linaro.org>");
-+MODULE_DESCRIPTION("Qualcomm QFPROM driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1193,16 +1193,18 @@
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+ 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
+ 			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
+-			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
++			         <&zg_clk>, <&p_clk>, <&hp_clk>, <&zs_clk>,
++				 <&zs_clk>;
+ 			#clock-cells = <1>;
+ 			clock-indices = <
+ 				R8A7790_CLK_MLB R8A7790_CLK_VIN3 R8A7790_CLK_VIN2
+-				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0 R8A7790_CLK_ETHER
++				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0
++				R8A7790_CLK_ETHER R8A7790_CLK_ETHERAVB
+ 				R8A7790_CLK_SATA1 R8A7790_CLK_SATA0
+ 			>;
+ 			clock-output-names =
+ 				"mlb", "vin3", "vin2", "vin1", "vin0", "ether",
+-				"sata1", "sata0";
++				"etheravb", "sata1", "sata0";
+ 		};
+ 		mstp9_clks: mstp9_clks at e6150994 {
+ 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
+Index: renesas/include/dt-bindings/clock/r8a7790-clock.h
+===================================================================
+--- renesas.orig/include/dt-bindings/clock/r8a7790-clock.h
++++ renesas/include/dt-bindings/clock/r8a7790-clock.h
+@@ -105,6 +105,7 @@
+ #define R8A7790_CLK_VIN2		9
+ #define R8A7790_CLK_VIN1		10
+ #define R8A7790_CLK_VIN0		11
++#define R8A7790_CLK_ETHERAVB		12
+ #define R8A7790_CLK_ETHER		13
+ #define R8A7790_CLK_SATA1		14
+ #define R8A7790_CLK_SATA0		15
