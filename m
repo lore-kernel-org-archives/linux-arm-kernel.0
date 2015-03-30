@@ -1,31 +1,41 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 30 Mar 2015 15:25:07 +0200
-Subject: ARM, earlyconsole and io mapping
-In-Reply-To: <20150330141148.299f38a4@free-electrons.com> (Thomas Petazzoni's
- message of "Mon, 30 Mar 2015 14:11:48 +0200")
-References: <87iodivgfm.fsf@free.fr>
- <20150330141148.299f38a4@free-electrons.com>
-Message-ID: <87bnjavcr0.fsf@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Mar 2015 14:26:17 +0100
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <551943CB.3010303@suse.cz>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+ <551943CB.3010303@suse.cz>
+Message-ID: <20150330132617.GI24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> writes:
+On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
+> Is this a limitation of a particular ARM ABI or a limitation of a state
+> of the art ARM linker or something else?
 
-> Dear Robert Jarzmik,
->
-> On Mon, 30 Mar 2015 14:05:33 +0200, Robert Jarzmik wrote:
-> A very early mapping of the I/O space is done in head.S, way before you
-> get into C code:
->
->   http://lxr.free-electrons.com/source/arch/arm/kernel/head.S#L277
-That's DEBUG_LL, right ? If that's what you mean, then I already have DEBUG_LL,
-but that doesn't answer my question, as DEBUG_LL stops spitting logs after the
-decompressor, and the errors I want to trap are between end of decompressor and
-drivers probe.
+It's a limitation of the ARM ISA.
 
-And my question about earlycon remains, DEBUG_LL is not earlycon.
+Normal PC-relative branches, which are emitted by the C compiler, can
+branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
+offset is not representable in the instruction.
 
-Cheers.
+To get around that "modern" linkers are able to insert stubs as
+necessary inbetween the object .text sections to extend the range of
+these branches (by emitting a chunk of code possibly with some data to
+extend the range of the branch.)
+
+Obviously, gcc can't know before hand that the sum total of all the
+small object files is going to cause problems, so the compiler can't
+do this on an "as necessary basis".
+
+For most practical kernels, this is not a problem; they normally fit
+within the PC-relative range.  However, the exception is allyesconfig.
+
+The question is: how far do we go with allyesconfig... do we want it
+to work, or is reaching the final link sufficient?  If we do tweak
+stuff to allow the link to work, are we going to try running it?
 
 -- 
-Robert
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
