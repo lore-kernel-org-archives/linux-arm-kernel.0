@@ -1,231 +1,499 @@
 From: danindrey@mail.ru (Andrey Danin)
-Date: Mon, 30 Mar 2015 23:00:12 +0300
-Subject: [PATCH v2 1/4] i2c: tegra: implement slave mode
+Date: Mon, 30 Mar 2015 23:00:13 +0300
+Subject: [PATCH v2 2/4] staging/nvec: reimplement on top of tegra i2c driver
 In-Reply-To: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
 References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
-Message-ID: <1427745615-5428-2-git-send-email-danindrey@mail.ru>
+Message-ID: <1427745615-5428-3-git-send-email-danindrey@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialization code is based on NVEC driver.
-
-There is a HW bug in AP20 that was also mentioned in kernel sources
-for Toshiba AC100.
+Remove i2c controller related code and use tegra i2c driver in slave mode.
+Update nvec documentation.
 
 Signed-off-by: Andrey Danin <danindrey@mail.ru>
 ---
 Changes for v2:
-- remove hack from tegra_i2c_clock_disable
-- replace slave status helper functions with local variables
-- add constant for default delay count value
-- add 10-bit address support
-- remove read_slave_start_delay init as zero
-- don't reset controller during slave registration
-- slave isr returns int instead of bool
-- make status related variables in slave u32 instead of unsigned int
-- enable i2c slave in Kconfig
-- rebase on top of new i2c slave framework
-- delay workaround was added from nvec
+- remove extra new line
+- keep old functions to simplify review
+- move nvec_state enum to nvec.c
+- use nvec-slave instead of nvec in dts to keep ABI compatibility
+- rebased on top of new i2c slave framework
+- delay workaround moved to tegra-i2c
+- documentation patch is integrated in this commit
+- reverted a log message to minimize changes
 
 ---
- drivers/i2c/busses/Kconfig     |   1 +
- drivers/i2c/busses/i2c-tegra.c | 119 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 120 insertions(+)
+ .../devicetree/bindings/nvec/nvidia,nvec.txt       |  21 +-
+ drivers/staging/nvec/nvec.c                        | 258 +++++++++++++--------
+ drivers/staging/nvec/nvec.h                        |  10 -
+ 3 files changed, 169 insertions(+), 120 deletions(-)
 
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index db09881..a2b259b 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -852,6 +852,7 @@ config I2C_SUN6I_P2WI
- config I2C_TEGRA
- 	tristate "NVIDIA Tegra internal I2C controller"
- 	depends on ARCH_TEGRA
-+	select I2C_SLAVE
- 	help
- 	  If you say yes to this option, support will be included for the
- 	  I2C controller embedded in NVIDIA Tegra SOCs
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index 1bcd75e..e378827 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -42,8 +42,17 @@
- #define I2C_SL_CNFG				0x020
- #define I2C_SL_CNFG_NACK			(1<<1)
- #define I2C_SL_CNFG_NEWSL			(1<<2)
-+#define I2C_SL_RCVD				0x024
-+#define I2C_SL_STATUS				0x028
-+#define I2C_SL_ST_IRQ				(1<<3)
+diff --git a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
+index 5ae601e..aba34095 100644
+--- a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
++++ b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
+@@ -1,21 +1,6 @@
+ NVIDIA compliant embedded controller
+ 
+ Required properties:
+-- compatible : should be "nvidia,nvec".
+-- reg : the iomem of the i2c slave controller
+-- interrupts : the interrupt line of the i2c slave controller
+-- clock-frequency : the frequency of the i2c bus
+-- gpios : the gpio used for ec request
+-- slave-addr: the i2c address of the slave controller
+-- clocks : Must contain an entry for each entry in clock-names.
+-  See ../clocks/clock-bindings.txt for details.
+-- clock-names : Must include the following entries:
+-  Tegra20/Tegra30:
+-  - div-clk
+-  - fast-clk
+-  Tegra114:
+-  - div-clk
+-- resets : Must contain an entry for each entry in reset-names.
+-  See ../reset/reset.txt for details.
+-- reset-names : Must include the following entries:
+-  - i2c
++- compatible : should be "nvidia,nvec-slave".
++- reg: the i2c address of the slave controller
++- request-gpios : the gpio used for ec request
+diff --git a/drivers/staging/nvec/nvec.c b/drivers/staging/nvec/nvec.c
+index 5868ebb..f4c5527 100644
+--- a/drivers/staging/nvec/nvec.c
++++ b/drivers/staging/nvec/nvec.c
+@@ -25,8 +25,8 @@
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
++#include <linux/i2c.h>
+ #include <linux/io.h>
+-#include <linux/irq.h>
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/list.h>
+@@ -39,25 +39,19 @@
+ 
+ #include "nvec.h"
+ 
+-#define I2C_CNFG			0x00
+-#define I2C_CNFG_PACKET_MODE_EN		(1<<10)
+-#define I2C_CNFG_NEW_MASTER_SFM		(1<<11)
+-#define I2C_CNFG_DEBOUNCE_CNT_SHIFT	12
+-
+-#define I2C_SL_CNFG		0x20
+-#define I2C_SL_NEWSL		(1<<2)
+-#define I2C_SL_NACK		(1<<1)
+-#define I2C_SL_RESP		(1<<0)
+-#define I2C_SL_IRQ		(1<<3)
+-#define END_TRANS		(1<<4)
+-#define RCVD			(1<<2)
+-#define RNW			(1<<1)
+-
+-#define I2C_SL_RCVD		0x24
+-#define I2C_SL_STATUS		0x28
+-#define I2C_SL_ADDR1		0x2c
+-#define I2C_SL_ADDR2		0x30
+-#define I2C_SL_DELAY_COUNT	0x3c
++
 +#define I2C_SL_ST_END_TRANS			(1<<4)
++#define I2C_SL_ST_IRQ				(1<<3)
 +#define I2C_SL_ST_RCVD				(1<<2)
 +#define I2C_SL_ST_RNW				(1<<1)
- #define I2C_SL_ADDR1				0x02c
- #define I2C_SL_ADDR2				0x030
-+#define I2C_SL_ADDR2_TEN_BIT_MODE		1
-+#define I2C_SL_DELAY_COUNT			0x03c
-+#define I2C_SL_DELAY_COUNT_DEFAULT		0x1E
- #define I2C_TX_FIFO				0x050
- #define I2C_RX_FIFO				0x054
- #define I2C_PACKET_TRANSFER_STATUS		0x058
-@@ -125,6 +134,8 @@ enum msg_end_type {
-  * @clk_divisor_std_fast_mode: Clock divisor in standard/fast mode. It is
-  *		applicable if there is no fast clock source i.e. single clock
-  *		source.
-+ * @slave_read_start_delay: Workaround for AP20 I2C Slave Controller bug. Delay
-+ *              before writing data byte into register I2C_SL_RCVD.
-  */
- 
- struct tegra_i2c_hw_feature {
-@@ -133,6 +144,7 @@ struct tegra_i2c_hw_feature {
- 	bool has_single_clk_source;
- 	int clk_divisor_hs_mode;
- 	int clk_divisor_std_fast_mode;
-+	int slave_read_start_delay;
- };
++
++
++enum nvec_state {
++	ST_NONE,
++	ST_RX,
++	ST_TX,
++	ST_TRANS_START,
++};
  
  /**
-@@ -173,6 +185,7 @@ struct tegra_i2c_dev {
- 	int msg_read;
- 	u32 bus_clk_rate;
- 	bool is_suspended;
-+	struct i2c_client *slave;
- };
- 
- static void dvc_writel(struct tegra_i2c_dev *i2c_dev, u32 val, unsigned long reg)
-@@ -461,12 +474,78 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
- 	return err;
+  * enum nvec_msg_category - Message categories for nvec_msg_alloc()
+@@ -479,7 +473,7 @@ static void nvec_tx_completed(struct nvec_chip *nvec)
+ 		nvec->tx->pos = 0;
+ 		nvec_gpio_set_value(nvec, 0);
+ 	} else {
+-		nvec->state = 0;
++		nvec->state = ST_NONE;
+ 	}
  }
  
-+static void tegra_i2c_slave_write(struct tegra_i2c_dev *i2c_dev, u32 val)
+@@ -497,7 +491,7 @@ static void nvec_rx_completed(struct nvec_chip *nvec)
+ 			   (uint) nvec->rx->pos);
+ 
+ 		nvec_msg_free(nvec, nvec->rx);
+-		nvec->state = 0;
++		nvec->state = ST_NONE;
+ 
+ 		/* Battery quirk - Often incomplete, and likes to crash */
+ 		if (nvec->rx->data[0] == NVEC_BAT)
+@@ -514,7 +508,7 @@ static void nvec_rx_completed(struct nvec_chip *nvec)
+ 
+ 	spin_unlock(&nvec->rx_lock);
+ 
+-	nvec->state = 0;
++	nvec->state = ST_NONE;
+ 
+ 	if (!nvec_msg_is_event(nvec->rx))
+ 		complete(&nvec->ec_transfer);
+@@ -522,6 +516,7 @@ static void nvec_rx_completed(struct nvec_chip *nvec)
+ 	schedule_work(&nvec->rx_work);
+ }
+ 
++#if 0
+ /**
+  * nvec_invalid_flags - Send an error message about invalid flags and jump
+  * @nvec: The nvec device
+@@ -536,6 +531,7 @@ static void nvec_invalid_flags(struct nvec_chip *nvec, unsigned int status,
+ 	if (reset)
+ 		nvec->state = 0;
+ }
++#endif /* FIXME: remove old code */
+ 
+ /**
+  * nvec_tx_set - Set the message to transfer (nvec->tx)
+@@ -566,6 +562,8 @@ static void nvec_tx_set(struct nvec_chip *nvec)
+ 		(uint)nvec->tx->size, nvec->tx->data[1]);
+ }
+ 
++
++#if 0
+ /**
+  * nvec_interrupt - Interrupt handler
+  * @irq: The IRQ
+@@ -755,6 +753,115 @@ static void nvec_disable_i2c_slave(struct nvec_chip *nvec)
+ 	clk_disable_unprepare(nvec->i2c_clk);
+ }
+ #endif
++#endif /* FIXME: remove old code. */
++
++
++/**
++ * nvec_slave_cb - I2C slave callback
++ *
++ * This callback fills our RX buffers and empties our TX
++ * buffers. This uses a finite state machine.
++ */
++static int nvec_slave_cb(struct i2c_client *client,
++		enum i2c_slave_event event, u8 *val)
 +{
-+	i2c_writel(i2c_dev, val, I2C_SL_RCVD);
++	struct nvec_chip *nvec = i2c_get_clientdata(client);
 +
-+	/*
-+	 * TODO: A correct fix needs to be found for this.
-+	 *
-+	 * We experience less incomplete messages with this delay than without
-+	 * it, but we don't know why. Help is appreciated.
-+	 */
-+	udelay(100);
-+}
++	switch (event) {
++	case I2C_SLAVE_WRITE_REQUESTED:
++		/* Alloc new msg only if prev transaction finished */
++		if (nvec->state == ST_NONE)
++			nvec->rx = nvec_msg_alloc(nvec, NVEC_MSG_RX);
 +
-+static int tegra_i2c_slave_isr(int irq, struct tegra_i2c_dev *i2c_dev)
-+{
-+	u32 status;
-+	u8 value;
-+	u8 dummy;
-+	u32 is_slave_irq, is_read, is_trans_start, is_trans_end;
++		/* Should not happen in a normal world */
++		if (unlikely(nvec->rx == NULL)) {
++			nvec->state = ST_NONE;
++			return -1;
++		}
++		nvec->rx->pos = 0;
 +
-+	if (!i2c_dev->slave || !i2c_dev->slave->slave_cb)
-+		return -EINVAL;
++		if (client->addr != ((*val) >> 1)) {
++			dev_err(&client->dev,
++				"received address 0x%02x, expected 0x%02x\n",
++				((*val) >> 1), client->addr);
++			return -1;
++		}
++		nvec->state = ST_TRANS_START;
++		break;
 +
-+	status = i2c_readl(i2c_dev, I2C_SL_STATUS);
++	case I2C_SLAVE_WRITE_RECEIVED:
++		if (nvec->state != ST_TRANS_START &&
++		    nvec->state != ST_RX) {
++			dev_err(&client->dev,
++				"unexpected write: state %d\n",
++				nvec->state);
++			return -1;
++		}
++		if (nvec->rx->pos >= NVEC_MSG_SIZE) {
++			dev_err(&client->dev,
++				"write buffer overflow: state %d\n",
++				nvec->state);
++			return -1;
++		}
++		nvec->rx->data[nvec->rx->pos++] = *val;
++		nvec->state = ST_RX;
++		break;
 +
-+	is_slave_irq = (status & I2C_SL_ST_IRQ);
-+	is_read = (status & I2C_SL_ST_RNW);
-+	is_trans_start = (status & I2C_SL_ST_RCVD);
-+	is_trans_end = (status & I2C_SL_ST_END_TRANS);
++	case I2C_SLAVE_READ_REQUESTED:
++		if (nvec->state != ST_RX) {
++			dev_err(&client->dev,
++				"unexpected read request: state %d\n",
++				nvec->state);
++			return -1;
++		}
++		nvec_msg_free(nvec, nvec->rx);
++		nvec_tx_set(nvec);
++		/* Should not happen in a normal world */
++		if (!nvec->tx) {
++			dev_err(&client->dev,
++				"can't alloc tx msg: state %d\n",
++				nvec->state);
++			return -1;
++		}
++		nvec_gpio_set_value(nvec, 1);
++		/* fallthrough */
++	case I2C_SLAVE_READ_PROCESSED:
++		if (nvec->state != ST_RX &&
++		    nvec->state != ST_TX) {
++			dev_err(&client->dev,
++				"unexpected read: state %d\n",
++				nvec->state);
++			return -1;
++		}
 +
-+	if (!is_slave_irq)
-+		return -EINVAL;
++		if (!nvec->tx || nvec->tx->pos >= nvec->tx->size) {
++			dev_err(nvec->dev,
++				"tx buffer underflow on %p (%u > %u)\n",
++				nvec->tx,
++				(uint) (nvec->tx ? nvec->tx->pos : 0),
++				(uint) (nvec->tx ? nvec->tx->size : 0));
++			nvec->state = ST_NONE;
++			break;
++		}
 +
-+	/* master sent stop */
-+	if (is_trans_end) {
-+		i2c_slave_event(i2c_dev->slave, I2C_SLAVE_STOP, &dummy);
-+		if (!is_trans_start)
-+			return 0;
-+	}
++		nvec->state = ST_TX;
++		*val = nvec->tx->data[nvec->tx->pos++];
++		break;
 +
-+	if (is_read) {
-+		/* i2c master reads data from us */
-+		i2c_slave_event(i2c_dev->slave,
-+				is_trans_start ? I2C_SLAVE_READ_REQUESTED
-+					       : I2C_SLAVE_READ_PROCESSED,
-+				&value);
-+		if (is_trans_start && i2c_dev->hw->slave_read_start_delay)
-+			udelay(i2c_dev->hw->slave_read_start_delay);
-+		tegra_i2c_slave_write(i2c_dev, value);
-+	} else {
-+		/* i2c master sends data to us */
-+		value = i2c_readl(i2c_dev, I2C_SL_RCVD);
-+		if (is_trans_start)
-+			tegra_i2c_slave_write(i2c_dev, 0);
-+		i2c_slave_event(i2c_dev->slave,
-+				is_trans_start ? I2C_SLAVE_WRITE_REQUESTED
-+					       : I2C_SLAVE_WRITE_RECEIVED,
-+				&value);
++	case I2C_SLAVE_STOP:
++		if (nvec->state == ST_TX)
++			nvec_tx_completed(nvec);
++		else if (nvec->state == ST_RX)
++			nvec_rx_completed(nvec);
++		nvec->state = ST_NONE;
++		break;
++
++	default:
++		return 0;
 +	}
 +
 +	return 0;
 +}
-+
- static irqreturn_t tegra_i2c_isr(int irq, void *dev_id)
+ 
+ static void nvec_power_off(void)
  {
- 	u32 status;
- 	const u32 status_err = I2C_INT_NO_ACK | I2C_INT_ARBITRATION_LOST;
- 	struct tegra_i2c_dev *i2c_dev = dev_id;
+@@ -767,7 +874,7 @@ static void nvec_power_off(void)
+ /*
+  *  Parse common device tree data
+  */
+-static int nvec_i2c_parse_dt_pdata(struct nvec_chip *nvec)
++static int nvec_i2c_parse_dt(struct nvec_chip *nvec)
+ {
+ 	nvec->gpio = of_get_named_gpio(nvec->dev->of_node, "request-gpios", 0);
  
-+	if (!tegra_i2c_slave_isr(irq, i2c_dev))
-+		return IRQ_HANDLED;
-+
- 	status = i2c_readl(i2c_dev, I2C_INT_STATUS);
+@@ -776,68 +883,39 @@ static int nvec_i2c_parse_dt_pdata(struct nvec_chip *nvec)
+ 		return -ENODEV;
+ 	}
  
- 	if (status == 0) {
-@@ -664,9 +743,48 @@ static u32 tegra_i2c_func(struct i2c_adapter *adap)
- 	return ret;
+-	if (of_property_read_u32(nvec->dev->of_node, "slave-addr",
+-				&nvec->i2c_addr)) {
+-		dev_err(nvec->dev, "no i2c address specified");
+-		return -ENODEV;
+-	}
+-
+ 	return 0;
  }
  
-+static int tegra_reg_slave(struct i2c_client *slave)
-+{
-+	struct tegra_i2c_dev *i2c_dev = i2c_get_adapdata(slave->adapter);
-+	int addr2 = 0;
+-static int tegra_nvec_probe(struct platform_device *pdev)
++static int nvec_probe(struct i2c_client *client, const struct i2c_device_id *id)
+ {
+-	int err, ret;
+-	struct clk *i2c_clk;
++	int ret;
+ 	struct nvec_chip *nvec;
+ 	struct nvec_msg *msg;
+-	struct resource *res;
+-	void __iomem *base;
+-	char	get_firmware_version[] = { NVEC_CNTL, GET_FIRMWARE_VERSION },
++	char    get_firmware_version[] = { NVEC_CNTL, GET_FIRMWARE_VERSION },
+ 		unmute_speakers[] = { NVEC_OEM0, 0x10, 0x59, 0x95 },
+ 		enable_event[7] = { NVEC_SYS, CNF_EVENT_REPORTING, true };
+ 
+-	if (!pdev->dev.of_node) {
+-		dev_err(&pdev->dev, "must be instantiated using device tree\n");
 +
-+	if (i2c_dev->slave)
-+		return -EBUSY;
++	if (!client->dev.of_node) {
++		dev_err(&client->dev, "must be instantiated using device tree\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	nvec = devm_kzalloc(&pdev->dev, sizeof(struct nvec_chip), GFP_KERNEL);
++	nvec = devm_kzalloc(&client->dev, sizeof(struct nvec_chip), GFP_KERNEL);
+ 	if (nvec == NULL)
+ 		return -ENOMEM;
+ 
+-	platform_set_drvdata(pdev, nvec);
+-	nvec->dev = &pdev->dev;
++	nvec->dev = &client->dev;
++	ret = nvec_i2c_parse_dt(nvec);
++	if (ret < 0)
++		return ret;
+ 
+-	err = nvec_i2c_parse_dt_pdata(nvec);
+-	if (err < 0)
+-		return err;
++	i2c_set_clientdata(client, nvec);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
++	ret = i2c_slave_register(client, nvec_slave_cb);
++	if (ret < 0)
++		return ret;
+ 
+-	nvec->irq = platform_get_irq(pdev, 0);
+-	if (nvec->irq < 0) {
+-		dev_err(&pdev->dev, "no irq resource?\n");
+-		return -ENODEV;
+-	}
+-
+-	i2c_clk = devm_clk_get(&pdev->dev, "div-clk");
+-	if (IS_ERR(i2c_clk)) {
+-		dev_err(nvec->dev, "failed to get controller clock\n");
+-		return -ENODEV;
+-	}
+-
+-	nvec->rst = devm_reset_control_get(&pdev->dev, "i2c");
+-	if (IS_ERR(nvec->rst)) {
+-		dev_err(nvec->dev, "failed to get controller reset\n");
+-		return PTR_ERR(nvec->rst);
+-	}
+-
+-	nvec->base = base;
+-	nvec->i2c_clk = i2c_clk;
+ 	nvec->rx = &nvec->msg_pool[0];
+ 
+ 	ATOMIC_INIT_NOTIFIER_HEAD(&nvec->notifier_list);
+@@ -852,23 +930,14 @@ static int tegra_nvec_probe(struct platform_device *pdev)
+ 	INIT_WORK(&nvec->rx_work, nvec_dispatch);
+ 	INIT_WORK(&nvec->tx_work, nvec_request_master);
+ 
+-	err = devm_gpio_request_one(&pdev->dev, nvec->gpio, GPIOF_OUT_INIT_HIGH,
+-					"nvec gpio");
+-	if (err < 0) {
++	ret = devm_gpio_request_one(&client->dev, nvec->gpio,
++			GPIOF_OUT_INIT_HIGH,
++			"nvec gpio");
++	if (ret < 0) {
+ 		dev_err(nvec->dev, "couldn't request gpio\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	err = devm_request_irq(&pdev->dev, nvec->irq, nvec_interrupt, 0,
+-				"nvec", nvec);
+-	if (err) {
+-		dev_err(nvec->dev, "couldn't request irq\n");
+-		return -ENODEV;
+-	}
+-	disable_irq(nvec->irq);
+-
+-	tegra_init_i2c_slave(nvec);
+-
+ 	/* enable event reporting */
+ 	nvec_toggle_global_events(nvec, true);
+ 
+@@ -907,9 +976,10 @@ static int tegra_nvec_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int tegra_nvec_remove(struct platform_device *pdev)
 +
-+	i2c_dev->slave = slave;
++static int nvec_remove(struct i2c_client *client)
+ {
+-	struct nvec_chip *nvec = platform_get_drvdata(pdev);
++	struct nvec_chip *nvec = i2c_get_clientdata(client);
+ 
+ 	nvec_toggle_global_events(nvec, false);
+ 	mfd_remove_devices(nvec->dev);
+@@ -938,8 +1008,6 @@ static int nvec_suspend(struct device *dev)
+ 	msg = nvec_write_sync(nvec, ap_suspend, sizeof(ap_suspend));
+ 	nvec_msg_free(nvec, msg);
+ 
+-	nvec_disable_i2c_slave(nvec);
+-
+ 	return 0;
+ }
+ 
+@@ -949,7 +1017,6 @@ static int nvec_resume(struct device *dev)
+ 	struct nvec_chip *nvec = platform_get_drvdata(pdev);
+ 
+ 	dev_dbg(nvec->dev, "resuming\n");
+-	tegra_init_i2c_slave(nvec);
+ 	nvec_toggle_global_events(nvec, true);
+ 
+ 	return 0;
+@@ -960,14 +1027,21 @@ static SIMPLE_DEV_PM_OPS(nvec_pm_ops, nvec_suspend, nvec_resume);
+ 
+ /* Match table for of_platform binding */
+ static const struct of_device_id nvidia_nvec_of_match[] = {
+-	{ .compatible = "nvidia,nvec", },
++	{ .compatible = "nvidia,nvec-slave", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, nvidia_nvec_of_match);
+ 
+-static struct platform_driver nvec_device_driver = {
+-	.probe   = tegra_nvec_probe,
+-	.remove  = tegra_nvec_remove,
++static const struct i2c_device_id nvidia_nvec_i2c_table[] = {
++	{ "nvec-slave", 0 },
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, nvidia_nvec_i2c_table);
 +
-+	tegra_i2c_clock_enable(i2c_dev);
-+
-+	i2c_writel(i2c_dev, I2C_SL_CNFG_NEWSL, I2C_SL_CNFG);
-+	i2c_writel(i2c_dev, I2C_SL_DELAY_COUNT_DEFAULT, I2C_SL_DELAY_COUNT);
-+
-+	if (slave->addr > 0x7F)
-+		addr2 = (slave->addr >> 7) | I2C_SL_ADDR2_TEN_BIT_MODE;
-+
-+	i2c_writel(i2c_dev, slave->addr, I2C_SL_ADDR1);
-+	i2c_writel(i2c_dev, addr2, I2C_SL_ADDR2);
-+
-+	return 0;
-+}
-+
-+static int tegra_unreg_slave(struct i2c_client *slave)
-+{
-+	struct tegra_i2c_dev *i2c_dev = i2c_get_adapdata(slave->adapter);
-+
-+	WARN_ON(!i2c_dev->slave);
-+
-+	i2c_writel(i2c_dev, 0, I2C_SL_CNFG);
-+
-+	i2c_dev->slave = NULL;
-+
-+	return 0;
-+}
-+
- static const struct i2c_algorithm tegra_i2c_algo = {
- 	.master_xfer	= tegra_i2c_xfer,
- 	.functionality	= tegra_i2c_func,
-+	.reg_slave	= tegra_reg_slave,
-+	.unreg_slave	= tegra_unreg_slave,
++static struct i2c_driver i2c_nvec_device_driver = {
++	.probe   = nvec_probe,
++	.remove  = nvec_remove,
++	.id_table = nvidia_nvec_i2c_table,
+ 	.driver  = {
+ 		.name = "nvec",
+ 		.pm = &nvec_pm_ops,
+@@ -975,9 +1049,9 @@ static struct platform_driver nvec_device_driver = {
+ 	}
  };
  
- static const struct tegra_i2c_hw_feature tegra20_i2c_hw = {
-@@ -675,6 +793,7 @@ static const struct tegra_i2c_hw_feature tegra20_i2c_hw = {
- 	.has_single_clk_source = false,
- 	.clk_divisor_hs_mode = 3,
- 	.clk_divisor_std_fast_mode = 0,
-+	.slave_read_start_delay = 8,
- };
+-module_platform_driver(nvec_device_driver);
++module_i2c_driver(i2c_nvec_device_driver);
  
- static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
+-MODULE_ALIAS("platform:nvec");
++MODULE_ALIAS("i2c:nvec");
+ MODULE_DESCRIPTION("NVIDIA compliant embedded controller interface");
+ MODULE_AUTHOR("Marc Dietrich <marvin24@gmx.de>");
+ MODULE_LICENSE("GPL");
+diff --git a/drivers/staging/nvec/nvec.h b/drivers/staging/nvec/nvec.h
+index e271375..ad6a556 100644
+--- a/drivers/staging/nvec/nvec.h
++++ b/drivers/staging/nvec/nvec.h
+@@ -107,11 +107,6 @@ struct nvec_msg {
+  * struct nvec_chip - A single connection to an NVIDIA Embedded controller
+  * @dev: The device
+  * @gpio: The same as for &struct nvec_platform_data
+- * @irq: The IRQ of the I2C device
+- * @i2c_addr: The address of the I2C slave
+- * @base: The base of the memory mapped region of the I2C device
+- * @i2c_clk: The clock of the I2C device
+- * @rst: The reset of the I2C device
+  * @notifier_list: Notifiers to be called on received messages, see
+  *                 nvec_register_notifier()
+  * @rx_data: Received messages that have to be processed
+@@ -137,11 +132,6 @@ struct nvec_msg {
+ struct nvec_chip {
+ 	struct device *dev;
+ 	int gpio;
+-	int irq;
+-	int i2c_addr;
+-	void __iomem *base;
+-	struct clk *i2c_clk;
+-	struct reset_control *rst;
+ 	struct atomic_notifier_head notifier_list;
+ 	struct list_head rx_data, tx_data;
+ 	struct notifier_block nvec_status_notifier;
 -- 
 1.9.1
