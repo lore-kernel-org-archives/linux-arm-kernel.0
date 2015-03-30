@@ -1,58 +1,70 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Mar 2015 13:49:27 +0200
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of drivers/built-in.o
+Date: Mon, 30 Mar 2015 13:49:26 +0200
+Subject: [RFC PATCH 1/2] Kbuild: kallsyms: ignore veneers emitted by the ARM
+ linker
 In-Reply-To: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1427716167-25078-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recursive partial linking of vmlinux can result in a
-drivers/built-in.o that is so huge that it interferes with
-the ability of the linker to emit veneers in the final link
-stage if the symbols are out of reach. This is caused by the
-fact that those veneers, which should be emitted close enough
-to the original call site, can only be emitted after the .text
-section of drivers/built-in.o, whose size pushes those veneers
-out of range.
+When linking large kernels on ARM, the linker will insert veneers
+(i.e., PLT like stubs) when function symbols are out of reach for
+the ordinary relative branch/branch-and-link instructions.
 
-So instead, avoid building drivers/built-in.o, and instead, add
-the constituent parts to the command line of the final link.
+However, due to the fact that the kallsyms region sits in .rodata,
+which is between .text and .init.text, additional veneers may be
+emitted in the second pass due to the fact that the size of the
+kallsyms region itself has pushed the .init.text section further
+down, resulting in additional veneers to be emitted.
+
+So ignore the veneers when generating the symbol table. Veneers
+have no corresponding source code, and they will not turn up in
+backtraces anyway.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- Makefile | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ scripts/kallsyms.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index e734965b1604..1eb6c246a586 100644
---- a/Makefile
-+++ b/Makefile
-@@ -558,7 +558,7 @@ scripts: scripts_basic include/config/auto.conf include/config/tristate.conf \
- 
- # Objects we will link into vmlinux / subdirs we need to visit
- init-y		:= init/
--drivers-y	:= drivers/ sound/ firmware/
-+drivers-y	:= sound/ firmware/
- net-y		:= net/
- libs-y		:= lib/
- core-y		:= usr/
-@@ -569,6 +569,16 @@ ifeq ($(dot-config),1)
- -include include/config/auto.conf
- 
- ifeq ($(KBUILD_EXTMOD),)
+diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
+index c6d33bd15b04..6668c87d599f 100644
+--- a/scripts/kallsyms.c
++++ b/scripts/kallsyms.c
+@@ -212,6 +212,12 @@ static int symbol_valid(struct sym_entry *s)
+ 		"_SDA_BASE_",		/* ppc */
+ 		"_SDA2_BASE_",		/* ppc */
+ 		NULL };
 +
-+# drivers/built-in.o can become huge, which interferes with the linker's
-+# ability to emit stubs for branch targets that are out of reach for the
-+# ordinary relative branch instructions
-+include $(srctree)/drivers/Makefile
-+drivers-y += $(addprefix drivers/,$(sort $(obj-y)))
-+drivers-m += $(addprefix drivers/,$(sort $(obj-m)))
-+obj-y :=
-+obj-m :=
++	static char *special_suffixes[] = {
++		"_compiled.",		/* gcc < 3.0: "gcc[0-9]_compiled." */
++		"_veneer",		/* arm */
++		NULL };
 +
- # Read in dependencies to all Kconfig* files, make sure to run
- # oldconfig if changes are detected.
- -include include/config/auto.conf.cmd
+ 	int i;
+ 	int offset = 1;
+ 
+@@ -244,13 +250,18 @@ static int symbol_valid(struct sym_entry *s)
+ 	}
+ 
+ 	/* Exclude symbols which vary between passes. */
+-	if (strstr((char *)s->sym + offset, "_compiled."))
+-		return 0;
+-
+ 	for (i = 0; special_symbols[i]; i++)
+ 		if( strcmp((char *)s->sym + offset, special_symbols[i]) == 0 )
+ 			return 0;
+ 
++	for (i = 0; special_suffixes[i]; i++) {
++		char *sym_name = (char *)s->sym + offset;
++		int l = strlen(sym_name) - strlen(special_suffixes[i]);
++
++		if (l >= 0 && strcmp(sym_name + l, special_suffixes[i]) == 0)
++			return 0;
++	}
++
+ 	return 1;
+ }
+ 
 -- 
 1.8.3.2
