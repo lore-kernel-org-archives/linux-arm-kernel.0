@@ -1,68 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Mar 2015 15:23:11 -0700
-Subject: [PATCH] sunxi: a10-lime: add regulator nodes
-In-Reply-To: <55169622.5070007@gmail.com>
-References: <551537ED.7060402@gmail.com> <551538AB.50207@redhat.com>
- <55169622.5070007@gmail.com>
-Message-ID: <20150330222311.GY23664@lukather>
+Date: Mon, 30 Mar 2015 14:58:18 -0700
+Subject: [PATCH v2 0/3] clk: sunxi: Add muxable AHB clock to fix hstimer
+ issues
+In-Reply-To: <CAGb2v66JqdGLZSAtAds+On3vBe-9Z=o7eQM0MPh42A5jx1fO-g@mail.gmail.com>
+References: <1427217729-10017-1-git-send-email-wens@csie.org>
+ <20150325185152.GM23664@lukather>
+ <CAGb2v66e=ssx=gPMVkc=u0WbhtwCHgbR2Vg3Q3wNTSsBZniaMA@mail.gmail.com>
+ <20150325215309.GN23664@lukather>
+ <CAGb2v66JqdGLZSAtAds+On3vBe-9Z=o7eQM0MPh42A5jx1fO-g@mail.gmail.com>
+Message-ID: <20150330215818.GV23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 28, 2015 at 11:53:06AM +0000, Iain Paton wrote:
-> On 27/03/15 11:02, Hans de Goede wrote:
-> > Hi Iain,
-> > 
-> > On 27-03-15 11:58, Iain Paton wrote:
-> >> add pmic regulator definitions matching the manufacturers 3.4.x fex
-> >> file.
-> >>
-> >> Signed-off-by: Iain Paton <ipaton0@gmail.com>
-> >> ---
-> >>
-> >> As this file belongs to Hans and he decided not to use axp209.dtsi in
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/315612.html
-> >> then I won't add it here.
-> > 
-> > That was because using it was breaking stuff, but now that we know better
-> > which regulators are used for what, and which one we most add an always-on;
-> > property too, I would greatly prefer you to acually use axp209.dtsi, see
-> > e.g. the sun5i-a13-utoo-p66.dts file where I'm using it.
-> > 
-> > Can you please respin this patch using axp209.dtsi?
-> > 
-> > Also please do not add nodes for unused regulators, like the ldo-s for the csi-s.
+> >> For sun8i the default divider results in 300 MHz for AHB, which might
+> >> be too fast.
+> >
+> > I guess you're talking about AHB1? APB2 should be muxed to PLL6 as
+> > well.
 > 
-> You would prefer that the csi is broken on the lime then? 
+> Ah, AHB1 yes. Is APB2 muxed from OSC 24MHz too slow?
 
-CSI is not usable (no driver for it), neither it is actually used by
-default on the lime, so disabling the regulator is the right thing to
-do.
+If it's clocked from the HOSC by default, I guess we're fine.
 
-> Unlike the cubieboards, ldo3 & ldo4 really are used on the olimex
-> boards. So it seems that as yet you still don't know enough about
-> which regulators are used, or you wouldn't be asking for that.
+> >> And we can't do clock rate assignment yet. The clock drivers need
+> >> to be split out.
+> >
+> > Why?
+> 
+> The clock rate is propagated down the tree from the root OSC 24M
+> clock. Unfortunately it is registered after all the A23 clocks,
+> due to the way the sunxi clock driver works. So at the time the
+> AHB1 clock is registered, the parent clocks all have rate=0,
+> as there is no proper reference value for all the factor clocks
+> to calculate their rates.
 
-They are not used. They are connected to something that is not usable
-in itself, so leaving them enabled is just useless.
+Too bad. I guess we will be able to switch to this when we will have
+converted all the clocks.
 
-> That's the major disadvantage of axp209.dtsi, the regulator node
-> isn't describing the pmic at all. Instead it's describing the stuff
-> connected to the pmic outputs, which is undeniably board specific
-> and therefore totally unsuitable for a generic file. Leading to
-> every board needing to override everything regardless.
-
-No, it's defining which regulators are provided by the regulator, and
-the voltage boundaries they have. It doesn't make any assumption with
-regards to what is connected to what, and if a particular regulator is
-connected to something. That's something that the board DTS should
-describe as accurately as possible.
-
-> So no, I'm not going to respin the patch. I strongly believe using
-> axp209.dtsi is the wrong thing to do here.  If that means the patch
-> doesn't make it in, then so be it.
-
-Too bad.
-
+Thanks,
 Maxime
 
 -- 
@@ -75,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/7474f066/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/fe9694ef/attachment-0001.sig>
