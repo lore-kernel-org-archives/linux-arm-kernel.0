@@ -1,95 +1,98 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Mar 2015 16:00:31 +0200
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
- <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
- <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
- <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 30 Mar 2015 22:02:09 +0800
+Subject: [GIT PULL 1/4] ARM: imx: cleanup for 4.1
+Message-ID: <CAAQ0ZWQXUJ0O+WBojuoTscW0L1tAGxR3JWYL0=7Jaej5D7zGJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 15:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Fri, Mar 27, 2015 at 02:16:19PM +0100, Ard Biesheuvel wrote:
->> On 26 March 2015 at 07:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
->> >>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> >>> index 16134608eecf..fd8434753372 100644
->> >>> --- a/arch/arm64/kernel/head.S
->> >>> +++ b/arch/arm64/kernel/head.S
->> >>> @@ -49,13 +49,15 @@
->> >>>  #ifdef CONFIG_ARM64_64K_PAGES
->> >>>  #define BLOCK_SHIFT  PAGE_SHIFT
->> >>>  #define BLOCK_SIZE   PAGE_SIZE
->> >>> -#define TABLE_SHIFT  PMD_SHIFT
->> >>>  #else
->> >>>  #define BLOCK_SHIFT  SECTION_SHIFT
->> >>>  #define BLOCK_SIZE   SECTION_SIZE
->> >>> -#define TABLE_SHIFT  PUD_SHIFT
->> >>>  #endif
->> >>>
->> >>> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
->> >>> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
->> >>> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
->> >>> +
->> >>>  #define KERNEL_START _text
->> >>>  #define KERNEL_END   _end
->> >>>
->> >>> @@ -237,7 +239,10 @@ ENTRY(stext)
->> >>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
->> >>>
->> >>>       adrp    x24, __PHYS_OFFSET
->> >>> -     mov     x23, #KIMAGE_OFFSET
->> >>> +     and     x23, x24, #~TABLE_MASK          // image offset
->> >>> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
->> >>> +     mov     x0, #KIMAGE_OFFSET
->> >>> +     add     x23, x23, x0
->> >>
->> >> I'm still trying to figure out how this works. Does the code imply that
->> >> the kernel image can only be loaded within a block size of the
->> >> PHYS_OFFSET? If that's the case, it's not too flexible.
->> >
->> > For now, yes.
->
-> Can we defer the setting of PHYS_OFFSET until we parse the DT memory
-> nodes?
->
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-I experimented a bit with that, but it is quite hairy. Any
-manipulation of the page tables goes through __va/__pa, so you need a
-valid PHYS_OFFSET there to ensure they point at the right physical
-region. But PHYS_OFFSET also needs to be small enough for the DT
-parsing code not to disregard regions that are below it. And then
-there is the memblock limit to ensure that early dynamically allocated
-page tables come from a region that is already mapped.
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-I think it may be doable, but it would require some significant
-hacking, e.g., call early_init_scan_dt() at its physical address with
-only the ID map loaded and the MMU and caches on, and only after that
-start populating the virtual address space. Or at least only populate
-the lower half, i.e., mappings below PAGE_OFFSET for the kernel and
-the FDT
+are available in the git repository at:
 
->> >> My thoughts were to make PHYS_OFFSET permanently 0 (i.e. get rid of it
->> >> entirely) or at least compute it at DT parsing time. I'm more inclined
->> >> for making it 0 assuming that it doesn't break anything else (vmemmap
->> >> virtual range may get slightly bigger but still not significant,
->> >> basically max_phys_addr / sizeof(struct page)).
->> >
->> > Making it zero would be an improvement, I suppose
->>
->> Actually, wouldn't that reintroduce a similar VA range problem to the
->> one I fixed the other day?
->>
->> On Seattle, with its DRAM at 0x80_0000_0000, you wouldn't have enough
->> space after PAGE_OFFSET
->
-> Ah, yes. When I thought about this PHYS_OFFSET == 0 in the past, we
-> didn't have any patches and the VA range had to be sufficiently large.
->
-> --
-> Catalin
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+tags/imx-cleanup-4.1
+
+for you to fetch changes up to dc98b0cb6175016f31c8ef1685dd0d69476aa495:
+
+  ARM: imx_v4_v5_defconfig: Remove CONFIG_MACH_MX25_3DS (2015-03-13
+22:14:59 +0800)
+
+----------------------------------------------------------------
+The i.MX cleanup for v4.1:
+ - Convert i.MX25 to be a DT only platform and remove the code that is
+   only used by non-DT support
+ - A couple trivial cleanup on iomux-v3 code
+
+----------------------------------------------------------------
+Fabio Estevam (11):
+      ARM: imx: Kconfig: Fix grammar in help text
+      ARM: mx25: Remove mach-mx25_3ds board file
+      ARM: imx25: Remove eukrea mx25 board files
+      ARM: mx25: Convert to a dt-only platform
+      ARM: mx25: Remove platform code support files
+      ARM: mx25: Remove mx25_clocks_init()
+      ARM: mx25: Retrieve IIM base from dt
+      ARM: mx25: Remove static memory mapping
+      ARM: mx25: Remove "mx25.h" header file
+      ARM: mx25: Remove imxdi_rtc platform code
+      ARM: imx_v4_v5_defconfig: Remove CONFIG_MACH_MX25_3DS
+
+Uwe Kleine-K?nig (1):
+      ARM: imx/iomux-v3: allow pad_list to be const
+
+Yannick Guerrini (1):
+      ARM: imx: Fix trivial typo in comments
+
+ arch/arm/configs/imx_v4_v5_defconfig              |   3 +-
+ arch/arm/configs/multi_v5_defconfig               |   2 +-
+ arch/arm/mach-imx/Kconfig                         |  81 +---
+ arch/arm/mach-imx/Makefile                        |   8 +-
+ arch/arm/mach-imx/clk-imx25.c                     |  75 ----
+ arch/arm/mach-imx/common.h                        |   5 -
+ arch/arm/mach-imx/cpu-imx25.c                     |  11 +-
+ arch/arm/mach-imx/devices-imx25.h                 |  85 ----
+ arch/arm/mach-imx/devices/Kconfig                 |   3 -
+ arch/arm/mach-imx/devices/Makefile                |   1 -
+ arch/arm/mach-imx/devices/platform-fec.c          |   5 -
+ arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c |   5 -
+ arch/arm/mach-imx/devices/platform-imx-fb.c       |   5 -
+ arch/arm/mach-imx/devices/platform-imx-i2c.c      |  10 -
+ arch/arm/mach-imx/devices/platform-imx-keypad.c   |   5 -
+ arch/arm/mach-imx/devices/platform-imx-ssi.c      |   9 -
+ arch/arm/mach-imx/devices/platform-imx-uart.c     |  12 -
+ arch/arm/mach-imx/devices/platform-imx2-wdt.c     |   5 -
+ arch/arm/mach-imx/devices/platform-imxdi_rtc.c    |  42 --
+ arch/arm/mach-imx/devices/platform-mx2-camera.c   |   5 -
+ arch/arm/mach-imx/devices/platform-mxc-ehci.c     |   7 -
+ arch/arm/mach-imx/devices/platform-mxc_nand.c     |   5 -
+ arch/arm/mach-imx/devices/platform-spi_imx.c      |  11 -
+ arch/arm/mach-imx/ehci-imx25.c                    |  99 ----
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c    | 310 -------------
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c    |   2 +-
+ arch/arm/mach-imx/hardware.h                      |   1 -
+ arch/arm/mach-imx/iomux-mx25.h                    | 524 ----------------------
+ arch/arm/mach-imx/iomux-mx3.h                     |   2 +-
+ arch/arm/mach-imx/iomux-v3.c                      |   5 +-
+ arch/arm/mach-imx/iomux-v3.h                      |   5 +-
+ arch/arm/mach-imx/mach-cpuimx35.c                 |   2 +-
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c          | 172 -------
+ arch/arm/mach-imx/{imx25-dt.c => mach-imx25.c}    |  20 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c                 | 270 -----------
+ arch/arm/mach-imx/mach-mx35_3ds.c                 |   2 +-
+ arch/arm/mach-imx/mach-pcm043.c                   |   2 +-
+ arch/arm/mach-imx/mach-vpr200.c                   |   2 +-
+ arch/arm/mach-imx/mm-imx25.c                      |  89 ----
+ arch/arm/mach-imx/mx25.h                          | 117 -----
+ 40 files changed, 59 insertions(+), 1965 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/devices-imx25.h
+ delete mode 100644 arch/arm/mach-imx/devices/platform-imxdi_rtc.c
+ delete mode 100644 arch/arm/mach-imx/ehci-imx25.c
+ delete mode 100644 arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
+ delete mode 100644 arch/arm/mach-imx/iomux-mx25.h
+ delete mode 100644 arch/arm/mach-imx/mach-eukrea_cpuimx25.c
+ rename arch/arm/mach-imx/{imx25-dt.c => mach-imx25.c} (68%)
+ delete mode 100644 arch/arm/mach-imx/mach-mx25_3ds.c
+ delete mode 100644 arch/arm/mach-imx/mm-imx25.c
+ delete mode 100644 arch/arm/mach-imx/mx25.h
