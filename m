@@ -1,39 +1,51 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Mar 2015 22:17:11 +0200
-Subject: [PATCH 09/11] clocksource: tegra: Maintain CPU endianness
+Date: Mon, 30 Mar 2015 22:17:12 +0200
+Subject: [PATCH 10/11] clocksource: dw_apb_timer_of: Make IO endian agnostic
 In-Reply-To: <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5519AEB2.8050306@linaro.org>
  <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1427746633-9137-9-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1427746633-9137-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Osipenko <digetx@gmail.com>
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Support big-endian kernel by using endian-aware register access functions.
+The dw_apb_timer_of timer is using __raw_readl to access the timer
+register, which is causing issues when the system is running in
+big endian mode. Fix this by using readl_relaxed() which should
+account for the endian settings.
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+This fixes issues where the time jumps around in the dmesg output
+due to returnling __le32 values.
+
+For an example, these two console lines show time running backwards:
+
+[   49.882572] CPU1: failed to come online
+[   43.282457] Brought up 1 CPUs
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Thierry Reding <treding@nvidia.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- drivers/clocksource/tegra20_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clocksource/dw_apb_timer_of.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
-index d2616ef..d8a3a4e 100644
---- a/drivers/clocksource/tegra20_timer.c
-+++ b/drivers/clocksource/tegra20_timer.c
-@@ -57,9 +57,9 @@ static u64 persistent_ms, last_persistent_ms;
- static struct delay_timer tegra_delay_timer;
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index d305fb0..a19a3f6 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -108,7 +108,7 @@ static void __init add_clocksource(struct device_node *source_timer)
  
- #define timer_writel(value, reg) \
--	__raw_writel(value, timer_reg_base + (reg))
-+	writel_relaxed(value, timer_reg_base + (reg))
- #define timer_readl(reg) \
--	__raw_readl(timer_reg_base + (reg))
-+	readl_relaxed(timer_reg_base + (reg))
+ static u64 notrace read_sched_clock(void)
+ {
+-	return ~__raw_readl(sched_io_base);
++	return ~readl_relaxed(sched_io_base);
+ }
  
- static int tegra_timer_set_next_event(unsigned long cycles,
- 					 struct clock_event_device *evt)
+ static const struct of_device_id sptimer_ids[] __initconst = {
 -- 
 1.9.1
