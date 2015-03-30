@@ -1,82 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Mar 2015 19:04:35 +0200
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <551959F1.4030704@suse.cz>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz>
- <20150330132617.GI24899@n2100.arm.linux.org.uk>
- <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
- <551959F1.4030704@suse.cz>
-Message-ID: <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Mar 2015 19:23:09 +0200
+Subject: [PATCH v5 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <1427703252.26464.14.camel@mtksdaap41>
+References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
+ <1426917922-61356-3-git-send-email-eddie.huang@mediatek.com>
+ <20150323084237.GG9742@pengutronix.de>
+ <1427703252.26464.14.camel@mtksdaap41>
+Message-ID: <20150330172309.GB9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 16:13, Michal Marek <mmarek@suse.cz> wrote:
-> On 2015-03-30 15:31, Ard Biesheuvel wrote:
->> On 30 March 2015 at 15:26, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
->>>> Is this a limitation of a particular ARM ABI or a limitation of a state
->>>> of the art ARM linker or something else?
->>>
->>> It's a limitation of the ARM ISA.
->>>
->>> Normal PC-relative branches, which are emitted by the C compiler, can
->>> branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
->>> offset is not representable in the instruction.
->
-> Thank you both for the explanation!
->
->
->>> The question is: how far do we go with allyesconfig... do we want it
->>> to work, or is reaching the final link sufficient?
->
-> It certainly is more useful as a test tool if the baseline is a
-> successful compile and link. Because you can have genuine link errors
-> due to missing symbols.
->
+On Mon, Mar 30, 2015 at 04:14:12PM +0800, Eddie Huang wrote:
+> Hi Sascha,
+> 
+> > 
+> > [...]
+> > 
+> > > +	if (i2c->speed_hz > 400000)
+> > > +		control_reg |= I2C_CONTROL_RS;
+> > > +	if (i2c->op == I2C_MASTER_WRRD)
+> > > +		control_reg |= I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS;
+> > > +	mtk_i2c_writew(control_reg, i2c, OFFSET_CONTROL);
+> > > +
+> > > +	/* set start condition */
+> > > +	if (i2c->speed_hz <= 100000)
+> > > +		mtk_i2c_writew(I2C_ST_START_CON, i2c, OFFSET_EXT_CONF);
+> > > +	else
+> > > +		mtk_i2c_writew(I2C_FS_START_CON, i2c, OFFSET_EXT_CONF);
+> > > +
+> > > +	if (~control_reg & I2C_CONTROL_RS)
+> > > +		mtk_i2c_writew(I2C_DELAY_LEN, i2c, OFFSET_DELAY_LEN);
+> > 
+> > speed <= 400000 here to make this more obvious?
+> There are two cases, not only speed<=400000, but I2C_MASTER_WRRD. I tend
+> to keep it.
 
-Agreed
+Still it looks strange. You only ever write this default value to the
+register. Putting this register write under an if() seems bogus since
+the same value will be in the register the next time this code is
+executed. It looks like you should move this register write to some
+initialization function.
 
->
->>> If we do tweak
->>> stuff to allow the link to work, are we going to try running it?
->
-> Good question. I myself always treated all{yes,mod}config as a build
-> test only and never dared to run it. Allyesconfig produces a giant
-> kernel image and allmodconfig builds binfmt_script as a module. And if
-> people used all*config for boot tests, they would probably be sending
-> patches to tweak the Kconfigs for that purpose. And this is not the case
-> as far as I can tell.
->
+> > > +
+> > > +	/* Enable interrupt */
+> > > +	mtk_i2c_writew(I2C_HS_NACKERR | I2C_ACKERR | I2C_TRANSAC_COMP,
+> > > +		i2c, OFFSET_INTR_MASK);
+> > 
+> > Why do you enable/disable interrupts for each transfer? Enabling them
+> > once and just acknowledge them in the interrupt handler should be
+> > enough.
+> This can avoid unwanted I2C interrupt. For example, I2C transfer error,
+> and cause timeout, I2C driver report error to caller. Then I2C error
+> interrupt happen.
 
-Russell should confirm this, but I think running such a large kernel
-is non-trivial on ARM, since the decompressor should make room for the
-decompressed image by moving itself upward in memory, and it may
-overwrite the device tree binary in the process.
+So isn't the same unwanted interrupt then just delayed until you enable
+the interrupts again? Is this something that really happens or just
+something you think that might happen?
 
->
->> That is an excellent question, hence the RFC in the subject line.
->>
->> Note that the other patch, the one against kallsyms, addresses the
->> issue where the distance between the beginning of .text and the end of
->> .init.text  exceeds this limit, which is not as unlikely as the issue
->> that this patch addresses, where just drivers/built-in.o in isolation
->> already exceeds this limit.
->>
->> So I am quite happy to drop this, especially as we can add
->> -ffunction-sections as well.
->
-> What you could do is to add a Kconfig option to arch/arm/Kconfig adding
-> -ffunction-sections to the compiler flags. Then allyesconfig would
-> select it and work around the problem in a somewhat elegant way.
->
+Sascha
 
-Excellent idea! Arnd hasn't chimed in yet, but he is the one doing
-lots and lots of randconfig builds and other test builds, so I will
-wait for him to confirm that this is a useful thing to have.
-
-Thanks,
-Ard.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
