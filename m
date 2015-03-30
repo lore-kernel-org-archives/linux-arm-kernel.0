@@ -1,73 +1,79 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Mar 2015 22:37:42 +0100
-Subject: [PATCH] ARM: fix exynos randconfig build error
-In-Reply-To: <14257250.yOR9pFcIkO@amdc1032>
-References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
- <54EF9091.30802@kernel.org> <54F4BC92.2050405@kernel.org>
- <14257250.yOR9pFcIkO@amdc1032>
-Message-ID: <20150330213742.GO24899@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 30 Mar 2015 22:41:01 +0100
+Subject: [PATCH] ARM: switch to use the generic show_mem() implementation
+Message-ID: <E1YchQb-0005DP-MZ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 03, 2015 at 01:44:34PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Tuesday, March 03, 2015 04:40:02 AM Kukjin Kim wrote:
-> > On 02/27/15 06:30, Kukjin Kim wrote:
-> > > On 02/25/15 20:46, Krzysztof Kozlowski wrote:
-> > >> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
-> > >>> The following error was observed with SMP=n in v4.0-rc1:
-> > >>>
-> > >>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
-> > >>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
-> > >>>
-> > >>> As the code unconditionally calls a function only available with SMP=y,
-> > >>> make the Exynos PM support depend on SMP.
-> > >>>
-> > >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > >>
-> > >> Hi,
-> > >>
-> > >> Thanks for the patch but this already waits for Kukjin top be picked
-> > >> up. The first patch was similar to yours (adds dependency on SMP),
-> > >> sent on 4th of February:
-> > >> https://patchwork.ozlabs.org/patch/436231/
-> > >>
-> > >> But later Bartlomiej fixed this in other way (allowing to use cpuidle
-> > >> on non-SMP):
-> > >> https://patchwork.ozlabs.org/patch/436445/
-> > >>
-> > >> Unfortunately none of them were picked up.
-> > >>
-> > > I've missed the fix, sorry.
-> > > 
-> > > BTW, as you know, all of exynos SoCs are based on SMP so generally (in
-> > > normal case) there is no reason to use non-SMP on exynos
-> > > platforms...even though I understand the build error should be fixed...
-> > > 
-> > > Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
-> > > 
-> > 
-> > Firstly, let me take rmk's patch for the randconfig build error...BTW
-> 
-> What is wrong with picking my patch instead?  It is non-invasive and fixes
-> cpuidle support on UP (which is a regression from previous kernels)?
-> 
-> https://lkml.org/lkml/2015/2/4/521
-> 
-> > I'm still wondering exynos stuff needs to support non-SMP and need to
-> > think more about its usefulness?...
-> 
-> Currently UP is supported and at least I find it useful for testing/debug
-> purposes.  If you want to to make Exynos SMP only thats OK but it should
-> be done globally for Exynos arch support not just for cpuidle support.
+Switch ARM to use the generic show_mem() implementation, which displays
+the statistics from the mm zone rather than walking the page arrays.
 
-Has either of these happened yet?  I don't see either in arm-soc.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Any objections to merging this?
 
-(lkml.org seems to be - as seems typical - having problems.  The above
-URL now returns a blank message.)
+ arch/arm/mm/init.c | 49 -------------------------------------------------
+ 1 file changed, 49 deletions(-)
 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 1609b022a72f..ae369c1066e6 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -86,55 +86,6 @@ static int __init parse_tag_initrd2(const struct tag *tag)
+ 
+ __tagtable(ATAG_INITRD2, parse_tag_initrd2);
+ 
+-/*
+- * This keeps memory configuration data used by a couple memory
+- * initialization functions, as well as show_mem() for the skipping
+- * of holes in the memory map.  It is populated by arm_add_memory().
+- */
+-void show_mem(unsigned int filter)
+-{
+-	int free = 0, total = 0, reserved = 0;
+-	int shared = 0, cached = 0, slab = 0;
+-	struct memblock_region *reg;
+-
+-	printk("Mem-info:\n");
+-	show_free_areas(filter);
+-
+-	for_each_memblock (memory, reg) {
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
+-
+-		pfn1 = memblock_region_memory_base_pfn(reg);
+-		pfn2 = memblock_region_memory_end_pfn(reg);
+-
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
+-
+-		do {
+-			total++;
+-			if (PageReserved(page))
+-				reserved++;
+-			else if (PageSwapCache(page))
+-				cached++;
+-			else if (PageSlab(page))
+-				slab++;
+-			else if (!page_count(page))
+-				free++;
+-			else
+-				shared += page_count(page) - 1;
+-			pfn1++;
+-			page = pfn_to_page(pfn1);
+-		} while (pfn1 < pfn2);
+-	}
+-
+-	printk("%d pages of RAM\n", total);
+-	printk("%d free pages\n", free);
+-	printk("%d reserved pages\n", reserved);
+-	printk("%d slab pages\n", slab);
+-	printk("%d pages shared\n", shared);
+-	printk("%d pages swap cached\n", cached);
+-}
+-
+ static void __init find_limits(unsigned long *min, unsigned long *max_low,
+ 			       unsigned long *max_high)
+ {
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
