@@ -1,46 +1,52 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Mar 2015 16:04:34 +0200
-Subject: [PATCH 1/5] ARM: mvebu: Use __init for the PM initialization functions
+Date: Mon, 30 Mar 2015 16:04:36 +0200
+Subject: [PATCH 3/5] ARM: mvebu: Allow using the GIC for wakeup in standby mode
 In-Reply-To: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1427724278-12379-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1427724278-12379-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mvebu_pm_init and mvebu_armada_xp_gp_pm_init are only called during
-boot, so flag them with __init and save some memory.
+On the Armada 375/38x/39x SoCs, in standby mode the SoC stay powered
+and it is possible to wake-up from any interrupt sources. This patch
+adds flag to the GIC irqchip driver to let linux know this.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm-board.c | 2 +-
- arch/arm/mach-mvebu/pm.c       | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/board-v7.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
-index 6dfd4ab97b2a..e56782ac9fbe 100644
---- a/arch/arm/mach-mvebu/pm-board.c
-+++ b/arch/arm/mach-mvebu/pm-board.c
-@@ -73,7 +73,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
- 		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
- }
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index 89a139ed7d5b..61774279a66d 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_fdt.h>
+ #include <linux/of_platform.h>
++#include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/clocksource.h>
+ #include <linux/dma-mapping.h>
+@@ -26,6 +27,7 @@
+ #include <linux/signal.h>
+ #include <linux/slab.h>
+ #include <linux/irqchip.h>
++#include <linux/irqchip/arm-gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -129,6 +131,11 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
  
--static int mvebu_armada_xp_gp_pm_init(void)
-+static int __init mvebu_armada_xp_gp_pm_init(void)
+ static void __init mvebu_init_irq(void)
  {
- 	struct device_node *np;
- 	struct device_node *gpio_ctrl_np;
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index 6573a8f11f70..36f28db6e3a1 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -177,7 +177,7 @@ static const struct platform_suspend_ops mvebu_pm_ops = {
- 	.valid = suspend_valid_only_mem,
- };
- 
--int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
-+int __init mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
- {
- 	struct device_node *np;
- 	struct resource res;
++	if (of_machine_is_compatible("marvell,armada375") ||
++	    of_machine_is_compatible("marvell,armada380") ||
++	    of_machine_is_compatible("marvell,armada390"))
++		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
++				      IRQCHIP_MASK_ON_SUSPEND);
+ 	irqchip_init();
+ 	mvebu_scu_enable();
+ 	coherency_init();
 -- 
 2.1.0
