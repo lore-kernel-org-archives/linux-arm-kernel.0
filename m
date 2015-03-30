@@ -1,71 +1,105 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Tue, 31 Mar 2015 08:38:30 +0900
-Subject: [PATCH 2/2] ARM: dts: s3c-rtc: Use s3c6410-rtc instead of
- exynos3250-rtc
-In-Reply-To: <1427728773-29065-3-git-send-email-k.kozlowski@samsung.com>
-References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
- <1427728773-29065-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5519DE76.4080803@samsung.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 30 Mar 2015 16:45:59 -0700
+Subject: [PATCH 01/25] arm: Use bool function return values of true/false not
+ 1/0
+In-Reply-To: <cover.1427759009.git.joe@perches.com>
+References: <cover.1427759009.git.joe@perches.com>
+Message-ID: <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2015 12:19 AM, Krzysztof Kozlowski wrote:
-> Mark "samsung,exynos3250-rtc" compatible as deprecated because it
-> duplicates the "samsung,s3c6410-rtc". Use "samsung,s3c6410-rtc" on
-> Exynos3250 and Exynos4415 boards.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  Documentation/devicetree/bindings/rtc/s3c-rtc.txt | 3 ++-
->  arch/arm/boot/dts/exynos3250.dtsi                 | 2 +-
->  arch/arm/boot/dts/exynos4415.dtsi                 | 2 +-
->  3 files changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> index ab757b84daa7..ac2fcd6ff4b8 100644
-> --- a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> +++ b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> @@ -6,7 +6,8 @@ Required properties:
->      * "samsung,s3c2416-rtc" - for controllers compatible with s3c2416 rtc.
->      * "samsung,s3c2443-rtc" - for controllers compatible with s3c2443 rtc.
->      * "samsung,s3c6410-rtc" - for controllers compatible with s3c6410 rtc.
-> -    * "samsung,exynos3250-rtc" - for controllers compatible with exynos3250 rtc.
-> +    * "samsung,exynos3250-rtc" - (deprecated) for controllers compatible with
-> +                                 exynos3250 rtc (use "samsung,s3c6410-rtc").
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - interrupts: Two interrupt numbers to the cpu should be specified. First
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index e3bfb11c6ef8..8d58b550e925 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -189,7 +189,7 @@
->  		};
->  
->  		rtc: rtc at 10070000 {
-> -			compatible = "samsung,exynos3250-rtc";
-> +			compatible = "samsung,s3c6410-rtc";
->  			reg = <0x10070000 0x100>;
->  			interrupts = <0 73 0>, <0 74 0>;
->  			interrupt-parent = <&pmu_system_controller>;
-> diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
-> index 5caea996e090..186cb8465683 100644
-> --- a/arch/arm/boot/dts/exynos4415.dtsi
-> +++ b/arch/arm/boot/dts/exynos4415.dtsi
-> @@ -177,7 +177,7 @@
->  		};
->  
->  		rtc: rtc at 10070000 {
-> -			compatible = "samsung,exynos3250-rtc";
-> +			compatible = "samsung,s3c6410-rtc";
->  			reg = <0x10070000 0x100>;
->  			interrupts = <0 73 0>, <0 74 0>;
->  			status = "disabled";
-> 
+Use the normal return values for bool functions
 
-Looks good to me.
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/include/asm/dma-mapping.h |  8 ++++----
+ arch/arm/include/asm/kvm_emulate.h |  2 +-
+ arch/arm/mach-omap2/powerdomain.c  | 14 +++++++-------
+ 3 files changed, 12 insertions(+), 12 deletions(-)
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-Thanks,
-Chanwoo Choi
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index b52101d..166e1e1 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -151,18 +151,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ 	u64 limit, mask;
+ 
+ 	if (!dev->dma_mask)
+-		return 0;
++		return false;
+ 
+ 	mask = *dev->dma_mask;
+ 
+ 	limit = (mask + 1) & ~mask;
+ 	if (limit && size > limit)
+-		return 0;
++		return false;
+ 
+ 	if ((addr | (addr + size - 1)) & ~mask)
+-		return 0;
++		return false;
+ 
+-	return 1;
++	return true;
+ }
+ 
+ static inline void dma_mark_clean(void *addr, size_t size) { }
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index a9c80a2..ad200a0 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -51,7 +51,7 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+ 
+ static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
+ {
+-	return 1;
++	return true;
+ }
+ 
+ static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 78af6d8..897f9fb 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -950,7 +950,7 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
+  */
+ bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
+ {
+-	return (pwrdm && pwrdm->flags & PWRDM_HAS_HDWR_SAR) ? 1 : 0;
++	return pwrdm && (pwrdm->flags & PWRDM_HAS_HDWR_SAR);
+ }
+ 
+ int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
+@@ -1185,24 +1185,24 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
+ 	if (!pwrdm) {
+ 		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
+ 			 __func__);
+-		return 1;
++		return true;
+ 	}
+ 
+ 	if (pwrdm->pwrsts & PWRSTS_OFF)
+-		return 1;
++		return true;
+ 
+ 	if (pwrdm->pwrsts & PWRSTS_RET) {
+ 		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
+-			return 1;
++			return true;
+ 
+ 		for (i = 0; i < pwrdm->banks; i++)
+ 			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
+-				return 1;
++				return true;
+ 	}
+ 
+ 	for (i = 0; i < pwrdm->banks; i++)
+ 		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
+-			return 1;
++			return true;
+ 
+-	return 0;
++	return false;
+ }
+-- 
+2.1.2
