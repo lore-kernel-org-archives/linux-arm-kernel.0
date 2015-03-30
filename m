@@ -1,41 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Mar 2015 14:26:17 +0100
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <551943CB.3010303@suse.cz>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz>
-Message-ID: <20150330132617.GI24899@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Mar 2015 15:29:41 +0200
+Subject: [PATCH 0/3] Add DT support for netxbig LEDs
+In-Reply-To: <20150330132240.GB8688@io.lakedaemon.net>
+References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
+ <20150309094107.GL1509@kw.sim.vm.gnt> <5506FE46.4000405@free-electrons.com>
+ <20150330083040.GY1509@kw.sim.vm.gnt> <20150330123008.GC17650@lunn.ch>
+ <20150330132240.GB8688@io.lakedaemon.net>
+Message-ID: <55194FC5.6080902@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
-> Is this a limitation of a particular ARM ABI or a limitation of a state
-> of the art ARM linker or something else?
+Hi Simon,
+[...]
 
-It's a limitation of the ARM ISA.
+>>> Hi Gregory, Andrew and Jason,
+>>>
+>>> This patch set seems stuck. I believe that Bryan is probably too busy to
+>>> handle it...
+>>>
+>>> Is that possible to merge it via the mvebu tree ? Since only some LaCie
+>>> boards are impacted, I think it could make sense.
+>>
+>> Hi Simon
+>>
+>> Hard one. I also have a driver stuck in led limbo.
+>>
+>> Last time we took a fix via mvebu, it all went messy at the last
+>> minute. We made it very clear to Bryon we planned to take a patch via
+>> mvebu, we had queued it via mvebu, we had sent a pull request to
+>> arm-soc, all with no reply from Bryon. Only at the last minute did he
+>> jump in, pull it himself and send it to Linus. That caused Olof all
+>> sorts of problems with his tree.
+> 
+> It's also good to keep in mind the workflow of driver maintainers who push
+> directly to Linus.  They send PRs during the merge window, and don't
+> necessarily spend too much time in -next.  Which means, if they have good
+> filters running on lkml, they just sit down a week or so before the merge
+> window and apply everything they have pending.
+> 
+> For those of us who are feeding arm-soc, and are accustomed to getting things
+> in early, this can be nerve-wracking.
+> 
+> Brian has demonstrated that he does pick things up and get them merged.  We
+> just need to make sure that what he picks up is well tested and reviewed when
+> he gets to it.  Since there won't be time for another revision before the merge
+> window.  But hey, that's what -rc's are for.  :-P
+> 
 
-Normal PC-relative branches, which are emitted by the C compiler, can
-branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
-offset is not representable in the instruction.
+At least what I can do is creating a led branch and merged it in the mvebu/for-next
+branch. It will allow us to be more confident for the merge window.
 
-To get around that "modern" linkers are able to insert stubs as
-necessary inbetween the object .text sections to extend the range of
-these branches (by emitting a chunk of code possibly with some data to
-extend the range of the branch.)
+Thanks,
 
-Obviously, gcc can't know before hand that the sum total of all the
-small object files is going to cause problems, so the compiler can't
-do this on an "as necessary basis".
+Gregory
 
-For most practical kernels, this is not a problem; they normally fit
-within the PC-relative range.  However, the exception is allyesconfig.
 
-The question is: how far do we go with allyesconfig... do we want it
-to work, or is reaching the final link sufficient?  If we do tweak
-stuff to allow the link to work, are we going to try running it?
+>> To stop that happening again, i think we need an Acked-by from Bryan.
+> 
+> I agree.
+
+
+
+
+
+> 
+> thx,
+> 
+> Jason.
+> 
+
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
