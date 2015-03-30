@@ -1,113 +1,127 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 30 Mar 2015 20:08:27 +0530
-Subject: arm64 kexec hang
-In-Reply-To: <551940F5.9050102@redhat.com>
-References: <1427477015.27739.30.camel@infradead.org>
- <5515C799.8010600@redhat.com> <551940F5.9050102@redhat.com>
-Message-ID: <55195FE3.5090409@redhat.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Mar 2015 15:39:54 +0100
+Subject: [PATCH v3 1/9] mmc: sdhci-st: Add macros for register offsets and
+ bitfields for mmcss glue regs
+In-Reply-To: <1427726402-7513-1-git-send-email-peter.griffin@linaro.org>
+References: <1427726402-7513-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1427726402-7513-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The stih407 family SoC's have additional glue registers in the flashSS which
+are used to configure the Arasan controller.
 
+This patch adds macros for the register offsets and bitfields which will be
+used by subsequent patches to support stih407 family SoC's.
 
-On Monday 30 March 2015 05:56 PM, Pratyush Anand wrote:
-> Hi Geoff,
->
-> On Saturday 28 March 2015 02:41 AM, Pratyush Anand wrote:
->> Hi Geoff,
->>
->> On Friday 27 March 2015 10:53 PM, Geoff Levand wrote:
->>> Hi Pratyush,
->>>
->>> On Wed, 2015-03-25 at 15:55 +0530, Pratyush Anand wrote:
->>>> So with following changes kexec load seems to complete without any
->>>> error. However, kexec reboot does not work yet, Nothing after bye
->>>> message :( (1st kernel booted with maxcpus=1)
->>>
->>> 'Bye!' doesn't mean much, other than the first kernel has
->>> almost shutdown.  I recommend for debugging you either define
->>> ARM64_DEBUG_PORT for the kexec-tools build, or have a suitable
->>> earlyprintk= on the kernel command line.  See the read_sink()
->>> routine in kexec-arm64.c.
->>>
->>
->
-> Problem seems to be related to compilation of purgatory code.
->
-> For example see here:
->
->    70 0000000000000120 <purgatory>:
->    71      120:       a9bf7bfd        stp     x29, x30, [sp,#-16]!
->    72      124:       910003fd        mov     x29, sp
->    73      128:       58000100        ldr     x0, 148 <purgatory+0x28>
->    74      12c:       94000000        bl      544 <printf>
->
->
-> So, when it executes instruction at address 0x128 in above code, it does
-> not contain correct address of data where "I'm in purgatory" is located.
-> It seems that code has been compiled as 32 bit.
->
-> PC: 0x400415012c , PSTATE: 0x400003c9
-> (gdb) monitor reg x0
-> x0 (/64): 0x00000000041568F8
-> (gdb) monitor mdw 0x00000000041568F8 4
-> 0x41568f8: fffefffe fffefffe fffefffe fffefffe  : ................
->
-> The buffer location passed to printf is not correct.
->
-> Similarly, even if ARM64_DEBUG_PORT is programmed with correct UART TX
-> register, arm64_sink is not modified correctly when elf_rel_set_symbol
-> is called.
->
-> So correct data is at 0x00000040041568F8 and not 0x00000000041568F8
->
-> (gdb) monitor mdw 0x00000040041568F8 4
-> 0x40041568f8: 206d2749 70206e69 61677275 79726f74  : I'm in purgatory
->
->
-> should n't the pc relative instruction like adrp be generated instead of
-> ldr.
->
-> What does -mcmodel=large cflag do? May be it is causing to generate such
-> instruction.
->
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ drivers/mmc/host/sdhci-st.c | 91 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
-Following changes allows purgatory to execute.
-
-
-diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index 8df66f5c8273..4365bb4087ad 100644
---- a/kexec/arch/arm64/kexec-arm64.c
-+++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -993,8 +993,8 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, 
-unsigned long r_type,
-  # define R_AARCH64_CALL26 283
-  #endif
-
--       uint32_t *location = (uint32_t *)ptr;
--       uint32_t data = *location;
-+       uint64_t *location = (uint64_t *)ptr;
-+       uint64_t data = *location;
-         const char *type = NULL;
-
-         switch(r_type) {
-@@ -1026,7 +1026,7 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, 
-unsigned long r_type,
-                 break;
-         }
-
--       dbgprintf("%s: %s %x->%x\n", __func__, type, data, *location);
-+       dbgprintf("%s: %s %lx->%lx\n", __func__, type, data, *location);
-  }
-
-
-So I get following and then nothing..
-
-[  162.087569] Bye!
-I'm in purgatory
-purgatory: kernel_entry: 0000004000280000
-purg
-
-Hopefully, I will be able to debug it further.will come back.
-
-~Pratyush
+diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+index 882b07e..a31ac04 100644
+--- a/drivers/mmc/host/sdhci-st.c
++++ b/drivers/mmc/host/sdhci-st.c
+@@ -26,6 +26,97 @@
+ 
+ #include "sdhci-pltfm.h"
+ 
++/* MMCSS glue logic to setup the HC on some ST SoCs (e.g. STiH407 family) */
++
++#define ST_MMC_CCONFIG_REG_1		0x400
++#define ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT	BIT(24)
++#define ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ	BIT(12)
++#define ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT	BIT(8)
++#define ST_MMC_CCONFIG_ASYNC_WAKEUP	BIT(0)
++#define ST_MMC_CCONFIG_1_DEFAULT	\
++				((ST_MMC_CCONFIG_TIMEOUT_CLK_UNIT) | \
++				 (ST_MMC_CCONFIG_TIMEOUT_CLK_FREQ) | \
++				 (ST_MMC_CCONFIG_TUNING_COUNT_DEFAULT))
++
++#define ST_MMC_CCONFIG_REG_2		0x404
++#define ST_MMC_CCONFIG_HIGH_SPEED	BIT(28)
++#define ST_MMC_CCONFIG_ADMA2		BIT(24)
++#define ST_MMC_CCONFIG_8BIT		BIT(20)
++#define ST_MMC_CCONFIG_MAX_BLK_LEN	16
++#define  MAX_BLK_LEN_1024		1
++#define  MAX_BLK_LEN_2048		2
++#define BASE_CLK_FREQ_200		0xc8
++#define BASE_CLK_FREQ_100		0x64
++#define BASE_CLK_FREQ_50		0x32
++#define ST_MMC_CCONFIG_2_DEFAULT \
++	(ST_MMC_CCONFIG_HIGH_SPEED | ST_MMC_CCONFIG_ADMA2 | \
++	 ST_MMC_CCONFIG_8BIT | \
++	 (MAX_BLK_LEN_1024 << ST_MMC_CCONFIG_MAX_BLK_LEN))
++
++#define ST_MMC_CCONFIG_REG_3			0x408
++#define ST_MMC_CCONFIG_EMMC_SLOT_TYPE		BIT(28)
++#define ST_MMC_CCONFIG_64BIT			BIT(24)
++#define ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT	BIT(20)
++#define ST_MMC_CCONFIG_1P8_VOLT			BIT(16)
++#define ST_MMC_CCONFIG_3P0_VOLT			BIT(12)
++#define ST_MMC_CCONFIG_3P3_VOLT			BIT(8)
++#define ST_MMC_CCONFIG_SUSP_RES_SUPPORT		BIT(4)
++#define ST_MMC_CCONFIG_SDMA			BIT(0)
++#define ST_MMC_CCONFIG_3_DEFAULT	\
++			 (ST_MMC_CCONFIG_ASYNCH_INTR_SUPPORT	| \
++			  ST_MMC_CCONFIG_3P3_VOLT		| \
++			  ST_MMC_CCONFIG_SUSP_RES_SUPPORT	| \
++			  ST_MMC_CCONFIG_SDMA)
++
++#define ST_MMC_CCONFIG_REG_4	0x40c
++#define ST_MMC_CCONFIG_D_DRIVER	BIT(20)
++#define ST_MMC_CCONFIG_C_DRIVER	BIT(16)
++#define ST_MMC_CCONFIG_A_DRIVER	BIT(12)
++#define ST_MMC_CCONFIG_DDR50	BIT(8)
++#define ST_MMC_CCONFIG_SDR104	BIT(4)
++#define ST_MMC_CCONFIG_SDR50	BIT(0)
++#define ST_MMC_CCONFIG_4_DEFAULT	0
++
++#define ST_MMC_CCONFIG_REG_5		0x410
++#define ST_MMC_CCONFIG_TUNING_FOR_SDR50	BIT(8)
++#define RETUNING_TIMER_CNT_MAX		0xf
++#define ST_MMC_CCONFIG_5_DEFAULT	0
++
++/* I/O configuration for Arasan IP */
++#define ST_MMC_GP_OUTPUT	0x450
++#define ST_MMC_GP_OUTPUT_CD	BIT(12)
++
++#define ST_MMC_STATUS_R		0x460
++
++#define ST_TOP_MMC_DLY_FIX_OFF(x)	(x - 0x8)
++
++/* TOP config registers to manage static and dynamic delay */
++#define ST_TOP_MMC_TX_CLK_DLY			ST_TOP_MMC_DLY_FIX_OFF(0x8)
++#define ST_TOP_MMC_RX_CLK_DLY			ST_TOP_MMC_DLY_FIX_OFF(0xc)
++/* MMC delay control register */
++#define ST_TOP_MMC_DLY_CTRL			ST_TOP_MMC_DLY_FIX_OFF(0x18)
++#define ST_TOP_MMC_DLY_CTRL_DLL_BYPASS_CMD	BIT(0)
++#define ST_TOP_MMC_DLY_CTRL_DLL_BYPASS_PH_SEL	BIT(1)
++#define ST_TOP_MMC_DLY_CTRL_TX_DLL_ENABLE	BIT(8)
++#define ST_TOP_MMC_DLY_CTRL_RX_DLL_ENABLE	BIT(9)
++#define ST_TOP_MMC_DLY_CTRL_ATUNE_NOT_CFG_DLY	BIT(10)
++#define ST_TOP_MMC_START_DLL_LOCK		BIT(11)
++
++/* register to provide the phase-shift value for DLL */
++#define ST_TOP_MMC_TX_DLL_STEP_DLY		ST_TOP_MMC_DLY_FIX_OFF(0x1c)
++#define ST_TOP_MMC_RX_DLL_STEP_DLY		ST_TOP_MMC_DLY_FIX_OFF(0x20)
++#define ST_TOP_MMC_RX_CMD_STEP_DLY		ST_TOP_MMC_DLY_FIX_OFF(0x24)
++
++/* phase shift delay on the tx clk 2.188ns */
++#define ST_TOP_MMC_TX_DLL_STEP_DLY_VALID	0x6
++
++#define ST_TOP_MMC_DLY_MAX			0xf
++
++#define ST_TOP_MMC_DYN_DLY_CONF	\
++		(ST_TOP_MMC_DLY_CTRL_TX_DLL_ENABLE | \
++		 ST_TOP_MMC_DLY_CTRL_ATUNE_NOT_CFG_DLY | \
++		 ST_TOP_MMC_START_DLL_LOCK)
++
+ static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
+ {
+ 	u32 ret;
+-- 
+1.9.1
