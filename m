@@ -1,37 +1,73 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sun, 29 Mar 2015 20:34:21 -0300
-Subject: Fwd: Ask for help: ARM: mvebu: add NAND support for dove
-In-Reply-To: <551714F8.2050401@gmail.com>
-References: <551713D8.3060809@gmail.com> <551714F8.2050401@gmail.com>
-Message-ID: <55188BFD.5070908@vanguardiasur.com.ar>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Mon, 30 Mar 2015 09:48:40 +0900
+Subject: [PATCH RESEND 5/7] mmc: host: dw_mmc make IO accessors endian
+ agnostic
+In-Reply-To: <1427282872-10563-6-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+ <1427282872-10563-6-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <55189D68.3060900@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Ben.
 
+Your patches (5/7~7/7) looks good to me..I will pick them..
+But could you fix the checkpatch warning?
+Or if you're ok. i will fix the checkpatch warning..then will apply them.
 
-On 03/28/2015 05:54 PM, Gabriel Dobato wrote:
-[..]
-> However, if I try to read/write into the mtd partitions, I can not,
-> there are errors:
+Best Regards,
+Jaehoon Chung
+
+On 03/25/2015 08:27 PM, Ben Dooks wrote:
+> The dw_mmc driver does not use endian agnostic IO accessors, so fix
+> the use of __raw reads and writes to be the relaxed versions.
 > 
-> root at debug:~# nandwrite -p /dev/mtd0 /uImage
-> Writing at 0x00000000
-> pxa3xx-nand f10c0000.nand: Wait time out!!!
+> This fixes the dw_mmc driver initialisation on Altera socfpga in big endian.
 > 
-> root at debug:~# flash_erase /dev/mtd0 0 0
-> Erasing 128 Kibyte @ 0 --  0 % complete pxa3xx-nand f10c0000.nand: Wait
-> time out!!!
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> --
+> CC: Linux MMC <linux-mmc@vger.kernel.org>
+> CC: Linux ARM Kernel <linux-arm-kernel@lists.infradead.org>
+> CC: Dinh Nguyen <dinguyen@opensource.altera.com>
+> CC: Chris Ball <chris@printf.net>
+> CC: Ulf Hansson <ulf.hansson@linaro.org>
+> CC: Jaehoon Chung <jh80.chung@samsung.com>
+> CC: Seungwon Jeon <tgih.jun@samsung.com>
+> ---
+>  drivers/mmc/host/dw_mmc.h | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 > 
-> root at debug:~# cat /dev/mtd0
-> pxa3xx-nand f10c0000.nand: Wait time out!!!
+> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+> index 18c4afe..46efdc5 100644
+> --- a/drivers/mmc/host/dw_mmc.h
+> +++ b/drivers/mmc/host/dw_mmc.h
+> @@ -171,22 +171,22 @@
+>  
+>  /* Register access macros */
+>  #define mci_readl(dev, reg)			\
+> -	__raw_readl((dev)->regs + SDMMC_##reg)
+> +	readl_relaxed((dev)->regs + SDMMC_##reg)
+>  #define mci_writel(dev, reg, value)			\
+> -	__raw_writel((value), (dev)->regs + SDMMC_##reg)
+> +	writel_relaxed((value), (dev)->regs + SDMMC_##reg)
+>  
+>  /* 16-bit FIFO access macros */
+>  #define mci_readw(dev, reg)			\
+> -	__raw_readw((dev)->regs + SDMMC_##reg)
+> +	readw_relaxed((dev)->regs + SDMMC_##reg)
+>  #define mci_writew(dev, reg, value)			\
+> -	__raw_writew((value), (dev)->regs + SDMMC_##reg)
+> +	writew_relaxed((value), (dev)->regs + SDMMC_##reg)
+>  
+>  /* 64-bit FIFO access macros */
+>  #ifdef readq
+>  #define mci_readq(dev, reg)			\
+> -	__raw_readq((dev)->regs + SDMMC_##reg)
+> +	readq_relaxed((dev)->regs + SDMMC_##reg)
+>  #define mci_writeq(dev, reg, value)			\
+> -	__raw_writeq((value), (dev)->regs + SDMMC_##reg)
+> +	writeq_relaxed((value), (dev)->regs + SDMMC_##reg)
+>  #else
+>  /*
+>   * Dummy readq implementation for architectures that don't define it.
 > 
-
-Maybe a silly question, but does your bootloader initializes the
-controller? Are you able to read/write/erase using it?
-
-The current pxa3xx-nand driver relies on that for Armada370/XP, as
-timing setup is not properly handled.
-
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
