@@ -1,75 +1,115 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 30 Mar 2015 15:11:55 +0200
-Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
-In-Reply-To: <20150330095820.GD17728@pengutronix.de>
-References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
- <139dc298c0914b3536445dddd37be286@agner.ch>
- <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
- <20150330095820.GD17728@pengutronix.de>
-Message-ID: <aee354623d135ce40177effddeafcbbd@agner.ch>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Mon, 30 Mar 2015 15:21:15 +0200
+Subject: [PATCH] DTS/TX25: add missing indention
+Message-ID: <201503301521.15583.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-30 11:58, Uwe Kleine-K?nig wrote:
-> On Mon, Mar 30, 2015 at 11:40:47AM +0200, Linus Walleij wrote:
->> On Fri, Mar 27, 2015 at 11:32 AM, Stefan Agner <stefan@agner.ch> wrote:
->> > On 2015-03-24 16:26, Markus Pargmann wrote:
->>
->> >> 0 is used in all pinfunction definitions when a config register is not
->> >> available, for example imx25-pinfunc.h. If a configuration value is used
->> >> for such a pinfunction the driver will always write it to the
->> >> configuration register if it is not -1. For a 0 configuration register
->> >> the configuration value is written to offset 0x0. This can lead to a
->> >> crashing/hanging system without any warning message.
->> >
->> > 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
->> > the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
->> > actually works.
->> >
->> > What is a bit a bummer is that we now have different meanings of 0,
->> > depending on the field:
->> > - For the first field (mux), 0 is a valid offset
->> > - For the second field (config), 0 means not valid
->>
->> What is generally scary about DTS files is that the DT formats
->> are not ruled by a context-free grammar.
->>
->> There were attempts to formalize some bindings using BNF
->> but they seems to have been given up.
->>
->> We need to combat this by trying to be strict and logic ...
->> I can't really understand from the discussion here whether
->> the patch should be applied or not, so I'm not applying it
->> until Stefan | Uwe gives an explicit ACK.
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> 
-> I just have a small bad feeling because -1 and 0 both mean "no config
-> register". But that is a problem already there without Markus' patch.
-> And I see that this patch really fixes a problem. As Stefan sait it
-> should be fine for Vybrid I think applying it is the right thing to do
-> here.
+Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+---
+ arch/arm/boot/dts/imx25-karo-tx25.dts |   84 +++++++++++++++++----------------
+ 1 file changed, 43 insertions(+), 41 deletions(-)
 
-Yes, that is how I feel too. As far as I see the situation, it is too
-late to be strict and logic here. We already have device trees out there
-which use that different logic, it is only that currently, the code
-interprets that wrong. This probably worked once, and is actually a
-regression fix of 3dac1918a491 ("pinctrl: imx: detect uninitialized
-pins").
+diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
+index 9b31faa96377..801c29e9c37c 100644
+--- a/arch/arm/boot/dts/imx25-karo-tx25.dts
++++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
+@@ -42,49 +42,51 @@
+ };
+ 
+ &iomuxc {
+-	pinctrl_uart1: uart1grp {
+-		fsl,pins = <
+-			MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
+-			MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
+-			MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
+-			MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
+-		>;
+-	};
++	imx25-karo-stk5 {
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
++				MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
++				MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
++				MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
++			>;
++		};
+ 
+-	pinctrl_fec: fecgrp {
+-		fsl,pins = <
+-			MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
+-			MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
+-			MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
+-			MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
+-			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
+-			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
+-			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
+-			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
+-			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
+-			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
+-			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
+-		>;
+-	};
++		pinctrl_fec: fecgrp {
++			fsl,pins = <
++				MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
++				MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
++				MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
++				MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
++				MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
++				MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
++				MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
++				MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
++				MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
++				MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
++				MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
++			>;
++		};
+ 
+-	pinctrl_nfc: nfcgrp {
+-		fsl,pins = <
+-			MX25_PAD_NF_CE0__NF_CE0		0x80000000
+-			MX25_PAD_NFWE_B__NFWE_B		0x80000000
+-			MX25_PAD_NFRE_B__NFRE_B		0x80000000
+-			MX25_PAD_NFALE__NFALE		0x80000000
+-			MX25_PAD_NFCLE__NFCLE		0x80000000
+-			MX25_PAD_NFWP_B__NFWP_B		0x80000000
+-			MX25_PAD_NFRB__NFRB		0x80000000
+-			MX25_PAD_D7__D7			0x80000000
+-			MX25_PAD_D6__D6			0x80000000
+-			MX25_PAD_D5__D5			0x80000000
+-			MX25_PAD_D4__D4			0x80000000
+-			MX25_PAD_D3__D3			0x80000000
+-			MX25_PAD_D2__D2			0x80000000
+-			MX25_PAD_D1__D1			0x80000000
+-			MX25_PAD_D0__D0			0x80000000
+-		>;
++		pinctrl_nfc: nfcgrp {
++			fsl,pins = <
++				MX25_PAD_NF_CE0__NF_CE0		0x80000000
++				MX25_PAD_NFWE_B__NFWE_B		0x80000000
++				MX25_PAD_NFRE_B__NFRE_B		0x80000000
++				MX25_PAD_NFALE__NFALE		0x80000000
++				MX25_PAD_NFCLE__NFCLE		0x80000000
++				MX25_PAD_NFWP_B__NFWP_B		0x80000000
++				MX25_PAD_NFRB__NFRB		0x80000000
++				MX25_PAD_D7__D7			0x80000000
++				MX25_PAD_D6__D6			0x80000000
++				MX25_PAD_D5__D5			0x80000000
++				MX25_PAD_D4__D4			0x80000000
++				MX25_PAD_D3__D3			0x80000000
++				MX25_PAD_D2__D2			0x80000000
++				MX25_PAD_D1__D1			0x80000000
++				MX25_PAD_D0__D0			0x80000000
++			>;
++		};
+ 	};
+ };
+ 
+-- 
+1.7.10.4
 
-For a better future, we could add a define like IMX_NO_PAD_CTL, which
-uses the highest bit to define that a register does not exist. This
-would make sure that we don't have a collision with a valid offset (0)
-as we have today...
-
-To be sure that this does not introduce another regression on Vybrid, I
-also quickly tested the patch on Vybrid. The pinmux worked smoothly,
-hence:
-Tested-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
-> 
-> Best regards
-> Uwe
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
