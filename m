@@ -1,19 +1,36 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 30 Mar 2015 12:13:46 +0200
-Subject: [PATCH 6/6] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock/reset controllers
-In-Reply-To: <1427447925-18030-7-git-send-email-s.hauer@pengutronix.de>
-References: <1427447925-18030-1-git-send-email-s.hauer@pengutronix.de>
- <1427447925-18030-7-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeK3mO4QS_ont871N0cQi4JnD-HYJsxLZc1E29d2QsvdyA@mail.gmail.com>
+Date: Mon, 30 Mar 2015 12:25:16 +0200
+Subject: [PATCH v3] Mediatek PMIC wrapper support
+In-Reply-To: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
+References: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CABuKBeLYQjx1+1=EnAN+MLQt4pxnfnezJTsHbC1pFDJkw2Mggw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-27 10:18 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
+2015-03-17 11:14 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> This series adds support for the PMIC wrapper found on MT8135 and
+> MT8173 SoCs. This has been sent several times already as part of
+> different series, this time broken out as a series only containing
+> the wrapper code. No further compile time dependencies.
 
-The patch should have a text as description.
+Applied , thank you.
 
-Thanks,
-Matthias
+>
+> Changes since v2:
+>
+> - remove stray debug printk
+> - change MODULE_LICENSE to GPL v2 as stated in the header
+>
+> Changes since v1:
+>
+> - Remove #define DEBUG
+> - Remove PMIC specific register writes
+> - Mention other SoCs which contain a PMIC wrapper aswell
+>
+> Sascha
+>
+
+
+
+-- 
+motzblog.wordpress.com
