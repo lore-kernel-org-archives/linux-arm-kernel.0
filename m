@@ -1,45 +1,31 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 30 Mar 2015 22:17:17 +0530
-Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
-In-Reply-To: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
-References: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
-Message-ID: <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 30 Mar 2015 11:49:44 -0500
+Subject: [patch v11 00/23] Introduce ACPI for ARM64 based on ACPI 5.1
+In-Reply-To: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <55197EA8.1000807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 5:25 AM, Scott Branden <sbranden@broadcom.com> wrote:
-> From: ismail <ismail@broadcom.com>
+On 03/24/2015 09:02 AM, Hanjun Guo wrote:
+> Some fixes since last version:
 >
-> Update the thread running index before issuing the
-> GO command to the DMAC.
->
-> Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> Signed-off-by: Scott Branden <sbranden@broadcom.com>
-> Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
-> ---
->  drivers/dma/pl330.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 0e1f567..631642d 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
->         /* Set to generate interrupts for SEV */
->         writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
->
-> +       thrd->req_running = idx;
-> +
->         /* Only manager can execute GO */
->         _execute_DBGINSN(thrd, insn, true);
->
-> -       thrd->req_running = idx;
-> -
-It would help to know what the behavior looks like before and after
-the patch. If anything we should look at locking rather the
-reordering.
+>   - Add a patch 19/23 for disabling ACPI for Xen on ARM64 for now to fix
+>     compile errors on XEN ACPI, Stefano and Julien are ok with this
+>     temporary solution.
+>   - Add patch "ARM64 / ACPI: Don't unflatten device tree if acpi=force
+>     is passed", which will fix the problem that the device tree will
+>     be unflattened even if acpi=force passed, that will not obey the
+>     policy.
+>   - update patch "irqchip: Add GICv2 specific ACPI boot support",
+>     which will cause compile error on i386 with both DT and ACPI
+>     enabled:
 
-Thanks
+All 23 patches:
+
+Tested-by: Timur Tabi <timur@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
