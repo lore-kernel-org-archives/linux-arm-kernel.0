@@ -1,36 +1,25 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 30 Mar 2015 12:25:16 +0200
-Subject: [PATCH v3] Mediatek PMIC wrapper support
-In-Reply-To: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
-References: <1426587274-7810-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CABuKBeLYQjx1+1=EnAN+MLQt4pxnfnezJTsHbC1pFDJkw2Mggw@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Mar 2015 11:29:08 +0100
+Subject: [PATCH v2 1/8] mmc: sdhci-st: Add macros for register offsets
+ and bitfields for mmcss glue regs
+In-Reply-To: <54F58BED.4020900@st.com>
+References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
+ <1424956227-18258-2-git-send-email-peter.griffin@linaro.org>
+ <54F58BED.4020900@st.com>
+Message-ID: <20150330102908.GA21893@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-17 11:14 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
-> This series adds support for the PMIC wrapper found on MT8135 and
-> MT8173 SoCs. This has been sent several times already as part of
-> different series, this time broken out as a series only containing
-> the wrapper code. No further compile time dependencies.
+Hi Maxime,
 
-Applied , thank you.
+On Tue, 03 Mar 2015, Maxime Coquelin wrote:
 
->
-> Changes since v2:
->
-> - remove stray debug printk
-> - change MODULE_LICENSE to GPL v2 as stated in the header
->
-> Changes since v1:
->
-> - Remove #define DEBUG
-> - Remove PMIC specific register writes
-> - Mention other SoCs which contain a PMIC wrapper aswell
->
-> Sascha
->
+> >+
+> >+#define	ST_MMC_CCONFIG_REG_1		0x400
+> Maybe my mail client, but I see a tab instead of a space after #define.
 
+Yes your correct, have fixed all occurances in v3
 
+regards,
 
--- 
-motzblog.wordpress.com
+Peter.
