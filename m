@@ -1,35 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 30 Mar 2015 17:09:35 +0100
-Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
- handling
-In-Reply-To: <20150330162811.3673482b@north>
-References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
- <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
- <20150330162811.3673482b@north>
-Message-ID: <20150330160934.GE22949@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Mar 2015 17:09:41 +0100
+Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
+ Exynos5433 SoC
+In-Reply-To: <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
+References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
+ <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20150330160940.GA13731@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 04:28:11PM +0200, Jakub Kicinski wrote:
-> On Fri, 27 Mar 2015 14:59:31 +0000, Dave Martin wrote:
-> > To this end, the TX softirq mechanism is removed and instead
+Hi,
 
-[...]
-
-> > pl011_start_tx() will now simply stuff the FIFO until full
-> > (guaranteeing future TX IRQs), or until there are no more chars
-> > to write (in which case we don't care whether an IRQ happens).
-> > 
-> > [1] Thanks to Jakub Kicinski for his input and similar patch.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On Wed, Mar 18, 2015 at 12:17:28AM +0000, Chanwoo Choi wrote:
+> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+> PSCI (Power State Coordination Interface) v0.1.
 > 
-> Signed-off-by: Jakub Kicinski <kubakici@wp.pl>
+> This patch includes following dt node to support Exynos5433 SoC:
+> 1. Octa core for big.LITTLE architecture
+> - Cortex-A53 LITTLE Quad-core
+> - Cortex-A57 big Quad-core
+> - Support PSCI v0.1
 
-Agreed, shoulda had that (sorry!)
+Is CPU0 hotplug still broken, or has the FW been fixed?
 
-Greg, can you add Jakub's S-o-B when applying, or do you want me to
-repost?
+I'm very worried about adding a DT that's known broken, especially when
+we have no idea as to if/when the FW will be fixed judging from prior
+replies.
 
-Cheers
----Dave
+Mark.
