@@ -1,121 +1,123 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon, 30 Mar 2015 14:28:12 +0200
-Subject: [PATCH v2 2/5] PCI: st: Add Device Tree bindings for sti pcie
-In-Reply-To: <20150317114213.GH27081@e106497-lin.cambridge.arm.com>
-References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
- <1426515635-9466-3-git-send-email-gabriel.fernandez@linaro.org>
- <20150317114213.GH27081@e106497-lin.cambridge.arm.com>
-Message-ID: <CAG374jCm6CREcqKsXYnXHTNCOuaokNA11Sv6_JSW13Vdeo-tHw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 30 Mar 2015 13:28:40 +0100
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150327191040.1119319d@north>
+Message-ID: <20150330122840.GA22949@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+On Fri, Mar 27, 2015 at 07:10:40PM +0100, Jakub Kicinski wrote:
 
-You're right, i removed configuration space from the ranges.
+[Gaah -- resend again!  Looks like most recipients didn't get this :( ]
 
-Thanks for reviewing.
+> On Fri, 27 Mar 2015 17:42:24 +0000, Dave P Martin wrote:
+> > [Resend -- apologies again for any duplicates received]
+> > 
+> > On Fri, Mar 27, 2015 at 05:40:55PM +0100, Jakub Kicinski wrote:
 
-Gabriel
+[...]
 
-On 17 March 2015 at 12:42, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
-> Hi Gabriel,
->
-> On Mon, Mar 16, 2015 at 02:20:32PM +0000, Gabriel FERNANDEZ wrote:
->> sti pcie is built around a Synopsis Designware PCIe IP.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/pci/st-pcie.txt | 54 +++++++++++++++++++++++
->>  1 file changed, 54 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
->> new file mode 100644
->> index 0000000..94aae2d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
->> @@ -0,0 +1,54 @@
->> +STMicroelectronics STi PCIe controller
->> +
->> +This PCIe host controller is based on the Synopsis Designware PCIe IP
->> +and thus inherits all the common properties defined in designware-pcie.txt.
->> +
->> +Required properties:
->> + - compatible: "st,stih407-pcie"
->> + - reg: base address and length of the pcie controller, mem-window address
->> +   and length available to the controller.
->> + - interrupts: A list of interrupt outputs of the controller. Must contain an
->> +   entry for each entry in the interrupt-names property.
->> + - interrupt-names: Should be "msi". STi interrupt that is asserted when an
->> +   MSI is received.
->> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
->> +   offset for IP configuration.
->> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
->> +   Associated names must be "powerdown" and "softreset".
->> + - phys, phy-names: the phandle for the PHY device.
->> +   Associated name must be "pcie"
->> +
->> +Optional properties:
->> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
->> +
->> +Example:
->> +
->> +pcie0: pcie at 9b00000 {
->> +     compatible = "st,stih407-pcie", "snps,dw-pcie";
->> +     device_type = "pci";
->> +     reg = <0x09b00000 0x4000>,      /* dbi cntrl registers */
->> +           <0x2fff0000 0x00010000>,  /* configuration space */
->> +           <0x40000000 0x80000000>;  /* lmi mem window */
->> +     reg-names = "dbi", "config", "mem-window";
->> +     st,syscfg = <&syscfg_core 0xd8 0xe0>;
->> +     #address-cells = <3>;
->> +     #size-cells = <2>;
->> +     ranges = <0x00000800 0 0x2fff0000 0x2fff0000 0 0x00010000   /* configuration space */
->
-> Unless you are trying to support some legacy code please remove the configuration space from the ranges.
-> There is no resource type associated with config space and the generic parser will give you back an
-> invalid resource type. The other reason for that is that if you really claim to be ECAM compliant by
-> adding the config space here you need way more than 64K of space.
->
-> Best regards,
-> Liviu
->
->> +               0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
->> +     num-lanes = <1>;
->> +     interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
->> +     interrupt-names = "msi";
->> +     #interrupt-cells = <1>;
->> +     interrupt-map-mask = <0 0 0 7>;
->> +     interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
->> +                     <0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
->> +                     <0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
->> +                     <0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
->> +
->> +     resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
->> +              <&softreset STIH407_PCIE0_SOFTRESET>;
->> +     reset-names = "powerdown",
->> +                   "softreset";
->> +     phys = <&phy_port0 PHY_TYPE_PCIE>;
->> +     phy-names = "pcie";
->> +};
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
-> --
-> ====================
-> | I would like to |
-> | fix the world,  |
-> | but they're not |
-> | giving me the   |
->  \ source code!  /
->   ---------------
->     ?\_(?)_/?
->
+> > > Dave, I'd prefer if you kept my .prev_from_irq thing.  If .start_tx()
+> > > races with the IRQ we may have a situation where the IRQ arrives
+> > > but .start_tx() already filled the FIFO.  The guarantee of half of the
+> > > FIFO being empty will not hold in this case.  That's why I use the
+> > > guarantee only if the previous load was also from FIFO.
+> > 
+> > I thought about this, but I think port->lock prevents this from
+> > happening.  I was overly defensive about this in the earlier versions
+> > of the patches, and that made the code a fair bit more complicated...
+> > I was hoping it could just go away ;)
+> > 
+> > 
+> > In pl011_int(), we have
+> > 
+> > -8<-
+> > 
+> > spin_lock_irqsave(&uap->port.lock, flags);
+> > 
+> > [...]
+> > 
+> > while (status = readw(uap->port.membase + UART012_MIS), status != 0) {
+> > 
+> > [...]
+> > 
+> > 	if (status & UART011_TXIS)
+> > 		pl011_tx_chars(uap, true);
+> > 
+> > } while (status != 0);
+> > 
+> > [...]
+> > 
+> > spin_unlock_irqrestore(&uap->port.lock, flags);
+> > 
+> > ->8-
+> > 
+> > 
+> > serial_core always holds port->lock around _start_tx(), so it should be
+> > impossible for any part of _start_tx() to run in parallel with this.  If
+> > TXIS is asserted and nothing can write the FIFO in the meantime, then
+> > that should mean that the FIFO is definitely half-empty on entry to
+> > pl011_tx_chars(..., from_irq=true) -- this is also why it's safe for
+> > pl011_int() to loop and potentially make repeated calls to
+> > pl011_tx_chars().
+> > 
+> > Can you see a way this could break, or does this reasoning sound good to
+> > you?
+> 
+> It doesn't have to run in parallel, perhaps using the word "race" was
+> not entirely justified on my side.  Sorry if my English is not
+> super-clear ;)  Even when the accesses are serialized the problem
+> remains.
+
+[...]
+
+> I think this would require some adverse condition to trigger (high load
+> + high baudrate) or IRQ pending during first unmask (which I think
+> shouldn't happen, but hey, let's not trust HW too much...).
+
+Ah, I see where you're coming from.
+
+TXIS reflects the live status of the FIFO, except that it is
+"spuriously" deasserted betweem reset/clear of the interrupt and the
+first TX IRQ, even though the FIFO may be empty.
+
+TXIS should never be spuriously _asserted_ (i.e., at the point when you
+read it, if it's asserted then you know for sure the FIFO is half-empty).
+
+
+Referring to your sequence:
+
+>  - start_tx() runs holding the lock,
+
+FIFO may be > 1/2 full
+
+>  - IRQ fires and waits for the lock,
+
+>  - start_tx() exists and releases the lock,
+
+>  - IRQ handler grabs the lock [...]
+
+FIFO may still be > 1/2 full.
+
+pl011_int() reads the interrups status from MIS.
+
+TXIS is always masked when DMA is active; apart from this, the FIFO is
+only written with port->lock held.
+
+So whatever status MIS reported, the FIFO can only have got emptier.
+
+So, if MIS reported TXIS, the FIFO is definitely <= 1/2 full.
+If MIS reported TXIS, the fifo may be (but does not have to be) > 1/2
+full.
+
+Provided TXIS is polled before calling pl011_tx_chars(... from_irq=true),
+and port->lock is *not* released in between the poll and the call,
+it should be safe to assume that the FIFO is at least half-empty.
+On all other call paths, pl011_tx_chars is called with from_irq=false.
+
+
+Did I go wrong somewhere?
+
+Cheers
+---Dave
