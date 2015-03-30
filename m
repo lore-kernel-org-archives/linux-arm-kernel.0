@@ -1,85 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Mar 2015 13:22:40 +0000
-Subject: [PATCH 0/3] Add DT support for netxbig LEDs
-In-Reply-To: <20150330123008.GC17650@lunn.ch>
-References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
- <20150309094107.GL1509@kw.sim.vm.gnt>
- <5506FE46.4000405@free-electrons.com>
- <20150330083040.GY1509@kw.sim.vm.gnt>
- <20150330123008.GC17650@lunn.ch>
-Message-ID: <20150330132240.GB8688@io.lakedaemon.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Mar 2015 15:23:21 +0200
+Subject: [PATCH] clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for
+ defining features
+In-Reply-To: <CAKohpokxaGDYv8B-_UiFU+rmbbMerRZLJyJ9=-YHF2KurX6k8A@mail.gmail.com>
+References: <3fac202ead48b50c0967c62eae92fe9786fd24a1.1425015704.git.viresh.kumar@linaro.org>	<20150227074601.GO7789@pengutronix.de>
+ <CAKohpokxaGDYv8B-_UiFU+rmbbMerRZLJyJ9=-YHF2KurX6k8A@mail.gmail.com>
+Message-ID: <55194E49.40605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 02:30:08PM +0200, Andrew Lunn wrote:
-> On Mon, Mar 30, 2015 at 10:30:40AM +0200, Simon Guinot wrote:
-> > On Mon, Mar 16, 2015 at 05:01:10PM +0100, Gregory CLEMENT wrote:
-> > > Hi all,
-> > > 
-> > > On 09/03/2015 10:41, Simon Guinot wrote:
-> > > > On Mon, Feb 23, 2015 at 04:04:18PM +0100, Simon Guinot wrote:
-> > > >> Hello,
-> > > >>
-> > > >> This patch series adds DT support for the LEDs found on the Kirkwood-based
-> > > >> LaCie boards 2Big and 5Big Network v2.
-> > > >>
-> > > >> Simon
-> > > >>
-> > > >> Simon Guinot (3):
-> > > >>   leds: netxbig: add device tree binding
-> > > >>   ARM: Kirkwood: add LED DT entries for netxbig boards
-> > > >>   ARM: mvebu: remove static LED setup for netxbig boards
-> > > > 
-> > > > Hi Brian,
-> > > > 
-> > > > Please, consider merging the first patch of this serie.
-> > > 
-> > > Brian,
-> > > 
-> > > here again let me know when this patch will be merged, and I will
-> > > also need a stable tag as patch 2 depends on this one.
-> > > 
-> > > Andrew, Jason,
-> > > 
-> > > patch 2 and 3 looks OK for me. What is your opinion about it?
-> > 
-> > Hi Gregory, Andrew and Jason,
-> > 
-> > This patch set seems stuck. I believe that Bryan is probably too busy to
-> > handle it...
-> > 
-> > Is that possible to merge it via the mvebu tree ? Since only some LaCie
-> > boards are impacted, I think it could make sense.
-> 
-> Hi Simon
-> 
-> Hard one. I also have a driver stuck in led limbo.
-> 
-> Last time we took a fix via mvebu, it all went messy at the last
-> minute. We made it very clear to Bryon we planned to take a patch via
-> mvebu, we had queued it via mvebu, we had sent a pull request to
-> arm-soc, all with no reply from Bryon. Only at the last minute did he
-> jump in, pull it himself and send it to Linus. That caused Olof all
-> sorts of problems with his tree.
+On 03/27/2015 06:16 PM, Viresh Kumar wrote:
+> On 27 February 2015 at 13:16, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+>> Hello Viresh,
+>>
+>> On Fri, Feb 27, 2015 at 11:12:33AM +0530, Viresh Kumar wrote:
+>>> We have used CLOCK_EVT_MODE_PERIODIC instead of CLOCK_EVT_FEAT_PERIODIC while
+>>> defining features. Fix it.
+>>>
+>>> Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+>>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>> Makes sense, thanks for catching.
+>>
+>> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> @Daniel: Have you applied this one ?
 
-It's also good to keep in mind the workflow of driver maintainers who push
-directly to Linus.  They send PRs during the merge window, and don't
-necessarily spend too much time in -next.  Which means, if they have good
-filters running on lkml, they just sit down a week or so before the merge
-window and apply everything they have pending.
+Nope, I missed it.
 
-For those of us who are feeding arm-soc, and are accustomed to getting things
-in early, this can be nerve-wracking.
+Applied in my tree.
 
-Brian has demonstrated that he does pick things up and get them merged.  We
-just need to make sure that what he picks up is well tested and reviewed when
-he gets to it.  Since there won't be time for another revision before the merge
-window.  But hey, that's what -rc's are for.  :-P
+Thanks for the heads up.
 
-> To stop that happening again, i think we need an Acked-by from Bryan.
+   -- Daniel
 
-I agree.
 
-thx,
 
-Jason.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
