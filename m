@@ -1,66 +1,101 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Mar 2015 11:43:17 +0200
-Subject: [PATCH 0/3] Improve dw-hdmi CTS/N setting
-In-Reply-To: <20150327111320.GA4019@n2100.arm.linux.org.uk>
-References: <20150327111320.GA4019@n2100.arm.linux.org.uk>
-Message-ID: <1427708597.3739.4.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Mar 2015 11:48:19 +0200
+Subject: [PATCH v2 resend 00/14] crypto: SHA glue code consolidation
+Message-ID: <1427708913-29678-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+NOTE: I appear to have screwed up something when I just sent this, so
+      resending now with no patches missing and no duplicates.
 
-Am Freitag, den 27.03.2015, 11:13 +0000 schrieb Russell King - ARM
-Linux:
-> All,
-> 
-> This is a mini-series to try and move audio support for the Designware
-> HDMI bridge along.
->
-> There are two known versions of the Designware HDMI audio:
-> 
-> - The Rockchip version, which is based upon feeding the HDMI block I2S
->   stream(s), which doesn't have any on-board DMA support.
-> - The Freescale version, which only has AHB DMA support.
-> 
-> There are two drivers around at present, one which I've had which is
-> ALSA based due to its simplicity for the Freescale version of the IP,
-> and one which is ASoC based from Yakir Yang for the Rockchip version.
-> 
-> There is some commonality between the two drivers - for example, the
-> setup of the CTS/N values is very similar, although not identical.
-> 
-> I have been reviewing (when time permits) the patches from Yakir Yang,
-> and making recommendations to try and extract the common parts of the
-> driver.  This is the patch set I came up with (mentioned in
-> 20150202130920.GC8656 at n2100.arm.linux.org.uk).
-> 
-> Yakir merged some of my ideas into his patch set - for example, Yakir
-> Yang's "drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
-> hdmi_regenerate_cts()" is very close to the version which I came up
-> with.
-> 
-> Yakir Yang didn't include the mutex patch, which I've included here -
-> it really is necessary because we have potentially two different
-> threads which can change the CTS/N values - a change of the video mode
-> vs a change in the audio driver.
-> 
-> The last patch is adjusting the CTS/N setting order - I have only gone
-> as far as what we know works for iMX6, and this is also identical to
-> Yakir Yang's patch.
-> 
-> The identical nature is hardly surprising; my patches were derived from
-> a previous set of his patches (which I acknowledge in the commit messages)
-> and I detailed in the above message what I wanted to see.
-> 
-> What I would like to see is that - as we are effectively in agreement
-> over two of these patches - we get these patches merged rather than
-> having to repeatedly see them.  If there's any objection, please let me
-> know, otherwise I'll collect acks and send them to David.
+Hello all,
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-Also,
-Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
-(with your dw-hdmi-audio patches on i.MX6)
+This is v2 of what is now a complete glue code consolidation series
+for generic, x86, arm and arm64 implementations of SHA-1, SHA-224/256
+and SHA-384/512.
 
-best regards
-Philipp
+The base layer implements all the update and finalization logic around
+the block transforms, where the prototypes of the latter look something
+like this:
+
+typedef void (shaXXX_block_fn)(int blocks, u8 const *src, uXX *state,
+			     const u8 *head, void *p);
+
+The block implementation should process the head block first, then
+process the requested number of block starting at 'src'. The generic
+pointer 'p' is passed down from the do_update/do_finalize() versions;
+this is used for instance by the ARM64 implementations to indicate to
+the core ASM implementation that it should finalize the digest, which
+it will do only if the input was a round multiple of the block size.
+The generic pointer is used here as a means of conveying that information
+back and forth.
+
+Note that the base functions prototypes are all 'returning int' but
+they all return 0. They should be invoked as tail calls where possible
+to eliminate some of the function call overhead. If that is not possible,
+the return values can be safely ignored.
+
+Changes since v1 (RFC):
+- prefixed globally visible generic symbols with crypto_
+- added SHA-1 base layer
+- updated init code to only set the initial constants and clear the
+  count, clearing the buffer is unnecessary [Markus]
+- favor the small update path in crypto_sha_XXX_base_do_update() [Markus]
+- update crypto_sha_XXX_do_finalize() to use memset() on the buffer directly
+  rather than copying a statically allocated padding buffer into it
+  [Markus]
+- moved a bunch of existing arm and x86 implementations to use the new base
+  layers
+
+Note: looking at the generated asm (for arm64), I noticed that the memcpy/memset
+invocations with compile time constant src and len arguments (which includes
+the empty struct assignments) are eliminated completely, and replaced by
+direct loads and stores. Hopefully this addresses the concern raised by Markus
+regarding this.
+
+Ard Biesheuvel (14):
+  crypto: sha512: implement base layer for SHA-512
+  crypto: sha256: implement base layer for SHA-256
+  crypto: sha1: implement base layer for SHA-1
+  crypto: sha512-generic: move to generic glue implementation
+  crypto: sha256-generic: move to generic glue implementation
+  crypto: sha1-generic: move to generic glue implementation
+  crypto/arm: move SHA-1 ARM asm implementation to base layer
+  crypto/arm: move SHA-1 ARMv8 implementation to base layer
+  crypto/arm: move SHA-224/256 ARMv8 implementation to base layer
+  crypto/arm64: move SHA-1 ARMv8 implementation to base layer
+  crypto/arm64: move SHA-224/256 ARMv8 implementation to base layer
+  crypto/x86: move SHA-1 SSSE3 implementation to base layer
+  crypto/x86: move SHA-224/256 SSSE3 implementation to base layer
+  crypto/x86: move SHA-384/512 SSSE3 implementation to base layer
+
+ arch/arm/crypto/Kconfig                  |   4 +-
+ arch/arm/crypto/sha1-ce-glue.c           | 110 +++++-----------
+ arch/arm/{include/asm => }/crypto/sha1.h |   3 +
+ arch/arm/crypto/sha1_glue.c              | 117 ++++-------------
+ arch/arm/crypto/sha2-ce-glue.c           | 151 +++++-----------------
+ arch/arm64/crypto/Kconfig                |   2 +
+ arch/arm64/crypto/sha1-ce-core.S         |  11 +-
+ arch/arm64/crypto/sha1-ce-glue.c         | 132 ++++----------------
+ arch/arm64/crypto/sha2-ce-core.S         |  11 +-
+ arch/arm64/crypto/sha2-ce-glue.c         | 208 +++++--------------------------
+ arch/x86/crypto/sha1_ssse3_glue.c        | 139 +++++----------------
+ arch/x86/crypto/sha256_ssse3_glue.c      | 186 ++++++---------------------
+ arch/x86/crypto/sha512_ssse3_glue.c      | 195 ++++++-----------------------
+ crypto/Kconfig                           |  16 +++
+ crypto/Makefile                          |   3 +
+ crypto/sha1_base.c                       | 125 +++++++++++++++++++
+ crypto/sha1_generic.c                    | 105 ++++------------
+ crypto/sha256_base.c                     | 140 +++++++++++++++++++++
+ crypto/sha256_generic.c                  | 139 ++++-----------------
+ crypto/sha512_base.c                     | 143 +++++++++++++++++++++
+ crypto/sha512_generic.c                  | 126 ++++---------------
+ include/crypto/sha.h                     |  62 +++++++++
+ 22 files changed, 836 insertions(+), 1292 deletions(-)
+ rename arch/arm/{include/asm => }/crypto/sha1.h (67%)
+ create mode 100644 crypto/sha1_base.c
+ create mode 100644 crypto/sha256_base.c
+ create mode 100644 crypto/sha512_base.c
+
+-- 
+1.8.3.2
