@@ -1,82 +1,88 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Mar 2015 16:20:41 +0200
-Subject: [PATCH 0/3] Add DT support for netxbig LEDs
-In-Reply-To: <20150330134605.GC8688@io.lakedaemon.net>
-References: <1424703861-20903-1-git-send-email-simon.guinot@sequanux.org>
- <20150309094107.GL1509@kw.sim.vm.gnt> <5506FE46.4000405@free-electrons.com>
- <20150330083040.GY1509@kw.sim.vm.gnt> <20150330123008.GC17650@lunn.ch>
- <20150330132240.GB8688@io.lakedaemon.net>
- <55194FC5.6080902@free-electrons.com>
- <20150330134605.GC8688@io.lakedaemon.net>
-Message-ID: <55195BB9.4020409@free-electrons.com>
+From: moorray3@wp.pl (Jakub =?UTF-8?B?S2ljacWEc2tp?=)
+Date: Mon, 30 Mar 2015 16:26:52 +0200
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150330122840.GA22949@e103592.cambridge.arm.com>
+References: <20150327191040.1119319d@north>
+ <20150330122840.GA22949@e103592.cambridge.arm.com>
+Message-ID: <20150330162652.0f0c7a18@north>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/2015 15:46, Jason Cooper wrote:
-> On Mon, Mar 30, 2015 at 03:29:41PM +0200, Gregory CLEMENT wrote:
->> Hi Simon,
->> [...]
->>
->>>>> Hi Gregory, Andrew and Jason,
->>>>>
->>>>> This patch set seems stuck. I believe that Bryan is probably too busy to
->>>>> handle it...
->>>>>
->>>>> Is that possible to merge it via the mvebu tree ? Since only some LaCie
->>>>> boards are impacted, I think it could make sense.
->>>>
->>>> Hi Simon
->>>>
->>>> Hard one. I also have a driver stuck in led limbo.
->>>>
->>>> Last time we took a fix via mvebu, it all went messy at the last
->>>> minute. We made it very clear to Bryon we planned to take a patch via
->>>> mvebu, we had queued it via mvebu, we had sent a pull request to
->>>> arm-soc, all with no reply from Bryon. Only at the last minute did he
->>>> jump in, pull it himself and send it to Linus. That caused Olof all
->>>> sorts of problems with his tree.
->>>
->>> It's also good to keep in mind the workflow of driver maintainers who push
->>> directly to Linus.  They send PRs during the merge window, and don't
->>> necessarily spend too much time in -next.  Which means, if they have good
->>> filters running on lkml, they just sit down a week or so before the merge
->>> window and apply everything they have pending.
->>>
->>> For those of us who are feeding arm-soc, and are accustomed to getting things
->>> in early, this can be nerve-wracking.
->>>
->>> Brian has demonstrated that he does pick things up and get them merged.  We
->>> just need to make sure that what he picks up is well tested and reviewed when
->>> he gets to it.  Since there won't be time for another revision before the merge
->>> window.  But hey, that's what -rc's are for.  :-P
->>>
->>
->> At least what I can do is creating a led branch and merged it in the mvebu/for-next
->> branch. It will allow us to be more confident for the merge window.
+On Mon, 30 Mar 2015 13:28:40 +0100, Dave Martin wrote:
+> On Fri, Mar 27, 2015 at 07:10:40PM +0100, Jakub Kicinski wrote:
 > 
-> How would we know when to remove it?  We have no reliable communication with Brian.
-
-We will remove it when we will received an acked-by from him.
-
-The purpose of it was to be able to do a pull request as soon as we know
-that either Bryan will take it or let us take the full series.
-
-In the mean time if Bryan also applied the patch in is leds/for-next branch
-it should not be a problem as the patch will be the same.
-
-Thanks,
-
-Gregory
-
+> [Gaah -- resend again!  Looks like most recipients didn't get this :( ]
 > 
-> thx,
+> > On Fri, 27 Mar 2015 17:42:24 +0000, Dave P Martin wrote:
+> > > [Resend -- apologies again for any duplicates received]
+> > > 
+> > > On Fri, Mar 27, 2015 at 05:40:55PM +0100, Jakub Kicinski wrote:
 > 
-> Jason.
+> [...]
 > 
+> > > > Dave, I'd prefer if you kept my .prev_from_irq thing.  If .start_tx()
+> > > > races with the IRQ we may have a situation where the IRQ arrives
+> > > > but .start_tx() already filled the FIFO.  The guarantee of half of the
+> > > > FIFO being empty will not hold in this case.  That's why I use the
+> > > > guarantee only if the previous load was also from FIFO.
+> > > 
+> > > I thought about this, but I think port->lock prevents this from
+> > > happening.  I was overly defensive about this in the earlier versions
+> > > of the patches, and that made the code a fair bit more complicated...
+> > > I was hoping it could just go away ;)
+> > > 
+> > > 
+> > > In pl011_int(), we have
+> > > 
+> > > -8<-
+> > > 
+> > > spin_lock_irqsave(&uap->port.lock, flags);
+> > > 
+> > > [...]
+> > > 
+> > > while (status = readw(uap->port.membase + UART012_MIS), status != 0) {
+> > > 
+> > > [...]
+> > > 
+> > > 	if (status & UART011_TXIS)
+> > > 		pl011_tx_chars(uap, true);
+> > > 
+> > > } while (status != 0);
+> > > 
+> > > [...]
+> > > 
+> > > spin_unlock_irqrestore(&uap->port.lock, flags);
+> > > 
+> > > ->8-
+> > > 
+> > > 
+> > > serial_core always holds port->lock around _start_tx(), so it should be
+> > > impossible for any part of _start_tx() to run in parallel with this.  If
+> > > TXIS is asserted and nothing can write the FIFO in the meantime, then
+> > > that should mean that the FIFO is definitely half-empty on entry to
+> > > pl011_tx_chars(..., from_irq=true) -- this is also why it's safe for
+> > > pl011_int() to loop and potentially make repeated calls to
+> > > pl011_tx_chars().
+> > > 
+> > > Can you see a way this could break, or does this reasoning sound good to
+> > > you?
+> > 
+> > It doesn't have to run in parallel, perhaps using the word "race" was
+> > not entirely justified on my side.  Sorry if my English is not
+> > super-clear ;)  Even when the accesses are serialized the problem
+> > remains.
+> 
+> [...]
+> 
+> > I think this would require some adverse condition to trigger (high load
+> > + high baudrate) or IRQ pending during first unmask (which I think
+> > shouldn't happen, but hey, let's not trust HW too much...).
+> 
+> Ah, I see where you're coming from.
+> 
+> TXIS reflects the live status of the FIFO, except that it is
+> "spuriously" deasserted betweem reset/clear of the interrupt and the
+> first TX IRQ, even though the FIFO may be empty.
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I missed that IRQ is cleared by writing data.
