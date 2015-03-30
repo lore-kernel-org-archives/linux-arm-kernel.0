@@ -1,93 +1,149 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Mar 2015 15:55:26 +0100
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
- <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
- <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
- <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
-Message-ID: <20150330145525.GA30015@leverpostej>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Mar 2015 15:39:57 +0100
+Subject: [PATCH v3 4/9] mmc: sdhci-st: Add st_mmcss_cconfig function to
+ configure mmcss glue registers.
+In-Reply-To: <1427726402-7513-1-git-send-email-peter.griffin@linaro.org>
+References: <1427726402-7513-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1427726402-7513-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 03:00:31PM +0100, Ard Biesheuvel wrote:
-> On 30 March 2015 at 15:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Mar 27, 2015 at 02:16:19PM +0100, Ard Biesheuvel wrote:
-> >> On 26 March 2015 at 07:22, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> > On 25 March 2015 at 15:59, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> >> On Mon, Mar 23, 2015 at 04:36:56PM +0100, Ard Biesheuvel wrote:
-> >> >>> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> >> >>> index 16134608eecf..fd8434753372 100644
-> >> >>> --- a/arch/arm64/kernel/head.S
-> >> >>> +++ b/arch/arm64/kernel/head.S
-> >> >>> @@ -49,13 +49,15 @@
-> >> >>>  #ifdef CONFIG_ARM64_64K_PAGES
-> >> >>>  #define BLOCK_SHIFT  PAGE_SHIFT
-> >> >>>  #define BLOCK_SIZE   PAGE_SIZE
-> >> >>> -#define TABLE_SHIFT  PMD_SHIFT
-> >> >>>  #else
-> >> >>>  #define BLOCK_SHIFT  SECTION_SHIFT
-> >> >>>  #define BLOCK_SIZE   SECTION_SIZE
-> >> >>> -#define TABLE_SHIFT  PUD_SHIFT
-> >> >>>  #endif
-> >> >>>
-> >> >>> +#define TABLE_SHIFT  (BLOCK_SHIFT + PAGE_SHIFT - 3)
-> >> >>> +#define TABLE_SIZE   (1 << TABLE_SHIFT)
-> >> >>> +#define TABLE_MASK   (~(TABLE_SIZE - 1))
-> >> >>> +
-> >> >>>  #define KERNEL_START _text
-> >> >>>  #define KERNEL_END   _end
-> >> >>>
-> >> >>> @@ -237,7 +239,10 @@ ENTRY(stext)
-> >> >>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
-> >> >>>
-> >> >>>       adrp    x24, __PHYS_OFFSET
-> >> >>> -     mov     x23, #KIMAGE_OFFSET
-> >> >>> +     and     x23, x24, #~TABLE_MASK          // image offset
-> >> >>> +     and     x24, x24, #TABLE_MASK           // PHYS_OFFSET
-> >> >>> +     mov     x0, #KIMAGE_OFFSET
-> >> >>> +     add     x23, x23, x0
-> >> >>
-> >> >> I'm still trying to figure out how this works. Does the code imply that
-> >> >> the kernel image can only be loaded within a block size of the
-> >> >> PHYS_OFFSET? If that's the case, it's not too flexible.
-> >> >
-> >> > For now, yes.
-> >
-> > Can we defer the setting of PHYS_OFFSET until we parse the DT memory
-> > nodes?
-> >
-> 
-> I experimented a bit with that, but it is quite hairy. Any
-> manipulation of the page tables goes through __va/__pa, so you need a
-> valid PHYS_OFFSET there to ensure they point at the right physical
-> region. But PHYS_OFFSET also needs to be small enough for the DT
-> parsing code not to disregard regions that are below it. And then
-> there is the memblock limit to ensure that early dynamically allocated
-> page tables come from a region that is already mapped.
+STiH407 family SoC's have glue registers in the flashSS subsystem which
+are used to configure the Arasan HC. This patch configures these glue
+registers according to what has been specified in the DT.
 
-Could we not use fixmaps to bootstrap the page tables to a state where
-we can address them via the linear mapping? That would allow us to
-forget about the memblock limit.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
+Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+---
+ drivers/mmc/host/sdhci-st.c | 88 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
-If we can do that, then we won't care about PHYS_OFFSET until later, and
-we should be able to leave it zero for parsing the DT, then move it up
-if necessary (dropping memory we can't address) once we know where
-memory is.
-
-This is of course a vast simplification of the work involved ;)
-
-> I think it may be doable, but it would require some significant
-> hacking, e.g., call early_init_scan_dt() at its physical address with
-> only the ID map loaded and the MMU and caches on, and only after that
-> start populating the virtual address space. Or at least only populate
-> the lower half, i.e., mappings below PAGE_OFFSET for the kernel and
-> the FDT
-
-I thought we were going to use the fixmap for the DT, which would avoid
-messiness there, no?
-
-Mark.
+diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
+index 6c4c551..1ce5a01 100644
+--- a/drivers/mmc/host/sdhci-st.c
++++ b/drivers/mmc/host/sdhci-st.c
+@@ -138,6 +138,87 @@ static inline void st_mmcss_set_static_delay(void __iomem *ioaddr)
+ 			ioaddr + ST_TOP_MMC_TX_CLK_DLY);
+ }
+ 
++/**
++ * st_mmcss_cconfig: configure the Arasan HC inside the flashSS.
++ * @np: dt device node.
++ * @host: sdhci host
++ * Description: this function is to configure the Arasan host controller.
++ * On some ST SoCs, i.e. STiH407 family, the MMC devices inside a dedicated
++ * flashSS sub-system which needs to be configured to be compliant to eMMC 4.5
++ * or eMMC4.3.  This has to be done before registering the sdhci host.
++ */
++static void st_mmcss_cconfig(struct device_node *np, struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct mmc_host *mhost = host->mmc;
++	u32 cconf2, cconf3, cconf4, cconf5;
++
++	if (!of_device_is_compatible(np, "st,sdhci-stih407"))
++		return;
++
++	cconf2 = ST_MMC_CCONFIG_2_DEFAULT;
++	cconf3 = ST_MMC_CCONFIG_3_DEFAULT;
++	cconf4 = ST_MMC_CCONFIG_4_DEFAULT;
++	cconf5 = ST_MMC_CCONFIG_5_DEFAULT;
++
++	writel_relaxed(ST_MMC_CCONFIG_1_DEFAULT,
++			host->ioaddr + ST_MMC_CCONFIG_REG_1);
++
++	/* Set clock frequency, default to 50MHz if max-frequency is not
++	 * provided */
++
++	switch (mhost->f_max) {
++	case 200000000:
++		clk_set_rate(pltfm_host->clk, mhost->f_max);
++		cconf2 |= BASE_CLK_FREQ_200;
++		break;
++	case 100000000:
++		clk_set_rate(pltfm_host->clk, mhost->f_max);
++		cconf2 |= BASE_CLK_FREQ_100;
++		break;
++	default:
++		clk_set_rate(pltfm_host->clk, 50000000);
++		cconf2 |= BASE_CLK_FREQ_50;
++	}
++
++	writel_relaxed(cconf2, host->ioaddr + ST_MMC_CCONFIG_REG_2);
++
++	if (mhost->caps & MMC_CAP_NONREMOVABLE)
++		cconf3 |= ST_MMC_CCONFIG_EMMC_SLOT_TYPE;
++	else
++		/* CARD _D ET_CTRL */
++		writel_relaxed(ST_MMC_GP_OUTPUT_CD,
++				host->ioaddr + ST_MMC_GP_OUTPUT);
++
++	if (mhost->caps & MMC_CAP_UHS_SDR50) {
++		/* use 1.8V */
++		cconf3 |= ST_MMC_CCONFIG_1P8_VOLT;
++		cconf4 |= ST_MMC_CCONFIG_SDR50;
++		/* Use tuning */
++		cconf5 |= ST_MMC_CCONFIG_TUNING_FOR_SDR50;
++		/* Max timeout for retuning */
++		cconf5 |= RETUNING_TIMER_CNT_MAX;
++	}
++
++	if (mhost->caps & MMC_CAP_UHS_SDR104) {
++		/*
++		 * SDR104 implies the HC can support HS200 mode, so
++		 * it's mandatory to use 1.8V
++		 */
++		cconf3 |= ST_MMC_CCONFIG_1P8_VOLT;
++		cconf4 |= ST_MMC_CCONFIG_SDR104;
++		/* Max timeout for retuning */
++		cconf5 |= RETUNING_TIMER_CNT_MAX;
++	}
++
++	if (mhost->caps & MMC_CAP_UHS_DDR50)
++		cconf4 |= ST_MMC_CCONFIG_DDR50;
++
++	writel_relaxed(cconf3, host->ioaddr + ST_MMC_CCONFIG_REG_3);
++	writel_relaxed(cconf4, host->ioaddr + ST_MMC_CCONFIG_REG_4);
++	writel_relaxed(cconf5, host->ioaddr + ST_MMC_CCONFIG_REG_5);
++}
++
+ static inline void st_mmcss_set_dll(void __iomem *ioaddr)
+ {
+ 	if (!ioaddr)
+@@ -214,6 +295,7 @@ static const struct sdhci_pltfm_data sdhci_st_pdata = {
+ 
+ static int sdhci_st_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	struct sdhci_host *host;
+ 	struct st_mmc_platform_data *pdata;
+ 	struct sdhci_pltfm_host *pltfm_host;
+@@ -266,6 +348,9 @@ static int sdhci_st_probe(struct platform_device *pdev)
+ 	pltfm_host->priv = pdata;
+ 	pltfm_host->clk = clk;
+ 
++	/* Configure the Arasan HC inside the flashSS */
++	st_mmcss_cconfig(np, host);
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed sdhci_add_host\n");
+@@ -335,12 +420,15 @@ static int sdhci_st_resume(struct device *dev)
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct st_mmc_platform_data *pdata = pltfm_host->priv;
++	struct device_node *np = dev->of_node;
+ 
+ 	clk_prepare_enable(pltfm_host->clk);
+ 
+ 	if (pdata->rstc)
+ 		reset_control_deassert(pdata->rstc);
+ 
++	st_mmcss_cconfig(np, host);
++
+ 	return sdhci_resume_host(host);
+ }
+ #endif
+-- 
+1.9.1
