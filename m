@@ -1,52 +1,66 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 30 Mar 2015 12:41:50 +0300
-Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
-Message-ID: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 30 Mar 2015 11:43:17 +0200
+Subject: [PATCH 0/3] Improve dw-hdmi CTS/N setting
+In-Reply-To: <20150327111320.GA4019@n2100.arm.linux.org.uk>
+References: <20150327111320.GA4019@n2100.arm.linux.org.uk>
+Message-ID: <1427708597.3739.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following warning by initializing directions field in the dma_device
-structure.
+Hi Russell,
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
-this driver doesn't support generic slave capabilities reporting
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
-Hardware name: Sharp-Collie
-[<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
-[<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
-[<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
-[<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
-[<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
-[<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
-[<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
-[<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
-[<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
-[<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
-[<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
-[<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
-[<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
-[<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
-[<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
----[ end trace e188b8fe0e782e75 ]---
+Am Freitag, den 27.03.2015, 11:13 +0000 schrieb Russell King - ARM
+Linux:
+> All,
+> 
+> This is a mini-series to try and move audio support for the Designware
+> HDMI bridge along.
+>
+> There are two known versions of the Designware HDMI audio:
+> 
+> - The Rockchip version, which is based upon feeding the HDMI block I2S
+>   stream(s), which doesn't have any on-board DMA support.
+> - The Freescale version, which only has AHB DMA support.
+> 
+> There are two drivers around at present, one which I've had which is
+> ALSA based due to its simplicity for the Freescale version of the IP,
+> and one which is ASoC based from Yakir Yang for the Rockchip version.
+> 
+> There is some commonality between the two drivers - for example, the
+> setup of the CTS/N values is very similar, although not identical.
+> 
+> I have been reviewing (when time permits) the patches from Yakir Yang,
+> and making recommendations to try and extract the common parts of the
+> driver.  This is the patch set I came up with (mentioned in
+> 20150202130920.GC8656 at n2100.arm.linux.org.uk).
+> 
+> Yakir merged some of my ideas into his patch set - for example, Yakir
+> Yang's "drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and
+> hdmi_regenerate_cts()" is very close to the version which I came up
+> with.
+> 
+> Yakir Yang didn't include the mutex patch, which I've included here -
+> it really is necessary because we have potentially two different
+> threads which can change the CTS/N values - a change of the video mode
+> vs a change in the audio driver.
+> 
+> The last patch is adjusting the CTS/N setting order - I have only gone
+> as far as what we know works for iMX6, and this is also identical to
+> Yakir Yang's patch.
+> 
+> The identical nature is hardly surprising; my patches were derived from
+> a previous set of his patches (which I acknowledge in the commit messages)
+> and I detailed in the above message what I wanted to see.
+> 
+> What I would like to see is that - as we are effectively in agreement
+> over two of these patches - we get these patches merged rather than
+> having to repeatedly see them.  If there's any objection, please let me
+> know, otherwise I'll collect acks and send them to David.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- drivers/dma/sa11x0-dma.c | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Also,
+Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+(with your dw-hdmi-audio patches on i.MX6)
 
-diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
-index 5adf540..bb7ddd6 100644
---- a/drivers/dma/sa11x0-dma.c
-+++ b/drivers/dma/sa11x0-dma.c
-@@ -948,6 +948,7 @@ static int sa11x0_dma_probe(struct platform_device *pdev)
- 	dma_cap_set(DMA_CYCLIC, d->slave.cap_mask);
- 	d->slave.device_prep_slave_sg = sa11x0_dma_prep_slave_sg;
- 	d->slave.device_prep_dma_cyclic = sa11x0_dma_prep_dma_cyclic;
-+	d->slave.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
- 	ret = sa11x0_dma_init_dmadev(&d->slave, &pdev->dev);
- 	if (ret) {
- 		dev_warn(d->slave.dev, "failed to register slave async device: %d\n",
--- 
-2.1.4
+best regards
+Philipp
