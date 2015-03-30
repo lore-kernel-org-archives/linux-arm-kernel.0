@@ -1,50 +1,60 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 30 Mar 2015 18:04:06 +0300
-Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
-In-Reply-To: <20150330121146.GG24899@n2100.arm.linux.org.uk>
-References: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
- <20150330121146.GG24899@n2100.arm.linux.org.uk>
-Message-ID: <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Mar 2015 16:05:52 +0100
+Subject: Versatile Express randomly fails to boot - Versatile Express to
+ be removed from nightly testing
+In-Reply-To: <55196228.5050805@arm.com>
+References: <55071742.6000405@arm.com>
+ <20150316181634.GK8656@n2100.arm.linux.org.uk>
+ <55072BF5.7030901@arm.com>
+ <20150316195255.GM8656@n2100.arm.linux.org.uk>
+ <550818A6.9020205@arm.com>
+ <20150317153657.GY8656@n2100.arm.linux.org.uk>
+ <55084D99.7050004@arm.com>
+ <20150317161748.GZ8656@n2100.arm.linux.org.uk>
+ <20150330140333.GJ24899@n2100.arm.linux.org.uk>
+ <55196228.5050805@arm.com>
+Message-ID: <20150330150552.GK24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Mar 30, 2015 at 03:48:08PM +0100, Sudeep Holla wrote:
+> Though <2 2 1> works fine most of the time, I did try testing continuous
+> reboot overnight and it failed. I kept increasing the latencies and
+> found out that even max latency of <8 8 8> could not survive continuous
+> overnight reboot test and it fails with exact same issue.
+> 
+> So I am not sure if we can consider it as a fix. However if we are OK to
+> have *mostly reliable*, then we can push that change.
 
-2015-03-30 15:11 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Mon, Mar 30, 2015 at 12:41:50PM +0300, Dmitry Eremin-Solenikov wrote:
->> Fix the following warning by initializing directions field in the dma_device
->> structure.
->>
->> ------------[ cut here ]------------
->> WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
->> this driver doesn't support generic slave capabilities reporting
->> Modules linked in:
->> CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
->> Hardware name: Sharp-Collie
->> [<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
->> [<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
->> [<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
->> [<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
->> [<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
->> [<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
->> [<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
->> [<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
->> [<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
->> [<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
->> [<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
->> [<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
->> [<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
->> [<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
->> [<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
->> ---[ end trace e188b8fe0e782e75 ]---
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->
-> It's an improvement, but I wonder whether src_addr_widths, dst_addr_widths
-> and residue_granularity should also be filled in.
+Okay, the issue I have is this.
 
-Nice catch. Missed that. I'll send a v2 tomorrow.
+Versatile Express used to boot reliably in the nightly build tests prior
+to DT.  In that mode, we never configured the latency values.
+
+Then the legacy code was removed, and I had to switch over to DT booting,
+and shortly after I noticed that the platform was now randomly failing
+its nightly boot tests.
+
+Maybe we should revert the commit removing the superior legacy code,
+because that seems to be the only thing that was reliable?  Maybe it was
+premature to remove it until DT had proven itself?
+
+On the other hand, if the legacy code hadn't been removed, I probably
+would never have tested it - but then, from what I hear, this was a
+*known* issue prior to the removal of the legacy code.  Given that the
+legacy code worked totally fine, it's utterly idiotic to me to have
+removed the working legacy code when DT is soo unstable.
+
+Whatever way I look at this, this problem _is_ a _regression_, and we
+can't sit around and hope it magically vanishes by some means.
+
+I think given what you've said, it suggests that there is something else
+going on.  So, what we need to do is to revert the removal of the legacy
+code and investigate what the differences are between the apparently
+broken DT code and the working legacy code.
+
+I have not _once_ seen this behaviour with the legacy code.
 
 -- 
-With best wishes
-Dmitry
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
