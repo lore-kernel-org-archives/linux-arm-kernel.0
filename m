@@ -1,87 +1,106 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 14:13:39 -0600
-Subject: [PATCH 6/8] coresight: remove the unnecessary configuration
- coresight-default-sink
+Date: Mon, 30 Mar 2015 14:13:40 -0600
+Subject: [PATCH 7/8] coresight-tmc: Adding a status interface to sysfs
 In-Reply-To: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1427746421-31360-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1427746421-31360-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kaixu Xia <xiakaixu@huawei.com>
+Knowing the state of various control register is always
+useful for degging and tuning.  As such add an entry in
+sysfs that expose to userspace the most important registers.
 
-The coresight-default-sink configuration option has been
-removed from the framework. As such remove it from DT and bindings.
-
-Signed-off-by: Kaixu Xia <xiakaixu@huawei.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/coresight.txt | 1 -
- arch/arm/boot/dts/hip04.dtsi                        | 1 -
- arch/arm/boot/dts/omap3-beagle-xm.dts               | 1 -
- arch/arm/boot/dts/omap3-beagle.dts                  | 1 -
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts          | 1 -
- 5 files changed, 5 deletions(-)
+ drivers/coresight/coresight-tmc.c | 56 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-index a3089359aaa6..88602b75418e 100644
---- a/Documentation/devicetree/bindings/arm/coresight.txt
-+++ b/Documentation/devicetree/bindings/arm/coresight.txt
-@@ -61,7 +61,6 @@ Example:
- 		compatible = "arm,coresight-etb10", "arm,primecell";
- 		reg = <0 0x20010000 0 0x1000>;
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
+index 030e097c4fb2..7147f3dd363c 100644
+--- a/drivers/coresight/coresight-tmc.c
++++ b/drivers/coresight/coresight-tmc.c
+@@ -565,6 +565,59 @@ static const struct file_operations tmc_fops = {
+ 	.llseek		= no_llseek,
+ };
  
--		coresight-default-sink;
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
- 		port {
-diff --git a/arch/arm/boot/dts/hip04.dtsi b/arch/arm/boot/dts/hip04.dtsi
-index 238814596a87..44044f275115 100644
---- a/arch/arm/boot/dts/hip04.dtsi
-+++ b/arch/arm/boot/dts/hip04.dtsi
-@@ -275,7 +275,6 @@
- 		compatible = "arm,coresight-etb10", "arm,primecell";
- 		reg = <0 0xe3c42000 0 0x1000>;
++static ssize_t status_show(struct device *dev,
++			   struct device_attribute *attr, char *buf)
++{
++	int ret;
++	unsigned long flags;
++	u32 tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg;
++	u32 tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr;
++	u32 devid;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
++
++	ret = clk_prepare_enable(drvdata->clk);
++	if (ret)
++		goto out;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++	CS_UNLOCK(drvdata->base);
++
++	tmc_rsz = readl_relaxed(drvdata->base + TMC_RSZ);
++	tmc_sts = readl_relaxed(drvdata->base + TMC_STS);
++	tmc_rrp = readl_relaxed(drvdata->base + TMC_RRP);
++	tmc_rwp = readl_relaxed(drvdata->base + TMC_RWP);
++	tmc_trg = readl_relaxed(drvdata->base + TMC_TRG);
++	tmc_ctl = readl_relaxed(drvdata->base + TMC_CTL);
++	tmc_ffsr = readl_relaxed(drvdata->base + TMC_FFSR);
++	tmc_ffcr = readl_relaxed(drvdata->base + TMC_FFCR);
++	tmc_mode = readl_relaxed(drvdata->base + TMC_MODE);
++	tmc_pscr = readl_relaxed(drvdata->base + TMC_PSCR);
++	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
++
++	CS_LOCK(drvdata->base);
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	clk_disable_unprepare(drvdata->clk);
++
++	return sprintf(buf,
++		       "Depth:\t\t0x%x\n"
++		       "Status:\t\t0x%x\n"
++		       "RAM read ptr:\t0x%x\n"
++		       "RAM wrt ptr:\t0x%x\n"
++		       "Trigger cnt:\t0x%x\n"
++		       "Control:\t0x%x\n"
++		       "Flush status:\t0x%x\n"
++		       "Flush ctrl:\t0x%x\n"
++		       "Mode:\t\t0x%x\n"
++		       "PSRC:\t\t0x%x\n"
++		       "DEVID:\t\t0x%x\n",
++			tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg,
++			tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr, devid);
++out:
++	return -EINVAL;
++}
++static DEVICE_ATTR_RO(status);
++
+ static ssize_t trigger_cntr_show(struct device *dev,
+ 			    struct device_attribute *attr, char *buf)
+ {
+@@ -593,18 +646,21 @@ static DEVICE_ATTR_RW(trigger_cntr);
  
--		coresight-default-sink;
- 		clocks = <&clk_375m>;
- 		clock-names = "apb_pclk";
- 		port {
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index 25f7b0a22114..8cdca51b6984 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -150,7 +150,6 @@
- 		compatible = "arm,coresight-etb10", "arm,primecell";
- 		reg = <0x5401b000 0x1000>;
+ static struct attribute *coresight_etb_attrs[] = {
+ 	&dev_attr_trigger_cntr.attr,
++	&dev_attr_status.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(coresight_etb);
  
--		coresight-default-sink;
- 		clocks = <&emu_src_ck>;
- 		clock-names = "apb_pclk";
- 		port {
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index c792391ef090..6d4c46be8c39 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -145,7 +145,6 @@
- 		compatible = "arm,coresight-etb10", "arm,primecell";
- 		reg = <0x5401b000 0x1000>;
+ static struct attribute *coresight_etr_attrs[] = {
+ 	&dev_attr_trigger_cntr.attr,
++	&dev_attr_status.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(coresight_etr);
  
--		coresight-default-sink;
- 		clocks = <&emu_src_ck>;
- 		clock-names = "apb_pclk";
- 		port {
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 33920df03640..7a2aeacd62c0 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -362,7 +362,6 @@
- 		compatible = "arm,coresight-etb10", "arm,primecell";
- 		reg = <0 0x20010000 0 0x1000>;
- 
--		coresight-default-sink;
- 		clocks = <&oscclk6a>;
- 		clock-names = "apb_pclk";
- 		port {
+ static struct attribute *coresight_etf_attrs[] = {
+ 	&dev_attr_trigger_cntr.attr,
++	&dev_attr_status.attr,
+ 	NULL,
+ };
+ ATTRIBUTE_GROUPS(coresight_etf);
 -- 
 1.9.1
