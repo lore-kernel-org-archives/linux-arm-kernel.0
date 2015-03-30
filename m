@@ -1,32 +1,50 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 30 Mar 2015 22:50:23 +0530
-Subject: [PATCH v2 1/7] dmaengine: of_dma: Support for DMA routers
-In-Reply-To: <55154C39.3030602@ti.com>
-References: <1426080210-841-1-git-send-email-peter.ujfalusi@ti.com>
- <1426080210-841-2-git-send-email-peter.ujfalusi@ti.com>
- <20150326105018.GJ32683@intel.com> <5513F77A.4030005@ti.com>
- <20150326153221.GM32683@intel.com> <55154C39.3030602@ti.com>
-Message-ID: <20150330172023.GH7192@intel.com>
+Date: Mon, 30 Mar 2015 22:55:46 +0530
+Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
+In-Reply-To: <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
+References: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
+ <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
+Message-ID: <20150330172546.GI7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 02:25:29PM +0200, Peter Ujfalusi wrote:
-> On 03/26/2015 05:32 PM, Vinod Koul wrote:
-> >> I have added the DT binding document since this series adds support for
-> >> routers for platforms booting with DT:
-> >>
-> >> Documentation/devicetree/bindings/dma/dma.txt | 28 ++++++++
-> > I meant the update to Documnetation/dmanegine/ for routers :)
-> 
-> I see. In what form you think we should have the documentation? Is it adequate
-> to lift and adjust the text from the DT binding document here? Should we have
-> a separate file for the router description?
-> My concern was and this is why I did not wrote anything under here is that the
-> code I add is only covers the DT boot case and I'm not planning to add legacy
-> support. The ACPI binding can be done in a similar fashion as the DT so you
-> would have a translator driver with ACPI API.
-Not the binding part but more of a guideline on how to go about solving the
-DMA router design for drivers
+On Mon, Mar 30, 2015 at 10:17:17PM +0530, Jassi Brar wrote:
+> On Fri, Mar 27, 2015 at 5:25 AM, Scott Branden <sbranden@broadcom.com> wrote:
+> > From: ismail <ismail@broadcom.com>
+> >
+> > Update the thread running index before issuing the
+> > GO command to the DMAC.
+> >
+> > Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > Signed-off-by: Scott Branden <sbranden@broadcom.com>
+> > Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+> > ---
+> >  drivers/dma/pl330.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> > index 0e1f567..631642d 100644
+> > --- a/drivers/dma/pl330.c
+> > +++ b/drivers/dma/pl330.c
+> > @@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
+> >         /* Set to generate interrupts for SEV */
+> >         writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
+> >
+> > +       thrd->req_running = idx;
+> > +
+> >         /* Only manager can execute GO */
+> >         _execute_DBGINSN(thrd, insn, true);
+> >
+> > -       thrd->req_running = idx;
+> > -
+> It would help to know what the behavior looks like before and after
+> the patch. If anything we should look at locking rather the
+> reordering.
+Yes that ia fair request, looking at changelog it is hard to understand the
+issue seen?
 
 -- 
 ~Vinod
