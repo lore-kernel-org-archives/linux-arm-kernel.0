@@ -1,18 +1,70 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 31 Mar 2015 00:56:45 +0300
-Subject: [PATCH 0/2] Add R8A7790 EtherAVB DT support
-Message-ID: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 30 Mar 2015 22:57:17 +0100
+Subject: [PATCH v4 02/10] regmap: Introduce regmap_get_reg_stride.
+In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1427752637-17131-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+This patch introduces regmap_get_reg_stride() function which would
+be used by the infrastructures like eeprom framework built on top of
+regmap. Mostly this function would be used for sanity checks on inputs
+within such infrastructure.
 
-   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
-'renesas-devel-20150330-v4.0-rc6' tag. Here we add the EtherAVB device tree
-support for the R8A7790 SoC. The 2nd patch depends on the EtherAVB driver
-posted recently for the bindings.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/base/regmap/regmap.c | 12 ++++++++++++
+ include/linux/regmap.h       |  7 +++++++
+ 2 files changed, 19 insertions(+)
 
-[1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
-[2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
-
-WBR, Sergei
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index d703921..ac44d43 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -2629,6 +2629,18 @@ int regmap_get_max_register(struct regmap *map)
+ }
+ EXPORT_SYMBOL_GPL(regmap_get_max_register);
+ 
++/**
++ * regmap_get_reg_stride(): Report the register address stride
++ *
++ * Report the register address stride, mainly intended to for use by
++ * generic infrastructure built on top of regmap.
++ */
++int regmap_get_reg_stride(struct regmap *map)
++{
++	return map->reg_stride;
++}
++EXPORT_SYMBOL_GPL(regmap_get_reg_stride);
++
+ int regmap_parse_val(struct regmap *map, const void *buf,
+ 			unsigned int *val)
+ {
+diff --git a/include/linux/regmap.h b/include/linux/regmap.h
+index 2d87ded..59c55ea 100644
+--- a/include/linux/regmap.h
++++ b/include/linux/regmap.h
+@@ -434,6 +434,7 @@ int regmap_update_bits_check_async(struct regmap *map, unsigned int reg,
+ 				   bool *change);
+ int regmap_get_val_bytes(struct regmap *map);
+ int regmap_get_max_register(struct regmap *map);
++int regmap_get_reg_stride(struct regmap *map);
+ int regmap_async_complete(struct regmap *map);
+ bool regmap_can_raw_write(struct regmap *map);
+ 
+@@ -683,6 +684,12 @@ static inline int regmap_get_max_register(struct regmap *map)
+ 	return -EINVAL;
+ }
+ 
++static inline int regmap_get_reg_stride(struct regmap *map)
++{
++	WARN_ONCE(1, "regmap API is disabled");
++	return -EINVAL;
++}
++
+ static inline int regcache_sync(struct regmap *map)
+ {
+ 	WARN_ONCE(1, "regmap API is disabled");
+-- 
+1.9.1
