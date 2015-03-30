@@ -1,139 +1,62 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Mon, 30 Mar 2015 17:04:40 +0300
-Subject: [PATCH 4/5] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
-References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
- <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <87bnjad1jb.fsf@ashishki-desk.ger.corp.intel.com>
+From: mmarek@suse.cz (Michal Marek)
+Date: Mon, 30 Mar 2015 16:13:05 +0200
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>	<1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>	<551943CB.3010303@suse.cz>	<20150330132617.GI24899@n2100.arm.linux.org.uk>
+ <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+Message-ID: <551959F1.4030704@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On 2015-03-30 15:31, Ard Biesheuvel wrote:
+> On 30 March 2015 at 15:26, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
+>>> Is this a limitation of a particular ARM ABI or a limitation of a state
+>>> of the art ARM linker or something else?
+>>
+>> It's a limitation of the ARM ISA.
+>>
+>> Normal PC-relative branches, which are emitted by the C compiler, can
+>> branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
+>> offset is not representable in the instruction.
 
-> +static int stm_send(void *addr, const void *data, u32 size)
-> +{
-> +	u32 len = size;
-> +
-> +	if (((unsigned long)data & 0x1) && (size >= 1)) {
-> +		writeb_relaxed(*(u8 *)data, addr);
-> +		data++;
-> +		size--;
-> +	}
-> +	if (((unsigned long)data & 0x2) && (size >= 2)) {
-> +		writew_relaxed(*(u16 *)data, addr);
-> +		data += 2;
-> +		size -= 2;
-> +	}
-> +
-> +	/* now we are 32bit aligned */
-> +	while (size >= 4) {
-> +		writel_relaxed(*(u32 *)data, addr);
-> +		data += 4;
-> +		size -= 4;
-> +	}
-> +
-> +	if (size >= 2) {
-> +		writew_relaxed(*(u16 *)data, addr);
-> +		data += 2;
-> +		size -= 2;
-> +	}
-> +	if (size >= 1) {
-> +		writeb_relaxed(*(u8 *)data, addr);
-> +		data++;
-> +		size--;
-> +	}
-> +
-> +	return len;
-> +}
-> +
-> +static int stm_trace_data(unsigned long ch_addr, u32 options,
-> +			  const void *data, u32 size)
-> +{
-> +	void *addr;
-> +
-> +	options &= ~STM_OPTION_TIMESTAMPED;
-> +	addr = (void *)(ch_addr | stm_channel_off(STM_PKT_TYPE_DATA, options));
-> +
-> +	return stm_send(addr, data, size);
-> +}
-> +
-> +static inline int stm_trace_hw(u32 options, u32 channel, u8 entity_id,
-> +			       const void *data, u32 size)
-> +{
-> +	int len = 0;
-> +	unsigned long ch_addr;
-> +	struct stm_drvdata *drvdata = stmdrvdata;
-> +
-> +
-> +	/* get the channel address */
-> +	ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
-> +
-> +	if (drvdata->write_64bit)
-> +		len = stm_trace_data_64bit(ch_addr, options, data, size);
-> +	else
-> +		/* send the payload data */
-> +		len = stm_trace_data(ch_addr, options, data, size);
-> +
-> +	return len;
-> +}
+Thank you both for the explanation!
 
-As it looks from the above snippet, you're using a stream of DATA
-packets for user's payload. I also noticed that you use an ioctl to
-trigger timestamps.
 
-Now, in the STP protocol there are, for example, marked data packets
-that can be used to mark beginning of a higher-level message,
-timestamped data packets that can be used to mean the same thing and
-FLAG packets to mark message boundaries.
+>> The question is: how far do we go with allyesconfig... do we want it
+>> to work, or is reaching the final link sufficient?
 
-In my Intel TH code, I'm using D*TS packet for the beginning of a
-message (or "frame") and FLAG packet for the the end of a message.
+It certainly is more useful as a test tool if the baseline is a
+successful compile and link. Because you can have genuine link errors
+due to missing symbols.
 
-So my question is, is there any specific STP framing pattern that you
-use with Coresight STM or should we perhaps figure out a generic framing
-pattern and make it part of the stm class as well?
 
-For example, we can replace stm's .write callback with something like
+>> If we do tweak
+>> stuff to allow the link to work, are we going to try running it?
 
-    int (*packet)(struct stm_data *data,
-                  unsigned int type,    /* data, flag, trig etc */
-                  unsigned int options, /* timestamped, marked */
-                  u64 payload);
+Good question. I myself always treated all{yes,mod}config as a build
+test only and never dared to run it. Allyesconfig produces a giant
+kernel image and allmodconfig builds binfmt_script as a module. And if
+people used all*config for boot tests, they would probably be sending
+patches to tweak the Kconfigs for that purpose. And this is not the case
+as far as I can tell.
 
-and let the stm core do the "framing", which, then, will be common and
-consistent across different architectures/stm implementations.
 
-> +static long stm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-> +{
-> +	u32 options;
-> +	struct stm_node *node = file->private_data;
-> +
-> +	switch (cmd) {
-> +	case STM_IOCTL_SET_OPTIONS:
-> +		if (copy_from_user(&options, (void __user *)arg, sizeof(u32)))
-> +			return -EFAULT;
-> +
-> +		options &= (STM_OPTION_TIMESTAMPED | STM_OPTION_GUARANTEED);
-> +		node->options = options;
-> +		break;
-> +	case STM_IOCTL_GET_OPTIONS:
-> +		options = node->options;
-> +		if (copy_to_user((void __user *)arg, &options, sizeof(options)))
-> +			return -EFAULT;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	};
-> +
-> +	return 0;
-> +}
+> That is an excellent question, hence the RFC in the subject line.
+> 
+> Note that the other patch, the one against kallsyms, addresses the
+> issue where the distance between the beginning of .text and the end of
+> .init.text  exceeds this limit, which is not as unlikely as the issue
+> that this patch addresses, where just drivers/built-in.o in isolation
+> already exceeds this limit.
+> 
+> So I am quite happy to drop this, especially as we can add
+> -ffunction-sections as well.
 
-That way, we also won't need private ioctl()s, or at least, not for this
-reason.
+What you could do is to add a Kconfig option to arch/arm/Kconfig adding
+-ffunction-sections to the compiler flags. Then allyesconfig would
+select it and work around the problem in a somewhat elegant way.
 
-How do you feel about this?
-
-Regards,
---
-Alex
+Michal
