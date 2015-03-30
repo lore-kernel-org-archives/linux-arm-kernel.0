@@ -1,168 +1,94 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 09:48:47 -0600
-Subject: [PATCH 4/5] coresight-stm: adding driver for CoreSight STM
- component
-In-Reply-To: <87bnjad1jb.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
- <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
- <87bnjad1jb.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkzK_LX4OQJOUtcr0EksRUKPueNOXrw2C+qTJWov0sQPFA@mail.gmail.com>
+From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
+Date: Mon, 30 Mar 2015 17:53:22 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is enabled
+ during suspend
+In-Reply-To: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 08:04, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
->
->> +static int stm_send(void *addr, const void *data, u32 size)
->> +{
->> +     u32 len = size;
->> +
->> +     if (((unsigned long)data & 0x1) && (size >= 1)) {
->> +             writeb_relaxed(*(u8 *)data, addr);
->> +             data++;
->> +             size--;
->> +     }
->> +     if (((unsigned long)data & 0x2) && (size >= 2)) {
->> +             writew_relaxed(*(u16 *)data, addr);
->> +             data += 2;
->> +             size -= 2;
->> +     }
->> +
->> +     /* now we are 32bit aligned */
->> +     while (size >= 4) {
->> +             writel_relaxed(*(u32 *)data, addr);
->> +             data += 4;
->> +             size -= 4;
->> +     }
->> +
->> +     if (size >= 2) {
->> +             writew_relaxed(*(u16 *)data, addr);
->> +             data += 2;
->> +             size -= 2;
->> +     }
->> +     if (size >= 1) {
->> +             writeb_relaxed(*(u8 *)data, addr);
->> +             data++;
->> +             size--;
->> +     }
->> +
->> +     return len;
->> +}
->> +
->> +static int stm_trace_data(unsigned long ch_addr, u32 options,
->> +                       const void *data, u32 size)
->> +{
->> +     void *addr;
->> +
->> +     options &= ~STM_OPTION_TIMESTAMPED;
->> +     addr = (void *)(ch_addr | stm_channel_off(STM_PKT_TYPE_DATA, options));
->> +
->> +     return stm_send(addr, data, size);
->> +}
->> +
->> +static inline int stm_trace_hw(u32 options, u32 channel, u8 entity_id,
->> +                            const void *data, u32 size)
->> +{
->> +     int len = 0;
->> +     unsigned long ch_addr;
->> +     struct stm_drvdata *drvdata = stmdrvdata;
->> +
->> +
->> +     /* get the channel address */
->> +     ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
->> +
->> +     if (drvdata->write_64bit)
->> +             len = stm_trace_data_64bit(ch_addr, options, data, size);
->> +     else
->> +             /* send the payload data */
->> +             len = stm_trace_data(ch_addr, options, data, size);
->> +
->> +     return len;
->> +}
->
-> As it looks from the above snippet, you're using a stream of DATA
-> packets for user's payload. I also noticed that you use an ioctl to
-> trigger timestamps.
+Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
+Management support v12") added pm support for the pl330 dma driver but
+it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
+during suspend and this clock needs to remain enabled in order to make
+the system resume from a system suspend state.
 
-Right, the ioctl() conveys user space intentions on that channel.
-Options are kept and applied on every packet for as long as the
-channel is open.
+To make sure that the clock is enabled during suspend, enable it prior
+to entering a suspend state and disable it once the system has resumed.
 
->
-> Now, in the STP protocol there are, for example, marked data packets
-> that can be used to mark beginning of a higher-level message,
-> timestamped data packets that can be used to mean the same thing and
-> FLAG packets to mark message boundaries.
+Thanks to Abhilash Kesavan for figuring out that this was the issue.
 
-Same on my side, I simply haven't included them yet.  I'll do so in my
-next iteration.
+Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+---
+ drivers/clk/samsung/clk-exynos5420.c | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
 
->
-> In my Intel TH code, I'm using D*TS packet for the beginning of a
-> message (or "frame") and FLAG packet for the the end of a message.
->
-> So my question is, is there any specific STP framing pattern that you
-> use with Coresight STM or should we perhaps figure out a generic framing
-> pattern and make it part of the stm class as well?
-
-Now specific pattern... Sending a packet consists of MARK, DATA, FLAG.
-
->
-> For example, we can replace stm's .write callback with something like
->
->     int (*packet)(struct stm_data *data,
->                   unsigned int type,    /* data, flag, trig etc */
->                   unsigned int options, /* timestamped, marked */
->                   u64 payload);
->
-> and let the stm core do the "framing", which, then, will be common and
-> consistent across different architectures/stm implementations.
-
-I think the framing should be left to individual drivers.  It's only a
-matter of time before we get a weird device that doesn't play well
-with others, forcing to carry the ugliness in the STM core rather than
-the driver.
-
-And isn't carrying "options" redundant?  Using "container_of" on the
-"data" field one can get back to the driver specific structure, which
-is definitely a better place to keep that information.  I think the
-general structure looks good right now, we simply need to find a way
-to get rid of the ioctls.
-
-Regarding the same "options", how did you plan on getting those from user space?
-
->
->> +static long stm_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
->> +{
->> +     u32 options;
->> +     struct stm_node *node = file->private_data;
->> +
->> +     switch (cmd) {
->> +     case STM_IOCTL_SET_OPTIONS:
->> +             if (copy_from_user(&options, (void __user *)arg, sizeof(u32)))
->> +                     return -EFAULT;
->> +
->> +             options &= (STM_OPTION_TIMESTAMPED | STM_OPTION_GUARANTEED);
->> +             node->options = options;
->> +             break;
->> +     case STM_IOCTL_GET_OPTIONS:
->> +             options = node->options;
->> +             if (copy_to_user((void __user *)arg, &options, sizeof(options)))
->> +                     return -EFAULT;
->> +             break;
->> +     default:
->> +             return -EINVAL;
->> +     };
->> +
->> +     return 0;
->> +}
->
-> That way, we also won't need private ioctl()s, or at least, not for this
-> reason.
->
-> How do you feel about this?
->
-> Regards,
-> --
-> Alex
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 07d666cc6a29..2d39b629144a 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -151,6 +151,7 @@ enum exynos5x_plls {
+ 
+ static void __iomem *reg_base;
+ static enum exynos5x_soc exynos5x_soc;
++struct samsung_clk_provider *ctx;
+ 
+ #ifdef CONFIG_PM_SLEEP
+ static struct samsung_clk_reg_dump *exynos5x_save;
+@@ -275,8 +276,18 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
+ 	{ .offset = GATE_IP_PERIC,		.value = 0xffffffff, },
+ };
+ 
++/*
++ * list of clocks that have to be kept enabled during suspend/resume cycle.
++ */
++static unsigned int exynos5x_clk_suspend[] = {
++	CLK_MDMA0,
++};
++
+ static int exynos5420_clk_suspend(void)
+ {
++	int i;
++	struct clk *clk;
++
+ 	samsung_clk_save(reg_base, exynos5x_save,
+ 				ARRAY_SIZE(exynos5x_clk_regs));
+ 
+@@ -287,11 +298,24 @@ static int exynos5420_clk_suspend(void)
+ 	samsung_clk_restore(reg_base, exynos5420_set_clksrc,
+ 				ARRAY_SIZE(exynos5420_set_clksrc));
+ 
++	for (i = 0; i < ARRAY_SIZE(exynos5x_clk_suspend); i++) {
++		clk = samsung_clk_lookup(ctx, exynos5x_clk_suspend[i]);
++		clk_prepare_enable(clk);
++	}
++
+ 	return 0;
+ }
+ 
+ static void exynos5420_clk_resume(void)
+ {
++	int i;
++	struct clk *clk;
++
++	for (i = 0; i < ARRAY_SIZE(exynos5x_clk_suspend); i++) {
++		clk = samsung_clk_lookup(ctx, exynos5x_clk_suspend[i]);
++		clk_disable_unprepare(clk);
++	}
++
+ 	samsung_clk_restore(reg_base, exynos5x_save,
+ 				ARRAY_SIZE(exynos5x_clk_regs));
+ 
+@@ -1255,8 +1279,6 @@ static const struct of_device_id ext_clk_match[] __initconst = {
+ static void __init exynos5x_clk_init(struct device_node *np,
+ 		enum exynos5x_soc soc)
+ {
+-	struct samsung_clk_provider *ctx;
+-
+ 	if (np) {
+ 		reg_base = of_iomap(np, 0);
+ 		if (!reg_base)
+-- 
+2.1.4
