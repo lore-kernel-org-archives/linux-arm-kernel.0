@@ -1,42 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Mar 2015 11:40:47 +0200
-Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
-In-Reply-To: <139dc298c0914b3536445dddd37be286@agner.ch>
-References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
- <139dc298c0914b3536445dddd37be286@agner.ch>
-Message-ID: <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 30 Mar 2015 12:41:50 +0300
+Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
+Message-ID: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 11:32 AM, Stefan Agner <stefan@agner.ch> wrote:
-> On 2015-03-24 16:26, Markus Pargmann wrote:
+Fix the following warning by initializing directions field in the dma_device
+structure.
 
->> 0 is used in all pinfunction definitions when a config register is not
->> available, for example imx25-pinfunc.h. If a configuration value is used
->> for such a pinfunction the driver will always write it to the
->> configuration register if it is not -1. For a 0 configuration register
->> the configuration value is written to offset 0x0. This can lead to a
->> crashing/hanging system without any warning message.
->
-> 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
-> the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
-> actually works.
->
-> What is a bit a bummer is that we now have different meanings of 0,
-> depending on the field:
-> - For the first field (mux), 0 is a valid offset
-> - For the second field (config), 0 means not valid
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
+this driver doesn't support generic slave capabilities reporting
+Modules linked in:
+CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
+Hardware name: Sharp-Collie
+[<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
+[<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
+[<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
+[<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
+[<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
+[<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
+[<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
+[<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
+[<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
+[<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
+[<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
+[<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
+[<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
+[<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
+[<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
+---[ end trace e188b8fe0e782e75 ]---
 
-What is generally scary about DTS files is that the DT formats
-are not ruled by a context-free grammar.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/dma/sa11x0-dma.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-There were attempts to formalize some bindings using BNF
-but they seems to have been given up.
-
-We need to combat this by trying to be strict and logic ...
-I can't really understand from the discussion here whether
-the patch should be applied or not, so I'm not applying it
-until Stefan | Uwe gives an explicit ACK.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/dma/sa11x0-dma.c b/drivers/dma/sa11x0-dma.c
+index 5adf540..bb7ddd6 100644
+--- a/drivers/dma/sa11x0-dma.c
++++ b/drivers/dma/sa11x0-dma.c
+@@ -948,6 +948,7 @@ static int sa11x0_dma_probe(struct platform_device *pdev)
+ 	dma_cap_set(DMA_CYCLIC, d->slave.cap_mask);
+ 	d->slave.device_prep_slave_sg = sa11x0_dma_prep_slave_sg;
+ 	d->slave.device_prep_dma_cyclic = sa11x0_dma_prep_dma_cyclic;
++	d->slave.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	ret = sa11x0_dma_init_dmadev(&d->slave, &pdev->dev);
+ 	if (ret) {
+ 		dev_warn(d->slave.dev, "failed to register slave async device: %d\n",
+-- 
+2.1.4
