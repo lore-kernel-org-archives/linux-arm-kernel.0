@@ -1,53 +1,23 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 30 Mar 2015 22:23:35 +0530
-Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
-In-Reply-To: <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
-References: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
- <20150330121146.GG24899@n2100.arm.linux.org.uk>
- <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
-Message-ID: <20150330165335.GF7192@intel.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 30 Mar 2015 16:58:30 +0000 (UTC)
+Subject: [PATCH] soc/tegra: pmc: Add Tegra210 support
+In-Reply-To: <1427106995-17265-1-git-send-email-thierry.reding@gmail.com>
+References: <1427106995-17265-1-git-send-email-thierry.reding@gmail.com>
+Message-ID: <alpine.DEB.2.02.1503301658170.27064@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 06:04:06PM +0300, Dmitry Eremin-Solenikov wrote:
-> Hello,
-> 
-> 2015-03-30 15:11 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> > On Mon, Mar 30, 2015 at 12:41:50PM +0300, Dmitry Eremin-Solenikov wrote:
-> >> Fix the following warning by initializing directions field in the dma_device
-> >> structure.
-> >>
-> >> ------------[ cut here ]------------
-> >> WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
-> >> this driver doesn't support generic slave capabilities reporting
-> >> Modules linked in:
-> >> CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
-> >> Hardware name: Sharp-Collie
-> >> [<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
-> >> [<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
-> >> [<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
-> >> [<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
-> >> [<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
-> >> [<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
-> >> [<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
-> >> [<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
-> >> [<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
-> >> [<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
-> >> [<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
-> >> [<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
-> >> [<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
-> >> [<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
-> >> [<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
-> >> ---[ end trace e188b8fe0e782e75 ]---
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >
-> > It's an improvement, but I wonder whether src_addr_widths, dst_addr_widths
-> > and residue_granularity should also be filled in.
-> 
-> Nice catch. Missed that. I'll send a v2 tomorrow.
-Yes that is the recommendation. I am pushing back on patches without all 4
-fields filled in :)
+On Mon, 23 Mar 2015, Thierry Reding wrote:
 
--- 
-~Vinod
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> Tegra210 uses a power management controller that is compatible with
+> earlier SoC generations but adds a couple of power partitions for new
+> hardware blocks.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+
+Reviewed-by: Paul Walmsley <paul@pwsan.com>
+
+
+- Paul
