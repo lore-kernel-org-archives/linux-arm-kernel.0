@@ -1,88 +1,67 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Mar 2015 22:14:42 +0200
-Subject: [GIT PULL] clockevents for 4.1
-Message-ID: <5519AEB2.8050306@linaro.org>
+Date: Mon, 30 Mar 2015 22:17:03 +0200
+Subject: [PATCH 01/11] clocksource: arm_arch_timer: Rename arch_timer_probed
+ to reflect behaviour
+In-Reply-To: <5519AEB2.8050306@linaro.org>
+References: <5519AEB2.8050306@linaro.org>
+Message-ID: <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Hi Thomas, Ingo,
+The arch_timer_probed function returns whether the given time doesn't
+need to be probed. This can be the case when the timer has been probed
+already, but also when it has no corresponding enabled node in DT.
 
-this pull request contains the following changes for 4.1:
+Rename the function to arch_timer_need_probe and invert its return value
+to better reflect the function's purpose and behaviour.
 
-  - Made IO endian agnostic for at91 and dw apb timers (Ben Dooks)
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-  - Maintained tegra endianess (Dmitry Osipenko)
-
-  - Enabled the sun4i / sun5i timer for sched_clock, all others winner 
-boards have the arch arm timer which is more accurate (Hans de Goede)
-
-  - Renamed the arch arm timer function name to reflect better its 
-purpose (Laurent Pinchart)
-
-  - Cleaned up the sun5i timer code, replaced the setup_irq by the 
-request_irq function and handled the parent clock frequency change with 
-the frequency notifiers (Maxime Ripard)
-
-  - Fixed features declaration for the efm32 timer (Viresh Kumar)
-
-Thanks !
-
-   -- Daniel
-
-The following changes since commit 2557d215a36d18c8bbaa35f65749349ac603360b:
-
-   Merge branch 'timers/urgent' into timers/core, to pick up fixes 
-before applying new changes (2015-03-17 11:11:24 +0100)
-
-are available in the git repository at:
-
-   http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.1
-
-for you to fetch changes up to 0bb4ef6f7c56cdf606a5e501cf1597f40c9028eb
-
-   clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for defining features 
-(2015-03-30 15:27:24 +0200)
-
-----------------------------------------------------------------
-Ben Dooks (2):
-       clocksource: at91: Make IO endian agnostic
-       clocksource: dw_apb_timer_of: Make IO endian agnostic
-
-Dmitry Osipenko (1):
-       clocksource: tegra: Maintain CPU endianness
-
-Hans de Goede (1):
-       clocksource: sun4i-timer: Only register a sched_clock on sun4i 
-and sun5i
-
-Laurent Pinchart (1):
-       clocksource: arm_arch_timer: Rename arch_timer_probed to reflect 
-behaviour
-
-Maxime Ripard (5):
-       clocksource: sun5i: Switch to request_irq
-       clocksource: sun5i: Use of_io_request_and_map
-       clocksource: sun5i: Remove sched_clock
-       clocksource: sun5i: Refactor the current code
-       clocksource: sun5i: Add clock notifiers
-
-Viresh Kumar (1):
-       clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for defining features
-
-  drivers/clocksource/arm_arch_timer.c  |  13 +++++-----
-  drivers/clocksource/dw_apb_timer_of.c |   2 +-
-  drivers/clocksource/sun4i_timer.c     |  10 +++++++-
-  drivers/clocksource/tegra20_timer.c   |   4 ++--
-  drivers/clocksource/time-efm32.c      |   2 +-
-  drivers/clocksource/timer-atmel-pit.c |   4 ++--
-  drivers/clocksource/timer-sun5i.c     | 302 
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------
-  7 files changed, 250 insertions(+), 87 deletions(-)
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index a3025e7..50bb7f2 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -661,17 +661,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ };
+ 
+ static bool __init
+-arch_timer_probed(int type, const struct of_device_id *matches)
++arch_timer_need_probe(int type, const struct of_device_id *matches)
+ {
+ 	struct device_node *dn;
+-	bool probed = true;
++	bool need_probe = false;
+ 
+ 	dn = of_find_matching_node(NULL, matches);
+ 	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+-		probed = false;
++		need_probe = true;
+ 	of_node_put(dn);
+ 
+-	return probed;
++	return need_probe;
+ }
+ 
+ static void __init arch_timer_common_init(void)
+@@ -680,9 +680,10 @@ static void __init arch_timer_common_init(void)
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
++		if (arch_timer_need_probe(ARCH_MEM_TIMER,
++					  arch_timer_mem_of_match))
+ 			return;
+-		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
++		if (arch_timer_need_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+ 			return;
+ 	}
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
