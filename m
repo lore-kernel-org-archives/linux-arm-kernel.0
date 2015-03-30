@@ -1,29 +1,37 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 14:13:37 -0600
-Subject: [PATCH 4/8] coresight: Correcting documentation typographical error
+Date: Mon, 30 Mar 2015 14:13:38 -0600
+Subject: [PATCH 5/8] coresight: adding the LINKSINK block as a sink type
 In-Reply-To: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1427746421-31360-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1427746421-31360-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Xia Kaixu <kaixu.xia@linaro.org>
+
+>From the TMC TRM, the ETF can be configured as buffer mode, so ETF can
+be a sink type.
+
+Signed-off-by: Xia Kaixu <kaixu.xia@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- Documentation/trace/coresight.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/coresight/coresight.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 02361552a3ea..77d14d51a670 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -14,7 +14,7 @@ document is concerned with the latter.
- HW assisted tracing is becoming increasingly useful when dealing with systems
- that have many SoCs and other components like GPU and DMA engines.  ARM has
- developed a HW assisted tracing solution by means of different components, each
--being added to a design at systhesis time to cater to specific tracing needs.
-+being added to a design at synthesis time to cater to specific tracing needs.
- Compoments are generally categorised as source, link and sinks and are
- (usually) discovered using the AMBA bus.
+diff --git a/drivers/coresight/coresight.c b/drivers/coresight/coresight.c
+index c5def9382357..894531d315b8 100644
+--- a/drivers/coresight/coresight.c
++++ b/drivers/coresight/coresight.c
+@@ -305,7 +305,9 @@ static int coresight_build_paths(struct coresight_device *csdev,
  
+ 	list_add(&csdev->path_link, path);
+ 
+-	if (csdev->type == CORESIGHT_DEV_TYPE_SINK && csdev->activated) {
++	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
++	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
++	    csdev->activated) {
+ 		if (enable)
+ 			ret = coresight_enable_path(path);
+ 		else
 -- 
 1.9.1
