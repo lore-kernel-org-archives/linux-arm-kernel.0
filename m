@@ -1,50 +1,50 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 30 Mar 2015 22:55:46 +0530
-Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
-In-Reply-To: <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
-References: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
- <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
-Message-ID: <20150330172546.GI7192@intel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Mar 2015 19:32:45 +0200
+Subject: [PATCH] sata_mv: Manage SATA port multiplier while searching for
+ active links
+Message-ID: <1427736765-846-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 10:17:17PM +0530, Jassi Brar wrote:
-> On Fri, Mar 27, 2015 at 5:25 AM, Scott Branden <sbranden@broadcom.com> wrote:
-> > From: ismail <ismail@broadcom.com>
-> >
-> > Update the thread running index before issuing the
-> > GO command to the DMAC.
-> >
-> > Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
-> > Reviewed-by: Ray Jui <rjui@broadcom.com>
-> > Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
-> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> > Signed-off-by: Scott Branden <sbranden@broadcom.com>
-> > Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
-> > ---
-> >  drivers/dma/pl330.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 0e1f567..631642d 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
-> >         /* Set to generate interrupts for SEV */
-> >         writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
-> >
-> > +       thrd->req_running = idx;
-> > +
-> >         /* Only manager can execute GO */
-> >         _execute_DBGINSN(thrd, insn, true);
-> >
-> > -       thrd->req_running = idx;
-> > -
-> It would help to know what the behavior looks like before and after
-> the patch. If anything we should look at locking rather the
-> reordering.
-Yes that ia fair request, looking at changelog it is hard to understand the
-issue seen?
+From: Nadav Haklai <nadavh@marvell.com>
 
+With this patch, when searching for active link, first search through
+the port multiplier links. And then fall to the default ap active_tag
+only if no there is no active link in the port multiplier.
+
+[gregory.clement at free-electrons.com: reword commit log and title]
+
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Reviewed-by: Nadav Haklai <nadavh@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/ata/sata_mv.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
+index f8c33e3772b8..7fac4d0fee86 100644
+--- a/drivers/ata/sata_mv.c
++++ b/drivers/ata/sata_mv.c
+@@ -2423,10 +2423,19 @@ static struct ata_queued_cmd *mv_get_active_qc(struct ata_port *ap)
+ {
+ 	struct mv_port_priv *pp = ap->private_data;
+ 	struct ata_queued_cmd *qc;
++	struct ata_link *link = NULL;
+ 
+ 	if (pp->pp_flags & MV_PP_FLAG_NCQ_EN)
+ 		return NULL;
+-	qc = ata_qc_from_tag(ap, ap->link.active_tag);
++
++	ata_for_each_link(link, ap, EDGE)
++		if (ata_link_active(link))
++			break;
++
++	if (!link)
++		link = &ap->link;
++
++	qc = ata_qc_from_tag(ap, link->active_tag);
+ 	if (qc && !(qc->tf.flags & ATA_TFLAG_POLLING))
+ 		return qc;
+ 	return NULL;
 -- 
-~Vinod
+2.1.0
