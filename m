@@ -1,42 +1,48 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 30 Mar 2015 16:17:03 +0800
-Subject: [PATCH v2 1/3] mfd: provide RTC resource in MT6397 MFD
-In-Reply-To: <20150318073045.GE3318@x1>
-References: <1426657537-41414-1-git-send-email-eddie.huang@mediatek.com>
- <1426657537-41414-2-git-send-email-eddie.huang@mediatek.com>
- <20150318073045.GE3318@x1>
-Message-ID: <1427703423.26464.16.camel@mtksdaap41>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Mar 2015 09:21:13 +0100
+Subject: [PATCH 0/4] GICv3 ITS fixes for v4.0-rc6
+In-Reply-To: <20150329195706.GC25778@io.lakedaemon.net>
+References: <1427465705-17126-1-git-send-email-marc.zyngier@arm.com>
+ <20150329195706.GC25778@io.lakedaemon.net>
+Message-ID: <55190779.90509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+On 29/03/15 20:57, Jason Cooper wrote:
+> Marc,
+> 
+> On Fri, Mar 27, 2015 at 02:15:01PM +0000, Marc Zyngier wrote:
+>> The folowing patches fix a number of minor issues, some which have
+>> been discovered when writing the KVM ITS emulation.
+>>
+>> The first two patches fix some command encoding bugs, the third is
+>> purely cosmetic, and the fourth fixes an issue that could occur on
+>> configurations where the ITS geenrates cacheable accesses, but isn't
+>> in the same shareability domain as the CPU.
+>>
+>> It would be good if they could make it into 4.0-rc6.
+>>
+>> Thanks,
+>>
+>> 	M.
+>>
+>> Andre Przywara (1):
+>>   irqchip: gicv3-its: Fix device ID encoding
+>>
+>> Marc Zyngier (3):
+>>   irqchip: gicv3-its: Fix encoding of collection's target redistributor
+>>   irqchip: gicv3-its: Fix PROP/PEND and BASE/CBASE confusion
+>>   irqchip: gicv3-its: Use non-cacheable accesses when no shareability
+>>
+>>  drivers/irqchip/irq-gic-v3-its.c   | 57 ++++++++++++++++++++++++++++++++------
+>>  include/linux/irqchip/arm-gic-v3.h | 17 ++++++++++++
+>>  2 files changed, 65 insertions(+), 9 deletions(-)
+> 
+> Applied to irqchip/urgent-gic and merged into irqchip/urgent.  I'll send a PR
+> mid-week or so.
 
-On Wed, 2015-03-18 at 07:30 +0000, Lee Jones wrote:
-> On Wed, 18 Mar 2015, Eddie Huang wrote:
-> 
-> > Provide MT6397 RTC interrupt, base address, and register in
-> > MT6397 MFD.
-> > 
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> >  drivers/mfd/mt6397-core.c | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> > 
-> > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> > index b61c4eb..ef431d8 100644
-> > --- a/drivers/mfd/mt6397-core.c
-> > +++ b/drivers/mfd/mt6397-core.c
-> > @@ -21,9 +21,24 @@
-> >  #include <linux/mfd/mt6397/core.h>
-> >  #include <linux/mfd/mt6397/registers.h>
-> >  
-> > +static const struct resource mt6397_rtc_resources[] = {
-> > +	{
-> > +		.start = 0xe000,
-> > +		.end   = 0xe03e,
-> 
-> I'd like to see these defined please.
-> 
-Sure, will change to use define next round.
+Awesome, thanks Jason.
 
-Eddie
+	M.
+-- 
+Jazz is not dead. It just smells funny...
