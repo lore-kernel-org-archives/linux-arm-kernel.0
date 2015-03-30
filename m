@@ -1,27 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 Mar 2015 16:01:17 -0700
-Subject: [PATCHv5 30/35] ARM: dts: omap4: add minimal l4 bus layout with
- control module support
-In-Reply-To: <1426877086-17131-31-git-send-email-t-kristo@ti.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-31-git-send-email-t-kristo@ti.com>
-Message-ID: <20150330230116.GM10805@atomide.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 31 Mar 2015 10:21:22 +1100
+Subject: linux-next: manual merge of the arm64 tree with the arm-soc tree
+Message-ID: <20150331102122.34db1c6e@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Catalin,
 
-* Tero Kristo <t-kristo@ti.com> [150320 11:46]:
-> This patch creates the l4_cfg and l4_wkup interconnects for OMAP4, and
-> moves some of the generic peripherals under it. System control module
-> support is added to the device tree also, and the existing SCM related
-> functionality is moved under it.
+Today's linux-next merge of the arm64 tree got a conflict in
+arch/arm64/configs/defconfig between commit c4bb799588f6 ("arm64: Add
+support for Spreadtrum's Sharkl64 Platform in Kconfig and defconfig")
+from the arm-soc tree and commit 475bfd3d67fa ("arm64: defconfig:
+updates for 4.1") from the arm64 tree.
 
-Doing a diff on the dmesg output before and after this series now
-produces this extra warning on omap4:
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-+ti_dt_clk_init_provider: scm_conf missing 'clocks' child node
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-Regards,
-
-Tony
+diff --cc arch/arm64/configs/defconfig
+index f3c8619f8fe1,e07896c819ef..000000000000
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@@ -31,9 -31,12 +31,13 @@@ CONFIG_MODULES=
+  CONFIG_MODULE_UNLOAD=y
+  # CONFIG_BLK_DEV_BSG is not set
+  # CONFIG_IOSCHED_DEADLINE is not set
++ CONFIG_ARCH_EXYNOS7=y
+  CONFIG_ARCH_FSL_LS2085A=y
+  CONFIG_ARCH_MEDIATEK=y
+ +CONFIG_ARCH_SPRD=y
++ CONFIG_ARCH_SEATTLE=y
++ CONFIG_ARCH_TEGRA=y
++ CONFIG_ARCH_TEGRA_132_SOC=y
+  CONFIG_ARCH_THUNDER=y
+  CONFIG_ARCH_VEXPRESS=y
+  CONFIG_ARCH_XGENE=y
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/387d21ef/attachment.sig>
