@@ -1,42 +1,45 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Mon, 30 Mar 2015 19:25:14 +0100
-Subject: [PATCH] ARM: dts: exynos4412: Enable AX88760 USB hub on Origen board
-Message-ID: <1427739914-24862-1-git-send-email-matthew@mattleach.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 30 Mar 2015 20:31:38 +0200
+Subject: [PATCH 2/6] clk: mediatek: Add initial common clock support for
+ Mediatek SoCs.
+In-Reply-To: <1427738146.14276.20.camel@perches.com>
+References: <1427737245-4064-1-git-send-email-s.hauer@pengutronix.de>
+ <1427737245-4064-3-git-send-email-s.hauer@pengutronix.de>
+ <1427738146.14276.20.camel@perches.com>
+Message-ID: <20150330183138.GG9742@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Origen's usb phy and ohci devices in the device tree.  Also
-add the "samsung,vbus-gpio" property to enable the GPX3(5) gpio pin so
-the AX88760 hub is powered.
+On Mon, Mar 30, 2015 at 10:55:46AM -0700, Joe Perches wrote:
+> On Mon, 2015-03-30 at 19:40 +0200, Sascha Hauer wrote:
+> > This patch adds common clock support for Mediatek SoCs, including plls,
+> > muxes and clock gates.
+> 
+> trivia:
+> 
+> > diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+> 
+> > +static int mtk_cg_bit_is_cleared(struct clk_hw *hw)
+> > +{
+> []
+> > +	return val == 0;
+> > +}
+> > +
+> > +static int mtk_cg_bit_is_set(struct clk_hw *hw)
+> > +{
+> []
+> > +	return val != 0;
+> > +}
+> 
+> These functions may be better returning a bool
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
----
- arch/arm/boot/dts/exynos4412-origen.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+The return type of these functions is forced by function prototype in
+struct clk_ops.
 
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index bd8b730..c810ca3 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -531,4 +531,19 @@
- 			clock-frequency = <24000000>;
- 		};
- 	};
-+
-+	exynos-usbphy at 125B0000 {
-+		status = "okay";
-+	};
-+
-+	ehci at 12580000 {
-+		samsung,vbus-gpio = <&gpx3 5 1>;
-+		status = "okay";
-+		port at 1{
-+			status = "okay";
-+		};
-+		port at 2 {
-+			status = "okay";
-+		};
-+	};
- };
+Sascha
+
 -- 
-2.3.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
