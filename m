@@ -1,35 +1,50 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 30 Mar 2015 12:43:01 +0200
-Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
- device ID string
-In-Reply-To: <20150330103659.GD17971@leverpostej>
-References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
- <20150330103659.GD17971@leverpostej>
-Message-ID: <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Mar 2015 11:46:39 +0100
+Subject: [PATCH v2 5/8] mmc: sdhci-st: Add sdhci_st_set_uhs_signaling
+ function.
+In-Reply-To: <54F59362.40605@st.com>
+References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
+ <1424956227-18258-6-git-send-email-peter.griffin@linaro.org>
+ <54F59362.40605@st.com>
+Message-ID: <20150330104639.GC21893@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2015 at 12:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> For DT patches, please send to devicetree at vger.kernel.org; this affects
-> more than just ARM.
+Hi Maxime,
 
-Ofc, sorry.
+On Tue, 03 Mar 2015, Maxime Coquelin wrote:
+> 
+> On 02/26/2015 02:10 PM, Peter Griffin wrote:
+> >To allow UHS modes to work properly we need to provide the st specific
+> >set_uhs_signaling callback function. This function differs from the
+> >generic sdhci_set_uhs_signaling callback in that we need to configure
+> >the correct delay depending on the UHS mode, and also set the V18_EN
+> >bit.
+<snip>
+> >+	if (ret)
+> >+		dev_warn(mmc_dev(host->mmc), "Error setting dll for clock\n");
+> Maybe you could  print the uhs value to know which mode it was
+> trying to set?
 
+Yes good idea, I have made that change in v3.
+> >+
+> >+	dev_dbg(mmc_dev(host->mmc), "uhs %d, ctrl_2 %04X\n", uhs, ctrl_2);
+> >+
+> >+	sdhci_writew(host, ctrl_2, SDHCI_HOST_CONTROL2);
+> >+}
+> >  static u32 sdhci_st_readl(struct sdhci_host *host, int reg)
+> >  {
+> >@@ -283,6 +332,7 @@ static const struct sdhci_ops sdhci_st_ops = {
+> >  	.set_bus_width = sdhci_set_bus_width,
+> >  	.read_l = sdhci_st_readl,
+> >  	.reset = sdhci_reset,
+> >+	.set_uhs_signaling = sdhci_st_set_uhs_signaling,
+> >  };
+> >  static const struct sdhci_pltfm_data sdhci_st_pdata = {
+> 
+> Other than that, you can add my:
+> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
 
-> On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
->> Device vendors often assign IDs to their devices to allow comparing
->> firmware image with device model. This is required to prevent users
->> from flashing incompatible image and soft-bricking device.
->> Add device_id property to DTs to allow user space (and optionally
->> bootloader) verifying firmware images.
->
-> This sounds like exactly what the "model" property is meant to be (per
-> ePAPR) -- a string that specifices the manufacturer's model number of
-> the device, ideally in "manufacturer,model" format.
+Thanks, regards,
 
-What if manufacturer decided to use some totally unfriendly ID for
-their low-level (firmware upgrade) model identification? I can't
-really see us using
-model = "U12H245T00_NETGEAR"
-which would mean nothing compared to the current friendly:
-model = "Netgear R6250 V1 (BCM4708)"
+Peter.
