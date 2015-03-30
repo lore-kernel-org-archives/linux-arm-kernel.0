@@ -1,154 +1,88 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 14:13:41 -0600
-Subject: [PATCH 8/8] coresight: moving to new "hwtracing" directory
-In-Reply-To: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1427746421-31360-9-git-send-email-mathieu.poirier@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Mar 2015 22:14:42 +0200
+Subject: [GIT PULL] clockevents for 4.1
+Message-ID: <5519AEB2.8050306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keeping drivers related to HW tracing on ARM, i.e coresight,
-under "drivers/coresight" doesn't make sense when other
-architectures start rolling out technologies of the same
-nature.
 
-As such creating a new "drivers/hwtracing" directory where all
-drivers of the same kind can reside, reducing namespace
-pollution under "drivers/".
+Hi Thomas, Ingo,
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- MAINTAINERS                                              | 2 +-
- arch/arm/Kconfig.debug                                   | 2 +-
- arch/arm64/Kconfig.debug                                 | 2 +-
- drivers/Makefile                                         | 2 +-
- drivers/{ => hwtracing}/coresight/Kconfig                | 0
- drivers/{ => hwtracing}/coresight/Makefile               | 0
- drivers/{ => hwtracing}/coresight/coresight-etb10.c      | 0
- drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c   | 0
- drivers/{ => hwtracing}/coresight/coresight-etm.h        | 0
- drivers/{ => hwtracing}/coresight/coresight-etm3x.c      | 0
- drivers/{ => hwtracing}/coresight/coresight-funnel.c     | 0
- drivers/{ => hwtracing}/coresight/coresight-priv.h       | 0
- drivers/{ => hwtracing}/coresight/coresight-replicator.c | 0
- drivers/{ => hwtracing}/coresight/coresight-tmc.c        | 0
- drivers/{ => hwtracing}/coresight/coresight-tpiu.c       | 0
- drivers/{ => hwtracing}/coresight/coresight.c            | 0
- drivers/{ => hwtracing}/coresight/of_coresight.c         | 0
- 17 files changed, 4 insertions(+), 4 deletions(-)
- rename drivers/{ => hwtracing}/coresight/Kconfig (100%)
- rename drivers/{ => hwtracing}/coresight/Makefile (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etb10.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm3x.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-funnel.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-priv.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-replicator.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-tmc.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-tpiu.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight.c (100%)
- rename drivers/{ => hwtracing}/coresight/of_coresight.c (100%)
+this pull request contains the following changes for 4.1:
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1de6afa8ee51..4bcaaf950cb9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -953,7 +953,7 @@ ARM/CORESIGHT FRAMEWORK AND DRIVERS
- M:	Mathieu Poirier <mathieu.poirier@linaro.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
--F:	drivers/coresight/*
-+F:	drivers/hwtracing/coresight/*
- F:	Documentation/trace/coresight.txt
- F:	Documentation/devicetree/bindings/arm/coresight.txt
- F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 8d14ad4e1db0..8b0183a9a300 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1610,6 +1610,6 @@ config DEBUG_SET_MODULE_RONX
- 	  against certain classes of kernel exploits.
- 	  If in doubt, say "N".
- 
--source "drivers/coresight/Kconfig"
-+source "drivers/hwtracing/coresight/Kconfig"
- 
- endmenu
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 5b2ffd8e6cdb..d6285ef9b5f9 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -89,6 +89,6 @@ config DEBUG_ALIGN_RODATA
- 
- 	  If in doubt, say N
- 
--source "drivers/coresight/Kconfig"
-+source "drivers/hwtracing/coresight/Kconfig"
- 
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 527a6da8d539..46d2554be404 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -163,5 +163,5 @@ obj-$(CONFIG_POWERCAP)		+= powercap/
- obj-$(CONFIG_MCB)		+= mcb/
- obj-$(CONFIG_RAS)		+= ras/
- obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
--obj-$(CONFIG_CORESIGHT)		+= coresight/
-+obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
- obj-$(CONFIG_ANDROID)		+= android/
-diff --git a/drivers/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-similarity index 100%
-rename from drivers/coresight/Kconfig
-rename to drivers/hwtracing/coresight/Kconfig
-diff --git a/drivers/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-similarity index 100%
-rename from drivers/coresight/Makefile
-rename to drivers/hwtracing/coresight/Makefile
-diff --git a/drivers/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-similarity index 100%
-rename from drivers/coresight/coresight-etb10.c
-rename to drivers/hwtracing/coresight/coresight-etb10.c
-diff --git a/drivers/coresight/coresight-etm-cp14.c b/drivers/hwtracing/coresight/coresight-etm-cp14.c
-similarity index 100%
-rename from drivers/coresight/coresight-etm-cp14.c
-rename to drivers/hwtracing/coresight/coresight-etm-cp14.c
-diff --git a/drivers/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
-similarity index 100%
-rename from drivers/coresight/coresight-etm.h
-rename to drivers/hwtracing/coresight/coresight-etm.h
-diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-similarity index 100%
-rename from drivers/coresight/coresight-etm3x.c
-rename to drivers/hwtracing/coresight/coresight-etm3x.c
-diff --git a/drivers/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-similarity index 100%
-rename from drivers/coresight/coresight-funnel.c
-rename to drivers/hwtracing/coresight/coresight-funnel.c
-diff --git a/drivers/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-similarity index 100%
-rename from drivers/coresight/coresight-priv.h
-rename to drivers/hwtracing/coresight/coresight-priv.h
-diff --git a/drivers/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-similarity index 100%
-rename from drivers/coresight/coresight-replicator.c
-rename to drivers/hwtracing/coresight/coresight-replicator.c
-diff --git a/drivers/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-similarity index 100%
-rename from drivers/coresight/coresight-tmc.c
-rename to drivers/hwtracing/coresight/coresight-tmc.c
-diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-similarity index 100%
-rename from drivers/coresight/coresight-tpiu.c
-rename to drivers/hwtracing/coresight/coresight-tpiu.c
-diff --git a/drivers/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-similarity index 100%
-rename from drivers/coresight/coresight.c
-rename to drivers/hwtracing/coresight/coresight.c
-diff --git a/drivers/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
-similarity index 100%
-rename from drivers/coresight/of_coresight.c
-rename to drivers/hwtracing/coresight/of_coresight.c
+  - Made IO endian agnostic for at91 and dw apb timers (Ben Dooks)
+
+  - Maintained tegra endianess (Dmitry Osipenko)
+
+  - Enabled the sun4i / sun5i timer for sched_clock, all others winner 
+boards have the arch arm timer which is more accurate (Hans de Goede)
+
+  - Renamed the arch arm timer function name to reflect better its 
+purpose (Laurent Pinchart)
+
+  - Cleaned up the sun5i timer code, replaced the setup_irq by the 
+request_irq function and handled the parent clock frequency change with 
+the frequency notifiers (Maxime Ripard)
+
+  - Fixed features declaration for the efm32 timer (Viresh Kumar)
+
+Thanks !
+
+   -- Daniel
+
+The following changes since commit 2557d215a36d18c8bbaa35f65749349ac603360b:
+
+   Merge branch 'timers/urgent' into timers/core, to pick up fixes 
+before applying new changes (2015-03-17 11:11:24 +0100)
+
+are available in the git repository at:
+
+   http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.1
+
+for you to fetch changes up to 0bb4ef6f7c56cdf606a5e501cf1597f40c9028eb
+
+   clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for defining features 
+(2015-03-30 15:27:24 +0200)
+
+----------------------------------------------------------------
+Ben Dooks (2):
+       clocksource: at91: Make IO endian agnostic
+       clocksource: dw_apb_timer_of: Make IO endian agnostic
+
+Dmitry Osipenko (1):
+       clocksource: tegra: Maintain CPU endianness
+
+Hans de Goede (1):
+       clocksource: sun4i-timer: Only register a sched_clock on sun4i 
+and sun5i
+
+Laurent Pinchart (1):
+       clocksource: arm_arch_timer: Rename arch_timer_probed to reflect 
+behaviour
+
+Maxime Ripard (5):
+       clocksource: sun5i: Switch to request_irq
+       clocksource: sun5i: Use of_io_request_and_map
+       clocksource: sun5i: Remove sched_clock
+       clocksource: sun5i: Refactor the current code
+       clocksource: sun5i: Add clock notifiers
+
+Viresh Kumar (1):
+       clocksource: efm32: Use CLOCK_EVT_FEAT_PERIODIC for defining features
+
+  drivers/clocksource/arm_arch_timer.c  |  13 +++++-----
+  drivers/clocksource/dw_apb_timer_of.c |   2 +-
+  drivers/clocksource/sun4i_timer.c     |  10 +++++++-
+  drivers/clocksource/tegra20_timer.c   |   4 ++--
+  drivers/clocksource/time-efm32.c      |   2 +-
+  drivers/clocksource/timer-atmel-pit.c |   4 ++--
+  drivers/clocksource/timer-sun5i.c     | 302 
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------------------------------
+  7 files changed, 250 insertions(+), 87 deletions(-)
+
 -- 
-1.9.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
