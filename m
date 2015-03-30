@@ -1,51 +1,42 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 30 Mar 2015 23:18:45 +0530
-Subject: [PATCH 2/5] dmaengine: omap-dma: Fix memory leak when
- terminating running transfer
-In-Reply-To: <1427456155-28990-3-git-send-email-peter.ujfalusi@ti.com>
+Date: Mon, 30 Mar 2015 23:18:56 +0530
+Subject: [PATCH 3/5] dmaengine: bcm2835-dma: Fix memory leak when
+ stopping a running transfer
+In-Reply-To: <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
 References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
- <1427456155-28990-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150330174845.GM7192@intel.com>
+ <1427456155-28990-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150330174856.GN7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 01:35:52PM +0200, Peter Ujfalusi wrote:
-> In omap_dma_start_desc the vdesc->node is removed from the virt-dma
-> framework managed lists (to be precise from the desc_issued list).
-> If a terminate_all comes before the transfer finishes the omap_desc will
-> not be freed up because it is not in any of the lists and we stopped the
-> DMA channel so the transfer will not going to complete.
-> There is no special sequence for leaking memory when using cyclic (audio)
-> transfer: with every start and stop of a cyclic transfer the driver leaks
-> struct omap_desc worth of memory.
-> 
-> Free up the allocated memory directly in omap_dma_terminate_all() since the
-> framework will not going to do that for us.
+On Fri, Mar 27, 2015 at 01:35:53PM +0200, Peter Ujfalusi wrote:
+> The vd->node is removed from the lists when the transfer started so the
+> vchan_get_all_descriptors() will not find it. This results memory leak.
 > 
 > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> CC: <stable@vger.kernel.org>
-> CC: <linux-omap@vger.kernel.org>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+> CC: Lee Jones <lee@kernel.org>
 Applied, thanks
 
 -- 
 ~Vinod
 
 > ---
->  drivers/dma/omap-dma.c | 1 +
+>  drivers/dma/bcm2835-dma.c | 1 +
 >  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> index 1e646d6c8230..6a4c378ee432 100644
-> --- a/drivers/dma/omap-dma.c
-> +++ b/drivers/dma/omap-dma.c
-> @@ -1002,6 +1002,7 @@ static int omap_dma_terminate_all(struct dma_chan *chan)
+> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+> index 0723096fb50a..c92d6a70ccf3 100644
+> --- a/drivers/dma/bcm2835-dma.c
+> +++ b/drivers/dma/bcm2835-dma.c
+> @@ -475,6 +475,7 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
 >  	 * c->desc is NULL and exit.)
 >  	 */
 >  	if (c->desc) {
-> +		omap_dma_desc_free(&c->desc->vd);
+> +		bcm2835_dma_desc_free(&c->desc->vd);
 >  		c->desc = NULL;
->  		/* Avoid stopping the dma twice */
->  		if (!c->paused)
+>  		bcm2835_dma_abort(c->chan_base);
+>  
 > -- 
 > 2.3.3
 > 
