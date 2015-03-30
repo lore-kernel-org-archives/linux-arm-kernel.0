@@ -1,40 +1,123 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 30 Mar 2015 21:40:37 +0200
-Subject: [PATCH] ASoC: atmel-pcm-dma: increase buffer_bytes_max
-Message-ID: <1427744437-14610-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 30 Mar 2015 20:40:26 +0100
+Subject: [PATCH RFC 06/11] drm: bridge/dw_hdmi: introduce interfaces to enable
+ and disable audio
+In-Reply-To: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+Message-ID: <E1YcfXu-0002v9-SB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel-pcm-dma is not limited to a buffer size of 64kB like atmel-pcm-pdc.
-Increase buffer_bytes_max to 512kB to allow for higher bit rates (i.e. 32bps at
-192kHz) to work correctly. By default, keep the prealloc at 64kB.
+iMX6 devices from an errata (ERR005174) where the audio FIFO can be
+emptied while it is partially full, resulting in misalignment of the
+audio samples.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+To prevent this, the errata workaround recommends writing N as zero
+until the audio FIFO has been loaded by DMA.  Writing N=0 prevents the
+HDMI bridge from reading from the audio FIFO, effectively disabling
+audio.
+
+This means we need to provide the audio driver with a pair of functions
+to enable/disable audio.  These are dw_hdmi_audio_enable() and
+dw_hdmi_audio_disable().
+
+A spinlock is introduced to ensure that setting the CTS/N values can't
+race, ensuring that the audio driver calling the enable/disable
+functions (which are called in an atomic context) can't race with a
+modeset.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- sound/soc/atmel/atmel-pcm-dma.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++++++++++++++++-
+ include/drm/bridge/dw_hdmi.h     |  2 ++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/sound/soc/atmel/atmel-pcm-dma.c b/sound/soc/atmel/atmel-pcm-dma.c
-index b8e7bad05eb1..b6625c8c411b 100644
---- a/sound/soc/atmel/atmel-pcm-dma.c
-+++ b/sound/soc/atmel/atmel-pcm-dma.c
-@@ -54,7 +54,7 @@ static const struct snd_pcm_hardware atmel_pcm_dma_hardware = {
- 	.period_bytes_max	= 2 * 0xffff,	/* if 2 bytes format */
- 	.periods_min		= 8,
- 	.periods_max		= 1024,		/* no limit */
--	.buffer_bytes_max	= ATMEL_SSC_DMABUF_SIZE,
-+	.buffer_bytes_max	= 512 * 1024,
- };
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index 245d17e58dec..67f07d15c12b 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -18,6 +18,7 @@
+ #include <linux/hdmi.h>
+ #include <linux/mutex.h>
+ #include <linux/of_device.h>
++#include <linux/spinlock.h>
  
- /**
-@@ -119,7 +119,7 @@ static int atmel_pcm_configure_dma(struct snd_pcm_substream *substream,
- static const struct snd_dmaengine_pcm_config atmel_dmaengine_pcm_config = {
- 	.prepare_slave_config = atmel_pcm_configure_dma,
- 	.pcm_hardware = &atmel_pcm_dma_hardware,
--	.prealloc_buffer_size = ATMEL_SSC_DMABUF_SIZE,
-+	.prealloc_buffer_size = 64 * 1024,
- };
+ #include <drm/drm_of.h>
+ #include <drm/drmP.h>
+@@ -124,8 +125,12 @@ struct dw_hdmi {
+ 	struct i2c_adapter *ddc;
+ 	void __iomem *regs;
  
- int atmel_pcm_dma_platform_register(struct device *dev)
++	spinlock_t audio_lock;
+ 	struct mutex audio_mutex;
+ 	unsigned int sample_rate;
++	unsigned int audio_cts;
++	unsigned int audio_n;
++	bool audio_enable;
+ 	int ratio;
+ 
+ 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+@@ -347,7 +352,11 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+ 	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
+ 		__func__, sample_rate, ratio, pixel_clk, n, cts);
+ 
+-	hdmi_set_cts_n(hdmi, cts, n);
++	spin_lock_irq(&hdmi->audio_lock);
++	hdmi->audio_n = n;
++	hdmi->audio_cts = cts;
++	hdmi_set_cts_n(hdmi, cts, hdmi->audio_enable ? n : 0);
++	spin_unlock_irq(&hdmi->audio_lock);
+ }
+ 
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+@@ -376,6 +385,28 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+ 
++void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&hdmi->audio_lock, flags);
++	hdmi->audio_enable = true;
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
++
++void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&hdmi->audio_lock, flags);
++	hdmi->audio_enable = false;
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
++
+ /*
+  * this submodule is responsible for the video data synchronization.
+  * for example, for RGB 4:4:4 input, the data map is defined as
+@@ -1579,6 +1610,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->encoder = encoder;
+ 
+ 	mutex_init(&hdmi->audio_mutex);
++	spin_lock_init(&hdmi->audio_lock);
+ 
+ 	of_property_read_u32(np, "reg-io-width", &val);
+ 
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index 424b51f6a215..ab5d36e83ea2 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -62,5 +62,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 		 const struct dw_hdmi_plat_data *plat_data);
+ 
+ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
++void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
++void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
+ 
+ #endif /* __IMX_HDMI_H__ */
 -- 
-2.1.0
+1.8.3.1
