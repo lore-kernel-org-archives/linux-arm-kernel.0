@@ -1,72 +1,40 @@
-From: mmarek@suse.cz (Michal Marek)
-Date: Mon, 30 Mar 2015 14:11:00 +0200
-Subject: [RFC PATCH 1/2] Kbuild: kallsyms: ignore veneers emitted by the
- ARM linker
-In-Reply-To: <1427716167-25078-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <55193D54.8070803@suse.cz>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Mar 2015 14:11:48 +0200
+Subject: ARM, earlyconsole and io mapping
+In-Reply-To: <87iodivgfm.fsf@free.fr>
+References: <87iodivgfm.fsf@free.fr>
+Message-ID: <20150330141148.299f38a4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-03-30 13:49, Ard Biesheuvel wrote:
-> When linking large kernels on ARM, the linker will insert veneers
-> (i.e., PLT like stubs) when function symbols are out of reach for
-> the ordinary relative branch/branch-and-link instructions.
+Dear Robert Jarzmik,
+
+On Mon, 30 Mar 2015 14:05:33 +0200, Robert Jarzmik wrote:
+
+> I was wondering how the earlyconsole was supposed to work in order to add
+> support to the pxa architecture. More specifically, I don't understand how the
+> memory mapping is supposed to be available at the early parameters parsing.
 > 
-> However, due to the fact that the kallsyms region sits in .rodata,
-> which is between .text and .init.text, additional veneers may be
-> emitted in the second pass due to the fact that the size of the
-> kallsyms region itself has pushed the .init.text section further
-> down, resulting in additional veneers to be emitted.
+> The thing I don't understand is that :
+>  - in kernel initialization, parse_early_param() is called before
+>    machine_desc->map_io()
+>  - as a consequence, the architecture didn't add the vm early mapping for serial
+>    peripheral (which is added in pxa_map_io())
+>  - as a consequence, earlycon_map() will fail to map the serial MMIO
+>    (as in stack showed in [1])
 > 
-> So ignore the veneers when generating the symbol table. Veneers
-> have no corresponding source code, and they will not turn up in
-> backtraces anyway.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  scripts/kallsyms.c | 17 ++++++++++++++---
->  1 file changed, 14 insertions(+), 3 deletions(-)
-> 
-> diff --git a/scripts/kallsyms.c b/scripts/kallsyms.c
-> index c6d33bd15b04..6668c87d599f 100644
-> --- a/scripts/kallsyms.c
-> +++ b/scripts/kallsyms.c
-> @@ -212,6 +212,12 @@ static int symbol_valid(struct sym_entry *s)
->  		"_SDA_BASE_",		/* ppc */
->  		"_SDA2_BASE_",		/* ppc */
->  		NULL };
-> +
-> +	static char *special_suffixes[] = {
-> +		"_compiled.",		/* gcc < 3.0: "gcc[0-9]_compiled." */
+> Therefore, are there non-DT earlycon users on the list, and could they tell me
+> what way they get earlycon support in their arm boards please ?
 
-Your newly added comment suggests that this can go away, since we have
-been requiring@least gcc 3.2 since some time. But it can be removed
-in a follow-up cleanup.
+A very early mapping of the I/O space is done in head.S, way before you
+get into C code:
 
+  http://lxr.free-electrons.com/source/arch/arm/kernel/head.S#L277
 
-> +		"_veneer",		/* arm */
-> +		NULL };
-> +
->  	int i;
->  	int offset = 1;
->  
-> @@ -244,13 +250,18 @@ static int symbol_valid(struct sym_entry *s)
->  	}
->  
->  	/* Exclude symbols which vary between passes. */
-> -	if (strstr((char *)s->sym + offset, "_compiled."))
-> -		return 0;
-> -
->  	for (i = 0; special_symbols[i]; i++)
->  		if( strcmp((char *)s->sym + offset, special_symbols[i]) == 0 )
->  			return 0;
->  
-> +	for (i = 0; special_suffixes[i]; i++) {
-> +		char *sym_name = (char *)s->sym + offset;
+Best regards,
 
-You should declare and set this useful helper a few lines earlier and
-use it in the other statements that test the symbol name.
-
-Michal
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
