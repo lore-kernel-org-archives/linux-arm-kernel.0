@@ -1,74 +1,48 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 29 Mar 2015 18:25:12 -0700
-Subject: [PATCH net-next] ethernet: Use bool function returns of true/false
- instead of 1/0
-In-Reply-To: <20150329.121655.2092434262655191613.davem@davemloft.net>
-References: <201503260524.AdqSbov9%fengguang.wu@intel.com>
- <20150325215525.GA26868@athens>
- <20150329.121655.2092434262655191613.davem@davemloft.net>
-Message-ID: <1427678712.2715.52.camel@perches.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 30 Mar 2015 10:39:53 +0900
+Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
+In-Reply-To: <20150327174044.GL12400@redacted.bos.redhat.com>
+References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
+ <20150327153131.GK12400@redacted.bos.redhat.com> <55157920.3050003@arm.com>
+ <20150327174044.GL12400@redacted.bos.redhat.com>
+Message-ID: <5518A969.3090707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use bool constants as the return values instead of 1 and 0.
+On 03/28/2015 02:40 AM, Kyle McMartin wrote:
+> On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
+>>> [  236.260863] Kernel panic - not syncing: HYP panic:
+>>> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
+>>
+>> It would be interesting if you could find out what you have at offset
+>> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
+>> help much).
+>>
+>
+> Given the alignment, i'm going to assume i'm looking at the right thing:
+>
+> 0000000000000820 <__kvm_hyp_reset>:
+>       820:       d51c2000        msr     ttbr0_el2, x0
+>       824:       d5033fdf        isb
+>       828:       d50c871f        tlbi    alle2
+>       82c:       d5033f9f        dsb     sy
+>       830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
+>       834:       b3403c01        bfxil   x1, x0, #0, #16
+>       838:       d61f0020        br      x1
+>       83c:       d53c1000        mrs     x0, sctlr_el2
+>
+> but it seems fairly implausible to be trapping on ADR x0, 1f...
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
-> To be honest I'd might rather get bunches of these, there has to be a ton
-> of them, than a slow trickle of one every few weeks/days.
 
-There aren't too many...
+I've never seen this panic on fast model...
 
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c | 2 +-
- drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c | 4 ++--
- drivers/net/ethernet/xilinx/xilinx_emaclite.c    | 2 +-
- 3 files changed, 4 insertions(+), 4 deletions(-)
+ESR shows that
+   - Exception class: Data abort taken without a change in Exception level
+   - Data fault status code: Translation fault at EL2
 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-index 039b0c1..9980912 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-@@ -11610,7 +11610,7 @@ static bool bnx2x_get_dropless_info(struct bnx2x *bp)
- 	u32 cfg;
- 
- 	if (IS_VF(bp))
--		return 0;
-+		return false;
- 
- 	if (IS_MF(bp) && !CHIP_IS_E1x(bp)) {
- 		/* Take function: tmp = func */
-diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-index 02ffb30..ccaecb1 100644
---- a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-+++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-@@ -1351,7 +1351,7 @@ static bool reg_pattern_test(struct ixgbe_adapter *adapter, u64 *data, int reg,
- 
- 	if (ixgbe_removed(adapter->hw.hw_addr)) {
- 		*data = 1;
--		return 1;
-+		return true;
- 	}
- 	for (pat = 0; pat < ARRAY_SIZE(test_pattern); pat++) {
- 		before = ixgbe_read_reg(&adapter->hw, reg);
-@@ -1376,7 +1376,7 @@ static bool reg_set_and_check(struct ixgbe_adapter *adapter, u64 *data, int reg,
- 
- 	if (ixgbe_removed(adapter->hw.hw_addr)) {
- 		*data = 1;
--		return 1;
-+		return true;
- 	}
- 	before = ixgbe_read_reg(&adapter->hw, reg);
- 	ixgbe_write_reg(&adapter->hw, reg, write & mask);
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 2111b91..6008eee 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1062,7 +1062,7 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
- 	} else {
- 		dev_warn(&ofdev->dev, "Parameter %s not found,"
- 			"defaulting to false\n", s);
--		return 0;
-+		return false;
- 	}
- }
- 
+and FAR seems not to be a proper address.
+
+-Takahiro AKASHI
+
+> --Kyle
+>
