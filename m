@@ -1,74 +1,64 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 14:13:33 -0600
-Subject: [PATCH 0/8] coresight: next 4.0-rc6
-Message-ID: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Mon, 30 Mar 2015 14:13:34 -0600
+Subject: [PATCH 1/8] coresight: making cpu index lookup arm64 compliant
+In-Reply-To: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1427746421-31360-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg, 
+Function "get_logical_index()" is not available on arm64.
+Instead of adding the function simply using "of_get_cpu_node()" and
+comparing the return value with cpu handles yields the same
+result.
 
-Please consider the following set for inclusion in your tree.  It has a 
-respin on the patches I asked you to drop [1], which allows [2] to apply
-correctly.  The latter has also been included herein to keep things
-together.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/coresight/of_coresight.c | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
-Thanks,
-Mathieu
-
-[1]. http://lkml.iu.edu/hypermail/linux/kernel/1503.2/04095.html
-[2]. http://lkml.iu.edu/hypermail/linux/kernel/1503.2/04716.html
-
-Kaixu Xia (1):
-  coresight: remove the unnecessary configuration coresight-default-sink
-
-Mathieu Poirier (6):
-  coresight: making cpu index lookup arm64 compliant
-  coresight: fixing compilation warnings picked up by 64bit compiler
-  coresight: Adding coresight support for arm64 architecture
-  coresight: Correcting documentation typographical error
-  coresight-tmc: Adding a status interface to sysfs
-  coresight: moving to new "hwtracing" directory
-
-Xia Kaixu (1):
-  coresight: adding the LINKSINK block as a sink type
-
- .../devicetree/bindings/arm/coresight.txt          |  1 -
- Documentation/trace/coresight.txt                  |  2 +-
- MAINTAINERS                                        |  2 +-
- arch/arm/Kconfig.debug                             | 55 +------------------
- arch/arm/boot/dts/hip04.dtsi                       |  1 -
- arch/arm/boot/dts/omap3-beagle-xm.dts              |  1 -
- arch/arm/boot/dts/omap3-beagle.dts                 |  1 -
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  1 -
- arch/arm64/Kconfig.debug                           |  2 +
- drivers/Makefile                                   |  2 +-
- drivers/hwtracing/coresight/Kconfig                | 61 ++++++++++++++++++++++
- drivers/{ => hwtracing}/coresight/Makefile         |  0
- .../{ => hwtracing}/coresight/coresight-etb10.c    |  4 +-
- .../{ => hwtracing}/coresight/coresight-etm-cp14.c |  0
- drivers/{ => hwtracing}/coresight/coresight-etm.h  |  0
- .../{ => hwtracing}/coresight/coresight-etm3x.c    |  0
- .../{ => hwtracing}/coresight/coresight-funnel.c   |  0
- drivers/{ => hwtracing}/coresight/coresight-priv.h |  0
- .../coresight/coresight-replicator.c               |  0
- drivers/{ => hwtracing}/coresight/coresight-tmc.c  | 60 ++++++++++++++++++++-
- drivers/{ => hwtracing}/coresight/coresight-tpiu.c |  0
- drivers/{ => hwtracing}/coresight/coresight.c      |  4 +-
- drivers/{ => hwtracing}/coresight/of_coresight.c   | 18 +++----
- 23 files changed, 136 insertions(+), 79 deletions(-)
- create mode 100644 drivers/hwtracing/coresight/Kconfig
- rename drivers/{ => hwtracing}/coresight/Makefile (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etb10.c (99%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-etm3x.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-funnel.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-priv.h (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-replicator.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight-tmc.c (91%)
- rename drivers/{ => hwtracing}/coresight/coresight-tpiu.c (100%)
- rename drivers/{ => hwtracing}/coresight/coresight.c (99%)
- rename drivers/{ => hwtracing}/coresight/of_coresight.c (94%)
-
+diff --git a/drivers/coresight/of_coresight.c b/drivers/coresight/of_coresight.c
+index c3efa418a86d..f3cc8e97a0f8 100644
+--- a/drivers/coresight/of_coresight.c
++++ b/drivers/coresight/of_coresight.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
+ #include <linux/coresight.h>
++#include <linux/cpumask.h>
+ #include <asm/smp_plat.h>
+ 
+ 
+@@ -113,7 +114,7 @@ static int of_coresight_alloc_memory(struct device *dev,
+ struct coresight_platform_data *of_get_coresight_platform_data(
+ 				struct device *dev, struct device_node *node)
+ {
+-	int i = 0, ret = 0;
++	int i = 0, ret = 0, cpu;
+ 	struct coresight_platform_data *pdata;
+ 	struct of_endpoint endpoint, rendpoint;
+ 	struct device *rdev;
+@@ -187,17 +188,10 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+ 	/* Affinity defaults to CPU0 */
+ 	pdata->cpu = 0;
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-	if (dn) {
+-		const u32 *cell;
+-		int len, index;
+-		u64 hwid;
+-
+-		cell = of_get_property(dn, "reg", &len);
+-		if (cell) {
+-			hwid = of_read_number(cell, of_n_addr_cells(dn));
+-			index = get_logical_index(hwid);
+-			if (index != -EINVAL)
+-				pdata->cpu = index;
++	for (cpu = 0; dn && cpu < nr_cpu_ids; cpu++) {
++		if (dn == of_get_cpu_node(cpu, NULL)) {
++			pdata->cpu = cpu;
++			break;
+ 		}
+ 	}
+ 
 -- 
 1.9.1
