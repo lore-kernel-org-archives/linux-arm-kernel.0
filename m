@@ -1,33 +1,30 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 31 Mar 2015 01:02:29 +0900
-Subject: [RFC PATCH v3 1/2] clk: samsung: Add a clock lookup function
-In-Reply-To: <1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 30 Mar 2015 17:07:44 +0100
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150330162652.0f0c7a18@north>
+References: <20150327191040.1119319d@north>
+ <20150330122840.GA22949@e103592.cambridge.arm.com>
+ <20150330162652.0f0c7a18@north>
+Message-ID: <20150330160743.GD22949@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Mon, Mar 30, 2015 at 04:26:52PM +0200, Jakub Kicinski wrote:
+> On Mon, 30 Mar 2015 13:28:40 +0100, Dave Martin wrote:
 
-2015-03-31 0:53 GMT+09:00 Javier Martinez Canillas
-<javier.martinez@collabora.co.uk>:
-> The Samsung helpers functions to register clocks, add the clock instance
-> returned by the common clock framework to a lookup table that is used by
-> OF to lookup the clocks.
->
-> But this table could also be useful to clock drivers if they need to get
-> a clock instance since the helper functions don't return them.
->
-> The common clock framework __clk_lookup() function from the clk provider
-> API could be used by drivers as well. But it's more efficient to use the
-> Samsung specific lookup table that returns the clock instance in constant
-> time, than using the __clk_lookup() function that uses the clock name as
-> an index so it has a linear search time.
+[...]
 
-Is this really something we should be concerned about? If so, maybe
-the generic look-up function should be rewritten to use something
-faster, such as tree or hash table?
+> > TXIS reflects the live status of the FIFO, except that it is
+> > "spuriously" deasserted betweem reset/clear of the interrupt and the
+> > first TX IRQ, even though the FIFO may be empty.
+> 
+> I missed that IRQ is cleared by writing data.
 
-Best regards,
-Tomasz
+No worries, it took me a fair while to be sure of that myself.  The TRM
+is not very clear on it.
+
+Thanks for the careful review.
+
+Cheers
+---Dave
