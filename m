@@ -1,57 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Mar 2015 11:47:44 +0100
-Subject: [PATCH v3a 11/11] KVM: arm/arm64: rework MMIO abort handling
- to use KVM MMIO bus
-In-Reply-To: <1427505193-32749-1-git-send-email-andre.przywara@arm.com>
-References: <20150327160046.GB5121@cbox>
- <1427505193-32749-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <551929D0.8030608@arm.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 30 Mar 2015 13:55:12 +0300
+Subject: [patch] spi: pxa2xx: missing break in pxa2xx_ssp_get_clk_div()
+In-Reply-To: <20150330103040.GB27144@mwanda>
+References: <20150330103040.GB27144@mwanda>
+Message-ID: <1427712912.14897.441.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/03/15 01:13, Andre Przywara wrote:
-> Currently we have struct kvm_exit_mmio for encapsulating MMIO abort
-> data to be passed on from syndrome decoding all the way down to the
-> VGIC register handlers. Now as we switch the MMIO handling to be
-> routed through the KVM MMIO bus, it does not make sense anymore to
-> use that structure already from the beginning. So we keep the data in
-> local variables until we put them into the kvm_io_bus framework.
-> Then we fill kvm_exit_mmio in the VGIC only, making it a VGIC private
-> structure. On that way we replace the data buffer in that structure
-> with a pointer pointing to a single location in a local variable, so
-> we get rid of some copying on the way.
-> With all of the virtual GIC emulation code now being registered with
-> the kvm_io_bus, we can remove all of the old MMIO handling code and
-> its dispatching functionality.
+On Mon, 2015-03-30 at 13:30 +0300, Dan Carpenter wrote:
+> We refactored this code but accidentally left out a break statement so
+> QUARK_X1000_SSP isn't handled correctly.
 > 
-> I didn't bother to rename kvm_exit_mmio (to vgic_mmio or something),
-> because that touches a lot of code lines without any good reason.
+
+Thanks for catching this!
+One comment below.
+
+
+> Fixes: 025ffe88ee60 ('spi: pxa2xx: shift clk_div in one place')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 > 
-> This is based on an original patch by Nikolay.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Cc: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
-> ---
-> Hi,
-> 
-> this is a new version of PATCH v3 11/11, which does not use kvm_run
-> in the write case anymore. That should fix the problem that Marc and
-> Christoffer mentioned. The trick is to not use a structure at all,
-> but instead just pass on the needed values as parameters. By folding
-> handle_kernel_mmio() into io_mem_abort() we save some code and avoid
-> passing too many parameters.
-> As this is the last patch and the only one changed, I just send out
-> this one and rely on v3 for the other patches. If a complete respin
-> on the list is preferred, let me know.
+> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+> index 60526a5..a081cfc 100644
+> --- a/drivers/spi/spi-pxa2xx.c
+> +++ b/drivers/spi/spi-pxa2xx.c
+> @@ -791,6 +791,7 @@ static unsigned int pxa2xx_ssp_get_clk_div(struct driver_data *drv_data,
+>  	switch (drv_data->ssp_type) {
+>  	case QUARK_X1000_SSP:
+>  		clk_div = quark_x1000_get_clk_div(rate, &chip->dds_rate);
+> +		break;
+>  	default:
+>  		clk_div = ssp_get_clk_div(drv_data, rate);
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+It would be nice to have a break here as well, but I think we also may
+change this to if-else-if construction.
 
-I've put this into queue, together with Nikolay's (reworked) patch. I'm
-currently taking the whole thing for a spin on a few boxesm and will
-hopefully push it into -next by the end of the day.
+>  	}
 
-Thanks,
+Whatever solution you choose
+Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-	M.
+And actually 
+Tested-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+
+Now run with time to see the difference.
+
 -- 
-Jazz is not dead. It just smells funny...
+Andy Shevchenko <andriy.shevchenko@intel.com>
+Intel Finland Oy
