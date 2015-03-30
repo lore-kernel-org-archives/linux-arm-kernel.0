@@ -1,47 +1,162 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Mar 2015 22:17:10 +0200
-Subject: [PATCH 08/11] clocksource: sun4i-timer: Only register a sched_clock
- on sun4i and sun5i
+Date: Mon, 30 Mar 2015 22:17:08 +0200
+Subject: [PATCH 06/11] clocksource: sun5i: Add clock notifiers
 In-Reply-To: <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
 References: <5519AEB2.8050306@linaro.org>
  <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1427746633-9137-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1427746633-9137-6-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans de Goede <hdegoede@redhat.com>
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-sun6i and newer have an arm arch timer which is a better sched_clock source
-then the sun4i-timer, and sched_clock does not have priorities, so do not
-register the sun4i-timer sched_clock at all on sun6i and newer.
+The parent clock of the sun5i timer is the AHB clock, which rate might change
+because of other devices requirements.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+This is for example the case on the Allwinner A31, where the DMA controller
+needs a minimum rate higher than the default, that is enforced after the timer
+driver has probed.
+
+Add clock notifiers to make sure we reflect the clock rate changes in the timer
+rates.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clocksource/sun4i_timer.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/clocksource/timer-sun5i.c | 68 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 66 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index f4a9c00..1928a89 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -170,7 +170,15 @@ static void __init sun4i_timer_init(struct device_node *node)
- 	       TIMER_CTL_CLK_SRC(TIMER_CTL_CLK_SRC_OSC24M),
- 	       timer_base + TIMER_CTL_REG(1));
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+index 824ce2d..b3840f6 100644
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -41,9 +41,13 @@
+ struct sun5i_timer {
+ 	void __iomem		*base;
+ 	struct clk		*clk;
++	struct notifier_block	clk_rate_cb;
+ 	u32			ticks_per_jiffy;
+ };
  
--	sched_clock_register(sun4i_timer_sched_read, 32, rate);
-+	/*
-+	 * sched_clock_register does not have priorities, and on sun6i and
-+	 * later there is a better sched_clock registered by arm_arch_timer.c
-+	 */
-+	if (of_machine_is_compatible("allwinner,sun4i-a10") ||
-+	    of_machine_is_compatible("allwinner,sun5i-a13") ||
-+	    of_machine_is_compatible("allwinner,sun5i-a10s"))
-+		sched_clock_register(sun4i_timer_sched_read, 32, rate);
++#define to_sun5i_timer(x) \
++	container_of(x, struct sun5i_timer, clk_rate_cb)
 +
- 	clocksource_mmio_init(timer_base + TIMER_CNTVAL_REG(1), node->name,
- 			      rate, 350, 32, clocksource_mmio_readl_down);
+ struct sun5i_timer_clksrc {
+ 	struct sun5i_timer	timer;
+ 	struct clocksource	clksrc;
+@@ -152,6 +156,30 @@ static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
+ 	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
+ }
  
++static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
++				unsigned long event, void *data)
++{
++	struct clk_notifier_data *ndata = data;
++	struct sun5i_timer *timer = to_sun5i_timer(nb);
++	struct sun5i_timer_clksrc *cs = container_of(timer,
++						     struct sun5i_timer_clksrc, timer);
++
++	switch (event) {
++	case PRE_RATE_CHANGE:
++		clocksource_unregister(&cs->clksrc);
++		break;
++
++	case POST_RATE_CHANGE:
++		clocksource_register_hz(&cs->clksrc, ndata->new_rate);
++		break;
++
++	default:
++		break;
++	}
++
++	return NOTIFY_DONE;
++}
++
+ static int __init sun5i_setup_clocksource(struct device_node *node,
+ 					  void __iomem *base,
+ 					  struct clk *clk, int irq)
+@@ -174,6 +202,14 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+ 
+ 	cs->timer.base = base;
+ 	cs->timer.clk = clk;
++	cs->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clksrc;
++	cs->timer.clk_rate_cb.next = NULL;
++
++	ret = clk_notifier_register(clk, &cs->timer.clk_rate_cb);
++	if (ret) {
++		pr_err("Unable to register clock notifier.\n");
++		goto err_disable_clk;
++	}
+ 
+ 	writel(~0, base + TIMER_INTVAL_LO_REG(1));
+ 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+@@ -188,11 +224,13 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+ 	ret = clocksource_register_hz(&cs->clksrc, rate);
+ 	if (ret) {
+ 		pr_err("Couldn't register clock source.\n");
+-		goto err_disable_clk;
++		goto err_remove_notifier;
+ 	}
+ 
+ 	return 0;
+ 
++err_remove_notifier:
++	clk_notifier_unregister(clk, &cs->timer.clk_rate_cb);
+ err_disable_clk:
+ 	clk_disable_unprepare(clk);
+ err_free:
+@@ -200,6 +238,22 @@ err_free:
+ 	return ret;
+ }
+ 
++static int sun5i_rate_cb_clkevt(struct notifier_block *nb,
++				unsigned long event, void *data)
++{
++	struct clk_notifier_data *ndata = data;
++	struct sun5i_timer *timer = to_sun5i_timer(nb);
++	struct sun5i_timer_clkevt *ce = container_of(timer,
++						     struct sun5i_timer_clkevt, timer);
++
++	if (event == POST_RATE_CHANGE) {
++		clockevents_update_freq(&ce->clkevt, ndata->new_rate);
++		ce->timer.ticks_per_jiffy = DIV_ROUND_UP(ndata->new_rate, HZ);
++	}
++
++	return NOTIFY_DONE;
++}
++
+ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem *base,
+ 					 struct clk *clk, int irq)
+ {
+@@ -223,6 +277,14 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+ 	ce->timer.base = base;
+ 	ce->timer.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+ 	ce->timer.clk = clk;
++	ce->timer.clk_rate_cb.notifier_call = sun5i_rate_cb_clkevt;
++	ce->timer.clk_rate_cb.next = NULL;
++
++	ret = clk_notifier_register(clk, &ce->timer.clk_rate_cb);
++	if (ret) {
++		pr_err("Unable to register clock notifier.\n");
++		goto err_disable_clk;
++	}
+ 
+ 	ce->clkevt.name = node->name;
+ 	ce->clkevt.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+@@ -243,11 +305,13 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+ 			  "sun5i_timer0", ce);
+ 	if (ret) {
+ 		pr_err("Unable to register interrupt\n");
+-		goto err_disable_clk;
++		goto err_remove_notifier;
+ 	}
+ 
+ 	return 0;
+ 
++err_remove_notifier:
++	clk_notifier_unregister(clk, &ce->timer.clk_rate_cb);
+ err_disable_clk:
+ 	clk_disable_unprepare(clk);
+ err_free:
 -- 
 1.9.1
