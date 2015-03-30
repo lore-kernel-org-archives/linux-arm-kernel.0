@@ -1,127 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Mar 2015 11:14:19 +0200
-Subject: [PATCH 1/2] mmc: Add support for marking hpi as broken through
- devicetree
-In-Reply-To: <1427652575-12642-1-git-send-email-hdegoede@redhat.com>
-References: <1427652575-12642-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAPDyKFp8bNYNgNW0u-JCN4ay0UM7JEdkdW48VRsCmu+JWpJgEA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 30 Mar 2015 11:23:02 +0200
+Subject: [PATCH/RFC] ARM: shmobile: r8a7791: Remove MSIOF address from
+ device tree
+In-Reply-To: <CAH1o70JyBbmQ9vDrpamtL=09nq64B9RM1asWOWRXEL0LdgrxMQ@mail.gmail.com>
+References: <1426430633-3867-1-git-send-email-ykaneko0929@gmail.com>
+ <CAH1o70JyBbmQ9vDrpamtL=09nq64B9RM1asWOWRXEL0LdgrxMQ@mail.gmail.com>
+Message-ID: <CAMuHMdV201bh8-QrJgsO4KNSMW-d9aVyMczHdyQO0Y_pg4sukw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2015 at 20:09, Hans de Goede <hdegoede@redhat.com> wrote:
-> The eMMC on a tablet I've will stop working / communicating as soon as
-> the kernel executes:
->
->                 mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->                                 EXT_CSD_HPI_MGMT, 1,
->                                 card->ext_csd.generic_cmd6_time);
->
-> There seems to be no way to reliable identify eMMC-s which have a broken
-> hpi implementation, but at least for eMMC's which are soldered onto a board
-> we can work around this by specifying that hpi is broken in devicetree.
+Hi Kaneko-san,
 
-Seems like a reasonable approach!
+On Sun, Mar 29, 2015 at 3:22 PM, Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> I'm wondering if you could find a moment to look over this patch.
 
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mmc-card.txt | 31 ++++++++++++++++++++++
->  drivers/mmc/core/mmc.c                             | 10 ++++++-
->  2 files changed, 40 insertions(+), 1 deletion(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/mmc-card.txt
->
-> diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt b/Documentation/devicetree/bindings/mmc/mmc-card.txt
-> new file mode 100644
-> index 0000000..0cc67fb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
-> @@ -0,0 +1,31 @@
-> +mmc-card / eMMC bindings
-> +------------------------
-> +
-> +This documents describes the devicetree bindings for a mmc-host controller
-> +child node describing a mmc-card / an eMMC, see "Use of Function subnodes"
-> +in mmc.txt
-> +
-> +Required properties:
-> +-compatible : Must be "mmc-card"
-> +-reg        : Must be <0>
+In light of the discussion thread w.r.t. to the driver changes (I
+don't recall you
+replying, did I miss that?), I think the DTS changes for r8a779[01] are fine.
+However, please also update the example (for r8a7791) in
+Documentation/devicetree/bindings/spi/sh-msiof.txt.
 
-Instead of using a compatible, why can we just use "reg = <0>"?
+Thanks!
 
-> +
-> +Optional properties:
-> +-broken-hpi : Use this to indicate that the mmc-card has a broken hpi
-> +              implementation, and that hpi should not be used
-> +
-> +Example:
-> +
-> +&mmc2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&mmc2_pins_a>;
-> +       vmmc-supply = <&reg_vcc3v3>;
-> +       bus-width = <8>;
-> +       non-removable;
-> +       status = "okay";
-> +
-> +       mmmcard: mmccard at 0 {
-> +               reg = <0>;
-> +               compatible = "mmc-card";
-> +               broken-hpi;
-> +       };
-> +};
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 1d41e85..8d18920 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -11,6 +11,7 @@
->   */
->
->  #include <linux/err.h>
-> +#include <linux/of.h>
->  #include <linux/slab.h>
->  #include <linux/stat.h>
->  #include <linux/pm_runtime.h>
-> @@ -336,6 +337,8 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->  {
->         int err = 0, idx;
->         unsigned int part_size;
-> +       struct device_node *np = card->dev.of_node;
-> +       bool broken_hpi = false;
->
->         /* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
->         card->ext_csd.raw_ext_csd_structure = ext_csd[EXT_CSD_STRUCTURE];
-> @@ -349,6 +352,9 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->                 }
->         }
->
-> +       if (np && of_device_is_compatible(np, "mmc-card"))
-> +               broken_hpi = of_property_read_bool(np, "broken-hpi");
-> +
->         /*
->          * The EXT_CSD format is meant to be forward compatible. As long
->          * as CSD_STRUCTURE does not change, all values for EXT_CSD_REV
-> @@ -494,7 +500,7 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
->                 }
->
->                 /* check whether the eMMC card supports HPI */
-> -               if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
-> +               if (!broken_hpi && (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1)) {
->                         card->ext_csd.hpi = 1;
->                         if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x2)
->                                 card->ext_csd.hpi_cmd = MMC_STOP_TRANSMISSION;
-> @@ -1251,6 +1257,8 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->                 card->ocr = ocr;
->                 card->type = MMC_TYPE_MMC;
->                 card->rca = 1;
-> +               /* Also gets done by mmc_add_card, but we need early access */
-> +               card->dev.of_node = mmc_of_find_child_device(host, 0);
->                 memcpy(card->raw_cid, cid, sizeof(card->raw_cid));
->         }
->
-> --
-> 2.3.4
->
+> 2015-03-15 23:43 GMT+09:00 Yoshihiro Kaneko <ykaneko0929@gmail.com>:
+>> From: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+>>
+>> MSIOF Base Address H'E6xx can be accessed by CPU and DMAC.
+>> MSIOF Base Address H'E7xx for DMAC was removed from H/W manual.
+>>
+>> Signed-off-by: Ryo Kataoka <ryo.kataoka.wt@renesas.com>
+>> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+>> ---
+>>
+>> This patch is based on devel branch of Simon Horman's renesas tree.
+>>
+>>  arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+>> index 4696062..3e9f824 100644
+>> --- a/arch/arm/boot/dts/r8a7791.dtsi
+>> +++ b/arch/arm/boot/dts/r8a7791.dtsi
+>> @@ -1288,7 +1288,7 @@
+>>
+>>         msiof0: spi at e6e20000 {
+>>                 compatible = "renesas,msiof-r8a7791";
+>> -               reg = <0 0xe6e20000 0 0x0064>, <0 0xe7e20000 0 0x0064>;
+>> +               reg = <0 0xe6e20000 0 0x0064>;
+>>                 interrupts = <0 156 IRQ_TYPE_LEVEL_HIGH>;
+>>                 clocks = <&mstp0_clks R8A7791_CLK_MSIOF0>;
+>>                 dmas = <&dmac0 0x51>, <&dmac0 0x52>;
 
-Kind regards
-Uffe
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
