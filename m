@@ -1,58 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 31 Mar 2015 00:58:23 +0300
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: add EtherAVB clock
-In-Reply-To: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
-References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
-Message-ID: <2142150.nOzfK74FZR@wasted.cogentembedded.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 30 Mar 2015 22:58:32 +0100
+Subject: [PATCH v4 08/10] eeprom: qfprom: Add bindings for qfprom
+In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1427752712-17389-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the EtherAVB clock to the R8A7790 device tree.
+This patch adds bindings for qfprom found in QCOM SOCs. QFPROM driver
+is based on simple eeprom framework.
 
-Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            |    8 +++++---
- include/dt-bindings/clock/r8a7790-clock.h |    1 +
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/eeprom/qfprom.txt          | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/eeprom/qfprom.txt
 
-Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1193,16 +1193,18 @@
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
- 			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
--			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
-+			         <&zg_clk>, <&p_clk>, <&hp_clk>, <&zs_clk>,
-+				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7790_CLK_MLB R8A7790_CLK_VIN3 R8A7790_CLK_VIN2
--				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0 R8A7790_CLK_ETHER
-+				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0
-+				R8A7790_CLK_ETHER R8A7790_CLK_ETHERAVB
- 				R8A7790_CLK_SATA1 R8A7790_CLK_SATA0
- 			>;
- 			clock-output-names =
- 				"mlb", "vin3", "vin2", "vin1", "vin0", "ether",
--				"sata1", "sata0";
-+				"etheravb", "sata1", "sata0";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-Index: renesas/include/dt-bindings/clock/r8a7790-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7790-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7790-clock.h
-@@ -105,6 +105,7 @@
- #define R8A7790_CLK_VIN2		9
- #define R8A7790_CLK_VIN1		10
- #define R8A7790_CLK_VIN0		11
-+#define R8A7790_CLK_ETHERAVB		12
- #define R8A7790_CLK_ETHER		13
- #define R8A7790_CLK_SATA1		14
- #define R8A7790_CLK_SATA0		15
+diff --git a/Documentation/devicetree/bindings/eeprom/qfprom.txt b/Documentation/devicetree/bindings/eeprom/qfprom.txt
+new file mode 100644
+index 0000000..21a7104
+--- /dev/null
++++ b/Documentation/devicetree/bindings/eeprom/qfprom.txt
+@@ -0,0 +1,34 @@
++= Qualcomm QFPROM device tree bindings =
++
++This binding is intended to represent QFPROM which is found in most QCOM SOCs.
++
++Required properties:
++- compatible: should be "qcom,qfprom"
++- reg: Should contain registers location and length
++
++= Data cells =
++Are child nodes of qfprom, bindings of which as described in
++bindings/eeprom/eeprom.txt
++
++Example:
++
++	qfprom: qfprom at 00700000 {
++		compatible 	= "qcom,qfprom";
++		reg		= <0x00700000 0x8000>;
++		...
++		/* Data cells */
++		tsens_calibration: calib at 404 {
++			reg = <0x4404 0x10>;
++		};
++	};
++
++
++= Data consumers =
++Are device nodes which consume eeprom data cells.
++
++For example:
++
++	tsens {
++		...
++		calibration = <&tsens_calibration>;
++	};
+-- 
+1.9.1
