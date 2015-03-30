@@ -1,51 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Mar 2015 10:59:30 +0100
-Subject: [RESEND PATCH] arm64: dts: add interrupt-affinity property to pmu
- node for juno
-Message-ID: <1427709570-15891-1-git-send-email-will.deacon@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Mar 2015 12:12:12 +0200
+Subject: [GIT PULL 1/2] ARM: tegra: Core code changes for v4.1-rc1
+Message-ID: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the Juno .dts robust against potential reordering of the CPU nodes
-by adding an explicit interrupt-affinity property to the PMU node. While
-we're at it, fix the PMU interrupts numbers too.
+Hi ARM SoC maintainers,
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Liviu Dudau <liviu.dudau@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-Resending, as requested. Please apply for 4.1.
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
- arch/arm64/boot/dts/arm/juno.dts | 14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index 133ee59de2d7..5e9110a3353d 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -120,12 +120,18 @@
- 
- 	pmu {
- 		compatible = "arm,armv8-pmuv3";
--		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
-+		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
--			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
-+			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&A57_0>,
-+				     <&A57_1>,
-+				     <&A53_0>,
-+				     <&A53_1>,
-+				     <&A53_2>,
-+				     <&A53_3>;
- 	};
- 
- 	/include/ "juno-clocks.dtsi"
--- 
-2.1.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.1-soc
+
+for you to fetch changes up to 5a240eff95e89af9648551a7686b0e5a7d0231ab:
+
+  memory: tegra: Add SWGROUP names (2015-03-30 11:47:40 +0200)
+
+----------------------------------------------------------------
+ARM: tegra: Core code changes for v4.1-rc1
+
+The biggest chunk of these changes is Mikko and Tomeu's external memory
+controller driver. It allows the frequency of the external memory to be
+changed and also puts the initial pieces into place to enable automatic
+scaling of the EMC frequency.
+
+There are also a couple of improvements such as the move to a restart
+handler to make it easier for boards to override restart behaviour in a
+board-specific way. There are also some preparatory patches to enable
+Tegra to run in big-endian mode.
+
+Finally there's a fix for a regression that was introduced in v3.17,
+causing suspend/resume to break.
+
+----------------------------------------------------------------
+Bob Mottram (1):
+      gpio: tegra: Maintain endianness
+
+David Riley (1):
+      soc/tegra: pmc: move to using a restart handler
+
+Dmitry Osipenko (1):
+      ARM: tegra20: Store CPU "resettable" status in IRAM
+
+Mikko Perttunen (7):
+      soc/tegra: fuse: Add RAM code reader helper
+      of: Add Tegra124 EMC bindings
+      memory: tegra: Add API needed by the EMC driver
+      memory: tegra: Add EMC (external memory controller) driver
+      memory: tegra: Add debugfs entry for getting and setting the EMC rate
+      clk: tegra124: Remove old emc clock
+      clk: tegra: Add EMC clock driver
+
+Nicholas Mc Guire (1):
+      soc/tegra: Watch wait_for_completion_timeout() return type
+
+Thierry Reding (1):
+      memory: tegra: Add SWGROUP names
+
+Tomeu Vizoso (8):
+      of: Document long-ram-code property in nvidia,tegra20-apbmisc
+      of: Document timings subnode of nvidia,tegra-mc
+      memory: tegra: Disable ARBITRATION_EMEM interrupt
+      of: document new emc-timings subnode in nvidia,tegra124-car
+      of: document external-memory-controller property in tegra124-car
+      clk: Expose clk_hw_reparent() to providers
+      clk: tegra: Set the EMC clock as the parent of the MC clock
+      clk: tegra: Have EMC clock implement determine_rate()
+
+ .../bindings/clock/nvidia,tegra124-car.txt         |   44 +-
+ .../memory-controllers/nvidia,tegra-mc.txt         |   84 +-
+ .../bindings/memory-controllers/tegra-emc.txt      |  374 +++++++
+ .../bindings/misc/nvidia,tegra20-apbmisc.txt       |    2 +
+ arch/arm/mach-tegra/cpuidle-tegra20.c              |    5 +-
+ arch/arm/mach-tegra/reset-handler.S                |   10 +-
+ arch/arm/mach-tegra/reset.h                        |    4 +
+ arch/arm/mach-tegra/sleep-tegra20.S                |   37 +-
+ arch/arm/mach-tegra/sleep.h                        |    4 +
+ arch/arm/mach-tegra/tegra.c                        |    1 -
+ drivers/clk/clk.c                                  |    8 +
+ drivers/clk/tegra/Makefile                         |    2 +-
+ drivers/clk/tegra/clk-emc.c                        |  539 ++++++++++
+ drivers/clk/tegra/clk-tegra124.c                   |   18 +-
+ drivers/clk/tegra/clk.h                            |    3 +
+ drivers/gpio/gpio-tegra.c                          |    4 +-
+ drivers/memory/tegra/Kconfig                       |   11 +
+ drivers/memory/tegra/Makefile                      |    2 +
+ drivers/memory/tegra/mc.c                          |  140 ++-
+ drivers/memory/tegra/tegra114.c                    |   32 +-
+ drivers/memory/tegra/tegra124-emc.c                | 1137 ++++++++++++++++++++
+ drivers/memory/tegra/tegra124.c                    |   90 +-
+ drivers/memory/tegra/tegra30.c                     |   32 +-
+ drivers/soc/tegra/fuse/fuse-tegra20.c              |    6 +-
+ drivers/soc/tegra/fuse/tegra-apbmisc.c             |   21 +
+ drivers/soc/tegra/pmc.c                            |   23 +-
+ include/linux/clk-provider.h                       |    1 +
+ include/soc/tegra/emc.h                            |   19 +
+ include/soc/tegra/fuse.h                           |    1 +
+ include/soc/tegra/mc.h                             |   15 +-
+ include/soc/tegra/pmc.h                            |    2 -
+ 31 files changed, 2560 insertions(+), 111 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/tegra-emc.txt
+ create mode 100644 drivers/clk/tegra/clk-emc.c
+ create mode 100644 drivers/memory/tegra/tegra124-emc.c
+ create mode 100644 include/soc/tegra/emc.h
