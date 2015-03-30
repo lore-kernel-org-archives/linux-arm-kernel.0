@@ -1,63 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 30 Mar 2015 08:08:29 +0100
-Subject: [PATCH 1/2] input: keypad: tc3589x: localize platform data
-In-Reply-To: <20150327164744.GA17364@dtor-ws>
-References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
- <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
- <20150319163856.GF30732@dtor-ws> <20150327164744.GA17364@dtor-ws>
-Message-ID: <20150330070829.GC457@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Mar 2015 08:16:13 +0100
+Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
+In-Reply-To: <5518A969.3090707@linaro.org>
+References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
+ <20150327153131.GK12400@redacted.bos.redhat.com>
+ <55157920.3050003@arm.com>
+ <20150327174044.GL12400@redacted.bos.redhat.com>
+ <5518A969.3090707@linaro.org>
+Message-ID: <20150330081613.60ff7dc0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Mar 2015, Dmitry Torokhov wrote:
+On Mon, 30 Mar 2015 02:39:53 +0100
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-> On Thu, Mar 19, 2015 at 09:38:56AM -0700, Dmitry Torokhov wrote:
-> > Hi Linus,
-> > 
-> > On Thu, Mar 19, 2015 at 03:52:44PM +0100, Linus Walleij wrote:
-> > > This driver can only get its platform data from the device tree,
-> > > and all platforms using it does that. Localize the platform data
-> > > for the keypad. A later patch will enforce the device tree / OF
-> > > dependence.
-> > > 
-> > > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > Cc: Lee Jones <lee.jones@linaro.org>
-> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> > > ---
-> > > Dmitry it would be great if you could ACK this patch so Lee can
-> > > take it with the other patch through MFD.
-> > 
-> > It looks like if you are making this OF-only you can get rid of pdata
-> > altogether and parse the OF data directly into the keypad. But that can
-> > be done later.
-> > 
-> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> On 03/28/2015 02:40 AM, Kyle McMartin wrote:
+> > On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
+> >>> [  236.260863] Kernel panic - not syncing: HYP panic:
+> >>> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
+> >>
+> >> It would be interesting if you could find out what you have at offset
+> >> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
+> >> help much).
+> >>
+> >
+> > Given the alignment, i'm going to assume i'm looking at the right thing:
+> >
+> > 0000000000000820 <__kvm_hyp_reset>:
+> >       820:       d51c2000        msr     ttbr0_el2, x0
+> >       824:       d5033fdf        isb
+> >       828:       d50c871f        tlbi    alle2
+> >       82c:       d5033f9f        dsb     sy
+> >       830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
+> >       834:       b3403c01        bfxil   x1, x0, #0, #16
+> >       838:       d61f0020        br      x1
+> >       83c:       d53c1000        mrs     x0, sctlr_el2
+> >
+> > but it seems fairly implausible to be trapping on ADR x0, 1f...
 > 
-> Hmm, just noticed an issue:
 > 
-> > >  
-> > >  	keypad = kzalloc(sizeof(struct tc_keypad), GFP_KERNEL);
-> > > +	keypad->board = tc3589x_keypad_of_probe(&pdev->dev);
-> > > +	if (IS_ERR(keypad->board)) {
-> > > +		dev_err(&pdev->dev, "invalid keypad platform data\n");
-> > > +		return PTR_ERR(keypad->board);
-> > > +	}
-> > > +
-> > >  	input = input_allocate_device();
-> > >  	if (!keypad || !input) {
-> > >  		dev_err(&pdev->dev, "failed to allocate keypad memory\n");
+> I've never seen this panic on fast model...
 > 
-> You slid of prasing right in between memory allocation and checking if
-> it succeeded, so there is a potential oops and memory leak now.
+> ESR shows that
+>    - Exception class: Data abort taken without a change in Exception level
+>    - Data fault status code: Translation fault at EL2
 > 
-> I want to commit the version of the patch below, holler if you disagree.
-> Note that I reverted much of plat -> board renames to keep the patch
-> small.
+> and FAR seems not to be a proper address.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+... which is consistent with what we're seeing here (data fault on
+something that doesn't generate a load/store). I'm pretty sure the
+page tables are screwed.
 
+Have you tested it with 64k pages?
+
+Thanks,
+
+        M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny.
