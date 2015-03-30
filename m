@@ -1,50 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 30 Mar 2015 16:57:55 +0200
-Subject: [GIT PULL] ARM: mediatek: soc updates for v4.1
-Message-ID: <CABuKBeJcRv_dGwL7qHSpSewwpmVuDvhon4JNcreYBaZ9z1E1Mw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 30 Mar 2015 16:00:08 +0100
+Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
+In-Reply-To: <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
+References: <20150317164353.GN23340@leverpostej>
+ <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20150325145949.GE26903@localhost>
+ <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
+ <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
+ <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
+Message-ID: <20150330150008.GD5964@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Mon, Mar 30, 2015 at 04:00:31PM +0200, Ard Biesheuvel wrote:
+> On 30 March 2015 at 15:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > Can we defer the setting of PHYS_OFFSET until we parse the DT memory
+> > nodes?
+> 
+> I experimented a bit with that, but it is quite hairy. Any
+> manipulation of the page tables goes through __va/__pa, so you need a
+> valid PHYS_OFFSET there to ensure they point at the right physical
+> region.
 
-please pull the following changes.
+Yes, so we need set PHYS_OFFSET before we start using __va/__pa.
 
-Thanks,
-Matthias
+> But PHYS_OFFSET also needs to be small enough for the DT
+> parsing code not to disregard regions that are below it.
 
----
+With PHYS_OFFSET as 0 initially, no regions would be dropped. But we
+could write a simplified early_init_dt_add_memory_arch() which avoids
+the PHYS_OFFSET check while setting the actual PHYS_OFFSET to the
+minimal address detected. I can see the generic function only uses
+__pa() to get the PHYS_OFFSET.
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> And then
+> there is the memblock limit to ensure that early dynamically allocated
+> page tables come from a region that is already mapped.
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+By the time we start using memblock allocations, we have a PHYS_OFFSET
+set. The early DT parsing does not require any memory allocations AFAIK.
+We need to make sure that setup_machine_fdt creates a VA mapping of the
+DT and does not require the __va() macro (I thought I've seen some
+patches to use fixmap for DT).
 
-are available in the git repository at:
+> I think it may be doable, but it would require some significant
+> hacking, e.g., call early_init_scan_dt() at its physical address with
+> only the ID map loaded and the MMU and caches on, and only after that
+> start populating the virtual address space. Or at least only populate
+> the lower half, i.e., mappings below PAGE_OFFSET for the kernel and
+> the FDT
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.0-next-soc
+With some form of your patches, we already decouple the PAGE_OFFSET from
+the kernel text mapping. We map the latter at some very high
+KERNEL_PAGE_OFFSET, the DT via fixmap (which is part of the kernel data
+section, so mapped at the high KERNEL_PAGE_OFFSET). Once we start
+calling early_init_dt_add_memory_arch(), we set the real PAGE_OFFSET and
+are free to use __pa/__va after setup_machine_fdt(). The actual linear
+mappings will be created later via paging_init().
 
-for you to fetch changes up to 1f022d84bd193ec88b01c6d2cb5b6647cb20a02f:
-
-  soc: mediatek: Add PMIC wrapper for MT8135 and MT8173 SoCs
-(2015-03-30 12:25:40 +0200)
-
-----------------------------------------------------------------
-- enable the pin controller in Kconfig
-- Add PMIC wrapper for MT8135 and MT8173 SoCs
-
-----------------------------------------------------------------
-Flora Fu (1):
-      soc: mediatek: Add PMIC wrapper for MT8135 and MT8173 SoCs
-
-Matthias Brugger (1):
-      ARM: mediatek: enable the pin controller
-
- arch/arm/mach-mediatek/Kconfig       |   1 +
- drivers/soc/Kconfig                  |   1 +
- drivers/soc/Makefile                 |   1 +
- drivers/soc/mediatek/Kconfig         |  11 +
- drivers/soc/mediatek/Makefile        |   1 +
- drivers/soc/mediatek/mtk-pmic-wrap.c | 977 +++++++++++++++++++++++++++++++++++
- 6 files changed, 992 insertions(+)
- create mode 100644 drivers/soc/mediatek/Kconfig
- create mode 100644 drivers/soc/mediatek/Makefile
- create mode 100644 drivers/soc/mediatek/mtk-pmic-wrap.c
+-- 
+Catalin
