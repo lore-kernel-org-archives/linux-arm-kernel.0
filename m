@@ -1,86 +1,77 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Mar 2015 12:12:13 +0200
-Subject: [GIT PULL 2/2] ARM: tegra: Device tree changes for v4.1-rc1
-In-Reply-To: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
-References: <1427710333-13472-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1427710333-13472-2-git-send-email-thierry.reding@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 30 Mar 2015 12:12:52 +0200
+Subject: [PATCH 3/6] clk: mediatek: Add reset controller support
+In-Reply-To: <1427447925-18030-4-git-send-email-s.hauer@pengutronix.de>
+References: <1427447925-18030-1-git-send-email-s.hauer@pengutronix.de>
+ <1427447925-18030-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CABuKBe+4mQ+gmEgBudpwMYLo7NLX1uJXx37nW1UtzOsY2x_WnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+2015-03-27 10:18 GMT+01:00 Sascha Hauer <s.hauer@pengutronix.de>:
+> The pericfg and infracfg units also provide reset lines to several
+> other SoC internal units. Add support for the reset controller.
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+This messages is a bit confusing, could you explain better what the
+patch does and how this interacts with pericfg and infracfg?
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/clk/mediatek/Makefile  |  1 +
+>  drivers/clk/mediatek/clk-mtk.h | 10 +++++
+>  drivers/clk/mediatek/reset.c   | 99 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 110 insertions(+)
+>  create mode 100644 drivers/clk/mediatek/reset.c
+>
+> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> index c384e97..0b6f1c3 100644
+> --- a/drivers/clk/mediatek/Makefile
+> +++ b/drivers/clk/mediatek/Makefile
+> @@ -1 +1,2 @@
+>  obj-y += clk-mtk.o clk-pll.o clk-gate.o
+> +obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> index 5aaba81..5a6b5dd 100644
+> --- a/drivers/clk/mediatek/clk-mtk.h
+> +++ b/drivers/clk/mediatek/clk-mtk.h
+> @@ -152,4 +152,14 @@ void __init mtk_clk_register_plls(struct device_node *node,
+>                 const struct mtk_pll_data *plls, int num_plls,
+>                 struct clk_onecell_data *clk_data);
+>
+> +#ifdef CONFIG_RESET_CONTROLLER
+> +void mtk_register_reset_controller(struct device_node *np,
+> +                       unsigned int num_regs, int regofs);
+> +#else
+> +static inline void mtk_register_reset_controller(struct device_node *np,
+> +                       unsigned int num_regs, int regofs)
+> +{
+> +}
+> +#endif
+> +
+>  #endif /* __DRV_CLK_MTK_H */
+> diff --git a/drivers/clk/mediatek/reset.c b/drivers/clk/mediatek/reset.c
+> new file mode 100644
+> index 0000000..3a85a53
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/reset.c
+> @@ -0,0 +1,99 @@
+> +/*
+> + * Copyright (c) 2014 MediaTek Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-are available in the git repository at:
+Do we need this? Seems that it isn't used at all.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.1-dt
-
-for you to fetch changes up to 03650bd2010b117c5c16a75278b0d01def8e9376:
-
-  ARM: tegra: Add EMC timings to Nyan Blaze device tree (2015-03-30 11:43:39 +0200)
-
-----------------------------------------------------------------
-ARM: tegra: Device tree changes for v4.1-rc1
-
-A bunch of changes to improve support on the Nyan Big (Acer Chromebook
-13). These enable the trackpad and make the WiFi card work. Changes to
-the userspace-exposed name of the soundcard are required for a better
-audio experience.
-
-Support for Nyan Blaze (HP Chromebook 14) is added. It is very similar
-to Nyan Big and therefore can enjoys many of the above improvements.
-
-Since the EMC driver can now be used to scale the frequency at which
-external memory is clocked, corresponding EMC frequency tables are added
-for Jetson TK1 and the Nyan boards.
-
-The Jetson TK1, Beaver and Nyan boards now also use generated pinmux
-data, which makes it easier to keep it in sync with the data provided by
-syseng.
-
-----------------------------------------------------------------
-Lucas Stach (1):
-      ARM: tegra: Use generated pinmux for Beaver board
-
-Mikko Perttunen (2):
-      ARM: tegra: Add EMC to Tegra124 device tree
-      ARM: tegra: Add EMC timings to Jetson TK1 device tree
-
-Stephen Warren (1):
-      ARM: tegra: Import latest Jetson TK1 pinmux
-
-Tomeu Vizoso (13):
-      ARM: tegra: Change model of sound card in Nyan Big
-      ARM: tegra: Move generic parts out of the nyan-big DT
-      ARM: tegra: Add DTS for the nyan-blaze board
-      ARM: tegra: Add node for trackpad in Nyan boards
-      ARM: tegra: Use pwrseq-simple for the wifi in Nyan
-      ARM: tegra: Use generated pinmux data for Nyan Big
-      ARM: tegra: nyan: Set maximum frequency for SPI flash
-      ARM: tegra: nyan: Add gpio-restart node
-      ARM: tegra: nyan: The WiFi card is kept powered during suspend
-      of: Add binding for NVIDIA Tegra ACTMON node
-      ARM: tegra: Add Tegra124 ACTMON support
-      ARM: tegra: Add EMC timings to Nyan Big device tree
-      ARM: tegra: Add EMC timings to Nyan Blaze device tree
-
- .../bindings/arm/tegra/nvidia,tegra30-actmon.txt   |   32 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi     | 2421 ++++++++++++++++++++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |  559 +++--
- arch/arm/boot/dts/tegra124-nyan-big-emc.dtsi       | 2023 ++++++++++++++++
- arch/arm/boot/dts/tegra124-nyan-big.dts            | 2121 +++++++++--------
- arch/arm/boot/dts/tegra124-nyan-blaze-emc.dtsi     | 2049 +++++++++++++++++
- arch/arm/boot/dts/tegra124-nyan-blaze.dts          | 1334 +++++++++++
- arch/arm/boot/dts/tegra124-nyan.dtsi               |  695 ++++++
- arch/arm/boot/dts/tegra124.dtsi                    |   19 +
- arch/arm/boot/dts/tegra30-beaver.dts               | 1653 ++++++++++++-
- 11 files changed, 11607 insertions(+), 1300 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/tegra/nvidia,tegra30-actmon.txt
- create mode 100644 arch/arm/boot/dts/tegra124-jetson-tk1-emc.dtsi
- create mode 100644 arch/arm/boot/dts/tegra124-nyan-big-emc.dtsi
- create mode 100644 arch/arm/boot/dts/tegra124-nyan-blaze-emc.dtsi
- create mode 100644 arch/arm/boot/dts/tegra124-nyan-blaze.dts
- create mode 100644 arch/arm/boot/dts/tegra124-nyan.dtsi
+Cheers,
+Matthias
