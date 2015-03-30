@@ -1,49 +1,47 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 30 Mar 2015 16:17:11 +0100
-Subject: [PATCH v2 5/6] usb: dwc3: dwc3-st: Update the incorrect DT dwc3
- example.
+Date: Mon, 30 Mar 2015 16:17:08 +0100
+Subject: [PATCH v2 2/6] ahci: st: Update the DT example for how to obtain the
+ PHY.
 In-Reply-To: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
 References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1427728632-10846-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1427728632-10846-3-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a subtle typo phys-names should be phy-names. Using the
-current example means you don't have working usb (as you fail to
-obtain the phys). Also update the example to use the generic phy
-type constants which are now used for miphy28.
+The example is wrong in that the phys property should take a
+phandle to the phy port.
 
-Additionaly also remove the unnecessary new line in the example.
+Also with the changing over to generic PHY type constants we also
+update that as well.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/usb/dwc3-st.txt | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/ata/ahci-st.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc3-st.txt b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-index f9d7025..01c71b1 100644
---- a/Documentation/devicetree/bindings/usb/dwc3-st.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc3-st.txt
-@@ -49,8 +49,7 @@ st_dwc3: dwc3 at 8f94000 {
- 	st,syscfg	= <&syscfg_core>;
- 	resets		= <&powerdown STIH407_USB3_POWERDOWN>,
- 			  <&softreset STIH407_MIPHY2_SOFTRESET>;
--	reset-names	= "powerdown",
--			  "softreset";
-+	reset-names	= "powerdown", "softreset";
- 	#address-cells	= <1>;
- 	#size-cells	= <1>;
- 	pinctrl-names	= "default";
-@@ -62,7 +61,7 @@ st_dwc3: dwc3 at 8f94000 {
- 		reg		= <0x09900000 0x100000>;
- 		interrupts	= <GIC_SPI 155 IRQ_TYPE_NONE>;
- 		dr_mode		= "host";
--		phys-names      = "usb2-phy", "usb3-phy";
--		phys            = <&usb2_picophy2>, <&phy_port2 MIPHY_TYPE_USB>;
-+		phy-names	= "usb2-phy", "usb3-phy";
-+		phys		= <&usb2_picophy2>, <&phy_port2 PHY_TYPE_USB3>;
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
+index 0574a77..1331202 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-st.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
+@@ -11,7 +11,7 @@ Required properties:
+  - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
+  - clocks	   : The phandle for the clock
+  - clock-names	   :   Associated name must be; "ahci_clk"
+- - phys		   : The phandle for the PHY device
++ - phys		   : The phandle for the PHY port
+  - phy-names	   :   Associated name must be; "ahci_phy"
+ 
+ Example:
+@@ -21,7 +21,7 @@ Example:
+ 		reg             = <0xfe380000 0x1000>;
+ 		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
+ 		interrupt-names = "hostc";
+-		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
++		phys	        = <&phy_port0 PHY_TYPE_SATA>;
+ 		phy-names       = "ahci_phy";
+ 		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
+ 				  <&softreset STIH416_SATA0_SOFTRESET>;
 -- 
 1.9.1
