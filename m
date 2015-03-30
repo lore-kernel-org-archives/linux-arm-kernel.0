@@ -1,79 +1,57 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 30 Mar 2015 22:41:01 +0100
-Subject: [PATCH] ARM: switch to use the generic show_mem() implementation
-Message-ID: <E1YchQb-0005DP-MZ@rmk-PC.arm.linux.org.uk>
+From: al.stone@linaro.org (Al Stone)
+Date: Mon, 30 Mar 2015 15:53:12 -0600
+Subject: [Linaro-acpi] [PATCH 1/2] ARM64 / ACPI: Ignore the return error
+ value of acpi_map_gic_cpu_interface()
+In-Reply-To: <1427458476-20140-1-git-send-email-hanjun.guo@linaro.org>
+References: <1427458476-20140-1-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <5519C5C8.2020903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch ARM to use the generic show_mem() implementation, which displays
-the statistics from the mm zone rather than walking the page arrays.
+On 03/27/2015 06:14 AM, Hanjun Guo wrote:
+> MADT table scannig will stopped once it gets the errors
+> returned by the handler, which is acpi_map_gic_cpu_interface()
+> in for ARM64, so Ignore the return error value to search for
+> all enabled CPUs for SMP init.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-Any objections to merging this?
+I think the comment should say something like:
 
- arch/arm/mm/init.c | 49 -------------------------------------------------
- 1 file changed, 49 deletions(-)
+MADT scanning will stop when it gets an error from the handler,
+acpi_map_gic_cpu_interface(), on arm64.  However, we need to
+find all of the enabled CPUs so that SMP initialization can work
+properly.  So, if an error occurs in this case, ignore it for
+now so that we can find all of the enabled CPUs.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 1609b022a72f..ae369c1066e6 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -86,55 +86,6 @@ static int __init parse_tag_initrd2(const struct tag *tag)
- 
- __tagtable(ATAG_INITRD2, parse_tag_initrd2);
- 
--/*
-- * This keeps memory configuration data used by a couple memory
-- * initialization functions, as well as show_mem() for the skipping
-- * of holes in the memory map.  It is populated by arm_add_memory().
-- */
--void show_mem(unsigned int filter)
--{
--	int free = 0, total = 0, reserved = 0;
--	int shared = 0, cached = 0, slab = 0;
--	struct memblock_region *reg;
--
--	printk("Mem-info:\n");
--	show_free_areas(filter);
--
--	for_each_memblock (memory, reg) {
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
--
--		pfn1 = memblock_region_memory_base_pfn(reg);
--		pfn2 = memblock_region_memory_end_pfn(reg);
--
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
--
--		do {
--			total++;
--			if (PageReserved(page))
--				reserved++;
--			else if (PageSwapCache(page))
--				cached++;
--			else if (PageSlab(page))
--				slab++;
--			else if (!page_count(page))
--				free++;
--			else
--				shared += page_count(page) - 1;
--			pfn1++;
--			page = pfn_to_page(pfn1);
--		} while (pfn1 < pfn2);
--	}
--
--	printk("%d pages of RAM\n", total);
--	printk("%d free pages\n", free);
--	printk("%d reserved pages\n", reserved);
--	printk("%d slab pages\n", slab);
--	printk("%d pages shared\n", shared);
--	printk("%d pages swap cached\n", cached);
--}
--
- static void __init find_limits(unsigned long *min, unsigned long *max_low,
- 			       unsigned long *max_high)
- {
+Is that what you meant, Hanjun?
+
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 07649e4..c263cba 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -181,7 +181,8 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>  		return -EINVAL;
+>  
+>  	acpi_table_print_madt_entry(header);
+> -	return acpi_map_gic_cpu_interface(processor);
+> +	acpi_map_gic_cpu_interface(processor);
+> +	return 0;
+>  }
+>  
+>  /* Parse GIC cpu interface entries in MADT for SMP init */
+> 
+
+
 -- 
-1.8.3.1
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Linaro Enterprise Group
+al.stone at linaro.org
+-----------------------------------
