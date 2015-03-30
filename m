@@ -1,42 +1,43 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 30 Mar 2015 13:24:19 +0800
-Subject: [PATCH v2 0/5] clk: hisilicon: support stub clock
-Message-ID: <1427693064-11062-1-git-send-email-leo.yan@linaro.org>
+Date: Mon, 30 Mar 2015 13:24:20 +0800
+Subject: [PATCH v2 1/5] clk: hisi: refine parameter checking for init
+In-Reply-To: <1427693064-11062-1-git-send-email-leo.yan@linaro.org>
+References: <1427693064-11062-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1427693064-11062-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for hisilicon stub clock driver. On hi6220,
-the bootloader needs load the firmware image and set info for OPPs;
-after run into kernel, the stub clock driver is used to communicate
-w/t firmware for cpu dynamic frequency scaling. So finally s/w will
-simply write request in sram and send ipc to power controller.
+*of_iomap()* will check the device node pointer, and if the pointer is
+NULL it will return error code. So refine clock's init flow by checking
+the device node with this simple way; and polish a little for the print
+out message.
 
-These patches have been tested on 96board hikey and will be used by
-cpufreq driver.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/clk/hisilicon/clk.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
 
-Changes from v1:
-* Refine parameter checking for init flow
-* Remove unnecessary debugging info
-* Modify to check spinlock pointer when register clocks
-
-
-Leo Yan (5):
-  clk: hisi: refine parameter checking for init
-  clk: hisi: add API for allocation clk data struct
-  dt-bindings: clk: hisilicon: Document stub clock driver
-  clk: hisi: add stub clk driver
-  clk: hisi: add stub clock register function
-
- .../devicetree/bindings/clock/hisi,stub-clock.txt  |  38 +++
- drivers/clk/hisilicon/Makefile                     |   2 +-
- drivers/clk/hisilicon/clk-stub.c                   | 282 +++++++++++++++++++++
- drivers/clk/hisilicon/clk.c                        |  64 ++++-
- drivers/clk/hisilicon/clk.h                        |  17 ++
- include/dt-bindings/clock/hisi,stub-clock.h        |  26 ++
- 6 files changed, 416 insertions(+), 13 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/hisi,stub-clock.txt
- create mode 100644 drivers/clk/hisilicon/clk-stub.c
- create mode 100644 include/dt-bindings/clock/hisi,stub-clock.h
-
+diff --git a/drivers/clk/hisilicon/clk.c b/drivers/clk/hisilicon/clk.c
+index a078e84..1951b37 100644
+--- a/drivers/clk/hisilicon/clk.c
++++ b/drivers/clk/hisilicon/clk.c
+@@ -45,14 +45,9 @@ struct hisi_clock_data __init *hisi_clk_init(struct device_node *np,
+ 	struct clk **clk_table;
+ 	void __iomem *base;
+ 
+-	if (np) {
+-		base = of_iomap(np, 0);
+-		if (!base) {
+-			pr_err("failed to map Hisilicon clock registers\n");
+-			goto err;
+-		}
+-	} else {
+-		pr_err("failed to find Hisilicon clock node in DTS\n");
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_err("%s: failed to map clock registers\n", __func__);
+ 		goto err;
+ 	}
+ 
 -- 
 1.9.1
