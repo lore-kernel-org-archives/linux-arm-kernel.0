@@ -1,82 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 30 Mar 2015 18:45:40 +0100
-Subject: [RFC PATCH 2/2] arm64: kernel: perf: add pmu CPU PM notifier
-In-Reply-To: <20150317172418.GX8399@arm.com>
-References: <1426008682-5680-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1426008682-5680-2-git-send-email-lorenzo.pieralisi@arm.com>
- <7hh9try12u.fsf@deeprootsystems.com>
- <CAJ5Y-eZBS9Z0BgQK92MggttEZLitgKOYPyZqg3-7=RggYAJWvw@mail.gmail.com>
- <20150313174002.GA1763@e102568-lin.cambridge.arm.com>
- <7hd24cpj8m.fsf@deeprootsystems.com>
- <20150317172418.GX8399@arm.com>
-Message-ID: <20150330174540.GB11684@red-moon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 30 Mar 2015 23:18:27 +0530
+Subject: [PATCH 1/5] dmaengine: edma: fix memory leak when terminating
+ running transfers
+In-Reply-To: <1427456155-28990-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1427456155-28990-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427456155-28990-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150330174827.GL7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 05:24:18PM +0000, Will Deacon wrote:
-> On Fri, Mar 13, 2015 at 11:31:37PM +0000, Kevin Hilman wrote:
-> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> > 
-> > > On Thu, Mar 12, 2015 at 01:18:54PM +0000, Ashwin Chaugule wrote:
-> > >> On 11 March 2015 at 12:02, Kevin Hilman <khilman@kernel.org> wrote:
-> > >> > Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-> > >> >
-> > >> >> When a CPU is being profiled through PMU events and it enters suspend
-> > >> >> or idle states, the PMU registers content can be lost, which means that
-> > >> >> counters that were relied upon on power down entry are reset on power
-> > >> >> up to values that are incosistent with the profile session.
-> > >> >>
-> > >> >> This patch adds a CPU PM notifier to arm64 perf code, that detects
-> > >> >> on entry if events are being monitored, and if so, it returns
-> > >> >> failure to the CPU PM notification chain, causing the suspend
-> > >> >> thread or the idle thread to abort power down, therefore preventing
-> > >> >> registers content loss.
-> > >> >>
-> > >> >> By triggering CPU PM notification failure this patch prevents
-> > >> >> suspending a system if the suspend thread is being profiled and
-> > >> >> it also prevents entering idle deep states on cores that have profile
-> > >> >> events in use, somehow limiting power management capabilities when
-> > >> >> there are active perf sessions.
-> > >> >
-> > >> > I guess that's one choice.  Couldn't you also stop the PMU and
-> > >> > save/restore it's context in the notifiers? so that you wouldn't affect
-> > >> > PM capabilities?
-> > >> >
-> > >> > That would imply that you lose the ability to profile after a certain
-> > >> > point in suspend/idle, but maybe that's a better trade off than having
-> > >> > profiling disable certain PM features?
-> > >> 
-> > >> I had something like that a few years ago on the Kraits and Scorpions [1].
-> > >
-> > > That's another option, but the point is understanding how we want to
-> > > tackle the issue, by preventing power down or by restoring the
-> > > PMU registers.
-> > 
-> > Personally, I think the save/restore approach is preferred.  IMO, it's
-> > more intuitive from the perspective of a user who doesn't understand all
-> > the mechanics and also actually allows you to profile most of the
-> > low-power paths and still actually hit the low power states.
+On Fri, Mar 27, 2015 at 01:35:51PM +0200, Peter Ujfalusi wrote:
+> From: Petr Kulhavy <petr@barix.com>
 > 
-> I agree that save/restore is the nicest thing to do, but until we have a
-> generic description of the power-domains in device-tree I really don't want
-> PMU-specific hacks in the arch code to deal with this (since many platforms
-> do not lose PMU state over suspend).
+> If edma_terminate_all() was called while a transfer was running (i.e. after
+> edma_execute() but before edma_callback()) the echan->edesc was not freed.
 > 
-> What Lorenzo is proposing is a stop-gap to prevent perf silently losing its
-> state on platforms where the register contents is lost.
+> This was due to the fact that a running transfer is on none of the
+> vchan lists: desc_submitted, desc_issued, desc_completed (edma_execute()
+> removes it from the desc_issued list), so the vchan_dma_desc_free_list()
+> called at the end of edma_terminate_all() didn't find it and didn't free it.
+> 
+> This bug was found on an AM1808 based hardware (very similar to da850evm,
+> however using the second MMC/SD controller), where intense operations on the SD
+> card wasted the device 128MB RAM within a couple of days.
+> 
+> Peter Ujfalusi:
+> The issue is even more severe since it affects cyclic (audio) transfers as
+> well. In this case starting/stopping audio will results memory leak.
+> 
+> Signed-off-by: Petr Kulhavy <petr@barix.com>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> CC: <stable@vger.kernel.org>
+> CC: <linux-omap@vger.kernel.org>
+Applied, thanks
 
-Yes, that's exactly the goal. I am fine either way, at the moment we are
-not in a position to define whether a core loses the PMU context, that's
-certain.
+-- 
+~Vinod
 
-I am not sure to understand why people want the core to really go
-to shutdown and save/restore perf context if perf is on (eg profiling a
-cpu for cache stats, clearly powering down a core biases the results
-and might even obfuscate them).
+> ---
+>  drivers/dma/edma.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 741baa68365c..984c2b12dae3 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -268,6 +268,13 @@ static int edma_terminate_all(struct dma_chan *chan)
+>  	 */
+>  	if (echan->edesc) {
+>  		int cyclic = echan->edesc->cyclic;
+> +
+> +		/*
+> +		 * free the running request descriptor
+> +		 * since it is not in any of the vdesc lists
+> +		 */
+> +		edma_desc_free(&echan->edesc->vdesc);
+> +
+>  		echan->edesc = NULL;
+>  		edma_stop(echan->ch_num);
+>  		/* Move the cyclic channel back to default queue */
+> -- 
+> 2.3.3
+> 
 
-It is not an easy call. If we go for this patch approach I am happy to
-rebase and retest the series again, for power domains I fear we have to
-wait given the sheer amount of changes in ARM CPUidle world at the moment,
-too much stuff going on there.
-
-Lorenzo
+-- 
