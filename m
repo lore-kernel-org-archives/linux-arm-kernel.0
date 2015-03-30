@@ -1,76 +1,82 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 30 Mar 2015 10:55:00 +0300
-Subject: [GIT PULL] OMAP-GPMC driver updates for v4.1
-In-Reply-To: <550FEBC6.3000902@ti.com>
-References: <550FEBC6.3000902@ti.com>
-Message-ID: <55190154.6050905@ti.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 30 Mar 2015 16:05:19 +0800
+Subject: [PATCH v5 3/3] I2C: mediatek: Add driver for MediaTek MT8173
+ I2C controller
+In-Reply-To: <20150323073905.GF9742@pengutronix.de>
+References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
+ <1426917922-61356-4-git-send-email-eddie.huang@mediatek.com>
+ <20150323073905.GF9742@pengutronix.de>
+Message-ID: <1427702719.26464.5.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Sascha,
 
-On 23/03/15 12:32, Roger Quadros wrote:
-> Hi Arnd, Hi Olof,
+On Mon, 2015-03-23 at 08:39 +0100, Sascha Hauer wrote:
+> On Sat, Mar 21, 2015 at 02:05:22PM +0800, Eddie Huang wrote:
+> > Add mediatek MT8173 I2C controller driver. Compare to I2C controller
+> > of earlier mediatek SoC, MT8173 fix write-then-read limitation, and
+> > also increase message size to 64kb.
+> > 
 > 
-> Based on Tony's request I will be sending you pull requests for OMAP-GPMC driver
-> hence forth. I've sent this earlier on the 9th of March but had missed to copy Olof.
+> [...]
 > 
-> Please pull in these OMAP-GPMC driver fixes for v4.1.
-> Patches have been tested for GPMC-NAND on dra7-evm and omap3-beagle.
+> > +static const struct i2c_adapter_quirks mt8173_i2c_quirks = {
+> > +	.max_num_msgs = MAX_MSG_NUM_MT8173,
+> > +	.max_write_len = MAX_DMA_TRANS_SIZE_MT8173,
+> > +	.max_read_len = MAX_DMA_TRANS_SIZE_MT8173,
+> > +	.max_comb_1st_msg_len = MAX_DMA_TRANS_SIZE_MT8173,
+> > +	.max_comb_2nd_msg_len = MAX_WRRD_TRANS_SIZE_MT8173,
+> > +};
+> > +
+> >  static int mtk_i2c_probe(struct platform_device *pdev)
+> >  {
+> >  	int ret = 0;
+> > @@ -587,7 +626,8 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+> >  		return -EINVAL;
+> >  
+> >  	i2c->platform_compat = mtk_get_device_prop(pdev);
+> > -	if (i2c->have_pmic && (i2c->platform_compat & COMPAT_MT6577))
+> > +	if (i2c->have_pmic && (i2c->platform_compat &
+> > +			(COMPAT_MT6577 | COMPAT_MT8173)))
+> >  		return -EINVAL;
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > @@ -613,7 +653,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+> >  	i2c->adap.dev.parent = &pdev->dev;
+> >  	i2c->adap.owner = THIS_MODULE;
+> >  	i2c->adap.algo = &mtk_i2c_algorithm;
+> > -	i2c->adap.quirks = &mt6577_i2c_quirks;
+> > +	if (i2c->platform_compat & COMPAT_MT8173)
+> > +		i2c->adap.quirks = &mt8173_i2c_quirks;
+> > +	else
+> > +		i2c->adap.quirks = &mt6577_i2c_quirks;
+> 
+> Instead of putting an integer into struct of_device_id you should
+> introduce a
+> 
+> struct mtk_i2c_data {
+> 	struct i2c_adapter_quirks quirks;
+> 	int compat;
+> 	/* Additional SoC specific data */
+> };
+> 
+> and put a pointer to this directly into the of_device_id. This way you
+> need less casting and can put newly discovered differences diretly into
+> some data struct and don't have to introduce if(socxy) ... else ...
+> everytime.
+> 
 
-Gentle reminder. Thanks.
+Thanks your suggestion. I will use capability struct like 
 
-cheers,
--roger
+struct mtk_i2c_compatible {
+	unsigned char pmic_i2c;
+	unsigned char dcm;
+	unsigned char auto_restart;
+	const struct i2c_adapter_quirks *quirks;
+};
 
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git at github.com:rogerq/linux.git tags/gpmc-omap-for-v4.1
-> 
-> for you to fetch changes up to 4b613e9b4bbe94545a588a100e09006d827a7ebe:
-> 
->   ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters (2015-03-06 12:55:32 +0200)
-> 
-> ----------------------------------------------------------------
-> OMAP-GPMC driver fixes for v4.1
-> 
-> * Fixed WAITMONITORINGTIME programming to be based on
-> GPMC_CLK instead of GPMC_FCLK. The GPMC clock divider
-> programming is fixed for both synchronous and asynchronous
-> modes.
-> * Allow GPMC's children of default bus type to be populated in
-> the device tree.
-> * Improved DEBUG output data and format.
-> * Prevent writing 1 into reserved bits of GPMC_CONFIG7.
-> 
-> ----------------------------------------------------------------
-> Robert ABEL (8):
->       ARM OMAP2+ GPMC: don't undef DEBUG
->       ARM OMAP2+ GPMC: add bus children
->       ARM OMAP2+ GPMC: fix debug output alignment
->       ARM OMAP2+ GPMC: change get_gpmc_timing_reg output for DTS
->       ARM OMAP2+ GPMC: always program GPMCFCLKDIVIDER
->       ARM OMAP2+ GPMC: calculate GPMCFCLKDIVIDER based on WAITMONITORINGTIME
->       ARM OMAP2+ GPMC: fix WAITMONITORINGTIME divider bug
->       ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters
-> 
-> Semen Protsenko (2):
->       ARM: OMAP2+: gpmc: Fix writing in gpmc_cs_set_memconf
->       ARM: OMAP2+: gpmc: make gpmc_cs_get_name() static
-> 
->  arch/arm/mach-omap2/gpmc-nand.c    |  18 +++++----
->  arch/arm/mach-omap2/gpmc-onenand.c |   4 +-
->  arch/arm/mach-omap2/usb-tusb6010.c |   4 +-
->  drivers/memory/omap-gpmc.c         | 358 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------
->  include/linux/omap-gpmc.h          |   3 +-
->  5 files changed, 305 insertions(+), 82 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+And pass in of_device_id, then remove all if(socxy).... else ... in
+driver.
+
+Eddie
