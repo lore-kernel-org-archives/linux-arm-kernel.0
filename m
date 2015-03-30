@@ -1,69 +1,18 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 30 Mar 2015 22:56:27 +0100
-Subject: [PATCH v4 01/10] regmap: Introduce regmap_get_max_register.
-In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427752587-17087-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 31 Mar 2015 00:56:45 +0300
+Subject: [PATCH 0/2] Add R8A7790 EtherAVB DT support
+Message-ID: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces regmap_get_max_register() function which would be
-used by the infrastructures like eeprom framework built on top of
-regmap.
+Hello.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/base/regmap/regmap.c | 12 ++++++++++++
- include/linux/regmap.h       |  7 +++++++
- 2 files changed, 19 insertions(+)
+   Here's the set of 2 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20150330-v4.0-rc6' tag. Here we add the EtherAVB device tree
+support for the R8A7790 SoC. The 2nd patch depends on the EtherAVB driver
+posted recently for the bindings.
 
-diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
-index f99b098..d703921 100644
---- a/drivers/base/regmap/regmap.c
-+++ b/drivers/base/regmap/regmap.c
-@@ -2617,6 +2617,18 @@ int regmap_get_val_bytes(struct regmap *map)
- }
- EXPORT_SYMBOL_GPL(regmap_get_val_bytes);
- 
-+/**
-+ * regmap_get_max_register(): Report the max register value
-+ *
-+ * Report the max register value, mainly intended to for use by
-+ * generic infrastructure built on top of regmap.
-+ */
-+int regmap_get_max_register(struct regmap *map)
-+{
-+	return map->max_register ? : -EINVAL;
-+}
-+EXPORT_SYMBOL_GPL(regmap_get_max_register);
-+
- int regmap_parse_val(struct regmap *map, const void *buf,
- 			unsigned int *val)
- {
-diff --git a/include/linux/regmap.h b/include/linux/regmap.h
-index 116655d..2d87ded 100644
---- a/include/linux/regmap.h
-+++ b/include/linux/regmap.h
-@@ -433,6 +433,7 @@ int regmap_update_bits_check_async(struct regmap *map, unsigned int reg,
- 				   unsigned int mask, unsigned int val,
- 				   bool *change);
- int regmap_get_val_bytes(struct regmap *map);
-+int regmap_get_max_register(struct regmap *map);
- int regmap_async_complete(struct regmap *map);
- bool regmap_can_raw_write(struct regmap *map);
- 
-@@ -676,6 +677,12 @@ static inline int regmap_get_val_bytes(struct regmap *map)
- 	return -EINVAL;
- }
- 
-+static inline int regmap_get_max_register(struct regmap *map)
-+{
-+	WARN_ONCE(1, "regmap API is disabled");
-+	return -EINVAL;
-+}
-+
- static inline int regcache_sync(struct regmap *map)
- {
- 	WARN_ONCE(1, "regmap API is disabled");
--- 
-1.9.1
+[1/2] ARM: shmobile: r8a7790: add EtherAVB clocks
+[2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+
+WBR, Sergei
