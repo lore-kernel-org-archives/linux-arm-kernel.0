@@ -1,37 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Mar 2015 15:03:33 +0100
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <20150317161748.GZ8656@n2100.arm.linux.org.uk>
-References: <20150316093553.GF8656@n2100.arm.linux.org.uk>
- <20150316130419.GI8656@n2100.arm.linux.org.uk>
- <55071742.6000405@arm.com>
- <20150316181634.GK8656@n2100.arm.linux.org.uk>
- <55072BF5.7030901@arm.com>
- <20150316195255.GM8656@n2100.arm.linux.org.uk>
- <550818A6.9020205@arm.com>
- <20150317153657.GY8656@n2100.arm.linux.org.uk>
- <55084D99.7050004@arm.com>
- <20150317161748.GZ8656@n2100.arm.linux.org.uk>
-Message-ID: <20150330140333.GJ24899@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Mar 2015 16:04:37 +0200
+Subject: [PATCH 4/5] irqchip: armada-370-xp: Allow using wakeup source
+In-Reply-To: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1427724278-12379-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 17, 2015 at 04:17:48PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Mar 17, 2015 at 03:51:53PM +0000, Sudeep Holla wrote:
-> > That's bad. I started with 2 cycles for all(rd/wr/setup) latencies(data
-> > and tag ram) and narrowed down to this setting with multiple
-> > experiments. I did try booting 10 times each time at-least.
-> > 
-> > Since the bootmon sets 8 cycles for all the latencies, does it make
-> > sense to try that setting to check if the issue you are seeing is
-> > related to L2 latencies at all. Meanwhile I will continue my testing.
-> 
-> For me <2 2 1> works - so read and write latencies of 2, setup of 1.
+On the Armada 370/XP SoCs, in standby mode the SoC stay powered and it
+is possible to wake-up from any interrupt sources. This patch adds
+flag to the MPIC irqchip driver to let linux know this.
 
-So what's happening?  Is someone going to update the dtb to adjust the
-latencies so that we can have a reliable platform?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/irqchip/irq-armada-370-xp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 564ec69af5f0..ab186b344e14 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -290,6 +290,7 @@ static struct irq_chip armada_370_xp_irq_chip = {
+ #ifdef CONFIG_SMP
+ 	.irq_set_affinity = armada_xp_set_affinity,
+ #endif
++	.flags		= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND,
+ };
+ 
+ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
