@@ -1,25 +1,48 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 30 Mar 2015 13:30:40 +0300
-Subject: [patch] spi: pxa2xx: missing break in pxa2xx_ssp_get_clk_div()
-Message-ID: <20150330103040.GB27144@mwanda>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Mar 2015 11:33:26 +0100
+Subject: [PATCH v2 3/8] mmc: sdhci-st: Add delay management functions for
+ top registers (eMMC).
+In-Reply-To: <54F5915C.6090707@st.com>
+References: <1424956227-18258-1-git-send-email-peter.griffin@linaro.org>
+ <1424956227-18258-4-git-send-email-peter.griffin@linaro.org>
+ <54F5915C.6090707@st.com>
+Message-ID: <20150330103326.GB21893@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We refactored this code but accidentally left out a break statement so
-QUARK_X1000_SSP isn't handled correctly.
+Hi Maxime,
 
-Fixes: 025ffe88ee60 ('spi: pxa2xx: shift clk_div in one place')
-Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+On Tue, 03 Mar 2015, Maxime Coquelin wrote:
+> 
+> On 02/26/2015 02:10 PM, Peter Griffin wrote:
+> >Due to the tight timing constriants in some UHS modes, it is required to have
+> s/constriant/constraints/
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 60526a5..a081cfc 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -791,6 +791,7 @@ static unsigned int pxa2xx_ssp_get_clk_div(struct driver_data *drv_data,
- 	switch (drv_data->ssp_type) {
- 	case QUARK_X1000_SSP:
- 		clk_div = quark_x1000_get_clk_div(rate, &chip->dds_rate);
-+		break;
- 	default:
- 		clk_div = ssp_get_clk_div(drv_data, rate);
- 	}
+Will fix.
+
+<snip>
+> >+
+> >+static inline void st_mmcss_set_static_delay(void __iomem *ioaddr)
+> >+{
+> >+	if (ioaddr) {
+> Maybe you could do:
+>     if (!ioaddr)
+>         return;
+
+Yes good idea, I have made that change in V3.
+> 
+>     writel_relaxed....
+> >+		writel_relaxed(0x0, ioaddr + ST_TOP_MMC_DLY_CTRL);
+> >+		writel_relaxed(ST_TOP_MMC_DLY_MAX,
+> >+				ioaddr + ST_TOP_MMC_TX_CLK_DLY);
+> >+	}
+> >+}
+> >+
+> >+static inline void st_mmcss_set_dll(void __iomem *ioaddr)
+> >+{
+> >+	if (ioaddr) {
+> Ditto
+
+regards,
+
+Peter
