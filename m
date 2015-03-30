@@ -1,69 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Mar 2015 16:17:04 -0700
-Subject: [PATCH 2/2] sunxi: a20-LIME2 define board specific operating
- points
-In-Reply-To: <55143D0D.6030104@gmail.com>
-References: <55143D0D.6030104@gmail.com>
-Message-ID: <20150330231704.GB23664@lukather>
+Date: Mon, 30 Mar 2015 16:26:53 -0700
+Subject: [PATCH v2 0/5] ARM: sunxi: SRAM mapping support
+In-Reply-To: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
+References: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150330232653.GC23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 05:08:29PM +0000, Iain Paton wrote:
-> these settings override the inappropriate ones in the dtsi with the
-> manufacturers provided settings from their 3.4.x fex file for this board
+Hi,
 
-Inappropriate how?
-
+On Thu, Mar 26, 2015 at 03:53:40PM +0100, Hans de Goede wrote:
+> Hi All,
 > 
-> Signed-off-by: Iain Paton <ipaton0@gmail.com>
-> ---
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> Here is v2 of my cleaned up version of Maxime's sunxi SRAM controller driver.
 > 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> index 704df28..f74f81e 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> @@ -83,6 +83,25 @@
->  	status = "okay";
->  };
->  
-> +&cpu0 {
-> +	cpu-supply = <&vdd_cpu>;
-> +	clocks = <&cpu>;
-> +	clock-latency = <244144>; /* 8 32k periods */
-
-This is already defined in the DTSI
-
-> +	operating-points = <
-> +		/* kHz    uV */
-> +		1008000 1450000
-> +		912000  1425000
-> +		864000  1350000
-> +		720000  1250000
-> +		528000  1150000
-> +		312000  1100000
-> +		144000  1050000
-> +		>;
-
-I'd rather have a better common operating points set and change that
-to accomodate all boards, rather than duplicating that information
-everywhere.
-
-> +	#cooling-cells = <2>;
-
-This is also defined in the DTSI.
-
-> +	cooling-min-level = <0>;
-> +	cooling-max-level = <6>;
-> +};
-> +
->  &ehci0 {
->  	status = "okay";
->  };
-> -- 
-> 2.1.3
+> Changes since v1:
+> - Make the SUNXI_SRAM Kconfig option hidden, enabled by default if ARCH_SUNXI
+> - Fix some typos in the comments in the dts file, both in the example in the
+>   devicetree-binding documentation, as well as in the actual dts files
+> - Drop the bogus change to drivers/net/ethernet/stmicro/stmmac/Kconfig
 > 
+> Since this is a prereq for my musb work, if there are no objections then I
+> would like to see this go upstream soon.
+> 
+> Since it only touches sunxi files (and one Makefile), it is probably best if
+> this all goes upstream through Maxime.
+
+I'm (obviously) fine with all the changes. Arnd, can I merge it
+through my tree and send a pull request, or do you want to handle the
+drivers/soc patches yourself?
 
 Thanks,
 Maxime
@@ -78,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/a0160020/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/bea0e22c/attachment.sig>
