@@ -1,115 +1,32 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Mon, 30 Mar 2015 15:21:15 +0200
-Subject: [PATCH] DTS/TX25: add missing indention
-Message-ID: <201503301521.15583.jbe@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Mar 2015 15:20:30 +0200
+Subject: [PATCH 0/2] Kbuild: kallsyms: update suffix ignore logic
+Message-ID: <1427721632-11665-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
----
- arch/arm/boot/dts/imx25-karo-tx25.dts |   84 +++++++++++++++++----------------
- 1 file changed, 43 insertions(+), 41 deletions(-)
+Two patches that update the kallsyms ignore logic.
 
-diff --git a/arch/arm/boot/dts/imx25-karo-tx25.dts b/arch/arm/boot/dts/imx25-karo-tx25.dts
-index 9b31faa96377..801c29e9c37c 100644
---- a/arch/arm/boot/dts/imx25-karo-tx25.dts
-+++ b/arch/arm/boot/dts/imx25-karo-tx25.dts
-@@ -42,49 +42,51 @@
- };
- 
- &iomuxc {
--	pinctrl_uart1: uart1grp {
--		fsl,pins = <
--			MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
--			MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
--			MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
--			MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
--		>;
--	};
-+	imx25-karo-stk5 {
-+		pinctrl_uart1: uart1grp {
-+			fsl,pins = <
-+				MX25_PAD_UART1_TXD__UART1_TXD 0x80000000
-+				MX25_PAD_UART1_RXD__UART1_RXD 0x80000000
-+				MX25_PAD_UART1_CTS__UART1_CTS 0x80000000
-+				MX25_PAD_UART1_RTS__UART1_RTS 0x80000000
-+			>;
-+		};
- 
--	pinctrl_fec: fecgrp {
--		fsl,pins = <
--			MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
--			MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
--			MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
--			MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
--			MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
--			MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
--			MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
--			MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
--			MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
--			MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
--			MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
--		>;
--	};
-+		pinctrl_fec: fecgrp {
-+			fsl,pins = <
-+				MX25_PAD_D11__GPIO_4_9		0x80000000 /* FEC PHY power on pin */
-+				MX25_PAD_D13__GPIO_4_7		0x80000000 /* FEC reset */
-+				MX25_PAD_FEC_MDC__FEC_MDC	0x80000000
-+				MX25_PAD_FEC_MDIO__FEC_MDIO	0x80000000
-+				MX25_PAD_FEC_TDATA0__FEC_TDATA0	0x80000000
-+				MX25_PAD_FEC_TDATA1__FEC_TDATA1	0x80000000
-+				MX25_PAD_FEC_TX_EN__FEC_TX_EN	0x80000000
-+				MX25_PAD_FEC_RDATA0__FEC_RDATA0	0x80000000
-+				MX25_PAD_FEC_RDATA1__FEC_RDATA1	0x80000000
-+				MX25_PAD_FEC_RX_DV__FEC_RX_DV	0x80000000
-+				MX25_PAD_FEC_TX_CLK__FEC_TX_CLK	0x80000000
-+			>;
-+		};
- 
--	pinctrl_nfc: nfcgrp {
--		fsl,pins = <
--			MX25_PAD_NF_CE0__NF_CE0		0x80000000
--			MX25_PAD_NFWE_B__NFWE_B		0x80000000
--			MX25_PAD_NFRE_B__NFRE_B		0x80000000
--			MX25_PAD_NFALE__NFALE		0x80000000
--			MX25_PAD_NFCLE__NFCLE		0x80000000
--			MX25_PAD_NFWP_B__NFWP_B		0x80000000
--			MX25_PAD_NFRB__NFRB		0x80000000
--			MX25_PAD_D7__D7			0x80000000
--			MX25_PAD_D6__D6			0x80000000
--			MX25_PAD_D5__D5			0x80000000
--			MX25_PAD_D4__D4			0x80000000
--			MX25_PAD_D3__D3			0x80000000
--			MX25_PAD_D2__D2			0x80000000
--			MX25_PAD_D1__D1			0x80000000
--			MX25_PAD_D0__D0			0x80000000
--		>;
-+		pinctrl_nfc: nfcgrp {
-+			fsl,pins = <
-+				MX25_PAD_NF_CE0__NF_CE0		0x80000000
-+				MX25_PAD_NFWE_B__NFWE_B		0x80000000
-+				MX25_PAD_NFRE_B__NFRE_B		0x80000000
-+				MX25_PAD_NFALE__NFALE		0x80000000
-+				MX25_PAD_NFCLE__NFCLE		0x80000000
-+				MX25_PAD_NFWP_B__NFWP_B		0x80000000
-+				MX25_PAD_NFRB__NFRB		0x80000000
-+				MX25_PAD_D7__D7			0x80000000
-+				MX25_PAD_D6__D6			0x80000000
-+				MX25_PAD_D5__D5			0x80000000
-+				MX25_PAD_D4__D4			0x80000000
-+				MX25_PAD_D3__D3			0x80000000
-+				MX25_PAD_D2__D2			0x80000000
-+				MX25_PAD_D1__D1			0x80000000
-+				MX25_PAD_D0__D0			0x80000000
-+			>;
-+		};
- 	};
- };
- 
--- 
-1.7.10.4
+Patch #1 adds logic to introduce symbols whose names end in (or equal)
+"_veneer". This prevent kallsyms generation errors on large ARM kernels
+where the emitted veneers will be different between the first and second
+pass, due to the fact that the size of the kallsyms region itself pushes
+the .text and .init.text sections further apart during the second pass.
+
+Patch #2 removes the handling of the "gcc[0-9]_compiled." symbol. It was
+only ever emitted by GCC v2.x which we don't support anymore anyway.
+
+This series is a followup to ' [RFC PATCH 0/2] ARM large kernels'
+(http://thread.gmane.org/gmane.linux.kbuild.devel/13065), but the
+other issue addressed by patch #2 of that series will be deferred
+for now.
+
+Ard Biesheuvel (2):
+  Kbuild: kallsyms: ignore veneers emitted by the ARM linker
+  Kbuild: kallsyms: drop special handling of pre-3.0 GCC symbols
+
+ scripts/kallsyms.c | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions               ? ? ?| http://www.pengutronix.de/  |
+1.8.3.2
