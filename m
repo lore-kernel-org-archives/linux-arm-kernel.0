@@ -1,126 +1,63 @@
-From: dobatog@gmail.com (Gabriel Dobato)
-Date: Mon, 30 Mar 2015 09:01:54 +0200
-Subject: Fwd: Ask for help: ARM: mvebu: add NAND support for dove
-In-Reply-To: <55188BFD.5070908@vanguardiasur.com.ar>
-References: <551713D8.3060809@gmail.com> <551714F8.2050401@gmail.com>
- <55188BFD.5070908@vanguardiasur.com.ar>
-Message-ID: <5518F4E2.1050505@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Mar 2015 08:08:29 +0100
+Subject: [PATCH 1/2] input: keypad: tc3589x: localize platform data
+In-Reply-To: <20150327164744.GA17364@dtor-ws>
+References: <1426776765-18812-1-git-send-email-linus.walleij@linaro.org>
+ <1426776765-18812-2-git-send-email-linus.walleij@linaro.org>
+ <20150319163856.GF30732@dtor-ws> <20150327164744.GA17364@dtor-ws>
+Message-ID: <20150330070829.GC457@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 27 Mar 2015, Dmitry Torokhov wrote:
 
-Sebastian,
+> On Thu, Mar 19, 2015 at 09:38:56AM -0700, Dmitry Torokhov wrote:
+> > Hi Linus,
+> > 
+> > On Thu, Mar 19, 2015 at 03:52:44PM +0100, Linus Walleij wrote:
+> > > This driver can only get its platform data from the device tree,
+> > > and all platforms using it does that. Localize the platform data
+> > > for the keypad. A later patch will enforce the device tree / OF
+> > > dependence.
+> > > 
+> > > Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > > ---
+> > > Dmitry it would be great if you could ACK this patch so Lee can
+> > > take it with the other patch through MFD.
+> > 
+> > It looks like if you are making this OF-only you can get rid of pdata
+> > altogether and parse the OF data directly into the keypad. But that can
+> > be done later.
+> > 
+> > Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> 
+> Hmm, just noticed an issue:
+> 
+> > >  
+> > >  	keypad = kzalloc(sizeof(struct tc_keypad), GFP_KERNEL);
+> > > +	keypad->board = tc3589x_keypad_of_probe(&pdev->dev);
+> > > +	if (IS_ERR(keypad->board)) {
+> > > +		dev_err(&pdev->dev, "invalid keypad platform data\n");
+> > > +		return PTR_ERR(keypad->board);
+> > > +	}
+> > > +
+> > >  	input = input_allocate_device();
+> > >  	if (!keypad || !input) {
+> > >  		dev_err(&pdev->dev, "failed to allocate keypad memory\n");
+> 
+> You slid of prasing right in between memory allocation and checking if
+> it succeeded, so there is a potential oops and memory leak now.
+> 
+> I want to commit the version of the patch below, holler if you disagree.
+> Note that I reverted much of plat -> board renames to keep the patch
+> small.
 
-> #address-cells and #size-cells of &nand below is <1> each, so above
-> should be 32b values. If it would be 64b it would have to be split
-> into two 32b values anyway.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Yes, you are right. I have to change it.
-
-> As said above, I doubt Dove NFC is fully compatible with Armada 370 NFC.
-> Ezequiel can tell for sure, as he probably knows Marvell NFC best.
-
-I am not sure, that's why I am asking for help. Looking at 
-Specification, they seem to be similar enough. Ezequiel told me that 
-pxa3xx-nand driver should be more or less compatible (using
-"marvell,armada370-nand" string for the compatible property).
-
->
-> There is a clock gate for NFC, check Dove FS, Clock Gating Control
-> register, bit 10. Above should be:
->
->     clocks = <&gate_clk 10>;
-
-As always, you found it. After changing it :
-
-root at debug:~# flash_eraseall /dev/mtd0
-flash_eraseall has been replaced by `flash_erase <mtddev> 0 0`; please 
-use it
-Erasing 128 Kibyte @ 1fee0000 -- 99 % complete flash_erase: Skipping bad 
-block at 1ff00000
-flash_erase: Skipping bad block at 1ff20000
-flash_erase: Skipping bad block at 1ff40000
-flash_erase: Skipping bad block at 1ff60000
-flash_erase: Skipping bad block at 1ff80000
-flash_erase: Skipping bad block at 1ffa0000
-flash_erase: Skipping bad block at 1ffc0000
-flash_erase: Skipping bad block at 1ffe0000
-Erasing 128 Kibyte @ 1ffe0000 -- 100 % complete
-
-
-
-root at debug:~# nandwrite -p /dev/mtd0 /uImage
-Writing data to block 0 at offset 0x0
-Writing data to block 1 at offset 0x20000
-Writing data to block 2 at offset 0x40000
-Writing data to block 3 at offset 0x60000
-Writing data to block 4 at offset 0x80000
-Writing data to block 5 at offset 0xa0000
-Writing data to block 6 at offset 0xc0000
-Writing data to block 7 at offset 0xe0000
-Writing data to block 8 at offset 0x100000
-Writing data to block 9 at offset 0x120000
-Writing data to block 10 at offset 0x140000
-Writing data to block 11 at offset 0x160000
-Writing data to block 12 at offset 0x180000
-Writing data to block 13 at offset 0x1a0000
-Writing data to block 14 at offset 0x1c0000
-Writing data to block 15 at offset 0x1e0000
-Writing data to block 16 at offset 0x200000
-Writing data to block 17 at offset 0x220000
-Writing data to block 18 at offset 0x240000
-Writing data to block 19 at offset 0x260000
-Writing data to block 20 at offset 0x280000
-Writing data to block 21 at offset 0x2a0000
-Writing data to block 22 at offset 0x2c0000
-Writing data to block 23 at offset 0x2e0000
-Writing data to block 24 at offset 0x300000
-Writing data to block 25 at offset 0x320000
-Writing data to block 26 at offset 0x340000
-Writing data to block 27 at offset 0x360000
-root at debug:~#
-
-CM-A510>> nboot 200000 nand0 0
-no partition number specified
-
-Loading from nand0, offset 0x0
-Bad block table found at page 262080, version 0x01
-Bad block table found at page 262016, version 0x01
-    Image Name:   Linux kernel
-    Created:      2015-03-30   6:41:19 UTC
-    Image Type:   ARM Linux Kernel Image (uncompressed)
-    Data Size:    3637235 Bytes =  3.5 MB
-    Load Address: 00008000
-    Entry Point:  00008000
-CM-A510>> bootm
-## Booting kernel from Legacy Image at 00200000 ...
-    Image Name:   Linux kernel
-    Created:      2015-03-30   6:41:19 UTC
-    Image Type:   ARM Linux Kernel Image (uncompressed)
-    Data Size:    3637235 Bytes =  3.5 MB
-    Load Address: 00008000
-    Entry Point:  00008000
-    Verifying Checksum ... OK
-    Loading Kernel Image ... OK
-OK
-
-Starting kernel ...
-
-Booting Linux on physical CPU 0x0
-...
-
-
-
-> On 30/03/15 01:34, Ezequiel Garcia wrote:
->> Maybe a silly question, but does your bootloader initializes the
->> controller? Are you able to read/write/erase using it?
->>
->> The current pxa3xx-nand driver relies on that for Armada370/XP, as
->> timing setup is not properly handled.
-
-Ezequiel,
-
-Yes, it initializes the controller.
-
-
-Gabriel Dobato
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
