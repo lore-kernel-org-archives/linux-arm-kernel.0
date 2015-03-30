@@ -1,40 +1,60 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 30 Mar 2015 19:31:42 -0400
-Subject: ARM, earlyconsole and io mapping
-In-Reply-To: <87iodivgfm.fsf@free.fr>
-References: <87iodivgfm.fsf@free.fr>
-Message-ID: <5519DCDE.4010406@hurleysoftware.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 31 Mar 2015 08:37:51 +0900
+Subject: [PATCH 1/2] drivers/rtc/rtc-s3c.c: Integrate Exynos3250 into
+ S3C6410
+In-Reply-To: <1427728773-29065-2-git-send-email-k.kozlowski@samsung.com>
+References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
+ <1427728773-29065-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5519DE4F.3080608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On 03/30/2015 08:05 AM, Robert Jarzmik wrote:
-> Hi,
+On 03/31/2015 12:19 AM, Krzysztof Kozlowski wrote:
+> There are now no differences between RTC on Exynos3250 and S3C6410.
+> Merge everything into one so duplicated code could be removed.
 > 
-> I was wondering how the earlyconsole was supposed to work in order to add
-> support to the pxa architecture. More specifically, I don't understand how the
-> memory mapping is supposed to be available at the early parameters parsing.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/rtc/rtc-s3c.c | 14 +-------------
+>  1 file changed, 1 insertion(+), 13 deletions(-)
 > 
-> The thing I don't understand is that :
->  - in kernel initialization, parse_early_param() is called before
->    machine_desc->map_io()
->  - as a consequence, the architecture didn't add the vm early mapping for serial
->    peripheral (which is added in pxa_map_io())
->  - as a consequence, earlycon_map() will fail to map the serial MMIO
->    (as in stack showed in [1])
+> diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+> index fb0c569765c6..5e162eaad277 100644
+> --- a/drivers/rtc/rtc-s3c.c
+> +++ b/drivers/rtc/rtc-s3c.c
+> @@ -774,18 +774,6 @@ static struct s3c_rtc_data const s3c6410_rtc_data = {
+>  	.disable		= s3c6410_rtc_disable,
+>  };
+>  
+> -static struct s3c_rtc_data const exynos3250_rtc_data = {
+> -	.max_user_freq		= 32768,
+> -	.needs_src_clk		= true,
+> -	.irq_handler		= s3c6410_rtc_irq,
+> -	.set_freq		= s3c6410_rtc_setfreq,
+> -	.enable_tick		= s3c6410_rtc_enable_tick,
+> -	.save_tick_cnt		= s3c6410_rtc_save_tick_cnt,
+> -	.restore_tick_cnt	= s3c6410_rtc_restore_tick_cnt,
+> -	.enable			= s3c24xx_rtc_enable,
+> -	.disable		= s3c6410_rtc_disable,
+> -};
+> -
+>  static const struct of_device_id s3c_rtc_dt_match[] = {
+>  	{
+>  		.compatible = "samsung,s3c2410-rtc",
+> @@ -801,7 +789,7 @@ static const struct of_device_id s3c_rtc_dt_match[] = {
+>  		.data = (void *)&s3c6410_rtc_data,
+>  	}, {
+>  		.compatible = "samsung,exynos3250-rtc",
+> -		.data = (void *)&exynos3250_rtc_data,
+> +		.data = (void *)&s3c6410_rtc_data,
+>  	},
+>  	{ /* sentinel */ },
+>  };
 > 
-> Therefore, are there non-DT earlycon users on the list, and could they tell me
-> what way they get earlycon support in their arm boards please ?
 
-Fixmap support has not been upstreamed yet, but if you're desperate, here's
-the latest patch version:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318372.html
+Looks good to me.
 
+Reviewd-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-If you're using /chosen/stdout-path, earlycon gets turned off at dummy
-VT console load, so for right now, specify your earlycon and consoles on the
-command line.
-
-Regards,
-Peter Hurley
+Thanks,
+Chanwoo Choi
