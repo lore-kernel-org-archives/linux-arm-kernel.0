@@ -1,31 +1,53 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 30 Mar 2015 11:49:44 -0500
-Subject: [patch v11 00/23] Introduce ACPI for ARM64 based on ACPI 5.1
-In-Reply-To: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
-References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55197EA8.1000807@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 30 Mar 2015 22:23:35 +0530
+Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
+In-Reply-To: <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
+References: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
+ <20150330121146.GG24899@n2100.arm.linux.org.uk>
+ <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
+Message-ID: <20150330165335.GF7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2015 09:02 AM, Hanjun Guo wrote:
-> Some fixes since last version:
->
->   - Add a patch 19/23 for disabling ACPI for Xen on ARM64 for now to fix
->     compile errors on XEN ACPI, Stefano and Julien are ok with this
->     temporary solution.
->   - Add patch "ARM64 / ACPI: Don't unflatten device tree if acpi=force
->     is passed", which will fix the problem that the device tree will
->     be unflattened even if acpi=force passed, that will not obey the
->     policy.
->   - update patch "irqchip: Add GICv2 specific ACPI boot support",
->     which will cause compile error on i386 with both DT and ACPI
->     enabled:
-
-All 23 patches:
-
-Tested-by: Timur Tabi <timur@codeaurora.org>
+On Mon, Mar 30, 2015 at 06:04:06PM +0300, Dmitry Eremin-Solenikov wrote:
+> Hello,
+> 
+> 2015-03-30 15:11 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > On Mon, Mar 30, 2015 at 12:41:50PM +0300, Dmitry Eremin-Solenikov wrote:
+> >> Fix the following warning by initializing directions field in the dma_device
+> >> structure.
+> >>
+> >> ------------[ cut here ]------------
+> >> WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
+> >> this driver doesn't support generic slave capabilities reporting
+> >> Modules linked in:
+> >> CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
+> >> Hardware name: Sharp-Collie
+> >> [<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
+> >> [<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
+> >> [<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
+> >> [<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
+> >> [<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
+> >> [<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
+> >> [<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
+> >> [<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
+> >> [<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
+> >> [<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
+> >> [<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
+> >> [<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
+> >> [<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
+> >> [<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
+> >> [<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
+> >> ---[ end trace e188b8fe0e782e75 ]---
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >
+> > It's an improvement, but I wonder whether src_addr_widths, dst_addr_widths
+> > and residue_granularity should also be filled in.
+> 
+> Nice catch. Missed that. I'll send a v2 tomorrow.
+Yes that is the recommendation. I am pushing back on patches without all 4
+fields filled in :)
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+~Vinod
