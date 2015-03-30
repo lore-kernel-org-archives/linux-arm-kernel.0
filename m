@@ -1,28 +1,29 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard)
-Date: Mon, 30 Mar 2015 14:50:34 -0700
-Subject: [PATCH 0/3] ARM: sun9i: Add support for PRCM on Allwinner
- A80 SoC
-In-Reply-To: <2015033017191699787718@allwinnertech.com>
-References: <1425349320-2754-1-git-send-email-wens@csie.org>
- <20150308173225.GK5085@lukather>
- <201503100902208865029@allwinnertech.com>
- <20150310201800.GA5085@lukather>
- <2015033017191699787718@allwinnertech.com>
-Message-ID: <20150330215034.GT23664@lukather>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Mar 2015 15:12:58 -0700
+Subject: [PATCH 0/3] ARM: sun8i: Add SMP and arch-timer support for A23
+In-Reply-To: <1426649042-30547-1-git-send-email-wens@csie.org>
+References: <1426649042-30547-1-git-send-email-wens@csie.org>
+Message-ID: <20150330221258.GA21316@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Mon, Mar 30, 2015 at 05:19:17PM +0800, kevin at allwinnertech.com wrote:
-> Hi, Maxime,
+On Wed, Mar 18, 2015 at 11:23:59AM +0800, Chen-Yu Tsai wrote:
+> Hi Maxime,
 > 
-> We have add the PRCM module description to the A80 document.
-> You can download it from the github: https://github.com/allwinner-zh/documents
+> This series adds support for SMP and arch-timer for the
+> A23. This follows our discussion from yesterday about
+> getting arch-timer support for sun8i and sun9i. I will
+> post a separate patch for sun9i-a80.
+> 
+> I know some people would like to see arch-timer and SMP
+> supported with PSCI, but work on this has been slow. So
+> in the mean time, I thought I'd just post what SMP code
+> I have.
+> 
+> Feel free to just merge the first patch if you think SMP
+> can wait.
 
-Awesome, thanks a lot.
-
-We'll look into it.
+Merged 2 and 3, thanks!
 
 Maxime
 
@@ -36,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/245c3aab/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/72d901da/attachment-0001.sig>
