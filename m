@@ -1,106 +1,154 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 30 Mar 2015 14:13:40 -0600
-Subject: [PATCH 7/8] coresight-tmc: Adding a status interface to sysfs
+Date: Mon, 30 Mar 2015 14:13:41 -0600
+Subject: [PATCH 8/8] coresight: moving to new "hwtracing" directory
 In-Reply-To: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1427746421-31360-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1427746421-31360-8-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1427746421-31360-9-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Knowing the state of various control register is always
-useful for degging and tuning.  As such add an entry in
-sysfs that expose to userspace the most important registers.
+Keeping drivers related to HW tracing on ARM, i.e coresight,
+under "drivers/coresight" doesn't make sense when other
+architectures start rolling out technologies of the same
+nature.
+
+As such creating a new "drivers/hwtracing" directory where all
+drivers of the same kind can reside, reducing namespace
+pollution under "drivers/".
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/coresight/coresight-tmc.c | 56 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ MAINTAINERS                                              | 2 +-
+ arch/arm/Kconfig.debug                                   | 2 +-
+ arch/arm64/Kconfig.debug                                 | 2 +-
+ drivers/Makefile                                         | 2 +-
+ drivers/{ => hwtracing}/coresight/Kconfig                | 0
+ drivers/{ => hwtracing}/coresight/Makefile               | 0
+ drivers/{ => hwtracing}/coresight/coresight-etb10.c      | 0
+ drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c   | 0
+ drivers/{ => hwtracing}/coresight/coresight-etm.h        | 0
+ drivers/{ => hwtracing}/coresight/coresight-etm3x.c      | 0
+ drivers/{ => hwtracing}/coresight/coresight-funnel.c     | 0
+ drivers/{ => hwtracing}/coresight/coresight-priv.h       | 0
+ drivers/{ => hwtracing}/coresight/coresight-replicator.c | 0
+ drivers/{ => hwtracing}/coresight/coresight-tmc.c        | 0
+ drivers/{ => hwtracing}/coresight/coresight-tpiu.c       | 0
+ drivers/{ => hwtracing}/coresight/coresight.c            | 0
+ drivers/{ => hwtracing}/coresight/of_coresight.c         | 0
+ 17 files changed, 4 insertions(+), 4 deletions(-)
+ rename drivers/{ => hwtracing}/coresight/Kconfig (100%)
+ rename drivers/{ => hwtracing}/coresight/Makefile (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-etb10.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-etm-cp14.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-etm.h (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-etm3x.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-funnel.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-priv.h (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-replicator.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-tmc.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight-tpiu.c (100%)
+ rename drivers/{ => hwtracing}/coresight/coresight.c (100%)
+ rename drivers/{ => hwtracing}/coresight/of_coresight.c (100%)
 
-diff --git a/drivers/coresight/coresight-tmc.c b/drivers/coresight/coresight-tmc.c
-index 030e097c4fb2..7147f3dd363c 100644
---- a/drivers/coresight/coresight-tmc.c
-+++ b/drivers/coresight/coresight-tmc.c
-@@ -565,6 +565,59 @@ static const struct file_operations tmc_fops = {
- 	.llseek		= no_llseek,
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1de6afa8ee51..4bcaaf950cb9 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -953,7 +953,7 @@ ARM/CORESIGHT FRAMEWORK AND DRIVERS
+ M:	Mathieu Poirier <mathieu.poirier@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+-F:	drivers/coresight/*
++F:	drivers/hwtracing/coresight/*
+ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 8d14ad4e1db0..8b0183a9a300 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1610,6 +1610,6 @@ config DEBUG_SET_MODULE_RONX
+ 	  against certain classes of kernel exploits.
+ 	  If in doubt, say "N".
  
-+static ssize_t status_show(struct device *dev,
-+			   struct device_attribute *attr, char *buf)
-+{
-+	int ret;
-+	unsigned long flags;
-+	u32 tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg;
-+	u32 tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr;
-+	u32 devid;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(dev->parent);
-+
-+	ret = clk_prepare_enable(drvdata->clk);
-+	if (ret)
-+		goto out;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+	CS_UNLOCK(drvdata->base);
-+
-+	tmc_rsz = readl_relaxed(drvdata->base + TMC_RSZ);
-+	tmc_sts = readl_relaxed(drvdata->base + TMC_STS);
-+	tmc_rrp = readl_relaxed(drvdata->base + TMC_RRP);
-+	tmc_rwp = readl_relaxed(drvdata->base + TMC_RWP);
-+	tmc_trg = readl_relaxed(drvdata->base + TMC_TRG);
-+	tmc_ctl = readl_relaxed(drvdata->base + TMC_CTL);
-+	tmc_ffsr = readl_relaxed(drvdata->base + TMC_FFSR);
-+	tmc_ffcr = readl_relaxed(drvdata->base + TMC_FFCR);
-+	tmc_mode = readl_relaxed(drvdata->base + TMC_MODE);
-+	tmc_pscr = readl_relaxed(drvdata->base + TMC_PSCR);
-+	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
-+
-+	CS_LOCK(drvdata->base);
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-+
-+	clk_disable_unprepare(drvdata->clk);
-+
-+	return sprintf(buf,
-+		       "Depth:\t\t0x%x\n"
-+		       "Status:\t\t0x%x\n"
-+		       "RAM read ptr:\t0x%x\n"
-+		       "RAM wrt ptr:\t0x%x\n"
-+		       "Trigger cnt:\t0x%x\n"
-+		       "Control:\t0x%x\n"
-+		       "Flush status:\t0x%x\n"
-+		       "Flush ctrl:\t0x%x\n"
-+		       "Mode:\t\t0x%x\n"
-+		       "PSRC:\t\t0x%x\n"
-+		       "DEVID:\t\t0x%x\n",
-+			tmc_rsz, tmc_sts, tmc_rrp, tmc_rwp, tmc_trg,
-+			tmc_ctl, tmc_ffsr, tmc_ffcr, tmc_mode, tmc_pscr, devid);
-+out:
-+	return -EINVAL;
-+}
-+static DEVICE_ATTR_RO(status);
-+
- static ssize_t trigger_cntr_show(struct device *dev,
- 			    struct device_attribute *attr, char *buf)
- {
-@@ -593,18 +646,21 @@ static DEVICE_ATTR_RW(trigger_cntr);
+-source "drivers/coresight/Kconfig"
++source "drivers/hwtracing/coresight/Kconfig"
  
- static struct attribute *coresight_etb_attrs[] = {
- 	&dev_attr_trigger_cntr.attr,
-+	&dev_attr_status.attr,
- 	NULL,
- };
- ATTRIBUTE_GROUPS(coresight_etb);
+ endmenu
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 5b2ffd8e6cdb..d6285ef9b5f9 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -89,6 +89,6 @@ config DEBUG_ALIGN_RODATA
  
- static struct attribute *coresight_etr_attrs[] = {
- 	&dev_attr_trigger_cntr.attr,
-+	&dev_attr_status.attr,
- 	NULL,
- };
- ATTRIBUTE_GROUPS(coresight_etr);
+ 	  If in doubt, say N
  
- static struct attribute *coresight_etf_attrs[] = {
- 	&dev_attr_trigger_cntr.attr,
-+	&dev_attr_status.attr,
- 	NULL,
- };
- ATTRIBUTE_GROUPS(coresight_etf);
+-source "drivers/coresight/Kconfig"
++source "drivers/hwtracing/coresight/Kconfig"
+ 
+ endmenu
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 527a6da8d539..46d2554be404 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -163,5 +163,5 @@ obj-$(CONFIG_POWERCAP)		+= powercap/
+ obj-$(CONFIG_MCB)		+= mcb/
+ obj-$(CONFIG_RAS)		+= ras/
+ obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
+-obj-$(CONFIG_CORESIGHT)		+= coresight/
++obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
+ obj-$(CONFIG_ANDROID)		+= android/
+diff --git a/drivers/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+similarity index 100%
+rename from drivers/coresight/Kconfig
+rename to drivers/hwtracing/coresight/Kconfig
+diff --git a/drivers/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+similarity index 100%
+rename from drivers/coresight/Makefile
+rename to drivers/hwtracing/coresight/Makefile
+diff --git a/drivers/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+similarity index 100%
+rename from drivers/coresight/coresight-etb10.c
+rename to drivers/hwtracing/coresight/coresight-etb10.c
+diff --git a/drivers/coresight/coresight-etm-cp14.c b/drivers/hwtracing/coresight/coresight-etm-cp14.c
+similarity index 100%
+rename from drivers/coresight/coresight-etm-cp14.c
+rename to drivers/hwtracing/coresight/coresight-etm-cp14.c
+diff --git a/drivers/coresight/coresight-etm.h b/drivers/hwtracing/coresight/coresight-etm.h
+similarity index 100%
+rename from drivers/coresight/coresight-etm.h
+rename to drivers/hwtracing/coresight/coresight-etm.h
+diff --git a/drivers/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+similarity index 100%
+rename from drivers/coresight/coresight-etm3x.c
+rename to drivers/hwtracing/coresight/coresight-etm3x.c
+diff --git a/drivers/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
+similarity index 100%
+rename from drivers/coresight/coresight-funnel.c
+rename to drivers/hwtracing/coresight/coresight-funnel.c
+diff --git a/drivers/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+similarity index 100%
+rename from drivers/coresight/coresight-priv.h
+rename to drivers/hwtracing/coresight/coresight-priv.h
+diff --git a/drivers/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+similarity index 100%
+rename from drivers/coresight/coresight-replicator.c
+rename to drivers/hwtracing/coresight/coresight-replicator.c
+diff --git a/drivers/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+similarity index 100%
+rename from drivers/coresight/coresight-tmc.c
+rename to drivers/hwtracing/coresight/coresight-tmc.c
+diff --git a/drivers/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+similarity index 100%
+rename from drivers/coresight/coresight-tpiu.c
+rename to drivers/hwtracing/coresight/coresight-tpiu.c
+diff --git a/drivers/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+similarity index 100%
+rename from drivers/coresight/coresight.c
+rename to drivers/hwtracing/coresight/coresight.c
+diff --git a/drivers/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+similarity index 100%
+rename from drivers/coresight/of_coresight.c
+rename to drivers/hwtracing/coresight/of_coresight.c
 -- 
 1.9.1
