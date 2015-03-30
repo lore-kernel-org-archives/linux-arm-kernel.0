@@ -1,63 +1,40 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 30 Mar 2015 20:40:21 +0100
-Subject: [PATCH RFC 05/11] drm: bridge/dw_hdmi: introduce interface to setting
- sample rate
-In-Reply-To: <20150330193911.GM24899@n2100.arm.linux.org.uk>
-References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YcfXp-0002ux-PC@rmk-PC.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 30 Mar 2015 21:40:37 +0200
+Subject: [PATCH] ASoC: atmel-pcm-dma: increase buffer_bytes_max
+Message-ID: <1427744437-14610-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce dw_hdmi_set_sample_rate(), which allows us to configure the
-audio sample rate, setting the CTS/N values appropriately.
+atmel-pcm-dma is not limited to a buffer size of 64kB like atmel-pcm-pdc.
+Increase buffer_bytes_max to 512kB to allow for higher bit rates (i.e. 32bps at
+192kHz) to work correctly. By default, keep the prealloc at 64kB.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 10 ++++++++++
- include/drm/bridge/dw_hdmi.h     |  5 +++++
- 2 files changed, 15 insertions(+)
+ sound/soc/atmel/atmel-pcm-dma.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 06b5583140a8..245d17e58dec 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -366,6 +366,16 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
- 	mutex_unlock(&hdmi->audio_mutex);
- }
+diff --git a/sound/soc/atmel/atmel-pcm-dma.c b/sound/soc/atmel/atmel-pcm-dma.c
+index b8e7bad05eb1..b6625c8c411b 100644
+--- a/sound/soc/atmel/atmel-pcm-dma.c
++++ b/sound/soc/atmel/atmel-pcm-dma.c
+@@ -54,7 +54,7 @@ static const struct snd_pcm_hardware atmel_pcm_dma_hardware = {
+ 	.period_bytes_max	= 2 * 0xffff,	/* if 2 bytes format */
+ 	.periods_min		= 8,
+ 	.periods_max		= 1024,		/* no limit */
+-	.buffer_bytes_max	= ATMEL_SSC_DMABUF_SIZE,
++	.buffer_bytes_max	= 512 * 1024,
+ };
  
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
-+{
-+	mutex_lock(&hdmi->audio_mutex);
-+	hdmi->sample_rate = rate;
-+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
-+				 hdmi->sample_rate, hdmi->ratio);
-+	mutex_unlock(&hdmi->audio_mutex);
-+}
-+EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
-+
- /*
-  * this submodule is responsible for the video data synchronization.
-  * for example, for RGB 4:4:4 input, the data map is defined as
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index 5a4f49005169..424b51f6a215 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -12,6 +12,8 @@
+ /**
+@@ -119,7 +119,7 @@ static int atmel_pcm_configure_dma(struct snd_pcm_substream *substream,
+ static const struct snd_dmaengine_pcm_config atmel_dmaengine_pcm_config = {
+ 	.prepare_slave_config = atmel_pcm_configure_dma,
+ 	.pcm_hardware = &atmel_pcm_dma_hardware,
+-	.prealloc_buffer_size = ATMEL_SSC_DMABUF_SIZE,
++	.prealloc_buffer_size = 64 * 1024,
+ };
  
- #include <drm/drmP.h>
- 
-+struct dw_hdmi;
-+
- enum {
- 	DW_HDMI_RES_8,
- 	DW_HDMI_RES_10,
-@@ -58,4 +60,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		 void *data, struct drm_encoder *encoder,
- 		 struct resource *iores, int irq,
- 		 const struct dw_hdmi_plat_data *plat_data);
-+
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
-+
- #endif /* __IMX_HDMI_H__ */
+ int atmel_pcm_dma_platform_register(struct device *dev)
 -- 
-1.8.3.1
+2.1.0
