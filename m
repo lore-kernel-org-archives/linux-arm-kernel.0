@@ -1,55 +1,51 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Mar 2015 11:58:20 +0200
-Subject: [PATCH] pinctrl: fsl: imx: Check for 0 config register
-In-Reply-To: <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
-References: <1427210778-28037-1-git-send-email-mpa@pengutronix.de>
- <139dc298c0914b3536445dddd37be286@agner.ch>
- <CACRpkdZ5UqTCHqXjBF5JWjmzHkbh2vwdDvTtn+UOkmrcmKxf9A@mail.gmail.com>
-Message-ID: <20150330095820.GD17728@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Mar 2015 10:59:30 +0100
+Subject: [RESEND PATCH] arm64: dts: add interrupt-affinity property to pmu
+ node for juno
+Message-ID: <1427709570-15891-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 11:40:47AM +0200, Linus Walleij wrote:
-> On Fri, Mar 27, 2015 at 11:32 AM, Stefan Agner <stefan@agner.ch> wrote:
-> > On 2015-03-24 16:26, Markus Pargmann wrote:
-> 
-> >> 0 is used in all pinfunction definitions when a config register is not
-> >> available, for example imx25-pinfunc.h. If a configuration value is used
-> >> for such a pinfunction the driver will always write it to the
-> >> configuration register if it is not -1. For a 0 configuration register
-> >> the configuration value is written to offset 0x0. This can lead to a
-> >> crashing/hanging system without any warning message.
-> >
-> > 0 is a valid offset for Vybrid's mux register, however, since Vybrid set
-> > the SHARE_MUX_CONF_REG, intepreting a 0 in conf_reg as "not set"
-> > actually works.
-> >
-> > What is a bit a bummer is that we now have different meanings of 0,
-> > depending on the field:
-> > - For the first field (mux), 0 is a valid offset
-> > - For the second field (config), 0 means not valid
-> 
-> What is generally scary about DTS files is that the DT formats
-> are not ruled by a context-free grammar.
-> 
-> There were attempts to formalize some bindings using BNF
-> but they seems to have been given up.
-> 
-> We need to combat this by trying to be strict and logic ...
-> I can't really understand from the discussion here whether
-> the patch should be applied or not, so I'm not applying it
-> until Stefan | Uwe gives an explicit ACK.
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Make the Juno .dts robust against potential reordering of the CPU nodes
+by adding an explicit interrupt-affinity property to the PMU node. While
+we're at it, fix the PMU interrupts numbers too.
 
-I just have a small bad feeling because -1 and 0 both mean "no config
-register". But that is a problem already there without Markus' patch.
-And I see that this patch really fixes a problem. As Stefan sait it
-should be fine for Vybrid I think applying it is the right thing to do
-here.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-Best regards
-Uwe
+Resending, as requested. Please apply for 4.1.
 
+ arch/arm64/boot/dts/arm/juno.dts | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index 133ee59de2d7..5e9110a3353d 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -120,12 +120,18 @@
+ 
+ 	pmu {
+ 		compatible = "arm,armv8-pmuv3";
+-		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
++			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A57_0>,
++				     <&A57_1>,
++				     <&A53_0>,
++				     <&A53_1>,
++				     <&A53_2>,
++				     <&A53_3>;
+ 	};
+ 
+ 	/include/ "juno-clocks.dtsi"
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.4
