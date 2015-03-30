@@ -1,38 +1,40 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 30 Mar 2015 22:58:49 +0100
-Subject: [PATCH v4 10/10] eeprom: Add to MAINTAINERS for eeprom framework
-In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427752729-17474-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 31 Mar 2015 00:59:41 +0300
+Subject: [PATCH 2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+In-Reply-To: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+Message-ID: <8163383.0UU0Q5gsLE@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MAINTAINERS to eeprom framework.
+Define the generic R8A7790 part of the EtherAVB device node. 
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 358eb01..7094bb0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3721,6 +3721,15 @@ T:	git git://git.alsa-project.org/alsa-kernel.git
- S:	Maintained
- F:	sound/usb/misc/ua101.c
+Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
++++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+@@ -626,6 +626,16 @@
+ 		status = "disabled";
+ 	};
  
-+EEPROM FRAMEWORK
-+M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+S:	Maintained
-+F:	drivers/eeprom/
-+F:	Documentation/devicetree/bindings/eeprom/
-+F:	include/linux/eeprom-provider.h
-+F:	include/linux/eeprom-consumer.h
++	avb: ethernet at e6800000 {
++		compatible = "renesas,ravb-r8a7790";
++		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
- EXTENSIBLE FIRMWARE INTERFACE (EFI)
- M:	Matt Fleming <matt.fleming@intel.com>
- L:	linux-efi at vger.kernel.org
--- 
-1.9.1
+ 	sata0: sata at ee300000 {
+ 		compatible = "renesas,sata-r8a7790";
+ 		reg = <0 0xee300000 0 0x2000>;
