@@ -1,39 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Mar 2015 11:58:29 +0100
-Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
- device ID string
-In-Reply-To: <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
-References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
- <20150330103659.GD17971@leverpostej>
- <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
-Message-ID: <20150330105828.GE17971@leverpostej>
+From: maninder1.s@samsung.com (Maninder Singh)
+Date: Mon, 30 Mar 2015 11:16:04 +0000 (GMT)
+Subject: [ARM: code clean up local_irq_disable]
+Message-ID: <1161463623.92611427714164373.JavaMail.weblogic@epmlwas01c>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
-> >> Device vendors often assign IDs to their devices to allow comparing
-> >> firmware image with device model. This is required to prevent users
-> >> from flashing incompatible image and soft-bricking device.
-> >> Add device_id property to DTs to allow user space (and optionally
-> >> bootloader) verifying firmware images.
-> >
-> > This sounds like exactly what the "model" property is meant to be (per
-> > ePAPR) -- a string that specifices the manufacturer's model number of
-> > the device, ideally in "manufacturer,model" format.
-> 
-> What if manufacturer decided to use some totally unfriendly ID for
-> their low-level (firmware upgrade) model identification? I can't
-> really see us using
-> model = "U12H245T00_NETGEAR"
-> which would mean nothing compared to the current friendly:
-> model = "Netgear R6250 V1 (BCM4708)"
+Hi
 
-If it uniquely identifies the model, it's fit to be a model string. If
-being "friendly" means that we lose that, then the property is useless
-anyway.
+Subject: [PATCH] ARM: code clean up local_irq_disable
 
-Note that both examples above deviate from the recommended format, and
-something like: "netgear,U12H245T00" would better align with the
-recommendation.
+Signed-off-by: Akhilesh Kumar <akhilesh.k@samsung.com>
+---
+ arch/arm/kernel/process.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 81ef686..18cfce4 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -195,7 +195,6 @@ void machine_halt(void)
+  local_irq_disable();
+  smp_send_stop();
+ 
+- local_irq_disable();
+  while (1);
+ }
+ 
+-- 
+1.7.1
 
-Mark.
+Thanks and Regards,
+Maninder Singh
