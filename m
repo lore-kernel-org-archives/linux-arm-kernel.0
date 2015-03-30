@@ -1,119 +1,103 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 30 Mar 2015 13:06:12 +0100
-Subject: [PATCH] ARM: force linker to use PIC veneers
-In-Reply-To: <CAKv+Gu8Wr7MY6ogMjNFBDU=GMgYrFga7CD5-kf2msSH5vk+ubQ@mail.gmail.com>
-References: <CAKv+Gu9NeqOTjUux9S7p5o89T1tc9ACraC0D53Y=CCTNzZXKMg@mail.gmail.com>
- <20150325104603.GA3560@e103592.cambridge.arm.com>
- <20150326113648.GC8656@n2100.arm.linux.org.uk>
- <CAKv+Gu8ktOUcQrGOwMfbt8s2QG+RFdnKBykVfhXPTLSUFtWQyA@mail.gmail.com>
- <20150326122203.GG8656@n2100.arm.linux.org.uk>
- <CAKv+Gu-ctXuiM2mcgbqfkBkP_96tivjac0jv+XJ48XSpqRf=Yg@mail.gmail.com>
- <20150326125334.GA27016@e103592.cambridge.arm.com>
- <CAKv+Gu9CDnFSiRrntzTDZDFhb3Cq1M-Dt_xKxvNUszZJpSrzpg@mail.gmail.com>
- <20150326131913.GA6140@e103592.cambridge.arm.com>
- <CAKv+Gu8Wr7MY6ogMjNFBDU=GMgYrFga7CD5-kf2msSH5vk+ubQ@mail.gmail.com>
-Message-ID: <20150330120612.GB22336@e103592.cambridge.arm.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 30 Mar 2015 13:06:57 +0100
+Subject: [PATCH] ARM: dts: hummingboard: add sgtl5000 support for Hummingboard
+ Pro
+Message-ID: <E1YcYT3-0006rE-3F@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 12:01:03AM +0000, Ard Biesheuvel wrote:
-> On 26 March 2015 at 14:19, Dave P Martin <Dave.Martin@arm.com> wrote:
-> > On Thu, Mar 26, 2015 at 01:05:09PM +0000, Ard Biesheuvel wrote:
-> >> On 26 March 2015 at 13:53, Dave P Martin <Dave.Martin@arm.com> wrote:
+Add the DT description for the SGTL5000 found on the Hummingboard Pro
+model.
 
-[...]
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Now that a fix for the SGTL5000 power problems has been merged, this can
+be queued for the next merge window.
 
-> > THUMB2_KERNEL generates a kernel which is very nearly 100% Thumb
-> > code, so BX should be very rare when veneers are not involved.
-> >
-> >> > Ard, can you should build a couple of !THUMB2_KERNEL/pre-v5
-> >> > configurations with your change and check, just to be sure?
-> >> >
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 43 +++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-[...]
-
-> ARM kernel with --pic-veneer:
-> =============================
-> $ readelf -A vmlinux
-> Attribute Section: aeabi
-> File Attributes
->   Tag_CPU_name: "4T"
->   Tag_CPU_arch: v4T
->   Tag_ARM_ISA_use: Yes
->   Tag_THUMB_ISA_use: Thumb-1
->   [...]
-> 
-> $ size vmlinux
->    text   data    bss    dec    hex filename
-> 38287123 13496224 9589540 61372887 3a879d7 vmlinux
-> 
-> $ grep -c veneer System.map
-> 493
-> 
-> Veneers look like this:
-> 
-> c247d53c <__sys_write_veneer>:
-> c247d53c:       e59fc000        ldr     ip, [pc]
-> c247d540:       e08ff00c        add     pc, pc, ip
-> c247d544:       fdd3aa8c        .word   0xfdd3aa8c
-> 
-> c247d548 <__init_rt_rq_veneer>:
-> c247d548:       e59fc000        ldr     ip, [pc]
-> c247d54c:       e08ff00c        add     pc, pc, ip
-> c247d550:       fdbf9600        .word   0xfdbf9600
-> 
-> c247d554 <__read_boot_clock_veneer>:
-> c247d554:       e59fc000        ldr     ip, [pc]
-> c247d558:       e08ff00c        add     pc, pc, ip
-> c247d55c:       fdb91310        .word   0xfdb91310
-> 
-> Thumb2 kernel with --pic-veneer
-> ===============================
-> Attribute Section: aeabi
-> File Attributes
->   Tag_CPU_name: "7-A"
->   Tag_CPU_arch: v7
->   Tag_CPU_arch_profile: Application
->   Tag_ARM_ISA_use: Yes
->   Tag_THUMB_ISA_use: Thumb-2
->   [...]
-> 
-> $ size vmlinux
->    text   data    bss    dec    hex filename
-> 29353740 13644128 9614052 52611920 322cb50 vmlinux
-> 
-> $ grep -c veneer System.map
-> 1928
-> 
-> Veneers look like this:
-> 
-> c014f9d8 <____down_interruptible_veneer>:
-> c014f9d8:       e59fc004        ldr     ip, [pc, #4]
-> c014f9dc:       e08fc00c        add     ip, pc, ip
-> c014f9e0:       e12fff1c        bx      ip
-> c014f9e4:       0128de45        .word   0x0128de45
-> 
-> c014f9e8 <___raw_write_unlock_veneer>:
-> c014f9e8:       4778            bx      pc
-> c014f9ea:       46c0            nop
-> c014f9ec:       e59fc004        ldr     ip, [pc, #4]
-> c014f9f0:       e08fc00c        add     ip, pc, ip
-> c014f9f4:       e12fff1c        bx      ip
-> c014f9f8:       012901e1        .word   0x012901e1
-> 
-> c014f9fc <____mutex_unlock_slowpath_veneer>:
-> c014f9fc:       e59fc004        ldr     ip, [pc, #4]
-> c014fa00:       e08fc00c        add     ip, pc, ip
-> c014fa04:       e12fff1c        bx      ip
-> c014fa08:       0128d8e1        .word   0x0128d8e1
-> 
-> $ arm-linux-gnueabihf-objdump -d vmlinux |grep -E bx\\s+pc -c
-> 319
-> 
-> This number does not change when adding --use-blx, so there is probably not
-> much point in adding it.
-
-Fair enough -- thanks for checking.
-
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index c0dc5948fa3c..8f86b7092d22 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -88,6 +88,19 @@
+ 		};
+ 	};
+ 
++	sound-sgtl5000 {
++		audio-codec = <&sgtl5000>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		compatible = "fsl,imx-audio-sgtl5000";
++		model = "On-board Codec";
++		mux-ext-port = <5>;
++		mux-int-port = <1>;
++		ssi-controller = <&ssi1>;
++	};
++
+ 	sound-spdif {
+ 		compatible = "fsl,imx-audio-spdif";
+ 		model = "On-board SPDIF";
+@@ -97,6 +110,10 @@
+ 	};
+ };
+ 
++&audmux {
++	status = "okay";
++};
++
+ &can1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_hummingboard_flexcan1>;
+@@ -120,6 +137,17 @@
+ 		compatible = "nxp,pcf8523";
+ 		reg = <0x68>;
+ 	};
++
++	/* Pro baseboard model */
++	sgtl5000: sgtl5000 at 0a {
++		clocks = <&clks 201>;
++		compatible = "fsl,sgtl5000";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_sgtl5000>;
++		reg = <0x0a>;
++		VDDA-supply = <&reg_3p3v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
+ };
+ 
+ &i2c2 {
+@@ -168,6 +196,16 @@
+ 			fsl,pins = <MX6QDL_PAD_DISP0_DAT8__PWM1_OUT 0x1b0b1>;
+ 		};
+ 
++		pinctrl_hummingboard_sgtl5000: hummingboard-sgtl5000 {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD 0x130b0
++				MX6QDL_PAD_KEY_COL0__AUD5_TXC 0x130b0
++				MX6QDL_PAD_KEY_ROW0__AUD5_TXD 0x110b0
++				MX6QDL_PAD_KEY_COL1__AUD5_TXFS 0x130b0
++				MX6QDL_PAD_GPIO_5__CCM_CLKO1 0x130b0
++			>;
++		};
++
+ 		pinctrl_hummingboard_spdif: hummingboard-spdif {
+ 			fsl,pins = <MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x13091>;
+ 		};
+@@ -232,6 +270,11 @@
+ 	status = "okay";
+ };
+ 
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
+ &usbh1 {
+ 	disable-over-current;
+ 	vbus-supply = <&reg_usbh1_vbus>;
+-- 
+1.8.3.1
