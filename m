@@ -1,27 +1,31 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Mar 2015 11:36:16 +0200
-Subject: [RFC PATCH 4/6] crypto: sha256-generic: move to generic glue
+Date: Mon, 30 Mar 2015 11:36:19 +0200
+Subject: [PATCH v2 05/14] crypto: sha256-generic: move to generic glue
  implementation
 In-Reply-To: <1427708184-2353-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1427708184-2353-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1427708184-2353-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1427708184-2353-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This updates the generic SHA-256 implementation to use the
 new shared SHA-256 glue code.
 
+It also implements a .finup hook crypto_sha256_finup() and exports
+it to other modules.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
  crypto/Kconfig          |   1 +
- crypto/sha256_generic.c | 131 +++++++-----------------------------------------
- 2 files changed, 18 insertions(+), 114 deletions(-)
+ crypto/sha256_generic.c | 139 ++++++++++--------------------------------------
+ include/crypto/sha.h    |   3 ++
+ 3 files changed, 31 insertions(+), 112 deletions(-)
 
 diff --git a/crypto/Kconfig b/crypto/Kconfig
-index 551bbf2e2ab5..59243df4ea13 100644
+index 83bc1680391a..72bf5af7240d 100644
 --- a/crypto/Kconfig
 +++ b/crypto/Kconfig
-@@ -608,6 +608,7 @@ config CRYPTO_SHA256_BASE
+@@ -611,6 +611,7 @@ config CRYPTO_SHA256_BASE
  
  config CRYPTO_SHA256
  	tristate "SHA224 and SHA256 digest algorithm"
@@ -30,10 +34,10 @@ index 551bbf2e2ab5..59243df4ea13 100644
  	help
  	  SHA256 secure hash standard (DFIPS 180-2).
 diff --git a/crypto/sha256_generic.c b/crypto/sha256_generic.c
-index b001ff5c2efc..7119346c2f41 100644
+index b001ff5c2efc..d5c18c08b3da 100644
 --- a/crypto/sha256_generic.c
 +++ b/crypto/sha256_generic.c
-@@ -214,136 +214,39 @@ static void sha256_transform(u32 *state, const u8 *input)
+@@ -214,136 +214,50 @@ static void sha256_transform(u32 *state, const u8 *input)
  	memzero_explicit(W, 64 * sizeof(u32));
  }
  
@@ -107,13 +111,13 @@ index b001ff5c2efc..7119346c2f41 100644
 -	memcpy(sctx->buf + partial, src, len - done);
 -
 -	return 0;
-+	return sha256_base_do_update(desc, data, len, sha256_generic_block_fn,
-+				     NULL);
++	return crypto_sha256_base_do_update(desc, data, len,
++					    sha256_generic_block_fn, NULL);
  }
  EXPORT_SYMBOL(crypto_sha256_update);
  
- static int sha256_final(struct shash_desc *desc, u8 *out)
- {
+-static int sha256_final(struct shash_desc *desc, u8 *out)
+-{
 -	struct sha256_state *sctx = shash_desc_ctx(desc);
 -	__be32 *dst = (__be32 *)out;
 -	__be64 bits;
@@ -155,47 +159,71 @@ index b001ff5c2efc..7119346c2f41 100644
 -}
 -
 -static int sha256_export(struct shash_desc *desc, void *out)
--{
++int crypto_sha256_finup(struct shash_desc *desc, const u8 *data,
++			unsigned int len, u8 *hash)
+ {
 -	struct sha256_state *sctx = shash_desc_ctx(desc);
 -
 -	memcpy(out, sctx, sizeof(*sctx));
 -	return 0;
--}
--
++	if (len)
++		crypto_sha256_base_do_update(desc, data, len,
++					     sha256_generic_block_fn, NULL);
++	crypto_sha256_base_do_finalize(desc, sha256_generic_block_fn, NULL);
++	return crypto_sha256_base_finish(desc, hash);
+ }
++EXPORT_SYMBOL(crypto_sha256_finup);
+ 
 -static int sha256_import(struct shash_desc *desc, const void *in)
--{
++static int sha256_final(struct shash_desc *desc, u8 *out)
+ {
 -	struct sha256_state *sctx = shash_desc_ctx(desc);
 -
 -	memcpy(sctx, in, sizeof(*sctx));
 -	return 0;
-+	sha256_base_do_finalize(desc, sha256_generic_block_fn, NULL);
-+	return sha256_base_finish(desc, out);
++	return crypto_sha256_finup(desc, NULL, 0, out);
  }
  
  static struct shash_alg sha256_algs[2] = { {
  	.digestsize	=	SHA256_DIGEST_SIZE,
 -	.init		=	sha256_init,
-+	.init		=	sha256_base_init,
++	.init		=	crypto_sha256_base_init,
  	.update		=	crypto_sha256_update,
  	.final		=	sha256_final,
 -	.export		=	sha256_export,
 -	.import		=	sha256_import,
-+	.export		=	sha256_base_export,
-+	.import		=	sha256_base_import,
++	.finup		=	crypto_sha256_finup,
++	.export		=	crypto_sha256_base_export,
++	.import		=	crypto_sha256_base_import,
  	.descsize	=	sizeof(struct sha256_state),
  	.statesize	=	sizeof(struct sha256_state),
  	.base		=	{
-@@ -355,9 +258,9 @@ static struct shash_alg sha256_algs[2] = { {
+@@ -355,9 +269,10 @@ static struct shash_alg sha256_algs[2] = { {
  	}
  }, {
  	.digestsize	=	SHA224_DIGEST_SIZE,
 -	.init		=	sha224_init,
-+	.init		=	sha224_base_init,
++	.init		=	crypto_sha224_base_init,
  	.update		=	crypto_sha256_update,
 -	.final		=	sha224_final,
 +	.final		=	sha256_final,
++	.finup		=	crypto_sha256_finup,
  	.descsize	=	sizeof(struct sha256_state),
  	.base		=	{
  		.cra_name	=	"sha224",
+diff --git a/include/crypto/sha.h b/include/crypto/sha.h
+index 17a1c43b2a01..1b4d9a87c2a4 100644
+--- a/include/crypto/sha.h
++++ b/include/crypto/sha.h
+@@ -97,6 +97,9 @@ extern int crypto_sha1_update(struct shash_desc *desc, const u8 *data,
+ extern int crypto_sha256_update(struct shash_desc *desc, const u8 *data,
+ 			      unsigned int len);
+ 
++extern int crypto_sha256_finup(struct shash_desc *desc, const u8 *data,
++			       unsigned int len, u8 *hash);
++
+ extern int crypto_sha512_update(struct shash_desc *desc, const u8 *data,
+ 			      unsigned int len);
+ 
 -- 
 1.8.3.2
