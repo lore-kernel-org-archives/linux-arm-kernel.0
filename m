@@ -1,64 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Mar 2015 20:39:11 +0100
-Subject: [RFC 0/11] dw_hdmi cleanups, audio preparation, helpers and ahb
- audio support
-Message-ID: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 30 Mar 2015 20:40:01 +0100
+Subject: [PATCH RFC 01/11] drm: bridge/dw_hdmi: clean up
+ hdmi_set_clk_regenerator()
+In-Reply-To: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+Message-ID: <E1YcfXV-0002uL-9O@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm sending this series for comments, and to allow people to update
-their code bases (for those who are using my AHB audio driver on
-iMX6).  This is really several series, and I'm not expecting this
-to be ready for the upcoming merge window.  That said, if anyone
-wants to say that they're happy with some of the initial four patches,
-I'm happy to queue those for David, if he's willing to take them.
+Clean up hdmi_set_clk_regenerator() by allowing it to take the audio
+sample rate and ratio directly, rather than hiding it inside the
+function.  Raise the unsupported pixel clock/sample rate message from
+debug to error level as this results in audio not working correctly.
 
-This series applies on top of my previous series, which finished with
-the patch "drm: bridge/dw_hdmi: adjust n/cts setting order".
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/bridge/dw_hdmi.c | 32 +++++++++++++++-----------------
+ 1 file changed, 15 insertions(+), 17 deletions(-)
 
-The first four patches are a few cleanups to the dw_hdmi driver.
-
-The next two patches introduce new interfaces to the dw_hdmi driver
-to support AHB audio, including the errata found on iMX6 which
-requires N to be programmed to zero when the audio FIFO is not full.
-I'm expecting some discussion with these last two as we try to work
-out how to deal with the two variants of audio support for this part
-(AHB audio vs I2S audio).
-
-The following three add various helpers to the DRM and ALSA subsystems
-for audio support which is non-specific to the AHB audio driver.  For
-DRM, this is a helper macro to obtain the pointer into the short audio
-descriptors.  For ALSA, it's a set of helpers to restrict an audio PCM
-device's capabilities according to the ELD, and to generate the IEC958
-channel status data.  If these helpers are acceptable, we can convert
-a number of drivers to them.
-
-The ELD helper isn't quite finished, but should be sufficient for
-initial testing.
-
-The last two patches add support for the dw_hdmi audio.  This is an
-ALSA driver rather than an ASoC driver as it's a pretty simple affair.
-I couldn't find a suitable location in the sound/ subtree to place it,
-so I've placed it next to the bridge - yes, we probably need to find
-it a better home in the sound/ subtree, but it currently makes
-use of dw_hdmi.h in the directory it lives.
-
- drivers/gpu/drm/bridge/Kconfig             |  11 +
- drivers/gpu/drm/bridge/Makefile            |   1 +
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 566 +++++++++++++++++++++++++++++
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h |  14 +
- drivers/gpu/drm/bridge/dw_hdmi.c           | 250 ++++++++-----
- drivers/gpu/drm/bridge/dw_hdmi.h           |   3 +
- include/drm/bridge/dw_hdmi.h               |   7 +
- include/drm/drm_edid.h                     |  19 +
- include/sound/pcm_drm_eld.h                |   6 +
- include/sound/pcm_iec958.h                 |   9 +
- sound/core/Kconfig                         |   6 +
- sound/core/Makefile                        |   3 +
- sound/core/pcm_drm_eld.c                   |  91 +++++
- sound/core/pcm_iec958.c                    |  70 ++++
- 14 files changed, 964 insertions(+), 92 deletions(-)
-
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index cca1c3d165e2..49df6c8c4ea8 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -335,39 +335,37 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
+ }
+ 
+ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+-				     unsigned long pixel_clk)
++	unsigned long pixel_clk, unsigned int sample_rate, unsigned int ratio)
+ {
+-	unsigned int clk_n, clk_cts;
++	unsigned int n, cts;
+ 
+-	clk_n = hdmi_compute_n(hdmi->sample_rate, pixel_clk,
+-			       hdmi->ratio);
+-	clk_cts = hdmi_compute_cts(hdmi->sample_rate, pixel_clk,
+-				   hdmi->ratio);
+-
+-	if (!clk_cts) {
+-		dev_dbg(hdmi->dev, "%s: pixel clock not supported: %lu\n",
+-			__func__, pixel_clk);
+-		return;
++	n = hdmi_compute_n(sample_rate, pixel_clk, ratio);
++	cts = hdmi_compute_cts(sample_rate, pixel_clk, ratio);
++	if (!cts) {
++		dev_err(hdmi->dev,
++			"%s: pixel clock/sample rate not supported: %luMHz / %ukHz\n",
++			__func__, pixel_clk, sample_rate);
+ 	}
+ 
+-	dev_dbg(hdmi->dev, "%s: samplerate=%d  ratio=%d  pixelclk=%lu  N=%d cts=%d\n",
+-		__func__, hdmi->sample_rate, hdmi->ratio,
+-		pixel_clk, clk_n, clk_cts);
++	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
++		__func__, sample_rate, ratio, pixel_clk, n, cts);
+ 
+-	hdmi_set_cts_n(hdmi, clk_cts, clk_n);
++	hdmi_set_cts_n(hdmi, cts, n);
+ }
+ 
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+-	hdmi_set_clk_regenerator(hdmi, 74250000);
++	hdmi_set_clk_regenerator(hdmi, 74250000, hdmi->sample_rate,
++				 hdmi->ratio);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
+ 
+ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+-	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
++	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
++				 hdmi->sample_rate, hdmi->ratio);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
