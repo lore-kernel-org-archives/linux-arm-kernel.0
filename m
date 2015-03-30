@@ -1,42 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 30 Mar 2015 17:21:29 +0200
-Subject: [PATCH] ARM: dts: Use define for s3c-rtc clock id
-Message-ID: <1427728889-29158-1-git-send-email-k.kozlowski@samsung.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon, 30 Mar 2015 20:55:31 +0530
+Subject: arm64 kexec hang
+In-Reply-To: <55195FE3.5090409@redhat.com>
+References: <1427477015.27739.30.camel@infradead.org>
+ <5515C799.8010600@redhat.com> <551940F5.9050102@redhat.com>
+ <55195FE3.5090409@redhat.com>
+Message-ID: <55196AEB.2040204@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a define instead of raw number as a ID for "rtc_src" clock.
+Hi Geoff,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
----
+On Monday 30 March 2015 08:08 PM, Pratyush Anand wrote:
+> diff --git a/kexec/arch/arm64/kexec-arm64.c
+> b/kexec/arch/arm64/kexec-arm64.c
+> index 8df66f5c8273..4365bb4087ad 100644
+> --- a/kexec/arch/arm64/kexec-arm64.c
+> +++ b/kexec/arch/arm64/kexec-arm64.c
+> @@ -993,8 +993,8 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr,
+> unsigned long r_type,
+>   # define R_AARCH64_CALL26 283
+>   #endif
+>
+> -       uint32_t *location = (uint32_t *)ptr;
+> -       uint32_t data = *location;
+> +       uint64_t *location = (uint64_t *)ptr;
+> +       uint64_t data = *location;
+>          const char *type = NULL;
+>
+>          switch(r_type) {
+> @@ -1026,7 +1026,7 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr,
+> unsigned long r_type,
+>                  break;
+>          }
+>
+> -       dbgprintf("%s: %s %x->%x\n", __func__, type, data, *location);
+> +       dbgprintf("%s: %s %lx->%lx\n", __func__, type, data, *location);
+>   }
 
-Patch depends on new file "dt-bindings/clock/samsung,s2mps11.h" from:
-http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg43136.html
----
- arch/arm/boot/dts/exynos3250-rinato.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Thanks for your help/pointer.
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 3905824cac58..d2cbc95364de 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -16,6 +16,7 @@
- #include "exynos3250.dtsi"
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/samsung,s2mps11.h>
- 
- / {
- 	model = "Samsung Rinato board";
-@@ -605,7 +606,7 @@
- };
- 
- &rtc {
--	clocks = <&cmu CLK_RTC>, <&s2mps14_osc 0>;
-+	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
- 	clock-names = "rtc", "rtc_src";
- 	status = "okay";
- };
--- 
-1.9.1
+So, this was it. With above changes kexec reboot works fine with 
+purgatory too.
+
+By the way, how much execution time expected for verify_sha256_digest? I 
+have not quantified, but it seems that it takes minutes to execute that.
+
+~Pratyush
