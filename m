@@ -1,49 +1,39 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 30 Mar 2015 13:55:12 +0300
-Subject: [patch] spi: pxa2xx: missing break in pxa2xx_ssp_get_clk_div()
-In-Reply-To: <20150330103040.GB27144@mwanda>
-References: <20150330103040.GB27144@mwanda>
-Message-ID: <1427712912.14897.441.camel@linux.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Mar 2015 11:58:29 +0100
+Subject: [PATCH RFC] ARM: BCM5301X: Add /device_id property including
+ device ID string
+In-Reply-To: <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
+References: <1427667288-23903-1-git-send-email-zajec5@gmail.com>
+ <20150330103659.GD17971@leverpostej>
+ <CACna6rykQq6AVSWzJh3qnHVNzPXbTD9TMGQf9D9p50pcbQkmng@mail.gmail.com>
+Message-ID: <20150330105828.GE17971@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-03-30 at 13:30 +0300, Dan Carpenter wrote:
-> We refactored this code but accidentally left out a break statement so
-> QUARK_X1000_SSP isn't handled correctly.
+> > On Sun, Mar 29, 2015 at 11:14:48PM +0100, Rafa? Mi?ecki wrote:
+> >> Device vendors often assign IDs to their devices to allow comparing
+> >> firmware image with device model. This is required to prevent users
+> >> from flashing incompatible image and soft-bricking device.
+> >> Add device_id property to DTs to allow user space (and optionally
+> >> bootloader) verifying firmware images.
+> >
+> > This sounds like exactly what the "model" property is meant to be (per
+> > ePAPR) -- a string that specifices the manufacturer's model number of
+> > the device, ideally in "manufacturer,model" format.
 > 
+> What if manufacturer decided to use some totally unfriendly ID for
+> their low-level (firmware upgrade) model identification? I can't
+> really see us using
+> model = "U12H245T00_NETGEAR"
+> which would mean nothing compared to the current friendly:
+> model = "Netgear R6250 V1 (BCM4708)"
 
-Thanks for catching this!
-One comment below.
+If it uniquely identifies the model, it's fit to be a model string. If
+being "friendly" means that we lose that, then the property is useless
+anyway.
 
+Note that both examples above deviate from the recommended format, and
+something like: "netgear,U12H245T00" would better align with the
+recommendation.
 
-> Fixes: 025ffe88ee60 ('spi: pxa2xx: shift clk_div in one place')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-> index 60526a5..a081cfc 100644
-> --- a/drivers/spi/spi-pxa2xx.c
-> +++ b/drivers/spi/spi-pxa2xx.c
-> @@ -791,6 +791,7 @@ static unsigned int pxa2xx_ssp_get_clk_div(struct driver_data *drv_data,
->  	switch (drv_data->ssp_type) {
->  	case QUARK_X1000_SSP:
->  		clk_div = quark_x1000_get_clk_div(rate, &chip->dds_rate);
-> +		break;
->  	default:
->  		clk_div = ssp_get_clk_div(drv_data, rate);
-
-It would be nice to have a break here as well, but I think we also may
-change this to if-else-if construction.
-
->  	}
-
-Whatever solution you choose
-Acked-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-
-And actually 
-Tested-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-
-Now run with time to see the difference.
-
--- 
-Andy Shevchenko <andriy.shevchenko@intel.com>
-Intel Finland Oy
+Mark.
