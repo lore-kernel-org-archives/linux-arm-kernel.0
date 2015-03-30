@@ -1,63 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 30 Mar 2015 16:00:08 +0100
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
-References: <20150317164353.GN23340@leverpostej>
- <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
- <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
- <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
- <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
-Message-ID: <20150330150008.GD5964@e104818-lin.cambridge.arm.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 30 Mar 2015 18:04:06 +0300
+Subject: [PATCH] dmaengine: sa11x0: fix boot-time warning
+In-Reply-To: <20150330121146.GG24899@n2100.arm.linux.org.uk>
+References: <1427708510-17370-1-git-send-email-dbaryshkov@gmail.com>
+ <20150330121146.GG24899@n2100.arm.linux.org.uk>
+Message-ID: <CALT56yPrFRF374vnfYpYgjEzWrg3Q+mTQtkGUODDnU2d6YZwWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 04:00:31PM +0200, Ard Biesheuvel wrote:
-> On 30 March 2015 at 15:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > Can we defer the setting of PHYS_OFFSET until we parse the DT memory
-> > nodes?
-> 
-> I experimented a bit with that, but it is quite hairy. Any
-> manipulation of the page tables goes through __va/__pa, so you need a
-> valid PHYS_OFFSET there to ensure they point at the right physical
-> region.
+Hello,
 
-Yes, so we need set PHYS_OFFSET before we start using __va/__pa.
+2015-03-30 15:11 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Mon, Mar 30, 2015 at 12:41:50PM +0300, Dmitry Eremin-Solenikov wrote:
+>> Fix the following warning by initializing directions field in the dma_device
+>> structure.
+>>
+>> ------------[ cut here ]------------
+>> WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
+>> this driver doesn't support generic slave capabilities reporting
+>> Modules linked in:
+>> CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
+>> Hardware name: Sharp-Collie
+>> [<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
+>> [<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
+>> [<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
+>> [<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
+>> [<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
+>> [<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
+>> [<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
+>> [<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
+>> [<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
+>> [<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
+>> [<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
+>> [<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
+>> [<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
+>> [<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
+>> [<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
+>> ---[ end trace e188b8fe0e782e75 ]---
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>
+> It's an improvement, but I wonder whether src_addr_widths, dst_addr_widths
+> and residue_granularity should also be filled in.
 
-> But PHYS_OFFSET also needs to be small enough for the DT
-> parsing code not to disregard regions that are below it.
-
-With PHYS_OFFSET as 0 initially, no regions would be dropped. But we
-could write a simplified early_init_dt_add_memory_arch() which avoids
-the PHYS_OFFSET check while setting the actual PHYS_OFFSET to the
-minimal address detected. I can see the generic function only uses
-__pa() to get the PHYS_OFFSET.
-
-> And then
-> there is the memblock limit to ensure that early dynamically allocated
-> page tables come from a region that is already mapped.
-
-By the time we start using memblock allocations, we have a PHYS_OFFSET
-set. The early DT parsing does not require any memory allocations AFAIK.
-We need to make sure that setup_machine_fdt creates a VA mapping of the
-DT and does not require the __va() macro (I thought I've seen some
-patches to use fixmap for DT).
-
-> I think it may be doable, but it would require some significant
-> hacking, e.g., call early_init_scan_dt() at its physical address with
-> only the ID map loaded and the MMU and caches on, and only after that
-> start populating the virtual address space. Or at least only populate
-> the lower half, i.e., mappings below PAGE_OFFSET for the kernel and
-> the FDT
-
-With some form of your patches, we already decouple the PAGE_OFFSET from
-the kernel text mapping. We map the latter at some very high
-KERNEL_PAGE_OFFSET, the DT via fixmap (which is part of the kernel data
-section, so mapped at the high KERNEL_PAGE_OFFSET). Once we start
-calling early_init_dt_add_memory_arch(), we set the real PAGE_OFFSET and
-are free to use __pa/__va after setup_machine_fdt(). The actual linear
-mappings will be created later via paging_init().
+Nice catch. Missed that. I'll send a v2 tomorrow.
 
 -- 
-Catalin
+With best wishes
+Dmitry
