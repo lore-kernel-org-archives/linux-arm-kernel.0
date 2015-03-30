@@ -1,47 +1,51 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 30 Mar 2015 16:17:08 +0100
-Subject: [PATCH v2 2/6] ahci: st: Update the DT example for how to obtain the
- PHY.
-In-Reply-To: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1427728632-10846-3-git-send-email-peter.griffin@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 30 Mar 2015 17:19:32 +0200
+Subject: [PATCH 1/2] drivers/rtc/rtc-s3c.c: Integrate Exynos3250 into S3C6410
+In-Reply-To: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
+References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1427728773-29065-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The example is wrong in that the phys property should take a
-phandle to the phy port.
+There are now no differences between RTC on Exynos3250 and S3C6410.
+Merge everything into one so duplicated code could be removed.
 
-Also with the changing over to generic PHY type constants we also
-update that as well.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- Documentation/devicetree/bindings/ata/ahci-st.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-s3c.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-st.txt b/Documentation/devicetree/bindings/ata/ahci-st.txt
-index 0574a77..1331202 100644
---- a/Documentation/devicetree/bindings/ata/ahci-st.txt
-+++ b/Documentation/devicetree/bindings/ata/ahci-st.txt
-@@ -11,7 +11,7 @@ Required properties:
-  - reset-names	   :   Associated names must be; "pwr-dwn" and "sw-rst"
-  - clocks	   : The phandle for the clock
-  - clock-names	   :   Associated name must be; "ahci_clk"
-- - phys		   : The phandle for the PHY device
-+ - phys		   : The phandle for the PHY port
-  - phy-names	   :   Associated name must be; "ahci_phy"
+diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
+index fb0c569765c6..5e162eaad277 100644
+--- a/drivers/rtc/rtc-s3c.c
++++ b/drivers/rtc/rtc-s3c.c
+@@ -774,18 +774,6 @@ static struct s3c_rtc_data const s3c6410_rtc_data = {
+ 	.disable		= s3c6410_rtc_disable,
+ };
  
- Example:
-@@ -21,7 +21,7 @@ Example:
- 		reg             = <0xfe380000 0x1000>;
- 		interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
- 		interrupt-names = "hostc";
--		phys	        = <&miphy365x_phy MIPHY_PORT_0 MIPHY_TYPE_SATA>;
-+		phys	        = <&phy_port0 PHY_TYPE_SATA>;
- 		phy-names       = "ahci_phy";
- 		resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
- 				  <&softreset STIH416_SATA0_SOFTRESET>;
+-static struct s3c_rtc_data const exynos3250_rtc_data = {
+-	.max_user_freq		= 32768,
+-	.needs_src_clk		= true,
+-	.irq_handler		= s3c6410_rtc_irq,
+-	.set_freq		= s3c6410_rtc_setfreq,
+-	.enable_tick		= s3c6410_rtc_enable_tick,
+-	.save_tick_cnt		= s3c6410_rtc_save_tick_cnt,
+-	.restore_tick_cnt	= s3c6410_rtc_restore_tick_cnt,
+-	.enable			= s3c24xx_rtc_enable,
+-	.disable		= s3c6410_rtc_disable,
+-};
+-
+ static const struct of_device_id s3c_rtc_dt_match[] = {
+ 	{
+ 		.compatible = "samsung,s3c2410-rtc",
+@@ -801,7 +789,7 @@ static const struct of_device_id s3c_rtc_dt_match[] = {
+ 		.data = (void *)&s3c6410_rtc_data,
+ 	}, {
+ 		.compatible = "samsung,exynos3250-rtc",
+-		.data = (void *)&exynos3250_rtc_data,
++		.data = (void *)&s3c6410_rtc_data,
+ 	},
+ 	{ /* sentinel */ },
+ };
 -- 
 1.9.1
