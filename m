@@ -1,86 +1,158 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 30 Mar 2015 22:57:59 +0100
-Subject: [PATCH v4 05/10] eeprom: Add bindings for simple eeprom framework
+Date: Mon, 30 Mar 2015 22:58:13 +0100
+Subject: [PATCH v4 06/10] eeprom: Add simple eeprom-mmio consumer helper
+ functions.
 In-Reply-To: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1427752492-17039-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1427752679-17261-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1427752693-17303-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds bindings for simple eeprom framework which allows eeprom
-consumers to talk to eeprom providers to get access to eeprom cell data.
+This patch adds probe and remove helper functions for eeproms which are
+mmio based, With these helper function new eeprom consumer drivers need
+very little code add its driver.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-[Maxime Ripard: intial version of eeprom framework]
+This code is currently used for qfprom and sunxi-sid eeprom consumer drivers.
+
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- .../devicetree/bindings/eeprom/eeprom.txt          | 58 ++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/eeprom/eeprom.txt
+ drivers/eeprom/Makefile      |  1 +
+ drivers/eeprom/eeprom-mmio.c | 69 ++++++++++++++++++++++++++++++++++++++++++++
+ drivers/eeprom/eeprom-mmio.h | 41 ++++++++++++++++++++++++++
+ 3 files changed, 111 insertions(+)
+ create mode 100644 drivers/eeprom/eeprom-mmio.c
+ create mode 100644 drivers/eeprom/eeprom-mmio.h
 
-diff --git a/Documentation/devicetree/bindings/eeprom/eeprom.txt b/Documentation/devicetree/bindings/eeprom/eeprom.txt
+diff --git a/drivers/eeprom/Makefile b/drivers/eeprom/Makefile
+index 51a727f..6812bbe 100644
+--- a/drivers/eeprom/Makefile
++++ b/drivers/eeprom/Makefile
+@@ -4,3 +4,4 @@
+ 
+ obj-$(CONFIG_EEPROM)		+= eeprom_core.o
+ eeprom_core-y			:= core.o
++eeprom_core-y			+= eeprom-mmio.o
+diff --git a/drivers/eeprom/eeprom-mmio.c b/drivers/eeprom/eeprom-mmio.c
 new file mode 100644
-index 0000000..fb71d46
+index 0000000..55b8913
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/eeprom/eeprom.txt
-@@ -0,0 +1,58 @@
-+= EEPROM Data Device Tree Bindings =
++++ b/drivers/eeprom/eeprom-mmio.c
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+This binding is intended to represent the location of hardware
-+configuration data stored in EEPROMs.
++#include <linux/device.h>
++#include <linux/module.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include "eeprom-mmio.h"
 +
-+On a significant proportion of boards, the manufacturer has stored
-+some data on an EEPROM-like device, for the OS to be able to retrieve
-+these information and act upon it. Obviously, the OS has to know
-+about where to retrieve these data from, and where they are stored on
-+the storage device.
++int eeprom_mmio_remove(struct platform_device *pdev)
++{
++	struct eeprom_device *eeprom = platform_get_drvdata(pdev);
 +
-+This document is here to document this.
++	return eeprom_unregister(eeprom);
++}
++EXPORT_SYMBOL_GPL(eeprom_mmio_remove);
 +
-+= Data providers =
-+Contains bindings specific to provider drivers and data cells as children
-+to this node.
++int eeprom_mmio_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	const struct eeprom_mmio_data *data;
++	struct eeprom_device *eeprom;
++	struct regmap *regmap;
++	const struct of_device_id *match;
++	void __iomem *base;
 +
-+= Data cells =
-+These are the child nodes of the provider which contain data cell
-+information like offset and size in eeprom provider.
++	if (!dev || !dev->driver)
++		return -ENODEV;
 +
-+Required properties:
-+reg:	specifies the offset in byte within that storage device, and the length
-+	in bytes of the data we care about.
-+	There could be more then one offset-length pairs in this property.
++	match = of_match_device(dev->driver->of_match_table, dev);
++	if (!match || !match->data)
++		return -EINVAL;
 +
-+Optional properties:
-+As required by specific data parsers/interpreters.
++	data = match->data;
 +
-+For example:
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
 +
-+	/* Provider */
-+	qfprom: qfprom at 00700000 {
-+		compatible 	= "qcom,qfprom";
-+		reg		= <0x00700000 0x8000>;
-+		...
++	data->regmap_config->max_register = resource_size(res) - 1;
 +
-+		/* Data cells */
-+		tsens_calibration: calib at 4404 {
-+			reg = <0x4404 0x10>;
-+		};
++	regmap = devm_regmap_init_mmio(dev, base, data->regmap_config);
++	if (IS_ERR(regmap)) {
++		dev_err(dev, "regmap init failed\n");
++		return PTR_ERR(regmap);
++	}
++	data->eeprom_config->dev = dev;
++	eeprom = eeprom_register(data->eeprom_config);
++	if (IS_ERR(eeprom))
++		return PTR_ERR(eeprom);
 +
-+		serial_number: sn {
-+			reg = <0x104 0x4>, <0x204 0x4>, <0x30c 0x4>;
++	platform_set_drvdata(pdev, eeprom);
 +
-+		};
-+		...
-+	};
++	return 0;
++}
++EXPORT_SYMBOL_GPL(eeprom_mmio_probe);
+diff --git a/drivers/eeprom/eeprom-mmio.h b/drivers/eeprom/eeprom-mmio.h
+new file mode 100644
+index 0000000..e58bcc8
+--- /dev/null
++++ b/drivers/eeprom/eeprom-mmio.h
+@@ -0,0 +1,41 @@
++/*
++ * MMIO based EEPROM providers.
++ *
++ * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+= Data consumers =
-+Are device nodes which consume eeprom data cells.
++#ifndef _LINUX_EEPROM_MMIO_H
++#define _LINUX_EEPROM_MMIO_H
 +
-+For example:
++#include <linux/platform_device.h>
++#include <linux/eeprom-provider.h>
++#include <linux/regmap.h>
 +
-+	tsens {
-+		...
-+		calibration = <&tsens_calibration>;
-+	};
++struct eeprom_mmio_data {
++	struct regmap_config *regmap_config;
++	struct eeprom_config *eeprom_config;
++};
++
++#if IS_ENABLED(CONFIG_EEPROM)
++
++int eeprom_mmio_probe(struct platform_device *pdev);
++int eeprom_mmio_remove(struct platform_device *pdev);
++
++#else
++
++static inline int eeprom_mmio_probe(struct platform_device *pdev)
++{
++	return -ENOSYS;
++}
++
++static inline int eeprom_mmio_remove(struct platform_device *pdev)
++{
++	return -ENOSYS;
++}
++#endif
++
++#endif  /* ifndef _LINUX_EEPROM_MMIO_H */
 -- 
 1.9.1
