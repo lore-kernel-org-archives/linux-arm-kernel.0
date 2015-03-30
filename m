@@ -1,53 +1,97 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Mar 2015 15:52:55 -0700
-Subject: [PATCH] ARM: dts: sun5i: Enable touchscreen on Utoo P66
-In-Reply-To: <1427652831-12838-2-git-send-email-hdegoede@redhat.com>
-References: <1427652831-12838-1-git-send-email-hdegoede@redhat.com>
- <1427652831-12838-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150330225255.GZ23664@lukather>
+Date: Mon, 30 Mar 2015 16:13:50 -0700
+Subject: [PATCH 1/2] sunxi: a20-LIME2 update regulator description
+In-Reply-To: <55143CA1.7000606@gmail.com>
+References: <55143CA1.7000606@gmail.com>
+Message-ID: <20150330231350.GA23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+Hi,
 
-On Sun, Mar 29, 2015 at 08:13:51PM +0200, Hans de Goede wrote:
-> Add a node for the chipone-icn8318 touchscreen found on the Utoo P66 tablet.
+On Thu, Mar 26, 2015 at 05:06:41PM +0000, Iain Paton wrote:
+> configure regulators as per the manufacturers recomendations from their
+> 3.4.x fex file.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> this is necessary to prevent operating points in the dtsi selecting
+> inappropriate values and causing the board to lockup
+> 
+> Signed-off-by: Iain Paton <ipaton0@gmail.com>
 > ---
->  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 34 +++++++++++++++++--------
+>  1 file changed, 24 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> index 0f0a411..d1d4d30 100644
-> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> @@ -50,6 +50,7 @@
->  #include "sunxi-common-regulators.dtsi"
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/input/input.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/pinctrl/sun4i-a10.h>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> index 5e57157..704df28 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+> @@ -123,41 +123,55 @@
+>  		ldo24in-supply = <&reg_axp_ipsout>;
+>  		ldo3in-supply = <&reg_axp_ipsout>;
 >  
->  / {
-> @@ -93,6 +94,20 @@
->  	pinctrl-0 = <&i2c1_pins_a>;
->  	status = "okay";
+> +		x-powers,dcdc-freq = <1500>;
+> +
+>  		regulators {
+>  			vdd_rtc: ldo1 {
+>  				regulator-min-microvolt = <1300000>;
+>  				regulator-max-microvolt = <1300000>;
+>  				regulator-always-on;
+> +				regulator-name="vdd_rtc";
+>  			};
 >  
-> +	chipone_icn8318 at 40 {
+>  			avcc: ldo2 {
+> -				regulator-min-microvolt = <1800000>;
+> -				regulator-max-microvolt = <3300000>;
+> +				regulator-min-microvolt = <3000000>;
+> +				regulator-max-microvolt = <3000000>;
+>  				regulator-always-on;
+> +				regulator-name="avcc";
+>  			};
+>  
+>  			vcc_csi0: ldo3 {
+> -				regulator-min-microvolt = <700000>;
+> -				regulator-max-microvolt = <3500000>;
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+>  				regulator-always-on;
+> +				regulator-name="vcc_csi0";
+>  			};
+>  
+>  			vcc_csi1: ldo4 {
+> -				regulator-min-microvolt = <1250000>;
+> -				regulator-max-microvolt = <3300000>;
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+>  				regulator-always-on;
+> +				regulator-name="vcc_csi1";
+> +			};
+> +
+> +			ldo5 {
+> +				regulator-min-microvolt = <2800000>;
+> +				regulator-max-microvolt = <2800000>;
+> +				regulator-name="reg_unused";
+>  			};
+>  
+>  			vdd_cpu: dcdc2 {
+> -				regulator-min-microvolt = <700000>;
+> -				regulator-max-microvolt = <2275000>;
+> +				regulator-min-microvolt = <1050000>;
+> +				regulator-max-microvolt = <1450000>;
+>  				regulator-always-on;
+> +				regulator-name="vdd_cpu";
+>  			};
+>  
+>  			vdd_int: dcdc3 {
+> -				regulator-min-microvolt = <700000>;
+> -				regulator-max-microvolt = <3500000>;
+> +				regulator-min-microvolt = <1300000>;
+> +				regulator-max-microvolt = <1300000>;
+>  				regulator-always-on;
+> +				regulator-name="vdd_int";
 
-The node name should be the class of the device, something like
-touchscreen at 40 in this case.
+Could you use the axp DTSI please?
 
-> +		compatible = "chipone,icn8318";
-> +		reg = <0x40>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
-
-Shouldn't you reference this pin in the pinctrl node too?
-
-If this patch is resent soon enough, I'll merge it and send it through
-a late pull request together with the A23 SMP and A31 cpufreq patches.
+That will remove most of the chunk defined in there.
 
 Thanks!
 Maxime
@@ -62,4 +106,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/2466e79c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/55a47e9b/attachment.sig>
