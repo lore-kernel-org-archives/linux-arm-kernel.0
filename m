@@ -1,79 +1,42 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 30 Mar 2015 13:39:30 +0300
-Subject: [PATCH 2/3] ARM: pxa: poodle: add gpio-keys configuration
+Date: Mon, 30 Mar 2015 13:39:31 +0300
+Subject: [PATCH 3/3] ARM: pxa: declare battery device on poodle
 In-Reply-To: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
 References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1427711971-8164-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1427711971-8164-3-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support setting wakeup sources through the two gpio keys - On button and
-'Sync' key present on cradle.
+Declare a battery platform device for SL-5600 (poodle) platform.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- arch/arm/mach-pxa/poodle.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ arch/arm/mach-pxa/poodle.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-index 4dd29a7..596e756 100644
+index 596e756..90d679a 100644
 --- a/arch/arm/mach-pxa/poodle.c
 +++ b/arch/arm/mach-pxa/poodle.c
-@@ -35,6 +35,8 @@
- #include <linux/memblock.h>
- #include <linux/iio/machine.h>
- #include <linux/mfd/locomo.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
+@@ -466,6 +466,11 @@ static struct platform_device poodle_power_device = {
+ 	.dev.platform_data	= &poodle_power_data,
+ };
  
- #include <mach/hardware.h>
- #include <asm/mach-types.h>
-@@ -161,6 +163,38 @@ static struct scoop_pcmcia_config poodle_pcmcia_config = {
- 
- EXPORT_SYMBOL(poodle_scoop_device);
- 
-+static struct gpio_keys_button poodle_gpio_keys[] = {
-+	{
-+		.type	= EV_PWR,
-+		.code	= KEY_RESERVED,
-+		.gpio	= POODLE_GPIO_ON_KEY,
-+		.desc	= "On key",
-+		.wakeup	= 1,
-+		.active_low = 1,
-+	},
-+	{
-+		.type	= EV_PWR,
-+		.code	= KEY_WAKEUP,
-+		.gpio	= POODLE_GPIO_WAKEUP,
-+		.desc	= "Sync",
-+		.wakeup = 1,
-+		.active_low = 1,
-+	},
++static struct platform_device poodle_battery_device = {
++	.name			= "poodle-battery",
++	.id			= -1,
 +};
 +
-+static struct gpio_keys_platform_data poodle_gpio_keys_data = {
-+	.buttons	= poodle_gpio_keys,
-+	.nbuttons	= ARRAY_SIZE(poodle_gpio_keys),
-+};
-+
-+static struct platform_device poodle_gpio_keys_device = {
-+	.name	= "gpio-keys",
-+	.id	= -1,
-+	.dev	= {
-+		.platform_data = &poodle_gpio_keys_data,
-+	},
-+};
-+
- 
- static struct platform_device poodle_audio_device = {
- 	.name	= "poodle-audio",
-@@ -436,6 +470,7 @@ static struct platform_device *devices[] __initdata = {
+ static struct platform_device *devices[] __initdata = {
  	&poodle_locomo_device,
  	&poodle_scoop_device,
- 	&poodle_audio_device,
-+	&poodle_gpio_keys_device,
+@@ -474,6 +479,7 @@ static struct platform_device *devices[] __initdata = {
  	&sharpsl_nand_device,
  	&sharpsl_rom_device,
  	&poodle_power_device,
++	&poodle_battery_device,
+ };
+ 
+ static struct i2c_board_info __initdata poodle_i2c_devices[] = {
 -- 
 2.1.4
