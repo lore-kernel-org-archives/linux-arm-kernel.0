@@ -1,48 +1,35 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Mon, 30 Mar 2015 18:08:40 +0200
-Subject: [RFC PATCH v3 1/2] clk: samsung: Add a clock lookup function
-In-Reply-To: <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
-Message-ID: <55197508.5030501@collabora.co.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 30 Mar 2015 17:09:35 +0100
+Subject: [PATCH v4 2/2] serial/amba-pl011: Refactor and simplify TX FIFO
+ handling
+In-Reply-To: <20150330162811.3673482b@north>
+References: <1427468371-11915-1-git-send-email-Dave.Martin@arm.com>
+ <1427468371-11915-3-git-send-email-Dave.Martin@arm.com>
+ <20150330162811.3673482b@north>
+Message-ID: <20150330160934.GE22949@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomasz,
+On Mon, Mar 30, 2015 at 04:28:11PM +0200, Jakub Kicinski wrote:
+> On Fri, 27 Mar 2015 14:59:31 +0000, Dave Martin wrote:
+> > To this end, the TX softirq mechanism is removed and instead
 
-On 03/30/2015 06:02 PM, Tomasz Figa wrote:
-> Hi Javier,
+[...]
+
+> > pl011_start_tx() will now simply stuff the FIFO until full
+> > (guaranteeing future TX IRQs), or until there are no more chars
+> > to write (in which case we don't care whether an IRQ happens).
+> > 
+> > [1] Thanks to Jakub Kicinski for his input and similar patch.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > 
-> 2015-03-31 0:53 GMT+09:00 Javier Martinez Canillas
-> <javier.martinez@collabora.co.uk>:
->> The Samsung helpers functions to register clocks, add the clock instance
->> returned by the common clock framework to a lookup table that is used by
->> OF to lookup the clocks.
->>
->> But this table could also be useful to clock drivers if they need to get
->> a clock instance since the helper functions don't return them.
->>
->> The common clock framework __clk_lookup() function from the clk provider
->> API could be used by drivers as well. But it's more efficient to use the
->> Samsung specific lookup table that returns the clock instance in constant
->> time, than using the __clk_lookup() function that uses the clock name as
->> an index so it has a linear search time.
-> 
-> Is this really something we should be concerned about? If so, maybe
-> the generic look-up function should be rewritten to use something
-> faster, such as tree or hash table?
->
+> Signed-off-by: Jakub Kicinski <kubakici@wp.pl>
 
-I don't performance is a big issue here. I just thought that since the
-lookup table is already filled by the driver and the lookup function
-is one line, we could use that instead to get the performance benefit.
+Agreed, shoulda had that (sorry!)
 
-But I don't mind to drop this patch and use the generic lookup function
-from the CCF API if that is preferred.
- 
-> Best regards,
-> Tomasz
->
+Greg, can you add Jakub's S-o-B when applying, or do you want me to
+repost?
 
-Best regards,
-Javier
+Cheers
+---Dave
