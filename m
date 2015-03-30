@@ -1,60 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Mar 2015 08:16:13 +0100
-Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
-In-Reply-To: <5518A969.3090707@linaro.org>
-References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>
- <20150327153131.GK12400@redacted.bos.redhat.com>
- <55157920.3050003@arm.com>
- <20150327174044.GL12400@redacted.bos.redhat.com>
- <5518A969.3090707@linaro.org>
-Message-ID: <20150330081613.60ff7dc0@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 30 Mar 2015 08:30:38 +0200
+Subject: [PATCH 1/4] net/macb: only probe queues once and use stored values
+In-Reply-To: <55158434.2090708@atmel.com>
+References: <cover.1427469791.git.nicolas.ferre@atmel.com>
+ <09960ba7389058e026b73409018fe1ee61d6dc57.1427469791.git.nicolas.ferre@atmel.com>
+ <55158434.2090708@atmel.com>
+Message-ID: <5518ED8E.2060906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Mar 2015 02:39:53 +0100
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> On 03/28/2015 02:40 AM, Kyle McMartin wrote:
-> > On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
-> >>> [  236.260863] Kernel panic - not syncing: HYP panic:
-> >>> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
-> >>
-> >> It would be interesting if you could find out what you have at offset
-> >> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
-> >> help much).
-> >>
-> >
-> > Given the alignment, i'm going to assume i'm looking at the right thing:
-> >
-> > 0000000000000820 <__kvm_hyp_reset>:
-> >       820:       d51c2000        msr     ttbr0_el2, x0
-> >       824:       d5033fdf        isb
-> >       828:       d50c871f        tlbi    alle2
-> >       82c:       d5033f9f        dsb     sy
-> >       830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
-> >       834:       b3403c01        bfxil   x1, x0, #0, #16
-> >       838:       d61f0020        br      x1
-> >       83c:       d53c1000        mrs     x0, sctlr_el2
-> >
-> > but it seems fairly implausible to be trapping on ADR x0, 1f...
+Le 27/03/2015 17:24, Cyrille Pitchen a ?crit :
+> Hi Nicolas,
 > 
+> There is a little mistake in this patch, which will prevent the GEM from 
+> working properly:
 > 
-> I've never seen this panic on fast model...
+> Le 27/03/2015 16:34, Nicolas Ferre a ?crit :
+>> When merging at91_ether and macb driver during 421d9df0628b (net/macb: merge
+>> at91_ether driver into macb driver) the probe function has been split. The code
+>> dealing with initialization of queues is now moved in macb_init() which needs
+>> information computed in the parent macb_probe() function.
+>> So, add the queue_mask information to the private structure and use it when
+>> needed in macb_init().
+>>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/net/ethernet/cadence/macb.c | 9 ++++-----
+>>  drivers/net/ethernet/cadence/macb.h | 1 +
+>>  2 files changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>> index a0a04b3638e6..b710768172d9 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -2180,7 +2180,7 @@ static void macb_probe_queues(void __iomem *mem,
+>>  static int macb_init(struct platform_device *pdev)
+>>  {
+>>  	struct net_device *dev = platform_get_drvdata(pdev);
+>> -	unsigned int hw_q, queue_mask, q, num_queues;
+>> +	unsigned int hw_q, q;
+>>  	struct macb *bp = netdev_priv(dev);
+>>  	struct macb_queue *queue;
+>>  	int err;
+>> @@ -2226,10 +2226,8 @@ static int macb_init(struct platform_device *pdev)
+>>  	 * register mapping but we don't want to test the queue index then
+>>  	 * compute the corresponding register offset at run time.
+>>  	 */
+>> -	macb_probe_queues(bp->regs, &queue_mask, &num_queues);
+>> -
+>> -	for (hw_q = 0, q = 0; hw_q < MACB_MAX_QUEUES; ++hw_q) {
+>> -		if (!(queue_mask & (1 << hw_q)))
+>> +	for (hw_q = 0, q = 0; hw_q < bp->num_queues; ++hw_q) {
+>> +		if (!(bp->queue_mask & (1 << hw_q)))
+>>  			continue;
 > 
-> ESR shows that
->    - Exception class: Data abort taken without a change in Exception level
->    - Data fault status code: Translation fault at EL2
+> The exit condition of the for loop must remain "hw_q < MACB_MAX_QUEUES" and 
+> should not be replaced by "hw_q < bp->num_queues".
+> Indeed there can be only 2 queues, for instance queue0 and queue7. So if you
+> change the exit conditon of the loop, queue7 won't be initialized and HRESP 
+> errors will occur.
+
+Absolutely. Sorry to have misunderstood this condition.
+
+I'll re-spin a v2 series.
+
+Bye,
+
+>>  
+>>  		queue = &bp->queues[q];
+>> @@ -2715,6 +2713,7 @@ static int macb_probe(struct platform_device *pdev)
+>>  	bp->dev = dev;
+>>  	bp->regs = mem;
+>>  	bp->num_queues = num_queues;
+>> +	bp->queue_mask = queue_mask;
+>>  	spin_lock_init(&bp->lock);
+>>  
+>>  	platform_set_drvdata(pdev, dev);
+>> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+>> index bc6e35c40822..0b6afac91bfe 100644
+>> --- a/drivers/net/ethernet/cadence/macb.h
+>> +++ b/drivers/net/ethernet/cadence/macb.h
+>> @@ -785,6 +785,7 @@ struct macb {
+>>  	size_t			rx_buffer_size;
+>>  
+>>  	unsigned int		num_queues;
+>> +	unsigned int		queue_mask;
+>>  	struct macb_queue	queues[MACB_MAX_QUEUES];
+>>  
+>>  	spinlock_t		lock;
+>>
 > 
-> and FAR seems not to be a proper address.
+> Best Regards,
+> 
+> Cyrille
+> 
 
-... which is consistent with what we're seeing here (data fault on
-something that doesn't generate a load/store). I'm pretty sure the
-page tables are screwed.
 
-Have you tested it with 64k pages?
-
-Thanks,
-
-        M.
 -- 
-Jazz is not dead. It just smells funny.
+Nicolas Ferre
