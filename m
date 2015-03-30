@@ -1,72 +1,121 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 30 Mar 2015 17:56:29 +0530
-Subject: arm64 kexec hang
-In-Reply-To: <5515C799.8010600@redhat.com>
-References: <1427477015.27739.30.camel@infradead.org>
- <5515C799.8010600@redhat.com>
-Message-ID: <551940F5.9050102@redhat.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 30 Mar 2015 14:28:12 +0200
+Subject: [PATCH v2 2/5] PCI: st: Add Device Tree bindings for sti pcie
+In-Reply-To: <20150317114213.GH27081@e106497-lin.cambridge.arm.com>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1426515635-9466-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20150317114213.GH27081@e106497-lin.cambridge.arm.com>
+Message-ID: <CAG374jCm6CREcqKsXYnXHTNCOuaokNA11Sv6_JSW13Vdeo-tHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi Liviu,
 
-On Saturday 28 March 2015 02:41 AM, Pratyush Anand wrote:
-> Hi Geoff,
+You're right, i removed configuration space from the ranges.
+
+Thanks for reviewing.
+
+Gabriel
+
+On 17 March 2015 at 12:42, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> Hi Gabriel,
 >
-> On Friday 27 March 2015 10:53 PM, Geoff Levand wrote:
->> Hi Pratyush,
+> On Mon, Mar 16, 2015 at 02:20:32PM +0000, Gabriel FERNANDEZ wrote:
+>> sti pcie is built around a Synopsis Designware PCIe IP.
 >>
->> On Wed, 2015-03-25 at 15:55 +0530, Pratyush Anand wrote:
->>> So with following changes kexec load seems to complete without any
->>> error. However, kexec reboot does not work yet, Nothing after bye
->>> message :( (1st kernel booted with maxcpus=1)
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/pci/st-pcie.txt | 54 +++++++++++++++++++++++
+>>  1 file changed, 54 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pci/st-pcie.txt
 >>
->> 'Bye!' doesn't mean much, other than the first kernel has
->> almost shutdown.  I recommend for debugging you either define
->> ARM64_DEBUG_PORT for the kexec-tools build, or have a suitable
->> earlyprintk= on the kernel command line.  See the read_sink()
->> routine in kexec-arm64.c.
+>> diff --git a/Documentation/devicetree/bindings/pci/st-pcie.txt b/Documentation/devicetree/bindings/pci/st-pcie.txt
+>> new file mode 100644
+>> index 0000000..94aae2d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pci/st-pcie.txt
+>> @@ -0,0 +1,54 @@
+>> +STMicroelectronics STi PCIe controller
+>> +
+>> +This PCIe host controller is based on the Synopsis Designware PCIe IP
+>> +and thus inherits all the common properties defined in designware-pcie.txt.
+>> +
+>> +Required properties:
+>> + - compatible: "st,stih407-pcie"
+>> + - reg: base address and length of the pcie controller, mem-window address
+>> +   and length available to the controller.
+>> + - interrupts: A list of interrupt outputs of the controller. Must contain an
+>> +   entry for each entry in the interrupt-names property.
+>> + - interrupt-names: Should be "msi". STi interrupt that is asserted when an
+>> +   MSI is received.
+>> + - st,syscfg : should be a phandle of the syscfg node. Also contains syscfg
+>> +   offset for IP configuration.
+>> + - resets, reset-names: the power-down and soft-reset lines of PCIe IP.
+>> +   Associated names must be "powerdown" and "softreset".
+>> + - phys, phy-names: the phandle for the PHY device.
+>> +   Associated name must be "pcie"
+>> +
+>> +Optional properties:
+>> + - reset-gpio: a GPIO spec to define which pin is connected to the bus reset.
+>> +
+>> +Example:
+>> +
+>> +pcie0: pcie at 9b00000 {
+>> +     compatible = "st,stih407-pcie", "snps,dw-pcie";
+>> +     device_type = "pci";
+>> +     reg = <0x09b00000 0x4000>,      /* dbi cntrl registers */
+>> +           <0x2fff0000 0x00010000>,  /* configuration space */
+>> +           <0x40000000 0x80000000>;  /* lmi mem window */
+>> +     reg-names = "dbi", "config", "mem-window";
+>> +     st,syscfg = <&syscfg_core 0xd8 0xe0>;
+>> +     #address-cells = <3>;
+>> +     #size-cells = <2>;
+>> +     ranges = <0x00000800 0 0x2fff0000 0x2fff0000 0 0x00010000   /* configuration space */
+>
+> Unless you are trying to support some legacy code please remove the configuration space from the ranges.
+> There is no resource type associated with config space and the generic parser will give you back an
+> invalid resource type. The other reason for that is that if you really claim to be ECAM compliant by
+> adding the config space here you need way more than 64K of space.
+>
+> Best regards,
+> Liviu
+>
+>> +               0x82000000 0 0x20000000 0x20000000 0 0x0FFF0000>; /* non-prefetchable memory */
+>> +     num-lanes = <1>;
+>> +     interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+>> +     interrupt-names = "msi";
+>> +     #interrupt-cells = <1>;
+>> +     interrupt-map-mask = <0 0 0 7>;
+>> +     interrupt-map = <0 0 0 1 &intc GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>, /* INT A */
+>> +                     <0 0 0 2 &intc GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>, /* INT B */
+>> +                     <0 0 0 3 &intc GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>, /* INT C */
+>> +                     <0 0 0 4 &intc GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>; /* INT D */
+>> +
+>> +     resets = <&powerdown STIH407_PCIE0_POWERDOWN>,
+>> +              <&softreset STIH407_PCIE0_SOFTRESET>;
+>> +     reset-names = "powerdown",
+>> +                   "softreset";
+>> +     phys = <&phy_port0 PHY_TYPE_PCIE>;
+>> +     phy-names = "pcie";
+>> +};
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>
 >
-
-Problem seems to be related to compilation of purgatory code.
-
-For example see here:
-
-   70 0000000000000120 <purgatory>:
-   71      120:       a9bf7bfd        stp     x29, x30, [sp,#-16]!
-   72      124:       910003fd        mov     x29, sp
-   73      128:       58000100        ldr     x0, 148 <purgatory+0x28>
-   74      12c:       94000000        bl      544 <printf>
-
-
-So, when it executes instruction at address 0x128 in above code, it does 
-not contain correct address of data where "I'm in purgatory" is located. 
-It seems that code has been compiled as 32 bit.
-
-PC: 0x400415012c , PSTATE: 0x400003c9
-(gdb) monitor reg x0
-x0 (/64): 0x00000000041568F8
-(gdb) monitor mdw 0x00000000041568F8 4
-0x41568f8: fffefffe fffefffe fffefffe fffefffe  : ................
-
-The buffer location passed to printf is not correct.
-
-Similarly, even if ARM64_DEBUG_PORT is programmed with correct UART TX 
-register, arm64_sink is not modified correctly when elf_rel_set_symbol 
-is called.
-
-So correct data is at 0x00000040041568F8 and not 0x00000000041568F8
-
-(gdb) monitor mdw 0x00000040041568F8 4
-0x40041568f8: 206d2749 70206e69 61677275 79726f74  : I'm in purgatory
-
-
-should n't the pc relative instruction like adrp be generated instead of 
-ldr.
-
-What does -mcmodel=large cflag do? May be it is causing to generate such 
-instruction.
-
-
-~Pratyush
+> --
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
+>
