@@ -1,27 +1,30 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 31 Mar 2015 21:14:46 +0800
-Subject: [PATCH v2 resend 01/14] crypto: sha512: implement base layer for
- SHA-512
-In-Reply-To: <1427708913-29678-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1427708913-29678-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427708913-29678-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150331131446.GA17133@gondor.apana.org.au>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 31 Mar 2015 15:18:34 +0200
+Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
+In-Reply-To: <20150330174315.GD15655@arm.com>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+ <20150330174315.GD15655@arm.com>
+Message-ID: <20150331131834.GE4441@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 11:48:20AM +0200, Ard Biesheuvel wrote:
-> To reduce the number of copies of boilerplate code throughout
-> the tree, this patch implements generic glue for the SHA-512
-> algorithm. This allows a specific arch or hardware implementation
-> to only implement the special handling that it needs.
+Hi Will,
+
+On Mon, Mar 30, 2015 at 06:43:15PM +0100, Will Deacon wrote:
+> Whilst I'm still a bit worried about the ability of the IOMMU driver to do
+> very much in the ->domain_alloc callback (since we don't know which IOMMU
+> instance the domain is for), it doesn't leave us any worse off than we
+> currently are.
+
+The IOMMU driver should just allocate the data-structures for a domain
+in the domain_alloc call-back. It should not be necessary to care about
+any relations of the domain with specific iommu instances.
+ 
+> So, for the arm-smmu patch and the core IOMMU changes:
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 
-Creating yet another module for this is too much.  Please just
-add these generic helpers to the generic module.
+Thanks a lot!
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+
+	Joerg
