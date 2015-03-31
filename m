@@ -1,81 +1,25 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 31 Mar 2015 08:43:30 +0200
-Subject: [PATCH 2/2] ARM: dts: s3c-rtc: Use s3c6410-rtc instead of
- exynos3250-rtc
-In-Reply-To: <5519DE76.4080803@samsung.com>
-References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
- <1427728773-29065-3-git-send-email-k.kozlowski@samsung.com>
- <5519DE76.4080803@samsung.com>
-Message-ID: <CABxcv=nDca+B1cpZ3d6PhLmpU-RuFgjGZiNCX5X2HivdAPnt-g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Mar 2015 07:43:38 +0100
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <20150331064338.GE2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 1:38 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> On 03/31/2015 12:19 AM, Krzysztof Kozlowski wrote:
->> Mark "samsung,exynos3250-rtc" compatible as deprecated because it
->> duplicates the "samsung,s3c6410-rtc". Use "samsung,s3c6410-rtc" on
->> Exynos3250 and Exynos4415 boards.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  Documentation/devicetree/bindings/rtc/s3c-rtc.txt | 3 ++-
->>  arch/arm/boot/dts/exynos3250.dtsi                 | 2 +-
->>  arch/arm/boot/dts/exynos4415.dtsi                 | 2 +-
->>  3 files changed, 4 insertions(+), 3 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
->> index ab757b84daa7..ac2fcd6ff4b8 100644
->> --- a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
->> +++ b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
->> @@ -6,7 +6,8 @@ Required properties:
->>      * "samsung,s3c2416-rtc" - for controllers compatible with s3c2416 rtc.
->>      * "samsung,s3c2443-rtc" - for controllers compatible with s3c2443 rtc.
->>      * "samsung,s3c6410-rtc" - for controllers compatible with s3c6410 rtc.
->> -    * "samsung,exynos3250-rtc" - for controllers compatible with exynos3250 rtc.
->> +    * "samsung,exynos3250-rtc" - (deprecated) for controllers compatible with
->> +                                 exynos3250 rtc (use "samsung,s3c6410-rtc").
->>  - reg: physical base address of the controller and length of memory mapped
->>    region.
->>  - interrupts: Two interrupt numbers to the cpu should be specified. First
->> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->> index e3bfb11c6ef8..8d58b550e925 100644
->> --- a/arch/arm/boot/dts/exynos3250.dtsi
->> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->> @@ -189,7 +189,7 @@
->>               };
->>
->>               rtc: rtc at 10070000 {
->> -                     compatible = "samsung,exynos3250-rtc";
->> +                     compatible = "samsung,s3c6410-rtc";
->>                       reg = <0x10070000 0x100>;
->>                       interrupts = <0 73 0>, <0 74 0>;
->>                       interrupt-parent = <&pmu_system_controller>;
->> diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
->> index 5caea996e090..186cb8465683 100644
->> --- a/arch/arm/boot/dts/exynos4415.dtsi
->> +++ b/arch/arm/boot/dts/exynos4415.dtsi
->> @@ -177,7 +177,7 @@
->>               };
->>
->>               rtc: rtc at 10070000 {
->> -                     compatible = "samsung,exynos3250-rtc";
->> +                     compatible = "samsung,s3c6410-rtc";
->>                       reg = <0x10070000 0x100>;
->>                       interrupts = <0 73 0>, <0 74 0>;
->>                       status = "disabled";
->>
->
-> Looks good to me.
->
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->
-> Thanks,
-> Chanwoo Choi
-> --
+On Mon, Mar 30, 2015 at 08:16:22PM -0700, Scott Branden wrote:
 
-Looks good to me also.
+> The audio PLL is embedded in the audio block and only used
+> by the audio block. The audio PLL registers are also in the middle of 
+> the audio register map.
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-
-Best regards,
-Javier
+When you say it's only used by the audio block do you mean to say that
+the audio block exposes no clock signals other than the bit and frame
+clocks?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/c196a976/attachment-0001.sig>
