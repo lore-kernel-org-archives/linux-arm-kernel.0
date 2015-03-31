@@ -1,79 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 Mar 2015 07:43:38 -0700
-Subject: [PATCH] ARM: dts: sun7i: Add Goodix GT911 nodes for Wexler TAB7200
-In-Reply-To: <1427789897-4085-1-git-send-email-mamlinav@gmail.com>
-References: <1427789897-4085-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <20150331144338.GG23664@lukather>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 31 Mar 2015 22:13:54 +0300
+Subject: [PATCHv6 01/34] ARM: OMAP2+: PRCM: rename of_prcm_init to
+ omap_prcm_init
+In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
+References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This avoids conflicts in the global namespace, and is more descriptive
+of the purpose anyway.
 
-On Tue, Mar 31, 2015 at 11:18:17AM +0300, Aleksei Mamlin wrote:
-> This patch adds nodes for the Goodix GT911 touchscreen controller found
-> on the Wexler TAB7200 tablet. Controller uses one of following I2C
-> addresses: 0x5d or 0x14, so just add two nodes.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/io.c         |    2 +-
+ arch/arm/mach-omap2/prm.h        |    2 +-
+ arch/arm/mach-omap2/prm_common.c |    8 +++++++-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
 
-In which case are these different addresses encountered? Different
-revisions of the same board?
-
-> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
-> ---
-> DT support for the Goodix GT911 touchscreen controller has been queued up
-> by Dmitry Torokhov for merging into 4.1:
-> https://git.kernel.org/cgit/linux/kernel/git/dtor/input.git/commit/?h=next&id=771d8f1b178e7e09fcc641fccd48852958dbc329
-> 
-> IRQ flags are set by the touchscreen controller driver, so use IRQ_TYPE_NONE.
-> 
->  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> index 2ad3b09..34e2bce 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> @@ -101,6 +101,20 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&i2c2_pins_a>;
->  	status = "okay";
-> +
-> +	gt911 at 5d {
-
-The node name should be the class of the device. touchscreen in this
-case.
-
-> +		compatible = "goodix,gt911";
-> +		reg = <0x5d>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <21 IRQ_TYPE_NONE>; /* EINT21 (PH21) */
-
-Unfortunately, IRQ_TYPE_NONE is not a valid value for the GIC
-bindings.
-
-You're also not adding a pinctrl group for that pin?
-
-> +	};
-> +
-> +	gt911 at 14 {
-> +		compatible = "goodix,gt911";
-> +		reg = <0x14>;
-> +		interrupt-parent = <&pio>;
-> +		interrupts = <21 IRQ_TYPE_NONE>; /* EINT21 (PH21) */
-> +	};
-
-And nodes should be ordered by addresses ascending order.
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index c4871c5..f504f71 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -764,7 +764,7 @@ int __init omap_clk_init(void)
+ 	ti_clk_init_features();
+ 
+ 	if (of_have_populated_dt()) {
+-		ret = of_prcm_init();
++		ret = omap_prcm_init();
+ 		if (ret)
+ 			return ret;
+ 
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index b9061a6..ba9b933 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -19,7 +19,7 @@
+ extern void __iomem *prm_base;
+ extern u16 prm_features;
+ extern void omap2_set_globals_prm(void __iomem *prm);
+-int of_prcm_init(void);
++int omap_prcm_init(void);
+ void omap3_prcm_legacy_iomaps_init(void);
+ # endif
+ 
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index bfaa7ba..c5cfaa9 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -625,7 +625,13 @@ static struct ti_clk_ll_ops omap_clk_ll_ops = {
+ 	.clk_writel = prm_clk_writel,
+ };
+ 
+-int __init of_prcm_init(void)
++/**
++ * omap_prcm_init - low level init for the PRCM drivers
++ *
++ * Initializes the low level clock infrastructure for PRCM drivers.
++ * Returns 0 in success, negative error value in failure.
++ */
++int __init omap_prcm_init(void)
+ {
+ 	struct device_node *np;
+ 	void __iomem *mem;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/a6c2adac/attachment.sig>
+1.7.9.5
