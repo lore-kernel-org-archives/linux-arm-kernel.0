@@ -1,46 +1,81 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 31 Mar 2015 21:30:50 +0530
-Subject: [PATCH 1/3] phy: core: Add devm_of_phy_get_by_index to phy-core
-In-Reply-To: <20150326230707.GB18887@dtor-ws>
-References: <1426885630-32429-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426885630-32429-2-git-send-email-arun.ramamurthy@broadcom.com>
- <20150320212645.GA25405@dtor-ws> <550C9134.9020003@broadcom.com>
- <551330B5.6030901@ti.com> <55134D10.2070805@broadcom.com>
- <20150326230707.GB18887@dtor-ws>
-Message-ID: <551AC4B2.4090609@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 31 Mar 2015 18:04:01 +0200
+Subject: [PATCH v2] ARM: mvebu: Disable CPU Idle on Armada 38x
+In-Reply-To: <1424889050-1008-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1424889050-1008-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20150331180401.177f5124@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Gregory CLEMENT,
 
+On Wed, 25 Feb 2015 19:30:50 +0100, Gregory CLEMENT wrote:
+> On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
+> Idle is enabled. Waiting for a solution to this issue, this patch
+> disables the CPU Idle support for this SoC.
+> 
+> As CPU Hot plug support also uses some of the CPU Idle functions it is
+> also affected by the same issue. This patch disables it also for the
+> Armada 38x SoCs.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: <stable@vger.kernel.org> # v3.17 +
 
-On Friday 27 March 2015 04:37 AM, Dmitry Torokhov wrote:
-> On Wed, Mar 25, 2015 at 05:04:32PM -0700, Arun Ramamurthy wrote:
->>
->>
->> On 15-03-25 03:03 PM, Kishon Vijay Abraham I wrote:
->>> Hi,
->>>
->>> On Saturday 21 March 2015 02:59 AM, Arun Ramamurthy wrote:
->>>>
->>>>
->>>> On 15-03-20 02:26 PM, Dmitry Torokhov wrote:
->>>>> Hi Arun,
->>>>>
->>>>> On Fri, Mar 20, 2015 at 02:07:08PM -0700, Arun Ramamurthy wrote:
->>>>>> Adding devm_of_phy_get_by_index to get phys by supplying an index
->>>>>> and not a phy name when multiple phys are declared
->>>
->>> I think a bit more explanation on why get_by_index is needed here.
->> Thanks Kison. Can you be more specific? I am unsure of what more I
->> can explain here.
->
-> We just need to mention that some generic drivers, such as ehci, may use
-> multiple phys, and for such drivers referencing phy(s) by name(s) does
-> not make sense. Instead of inventing elaborate naming schemes and
-> producing custom code to iterate over names, such drivers are better of
-> using nameless phy bindings and using this newly introduced API to
-> iterate through them.
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-+1
+I tested on Armada 38x, and indeed CPU hotplug is properly disabled,
+and it doesn't prevent suspend/resume (not supported yet in mainline,
+but hopefully soon to be supported).
 
--Kishon
+Some minor comments below.
+
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+> index 8b9f5e202ccf..2145f192662f 100644
+> --- a/arch/arm/mach-mvebu/pmsu.c
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -415,6 +415,9 @@ static __init int armada_38x_cpuidle_init(void)
+>  	void __iomem *mpsoc_base;
+>  	u32 reg;
+>  
+> +	pr_warn("CPU Idle is currently broken on Armada 38x: disabling");
+
+Idle -> idle
+
+> +	return 0;
+> +
+>  	np = of_find_compatible_node(NULL, NULL,
+>  				     "marvell,armada-380-coherency-fabric");
+>  	if (!np)
+> @@ -469,13 +472,23 @@ static __init int armada_xp_cpuidle_init(void)
+>  static int __init mvebu_v7_cpu_pm_init(void)
+>  {
+>  	struct device_node *np;
+> -	int ret;
+> +	int ret = 0;
+
+Not clear why this change is needed.
+
+>  
+>  	np = of_find_matching_node(NULL, of_pmsu_table);
+>  	if (!np)
+>  		return 0;
+>  	of_node_put(np);
+>  
+> +	/*
+> +	 * Currently the CPU Idle support for Armada 38x is broken, as
+> +	 * the CPU Hotplug uses some of the CPU Idle functions it is
+> +	 * broken too, so let's disable it
+> +	 */
+> +	if (of_machine_is_compatible("marvell,armada380")) {
+> +		cpu_hotplug_disable();
+> +		pr_warn("CPU Hotplug support is currently broken on Armada 38x: disabling");
+
+Hotplug -> hotplug.
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
