@@ -1,21 +1,46 @@
-From: byan@nvidia.com (Bo Yan)
-Date: Mon, 30 Mar 2015 19:18:42 -0700
-Subject: a question about run-time patching for heterogeneous cores.
-Message-ID: <551A0402.90903@nvidia.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Tue, 31 Mar 2015 08:32:01 +0530
+Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+References: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+Message-ID: <CAJe_ZheO1iNKj80798gT8RLcYoYo3xky3urw=ke4x-3wKdtZ9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18 March 2015 at 11:14, Vincent Yang <vincent.cw.yang@gmail.com> wrote:
+> Hi Arnd and Olof,
+>
+> Please consider pulling in these patches for series of Fujitsu SoC
+> based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
+>
+> The MHU driver is already queued in Mailbox tree.
+>
+> Thanks,
+>
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+>
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+> s7x-arch-pull
+>
+> for you to fetch changes up to 9cf417fee0bbea9296791fa9a15ab289307bb26a:
+>
+>   ARM: MB86S7x: Add configs (2015-03-17 11:22:40 +0530)
+>
+> ----------------------------------------------------------------
+> Jassi Brar (6):
+>       ARM: Add platform support for Fujitsu MB86S7X SoCs
+>       ARM: MB86S7X: Add MCPM support
+>       clk: Add clock driver for mb86s7x
+>       dt: mb86s7x: add dt files for MB86S7x evbs
+>       of: add Fujitsu vendor prefix
+>       ARM: MB86S7x: Add configs
+>
+Hi Arnd, Hi Olof,
+   A polite reminder on the pull request. Or do we miss doing something?
 
-The current code for arm64 run-time patching works fine if all CPUs are 
-the same, but doesn't seem to handle the case when CPUs are of different 
-type. For example, when you have a mix of A53 and A57 cores, currently 
-the errata WARs can be applied irrespective of A53 or A57 since the code 
-in need of patching are shared.
-
-It doesn't look like the current WARs will cause functional problems 
-across different CPU cores. On the other hand, is there a perf issue due 
-to the same errata WARs being applied to different cores?
-
-Thanks
-
-Bo
+Thanks.
+Jassi
