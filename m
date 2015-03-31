@@ -1,98 +1,32 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 31 Mar 2015 13:10:38 +0200
-Subject: [PATCH net-next] ethernet: Use bool function returns of true/false
- instead of 1/0
-In-Reply-To: <1427678712.2715.52.camel@perches.com>
-References: <201503260524.AdqSbov9%fengguang.wu@intel.com>	
- <20150325215525.GA26868@athens>	
- <20150329.121655.2092434262655191613.davem@davemloft.net>
- <1427678712.2715.52.camel@perches.com>
-Message-ID: <551A80AE.7020506@monstr.eu>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Mar 2015 12:16:51 +0100
+Subject: [PATCH] spi: xilinx: Use standard num-cs binding
+In-Reply-To: <74214fc9-e5e4-42db-bd85-51ed02975388@BN1AFFO11FD026.protection.gbl>
+References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
+ <20150308190012.GV28806@sirena.org.uk>
+ <2a81c738-f7e2-4387-b04c-05c9892ba8e4@BN1AFFO11FD026.protection.gbl>
+ <20150327175318.GG1743@sirena.org.uk>
+ <1bd88fda-314c-496a-ba8b-e9292f9c411b@BY2FFO11FD023.protection.gbl>
+ <20150331054714.GA2869@sirena.org.uk>
+ <74214fc9-e5e4-42db-bd85-51ed02975388@BN1AFFO11FD026.protection.gbl>
+Message-ID: <20150331111651.GL2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2015 03:25 AM, Joe Perches wrote:
-> Use bool constants as the return values instead of 1 and 0.
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->> To be honest I'd might rather get bunches of these, there has to be a ton
->> of them, than a slow trickle of one every few weeks/days.
-> 
-> There aren't too many...
-> 
->  drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c | 2 +-
->  drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c | 4 ++--
->  drivers/net/ethernet/xilinx/xilinx_emaclite.c    | 2 +-
->  3 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-> index 039b0c1..9980912 100644
-> --- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-> +++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
-> @@ -11610,7 +11610,7 @@ static bool bnx2x_get_dropless_info(struct bnx2x *bp)
->  	u32 cfg;
->  
->  	if (IS_VF(bp))
-> -		return 0;
-> +		return false;
->  
->  	if (IS_MF(bp) && !CHIP_IS_E1x(bp)) {
->  		/* Take function: tmp = func */
-> diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-> index 02ffb30..ccaecb1 100644
-> --- a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-> +++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
-> @@ -1351,7 +1351,7 @@ static bool reg_pattern_test(struct ixgbe_adapter *adapter, u64 *data, int reg,
->  
->  	if (ixgbe_removed(adapter->hw.hw_addr)) {
->  		*data = 1;
-> -		return 1;
-> +		return true;
->  	}
->  	for (pat = 0; pat < ARRAY_SIZE(test_pattern); pat++) {
->  		before = ixgbe_read_reg(&adapter->hw, reg);
-> @@ -1376,7 +1376,7 @@ static bool reg_set_and_check(struct ixgbe_adapter *adapter, u64 *data, int reg,
->  
->  	if (ixgbe_removed(adapter->hw.hw_addr)) {
->  		*data = 1;
-> -		return 1;
-> +		return true;
->  	}
->  	before = ixgbe_read_reg(&adapter->hw, reg);
->  	ixgbe_write_reg(&adapter->hw, reg, write & mask);
-> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> index 2111b91..6008eee 100644
-> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-> @@ -1062,7 +1062,7 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
->  	} else {
->  		dev_warn(&ofdev->dev, "Parameter %s not found,"
->  			"defaulting to false\n", s);
-> -		return 0;
-> +		return false;
->  	}
->  }
+On Tue, Mar 31, 2015 at 10:16:57AM +0200, Michal Simek wrote:
+> On 03/31/2015 07:47 AM, Mark Brown wrote:
 
-Kernel-doc should be also fixed in spite of this whole function is just
-broken and binding should be fixed to use of_property_read_bool for
-these properties.
+> > num-cs *is* a software setting.
 
-Thanks,
-Michal
+> ok - what to do with that? Remove it because it shouldn't be passed via DT?
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
+Well, there's a lot of existing users to check and clean up some of
+which currently rely on it which will take time to deal with.  Removing
+it while some drivers rely on using it isn't ideal.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/a20eff93/attachment-0001.sig>
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/beaf67aa/attachment.sig>
