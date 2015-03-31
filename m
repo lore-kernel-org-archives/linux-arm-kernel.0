@@ -1,150 +1,50 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 31 Mar 2015 16:40:43 +0100
-Subject: [PATCH v2 1/4] linux-headers: partial sync from my kernel tree (DEV)
-In-Reply-To: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
-References: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1427816446-31586-2-git-send-email-alex.bennee@linaro.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 31 Mar 2015 18:41:19 +0300
+Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
+In-Reply-To: <551ABCBE.3030005@ti.com>
+References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
+ <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
+ <201503281633.02801.marex@denx.de>
+ <20150331113448.GN12479@tarshish> <551ABCBE.3030005@ti.com>
+Message-ID: <20150331154119.GO12479@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I assume I'll properly merge the KVM Headers direct from Linux when
-done. These headers came from:
+Hi Kishon,
 
-https://git.linaro.org/people/alex.bennee/linux.git/shortlog/refs/heads/guest-debug/4.0-rc6-v2
+On Tue, Mar 31, 2015 at 08:56:54PM +0530, Kishon Vijay Abraham I wrote:
+> On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
+> >On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
+> >>On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
+> >>>Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
+> >>>Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
+> >>>usb2 host.
+> >>>
+> >>>The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
+> >>>different enough to merit its own driver. Also, this driver uses the
+> >>>generic phy infrastructure.
+> >>
+> >>the register set looks very similar to MXS one indeed. How is it different
+> >>please ?
+> >
+> >Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
+> >defined in the Digicolor one. Some have different meaning, and some are
+> >reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
+> >range. Also, the Digicolor phy does not have anatop registers.
+> 
+> I think we should try adding support for this in the same driver.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+The only code that can actually be shared between the driver is the two lines 
+usb_phy .on_connect callback routine. The init sequence that takes most of the 
+digicolor driver is totally different. Using a single driver for both PHYs 
+does not make much sense, IMHO.
 
----
-v2
-  - update ABI to include ->far
+Besides, phy-mxs-usb.c uses the deprecated usb_phy framework. So we first need 
+to port this driver to the generic phy framework.
 
-diff --git a/linux-headers/asm-arm64/kvm.h b/linux-headers/asm-arm64/kvm.h
-index 3ef77a4..73f21e4 100644
---- a/linux-headers/asm-arm64/kvm.h
-+++ b/linux-headers/asm-arm64/kvm.h
-@@ -100,10 +100,25 @@ struct kvm_sregs {
- struct kvm_fpu {
- };
- 
-+/*
-+ * See ARM ARM D7.3: Debug Registers
-+ *
-+ * The control registers are architecturally defined as 32 bits but are
-+ * stored as 64 bit values along side the value registers and aligned
-+ * with the rest 64 bit registers in the normal CPU context.
-+ */
-+#define KVM_ARM_NDBG_REGS 16
- struct kvm_guest_debug_arch {
-+	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
-+	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
-+	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
-+	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
- };
- 
- struct kvm_debug_exit_arch {
-+	__u64 pc;
-+	__u32 hsr;
-+	__u64 far;	/* used for watchpoints */
- };
- 
- struct kvm_sync_regs {
-@@ -207,4 +222,11 @@ struct kvm_arch_memory_slot {
- 
- #endif
- 
-+/*
-+ * Architecture related debug defines - upper 16 bits of
-+ * kvm_guest_debug->control
-+ */
-+#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
-+#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
-+
- #endif /* __ARM_KVM_H__ */
-diff --git a/linux-headers/asm-powerpc/kvm.h b/linux-headers/asm-powerpc/kvm.h
-index ab4d473..1731569 100644
---- a/linux-headers/asm-powerpc/kvm.h
-+++ b/linux-headers/asm-powerpc/kvm.h
-@@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
-  * and upper 16 bits are architecture specific. Architecture specific defines
-  * that ioctl is for setting hardware breakpoint or software breakpoint.
-  */
--#define KVM_GUESTDBG_USE_SW_BP		0x00010000
--#define KVM_GUESTDBG_USE_HW_BP		0x00020000
-+#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
-+#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
- 
- /* definition of registers in kvm_run */
- struct kvm_sync_regs {
-diff --git a/linux-headers/asm-x86/kvm.h b/linux-headers/asm-x86/kvm.h
-index d7dcef5..1438202 100644
---- a/linux-headers/asm-x86/kvm.h
-+++ b/linux-headers/asm-x86/kvm.h
-@@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
- 	__u64 dr7;
- };
- 
--#define KVM_GUESTDBG_USE_SW_BP		0x00010000
--#define KVM_GUESTDBG_USE_HW_BP		0x00020000
-+#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
-+#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
- #define KVM_GUESTDBG_INJECT_DB		0x00040000
- #define KVM_GUESTDBG_INJECT_BP		0x00080000
- 
-diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
-index 60a54c8..fa6c2ac 100644
---- a/linux-headers/linux/kvm.h
-+++ b/linux-headers/linux/kvm.h
-@@ -226,6 +226,7 @@ struct kvm_run {
- 			__u32 count;
- 			__u64 data_offset; /* relative to kvm_run start */
- 		} io;
-+		/* KVM_EXIT_DEBUG */
- 		struct {
- 			struct kvm_debug_exit_arch arch;
- 		} debug;
-@@ -274,6 +275,7 @@ struct kvm_run {
- 			__u32 data;
- 			__u8  is_write;
- 		} dcr;
-+		/* KVM_EXIT_INTERNAL_ERROR */
- 		struct {
- 			__u32 suberror;
- 			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
-@@ -284,6 +286,7 @@ struct kvm_run {
- 		struct {
- 			__u64 gprs[32];
- 		} osi;
-+		/* KVM_EXIT_PAPR_HCALL */
- 		struct {
- 			__u64 nr;
- 			__u64 ret;
-@@ -522,8 +525,16 @@ struct kvm_s390_irq {
- 
- /* for KVM_SET_GUEST_DEBUG */
- 
--#define KVM_GUESTDBG_ENABLE		0x00000001
--#define KVM_GUESTDBG_SINGLESTEP		0x00000002
-+#define KVM_GUESTDBG_ENABLE		(1 << 0)
-+#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
-+
-+/*
-+ * Architecture specific stuff uses the top 16 bits of the field,
-+ * however there is some shared commonality for the common cases
-+ */
-+#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
-+#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
-+
- 
- struct kvm_guest_debug {
- 	__u32 control;
-@@ -760,6 +771,8 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_PPC_ENABLE_HCALL 104
- #define KVM_CAP_CHECK_EXTENSION_VM 105
- #define KVM_CAP_S390_USER_SIGP 106
-+#define KVM_CAP_GUEST_DEBUG_HW_BPS 107
-+#define KVM_CAP_GUEST_DEBUG_HW_WPS 108
- 
- #ifdef KVM_CAP_IRQ_ROUTING
- 
+baruch
+
 -- 
-2.3.4
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
