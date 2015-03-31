@@ -1,175 +1,134 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Mar 2015 08:40:27 +0100
-Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type
- constants in dt-bindings/phy/phy.h
-In-Reply-To: <551A2D4D.1010601@ti.com>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
- <551A2D4D.1010601@ti.com>
-Message-ID: <20150331074027.GH9447@x1>
+From: ykk@rock-chips.com (Yang Kuankuan)
+Date: Tue, 31 Mar 2015 03:45:15 -0400
+Subject: [PATCH RFC 06/11] drm: bridge/dw_hdmi: introduce interfaces to
+ enable and disable audio
+In-Reply-To: <E1YcfXu-0002v9-SB@rmk-PC.arm.linux.org.uk>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+ <E1YcfXu-0002v9-SB@rmk-PC.arm.linux.org.uk>
+Message-ID: <551A508B.1010106@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+Hi Russell,
 
-> Hi Patrice, Maxime,
-> 
-> On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
-> >Now there are generic phy type constants declared in phy.h, migrate over to
-> >using them rather than defining our own. This change has been done as one
-> >atomic commit to be bisectable.
-> >
-> >Note: The values of the defines are the same, so there is no ABI breakage
-> >with this patch.
-> >
-> >Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> >Acked-by: Rob Herring <robh@kernel.org>
-> >Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Are you okay for this patch to go via PHY tree? It modifies arch/arm/boot/dts
-> /stih416.dtsi.
+On 03/30/2015 03:40 PM, Russell King wrote:
+> iMX6 devices from an errata (ERR005174) where the audio FIFO can be
+> emptied while it is partially full, resulting in misalignment of the
+> audio samples.
+>
+> To prevent this, the errata workaround recommends writing N as zero
+> until the audio FIFO has been loaded by DMA.  Writing N=0 prevents the
+> HDMI bridge from reading from the audio FIFO, effectively disabling
+> audio.
+>
+> This means we need to provide the audio driver with a pair of functions
+> to enable/disable audio.  These are dw_hdmi_audio_enable() and
+> dw_hdmi_audio_disable().
+>
+> A spinlock is introduced to ensure that setting the CTS/N values can't
+> race, ensuring that the audio driver calling the enable/disable
+> functions (which are called in an atomic context) can't race with a
+> modeset.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++++++++++++++++-
+>   include/drm/bridge/dw_hdmi.h     |  2 ++
+>   2 files changed, 35 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+> index 245d17e58dec..67f07d15c12b 100644
+> --- a/drivers/gpu/drm/bridge/dw_hdmi.c
+> +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/hdmi.h>
+>   #include <linux/mutex.h>
+>   #include <linux/of_device.h>
+> +#include <linux/spinlock.h>
+>   
+>   #include <drm/drm_of.h>
+>   #include <drm/drmP.h>
+> @@ -124,8 +125,12 @@ struct dw_hdmi {
+>   	struct i2c_adapter *ddc;
+>   	void __iomem *regs;
+>   
+> +	spinlock_t audio_lock;
+>   	struct mutex audio_mutex;
+>   	unsigned int sample_rate;
+> +	unsigned int audio_cts;
+> +	unsigned int audio_n;
+> +	bool audio_enable;
+>   	int ratio;
+>   
+>   	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+> @@ -347,7 +352,11 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+>   	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
+>   		__func__, sample_rate, ratio, pixel_clk, n, cts);
+>   
+> -	hdmi_set_cts_n(hdmi, cts, n);
+> +	spin_lock_irq(&hdmi->audio_lock);
+> +	hdmi->audio_n = n;
+> +	hdmi->audio_cts = cts;
+> +	hdmi_set_cts_n(hdmi, cts, hdmi->audio_enable ? n : 0);
+> +	spin_unlock_irq(&hdmi->audio_lock);
+>   }
+>   
+>   static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+> @@ -376,6 +385,28 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+>   }
+>   EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+>   
+> +void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&hdmi->audio_lock, flags);
+> +	hdmi->audio_enable = true;
+> +	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
+> +	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+> +}
+> +EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
+> +
+> +void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&hdmi->audio_lock, flags);
+> +	hdmi->audio_enable = false;
+> +	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
+> +	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
+> +}
+> +EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
+> +
 
-These files need to be changed simultaneously in order to prevent
-breakage during bisection and the like.  I think the best bet moving
-forward is to pull this into its own branch, tag it and send Maxime a
-pull-request to the immutable branch.  It's the best way to minimise
-merge conflicts during the v4.1 merge window.
+It is an smart way to operate audio status that do not relate to the audio
+interfaces (AHB or I2S), but I am not sure whether this will work on 
+rockchip
+platform, I will do some experiment to test it as soon as possible :)
 
-> >---
-> >  Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  8 ++++----
-> >  arch/arm/boot/dts/stih416.dtsi                          |  4 ++--
-> >  drivers/phy/phy-miphy365x.c                             | 14 +++++++-------
-> >  include/dt-bindings/phy/phy-miphy365x.h                 | 14 --------------
-> >  4 files changed, 13 insertions(+), 27 deletions(-)
-> >  delete mode 100644 include/dt-bindings/phy/phy-miphy365x.h
-> >
-> >diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >index 9802d5d..8772900 100644
-> >--- a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >+++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> >@@ -20,8 +20,8 @@ Required nodes	:  A sub-node is required for each channel the controller
-> >  Required properties (port (child) node):
-> >  - #phy-cells 	: Should be 1 (See second example)
-> >  		  Cell after port phandle is device type from:
-> >-			- MIPHY_TYPE_SATA
-> >-			- MIPHY_TYPE_PCI
-> >+			- PHY_TYPE_SATA
-> >+			- PHY_TYPE_PCI
-> >  - reg        	: Address and length of register sets for each device in
-> >  		  "reg-names"
-> >  - reg-names     : The names of the register addresses corresponding to the
-> >@@ -68,10 +68,10 @@ property, containing a phandle to the phy port node and a device type.
-> >
-> >  Example:
-> >
-> >-#include <dt-bindings/phy/phy-miphy365x.h>
-> >+#include <dt-bindings/phy/phy.h>
-> >
-> >  	sata0: sata at fe380000 {
-> >  		...
-> >-		phys	  = <&phy_port0 MIPHY_TYPE_SATA>;
-> >+		phys	  = <&phy_port0 PHY_TYPE_SATA>;
-> >  		...
-> >  	};
-> >diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> >index ea28eba..eeb7afe 100644
-> >--- a/arch/arm/boot/dts/stih416.dtsi
-> >+++ b/arch/arm/boot/dts/stih416.dtsi
-> >@@ -10,7 +10,7 @@
-> >  #include "stih416-clock.dtsi"
-> >  #include "stih416-pinctrl.dtsi"
-> >
-> >-#include <dt-bindings/phy/phy-miphy365x.h>
-> >+#include <dt-bindings/phy/phy.h>
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >  #include <dt-bindings/reset-controller/stih416-resets.h>
-> >  / {
-> >@@ -306,7 +306,7 @@
-> >  			reg             = <0xfe380000 0x1000>;
-> >  			interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
-> >  			interrupt-names = "hostc";
-> >-			phys	        = <&phy_port0 MIPHY_TYPE_SATA>;
-> >+			phys	        = <&phy_port0 PHY_TYPE_SATA>;
-> >  			phy-names       = "sata-phy";
-> >  			resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
-> >  					  <&softreset STIH416_SATA0_SOFTRESET>;
-> >diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> >index 51b459d..019c2d7 100644
-> >--- a/drivers/phy/phy-miphy365x.c
-> >+++ b/drivers/phy/phy-miphy365x.c
-> >@@ -25,7 +25,7 @@
-> >  #include <linux/mfd/syscon.h>
-> >  #include <linux/regmap.h>
-> >
-> >-#include <dt-bindings/phy/phy-miphy365x.h>
-> >+#include <dt-bindings/phy/phy.h>
-> >
-> >  #define HFC_TIMEOUT		100
-> >
-> >@@ -177,7 +177,7 @@ static u8 rx_tx_spd[] = {
-> >  static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
-> >  			      struct miphy365x_dev *miphy_dev)
-> >  {
-> >-	bool sata = (miphy_phy->type == MIPHY_TYPE_SATA);
-> >+	bool sata = (miphy_phy->type == PHY_TYPE_SATA);
-> >
-> >  	return regmap_update_bits(miphy_dev->regmap,
-> >  				  miphy_phy->ctrlreg,
-> >@@ -431,7 +431,7 @@ static int miphy365x_init(struct phy *phy)
-> >  	}
-> >
-> >  	/* Initialise Miphy for PCIe or SATA */
-> >-	if (miphy_phy->type == MIPHY_TYPE_PCIE)
-> >+	if (miphy_phy->type == PHY_TYPE_PCIE)
-> >  		ret = miphy365x_init_pcie_port(miphy_phy, miphy_dev);
-> >  	else
-> >  		ret = miphy365x_init_sata_port(miphy_phy, miphy_dev);
-> >@@ -455,8 +455,8 @@ int miphy365x_get_addr(struct device *dev, struct miphy365x_phy *miphy_phy,
-> >  		return ret;
-> >  	}
-> >
-> >-	if (!((!strncmp(name, "sata", 4) && type == MIPHY_TYPE_SATA) ||
-> >-	      (!strncmp(name, "pcie", 4) && type == MIPHY_TYPE_PCIE)))
-> >+	if (!((!strncmp(name, "sata", 4) && type == PHY_TYPE_SATA) ||
-> >+	      (!strncmp(name, "pcie", 4) && type == PHY_TYPE_PCIE)))
-> >  		return 0;
-> >
-> >  	miphy_phy->base = of_iomap(phynode, index);
-> >@@ -499,8 +499,8 @@ static struct phy *miphy365x_xlate(struct device *dev,
-> >
-> >  	miphy_phy->type = args->args[0];
-> >
-> >-	if (!(miphy_phy->type == MIPHY_TYPE_SATA ||
-> >-	      miphy_phy->type == MIPHY_TYPE_PCIE)) {
-> >+	if (!(miphy_phy->type == PHY_TYPE_SATA ||
-> >+	      miphy_phy->type == PHY_TYPE_PCIE)) {
-> >  		dev_err(dev, "Unsupported device type: %d\n", miphy_phy->type);
-> >  		return ERR_PTR(-EINVAL);
-> >  	}
-> >diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> >deleted file mode 100644
-> >index 8ef8aba..0000000
-> >--- a/include/dt-bindings/phy/phy-miphy365x.h
-> >+++ /dev/null
-> >@@ -1,14 +0,0 @@
-> >-/*
-> >- * This header provides constants for the phy framework
-> >- * based on the STMicroelectronics MiPHY365x.
-> >- *
-> >- * Author: Lee Jones <lee.jones@linaro.org>
-> >- */
-> >-#ifndef _DT_BINDINGS_PHY_MIPHY
-> >-#define _DT_BINDINGS_PHY_MIPHY
-> >-
-> >-#define MIPHY_TYPE_SATA		1
-> >-#define MIPHY_TYPE_PCIE		2
-> >-#define MIPHY_TYPE_USB		3
-> >-
-> >-#endif /* _DT_BINDINGS_PHY_MIPHY */
-> >
+Best regards.
+Yakir Yang
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>   /*
+>    * this submodule is responsible for the video data synchronization.
+>    * for example, for RGB 4:4:4 input, the data map is defined as
+> @@ -1579,6 +1610,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+>   	hdmi->encoder = encoder;
+>   
+>   	mutex_init(&hdmi->audio_mutex);
+> +	spin_lock_init(&hdmi->audio_lock);
+>   
+>   	of_property_read_u32(np, "reg-io-width", &val);
+>   
+> diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+> index 424b51f6a215..ab5d36e83ea2 100644
+> --- a/include/drm/bridge/dw_hdmi.h
+> +++ b/include/drm/bridge/dw_hdmi.h
+> @@ -62,5 +62,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+>   		 const struct dw_hdmi_plat_data *plat_data);
+>   
+>   void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
+> +void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
+> +void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
+>   
+>   #endif /* __IMX_HDMI_H__ */
