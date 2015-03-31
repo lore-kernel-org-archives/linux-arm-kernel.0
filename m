@@ -1,328 +1,449 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:05 +0300
-Subject: [PATCHv6 12/34] ARM: OMAP2+: CM: determine CM base address from
- device tree
+Date: Tue, 31 Mar 2015 22:14:08 +0300
+Subject: [PATCHv6 15/34] ARM: OMAP2+: PRM: move SoC specific init calls within
+ a generic API
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-13-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-16-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to provide the CM base address through a low-level API
-from the low-level IO init, as this information is available through DT.
-Re-routed the parsing function to be called from the CM drivers also to
-simplify the implementation under io.c.
+This gets rid of need for some exported driver APIs, and simplifies the
+initialization of the PRM driver. Done in preparation to make PRM a
+separate driver. The init data is now also passed to the SoC specific
+implementations, allowing future expansion to add feature flags etc.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm.h          |    1 +
- arch/arm/mach-omap2/cm2xxx.c      |    1 +
- arch/arm/mach-omap2/cm33xx.c      |    1 +
- arch/arm/mach-omap2/cm3xxx.c      |    2 +
- arch/arm/mach-omap2/cm_common.c   |   73 ++++++++++++++++++++++++++++++++++---
- arch/arm/mach-omap2/cminst44xx.c  |    1 +
- arch/arm/mach-omap2/io.c          |   14 +------
- arch/arm/mach-omap2/prcm-common.h |    6 +++
- arch/arm/mach-omap2/prm_common.c  |    1 -
- 9 files changed, 81 insertions(+), 19 deletions(-)
+ arch/arm/mach-omap2/io.c           |   21 +++++-----
+ arch/arm/mach-omap2/prcm-common.h  |    4 ++
+ arch/arm/mach-omap2/prm.h          |    1 +
+ arch/arm/mach-omap2/prm2xxx.c      |    3 +-
+ arch/arm/mach-omap2/prm2xxx.h      |    2 +-
+ arch/arm/mach-omap2/prm33xx.c      |    3 +-
+ arch/arm/mach-omap2/prm33xx.h      |    2 +-
+ arch/arm/mach-omap2/prm3xxx.c      |    4 +-
+ arch/arm/mach-omap2/prm3xxx.h      |    2 +-
+ arch/arm/mach-omap2/prm44xx.c      |    3 +-
+ arch/arm/mach-omap2/prm44xx.h      |    1 -
+ arch/arm/mach-omap2/prm44xx_54xx.h |    4 +-
+ arch/arm/mach-omap2/prm54xx.h      |    1 -
+ arch/arm/mach-omap2/prm7xx.h       |    2 +-
+ arch/arm/mach-omap2/prm_common.c   |   76 ++++++++++++++++++++++++++++++------
+ 15 files changed, 90 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
-index 748ac33..1fe3e6b 100644
---- a/arch/arm/mach-omap2/cm.h
-+++ b/arch/arm/mach-omap2/cm.h
-@@ -71,6 +71,7 @@ int omap_cm_module_disable(u8 part, u16 inst, u16 clkctrl_offs);
- extern int cm_register(struct cm_ll_data *cld);
- extern int cm_unregister(struct cm_ll_data *cld);
- int omap_cm_init(void);
-+int omap2_cm_base_init(void);
- 
- # endif
- 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index ef62ac9..f18c844 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -395,6 +395,7 @@ static struct cm_ll_data omap2xxx_cm_ll_data = {
- 
- int __init omap2xxx_cm_init(void)
- {
-+	omap2_cm_base_init();
- 	return cm_register(&omap2xxx_cm_ll_data);
- }
- 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index cc5aac7..221bca3 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -354,6 +354,7 @@ static struct cm_ll_data am33xx_cm_ll_data = {
- 
- int __init am33xx_cm_init(void)
- {
-+	omap2_cm_base_init();
- 	return cm_register(&am33xx_cm_ll_data);
- }
- 
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index ebead8f..88e6cb6 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -673,6 +673,8 @@ static struct cm_ll_data omap3xxx_cm_ll_data = {
- 
- int __init omap3xxx_cm_init(void)
- {
-+	omap2_clk_legacy_provider_init(TI_CLKM_CM, cm_base + OMAP3430_IVA2_MOD);
-+	omap2_cm_base_init();
- 	return cm_register(&omap3xxx_cm_ll_data);
- }
- 
-diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-index f3d578b..32af8fc 100644
---- a/arch/arm/mach-omap2/cm_common.c
-+++ b/arch/arm/mach-omap2/cm_common.c
-@@ -36,6 +36,8 @@ void __iomem *cm_base;
- /* cm2_base: base virtual address of the CM2 IP block (OMAP44xx only) */
- void __iomem *cm2_base;
- 
-+#define CM_NO_CLOCKS		0x1
-+
- /**
-  * omap2_set_globals_cm - set the CM/CM2 base addresses (for early use)
-  * @cm: CM base virtual address
-@@ -224,18 +226,79 @@ static struct omap_prcm_init_data cm2_data = {
- 	.index = TI_CLKM_CM2,
- };
- 
-+static struct omap_prcm_init_data omap2_prcm_data = {
-+	.index = TI_CLKM_CM,
-+	.flags = CM_NO_CLOCKS,
-+};
-+
-+static struct omap_prcm_init_data omap3_cm_data = {
-+	.index = TI_CLKM_CM,
-+
-+	/*
-+	 * IVA2 offset is a negative value, must offset the cm_base address
-+	 * by this to get it to positive side on the iomap
-+	 */
-+	.offset = -OMAP3430_IVA2_MOD,
-+};
-+
-+static struct omap_prcm_init_data am3_prcm_data = {
-+	.index = TI_CLKM_CM,
-+	.flags = CM_NO_CLOCKS,
-+};
-+
-+static struct omap_prcm_init_data am4_prcm_data = {
-+	.index = TI_CLKM_CM,
-+	.flags = CM_NO_CLOCKS,
-+};
-+
- static const struct of_device_id omap_cm_dt_match_table[] = {
--	{ .compatible = "ti,omap3-cm", .data = &cm_data },
-+	{ .compatible = "ti,omap2-prcm", .data = &omap2_prcm_data },
-+	{ .compatible = "ti,omap3-cm", .data = &omap3_cm_data },
- 	{ .compatible = "ti,omap4-cm1", .data = &cm_data },
- 	{ .compatible = "ti,omap4-cm2", .data = &cm2_data },
- 	{ .compatible = "ti,omap5-cm-core-aon", .data = &cm_data },
- 	{ .compatible = "ti,omap5-cm-core", .data = &cm2_data },
- 	{ .compatible = "ti,dra7-cm-core-aon", .data = &cm_data },
- 	{ .compatible = "ti,dra7-cm-core", .data = &cm2_data },
-+	{ .compatible = "ti,am3-prcm", .data = &am3_prcm_data },
-+	{ .compatible = "ti,am4-prcm", .data = &am4_prcm_data },
- 	{ }
- };
- 
- /**
-+ * omap2_cm_base_init - initialize iomappings for the CM drivers
-+ *
-+ * Detects and initializes the iomappings for the CM driver, based
-+ * on the DT data. Returns 0 in success, negative error value
-+ * otherwise.
-+ */
-+int __init omap2_cm_base_init(void)
-+{
-+	struct device_node *np;
-+	const struct of_device_id *match;
-+	struct omap_prcm_init_data *data;
-+	void __iomem *mem;
-+
-+	for_each_matching_node_and_match(np, omap_cm_dt_match_table, &match) {
-+		data = (struct omap_prcm_init_data *)match->data;
-+
-+		mem = of_iomap(np, 0);
-+		if (!mem)
-+			return -ENOMEM;
-+
-+		if (data->index == TI_CLKM_CM)
-+			cm_base = mem + data->offset;
-+
-+		if (data->index == TI_CLKM_CM2)
-+			cm2_base = mem + data->offset;
-+
-+		data->mem = mem;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-  * omap_cm_init - low level init for the CM drivers
-  *
-  * Initializes the low level clock infrastructure for CM drivers.
-@@ -244,7 +307,6 @@ static const struct of_device_id omap_cm_dt_match_table[] = {
- int __init omap_cm_init(void)
- {
- 	struct device_node *np;
--	void __iomem *mem;
- 	const struct of_device_id *match;
- 	const struct omap_prcm_init_data *data;
- 	int ret;
-@@ -252,11 +314,10 @@ int __init omap_cm_init(void)
- 	for_each_matching_node_and_match(np, omap_cm_dt_match_table, &match) {
- 		data = match->data;
- 
--		mem = of_iomap(np, 0);
--		if (!mem)
--			return -ENOMEM;
-+		if (data->flags & CM_NO_CLOCKS)
-+			continue;
- 
--		ret = omap2_clk_provider_init(np, data->index, mem);
-+		ret = omap2_clk_provider_init(np, data->index, data->mem);
- 		if (ret)
- 			return ret;
- 	}
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-index 9319034..4aed22d 100644
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -516,6 +516,7 @@ static struct cm_ll_data omap4xxx_cm_ll_data = {
- 
- int __init omap4_cm_init(void)
- {
-+	omap2_cm_base_init();
- 	omap_cm_base_init();
- 
- 	return cm_register(&omap4xxx_cm_ll_data);
 diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 46640c0..b43e09d 100644
+index 622ee3b..7632dfe 100644
 --- a/arch/arm/mach-omap2/io.c
 +++ b/arch/arm/mach-omap2/io.c
-@@ -387,7 +387,6 @@ void __init omap2420_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE), NULL);
+@@ -386,7 +386,7 @@ void __init omap2420_init_early(void)
+ 			       OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE));
+ 	omap2_control_base_init();
  	omap2xxx_check_revision();
- 	omap2xxx_prm_init();
+-	omap2xxx_prm_init();
++	omap2_prcm_base_init();
  	omap2xxx_cm_init();
-@@ -417,7 +416,6 @@ void __init omap2430_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE), NULL);
+ 	omap2xxx_voltagedomains_init();
+ 	omap242x_powerdomains_init();
+@@ -413,7 +413,7 @@ void __init omap2430_init_early(void)
+ 			       OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE));
+ 	omap2_control_base_init();
  	omap2xxx_check_revision();
- 	omap2xxx_prm_init();
+-	omap2xxx_prm_init();
++	omap2_prcm_base_init();
  	omap2xxx_cm_init();
-@@ -451,6 +449,8 @@ void __init omap3_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
-+
-+	/* XXX: remove this once OMAP3 is DT only */
- 	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE), NULL);
+ 	omap2xxx_voltagedomains_init();
+ 	omap243x_powerdomains_init();
+@@ -453,7 +453,8 @@ void __init omap3_init_early(void)
+ 	omap2_control_base_init();
  	omap3xxx_check_revision();
  	omap3xxx_check_features();
-@@ -552,7 +552,6 @@ void __init ti814x_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE), NULL);
+-	omap3xxx_prm_init();
++	omap2_prcm_base_init();
++	omap3xxx_prm_init(NULL);
+ 	omap3xxx_cm_init();
+ 	omap3xxx_voltagedomains_init();
+ 	omap3xxx_powerdomains_init();
+@@ -551,7 +552,7 @@ void __init ti814x_init_early(void)
+ 	omap2_control_base_init();
  	omap3xxx_check_revision();
  	ti81xx_check_features();
- 	am33xx_prm_init();
-@@ -573,7 +572,6 @@ void __init ti816x_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE), NULL);
+-	am33xx_prm_init();
++	omap2_prcm_base_init();
+ 	am33xx_cm_init();
+ 	omap3xxx_voltagedomains_init();
+ 	omap3xxx_powerdomains_init();
+@@ -569,7 +570,7 @@ void __init ti816x_init_early(void)
+ 	omap2_control_base_init();
  	omap3xxx_check_revision();
  	ti81xx_check_features();
- 	am33xx_prm_init();
-@@ -596,7 +594,6 @@ void __init am33xx_init_early(void)
- 	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE));
--	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
+-	am33xx_prm_init();
++	omap2_prcm_base_init();
+ 	am33xx_cm_init();
+ 	omap3xxx_voltagedomains_init();
+ 	omap3xxx_powerdomains_init();
+@@ -589,7 +590,7 @@ void __init am33xx_init_early(void)
+ 	omap2_control_base_init();
  	omap3xxx_check_revision();
  	am33xx_check_features();
- 	am33xx_prm_init();
-@@ -622,7 +619,6 @@ void __init am43xx_init_early(void)
- 	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
- 				  NULL);
- 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE));
--	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
+-	am33xx_prm_init();
++	omap2_prcm_base_init();
+ 	am33xx_cm_init();
+ 	am33xx_powerdomains_init();
+ 	am33xx_clockdomains_init();
+@@ -612,7 +613,7 @@ void __init am43xx_init_early(void)
+ 	omap2_control_base_init();
  	omap3xxx_check_revision();
  	am33xx_check_features();
- 	omap44xx_prm_init();
-@@ -649,8 +645,6 @@ void __init omap4430_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
- 				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
--			     OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE));
+-	omap44xx_prm_init();
++	omap2_prcm_base_init();
+ 	omap4_cm_init();
+ 	am43xx_powerdomains_init();
+ 	am43xx_clockdomains_init();
+@@ -638,7 +639,7 @@ void __init omap4430_init_early(void)
  	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
  	omap4xxx_check_revision();
  	omap4xxx_check_features();
-@@ -682,8 +676,6 @@ void __init omap5_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+-	omap44xx_prm_init();
++	omap2_prcm_base_init();
+ 	omap4_cm_init();
+ 	omap4_pm_init_early();
+ 	omap44xx_voltagedomains_init();
+@@ -667,7 +668,7 @@ void __init omap5_init_early(void)
  				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
--			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
  	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
  	omap4_pm_init_early();
- 	omap44xx_prm_init();
-@@ -712,8 +704,6 @@ void __init dra7xx_init_early(void)
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+-	omap44xx_prm_init();
++	omap2_prcm_base_init();
+ 	omap5xxx_check_revision();
+ 	omap4_cm_init();
+ 	omap54xx_voltagedomains_init();
+@@ -694,7 +695,7 @@ void __init dra7xx_init_early(void)
  				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
- 	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));
--	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(DRA7XX_CM_CORE_AON_BASE),
--			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
  	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
  	omap4_pm_init_early();
- 	omap44xx_prm_init();
+-	omap44xx_prm_init();
++	omap2_prcm_base_init();
+ 	dra7xxx_check_revision();
+ 	omap4_cm_init();
+ 	dra7xx_powerdomains_init();
 diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index ee38356..9e4dd0b 100644
+index 9e4dd0b..461bdc4 100644
 --- a/arch/arm/mach-omap2/prcm-common.h
 +++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -521,9 +521,15 @@ struct omap_prcm_irq_setup {
- /**
-  * struct omap_prcm_init_data - PRCM driver init data
-  * @index: clock memory mapping index to be used
-+ * @mem: IO mem pointer for this module
-+ * @offset: module base address offset from the IO base
-+ * @flags: PRCM module init flags
+@@ -524,12 +524,16 @@ struct omap_prcm_irq_setup {
+  * @mem: IO mem pointer for this module
+  * @offset: module base address offset from the IO base
+  * @flags: PRCM module init flags
++ * @init: low level PRCM init function for this module
++ * @np: device node for this PRCM module
   */
  struct omap_prcm_init_data {
  	int index;
-+	void __iomem *mem;
-+	s16 offset;
-+	u16 flags;
+ 	void __iomem *mem;
+ 	s16 offset;
+ 	u16 flags;
++	int (*init)(const struct omap_prcm_init_data *data);
++	struct device_node *np;
  };
  
  extern void omap_prcm_irq_cleanup(void);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 6cbebbe..9f9c816 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -689,7 +689,6 @@ int __init omap_prcm_init(void)
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index 6707333..3936e6c 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -21,6 +21,7 @@ extern u16 prm_features;
+ extern void omap2_set_globals_prm(void __iomem *prm);
+ int omap_prcm_init(void);
+ int omap2_prm_base_init(void);
++int omap2_prcm_base_init(void);
+ # endif
  
- void __init omap3_prcm_legacy_iomaps_init(void)
+ /*
+diff --git a/arch/arm/mach-omap2/prm2xxx.c b/arch/arm/mach-omap2/prm2xxx.c
+index 29e203f..752018ce 100644
+--- a/arch/arm/mach-omap2/prm2xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx.c
+@@ -220,9 +220,8 @@ static struct prm_ll_data omap2xxx_prm_ll_data = {
+ 	.clear_mod_irqs = &omap2xxx_prm_clear_mod_irqs,
+ };
+ 
+-int __init omap2xxx_prm_init(void)
++int __init omap2xxx_prm_init(const struct omap_prcm_init_data *data)
  {
--	omap2_clk_legacy_provider_init(TI_CLKM_CM, cm_base + OMAP3430_IVA2_MOD);
+-	omap2_prm_base_init();
+ 	return prm_register(&omap2xxx_prm_ll_data);
+ }
+ 
+diff --git a/arch/arm/mach-omap2/prm2xxx.h b/arch/arm/mach-omap2/prm2xxx.h
+index 9c91f4f..9008a9e 100644
+--- a/arch/arm/mach-omap2/prm2xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx.h
+@@ -124,7 +124,7 @@
+ extern int omap2xxx_clkdm_sleep(struct clockdomain *clkdm);
+ extern int omap2xxx_clkdm_wakeup(struct clockdomain *clkdm);
+ 
+-extern int __init omap2xxx_prm_init(void);
++int __init omap2xxx_prm_init(const struct omap_prcm_init_data *data);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 1e052aa..dcb5001 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -378,9 +378,8 @@ static struct prm_ll_data am33xx_prm_ll_data = {
+ 	.reset_system			= am33xx_prm_global_warm_sw_reset,
+ };
+ 
+-int __init am33xx_prm_init(void)
++int __init am33xx_prm_init(const struct omap_prcm_init_data *data)
+ {
+-	omap2_prm_base_init();
+ 	return prm_register(&am33xx_prm_ll_data);
+ }
+ 
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 98ac41f..2bc4ec5 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -118,7 +118,7 @@
+ #define AM33XX_PM_CEFUSE_PWRSTST		AM33XX_PRM_REGADDR(AM33XX_PRM_CEFUSE_MOD, 0x0004)
+ 
+ #ifndef __ASSEMBLER__
+-int am33xx_prm_init(void);
++int am33xx_prm_init(const struct omap_prcm_init_data *data);
+ 
+ #endif /* ASSEMBLER */
+ #endif
+diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+index a347993..62680aa 100644
+--- a/arch/arm/mach-omap2/prm3xxx.c
++++ b/arch/arm/mach-omap2/prm3xxx.c
+@@ -670,12 +670,10 @@ static struct prm_ll_data omap3xxx_prm_ll_data = {
+ 	.vp_clear_txdone = &omap3_prm_vp_clear_txdone,
+ };
+ 
+-int __init omap3xxx_prm_init(void)
++int __init omap3xxx_prm_init(const struct omap_prcm_init_data *data)
+ {
  	omap2_clk_legacy_provider_init(TI_CLKM_PRM,
  				       prm_base + OMAP3430_IVA2_MOD);
- 	omap2_clk_legacy_provider_init(TI_CLKM_SCRM, omap_ctrl_base_get());
+-	omap2_prm_base_init();
+-
+ 	if (omap3_has_io_wakeup())
+ 		prm_features |= PRM_HAS_IO_WAKEUP;
+ 
+diff --git a/arch/arm/mach-omap2/prm3xxx.h b/arch/arm/mach-omap2/prm3xxx.h
+index 55e4c89..5f095ee 100644
+--- a/arch/arm/mach-omap2/prm3xxx.h
++++ b/arch/arm/mach-omap2/prm3xxx.h
+@@ -140,7 +140,7 @@ extern u32 omap3_prm_vcvp_read(u8 offset);
+ extern void omap3_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap3_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
+-extern int __init omap3xxx_prm_init(void);
++int __init omap3xxx_prm_init(const struct omap_prcm_init_data *data);
+ void omap3xxx_prm_iva_idle(void);
+ void omap3_prm_reset_modem(void);
+ int omap3xxx_prm_clear_global_cold_reset(void);
+diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
+index b479a33..e3f2d31 100644
+--- a/arch/arm/mach-omap2/prm44xx.c
++++ b/arch/arm/mach-omap2/prm44xx.c
+@@ -703,9 +703,8 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
+ 	.vp_clear_txdone	= omap4_prm_vp_clear_txdone,
+ };
+ 
+-int __init omap44xx_prm_init(void)
++int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+ {
+-	omap2_prm_base_init();
+ 	omap_prm_base_init();
+ 
+ 	if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx())
+diff --git a/arch/arm/mach-omap2/prm44xx.h b/arch/arm/mach-omap2/prm44xx.h
+index 7db2422..efd6035 100644
+--- a/arch/arm/mach-omap2/prm44xx.h
++++ b/arch/arm/mach-omap2/prm44xx.h
+@@ -26,7 +26,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRM44XX_H
+ 
+ #include "prm44xx_54xx.h"
+-#include "prcm-common.h"
+ #include "prm.h"
+ 
+ #define OMAP4430_PRM_BASE		0x4a306000
+diff --git a/arch/arm/mach-omap2/prm44xx_54xx.h b/arch/arm/mach-omap2/prm44xx_54xx.h
+index a470185..3f139eb 100644
+--- a/arch/arm/mach-omap2/prm44xx_54xx.h
++++ b/arch/arm/mach-omap2/prm44xx_54xx.h
+@@ -23,6 +23,8 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_PRM44XX_54XX_H
+ #define __ARCH_ARM_MACH_OMAP2_PRM44XX_54XX_H
+ 
++#include "prcm-common.h"
++
+ /* Function prototypes */
+ #ifndef __ASSEMBLER__
+ 
+@@ -34,7 +36,7 @@ extern u32 omap4_prm_vcvp_read(u8 offset);
+ extern void omap4_prm_vcvp_write(u32 val, u8 offset);
+ extern u32 omap4_prm_vcvp_rmw(u32 mask, u32 bits, u8 offset);
+ 
+-extern int __init omap44xx_prm_init(void);
++int __init omap44xx_prm_init(const struct omap_prcm_init_data *data);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/prm54xx.h b/arch/arm/mach-omap2/prm54xx.h
+index e441101..1eb22ff 100644
+--- a/arch/arm/mach-omap2/prm54xx.h
++++ b/arch/arm/mach-omap2/prm54xx.h
+@@ -22,7 +22,6 @@
+ #define __ARCH_ARM_MACH_OMAP2_PRM54XX_H
+ 
+ #include "prm44xx_54xx.h"
+-#include "prcm-common.h"
+ #include "prm.h"
+ 
+ #define OMAP54XX_PRM_BASE		0x4ae06000
+diff --git a/arch/arm/mach-omap2/prm7xx.h b/arch/arm/mach-omap2/prm7xx.h
+index 4bb50fbf..cc1e6a2 100644
+--- a/arch/arm/mach-omap2/prm7xx.h
++++ b/arch/arm/mach-omap2/prm7xx.h
+@@ -22,8 +22,8 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_PRM7XX_H
+ #define __ARCH_ARM_MACH_OMAP2_PRM7XX_H
+ 
+-#include "prm44xx_54xx.h"
+ #include "prcm-common.h"
++#include "prm44xx_54xx.h"
+ #include "prm.h"
+ 
+ #define DRA7XX_PRM_BASE		0x4ae06000
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index a943e14..aede589 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -32,6 +32,7 @@
+ #include "prm2xxx_3xxx.h"
+ #include "prm2xxx.h"
+ #include "prm3xxx.h"
++#include "prm33xx.h"
+ #include "prm44xx.h"
+ #include "common.h"
+ #include "clock.h"
+@@ -633,12 +634,17 @@ int prm_unregister(struct prm_ll_data *pld)
+ 	return 0;
+ }
+ 
+-static struct omap_prcm_init_data prm_data = {
++#ifdef CONFIG_ARCH_OMAP2
++static struct omap_prcm_init_data omap2_prm_data __initdata = {
+ 	.index = TI_CLKM_PRM,
++	.init = omap2xxx_prm_init,
+ };
++#endif
+ 
+-static struct omap_prcm_init_data omap3_prm_data = {
++#ifdef CONFIG_ARCH_OMAP3
++static struct omap_prcm_init_data omap3_prm_data __initdata = {
+ 	.index = TI_CLKM_PRM,
++	.init = omap3xxx_prm_init,
+ 
+ 	/*
+ 	 * IVA2 offset is a negative value, must offset the prm_base
+@@ -646,23 +652,57 @@ static struct omap_prcm_init_data omap3_prm_data = {
+ 	 */
+ 	.offset = -OMAP3430_IVA2_MOD,
+ };
++#endif
+ 
+-static struct omap_prcm_init_data scrm_data = {
+-	.index = TI_CLKM_SCRM,
++#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_TI81XX)
++static struct omap_prcm_init_data am3_prm_data __initdata = {
++	.index = TI_CLKM_PRM,
++	.init = am33xx_prm_init,
++};
++#endif
++
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || \
++	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
++static struct omap_prcm_init_data omap4_prm_data __initdata = {
++	.index = TI_CLKM_PRM,
++	.init = omap44xx_prm_init,
+ };
++#endif
+ 
+-static const struct of_device_id omap_prcm_dt_match_table[] = {
+-	{ .compatible = "ti,am3-prcm", .data = &prm_data },
+-	{ .compatible = "ti,am4-prcm", .data = &prm_data },
+-	{ .compatible = "ti,dm814-prcm", .data = &prm_data },
+-	{ .compatible = "ti,dm816-prcm", .data = &prm_data },
+-	{ .compatible = "ti,omap2-prcm", .data = &prm_data },
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
++static struct omap_prcm_init_data scrm_data __initdata = {
++	.index = TI_CLKM_SCRM,
++};
++#endif
++
++static const struct of_device_id omap_prcm_dt_match_table[] __initconst = {
++#ifdef CONFIG_SOC_AM33XX
++	{ .compatible = "ti,am3-prcm", .data = &am3_prm_data },
++#endif
++#ifdef CONFIG_SOC_AM43XX
++	{ .compatible = "ti,am4-prcm", .data = &omap4_prm_data },
++#endif
++#ifdef CONFIG_SOC_TI81XX
++	{ .compatible = "ti,dm814-prcm", .data = &am3_prm_data },
++	{ .compatible = "ti,dm816-prcm", .data = &am3_prm_data },
++#endif
++#ifdef CONFIG_ARCH_OMAP2
++	{ .compatible = "ti,omap2-prcm", .data = &omap2_prm_data },
++#endif
++#ifdef CONFIG_ARCH_OMAP3
+ 	{ .compatible = "ti,omap3-prm", .data = &omap3_prm_data },
+-	{ .compatible = "ti,omap4-prm", .data = &prm_data },
++#endif
++#ifdef CONFIG_ARCH_OMAP4
++	{ .compatible = "ti,omap4-prm", .data = &omap4_prm_data },
+ 	{ .compatible = "ti,omap4-scrm", .data = &scrm_data },
+-	{ .compatible = "ti,omap5-prm", .data = &prm_data },
++#endif
++#ifdef CONFIG_SOC_OMAP5
++	{ .compatible = "ti,omap5-prm", .data = &omap4_prm_data },
+ 	{ .compatible = "ti,omap5-scrm", .data = &scrm_data },
+-	{ .compatible = "ti,dra7-prm", .data = &prm_data },
++#endif
++#ifdef CONFIG_SOC_DRA7XX
++	{ .compatible = "ti,dra7-prm", .data = &omap4_prm_data },
++#endif
+ 	{ }
+ };
+ 
+@@ -691,11 +731,21 @@ int __init omap2_prm_base_init(void)
+ 			prm_base = mem + data->offset;
+ 
+ 		data->mem = mem;
++
++		data->np = np;
++
++		if (data->init)
++			data->init(data);
+ 	}
+ 
+ 	return 0;
+ }
+ 
++int __init omap2_prcm_base_init(void)
++{
++	return omap2_prm_base_init();
++}
++
+ /**
+  * omap_prcm_init - low level init for the PRCM drivers
+  *
 -- 
 1.7.9.5
