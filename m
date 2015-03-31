@@ -1,62 +1,31 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Mon, 30 Mar 2015 18:40:13 -0700
-Subject: [RFC PATCH v3 1/2] clk: samsung: Add a clock lookup function
-In-Reply-To: <55197508.5030501@collabora.co.uk>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
- <55197508.5030501@collabora.co.uk>
-Message-ID: <20150331014013.25195.26862@quantum>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 31 Mar 2015 09:42:40 +0800
+Subject: [Linaro-acpi] [PATCH 1/2] ARM64 / ACPI: Ignore the return error
+ value of acpi_map_gic_cpu_interface()
+In-Reply-To: <5519C5C8.2020903@linaro.org>
+References: <1427458476-20140-1-git-send-email-hanjun.guo@linaro.org>
+ <5519C5C8.2020903@linaro.org>
+Message-ID: <5519FB90.4010400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Javier Martinez Canillas (2015-03-30 09:08:40)
-> Hello Tomasz,
-> 
-> On 03/30/2015 06:02 PM, Tomasz Figa wrote:
-> > Hi Javier,
-> > 
-> > 2015-03-31 0:53 GMT+09:00 Javier Martinez Canillas
-> > <javier.martinez@collabora.co.uk>:
-> >> The Samsung helpers functions to register clocks, add the clock instance
-> >> returned by the common clock framework to a lookup table that is used by
-> >> OF to lookup the clocks.
-> >>
-> >> But this table could also be useful to clock drivers if they need to get
-> >> a clock instance since the helper functions don't return them.
-> >>
-> >> The common clock framework __clk_lookup() function from the clk provider
-> >> API could be used by drivers as well. But it's more efficient to use the
-> >> Samsung specific lookup table that returns the clock instance in constant
-> >> time, than using the __clk_lookup() function that uses the clock name as
-> >> an index so it has a linear search time.
-> > 
-> > Is this really something we should be concerned about? If so, maybe
-> > the generic look-up function should be rewritten to use something
-> > faster, such as tree or hash table?
-> >
-> 
-> I don't performance is a big issue here. I just thought that since the
-> lookup table is already filled by the driver and the lookup function
-> is one line, we could use that instead to get the performance benefit.
-> 
-> But I don't mind to drop this patch and use the generic lookup function
-> from the CCF API if that is preferred.
+On 2015/3/31 5:53, Al Stone wrote:
+> On 03/27/2015 06:14 AM, Hanjun Guo wrote:
+>> MADT table scannig will stopped once it gets the errors
+>> returned by the handler, which is acpi_map_gic_cpu_interface()
+>> in for ARM64, so Ignore the return error value to search for
+>> all enabled CPUs for SMP init.
+> I think the comment should say something like:
+>
+> MADT scanning will stop when it gets an error from the handler,
+> acpi_map_gic_cpu_interface(), on arm64.  However, we need to
+> find all of the enabled CPUs so that SMP initialization can work
+> properly.  So, if an error occurs in this case, ignore it for
+> now so that we can find all of the enabled CPUs.
+>
+> Is that what you meant, Hanjun?
 
-Hello,
+That's exactly what I mean, you describe it much clearer :)
 
-I am not a fan of __clk_lookup and I don't like to see it used more and
-more outside of drivers/clk/clk.c. You mentioned that performance wasn't
-really the problem here.  The real method for a driver to get a clock is
-with clk_get(). Any reason to not use that?
-
-Regards,
-Mike
-
->  
-> > Best regards,
-> > Tomasz
-> >
-> 
-> Best regards,
-> Javier
+Thanks
+Hanjun
