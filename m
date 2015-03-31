@@ -1,58 +1,109 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 31 Mar 2015 08:37:55 +0200
-Subject: [PATCH] ARM: dts: Use define for s3c-rtc clock id
-In-Reply-To: <551A1D27.6000301@samsung.com>
-References: <1427728889-29158-1-git-send-email-k.kozlowski@samsung.com>
- <551A1D27.6000301@samsung.com>
-Message-ID: <CABxcv=moU4xO=BNj6r4_O-VeL_OuAjCuoWiB9xsKWw9NjFTr9g@mail.gmail.com>
+From: danindrey@mail.ru (Andrey Danin)
+Date: Tue, 31 Mar 2015 09:40:27 +0300
+Subject: [PATCH 3/3] dt: paz00: define nvec as child of i2c bus
+In-Reply-To: <54CFEA2F.8040701@wwwdotorg.org>
+References: <1422516022-27161-1-git-send-email-danindrey@mail.ru>
+ <1422516022-27161-4-git-send-email-danindrey@mail.ru>
+ <54CFEA2F.8040701@wwwdotorg.org>
+Message-ID: <551A415B.4040506@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 6:05 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> Hi,
->
-> On 03/31/2015 12:21 AM, Krzysztof Kozlowski wrote:
->> Use a define instead of raw number as a ID for "rtc_src" clock.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->>
->> Patch depends on new file "dt-bindings/clock/samsung,s2mps11.h" from:
->> http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg43136.html
->> ---
->>  arch/arm/boot/dts/exynos3250-rinato.dts | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->> index 3905824cac58..d2cbc95364de 100644
->> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->> @@ -16,6 +16,7 @@
->>  #include "exynos3250.dtsi"
->>  #include <dt-bindings/input/input.h>
->>  #include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/clock/samsung,s2mps11.h>
->>
->>  / {
->>       model = "Samsung Rinato board";
->> @@ -605,7 +606,7 @@
->>  };
->>
->>  &rtc {
->> -     clocks = <&cmu CLK_RTC>, <&s2mps14_osc 0>;
->> +     clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
->>       clock-names = "rtc", "rtc_src";
->>       status = "okay";
->>  };
->>
->
-> Looks good to me.
->
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->
+Hi,
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Thanks for the review.
 
-Best regards,
-Javier
+On 03.02.2015 0:20, Stephen Warren wrote:
+> On 01/29/2015 12:20 AM, Andrey Danin wrote:
+>> NVEC driver was reimplemented to use tegra i2c. Use common i2c bindings
+>> for NVEC node.
+>
+>> diff --git a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
+>> b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
+>
+> The changes to this file make more sense either as a standalone patch
+> 1/4, or as part of the driver changes.
+>
+>> @@ -2,20 +2,5 @@ NVIDIA compliant embedded controller
+>>
+>>   Required properties:
+>>   - compatible : should be "nvidia,nvec".
+>> -- reg : the iomem of the i2c slave controller
+>> -- interrupts : the interrupt line of the i2c slave controller
+>> -- clock-frequency : the frequency of the i2c bus
+>> -- gpios : the gpio used for ec request
+>> -- slave-addr: the i2c address of the slave controller
+>> -- clocks : Must contain an entry for each entry in clock-names.
+>> -  See ../clocks/clock-bindings.txt for details.
+>> -- clock-names : Must include the following entries:
+>> -  Tegra20/Tegra30:
+>> -  - div-clk
+>> -  - fast-clk
+>> -  Tegra114:
+>> -  - div-clk
+>> -- resets : Must contain an entry for each entry in reset-names.
+>> -  See ../reset/reset.txt for details.
+>> -- reset-names : Must include the following entries:
+>> -  - i2c
+>> +- request-gpios : the gpio used for ec request
+>> +- reg: the i2c address of the slave controller
+>
+> This change breaks ABI.
+>
+> Instead of modifying the definition of the existing compatible value, I
+> think you should introduce a new compatible value to describe the
+> external NVEC chip.
+
+I changed compatible value to nvec-slave in v2.
+>
+>> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+>> b/arch/arm/boot/dts/tegra20-paz00.dts
+>
+>> -    nvec at 7000c500 {
+>> -        compatible = "nvidia,nvec";
+>> -        reg = <0x7000c500 0x100>;
+>> -        interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+>> -        #address-cells = <1>;
+>> -        #size-cells = <0>;
+>> +    i2c at 7000c500 {
+>> +        status = "okay";
+>>           clock-frequency = <80000>;
+>> -        request-gpios = <&gpio TEGRA_GPIO(V, 2) GPIO_ACTIVE_HIGH>;
+>> -        slave-addr = <138>;
+>> -        clocks = <&tegra_car TEGRA20_CLK_I2C3>,
+>> -                 <&tegra_car TEGRA20_CLK_PLL_P_OUT3>;
+>> -        clock-names = "div-clk", "fast-clk";
+>> -        resets = <&tegra_car 67>;
+>> -        reset-names = "i2c";
+>> +
+>> +        nvec: nvec at 45 {
+>
+> This doesn't feel correct. There's nothing here to indicate that this
+> child device is a slave that is implemented by the host SoC rather than
+> something external attached to the I2C bus.
+>
+> Perhaps you can get away with this, since the driver for nvidia,nvec
+> only calls I2C APIs suitable for internal slaves rather than external
+> slaves? Even so though, I think the distinction needs to be clearly
+> marked in the DT so that any generic code outside the NVEC driver that
+> parses the DT can determine the difference.
+>
+> I would recommend the I2C controller having #address-cells=<2> with cell
+> 0 being 0==master,1==slave, cell 1 being the I2C address. The I2C driver
+> would need to support #address-cells=<1> for backwards-compatibility.
+>
+Driver (nvec in this case) can decide what mode should it use according 
+to compatible value. Is it not enough ?
+
+>> +            compatible = "nvidia,nvec";
+>> +            request-gpios = <&gpio TEGRA_GPIO(V, 2)
+>> +                GPIO_ACTIVE_HIGH>;
+>> +            reg = <0x45>;
+>
+> The order is typically compatible, reg, other properties.
+
+Ok, thanks.
+>
+>> +        };
+>>       };
+>
