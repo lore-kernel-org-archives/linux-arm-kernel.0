@@ -1,72 +1,38 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 31 Mar 2015 16:08:00 +0100
-Subject: [PATCH v2 02/10] KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP values
-In-Reply-To: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1427814488-28467-3-git-send-email-alex.bennee@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 31 Mar 2015 20:56:54 +0530
+Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
+In-Reply-To: <20150331113448.GN12479@tarshish>
+References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
+ <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
+ <201503281633.02801.marex@denx.de> <20150331113448.GN12479@tarshish>
+Message-ID: <551ABCBE.3030005@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently x86, powerpc and soon arm64 use the same two architecture
-specific bits for guest debug support for software and hardware
-breakpoints. This makes the shared values explicit while leaving the
-gate open for another architecture to use some other value if they
-really really want to.
+Hi,
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
+> Hi Marek,
+>
+> On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
+>> On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
+>>> Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
+>>> Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
+>>> usb2 host.
+>>>
+>>> The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
+>>> different enough to merit its own driver. Also, this driver uses the
+>>> generic phy infrastructure.
+>>
+>> the register set looks very similar to MXS one indeed. How is it different
+>> please ?
+>
+> Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
+> defined in the Digicolor one. Some have different meaning, and some are
+> reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
+> range. Also, the Digicolor phy does not have anatop registers.
 
-diff --git a/arch/powerpc/include/uapi/asm/kvm.h b/arch/powerpc/include/uapi/asm/kvm.h
-index ab4d473..1731569 100644
---- a/arch/powerpc/include/uapi/asm/kvm.h
-+++ b/arch/powerpc/include/uapi/asm/kvm.h
-@@ -310,8 +310,8 @@ struct kvm_guest_debug_arch {
-  * and upper 16 bits are architecture specific. Architecture specific defines
-  * that ioctl is for setting hardware breakpoint or software breakpoint.
-  */
--#define KVM_GUESTDBG_USE_SW_BP		0x00010000
--#define KVM_GUESTDBG_USE_HW_BP		0x00020000
-+#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
-+#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
- 
- /* definition of registers in kvm_run */
- struct kvm_sync_regs {
-diff --git a/arch/x86/include/uapi/asm/kvm.h b/arch/x86/include/uapi/asm/kvm.h
-index d7dcef5..1438202 100644
---- a/arch/x86/include/uapi/asm/kvm.h
-+++ b/arch/x86/include/uapi/asm/kvm.h
-@@ -250,8 +250,8 @@ struct kvm_debug_exit_arch {
- 	__u64 dr7;
- };
- 
--#define KVM_GUESTDBG_USE_SW_BP		0x00010000
--#define KVM_GUESTDBG_USE_HW_BP		0x00020000
-+#define KVM_GUESTDBG_USE_SW_BP		__KVM_GUESTDBG_USE_SW_BP
-+#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
- #define KVM_GUESTDBG_INJECT_DB		0x00040000
- #define KVM_GUESTDBG_INJECT_BP		0x00080000
- 
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 5eedf84..ce2db14 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -525,8 +525,16 @@ struct kvm_s390_irq {
- 
- /* for KVM_SET_GUEST_DEBUG */
- 
--#define KVM_GUESTDBG_ENABLE		0x00000001
--#define KVM_GUESTDBG_SINGLESTEP		0x00000002
-+#define KVM_GUESTDBG_ENABLE		(1 << 0)
-+#define KVM_GUESTDBG_SINGLESTEP	(1 << 1)
-+
-+/*
-+ * Architecture specific stuff uses the top 16 bits of the field,
-+ * however there is some shared commonality for the common cases
-+ */
-+#define __KVM_GUESTDBG_USE_SW_BP	(1 << 16)
-+#define __KVM_GUESTDBG_USE_HW_BP	(1 << 17)
-+
- 
- struct kvm_guest_debug {
- 	__u32 control;
--- 
-2.3.4
+I think we should try adding support for this in the same driver.
+
+Thanks
+Kishon
