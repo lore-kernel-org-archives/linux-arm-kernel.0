@@ -1,60 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 Mar 2015 17:46:36 +0100
-Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
-In-Reply-To: <20150331161902.GH9119@e104818-lin.cambridge.arm.com>
-References: <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
- <20150325145949.GE26903@localhost>
- <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
- <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
- <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
- <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
- <20150330150008.GD5964@e104818-lin.cambridge.arm.com>
- <CAKv+Gu-C5c0Ma+KEWkPWbxhcgvGfZXyDp4OXxG_BMyR7Hwtk1A@mail.gmail.com>
- <20150331144931.GF9119@e104818-lin.cambridge.arm.com>
- <20150331161902.GH9119@e104818-lin.cambridge.arm.com>
-Message-ID: <20150331164636.GI9119@e104818-lin.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 31 Mar 2015 19:48:03 +0300
+Subject: [PATCH v3 1/7] dmaengine: of_dma: Support for DMA routers
+In-Reply-To: <201503280244.46961.arnd@arndb.de>
+References: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427459213-14611-2-git-send-email-peter.ujfalusi@ti.com>
+ <201503280244.46961.arnd@arndb.de>
+Message-ID: <551ACFC3.5020003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 05:19:03PM +0100, Catalin Marinas wrote:
-> On Tue, Mar 31, 2015 at 03:49:32PM +0100, Catalin Marinas wrote:
-> > On Mon, Mar 30, 2015 at 08:08:52PM +0200, Ard Biesheuvel wrote:
-> > > But using early_fixmap() implies using the ordinary page tables
-> > > manipulation code, which uses __pa/__va
-> > > So instead, I should refactor those patches to simply pick a VA offset
-> > > and map the FDT there from head.S
-> > 
-> > I haven't dug out those patches yet but in principle you should not care
-> > about __va, just __pa for populating the pmd/pud/pgd. Since with
-> > fixmap we pre-allocate the page tables in the kernel data section
-> > (bm_pud/pmd/pte), a __pa implementation that takes KERNEL_PAGE_OFFSET
-> > into account (as per these patches) is enough, you don't really care
-> > about the linear PAGE_OFFSET at this stage since you would not provide
-> > __pa with such virtual address until after setup_machine_fdt().
+On 03/28/2015 03:44 AM, Arnd Bergmann wrote:
+> On Friday 27 March 2015, Peter Ujfalusi wrote:
+>> +Required property:
+>> +- dma-device:          phandle of the DMA controller. The router is modifying
+>> +                       the DMA requests for this controller.
 > 
-> Actually, that's wrong, early_fixmap_init() uses pud/pmd_offset which in
-> turn use the pmd_offset etc. and pmd_page_vaddr. These would not be
-> mapped in the linear mapping at this stage. create_mapping() also uses
-> the *_offset() functions, so we have the same issue.
-> 
-> So I think we still need to calculate the default initial PHYS_OFFSET in
-> head.S as we currently do, based on the kernel load address so that
-> __va() returns a mapping in the initial KERNEL_PAGE_OFFSET range. During
-> our own early_init_dt_add_memory_arch(), we calculate the real
-> PHYS_OFFSET but don't set it yet. We should defer the setting of the
-> real PHYS_OFFSET until we map the first block of memory via
-> create_mapping(). We know that we can't cope with allocations before the
-> first block anyway, so this approach may work.
+> This property seems rather specific to the case at hand, I would expect that
+> one might also see routers like this that are connected to more than one
+> dma-device, so maybe make it a list?
 
-Some more brainstorming with Mark, I think we can set the real
-PHYS_OFFSET immediately after we map the kernel text into the linear
-mapping (and before mapping the RAM with create_mapping) so that we have
-access to swapper_pg_dir via this mapping. But we need the initial
-swapper be pre-populated with pud/pmd for (1) the kernel text at
-KERNEL_PAGE_OFFSET, (2) kernel text in the linear mapping and (3) the
-1st GB of PAGE_OFFSET (to avoid memblock allocations until we mapped
-some RAM). This way we avoid mandating that the kernel image is only
-loaded in the first GB of RAM.
+Yeah, it is intentional from my part.
+In dra7xx family we actually have two DMA controllers: sDMA and eDMA. They
+both have identical crossbar up front but you can not choose the DMA request
+to be routed to either eDMA or sDMA. They are always routed to both and in the
+crossbar you select which signal goes to which DMA request of the given
+controller.
+At the moment I was not aware of different designs (current and future), but
+it might be possible that a design you described might surface at some point.
+For sure, the list will complicate things quite a bit it might require
+different API and callbacks at the end. I need to think about this how it is
+going to work best.
+
+> It might also be better to name this as 'dma-controllers' or 'dma-masters',
+> as it is not entirely obvious (without referencing the binding document)
+> whether a dma device refers to the slave or the master.
+
+I think the 'dma-masters' sounds much better.
+
+PS: I'm out of office this week so do not expect v4 before mid next week.
 
 -- 
-Catalin
+P?ter
