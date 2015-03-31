@@ -1,75 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 31 Mar 2015 02:31:01 +0200
-Subject: [PATCH 2/2] ARM: dts: s3c-rtc: Use s3c6410-rtc instead of
- exynos3250-rtc
-In-Reply-To: <5519DE76.4080803@samsung.com>
-References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
- <1427728773-29065-3-git-send-email-k.kozlowski@samsung.com>
- <5519DE76.4080803@samsung.com>
-Message-ID: <20150331003101.GG3849@piout.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 30 Mar 2015 17:31:52 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.1 #3
+In-Reply-To: <1427235082-27415-1-git-send-email-f.fainelli@gmail.com>
+References: <1427235082-27415-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150331003152.GF32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 31/03/2015 at 08:38:30 +0900, Chanwoo Choi wrote :
-> > diff --git a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> > index ab757b84daa7..ac2fcd6ff4b8 100644
-> > --- a/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> > +++ b/Documentation/devicetree/bindings/rtc/s3c-rtc.txt
-> > @@ -6,7 +6,8 @@ Required properties:
-> >      * "samsung,s3c2416-rtc" - for controllers compatible with s3c2416 rtc.
-> >      * "samsung,s3c2443-rtc" - for controllers compatible with s3c2443 rtc.
-> >      * "samsung,s3c6410-rtc" - for controllers compatible with s3c6410 rtc.
-> > -    * "samsung,exynos3250-rtc" - for controllers compatible with exynos3250 rtc.
-> > +    * "samsung,exynos3250-rtc" - (deprecated) for controllers compatible with
-> > +                                 exynos3250 rtc (use "samsung,s3c6410-rtc").
-> >  - reg: physical base address of the controller and length of memory mapped
-> >    region.
-> >  - interrupts: Two interrupt numbers to the cpu should be specified. First
-> > diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> > index e3bfb11c6ef8..8d58b550e925 100644
-> > --- a/arch/arm/boot/dts/exynos3250.dtsi
-> > +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> > @@ -189,7 +189,7 @@
-> >  		};
-> >  
-> >  		rtc: rtc at 10070000 {
-> > -			compatible = "samsung,exynos3250-rtc";
-> > +			compatible = "samsung,s3c6410-rtc";
-> >  			reg = <0x10070000 0x100>;
-> >  			interrupts = <0 73 0>, <0 74 0>;
-> >  			interrupt-parent = <&pmu_system_controller>;
-> > diff --git a/arch/arm/boot/dts/exynos4415.dtsi b/arch/arm/boot/dts/exynos4415.dtsi
-> > index 5caea996e090..186cb8465683 100644
-> > --- a/arch/arm/boot/dts/exynos4415.dtsi
-> > +++ b/arch/arm/boot/dts/exynos4415.dtsi
-> > @@ -177,7 +177,7 @@
-> >  		};
-> >  
-> >  		rtc: rtc at 10070000 {
-> > -			compatible = "samsung,exynos3250-rtc";
-> > +			compatible = "samsung,s3c6410-rtc";
-> >  			reg = <0x10070000 0x100>;
-> >  			interrupts = <0 73 0>, <0 74 0>;
-> >  			status = "disabled";
-> > 
+On Tue, Mar 24, 2015 at 03:11:22PM -0700, Florian Fainelli wrote:
+> The following changes since commit cd590b50a9367b52520f6866b27f72317bb1a07e:
 > 
-> Looks good to me.
+>   ARM: dts: enable PCIe support for Cygnus (2015-03-13 09:20:47 -0700)
 > 
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> are available in the git repository at:
 > 
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-4.1/devicetree-part-3
+> 
+> for you to fetch changes up to 0c02acec74b655fe44b698d293f6f2a9600c4a8b:
+> 
+>   ARM: dts: brcmstb: add IRQ0 controller (2015-03-19 09:34:14 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains changes to the BCM7445 reference DTS files from
+> Brian:
+> 
+> - making a clock-frequency property decimal instead of hexadecimal
+> 
+> - adding the irq0 interrupt controller node to make the reference DTS bootable
+>   again
+> 
+> ----------------------------------------------------------------
+> Brian Norris (2):
+>       ARM: dts: brcmstb: un-hexify clock frequency
+>       ARM: dts: brcmstb: add IRQ0 controller
+> 
+>  arch/arm/boot/dts/bcm7445.dtsi | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 
-Are you absolutely sure that the exynos3250 IP is the same as the
-s3c6410 (I don't know much about the exynos family). The concern being
-that if at one point you have an errata on one or ther other, you will
-have to break the DT ABI by undoing this change.
+FWIW, I noticed a small typo in the DTSI. I can send an official patch,
+or someone could queue it up on top:
 
-Note that I'm fine with it, I'm just asking.
-
-Regards,
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+diff --git a/arch/arm/boot/dts/bcm7445.dtsi b/arch/arm/boot/dts/bcm7445.dtsi
+index 9eaeac8dce1b..39ac7840d7ee 100644
+--- a/arch/arm/boot/dts/bcm7445.dtsi
++++ b/arch/arm/boot/dts/bcm7445.dtsi
+@@ -97,7 +97,7 @@
+ 			reg = <0x452000 0x100>;
+ 		};
+ 
+-		irq0_intc: interrupt-controller at f040a780 {
++		irq0_intc: interrupt-controller at 40a780 {
+ 			compatible = "brcm,bcm7120-l2-intc";
+ 			interrupt-parent = <&gic>;
+ 			#interrupt-cells = <1>;
