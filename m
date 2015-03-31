@@ -1,274 +1,70 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:18 +0300
-Subject: [PATCHv6 25/34] ARM: dts: omap3: add minimal l4 bus layout with
- control module support
+Date: Tue, 31 Mar 2015 22:14:27 +0300
+Subject: [PATCHv6 34/34] ARM: OMAP4+: control: add support for initializing
+ control module via DT
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-26-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-35-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch creates an l4_core interconnect for OMAP3, and moves some
-of the generic peripherals under it. System control module nodes are
-moved under this new interconnect also, and the SCM clock layout
-is changed to use the renamed SCM node as the clock provider.
+OMAP4, OMAP5 and DRA7 now parse DT entries for control module address spaces,
+and set up syscon mappings appropriately. Low level IO init is updated to
+remove the legacy control module mappings for these devices also.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Reported-by: Tony Lindgren <tony@atomide.com>
 ---
- Documentation/devicetree/bindings/arm/omap/l4.txt  |    1 +
- .../devicetree/bindings/arm/omap/prcm.txt          |    2 +-
- arch/arm/boot/dts/am3517.dtsi                      |    2 +-
- arch/arm/boot/dts/am35xx-clocks.dtsi               |    2 +-
- arch/arm/boot/dts/omap3.dtsi                       |   96 +++++++++++---------
- arch/arm/boot/dts/omap3xxx-clocks.dtsi             |   13 +--
- arch/arm/mach-omap2/control.c                      |    2 +-
- 7 files changed, 67 insertions(+), 51 deletions(-)
+ arch/arm/mach-omap2/control.c |    3 +++
+ arch/arm/mach-omap2/io.c      |    6 +++---
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
-index 57569cc8..6402022 100644
---- a/Documentation/devicetree/bindings/arm/omap/l4.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
-@@ -5,6 +5,7 @@ These bindings describe the OMAP SoCs L4 interconnect bus.
- Required properties:
- - compatible : Should be "ti,omap2-l4" for OMAP2 family l4 core bus
- 	       Should be "ti,omap2-l4-wkup" for OMAP2 family l4 wkup bus
-+	       Should be "ti,omap3-l4-core" for OMAP3 family l4 core bus
- - ranges : contains the IO map range for the bus
- 
- Examples:
-diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-index cce8365..ef5a74b 100644
---- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
-@@ -17,7 +17,7 @@ Required properties:
- 		"ti,omap2-scm"
- 		"ti,omap3-prm"
- 		"ti,omap3-cm"
--		"ti,omap3-scrm"
-+		"ti,omap3-scm"
- 		"ti,omap4-cm1"
- 		"ti,omap4-prm"
- 		"ti,omap4-cm2"
-diff --git a/arch/arm/boot/dts/am3517.dtsi b/arch/arm/boot/dts/am3517.dtsi
-index c90724b..f164dce 100644
---- a/arch/arm/boot/dts/am3517.dtsi
-+++ b/arch/arm/boot/dts/am3517.dtsi
-@@ -31,7 +31,7 @@
- 			status = "disabled";
- 			reg = <0x5c000000 0x30000>;
- 			interrupts = <67 68 69 70>;
--			syscon = <&omap3_scm_general>;
-+			syscon = <&scm_conf>;
- 			ti,davinci-ctrl-reg-offset = <0x10000>;
- 			ti,davinci-ctrl-mod-reg-offset = <0>;
- 			ti,davinci-ctrl-ram-offset = <0x20000>;
-diff --git a/arch/arm/boot/dts/am35xx-clocks.dtsi b/arch/arm/boot/dts/am35xx-clocks.dtsi
-index df489d3..518b8fd 100644
---- a/arch/arm/boot/dts/am35xx-clocks.dtsi
-+++ b/arch/arm/boot/dts/am35xx-clocks.dtsi
-@@ -7,7 +7,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  */
--&scrm_clocks {
-+&scm_clocks {
- 	emac_ick: emac_ick {
- 		#clock-cells = <0>;
- 		compatible = "ti,am35xx-gate-clock";
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 01b7111..b28791a 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -87,6 +87,60 @@
- 		ranges;
- 		ti,hwmods = "l3_main";
- 
-+		l4_core: l4 at 48000000 {
-+			compatible = "ti,omap3-l4-core", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x48000000 0x1000000>;
-+
-+			scm: scm at 2000 {
-+				compatible = "ti,omap3-scm", "simple-bus";
-+				reg = <0x2000 0x2000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x2000 0x2000>;
-+
-+				omap3_pmx_core: pinmux at 30 {
-+					compatible = "ti,omap3-padconf",
-+						     "pinctrl-single";
-+					reg = <0x30 0x238>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#interrupt-cells = <1>;
-+					interrupt-controller;
-+					pinctrl-single,register-width = <16>;
-+					pinctrl-single,function-mask = <0xff1f>;
-+				};
-+
-+				scm_conf: scm_conf at 270 {
-+					compatible = "syscon";
-+					reg = <0x270 0x330>;
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+
-+					scm_clocks: clocks {
-+						#address-cells = <1>;
-+						#size-cells = <0>;
-+					};
-+				};
-+
-+				scm_clockdomains: clockdomains {
-+				};
-+
-+				omap3_pmx_wkup: pinmux at a00 {
-+					compatible = "ti,omap3-padconf",
-+						     "pinctrl-single";
-+					reg = <0xa00 0x5c>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#interrupt-cells = <1>;
-+					interrupt-controller;
-+					pinctrl-single,register-width = <16>;
-+					pinctrl-single,function-mask = <0xff1f>;
-+				};
-+			};
-+		};
-+
- 		aes: aes at 480c5000 {
- 			compatible = "ti,omap3-aes";
- 			ti,hwmods = "aes";
-@@ -121,19 +175,6 @@
- 			};
- 		};
- 
--		scrm: scrm at 48002000 {
--			compatible = "ti,omap3-scrm";
--			reg = <0x48002000 0x2000>;
--
--			scrm_clocks: clocks {
--				#address-cells = <1>;
--				#size-cells = <0>;
--			};
--
--			scrm_clockdomains: clockdomains {
--			};
--		};
--
- 		counter32k: counter at 48320000 {
- 			compatible = "ti,omap-counter32k";
- 			reg = <0x48320000 0x20>;
-@@ -159,37 +200,10 @@
- 			#dma-requests = <96>;
- 		};
- 
--		omap3_pmx_core: pinmux at 48002030 {
--			compatible = "ti,omap3-padconf", "pinctrl-single";
--			reg = <0x48002030 0x0238>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0xff1f>;
--		};
--
--		omap3_pmx_wkup: pinmux at 48002a00 {
--			compatible = "ti,omap3-padconf", "pinctrl-single";
--			reg = <0x48002a00 0x5c>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			#interrupt-cells = <1>;
--			interrupt-controller;
--			pinctrl-single,register-width = <16>;
--			pinctrl-single,function-mask = <0xff1f>;
--		};
--
--		omap3_scm_general: tisyscon at 48002270 {
--			compatible = "syscon";
--			reg = <0x48002270 0x2f0>;
--		};
--
- 		pbias_regulator: pbias_regulator {
- 			compatible = "ti,pbias-omap";
- 			reg = <0x2b0 0x4>;
--			syscon = <&omap3_scm_general>;
-+			syscon = <&scm_conf>;
- 			pbias_mmc_reg: pbias_mmc_omap2430 {
- 				regulator-name = "pbias_mmc_omap2430";
- 				regulator-min-microvolt = <1800000>;
-diff --git a/arch/arm/boot/dts/omap3xxx-clocks.dtsi b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-index 5c37500..bbba5bd 100644
---- a/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-+++ b/arch/arm/boot/dts/omap3xxx-clocks.dtsi
-@@ -79,13 +79,14 @@
- 		clock-div = <1>;
- 	};
- };
--&scrm_clocks {
-+
-+&scm_clocks {
- 	mcbsp5_mux_fck: mcbsp5_mux_fck {
- 		#clock-cells = <0>;
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&core_96m_fck>, <&mcbsp_clks>;
- 		ti,bit-shift = <4>;
--		reg = <0x02d8>;
-+		reg = <0x68>;
- 	};
- 
- 	mcbsp5_fck: mcbsp5_fck {
-@@ -99,7 +100,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&core_96m_fck>, <&mcbsp_clks>;
- 		ti,bit-shift = <2>;
--		reg = <0x0274>;
-+		reg = <0x04>;
- 	};
- 
- 	mcbsp1_fck: mcbsp1_fck {
-@@ -113,7 +114,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&per_96m_fck>, <&mcbsp_clks>;
- 		ti,bit-shift = <6>;
--		reg = <0x0274>;
-+		reg = <0x04>;
- 	};
- 
- 	mcbsp2_fck: mcbsp2_fck {
-@@ -126,7 +127,7 @@
- 		#clock-cells = <0>;
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&per_96m_fck>, <&mcbsp_clks>;
--		reg = <0x02d8>;
-+		reg = <0x68>;
- 	};
- 
- 	mcbsp3_fck: mcbsp3_fck {
-@@ -140,7 +141,7 @@
- 		compatible = "ti,composite-mux-clock";
- 		clocks = <&per_96m_fck>, <&mcbsp_clks>;
- 		ti,bit-shift = <2>;
--		reg = <0x02d8>;
-+		reg = <0x68>;
- 	};
- 
- 	mcbsp4_fck: mcbsp4_fck {
 diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index eb592ea..30f5aff 100644
+index c8565d3..af95a62 100644
 --- a/arch/arm/mach-omap2/control.c
 +++ b/arch/arm/mach-omap2/control.c
-@@ -670,7 +670,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
- 	{ .compatible = "ti,am3-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,am4-scrm", .data = &ctrl_data },
+@@ -650,6 +650,9 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
  	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
--	{ .compatible = "ti,omap3-scrm", .data = &ctrl_data },
-+	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
+ 	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
  	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
++	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
++	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
++	{ .compatible = "ti,dra7-scm-core", .data = &ctrl_data },
  	{ }
  };
+ 
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 6c39cc0..7743e367 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -631,8 +631,8 @@ void __init omap4430_init_early(void)
+ {
+ 	omap2_set_globals_tap(OMAP443X_CLASS,
+ 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
++	omap2_control_base_init();
+ 	omap4xxx_check_revision();
+ 	omap4xxx_check_features();
+ 	omap2_prcm_base_init();
+@@ -659,8 +659,8 @@ void __init omap5_init_early(void)
+ {
+ 	omap2_set_globals_tap(OMAP54XX_CLASS,
+ 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
++	omap2_control_base_init();
+ 	omap4_pm_init_early();
+ 	omap2_prcm_base_init();
+ 	omap5xxx_check_revision();
+@@ -684,8 +684,8 @@ void __init omap5_init_late(void)
+ void __init dra7xx_init_early(void)
+ {
+ 	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
+-	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
++	omap2_control_base_init();
+ 	omap4_pm_init_early();
+ 	omap2_prcm_base_init();
+ 	dra7xxx_check_revision();
 -- 
 1.7.9.5
