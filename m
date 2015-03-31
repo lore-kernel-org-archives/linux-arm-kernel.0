@@ -1,27 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 Mar 2015 21:23:06 +0100
-Subject: [PATCH v2] spi: bitbang: only toggle bitchanges
-In-Reply-To: <20150331201300.GB12253@pengutronix.de>
-References: <20150331141321.GR2869@sirena.org.uk>
- <1427812501-7194-1-git-send-email-m.grzeschik@pengutronix.de>
- <CAOiHx=k_NhSgzUDNPGXLUWN9r9bJ1rbsv3vLg_gFKpuinEqKmA@mail.gmail.com>
- <20150331201300.GB12253@pengutronix.de>
-Message-ID: <20150331202306.GX2869@sirena.org.uk>
+From: byan@nvidia.com (Bo Yan)
+Date: Tue, 31 Mar 2015 13:30:48 -0700
+Subject: [PATCH] arm64: fix midr range for Cortex-A57 erratum 832075
+Message-ID: <1427833848-12188-1-git-send-email-byan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 10:13:00PM +0200, Michael Grzeschik wrote:
+Register MIDR_EL1 is masked to get variant and revision fields, then
+compared against midr_range_min and midr_range_max when checking
+whether CPU is affected by any particular erratum. However, variant
+and revision fields in MIDR_EL1 are separated by 16 bits, so the min
+and max of midr range should be constructed accordingly, otherwise
+the patch will not be applied when variant field is non-0.
 
-> Mark, should I send a corrected version or do you squash the 31 into the
-> applied patch?
+Signed-off-by: Bo Yan <byan@nvidia.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-If you could send me a patch (either incremental or squashed is fine)
-that'd be good - I'd prefer to have something from you as I'd need to
-set up a test system for bitbang.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/49311aa4/attachment.sig>
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index fa62637e63a8..7838f1578019 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -88,7 +88,7 @@ struct arm64_cpu_capabilities arm64_errata[] = {
+ 	/* Cortex-A57 r0p0 - r1p2 */
+ 		.desc = "ARM erratum 832075",
+ 		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+-		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
++		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x100002),
+ 	},
+ #endif
+ 	{
+-- 
+2.1.4
