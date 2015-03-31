@@ -1,73 +1,41 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 30 Mar 2015 20:40:43 -0700
-Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
-In-Reply-To: <20150330172546.GI7192@intel.com>
-References: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
- <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
- <20150330172546.GI7192@intel.com>
-Message-ID: <551A173B.4010704@broadcom.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 31 Mar 2015 06:55:37 +0300
+Subject: [PATCH] ARM: remove duplicate reboot.h include in process.c
+In-Reply-To: <3093e9eafb72eae28fe83b350ddb88d2cd5c99d8.1427020607.git.baruch@tkos.co.il>
+References: <3093e9eafb72eae28fe83b350ddb88d2cd5c99d8.1427020607.git.baruch@tkos.co.il>
+Message-ID: <20150331035537.GL12479@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod, Jassi,
+Hi Russell, all,
 
-Some details on the problem encountered.
+On Sun, Mar 22, 2015 at 12:36:47PM +0200, Baruch Siach wrote:
+> Fixes: 7b6d864b48d ('reboot: arm: change reboot_mode to use enum reboot_mode')
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-On 15-03-30 10:25 AM, Vinod Koul wrote:
-> On Mon, Mar 30, 2015 at 10:17:17PM +0530, Jassi Brar wrote:
->> On Fri, Mar 27, 2015 at 5:25 AM, Scott Branden <sbranden@broadcom.com> wrote:
->>> From: ismail <ismail@broadcom.com>
->>>
->>> Update the thread running index before issuing the
->>> GO command to the DMAC.
->>>
->>> Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
->>> Reviewed-by: Ray Jui <rjui@broadcom.com>
->>> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
->>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
->>> Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
->>> ---
->>>   drivers/dma/pl330.c | 4 ++--
->>>   1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
->>> index 0e1f567..631642d 100644
->>> --- a/drivers/dma/pl330.c
->>> +++ b/drivers/dma/pl330.c
->>> @@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
->>>          /* Set to generate interrupts for SEV */
->>>          writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
->>>
->>> +       thrd->req_running = idx;
->>> +
->>>          /* Only manager can execute GO */
->>>          _execute_DBGINSN(thrd, insn, true);
->>>
->>> -       thrd->req_running = idx;
->>> -
->> It would help to know what the behavior looks like before and after
->> the patch. If anything we should look at locking rather the
->> reordering.
-> Yes that ia fair request, looking at changelog it is hard to understand the
-> issue seen?
->
-We encountered this problem as we modified the driver to make SMC calls 
-to a TZ handler.  This slowed down the driver to the point where DMA 
-transactions easily failed.  I believe the same could be accomplished by 
-adding a delay between the GOCMD and update of the req_running and 
-running the built in dmatest.
+Unless anyone objects I'll put this trivial patch in the patch system 
+tomorrow.
 
-The DMA transaction is broken if the interrupt occurs before the 
-thrd->req_running is updated.
+baruch
 
-The pl330 issues a GOCMD (in _trigger function) to start a new transfer.
+> ---
+>  arch/arm/kernel/process.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index fdfa3a78ec8c..7989a9063fea 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -31,7 +31,6 @@
+>  #include <linux/random.h>
+>  #include <linux/hw_breakpoint.h>
+>  #include <linux/leds.h>
+> -#include <linux/reboot.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/idmap.h>
 
-The issue of GOCMD generates an interrupt and the IRQ handler will call 
-the pl330_update function to process the interrupt.
-
-The pl330_update function will verify the thread running index and break 
-the transaction, if the thread running index is not set.
-
-Regards,
-  Scott
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
