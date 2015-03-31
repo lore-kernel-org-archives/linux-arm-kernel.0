@@ -1,80 +1,57 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 31 Mar 2015 22:00:14 +0200
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>	<1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>	<CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>	<551976F1.1000605@collabora.co.uk>
- <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
-Message-ID: <551AFCCE.4050404@collabora.co.uk>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Tue, 31 Mar 2015 22:13:00 +0200
+Subject: [PATCH v2] spi: bitbang: only toggle bitchanges
+In-Reply-To: <CAOiHx=k_NhSgzUDNPGXLUWN9r9bJ1rbsv3vLg_gFKpuinEqKmA@mail.gmail.com>
+References: <20150331141321.GR2869@sirena.org.uk>
+ <1427812501-7194-1-git-send-email-m.grzeschik@pengutronix.de>
+ <CAOiHx=k_NhSgzUDNPGXLUWN9r9bJ1rbsv3vLg_gFKpuinEqKmA@mail.gmail.com>
+Message-ID: <20150331201300.GB12253@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Abhilash,
-
-On 03/31/2015 04:38 PM, Abhilash Kesavan wrote:
-> javier.martinez at collabora.co.uk> wrote:
->> On 03/30/2015 06:07 PM, Tomasz Figa wrote:
->> >
->> > If look-up speed is important here, maybe all the relevant clocks
->> > could be looked up once at initialization time and just prepared and
->> > enabled here?
->> >
->>
->> Yes, I'll do that indeed.
->>
->> In fact, I was wondering if we should let this clock be disabled at
->> all. I noticed that the rockchip clk drivers do something similar
->> and prepare / enable a list of clocks at init time [0,1].
->>
->> Unfortunately I don't fully understand why this clock needs to be
->> enabled. It would be good if someone at Samsung can explain in
->> more detail what the real problem really is.
->>
+On Tue, Mar 31, 2015 at 08:59:28PM +0200, Jonas Gorski wrote:
+> On Tue, Mar 31, 2015 at 4:35 PM, Michael Grzeschik
+> <m.grzeschik@pengutronix.de> wrote:
+> > The current implementation of bitbang_txrx_be_cpha0 and
+> > bitbang_txrx_be_cpha1 always call setmosi. That runs into several
+> > unnecessary calls into the gpiolib when the level of the GPIO actually
+> > has not to be changed.
+> >
+> > This patch changes the routines to remember the last GPIO level
+> > and only calls setmosi if an change has to be made. This
+> > way it improves the transfer throughput.
+> >
+> > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > ---
+> > v2: added missing braces
+> >
+> >  drivers/spi/spi-bitbang-txrx.h | 18 ++++++++++++++----
+> >  1 file changed, 14 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-bitbang-txrx.h b/drivers/spi/spi-bitbang-txrx.h
+> > index c616e41..06b34e5 100644
+> > --- a/drivers/spi/spi-bitbang-txrx.h
+> > +++ b/drivers/spi/spi-bitbang-txrx.h
+> > @@ -49,12 +49,17 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
+> >  {
+> >         /* if (cpol == 0) this is SPI_MODE_0; else this is SPI_MODE_2 */
+> >
+> > +       bool oldbit = !(word & 1);
 > 
-> I had a look at this some more today. The problem actually occurs when the
-> mdma0 clock's parent - aclk266_g2d gets disabled. The run-time pm support
-> in the dma driver disables mdma0 and in turn aclk266_g2d which causes the
-> issue.
-> From the User Manual, it appears that aclk266_g2d should be gated only when
-> certain bits in the clock gating status register are 0. I cannot say for
-> certain, but our gating the aclk266_g2d clock without the CG_STATUS bits
-> being 0 could be a cause of the suspend failure.
-> 
+> Is it intentional you check the first bit (word & 1) here? Everywhere
+> else you use (word & 31).
 
-Thanks a lot for the explanation. I see the NOTE at the bottom of section
-7.9.1.159 CLK_GATE_BUS_TOP that mentions that. I'll add this information
-to the commit message when posting as a proper patch instead of a RFC.
+Doh! I was reworking this from an _le_ variant of the same code.
+This hunk unfortunately is an leftover... :/
 
-I confirmed that changing the patch to prevent "aclk266_g2d" to be gated
-instead of "mdm0" also makes the system to resume correctly from suspend
-so I'll change that on the patch as well.
+Mark, should I send a corrected version or do you squash the 31 into the
+applied patch?
 
-I see that many of the Exynos5420 clocks (including "aclk266_g2d") use the
-CLK_IGNORE_UNUSED flag but AFAIU it only prevents the common clock framework
-to disable the clocks on init but doesn't prevent the clocks to be disabled
-if all the clock childs are gated so the parent is gated as well.
+Thanks for the hint,
+Michael
 
-> As the CG_STATUS bits are not being checked anywhere in the kernel I think
-> aclk266_g2d (and others in GATE_BUS_TOP) should not be gated. I am OK with
-
-For now I'll just add "aclk266_g2d" but later if needed all the GATE_BUS_TOP
-clocks (and others) that should only be gated when CG_STATUS is 0 can be
-added. My patch iterates over a list of clocks to be kept during suspend even
-when there is only one for now so adding more later if needed will be trivial.
-
-Or do you think that I should add all the GATE_BUS_TOP clocks now?
-
-> the suspend specific approach you have posted.
->
-
-Great, I'll wait a couple of days to see if others have more comments about
-the last RFC I shared [0] and I'll post it as a proper patch.
-
-> Regards,
-> Abhilash
-> 
-
-Thanks a lot for all your help and best regards,
-Javier
-
-[0]: https://lkml.org/lkml/2015/3/31/152
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
