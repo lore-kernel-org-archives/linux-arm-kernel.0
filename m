@@ -1,83 +1,134 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 31 Mar 2015 18:24:43 +0200
-Subject: [PATCH v4 02/15] ARM: ARMv7-M: Enlarge vector table up to 256 entries
+Date: Tue, 31 Mar 2015 18:24:46 +0200
+Subject: [PATCH v4 05/15] dt-bindings: Document the STM32 reset bindings
 In-Reply-To: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1427819096-31109-3-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1427819096-31109-6-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
-So the number of entries in vectors table is up to 256.
+This adds documentation of device tree bindings for the
+STM32 reset controller.
 
-This patch adds a new config flag to specify the number of external interrupts.
-Some ifdeferies are added in order to respect the natural alignment without
-wasting too much space on smaller systems.
-
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Acked-by: Stefan Agner <stefan@agner.ch>
 Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- arch/arm/kernel/entry-v7m.S | 13 +++++++++----
- arch/arm/mm/Kconfig         | 15 +++++++++++++++
- 2 files changed, 24 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/reset/st,stm32-rcc.txt     | 107 +++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
 
-diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-index 8944f49..b6c8bb9 100644
---- a/arch/arm/kernel/entry-v7m.S
-+++ b/arch/arm/kernel/entry-v7m.S
-@@ -117,9 +117,14 @@ ENTRY(__switch_to)
- ENDPROC(__switch_to)
- 
- 	.data
--	.align	8
-+#if CONFIG_CPU_V7M_NUM_IRQ <= 112
-+	.align	9
-+#else
-+	.align	10
-+#endif
+diff --git a/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+new file mode 100644
+index 0000000..e2e2f25
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/st,stm32-rcc.txt
+@@ -0,0 +1,107 @@
++STMicroelectronics STM32 Peripheral Reset Controller
++====================================================
 +
- /*
-- * Vector table (64 words => 256 bytes natural alignment)
-+ * Vector table (Natural alignment need to be ensured)
-  */
- ENTRY(vector_table)
- 	.long	0			@ 0 - Reset stack pointer
-@@ -138,6 +143,6 @@ ENTRY(vector_table)
- 	.long	__invalid_entry		@ 13 - Reserved
- 	.long	__pendsv_entry		@ 14 - PendSV
- 	.long	__invalid_entry		@ 15 - SysTick
--	.rept	64 - 16
--	.long	__irq_entry		@ 16..64 - External Interrupts
-+	.rept	CONFIG_CPU_V7M_NUM_IRQ
-+	.long	__irq_entry		@ External Interrupts
- 	.endr
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 9b4f29e..aec53b4 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -604,6 +604,21 @@ config CPU_USE_DOMAINS
- 	  This option enables or disables the use of domain switching
- 	  via the set_fs() function.
- 
-+config CPU_V7M_NUM_IRQ
-+	int "Number of external interrupts connected to the NVIC"
-+	depends on CPU_V7M
-+	default 90 if ARCH_STM32
-+	default 38 if ARCH_EFM32
-+	default 240
-+	help
-+	  This option indicates the number of interrupts connected to the NVIC.
-+	  The value can be larger than the real number of interrupts supported
-+	  by the system, but must not be lower.
-+	  The default value is 240, corresponding to the maximum number of
-+	  interrupts supported by the NVIC on Cortex-M family.
++The RCC IP is both a reset and a clock controller. This documentation only
++document the reset part.
 +
-+	  If unsure, keep default value.
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
- #
- # CPU supports 36-bit I/O
- #
++Required properties:
++- compatible: Should be "st,stm32-rcc"
++- reg: should be register base and length as documented in the
++  datasheet
++- #reset-cells: 1, see below
++
++example:
++
++rcc: reset at 40023800 {
++	#reset-cells = <1>;
++	compatible = "st,stm32-rcc";
++	reg = <0x40023800 0x400>;
++};
++
++Specifying softreset control of devices
++=======================================
++
++Device nodes should specify the reset channel required in their "resets"
++property, containing a phandle to the reset device node and an index specifying
++which channel to use.
++The index is the bit number within the RCC registers bank, starting from RCC
++base address.
++It is calculated as: index = register_offset / 4 * 32 + bit_offset.
++Where bit_offset is the bit offset within the register.
++For example, for CRC reset:
++  crc = AHB1RSTR_offset / 4 * 32 + CRCRST_bit_offset = 0x10 / 4 * 32 + 12 = 140
++
++example:
++
++	timer2 {
++		resets			= <&rcc 256>;
++	};
++
++List of valid indices for STM32F429:
++ - gpioa: 128
++ - gpiob: 129
++ - gpioc: 130
++ - gpiod: 131
++ - gpioe: 132
++ - gpiof: 133
++ - gpiog: 134
++ - gpioh: 135
++ - gpioi: 136
++ - gpioj: 137
++ - gpiok: 138
++ - crc: 140
++ - dma1: 149
++ - dma2: 150
++ - dma2d: 151
++ - ethmac: 153
++ - otghs: 157
++ - dcmi: 160
++ - cryp: 164
++ - hash: 165
++ - rng: 166
++ - otgfs: 167
++ - fmc: 192
++ - tim2: 256
++ - tim3: 257
++ - tim4: 258
++ - tim5: 259
++ - tim6: 260
++ - tim7: 261
++ - tim12: 262
++ - tim13: 263
++ - tim14: 264
++ - wwdg: 267
++ - spi2: 270
++ - spi3: 271
++ - uart2: 273
++ - uart3: 274
++ - uart4: 275
++ - uart5: 276
++ - i2c1: 277
++ - i2c2: 278
++ - i2c3: 279
++ - can1: 281
++ - can2: 282
++ - pwr: 284
++ - dac: 285
++ - uart7: 286
++ - uart8: 287
++ - tim1: 288
++ - tim8: 289
++ - usart1: 292
++ - usart6: 293
++ - adc: 296
++ - sdio: 299
++ - spi1: 300
++ - spi4: 301
++ - syscfg: 302
++ - tim9: 304
++ - tim10: 305
++ - tim11: 306
++ - spi5: 308
++ - spi6: 309
++ - sai1: 310
++ - ltdc: 314
 -- 
 1.9.1
