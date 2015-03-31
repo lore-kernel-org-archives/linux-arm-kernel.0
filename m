@@ -1,42 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 31 Mar 2015 11:00:31 +0200
-Subject: [rtc-linux] Re: [PATCH 1/2] drivers/rtc/rtc-s3c.c: Integrate
- Exynos3250 into S3C6410
-In-Reply-To: <20150331082052.GI3849@piout.net>
-References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
- <1427728773-29065-2-git-send-email-k.kozlowski@samsung.com>
- <20150331002709.GF3849@piout.net>
- <CABxcv==+h8R-tL9D5OXmYsuYfs_cLATViZ3N1veZwZBZF=fu0Q@mail.gmail.com>
- <20150331082052.GI3849@piout.net>
-Message-ID: <CAJKOXPemefBOfOUV_azuJbiOMGurZLTGtFKBx7rW6NCgu+sjvQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 31 Mar 2015 11:01:12 +0200
+Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb0
+Message-ID: <1427792472-13555-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-03-31 10:20 GMT+02:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> Hi,
->
-> On 31/03/2015 at 08:49:39 +0200, Javier Martinez Canillas wrote :
->> Hello Alexandre,
->>
->> On Tue, Mar 31, 2015 at 2:27 AM, Alexandre Belloni
->> <alexandre.belloni@free-electrons.com> wrote:
->> > nitpick: I would prefer rtc: rtc-s3c instead of drivers/rtc/rtc-s3c.c
->> >
->>
->> Yes but Krzysztof is following the convention used in drivers/rtc/
->> which I think is the correct thing to do even when it's different from
->> what is used all over the kernel.
->>
->
-> Having a look at the git history, the first and most used prefix is
-> actually 'rtc:' at some point, this started to change to 'drivers/rtc/'.
-> We should probably start to get back to 'rtc:', like most subsystems.
+Specify the phy address on macb0 node aka GEM.
 
-Yes, I used "rtc: driver_name:" before but I saw that Andrew changes
-them to full path when he picks the patch. So this time I wanted to
-reduce the overhead for him... Anyway I'll stick to one format ("rtc:
-rtc-s3c:") as you proposed.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index 6c4bc53cbf4e..08cb500ce171 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -105,7 +105,13 @@
+ 
+ 			macb0: ethernet at f0028000 {
+ 				phy-mode = "rgmii";
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				status = "okay";
++
++				ethernet-phy at 7 {
++					reg = <0x7>;
++				};
+ 			};
+ 
+ 			pwm0: pwm at f002c000 {
+-- 
+2.1.3
