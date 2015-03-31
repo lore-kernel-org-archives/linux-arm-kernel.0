@@ -1,73 +1,47 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 31 Mar 2015 15:08:35 +0800
-Subject: [PATCH v5 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150330172309.GB9742@pengutronix.de>
-References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
- <1426917922-61356-3-git-send-email-eddie.huang@mediatek.com>
- <20150323084237.GG9742@pengutronix.de>
- <1427703252.26464.14.camel@mtksdaap41>
- <20150330172309.GB9742@pengutronix.de>
-Message-ID: <1427785715.3500.16.camel@mtksdaap41>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 31 Mar 2015 09:14:52 +0200
+Subject: [PATCH 01/11] clocksource: arm_arch_timer: Rename
+ arch_timer_probed to reflect behaviour
+In-Reply-To: <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
+References: <5519AEB2.8050306@linaro.org>
+ <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20150331071452.GA9252@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
-On Mon, 2015-03-30 at 19:23 +0200, Sascha Hauer wrote:
-> On Mon, Mar 30, 2015 at 04:14:12PM +0800, Eddie Huang wrote:
-> > Hi Sascha,
-> > 
-> > > 
-> > > [...]
-> > > 
-> > > > +	if (i2c->speed_hz > 400000)
-> > > > +		control_reg |= I2C_CONTROL_RS;
-> > > > +	if (i2c->op == I2C_MASTER_WRRD)
-> > > > +		control_reg |= I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS;
-> > > > +	mtk_i2c_writew(control_reg, i2c, OFFSET_CONTROL);
-> > > > +
-> > > > +	/* set start condition */
-> > > > +	if (i2c->speed_hz <= 100000)
-> > > > +		mtk_i2c_writew(I2C_ST_START_CON, i2c, OFFSET_EXT_CONF);
-> > > > +	else
-> > > > +		mtk_i2c_writew(I2C_FS_START_CON, i2c, OFFSET_EXT_CONF);
-> > > > +
-> > > > +	if (~control_reg & I2C_CONTROL_RS)
-> > > > +		mtk_i2c_writew(I2C_DELAY_LEN, i2c, OFFSET_DELAY_LEN);
-> > > 
-> > > speed <= 400000 here to make this more obvious?
-> > There are two cases, not only speed<=400000, but I2C_MASTER_WRRD. I tend
-> > to keep it.
-> 
-> Still it looks strange. You only ever write this default value to the
-> register. Putting this register write under an if() seems bogus since
-> the same value will be in the register the next time this code is
-> executed. It looks like you should move this register write to some
-> initialization function.
-OK, move to mtk_i2c_init_hw function
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 > 
-> > > > +
-> > > > +	/* Enable interrupt */
-> > > > +	mtk_i2c_writew(I2C_HS_NACKERR | I2C_ACKERR | I2C_TRANSAC_COMP,
-> > > > +		i2c, OFFSET_INTR_MASK);
-> > > 
-> > > Why do you enable/disable interrupts for each transfer? Enabling them
-> > > once and just acknowledge them in the interrupt handler should be
-> > > enough.
-> > This can avoid unwanted I2C interrupt. For example, I2C transfer error,
-> > and cause timeout, I2C driver report error to caller. Then I2C error
-> > interrupt happen.
+> The arch_timer_probed function returns whether the given time doesn't
+> need to be probed. This can be the case when the timer has been probed
+> already, but also when it has no corresponding enabled node in DT.
 > 
-> So isn't the same unwanted interrupt then just delayed until you enable
-> the interrupts again? Is this something that really happens or just
-> something you think that might happen?
+> Rename the function to arch_timer_need_probe and invert its return value
+> to better reflect the function's purpose and behaviour.
 > 
-Clear interrupt status before enable interrupt, so won't get unwanted
-interrupt again. I just think this might happen, and it's not harmful to
-enable/disable interrupt in transfer function and can get extra benefit
-to avoid unnecessary interrupt.  Tegra I2C driver i2c-tegra.c also do
-the same thing.
+> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index a3025e7..50bb7f2 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -661,17 +661,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+>  };
+>  
+>  static bool __init
+> -arch_timer_probed(int type, const struct of_device_id *matches)
+> +arch_timer_need_probe(int type, const struct of_device_id *matches)
 
-Eddie
+If we do a rename we might as well use valid English spelling such as 
+'arch_timer_needs_probing()'?
+
+Thanks,
+
+	Ingo
