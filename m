@@ -1,92 +1,22 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 31 Mar 2015 11:22:29 -0400 (EDT)
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz> <20150330132617.GI24899@n2100.arm.linux.org.uk>
- <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
- <551959F1.4030704@suse.cz>
- <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Mar 2015 16:22:47 +0100
+Subject: [RESEND PATCH] MAINTAINERS: change the Atmel audio alsa driver
+ entry
+In-Reply-To: <1427808891-9321-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1427808891-9321-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150331152247.GS2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Mar 2015, Ard Biesheuvel wrote:
+On Tue, Mar 31, 2015 at 03:34:51PM +0200, Nicolas Ferre wrote:
+> I take over the the maintainship of Atmel alsa drivers from Voice.
+> Thanks for your work!
 
-> On 30 March 2015 at 16:13, Michal Marek <mmarek@suse.cz> wrote:
-> > On 2015-03-30 15:31, Ard Biesheuvel wrote:
-> >> On 30 March 2015 at 15:26, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >>> On Mon, Mar 30, 2015 at 02:38:35PM +0200, Michal Marek wrote:
-> >>>> Is this a limitation of a particular ARM ABI or a limitation of a state
-> >>>> of the art ARM linker or something else?
-> >>>
-> >>> It's a limitation of the ARM ISA.
-> >>>
-> >>> Normal PC-relative branches, which are emitted by the C compiler, can
-> >>> branch +/- 32MB for ARM, or +/- 16MB of Thumb.  Beyond that, the address
-> >>> offset is not representable in the instruction.
-> >
-> > Thank you both for the explanation!
-> >
-> >
-> >>> The question is: how far do we go with allyesconfig... do we want it
-> >>> to work, or is reaching the final link sufficient?
-> >
-> > It certainly is more useful as a test tool if the baseline is a
-> > successful compile and link. Because you can have genuine link errors
-> > due to missing symbols.
-> >
-> 
-> Agreed
-> 
-> >
-> >>> If we do tweak
-> >>> stuff to allow the link to work, are we going to try running it?
-> >
-> > Good question. I myself always treated all{yes,mod}config as a build
-> > test only and never dared to run it. Allyesconfig produces a giant
-> > kernel image and allmodconfig builds binfmt_script as a module. And if
-> > people used all*config for boot tests, they would probably be sending
-> > patches to tweak the Kconfigs for that purpose. And this is not the case
-> > as far as I can tell.
-> >
-> 
-> Russell should confirm this, but I think running such a large kernel
-> is non-trivial on ARM, since the decompressor should make room for the
-> decompressed image by moving itself upward in memory, and it may
-> overwrite the device tree binary in the process.
-
-Loading the device tree at a different address should be easy.  You just 
-need to load it at the top of RAM. You may also start by attempting to 
-boot a plain Image (uncompressed) kernel binary.
-
-> >> That is an excellent question, hence the RFC in the subject line.
-> >>
-> >> Note that the other patch, the one against kallsyms, addresses the
-> >> issue where the distance between the beginning of .text and the end of
-> >> .init.text  exceeds this limit, which is not as unlikely as the issue
-> >> that this patch addresses, where just drivers/built-in.o in isolation
-> >> already exceeds this limit.
-> >>
-> >> So I am quite happy to drop this, especially as we can add
-> >> -ffunction-sections as well.
-> >
-> > What you could do is to add a Kconfig option to arch/arm/Kconfig adding
-> > -ffunction-sections to the compiler flags. Then allyesconfig would
-> > select it and work around the problem in a somewhat elegant way.
-> >
-> 
-> Excellent idea! Arnd hasn't chimed in yet, but he is the one doing
-> lots and lots of randconfig builds and other test builds, so I will
-> wait for him to confirm that this is a useful thing to have.
-
-I'm using -ffunction-sections as well for the kernel size reduction work 
-I'm currently doing.  The linker script has to be adapted so .text.* is 
-specified along .text otherwise those functions end up appended at the 
-end of the binary.
-
-
-Nicolas
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/aa5e8143/attachment.sig>
