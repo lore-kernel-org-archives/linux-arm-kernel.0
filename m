@@ -1,32 +1,92 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 17:58:49 +0300
-Subject: [PATCHv5 30/35] ARM: dts: omap4: add minimal l4 bus layout with
- control module support
-In-Reply-To: <20150330230116.GM10805@atomide.com>
-References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
- <1426877086-17131-31-git-send-email-t-kristo@ti.com>
- <20150330230116.GM10805@atomide.com>
-Message-ID: <551AB629.5020104@ti.com>
+From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
+Date: Tue, 31 Mar 2015 14:58:49 +0000
+Subject: [PATCH v2 8/8] net/macb: unify peripheral version testing
+In-Reply-To: <1427806926-18887-9-git-send-email-nicolas.ferre@atmel.com>
+References: <1427806926-18887-1-git-send-email-nicolas.ferre@atmel.com>
+ <1427806926-18887-9-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1563b908-8a90-4eb8-8f4e-6e989c467533@BN1BFFO11FD030.protection.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2015 02:01 AM, Tony Lindgren wrote:
-> Hi,
->
-> * Tero Kristo <t-kristo@ti.com> [150320 11:46]:
->> This patch creates the l4_cfg and l4_wkup interconnects for OMAP4, and
->> moves some of the generic peripherals under it. System control module
->> support is added to the device tree also, and the existing SCM related
->> functionality is moved under it.
->
-> Doing a diff on the dmesg output before and after this series now
-> produces this extra warning on omap4:
->
-> +ti_dt_clk_init_provider: scm_conf missing 'clocks' child node
 
-Nice test case you got there.
 
-Added a check against missing clocks node, control module no longer 
-attempts clock registration if the clocks are not defined. Will repost.
+> -----Original Message-----
+> From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
+> Sent: Tuesday, March 31, 2015 6:32 PM
+> To: linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; David S.
+> Miller
+> Cc: linux-kernel at vger.kernel.org; Boris BREZILLON; Cyrille Pitchen; Alexandre
+> Belloni; Michal Simek; Punnaiah Choudary Kalluri; Nicolas Ferre
+> Subject: [PATCH v2 8/8] net/macb: unify peripheral version testing
+> 
+> As we need to check peripheral version from the hardware during probe, I
+> introduce a little helper to unify these tests. It would prevent to
+> de-synchronize the test like previously observed.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+    Reviewed-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
 
--Tero
+> ---
+> 
+> Changes in v2: None
+> 
+>  drivers/net/ethernet/cadence/macb.c | 7 ++-----
+>  drivers/net/ethernet/cadence/macb.h | 5 +++++
+>  2 files changed, 7 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb.c
+> b/drivers/net/ethernet/cadence/macb.c
+> index 4412895cf4a8..448a32309dd0 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -2139,10 +2139,9 @@ static void macb_configure_caps(struct macb *bp,
+> const struct macb_config *dt_co
+>  	if (dt_conf)
+>  		bp->caps = dt_conf->caps;
+> 
+> -	if (MACB_BFEXT(IDNUM, macb_readl(bp, MID)) >= 0x2)
+> +	if (macb_is_gem_hw(bp->regs)) {
+>  		bp->caps |= MACB_CAPS_MACB_IS_GEM;
+> 
+> -	if (macb_is_gem(bp)) {
+>  		dcfg = gem_readl(bp, DCFG1);
+>  		if (GEM_BFEXT(IRQCOR, dcfg) == 0)
+>  			bp->caps |= MACB_CAPS_ISR_CLEAR_ON_WRITE;
+> @@ -2159,7 +2158,6 @@ static void macb_probe_queues(void __iomem
+> *mem,
+>  			      unsigned int *num_queues)
+>  {
+>  	unsigned int hw_q;
+> -	u32 mid;
+> 
+>  	*queue_mask = 0x1;
+>  	*num_queues = 1;
+> @@ -2170,8 +2168,7 @@ static void macb_probe_queues(void __iomem
+> *mem,
+>  	 * we are early in the probe process and don't have the
+>  	 * MACB_CAPS_MACB_IS_GEM flag positioned
+>  	 */
+> -	mid = readl_relaxed(mem + MACB_MID);
+> -	if (MACB_BFEXT(IDNUM, mid) < 0x2)
+> +	if (!macb_is_gem_hw(mem))
+>  		return;
+> 
+>  	/* bit 0 is never set but queue 0 always exists */
+> diff --git a/drivers/net/ethernet/cadence/macb.h
+> b/drivers/net/ethernet/cadence/macb.h
+> index fd0a22157a88..eb7d76f7bf6a 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -833,4 +833,9 @@ static inline bool macb_is_gem(struct macb *bp)
+>  	return !!(bp->caps & MACB_CAPS_MACB_IS_GEM);
+>  }
+> 
+> +static inline bool macb_is_gem_hw(void __iomem *addr)
+> +{
+> +	return !!(MACB_BFEXT(IDNUM, readl_relaxed(addr + MACB_MID))
+> >= 0x2);
+> +}
+> +
+>  #endif /* _MACB_H */
+> --
+> 2.1.3
