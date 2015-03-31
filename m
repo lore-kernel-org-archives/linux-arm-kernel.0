@@ -1,94 +1,63 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 31 Mar 2015 09:50:50 -0600
-Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
- iommu_ops
-In-Reply-To: <20150331144956.GA24094@arm.com>
-References: <20150327171946.GL1562@arm.com>
- <20150331142440.GD22683@8bytes.org> <20150331144956.GA24094@arm.com>
-Message-ID: <1427817050.5567.148.camel@redhat.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 31 Mar 2015 17:55:42 +0200
+Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type constants
+ in dt-bindings/phy/phy.h
+In-Reply-To: <551ABD99.2000503@ti.com>
+References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
+ <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
+ <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
+ <551ABD99.2000503@ti.com>
+Message-ID: <551AC37E.70503@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-03-31 at 15:49 +0100, Will Deacon wrote:
-> On Tue, Mar 31, 2015 at 03:24:40PM +0100, Joerg Roedel wrote:
-> > Hi Will,
-> 
-> Hi Joerg,
-> 
-> > On Fri, Mar 27, 2015 at 05:19:46PM +0000, Will Deacon wrote:
-> > > Please can you pull the following IOMMU changes for 4.1? They move the
-> > > per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
-> > > IOMMUs such as the ARM SMMU to support different page sizes within a
-> > > given SoC.
-> > 
-> > I have some concerns about the direction taken with this patch-set. The
-> > goal for the IOMMU-API is still to have domains that can be attached to
-> > arbitrary devices (even when mappings already exist). But with this
-> > patch-set we move into a direction where a domain can only be used on
-> > IOMMUs that support the page-sizes required by the domain. In the end
-> > this would be visible to the user of the IOMMU-API, which is not what we
-> > want.
-> 
-> But isn't this restriction already the case in practice? For example, if
-> I have a domain with some mapping already configured, then that mapping
-> will be using some fixed set of page sizes. Attaching a device behind
-> another IOMMU that doesn't support that page size would effectively require
-> the domain page tables to be freed and re-allocated from scratch.
-> 
-> So I don't think this patch series leaves us any worse off that we currently
-> are already.
-> 
-> Ths plus points of the patches are that:
-> 
->   - We can support different page sizes per domain (the ARM SMMU hardware
->     really does support this and it would be nice to exploit that to gain
->     better TLB utilisation)
-> 
->   - We can support systems containing IOMMUs that don't support a common
->     page size (I believe the arm64 Juno platform has this feature)
-> 
->   - I don't have to manipulate a const data structure (iommu_ops) at runtime
->     whenever I find a new IOMMU with a different set of supported page
->     sizes.
-> 
-> > I can understand the motivation behind these patches, but we need to
-> > think about how this could work with the desired semantics of the
-> > IOMMU-API.
-> 
-> Do we have any code using this feature of the IOMMU API? I don't think it's
-> realistic in the general case to allow arbitrary devices to be attached to a
-> domain unless the domain can also span multiple IOMMUs. In that case, we'd
-> actually need multiple sets of page tables, potentially described using
-> different formats...
+Hi Kishon,
 
-Legacy KVM assignment relies on being able to attach all the devices to
-a single IOMMU domain and the hardware generally supports the domain
-page table being used by multiple hardware units.  It's not without
-issue though.  For instance, there's no hardware spec that requires that
-all the hardware IOMMUs for an iommu_ops must support
-IOMMU_CAP_CACHE_COHERENCY.  That's a per domain capability, not per
-iommu_ops.  If we start with a device attached to an IOMMU that does
-support this capability and create our mappings with the IOMMU_CACHE
-protection flag, that domain is incompatible with other IOMMU hardware
-units that do not support that capability.  On VT-d, the IOMMU API lets
-us share the domain between hardware units, but we might get invalid
-reserved field faults if we mix-n-match too much.
+On 03/31/2015 05:30 PM, Kishon Vijay Abraham I wrote:
+> Maxime,
+>
+> On Tuesday 31 March 2015 01:10 PM, Lee Jones wrote:
+>> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+>>
+>>> Hi Patrice, Maxime,
+>>>
+>>> On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
+>>>> Now there are generic phy type constants declared in phy.h, migrate 
+>>>> over to
+>>>> using them rather than defining our own. This change has been done 
+>>>> as one
+>>>> atomic commit to be bisectable.
+>>>>
+>>>> Note: The values of the defines are the same, so there is no ABI 
+>>>> breakage
+>>>> with this patch.
+>>>>
+>>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>
+>>> Are you okay for this patch to go via PHY tree? It modifies 
+>>> arch/arm/boot/dts
+>>> /stih416.dtsi.
+>>
+>> These files need to be changed simultaneously in order to prevent
+>> breakage during bisection and the like.  I think the best bet moving
+>> forward is to pull this into its own branch, tag it and send Maxime a
+>> pull-request to the immutable branch.  It's the best way to minimise
+>> merge conflicts during the v4.1 merge window.
+>
+> okay. I still need an Ack from Maxime.
 
-This is why VFIO had to add support for multiple IOMMU domains within a
-VFIO container.  It used to be that a VFIO container was essentially a
-1:1 abstraction of an IOMMU domain, but issues like IOMMU_CACHE forced
-us to extend that abstraction.
+You have my Ack.
 
-It makes sense to me that supported page sizes has a similar problem to
-IOMMU_CACHE; IOMMU mappings can be made that are dependent on the
-composition of the domain at the time of mapping and there's no
-requirement that all the IOMMU hardware units support the exact same
-features.  VFIO already assumes that separate domains don't necessarily
-use the same ops and we make sure mappings and un-mappings are aligned
-to the smallest common size.  We'll have some work to do though if there
-is no common size between the domains and we may need to add a test to
-our notion of compatible domains if pgsize_bitmap moves from iommu_ops
-(sorry, I forget whether you already had a patch for that in this pull
-request).  Thanks,
+I haven't sent a pull request for STi DT files for v4.1 now, and it is 
+too late to send one.
+So creating an immutable tag is not even needed in my opinion, you can 
+just take the DT patch.
 
-Alex
+Thanks,
+Maxime
+
+>
+> Thanks
+> Kishon
