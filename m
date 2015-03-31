@@ -1,28 +1,64 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 31 Mar 2015 15:40:12 +0200
-Subject: [GIT PULL] iommu/arm-smmu: updates for 4.1
-In-Reply-To: <20150327172146.GM1562@arm.com>
-References: <20150327172146.GM1562@arm.com>
-Message-ID: <20150331134012.GC22683@8bytes.org>
+From: m.grzeschik@pengutronix.de (Michael Grzeschik)
+Date: Tue, 31 Mar 2015 15:54:49 +0200
+Subject: [PATCH] spi: bitbang: only toggle bitchanges
+Message-ID: <1427810089-14866-1-git-send-email-m.grzeschik@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 05:21:46PM +0000, Will Deacon wrote:
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+The current implementation of bitbang_txrx_be_cpha0 and
+bitbang_txrx_be_cpha1 always call setmosi. That runs into several
+unnecessary calls into the gpiolib when the level of the GPIO actually
+has not to be changed.
 
-Pulled, but ...
+This patch changes the routines to remember the last GPIO level
+and only calls setmosi if an change has to be made. This
+way it improves the transfer throughput.
 
-> Robin Murphy (1):
->       iommu/arm-smmu: set a more appropriate DMA mask
-> 
-> Will Deacon (3):
->       iommu/arm-smmu: ensure CBA2R is initialised before CBAR on SMMUv2
->       iommu/arm-smmu: handle multi-alias IOMMU groups for PCI devices
->       iommu/io-pgtable-arm: avoid speculative walks through TTBR1
+Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+---
+ drivers/spi/spi-bitbang-txrx.h | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-... next time please make sure the commit subjects start with capital
-letters after the colon.
-
-Thanks,
-
-	Joerg
+diff --git a/drivers/spi/spi-bitbang-txrx.h b/drivers/spi/spi-bitbang-txrx.h
+index c616e41..62bdf62 100644
+--- a/drivers/spi/spi-bitbang-txrx.h
++++ b/drivers/spi/spi-bitbang-txrx.h
+@@ -49,12 +49,16 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
+ {
+ 	/* if (cpol == 0) this is SPI_MODE_0; else this is SPI_MODE_2 */
+ 
++	bool oldbit = !(word & 1);
+ 	/* clock starts at inactive polarity */
+ 	for (word <<= (32 - bits); likely(bits); bits--) {
+ 
+ 		/* setup MSB (to slave) on trailing edge */
+ 		if ((flags & SPI_MASTER_NO_TX) == 0)
+-			setmosi(spi, word & (1 << 31));
++			if ((word & (1 << 31)) != oldbit) {
++				setmosi(spi, word & (1 << 31));
++				oldbit = word & (1 << 31);
++			}
+ 		spidelay(nsecs);	/* T(setup) */
+ 
+ 		setsck(spi, !cpol);
+@@ -76,13 +80,17 @@ bitbang_txrx_be_cpha1(struct spi_device *spi,
+ {
+ 	/* if (cpol == 0) this is SPI_MODE_1; else this is SPI_MODE_3 */
+ 
++	bool oldbit = !(word & (1 << 31));
+ 	/* clock starts@inactive polarity */
+ 	for (word <<= (32 - bits); likely(bits); bits--) {
+ 
+ 		/* setup MSB (to slave) on leading edge */
+ 		setsck(spi, !cpol);
+ 		if ((flags & SPI_MASTER_NO_TX) == 0)
+-			setmosi(spi, word & (1 << 31));
++			if ((word & (1 << 31)) != oldbit) {
++				setmosi(spi, word & (1 << 31));
++				oldbit = word & (1 << 31);
++			}
+ 		spidelay(nsecs); /* T(setup) */
+ 
+ 		setsck(spi, cpol);
+-- 
+2.1.4
