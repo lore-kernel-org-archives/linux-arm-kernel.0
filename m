@@ -1,47 +1,65 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 31 Mar 2015 11:11:09 +0200
-Subject: ARM, earlyconsole and io mapping
-In-Reply-To: <5519DCDE.4010406@hurleysoftware.com> (Peter Hurley's message of
- "Mon, 30 Mar 2015 19:31:42 -0400")
-References: <87iodivgfm.fsf@free.fr> <5519DCDE.4010406@hurleysoftware.com>
-Message-ID: <874mp1v8eq.fsf@free.fr>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Tue, 31 Mar 2015 11:11:44 +0200
+Subject: [PATCH v2 3/5] PCI: st: Provide support for the sti PCIe
+ controller
+In-Reply-To: <1426674930.2649.50.camel@tiscali.nl>
+References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
+ <1426518695.26437.55.camel@x220> <55093C12.7070004@st.com>
+ <1426674930.2649.50.camel@tiscali.nl>
+Message-ID: <CAG374jCjTVBwiNrWoo=X9hUSb-etzn8G-XSXGO_nNYhiL_9k_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Hurley <peter@hurleysoftware.com> writes:
+Hi Bjorn,
 
-> Hi Robert,
+pci-st.c driver could be modular with modification of pcie-designware
+core driver. But as Fabrice said  it should be another patchset.
+
+What do you prefer ?
+
+drop all the module related macros as mentioned by Paul ?
+or
+keep macros like other vendors do ?
+
+Thanks
+
+Gabriel
+
+On 18 March 2015 at 11:35, Paul Bolle <pebolle@tiscali.nl> wrote:
+> Hi Fabrice,
 >
-> On 03/30/2015 08:05 AM, Robert Jarzmik wrote:
->> Hi,
->> 
->> I was wondering how the earlyconsole was supposed to work in order to add
->> support to the pxa architecture. More specifically, I don't understand how the
->> memory mapping is supposed to be available at the early parameters parsing.
-> Fixmap support has not been upstreamed yet, but if you're desperate, here's
-> the latest patch version:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318372.html
-
-Ah I'm not desperate, that would be nice to have tool on my automation
-platform. I've gone the DEBUG_LL + JTAG/__log_buf memory dump so far.
-
-And yet I remember viewing early concole patches a few monthes back, and I
-wondered how the authors could make them work ... And as my memory didn't serve
-me well, I couldn't remember your name.
-
-> If you're using /chosen/stdout-path, earlycon gets turned off at dummy
-> VT console load, so for right now, specify your earlycon and consoles on the
-> command line.
-Ah I'm using device-tree in only 1/3rd of the PXA tests :
- - 1/3rd for legacy platform_data tests
- - 1/3rd for device-tree pxa platforms
- - 1/3rd for multiplatform kernel
-
-Anyway, I hope you'll have Russell's comments addressed, and that your patch
-will make it upstream. Thanks for the information, it is exactly what I was
-asking for.
-
-Cheers.
-
--- 
-Robert
+> Fabrice Gasnier schreef op wo 18-03-2015 om 09:49 [+0100]:
+>> On 03/16/2015 04:11 PM, Paul Bolle wrote:
+>> >> +config PCI_ST
+>> >> +  bool "ST PCIe controller"
+>> > You add a bool Kconfig symbol. A week or two ago I saw some patches fly
+>> > by that - I think - allowed PCIe controllers to be built modular.
+>>
+>> Thanks for your review.
+>>
+>> Are you talking about "PCI: Export symbols of PCI functions" patch, that
+>> is part of a series
+>> named "pci: iproc: Add Broadcom iProc PCIe support" ?
+>
+> Yes, that is the series I was thinking about. (I made you search lkml,
+> and that was a bit rude. But you found the patch anyhow.)
+>
+>> This controller doesn't look like to be based on pcie-designware core
+>> driver.
+>> Other vendors that are using "pcie-designware" core driver are also make
+>> it bool.
+>> The current core driver doesn't support module loading/unloading as I
+>> see it.
+>> If this is required, I also think this should be part of another patchset.
+>>
+>> What do you think ?
+>
+> I wouldn't know whether your driver might work as a loadable module, but
+> other people reading this surely will. But if it can't work as a module
+> you should drop all the module related macros etc. I spotted. Because
+> then they serve no purpose.
+>
+>
+> Paul Bolle
+>
