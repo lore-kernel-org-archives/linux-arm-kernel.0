@@ -1,135 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Mar 2015 10:08:18 +0100
-Subject: [PATCH] arm64: errata: add workaround for cortex-a53 erratum #845719
-Message-ID: <1427792898-22297-1-git-send-email-will.deacon@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 31 Mar 2015 11:10:34 +0200
+Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
+In-Reply-To: <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+ <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
+Message-ID: <1427793034.2969.17.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running a compat (AArch32) userspace on Cortex-A53, a load at EL0
-from a virtual address that matches the bottom 32 bits of the virtual
-address used by a recent load at (AArch64) EL1 might return incorrect
-data.
+Hi,
 
-This patch works around the issue by writing to the contextidr_el1
-register on the exception return path when returning to a 32-bit task.
-This workaround is patched in at runtime based on the MIDR value of the
-processor.
+Am Montag, den 30.03.2015, 20:40 +0100 schrieb Russell King:
+> Add a helper to create the IEC958 channel status from an ALSA
+> snd_pcm_runtime structure, taking account of the sample rate.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  include/sound/pcm_iec958.h |  9 ++++++
+>  sound/core/Kconfig         |  3 ++
+>  sound/core/Makefile        |  2 ++
+>  sound/core/pcm_iec958.c    | 70 ++++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 84 insertions(+)
+>  create mode 100644 include/sound/pcm_iec958.h
+>  create mode 100644 sound/core/pcm_iec958.c
+> 
+> diff --git a/include/sound/pcm_iec958.h b/include/sound/pcm_iec958.h
+> new file mode 100644
+> index 000000000000..0eed397aca8e
+> --- /dev/null
+> +++ b/include/sound/pcm_iec958.h
+> @@ -0,0 +1,9 @@
+> +#ifndef __SOUND_PCM_IEC958_H
+> +#define __SOUND_PCM_IEC958_H
+> +
+> +#include <linux/types.h>
+> +
+> +int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
+> +	size_t len);
+> +
+> +#endif
+> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+> index b534c8a6046b..1507469425ec 100644
+> --- a/sound/core/Kconfig
+> +++ b/sound/core/Kconfig
+> @@ -9,6 +9,9 @@ config SND_PCM
+>  config SND_PCM_ELD
+>  	bool
+>  
+> +config SND_PCM_IEC958
+> +	bool
+> +
+>  config SND_DMAENGINE_PCM
+>  	tristate
+>  
+> diff --git a/sound/core/Makefile b/sound/core/Makefile
+> index 591b49157b4d..70ea06712ec2 100644
+> --- a/sound/core/Makefile
+> +++ b/sound/core/Makefile
+> @@ -14,10 +14,12 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+>  		pcm_memory.o memalloc.o
+>  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+>  snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+> +snd-pcm-$(CONFIG_SND_PCM_IEC958) += snd-pcm-iec958.o
+>  
+>  # for trace-points
+>  CFLAGS_pcm_lib.o := -I$(src)
+>  
+> +snd-pcm-iec958-objs := pcm_iec958.o
+>  snd-pcm-dmaengine-objs := pcm_dmaengine.o
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig                  | 21 +++++++++++++++++++++
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/kernel/cpu_errata.c      |  8 ++++++++
- arch/arm64/kernel/entry.S           | 20 ++++++++++++++++++++
- 4 files changed, 51 insertions(+), 1 deletion(-)
+This fails to build for me on 4.0-rc6:
+make[2]: *** No rule to make target 'sound/core/snd-pcm-iec958.o', needed by 'sound/core/snd-pcm.o'.  Stop.
+scripts/Makefile.build:403: recipe for target 'sound/core' failed
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 1b8e97331ffb..11103853d5f4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -361,6 +361,27 @@ config ARM64_ERRATUM_832075
- 
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_845719
-+	bool "Cortex-A53: 845719: a load might read incorrect data"
-+	depends on COMPAT
-+	default y
-+	help
-+	  This option adds an alternative code sequence to work around ARM
-+	  erratum 845719 on Cortex-A53 parts up to r0p4.
+unless I change it to either:
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -14,7 +14,8 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+                pcm_memory.o memalloc.o
+ snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+ snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+-snd-pcm-$(CONFIG_SND_PCM_IEC958) += snd-pcm-iec958.o
 +
-+	  When running a compat (AArch32) userspace on an affected Cortex-A53
-+	  part, a load at EL0 from a virtual address that matches the bottom 32
-+	  bits of the virtual address used by a recent load at (AArch64) EL1
-+	  might return incorrect data.
-+
-+	  The workaround is to write the contextidr_el1 register on exception
-+	  return to a 32-bit task.
-+	  Please note that this does not necessarily enable the workaround,
-+	  as it depends on the alternative framework, which will only patch
-+	  the kernel if an affected CPU is detected.
-+
-+	  If unsure, say Y.
-+
- endmenu
++obj-$(CONFIG_SND_PCM_IEC958) += snd-pcm-iec958.o
  
+ # for trace-points
+ CFLAGS_pcm_lib.o := -I$(src)
+
+or:
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -14,12 +14,11 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+                pcm_memory.o memalloc.o
+ snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+ snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+-snd-pcm-$(CONFIG_SND_PCM_IEC958) += snd-pcm-iec958.o
++snd-pcm-$(CONFIG_SND_PCM_IEC958) += pcm_iec958.o
  
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b6c16d5f622f..3f0c53c45771 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -23,8 +23,9 @@
+ # for trace-points
+ CFLAGS_pcm_lib.o := -I$(src)
  
- #define ARM64_WORKAROUND_CLEAN_CACHE		0
- #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
-+#define ARM64_WORKAROUND_845719			2
+-snd-pcm-iec958-objs := pcm_iec958.o
+ snd-pcm-dmaengine-objs := pcm_dmaengine.o
  
--#define ARM64_NCAPS				2
-+#define ARM64_NCAPS				3
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index fa62637e63a8..ac5d965f1300 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -91,6 +91,14 @@ struct arm64_cpu_capabilities arm64_errata[] = {
- 		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
- 	},
- #endif
-+#ifdef CONFIG_ARM64_ERRATUM_845719
-+	{
-+	/* Cortex-A53 r0p[01234] */
-+		.desc = "ARM erratum 845719",
-+		.capability = ARM64_WORKAROUND_845719,
-+		MIDR_RANGE(MIDR_CORTEX_A53, 0x00, 0x04),
-+	},
-+#endif
- 	{
- 	}
- };
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index cf21bb3bf752..959fe8733560 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -21,8 +21,10 @@
- #include <linux/init.h>
- #include <linux/linkage.h>
- 
-+#include <asm/alternative-asm.h>
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
-+#include <asm/cpufeature.h>
- #include <asm/errno.h>
- #include <asm/esr.h>
- #include <asm/thread_info.h>
-@@ -120,6 +122,24 @@
- 	ct_user_enter
- 	ldr	x23, [sp, #S_SP]		// load return stack pointer
- 	msr	sp_el0, x23
-+
-+#ifdef CONFIG_ARM64_ERRATUM_845719
-+	alternative_insn						\
-+	"nop",								\
-+	"tbz x22, #4, 1f",						\
-+	ARM64_WORKAROUND_845719
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	alternative_insn						\
-+	"nop; nop",							\
-+	"mrs x29, contextidr_el1; msr contextidr_el1, x29; 1:",		\
-+	ARM64_WORKAROUND_845719
-+#else
-+	alternative_insn						\
-+	"nop",								\
-+	"msr contextidr_el1, xzr; 1:",					\
-+	ARM64_WORKAROUND_845719
-+#endif
-+#endif
- 	.endif
- 	msr	elr_el1, x21			// set up the return data
- 	msr	spsr_el1, x22
--- 
-2.1.4
+ snd-rawmidi-objs  := rawmidi.o
+
+regards
+Philipp
