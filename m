@@ -1,46 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Mar 2015 16:26:53 -0700
-Subject: [PATCH v2 0/5] ARM: sunxi: SRAM mapping support
-In-Reply-To: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
-References: <1427381625-6942-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150330232653.GC23664@lukather>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 31 Mar 2015 15:14:41 +0200
+Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
+In-Reply-To: <1427516662.3643.906.camel@redhat.com>
+References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
+ <1427516662.3643.906.camel@redhat.com>
+Message-ID: <20150331131441.GD4441@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Alex,
 
-On Thu, Mar 26, 2015 at 03:53:40PM +0100, Hans de Goede wrote:
-> Hi All,
+On Fri, Mar 27, 2015 at 10:24:22PM -0600, Alex Williamson wrote:
+> For 1-5,16
 > 
-> Here is v2 of my cleaned up version of Maxime's sunxi SRAM controller driver.
-> 
-> Changes since v1:
-> - Make the SUNXI_SRAM Kconfig option hidden, enabled by default if ARCH_SUNXI
-> - Fix some typos in the comments in the dts file, both in the example in the
->   devicetree-binding documentation, as well as in the actual dts files
-> - Drop the bogus change to drivers/net/ethernet/stmicro/stmmac/Kconfig
-> 
-> Since this is a prereq for my musb work, if there are no objections then I
-> would like to see this go upstream soon.
-> 
-> Since it only touches sunxi files (and one Makefile), it is probably best if
-> this all goes upstream through Maxime.
+> Reviewed-by: Alex Williamson <alex.williamson@redhat.com>
 
-I'm (obviously) fine with all the changes. Arnd, can I merge it
-through my tree and send a pull request, or do you want to handle the
-drivers/soc patches yourself?
+Thanks a lot for your review.
 
-Thanks,
-Maxime
+> My only comment/question is whether you'd want to consider using
+> ERR_PTR() return values from domain_alloc().  It's an alloc functions,
+> so NULL == -ENOMEM is pretty standard, but we could at least have the
+> interface to the iommu driver return more info even if we continue to
+> mask that as NULL out to the IOMMU API users for now.  Thanks,
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150330/bea0e22c/attachment.sig>
+Yes, that might make sense. But to do anything useful with the ERR_PTR
+we also need to change the iommu_domain_alloc() interface. This is
+out-of-scope for this patch-set, we can discuss this seperatly.
+
+
+	Joerg
