@@ -1,35 +1,44 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 31 Mar 2015 13:25:07 +0200
-Subject: [PATCH] spi: xilinx: Use standard num-cs binding
-In-Reply-To: <20150331111651.GL2869@sirena.org.uk>
-References: <67f3c196833c427a489ca2c530d08987a6b5ee2a.1421412912.git.michal.simek@xilinx.com>
- <20150308190012.GV28806@sirena.org.uk>
- <2a81c738-f7e2-4387-b04c-05c9892ba8e4@BN1AFFO11FD026.protection.gbl>
- <20150327175318.GG1743@sirena.org.uk>
- <1bd88fda-314c-496a-ba8b-e9292f9c411b@BY2FFO11FD023.protection.gbl>
- <20150331054714.GA2869@sirena.org.uk>
- <74214fc9-e5e4-42db-bd85-51ed02975388@BN1AFFO11FD026.protection.gbl>
- <20150331111651.GL2869@sirena.org.uk>
-Message-ID: <98b110d7-f875-4bd5-98de-47641ac2134c@BN1AFFO11FD026.protection.gbl>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 31 Mar 2015 14:34:48 +0300
+Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
+In-Reply-To: <201503281633.02801.marex@denx.de>
+References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
+ <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
+ <201503281633.02801.marex@denx.de>
+Message-ID: <20150331113448.GN12479@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2015 01:16 PM, Mark Brown wrote:
-> On Tue, Mar 31, 2015 at 10:16:57AM +0200, Michal Simek wrote:
->> On 03/31/2015 07:47 AM, Mark Brown wrote:
-> 
->>> num-cs *is* a software setting.
-> 
->> ok - what to do with that? Remove it because it shouldn't be passed via DT?
-> 
-> Well, there's a lot of existing users to check and clean up some of
-> which currently rely on it which will take time to deal with.  Removing
-> it while some drivers rely on using it isn't ideal.
-> 
+Hi Marek,
 
-We have spi-cadence driver in the kernel which uses num-cs and also
-is-decoded-cs and we can change it but the question still remains how
-to do it better.
+On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
+> On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
+> > Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
+> > Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
+> > usb2 host.
+> > 
+> > The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
+> > different enough to merit its own driver. Also, this driver uses the
+> > generic phy infrastructure.
+> 
+> the register set looks very similar to MXS one indeed. How is it different 
+> please ?
 
-Thanks,
-Michal
+Almost of the bits that are defined in the MXS USBPHY_CTRL register are not 
+defined in the Digicolor one. Some have different meaning, and some are 
+reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13 
+range. Also, the Digicolor phy does not have anatop registers.
+
+> The driver looks OK.
+
+Thanks.
+
+BTW, do you know why the phy-mxs-usb driver calls its init from 
+postcore_initcall? Is there a special need to register the driver so early?
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
