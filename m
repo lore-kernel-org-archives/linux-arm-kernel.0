@@ -1,47 +1,57 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 31 Mar 2015 16:40:42 +0100
-Subject: [PATCH v2 0/4] QEMU support for KVM Guest Debug on arm64
-Message-ID: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
+Date: Tue, 31 Mar 2015 16:40:45 +0100
+Subject: [PATCH v2 3/4] target-arm: kvm - support for single step
+In-Reply-To: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
+References: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1427816446-31586-4-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds support for single-step. There isn't much to do on the QEMU
+side as after we set-up the request for single step via the debug ioctl
+it is all handled within the kernel.
 
-I thought I'd sent V1 to the list but apparently not. Anyway this
-patch series provides the QEMU side of guest debug support for arm64.
-I'm assuming the first patch will be dropped when a proper merge of
-the linux-headers is done once the kernel side is upstreamed.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-There is nothing particularly special about the implementation details
-although some of the bit-fiddling is a little fiddly.
+---
+v2
+  - convert to using HSR_EC
 
-GIT Repos:
-
-The patch series is based off a recent master and can be found at:
-
-https://github.com/stsquad/qemu
-branch: kvm/guest-debug-v2
-
-The kernel patches for this series are based off a v4.0-rc6 and can be
-found at:
-
-https://git.linaro.org/people/alex.bennee/linux.git
-branch: guest-debug/4.0-rc6-v2
-
-Alex Benn?e (4):
-  linux-headers: partial sync from my kernel tree (DEV)
-  target-arm: kvm - implement software breakpoints
-  target-arm: kvm - support for single step
-  target-arm: kvm - add support for HW assisted debug
-
- linux-headers/asm-arm64/kvm.h   |  22 +++
- linux-headers/asm-powerpc/kvm.h |   4 +-
- linux-headers/asm-x86/kvm.h     |   4 +-
- linux-headers/linux/kvm.h       |  17 ++-
- target-arm/kvm.c                | 124 ++++++++++++----
- target-arm/kvm64.c              | 315 ++++++++++++++++++++++++++++++++++++++++
- target-arm/kvm_arm.h            |  21 +++
- 7 files changed, 474 insertions(+), 33 deletions(-)
-
+diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+index 290c1fe..ae0f8b2 100644
+--- a/target-arm/kvm.c
++++ b/target-arm/kvm.c
+@@ -475,6 +475,7 @@ void kvm_arch_post_run(CPUState *cs, struct kvm_run *run)
+ */
+ 
+ #define HSR_EC_SHIFT            26
++#define HSR_EC_SOFT_STEP        0x32
+ #define HSR_EC_SW_BKPT          0x3c
+ 
+ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+@@ -483,6 +484,13 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+     int hsr_ec = arch_info->hsr >> HSR_EC_SHIFT;
+ 
+     switch (hsr_ec) {
++    case HSR_EC_SOFT_STEP:
++        if (cs->singlestep_enabled) {
++            return true;
++        } else {
++            error_report("Came out of SINGLE STEP when not enabled");
++        }
++        break;
+     case HSR_EC_SW_BKPT:
+         if (kvm_find_sw_breakpoint(cs, arch_info->pc)) {
+             return true;
+@@ -542,6 +550,9 @@ int kvm_arch_on_sigbus(int code, void *addr)
+ 
+ void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
+ {
++    if (cs->singlestep_enabled) {
++        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
++    }
+     if (kvm_sw_breakpoints_active(cs)) {
+         dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
+     }
 -- 
 2.3.4
