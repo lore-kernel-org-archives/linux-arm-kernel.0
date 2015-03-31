@@ -1,21 +1,18 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 Mar 2015 08:54:26 -0700
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 31 Mar 2015 17:58:28 +0200
 Subject: [PATCH 01/25] arm: Use bool function return values of true/false
  not 1/0
 In-Reply-To: <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
 References: <cover.1427759009.git.joe@perches.com>
  <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
-Message-ID: <20150331155426.GP10805@atomide.com>
+Message-ID: <551AC424.9010802@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joe Perches <joe@perches.com> [150330 16:47]:
+On 31/03/2015 01:45, Joe Perches wrote:
 > Use the normal return values for bool functions
 > 
 > Signed-off-by: Joe Perches <joe@perches.com>
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
 > ---
 >  arch/arm/include/asm/dma-mapping.h |  8 ++++----
 >  arch/arm/include/asm/kvm_emulate.h |  2 +-
@@ -106,6 +103,8 @@ Acked-by: Tony Lindgren <tony@atomide.com>
 > -	return 0;
 > +	return false;
 >  }
-> -- 
-> 2.1.2
 > 
+
+Marc/Christoffer, please pick this up yourself.
+
+Paolo
