@@ -1,40 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 31 Mar 2015 15:34:51 +0200
-Subject: [RESEND PATCH] MAINTAINERS: change the Atmel audio alsa driver entry
-Message-ID: <1427808891-9321-1-git-send-email-nicolas.ferre@atmel.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 31 Mar 2015 15:40:12 +0200
+Subject: [GIT PULL] iommu/arm-smmu: updates for 4.1
+In-Reply-To: <20150327172146.GM1562@arm.com>
+References: <20150327172146.GM1562@arm.com>
+Message-ID: <20150331134012.GC22683@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I take over the the maintainship of Atmel alsa drivers from Voice.
-Thanks for your work!
+On Fri, Mar 27, 2015 at 05:21:46PM +0000, Will Deacon wrote:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Bo Shen <voice.shen@atmel.com>
-Cc: Mark Brown <broonie@kernel.org>
----
-Hi Mark,
+Pulled, but ...
 
-Here is the MAINTAINERS' change that I sent to the wrong address. Can you
-please take it with your tree?
+> Robin Murphy (1):
+>       iommu/arm-smmu: set a more appropriate DMA mask
+> 
+> Will Deacon (3):
+>       iommu/arm-smmu: ensure CBA2R is initialised before CBAR on SMMUv2
+>       iommu/arm-smmu: handle multi-alias IOMMU groups for PCI devices
+>       iommu/io-pgtable-arm: avoid speculative walks through TTBR1
 
-Thanks, bye.
+... next time please make sure the commit subjects start with capital
+letters after the colon.
 
+Thanks,
 
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6cb40f8736ee..a915bb124fe7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1762,7 +1762,7 @@ S:	Supported
- F:	drivers/tty/serial/atmel_serial.c
- 
- ATMEL Audio ALSA driver
--M:	Bo Shen <voice.shen@atmel.com>
-+M:	Nicolas Ferre <nicolas.ferre@atmel.com>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
- S:	Supported
- F:	sound/soc/atmel
--- 
-2.1.3
+	Joerg
