@@ -1,40 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 31 Mar 2015 17:47:50 +0300
-Subject: [PATCH 2/2] ARM: dts: sun5i: Add broken-hpi property for Utoo-P66
- eMMC
-In-Reply-To: <1427652575-12642-2-git-send-email-hdegoede@redhat.com>
-References: <1427652575-12642-1-git-send-email-hdegoede@redhat.com>
- <1427652575-12642-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <551AB396.3040404@cogentembedded.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 31 Mar 2015 17:47:25 +0300
+Subject: [PATCH v3 5/7] dmaengine: omap-dma: Take DMA request number from
+ DT if it is available
+In-Reply-To: <20150327202446.GB4027@n2100.arm.linux.org.uk>
+References: <1427459213-14611-1-git-send-email-peter.ujfalusi@ti.com>
+ <1427459213-14611-6-git-send-email-peter.ujfalusi@ti.com>
+ <20150327202446.GB4027@n2100.arm.linux.org.uk>
+Message-ID: <551AB37D.1090104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 03/27/2015 10:24 PM, Russell King - ARM Linux wrote:
+> On Fri, Mar 27, 2015 at 02:26:51PM +0200, Peter Ujfalusi wrote:
+>> +	if (!pdev->dev.of_node || of_property_read_u32(pdev->dev.of_node,
+>> +						       "dma-requests",
+>> +						       &od->dma_requests)) {
+>> +		dev_info(&pdev->dev,
+>> +			 "Missing dma-requests property, using %u.\n",
+>> +			 OMAP_SDMA_REQUESTS);
+>> +		od->dma_requests = OMAP_SDMA_REQUESTS;
+>> +	}
+> 
+> Are all OMAPs including OMAP1 being converted to DT?  If not, don't
+> introduce noisy printks for which a platform can't do anything about.
+> Think about this please - if there's no of_node, then why complain
+> about a missing OF property?
 
-On 3/29/2015 9:09 PM, Hans de Goede wrote:
+Yes, you are perfectly right on this. Will fix it up.
 
-> The eMMC on the A13 based Utoo-P66 tablet does not properly support hpi,
-> and trying to enable it results in the eMMC not working, so add a child-node
-> describing the eMMC, and set the broken-hpi property on it.
-
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->   arch/arm/boot/dts/sun5i-a13-utoo-p66.dts | 6 ++++++
->   1 file changed, 6 insertions(+)
-
-> diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> index 6c9f5f3..5b572fa 100644
-> --- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> +++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
-> @@ -150,6 +150,12 @@
->   	bus-width = <8>;
->   	non-removable;
->   	status = "okay";
-> +
-> +	mmmcard: mmccard at 0 {
-
-    Not "mmcard:"? :-)
-
-[...]
-
-WBR, Sergei
+Thanks,
+P?ter
