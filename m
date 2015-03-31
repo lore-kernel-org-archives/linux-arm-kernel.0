@@ -1,73 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Mar 2015 18:46:18 +0200
-Subject: [PATCH v3] ARM: mvebu: Disable CPU Idle on Armada 38x
-Message-ID: <1427820378-13415-1-git-send-email-gregory.clement@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Mar 2015 17:46:36 +0100
+Subject: [PATCH 4/4] arm64: align PHYS_OFFSET to block size
+In-Reply-To: <20150331161902.GH9119@e104818-lin.cambridge.arm.com>
+References: <1427125016-3873-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20150325145949.GE26903@localhost>
+ <CAKv+Gu8LQGNVDw36B+Lv4xMQkcGN=M=uHxey-94cqrmE=AZDvg@mail.gmail.com>
+ <CAKv+Gu_3PG7ffwn+TK7PdUPeovVoamb4XX1PSfor-3sNKW-0AQ@mail.gmail.com>
+ <20150330123011.GB5964@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu84YezZSQmyf4cV34TxMKRPytcFyrrTGO3RFx=_17i-Mg@mail.gmail.com>
+ <20150330150008.GD5964@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-C5c0Ma+KEWkPWbxhcgvGfZXyDp4OXxG_BMyR7Hwtk1A@mail.gmail.com>
+ <20150331144931.GF9119@e104818-lin.cambridge.arm.com>
+ <20150331161902.GH9119@e104818-lin.cambridge.arm.com>
+Message-ID: <20150331164636.GI9119@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Armada 38x SoCs, under heavy I/O load, the system hangs when CPU
-Idle is enabled. Waiting for a solution to this issue, this patch
-disables the CPU Idle support for this SoC.
+On Tue, Mar 31, 2015 at 05:19:03PM +0100, Catalin Marinas wrote:
+> On Tue, Mar 31, 2015 at 03:49:32PM +0100, Catalin Marinas wrote:
+> > On Mon, Mar 30, 2015 at 08:08:52PM +0200, Ard Biesheuvel wrote:
+> > > But using early_fixmap() implies using the ordinary page tables
+> > > manipulation code, which uses __pa/__va
+> > > So instead, I should refactor those patches to simply pick a VA offset
+> > > and map the FDT there from head.S
+> > 
+> > I haven't dug out those patches yet but in principle you should not care
+> > about __va, just __pa for populating the pmd/pud/pgd. Since with
+> > fixmap we pre-allocate the page tables in the kernel data section
+> > (bm_pud/pmd/pte), a __pa implementation that takes KERNEL_PAGE_OFFSET
+> > into account (as per these patches) is enough, you don't really care
+> > about the linear PAGE_OFFSET at this stage since you would not provide
+> > __pa with such virtual address until after setup_machine_fdt().
+> 
+> Actually, that's wrong, early_fixmap_init() uses pud/pmd_offset which in
+> turn use the pmd_offset etc. and pmd_page_vaddr. These would not be
+> mapped in the linear mapping at this stage. create_mapping() also uses
+> the *_offset() functions, so we have the same issue.
+> 
+> So I think we still need to calculate the default initial PHYS_OFFSET in
+> head.S as we currently do, based on the kernel load address so that
+> __va() returns a mapping in the initial KERNEL_PAGE_OFFSET range. During
+> our own early_init_dt_add_memory_arch(), we calculate the real
+> PHYS_OFFSET but don't set it yet. We should defer the setting of the
+> real PHYS_OFFSET until we map the first block of memory via
+> create_mapping(). We know that we can't cope with allocations before the
+> first block anyway, so this approach may work.
 
-As CPU Hot plug support also uses some of the CPU Idle functions it is
-also affected by the same issue. This patch disables it also for the
-Armada 38x SoCs.
+Some more brainstorming with Mark, I think we can set the real
+PHYS_OFFSET immediately after we map the kernel text into the linear
+mapping (and before mapping the RAM with create_mapping) so that we have
+access to swapper_pg_dir via this mapping. But we need the initial
+swapper be pre-populated with pud/pmd for (1) the kernel text at
+KERNEL_PAGE_OFFSET, (2) kernel text in the linear mapping and (3) the
+1st GB of PAGE_OFFSET (to avoid memblock allocations until we mapped
+some RAM). This way we avoid mandating that the kernel image is only
+loaded in the first GB of RAM.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.17 +
----
-Hi,
-
-In this version I removed the unneeded initialization of the ret
-variable, I also fixed the warning message, and finally I added the
-Tested-by from Thomas.
-
-Gregory
-
- arch/arm/mach-mvebu/pmsu.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 8b9f5e202ccf..4f4e22206ae5 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -415,6 +415,9 @@ static __init int armada_38x_cpuidle_init(void)
- 	void __iomem *mpsoc_base;
- 	u32 reg;
- 
-+	pr_warn("CPU idle is currently broken on Armada 38x: disabling");
-+	return 0;
-+
- 	np = of_find_compatible_node(NULL, NULL,
- 				     "marvell,armada-380-coherency-fabric");
- 	if (!np)
-@@ -476,6 +479,16 @@ static int __init mvebu_v7_cpu_pm_init(void)
- 		return 0;
- 	of_node_put(np);
- 
-+	/*
-+	 * Currently the CPU idle support for Armada 38x is broken, as
-+	 * the CPU hotplug uses some of the CPU idle functions it is
-+	 * broken too, so let's disable it
-+	 */
-+	if (of_machine_is_compatible("marvell,armada380")) {
-+		cpu_hotplug_disable();
-+		pr_warn("CPU hotplug support is currently broken on Armada 38x: disabling");
-+	}
-+
- 	if (of_machine_is_compatible("marvell,armadaxp"))
- 		ret = armada_xp_cpuidle_init();
- 	else if (of_machine_is_compatible("marvell,armada370"))
-@@ -489,7 +502,8 @@ static int __init mvebu_v7_cpu_pm_init(void)
- 		return ret;
- 
- 	mvebu_v7_pmsu_enable_l2_powerdown_onidle();
--	platform_device_register(&mvebu_v7_cpuidle_device);
-+	if (mvebu_v7_cpuidle_device.name)
-+		platform_device_register(&mvebu_v7_cpuidle_device);
- 	cpu_pm_register_notifier(&mvebu_v7_cpu_pm_notifier);
- 
- 	return 0;
 -- 
-2.1.0
+Catalin
