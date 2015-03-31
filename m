@@ -1,56 +1,38 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 31 Mar 2015 17:14:02 +0300
-Subject: [PATCH 01/11] clocksource: arm_arch_timer: Rename
- arch_timer_probed to reflect behaviour
-In-Reply-To: <20150331071452.GA9252@gmail.com>
-References: <5519AEB2.8050306@linaro.org>
- <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
- <20150331071452.GA9252@gmail.com>
-Message-ID: <15031814.pvNHsWnCPH@avalon>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 31 Mar 2015 09:13:49 -0500
+Subject: [RESEND] Altera socfpga big endian work
+In-Reply-To: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <551AAB9D.1000809@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo,
+Hi Ben,
 
-On Tuesday 31 March 2015 09:14:52 Ingo Molnar wrote:
-> * Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > The arch_timer_probed function returns whether the given time doesn't
-> > need to be probed. This can be the case when the timer has been probed
-> > already, but also when it has no corresponding enabled node in DT.
-> > 
-> > Rename the function to arch_timer_need_probe and invert its return value
-> > to better reflect the function's purpose and behaviour.
-> > 
-> > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > ---
-> > 
-> >  drivers/clocksource/arm_arch_timer.c | 13 +++++++------
-> >  1 file changed, 7 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c
-> > b/drivers/clocksource/arm_arch_timer.c index a3025e7..50bb7f2 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -661,17 +661,17 @@ static const struct of_device_id
-> > arch_timer_mem_of_match[] __initconst = {> 
-> >  };
-> >  
-> >  static bool __init
-> > 
-> > -arch_timer_probed(int type, const struct of_device_id *matches)
-> > +arch_timer_need_probe(int type, const struct of_device_id *matches)
+On 3/25/15 6:27 AM, Ben Dooks wrote:
+> This series enables the core of the socfpga systen to run in big endian
+> mode. It inclusdes support for debug uart, secondary core boot and has
+> support for timers and initial conversion patches for the mmc.
 > 
-> If we do a rename we might as well use valid English spelling such as
-> 'arch_timer_needs_probing()'?
+> The two drivers that are known to not work are the Ethernet and the
+> dwc2 usb. I do not have data for either, so I currently do not know
+> if it possible to change the hardware's endian fetch mode.
+> 
+> The dwc2 driver on my cyclone5 socfpga board with v4.0-rc5 does not
+> work in little endian mode, which makes testing converting the driver
+> difficult. The supplied 3.10 kernel does work so it is not down to the
+> hardware. It detects the presence of a new device and then fails to
+> enumerate it (no other errors shown)
+> 
+> This is up on git.baserock.org/delta/linux.git in the branch
+> baserock/bjdooks/socfpga-v5
+> 
+> Sorry, this is a resend due to incorrect linux-arm-kernel mailing list
+> address.
+> 
 
-Of course. Should I resend the patch or can you fix that while applying it ?
+I think I can take patches 1-3 through my tree, but the mmc patches
+[4-7] will need to linux-mmc tree.
 
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Dinh
