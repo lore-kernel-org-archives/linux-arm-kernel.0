@@ -1,38 +1,32 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 31 Mar 2015 09:13:49 -0500
-Subject: [RESEND] Altera socfpga big endian work
-In-Reply-To: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <551AAB9D.1000809@opensource.altera.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 31 Mar 2015 16:24:40 +0200
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150327171946.GL1562@arm.com>
+References: <20150327171946.GL1562@arm.com>
+Message-ID: <20150331142440.GD22683@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hi Will,
 
-On 3/25/15 6:27 AM, Ben Dooks wrote:
-> This series enables the core of the socfpga systen to run in big endian
-> mode. It inclusdes support for debug uart, secondary core boot and has
-> support for timers and initial conversion patches for the mmc.
-> 
-> The two drivers that are known to not work are the Ethernet and the
-> dwc2 usb. I do not have data for either, so I currently do not know
-> if it possible to change the hardware's endian fetch mode.
-> 
-> The dwc2 driver on my cyclone5 socfpga board with v4.0-rc5 does not
-> work in little endian mode, which makes testing converting the driver
-> difficult. The supplied 3.10 kernel does work so it is not down to the
-> hardware. It detects the presence of a new device and then fails to
-> enumerate it (no other errors shown)
-> 
-> This is up on git.baserock.org/delta/linux.git in the branch
-> baserock/bjdooks/socfpga-v5
-> 
-> Sorry, this is a resend due to incorrect linux-arm-kernel mailing list
-> address.
-> 
+On Fri, Mar 27, 2015 at 05:19:46PM +0000, Will Deacon wrote:
+> Please can you pull the following IOMMU changes for 4.1? They move the
+> per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
+> IOMMUs such as the ARM SMMU to support different page sizes within a
+> given SoC.
 
-I think I can take patches 1-3 through my tree, but the mmc patches
-[4-7] will need to linux-mmc tree.
+I have some concerns about the direction taken with this patch-set. The
+goal for the IOMMU-API is still to have domains that can be attached to
+arbitrary devices (even when mappings already exist). But with this
+patch-set we move into a direction where a domain can only be used on
+IOMMUs that support the page-sizes required by the domain. In the end
+this would be visible to the user of the IOMMU-API, which is not what we
+want.
 
-Thanks,
-Dinh
+I can understand the motivation behind these patches, but we need to
+think about how this could work with the desired semantics of the
+IOMMU-API.
+
+
+	Joerg
