@@ -1,162 +1,99 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 31 Mar 2015 10:44:53 +0530
-Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type constants
- in dt-bindings/phy/phy.h
-In-Reply-To: <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <551A2D4D.1010601@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 31 Mar 2015 10:50:27 +0530
+Subject: [PATCH] dmaengine: pl330: fix the race condition in pl330 driver.
+In-Reply-To: <551A173B.4010704@broadcom.com>
+References: <1427414105-3480-1-git-send-email-sbranden@broadcom.com>
+ <CABb+yY3s8ZXWe3YAsEeKZ6Vx2av2yvdjWiBGiy7_uGCcai=Rpw@mail.gmail.com>
+ <20150330172546.GI7192@intel.com> <551A173B.4010704@broadcom.com>
+Message-ID: <CABb+yY3+cNqQHVxZg62CPxhb+oKEXcU-twAvpyo6DWUK_8m4qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice, Maxime,
+On Tue, Mar 31, 2015 at 9:10 AM, Scott Branden <sbranden@broadcom.com> wrote:
+> Hi Vinod, Jassi,
+>
+> Some details on the problem encountered.
+>
+>
+> On 15-03-30 10:25 AM, Vinod Koul wrote:
+>>
+>> On Mon, Mar 30, 2015 at 10:17:17PM +0530, Jassi Brar wrote:
+>>>
+>>> On Fri, Mar 27, 2015 at 5:25 AM, Scott Branden <sbranden@broadcom.com>
+>>> wrote:
+>>>>
+>>>> From: ismail <ismail@broadcom.com>
+>>>>
+>>>> Update the thread running index before issuing the
+>>>> GO command to the DMAC.
+>>>>
+>>>> Tested-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+>>>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+>>>> Reviewed-by: Arun Parameswaran <aparames@broadcom.com>
+>>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>>> Signed-off-by: Scott Branden <sbranden@broadcom.com>
+>>>> Signed-off-by: Mohamed Ismail Abdul Packir Mohamed <ismail@broadcom.com>
+>>>> ---
+>>>>   drivers/dma/pl330.c | 4 ++--
+>>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>>>> index 0e1f567..631642d 100644
+>>>> --- a/drivers/dma/pl330.c
+>>>> +++ b/drivers/dma/pl330.c
+>>>> @@ -1072,11 +1072,11 @@ static bool _trigger(struct pl330_thread *thrd)
+>>>>          /* Set to generate interrupts for SEV */
+>>>>          writel(readl(regs + INTEN) | (1 << thrd->ev), regs + INTEN);
+>>>>
+>>>> +       thrd->req_running = idx;
+>>>> +
+>>>>          /* Only manager can execute GO */
+>>>>          _execute_DBGINSN(thrd, insn, true);
+>>>>
+>>>> -       thrd->req_running = idx;
+>>>> -
+>>>
+>>> It would help to know what the behavior looks like before and after
+>>> the patch. If anything we should look at locking rather the
+>>> reordering.
+>>
+>> Yes that ia fair request, looking at changelog it is hard to understand
+>> the
+>> issue seen?
+>>
+> We encountered this problem as we modified the driver to make SMC calls to a
+> TZ handler.  This slowed down the driver to the point where DMA transactions
+> easily failed.  I believe the same could be accomplished by adding a delay
+> between the GOCMD and update of the req_running and running the built in
+> dmatest.
+>
+> The DMA transaction is broken if the interrupt occurs before the
+> thrd->req_running is updated.
+>
+> The pl330 issues a GOCMD (in _trigger function) to start a new transfer.
+>
+> The issue of GOCMD generates an interrupt and the IRQ handler will call the
+> pl330_update function to process the interrupt.
+>
+> The pl330_update function will verify the thread running index and break the
+> transaction, if the thread running index is not set.
+>
+As I suspected the locking seems screwed up. The following patch
+should fix the race properly. Can you please test the attached patches
+instead?
 
-On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
-> Now there are generic phy type constants declared in phy.h, migrate over to
-> using them rather than defining our own. This change has been done as one
-> atomic commit to be bisectable.
->
-> Note: The values of the defines are the same, so there is no ABI breakage
-> with this patch.
->
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Are you okay for this patch to go via PHY tree? It modifies arch/arm/boot/dts
-/stih416.dtsi.
-
-Thanks
-Kishon
-> ---
->   Documentation/devicetree/bindings/phy/phy-miphy365x.txt |  8 ++++----
->   arch/arm/boot/dts/stih416.dtsi                          |  4 ++--
->   drivers/phy/phy-miphy365x.c                             | 14 +++++++-------
->   include/dt-bindings/phy/phy-miphy365x.h                 | 14 --------------
->   4 files changed, 13 insertions(+), 27 deletions(-)
->   delete mode 100644 include/dt-bindings/phy/phy-miphy365x.h
->
-> diff --git a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> index 9802d5d..8772900 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-miphy365x.txt
-> @@ -20,8 +20,8 @@ Required nodes	:  A sub-node is required for each channel the controller
->   Required properties (port (child) node):
->   - #phy-cells 	: Should be 1 (See second example)
->   		  Cell after port phandle is device type from:
-> -			- MIPHY_TYPE_SATA
-> -			- MIPHY_TYPE_PCI
-> +			- PHY_TYPE_SATA
-> +			- PHY_TYPE_PCI
->   - reg        	: Address and length of register sets for each device in
->   		  "reg-names"
->   - reg-names     : The names of the register addresses corresponding to the
-> @@ -68,10 +68,10 @@ property, containing a phandle to the phy port node and a device type.
->
->   Example:
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->
->   	sata0: sata at fe380000 {
->   		...
-> -		phys	  = <&phy_port0 MIPHY_TYPE_SATA>;
-> +		phys	  = <&phy_port0 PHY_TYPE_SATA>;
->   		...
->   	};
-> diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
-> index ea28eba..eeb7afe 100644
-> --- a/arch/arm/boot/dts/stih416.dtsi
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -10,7 +10,7 @@
->   #include "stih416-clock.dtsi"
->   #include "stih416-pinctrl.dtsi"
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->   #include <dt-bindings/interrupt-controller/arm-gic.h>
->   #include <dt-bindings/reset-controller/stih416-resets.h>
->   / {
-> @@ -306,7 +306,7 @@
->   			reg             = <0xfe380000 0x1000>;
->   			interrupts      = <GIC_SPI 157 IRQ_TYPE_NONE>;
->   			interrupt-names = "hostc";
-> -			phys	        = <&phy_port0 MIPHY_TYPE_SATA>;
-> +			phys	        = <&phy_port0 PHY_TYPE_SATA>;
->   			phy-names       = "sata-phy";
->   			resets	        = <&powerdown STIH416_SATA0_POWERDOWN>,
->   					  <&softreset STIH416_SATA0_SOFTRESET>;
-> diff --git a/drivers/phy/phy-miphy365x.c b/drivers/phy/phy-miphy365x.c
-> index 51b459d..019c2d7 100644
-> --- a/drivers/phy/phy-miphy365x.c
-> +++ b/drivers/phy/phy-miphy365x.c
-> @@ -25,7 +25,7 @@
->   #include <linux/mfd/syscon.h>
->   #include <linux/regmap.h>
->
-> -#include <dt-bindings/phy/phy-miphy365x.h>
-> +#include <dt-bindings/phy/phy.h>
->
->   #define HFC_TIMEOUT		100
->
-> @@ -177,7 +177,7 @@ static u8 rx_tx_spd[] = {
->   static int miphy365x_set_path(struct miphy365x_phy *miphy_phy,
->   			      struct miphy365x_dev *miphy_dev)
->   {
-> -	bool sata = (miphy_phy->type == MIPHY_TYPE_SATA);
-> +	bool sata = (miphy_phy->type == PHY_TYPE_SATA);
->
->   	return regmap_update_bits(miphy_dev->regmap,
->   				  miphy_phy->ctrlreg,
-> @@ -431,7 +431,7 @@ static int miphy365x_init(struct phy *phy)
->   	}
->
->   	/* Initialise Miphy for PCIe or SATA */
-> -	if (miphy_phy->type == MIPHY_TYPE_PCIE)
-> +	if (miphy_phy->type == PHY_TYPE_PCIE)
->   		ret = miphy365x_init_pcie_port(miphy_phy, miphy_dev);
->   	else
->   		ret = miphy365x_init_sata_port(miphy_phy, miphy_dev);
-> @@ -455,8 +455,8 @@ int miphy365x_get_addr(struct device *dev, struct miphy365x_phy *miphy_phy,
->   		return ret;
->   	}
->
-> -	if (!((!strncmp(name, "sata", 4) && type == MIPHY_TYPE_SATA) ||
-> -	      (!strncmp(name, "pcie", 4) && type == MIPHY_TYPE_PCIE)))
-> +	if (!((!strncmp(name, "sata", 4) && type == PHY_TYPE_SATA) ||
-> +	      (!strncmp(name, "pcie", 4) && type == PHY_TYPE_PCIE)))
->   		return 0;
->
->   	miphy_phy->base = of_iomap(phynode, index);
-> @@ -499,8 +499,8 @@ static struct phy *miphy365x_xlate(struct device *dev,
->
->   	miphy_phy->type = args->args[0];
->
-> -	if (!(miphy_phy->type == MIPHY_TYPE_SATA ||
-> -	      miphy_phy->type == MIPHY_TYPE_PCIE)) {
-> +	if (!(miphy_phy->type == PHY_TYPE_SATA ||
-> +	      miphy_phy->type == PHY_TYPE_PCIE)) {
->   		dev_err(dev, "Unsupported device type: %d\n", miphy_phy->type);
->   		return ERR_PTR(-EINVAL);
->   	}
-> diff --git a/include/dt-bindings/phy/phy-miphy365x.h b/include/dt-bindings/phy/phy-miphy365x.h
-> deleted file mode 100644
-> index 8ef8aba..0000000
-> --- a/include/dt-bindings/phy/phy-miphy365x.h
-> +++ /dev/null
-> @@ -1,14 +0,0 @@
-> -/*
-> - * This header provides constants for the phy framework
-> - * based on the STMicroelectronics MiPHY365x.
-> - *
-> - * Author: Lee Jones <lee.jones@linaro.org>
-> - */
-> -#ifndef _DT_BINDINGS_PHY_MIPHY
-> -#define _DT_BINDINGS_PHY_MIPHY
-> -
-> -#define MIPHY_TYPE_SATA		1
-> -#define MIPHY_TYPE_PCIE		2
-> -#define MIPHY_TYPE_USB		3
-> -
-> -#endif /* _DT_BINDINGS_PHY_MIPHY */
->
+Thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-dma-pl330-change-busy-marker-for-threads.patch
+Type: text/x-patch
+Size: 3065 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/6f9af47d/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-dma-pl330-fix-race-between-trigger-and-completion.patch
+Type: text/x-patch
+Size: 1612 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/6f9af47d/attachment-0003.bin>
