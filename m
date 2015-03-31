@@ -1,64 +1,64 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 31 Mar 2015 14:42:24 -0400 (EDT)
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <20150331161026.GA17480@e103592.cambridge.arm.com>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz> <20150330132617.GI24899@n2100.arm.linux.org.uk>
- <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
- <551959F1.4030704@suse.cz>
- <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
- <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
- <20150331161026.GA17480@e103592.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.11.1503311429240.25806@knanqh.ubzr>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 31 Mar 2015 21:42:53 +0300
+Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
+In-Reply-To: <551AC160.8060202@ti.com>
+References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
+ <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
+ <201503281633.02801.marex@denx.de>
+ <20150331113448.GN12479@tarshish> <551ABCBE.3030005@ti.com>
+ <20150331154119.GO12479@tarshish> <551AC160.8060202@ti.com>
+Message-ID: <20150331184253.GR12479@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Mar 2015, Dave Martin wrote:
+Hi Kishon,
 
-> On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
-> > On Mon, 30 Mar 2015, Ard Biesheuvel wrote:
-> > 
-> > > On 30 March 2015 at 16:13, Michal Marek <mmarek@suse.cz> wrote:
+On Tue, Mar 31, 2015 at 09:16:40PM +0530, Kishon Vijay Abraham I wrote:
+> On Tuesday 31 March 2015 09:11 PM, Baruch Siach wrote:
+> >On Tue, Mar 31, 2015 at 08:56:54PM +0530, Kishon Vijay Abraham I wrote:
+> >>On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
+> >>>On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
+> >>>>On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
+> >>>>>Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
+> >>>>>Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
+> >>>>>usb2 host.
+> >>>>>
+> >>>>>The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
+> >>>>>different enough to merit its own driver. Also, this driver uses the
+> >>>>>generic phy infrastructure.
+> >>>>
+> >>>>the register set looks very similar to MXS one indeed. How is it different
+> >>>>please ?
+> >>>
+> >>>Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
+> >>>defined in the Digicolor one. Some have different meaning, and some are
+> >>>reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
+> >>>range. Also, the Digicolor phy does not have anatop registers.
+> >>
+> >>I think we should try adding support for this in the same driver.
+> >
+> >The only code that can actually be shared between the driver is the two lines
+> >usb_phy .on_connect callback routine. The init sequence that takes most of the
+> >digicolor driver is totally different. Using a single driver for both PHYs
+> >does not make much sense, IMHO.
+> >
+> >Besides, phy-mxs-usb.c uses the deprecated usb_phy framework. So we first need
+> >to port this driver to the generic phy framework.
 > 
-> [...]
-> 
-> > > > What you could do is to add a Kconfig option to arch/arm/Kconfig adding
-> > > > -ffunction-sections to the compiler flags. Then allyesconfig would
-> > > > select it and work around the problem in a somewhat elegant way.
-> > > >
-> > > 
-> > > Excellent idea! Arnd hasn't chimed in yet, but he is the one doing
-> > > lots and lots of randconfig builds and other test builds, so I will
-> > > wait for him to confirm that this is a useful thing to have.
-> > 
-> > I'm using -ffunction-sections as well for the kernel size reduction work 
-> > I'm currently doing.  The linker script has to be adapted so .text.* is 
-> > specified along .text otherwise those functions end up appended at the 
-> > end of the binary.
-> 
-> Interesting ... do you also mean using --gc-sections at link time?
+> Doesn't your driver also use the usb_phy framework?
 
-Yes.
+My driver uses usb_phy only for the .notify_connect/.notify_disconnect 
+callbacks, since there is no comparable functionality in the generic phy 
+framework. But it doesn't make this driver any more similar to phy-mxs-usb.
 
-> We'd need to avoid pruning needed code that has no explicit caller,
-> and functions that are part of the kernel/module ABI but not used
-> within vmlinux.
+My point is that merging the drives would require migrating phy-mxs-usb to 
+generic phy. But this is just an added complication. The main reason I think 
+the drivers should be separate is because they have very little in common, 
+regardless of the framework they are using.
 
-Those are usually located in special sections, like the initcall table, 
-the CPU entry table, etc. The linker allows for those sections to be 
-marked with KEEP() not to prune them.
+baruch
 
-> The GCC docs suggest that -ffunction-sections may impact performance
-> and/or increase code size, but I don't know by how much.  Maybe it
-> interferes with inling.
-
-It doesn't interfere with inlining. However it impose a section 
-alignment on every function. That still can be overriden though. Also, I 
-suppose that gcc may not assume that calls to a global function that 
-happens to be located in the same C file will be close by anymore, 
-however I don't see this having any impact on ARM code generation.
-
-
-Nicolas
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
