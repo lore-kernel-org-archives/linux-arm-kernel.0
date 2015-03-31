@@ -1,41 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 31 Mar 2015 10:56:10 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
-Message-ID: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 31 Mar 2015 10:56:15 +0200
+Subject: [rtc-linux] Re: [PATCH 2/2] ARM: dts: s3c-rtc: Use s3c6410-rtc
+ instead of exynos3250-rtc
+In-Reply-To: <20150331081204.GH3849@piout.net>
+References: <1427728773-29065-1-git-send-email-k.kozlowski@samsung.com>
+ <1427728773-29065-3-git-send-email-k.kozlowski@samsung.com>
+ <5519DE76.4080803@samsung.com> <20150331003101.GG3849@piout.net>
+ <5519EE93.70509@samsung.com> <20150331081204.GH3849@piout.net>
+Message-ID: <CAJKOXPc7px9Aq4b6DRyKnNf=uREYzO0L41ANzKXB3n9HTzV9oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
-the macb1 interface refuses to work properly because it tries
-to cling to address 0 which isn't able to communicate in broadcast with
-the mac anymore. The micrel phy on the board is actually configured
-to show up at address 1.
-Adding the phy node and its real address fixes the issue.
+2015-03-31 10:12 GMT+02:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 31/03/2015 at 09:47:15 +0900, Chanwoo Choi wrote :
+>> > Are you absolutely sure that the exynos3250 IP is the same as the
+>> > s3c6410 (I don't know much about the exynos family). The concern being
+>> > that if at one point you have an errata on one or ther other, you will
+>> > have to break the DT ABI by undoing this change.
+>> >
+>> > Note that I'm fine with it, I'm just asking.
+>>
+>> I'm sure about exynos3250 RTC is same with S3C6410 RTC.
+>> There was little different about that pevious S3C6410 RTC
+>> don't consider to control the 'rtc_src' clk.
+>>
+>>
+>> But, Javier's patch[1] add the '.needs_src_clk' to control the
+>> 'rtc_src' clk. After merged this patch, there is no different part between
+>> Exynos3250 RTC and S3C6410 RTC.
+>>
+>> [1] 8792f7772f4f (drivers/rtc/rtc-s3c.c: add .needs_src_clk to s3c6410 RTC data)
+>>
+>
+> Yes, I saw that the software was handling both the same way, I was
+> asking about the hardware side.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Johan Hovold <johan@kernel.org>
-Cc: <stable@vger.kernel.org> #3.19
----
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+The hardware is exactly the same. Or maybe I should say: I could not
+find any differences.
 
-diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-index fec1fca2ad66..6c4bc53cbf4e 100644
---- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-@@ -167,7 +167,13 @@
- 
- 			macb1: ethernet at f802c000 {
- 				phy-mode = "rmii";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				status = "okay";
-+
-+				ethernet-phy at 1 {
-+					reg = <0x1>;
-+				};
- 			};
- 
- 			dbgu: serial at ffffee00 {
--- 
-2.1.3
+Best regards,
+Krzysztof
