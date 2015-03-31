@@ -1,41 +1,46 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 31 Mar 2015 17:33:23 +0200
-Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP
- is clocked.
-In-Reply-To: <20150331152958.GF9974@htj.duckdns.org>
-References: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
- <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
- <20150331152958.GF9974@htj.duckdns.org>
-Message-ID: <551ABE43.60602@st.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue, 31 Mar 2015 16:34:21 +0100
+Subject: [RESEND] Altera socfpga big endian work
+In-Reply-To: <551AAB9D.1000809@opensource.altera.com>
+References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
+ <551AAB9D.1000809@opensource.altera.com>
+Message-ID: <551ABE7D.4090908@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tejun,
-
-On 03/31/2015 05:29 PM, Tejun Heo wrote:
-> On Tue, Mar 31, 2015 at 08:35:09AM +0100, Peter Griffin wrote:
->> Currently the ahci_st driver will hang the system on probe, as the
->> st_configure_oob function does some register writes before the IP
->> is clocked. This patch moves the function call to after
->> ahci_platform_enable_resources (which enables the IP clock), and
->> resolves the hang.
+On 31/03/15 15:13, Dinh Nguyen wrote:
+> Hi Ben,
+> 
+> On 3/25/15 6:27 AM, Ben Dooks wrote:
+>> This series enables the core of the socfpga systen to run in big endian
+>> mode. It inclusdes support for debug uart, secondary core boot and has
+>> support for timers and initial conversion patches for the mmc.
 >>
->> Addtionally st_ahci_configure_oob should be called in the st_ahci_resume
->> function, so we also rectify that ensuring it is also called after
->> the IP clock has been enabled.
+>> The two drivers that are known to not work are the Ethernet and the
+>> dwc2 usb. I do not have data for either, so I currently do not know
+>> if it possible to change the hardware's endian fetch mode.
 >>
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-> How should this patch be routed?  Should I pick this up and apply to
-> libata/for-4.1 or should it go together with the other patches?  If
-> the latter, please feel free to add my acked-by.
+>> The dwc2 driver on my cyclone5 socfpga board with v4.0-rc5 does not
+>> work in little endian mode, which makes testing converting the driver
+>> difficult. The supplied 3.10 kernel does work so it is not down to the
+>> hardware. It detects the presence of a new device and then fails to
+>> enumerate it (no other errors shown)
+>>
+>> This is up on git.baserock.org/delta/linux.git in the branch
+>> baserock/bjdooks/socfpga-v5
+>>
+>> Sorry, this is a resend due to incorrect linux-arm-kernel mailing list
+>> address.
+>>
+> 
+> I think I can take patches 1-3 through my tree, but the mmc patches
+> [4-7] will need to linux-mmc tree.
 
-I think you can pick patches 1 & 3.
-I will apply patch 2 to STi DT branch.
+Thanks. I did CC 4-7 to the relevant maintainers.
 
-Thanks,
-Maxime
->
-> Thanks.
->
+Any idea if dwc2 is going to be fixed before 4.1?
+
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
