@@ -1,47 +1,47 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 31 Mar 2015 09:14:52 +0200
-Subject: [PATCH 01/11] clocksource: arm_arch_timer: Rename
- arch_timer_probed to reflect behaviour
-In-Reply-To: <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
-References: <5519AEB2.8050306@linaro.org>
- <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20150331071452.GA9252@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 31 Mar 2015 09:15:22 +0200
+Subject: [PATCH] sata_mv: Manage SATA port multiplier while searching
+ for active links
+In-Reply-To: <20150330173515.GC9974@htj.duckdns.org>
+References: <1427736765-846-1-git-send-email-gregory.clement@free-electrons.com>
+ <20150330173515.GC9974@htj.duckdns.org>
+Message-ID: <551A498A.2010008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tejun,
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+On 30/03/2015 19:35, Tejun Heo wrote:
+> Hello,
+> 
+> On Mon, Mar 30, 2015 at 07:32:45PM +0200, Gregory CLEMENT wrote:
+>> From: Nadav Haklai <nadavh@marvell.com>
+>>
+>> With this patch, when searching for active link, first search through
+>> the port multiplier links. And then fall to the default ap active_tag
+>> only if no there is no active link in the port multiplier.
+> 
+> What does this fix?  What was broken before?  What's the impact of the
+> patch?  A patch description which just restates the patch content
+> isn't all that useful.
 
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> 
-> The arch_timer_probed function returns whether the given time doesn't
-> need to be probed. This can be the case when the timer has been probed
-> already, but also when it has no corresponding enabled node in DT.
-> 
-> Rename the function to arch_timer_need_probe and invert its return value
-> to better reflect the function's purpose and behaviour.
-> 
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index a3025e7..50bb7f2 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -661,17 +661,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
->  };
->  
->  static bool __init
-> -arch_timer_probed(int type, const struct of_device_id *matches)
-> +arch_timer_need_probe(int type, const struct of_device_id *matches)
-
-If we do a rename we might as well use valid English spelling such as 
-'arch_timer_needs_probing()'?
+I _thought_ that the purpose of this patch was to manage the port multiplier,
+and without this patch we don't only handle it. I will ask more detail and
+come back with a new version of the patch with a more useful description.
 
 Thanks,
 
-	Ingo
+Gregory
+
+
+
+> 
+> Thanks.
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
