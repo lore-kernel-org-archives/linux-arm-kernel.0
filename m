@@ -1,105 +1,104 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 31 Mar 2015 18:02:54 +0300
-Subject: [PATCH] ti-soc-thermal: implement omap3 support
-In-Reply-To: <20150331084234.GA11712@amd>
-References: <20150103114632.GA21883@amd> <20150118202447.GA29014@amd>
- <20150331084234.GA11712@amd>
-Message-ID: <CANOLnOO4J3RQCJZB0ibkGc5KhvPu+Q1f-bwc8mpxKCPRgjw5PQ@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 31 Mar 2015 18:04:28 +0300
+Subject: [PATCH 4/5] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <CANLsYkzK_LX4OQJOUtcr0EksRUKPueNOXrw2C+qTJWov0sQPFA@mail.gmail.com>
+References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
+ <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
+ <87bnjad1jb.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkzK_LX4OQJOUtcr0EksRUKPueNOXrw2C+qTJWov0sQPFA@mail.gmail.com>
+Message-ID: <87384lcio3.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 11:42 AM, Pavel Machek <pavel@ucw.cz> wrote:
->
-> This adds support for OMAP3 chips to ti-soc-thermal. As requested by
-> TI people, it is marked unreliable and warning is printed.
->
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->
-> ---
-> ...
-> --- /dev/null
-> +++ b/drivers/thermal/ti-soc-thermal/omap3-thermal-data.c
-> @@ -0,0 +1,103 @@
-> +/*
-> + * OMAP3 thermal driver.
-> + *
-> + * Copyright (C) 2011-2012 Texas Instruments Inc.
-> + * Copyright (C) 2014 Pavel Machek <pavel@ucw.cz>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + * Note
-> + * http://www.ti.com/lit/er/sprz278f/sprz278f.pdf "Advisory
-> + * 3.1.1.186 MMC OCP Clock Not Gated When Thermal Sensor Is Used"
-> + *
-> + * Also TI says:
-> + * Just be careful when you try to make thermal policy like decisions
-> + * based on this sensor. Placement of the sensor w.r.t the actual logic
-> + * generating heat has to be a factor as well. If you are just looking
-> + * for an approximation temperature (thermometerish kind), you might be
-> + * ok with this. I am not sure we'd find any TI data around this.. just a
-> + * heads up.
-> + */
-> +
-> +#include "ti-thermal.h"
-> +#include "ti-bandgap.h"
-> +
-> +/*
-> + * OMAP34XX has one instance of thermal sensor for MPU
-> + * need to describe the individual bit fields
-> + */
-> +static struct temp_sensor_registers
-> +omap34xx_mpu_temp_sensor_registers = {
-> +       .temp_sensor_ctrl = 0,
-> +       .bgap_soc_mask = BIT(8),
-> +       .bgap_eocz_mask = BIT(7),
-> +       .bgap_dtemp_mask = 0x7f,
-> +
-> +       .bgap_mode_ctrl = 0,
-> +       .mode_ctrl_mask = BIT(9),
-> +};
-> +
-> +/* Thresholds and limits for OMAP34XX MPU temperature sensor */
-> +static struct temp_sensor_data omap34xx_mpu_temp_sensor_data = {
-> +       .min_freq = 32768,
-> +       .max_freq = 32768,
-> +       .max_temp = -99000,
-> +       .min_temp = 99000,
+Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 
-This looks mixed up. Also, perhaps use -40000 to 125000 to match the
-table below?
-
-> +       .hyst_val = 5000,
-> +};
-> +
-> +/*
-> + * Temperature values in milli degree celsius
-> + */
-> +static const int
-> +omap34xx_adc_to_temp[128] = {
-> +       -40000, -40000, -40000, -40000, -40000, -39000, -38000, -36000,
-> +       -34000, -32000, -31000, -29000, -28000, -26000, -25000, -24000,
-> +       -22000, -21000, -19000, -18000, -17000, -15000, -14000, -12000,
-> +       -11000, -9000, -8000, -7000, -5000, -4000, -2000, -1000, 0000,
-> +       1000, 3000, 4000, 5000, 7000, 8000, 10000, 11000, 13000, 14000,
-> +       15000, 17000, 18000, 20000, 21000, 22000, 24000, 25000, 27000,
-> +       28000, 30000, 31000, 32000, 34000, 35000, 37000, 38000, 39000,
-> +       41000, 42000, 44000, 45000, 47000, 48000, 49000, 51000, 52000,
-> +       53000, 55000, 56000, 58000, 59000, 60000, 62000, 63000, 65000,
-> +       66000, 67000, 69000, 70000, 72000, 73000, 74000, 76000, 77000,
-> +       79000, 80000, 81000, 83000, 84000, 85000, 87000, 88000, 89000,
-> +       91000, 92000, 94000, 95000, 96000, 98000, 99000, 100000,
-> +       102000, 103000, 105000, 106000, 107000, 109000, 110000, 111000,
-> +       113000, 114000, 116000, 117000, 118000, 120000, 121000, 122000,
-> +       124000, 124000, 125000, 125000, 125000, 125000, 125000
-> +};
+> On 30 March 2015 at 08:04, Alexander Shishkin
+> <alexander.shishkin@linux.intel.com> wrote:
+>> As it looks from the above snippet, you're using a stream of DATA
+>> packets for user's payload. I also noticed that you use an ioctl to
+>> trigger timestamps.
 >
+> Right, the ioctl() conveys user space intentions on that channel.
+> Options are kept and applied on every packet for as long as the
+> channel is open.
 
-Gra?vydas
+So this means that, for example, if you enable timestamps on a channel,
+then every single data packet on that channel will be timestamped, which
+is a lot of timestamps. Normally, you would only be interested in the
+timestamp on the first data packet in the message (or frame or however
+we decide to call it). This is one of the reasons why I'm suggesting a
+common framing scheme or a "protocol".
+
+>> Now, in the STP protocol there are, for example, marked data packets
+>> that can be used to mark beginning of a higher-level message,
+>> timestamped data packets that can be used to mean the same thing and
+>> FLAG packets to mark message boundaries.
+>
+> Same on my side, I simply haven't included them yet.  I'll do so in my
+> next iteration.
+>
+>>
+>> In my Intel TH code, I'm using D*TS packet for the beginning of a
+>> message (or "frame") and FLAG packet for the the end of a message.
+>>
+>> So my question is, is there any specific STP framing pattern that you
+>> use with Coresight STM or should we perhaps figure out a generic framing
+>> pattern and make it part of the stm class as well?
+>
+> Now specific pattern... Sending a packet consists of MARK, DATA, FLAG.
+
+Is this pattern mandated by a decoder that you use or is there any other
+reason why it's exactly that?
+
+>>
+>> For example, we can replace stm's .write callback with something like
+>>
+>>     int (*packet)(struct stm_data *data,
+>>                   unsigned int type,    /* data, flag, trig etc */
+>>                   unsigned int options, /* timestamped, marked */
+>>                   u64 payload);
+>>
+>> and let the stm core do the "framing", which, then, will be common and
+>> consistent across different architectures/stm implementations.
+>
+> I think the framing should be left to individual drivers.  It's only a
+> matter of time before we get a weird device that doesn't play well
+> with others, forcing to carry the ugliness in the STM core rather than
+> the driver.
+
+Not necessarily. If a device doesn't support one type of packet or the
+other, it will be up to them to work around that in the above .packet
+callback.
+
+As for the devices that don't play well, there's a question of how much
+one can violate the spec and still call oneself compliant.
+
+> And isn't carrying "options" redundant?  Using "container_of" on the
+> "data" field one can get back to the driver specific structure, which
+> is definitely a better place to keep that information.  I think the
+> general structure looks good right now, we simply need to find a way
+> to get rid of the ioctls.
+
+No, what I mean by options here is a property of each individual packet,
+not the whole channel. For example, if I want the underlying driver to
+send a marked data packet, I do
+
+     stm_data->packet(stm_data, STP_PACKET_D8, STP_OPTION_MARKED, payload);
+
+or if I want to send a timestamped flag, I do
+
+     stm_data->packet(stm_data, STP_PACKET_FLAG, STP_OPTION_TS, 0);
+
+Like I said above, there seems little to be gained from enabling
+timestamps for all packets in one channel.
+
+> Regarding the same "options", how did you plan on getting those from user space?
+
+Ideally, if we have a framing convension, we don't need to get it from
+userspace at all, all userspace should care about is writing data to the
+character device and we wrap it up and feed it to the underlying driver.
+
+Regards,
+--
+Alex
