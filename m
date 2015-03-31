@@ -1,46 +1,98 @@
 From: sbranden@broadcom.com (Scott Branden)
-Date: Mon, 30 Mar 2015 20:16:22 -0700
-Subject: [PATCH 0/2] Cygnus Audio Driver
-Message-ID: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+Date: Mon, 30 Mar 2015 20:16:23 -0700
+Subject: [PATCH 1/2] ASoC: cygnus-audio: adding device tree bindings
+In-Reply-To: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+Message-ID: <1427771784-29950-2-git-send-email-sbranden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please provide comments on the initial version of this driver.
+From: Lori Hikichi <lhikichi@broadcom.com>
 
-This patchset contains the devicetree bindings and core audio driver
-for the Cygnus SoC.
+Add device tree binding documentation for the Cygnus SOC audio block
 
-There is an open question on how to fit this driver into the clock
-framework (if at all).
-
-The audio PLL is embedded in the audio block and only used
-by the audio block. The audio PLL registers are also in the middle of 
-the audio register map.
-
-In addition, the audio PLL is adjustable to less than 1 Hz.
-The existing clock driver framework does not provide a mechanism to take
-advantage of the resolution of the hardware.
-
-Can the audio PLL remain within the audio driver and/or any modifications
-required?
-
-Lori Hikichi (2):
-  ASoC: cygnus-audio: adding device tree bindings
-  ASoC: add core audio driver for Broadcom Cygnus SOC.
-
- .../bindings/sound/brcm,cygnus-audio.txt           |   68 +
- sound/soc/bcm/Kconfig                              |   11 +
- sound/soc/bcm/Makefile                             |    5 +-
- sound/soc/bcm/cygnus-pcm.c                         |  918 +++++++++++
- sound/soc/bcm/cygnus-pcm.h                         |   45 +
- sound/soc/bcm/cygnus-ssp.c                         | 1613 ++++++++++++++++++++
- sound/soc/bcm/cygnus-ssp.h                         |   84 +
- 7 files changed, 2743 insertions(+), 1 deletion(-)
+Reviewed-by: Jonathan Richardson <jonathar@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Signed-off-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
+---
+ .../bindings/sound/brcm,cygnus-audio.txt           | 68 ++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
- create mode 100644 sound/soc/bcm/cygnus-pcm.c
- create mode 100644 sound/soc/bcm/cygnus-pcm.h
- create mode 100644 sound/soc/bcm/cygnus-ssp.c
- create mode 100644 sound/soc/bcm/cygnus-ssp.h
 
+diff --git a/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+new file mode 100644
+index 0000000..5358cc3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+@@ -0,0 +1,68 @@
++BROADCOM Cygnus Audio I2S/TDM/SPDIF controller
++
++Required properties:
++	- compatible : "brcm,cygnus-audio"
++	- #address-cells: 32bit valued, 1 cell. <1>
++	- #size-cells:  32bit valued, 1 cell. <1>
++	- reg : Should contain audio registers location and length
++	- interrupts: audio DMA interrupt number
++
++SSP Subnode properties:
++- dai-name: The name of the DAI registered with ASOC
++- ssp-port-id: The ssp port interface to use
++	Valid value are 0, 1, 2, or 3 (for spdif)
++- mode: Controls if this port should be configured as I2S or TDM mode.
++	Valid values are: "tdm" or "i2s"
++- tdm-bits-per-frame:  only if mode is "tdm" then this property must set.
++	Valid values are (128/256/512)
++- port-status: Controls if port is enabled or not
++	Valid values "enabled" or "disabled"
++- channel-group: Control grouping of serial port
++	Valid values are "2_0", "3_1", or "5_1"
++
++Example:
++	cygnus_audio: audio at 0x180ae000 {
++		compatible = "brcm,cygnus-audio";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x180ae000 0x1000>;
++
++		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
++
++		ssp0: ssp_port at 0 {
++			dai-name = "cygnus-ssp0";
++			ssp-port-id = <0>;
++
++			mode = "i2s"; /* "i2s" or "tdm" */
++			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
++			port-status = "enabled";
++		};
++
++		ssp1: ssp_port at 1 {
++			dai-name = "cygnus-ssp1";
++			ssp-port-id = <1>;
++
++			mode = "i2s"; /* "i2s" or "tdm" */
++			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
++			port-status = "disabled";
++		};
++
++		ssp2: ssp_port at 2 {
++			dai-name = "cygnus-ssp2";
++			ssp-port-id = <2>;
++
++			mode = "tdm"; /* "i2s" or "tdm" */
++			tdm-bits-per-frame = <256>;
++			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
++			port-status = "disabled";
++		};
++
++		spdif: spdif_port at 3 {
++			dai-name = "cygnus-spdif";
++			ssp-port-id = <3>;
++
++			mode = "i2s"; /* "i2s" or "tdm" */
++			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
++			port-status = "disabled";
++		};
++	};
 -- 
 2.3.3
