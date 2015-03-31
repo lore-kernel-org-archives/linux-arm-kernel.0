@@ -1,55 +1,64 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Tue, 31 Mar 2015 11:39:37 -0700
-Subject: Build regression in next-20150331
-Message-ID: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 31 Mar 2015 14:42:24 -0400 (EDT)
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <20150331161026.GA17480@e103592.cambridge.arm.com>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+ <551943CB.3010303@suse.cz> <20150330132617.GI24899@n2100.arm.linux.org.uk>
+ <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+ <551959F1.4030704@suse.cz>
+ <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
+ <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
+ <20150331161026.GA17480@e103592.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.11.1503311429240.25806@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Rafael,
+On Tue, 31 Mar 2015, Dave Martin wrote:
 
-I was notified this morning by the kernelci.org system that a new
-build error has been detected in next-20150331[0][1][2]. It seems that
-"clockevents: Remove CONFIG_GENERIC_CLOCKEVENTS_BUILD"
-c9439b1d6eb4ada5c2faf3970ac0d2bc4bd20e14 is the culprit.
+> On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
+> > On Mon, 30 Mar 2015, Ard Biesheuvel wrote:
+> > 
+> > > On 30 March 2015 at 16:13, Michal Marek <mmarek@suse.cz> wrote:
+> 
+> [...]
+> 
+> > > > What you could do is to add a Kconfig option to arch/arm/Kconfig adding
+> > > > -ffunction-sections to the compiler flags. Then allyesconfig would
+> > > > select it and work around the problem in a somewhat elegant way.
+> > > >
+> > > 
+> > > Excellent idea! Arnd hasn't chimed in yet, but he is the one doing
+> > > lots and lots of randconfig builds and other test builds, so I will
+> > > wait for him to confirm that this is a useful thing to have.
+> > 
+> > I'm using -ffunction-sections as well for the kernel size reduction work 
+> > I'm currently doing.  The linker script has to be adapted so .text.* is 
+> > specified along .text otherwise those functions end up appended at the 
+> > end of the binary.
+> 
+> Interesting ... do you also mean using --gc-sections at link time?
 
-Initially, I reported these failures to John Stultz and his response is below.
+Yes.
 
-*snip*
+> We'd need to avoid pruning needed code that has no explicit caller,
+> and functions that are part of the kernel/module ABI but not used
+> within vmlinux.
 
-I suspect we either need to enable GENERIC_CLOCKEVENTS on those three
-hardware types, or if that's not possible, rework the definitions.
+Those are usually located in special sections, like the initcall table, 
+the CPU entry table, etc. The linker allows for those sections to be 
+marked with KEEP() not to prune them.
 
-Or something like (copy-paste whitespace corruption below.. only for
-reference, don't apply):
+> The GCC docs suggest that -ffunction-sections may impact performance
+> and/or increase code size, but I don't know by how much.  Maybe it
+> interferes with inling.
 
-diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-index 2a1563a..6da40c0 100644
---- a/kernel/time/tick-internal.h
-+++ b/kernel/time/tick-internal.h
-@@ -107,12 +107,13 @@ static inline void tick_resume_broadcast(void) { }
- static inline bool tick_resume_check_broadcast(void) { return false; }
- static inline void tick_broadcast_init(void) { }
- static inline int tick_broadcast_update_freq(struct
-clock_event_device *dev, u32 freq) { return -ENODEV; }
--
-+#ifdef CONFIG_GENERIC_CLOCKEVENTS
- /* Set the periodic handler in non broadcast mode */
- static inline void tick_set_periodic_handler(struct
-clock_event_device *dev, int broadcast)
- {
-        dev->event_handler = tick_handle_periodic;
- }
-+#endif
- #endif /* !BROADCAST */
+It doesn't interfere with inlining. However it impose a section 
+alignment on every function. That still can be overriden though. Also, I 
+suppose that gcc may not assume that calls to a global function that 
+happens to be located in the same C file will be close by anymore, 
+however I don't see this having any impact on ARM code generation.
 
-*snip*
 
-Any chance either of you can reproduce this issue on your end?
-
-Cheers,
-
-Tyler
-
-[0] http://storage.kernelci.org/next/next-20150331/arm-ep93xx_defconfig/build.log
-[1] http://storage.kernelci.org/next/next-20150331/arm-ebsa110_defconfig/build.log
-[2] http://storage.kernelci.org/next/next-20150331/arm-rpc_defconfig/build.log
+Nicolas
