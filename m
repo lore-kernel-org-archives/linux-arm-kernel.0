@@ -1,47 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Mar 2015 09:15:22 +0200
-Subject: [PATCH] sata_mv: Manage SATA port multiplier while searching
- for active links
-In-Reply-To: <20150330173515.GC9974@htj.duckdns.org>
-References: <1427736765-846-1-git-send-email-gregory.clement@free-electrons.com>
- <20150330173515.GC9974@htj.duckdns.org>
-Message-ID: <551A498A.2010008@free-electrons.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 31 Mar 2015 09:17:59 +0200
+Subject: [GIT PULL] clockevents for 4.1
+In-Reply-To: <5519AEB2.8050306@linaro.org>
+References: <5519AEB2.8050306@linaro.org>
+Message-ID: <20150331071759.GB9252@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
 
-On 30/03/2015 19:35, Tejun Heo wrote:
-> Hello,
-> 
-> On Mon, Mar 30, 2015 at 07:32:45PM +0200, Gregory CLEMENT wrote:
->> From: Nadav Haklai <nadavh@marvell.com>
->>
->> With this patch, when searching for active link, first search through
->> the port multiplier links. And then fall to the default ap active_tag
->> only if no there is no active link in the port multiplier.
-> 
-> What does this fix?  What was broken before?  What's the impact of the
-> patch?  A patch description which just restates the patch content
-> isn't all that useful.
-
-I _thought_ that the purpose of this patch was to manage the port multiplier,
-and without this patch we don't only handle it. I will ask more detail and
-come back with a new version of the patch with a more useful description.
-
-Thanks,
-
-Gregory
-
-
+* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
 > 
-> Thanks.
+> Hi Thomas, Ingo,
 > 
+> this pull request contains the following changes for 4.1:
+> 
+>  - Made IO endian agnostic for at91 and dw apb timers (Ben Dooks)
+> 
+>  - Maintained tegra endianess (Dmitry Osipenko)
+> 
+>  - Enabled the sun4i / sun5i timer for sched_clock, all others winner boards
+> have the arch arm timer which is more accurate (Hans de Goede)
+> 
+>  - Renamed the arch arm timer function name to reflect better its purpose
+> (Laurent Pinchart)
+> 
+>  - Cleaned up the sun5i timer code, replaced the setup_irq by the
+> request_irq function and handled the parent clock frequency change with the
+> frequency notifiers (Maxime Ripard)
+> 
+>  - Fixed features declaration for the efm32 timer (Viresh Kumar)
+> 
+> Thanks !
 
+So I had some comments about one of the patches, and fixes to 
+changelogs, so I've applied all but the sun4/5i patches from email to 
+move things forward.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+The sun4/5i patches conflicted - mind reposting those merged on top of 
+the latest tip:timers:core tree?
+
+Thanks!
+
+	Ingo
