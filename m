@@ -1,110 +1,23 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 31 Mar 2015 17:58:28 +0200
-Subject: [PATCH 01/25] arm: Use bool function return values of true/false
- not 1/0
-In-Reply-To: <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
-References: <cover.1427759009.git.joe@perches.com>
- <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
-Message-ID: <551AC424.9010802@redhat.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Tue, 31 Mar 2015 11:59:51 -0400
+Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP
+ is clocked.
+In-Reply-To: <20150331153627.GA8200@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
+ <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
+ <20150331152958.GF9974@htj.duckdns.org>
+ <20150331153627.GA8200@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20150331155951.GG9974@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/2015 01:45, Joe Perches wrote:
-> Use the normal return values for bool functions
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm/include/asm/dma-mapping.h |  8 ++++----
->  arch/arm/include/asm/kvm_emulate.h |  2 +-
->  arch/arm/mach-omap2/powerdomain.c  | 14 +++++++-------
->  3 files changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index b52101d..166e1e1 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -151,18 +151,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
->  	u64 limit, mask;
->  
->  	if (!dev->dma_mask)
-> -		return 0;
-> +		return false;
->  
->  	mask = *dev->dma_mask;
->  
->  	limit = (mask + 1) & ~mask;
->  	if (limit && size > limit)
-> -		return 0;
-> +		return false;
->  
->  	if ((addr | (addr + size - 1)) & ~mask)
-> -		return 0;
-> +		return false;
->  
-> -	return 1;
-> +	return true;
->  }
->  
->  static inline void dma_mark_clean(void *addr, size_t size) { }
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index a9c80a2..ad200a0 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -51,7 +51,7 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
->  
->  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
->  {
-> -	return 1;
-> +	return true;
->  }
->  
->  static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 78af6d8..897f9fb 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -950,7 +950,7 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
->   */
->  bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
->  {
-> -	return (pwrdm && pwrdm->flags & PWRDM_HAS_HDWR_SAR) ? 1 : 0;
-> +	return pwrdm && (pwrdm->flags & PWRDM_HAS_HDWR_SAR);
->  }
->  
->  int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
-> @@ -1185,24 +1185,24 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
->  	if (!pwrdm) {
->  		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
->  			 __func__);
-> -		return 1;
-> +		return true;
->  	}
->  
->  	if (pwrdm->pwrsts & PWRSTS_OFF)
-> -		return 1;
-> +		return true;
->  
->  	if (pwrdm->pwrsts & PWRSTS_RET) {
->  		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
-> -			return 1;
-> +			return true;
->  
->  		for (i = 0; i < pwrdm->banks; i++)
->  			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
-> -				return 1;
-> +				return true;
->  	}
->  
->  	for (i = 0; i < pwrdm->banks; i++)
->  		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
-> -			return 1;
-> +			return true;
->  
-> -	return 0;
-> +	return false;
->  }
-> 
+On Tue, Mar 31, 2015 at 04:36:27PM +0100, Peter Griffin wrote:
+> This patch (and also the DT documentation change) can go via your tree. Maxime
+> will take the stih407 DT patch.
 
-Marc/Christoffer, please pick this up yourself.
+Hmmm... The first patch doesn't apply to libata/for-4.1?
 
-Paolo
+Thanks.
+
+-- 
+tejun
