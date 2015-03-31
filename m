@@ -1,10 +1,10 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 31 Mar 2015 22:14:20 +0300
+Date: Tue, 31 Mar 2015 22:31:20 +0300
 Subject: [PATCH] ARM: dts: sun7i: Add Goodix GT911 nodes for Wexler TAB7200
 In-Reply-To: <20150331144338.GG23664@lukather>
 References: <1427789897-4085-1-git-send-email-mamlinav@gmail.com>
  <20150331144338.GG23664@lukather>
-Message-ID: <20150331221420.3b65d2540c7dbe1d12611e12@gmail.com>
+Message-ID: <20150331223120.10199bf9e3fb41b16f879eca@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,10 +21,6 @@ Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > In which case are these different addresses encountered? Different
 > revisions of the same board?
 > 
-According to the datasheet it is a feature of the controller. 
-The address(0x5d or 0x14) can be configured using a reset sequence,
-which has not yet been implemented in the driver.
->
 > > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 > > ---
 > > DT support for the Goodix GT911 touchscreen controller has been queued up
@@ -50,6 +46,8 @@ which has not yet been implemented in the driver.
 > The node name should be the class of the device. touchscreen in this
 > case.
 > 
+Ok, I'll fix it.
+>
 > > +		compatible = "goodix,gt911";
 > > +		reg = <0x5d>;
 > > +		interrupt-parent = <&pio>;
@@ -58,8 +56,12 @@ which has not yet been implemented in the driver.
 > Unfortunately, IRQ_TYPE_NONE is not a valid value for the GIC
 > bindings.
 > 
+Hmm. Which value I must use in this case? IRQ type is set by the touchscreen controller driver, so I think that value must be 0.
+>
 > You're also not adding a pinctrl group for that pin?
-> 
+>
+No, because it works fine with this DT nodes. It seems that I should first configure pin to work in interrupt mode. Correct?
+>
 > > +	};
 > > +
 > > +	gt911 at 14 {
@@ -70,7 +72,9 @@ which has not yet been implemented in the driver.
 > > +	};
 > 
 > And nodes should be ordered by addresses ascending order.
-> 
+>
+I'll fix it too.
+>
 > Thanks!
 > Maxime
 > 
