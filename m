@@ -1,45 +1,21 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Tue, 31 Mar 2015 09:17:59 +0200
-Subject: [GIT PULL] clockevents for 4.1
-In-Reply-To: <5519AEB2.8050306@linaro.org>
-References: <5519AEB2.8050306@linaro.org>
-Message-ID: <20150331071759.GB9252@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 31 Mar 2015 09:26:20 +0200
+Subject: 4.0-rc1 to -rc4: random sound and speed problems on n900
+Message-ID: <20150331072620.GA30788@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-* Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+4.0-rc4 (or more specifically 7b09ac704bac2de5bf0362793edc22a0094e381c
+based kernel boots really really slowly on n900, and there's an ugly
+backtrace from sound in the dmesg.
 
-> 
-> Hi Thomas, Ingo,
-> 
-> this pull request contains the following changes for 4.1:
-> 
->  - Made IO endian agnostic for at91 and dw apb timers (Ben Dooks)
-> 
->  - Maintained tegra endianess (Dmitry Osipenko)
-> 
->  - Enabled the sun4i / sun5i timer for sched_clock, all others winner boards
-> have the arch arm timer which is more accurate (Hans de Goede)
-> 
->  - Renamed the arch arm timer function name to reflect better its purpose
-> (Laurent Pinchart)
-> 
->  - Cleaned up the sun5i timer code, replaced the setup_irq by the
-> request_irq function and handled the parent clock frequency change with the
-> frequency notifiers (Maxime Ripard)
-> 
->  - Fixed features declaration for the efm32 timer (Viresh Kumar)
-> 
-> Thanks !
+I re-tested 4.0-rc4 and it worked ok. Weird. I guess we have some
+random stuff going on during boot....
 
-So I had some comments about one of the patches, and fixes to 
-changelogs, so I've applied all but the sun4/5i patches from email to 
-move things forward.
+									Pavel
 
-The sun4/5i patches conflicted - mind reposting those merged on top of 
-the latest tip:timers:core tree?
-
-Thanks!
-
-	Ingo
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
