@@ -1,140 +1,55 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Mon, 30 Mar 2015 18:33:27 -0700
-Subject: [PATCH v10]: clk: Add common clock support for Mediatek MT8135
- and MT8173
-In-Reply-To: <1427737245-4064-1-git-send-email-s.hauer@pengutronix.de>
-References: <1427737245-4064-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20150331013327.25195.2077@quantum>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Tue, 31 Mar 2015 01:36:19 +0000
+Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from
+ ARM defconfigs
+In-Reply-To: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
+References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
+ <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87k2xy6ja0.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sascha Hauer (2015-03-30 10:40:39)
-> The following changes since commit 9eccca0843205f87c00404b663188b88eb248051:
-> 
->   Linux 4.0-rc3 (2015-03-08 16:09:09 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.pengutronix.de/git/imx/linux-2.6.git tags/v4.0-clk-mediatek-v10
 
-Hi Sascha et al,
+Hi Olof, Kevin, Arnd, Simon
 
-This series looks good to me. I had an incredibly petty nitpick about
-some magic numbers, but otherwise this series is good to go and I can
-pick it up once those are fixed.
+ping ?
 
-Regards,
-Mike
-
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> for you to fetch changes up to 6c36b94751bb2830388c0cc11440f3056db65b6f:
+> Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
+> Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
+> And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
+> But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
+> not a general purpose DMAC (2nd DMAC is for Device to Device inside
+> sound system). Additionally, current DMAEngine can't support Device to
+> Device, and we don't have correct DT bindings for it at this point.
+> So the easiest solution for it is that move it from DMAEngine to rsnd
+> driver.
+> Audio DMAC peri peri DMAEngine is no longer needed.
+> Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
 > 
->   dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers (2015-03-30 19:37:46 +0200)
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> ----------------------------------------------------------------
-> This patchset contains the initial common clock support for Mediatek SoCs.
-> Mediatek SoC's clock architecture comprises of various PLLs, dividers, muxes
-> and clock gates.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 06075b6..e805984 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -505,7 +505,6 @@ CONFIG_DW_DMAC=y
+>  CONFIG_MV_XOR=y
+>  CONFIG_TEGRA20_APB_DMA=y
+>  CONFIG_SH_DMAE=y
+> -CONFIG_RCAR_AUDMAC_PP=m
+>  CONFIG_RCAR_DMAC=y
+>  CONFIG_STE_DMA40=y
+>  CONFIG_SIRF_DMA=y
+> -- 
+> 1.9.1
 > 
-> Changes in v10:
-> - polish some commit messages
-> 
-> Changes in v9:
-> - rename 'lock' to 'mt81xx_clk_lock' to get better lockdep output
-> 
-> Changes in v8:
-> - add patch to allow to put parent_name arrays in __initconst
-> - put parent_name arrays into __initconst
-> 
-> Changes in v7:
-> - fix duplicate definition/declaration of mtk_register_reset_controller
-> - fix pd_reg offset of tvdpll
-> - make clk initialization arrays const
-> 
-> Changes in v6:
-> - rework PLL support, only a fraction of original size now
-> - Move binding docs to Documentation/devicetree/bindings/arm/mediatek since
->   the units are not really clock specific (they contain reset controllers)
-> 
-> Changes in v5:
-> - Add reset controller support for pericfg/infracfg
-> - Use regmap for the gates
-> - remove now unnecessary spinlock for the gates
-> - Add PMIC wrapper support as of v3
-> 
-> Changes in v4:
-> - Support MT8173 platform.
-> - Re-ordered patchset. driver/clk/Makefile in 2nd patch.
-> - Extract the common part definition(mtk_gate/mtk_pll/mtk_mux) from
->   clk-mt8135.c/clk-mt8173.c to clk-mtk.c.
-> - Refine code. Rmove unnessacary debug information and unsed defines,
->   add prefix "mtk_" for static functions.
-> - Remove flag CLK_IGNORE_UNUSED and set flag CLK_SET_RATE_PARENT on
->   gate/mux/fixed-factor.
-> - Use spin_lock_irqsave(&clk_ops_lock, flags) instead of mtk_clk_lock.
-> - Example above include a node for the clock controller itself, followed
->   by the i2c controller example above.
-> 
-> Changes in v3:
-> - Rebase to 3.19-rc1.
-> - Refine code. Remove unneed functions, debug logs and comments, and fine tune
->   error logs.
-> 
-> Changes in v2:
-> - Re-ordered patchset. Fold include/dt-bindings and DT document in 1st patch.
-> 
-> ----------------------------------------------------------------
-> James Liao (3):
->       clk: mediatek: Add initial common clock support for Mediatek SoCs.
->       clk: mediatek: Add basic clocks for Mediatek MT8135.
->       clk: mediatek: Add basic clocks for Mediatek MT8173.
-> 
-> Sascha Hauer (3):
->       clk: make strings in parent name arrays const
->       clk: mediatek: Add reset controller support
->       dt-bindings: ARM: Mediatek: Document devicetree bindings for clock/reset controllers
-> 
->  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  23 +
->  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  30 +
->  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  30 +
->  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  23 +
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/clk-composite.c                        |   2 +-
->  drivers/clk/clk-mux.c                              |   4 +-
->  drivers/clk/mediatek/Makefile                      |   4 +
->  drivers/clk/mediatek/clk-gate.c                    | 137 ++++
->  drivers/clk/mediatek/clk-gate.h                    |  49 ++
->  drivers/clk/mediatek/clk-mt8135.c                  | 640 ++++++++++++++++
->  drivers/clk/mediatek/clk-mt8173.c                  | 826 +++++++++++++++++++++
->  drivers/clk/mediatek/clk-mtk.c                     | 197 +++++
->  drivers/clk/mediatek/clk-mtk.h                     | 165 ++++
->  drivers/clk/mediatek/clk-pll.c                     | 325 ++++++++
->  drivers/clk/mediatek/reset.c                       |  99 +++
->  include/dt-bindings/clock/mt8135-clk.h             | 190 +++++
->  include/dt-bindings/clock/mt8173-clk.h             | 231 ++++++
->  .../dt-bindings/reset-controller/mt8135-resets.h   |  64 ++
->  .../dt-bindings/reset-controller/mt8173-resets.h   |  63 ++
->  include/linux/clk-provider.h                       |   8 +-
->  21 files changed, 3104 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
->  create mode 100644 drivers/clk/mediatek/Makefile
->  create mode 100644 drivers/clk/mediatek/clk-gate.c
->  create mode 100644 drivers/clk/mediatek/clk-gate.h
->  create mode 100644 drivers/clk/mediatek/clk-mt8135.c
->  create mode 100644 drivers/clk/mediatek/clk-mt8173.c
->  create mode 100644 drivers/clk/mediatek/clk-mtk.c
->  create mode 100644 drivers/clk/mediatek/clk-mtk.h
->  create mode 100644 drivers/clk/mediatek/clk-pll.c
->  create mode 100644 drivers/clk/mediatek/reset.c
->  create mode 100644 include/dt-bindings/clock/mt8135-clk.h
->  create mode 100644 include/dt-bindings/clock/mt8173-clk.h
->  create mode 100644 include/dt-bindings/reset-controller/mt8135-resets.h
->  create mode 100644 include/dt-bindings/reset-controller/mt8173-resets.h
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
