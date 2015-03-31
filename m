@@ -1,73 +1,17 @@
-From: punnaiah.choudary.kalluri@xilinx.com (Punnaiah Choudary Kalluri)
-Date: Tue, 31 Mar 2015 15:08:19 +0000
-Subject: [PATCH v2 7/8] net/macb: fix the peripheral version test
-In-Reply-To: <1427806926-18887-8-git-send-email-nicolas.ferre@atmel.com>
-References: <1427806926-18887-1-git-send-email-nicolas.ferre@atmel.com>
- <1427806926-18887-8-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <fca6d00c-5a4f-403b-ba18-bc08fefea121@BN1BFFO11FD016.protection.gbl>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 31 Mar 2015 08:08:31 -0700
+Subject: [PATCH v3 1/2] watchdog: digicolor: document device tree binding
+In-Reply-To: <9995b9d0be8cda30103be7406a781cd79f347aeb.1427782499.git.baruch@tkos.co.il>
+References: <9995b9d0be8cda30103be7406a781cd79f347aeb.1427782499.git.baruch@tkos.co.il>
+Message-ID: <551AB86F.9010407@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 03/30/2015 11:14 PM, Baruch Siach wrote:
+> Add a device tree binding documentation to the watchdog hardware block on the
+> Conexant CX92755 SoC. The CX92755 is from the Digicolor SoCs series. Other SoCs
+> in that series may share the same hardware block.
+>
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
-
-> -----Original Message-----
-> From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
-> Sent: Tuesday, March 31, 2015 6:32 PM
-> To: linux-arm-kernel at lists.infradead.org; netdev at vger.kernel.org; David S.
-> Miller
-> Cc: linux-kernel at vger.kernel.org; Boris BREZILLON; Cyrille Pitchen; Alexandre
-> Belloni; Michal Simek; Punnaiah Choudary Kalluri; Nicolas Ferre;
-> stable at vger.kernel.org
-> Subject: [PATCH v2 7/8] net/macb: fix the peripheral version test
->
-> We currently need two checks of the peripheral version in MACB_MID
-> register.
-> One of them got out of sync after modification by 8a013a9c71b2 (net: macb:
-> Include multi queue support for xilinx ZynqMP ethernet version).
-> Fix this in macb_configure_caps() so that xilinx ZynqMP will be considered
-> as a GEM flavor.
->
-> Fixes: 8a013a9c71b2 ("net: macb: Include multi queue support for xilinx
-> ZynqMP
-> ethernet version")
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-   Reviewed-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-
-Thanks for the patch. We have this change in our tree but somehow missed while sending
-this patch to mainline.
-
-Regards,
-Punnaiah
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> Cc: <stable@vger.kernel.org> #4.0 (if it doesn't make it for -final)
-> ---
->
-> Changes in v2:
-> - fix peripheral version test
->
->  drivers/net/ethernet/cadence/macb.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/cadence/macb.c
-> b/drivers/net/ethernet/cadence/macb.c
-> index babe972a7c32..4412895cf4a8 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -2139,7 +2139,7 @@ static void macb_configure_caps(struct macb *bp,
-> const struct macb_config *dt_co
->       if (dt_conf)
->               bp->caps = dt_conf->caps;
->
-> -     if (MACB_BFEXT(IDNUM, macb_readl(bp, MID)) == 0x2)
-> +     if (MACB_BFEXT(IDNUM, macb_readl(bp, MID)) >= 0x2)
->               bp->caps |= MACB_CAPS_MACB_IS_GEM;
->
->       if (macb_is_gem(bp)) {
-> --
-> 2.1.3
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
