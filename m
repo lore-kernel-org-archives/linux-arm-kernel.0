@@ -1,30 +1,23 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 31 Mar 2015 15:18:34 +0200
-Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
-In-Reply-To: <20150330174315.GD15655@arm.com>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
- <20150330174315.GD15655@arm.com>
-Message-ID: <20150331131834.GE4441@8bytes.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 31 Mar 2015 15:22:52 +0200
+Subject: at91 git tree in linux-next
+Message-ID: <551A9FAC.2010203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Stephen,
 
-On Mon, Mar 30, 2015 at 06:43:15PM +0100, Will Deacon wrote:
-> Whilst I'm still a bit worried about the ability of the IOMMU driver to do
-> very much in the ->domain_alloc callback (since we don't know which IOMMU
-> instance the domain is for), it doesn't leave us any worse off than we
-> currently are.
+I am the maintainer for the Atmel ARM SoCs (aka at91) and I would like to
+know if it's possible for you to include my git tree in linux-next. It is
+usually pulled in by the ARM-soc guys (in copy).
 
-The IOMMU driver should just allocate the data-structures for a domain
-in the domain_alloc call-back. It should not be necessary to care about
-any relations of the domain with specific iommu instances.
- 
-> So, for the arm-smmu patch and the core IOMMU changes:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+Here it is, with the branch that you would pull: "at91-next".
 
-Thanks a lot!
+git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git  at91-next
 
+I usually merge branches in this particular one when I send a pull-request to
+Arnd, Olof and Kevin so the material is usually pretty "stable".
 
-	Joerg
+Thanks, bye,
+-- 
+Nicolas Ferre
