@@ -1,141 +1,35 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:12 +0300
-Subject: [PATCHv6 19/34] ARM: OMAP4+: PRM: get rid of cpu_is_omap44xx calls
- from interrupt init
+Date: Tue, 31 Mar 2015 22:14:15 +0300
+Subject: [PATCHv6 22/34] ARM: OMAP2+: id: cache omap_type value
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-20-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-23-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible DT node is now passed with the prm init, so there is no
-need to do node matching here again. Added a new flag to the init data
-also, to detect default IRQ support for OMAP4. Also, any booting omap4
-DT setup always has a PRM node, so there is no need to check against
-the special case where it would be missing.
+There is no need to read the register with every invocation of the function,
+as the value is constant. Thus, cache the value in a static variable.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm.h        |    6 +++--
- arch/arm/mach-omap2/prm44xx.c    |   54 +++++++++++++++-----------------------
- arch/arm/mach-omap2/prm_common.c |    2 +-
- 3 files changed, 26 insertions(+), 36 deletions(-)
+ arch/arm/mach-omap2/id.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index 3936e6c..233bc84 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -29,9 +29,11 @@ int omap2_prcm_base_init(void);
-  *
-  * PRM_HAS_IO_WAKEUP: has IO wakeup capability
-  * PRM_HAS_VOLTAGE: has voltage domains
-+ * PRM_IRQ_DEFAULT: use default irq number for PRM irq
-  */
--#define PRM_HAS_IO_WAKEUP	(1 << 0)
--#define PRM_HAS_VOLTAGE		(1 << 1)
-+#define PRM_HAS_IO_WAKEUP	BIT(0)
-+#define PRM_HAS_VOLTAGE		BIT(1)
-+#define PRM_IRQ_DEFAULT		BIT(2)
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 2a2f4d5..f8121db 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -52,7 +52,10 @@ EXPORT_SYMBOL(omap_rev);
  
- /*
-  * MAX_MODULE_SOFTRESET_WAIT: Maximum microseconds to wait for OMAP
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index 243133c..c35ad0b 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -703,10 +703,14 @@ static struct prm_ll_data omap44xx_prm_ll_data = {
- 	.vp_clear_txdone	= omap4_prm_vp_clear_txdone,
- };
- 
-+static const struct omap_prcm_init_data *prm_init_data;
-+
- int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
+ int omap_type(void)
  {
- 	omap_prm_base_init();
- 
-+	prm_init_data = data;
+-	u32 val = 0;
++	static u32 val = OMAP2_DEVICETYPE_MASK;
 +
- 	if (data->flags & PRM_HAS_IO_WAKEUP)
- 		prm_features |= PRM_HAS_IO_WAKEUP;
++	if (val < OMAP2_DEVICETYPE_MASK)
++		return val;
  
-@@ -718,16 +722,8 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
- 	return prm_register(&omap44xx_prm_ll_data);
- }
- 
--static const struct of_device_id omap_prm_dt_match_table[] = {
--	{ .compatible = "ti,omap4-prm" },
--	{ .compatible = "ti,omap5-prm" },
--	{ .compatible = "ti,dra7-prm" },
--	{ }
--};
--
- static int omap44xx_prm_late_init(void)
- {
--	struct device_node *np;
- 	int irq_num;
- 
- 	if (!(prm_features & PRM_HAS_IO_WAKEUP))
-@@ -737,31 +733,23 @@ static int omap44xx_prm_late_init(void)
- 	if (!of_have_populated_dt())
- 		return 0;
- 
--	np = of_find_matching_node(NULL, omap_prm_dt_match_table);
--
--	if (!np) {
--		/* Default loaded up with OMAP4 values */
--		if (!cpu_is_omap44xx())
--			return 0;
--	} else {
--		irq_num = of_irq_get(np, 0);
--		/*
--		 * Already have OMAP4 IRQ num. For all other platforms, we need
--		 * IRQ numbers from DT
--		 */
--		if (irq_num < 0 && !cpu_is_omap44xx()) {
--			if (irq_num == -EPROBE_DEFER)
--				return irq_num;
--
--			/* Have nothing to do */
--			return 0;
--		}
--
--		/* Once OMAP4 DT is filled as well */
--		if (irq_num >= 0) {
--			omap4_prcm_irq_setup.irq = irq_num;
--			omap4_prcm_irq_setup.xlate_irq = NULL;
--		}
-+	irq_num = of_irq_get(prm_init_data->np, 0);
-+	/*
-+	 * Already have OMAP4 IRQ num. For all other platforms, we need
-+	 * IRQ numbers from DT
-+	 */
-+	if (irq_num < 0 && !(prm_init_data->flags & PRM_IRQ_DEFAULT)) {
-+		if (irq_num == -EPROBE_DEFER)
-+			return irq_num;
-+
-+		/* Have nothing to do */
-+		return 0;
-+	}
-+
-+	/* Once OMAP4 DT is filled as well */
-+	if (irq_num >= 0) {
-+		omap4_prcm_irq_setup.irq = irq_num;
-+		omap4_prcm_irq_setup.xlate_irq = NULL;
- 	}
- 
- 	omap44xx_prm_enable_io_wakeup();
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 04dfe8f..6832a31 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -669,7 +669,7 @@ static struct omap_prcm_init_data omap4_prm_data __initdata = {
- 	.index = TI_CLKM_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = OMAP4430_PRM_DEVICE_INST,
--	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE,
-+	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE | PRM_IRQ_DEFAULT,
- };
- #endif
- 
+ 	if (cpu_is_omap24xx()) {
+ 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
 -- 
 1.7.9.5
