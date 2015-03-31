@@ -1,131 +1,98 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Tue, 31 Mar 2015 20:01:38 +0900
-Subject: [PATCH v2 2/3] rtc: mediatek: Add MT6397 RTC driver
-In-Reply-To: <1427795066.14023.64.camel@mtksdaap41>
-References: <1426657537-41414-1-git-send-email-eddie.huang@mediatek.com>
- <1426657537-41414-3-git-send-email-eddie.huang@mediatek.com>
- <CAAFQd5ADCaKhP=3BmJsVimvo-uXZB3pobVAUST-b5kU+98Rt+A@mail.gmail.com>
- <1427795066.14023.64.camel@mtksdaap41>
-Message-ID: <CAAFQd5AHcFi-NhQ5ogbqRR-mdhoELBaKD0JgLu9v462JD6JBRw@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 31 Mar 2015 13:10:38 +0200
+Subject: [PATCH net-next] ethernet: Use bool function returns of true/false
+ instead of 1/0
+In-Reply-To: <1427678712.2715.52.camel@perches.com>
+References: <201503260524.AdqSbov9%fengguang.wu@intel.com>	
+ <20150325215525.GA26868@athens>	
+ <20150329.121655.2092434262655191613.davem@davemloft.net>
+ <1427678712.2715.52.camel@perches.com>
+Message-ID: <551A80AE.7020506@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+On 03/30/2015 03:25 AM, Joe Perches wrote:
+> Use bool constants as the return values instead of 1 and 0.
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>> To be honest I'd might rather get bunches of these, there has to be a ton
+>> of them, than a slow trickle of one every few weeks/days.
+> 
+> There aren't too many...
+> 
+>  drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c | 2 +-
+>  drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c | 4 ++--
+>  drivers/net/ethernet/xilinx/xilinx_emaclite.c    | 2 +-
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
+> index 039b0c1..9980912 100644
+> --- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
+> +++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_main.c
+> @@ -11610,7 +11610,7 @@ static bool bnx2x_get_dropless_info(struct bnx2x *bp)
+>  	u32 cfg;
+>  
+>  	if (IS_VF(bp))
+> -		return 0;
+> +		return false;
+>  
+>  	if (IS_MF(bp) && !CHIP_IS_E1x(bp)) {
+>  		/* Take function: tmp = func */
+> diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
+> index 02ffb30..ccaecb1 100644
+> --- a/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
+> +++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_ethtool.c
+> @@ -1351,7 +1351,7 @@ static bool reg_pattern_test(struct ixgbe_adapter *adapter, u64 *data, int reg,
+>  
+>  	if (ixgbe_removed(adapter->hw.hw_addr)) {
+>  		*data = 1;
+> -		return 1;
+> +		return true;
+>  	}
+>  	for (pat = 0; pat < ARRAY_SIZE(test_pattern); pat++) {
+>  		before = ixgbe_read_reg(&adapter->hw, reg);
+> @@ -1376,7 +1376,7 @@ static bool reg_set_and_check(struct ixgbe_adapter *adapter, u64 *data, int reg,
+>  
+>  	if (ixgbe_removed(adapter->hw.hw_addr)) {
+>  		*data = 1;
+> -		return 1;
+> +		return true;
+>  	}
+>  	before = ixgbe_read_reg(&adapter->hw, reg);
+>  	ixgbe_write_reg(&adapter->hw, reg, write & mask);
+> diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> index 2111b91..6008eee 100644
+> --- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> +++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+> @@ -1062,7 +1062,7 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
+>  	} else {
+>  		dev_warn(&ofdev->dev, "Parameter %s not found,"
+>  			"defaulting to false\n", s);
+> -		return 0;
+> +		return false;
+>  	}
+>  }
 
-Please see my response inline.
+Kernel-doc should be also fixed in spite of this whole function is just
+broken and binding should be fixed to use of_property_read_bool for
+these properties.
 
-On Tue, Mar 31, 2015 at 6:44 PM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+Thanks,
+Michal
 
-[snip]
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
->> > +       ret = mtk_rtc_read(rtc, RTC_BBPU, &data);
->> > +       if (ret < 0)
->> > +               goto exit;
->> > +
->> > +       while (data & RTC_BBPU_CBUSY) {
->> > +               cpu_relax();
->> > +               ret = mtk_rtc_read(rtc, RTC_BBPU, &data);
->> > +               if (ret < 0)
->> > +                       goto exit;
->> > +       }
->>
->> The initial read and the loop could be folded into a do {} while loop?
->> Also it would be safer to have a timeout here.
-> Because I need to check return value, so not put initial read in do { }.
 
-Hmm, inside the loop you also check return value. Considering the fact
-that cpu_relax() doesn't do anything interesting besides issuing a
-memory barrier (and probably could be omitted here) I don't see why
-this couldn't be made a do {} while loop. (Obviously this is a bit of
-bikeshedding, but by the way of other changes this could be changed as
-well.)
-
-[snip]
-
->>
->> Also shouldn't the unused bits be masked out?
-> Hardware return zero in unused bits. So I think it not necessary to add
-> mask.
->
-
-OK. Thanks for explaining this.
-
->>
->> > +
->> > +exit:
->> > +       mutex_unlock(&rtc->lock);
->> > +       return ret;
->> > +}
->> > +
->> > +static int mtk_rtc_read_time(struct device *dev, struct rtc_time *tm)
->> > +{
->> > +       time64_t time;
->> > +       struct mt6397_rtc *rtc = dev_get_drvdata(dev);
->> > +       int sec, ret;
->> > +
->> > +       do {
->> > +               ret = __mtk_rtc_read_time(rtc, tm, &sec);
->> > +               if (ret < 0)
->> > +                       goto exit;
->> > +       } while (sec < tm->tm_sec);
->>
->> Shouldn't this be while (sec > tm->tm_sec)?
-> No, it should keep it as is, this is used to check whether second
-> overflow (from 59 to 0). If yes, read time again.
->
-
-Ah, right, of course, an overlooking on my side. Thanks for clarifying this.
-
-[snip]
-
->> > +       mutex_lock(&rtc->lock);
->> > +       if (alm->enabled) {
->>
->> Is this possible that an alarm was already set? Is it okay to keep it
->> enabled while changing the alarm time to new one?
-> It's ok because all alarm time register set to hardware after call
-> mtk_rtc_write_trigger.
->
-
-Fair enough. Thanks for explanation. Could you maybe add a comment
-here saying that the new alarm setting will be committed after calling
-mtk_rtc_write_trigger()?
-
-[snip]
-
->> > +       res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->> > +       rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
->> > +       if (rtc->irq <= 0)
->> > +               goto out_rtc;
->>
->> Just return an error code here directly. Which one is actually a good
->> question. Looks like existing code is using -EINVAL or -ENXIO. Any
->> ideas?
-> I tend to use -EINVAL
-
-SGTM.
-
-[snip]
-
->> > +
->> > +out_rtc:
->> > +       rtc_device_unregister(rtc->rtc_dev);
->>
->> All references to this label are actually before rtc_device_register()
->> is even called. The proper thing to do here is to dispose the created
->> IRQ mapping.
-> OK, will call irq_dispose_mapping and free_irq
->
-
-OK, thanks. Please note that this will also mean changing
-devm_request_threaded_irq() to normal request_threaded_irq().
-
-Still, now as I think of it, I'm not sure if this driver is the right
-place to call irq_create_mapping(). Instead, shouldn't the parent MFD
-driver create the mapping and pass the final virtual IRQ number to
-this driver through resources?
-
-Lee, could you comment on this, please?
-
-Best regards,
-Tomasz
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/a20eff93/attachment-0001.sig>
