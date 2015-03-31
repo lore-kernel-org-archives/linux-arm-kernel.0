@@ -1,41 +1,47 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 31 Mar 2015 16:36:27 +0100
-Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP
- is clocked.
-In-Reply-To: <20150331152958.GF9974@htj.duckdns.org>
-References: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
- <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
- <20150331152958.GF9974@htj.duckdns.org>
-Message-ID: <20150331153627.GA8200@griffinp-ThinkPad-X1-Carbon-2nd>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Tue, 31 Mar 2015 16:40:42 +0100
+Subject: [PATCH v2 0/4] QEMU support for KVM Guest Debug on arm64
+Message-ID: <1427816446-31586-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+Hi,
 
-On Tue, 31 Mar 2015, Tejun Heo wrote:
+I thought I'd sent V1 to the list but apparently not. Anyway this
+patch series provides the QEMU side of guest debug support for arm64.
+I'm assuming the first patch will be dropped when a proper merge of
+the linux-headers is done once the kernel side is upstreamed.
 
-> On Tue, Mar 31, 2015 at 08:35:09AM +0100, Peter Griffin wrote:
-> > Currently the ahci_st driver will hang the system on probe, as the
-> > st_configure_oob function does some register writes before the IP
-> > is clocked. This patch moves the function call to after
-> > ahci_platform_enable_resources (which enables the IP clock), and
-> > resolves the hang.
-> > 
-> > Addtionally st_ahci_configure_oob should be called in the st_ahci_resume
-> > function, so we also rectify that ensuring it is also called after
-> > the IP clock has been enabled.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
-> 
-> How should this patch be routed?  Should I pick this up and apply to
-> libata/for-4.1 or should it go together with the other patches?  If
-> the latter, please feel free to add my acked-by.
+There is nothing particularly special about the implementation details
+although some of the bit-fiddling is a little fiddly.
 
-This patch (and also the DT documentation change) can go via your tree. Maxime
-will take the stih407 DT patch.
+GIT Repos:
 
-regards,
+The patch series is based off a recent master and can be found at:
 
-Peter.
+https://github.com/stsquad/qemu
+branch: kvm/guest-debug-v2
+
+The kernel patches for this series are based off a v4.0-rc6 and can be
+found at:
+
+https://git.linaro.org/people/alex.bennee/linux.git
+branch: guest-debug/4.0-rc6-v2
+
+Alex Benn?e (4):
+  linux-headers: partial sync from my kernel tree (DEV)
+  target-arm: kvm - implement software breakpoints
+  target-arm: kvm - support for single step
+  target-arm: kvm - add support for HW assisted debug
+
+ linux-headers/asm-arm64/kvm.h   |  22 +++
+ linux-headers/asm-powerpc/kvm.h |   4 +-
+ linux-headers/asm-x86/kvm.h     |   4 +-
+ linux-headers/linux/kvm.h       |  17 ++-
+ target-arm/kvm.c                | 124 ++++++++++++----
+ target-arm/kvm64.c              | 315 ++++++++++++++++++++++++++++++++++++++++
+ target-arm/kvm_arm.h            |  21 +++
+ 7 files changed, 474 insertions(+), 33 deletions(-)
+
+-- 
+2.3.4
