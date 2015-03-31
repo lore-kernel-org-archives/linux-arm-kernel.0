@@ -1,64 +1,35 @@
-From: m.grzeschik@pengutronix.de (Michael Grzeschik)
-Date: Tue, 31 Mar 2015 15:54:49 +0200
-Subject: [PATCH] spi: bitbang: only toggle bitchanges
-Message-ID: <1427810089-14866-1-git-send-email-m.grzeschik@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 Mar 2015 15:04:10 +0100
+Subject: linux-next: manual merge of the arm64 tree with the arm-soc tree
+In-Reply-To: <20150331102122.34db1c6e@canb.auug.org.au>
+References: <20150331102122.34db1c6e@canb.auug.org.au>
+Message-ID: <20150331140407.GA23192@MBP>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of bitbang_txrx_be_cpha0 and
-bitbang_txrx_be_cpha1 always call setmosi. That runs into several
-unnecessary calls into the gpiolib when the level of the GPIO actually
-has not to be changed.
+Hi Stephen,
 
-This patch changes the routines to remember the last GPIO level
-and only calls setmosi if an change has to be made. This
-way it improves the transfer throughput.
+On Tue, Mar 31, 2015 at 10:21:22AM +1100, Stephen Rothwell wrote:
+> diff --cc arch/arm64/configs/defconfig
+> index f3c8619f8fe1,e07896c819ef..000000000000
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@@ -31,9 -31,12 +31,13 @@@ CONFIG_MODULES=
+>   CONFIG_MODULE_UNLOAD=y
+>   # CONFIG_BLK_DEV_BSG is not set
+>   # CONFIG_IOSCHED_DEADLINE is not set
+> + CONFIG_ARCH_EXYNOS7=y
+>   CONFIG_ARCH_FSL_LS2085A=y
+>   CONFIG_ARCH_MEDIATEK=y
+>  +CONFIG_ARCH_SPRD=y
+> + CONFIG_ARCH_SEATTLE=y
+> + CONFIG_ARCH_TEGRA=y
+> + CONFIG_ARCH_TEGRA_132_SOC=y
+>   CONFIG_ARCH_THUNDER=y
+>   CONFIG_ARCH_VEXPRESS=y
+>   CONFIG_ARCH_XGENE=y
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
----
- drivers/spi/spi-bitbang-txrx.h | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Thanks. Looks fine.
 
-diff --git a/drivers/spi/spi-bitbang-txrx.h b/drivers/spi/spi-bitbang-txrx.h
-index c616e41..62bdf62 100644
---- a/drivers/spi/spi-bitbang-txrx.h
-+++ b/drivers/spi/spi-bitbang-txrx.h
-@@ -49,12 +49,16 @@ bitbang_txrx_be_cpha0(struct spi_device *spi,
- {
- 	/* if (cpol == 0) this is SPI_MODE_0; else this is SPI_MODE_2 */
- 
-+	bool oldbit = !(word & 1);
- 	/* clock starts at inactive polarity */
- 	for (word <<= (32 - bits); likely(bits); bits--) {
- 
- 		/* setup MSB (to slave) on trailing edge */
- 		if ((flags & SPI_MASTER_NO_TX) == 0)
--			setmosi(spi, word & (1 << 31));
-+			if ((word & (1 << 31)) != oldbit) {
-+				setmosi(spi, word & (1 << 31));
-+				oldbit = word & (1 << 31);
-+			}
- 		spidelay(nsecs);	/* T(setup) */
- 
- 		setsck(spi, !cpol);
-@@ -76,13 +80,17 @@ bitbang_txrx_be_cpha1(struct spi_device *spi,
- {
- 	/* if (cpol == 0) this is SPI_MODE_1; else this is SPI_MODE_3 */
- 
-+	bool oldbit = !(word & (1 << 31));
- 	/* clock starts@inactive polarity */
- 	for (word <<= (32 - bits); likely(bits); bits--) {
- 
- 		/* setup MSB (to slave) on leading edge */
- 		setsck(spi, !cpol);
- 		if ((flags & SPI_MASTER_NO_TX) == 0)
--			setmosi(spi, word & (1 << 31));
-+			if ((word & (1 << 31)) != oldbit) {
-+				setmosi(spi, word & (1 << 31));
-+				oldbit = word & (1 << 31);
-+			}
- 		spidelay(nsecs); /* T(setup) */
- 
- 		setsck(spi, cpol);
 -- 
-2.1.4
+Catalin
