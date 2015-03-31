@@ -1,75 +1,266 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:23 +0300
-Subject: [PATCHv6 30/34] ARM: OMAP4: display: convert display to use syscon
- for dsi muxing
+Date: Tue, 31 Mar 2015 22:14:25 +0300
+Subject: [PATCHv6 32/34] ARM: dts: omap5: add minimal l4 bus layout with
+ control module support
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-31-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-33-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The legacy control module APIs will be gone, thus convert the display
-driver to use syscon. This change should eventually be moved to
-display driver from the board directory.
+This patch creates the l4_cfg and l4_wkup interconnects for OMAP5, and
+moves some of the generic peripherals under it. System control module
+support is added to the device tree also, and the existing SCM related
+functionality is moved under it.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/display.c |   15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/arm/omap/ctrl.txt          |    2 +
+ Documentation/devicetree/bindings/arm/omap/l4.txt  |    2 +
+ arch/arm/boot/dts/omap5.dtsi                       |  182 ++++++++++++--------
+ 3 files changed, 116 insertions(+), 70 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
-index 7a050f9..f492ae1 100644
---- a/arch/arm/mach-omap2/display.c
-+++ b/arch/arm/mach-omap2/display.c
-@@ -26,6 +26,8 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/slab.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
+diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+index 2675881..acb68ed 100644
+--- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
++++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+@@ -21,6 +21,8 @@ Required properties:
+ 		"ti,omap3-scm"
+ 		"ti,omap4-scm-core"
+ 		"ti,omap4-scm-padconf-core"
++		"ti,omap5-scm-core"
++		"ti,omap5-scm-padconf-core"
+ - reg:		Contains Control Module register address range
+ 		(base address and length)
  
- #include <video/omapdss.h>
- #include "omap_hwmod.h"
-@@ -104,6 +106,10 @@ static const struct omap_dss_hwmod_data omap4_dss_hwmod_data[] __initconst = {
- 	{ "dss_hdmi", "omapdss_hdmi", -1 },
- };
+diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
+index de18cfa..2fe4211 100644
+--- a/Documentation/devicetree/bindings/arm/omap/l4.txt
++++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
+@@ -8,6 +8,8 @@ Required properties:
+ 	       Should be "ti,omap3-l4-core" for OMAP3 family l4 core bus
+ 	       Should be "ti,omap4-l4-cfg" for OMAP4 family l4 cfg bus
+ 	       Should be "ti,omap4-l4-wkup" for OMAP4 family l4 wkup bus
++	       Should be "ti,omap5-l4-cfg" for OMAP5 family l4 cfg bus
++	       Should be "ti,omap5-l4-wkup" for OMAP5 family l4 wkup bus
+ 	       Should be "ti,am3-l4-wkup" for AM33xx family l4 wkup bus
+ 	       Should be "ti,am4-l4-wkup" for AM43xx family l4 wkup bus
+ - ranges : contains the IO map range for the bus
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index b321fdf..326a429 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -129,99 +129,141 @@
+ 		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
  
-+#define OMAP4_DSIPHY_SYSCON_OFFSET		0x78
+-		prm: prm at 4ae06000 {
+-			compatible = "ti,omap5-prm";
+-			reg = <0x4ae06000 0x3000>;
+-			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		l4_cfg: l4 at 4a000000 {
++			compatible = "ti,omap5-l4-cfg", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a000000 0x22a000>;
+ 
+-			prm_clocks: clocks {
++			scm_core: scm at 2000 {
++				compatible = "ti,omap5-scm-core", "simple-bus";
++				reg = <0x2000 0x1000>;
+ 				#address-cells = <1>;
+-				#size-cells = <0>;
++				#size-cells = <1>;
++				ranges = <0 0x2000 0x800>;
 +
-+static struct regmap *omap4_dsi_mux_syscon;
++				scm_conf: scm_conf at 0 {
++					compatible = "syscon";
++					reg = <0x0 0x800>;
++					#address-cells = <1>;
++					#size-cells = <1>;
++				};
+ 			};
+ 
+-			prm_clockdomains: clockdomains {
++			scm_padconf_core: scm at 2800 {
++				compatible = "ti,omap5-scm-padconf-core",
++					     "simple-bus";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x2800 0x800>;
 +
- static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
- {
- 	u32 enable_mask, enable_shift;
-@@ -124,7 +130,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
- 		return -ENODEV;
- 	}
- 
--	reg = omap4_ctrl_pad_readl(OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
-+	regmap_read(omap4_dsi_mux_syscon, OMAP4_DSIPHY_SYSCON_OFFSET, &reg);
- 
- 	reg &= ~enable_mask;
- 	reg &= ~pipd_mask;
-@@ -132,7 +138,7 @@ static int omap4_dsi_mux_pads(int dsi_id, unsigned lanes)
- 	reg |= (lanes << enable_shift) & enable_mask;
- 	reg |= (lanes << pipd_shift) & pipd_mask;
- 
--	omap4_ctrl_pad_writel(reg, OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_DSIPHY);
-+	regmap_write(omap4_dsi_mux_syscon, OMAP4_DSIPHY_SYSCON_OFFSET, reg);
- 
- 	return 0;
- }
-@@ -665,5 +671,10 @@ int __init omapdss_init_of(void)
- 		return r;
- 	}
- 
-+	/* add DSI info for omap4 */
-+	node = of_find_node_by_name(NULL, "omap4_padconf_global");
-+	if (node)
-+		omap4_dsi_mux_syscon = syscon_node_to_regmap(node);
++				omap5_pmx_core: pinmux at 40 {
++					compatible = "ti,omap5-padconf",
++						     "pinctrl-single";
++					reg = <0x40 0x01b6>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					#interrupt-cells = <1>;
++					interrupt-controller;
++					pinctrl-single,register-width = <16>;
++					pinctrl-single,function-mask = <0x7fff>;
++				};
 +
- 	return 0;
- }
++				omap5_padconf_global: omap5_padconf_global at 5a0 {
++					compatible = "syscon";
++					reg = <0x5a0 0xec>;
++					#address-cells = <1>;
++					#size-cells = <1>;
++
++					pbias_regulator: pbias_regulator {
++						compatible = "ti,pbias-omap";
++						reg = <0x60 0x4>;
++						syscon = <&omap5_padconf_global>;
++						pbias_mmc_reg: pbias_mmc_omap5 {
++							regulator-name = "pbias_mmc_omap5";
++							regulator-min-microvolt = <1800000>;
++							regulator-max-microvolt = <3000000>;
++						};
++					};
++				};
+ 			};
+-		};
+ 
+-		cm_core_aon: cm_core_aon at 4a004000 {
+-			compatible = "ti,omap5-cm-core-aon";
+-			reg = <0x4a004000 0x2000>;
++			cm_core_aon: cm_core_aon at 4000 {
++				compatible = "ti,omap5-cm-core-aon";
++				reg = <0x4000 0x2000>;
+ 
+-			cm_core_aon_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
++				cm_core_aon_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 
+-			cm_core_aon_clockdomains: clockdomains {
++				cm_core_aon_clockdomains: clockdomains {
++				};
+ 			};
+-		};
+ 
+-		scrm: scrm at 4ae0a000 {
+-			compatible = "ti,omap5-scrm";
+-			reg = <0x4ae0a000 0x2000>;
++			cm_core: cm_core at 8000 {
++				compatible = "ti,omap5-cm-core";
++				reg = <0x8000 0x3000>;
+ 
+-			scrm_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
++				cm_core_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 
+-			scrm_clockdomains: clockdomains {
++				cm_core_clockdomains: clockdomains {
++				};
+ 			};
+ 		};
+ 
+-		cm_core: cm_core at 4a008000 {
+-			compatible = "ti,omap5-cm-core";
+-			reg = <0x4a008000 0x3000>;
++		l4_wkup: l4 at 4ae00000 {
++			compatible = "ti,omap5-l4-wkup", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4ae00000 0x2b000>;
+ 
+-			cm_core_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
++			counter32k: counter at 4000 {
++				compatible = "ti,omap-counter32k";
++				reg = <0x4000 0x40>;
++				ti,hwmods = "counter_32k";
+ 			};
+ 
+-			cm_core_clockdomains: clockdomains {
++			prm: prm at 6000 {
++				compatible = "ti,omap5-prm";
++				reg = <0x6000 0x3000>;
++				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++
++				prm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				prm_clockdomains: clockdomains {
++				};
+ 			};
+-		};
+ 
+-		counter32k: counter at 4ae04000 {
+-			compatible = "ti,omap-counter32k";
+-			reg = <0x4ae04000 0x40>;
+-			ti,hwmods = "counter_32k";
+-		};
++			scrm: scrm at a000 {
++				compatible = "ti,omap5-scrm";
++				reg = <0xa000 0x2000>;
+ 
+-		omap5_pmx_core: pinmux at 4a002840 {
+-			compatible = "ti,omap5-padconf", "pinctrl-single";
+-			reg = <0x4a002840 0x01b6>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
+-		omap5_pmx_wkup: pinmux at 4ae0c840 {
+-			compatible = "ti,omap5-padconf", "pinctrl-single";
+-			reg = <0x4ae0c840 0x0038>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <16>;
+-			pinctrl-single,function-mask = <0x7fff>;
+-		};
++				scrm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 
+-		omap5_padconf_global: tisyscon at 4a002da0 {
+-			compatible = "syscon";
+-			reg = <0x4A002da0 0xec>;
+-		};
++				scrm_clockdomains: clockdomains {
++				};
++			};
+ 
+-		pbias_regulator: pbias_regulator {
+-			compatible = "ti,pbias-omap";
+-			reg = <0x60 0x4>;
+-			syscon = <&omap5_padconf_global>;
+-			pbias_mmc_reg: pbias_mmc_omap5 {
+-				regulator-name = "pbias_mmc_omap5";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3000000>;
++			omap5_pmx_wkup: pinmux at c840 {
++				compatible = "ti,omap5-padconf",
++					     "pinctrl-single";
++				reg = <0xc840 0x0038>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				#interrupt-cells = <1>;
++				interrupt-controller;
++				pinctrl-single,register-width = <16>;
++				pinctrl-single,function-mask = <0x7fff>;
+ 			};
+ 		};
+ 
 -- 
 1.7.9.5
