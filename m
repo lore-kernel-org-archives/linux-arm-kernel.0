@@ -1,67 +1,122 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:11 +0300
-Subject: [PATCHv6 18/34] ARM: OMAP4+: PRM: setup prm_features from the PRM
- init time flags
+Date: Tue, 31 Mar 2015 22:14:20 +0300
+Subject: [PATCHv6 27/34] ARM: dts: am43xx-epos-evm: fix pinmux node layout
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-19-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-28-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently some cpu_is_X checks are used to setup prm_features, however
-the same can be accomplished by just passing these flags from the PRM
-init data. This is done in preparation to make PRM a separate driver.
+Pinmux node should be a reference to the base one, not a complete re-write
+of it. Having the node like this also prevents modifying the node layout
+in the base am4372.dtsi file, which is needed for control module changes.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/prm44xx.c    |    4 ++--
- arch/arm/mach-omap2/prm_common.c |    3 +++
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/am43x-epos-evm.dts |   84 +++++++++++++++++-----------------
+ 1 file changed, 42 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/prm44xx.c b/arch/arm/mach-omap2/prm44xx.c
-index a980d245..243133c 100644
---- a/arch/arm/mach-omap2/prm44xx.c
-+++ b/arch/arm/mach-omap2/prm44xx.c
-@@ -707,10 +707,10 @@ int __init omap44xx_prm_init(const struct omap_prcm_init_data *data)
- {
- 	omap_prm_base_init();
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 257c099..72f01bb 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -69,7 +69,48 @@
+ 		};
+ 	};
  
--	if (cpu_is_omap44xx() || soc_is_omap54xx() || soc_is_dra7xx())
-+	if (data->flags & PRM_HAS_IO_WAKEUP)
- 		prm_features |= PRM_HAS_IO_WAKEUP;
- 
--	if (!soc_is_dra7xx())
-+	if (data->flags & PRM_HAS_VOLTAGE)
- 		prm_features |= PRM_HAS_VOLTAGE;
- 
- 	omap4_prminst_set_prm_dev_inst(data->device_inst_offset);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 3e932b8..04dfe8f 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -669,6 +669,7 @@ static struct omap_prcm_init_data omap4_prm_data __initdata = {
- 	.index = TI_CLKM_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = OMAP4430_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE,
+-	am43xx_pinmux: pinmux at 44e10800 {
++	matrix_keypad: matrix_keypad at 0 {
++		compatible = "gpio-matrix-keypad";
++		debounce-delay-ms = <5>;
++		col-scan-delay-us = <2>;
++
++		row-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH		/* Bank0, pin12 */
++			     &gpio0 13 GPIO_ACTIVE_HIGH		/* Bank0, pin13 */
++			     &gpio0 14 GPIO_ACTIVE_HIGH		/* Bank0, pin14 */
++			     &gpio0 15 GPIO_ACTIVE_HIGH>;	/* Bank0, pin15 */
++
++		col-gpios = <&gpio3 9 GPIO_ACTIVE_HIGH		/* Bank3, pin9 */
++			     &gpio3 10 GPIO_ACTIVE_HIGH		/* Bank3, pin10 */
++			     &gpio2 18 GPIO_ACTIVE_HIGH		/* Bank2, pin18 */
++			     &gpio2 19 GPIO_ACTIVE_HIGH>;	/* Bank2, pin19 */
++
++		linux,keymap = <0x00000201	/* P1 */
++			0x01000204	/* P4 */
++			0x02000207	/* P7 */
++			0x0300020a	/* NUMERIC_STAR */
++			0x00010202	/* P2 */
++			0x01010205	/* P5 */
++			0x02010208	/* P8 */
++			0x03010200	/* P0 */
++			0x00020203	/* P3 */
++			0x01020206	/* P6 */
++			0x02020209	/* P9 */
++			0x0302020b	/* NUMERIC_POUND */
++			0x00030067	/* UP */
++			0x0103006a	/* RIGHT */
++			0x0203006c	/* DOWN */
++			0x03030069>;	/* LEFT */
++	};
++
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&ecap0 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 51 53 56 62 75 101 152 255>;
++		default-brightness-level = <8>;
++	};
++};
++
++&am43xx_pinmux {
+ 		cpsw_default: cpsw_default {
+ 			pinctrl-single,pins = <
+ 				/* Slave 1 */
+@@ -279,47 +320,6 @@
+ 				0x204 (DS0_PULL_UP_DOWN_EN | INPUT_EN | MUX_MODE7)
+ 			>;
+ 		};
+-	};
+-
+-	matrix_keypad: matrix_keypad at 0 {
+-			compatible = "gpio-matrix-keypad";
+-			debounce-delay-ms = <5>;
+-			col-scan-delay-us = <2>;
+-
+-			row-gpios = <&gpio0 12 GPIO_ACTIVE_HIGH		/* Bank0, pin12 */
+-				     &gpio0 13 GPIO_ACTIVE_HIGH		/* Bank0, pin13 */
+-				     &gpio0 14 GPIO_ACTIVE_HIGH		/* Bank0, pin14 */
+-				     &gpio0 15 GPIO_ACTIVE_HIGH>;	/* Bank0, pin15 */
+-
+-			col-gpios = <&gpio3 9 GPIO_ACTIVE_HIGH		/* Bank3, pin9 */
+-				     &gpio3 10 GPIO_ACTIVE_HIGH		/* Bank3, pin10 */
+-				     &gpio2 18 GPIO_ACTIVE_HIGH		/* Bank2, pin18 */
+-				     &gpio2 19 GPIO_ACTIVE_HIGH>;	/* Bank2, pin19 */
+-
+-			linux,keymap = <0x00000201	/* P1 */
+-				0x01000204	/* P4 */
+-				0x02000207	/* P7 */
+-				0x0300020a	/* NUMERIC_STAR */
+-				0x00010202	/* P2 */
+-				0x01010205	/* P5 */
+-				0x02010208	/* P8 */
+-				0x03010200	/* P0 */
+-				0x00020203	/* P3 */
+-				0x01020206	/* P6 */
+-				0x02020209	/* P9 */
+-				0x0302020b	/* NUMERIC_POUND */
+-				0x00030067	/* UP */
+-				0x0103006a	/* RIGHT */
+-				0x0203006c	/* DOWN */
+-				0x03030069>;	/* LEFT */
+-		};
+-
+-	backlight {
+-		compatible = "pwm-backlight";
+-		pwms = <&ecap0 0 50000 PWM_POLARITY_INVERTED>;
+-		brightness-levels = <0 51 53 56 62 75 101 152 255>;
+-		default-brightness-level = <8>;
+-	};
  };
- #endif
  
-@@ -677,6 +678,7 @@ static struct omap_prcm_init_data omap5_prm_data __initdata = {
- 	.index = TI_CLKM_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = OMAP54XX_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP | PRM_HAS_VOLTAGE,
- };
- #endif
- 
-@@ -685,6 +687,7 @@ static struct omap_prcm_init_data dra7_prm_data __initdata = {
- 	.index = TI_CLKM_PRM,
- 	.init = omap44xx_prm_init,
- 	.device_inst_offset = DRA7XX_PRM_DEVICE_INST,
-+	.flags = PRM_HAS_IO_WAKEUP,
- };
- #endif
- 
+ &mmc1 {
 -- 
 1.7.9.5
