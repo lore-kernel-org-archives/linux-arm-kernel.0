@@ -1,65 +1,59 @@
-From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
-Date: Tue, 31 Mar 2015 13:42:32 +0200
-Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on
- Exynos5250 and other
-In-Reply-To: <5515ADB6.6050204@collabora.co.uk>
-References: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
- <5515ADB6.6050204@collabora.co.uk>
-Message-ID: <551A8828.70108@suse.de>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 31 Mar 2015 19:50:58 +0800
+Subject: [PATCH v5 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <1427785715.3500.16.camel@mtksdaap41>
+References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
+ <1426917922-61356-3-git-send-email-eddie.huang@mediatek.com>
+ <20150323084237.GG9742@pengutronix.de>
+ <1427703252.26464.14.camel@mtksdaap41>
+ <20150330172309.GB9742@pengutronix.de>
+ <1427785715.3500.16.camel@mtksdaap41>
+Message-ID: <1427802658.32196.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.03.2015 um 20:21 schrieb Javier Martinez Canillas:
-> Hello Krzysztof,
-> 
-> On 03/27/2015 05:08 PM, Krzysztof Kozlowski wrote:
->> After adding display power domain for Exynos5250 in commit
->> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
->> display on Chromebook Snow and others stopped working after boot.
->>
->> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
->> This clock is required by Display Port and is enabled by bootloader.
->> However when FIMD driver probing was deferred, the display power domain
->> was turned off. This effectively reset the value of DP clock enable
->> register.
->>
->> When exynos-dp is later probed, the clock is not enabled and display is
->> not properly configured:
->>
->> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
->> exynos-dp 145b0000.dp-controller: unable to config video
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
->> Cc: <stable@vger.kernel.org>
->>
->> ---
->>
->> This should fix issue reported by Javier [1][2].
->>
-> 
-> I tested this patch and does indeed solves both issues I reported
-> The exynos-dp probe deferral does not make the display to not be
-> working and also disabling and enabling the display with:
-> 
-> with /sys/devices/platform/exynos-drm/graphics/fb0/blank works.
-> 
-> Thanks a lot for fixing this issue.
-> 
-> On an Exynos5250 Snow Chromebook:
-> 
-> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Hi Sascha,
 
-Seems to fix Spring Chromebook as well,
+On Tue, 2015-03-31 at 15:08 +0800, Eddie Huang wrote:
+> Hi Sascha,
+> 
+> On Mon, 2015-03-30 at 19:23 +0200, Sascha Hauer wrote:
+> > On Mon, Mar 30, 2015 at 04:14:12PM +0800, Eddie Huang wrote:
+> > > Hi Sascha,
+> > >
+> > > >
+> > > > [...]
+> > > >
+> > > > > +       if (i2c->speed_hz > 400000)
+> > > > > +               control_reg |= I2C_CONTROL_RS;
+> > > > > +       if (i2c->op == I2C_MASTER_WRRD)
+> > > > > +               control_reg |= I2C_CONTROL_DIR_CHANGE | I2C_CONTROL_RS;
+> > > > > +       mtk_i2c_writew(control_reg, i2c, OFFSET_CONTROL);
+> > > > > +
+> > > > > +       /* set start condition */
+> > > > > +       if (i2c->speed_hz <= 100000)
+> > > > > +               mtk_i2c_writew(I2C_ST_START_CON, i2c, OFFSET_EXT_CONF);
+> > > > > +       else
+> > > > > +               mtk_i2c_writew(I2C_FS_START_CON, i2c, OFFSET_EXT_CONF);
+> > > > > +
+> > > > > +       if (~control_reg & I2C_CONTROL_RS)
+> > > > > +               mtk_i2c_writew(I2C_DELAY_LEN, i2c, OFFSET_DELAY_LEN);
+> > > >
+> > > > speed <= 400000 here to make this more obvious?
+> > > There are two cases, not only speed<=400000, but I2C_MASTER_WRRD. I tend
+> > > to keep it.
+> >
+> > Still it looks strange. You only ever write this default value to the
+> > register. Putting this register write under an if() seems bogus since
+> > the same value will be in the register the next time this code is
+> > executed. It looks like you should move this register write to some
+> > initialization function.
+> OK, move to mtk_i2c_init_hw function
+> 
+Sorry for my negligence. Write-then-read (I2C_MASTER_WRRD) decides
+according to each I2C transfer, so I still need to judge whether set
+I2C_CONTROL_RS and DELAY_LEN here. Other control setting can move to
+init function.
 
-Tested-by: Andreas F?rber <afaerber@suse.de>
-
-Thanks a lot,
-
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
-Graham Norton; HRB 21284 (AG N?rnberg)
+Eddie
