@@ -1,56 +1,60 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Tue, 31 Mar 2015 09:27:53 -0700
-Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
-In-Reply-To: <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
- (Sascha Hauer's message of "Tue, 10 Mar 2015 16:41:01 +0100")
-References: <1426002063-25713-1-git-send-email-s.hauer@pengutronix.de>
- <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <7hbnj9b08m.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Mar 2015 17:34:59 +0100
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <20150331161026.GA17480@e103592.cambridge.arm.com>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+ <551943CB.3010303@suse.cz>
+ <20150330132617.GI24899@n2100.arm.linux.org.uk>
+ <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+ <551959F1.4030704@suse.cz>
+ <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
+ <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
+ <20150331161026.GA17480@e103592.cambridge.arm.com>
+Message-ID: <20150331163459.GU24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Tue, Mar 31, 2015 at 05:27:22PM +0100, Dave Martin wrote:
+> On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
+> > I'm using -ffunction-sections as well for the kernel size reduction work 
+> > I'm currently doing.  The linker script has to be adapted so .text.* is 
+> > specified along .text otherwise those functions end up appended at the 
+> > end of the binary.
+> 
+> Interesting ... do you also mean using --gc-sections at link time?
+> We'd need to avoid pruning needed code that has no explicit caller,
+> and functions that are part of the kernel/module ABI but not used
+> within vmlinux.
+> 
+> The GCC docs suggest that -ffunction-sections may impact performance
+> and/or increase code size, but I don't know by how much.  Maybe it
+> interferes with inling.
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
+I've mentioned these options over the course of the last couple of
+months.  David Woodhouse replied in February, so it's worth reading
+up on that work.
 
-> This adds a power domain driver for the Mediatek SCPSYS unit.
->
-> The System Control Processor System (SCPSYS) has several power
-> management related tasks in the system. The tasks include thermal
-> measurement, dynamic voltage frequency scaling (DVFS), interrupt
-> filter and lowlevel sleep control. The System Power Manager (SPM)
-> inside the SCPSYS is for the MTCMOS power domain control.
->
-> For now this driver only adds power domain support, the more
-> advanced features are not yet supported. The driver implements
-> the generic PM domain device tree bindings, the first user will
-> most likely be the Mediatek AFE audio driver.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+David Woodhouse wrote:
+| In many kernel configurations there are actually quite a lot of
+| functions that are never called, and I was quite surprised the first
+| time I played with this stuff.
+| 
+| There are a few ways of dealing with it. One is to use
+| -ffunction-section -fdata-sections --gc-sections as you noted. I once
+| also played with using GCC's --combine during the brief period that it
+| was supported and not *entirely* broken, with similar effects:
+| https://lwn.net/Articles/197097/
+| 
+| These days, the better answer is probably LTO. We could potentially
+| still look at --gc-sections, but I suspect we're better off using LTO
+| and just filing toolchain bugs until everything that --gc-sections
+| *would* have dropped is also dropped from the LTO build :)
+| 
+| Unless --gc-sections actually speeds up the build in a significant way;
+| a full LTO link of the kernel takes insane amounts of memory IIRC.
 
-Sorry for the lag, was travelling last week at ELC and not keeping up
-with reviews.
-
-This version looks pretty good to me, but had one minor
-comment/question...
-
-[...]
-
-> +#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
-> +
-> +struct scp;
-> +
-> +struct scp_domain {
-> +	struct generic_pm_domain pmd;
-> +	struct scp_domain_data *data;
-> +	struct scp *scp;
-> +};
-> +
-> +struct scp {
-> +	struct scp_domain domains[NUM_DOMAINS];
-> +	struct generic_pm_domain *pmd[NUM_DOMAINS];
-
-Why is this genpd pointer needed?  It's just a pointer to the
-.domains.pmd[i] anyways, and IMO makes the code a bit hard to follow.
-
-Kevin
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
