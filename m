@@ -1,62 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Mar 2015 15:49:56 +0100
-Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
- iommu_ops
-In-Reply-To: <20150331142440.GD22683@8bytes.org>
-References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
-Message-ID: <20150331144956.GA24094@arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 31 Mar 2015 17:57:56 +0300
+Subject: [PATCHv5 26/35] ARM: dts: omap3: add minimal l4 bus layout with
+ control module support
+In-Reply-To: <20150330225634.GL10805@atomide.com>
+References: <1426877086-17131-1-git-send-email-t-kristo@ti.com>
+ <1426877086-17131-27-git-send-email-t-kristo@ti.com>
+ <20150330225634.GL10805@atomide.com>
+Message-ID: <551AB5F4.1040200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 03:24:40PM +0100, Joerg Roedel wrote:
-> Hi Will,
+On 03/31/2015 01:56 AM, Tony Lindgren wrote:
+> Hi,
+>
+> * Tero Kristo <t-kristo@ti.com> [150320 11:46]:
+>> --- a/arch/arm/boot/dts/omap3.dtsi
+>> +++ b/arch/arm/boot/dts/omap3.dtsi
+>> @@ -87,6 +87,60 @@
+>>   		ranges;
+>>   		ti,hwmods = "l3_main";
+>>
+>> +		l4_core: l4 at 48000000 {
+>> +			compatible = "ti,omap3-l4-core", "simple-bus";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges = <0 0x48000000 0x1000000>;
+>> +
+>> +			scm: scm at 2000 {
+>> +				compatible = "ti,omap3-scm", "simple-bus";
+>> +				reg = <0x2000 0x2000>;
+>> +				#address-cells = <1>;
+>> +				#size-cells = <1>;
+>> +				ranges = <0 0x2000 0x2000>;
+>> +
+>> +				omap3_pmx_core: pinmux at 30 {
+>> +					compatible = "ti,omap3-padconf",
+>> +						     "pinctrl-single";
+>> +					reg = <0x30 0x230>;
+>> +					#address-cells = <1>;
+>> +					#size-cells = <0>;
+>> +					#interrupt-cells = <1>;
+>> +					interrupt-controller;
+>> +					pinctrl-single,register-width = <16>;
+>> +					pinctrl-single,function-mask = <0xff1f>;
+>> +				};
+>
+> Just noticed we may be now missing few pins as diffing the dmesg before
+> and after this series produces this on omap3:
+>
+> -pinctrl-single 48002030.pinmux: 284 pins at pa fa002030 size 568
+> +pinctrl-single 48002030.pinmux: 280 pins at pa fa002030 size 560
+>
+> Care to check that?
 
-Hi Joerg,
+True, there is a typo in the omap3.dtsi file. Will fix this and repost.
 
-> On Fri, Mar 27, 2015 at 05:19:46PM +0000, Will Deacon wrote:
-> > Please can you pull the following IOMMU changes for 4.1? They move the
-> > per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
-> > IOMMUs such as the ARM SMMU to support different page sizes within a
-> > given SoC.
-> 
-> I have some concerns about the direction taken with this patch-set. The
-> goal for the IOMMU-API is still to have domains that can be attached to
-> arbitrary devices (even when mappings already exist). But with this
-> patch-set we move into a direction where a domain can only be used on
-> IOMMUs that support the page-sizes required by the domain. In the end
-> this would be visible to the user of the IOMMU-API, which is not what we
-> want.
-
-But isn't this restriction already the case in practice? For example, if
-I have a domain with some mapping already configured, then that mapping
-will be using some fixed set of page sizes. Attaching a device behind
-another IOMMU that doesn't support that page size would effectively require
-the domain page tables to be freed and re-allocated from scratch.
-
-So I don't think this patch series leaves us any worse off that we currently
-are already.
-
-Ths plus points of the patches are that:
-
-  - We can support different page sizes per domain (the ARM SMMU hardware
-    really does support this and it would be nice to exploit that to gain
-    better TLB utilisation)
-
-  - We can support systems containing IOMMUs that don't support a common
-    page size (I believe the arm64 Juno platform has this feature)
-
-  - I don't have to manipulate a const data structure (iommu_ops) at runtime
-    whenever I find a new IOMMU with a different set of supported page
-    sizes.
-
-> I can understand the motivation behind these patches, but we need to
-> think about how this could work with the desired semantics of the
-> IOMMU-API.
-
-Do we have any code using this feature of the IOMMU API? I don't think it's
-realistic in the general case to allow arbitrary devices to be attached to a
-domain unless the domain can also span multiple IOMMUs. In that case, we'd
-actually need multiple sets of page tables, potentially described using
-different formats...
-
-Will
+-Tero
