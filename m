@@ -1,44 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Mar 2015 10:16:03 +0100
-Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
-In-Reply-To: <1427793034.2969.17.camel@pengutronix.de>
-References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
- <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
- <1427793034.2969.17.camel@pengutronix.de>
-Message-ID: <20150331091603.GQ24899@n2100.arm.linux.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Tue, 31 Mar 2015 11:26:03 +0200
+Subject: [PATCH] ARM: fix exynos randconfig build error
+In-Reply-To: <20150330213742.GO24899@n2100.arm.linux.org.uk>
+References: <E1YQa78-0000O0-A4@rmk-PC.arm.linux.org.uk>
+ <14257250.yOR9pFcIkO@amdc1032> <20150330213742.GO24899@n2100.arm.linux.org.uk>
+Message-ID: <9274849.uVSoggUUTC@amdc1032>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 11:10:34AM +0200, Philipp Zabel wrote:
-> This fails to build for me on 4.0-rc6:
-> make[2]: *** No rule to make target 'sound/core/snd-pcm-iec958.o', needed by 'sound/core/snd-pcm.o'.  Stop.
-> scripts/Makefile.build:403: recipe for target 'sound/core' failed
 
-Yes, I originally had this as a separate module, but decided it was silly,
-so put it in the main snd-pcm module instead.
+Hi,
 
-Naturally, it builds for me because the target object exists in my build
-tree from the first way...
+On Monday, March 30, 2015 10:37:42 PM Russell King - ARM Linux wrote:
+> On Tue, Mar 03, 2015 at 01:44:34PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Tuesday, March 03, 2015 04:40:02 AM Kukjin Kim wrote:
+> > > On 02/27/15 06:30, Kukjin Kim wrote:
+> > > > On 02/25/15 20:46, Krzysztof Kozlowski wrote:
+> > > >> 2015-02-25 12:26 GMT+01:00 Russell King <rmk+kernel@arm.linux.org.uk>:
+> > > >>> The following error was observed with SMP=n in v4.0-rc1:
+> > > >>>
+> > > >>> arch/arm/mach-exynos/pm.c: In function 'exynos_cpu0_enter_aftr':
+> > > >>> arch/arm/mach-exynos/pm.c:246:4: error: implicit declaration of function 'arch_send_wakeup_ipi_mask' [-Werror=implicit-function-declaration]
+> > > >>>
+> > > >>> As the code unconditionally calls a function only available with SMP=y,
+> > > >>> make the Exynos PM support depend on SMP.
+> > > >>>
+> > > >>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > >>
+> > > >> Hi,
+> > > >>
+> > > >> Thanks for the patch but this already waits for Kukjin top be picked
+> > > >> up. The first patch was similar to yours (adds dependency on SMP),
+> > > >> sent on 4th of February:
+> > > >> https://patchwork.ozlabs.org/patch/436231/
+> > > >>
+> > > >> But later Bartlomiej fixed this in other way (allowing to use cpuidle
+> > > >> on non-SMP):
+> > > >> https://patchwork.ozlabs.org/patch/436445/
+> > > >>
+> > > >> Unfortunately none of them were picked up.
+> > > >>
+> > > > I've missed the fix, sorry.
+> > > > 
+> > > > BTW, as you know, all of exynos SoCs are based on SMP so generally (in
+> > > > normal case) there is no reason to use non-SMP on exynos
+> > > > platforms...even though I understand the build error should be fixed...
+> > > > 
+> > > > Anyway, I'll have a look Bart's patch and Russell's fix in this weekend.
+> > > > 
+> > > 
+> > > Firstly, let me take rmk's patch for the randconfig build error...BTW
+> > 
+> > What is wrong with picking my patch instead?  It is non-invasive and fixes
+> > cpuidle support on UP (which is a regression from previous kernels)?
+> > 
+> > https://lkml.org/lkml/2015/2/4/521
+> > 
+> > > I'm still wondering exynos stuff needs to support non-SMP and need to
+> > > think more about its usefulness?...
+> > 
+> > Currently UP is supported and at least I find it useful for testing/debug
+> > purposes.  If you want to to make Exynos SMP only thats OK but it should
+> > be done globally for Exynos arch support not just for cpuidle support.
+> 
+> Has either of these happened yet?  I don't see either in arm-soc.
+> 
+> (lkml.org seems to be - as seems typical - having problems.  The above
+> URL now returns a blank message.)
 
-> --- a/sound/core/Makefile
-> +++ b/sound/core/Makefile
-> @@ -14,12 +14,11 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
->                 pcm_memory.o memalloc.o
->  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
->  snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
-> -snd-pcm-$(CONFIG_SND_PCM_IEC958) += snd-pcm-iec958.o
-> +snd-pcm-$(CONFIG_SND_PCM_IEC958) += pcm_iec958.o
->  
->  # for trace-points
->  CFLAGS_pcm_lib.o := -I$(src)
->  
-> -snd-pcm-iec958-objs := pcm_iec958.o
->  snd-pcm-dmaengine-objs := pcm_dmaengine.o
->  
->  snd-rawmidi-objs  := rawmidi.o
+My fix has been in Kukjin's tree (and thus linux-next) for the last two weeks:
+http://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/commit/?h=v4.0-samsung-fixes-2&id=cfdda3535f87e752780ca18a57d13db58f6a6913
 
-Yep, that's obviously what I wanted - good catch, thanks!
+Unfortunately it seems that Samsung fixes branch has not been pushed to
+arm-soc tree yet.
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
