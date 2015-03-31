@@ -1,68 +1,156 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 31 Mar 2015 14:46:43 -0400 (EDT)
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <20150331163459.GU24899@n2100.arm.linux.org.uk>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz> <20150330132617.GI24899@n2100.arm.linux.org.uk>
- <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
- <551959F1.4030704@suse.cz>
- <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
- <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
- <20150331161026.GA17480@e103592.cambridge.arm.com>
- <20150331163459.GU24899@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.11.1503311443360.25806@knanqh.ubzr>
+From: fabf@skynet.be (Fabian Frederick)
+Date: Tue, 31 Mar 2015 20:50:42 +0200
+Subject: [PATCH V2 linux-next] clk: constify of_device_id array
+Message-ID: <1427827843-30823-1-git-send-email-fabf@skynet.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Mar 2015, Russell King - ARM Linux wrote:
+of_device_id is always used as const.
+(See driver.of_match_table and open firmware functions)
 
-> On Tue, Mar 31, 2015 at 05:27:22PM +0100, Dave Martin wrote:
-> > On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
-> > > I'm using -ffunction-sections as well for the kernel size reduction work 
-> > > I'm currently doing.  The linker script has to be adapted so .text.* is 
-> > > specified along .text otherwise those functions end up appended at the 
-> > > end of the binary.
-> > 
-> > Interesting ... do you also mean using --gc-sections at link time?
-> > We'd need to avoid pruning needed code that has no explicit caller,
-> > and functions that are part of the kernel/module ABI but not used
-> > within vmlinux.
-> > 
-> > The GCC docs suggest that -ffunction-sections may impact performance
-> > and/or increase code size, but I don't know by how much.  Maybe it
-> > interferes with inling.
-> 
-> I've mentioned these options over the course of the last couple of
-> months.  David Woodhouse replied in February, so it's worth reading
-> up on that work.
+__initdata updated to __initconst for
+static const struct of_device_id ti_clkdm_match_table[]
 
-Yup, I did.
+Signed-off-by: Fabian Frederick <fabf@skynet.be>
+---
+V2:
+add __initdata -> __initconst in changelog
 
-> David Woodhouse wrote:
-> | In many kernel configurations there are actually quite a lot of
-> | functions that are never called, and I was quite surprised the first
-> | time I played with this stuff.
-> | 
-> | There are a few ways of dealing with it. One is to use
-> | -ffunction-section -fdata-sections --gc-sections as you noted. I once
-> | also played with using GCC's --combine during the brief period that it
-> | was supported and not *entirely* broken, with similar effects:
-> | https://lwn.net/Articles/197097/
-> | 
-> | These days, the better answer is probably LTO. We could potentially
-> | still look at --gc-sections, but I suspect we're better off using LTO
-> | and just filing toolchain bugs until everything that --gc-sections
-> | *would* have dropped is also dropped from the LTO build :)
-> | 
-> | Unless --gc-sections actually speeds up the build in a significant way;
-> | a full LTO link of the kernel takes insane amounts of memory IIRC.
+ drivers/clk/clk-palmas.c                 | 2 +-
+ drivers/clk/st/clkgen-fsyn.c             | 2 +-
+ drivers/clk/st/clkgen-mux.c              | 8 ++++----
+ drivers/clk/st/clkgen-pll.c              | 4 ++--
+ drivers/clk/ti/clk-dra7-atl.c            | 2 +-
+ drivers/clk/ti/clockdomain.c             | 2 +-
+ drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
+ 7 files changed, 11 insertions(+), 11 deletions(-)
 
-LTO indirectly achieve the same effect (and more), however it is 
-frigging heavy and unwieldy for kernel builds.  And it has many subtle 
-issues of its own that --gc-sections doesn't have.  I'm therefore 
-looking at both in parallel.
-
-
-Nicolas
+diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
+index 8d45992..45a535a 100644
+--- a/drivers/clk/clk-palmas.c
++++ b/drivers/clk/clk-palmas.c
+@@ -161,7 +161,7 @@ static struct palmas_clks_of_match_data palmas_of_clk32kgaudio = {
+ 	},
+ };
+ 
+-static struct of_device_id palmas_clks_of_match[] = {
++static const struct of_device_id palmas_clks_of_match[] = {
+ 	{
+ 		.compatible = "ti,palmas-clk32kg",
+ 		.data = &palmas_of_clk32kg,
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index af94ed8..a917c4c 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -1057,7 +1057,7 @@ static struct clk * __init st_clk_register_quadfs_fsynth(
+ 	return clk;
+ }
+ 
+-static struct of_device_id quadfs_of_match[] = {
++static const struct of_device_id quadfs_of_match[] = {
+ 	{
+ 		.compatible = "st,stih416-quadfs216",
+ 		.data = &st_fs216c65_416
+diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
+index 9a15ec3..fdcff10 100644
+--- a/drivers/clk/st/clkgen-mux.c
++++ b/drivers/clk/st/clkgen-mux.c
+@@ -341,7 +341,7 @@ static struct clkgena_divmux_data st_divmux_c32odf3 = {
+ 	.fb_start_bit_idx = 24,
+ };
+ 
+-static struct of_device_id clkgena_divmux_of_match[] = {
++static const struct of_device_id clkgena_divmux_of_match[] = {
+ 	{
+ 		.compatible = "st,clkgena-divmux-c65-hs",
+ 		.data = &st_divmux_c65hs,
+@@ -479,7 +479,7 @@ static struct clkgena_prediv_data prediv_c32_data = {
+ 	.table = prediv_table16,
+ };
+ 
+-static struct of_device_id clkgena_prediv_of_match[] = {
++static const struct of_device_id clkgena_prediv_of_match[] = {
+ 	{ .compatible = "st,clkgena-prediv-c65", .data = &prediv_c65_data },
+ 	{ .compatible = "st,clkgena-prediv-c32", .data = &prediv_c32_data },
+ 	{}
+@@ -586,7 +586,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
+ 	.width = 2,
+ };
+ 
+-static struct of_device_id mux_of_match[] = {
++static const struct of_device_id mux_of_match[] = {
+ 	{
+ 		.compatible = "st,stih416-clkgenc-vcc-hd",
+ 		.data = &clkgen_mux_c_vcc_hd_416,
+@@ -693,7 +693,7 @@ static struct clkgen_vcc_data st_clkgenf_vcc_416 = {
+ 	.lock = &clkgenf_lock,
+ };
+ 
+-static struct of_device_id vcc_of_match[] = {
++static const struct of_device_id vcc_of_match[] = {
+ 	{ .compatible = "st,stih416-clkgenc", .data = &st_clkgenc_vcc_416 },
+ 	{ .compatible = "st,stih416-clkgenf", .data = &st_clkgenf_vcc_416 },
+ 	{}
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+index 29769d7..d204ba8 100644
+--- a/drivers/clk/st/clkgen-pll.c
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -593,7 +593,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
+ 	return clk;
+ }
+ 
+-static struct of_device_id c32_pll_of_match[] = {
++static const struct of_device_id c32_pll_of_match[] = {
+ 	{
+ 		.compatible = "st,plls-c32-a1x-0",
+ 		.data = &st_pll3200c32_a1x_0,
+@@ -708,7 +708,7 @@ err:
+ }
+ CLK_OF_DECLARE(clkgen_c32_pll, "st,clkgen-plls-c32", clkgen_c32_pll_setup);
+ 
+-static struct of_device_id c32_gpu_pll_of_match[] = {
++static const struct of_device_id c32_gpu_pll_of_match[] = {
+ 	{
+ 		.compatible = "st,stih415-gpu-pll-c32",
+ 		.data = &st_pll1200c32_gpu_415,
+diff --git a/drivers/clk/ti/clk-dra7-atl.c b/drivers/clk/ti/clk-dra7-atl.c
+index 59bb4b3..d86bc46 100644
+--- a/drivers/clk/ti/clk-dra7-atl.c
++++ b/drivers/clk/ti/clk-dra7-atl.c
+@@ -294,7 +294,7 @@ static int of_dra7_atl_clk_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct of_device_id of_dra7_atl_clk_match_tbl[] = {
++static const struct of_device_id of_dra7_atl_clk_match_tbl[] = {
+ 	{ .compatible = "ti,dra7-atl", },
+ 	{},
+ };
+diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+index b4c5fac..35fe108 100644
+--- a/drivers/clk/ti/clockdomain.c
++++ b/drivers/clk/ti/clockdomain.c
+@@ -52,7 +52,7 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
+ 	}
+ }
+ 
+-static struct of_device_id ti_clkdm_match_table[] __initdata = {
++static const struct of_device_id ti_clkdm_match_table[] __initconst = {
+ 	{ .compatible = "ti,clockdomain" },
+ 	{ }
+ };
+diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+index 765f1e0..89c0609 100644
+--- a/drivers/clk/versatile/clk-vexpress-osc.c
++++ b/drivers/clk/versatile/clk-vexpress-osc.c
+@@ -110,7 +110,7 @@ static int vexpress_osc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static struct of_device_id vexpress_osc_of_match[] = {
++static const struct of_device_id vexpress_osc_of_match[] = {
+ 	{ .compatible = "arm,vexpress-osc", },
+ 	{}
+ };
+-- 
+1.9.1
