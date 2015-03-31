@@ -1,34 +1,44 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Tue, 31 Mar 2015 11:29:58 -0400
-Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP
- is clocked.
-In-Reply-To: <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
-References: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
- <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20150331152958.GF9974@htj.duckdns.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 31 Mar 2015 21:00:33 +0530
+Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type constants
+ in dt-bindings/phy/phy.h
+In-Reply-To: <20150331074027.GH9447@x1>
+References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
+ <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
+ <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
+Message-ID: <551ABD99.2000503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 08:35:09AM +0100, Peter Griffin wrote:
-> Currently the ahci_st driver will hang the system on probe, as the
-> st_configure_oob function does some register writes before the IP
-> is clocked. This patch moves the function call to after
-> ahci_platform_enable_resources (which enables the IP clock), and
-> resolves the hang.
-> 
-> Addtionally st_ahci_configure_oob should be called in the st_ahci_resume
-> function, so we also rectify that ensuring it is also called after
-> the IP clock has been enabled.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Maxime,
 
-How should this patch be routed?  Should I pick this up and apply to
-libata/for-4.1 or should it go together with the other patches?  If
-the latter, please feel free to add my acked-by.
+On Tuesday 31 March 2015 01:10 PM, Lee Jones wrote:
+> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+>
+>> Hi Patrice, Maxime,
+>>
+>> On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
+>>> Now there are generic phy type constants declared in phy.h, migrate over to
+>>> using them rather than defining our own. This change has been done as one
+>>> atomic commit to be bisectable.
+>>>
+>>> Note: The values of the defines are the same, so there is no ABI breakage
+>>> with this patch.
+>>>
+>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Are you okay for this patch to go via PHY tree? It modifies arch/arm/boot/dts
+>> /stih416.dtsi.
+>
+> These files need to be changed simultaneously in order to prevent
+> breakage during bisection and the like.  I think the best bet moving
+> forward is to pull this into its own branch, tag it and send Maxime a
+> pull-request to the immutable branch.  It's the best way to minimise
+> merge conflicts during the v4.1 merge window.
 
-Thanks.
+okay. I still need an Ack from Maxime.
 
--- 
-tejun
+Thanks
+Kishon
