@@ -1,58 +1,67 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 31 Mar 2015 12:11:02 +0200
-Subject: [GIT PULL] clockevents for 4.1 #2
-Message-ID: <551A72B6.7030106@linaro.org>
+Date: Tue, 31 Mar 2015 12:12:22 +0200
+Subject: [PATCH 1/5] clocksource/drivers/arm_arch_timer: Rename
+ arch_timer_probed to reflect behaviour
+In-Reply-To: <551A72B6.7030106@linaro.org>
+References: <551A72B6.7030106@linaro.org>
+Message-ID: <1427796746-373-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ingo, Thomas,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-this is the second pull request with the different fixes. The sun5i 
-timer conflict is fixed and the function name for arch arm timer is also 
-fixed. So this second pull request contains the following:
+The arch_timer_probed function returns whether the given time doesn't
+need to be probed. This can be the case when the timer has been probed
+already, but also when it has no corresponding enabled node in DT.
 
-  - Changed the arch_timer_probed function name to 
-arch_timer_needs_probe to reflect better the behavior (Laurent Pinchart)
+Rename the function to arch_timer_needs_probe and invert its return value
+to better reflect the function's purpose and behaviour.
 
-  - Used the freq changes notifiers to fix the rate alteration with the 
-cpufreq driver as this one impacts the sun5i's parent clock (Maxime Ripard)
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-Thanks !
-
-   -- Daniel
-
-The following changes since commit 4806c87f017d8a7003ad34886f58c3b9e023df6a:
-
-   clocksource/drivers/at91: Fix IO endianness (2015-03-31 09:15:58 +0200)
-
-are available in the git repository at:
-
-   http://git.linaro.org/people/daniel.lezcano/linux.git clockevents/4.1
-
-for you to fetch changes up to 639793eb6552f3f5ce7db93e75aff57c1bad7a6b:
-
-   clocksource/drivers/sun5i: Add clock notifiers (2015-03-31 11:50:06 
-+0200)
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-       clocksource/drivers/arm_arch_timer: Rename arch_timer_probed to 
-reflect behaviour
-
-Maxime Ripard (4):
-       clocksource/drivers/sun5i: Switch to request_irq
-       clocksource/drivers/sun5i: Use of_io_request_and_map
-       clocksource/drivers/sun5i: Refactor the current code
-       clocksource/drivers/sun5i: Add clock notifiers
-
-  drivers/clocksource/arm_arch_timer.c |  13 +++++-----
-  drivers/clocksource/timer-sun5i.c    | 302 
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++------------------------------------------------------
-  2 files changed, 238 insertions(+), 77 deletions(-)
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index a3025e7..26acfb5 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -661,17 +661,17 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ };
+ 
+ static bool __init
+-arch_timer_probed(int type, const struct of_device_id *matches)
++arch_timer_needs_probe(int type, const struct of_device_id *matches)
+ {
+ 	struct device_node *dn;
+-	bool probed = true;
++	bool needs_probe = false;
+ 
+ 	dn = of_find_matching_node(NULL, matches);
+ 	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
+-		probed = false;
++		needs_probe = true;
+ 	of_node_put(dn);
+ 
+-	return probed;
++	return needs_probe;
+ }
+ 
+ static void __init arch_timer_common_init(void)
+@@ -680,9 +680,10 @@ static void __init arch_timer_common_init(void)
+ 
+ 	/* Wait until both nodes are probed if we have two timers */
+ 	if ((arch_timers_present & mask) != mask) {
+-		if (!arch_timer_probed(ARCH_MEM_TIMER, arch_timer_mem_of_match))
++		if (arch_timer_needs_probe(ARCH_MEM_TIMER,
++					  arch_timer_mem_of_match))
+ 			return;
+-		if (!arch_timer_probed(ARCH_CP15_TIMER, arch_timer_of_match))
++		if (arch_timer_needs_probe(ARCH_CP15_TIMER, arch_timer_of_match))
+ 			return;
+ 	}
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
