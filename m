@@ -1,121 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 31 Mar 2015 17:05:30 +0100
-Subject: [PATCH 01/25] arm: Use bool function return values of
- true/false not 1/0
-In-Reply-To: <551AC424.9010802@redhat.com>
-References: <cover.1427759009.git.joe@perches.com>
- <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
- <551AC424.9010802@redhat.com>
-Message-ID: <20150331170530.0479b9ab@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 Mar 2015 17:07:01 +0100
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150331142440.GD22683@8bytes.org>
+References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
+Message-ID: <551AC625.6000200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Mar 2015 16:58:28 +0100
-Paolo Bonzini <pbonzini@redhat.com> wrote:
+Hi Joerg,
 
-> On 31/03/2015 01:45, Joe Perches wrote:
-> > Use the normal return values for bool functions
-> > 
-> > Signed-off-by: Joe Perches <joe@perches.com>
-> > ---
-> >  arch/arm/include/asm/dma-mapping.h |  8 ++++----
-> >  arch/arm/include/asm/kvm_emulate.h |  2 +-
-> >  arch/arm/mach-omap2/powerdomain.c  | 14 +++++++-------
-> >  3 files changed, 12 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> > index b52101d..166e1e1 100644
-> > --- a/arch/arm/include/asm/dma-mapping.h
-> > +++ b/arch/arm/include/asm/dma-mapping.h
-> > @@ -151,18 +151,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-> >  	u64 limit, mask;
-> >  
-> >  	if (!dev->dma_mask)
-> > -		return 0;
-> > +		return false;
-> >  
-> >  	mask = *dev->dma_mask;
-> >  
-> >  	limit = (mask + 1) & ~mask;
-> >  	if (limit && size > limit)
-> > -		return 0;
-> > +		return false;
-> >  
-> >  	if ((addr | (addr + size - 1)) & ~mask)
-> > -		return 0;
-> > +		return false;
-> >  
-> > -	return 1;
-> > +	return true;
-> >  }
-> >  
-> >  static inline void dma_mark_clean(void *addr, size_t size) { }
-> > diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> > index a9c80a2..ad200a0 100644
-> > --- a/arch/arm/include/asm/kvm_emulate.h
-> > +++ b/arch/arm/include/asm/kvm_emulate.h
-> > @@ -51,7 +51,7 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
-> >  
-> >  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
-> >  {
-> > -	return 1;
-> > +	return true;
-> >  }
-> >  
-> >  static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
-> > diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> > index 78af6d8..897f9fb 100644
-> > --- a/arch/arm/mach-omap2/powerdomain.c
-> > +++ b/arch/arm/mach-omap2/powerdomain.c
-> > @@ -950,7 +950,7 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
-> >   */
-> >  bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
-> >  {
-> > -	return (pwrdm && pwrdm->flags & PWRDM_HAS_HDWR_SAR) ? 1 : 0;
-> > +	return pwrdm && (pwrdm->flags & PWRDM_HAS_HDWR_SAR);
-> >  }
-> >  
-> >  int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
-> > @@ -1185,24 +1185,24 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
-> >  	if (!pwrdm) {
-> >  		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
-> >  			 __func__);
-> > -		return 1;
-> > +		return true;
-> >  	}
-> >  
-> >  	if (pwrdm->pwrsts & PWRSTS_OFF)
-> > -		return 1;
-> > +		return true;
-> >  
-> >  	if (pwrdm->pwrsts & PWRSTS_RET) {
-> >  		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
-> > -			return 1;
-> > +			return true;
-> >  
-> >  		for (i = 0; i < pwrdm->banks; i++)
-> >  			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
-> > -				return 1;
-> > +				return true;
-> >  	}
-> >  
-> >  	for (i = 0; i < pwrdm->banks; i++)
-> >  		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
-> > -			return 1;
-> > +			return true;
-> >  
-> > -	return 0;
-> > +	return false;
-> >  }
-> > 
-> 
-> Marc/Christoffer, please pick this up yourself.
+On 31/03/15 15:24, Joerg Roedel wrote:
+> Hi Will,
+>
+> On Fri, Mar 27, 2015 at 05:19:46PM +0000, Will Deacon wrote:
+>> Please can you pull the following IOMMU changes for 4.1? They move the
+>> per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
+>> IOMMUs such as the ARM SMMU to support different page sizes within a
+>> given SoC.
+>
+> I have some concerns about the direction taken with this patch-set. The
+> goal for the IOMMU-API is still to have domains that can be attached to
+> arbitrary devices (even when mappings already exist). But with this
+> patch-set we move into a direction where a domain can only be used on
+> IOMMUs that support the page-sizes required by the domain. In the end
+> this would be visible to the user of the IOMMU-API, which is not what we
+> want.
 
-Given that it touches a range of completely unrelated files, for the
-KVM part:
+I think the notion of sharing domains between arbitrary devices is 
+already broken for systems with multiple IOMMU devices - with the 
+iommu_domain itself now embedded in a private data structure, it's 
+certainly not safe to pass it to two different drivers, should the 
+client devices be behind heterogeneous IOMMUs. Furthermore, since most 
+of those private data structures contain instance-specific data, that 
+prevents a domain spanning even two homogeneous IOMMU devices.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+If the goal is for iommu_domains to be a hardware-independent 
+abstraction, then shouldn't we be looking to move the other 
+instance-specific features like attributes and geometry out of them? 
+Perhaps the answer is the opposite; accept the existing iommu_domain as 
+what it appears to be used as - a fairly thin abstraction of one or more 
+context banks/uTLBs/DMARs/whatever on a single IOMMU device - and 
+consider some higher-level interface for grouping one or more of these 
+"device domains" together and sharing a single IOVA space between them.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+
+Robin.
+
+> I can understand the motivation behind these patches, but we need to
+> think about how this could work with the desired semantics of the
+> IOMMU-API.
+>
+>
+> 	Joerg
+>
