@@ -1,26 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 31 Mar 2015 16:52:16 -0400 (EDT)
-Subject: [PATCH v2 0/8] net/macb: fixes after big driver update
-In-Reply-To: <1427806926-18887-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1427806926-18887-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150331.165216.1751909468171592817.davem@davemloft.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 31 Mar 2015 14:02:04 -0700
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <551976F1.1000605@collabora.co.uk> (Javier Martinez Canillas's
+ message of "Mon, 30 Mar 2015 18:16:49 +0200")
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk>
+Message-ID: <7hiodg98z7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Tue, 31 Mar 2015 15:01:58 +0200
+Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
 
-> The recent modifications to the macb driver lead to issues with the probe
-> function code flow. Here are some attempt to fix them.
-> This time, some more issues are fixed related to the clock as reported by Boris
-> Brezillon.
-> 
-> The series is written on top of net-next.
-> 
-> Changes in v2:
-> - address Cyrille comment about exit condition of queue configuration loop
-> - add fixes for probe sequence related to clocks
-> - add ethtool register dump
-> - fix peripheral version test
+[...]
 
-Series applied, thanks.
+> Unfortunately I don't fully understand why this clock needs to be
+> enabled. It would be good if someone at Samsung can explain in more
+> detail what the real problem really is.
+
++1
+
+Maybe Abhilash can shed some light here?
+
+We really should know *why* this is needed because having the fix in the
+clock driver just doesn't seem right.  It seems like the DMA driver
+should be managing this clock.
+
+Kevin
