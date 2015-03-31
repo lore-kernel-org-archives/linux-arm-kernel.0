@@ -1,64 +1,68 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 31 Mar 2015 21:42:53 +0300
-Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
-In-Reply-To: <551AC160.8060202@ti.com>
-References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
- <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
- <201503281633.02801.marex@denx.de>
- <20150331113448.GN12479@tarshish> <551ABCBE.3030005@ti.com>
- <20150331154119.GO12479@tarshish> <551AC160.8060202@ti.com>
-Message-ID: <20150331184253.GR12479@tarshish>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 31 Mar 2015 14:46:43 -0400 (EDT)
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <20150331163459.GU24899@n2100.arm.linux.org.uk>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+ <551943CB.3010303@suse.cz> <20150330132617.GI24899@n2100.arm.linux.org.uk>
+ <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+ <551959F1.4030704@suse.cz>
+ <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
+ <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
+ <20150331161026.GA17480@e103592.cambridge.arm.com>
+ <20150331163459.GU24899@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.11.1503311443360.25806@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Tue, 31 Mar 2015, Russell King - ARM Linux wrote:
 
-On Tue, Mar 31, 2015 at 09:16:40PM +0530, Kishon Vijay Abraham I wrote:
-> On Tuesday 31 March 2015 09:11 PM, Baruch Siach wrote:
-> >On Tue, Mar 31, 2015 at 08:56:54PM +0530, Kishon Vijay Abraham I wrote:
-> >>On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
-> >>>On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
-> >>>>On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
-> >>>>>Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
-> >>>>>Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
-> >>>>>usb2 host.
-> >>>>>
-> >>>>>The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
-> >>>>>different enough to merit its own driver. Also, this driver uses the
-> >>>>>generic phy infrastructure.
-> >>>>
-> >>>>the register set looks very similar to MXS one indeed. How is it different
-> >>>>please ?
-> >>>
-> >>>Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
-> >>>defined in the Digicolor one. Some have different meaning, and some are
-> >>>reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
-> >>>range. Also, the Digicolor phy does not have anatop registers.
-> >>
-> >>I think we should try adding support for this in the same driver.
-> >
-> >The only code that can actually be shared between the driver is the two lines
-> >usb_phy .on_connect callback routine. The init sequence that takes most of the
-> >digicolor driver is totally different. Using a single driver for both PHYs
-> >does not make much sense, IMHO.
-> >
-> >Besides, phy-mxs-usb.c uses the deprecated usb_phy framework. So we first need
-> >to port this driver to the generic phy framework.
+> On Tue, Mar 31, 2015 at 05:27:22PM +0100, Dave Martin wrote:
+> > On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
+> > > I'm using -ffunction-sections as well for the kernel size reduction work 
+> > > I'm currently doing.  The linker script has to be adapted so .text.* is 
+> > > specified along .text otherwise those functions end up appended at the 
+> > > end of the binary.
+> > 
+> > Interesting ... do you also mean using --gc-sections at link time?
+> > We'd need to avoid pruning needed code that has no explicit caller,
+> > and functions that are part of the kernel/module ABI but not used
+> > within vmlinux.
+> > 
+> > The GCC docs suggest that -ffunction-sections may impact performance
+> > and/or increase code size, but I don't know by how much.  Maybe it
+> > interferes with inling.
 > 
-> Doesn't your driver also use the usb_phy framework?
+> I've mentioned these options over the course of the last couple of
+> months.  David Woodhouse replied in February, so it's worth reading
+> up on that work.
 
-My driver uses usb_phy only for the .notify_connect/.notify_disconnect 
-callbacks, since there is no comparable functionality in the generic phy 
-framework. But it doesn't make this driver any more similar to phy-mxs-usb.
+Yup, I did.
 
-My point is that merging the drives would require migrating phy-mxs-usb to 
-generic phy. But this is just an added complication. The main reason I think 
-the drivers should be separate is because they have very little in common, 
-regardless of the framework they are using.
+> David Woodhouse wrote:
+> | In many kernel configurations there are actually quite a lot of
+> | functions that are never called, and I was quite surprised the first
+> | time I played with this stuff.
+> | 
+> | There are a few ways of dealing with it. One is to use
+> | -ffunction-section -fdata-sections --gc-sections as you noted. I once
+> | also played with using GCC's --combine during the brief period that it
+> | was supported and not *entirely* broken, with similar effects:
+> | https://lwn.net/Articles/197097/
+> | 
+> | These days, the better answer is probably LTO. We could potentially
+> | still look at --gc-sections, but I suspect we're better off using LTO
+> | and just filing toolchain bugs until everything that --gc-sections
+> | *would* have dropped is also dropped from the LTO build :)
+> | 
+> | Unless --gc-sections actually speeds up the build in a significant way;
+> | a full LTO link of the kernel takes insane amounts of memory IIRC.
 
-baruch
+LTO indirectly achieve the same effect (and more), however it is 
+frigging heavy and unwieldy for kernel builds.  And it has many subtle 
+issues of its own that --gc-sections doesn't have.  I'm therefore 
+looking at both in parallel.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+
+Nicolas
