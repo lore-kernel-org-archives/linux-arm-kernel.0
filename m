@@ -1,38 +1,134 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 31 Mar 2015 20:56:54 +0530
-Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
-In-Reply-To: <20150331113448.GN12479@tarshish>
-References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
- <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
- <201503281633.02801.marex@denx.de> <20150331113448.GN12479@tarshish>
-Message-ID: <551ABCBE.3030005@ti.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 31 Mar 2015 17:29:18 +0200
+Subject: [PATCH] ARM: BCM5301X: Add DT for Asus RT-AC56U
+Message-ID: <1427815758-7933-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+This patch is based on top of
+ARM: BCM5301X: Add DT for Asus RT-AC68U
+(please follow this order, to avoid Makefile conflict)
+---
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts | 96 +++++++++++++++++++++++++++++
+ 2 files changed, 97 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
 
-On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
-> Hi Marek,
->
-> On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
->> On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
->>> Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
->>> Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
->>> usb2 host.
->>>
->>> The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
->>> different enough to merit its own driver. Also, this driver uses the
->>> generic phy infrastructure.
->>
->> the register set looks very similar to MXS one indeed. How is it different
->> please ?
->
-> Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
-> defined in the Digicolor one. Some have different meaning, and some are
-> reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
-> range. Also, the Digicolor phy does not have anatop registers.
-
-I think we should try adding support for this in the same driver.
-
-Thanks
-Kishon
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7c1ca2a..53f8c1a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b.dtb \
+ 	bcm2835-rpi-b-plus.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
++	bcm4708-asus-rt-ac56u.dtb \
+ 	bcm4708-asus-rt-ac68u.dtb \
+ 	bcm4708-buffalo-wzr-1750dhp.dtb \
+ 	bcm4708-luxul-xwc-1000.dtb \
+diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+new file mode 100644
+index 0000000..71cff8d
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+@@ -0,0 +1,96 @@
++/*
++ * Broadcom BCM470X / BCM5301X ARM platform code.
++ * DTS for Asus RT-AC56U
++ *
++ * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	compatible = "asus,rt-ac56u", "brcm,bcm4708";
++	model = "Asus RT-AC56U (BCM4708)";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		usb3 {
++			label = "bcm53xx:blue:usb3";
++			gpios = <&chipcommon 0 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		wan {
++			label = "bcm53xx:blue:wan";
++			gpios = <&chipcommon 1 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		lan {
++			label = "bcm53xx:blue:lan";
++			gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		power {
++			label = "bcm53xx:blue:power";
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		all {
++			label = "bcm53xx:blue:all";
++			gpios = <&chipcommon 4 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-on";
++		};
++
++		2ghz {
++			label = "bcm53xx:blue:2ghz";
++			gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++
++		usb2 {
++			label = "bcm53xx:blue:usb2";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rfkill {
++			label = "WiFi";
++			linux,code = <KEY_RFKILL>;
++			gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
++		};
++
++		restart {
++			label = "Reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
++		};
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 15 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
+-- 
+1.8.4.5
