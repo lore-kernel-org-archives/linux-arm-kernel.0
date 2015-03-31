@@ -1,46 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 31 Mar 2015 09:47:41 +0100
-Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type
- constants in dt-bindings/phy/phy.h
-In-Reply-To: <20150331080154.GA2029@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
- <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
- <20150331080154.GA2029@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20150331084741.GM9447@x1>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Mar 2015 09:49:57 +0100
+Subject: [patch] spi: pxa2xx: missing break in pxa2xx_ssp_get_clk_div()
+In-Reply-To: <1427712912.14897.441.camel@linux.intel.com>
+References: <20150330103040.GB27144@mwanda>
+ <1427712912.14897.441.camel@linux.intel.com>
+Message-ID: <20150331084957.GJ2869@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Mar 2015, Peter Griffin wrote:
-> On Tue, 31 Mar 2015, Lee Jones wrote:
-> > On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
-> > 
-> > > Hi Patrice, Maxime,
-> > > 
-> > > On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
-> > > >Now there are generic phy type constants declared in phy.h, migrate over to
-> > > >using them rather than defining our own. This change has been done as one
-> > > >atomic commit to be bisectable.
-> > > >
-> > > >Note: The values of the defines are the same, so there is no ABI breakage
-> > > >with this patch.
-> > > >
-> > > >Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > > >Acked-by: Rob Herring <robh@kernel.org>
-> > > >Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Are you okay for this patch to go via PHY tree? It modifies arch/arm/boot/dts
-> > > /stih416.dtsi.
-> > 
-> > These files need to be changed simultaneously in order to prevent
-> > breakage during bisection and the like.
-> 
-> That is why it has been authored as one atomic commit. See commit message above.
+On Mon, Mar 30, 2015 at 01:55:12PM +0300, Andy Shevchenko wrote:
+> On Mon, 2015-03-30 at 13:30 +0300, Dan Carpenter wrote:
 
-I already know you know why you did it.  The comment was for Kishon.
+> > @@ -791,6 +791,7 @@ static unsigned int pxa2xx_ssp_get_clk_div(struct driver_data *drv_data,
+> >  	switch (drv_data->ssp_type) {
+> >  	case QUARK_X1000_SSP:
+> >  		clk_div = quark_x1000_get_clk_div(rate, &chip->dds_rate);
+> > +		break;
+> >  	default:
+> >  		clk_div = ssp_get_clk_div(drv_data, rate);
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> It would be nice to have a break here as well, but I think we also may
+> change this to if-else-if construction.
+
+No.  Using if/else chains is an antipattern - think what happens when a
+new hardware variant needs slightly different handling again.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150331/643da208/attachment.sig>
