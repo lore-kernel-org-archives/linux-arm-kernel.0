@@ -1,49 +1,354 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 31 Mar 2015 17:27:22 +0100
-Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
- drivers/built-in.o
-In-Reply-To: <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
-References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
- <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
- <551943CB.3010303@suse.cz>
- <20150330132617.GI24899@n2100.arm.linux.org.uk>
- <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
- <551959F1.4030704@suse.cz>
- <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
- <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
-Message-ID: <20150331161026.GA17480@e103592.cambridge.arm.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 31 Mar 2015 18:24:54 +0200
+Subject: [PATCH v4 13/15] ARM: dts: Introduce STM32F429 MCU
+In-Reply-To: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1427819096-31109-14-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 11:22:29AM -0400, Nicolas Pitre wrote:
-> On Mon, 30 Mar 2015, Ard Biesheuvel wrote:
-> 
-> > On 30 March 2015 at 16:13, Michal Marek <mmarek@suse.cz> wrote:
+The STMicrolectornics's STM32F419 MCU has the following main features:
+ - Cortex-M4 core running up to @180MHz
+ - 2MB internal flash, 256KBytes internal RAM
+ - FMC controller to connect SDRAM, NOR and NAND memories
+ - SD/MMC/SDIO support
+ - Ethernet controller
+ - USB OTFG FS & HS controllers
+ - I2C, SPI, CAN busses support
+ - Several 16 & 32 bits general purpose timers
+ - Serial Audio interface
+ - LCD controller
 
-[...]
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/stm32f429-disco.dts |  71 +++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi      | 226 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 298 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
 
-> > > What you could do is to add a Kconfig option to arch/arm/Kconfig adding
-> > > -ffunction-sections to the compiler flags. Then allyesconfig would
-> > > select it and work around the problem in a somewhat elegant way.
-> > >
-> > 
-> > Excellent idea! Arnd hasn't chimed in yet, but he is the one doing
-> > lots and lots of randconfig builds and other test builds, so I will
-> > wait for him to confirm that this is a useful thing to have.
-> 
-> I'm using -ffunction-sections as well for the kernel size reduction work 
-> I'm currently doing.  The linker script has to be adapted so .text.* is 
-> specified along .text otherwise those functions end up appended at the 
-> end of the binary.
-
-Interesting ... do you also mean using --gc-sections at link time?
-We'd need to avoid pruning needed code that has no explicit caller,
-and functions that are part of the kernel/module ABI but not used
-within vmlinux.
-
-The GCC docs suggest that -ffunction-sections may impact performance
-and/or increase code size, but I don't know by how much.  Maybe it
-interferes with inling.
-
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..e5dbd03 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -509,6 +509,7 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih416-b2020.dtb \
+ 	stih416-b2020e.dtb \
+ 	stih418-b2199.dtb
++dtb-$(CONFIG_ARCH_STM32)+= stm32f429-disco.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+new file mode 100644
+index 0000000..6b9aa59
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -0,0 +1,71 @@
++/*
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "stm32f429.dtsi"
++
++/ {
++	model = "STMicroelectronics STM32F429i-DISCO board";
++	compatible = "st,stm32f429i-disco", "st,stm32f429";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/ram rdinit=/linuxrc";
++		linux,stdout-path = &usart1;
++	};
++
++	memory {
++		reg = <0x90000000 0x800000>;
++	};
++
++	aliases {
++		serial0 = &usart1;
++	};
++};
++
++&usart1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+new file mode 100644
+index 0000000..39ffdb8
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -0,0 +1,226 @@
++/*
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armv7-m.dtsi"
++
++/ {
++	clocks {
++		clk_sysclk: clk-sysclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_hclk: clk-hclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_pclk1: clk-pclk1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <45000000>;
++		};
++
++		clk_pclk2: clk-pclk2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr1: clk-pmtr1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr2: clk-pmtr2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_systick: clk-systick {
++			compatible = "fixed-factor-clock";
++			clocks = <&clk_hclk>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++		};
++	};
++
++	soc {
++		timer2: timer at 40000000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000000 0x400>;
++			interrupts = <28>;
++			resets = <&rcc 256>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer3: timer at 40000400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000400 0x400>;
++			interrupts = <29>;
++			resets = <&rcc 257>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer4: timer at 40000800 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000800 0x400>;
++			interrupts = <30>;
++			resets = <&rcc 258>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer5: timer at 40000c00 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000c00 0x400>;
++			interrupts = <50>;
++			resets = <&rcc 259>;
++			clocks = <&clk_pmtr1>;
++		};
++
++		timer6: timer at 40001000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001000 0x400>;
++			interrupts = <54>;
++			resets = <&rcc 260>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer7: timer at 40001400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001400 0x400>;
++			interrupts = <55>;
++			resets = <&rcc 261>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		usart2: serial at 40004400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004400 0x400>;
++			interrupts = <38>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart3: serial at 40004800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004800 0x400>;
++			interrupts = <39>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart4: serial at 40004c00 {
++			compatible = "st,stm32-uart";
++			reg = <0x40004c00 0x400>;
++			interrupts = <52>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart5: serial at 40005000 {
++			compatible = "st,stm32-uart";
++			reg = <0x40005000 0x400>;
++			interrupts = <53>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart7: serial at 40007800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007800 0x400>;
++			interrupts = <82>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart8: serial at 40007c00 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007c00 0x400>;
++			interrupts = <83>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart1: serial at 40011000 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011000 0x400>;
++			interrupts = <37>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++
++		usart6: serial at 40011400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011400 0x400>;
++			interrupts = <71>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++
++		rcc: rcc at 40023810 {
++			#reset-cells = <1>;
++			compatible = "st,stm32-rcc";
++			reg = <0x40023800 0x400>;
++		};
++	};
++};
++
++&systick {
++	clocks = <&clk_systick>;
++	status = "okay";
++};
+-- 
+1.9.1
