@@ -1,60 +1,22 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 31 Mar 2015 08:35:09 +0100
-Subject: [PATCH 3/3] ahci: st: st_configure_oob must be called after IP is
- clocked.
-In-Reply-To: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
-References: <1427787309-1601-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1427787309-1601-4-git-send-email-peter.griffin@linaro.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 31 Mar 2015 09:39:30 +0200
+Subject: [alsa-devel] [PATCH] ASoC: atmel-pcm-dma: increase
+ buffer_bytes_max
+In-Reply-To: <1427744437-14610-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1427744437-14610-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <551A4F32.10608@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ahci_st driver will hang the system on probe, as the
-st_configure_oob function does some register writes before the IP
-is clocked. This patch moves the function call to after
-ahci_platform_enable_resources (which enables the IP clock), and
-resolves the hang.
+On 03/30/2015 09:40 PM, Alexandre Belloni wrote:
+> atmel-pcm-dma is not limited to a buffer size of 64kB like atmel-pcm-pdc.
+> Increase buffer_bytes_max to 512kB to allow for higher bit rates (i.e. 32bps at
+> 192kHz) to work correctly. By default, keep the prealloc at 64kB.
 
-Addtionally st_ahci_configure_oob should be called in the st_ahci_resume
-function, so we also rectify that ensuring it is also called after
-the IP clock has been enabled.
+Patch per se looks good. But can you test if it works to just throw 
+atmel_pcm_dma_hardware away completely and rely on the dmaengine PCM driver 
+getting the capabilities directly from the DMA driver. Since the DMA driver 
+now reports its capabilities I think it should work, and if it does that's 
+the preferred solution.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
----
- drivers/ata/ahci_st.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/ata/ahci_st.c b/drivers/ata/ahci_st.c
-index bc971af..ea0ff00 100644
---- a/drivers/ata/ahci_st.c
-+++ b/drivers/ata/ahci_st.c
-@@ -68,8 +68,6 @@ static int st_ahci_deassert_resets(struct device *dev)
- 		}
- 	}
- 
--	st_ahci_configure_oob(drv_data->hpriv->mmio);
--
- 	if (drv_data->sw_rst) {
- 		err = reset_control_deassert(drv_data->sw_rst);
- 		if (err) {
-@@ -172,6 +170,8 @@ static int st_ahci_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
- 
-+	st_ahci_configure_oob(drv_data->hpriv->mmio);
-+
- 	err = ahci_platform_init_host(pdev, hpriv, &st_ahci_port_info,
- 				      &ahci_platform_sht);
- 	if (err) {
-@@ -222,6 +222,8 @@ static int st_ahci_resume(struct device *dev)
- 		return err;
- 	}
- 
-+	st_ahci_configure_oob(drv_data->hpriv->mmio);
-+
- 	return ahci_platform_resume_host(dev);
- }
- #endif
--- 
-1.9.1
+- Lars
