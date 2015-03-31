@@ -1,44 +1,65 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 31 Mar 2015 14:34:48 +0300
-Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
-In-Reply-To: <201503281633.02801.marex@denx.de>
-References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
- <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
- <201503281633.02801.marex@denx.de>
-Message-ID: <20150331113448.GN12479@tarshish>
+From: afaerber@suse.de (=?UTF-8?B?QW5kcmVhcyBGw6RyYmVy?=)
+Date: Tue, 31 Mar 2015 13:42:32 +0200
+Subject: [RFT PATCHv2] drm/exynos: Enable DP clock to fix display on
+ Exynos5250 and other
+In-Reply-To: <5515ADB6.6050204@collabora.co.uk>
+References: <1427472488-21454-1-git-send-email-k.kozlowski@samsung.com>
+ <5515ADB6.6050204@collabora.co.uk>
+Message-ID: <551A8828.70108@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
-> On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
-> > Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
-> > Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
-> > usb2 host.
-> > 
-> > The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
-> > different enough to merit its own driver. Also, this driver uses the
-> > generic phy infrastructure.
+Am 27.03.2015 um 20:21 schrieb Javier Martinez Canillas:
+> Hello Krzysztof,
 > 
-> the register set looks very similar to MXS one indeed. How is it different 
-> please ?
+> On 03/27/2015 05:08 PM, Krzysztof Kozlowski wrote:
+>> After adding display power domain for Exynos5250 in commit
+>> 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250") the
+>> display on Chromebook Snow and others stopped working after boot.
+>>
+>> The reason for this suggested Andrzej Hajda: the DP clock was disabled.
+>> This clock is required by Display Port and is enabled by bootloader.
+>> However when FIMD driver probing was deferred, the display power domain
+>> was turned off. This effectively reset the value of DP clock enable
+>> register.
+>>
+>> When exynos-dp is later probed, the clock is not enabled and display is
+>> not properly configured:
+>>
+>> exynos-dp 145b0000.dp-controller: Timeout of video streamclk ok
+>> exynos-dp 145b0000.dp-controller: unable to config video
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Reported-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>> Fixes: 2d2c9a8d0a4f ("ARM: dts: add display power domain for exynos5250")
+>> Cc: <stable@vger.kernel.org>
+>>
+>> ---
+>>
+>> This should fix issue reported by Javier [1][2].
+>>
+> 
+> I tested this patch and does indeed solves both issues I reported
+> The exynos-dp probe deferral does not make the display to not be
+> working and also disabling and enabling the display with:
+> 
+> with /sys/devices/platform/exynos-drm/graphics/fb0/blank works.
+> 
+> Thanks a lot for fixing this issue.
+> 
+> On an Exynos5250 Snow Chromebook:
+> 
+> Tested-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 
-Almost of the bits that are defined in the MXS USBPHY_CTRL register are not 
-defined in the Digicolor one. Some have different meaning, and some are 
-reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13 
-range. Also, the Digicolor phy does not have anatop registers.
+Seems to fix Spring Chromebook as well,
 
-> The driver looks OK.
+Tested-by: Andreas F?rber <afaerber@suse.de>
 
-Thanks.
+Thanks a lot,
 
-BTW, do you know why the phy-mxs-usb driver calls its init from 
-postcore_initcall? Is there a special need to register the driver so early?
-
-baruch
+Andreas
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Jennifer Guild, Dilip Upmanyu,
+Graham Norton; HRB 21284 (AG N?rnberg)
