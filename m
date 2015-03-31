@@ -1,138 +1,83 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 31 Mar 2015 18:24:45 +0200
-Subject: [PATCH v4 04/15] clocksource/drivers: Add ARM System timer driver
+Date: Tue, 31 Mar 2015 18:24:43 +0200
+Subject: [PATCH v4 02/15] ARM: ARMv7-M: Enlarge vector table up to 256 entries
 In-Reply-To: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1427819096-31109-5-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1427819096-31109-3-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clocksource support for ARMv7-M's System timer,
-also known as SysTick.
+>From Cortex-M reference manuals, the nvic supports up to 240 interrupts.
+So the number of entries in vectors table is up to 256.
 
+This patch adds a new config flag to specify the number of external interrupts.
+Some ifdeferies are added in order to respect the natural alignment without
+wasting too much space on smaller systems.
+
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Acked-by: Stefan Agner <stefan@agner.ch>
 Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- drivers/clocksource/Kconfig          |  7 ++++
- drivers/clocksource/Makefile         |  1 +
- drivers/clocksource/armv7m_systick.c | 79 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 87 insertions(+)
- create mode 100644 drivers/clocksource/armv7m_systick.c
+ arch/arm/kernel/entry-v7m.S | 13 +++++++++----
+ arch/arm/mm/Kconfig         | 15 +++++++++++++++
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 1c2506f..b82e58b 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -134,6 +134,13 @@ config CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	help
- 	 Use ARM global timer clock source as sched_clock
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index 8944f49..b6c8bb9 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -117,9 +117,14 @@ ENTRY(__switch_to)
+ ENDPROC(__switch_to)
  
-+config ARMV7M_SYSTICK
-+	bool
-+	select CLKSRC_OF if OF
-+	select CLKSRC_MMIO
+ 	.data
+-	.align	8
++#if CONFIG_CPU_V7M_NUM_IRQ <= 112
++	.align	9
++#else
++	.align	10
++#endif
++
+ /*
+- * Vector table (64 words => 256 bytes natural alignment)
++ * Vector table (Natural alignment need to be ensured)
+  */
+ ENTRY(vector_table)
+ 	.long	0			@ 0 - Reset stack pointer
+@@ -138,6 +143,6 @@ ENTRY(vector_table)
+ 	.long	__invalid_entry		@ 13 - Reserved
+ 	.long	__pendsv_entry		@ 14 - PendSV
+ 	.long	__invalid_entry		@ 15 - SysTick
+-	.rept	64 - 16
+-	.long	__irq_entry		@ 16..64 - External Interrupts
++	.rept	CONFIG_CPU_V7M_NUM_IRQ
++	.long	__irq_entry		@ External Interrupts
+ 	.endr
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 9b4f29e..aec53b4 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -604,6 +604,21 @@ config CPU_USE_DOMAINS
+ 	  This option enables or disables the use of domain switching
+ 	  via the set_fs() function.
+ 
++config CPU_V7M_NUM_IRQ
++	int "Number of external interrupts connected to the NVIC"
++	depends on CPU_V7M
++	default 90 if ARCH_STM32
++	default 38 if ARCH_EFM32
++	default 240
 +	help
-+	  This options enables support for the ARMv7M system timer unit
++	  This option indicates the number of interrupts connected to the NVIC.
++	  The value can be larger than the real number of interrupts supported
++	  by the system, but must not be lower.
++	  The default value is 240, corresponding to the maximum number of
++	  interrupts supported by the NVIC on Cortex-M family.
 +
- config ATMEL_PIT
- 	select CLKSRC_OF if OF
- 	def_bool SOC_AT91SAM9 || SOC_SAMA5
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 752d5c7..1c9a643 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
-+obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
- obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
- obj-$(CONFIG_ARCH_KEYSTONE)		+= timer-keystone.o
-diff --git a/drivers/clocksource/armv7m_systick.c b/drivers/clocksource/armv7m_systick.c
-new file mode 100644
-index 0000000..addfd2c
---- /dev/null
-+++ b/drivers/clocksource/armv7m_systick.c
-@@ -0,0 +1,79 @@
-+/*
-+ * Copyright (C) Maxime Coquelin 2015
-+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
++	  If unsure, keep default value.
 +
-+#include <linux/kernel.h>
-+#include <linux/clocksource.h>
-+#include <linux/clockchips.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/clk.h>
-+#include <linux/bitops.h>
-+
-+#define SYST_CSR	0x00
-+#define SYST_RVR	0x04
-+#define SYST_CVR	0x08
-+#define SYST_CALIB	0x0c
-+
-+#define SYST_CSR_ENABLE BIT(0)
-+
-+#define SYSTICK_LOAD_RELOAD_MASK 0x00FFFFFF
-+
-+static void __init system_timer_of_register(struct device_node *np)
-+{
-+	struct clk *clk = NULL;
-+	void __iomem *base;
-+	u32 rate;
-+	int ret;
-+
-+	base = of_iomap(np, 0);
-+	if (!base) {
-+		pr_warn("system-timer: invalid base address\n");
-+		return;
-+	}
-+
-+	ret = of_property_read_u32(np, "clock-frequency", &rate);
-+	if (ret) {
-+		clk = of_clk_get(np, 0);
-+		if (IS_ERR(clk))
-+			goto out_unmap;
-+
-+		ret = clk_prepare_enable(clk);
-+		if (ret)
-+			goto out_clk_put;
-+
-+		rate = clk_get_rate(clk);
-+		if (!rate)
-+			goto out_clk_disable;
-+	}
-+
-+	writel_relaxed(SYSTICK_LOAD_RELOAD_MASK, base + SYST_RVR);
-+	writel_relaxed(SYST_CSR_ENABLE, base + SYST_CSR);
-+
-+	ret = clocksource_mmio_init(base + SYST_CVR, "arm_system_timer", rate,
-+			200, 24, clocksource_mmio_readl_down);
-+	if (ret) {
-+		pr_err("failed to init clocksource (%d)\n", ret);
-+		if (clk)
-+			goto out_clk_disable;
-+		else
-+			goto out_unmap;
-+	}
-+
-+	pr_info("ARM System timer initialized as clocksource\n");
-+
-+	return;
-+
-+out_clk_disable:
-+	clk_disable_unprepare(clk);
-+out_clk_put:
-+	clk_put(clk);
-+out_unmap:
-+	iounmap(base);
-+	pr_warn("ARM System timer register failed (%d)\n", ret);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(arm_systick, "arm,armv7m-systick",
-+			system_timer_of_register);
+ #
+ # CPU supports 36-bit I/O
+ #
 -- 
 1.9.1
