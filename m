@@ -1,215 +1,211 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:16 +0300
-Subject: [PATCHv6 23/34] ARM: OMAP2+: control: add syscon support for register
- accesses
+Date: Tue, 31 Mar 2015 22:14:19 +0300
+Subject: [PATCHv6 26/34] ARM: dts: am33xx: add minimal l4 bus layout with
+ control module support
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-24-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-27-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Control module driver needs to support syscon for register accesses, as
-the DT hierarchy for control module driver is going to be changed. All
-the control module related features will be moved under control module
-node, including clocks, pinctrl, and generic configuration register
-access. Temporary iomap is still provided very early in the boot for
-access while syscon is not yet ready.
+This patch creates an l4_wkup interconnect for AM33xx, and moves some of
+the generic peripherals under it. System control module nodes are moved
+under this new interconnect also, and the SCM clock layout is changed
+to use the renamed SCM node as the clock provider.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |  104 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 87 insertions(+), 17 deletions(-)
+ Documentation/devicetree/bindings/arm/omap/l4.txt  |    1 +
+ .../devicetree/bindings/arm/omap/prcm.txt          |    2 +-
+ arch/arm/boot/dts/am33xx-clocks.dtsi               |    2 +-
+ arch/arm/boot/dts/am33xx.dtsi                      |   87 +++++++++++---------
+ arch/arm/mach-omap2/control.c                      |    2 +-
+ 5 files changed, 51 insertions(+), 43 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
+index 6402022..d333f0a 100644
+--- a/Documentation/devicetree/bindings/arm/omap/l4.txt
++++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
+@@ -6,6 +6,7 @@ Required properties:
+ - compatible : Should be "ti,omap2-l4" for OMAP2 family l4 core bus
+ 	       Should be "ti,omap2-l4-wkup" for OMAP2 family l4 wkup bus
+ 	       Should be "ti,omap3-l4-core" for OMAP3 family l4 core bus
++	       Should be "ti,am3-l4-wkup" for AM33xx family l4 wkup bus
+ - ranges : contains the IO map range for the bus
+ 
+ Examples:
+diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+index ef5a74b..c8e2027 100644
+--- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
++++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+@@ -10,7 +10,7 @@ documentation about the individual clock/clockdomain nodes.
+ Required properties:
+ - compatible:	Must be one of:
+ 		"ti,am3-prcm"
+-		"ti,am3-scrm"
++		"ti,am3-scm"
+ 		"ti,am4-prcm"
+ 		"ti,am4-scrm"
+ 		"ti,omap2-prcm"
+diff --git a/arch/arm/boot/dts/am33xx-clocks.dtsi b/arch/arm/boot/dts/am33xx-clocks.dtsi
+index 712edce..236c78a 100644
+--- a/arch/arm/boot/dts/am33xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am33xx-clocks.dtsi
+@@ -7,7 +7,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-&scrm_clocks {
++&scm_clocks {
+ 	sys_clkin_ck: sys_clkin_ck {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,mux-clock";
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index acd3705..21fcc44 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -83,20 +83,6 @@
+ 		};
+ 	};
+ 
+-	am33xx_control_module: control_module at 4a002000 {
+-		compatible = "syscon";
+-		reg = <0x44e10000 0x7fc>;
+-	};
+-
+-	am33xx_pinmux: pinmux at 44e10800 {
+-		compatible = "pinctrl-single";
+-		reg = <0x44e10800 0x0238>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		pinctrl-single,register-width = <32>;
+-		pinctrl-single,function-mask = <0x7f>;
+-	};
+-
+ 	/*
+ 	 * XXX: Use a flat representation of the AM33XX interconnect.
+ 	 * The real AM33XX interconnect network is quite complex. Since
+@@ -111,37 +97,58 @@
+ 		ranges;
+ 		ti,hwmods = "l3_main";
+ 
+-		prcm: prcm at 44e00000 {
+-			compatible = "ti,am3-prcm";
+-			reg = <0x44e00000 0x4000>;
+-
+-			prcm_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
++		l4_wkup: l4_wkup at 44c00000 {
++			compatible = "ti,am3-l4-wkup", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x44c00000 0x280000>;
+ 
+-			prcm_clockdomains: clockdomains {
+-			};
+-		};
++			prcm: prcm at 200000 {
++				compatible = "ti,am3-prcm";
++				reg = <0x200000 0x4000>;
+ 
+-		scrm: scrm at 44e10000 {
+-			compatible = "ti,am3-scrm";
+-			reg = <0x44e10000 0x2000>;
++				prcm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
+ 
+-			scrm_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
++				prcm_clockdomains: clockdomains {
++				};
+ 			};
+ 
+-			scrm_clockdomains: clockdomains {
++			scm: scm at 210000 {
++				compatible = "ti,am3-scm", "simple-bus";
++				reg = <0x210000 0x2000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x210000 0x2000>;
++
++				am33xx_pinmux: pinmux at 800 {
++					compatible = "pinctrl-single";
++					reg = <0x800 0x238>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					pinctrl-single,register-width = <32>;
++					pinctrl-single,function-mask = <0x7f>;
++				};
++
++				scm_conf: scm_conf at 0 {
++					compatible = "syscon";
++					reg = <0x0 0x800>;
++					#address-cells = <1>;
++					#size-cells = <1>;
++
++					scm_clocks: clocks {
++						#address-cells = <1>;
++						#size-cells = <0>;
++					};
++				};
++
++				scm_clockdomains: clockdomains {
++				};
+ 			};
+ 		};
+ 
+-		cm: syscon at 44e10000 {
+-			compatible = "ti,am33xx-controlmodule", "syscon";
+-			reg = <0x44e10000 0x800>;
+-		};
+-
+ 		intc: interrupt-controller at 48200000 {
+ 			compatible = "ti,am33xx-intc";
+ 			interrupt-controller;
+@@ -350,7 +357,7 @@
+ 			reg = <0x481cc000 0x2000>;
+ 			clocks = <&dcan0_fck>;
+ 			clock-names = "fck";
+-			syscon-raminit = <&am33xx_control_module 0x644 0>;
++			syscon-raminit = <&scm_conf 0x644 0>;
+ 			interrupts = <52>;
+ 			status = "disabled";
+ 		};
+@@ -361,7 +368,7 @@
+ 			reg = <0x481d0000 0x2000>;
+ 			clocks = <&dcan1_fck>;
+ 			clock-names = "fck";
+-			syscon-raminit = <&am33xx_control_module 0x644 1>;
++			syscon-raminit = <&scm_conf 0x644 1>;
+ 			interrupts = <55>;
+ 			status = "disabled";
+ 		};
+@@ -720,7 +727,7 @@
+ 			 */
+ 			interrupts = <40 41 42 43>;
+ 			ranges;
+-			syscon = <&cm>;
++			syscon = <&scm_conf>;
+ 			status = "disabled";
+ 
+ 			davinci_mdio: mdio at 4a101000 {
 diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 202fc72..4970c5c 100644
+index 30f5aff..477e2c8 100644
 --- a/arch/arm/mach-omap2/control.c
 +++ b/arch/arm/mach-omap2/control.c
-@@ -15,6 +15,8 @@
- #include <linux/kernel.h>
- #include <linux/io.h>
- #include <linux/of_address.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
- 
- #include "soc.h"
- #include "iomap.h"
-@@ -33,7 +35,9 @@
- #define PADCONF_SAVE_DONE		0x1
- 
- static void __iomem *omap2_ctrl_base;
-+static s16 omap2_ctrl_offset;
- static void __iomem *omap4_ctrl_pad_base;
-+static struct regmap *omap2_ctrl_syscon;
- 
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
- struct omap3_scratchpad {
-@@ -135,7 +139,6 @@ struct omap3_control_regs {
- static struct omap3_control_regs control_context;
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
- 
--#define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
- #define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
- 
- void __init omap2_set_globals_control(void __iomem *ctrl,
-@@ -147,32 +150,72 @@ void __init omap2_set_globals_control(void __iomem *ctrl,
- 
- u8 omap_ctrl_readb(u16 offset)
- {
--	return readb_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+	u8 byte_offset = offset & 0x3;
-+
-+	val = omap_ctrl_readl(offset);
-+
-+	return (val >> (byte_offset * 8)) & 0xff;
- }
- 
- u16 omap_ctrl_readw(u16 offset)
- {
--	return readw_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+	u16 byte_offset = offset & 0x2;
-+
-+	val = omap_ctrl_readl(offset);
-+
-+	return (val >> (byte_offset * 8)) & 0xffff;
- }
- 
- u32 omap_ctrl_readl(u16 offset)
- {
--	return readl_relaxed(OMAP_CTRL_REGADDR(offset));
-+	u32 val;
-+
-+	offset &= 0xfffc;
-+	if (!omap2_ctrl_syscon)
-+		val = readl_relaxed(omap2_ctrl_base + offset);
-+	else
-+		regmap_read(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
-+			    &val);
-+
-+	return val;
- }
- 
- void omap_ctrl_writeb(u8 val, u16 offset)
- {
--	writeb_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	u32 tmp;
-+	u8 byte_offset = offset & 0x3;
-+
-+	tmp = omap_ctrl_readl(offset);
-+
-+	tmp &= 0xffffffff ^ (0xff << (byte_offset * 8));
-+	tmp |= val << (byte_offset * 8);
-+
-+	omap_ctrl_writel(tmp, offset);
- }
- 
- void omap_ctrl_writew(u16 val, u16 offset)
- {
--	writew_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	u32 tmp;
-+	u8 byte_offset = offset & 0x2;
-+
-+	tmp = omap_ctrl_readl(offset);
-+
-+	tmp &= 0xffffffff ^ (0xffff << (byte_offset * 8));
-+	tmp |= val << (byte_offset * 8);
-+
-+	omap_ctrl_writel(tmp, offset);
- }
- 
- void omap_ctrl_writel(u32 val, u16 offset)
- {
--	writel_relaxed(val, OMAP_CTRL_REGADDR(offset));
-+	offset &= 0xfffc;
-+	if (!omap2_ctrl_syscon)
-+		writel_relaxed(val, omap2_ctrl_base + offset);
-+	else
-+		regmap_write(omap2_ctrl_syscon, omap2_ctrl_offset + offset,
-+			     val);
- }
- 
- /*
-@@ -611,7 +654,7 @@ void __init omap3_ctrl_init(void)
- 
- struct control_init_data {
- 	int index;
--	void __iomem *mem;
-+	s16 offset;
+@@ -667,7 +667,7 @@ static const struct control_init_data omap2_ctrl_data = {
  };
  
- static struct control_init_data ctrl_data = {
-@@ -639,17 +682,15 @@ int __init omap2_control_base_init(void)
- 	struct device_node *np;
- 	const struct of_device_id *match;
- 	struct control_init_data *data;
--	void __iomem *mem;
- 
- 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
- 		data = (struct control_init_data *)match->data;
- 
--		mem = of_iomap(np, 0);
--		if (!mem)
-+		omap2_ctrl_base = of_iomap(np, 0);
-+		if (!omap2_ctrl_base)
- 			return -ENOMEM;
- 
--		omap2_ctrl_base = mem;
--		data->mem = mem;
-+		omap2_ctrl_offset = data->offset;
- 	}
- 
- 	return 0;
-@@ -663,17 +704,46 @@ int __init omap2_control_base_init(void)
-  */
- int __init omap_control_init(void)
- {
--	struct device_node *np;
-+	struct device_node *np, *scm_conf;
- 	const struct of_device_id *match;
- 	const struct omap_prcm_init_data *data;
- 	int ret;
-+	struct regmap *syscon;
- 
- 	for_each_matching_node_and_match(np, omap_scrm_dt_match_table, &match) {
- 		data = match->data;
- 
--		ret = omap2_clk_provider_init(np, data->index, NULL, data->mem);
--		if (ret)
--			return ret;
-+		/*
-+		 * Check if we have scm_conf node, if yes, use this to
-+		 * access clock registers.
-+		 */
-+		scm_conf = of_get_child_by_name(np, "scm_conf");
-+
-+		if (scm_conf) {
-+			syscon = syscon_node_to_regmap(scm_conf);
-+
-+			if (IS_ERR(syscon))
-+				return PTR_ERR(syscon);
-+
-+			omap2_ctrl_syscon = syscon;
-+
-+			if (of_get_child_by_name(scm_conf, "clocks")) {
-+				ret = omap2_clk_provider_init(scm_conf,
-+							      data->index,
-+							      syscon, NULL);
-+				if (ret)
-+					return ret;
-+			}
-+
-+			iounmap(omap2_ctrl_base);
-+			omap2_ctrl_base = NULL;
-+		} else {
-+			/* No scm_conf found, direct access */
-+			ret = omap2_clk_provider_init(np, data->index, NULL,
-+						      omap2_ctrl_base);
-+			if (ret)
-+				return ret;
-+		}
- 	}
- 
- 	return 0;
+ static const struct of_device_id omap_scrm_dt_match_table[] = {
+-	{ .compatible = "ti,am3-scrm", .data = &ctrl_data },
++	{ .compatible = "ti,am3-scm", .data = &ctrl_data },
+ 	{ .compatible = "ti,am4-scrm", .data = &ctrl_data },
+ 	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
+ 	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
 -- 
 1.7.9.5
