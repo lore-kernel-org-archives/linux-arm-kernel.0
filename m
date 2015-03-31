@@ -1,65 +1,88 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Tue, 31 Mar 2015 11:11:44 +0200
-Subject: [PATCH v2 3/5] PCI: st: Provide support for the sti PCIe
- controller
-In-Reply-To: <1426674930.2649.50.camel@tiscali.nl>
-References: <1426515635-9466-1-git-send-email-gabriel.fernandez@linaro.org>
- <1426515635-9466-4-git-send-email-gabriel.fernandez@linaro.org>
- <1426518695.26437.55.camel@x220> <55093C12.7070004@st.com>
- <1426674930.2649.50.camel@tiscali.nl>
-Message-ID: <CAG374jCjTVBwiNrWoo=X9hUSb-etzn8G-XSXGO_nNYhiL_9k_A@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 31 Mar 2015 11:12:51 +0200
+Subject: [PATCH RFC 08/11] sound/core: add DRM ELD helper
+In-Reply-To: <E1YcfY5-0002vT-5K@rmk-PC.arm.linux.org.uk>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+ <E1YcfY5-0002vT-5K@rmk-PC.arm.linux.org.uk>
+Message-ID: <1427793171.2969.19.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Am Montag, den 30.03.2015, 20:40 +0100 schrieb Russell King:
+> Add a helper for the EDID like data structure, which is typically passed
+> from a HDMI adapter to its associated audio driver.  This informs the
+> audio driver of the capabilities of the attached HDMI sink.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  include/sound/pcm_drm_eld.h |  6 +++
+>  sound/core/Kconfig          |  3 ++
+>  sound/core/Makefile         |  1 +
+>  sound/core/pcm_drm_eld.c    | 91 +++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 101 insertions(+)
+>  create mode 100644 include/sound/pcm_drm_eld.h
+>  create mode 100644 sound/core/pcm_drm_eld.c
+> 
+> diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
+> new file mode 100644
+> index 000000000000..93357b25d2e2
+> --- /dev/null
+> +++ b/include/sound/pcm_drm_eld.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __SOUND_PCM_DRM_ELD_H
+> +#define __SOUND_PCM_DRM_ELD_H
+> +
+> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld);
+> +
+> +#endif
+> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+> index 313f22e9d929..b534c8a6046b 100644
+> --- a/sound/core/Kconfig
+> +++ b/sound/core/Kconfig
+> @@ -6,6 +6,9 @@ config SND_PCM
+>  	tristate
+>  	select SND_TIMER
+>  
+> +config SND_PCM_ELD
+> +	bool
+> +
+>  config SND_DMAENGINE_PCM
+>  	tristate
+>  
+> diff --git a/sound/core/Makefile b/sound/core/Makefile
+> index 4daf2f58261c..591b49157b4d 100644
+> --- a/sound/core/Makefile
+> +++ b/sound/core/Makefile
+> @@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
+>  snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+>  		pcm_memory.o memalloc.o
+>  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+> +snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+>  
+>  # for trace-points
+>  CFLAGS_pcm_lib.o := -I$(src)
+> diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
+> new file mode 100644
+> index 000000000000..78d551a1b05f
+> --- /dev/null
+> +++ b/sound/core/pcm_drm_eld.c
+> @@ -0,0 +1,91 @@
+> +/*
+> + *  PCM DRM helpers
+> + *
+> + *   This program is free software; you can redistribute it and/or modify
+> + *   it under the terms of the GNU General Public License as published by
+> + *   the Free Software Foundation; either version 2 of the License.
+> + */
 
-pci-st.c driver could be modular with modification of pcie-designware
-core driver. But as Fabrice said  it should be another patchset.
+Should this say:
 
-What do you prefer ?
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 
-drop all the module related macros as mentioned by Paul ?
-or
-keep macros like other vendors do ?
+?
 
-Thanks
+Same for patch 9.
 
-Gabriel
-
-On 18 March 2015 at 11:35, Paul Bolle <pebolle@tiscali.nl> wrote:
-> Hi Fabrice,
->
-> Fabrice Gasnier schreef op wo 18-03-2015 om 09:49 [+0100]:
->> On 03/16/2015 04:11 PM, Paul Bolle wrote:
->> >> +config PCI_ST
->> >> +  bool "ST PCIe controller"
->> > You add a bool Kconfig symbol. A week or two ago I saw some patches fly
->> > by that - I think - allowed PCIe controllers to be built modular.
->>
->> Thanks for your review.
->>
->> Are you talking about "PCI: Export symbols of PCI functions" patch, that
->> is part of a series
->> named "pci: iproc: Add Broadcom iProc PCIe support" ?
->
-> Yes, that is the series I was thinking about. (I made you search lkml,
-> and that was a bit rude. But you found the patch anyhow.)
->
->> This controller doesn't look like to be based on pcie-designware core
->> driver.
->> Other vendors that are using "pcie-designware" core driver are also make
->> it bool.
->> The current core driver doesn't support module loading/unloading as I
->> see it.
->> If this is required, I also think this should be part of another patchset.
->>
->> What do you think ?
->
-> I wouldn't know whether your driver might work as a loadable module, but
-> other people reading this surely will. But if it can't work as a module
-> you should drop all the module related macros etc. I spotted. Because
-> then they serve no purpose.
->
->
-> Paul Bolle
->
+regards
+Philipp
