@@ -1,63 +1,111 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 31 Mar 2015 17:55:42 +0200
-Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type constants
- in dt-bindings/phy/phy.h
-In-Reply-To: <551ABD99.2000503@ti.com>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
- <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
- <551ABD99.2000503@ti.com>
-Message-ID: <551AC37E.70503@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 Mar 2015 08:54:26 -0700
+Subject: [PATCH 01/25] arm: Use bool function return values of true/false
+ not 1/0
+In-Reply-To: <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
+References: <cover.1427759009.git.joe@perches.com>
+ <912ed0ebae3c6a16f58b1452d5ce9226681bc8df.1427759009.git.joe@perches.com>
+Message-ID: <20150331155426.GP10805@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+* Joe Perches <joe@perches.com> [150330 16:47]:
+> Use the normal return values for bool functions
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-On 03/31/2015 05:30 PM, Kishon Vijay Abraham I wrote:
-> Maxime,
->
-> On Tuesday 31 March 2015 01:10 PM, Lee Jones wrote:
->> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
->>
->>> Hi Patrice, Maxime,
->>>
->>> On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
->>>> Now there are generic phy type constants declared in phy.h, migrate 
->>>> over to
->>>> using them rather than defining our own. This change has been done 
->>>> as one
->>>> atomic commit to be bisectable.
->>>>
->>>> Note: The values of the defines are the same, so there is no ABI 
->>>> breakage
->>>> with this patch.
->>>>
->>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>>> Acked-by: Rob Herring <robh@kernel.org>
->>>> Acked-by: Lee Jones <lee.jones@linaro.org>
->>>
->>> Are you okay for this patch to go via PHY tree? It modifies 
->>> arch/arm/boot/dts
->>> /stih416.dtsi.
->>
->> These files need to be changed simultaneously in order to prevent
->> breakage during bisection and the like.  I think the best bet moving
->> forward is to pull this into its own branch, tag it and send Maxime a
->> pull-request to the immutable branch.  It's the best way to minimise
->> merge conflicts during the v4.1 merge window.
->
-> okay. I still need an Ack from Maxime.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-You have my Ack.
-
-I haven't sent a pull request for STi DT files for v4.1 now, and it is 
-too late to send one.
-So creating an immutable tag is not even needed in my opinion, you can 
-just take the DT patch.
-
-Thanks,
-Maxime
-
->
-> Thanks
-> Kishon
+> ---
+>  arch/arm/include/asm/dma-mapping.h |  8 ++++----
+>  arch/arm/include/asm/kvm_emulate.h |  2 +-
+>  arch/arm/mach-omap2/powerdomain.c  | 14 +++++++-------
+>  3 files changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index b52101d..166e1e1 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -151,18 +151,18 @@ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+>  	u64 limit, mask;
+>  
+>  	if (!dev->dma_mask)
+> -		return 0;
+> +		return false;
+>  
+>  	mask = *dev->dma_mask;
+>  
+>  	limit = (mask + 1) & ~mask;
+>  	if (limit && size > limit)
+> -		return 0;
+> +		return false;
+>  
+>  	if ((addr | (addr + size - 1)) & ~mask)
+> -		return 0;
+> +		return false;
+>  
+> -	return 1;
+> +	return true;
+>  }
+>  
+>  static inline void dma_mark_clean(void *addr, size_t size) { }
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index a9c80a2..ad200a0 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -51,7 +51,7 @@ static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+>  
+>  static inline bool vcpu_mode_is_32bit(struct kvm_vcpu *vcpu)
+>  {
+> -	return 1;
+> +	return true;
+>  }
+>  
+>  static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+> index 78af6d8..897f9fb 100644
+> --- a/arch/arm/mach-omap2/powerdomain.c
+> +++ b/arch/arm/mach-omap2/powerdomain.c
+> @@ -950,7 +950,7 @@ int pwrdm_disable_hdwr_sar(struct powerdomain *pwrdm)
+>   */
+>  bool pwrdm_has_hdwr_sar(struct powerdomain *pwrdm)
+>  {
+> -	return (pwrdm && pwrdm->flags & PWRDM_HAS_HDWR_SAR) ? 1 : 0;
+> +	return pwrdm && (pwrdm->flags & PWRDM_HAS_HDWR_SAR);
+>  }
+>  
+>  int pwrdm_state_switch_nolock(struct powerdomain *pwrdm)
+> @@ -1185,24 +1185,24 @@ bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm)
+>  	if (!pwrdm) {
+>  		pr_debug("powerdomain: %s: invalid powerdomain pointer\n",
+>  			 __func__);
+> -		return 1;
+> +		return true;
+>  	}
+>  
+>  	if (pwrdm->pwrsts & PWRSTS_OFF)
+> -		return 1;
+> +		return true;
+>  
+>  	if (pwrdm->pwrsts & PWRSTS_RET) {
+>  		if (pwrdm->pwrsts_logic_ret & PWRSTS_OFF)
+> -			return 1;
+> +			return true;
+>  
+>  		for (i = 0; i < pwrdm->banks; i++)
+>  			if (pwrdm->pwrsts_mem_ret[i] & PWRSTS_OFF)
+> -				return 1;
+> +				return true;
+>  	}
+>  
+>  	for (i = 0; i < pwrdm->banks; i++)
+>  		if (pwrdm->pwrsts_mem_on[i] & PWRSTS_OFF)
+> -			return 1;
+> +			return true;
+>  
+> -	return 0;
+> +	return false;
+>  }
+> -- 
+> 2.1.2
+> 
