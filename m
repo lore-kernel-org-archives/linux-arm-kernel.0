@@ -1,16 +1,40 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 31 Mar 2015 15:33:44 +0200
-Subject: [PATCH 00/16 v2] iommu: Move domain allocation into drivers
-In-Reply-To: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-References: <1427373799-18662-1-git-send-email-joro@8bytes.org>
-Message-ID: <20150331133344.GA22683@8bytes.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 31 Mar 2015 15:34:51 +0200
+Subject: [RESEND PATCH] MAINTAINERS: change the Atmel audio alsa driver entry
+Message-ID: <1427808891-9321-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 01:43:03PM +0100, Joerg Roedel wrote:
-> Changes v1-v2:
-> 
-> 	* Rebased to v4.0-rc5
-> 	* Converted domain-types to a bit-field
+I take over the the maintainship of Atmel alsa drivers from Voice.
+Thanks for your work!
 
-Applied this series to the core branch.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Bo Shen <voice.shen@atmel.com>
+Cc: Mark Brown <broonie@kernel.org>
+---
+Hi Mark,
+
+Here is the MAINTAINERS' change that I sent to the wrong address. Can you
+please take it with your tree?
+
+Thanks, bye.
+
+
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 6cb40f8736ee..a915bb124fe7 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1762,7 +1762,7 @@ S:	Supported
+ F:	drivers/tty/serial/atmel_serial.c
+ 
+ ATMEL Audio ALSA driver
+-M:	Bo Shen <voice.shen@atmel.com>
++M:	Nicolas Ferre <nicolas.ferre@atmel.com>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+ S:	Supported
+ F:	sound/soc/atmel
+-- 
+2.1.3
