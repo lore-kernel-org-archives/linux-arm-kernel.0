@@ -1,55 +1,62 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Tue, 31 Mar 2015 01:36:19 +0000
-Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from
- ARM defconfigs
-In-Reply-To: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
-References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
- <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87k2xy6ja0.wl%kuninori.morimoto.gx@renesas.com>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Mon, 30 Mar 2015 18:40:13 -0700
+Subject: [RFC PATCH v3 1/2] clk: samsung: Add a clock lookup function
+In-Reply-To: <55197508.5030501@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
+ <55197508.5030501@collabora.co.uk>
+Message-ID: <20150331014013.25195.26862@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Quoting Javier Martinez Canillas (2015-03-30 09:08:40)
+> Hello Tomasz,
+> 
+> On 03/30/2015 06:02 PM, Tomasz Figa wrote:
+> > Hi Javier,
+> > 
+> > 2015-03-31 0:53 GMT+09:00 Javier Martinez Canillas
+> > <javier.martinez@collabora.co.uk>:
+> >> The Samsung helpers functions to register clocks, add the clock instance
+> >> returned by the common clock framework to a lookup table that is used by
+> >> OF to lookup the clocks.
+> >>
+> >> But this table could also be useful to clock drivers if they need to get
+> >> a clock instance since the helper functions don't return them.
+> >>
+> >> The common clock framework __clk_lookup() function from the clk provider
+> >> API could be used by drivers as well. But it's more efficient to use the
+> >> Samsung specific lookup table that returns the clock instance in constant
+> >> time, than using the __clk_lookup() function that uses the clock name as
+> >> an index so it has a linear search time.
+> > 
+> > Is this really something we should be concerned about? If so, maybe
+> > the generic look-up function should be rewritten to use something
+> > faster, such as tree or hash table?
+> >
+> 
+> I don't performance is a big issue here. I just thought that since the
+> lookup table is already filled by the driver and the lookup function
+> is one line, we could use that instead to get the performance benefit.
+> 
+> But I don't mind to drop this patch and use the generic lookup function
+> from the CCF API if that is preferred.
 
-Hi Olof, Kevin, Arnd, Simon
+Hello,
 
-ping ?
+I am not a fan of __clk_lookup and I don't like to see it used more and
+more outside of drivers/clk/clk.c. You mentioned that performance wasn't
+really the problem here.  The real method for a driver to get a clock is
+with clk_get(). Any reason to not use that?
 
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Regards,
+Mike
+
+>  
+> > Best regards,
+> > Tomasz
+> >
 > 
-> Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
-> Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
-> And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
-> But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
-> not a general purpose DMAC (2nd DMAC is for Device to Device inside
-> sound system). Additionally, current DMAEngine can't support Device to
-> Device, and we don't have correct DT bindings for it at this point.
-> So the easiest solution for it is that move it from DMAEngine to rsnd
-> driver.
-> Audio DMAC peri peri DMAEngine is no longer needed.
-> Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
-> 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 06075b6..e805984 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -505,7 +505,6 @@ CONFIG_DW_DMAC=y
->  CONFIG_MV_XOR=y
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_SH_DMAE=y
-> -CONFIG_RCAR_AUDMAC_PP=m
->  CONFIG_RCAR_DMAC=y
->  CONFIG_STE_DMA40=y
->  CONFIG_SIRF_DMA=y
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Best regards,
+> Javier
