@@ -1,188 +1,107 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue, 31 Mar 2015 16:08:03 +0100
-Subject: [PATCH v2 05/10] KVM: arm: introduce kvm_arch_setup/clear_debug()
-In-Reply-To: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
+Date: Tue, 31 Mar 2015 16:07:58 +0100
+Subject: [PATCH v2 00/10] KVM Guest Debug support for arm64
+Message-ID: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a precursor for later patches which will need to do more to
-setup debug state before entering the hyp.S switch code. The existing
-functionality for setting mdcr_el2 has been moved out of hyp.S and now
-uses the value kept in vcpu->arch.mdcr_el2.
+Hi,
 
-This also moves the conditional setting of the TDA bit from the hyp code
-into the C code.
+Here is V2 of the KVM Guest Debug support for arm64. Although there
+has been an increase in the total number of patches the implementation
+is both simpler and more complete.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Gone are most of the changes that touch hyp.S replaced with C based
+hooks kvm_arch_setup/clear_debug() that manipulate the VCPU context
+before entering hyp.S. As a result I dropped the re-factoring patch
+for simplicity.
 
+The API has been simplified to pass the syndrome information directly
+back to user-space and leaving it to figure out what each exception
+is.
+
+The ioctl and handle_exit code have been re-factored and simplified.
+The handle_exit code in particular is all done with one handler which
+aside from watchpoints is supplying pretty much the same information
+for every exception.
+
+The HW debugging support has been improved by handling guest access to
+the debug register while debugging is happening.
+
+As a result a bunch of the review comments are no longer relevant as
+they applied to code that no longer exists. All the rest have been
+addressed as of this patch series.
+
+There are a few checkpatch violations for white space. Some in
+existing code (asm-offsets) and a couple in the handle_exit code where
+adding a whole extra tab seemed excessive.
+
+GIT Repos:
+
+The patches for this series are based off v4.0-rc6 and can be found
+at:
+
+https://git.linaro.org/people/alex.bennee/linux.git
+branch: guest-debug/4.0-rc6-v2
+
+You can find the QEMU code that goes with this patch series at:
+
+https://github.com/stsquad/qemu
+branch: kvm/guest-debug-v2
+
+Patch breakdown:
+
+The first 2 patches are simple clean-ups to rationalise some of the
+commentary and #defines.
+
+The next 2 introduce the API and implement the stub ioctl handler
+which is built up in later patches.
+
+The kvm_arch_setup/clear_debug() patch is a functional replacement for
+the previous manipulations of mdcr_el2 in hyp.S but making the value
+part of the VCPU context.
+
+The next 3 patches implement the various guest debug features.
+
+The penultimate patch could be merged with the one before but I kept
+it split apart for ease of review.
+
+The final patch may get dropped before up-streaming but it does
+provide useful trace points for anyone who want to track what is
+happening during guest debug.
+
+Alex Benn?e (10):
+  KVM: add commentary for kvm_debug_exit_arch struct
+  KVM: define common __KVM_GUESTDBG_USE_SW/HW_BP values
+  KVM: arm: guest debug, define API headers
+  KVM: arm: guest debug, add stub KVM_SET_GUEST_DEBUG ioctl
+  KVM: arm: introduce kvm_arch_setup/clear_debug()
+  KVM: arm64: guest debug, add SW break point support
+  KVM: arm64: guest debug, add support for single-step
+  KVM: arm64: guest debug, HW assisted debug support
+  KVM: arm64: trap nested debug register access
+  KVM: arm64: add trace points for guest_debug debug
+
+ Documentation/virtual/kvm/api.txt      |  10 +-
+ arch/arm/include/asm/kvm_host.h        |   2 +
+ arch/arm/kvm/arm.c                     |  51 ++++++-
+ arch/arm64/include/asm/hw_breakpoint.h |  12 ++
+ arch/arm64/include/asm/kvm_host.h      |  19 ++-
+ arch/arm64/include/uapi/asm/kvm.h      |  22 +++
+ arch/arm64/kernel/asm-offsets.c        |   1 +
+ arch/arm64/kernel/hw_breakpoint.c      |  12 --
+ arch/arm64/kvm/Makefile                |   2 +-
+ arch/arm64/kvm/debug.c                 | 249 +++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/handle_exit.c           |  43 ++++++
+ arch/arm64/kvm/hyp.S                   |  13 +-
+ arch/arm64/kvm/reset.c                 |   6 +
+ arch/arm64/kvm/sys_regs.c              |  55 ++++++++
+ arch/arm64/kvm/trace.h                 |  66 +++++++++
+ arch/powerpc/include/uapi/asm/kvm.h    |   4 +-
+ arch/x86/include/uapi/asm/kvm.h        |   4 +-
+ include/uapi/linux/kvm.h               |  17 ++-
+ 18 files changed, 553 insertions(+), 35 deletions(-)
  create mode 100644 arch/arm64/kvm/debug.c
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 41008cd..8c01c97 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -242,5 +242,7 @@ static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-+static inline void kvm_arch_setup_debug(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arch_clear_debug(struct kvm_vcpu *vcpu) {}
- 
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 445933d..7ea8b0e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -523,6 +523,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		kvm_vgic_flush_hwstate(vcpu);
- 		kvm_timer_flush_hwstate(vcpu);
-+		kvm_arch_setup_debug(vcpu);
- 
- 		local_irq_disable();
- 
-@@ -569,6 +570,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * Back from guest
- 		 *************************************************************/
- 
-+		kvm_arch_clear_debug(vcpu);
- 		kvm_timer_sync_hwstate(vcpu);
- 		kvm_vgic_sync_hwstate(vcpu);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 8ac3c70..0631840 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -101,6 +101,7 @@ struct kvm_vcpu_arch {
- 
- 	/* HYP configuration */
- 	u64 hcr_el2;
-+	u32 mdcr_el2;
- 
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
-@@ -257,4 +258,7 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- 
-+void kvm_arch_setup_debug(struct kvm_vcpu *vcpu);
-+void kvm_arch_clear_debug(struct kvm_vcpu *vcpu);
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index f7fa65d..cd06209 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -122,6 +122,7 @@ int main(void)
-   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
-   DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
-   DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-+  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
-   DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-   DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 4e6e09e..6796d4a 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -17,7 +17,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
- 
- kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
--kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
- kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic-v2.o
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-new file mode 100644
-index 0000000..8a29d0b
---- /dev/null
-+++ b/arch/arm64/kvm/debug.c
-@@ -0,0 +1,58 @@
-+/*
-+ * Debug and Guest Debug support
-+ *
-+ * Copyright (C) 2015 - Linaro Ltd
-+ * Author: Alex Benn?e <alex.bennee@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm_host.h>
-+
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_host.h>
-+
-+/**
-+ * kvm_arch_setup_debug - set-up debug related stuff
-+ *
-+ * @vcpu:	the vcpu pointer
-+ *
-+ * This is called before each entry in to the hypervisor to setup any
-+ * debug related registers. Currently this just ensures we will trap
-+ * access to:
-+ *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
-+ *  - Debug ROM Address (MDCR_EL2_TDRA)
-+ *  - Power down debug registers (MDCR_EL2_TDOSA)
-+ *
-+ * Additionally the hypervisor lazily saves/restores the debug
-+ * register state. If it is not currently doing so (arch.debug_flags)
-+ * then we also need to ensure we trap if the guest messes with them
-+ * so we know we need to save them.
-+ */
-+
-+void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
-+	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
-+
-+	if (!vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-+		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
-+	else
-+		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
-+
-+}
-+
-+void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
-+{
-+	/* Nothing to do yet */
-+}
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 5befd01..be92bfe1 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -768,17 +768,8 @@
- 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
- 	msr	hstr_el2, x2
- 
--	mrs	x2, mdcr_el2
--	and	x2, x2, #MDCR_EL2_HPMN_MASK
--	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
--	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
--
--	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
--	// if not dirty.
--	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
--	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
--	orr	x2, x2,  #MDCR_EL2_TDA
--1:
-+	// Monitor Debug Config - see kvm_arch_setup_debug()
-+	ldr	x2, [x0, #VCPU_MDCR_EL2]
- 	msr	mdcr_el2, x2
- .endm
- 
 -- 
 2.3.4
