@@ -1,92 +1,108 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 31 Mar 2015 11:46:52 +0530
-Subject: [PATCH v1 3/3] phy: cygnus-usbphy: Add Broadcom Cygnus USB phy
- driver
-In-Reply-To: <55134D73.7060507@broadcom.com>
-References: <1426886727-537-1-git-send-email-arun.ramamurthy@broadcom.com>
- <1426886727-537-4-git-send-email-arun.ramamurthy@broadcom.com>
- <551336A2.1050704@ti.com> <20150325224253.GA16950@dtor-ws>
- <55134C3E.4060400@ti.com> <55134D73.7060507@broadcom.com>
-Message-ID: <551A3BD4.2040404@ti.com>
+From: danindrey@mail.ru (Andrey Danin)
+Date: Tue, 31 Mar 2015 09:25:38 +0300
+Subject: [PATCH 1/3] i2c: tegra: implement slave mode
+In-Reply-To: <20150129114155.GA9080@katana>
+References: <1422516022-27161-1-git-send-email-danindrey@mail.ru>
+ <1422516022-27161-2-git-send-email-danindrey@mail.ru>
+ <20150129114155.GA9080@katana>
+Message-ID: <551A3DE2.90806@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thursday 26 March 2015 05:36 AM, Arun Ramamurthy wrote:
->
->
-> On 15-03-25 05:01 PM, Kishon Vijay Abraham I wrote:
->>
->>
->> On Thursday 26 March 2015 04:12 AM, Dmitry Torokhov wrote:
->>> Hi Kishon,
->>>
->>> On Thu, Mar 26, 2015 at 03:58:50AM +0530, Kishon Vijay Abraham I wrote:
->>>> Hi,
->>>>
->>>> On Saturday 21 March 2015 02:55 AM, Arun Ramamurthy wrote:
->>>>> +struct bcm_phy_driver {
->>>>> +    void __iomem *usbphy_regs;
->>>>> +    void __iomem *usb2h_idm_regs;
->>>>> +    void __iomem *usb2d_idm_regs;
->>>>> +    struct bcm_phy_instance *ports[MAX_PHY_PORTS];
->>>>
->>>> er.. can't we allocate this dynamically?
->>>
->>> The chip has support for only 3 phys, so I believe allocating array of 3
->>> pointers is simplest.
->>>
->>> [...]
->>>
->>>>> +
->>>>> +static struct phy *bcm_usb_phy_xlate(struct device *dev,
->>>>> +                     struct of_phandle_args *args)
->>>>> +{
->>>>> +    struct bcm_phy_driver *phy_driver = dev_get_drvdata(dev);
->>>>> +    struct bcm_phy_instance *port = NULL;
->>>>> +    int i;
->>>>> +
->>>>> +    if (!phy_driver)
->>>>> +        return ERR_PTR(-EINVAL);
->>>>> +
->>>>> +    if (WARN_ON(args->args_count != 1))
->>>>> +        return ERR_PTR(-EINVAL);
->>>>> +
->>>>> +    if (WARN_ON(args->args[0] < 0 || args->args[0] > 1))
->>>>> +        return ERR_PTR(-EINVAL);
->>>>> +
->>>>> +    for (i = 0; i < ARRAY_SIZE(phy_driver->ports); i++) {
->>>>> +        struct bcm_phy_instance *p = phy_driver->ports[i];
->>>>> +
->>>>> +        if (p && p->generic_phy->dev.of_node == args->np) {
->>>>> +            port = p;
->>>>> +            break;
->>>>> +        }
->>>>> +    }
->>>>> +
->>>>> +    if (!port) {
->>>>> +        dev_err(dev, "Failed to locate phy %s\n", args->np->name);
->>>>> +        return ERR_PTR(-EINVAL);
->>>>> +    }
->>>>> +
->>>>> +    port->host_mode = args->args[0];
->>>>> +
->>>>> +    return port->generic_phy;
->>>>> +}
->>>>
->>>> The xlate function here shouldn't be needed at all. Use of_phy_simple_xlate
->>>> instead.
->>>
->>> of_phy_simple_xlate() will not allow specifying host vs device mode when
->>> requesting phy though...
->>
->> indeed!
->>
-> Kishon, to confirm , are the xlate function and the MAX_PHY_PORTS ok or are you
-> recommending changes? Thanks
+Sorry for long delay.
 
-as Dmitry pointed out you'll still need your own implementation of xlate.
+And thanks for the quick review. It helped a lot!
 
-Thanks
-Kishon
+On 29.01.2015 14:41, Wolfram Sang wrote:
+> Hi,
+>
+>> Initialization code is based on NVEC driver.
+>>
+>> There is a HW bug in AP20 that was also mentioned in kernel sources
+>> for Toshiba AC100.
+>>
+>> Signed-off-by: Andrey Danin <danindrey@mail.ru>
+>
+> Cool, thanks for the converison. While I usually like to only get the
+> patches which I need to handle, please CC me to all patches next time. I
+> am interested what changes were needed for the user of the slave
+> framework, too.
+
+Done. I sent v2 yesterday evening.
+>
+>> +static bool tegra_i2c_slave_isr(int irq, struct tegra_i2c_dev *i2c_dev)
+>> +{
+>> +	unsigned long status;
+>> +	u8 value;
+>> +
+>> +	if (!i2c_dev->slave || !i2c_dev->slave->slave_cb)
+>> +		return false;
+>
+> Can this happen?
+
+Yes. I call slave ISR without any conditions from main ISR routine.
+>
+>> +	/* i2c master sends data to us */
+>> +	if (is_write(status)) {
+>> +		i2c_slave_event(i2c_dev->slave, I2C_SLAVE_REQ_WRITE_START,
+>> +				NULL);
+>
+> Can this HW create an interrupt once the address detection + RW bit are
+> received? Or only if a complete write has been received?
+
+Tegra I2C generates one interrupt per byte (address or data) and one 
+interrupt for stop bit.
+>
+>> +static int tegra_reg_slave(struct i2c_client *slave)
+>> +{
+>> +	struct tegra_i2c_dev *i2c_dev = i2c_get_adapdata(slave->adapter);
+>> +
+>> +	if (i2c_dev->slave)
+>> +		return -EBUSY;
+>> +
+>> +	i2c_dev->slave = slave;
+>> +
+>> +	tegra_i2c_clock_enable(i2c_dev);
+>> +
+>> +	reset_control_assert(i2c_dev->rst);
+>> +	udelay(2);
+>> +	reset_control_deassert(i2c_dev->rst);
+>
+> Why do you need a reset when a slave gets registered?
+
+I copied this code from nvec driver. Reset is done during I2C controller 
+initialization. This reset is not needed. Thanks for pointing.
+>
+>> +
+>> +	i2c_writel(i2c_dev, I2C_SL_CNFG_NEWSL, I2C_SL_CNFG);
+>> +	i2c_writel(i2c_dev, 0x1E, I2C_SL_DELAY_COUNT);
+>
+> What does this magic number mean?
+
+It's a default value. I created a constant for it.
+>
+>> +
+>> +	i2c_writel(i2c_dev, slave->addr, I2C_SL_ADDR1);
+>> +	i2c_writel(i2c_dev, 0, I2C_SL_ADDR2);
+>
+> Handling 10 bit addresses?
+
+In v2.
+>
+>> +
+>> +	return 0;
+>> +}
+>> +
+>
+>>   static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
+>> @@ -679,6 +808,7 @@ static const struct tegra_i2c_hw_feature tegra30_i2c_hw = {
+>>   	.has_single_clk_source = false,
+>>   	.clk_divisor_hs_mode = 3,
+>>   	.clk_divisor_std_fast_mode = 0,
+>> +	.slave_read_start_delay = 0,
+>
+> No need to init to 0 IMO.
+>
+Ok.
