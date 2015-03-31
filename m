@@ -1,50 +1,60 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 31 Mar 2015 21:16:40 +0530
-Subject: [PATCH 2/2] phy: driver for Conexant Digicolor internal USB PHY
-In-Reply-To: <20150331154119.GO12479@tarshish>
-References: <6284a7672647d46100281959552f9787f98bb552.1427430989.git.baruch@tkos.co.il>
- <4a9ceb0a240d49dd6a68d50c78f85d310d4b932f.1427430989.git.baruch@tkos.co.il>
- <201503281633.02801.marex@denx.de> <20150331113448.GN12479@tarshish>
- <551ABCBE.3030005@ti.com> <20150331154119.GO12479@tarshish>
-Message-ID: <551AC160.8060202@ti.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 31 Mar 2015 17:49:45 +0200
+Subject: [PATCH 01/11] clocksource: arm_arch_timer: Rename
+ arch_timer_probed to reflect behaviour
+In-Reply-To: <15031814.pvNHsWnCPH@avalon>
+References: <5519AEB2.8050306@linaro.org>
+ <1427746633-9137-1-git-send-email-daniel.lezcano@linaro.org>
+ <20150331071452.GA9252@gmail.com> <15031814.pvNHsWnCPH@avalon>
+Message-ID: <20150331154945.GA27058@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tuesday 31 March 2015 09:11 PM, Baruch Siach wrote:
-> Hi Kishon,
->
-> On Tue, Mar 31, 2015 at 08:56:54PM +0530, Kishon Vijay Abraham I wrote:
->> On Tuesday 31 March 2015 05:04 PM, Baruch Siach wrote:
->>> On Sat, Mar 28, 2015 at 04:33:02PM +0100, Marek Vasut wrote:
->>>> On Friday, March 27, 2015 at 05:36:29 AM, Baruch Siach wrote:
->>>>> Add a driver for the USB PHY on the Conexant CX92755 SoC, from the
->>>>> Digicolor series of SoCs. The PHY is connected to the on-chip chipidea
->>>>> usb2 host.
->>>>>
->>>>> The hardware is somewhat similar to the phy-mxs-usb.c usb_phy, but it is
->>>>> different enough to merit its own driver. Also, this driver uses the
->>>>> generic phy infrastructure.
->>>>
->>>> the register set looks very similar to MXS one indeed. How is it different
->>>> please ?
->>>
->>> Almost of the bits that are defined in the MXS USBPHY_CTRL register are not
->>> defined in the Digicolor one. Some have different meaning, and some are
->>> reserved. OTOH, the Digicolor USBPHY_CTRL register uses all bits in the 1-13
->>> range. Also, the Digicolor phy does not have anatop registers.
->>
->> I think we should try adding support for this in the same driver.
->
-> The only code that can actually be shared between the driver is the two lines
-> usb_phy .on_connect callback routine. The init sequence that takes most of the
-> digicolor driver is totally different. Using a single driver for both PHYs
-> does not make much sense, IMHO.
->
-> Besides, phy-mxs-usb.c uses the deprecated usb_phy framework. So we first need
-> to port this driver to the generic phy framework.
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-Doesn't your driver also use the usb_phy framework?
+> Hi Ingo,
+> 
+> On Tuesday 31 March 2015 09:14:52 Ingo Molnar wrote:
+> > * Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> > > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > The arch_timer_probed function returns whether the given time doesn't
+> > > need to be probed. This can be the case when the timer has been probed
+> > > already, but also when it has no corresponding enabled node in DT.
+> > > 
+> > > Rename the function to arch_timer_need_probe and invert its return value
+> > > to better reflect the function's purpose and behaviour.
+> > > 
+> > > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > > ---
+> > > 
+> > >  drivers/clocksource/arm_arch_timer.c | 13 +++++++------
+> > >  1 file changed, 7 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/clocksource/arm_arch_timer.c
+> > > b/drivers/clocksource/arm_arch_timer.c index a3025e7..50bb7f2 100644
+> > > --- a/drivers/clocksource/arm_arch_timer.c
+> > > +++ b/drivers/clocksource/arm_arch_timer.c
+> > > @@ -661,17 +661,17 @@ static const struct of_device_id
+> > > arch_timer_mem_of_match[] __initconst = {> 
+> > >  };
+> > >  
+> > >  static bool __init
+> > > 
+> > > -arch_timer_probed(int type, const struct of_device_id *matches)
+> > > +arch_timer_need_probe(int type, const struct of_device_id *matches)
+> > 
+> > If we do a rename we might as well use valid English spelling such as
+> > 'arch_timer_needs_probing()'?
+> 
+> Of course. Should I resend the patch or can you fix that while applying it ?
 
--Kishon
+No need to resend, I've done the rename in the patch.
+
+Thanks,
+
+	Ingo
