@@ -1,354 +1,56 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 31 Mar 2015 18:24:54 +0200
-Subject: [PATCH v4 13/15] ARM: dts: Introduce STM32F429 MCU
-In-Reply-To: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1427819096-31109-14-git-send-email-mcoquelin.stm32@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Tue, 31 Mar 2015 09:27:53 -0700
+Subject: [PATCH 2/4] soc: Mediatek: Add SCPSYS power domain driver
+In-Reply-To: <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
+ (Sascha Hauer's message of "Tue, 10 Mar 2015 16:41:01 +0100")
+References: <1426002063-25713-1-git-send-email-s.hauer@pengutronix.de>
+ <1426002063-25713-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <7hbnj9b08m.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STMicrolectornics's STM32F419 MCU has the following main features:
- - Cortex-M4 core running up to @180MHz
- - 2MB internal flash, 256KBytes internal RAM
- - FMC controller to connect SDRAM, NOR and NAND memories
- - SD/MMC/SDIO support
- - Ethernet controller
- - USB OTFG FS & HS controllers
- - I2C, SPI, CAN busses support
- - Several 16 & 32 bits general purpose timers
- - Serial Audio interface
- - LCD controller
+Hi Sascha,
 
-Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/boot/dts/Makefile            |   1 +
- arch/arm/boot/dts/stm32f429-disco.dts |  71 +++++++++++
- arch/arm/boot/dts/stm32f429.dtsi      | 226 ++++++++++++++++++++++++++++++++++
- 3 files changed, 298 insertions(+)
- create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
- create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
+Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b..e5dbd03 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -509,6 +509,7 @@ dtb-$(CONFIG_ARCH_STI) += \
- 	stih416-b2020.dtb \
- 	stih416-b2020e.dtb \
- 	stih418-b2199.dtb
-+dtb-$(CONFIG_ARCH_STM32)+= stm32f429-disco.dtb
- dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-a1000.dtb \
- 	sun4i-a10-ba10-tvbox.dtb \
-diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
-new file mode 100644
-index 0000000..6b9aa59
---- /dev/null
-+++ b/arch/arm/boot/dts/stm32f429-disco.dts
-@@ -0,0 +1,71 @@
-+/*
-+ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "stm32f429.dtsi"
-+
-+/ {
-+	model = "STMicroelectronics STM32F429i-DISCO board";
-+	compatible = "st,stm32f429i-disco", "st,stm32f429";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 root=/dev/ram rdinit=/linuxrc";
-+		linux,stdout-path = &usart1;
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x800000>;
-+	};
-+
-+	aliases {
-+		serial0 = &usart1;
-+	};
-+};
-+
-+&usart1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-new file mode 100644
-index 0000000..39ffdb8
---- /dev/null
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -0,0 +1,226 @@
-+/*
-+ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "armv7-m.dtsi"
-+
-+/ {
-+	clocks {
-+		clk_sysclk: clk-sysclk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <180000000>;
-+		};
-+
-+		clk_hclk: clk-hclk {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <180000000>;
-+		};
-+
-+		clk_pclk1: clk-pclk1 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <45000000>;
-+		};
-+
-+		clk_pclk2: clk-pclk2 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <90000000>;
-+		};
-+
-+		clk_pmtr1: clk-pmtr1 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <90000000>;
-+		};
-+
-+		clk_pmtr2: clk-pmtr2 {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <180000000>;
-+		};
-+
-+		clk_systick: clk-systick {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&clk_hclk>;
-+			#clock-cells = <0>;
-+			clock-div = <8>;
-+			clock-mult = <1>;
-+		};
-+	};
-+
-+	soc {
-+		timer2: timer at 40000000 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40000000 0x400>;
-+			interrupts = <28>;
-+			resets = <&rcc 256>;
-+			clocks = <&clk_pmtr1>;
-+			status = "disabled";
-+		};
-+
-+		timer3: timer at 40000400 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40000400 0x400>;
-+			interrupts = <29>;
-+			resets = <&rcc 257>;
-+			clocks = <&clk_pmtr1>;
-+			status = "disabled";
-+		};
-+
-+		timer4: timer at 40000800 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40000800 0x400>;
-+			interrupts = <30>;
-+			resets = <&rcc 258>;
-+			clocks = <&clk_pmtr1>;
-+			status = "disabled";
-+		};
-+
-+		timer5: timer at 40000c00 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40000c00 0x400>;
-+			interrupts = <50>;
-+			resets = <&rcc 259>;
-+			clocks = <&clk_pmtr1>;
-+		};
-+
-+		timer6: timer at 40001000 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40001000 0x400>;
-+			interrupts = <54>;
-+			resets = <&rcc 260>;
-+			clocks = <&clk_pmtr1>;
-+			status = "disabled";
-+		};
-+
-+		timer7: timer at 40001400 {
-+			compatible = "st,stm32-timer";
-+			reg = <0x40001400 0x400>;
-+			interrupts = <55>;
-+			resets = <&rcc 261>;
-+			clocks = <&clk_pmtr1>;
-+			status = "disabled";
-+		};
-+
-+		usart2: serial at 40004400 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40004400 0x400>;
-+			interrupts = <38>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart3: serial at 40004800 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40004800 0x400>;
-+			interrupts = <39>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart4: serial at 40004c00 {
-+			compatible = "st,stm32-uart";
-+			reg = <0x40004c00 0x400>;
-+			interrupts = <52>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart5: serial at 40005000 {
-+			compatible = "st,stm32-uart";
-+			reg = <0x40005000 0x400>;
-+			interrupts = <53>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart7: serial at 40007800 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40007800 0x400>;
-+			interrupts = <82>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart8: serial at 40007c00 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40007c00 0x400>;
-+			interrupts = <83>;
-+			clocks = <&clk_pclk1>;
-+			status = "disabled";
-+		};
-+
-+		usart1: serial at 40011000 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40011000 0x400>;
-+			interrupts = <37>;
-+			clocks = <&clk_pclk2>;
-+			status = "disabled";
-+		};
-+
-+		usart6: serial at 40011400 {
-+			compatible = "st,stm32-usart", "st,stm32-uart";
-+			reg = <0x40011400 0x400>;
-+			interrupts = <71>;
-+			clocks = <&clk_pclk2>;
-+			status = "disabled";
-+		};
-+
-+		rcc: rcc at 40023810 {
-+			#reset-cells = <1>;
-+			compatible = "st,stm32-rcc";
-+			reg = <0x40023800 0x400>;
-+		};
-+	};
-+};
-+
-+&systick {
-+	clocks = <&clk_systick>;
-+	status = "okay";
-+};
--- 
-1.9.1
+> This adds a power domain driver for the Mediatek SCPSYS unit.
+>
+> The System Control Processor System (SCPSYS) has several power
+> management related tasks in the system. The tasks include thermal
+> measurement, dynamic voltage frequency scaling (DVFS), interrupt
+> filter and lowlevel sleep control. The System Power Manager (SPM)
+> inside the SCPSYS is for the MTCMOS power domain control.
+>
+> For now this driver only adds power domain support, the more
+> advanced features are not yet supported. The driver implements
+> the generic PM domain device tree bindings, the first user will
+> most likely be the Mediatek AFE audio driver.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Sorry for the lag, was travelling last week at ELC and not keeping up
+with reviews.
+
+This version looks pretty good to me, but had one minor
+comment/question...
+
+[...]
+
+> +#define NUM_DOMAINS	ARRAY_SIZE(scp_domain_data)
+> +
+> +struct scp;
+> +
+> +struct scp_domain {
+> +	struct generic_pm_domain pmd;
+> +	struct scp_domain_data *data;
+> +	struct scp *scp;
+> +};
+> +
+> +struct scp {
+> +	struct scp_domain domains[NUM_DOMAINS];
+> +	struct generic_pm_domain *pmd[NUM_DOMAINS];
+
+Why is this genpd pointer needed?  It's just a pointer to the
+.domains.pmd[i] anyways, and IMO makes the code a bit hard to follow.
+
+Kevin
