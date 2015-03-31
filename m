@@ -1,143 +1,251 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 31 Mar 2015 22:14:24 +0300
-Subject: [PATCHv6 31/34] ARM: OMAP4+: control: remove support for legacy pad
- read/write
+Date: Tue, 31 Mar 2015 22:14:26 +0300
+Subject: [PATCHv6 33/34] ARM: dts: dra7: add minimal l4 bus layout with
+ control module support
 In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
 References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1427829267-32077-32-git-send-email-t-kristo@ti.com>
+Message-ID: <1427829267-32077-34-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap4_ctrl_pad_readl/writel are no longer used by anybody, so remove
-these. Syscon / pinctrl should be used to access the padconf area
-instead.
+This patch creates the l4_cfg and l4_wkup interconnects for DRA7, and
+moves some of the generic peripherals under it. System control module
+support is added to the device tree also, and the existing SCM related
+functionality is moved under it.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/control.c |   24 +-----------------------
- arch/arm/mach-omap2/control.h |    5 +----
- arch/arm/mach-omap2/io.c      |   11 ++++-------
- 3 files changed, 6 insertions(+), 34 deletions(-)
+ .../devicetree/bindings/arm/omap/ctrl.txt          |    1 +
+ Documentation/devicetree/bindings/arm/omap/l4.txt  |    2 +
+ arch/arm/boot/dts/dra7.dtsi                        |  166 +++++++++++---------
+ 3 files changed, 96 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index 4047784..c8565d3 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -36,7 +36,6 @@
+diff --git a/Documentation/devicetree/bindings/arm/omap/ctrl.txt b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+index acb68ed..3a4e590 100644
+--- a/Documentation/devicetree/bindings/arm/omap/ctrl.txt
++++ b/Documentation/devicetree/bindings/arm/omap/ctrl.txt
+@@ -23,6 +23,7 @@ Required properties:
+ 		"ti,omap4-scm-padconf-core"
+ 		"ti,omap5-scm-core"
+ 		"ti,omap5-scm-padconf-core"
++		"ti,dra7-scm-core"
+ - reg:		Contains Control Module register address range
+ 		(base address and length)
  
- static void __iomem *omap2_ctrl_base;
- static s16 omap2_ctrl_offset;
--static void __iomem *omap4_ctrl_pad_base;
- static struct regmap *omap2_ctrl_syscon;
+diff --git a/Documentation/devicetree/bindings/arm/omap/l4.txt b/Documentation/devicetree/bindings/arm/omap/l4.txt
+index 2fe4211..b4f8a16 100644
+--- a/Documentation/devicetree/bindings/arm/omap/l4.txt
++++ b/Documentation/devicetree/bindings/arm/omap/l4.txt
+@@ -10,6 +10,8 @@ Required properties:
+ 	       Should be "ti,omap4-l4-wkup" for OMAP4 family l4 wkup bus
+ 	       Should be "ti,omap5-l4-cfg" for OMAP5 family l4 cfg bus
+ 	       Should be "ti,omap5-l4-wkup" for OMAP5 family l4 wkup bus
++	       Should be "ti,dra7-l4-cfg" for DRA7 family l4 cfg bus
++	       Should be "ti,dra7-l4-wkup" for DRA7 family l4 wkup bus
+ 	       Should be "ti,am3-l4-wkup" for AM33xx family l4 wkup bus
+ 	       Should be "ti,am4-l4-wkup" for AM43xx family l4 wkup bus
+ - ranges : contains the IO map range for the bus
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 5827fed..8e50ca3 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -94,17 +94,101 @@
+ 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI DIRECT_IRQ(10) IRQ_TYPE_LEVEL_HIGH>;
  
- #if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
-@@ -139,13 +138,9 @@ struct omap3_control_regs {
- static struct omap3_control_regs control_context;
- #endif /* CONFIG_ARCH_OMAP3 && CONFIG_PM */
+-		prm: prm at 4ae06000 {
+-			compatible = "ti,dra7-prm";
+-			reg = <0x4ae06000 0x3000>;
+-			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++		l4_cfg: l4 at 4a000000 {
++			compatible = "ti,dra7-l4-cfg", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4a000000 0x22c000>;
  
--#define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
+-			prm_clocks: clocks {
++			scm: scm at 2000 {
++				compatible = "ti,dra7-scm-core", "simple-bus";
++				reg = <0x2000 0x2000>;
+ 				#address-cells = <1>;
+-				#size-cells = <0>;
++				#size-cells = <1>;
++				ranges = <0 0x2000 0x2000>;
++
++				scm_conf: scm_conf at 0 {
++					compatible = "syscon";
++					reg = <0x0 0x1400>;
++					#address-cells = <1>;
++					#size-cells = <1>;
++
++					pbias_regulator: pbias_regulator {
++						compatible = "ti,pbias-omap";
++						reg = <0xe00 0x4>;
++						syscon = <&scm_conf>;
++						pbias_mmc_reg: pbias_mmc_omap5 {
++							regulator-name = "pbias_mmc_omap5";
++							regulator-min-microvolt = <1800000>;
++							regulator-max-microvolt = <3000000>;
++						};
++					};
++				};
++
++				dra7_pmx_core: pinmux at 1400 {
++					compatible = "ti,dra7-padconf",
++						     "pinctrl-single";
++					reg = <0x1400 0x0464>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					#interrupt-cells = <1>;
++					interrupt-controller;
++					pinctrl-single,register-width = <32>;
++					pinctrl-single,function-mask = <0x3fffffff>;
++				};
++			};
++
++			cm_core_aon: cm_core_aon at 5000 {
++				compatible = "ti,dra7-cm-core-aon";
++				reg = <0x5000 0x2000>;
++
++				cm_core_aon_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				cm_core_aon_clockdomains: clockdomains {
++				};
++			};
++
++			cm_core: cm_core at 8000 {
++				compatible = "ti,dra7-cm-core";
++				reg = <0x8000 0x3000>;
++
++				cm_core_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				cm_core_clockdomains: clockdomains {
++				};
+ 			};
++		};
+ 
+-			prm_clockdomains: clockdomains {
++		l4_wkup: l4 at 4ae00000 {
++			compatible = "ti,dra7-l4-wkup", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0x4ae00000 0x3f000>;
++
++			counter32k: counter at 4000 {
++				compatible = "ti,omap-counter32k";
++				reg = <0x4000 0x40>;
++				ti,hwmods = "counter_32k";
++			};
++
++			prm: prm at 6000 {
++				compatible = "ti,dra7-prm";
++				reg = <0x6000 0x3000>;
++				interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++
++				prm_clocks: clocks {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++
++				prm_clockdomains: clockdomains {
++				};
+ 			};
+ 		};
+ 
+@@ -177,70 +261,6 @@
+ 			};
+ 		};
+ 
+-		cm_core_aon: cm_core_aon at 4a005000 {
+-			compatible = "ti,dra7-cm-core-aon";
+-			reg = <0x4a005000 0x2000>;
 -
--void __init omap2_set_globals_control(void __iomem *ctrl,
--				      void __iomem *ctrl_pad)
-+void __init omap2_set_globals_control(void __iomem *ctrl)
- {
- 	omap2_ctrl_base = ctrl;
--	omap4_ctrl_pad_base = ctrl_pad;
- }
- 
- u8 omap_ctrl_readb(u16 offset)
-@@ -218,23 +213,6 @@ void omap_ctrl_writel(u32 val, u16 offset)
- 			     val);
- }
- 
--/*
-- * On OMAP4 control pad are not addressable from control
-- * core base. So the common omap_ctrl_read/write APIs breaks
-- * Hence export separate APIs to manage the omap4 pad control
-- * registers. This APIs will work only for OMAP4
-- */
+-			cm_core_aon_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
 -
--u32 omap4_ctrl_pad_readl(u16 offset)
--{
--	return readl_relaxed(OMAP4_CTRL_PAD_REGADDR(offset));
--}
+-			cm_core_aon_clockdomains: clockdomains {
+-			};
+-		};
 -
--void omap4_ctrl_pad_writel(u32 val, u16 offset)
--{
--	writel_relaxed(val, OMAP4_CTRL_PAD_REGADDR(offset));
--}
+-		cm_core: cm_core at 4a008000 {
+-			compatible = "ti,dra7-cm-core";
+-			reg = <0x4a008000 0x3000>;
 -
- #ifdef CONFIG_ARCH_OMAP3
- 
- /**
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index 5353ff4..80d2b7d 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -443,11 +443,9 @@
- extern u8 omap_ctrl_readb(u16 offset);
- extern u16 omap_ctrl_readw(u16 offset);
- extern u32 omap_ctrl_readl(u16 offset);
--extern u32 omap4_ctrl_pad_readl(u16 offset);
- extern void omap_ctrl_writeb(u8 val, u16 offset);
- extern void omap_ctrl_writew(u16 val, u16 offset);
- extern void omap_ctrl_writel(u32 val, u16 offset);
--extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
- 
- extern void omap3_save_scratchpad_contents(void);
- extern void omap3_clear_scratchpad_contents(void);
-@@ -465,8 +463,7 @@ extern int omap3_ctrl_save_padconf(void);
- void omap3_ctrl_init(void);
- int omap2_control_base_init(void);
- int omap_control_init(void);
--extern void omap2_set_globals_control(void __iomem *ctrl,
--				      void __iomem *ctrl_pad);
-+void omap2_set_globals_control(void __iomem *ctrl);
- void __init omap3_control_legacy_iomap_init(void);
- #else
- #define omap_ctrl_readb(x)		0
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index c3fa739..6c39cc0 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -443,7 +443,7 @@ void __init omap3_init_early(void)
- 	/* XXX: remove these once OMAP3 is DT only */
- 	if (!of_have_populated_dt()) {
- 		omap2_set_globals_control(
--			OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE), NULL);
-+			OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE));
- 		omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
- 		omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
- 				     NULL);
-@@ -631,8 +631,7 @@ void __init omap4430_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP443X_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
- 	omap4xxx_check_revision();
- 	omap4xxx_check_features();
-@@ -660,8 +659,7 @@ void __init omap5_init_early(void)
- {
- 	omap2_set_globals_tap(OMAP54XX_CLASS,
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
-@@ -686,8 +684,7 @@ void __init omap5_init_late(void)
- void __init dra7xx_init_early(void)
- {
- 	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
--	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--				  OMAP2_L4_IO_ADDRESS(DRA7XX_CTRL_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap4_pm_init_early();
- 	omap2_prcm_base_init();
+-			cm_core_clocks: clocks {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-			};
+-
+-			cm_core_clockdomains: clockdomains {
+-			};
+-		};
+-
+-		counter32k: counter at 4ae04000 {
+-			compatible = "ti,omap-counter32k";
+-			reg = <0x4ae04000 0x40>;
+-			ti,hwmods = "counter_32k";
+-		};
+-
+-		dra7_ctrl_core: ctrl_core at 4a002000 {
+-			compatible = "syscon";
+-			reg = <0x4a002000 0x6d0>;
+-		};
+-
+-		dra7_ctrl_general: tisyscon at 4a002e00 {
+-			compatible = "syscon";
+-			reg = <0x4a002e00 0x7c>;
+-		};
+-
+-		pbias_regulator: pbias_regulator {
+-			compatible = "ti,pbias-omap";
+-			reg = <0 0x4>;
+-			syscon = <&dra7_ctrl_general>;
+-			pbias_mmc_reg: pbias_mmc_omap5 {
+-				regulator-name = "pbias_mmc_omap5";
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3000000>;
+-			};
+-		};
+-
+-		dra7_pmx_core: pinmux at 4a003400 {
+-			compatible = "ti,dra7-padconf", "pinctrl-single";
+-			reg = <0x4a003400 0x0464>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			#interrupt-cells = <1>;
+-			interrupt-controller;
+-			pinctrl-single,register-width = <32>;
+-			pinctrl-single,function-mask = <0x3fffffff>;
+-		};
+-
+ 		sdma: dma-controller at 4a056000 {
+ 			compatible = "ti,omap4430-sdma";
+ 			reg = <0x4a056000 0x1000>;
+@@ -1410,7 +1430,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan1";
+ 			reg = <0x4ae3c000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 0>;
++			syscon-raminit = <&scm_conf 0x558 0>;
+ 			interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&dcan1_sys_clk_mux>;
+ 			status = "disabled";
+@@ -1420,7 +1440,7 @@
+ 			compatible = "ti,dra7-d_can";
+ 			ti,hwmods = "dcan2";
+ 			reg = <0x48480000 0x2000>;
+-			syscon-raminit = <&dra7_ctrl_core 0x558 1>;
++			syscon-raminit = <&scm_conf 0x558 1>;
+ 			interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&sys_clkin1>;
+ 			status = "disabled";
 -- 
 1.7.9.5
