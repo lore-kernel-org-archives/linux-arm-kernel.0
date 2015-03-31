@@ -1,31 +1,52 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 31 Mar 2015 09:42:40 +0800
-Subject: [Linaro-acpi] [PATCH 1/2] ARM64 / ACPI: Ignore the return error
- value of acpi_map_gic_cpu_interface()
-In-Reply-To: <5519C5C8.2020903@linaro.org>
-References: <1427458476-20140-1-git-send-email-hanjun.guo@linaro.org>
- <5519C5C8.2020903@linaro.org>
-Message-ID: <5519FB90.4010400@huawei.com>
+Date: Tue, 31 Mar 2015 09:49:42 +0800
+Subject: [patch v11 13/23] ACPI / processor: Introduce phys_cpuid_t for
+ CPU hardware ID
+In-Reply-To: <20150330135810.GC5964@e104818-lin.cambridge.arm.com>
+References: <1427205776-5060-1-git-send-email-hanjun.guo@linaro.org>
+ <1427205776-5060-14-git-send-email-hanjun.guo@linaro.org>
+ <20150325172109.GJ14585@localhost> <551381CD.5010804@huawei.com>
+ <55155DCA.3060006@linaro.org>
+ <20150330135810.GC5964@e104818-lin.cambridge.arm.com>
+Message-ID: <5519FD36.2080901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/3/31 5:53, Al Stone wrote:
-> On 03/27/2015 06:14 AM, Hanjun Guo wrote:
->> MADT table scannig will stopped once it gets the errors
->> returned by the handler, which is acpi_map_gic_cpu_interface()
->> in for ARM64, so Ignore the return error value to search for
->> all enabled CPUs for SMP init.
-> I think the comment should say something like:
->
-> MADT scanning will stop when it gets an error from the handler,
-> acpi_map_gic_cpu_interface(), on arm64.  However, we need to
-> find all of the enabled CPUs so that SMP initialization can work
-> properly.  So, if an error occurs in this case, ignore it for
-> now so that we can find all of the enabled CPUs.
->
-> Is that what you meant, Hanjun?
+On 2015/3/30 21:58, Catalin Marinas wrote:
+> On Fri, Mar 27, 2015 at 09:40:26PM +0800, Hanjun Guo wrote:
+>> On 2015?03?26? 11:49, Hanjun Guo wrote:
+>>> On 2015/3/26 1:21, Catalin Marinas wrote:
+>>>> On Tue, Mar 24, 2015 at 10:02:46PM +0800, Hanjun Guo wrote:
+>>>>> --- a/drivers/acpi/acpi_processor.c
+>>>>> +++ b/drivers/acpi/acpi_processor.c
+>>>>> @@ -170,7 +170,7 @@ static int acpi_processor_hotadd_init(struct acpi_processor *pr)
+>>>>>  	acpi_status status;
+>>>>>  	int ret;
+>>>>>
+>>>>> -	if (pr->phys_id == -1)
+>>>>> +	if (pr->phys_id == PHYS_CPUID_INVALID)
+>>>>>  		return -ENODEV;
+>>>> If PHYS_CPUID_INVALID is the same as INVALID_HWID, we should get rid of
+>>>> the latter in the arm64 code (as a subsequent clean-up patch).
+>>> OK, I'm preparing a patch set to introduce invalid_phys_cpuid() and invalid_logical_cpuid()
+>>> to remove the direct comparison of PHYS_CPUID_INVALID and -1 in ACPI processor drivers,
+>>> which is suggested by Rafael, I will cleanup PHYS_CPUID_INVALID in this patch set.
+>> I met difficulty to do so, because we use
+>>
+>> +#ifndef PHYS_CPUID_INVALID
+>> +typedef u32 phys_cpuid_t;
+>> +#define PHYS_CPUID_INVALID (phys_cpuid_t)(-1)
+>> +#endif
+>>
+>> in the common head file linux/acpi.h, we need macro
+>> PHYS_CPUID_INVALID to identify if phys_cpuid_t is typedefed
+>> for different arch, so if we want remove PHYS_CPUID_INVALID
+>> for ARM64, we need to got back to typedef phys_cpuid_t for
+>> each arch using ACPI. which means that
+> What I meant was removing INVALID_HWID from arm64 and always use the
+> PHYS_CPUID_INVALID but I think we should leave them as they are for now
+> since PHYS_CPUID_INVALID is defined in the asm/acpi.h file.
 
-That's exactly what I mean, you describe it much clearer :)
+OK, thanks for the clarify.
 
-Thanks
 Hanjun
