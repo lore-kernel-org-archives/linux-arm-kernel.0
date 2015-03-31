@@ -1,42 +1,26 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 31 Mar 2015 09:01:54 +0100
-Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type
- constants in dt-bindings/phy/phy.h
-In-Reply-To: <20150331074027.GH9447@x1>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
- <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
-Message-ID: <20150331080154.GA2029@griffinp-ThinkPad-X1-Carbon-2nd>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 31 Mar 2015 10:00:24 +0200
+Subject: [PATCH 3/6] clk: mediatek: Add reset controller support
+In-Reply-To: <1427737245-4064-4-git-send-email-s.hauer@pengutronix.de>
+References: <1427737245-4064-1-git-send-email-s.hauer@pengutronix.de>
+ <1427737245-4064-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1427788824.2969.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Tue, 31 Mar 2015, Lee Jones wrote:
-> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+Am Montag, den 30.03.2015, 19:40 +0200 schrieb Sascha Hauer:
+> The pericfg and infracfg units also provide reset lines to several
+> other SoC internal units. This adds a function which can be called
+> from the pericfg and infracfg initialization functions which will
+> register the reset controller using reset_controller_register. The
+> reset controller will provide support for resetting the units
+> connected to the pericfg and infracfg controller. The units resetted
+> by this controller can use the standard reset device tree binding
+> to gain access to the reset lines.
 > 
-> > Hi Patrice, Maxime,
-> > 
-> > On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
-> > >Now there are generic phy type constants declared in phy.h, migrate over to
-> > >using them rather than defining our own. This change has been done as one
-> > >atomic commit to be bisectable.
-> > >
-> > >Note: The values of the defines are the same, so there is no ABI breakage
-> > >with this patch.
-> > >
-> > >Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > >Acked-by: Rob Herring <robh@kernel.org>
-> > >Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Are you okay for this patch to go via PHY tree? It modifies arch/arm/boot/dts
-> > /stih416.dtsi.
-> 
-> These files need to be changed simultaneously in order to prevent
-> breakage during bisection and the like.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-That is why it has been authored as one atomic commit. See commit message above.
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-regards,
-
-Peter
+regards
+Philipp
