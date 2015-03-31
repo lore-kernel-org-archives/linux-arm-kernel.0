@@ -1,88 +1,39 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Mar 2015 11:12:51 +0200
-Subject: [PATCH RFC 08/11] sound/core: add DRM ELD helper
-In-Reply-To: <E1YcfY5-0002vT-5K@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Mar 2015 10:13:29 +0100
+Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
+In-Reply-To: <551A5B2F.50203@rock-chips.com>
 References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
- <E1YcfY5-0002vT-5K@rmk-PC.arm.linux.org.uk>
-Message-ID: <1427793171.2969.19.camel@pengutronix.de>
+ <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
+ <551A5B2F.50203@rock-chips.com>
+Message-ID: <20150331091329.GP24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 30.03.2015, 20:40 +0100 schrieb Russell King:
-> Add a helper for the EDID like data structure, which is typically passed
-> from a HDMI adapter to its associated audio driver.  This informs the
-> audio driver of the capabilities of the attached HDMI sink.
+On Tue, Mar 31, 2015 at 04:30:39AM -0400, Yang Kuankuan wrote:
+> >+	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
+> >+	cs[1] = IEC958_AES1_CON_GENERAL;
+> >+	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
+> >+	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | fs;
+> >+
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  include/sound/pcm_drm_eld.h |  6 +++
->  sound/core/Kconfig          |  3 ++
->  sound/core/Makefile         |  1 +
->  sound/core/pcm_drm_eld.c    | 91 +++++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 101 insertions(+)
->  create mode 100644 include/sound/pcm_drm_eld.h
->  create mode 100644 sound/core/pcm_drm_eld.c
+> Pretty good, also suitable to rockchip platform, but why not add the
+> "IEC958_AES2_CON_CHANNEL_MASK" & "IEC958_AES2_CON_WORDLEN" ?
 > 
-> diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
-> new file mode 100644
-> index 000000000000..93357b25d2e2
-> --- /dev/null
-> +++ b/include/sound/pcm_drm_eld.h
-> @@ -0,0 +1,6 @@
-> +#ifndef __SOUND_PCM_DRM_ELD_H
-> +#define __SOUND_PCM_DRM_ELD_H
-> +
-> +int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld);
-> +
-> +#endif
-> diff --git a/sound/core/Kconfig b/sound/core/Kconfig
-> index 313f22e9d929..b534c8a6046b 100644
-> --- a/sound/core/Kconfig
-> +++ b/sound/core/Kconfig
-> @@ -6,6 +6,9 @@ config SND_PCM
->  	tristate
->  	select SND_TIMER
->  
-> +config SND_PCM_ELD
-> +	bool
-> +
->  config SND_DMAENGINE_PCM
->  	tristate
->  
-> diff --git a/sound/core/Makefile b/sound/core/Makefile
-> index 4daf2f58261c..591b49157b4d 100644
-> --- a/sound/core/Makefile
-> +++ b/sound/core/Makefile
-> @@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
->  snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
->  		pcm_memory.o memalloc.o
->  snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
-> +snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
->  
->  # for trace-points
->  CFLAGS_pcm_lib.o := -I$(src)
-> diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
-> new file mode 100644
-> index 000000000000..78d551a1b05f
-> --- /dev/null
-> +++ b/sound/core/pcm_drm_eld.c
-> @@ -0,0 +1,91 @@
-> +/*
-> + *  PCM DRM helpers
-> + *
-> + *   This program is free software; you can redistribute it and/or modify
-> + *   it under the terms of the GNU General Public License as published by
-> + *   the Free Software Foundation; either version 2 of the License.
-> + */
+> Seems sample frequency & channle number & word length are the basic
+> message :)
 
-Should this say:
+I was debating about the word length, and that's something I'll add
+later to it - but only if length shows that we have the 5th byte
+available in the buffer.  Most users seem to only use the first four
+bytes.
 
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
+As for the channel number, this is intentionally left to the driver -
+most cases I've found either the driver isn't interested, or where
+they are interested (the only case I know of is my dw_hdmi ahb audio
+driver), it's more appropriate to generate a baseline channel status,
+and let the driver iterate over the channels adding the appropriate
+channel number in.
 
-?
-
-Same for patch 9.
-
-regards
-Philipp
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
