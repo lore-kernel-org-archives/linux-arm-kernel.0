@@ -1,70 +1,38 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 02 Apr 2015 03:17:33 +0900
-Subject: [GIT PULL 5/5] Samsung mach updates for v4.1
-Message-ID: <551C363D.3040207@kernel.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Apr 2015 19:18:19 +0100
+Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
+ generation of APM X-Gene SoC
+In-Reply-To: <20150401173029.GF24899@n2100.arm.linux.org.uk>
+References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
+ <1427899682-10912-2-git-send-email-stripathi@apm.com>
+ <20150401161336.GS9974@htj.duckdns.org>
+ <20150401163116.GT9974@htj.duckdns.org>
+ <20150401163956.GE24899@n2100.arm.linux.org.uk>
+ <20150401170032.GC28616@e104818-lin.cambridge.arm.com>
+ <20150401173029.GF24899@n2100.arm.linux.org.uk>
+Message-ID: <20150401181819.GD28616@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+On Wed, Apr 01, 2015 at 06:30:30PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 01, 2015 at 06:00:33PM +0100, Catalin Marinas wrote:
+> > The driver in general should not be ARM specific, though it runs on an
+> > ARMv8 platform. But looking at the patch it has some errata workarounds
+> > triggered based on the CPU id (MIDR). That looks dodgy as it doesn't
+> > even check the full ID, only the variant part.
+> 
+> Okay, it's not ARM but an ARM64 driver, so that's your territory, not
+> mine. :)
 
-  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+Well, feel free to enter this territory ;).
 
-are available in the git repository at:
+Anyway, what I meant is that such driver should not rely on CPU
+identification at all, especially since it does not require some
+specific CPU features but it tries to guess which SoC revision it is and
+which device (not CPU) bugs have been fixed. Better if they follow Mark
+R's idea to pass such information in DT for the device.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-updates
+So maybe the revert is not too bad an idea.
 
-for you to fetch changes up to bd0d888c4f7f125b7c7168f51039142150d9d1cc:
-
-  ARM: EXYNOS: allow cpuidle driver usage on Exynos3250 SoC (2015-03-27
-02:35:52 +0900)
-
-----------------------------------------------------------------
-Samsung mach updates for v4.1
-
-- for s3c64xx
-  : use fixed IRQ bases to avoid conflicts on Cragganmore
-
-- for exynos3250
-  : add cpuidle and AFTR mode support
-  : fix CPU1 hotplug
-
-- for exynos SoCs
-  : add code for setting/clearing boot flag for cpuidle AFTR
-  : remove left over 'extra_save' and constify 'exynos_pm_data' array
-  : use static in suspend.c as per compiler suggestions
-  : use platform device name as power domain name
-  : add support for async-bridge clocks for pm_domains (exynos5420)
-
-----------------------------------------------------------------
-Andrzej Hajda (1):
-      ARM: EXYNOS: add support for async-bridge clocks for pm_domains
-
-Bartlomiej Zolnierkiewicz (4):
-      ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
-      ARM: EXYNOS: add code for setting/clearing boot flag
-      ARM: EXYNOS: add AFTR mode support for Exynos3250
-      ARM: EXYNOS: allow cpuidle driver usage on Exynos3250 SoC
-
-Charles Keepax (1):
-      ARM: S3C64XX: Use fixed IRQ bases to avoid conflicts on Cragganmore
-
-Krzysztof Kozlowski (4):
-      ARM: EXYNOS: Use platform device name as power domain name
-      ARM: EXYNOS: use static in suspend.c
-      ARM: EXYNOS: Constify exynos_pm_data array
-      ARM: EXYNOS: Remove left over 'extra_save'
-
- arch/arm/mach-exynos/common.h         |  6 ++++++
- arch/arm/mach-exynos/exynos.c         |  1 +
- arch/arm/mach-exynos/firmware.c       | 33
-++++++++++++++++++++++++++++++++-
- arch/arm/mach-exynos/platsmp.c        | 23 ++++++++++++++++++++---
- arch/arm/mach-exynos/pm.c             | 12 +++++++++++-
- arch/arm/mach-exynos/pm_domains.c     | 29 ++++++++++++++++++++++++-----
- arch/arm/mach-exynos/regs-pmu.h       |  3 +++
- arch/arm/mach-exynos/smc.h            |  9 +++++++++
- arch/arm/mach-exynos/suspend.c        | 22 ++++++----------------
- arch/arm/mach-s3c64xx/crag6410.h      |  1 +
- arch/arm/mach-s3c64xx/mach-crag6410.c |  1 +
- 11 files changed, 114 insertions(+), 26 deletions(-)
+-- 
+Catalin
