@@ -1,75 +1,80 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Apr 2015 11:55:19 +0100
-Subject: [PATCH] arm64: fix midr range for Cortex-A57 erratum 832075
-In-Reply-To: <20150401092229.GC1552@arm.com>
-References: <1427833848-12188-1-git-send-email-byan@nvidia.com>
- <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
- <20150401092229.GC1552@arm.com>
-Message-ID: <20150401105519.GC11403@leverpostej>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 01 Apr 2015 13:03:26 +0200
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <551AFCCE.4050404@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk>
+ <CAM4voanL3A=dS8Z-ovi_-EDi9ctyaxZkvjajp+3ZjyNAnqR1aQ@mail.gmail.com>
+ <551AFCCE.4050404@collabora.co.uk>
+Message-ID: <551BD07E.2090506@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 10:22:29AM +0100, Will Deacon wrote:
-> On Tue, Mar 31, 2015 at 10:17:21PM +0100, Paul Walmsley wrote:
-> > On Tue, 31 Mar 2015, Bo Yan wrote:
-> > 
-> > > Register MIDR_EL1 is masked to get variant and revision fields, then
-> > > compared against midr_range_min and midr_range_max when checking
-> > > whether CPU is affected by any particular erratum. However, variant
-> > > and revision fields in MIDR_EL1 are separated by 16 bits, so the min
-> > > and max of midr range should be constructed accordingly, otherwise
-> > > the patch will not be applied when variant field is non-0.
-> > > 
-> > > Signed-off-by: Bo Yan <byan@nvidia.com>
-> > > ---
-> > >  arch/arm64/kernel/cpu_errata.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > > index fa62637e63a8..7838f1578019 100644
-> > > --- a/arch/arm64/kernel/cpu_errata.c
-> > > +++ b/arch/arm64/kernel/cpu_errata.c
-> > > @@ -88,7 +88,7 @@ struct arm64_cpu_capabilities arm64_errata[] = {
-> > >  	/* Cortex-A57 r0p0 - r1p2 */
-> > >  		.desc = "ARM erratum 832075",
-> > >  		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
-> > > -		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
-> > > +		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x100002),
-> > >  	},
-> > >  #endif
-> > >  	{
-> > > -- 
-> > > 2.1.4
-> > 
-> > Reviewed-by: Paul Walmsley <paul@pwsan.com>
-> > 
-> > Reviewed against DDI0488G section 4.3.1 "Main ID Register, EL1".  Looks 
-> > like a cut-and-paste error from the A53 workarounds.
-> 
-> Thanks guys, I agree that this is a bug. I'll apply this, but using an
-> explicit shift to set the variant (tweaked version below).
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index a66f4fa4d541..c998345a052f 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -70,7 +70,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
->         /* Cortex-A57 r0p0 - r1p2 */
->                 .desc = "ARM erratum 832075",
->                 .capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
-> -               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
-> +               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, (1 << MIDR_VARIANT_SHIFT) | 2,
->         },
+Hello,
 
-That works, though it's going to make this really painful to read.
-Perhaps we should update MIDR_RANGE to take separate variant and
-revision parameters?
+On 31/03/15 22:00, Javier Martinez Canillas wrote:
+> On 03/31/2015 04:38 PM, Abhilash Kesavan wrote:
+>> javier.martinez at collabora.co.uk> wrote:
 
-Then we could have MIDR_RANGE(MIDR_CORTEX_A57, 0x0, 0x0, 0x1, 0x2) for
-Cortex-A57 r0p0 to r1p2.
+>>> Unfortunately I don't fully understand why this clock needs to be
+>>> enabled. It would be good if someone at Samsung can explain in
+>>> more detail what the real problem really is.
+>>>
+>>
+>> I had a look at this some more today. The problem actually occurs when the
+>> mdma0 clock's parent - aclk266_g2d gets disabled. The run-time pm support
+>> in the dma driver disables mdma0 and in turn aclk266_g2d which causes the
+>> issue.
+>> From the User Manual, it appears that aclk266_g2d should be gated only when
+>> certain bits in the clock gating status register are 0. I cannot say for
+>> certain, but our gating the aclk266_g2d clock without the CG_STATUS bits
+>> being 0 could be a cause of the suspend failure.
+>>
+> 
+> Thanks a lot for the explanation. I see the NOTE at the bottom of section
+> 7.9.1.159 CLK_GATE_BUS_TOP that mentions that. I'll add this information
+> to the commit message when posting as a proper patch instead of a RFC.
+> 
+> I confirmed that changing the patch to prevent "aclk266_g2d" to be gated
+> instead of "mdm0" also makes the system to resume correctly from suspend
+> so I'll change that on the patch as well.
+> 
+> I see that many of the Exynos5420 clocks (including "aclk266_g2d") use the
+> CLK_IGNORE_UNUSED flag but AFAIU it only prevents the common clock framework
+> to disable the clocks on init but doesn't prevent the clocks to be disabled
+> if all the clock childs are gated so the parent is gated as well.
+> 
+>> As the CG_STATUS bits are not being checked anywhere in the kernel I think
+>> aclk266_g2d (and others in GATE_BUS_TOP) should not be gated. I am OK with
+> 
+> For now I'll just add "aclk266_g2d" but later if needed all the GATE_BUS_TOP
+> clocks (and others) that should only be gated when CG_STATUS is 0 can be
+> added. My patch iterates over a list of clocks to be kept during suspend even
+> when there is only one for now so adding more later if needed will be trivial.
 
-Mark.
+It's not clear what subsystems affect state of the CG_STATUSx registers, it
+would be good if we could get more information on that. They are in the PMU
+block and are related to LPI (Low Power Interface handshaking), but what
+subsystems/peripheral blocks exactly are associated with them it's not clear
+from the documentation.
+
+I think it's essential to understand what triggers changes in CG_STATUSx
+registers, before we start checking their value in the clock driver.
+
+Also it might be that there are indeed some clocks which must stay enabled
+over suspend/resume cycle, then the approach with enabling/disabling clocks
+in the clock driver might not be such a hack as it looks at first sight.
+
+> Or do you think that I should add all the GATE_BUS_TOP clocks now?
+
+No, please don't do that. That includes many important clocks and we should
+be certain what we are doing. I don't think it is expected to touch those
+clocks in that way, it would likely cause more issues.
+
+
+-- 
+Thanks
+Sylwester
