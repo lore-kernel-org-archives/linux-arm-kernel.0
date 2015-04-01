@@ -1,71 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 1 Apr 2015 11:16:08 +0200
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <7h1tk47awc.fsf@deeprootsystems.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
- <551976F1.1000605@collabora.co.uk>
- <7hiodg98z7.fsf@deeprootsystems.com>
- <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
- <7h1tk47awc.fsf@deeprootsystems.com>
-Message-ID: <CAJKOXPftzX4KT=RNVnuD3UKOLXKkKr0b9i9_HDE47=8z9AyzUQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 1 Apr 2015 11:18:29 +0200
+Subject: [PATCH 0/5] Add standby support for the recent mvebu SoCs
+In-Reply-To: <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
+Message-ID: <20150401111829.311a73fa@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-01 6:03 GMT+02:00 Kevin Hilman <khilman@kernel.org>:
-> Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
->
->> On Wed, Apr 1, 2015 at 2:32 AM, Kevin Hilman <khilman@kernel.org> wrote:
->>> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
->>>
->>> [...]
->>>
->>>> Unfortunately I don't fully understand why this clock needs to be
->>>> enabled. It would be good if someone at Samsung can explain in more
->>>> detail what the real problem really is.
->>>
->>> +1
->>>
->>> Maybe Abhilash can shed some light here?
->>>
->>> We really should know *why* this is needed because having the fix in the
->>> clock driver just doesn't seem right.  It seems like the DMA driver
->>> should be managing this clock.
->>
->> I think my last mail might not have reached you (was accidentally sent
->> as html).
->
-> Yeah, I saw it a bit later in Javier's reply.  Thanks for doing the
-> research and reporting back.
->
->> We are gating the aclk266_g2d clock without checking the
->> CG_STATUS0 register bits as specified in the UM. It looks like we need
->> to keep several clocks alive or gate them only after checking the
->> CG_STATUSx register bits.
->
-> I dont' know much about this clock hardware, but to me it sounds like a
-> clock driver bug.  The suspend fix Javier is proposing would fix it, but
-> to me it sounds like the clock driver needs to actually start checking
-> these CG_STATUSx bits before gating clocks.
->
-> Otherwise, we might fix this current bug but a similar one will come and
-> bite us another day.
+Dear Marcin Wojtas,
 
-Actually it looks kind a similar to issue with adma/mau_epll clocks:
-https://lkml.org/lkml/2014/12/5/291
+On Wed, 1 Apr 2015 11:02:47 +0200, Marcin Wojtas wrote:
 
-In that case runtime PM for pl330 caused adma clock to be gated. This
-lead to gating its parent clock - mau_epll. The clock hierarchy is
-strange for maudio domain. Basically mau_epll is needed to access
-maudio clocks however these clocks are not children of mau_epll.
+> When I run standby on A385 I get following error:
+> root at localhost:~# echo standby > /sys/power/state
+> [  122.889266] PM: System core suspend callback
+> mvebu_mbus_suspend+0x0/0xf4 failed.
+> 
+> Did you see this issue in your setup?
 
-I think we should not enable the mdma0 but instead we should find the
-proper parent which needs to be enabled.
+You need to change your DT to include an additional set of registers
+for the MBus node.
 
-Anyway it is kind of annoying (or funny if one has sense of black
-humour) that two issues are exposed by runtime PM for pl330 driver.
+This is something that we probably need to change in the mvebu-mbus
+driver, I remember we discussed this with Greg.
 
-Best regards,
-Krzysztof
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
