@@ -1,73 +1,39 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 1 Apr 2015 13:50:55 -0700
-Subject: [PATCH v2 1/3] phy: phy-core: allow specifying supply at port level
-In-Reply-To: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1427921457-18235-2-git-send-email-arun.ramamurthy@broadcom.com>
+Date: Wed, 1 Apr 2015 13:50:54 -0700
+Subject: [PATCH v2 0/3] USB PHY driver for Broadcom's Cygnus chipset
+Message-ID: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dmitry Torokhov <dtor@chromium.org>
+This patchset adds the USB phy driver and documentation 
+for Broadom's Cygnus chipset. The phy is configurable from device tree
+and is capable of both device and host functions. It also provides
+a clock and reset to the host controller
 
-Multi-port phy's may have per-port power supplies. Let's change phy core
-to first attempt to look up the supply at the port level, and then, if
-not found, check parent device.
+History:
+v1:
+    - Included Dmitry Torokhov's patch that addresed Kishon Vijay Abraham's 
+    comments on multiple phy model
+    - Inlucded Dmitry Torokhov's patch to use phy regulator
+    - Addressed Arnd Bergmann's comments on usage of this phy driver by
+    ehci-platform and ohci-platform driver in a separate patchset. 
+v2:
+    - Addressed Kishon's comments on documentation and function names
+    - Dmitry Addressed Kishon's comments on per port phy regulators
 
-Signed-off-by: Dmitry Torokhov <dtor@chromium.org>
-Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- drivers/phy/phy-core.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+Arun Ramamurthy (3):
+  phy: phy-core: allow specifying supply at port level
+  Phy: DT binding documentation for Broadcom Cygnus USB PHY driver
+  phy: cygnus-usbphy: Add Broadcom Cygnus USB phy driver
 
-diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-index 3791838..c7aa297 100644
---- a/drivers/phy/phy-core.c
-+++ b/drivers/phy/phy-core.c
-@@ -651,16 +651,6 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
- 		goto free_phy;
- 	}
- 
--	/* phy-supply */
--	phy->pwr = regulator_get_optional(dev, "phy");
--	if (IS_ERR(phy->pwr)) {
--		if (PTR_ERR(phy->pwr) == -EPROBE_DEFER) {
--			ret = -EPROBE_DEFER;
--			goto free_ida;
--		}
--		phy->pwr = NULL;
--	}
--
- 	device_initialize(&phy->dev);
- 	mutex_init(&phy->mutex);
- 
-@@ -674,6 +664,16 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
- 	if (ret)
- 		goto put_dev;
- 
-+	/* phy-supply */
-+	phy->pwr = regulator_get_optional(&phy->dev, "phy");
-+	if (IS_ERR(phy->pwr)) {
-+		ret = PTR_ERR(phy->pwr);
-+		if (ret == -EPROBE_DEFER)
-+			goto put_dev;
-+
-+		phy->pwr = NULL;
-+	}
-+
- 	ret = device_add(&phy->dev);
- 	if (ret)
- 		goto put_dev;
-@@ -689,9 +689,6 @@ put_dev:
- 	put_device(&phy->dev);  /* calls phy_release() which frees resources */
- 	return ERR_PTR(ret);
- 
--free_ida:
--	ida_simple_remove(&phy_ida, phy->id);
--
- free_phy:
- 	kfree(phy);
- 	return ERR_PTR(ret);
+ .../bindings/phy/brcm,cygnus-usb-phy.txt           |  69 +++
+ drivers/phy/Kconfig                                |  12 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-cygnus-usb.c                   | 484 +++++++++++++++++++++
+ drivers/phy/phy-core.c                             |  23 +-
+ 5 files changed, 576 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-cygnus-usb.c
+
 -- 
 2.3.4
