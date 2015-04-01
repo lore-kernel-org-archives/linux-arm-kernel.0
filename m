@@ -1,36 +1,35 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 1 Apr 2015 15:45:20 +0800
-Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
-In-Reply-To: <CACRpkdapp8vGFHJA+WrZzRk503zoAzrz3HaVGYXH+CHRDaLaDg@mail.gmail.com>
-References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
- <CACRpkdapp8vGFHJA+WrZzRk503zoAzrz3HaVGYXH+CHRDaLaDg@mail.gmail.com>
-Message-ID: <15EE7657-76F1-4AD4-B90B-C6A166301154@jcrosoft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Apr 2015 08:58:24 +0100
+Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
+In-Reply-To: <551B5213.8070902@rock-chips.com>
+References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
+ <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
+ <551A5B2F.50203@rock-chips.com>
+ <20150331091329.GP24899@n2100.arm.linux.org.uk>
+ <551B5213.8070902@rock-chips.com>
+Message-ID: <20150401075824.GX24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-J
-> On Mar 27, 2015, at 5:07 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, Apr 01, 2015 at 10:04:03AM +0800, Yakir wrote:
+> Hi Russell,
 > 
-> On Fri, Mar 20, 2015 at 8:12 PM, Alexander Stein <alexanders83@web.de> wrote:
-> 
->> This adds the callback for set_multiple.
->> As this controller has a separate set and clear register, we can't write
->> directly to PIO_ODSR as this would required a cached variable and would
->> race with at91_gpio_set.
->> So build masks for the PIO_SODR and PIO_CODR registers and write them
->> together.
->> 
->> Signed-off-by: Alexander Stein <alexanders83@web.de>
->> ---
->> This was tested by using an own test driver which uses
->> gpiod_set_array_cansleep to set multiple GPIOs at once.
-> 
-> I remember J-C brought this up ages ago, so I hope he will be delighted
-> to see we can now, FINALLY, do this!
-> 
-> J-C can I have your review on this?
+> ? 2015/3/31 17:13, Russell King - ARM Linux ??:
+> >As for the channel number, this is intentionally left to the driver -
+> >most cases I've found either the driver isn't interested, or where
+> >they are interested (the only case I know of is my dw_hdmi ahb audio
+> >driver), it's more appropriate to generate a baseline channel status,
+> >and let the driver iterate over the channels adding the appropriate
+> >channel number in.
+> Okay, agree with you to keep baseline channel status, but seems dw_hdmi
+> i2s audio are interested in channle number (to fill in schnl resigeters).
 
-I will check it tonight
+Correct - but it's pointless having it in this helper as I explained.
+Please read my dw_hdmi-ahb-audio code to see why.
 
-Best Regards,
-J.
+It would be wasteful to memset the structure back to zero, only to
+re-fill it with exactly the same data except for the channel number.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
