@@ -1,7 +1,7 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 02 Apr 2015 03:16:55 +0900
-Subject: [GIT PULL 4/5] Samsung arm64 DT updates for v4.1
-Message-ID: <551C3617.5040306@kernel.org>
+Date: Thu, 02 Apr 2015 03:17:33 +0900
+Subject: [GIT PULL 5/5] Samsung mach updates for v4.1
+Message-ID: <551C363D.3040207@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,49 +12,59 @@ The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt-64
+tags/samsung-updates
 
-for you to fetch changes up to 423c716151e254e42650ad78b30c2cd782c6f654:
+for you to fetch changes up to bd0d888c4f7f125b7c7168f51039142150d9d1cc:
 
-  arm64: dts: Add thermal-zones dt node for exynos5433 (2015-03-27
-02:13:43 +0900)
-
-----------------------------------------------------------------
-Samsung arm64 DT updates for v4.1
-
-- add new SoC for arm64 based exynos5433 SoC
-  : exynos5433 - Octa cores for big.LITTLE architecture
-  (Quad Cortex-A57 big and Quad Cortex-A53 LITTLE cores)
-
-  : added thermal-zones, TMU sensor and I2S dt nodes
-  : added ADMA, RTC, ADC, PMU, SPI/PDMA and MSHC dt nodes
-  : added pinctrl, HS-I2C, Serial and basic system dt nodes
+  ARM: EXYNOS: allow cpuidle driver usage on Exynos3250 SoC (2015-03-27
+02:35:52 +0900)
 
 ----------------------------------------------------------------
-Chanwoo Choi (6):
-      arm64: dts: Add dts files for 64-bit Exynos5433 SoC
-      arm64: dts: Add SPI/PDMA dt node for exynos5433
-      arm64: dts: Add PMU dt node for exynos5433
-      arm64: dts: Add RTC and ADC dt node for exynos5433
-      arm64: dts: Add TMU sensor dt node for exynos5433
-      arm64: dts: Add thermal-zones dt node for exynos5433
+Samsung mach updates for v4.1
 
-Inha Song (2):
-      arm64: dts: Add ADMA dt node for exynos5433
-      arm64: dts: Add I2S dt node for exynos5433
+- for s3c64xx
+  : use fixed IRQ bases to avoid conflicts on Cragganmore
 
-Jaehoon Chung (1):
-      arm64: dts: Add MSHC dt node for exynos5433
+- for exynos3250
+  : add cpuidle and AFTR mode support
+  : fix CPU1 hotplug
 
- .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
- arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++
- .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  22 +
- arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 231 +++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 931
-+++++++++++++++++++++
- 5 files changed, 1883 insertions(+)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
- create mode 100644
-arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
+- for exynos SoCs
+  : add code for setting/clearing boot flag for cpuidle AFTR
+  : remove left over 'extra_save' and constify 'exynos_pm_data' array
+  : use static in suspend.c as per compiler suggestions
+  : use platform device name as power domain name
+  : add support for async-bridge clocks for pm_domains (exynos5420)
+
+----------------------------------------------------------------
+Andrzej Hajda (1):
+      ARM: EXYNOS: add support for async-bridge clocks for pm_domains
+
+Bartlomiej Zolnierkiewicz (4):
+      ARM: EXYNOS: fix CPU1 hotplug on Exynos3250
+      ARM: EXYNOS: add code for setting/clearing boot flag
+      ARM: EXYNOS: add AFTR mode support for Exynos3250
+      ARM: EXYNOS: allow cpuidle driver usage on Exynos3250 SoC
+
+Charles Keepax (1):
+      ARM: S3C64XX: Use fixed IRQ bases to avoid conflicts on Cragganmore
+
+Krzysztof Kozlowski (4):
+      ARM: EXYNOS: Use platform device name as power domain name
+      ARM: EXYNOS: use static in suspend.c
+      ARM: EXYNOS: Constify exynos_pm_data array
+      ARM: EXYNOS: Remove left over 'extra_save'
+
+ arch/arm/mach-exynos/common.h         |  6 ++++++
+ arch/arm/mach-exynos/exynos.c         |  1 +
+ arch/arm/mach-exynos/firmware.c       | 33
+++++++++++++++++++++++++++++++++-
+ arch/arm/mach-exynos/platsmp.c        | 23 ++++++++++++++++++++---
+ arch/arm/mach-exynos/pm.c             | 12 +++++++++++-
+ arch/arm/mach-exynos/pm_domains.c     | 29 ++++++++++++++++++++++++-----
+ arch/arm/mach-exynos/regs-pmu.h       |  3 +++
+ arch/arm/mach-exynos/smc.h            |  9 +++++++++
+ arch/arm/mach-exynos/suspend.c        | 22 ++++++----------------
+ arch/arm/mach-s3c64xx/crag6410.h      |  1 +
+ arch/arm/mach-s3c64xx/mach-crag6410.c |  1 +
+ 11 files changed, 114 insertions(+), 26 deletions(-)
