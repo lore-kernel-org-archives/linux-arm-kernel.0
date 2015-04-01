@@ -1,38 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Apr 2015 19:18:19 +0100
-Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
- generation of APM X-Gene SoC
-In-Reply-To: <20150401173029.GF24899@n2100.arm.linux.org.uk>
-References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
- <1427899682-10912-2-git-send-email-stripathi@apm.com>
- <20150401161336.GS9974@htj.duckdns.org>
- <20150401163116.GT9974@htj.duckdns.org>
- <20150401163956.GE24899@n2100.arm.linux.org.uk>
- <20150401170032.GC28616@e104818-lin.cambridge.arm.com>
- <20150401173029.GF24899@n2100.arm.linux.org.uk>
-Message-ID: <20150401181819.GD28616@e104818-lin.cambridge.arm.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 01 Apr 2015 12:18:27 -0600
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150401175040.GQ1552@arm.com>
+References: <20150327171946.GL1562@arm.com>
+ <1427894051.22236.6.camel@infradead.org> <20150401133908.GI1552@arm.com>
+ <1427896377.22236.8.camel@infradead.org>
+ <1427907064.5567.256.camel@redhat.com> <20150401175040.GQ1552@arm.com>
+Message-ID: <1427912307.5567.270.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 06:30:30PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 01, 2015 at 06:00:33PM +0100, Catalin Marinas wrote:
-> > The driver in general should not be ARM specific, though it runs on an
-> > ARMv8 platform. But looking at the patch it has some errata workarounds
-> > triggered based on the CPU id (MIDR). That looks dodgy as it doesn't
-> > even check the full ID, only the variant part.
+On Wed, 2015-04-01 at 18:50 +0100, Will Deacon wrote:
+> Hi Alex,
 > 
-> Okay, it's not ARM but an ARM64 driver, so that's your territory, not
-> mine. :)
+> On Wed, Apr 01, 2015 at 05:51:04PM +0100, Alex Williamson wrote:
+> > On Wed, 2015-04-01 at 15:52 +0200, David Woodhouse wrote:
+> > > On Wed, 2015-04-01 at 14:39 +0100, Will Deacon wrote:
+> > > > In fact, that would also allow us to nuke the whole TLB on VFIO unmap of
+> > > > large ranges. We currently iterate over the range page-by-page, which takes
+> > > > ages (minutes) in simulation.
+> > > 
+> > > Which is one of the big reasons we lie about page sizes in VT-d.
+> > 
+> > I think (hope) we've solved a significant portion of the unmap problem
+> > with the chunking patches that are now in v4.0.  We should now be
+> > attempting to find the largest contiguous range to unmap instead of
+> > doing the page-by-page unmap that was mostly hoping the IOMMU actually
+> > used a super page.  I'm not sure how lying about page sizes had any
+> > effect on this though.  In order for vfio to get any smarter about it
+> > we'd need a "commit" callback and to be able to use the freelist to
+> > track pages to unpin after commit.  Thanks,
+> 
+> Just so I understand this correctly, is that "commit" callback to ensure
+> that the domain_destroy has actually taken effect on the IOMMU (e.g. by
+> invalidating the TLBs and waiting for that to take effect)?
 
-Well, feel free to enter this territory ;).
+Not necessarily domain_destroy, but simply large unmaps that require
+multiple calls to iommu_unmap().  Each call requires the IOMMU driver to
+flush io-tlb page structures.  If we could save the io-tlb flushes all
+to the end, I imagine we'd get a good improvement in efficiency.  We
+can't unpin pages until after the flush though, so we'd need something
+like the page freelist to bridge the gap.
 
-Anyway, what I meant is that such driver should not rely on CPU
-identification at all, especially since it does not require some
-specific CPU features but it tries to guess which SoC revision it is and
-which device (not CPU) bugs have been fixed. Better if they follow Mark
-R's idea to pass such information in DT for the device.
+> The io-pgtable API has a tlb_sync callback, but actually I made
+> tlb_flush_all (which is called when destroying the page tables) always
+> synchronous so that you wouldn't need to unmap anything explicitly in
+> that case.
 
-So maybe the revert is not too bad an idea.
+Unfortunately we need to unmap before we destroy the domain because the
+IOMMU is tracking the pages we have pinned.  It's again a chicken and
+egg problem, we need the IOMMU to know what to unpin, but we can't unpin
+it until the IOMMU mapping is removed because that would give the
+userspace device access to an IOVA not backed by pinned memory.
 
--- 
-Catalin
+> Unfortunately, 4.0 doesn't seem to have improved wrt VFIO unmap for me.
+> Is there something extra I need to add to the ARM SMMU driver?
+
+No, but see the comment above
+drivers/vfio/vfio_iommu_type1.c:vfio_test_domain_fgsp()  It's an ugly
+heuristic, but the only way I could come up with for improving
+performance on VT-d w/o degrading performance on AMD-Vi.  I don't know
+what your hardware does, but if it's more like AMD-Vi, you may not see a
+difference.  Thanks,
+
+Alex
