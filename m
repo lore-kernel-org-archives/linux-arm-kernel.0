@@ -1,35 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Apr 2015 17:39:56 +0100
-Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
- generation of APM X-Gene SoC
-In-Reply-To: <20150401163116.GT9974@htj.duckdns.org>
-References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
- <1427899682-10912-2-git-send-email-stripathi@apm.com>
- <20150401161336.GS9974@htj.duckdns.org>
- <20150401163116.GT9974@htj.duckdns.org>
-Message-ID: <20150401163956.GE24899@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 1 Apr 2015 11:43:39 -0500
+Subject: [PATCH 0/7] OPP: Introduce OPP bindings V2 and supporting code
+In-Reply-To: <CAKohpokDhHo1ftcB6b4b+hO125_sqjK0NKESt79GVcWEwiq04w@mail.gmail.com>
+References: <cover.1423642246.git.viresh.kumar@linaro.org>
+ <CAKohpokDhHo1ftcB6b4b+hO125_sqjK0NKESt79GVcWEwiq04w@mail.gmail.com>
+Message-ID: <CAL_JsqLCjkrb2gT-_hj-UTAs+qn2LZtEm=f_C05ovhdwkZKB-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 12:31:16PM -0400, Tejun Heo wrote:
-> On Wed, Apr 01, 2015 at 12:13:36PM -0400, Tejun Heo wrote:
-> > > Signed-off-by : Suman Tripathi <stripathi@apm.com>
-> > 
-> > Applied to libata/for-4.1 w/ minor edit.
-> 
-> Reverted due to build failure from missing asm/cputype.h.
+On Wed, Apr 1, 2015 at 1:22 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 11 February 2015 at 13:46, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> Now that I have received an verbal Ack from Rob Herring (in a personal
+>> conversation) about the bindings, I am showing how the code looks like with
+>> these new bindings.
 
-I'm guessing this is some kind of ARM driver, which is why
-linux-arm-kernel has been Cc'd - though I haven't seen the original
-patch.
+I have also told you multiple times I want to see others' inputs and
+acks. So yes it looks fine to me, but I am not a user of it.
 
-ARM has asm/cputype.h, and has had for a long time, so "missing
-asm/cputype.h" doesn't make sense as a reason to revert it.  Maybe
-it's trying to be built on x86 when it should be restricted to
-only ARM?
+>> Some part is still now done:
+>> - Interface for adding new detailed OPPs from platform code instead of DT
+>> - Providing cpufreq helpers for the next OPPs
+>> - Providing regulator helpers for the target/min/max ranges
+>>
+>> Please provide feedback on how this looks like..
+>
+> @Rafael: Its been two months now since this was posted. Can we get this
+> merged please? If someone finds issues later, we can go fix them ..
 
-Dunno without seeing the original patch.
+If there are users waiting for this, then get their acks first. As you
+already know, I spoke to Stephen at ELC and he still has concerns
+about it. As Qualcomm is probably the most complicated case, it needs
+to work for them (or we accept that it can't and they do everything
+their own way).
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Rob
