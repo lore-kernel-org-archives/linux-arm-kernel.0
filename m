@@ -1,76 +1,50 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 1 Apr 2015 11:02:47 +0200
-Subject: [PATCH 0/5] Add standby support for the recent mvebu SoCs
-In-Reply-To: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 1 Apr 2015 10:04:57 +0100
+Subject: [RFC PATCH 2/2] Kbuild: avoid partial linking of
+ drivers/built-in.o
+In-Reply-To: <alpine.LFD.2.11.1503311429240.25806@knanqh.ubzr>
+References: <1427716167-25078-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1427716167-25078-3-git-send-email-ard.biesheuvel@linaro.org>
+ <551943CB.3010303@suse.cz>
+ <20150330132617.GI24899@n2100.arm.linux.org.uk>
+ <CAKv+Gu8-4XR5D-0_JnVfS2LNkH_Uvcc5txe4wJhwZogc5hZ-1w@mail.gmail.com>
+ <551959F1.4030704@suse.cz>
+ <CAKv+Gu-gRuf8L+NKtez4Jm9Mqe1HeeufH9MPqRztLcD+NTo+sA@mail.gmail.com>
+ <alpine.LFD.2.11.1503311115300.25806@knanqh.ubzr>
+ <20150331161026.GA17480@e103592.cambridge.arm.com>
+ <alpine.LFD.2.11.1503311429240.25806@knanqh.ubzr>
+Message-ID: <20150401090449.GA3602@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Tue, Mar 31, 2015 at 02:42:24PM -0400, Nicolas Pitre wrote:
+> On Tue, 31 Mar 2015, Dave Martin wrote:
 
-When I run standby on A385 I get following error:
-root at localhost:~# echo standby > /sys/power/state
-[  122.889266] PM: System core suspend callback
-mvebu_mbus_suspend+0x0/0xf4 failed.
+[...]
 
-Did you see this issue in your setup?
+> > We'd need to avoid pruning needed code that has no explicit caller,
+> > and functions that are part of the kernel/module ABI but not used
+> > within vmlinux.
+> 
+> Those are usually located in special sections, like the initcall table, 
+> the CPU entry table, etc. The linker allows for those sections to be 
+> marked with KEEP() not to prune them.
 
-Best regards,
-Marcin
+True.  See what breaks, I guess.
 
-2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi,
->
-> Until now only one Armada XP based board supported suspend to
-> ram. This suspend to ram mode was unusual because it involved shutting
-> down the SoC and relied on a PIC to wake up the system.
->
-> However, most of the recent mvebu SoCs can support the standby
-> mode. Unlike for the suspend to ram, nothing special have to be done
-> for these SoCs. In this mode the SoCs go in idle mode (but they remain
-> powered up) and the devices enter in suspend mode. The support itself
-> was added in the patch 2.
->
-> In order to wake-up the interrupt controller driver have been
-> updated. As in standby mode the interrupt controller is not shutdown,
-> any interrupt can be a wake-up source. So the MPIC (patch 4) and the
-> GIC (patch 3) now used the flags IRQCHIP_SKIP_SET_WAKE and
-> IRQCHIP_MASK_ON_SUSPEND.
->
-> A wake up source is supposed to work in suspend _and_ in standby mode
-> but for the mvebu SoCs, no interrupt can wake up the system. The last
-> patch warns the user about it.
->
-> The first patch is a clean-up found while working on this series
->
-> All the patch are independents either for building or for running.
->
-> Thanks,
->
-> Gregory
->
->
-> Gregory CLEMENT (5):
->   ARM: mvebu: Use __init for the PM initialization functions
->   ARM: mvebu: Add standby support
->   ARM: mvebu: Allow using the GIC for wakeup in standby mode
->   irqchip: armada-370-xp: Allow using wakeup source
->   ARM: mvebu: Warn about the wake-ups sources not taken into account in
->     suspend
->
->  arch/arm/mach-mvebu/board-v7.c      |  7 +++++
->  arch/arm/mach-mvebu/common.h        |  5 ++--
->  arch/arm/mach-mvebu/pm-board.c      | 15 ++++++----
->  arch/arm/mach-mvebu/pm.c            | 57 ++++++++++++++++++++++++++++++++-----
->  drivers/irqchip/irq-armada-370-xp.c |  1 +
->  5 files changed, 70 insertions(+), 15 deletions(-)
->
-> --
-> 2.1.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > The GCC docs suggest that -ffunction-sections may impact performance
+> > and/or increase code size, but I don't know by how much.  Maybe it
+> > interferes with inling.
+> 
+> It doesn't interfere with inlining. However it impose a section 
+> alignment on every function. That still can be overriden though. Also, I 
+> suppose that gcc may not assume that calls to a global function that 
+> happens to be located in the same C file will be close by anymore, 
+> however I don't see this having any impact on ARM code generation.
+
+More veneers may be introduced during linking, and it's likely that
+cache/TLB locality would be affected, but I've no idea whether the
+impact would be significant.
+
+Cheers
+---Dave
