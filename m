@@ -1,36 +1,35 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 1 Apr 2015 17:17:31 +0530
-Subject: [RESEND PATCH 1/8] Documentation: DT: Add entry for FSL LS2085A QDS
- and RDB boards
+Date: Wed, 1 Apr 2015 17:17:32 +0530
+Subject: [RESEND PATCH 2/8] doc/bindings: Update PCIe devicetree binding
+ documentation for LS2085A
 In-Reply-To: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1427888858-29636-2-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1427888858-29636-3-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a devicetree binding documentation for FSL's
-LS2085A QDS and RDB boards.
+Add the documentation for compatible string "fsl,ls2085a-pcie"
+for LS2085A platform.
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Reviewed-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
 ---
- Documentation/devicetree/bindings/arm/fsl.txt |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ .../devicetree/bindings/pci/layerscape-pci.txt     |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index a5462b6..29b53a7 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -132,3 +132,11 @@ LS2085A ARMv8 based Simulator model
- Required root node properties:
-     - compatible = "fsl,ls2085a-simu", "fsl,ls2085a";
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 6286f04..0654809 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+ and thus inherits all the common properties defined in designware-pcie.txt.
  
-+LS2085A ARMv8 based QDS Board
-+Required root node properties:
-+    - compatible = "fsl,ls2085a-qds", "fsl,ls2085a";
-+
-+LS2085A ARMv8 based RDB Board
-+Required root node properties:
-+    - compatible = "fsl,ls2085a-rdb", "fsl,ls2085a";
-+
+ Required properties:
+-- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
++- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie",
++  "fsl,ls2085a-pcie".
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
 -- 
 1.7.9.5
