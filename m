@@ -1,106 +1,66 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 01 Apr 2015 11:21:30 +0200
-Subject: [PATCH 0/5] Add standby support for the recent mvebu SoCs
-In-Reply-To: <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
-References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
-Message-ID: <551BB89A.60405@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Apr 2015 10:22:29 +0100
+Subject: [PATCH] arm64: fix midr range for Cortex-A57 erratum 832075
+In-Reply-To: <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
+References: <1427833848-12188-1-git-send-email-byan@nvidia.com>
+ <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
+Message-ID: <20150401092229.GC1552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
-
-On 01/04/2015 11:02, Marcin Wojtas wrote:
-> Hi Gregory,
+On Tue, Mar 31, 2015 at 10:17:21PM +0100, Paul Walmsley wrote:
+> On Tue, 31 Mar 2015, Bo Yan wrote:
 > 
-> When I run standby on A385 I get following error:
-> root at localhost:~# echo standby > /sys/power/state
-> [  122.889266] PM: System core suspend callback
-> mvebu_mbus_suspend+0x0/0xf4 failed.
+> > Register MIDR_EL1 is masked to get variant and revision fields, then
+> > compared against midr_range_min and midr_range_max when checking
+> > whether CPU is affected by any particular erratum. However, variant
+> > and revision fields in MIDR_EL1 are separated by 16 bits, so the min
+> > and max of midr range should be constructed accordingly, otherwise
+> > the patch will not be applied when variant field is non-0.
+> > 
+> > Signed-off-by: Bo Yan <byan@nvidia.com>
+> > ---
+> >  arch/arm64/kernel/cpu_errata.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > index fa62637e63a8..7838f1578019 100644
+> > --- a/arch/arm64/kernel/cpu_errata.c
+> > +++ b/arch/arm64/kernel/cpu_errata.c
+> > @@ -88,7 +88,7 @@ struct arm64_cpu_capabilities arm64_errata[] = {
+> >  	/* Cortex-A57 r0p0 - r1p2 */
+> >  		.desc = "ARM erratum 832075",
+> >  		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+> > -		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
+> > +		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x100002),
+> >  	},
+> >  #endif
+> >  	{
+> > -- 
+> > 2.1.4
 > 
-> Did you see this issue in your setup?
-
-Yes the mbus driver for the Armada 38x must be updated. As Thomas
-worked on it I didn't put it in the series.
-
-I have just create the patch needed you can try it, and I will
-add it in the next version of the series.
-
-Thanks,
-
-Gregory
-
-
+> Reviewed-by: Paul Walmsley <paul@pwsan.com>
 > 
-> Best regards,
-> Marcin
-> 
-> 2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> Hi,
->>
->> Until now only one Armada XP based board supported suspend to
->> ram. This suspend to ram mode was unusual because it involved shutting
->> down the SoC and relied on a PIC to wake up the system.
->>
->> However, most of the recent mvebu SoCs can support the standby
->> mode. Unlike for the suspend to ram, nothing special have to be done
->> for these SoCs. In this mode the SoCs go in idle mode (but they remain
->> powered up) and the devices enter in suspend mode. The support itself
->> was added in the patch 2.
->>
->> In order to wake-up the interrupt controller driver have been
->> updated. As in standby mode the interrupt controller is not shutdown,
->> any interrupt can be a wake-up source. So the MPIC (patch 4) and the
->> GIC (patch 3) now used the flags IRQCHIP_SKIP_SET_WAKE and
->> IRQCHIP_MASK_ON_SUSPEND.
->>
->> A wake up source is supposed to work in suspend _and_ in standby mode
->> but for the mvebu SoCs, no interrupt can wake up the system. The last
->> patch warns the user about it.
->>
->> The first patch is a clean-up found while working on this series
->>
->> All the patch are independents either for building or for running.
->>
->> Thanks,
->>
->> Gregory
->>
->>
->> Gregory CLEMENT (5):
->>   ARM: mvebu: Use __init for the PM initialization functions
->>   ARM: mvebu: Add standby support
->>   ARM: mvebu: Allow using the GIC for wakeup in standby mode
->>   irqchip: armada-370-xp: Allow using wakeup source
->>   ARM: mvebu: Warn about the wake-ups sources not taken into account in
->>     suspend
->>
->>  arch/arm/mach-mvebu/board-v7.c      |  7 +++++
->>  arch/arm/mach-mvebu/common.h        |  5 ++--
->>  arch/arm/mach-mvebu/pm-board.c      | 15 ++++++----
->>  arch/arm/mach-mvebu/pm.c            | 57 ++++++++++++++++++++++++++++++++-----
->>  drivers/irqchip/irq-armada-370-xp.c |  1 +
->>  5 files changed, 70 insertions(+), 15 deletions(-)
->>
->> --
->> 2.1.0
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Reviewed against DDI0488G section 4.3.1 "Main ID Register, EL1".  Looks 
+> like a cut-and-paste error from the A53 workarounds.
 
+Thanks guys, I agree that this is a bug. I'll apply this, but using an
+explicit shift to set the variant (tweaked version below).
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-mvebu-adjust-mbus-controller-description-on-Arma.patch
-Type: text/x-diff
-Size: 1205 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150401/c5ed8db9/attachment.bin>
+Will
+
+--->8
+
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a66f4fa4d541..c998345a052f 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -70,7 +70,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+        /* Cortex-A57 r0p0 - r1p2 */
+                .desc = "ARM erratum 832075",
+                .capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+-               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
++               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, (1 << MIDR_VARIANT_SHIFT) | 2,
+        },
+ #endif
+        {
