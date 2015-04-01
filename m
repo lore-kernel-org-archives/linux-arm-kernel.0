@@ -1,51 +1,158 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  1 Apr 2015 23:20:40 +0200
-Subject: [PATCH 3/6] doc: dt: add documentation for lpc3250-timer
+Date: Wed,  1 Apr 2015 23:20:43 +0200
+Subject: [PATCH 6/6] ARM: lpc18xx: add kernel config
 In-Reply-To: <1427923243-26296-1-git-send-email-manabian@gmail.com>
 References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
-Message-ID: <1427923243-26296-4-git-send-email-manabian@gmail.com>
+Message-ID: <1427923243-26296-7-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings documentation for lpc3250-timer. This timer is
-used as clocksource on many NXP platforms.
-
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../bindings/timer/nxp,lpc3250-timer.txt           | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/nxp,lpc3250-timer.txt
+ arch/arm/configs/lpc18xx_defconfig | 135 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+ create mode 100644 arch/arm/configs/lpc18xx_defconfig
 
-diff --git a/Documentation/devicetree/bindings/timer/nxp,lpc3250-timer.txt b/Documentation/devicetree/bindings/timer/nxp,lpc3250-timer.txt
+diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
 new file mode 100644
-index 000000000000..9381c3e1d5aa
+index 000000000000..0d03853fe462
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/nxp,lpc3250-timer.txt
-@@ -0,0 +1,25 @@
-+* NXP LPC3250 timer
-+
-+The NXP LPC3250 timer is used on a wide range of NXP SoCs. This
-+includes LPC32xx, LPC178x, LPC18xx and LPC43xx parts.
-+
-+Required properties:
-+- compatible:
-+	Should be "nxp,lpc3250-timer".
-+- reg:
-+	Address and length of the register set.
-+- interrupts:
-+	Reference to the timer interrupt
-+- clocks:
-+	Should contain a reference to the timer clock.
-+
-+
-+Example:
-+
-+timer1: timer at 40085000 {
-+	compatible = "nxp,lpc3250-timer";
-+	reg = <0x40085000 0x1000>;
-+	interrupts = <13>;
-+	clocks = <&ccu1 CLK_CPU_TIMER1>;
-+};
-+
++++ b/arch/arm/configs/lpc18xx_defconfig
+@@ -0,0 +1,135 @@
++CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_XZ is not set
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++# CONFIG_UID16 is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_SLUB_DEBUG is not set
++# CONFIG_LBDAF is not set
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_IOSCHED_DEADLINE is not set
++# CONFIG_IOSCHED_CFQ is not set
++# CONFIG_MMU is not set
++CONFIG_ARCH_LPC18XX=y
++CONFIG_SET_MEM_PARAM=y
++CONFIG_DRAM_BASE=0x28000000
++CONFIG_DRAM_SIZE=0x02000000
++CONFIG_FLASH_MEM_BASE=0x1b000000
++CONFIG_FLASH_SIZE=0x00080000
++CONFIG_PREEMPT=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_BINFMT_FLAT=y
++CONFIG_BINFMT_ZFLAT=y
++CONFIG_BINFMT_SHARED_FLAT=y
++# CONFIG_COREDUMP is not set
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_INET_LRO is not set
++# CONFIG_INET_DIAG is not set
++# CONFIG_IPV6 is not set
++# CONFIG_WIRELESS is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_FW_LOADER is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_SRAM=y
++CONFIG_EEPROM_AT24=y
++CONFIG_NETDEVICES=y
++# CONFIG_NET_VENDOR_ARC is not set
++# CONFIG_NET_CADENCE is not set
++# CONFIG_NET_VENDOR_BROADCOM is not set
++# CONFIG_NET_VENDOR_CIRRUS is not set
++# CONFIG_NET_VENDOR_FARADAY is not set
++# CONFIG_NET_VENDOR_HISILICON is not set
++# CONFIG_NET_VENDOR_INTEL is not set
++# CONFIG_NET_VENDOR_MARVELL is not set
++# CONFIG_NET_VENDOR_MICREL is not set
++# CONFIG_NET_VENDOR_MICROCHIP is not set
++# CONFIG_NET_VENDOR_NATSEMI is not set
++# CONFIG_NET_VENDOR_SAMSUNG is not set
++# CONFIG_NET_VENDOR_SEEQ is not set
++# CONFIG_NET_VENDOR_SMSC is not set
++CONFIG_STMMAC_ETH=y
++# CONFIG_NET_VENDOR_VIA is not set
++# CONFIG_NET_VENDOR_WIZNET is not set
++CONFIG_SMSC_PHY=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++CONFIG_INPUT_EVDEV=y
++# CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_GPIO_POLLED=y
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_UNIX98_PTYS is not set
++# CONFIG_LEGACY_PTYS is not set
++CONFIG_SERIAL_NONSTANDARD=y
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_SPI=y
++CONFIG_SPI_PL022=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_SENSORS_LM75=y
++CONFIG_WATCHDOG=y
++CONFIG_WATCHDOG_CORE=y
++CONFIG_MFD_SYSCON=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_ROOT_HUB_TT=y
++CONFIG_MMC=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_PCA9532=y
++CONFIG_LEDS_PCA9532_GPIO=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_AMBA_PL08X=y
++CONFIG_EXT2_FS=y
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_NETWORK_FILESYSTEMS is not set
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_INFO=y
++# CONFIG_ENABLE_WARN_DEPRECATED is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++# CONFIG_SCHED_DEBUG is not set
++# CONFIG_DEBUG_BUGVERBOSE is not set
++# CONFIG_RCU_CPU_STALL_INFO is not set
++# CONFIG_FTRACE is not set
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
++CONFIG_EARLY_PRINTK=y
++CONFIG_CRC_ITU_T=y
++CONFIG_CRC7=y
 -- 
 1.8.0
