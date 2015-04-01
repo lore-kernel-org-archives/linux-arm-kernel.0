@@ -1,116 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Apr 2015 14:24:00 +0100
-Subject: [RESEND PATCH 4/8] layerscape/ftm: Add compatible string for
- FTM0 be used as alarm timer.
-In-Reply-To: <1427888858-29636-5-git-send-email-bhupesh.sharma@freescale.com>
-References: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
- <1427888858-29636-5-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20150401132400.GF11403@leverpostej>
+From: vianney.leclement@essensium.com (Vianney le =?iso-8859-1?q?Cl=E9ment?=)
+Date: Wed, 1 Apr 2015 15:25:36 +0200
+Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
+In-Reply-To: <CAOMZO5DM66sUX-YojCyY5BC3Pdk4p4bkEqQ+W3tyDeNEL6nU5w@mail.gmail.com>
+References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
+ <CAOMZO5DM66sUX-YojCyY5BC3Pdk4p4bkEqQ+W3tyDeNEL6nU5w@mail.gmail.com>
+Message-ID: <1427894736.2449.2@mail.essensium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 12:47:34PM +0100, Bhupesh Sharma wrote:
-> From: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Wed, Apr 1, 2015 at 1:39 , Fabio Estevam <festevam@gmail.com> wrote:
+> On Wed, Apr 1, 2015 at 5:10 AM, Vianney le Cl?ment de Saint-Marcq
+> <vianney.leclement@essensium.com> wrote:
+>>  Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 
+>> Dual
+>>  based development board.
+>> 
+>>  The e-MMC chip is disabled because initialization fails (error 
+>> -110).
+>>  A possible cause is described in [2].
+>> 
+>>  [1] http://www.embest-tech.com/shop/star/marsboard.html
+>>  [2] https://community.freescale.com/message/442168#442168
+>> 
+>>  Signed-off-by: Vianney le Cl?ment de Saint-Marcq 
+>> <vianney.leclement@essensium.com>
 > 
-> Only FTM0 can be used as an alarm timer, so add a "fsl,ftm-alarm"
-> compatible string to describe FTM0 alarm mode.
-> 
-> Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-> Reviewed-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  .../devicetree/bindings/timer/fsl,ftm-timer.txt    |   46 ++++++++++++++------
->  1 file changed, 32 insertions(+), 14 deletions(-)
+> Couldn't this be combined with the existing
+> arch/arm/boot/dts/imx6dl-riotboard.dts?
 
-Shouldn't there be a corresponding driver update?
+While both boards do indeed share a lot of the schematics, the 
+marsboard has some differences, e.g., in pin configuration, that 
+requires a separate dts.  We could split common parts out in a new 
+dtsi, but I am not sure it is worth the hassle.
 
-There wasn't one in this series.
+Regards,
+Vianney
 
-> 
-> diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> index aa8c402..a372ed7 100644
-> --- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-> @@ -2,12 +2,18 @@ Freescale FlexTimer Module (FTM) Timer
->  
->  Required properties:
->  
-> -- compatible : should be "fsl,ftm-timer"
-> +- compatible : should be "fsl,ftm-timer" & "fsl,ftm-alarm".
-> +  (a) "fsl,ftm-timer", for FlexTimer compatible as normal timer.
-> +  (b) "fsl,ftm-alarm", for FlexTimer compatible when FTM0 as an ALARM timer.
-
-
-Lets not be redundant here. This would be better as:
-
-- compatible: should contain one of:
-  * "fsl,ftm-timer" for a FlexTimer usable as a normal timer.
-  * "fsl,ftm-alarm" for a FlexTimer usable as an ALARM timer.
-
-I don't think FTM0 is useful to mention here; it sounds like that's just
-the name of an instance on a particular design.
-
-What exactly is the difference between a "normal" timer and an "alarm"
-timer?
-
-> +
->  - reg : Specifies base physical address and size of the register sets for the
->    clock event device and clock source device.
-> +
->  - interrupts : Should be the clock event device interrupt.
-> +
->  - clocks : The clocks provided by the SoC to drive the timer, must contain an
->    entry for each entry in clock-names.
-> +
->  - clock-names : Must include the following entries:
->    o "ftm-evt"
->    o "ftm-src"
-> @@ -16,16 +22,28 @@ Required properties:
->  - big-endian: One boolean property, the big endian mode will be in use if it is
->    present, or the little endian mode will be in use for all the device registers.
->  
-> -Example:
-> -ftm: ftm at 400b8000 {
-> -	compatible = "fsl,ftm-timer";
-> -	reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
-> -	interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-> -	clock-names = "ftm-evt", "ftm-src",
-> -		"ftm-evt-counter-en", "ftm-src-counter-en";
-> -	clocks = <&clks VF610_CLK_FTM2>,
-> -		<&clks VF610_CLK_FTM3>,
-> -		<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
-> -		<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
-> -	big-endian;
-> -};
-> +Example 1: In this example, The FlexTimer module (FTM) is a two-to-eight,
-> +	   channel timer that supports input capture, output compare, and
-> +	   the generation of PWM signals to control electric motor and power
-> +	   management applications.
-> +
-> +	ftm: ftm at 400b8000 {
-> +		compatible = "fsl,ftm-timer";
-> +		reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
-> +		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-> +		clock-names = "ftm-evt", "ftm-src",
-> +			"ftm-evt-counter-en", "ftm-src-counter-en";
-> +		clocks = <&clks VF610_CLK_FTM2>,
-> +			<&clks VF610_CLK_FTM3>,
-> +			<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
-> +			<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
-> +		big-endian;
-> +	};
-> +
-> +Example 2: In this example, FTM0 only be used as an alarm timer.
-
-Do you mean that FTM0 is the only instance usable as an alarm timer, or
-that the FTM0 instance can only be used as an alarm timer?
-
-> +
-> +	ftm0: ftm0 at 2800000 {
-> +		compatible = "fsl,ftm-alarm";
-> +		reg = <0x0 0x2800000 0x0 0x10000>;
-> +		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-
-Missing properties?
-
-Mark.
+Vianney le Cl?ment de Saint-Marcq
+Embedded Software Developper ? +32 485 84 55 05
+Essensium, Mind division ? www.mind.be
+GPG: 727B CFE9 355F 1B02 0820 EE1C 9042 3E07 A804 0316
