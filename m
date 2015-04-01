@@ -1,126 +1,83 @@
-From: dahi@linux.vnet.ibm.com (David Hildenbrand)
-Date: Wed, 1 Apr 2015 18:28:55 +0200
-Subject: [PATCH v2 05/10] KVM: arm: introduce kvm_arch_setup/clear_debug()
-In-Reply-To: <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-6-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150401182855.4650b14a@thinkpad-w530>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 1 Apr 2015 11:30:37 -0500
+Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <1426022847-30912-4-git-send-email-marek@goldelico.com>
+References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
+ <1426022847-30912-4-git-send-email-marek@goldelico.com>
+Message-ID: <CAL_JsqL1hMmp-cj56xDKJtdnySgLyCMJtmKVaLLtn=ALKUE8=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This is a precursor for later patches which will need to do more to
-> setup debug state before entering the hyp.S switch code. The existing
-> functionality for setting mdcr_el2 has been moved out of hyp.S and now
-> uses the value kept in vcpu->arch.mdcr_el2.
-> 
-> This also moves the conditional setting of the TDA bit from the hyp code
-> into the C code.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
->  create mode 100644 arch/arm64/kvm/debug.c
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 41008cd..8c01c97 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -242,5 +242,7 @@ static inline void kvm_arch_hardware_unsetup(void) {}
->  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> +static inline void kvm_arch_setup_debug(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_arch_clear_debug(struct kvm_vcpu *vcpu) {}
-
-Do you really want to call these functions "kvm_arch.." although they are not
-defined for other arch and not triggered by common code?
-
-kvm_setup ... or kvm_arm_setup...
-
-> 
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 445933d..7ea8b0e 100644
-> --- a/arch/arm/kvm/arm.c
-[...]
-> +#include <linux/kvm_host.h>
+On Tue, Mar 10, 2015 at 4:27 PM, Marek Belisko <marek@goldelico.com> wrote:
+> Signed-off-by: Marek Belisko <marek@goldelico.com>
+> ---
+>  .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+>
+> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> new file mode 100644
+> index 0000000..d3dd9d8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
+> @@ -0,0 +1,43 @@
+> +twl4030_madc_battery
 > +
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_host.h>
+> +Required properties:
+> + - compatible : "ti,twl4030-madc-battery"
+
+Is this a sub-node of the twl4030 or something? Please define where
+this fits (hint: I would expect to be a sub node of a charging
+controller or battery monitor).
+
+> + - capacity-uah : battery capacity in uAh
+> + - ti,volt-to-capacity-charging-map : list of voltage(mV):level(%) values
+> +       for charging calibration (see example)
+> + - ti,volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
+> +       for discharging calibration (see example)
+
+These seem like properties of the battery independent of the
+battery/charging controller which is the twl4030. Ideally we would
+define battery nodes generically and independent of the charge
+controllers. Then there are smart batteries to consider too.
+
+Rob
+
+> + - io-channels: Should contain IIO channel specifiers
+> +       for each element in io-channel-names.
+> +- io-channel-names: Should contain the following values:
+> + * "temp" - The ADC channel for temperature reading
+> + * "ichg" - The ADC channel for battery charging status
+> + * "vbat" - The ADC channel to measure the battery voltage
 > +
-> +/**
-> + * kvm_arch_setup_debug - set-up debug related stuff
-> + *
-> + * @vcpu:	the vcpu pointer
-> + *
-> + * This is called before each entry in to the hypervisor to setup any
-> + * debug related registers. Currently this just ensures we will trap
-> + * access to:
-> + *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
-> + *  - Debug ROM Address (MDCR_EL2_TDRA)
-> + *  - Power down debug registers (MDCR_EL2_TDOSA)
-> + *
-> + * Additionally the hypervisor lazily saves/restores the debug
-> + * register state. If it is not currently doing so (arch.debug_flags)
-> + * then we also need to ensure we trap if the guest messes with them
-> + * so we know we need to save them.
-> + */
+> +Example:
+> +       madc-battery {
+> +               compatible = "ti,twl4030-madc-battery";
+> +               capacity-uah = <1200000>;
+> +               ti,volt-to-capacity-charging-map = <4200 100>,
+> +                                               <4100 75>,
+> +                                               <4000 55>,
+> +                                               <3900 25>,
+> +                                               <3800 5>,
+> +                                               <3700 2>,
+> +                                               <3600 1>,
+> +                                               <3300 0>;
 > +
-> +void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
-> +{
-> +	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
-> +	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
-
-I'd put that into a single assignment.
-
-> +
-> +	if (!vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
-> +	else
-> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
-> +
-> +}
-> +
-> +void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
-> +{
-> +	/* Nothing to do yet */
-
-Wonder if that would be the right place to clear MDCR_EL2_TDA unconditionally?
-But see my comment below.
-
-> +}
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 5befd01..be92bfe1 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -768,17 +768,8 @@
->  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
->  	msr	hstr_el2, x2
-> 
-> -	mrs	x2, mdcr_el2
-> -	and	x2, x2, #MDCR_EL2_HPMN_MASK
-> -	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
-> -	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
-> -
-> -	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
-> -	// if not dirty.
-> -	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
-> -	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
-> -	orr	x2, x2,  #MDCR_EL2_TDA
-> -1:
-
-*neither an assembler nor arm expert*
-The existing code always cleared all bits except MDCR_EL2_HPMN_MASK. So they
-remained set.
-
-We would now always overwrite these bits with the values from 
-vcpu->arch.mdcr_el2, is that okay?
-
-> +	// Monitor Debug Config - see kvm_arch_setup_debug()
-> +	ldr	x2, [x0, #VCPU_MDCR_EL2]
->  	msr	mdcr_el2, x2
->  .endm
-> 
-
-
-
-David
+> +               ti,volt-to-capacity-discharging-map = <4200 100>
+> +                                                  <4100 95>,
+> +                                                  <4000 70>,
+> +                                                  <3800 50>,
+> +                                                  <3700 10>,
+> +                                                  <3600 5>,
+> +                                                  <3300 0>;
+> +               io-channels = <&twl_madc 1>,
+> +                             <&twl_madc 10>,
+> +                             <&twl_madc 12>;
+> +               io-channel-names = "temp",
+> +                                  "ichg",
+> +                                  "vbat";
+> +       };
+> --
+> 1.9.1
+>
