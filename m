@@ -1,8 +1,10 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  1 Apr 2015 12:08:29 +0100
+Date: Wed,  1 Apr 2015 12:09:44 +0100
 Subject: [PATCH REPOST v4 1/2] Revert "serial/amba-pl011: Leave the TX IRQ
  alone when the UART is not open"
-Message-ID: <1427886509-8553-1-git-send-email-Dave.Martin@arm.com>
+In-Reply-To: <1427886345-8507-1-git-send-email-Dave.Martin@arm.com>
+References: <1427886345-8507-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1427886584-8680-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
