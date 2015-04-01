@@ -1,116 +1,46 @@
-From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
-Date: Wed, 1 Apr 2015 18:46:59 +0200
-Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
- bindings
-In-Reply-To: <CAL_JsqL1hMmp-cj56xDKJtdnySgLyCMJtmKVaLLtn=ALKUE8=g@mail.gmail.com>
-References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
- <1426022847-30912-4-git-send-email-marek@goldelico.com>
- <CAL_JsqL1hMmp-cj56xDKJtdnySgLyCMJtmKVaLLtn=ALKUE8=g@mail.gmail.com>
-Message-ID: <034B4896-E7D1-4860-ADBE-78C4DB7C4B11@goldelico.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 1 Apr 2015 12:47:48 -0400
+Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
+ generation of APM X-Gene SoC
+In-Reply-To: <20150401163956.GE24899@n2100.arm.linux.org.uk>
+References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
+ <1427899682-10912-2-git-send-email-stripathi@apm.com>
+ <20150401161336.GS9974@htj.duckdns.org>
+ <20150401163116.GT9974@htj.duckdns.org>
+ <20150401163956.GE24899@n2100.arm.linux.org.uk>
+Message-ID: <20150401164748.GU9974@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 01.04.2015 um 18:30 schrieb Rob Herring <robherring2@gmail.com>:
-
-> On Tue, Mar 10, 2015 at 4:27 PM, Marek Belisko <marek@goldelico.com> wrote:
->> Signed-off-by: Marek Belisko <marek@goldelico.com>
->> ---
->> .../bindings/power_supply/twl4030_madc_battery.txt | 43 ++++++++++++++++++++++
->> 1 file changed, 43 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
->> 
->> diff --git a/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
->> new file mode 100644
->> index 0000000..d3dd9d8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/power_supply/twl4030_madc_battery.txt
->> @@ -0,0 +1,43 @@
->> +twl4030_madc_battery
->> +
->> +Required properties:
->> + - compatible : "ti,twl4030-madc-battery"
+On Wed, Apr 01, 2015 at 05:39:56PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 01, 2015 at 12:31:16PM -0400, Tejun Heo wrote:
+> > On Wed, Apr 01, 2015 at 12:13:36PM -0400, Tejun Heo wrote:
+> > > > Signed-off-by : Suman Tripathi <stripathi@apm.com>
+> > > 
+> > > Applied to libata/for-4.1 w/ minor edit.
+> > 
+> > Reverted due to build failure from missing asm/cputype.h.
 > 
-> Is this a sub-node of the twl4030 or something? Please define where
-> this fits (hint: I would expect to be a sub node of a charging
-> controller or battery monitor).
+> I'm guessing this is some kind of ARM driver, which is why
+> linux-arm-kernel has been Cc'd - though I haven't seen the original
+> patch.
 
-It is a driver connecting some battery parameters with measurements provided
-by the twl4030-madc to present a /sys/class/power_supply node for the battery
-with a coarse estimate for the charging level.
+It's ahci_xgene which seems to be specific to ARM.
 
-So maybe the best wording is that it is a battery-driver assuming a twl4030-madc
-providing raw measurements (voltage, charging).
+> ARM has asm/cputype.h, and has had for a long time, so "missing
+> asm/cputype.h" doesn't make sense as a reason to revert it.  Maybe
 
-Therefore it could as well be battery-twl4030-madc.
+As it's a new build failure I assumed that was a new file.  Apparently
+not.
 
-> 
->> + - capacity-uah : battery capacity in uAh
->> + - ti,volt-to-capacity-charging-map : list of voltage(mV):level(%) values
->> +       for charging calibration (see example)
->> + - ti,volt-to-capacity-discharging-map : list of voltage(mV):level(%) values
->> +       for discharging calibration (see example)
-> 
-> These seem like properties of the battery independent of the
-> battery/charging controller which is the twl4030. Ideally we would
-> define battery nodes generically and independent of the charge
-> controllers. Then there are smart batteries to consider too.
+> it's trying to be built on x86 when it should be restricted to
+> only ARM?
 
-For smart batteries there are completely independent mechanisms
-like I2C and HDQ/1-wire communication with fuel gauge chips (e.g. b27xxx).
+The build failure is from kbuild and it's on PPC64 w/ COMPILE_TEST.
+Urgh.. Suman, can you please update the patch to turn off COMPILE_TEST
+on the driver?
 
-Those do not need such battery properties because they are stored
-in EEPROMs within these chips.
+Thanks.
 
-So all this is a quite special solution just for those handful of board that
-have no smart battery and use exactly this twl4030 chip.
-
-It is not intended to become a generic charging/fuel solution. Just
-make it work with DT (it worked with platform_data since ~3.12).
-
-BR,
-Nikolaus
-
-
-
-> 
-> Rob
-> 
->> + - io-channels: Should contain IIO channel specifiers
->> +       for each element in io-channel-names.
->> +- io-channel-names: Should contain the following values:
->> + * "temp" - The ADC channel for temperature reading
->> + * "ichg" - The ADC channel for battery charging status
->> + * "vbat" - The ADC channel to measure the battery voltage
->> +
->> +Example:
->> +       madc-battery {
->> +               compatible = "ti,twl4030-madc-battery";
->> +               capacity-uah = <1200000>;
->> +               ti,volt-to-capacity-charging-map = <4200 100>,
->> +                                               <4100 75>,
->> +                                               <4000 55>,
->> +                                               <3900 25>,
->> +                                               <3800 5>,
->> +                                               <3700 2>,
->> +                                               <3600 1>,
->> +                                               <3300 0>;
->> +
->> +               ti,volt-to-capacity-discharging-map = <4200 100>
->> +                                                  <4100 95>,
->> +                                                  <4000 70>,
->> +                                                  <3800 50>,
->> +                                                  <3700 10>,
->> +                                                  <3600 5>,
->> +                                                  <3300 0>;
->> +               io-channels = <&twl_madc 1>,
->> +                             <&twl_madc 10>,
->> +                             <&twl_madc 12>;
->> +               io-channel-names = "temp",
->> +                                  "ichg",
->> +                                  "vbat";
->> +       };
->> --
->> 1.9.1
->> 
+-- 
+tejun
