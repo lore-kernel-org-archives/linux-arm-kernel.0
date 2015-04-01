@@ -1,41 +1,100 @@
-From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
-Date: Wed, 1 Apr 2015 08:49:14 +0530
-Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
- enabled during suspend
-In-Reply-To: <7hiodg98z7.fsf@deeprootsystems.com>
-References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
- <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
- <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
- <551976F1.1000605@collabora.co.uk>
- <7hiodg98z7.fsf@deeprootsystems.com>
-Message-ID: <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 1 Apr 2015 08:56:30 +0530
+Subject: [PATCH 1/2] dma: Add Freescale qDMA engine driver support
+In-Reply-To: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
+References: <1426570119-8634-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20150401032630.GR7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Tue, Mar 17, 2015 at 01:28:38PM +0800, Yuan Yao wrote:
+> +static int fsl_qdma_alloc_chan_resources(struct dma_chan *chan)
+> +{
+> +	/*
+> +	 * In QDMA mode, We don't need to do anything.
+> +	 */
+> +	return 0;
+> +}
+Pls remove this
 
-On Wed, Apr 1, 2015 at 2:32 AM, Kevin Hilman <khilman@kernel.org> wrote:
-> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
->
-> [...]
->
->> Unfortunately I don't fully understand why this clock needs to be
->> enabled. It would be good if someone at Samsung can explain in more
->> detail what the real problem really is.
->
-> +1
->
-> Maybe Abhilash can shed some light here?
->
-> We really should know *why* this is needed because having the fix in the
-> clock driver just doesn't seem right.  It seems like the DMA driver
-> should be managing this clock.
+> +static struct fsl_qdma_comp *fsl_qdma_request_enqueue_desc(
+> +					struct fsl_qdma_chan *fsl_chan)
+> +{
+> +	struct fsl_qdma_comp *comp_temp;
+> +	struct fsl_qdma_queue *queue = fsl_chan->queue;
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&queue->queue_lock, flags);
+> +	if (list_empty(&queue->comp_free)) {
+> +		spin_unlock_irqrestore(&queue->queue_lock, flags);
+> +		comp_temp = kzalloc(sizeof(*comp_temp), GFP_KERNEL);
+this is called by prep_ APIs so should be atomic so GFP_KERNEL is wrong, you
+should use GFP_NOWAIT like you did for below..
 
-I think my last mail might not have reached you (was accidentally sent
-as html). We are gating the aclk266_g2d clock without checking the
-CG_STATUS0 register bits as specified in the UM. It looks like we need
-to keep several clocks alive or gate them only after checking the
-CG_STATUSx register bits.
+> +static int fsl_qdma_halt(struct fsl_qdma_engine *fsl_qdma)
+> +{
+> +	void __iomem *addr = fsl_qdma->membase;
+> +	int i, count = 5;
+> +	u32 reg;
+> +
+> +	/* Disable the command queue and wait for idle state. */
+no locks held while you do this ?
 
-Regards,
-Abhilash
+> +static struct dma_async_tx_descriptor *fsl_qdma_prep_dma_sg(
+> +		struct dma_chan *chan,
+> +		struct scatterlist *dst_sg, unsigned int dst_nents,
+> +		struct scatterlist *src_sg, unsigned int src_nents,
+> +		unsigned long flags)
+> +{
+> +	return NULL;
+> +}
+why is this empty?
+
+> +	dma_cap_set(DMA_PRIVATE, fsl_qdma->dma_dev.cap_mask);
+> +	dma_cap_set(DMA_SLAVE, fsl_qdma->dma_dev.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, fsl_qdma->dma_dev.cap_mask);
+> +
+> +	fsl_qdma->dma_dev.dev = &pdev->dev;
+> +	fsl_qdma->dma_dev.device_alloc_chan_resources
+> +		= fsl_qdma_alloc_chan_resources;
+> +	fsl_qdma->dma_dev.device_free_chan_resources
+> +		= fsl_qdma_free_chan_resources;
+> +	fsl_qdma->dma_dev.device_tx_status = fsl_qdma_tx_status;
+> +	fsl_qdma->dma_dev.device_prep_dma_memcpy = fsl_qdma_prep_memcpy;
+> +	fsl_qdma->dma_dev.device_prep_dma_sg = fsl_qdma_prep_dma_sg;
+> +	fsl_qdma->dma_dev.device_issue_pending = fsl_qdma_issue_pending;
+pls set direction etc fields as well
+
+> +
+> +	/* Free descriptor areas */
+> +	for (i = 0; i < fsl_qdma->n_queues; i++) {
+> +		queue_temp = fsl_qdma->queue + i;
+> +		list_for_each_entry_safe(comp_temp, _comp_temp,
+> +					&queue_temp->comp_used,	list) {
+> +			dma_pool_free(queue_temp->comp_pool,
+> +					comp_temp->virt_addr,
+> +					comp_temp->bus_addr);
+> +			list_del(&comp_temp->list);
+> +			kfree(comp_temp);
+> +		}
+> +		list_for_each_entry_safe(comp_temp, _comp_temp,
+> +					&queue_temp->comp_free, list) {
+> +			dma_pool_free(queue_temp->comp_pool,
+> +					comp_temp->virt_addr,
+> +					comp_temp->bus_addr);
+> +			list_del(&comp_temp->list);
+> +			kfree(comp_temp);
+> +		}
+> +		dma_free_coherent(&pdev->dev, sizeof(struct fsl_qdma_ccdf) *
+> +					queue_temp->n_cq, queue_temp->cq,
+> +					queue_temp->bus_addr);
+> +		dma_pool_destroy(queue_temp->comp_pool);
+> +	}
+> +
+> +	dma_free_coherent(&pdev->dev, sizeof(struct fsl_qdma_ccdf) *
+> +				status->n_cq, status->cq, status->bus_addr);
+and at this point you still have irq registered and enabled, so can be
+invoked!
+
+-- 
+~Vinod
