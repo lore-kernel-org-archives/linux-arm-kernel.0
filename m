@@ -1,108 +1,198 @@
 From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 31 Mar 2015 18:13:02 -0700
-Subject: [STLinux Kernel] [PATCH 3/4] clk: Provide always-on clock support
-In-Reply-To: <20150302081606.GC31325@x1>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
- <54F173B7.9030305@st.com> <20150302081606.GC31325@x1>
-Message-ID: <20150401011302.25195.55588@quantum>
+Date: Tue, 31 Mar 2015 18:29:55 -0700
+Subject: [RFC PATCH v3 1/2] clk: samsung: Add a clock lookup function
+In-Reply-To: <551A61FB.1040401@collabora.co.uk>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-2-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22Fn+TRGcFXH7m=LkOCpAtbdKq98jNNNDM0shYWvfHEBiA@mail.gmail.com>
+ <55197508.5030501@collabora.co.uk> <20150331014013.25195.26862@quantum>
+ <551A61FB.1040401@collabora.co.uk>
+Message-ID: <20150401012955.25195.29066@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2015-03-02 00:16:06)
-> On Sat, 28 Feb 2015, Maxime Coquelin wrote:
+Quoting Javier Martinez Canillas (2015-03-31 01:59:39)
+> +Tomeu who I forgot to add to the cc list.
 > 
-> > Hi Lee,
-> > 
-> > On 02/27/2015 10:14 PM, Lee Jones wrote:
-> > >Lots of platforms contain clocks which if turned off would prove fatal.
-> > >The only way to recover from these catastrophic failures is to restart
-> > >the board(s).  Now, when a clock is registered with the framework it is
-> > >compared against a list of provided always-on clock names which must be
-> > >kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-> > >flag, which will prevent the common clk framework from attempting to
-> > >gate it during the clk_disable_unused() procedure.
-> > 
-> > Please correct me if I'm wrong, but your patch does not fix the
-> > issue you had initially.
-> > Let's take an example:
-> > A clock is critical for the system, and should never be gated, so
-> > you add the CLK_IGNORE_UNUSED
-> > flag so that it is not disabled by clk_disable_unused() procedure.
-> > The same clock is also used by other IPs, for example spi 0 instance.
-> > When starting a spi transfer, clk_enable() is called on this clock,
-> > so its usecount becomes 1.
-> > Once transfer done, clk_disable() is called, usecount becomes 0 and
-> > the clock gets disabled: system freeze.
+> Hello Mike,
 > 
-> You're right.  I also need to extend clk_core_disable() to take notice
-> of CLK_IGNORE_UNUSED.
+> Thanks a lot for your feedback.
+> 
+> On 03/31/2015 03:40 AM, Michael Turquette wrote:
+> >> 
+> >> I don't performance is a big issue here. I just thought that since the
+> >> lookup table is already filled by the driver and the lookup function
+> >> is one line, we could use that instead to get the performance benefit.
+> >> 
+> >> But I don't mind to drop this patch and use the generic lookup function
+> >> from the CCF API if that is preferred.
+> > 
+> > Hello,
+> > 
+> > I am not a fan of __clk_lookup and I don't like to see it used more and
+> > more outside of drivers/clk/clk.c. You mentioned that performance wasn't
+> > really the problem here.  The real method for a driver to get a clock is
+> > with clk_get(). Any reason to not use that?
+> >
+> 
+> I can certainly use clk_get() but I thought that the clk consumer API was
+> not supposed to be used from within clock drivers. That's why I mentioned
+> __clk_lookup() as a possibility since that is part of the provider API.
 
-Hi Lee,
+I would like to remove __clk_lookup some day, so the fewer users now the
+better. Additionally, now that we have unique struct clk pointers from
+clk_get it makes a lot of sense for clk_register to stop returning
+pointers to a struct clk. Hopefully we can get around to that soon.
 
-I'd like to combine elements of your V3 and this series (V4?). Firstly
-let's stay away from modifying the semantics around CLK_IGNORE_UNUSED.
-There was discussion around adding a new flag which I'd like to avoid if
-possible.
+These two points above are enough reason for the clock provider to use
+clk_get.
 
-If we're leaving clocks enabled then it would be best to reflect that
-reality with the prepare/enable refcounting in the core. The best way to
-do this is with clk_prepare_enable(my_alwon_clk). Drivers already do
-this today by hacking calls to clk_prepare_enable into their driver's
-probe function, and we can support it more explicitly in DT.
+> 
+> Below is a RFC patch that uses clk_get() [0]. That needs another patch
+> which was part of a previous RFC and adds an alias for the mdma0 clock:
+> 
+> https://lkml.org/lkml/2015/3/27/769
+> 
+> If you think that is the correct approach then I can post it as a patch.
+> 
+> It would be great if you can also provide some feedback about the other
+> patch in the first RFC that instead of enabling and disabling the mdma0
+> clock in driver, does it in the exynos5420 platform PM callbacks:
+> 
+> https://lkml.org/lkml/2015/3/27/770
 
-Since we already have assigned-clock-rate and assigned-clock-parent in
-drivers/clk/clk-conf.c I propose that we add a third property here,
-assigned-clock-alwon. I don't really care about the name, so feel free
-to change it, so long as your suggestion is Measurably Better.
+This seems like a big hack to me.
 
-This property can only be added to clock providers (not consumers),
-because if we have a clock consumer then that consumer should just call
-clk_prepare_enable. See the pseudo-code below:
+> 
+> I was asked to do it in the exynos5420 clk driver instead but maybe you
+> have a different opinion on that.
+> 
+> Best regards,
+> Javier
+> 
+> [0]:
+> From c118df83da8cac65cc218ae9443622592222f5d0 Mon Sep 17 00:00:00 2001
+> From: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> Date: Mon, 30 Mar 2015 17:11:40 +0200
+> Subject: [RFC] clk: exynos5420: Make sure MDMA0 clock is enabled during
+>  suspend
+> 
+> Commit ae43b3289186 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power
+> Management support v12") added pm support for the pl330 dma driver but
+> it makes the clock for the Exynos5420 MDMA0 DMA controller to be gated
+> during suspend and this clock needs to remain enabled in order to make
+> the system resume from a system suspend state.
+> 
+> To make sure that the clock is enabled during suspend, enable it prior
+> to entering a suspend state and disable it once the system has resumed.
 
-
-
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-index 48a65b2..19dce89 100644
---- a/drivers/clk/clk-conf.c
-+++ b/drivers/clk/clk-conf.c
-@@ -115,6 +115,14 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
- 	return 0;
- }
- 
-+static int __set_clk_alwon(struct device_node *node, bool clk_supplier)
-+{
-+	if (!clk_supplier)
-+		return -EINVAL;
-+
-+	clk_prepare_enable(...);
-+}
-+
- /**
-  * of_clk_set_defaults() - parse and set assigned clocks configuration
-  * @node: device node to apply clock settings for
-@@ -138,6 +146,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
- 	if (rc < 0)
- 		return rc;
- 
--	return __set_clk_rates(node, clk_supplier);
-+	rc = __set_clk_rates(node, clk_supplier);
-+	if (rc < 0)
-+		return rc;
-+
-+	return __set_clk_alwon(node, clk_supplier);
- }
- EXPORT_SYMBOL_GPL(of_clk_set_defaults);
-
-
-
-Amazing, I know. Is there any aspect of this approach which does not
-solve your use case?
-
-We should mark this new property (assigned-clk-alwon) as unstable since
-it can (and likely will) grow into more stuff in the future (e.g.
-Stephen Boyd mentioned a "hand-off" which tells the core to keep clocks
-enabled until the correct driver claims them).
+I'd like to understand the issue a bit further. Isn't the correct
+solution that the clk's prepare/unprepare and enable/disable callbacks
+should support the CG_STATUS requirement?
 
 Regards,
 Mike
+
+> 
+> Thanks to Abhilash Kesavan for figuring out that this was the issue.
+> 
+> Fixes: ae43b32 ("ARM: 8202/1: dmaengine: pl330: Add runtime Power Management support v12")
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> ---
+>  drivers/clk/samsung/clk-exynos5420.c | 44 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 8b49e8b3b548..02029cf9fcb8 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -155,6 +155,7 @@ static enum exynos5x_soc exynos5x_soc;
+>  #ifdef CONFIG_PM_SLEEP
+>  static struct samsung_clk_reg_dump *exynos5x_save;
+>  static struct samsung_clk_reg_dump *exynos5800_save;
+> +static struct clk **exynos5x_clks;
+>  
+>  /*
+>   * list of controller registers to be saved and restored during a
+> @@ -275,8 +276,17 @@ static const struct samsung_clk_reg_dump exynos5420_set_clksrc[] = {
+>         { .offset = GATE_IP_PERIC,              .value = 0xffffffff, },
+>  };
+>  
+> +/*
+> + * list of clocks that have to be kept enabled during suspend/resume cycle.
+> + */
+> +static const char *exynos5x_clk_pm[] __initdata = {
+> +       "mdma0",
+> +};
+> +
+>  static int exynos5420_clk_suspend(void)
+>  {
+> +       int i;
+> +
+>         samsung_clk_save(reg_base, exynos5x_save,
+>                                 ARRAY_SIZE(exynos5x_clk_regs));
+>  
+> @@ -287,11 +297,19 @@ static int exynos5420_clk_suspend(void)
+>         samsung_clk_restore(reg_base, exynos5420_set_clksrc,
+>                                 ARRAY_SIZE(exynos5420_set_clksrc));
+>  
+> +       for (i = 0; i < ARRAY_SIZE(exynos5x_clk_pm); i++)
+> +               clk_prepare_enable(exynos5x_clks[i]);
+> +
+>         return 0;
+>  }
+>  
+>  static void exynos5420_clk_resume(void)
+>  {
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(exynos5x_clk_pm); i++)
+> +               clk_disable_unprepare(exynos5x_clks[i]);
+> +
+>         samsung_clk_restore(reg_base, exynos5x_save,
+>                                 ARRAY_SIZE(exynos5x_clk_regs));
+>  
+> @@ -307,6 +325,9 @@ static struct syscore_ops exynos5420_clk_syscore_ops = {
+>  
+>  static void exynos5420_clk_sleep_init(void)
+>  {
+> +       int i;
+> +       int clk_len = ARRAY_SIZE(exynos5x_clk_pm);
+> +
+>         exynos5x_save = samsung_clk_alloc_reg_dump(exynos5x_clk_regs,
+>                                         ARRAY_SIZE(exynos5x_clk_regs));
+>         if (!exynos5x_save) {
+> @@ -323,8 +344,31 @@ static void exynos5420_clk_sleep_init(void)
+>                         goto err_soc;
+>         }
+>  
+> +       exynos5x_clks = kzalloc(sizeof(struct clk *) * clk_len, GFP_KERNEL);
+> +       if (!exynos5x_clks)
+> +               goto err_clks;
+> +
+> +       for (i = 0; i < clk_len; i++) {
+> +               exynos5x_clks[i] = clk_get(NULL, exynos5x_clk_pm[i]);
+> +               if (IS_ERR(exynos5x_clks[i])) {
+> +                       pr_warn("Failed to get %s clk (%ld)\n",
+> +                               exynos5x_clk_pm[i], PTR_ERR(exynos5x_clks[i]));
+> +
+> +                       while (i--)
+> +                               clk_put(exynos5x_clks[i]);
+> +
+> +                       goto err_clkget;
+> +               }
+> +       }
+> +
+>         register_syscore_ops(&exynos5420_clk_syscore_ops);
+>         return;
+> +err_clkget:
+> +       kfree(exynos5x_clks);
+> +err_clks:
+> +       kfree(exynos5800_save);
+> +       pr_warn("%s: failed to allocate suspend clocks, no sleep support!\n",
+> +               __func__);
+>  err_soc:
+>         kfree(exynos5x_save);
+>         pr_warn("%s: failed to allocate sleep save data, no sleep support!\n",
+> -- 
+> 2.1.4
