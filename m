@@ -1,32 +1,86 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 1 Apr 2015 17:53:51 +0200
-Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
- iommu_ops
-In-Reply-To: <20150401115340.GG1552@arm.com>
-References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
- <20150331144956.GA24094@arm.com>
- <1427817050.5567.148.camel@redhat.com>
- <20150401115340.GG1552@arm.com>
-Message-ID: <20150401155351.GH4441@8bytes.org>
+From: dahi@linux.vnet.ibm.com (David Hildenbrand)
+Date: Wed, 1 Apr 2015 17:55:29 +0200
+Subject: [PATCH v2 04/10] KVM: arm: guest debug, add stub
+ KVM_SET_GUEST_DEBUG ioctl
+In-Reply-To: <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150401175529.642f64af@thinkpad-w530>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+> This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
+> ioctl. Currently any operation flag will return EINVAL. Actual
 
-On Wed, Apr 01, 2015 at 12:53:40PM +0100, Will Deacon wrote:
-> Joerg: are you still against merging this? If so, what do you need to
-> see in order to change your mind? This is certainly something that we
-> need on ARM-based systems and, tbh, the direction that the IOMMU core is
-> going seems to be towards a N:1 domain:IOMMU mapping anyway (c.f. your
-> series to embed struct iommu_domain in a driver-private data structure).
+Well it won't return -EINVAL if you push in KVM_GUESTDBG_ENABLE or 0.
 
-What I want is consistent behavior between drivers. Until now I tried to
-push for the domain concept, which allows to attach arbitrary devices to
-a domain. This patch-set makes it impossible to achieve this goal,
-that's why I am resistant against it.
+"Any unsupported flag will return -EINVAL. For now, only KVM_GUESTDBG_ENABLE is
+supported, although it won't have any effects."
 
-We can discuss moving into another direction with the IOMMU-API, and
-re-evaluate then if this patch-set is still required.
+> functionality will be added with further patches.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
+> 
+> ---
+> v2
+>   - simplified form of the ioctl (stuff will go into setup_debug)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index b112efc..06c5064 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2604,7 +2604,7 @@ handled.
+>  4.87 KVM_SET_GUEST_DEBUG
+> 
+>  Capability: KVM_CAP_SET_GUEST_DEBUG
+> -Architectures: x86, s390, ppc
+> +Architectures: x86, s390, ppc, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_guest_debug (in)
+>  Returns: 0 on success; -1 on error
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 5560f74..445933d 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_ARM_PSCI:
+>  	case KVM_CAP_ARM_PSCI_0_2:
+>  	case KVM_CAP_READONLY_MEM:
+> +	case KVM_CAP_SET_GUEST_DEBUG:
+>  		r = 1;
+>  		break;
+>  	case KVM_CAP_COALESCED_MMIO:
+> @@ -303,10 +304,21 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	kvm_arm_set_running_vcpu(NULL);
+>  }
+> 
+> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE)
 
+That makes me rather think that it is another flag.
 
-	Joerg
+We(s390x) use VALID_GUESTDBG_FLAGS, what about that or KVM_GUESTDBG_VALID_MASK?
+
+> +
+>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  					struct kvm_guest_debug *dbg)
+>  {
+> -	return -EINVAL;
+> +	if (dbg->control & KVM_GUESTDBG_ENABLE) {
+> +		if (dbg->control & ~KVM_GUESTDBG_VALID)
+> +			return -EINVAL;
+
+I'd move that check directly to the start of the function and bail out on any
+unsupported flag.
+
+> +
+> +		vcpu->guest_debug = dbg->control;
+> +	} else {
+> +		/* If not enabled clear all flags */
+> +		vcpu->guest_debug = 0;
+> +	}
+> +	return 0;
+>  }
+> 
+> 
+
+David
