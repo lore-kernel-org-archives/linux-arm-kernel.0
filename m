@@ -1,66 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Apr 2015 10:22:29 +0100
-Subject: [PATCH] arm64: fix midr range for Cortex-A57 erratum 832075
-In-Reply-To: <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
-References: <1427833848-12188-1-git-send-email-byan@nvidia.com>
- <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
-Message-ID: <20150401092229.GC1552@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed,  1 Apr 2015 11:26:54 +0200
+Subject: [PATCH] ARM: dts: imx6qdl: move HDMI controller to right location in
+ DT
+Message-ID: <1427880414-18503-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 10:17:21PM +0100, Paul Walmsley wrote:
-> On Tue, 31 Mar 2015, Bo Yan wrote:
-> 
-> > Register MIDR_EL1 is masked to get variant and revision fields, then
-> > compared against midr_range_min and midr_range_max when checking
-> > whether CPU is affected by any particular erratum. However, variant
-> > and revision fields in MIDR_EL1 are separated by 16 bits, so the min
-> > and max of midr range should be constructed accordingly, otherwise
-> > the patch will not be applied when variant field is non-0.
-> > 
-> > Signed-off-by: Bo Yan <byan@nvidia.com>
-> > ---
-> >  arch/arm64/kernel/cpu_errata.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > index fa62637e63a8..7838f1578019 100644
-> > --- a/arch/arm64/kernel/cpu_errata.c
-> > +++ b/arch/arm64/kernel/cpu_errata.c
-> > @@ -88,7 +88,7 @@ struct arm64_cpu_capabilities arm64_errata[] = {
-> >  	/* Cortex-A57 r0p0 - r1p2 */
-> >  		.desc = "ARM erratum 832075",
-> >  		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
-> > -		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
-> > +		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x100002),
-> >  	},
-> >  #endif
-> >  	{
-> > -- 
-> > 2.1.4
-> 
-> Reviewed-by: Paul Walmsley <paul@pwsan.com>
-> 
-> Reviewed against DDI0488G section 4.3.1 "Main ID Register, EL1".  Looks 
-> like a cut-and-paste error from the A53 workarounds.
+Currently the HDMI controller is a child device of the AIPS bus in the
+DT which is clearly wrong. Move it to the right location.
+This introduces no functional change it just aligns the DT representation
+with reality.
 
-Thanks guys, I agree that this is a bug. I'll apply this, but using an
-explicit shift to set the variant (tweaked version below).
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 56 +++++++++++++++++++++---------------------
+ 1 file changed, 28 insertions(+), 28 deletions(-)
 
-Will
-
---->8
-
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a66f4fa4d541..c998345a052f 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -70,7 +70,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
-        /* Cortex-A57 r0p0 - r1p2 */
-                .desc = "ARM erratum 832075",
-                .capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
--               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
-+               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, (1 << MIDR_VARIANT_SHIFT) | 2,
-        },
- #endif
-        {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index f74a8ded515f..0482a665125a 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -119,6 +119,34 @@
+ 			status = "disabled";
+ 		};
+ 
++		hdmi: hdmi at 0120000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00120000 0x9000>;
++			interrupts = <0 115 0x04>;
++			gpr = <&gpr>;
++			clocks = <&clks IMX6QDL_CLK_HDMI_IAHB>,
++				 <&clks IMX6QDL_CLK_HDMI_ISFR>;
++			clock-names = "iahb", "isfr";
++			status = "disabled";
++
++			port at 0 {
++				reg = <0>;
++
++				hdmi_mux_0: endpoint {
++					remote-endpoint = <&ipu1_di0_hdmi>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				hdmi_mux_1: endpoint {
++					remote-endpoint = <&ipu1_di1_hdmi>;
++				};
++			};
++		};
++
+ 		timer at 00a00600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0x00a00600 0x20>;
+@@ -778,34 +806,6 @@
+ 				};
+ 			};
+ 
+-			hdmi: hdmi at 0120000 {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				reg = <0x00120000 0x9000>;
+-				interrupts = <0 115 0x04>;
+-				gpr = <&gpr>;
+-				clocks = <&clks IMX6QDL_CLK_HDMI_IAHB>,
+-					 <&clks IMX6QDL_CLK_HDMI_ISFR>;
+-				clock-names = "iahb", "isfr";
+-				status = "disabled";
+-
+-				port at 0 {
+-					reg = <0>;
+-
+-					hdmi_mux_0: endpoint {
+-						remote-endpoint = <&ipu1_di0_hdmi>;
+-					};
+-				};
+-
+-				port at 1 {
+-					reg = <1>;
+-
+-					hdmi_mux_1: endpoint {
+-						remote-endpoint = <&ipu1_di1_hdmi>;
+-					};
+-				};
+-			};
+-
+ 			dcic1: dcic at 020e4000 {
+ 				reg = <0x020e4000 0x4000>;
+ 				interrupts = <0 124 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.1.4
