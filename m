@@ -1,101 +1,56 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 02 Apr 2015 08:27:49 +0900
-Subject: [PATCH 0/5] arm64: add kdump support
-In-Reply-To: <551C1537.2030009@redhat.com>
-References: <1427358533-3754-1-git-send-email-takahiro.akashi@linaro.org>
- <551C1537.2030009@redhat.com>
-Message-ID: <551C7EF5.9030806@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 1 Apr 2015 16:32:11 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC r8a73a4 CCF and Multiplatform
+ Updates for v4.1
+In-Reply-To: <cover.1425517246.git.horms+renesas@verge.net.au>
+References: <cover.1425517246.git.horms+renesas@verge.net.au>
+Message-ID: <20150401233211.GB8137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+On Thu, Mar 05, 2015 at 10:57:57AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+> 
+> Please consider these Renesas ARM based SoC r8a73a4 CCF and multiplatform
+> updates for v4.1.
+> 
+> 
+> This pull request is based on "Renesas ARM Based SoC Simple PM Bus Updates
+> for v4.1", tagged as renesas-simple-pm-bus-for-v4.1, which you have already
+> pulled. That pull request provides run-time dependencies for this one.
+> 
+> 
+> This pull requests has minor conflicts with "Renesas ARM Based SoC sh7372
+> SoC Removal Updates for v4.1", tagged as
+> renesas-sh7372-soc-removal-for-v4.1, which you have already pulled.
+> 
+> The conflicts are in the following files:
+> 	arch/arm/mach-shmobile/Kconfig
+> 	arch/arm/mach-shmobile/Makefile
+> 
+> The solution is to delete both.
+> 
+> This solution can be found in the renesas-next-20150305v2-v4.0-rc1 tag of
+> the renesas tree.
+> 
+> 
+> The following changes since commit 89d463ea106dba530786a2815fd174f9e6eab71f:
+> 
+>   drivers: bus: Add Simple Power-Managed Bus Driver (2015-02-24 06:36:18 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-r8a73a4-ccf-and-multiplatform-for-v4.1
+> 
+> for you to fetch changes up to 914d7d148411997c2f76f689338d27c362300b7a:
+> 
+>   ARM: shmobile: r8a73a4: Remove legacy code (2015-02-25 16:14:02 +0900)
 
-On 04/02/2015 12:56 AM, Pratyush Anand wrote:
-> Hi Akashi,
->
-> On Thursday 26 March 2015 01:58 PM, AKASHI Takahiro wrote:
->> This patch set enables kdump (crash dump kernel) support on arm64 on top of
->> Geoff's kexec patchset.
->>
->> In this version, there are some arm64-specific usage/constraints:
->> 1) "mem=" boot parameter must be specified on crash dump kernel
->> 2) Kvm will not be enabled on crash dump kernel even if configured
->> See commit messages and Documentation/kdump/kdump.txt for details.
->>
->> The only concern I have is whether or not we can use the exact same kernel
->> as both system kernel and crash dump kernel. The current arm64 kernel is
->> not relocatable in the exact sense but I have no problems in using the same
->> binary for testing kdump.
->>
->> I tested the code with
->>     - ATF v1.1 + EDK2(UEFI) v3.0-rc0
->>     - kernel v4.0-rc4 + Geoff' kexec v8
->> on Base fast model, using my yet-to-be-submitted kexec-tools [1].
->> You may want to start a kernel with the following boot parameter:
->>     crashkernel=64M at 2240M
->> and try
->>     $ kexec -p --load <vmlinux> --append ...
->>     $ echo c > /proc/sysrq-trigger
->>
->
-> I tried to use your kdump patches for kernel and kexec-tools. I am not able to load the crash kernel properly.
->
->
-> I passed crashkernel=64M at 259G (My 8GB RAM starts at 256G) to primary kernel.
->
-> Used following to load the crash kernel
-> kexec -p  --load vmlinux  --append="$( cat /proc/cmdline ) maxcpus=1 mem=64M reset_devices"
->
-> I see:
->
-> kexec_load failed: Cannot assign requested address
-> entry       = 0x40c40005d0 flags = 0xb70001
->
-> What I noticed that arm64_load_other_segments does not calculate correct load address for purgatory or if I pass initrd
-> then for that too within crash kernel allocated memory.
+Thanks, merged.
 
-It seems that you hit the same problem that I mentioned in:
-   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/334613.html
+I don't see a reason for you to split your branches per SoC like this
+though -- you already had another multiplatform branch for another SoC,
+you can combine the two.
 
-Please try my latest kexec-tools in my linaro repo (branch name is kdump/v0.11)
-and let me know the result.
 
-> Shouldn't we have a function similar to locate_dtb_in_crashmem for putgatory as well as initrd? I can try to fix this
-> allocation, but I was just wondering if I understood correctly or I am missing something.
-
-I don't think a function for purgatory is necessary since we try to find a hole
-just after dtb.
-
-Thanks,
--Takahiro AKASHI
-
-> ~Pratyush
->
->
->> To examine vmcore (/proc/vmcore), you may use
->>     - gdb v7.7 or later
->>     - crash + a small patch (to recognize v4.0 kernel)
->>
->> [1] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git
->>
->>
->> AKASHI Takahiro (5):
->>    arm64: kdump: reserve memory for crash dump kernel
->>    arm64: kdump: implement machine_crash_shutdown()
->>    arm64: kdump: do not go into EL2 before starting a crash dump kernel
->>    arm64: add kdump support
->>    arm64: enable kdump in the arm64 defconfig
->>
->>   Documentation/kdump/kdump.txt     |   31 ++++++++++++++-
->>   arch/arm64/Kconfig                |   12 ++++++
->>   arch/arm64/configs/defconfig      |    1 +
->>   arch/arm64/include/asm/kexec.h    |   34 +++++++++++++++-
->>   arch/arm64/kernel/Makefile        |    1 +
->>   arch/arm64/kernel/crash_dump.c    |   71 +++++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/machine_kexec.c |   55 +++++++++++++++++++++++++-
->>   arch/arm64/kernel/process.c       |    7 +++-
->>   arch/arm64/kernel/setup.c         |   78 +++++++++++++++++++++++++++++++++++++
->>   arch/arm64/kernel/smp.c           |   10 ++++-
->>   10 files changed, 294 insertions(+), 6 deletions(-)
->>   create mode 100644 arch/arm64/kernel/crash_dump.c
->>
+-Olof
