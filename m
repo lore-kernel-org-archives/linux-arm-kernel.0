@@ -1,381 +1,102 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed,  1 Apr 2015 12:09:42 +0200
-Subject: [PATCH RFC v2 08/12] drm/rockchip: lvds: register a bridge when no
- panel is set
+Date: Wed,  1 Apr 2015 12:09:40 +0200
+Subject: [PATCH RFC v2 06/12] dt-bindings: Add documentation for rockchip lvds
 In-Reply-To: <1427882986-19110-1-git-send-email-heiko@sntech.de>
 References: <1427882986-19110-1-git-send-email-heiko@sntech.de>
-Message-ID: <1427882986-19110-9-git-send-email-heiko@sntech.de>
+Message-ID: <1427882986-19110-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On socs using the lvds components it also controls the use of the
-general rgb outputs and must thus be configured for things like
-external encoders.
+From: Mark Yao <yzq@rock-chips.com>
 
-Therefore register a drm_bridge in this case and try to find
-the encoder in the output port.
+Add binding documentation for Rockchip SoC LVDS driver.
 
+Signed-off-by: Mark Yao <yzq@rock-chips.com>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/rockchip/rockchip_lvds.c | 255 ++++++++++++++++++++++++++++---
- 1 file changed, 233 insertions(+), 22 deletions(-)
+ .../devicetree/bindings/video/rockchip-lvds.txt    | 74 ++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/rockchip-lvds.txt
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-index 657609e..5ffd70a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_lvds.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-@@ -43,6 +43,9 @@
- #define encoder_to_lvds(c) \
- 		container_of(c, struct rockchip_lvds, encoder)
- 
-+#define bridge_to_lvds(c) \
-+		container_of(c, struct rockchip_lvds, bridge)
+diff --git a/Documentation/devicetree/bindings/video/rockchip-lvds.txt b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
+new file mode 100644
+index 0000000..80529f4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/video/rockchip-lvds.txt
+@@ -0,0 +1,74 @@
++Rockchip RK3288 LVDS interface
++================================
 +
- /*
-  * @grf_offset: offset inside the grf regmap for setting the rockchip lvds
-  */
-@@ -68,6 +71,8 @@ struct rockchip_lvds {
- 	struct drm_panel *panel;
- 	struct drm_connector connector;
- 	struct drm_encoder encoder;
-+	struct drm_bridge bridge;
-+	struct drm_encoder *ext_encoder;
- 
- 	struct mutex suspend_lock;
- 	int suspend;
-@@ -248,11 +253,10 @@ rockchip_lvds_encoder_mode_fixup(struct drm_encoder *encoder,
- 	return true;
- }
- 
--static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
--					  struct drm_display_mode *mode,
--					  struct drm_display_mode *adjusted)
-+static void rockchip_lvds_mode_set(struct rockchip_lvds *lvds,
-+				   struct drm_display_mode *mode,
-+				   struct drm_display_mode *adjusted)
- {
--	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
- 	u32 h_bp = mode->htotal - mode->hsync_start;
- 	u8 pin_hsync = (mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
- 	u8 pin_dclk = (mode->flags & DRM_MODE_FLAG_PCSYNC) ? 1 : 0;
-@@ -347,32 +351,52 @@ static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
- 	dsb();
- }
- 
--static void rockchip_lvds_encoder_prepare(struct drm_encoder *encoder)
-+static void rockchip_lvds_encoder_mode_set(struct drm_encoder *encoder,
-+					   struct drm_display_mode *mode,
-+					   struct drm_display_mode *adjusted)
-+{
-+	rockchip_lvds_mode_set(encoder_to_lvds(encoder), mode, adjusted);
-+}
++Required properties:
++- compatible: "rockchip,rk3288-lvds";
 +
-+static int rockchip_lvds_set_vop_source(struct rockchip_lvds *lvds,
-+					struct drm_encoder *encoder)
- {
--	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
- 	u32 val;
- 	int ret;
- 
--	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
--						lvds->connector.connector_type,
--						ROCKCHIP_OUT_MODE_P888);
--	if (ret < 0) {
--		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
--		return;
--	}
--
- 	ret = rockchip_drm_encoder_get_mux_id(lvds->dev->of_node, encoder);
- 	if (ret < 0)
--		return;
-+		return ret;
- 
- 	if (ret)
- 		val = RK3288_LVDS_SOC_CON6_SEL_VOP_LIT |
- 		      (RK3288_LVDS_SOC_CON6_SEL_VOP_LIT << 16);
- 	else
- 		val = RK3288_LVDS_SOC_CON6_SEL_VOP_LIT << 16;
++- reg: physical base address of the controller and length
++	of memory mapped region.
++- clocks: must include clock specifiers corresponding to entries in the
++	clock-names property.
++- clock-names: must contain "pclk_lvds"
 +
- 	ret = regmap_write(lvds->grf, lvds->soc_data->grf_soc_con6, val);
--	if (ret != 0) {
--		dev_err(lvds->dev, "Could not write to GRF: %d\n", ret);
-+	if (ret < 0)
-+		return ret;
++- avdd1v0-supply: regulator phandle for 1.0V analog power
++- avdd1v8-supply: regulator phandle for 1.8V analog power
++- avdd3v3-supply: regulator phandle for 3.3V analog power
 +
-+	return 0;
-+}
++- rockchip,grf: phandle to the general register files syscon
 +
-+static void rockchip_lvds_encoder_prepare(struct drm_encoder *encoder)
-+{
-+	struct rockchip_lvds *lvds = encoder_to_lvds(encoder);
-+	int ret;
++- rockchip,data-mapping: should be "vesa" or "jeida",
++	This describes how the color bits are laid out in the
++	serialized LVDS signal.
++- rockchip,data-width : should be <18> or <24>;
++- rockchip,output: should be "rgb", "lvds" or "duallvds",
++	This describes the output face.
 +
-+	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-+						lvds->connector.connector_type,
-+						ROCKCHIP_OUT_MODE_P888);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
-+		return;
-+	}
++Required nodes:
 +
-+	ret = rockchip_lvds_set_vop_source(lvds, encoder);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set vop source: %d\n", ret);
- 		return;
- 	}
- }
-@@ -405,6 +429,97 @@ static struct drm_encoder_funcs rockchip_lvds_encoder_funcs = {
- 	.destroy = rockchip_lvds_encoder_destroy,
- };
- 
-+static void rockchip_lvds_bridge_mode_set(struct drm_bridge *bridge,
-+					  struct drm_display_mode *mode,
-+					  struct drm_display_mode *adjusted)
-+{
-+	rockchip_lvds_mode_set(bridge_to_lvds(bridge), mode, adjusted);
-+}
++The lvds has two video ports as described by
++	Documentation/devicetree/bindings/media/video-interfaces.txt.
++Their connections are modeled using the OF graph bindings specified in
++	Documentation/devicetree/bindings/graph.txt.
 +
-+static void rockchip_lvds_bridge_pre_enable(struct drm_bridge *bridge)
-+{
-+}
++- video port 0 for the VOP inputs
++- video port 1 for either a panel or subsequent encoder
 +
-+/*
-+ * post_disable is called right after encoder prepare, so do lvds and crtc
-+ * mode config here.
-+ */
-+static void rockchip_lvds_bridge_post_disable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+	struct drm_connector *connector;
-+	int ret, connector_type = DRM_MODE_CONNECTOR_Unknown;
++Example:
++	lvds: lvds at ff96c000 {
++		compatible = "rockchip,rk3288-lvds";
++		rockchip,grf = <&grf>;
++		reg = <0xff96c000 0x4000>;
++		clocks = <&cru PCLK_LVDS_PHY>;
++		clock-names = "pclk_lvds";
++		avdd1v0-supply = <&vdd10_lcd>;
++		avdd1v8-supply = <&vcc18_lcd>;
++		avdd3v3-supply = <&vcca_33>;
++		rockchip,data-mapping = "jeida";
++		rockchip,data-width = <24>;
++		rockchip,output = "rgb";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+	if (!bridge->encoder->crtc)
-+		return;
++			lvds_in: port at 0 {
++				reg = <0>;
 +
-+	list_for_each_entry(connector, &bridge->dev->mode_config.connector_list,
-+			head) {
-+		if (connector->encoder == bridge->encoder)
-+			connector_type = connector->connector_type;
-+	}
++				lvds_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_lvds>;
++				};
++				lvds_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_lvds>;
++				};
++			};
 +
-+	ret = rockchip_drm_crtc_mode_config(bridge->encoder->crtc,
-+						connector_type,
-+						ROCKCHIP_OUT_MODE_P888);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set crtc mode config: %d\n", ret);
-+		return;
-+	}
++			lvds_out: port at 1 {
++				reg = <1>;
 +
-+	ret = rockchip_lvds_set_vop_source(lvds, bridge->encoder);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "Could not set vop source: %d\n", ret);
-+		return;
-+	}
-+}
-+
-+static void rockchip_lvds_bridge_enable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+	int ret;
-+
-+	mutex_lock(&lvds->suspend_lock);
-+
-+	if (!lvds->suspend)
-+		goto out;
-+
-+	ret = rockchip_lvds_poweron(lvds);
-+	if (ret < 0) {
-+		dev_err(lvds->dev, "could not enable lvds\n");
-+		goto out;
-+	}
-+
-+	lvds->suspend = false;
-+
-+out:
-+	mutex_unlock(&lvds->suspend_lock);
-+}
-+
-+static void rockchip_lvds_bridge_disable(struct drm_bridge *bridge)
-+{
-+	struct rockchip_lvds *lvds = bridge_to_lvds(bridge);
-+
-+	mutex_lock(&lvds->suspend_lock);
-+
-+	if (lvds->suspend)
-+		goto out;
-+
-+	rockchip_lvds_poweroff(lvds);
-+	lvds->suspend = true;
-+
-+out:
-+	mutex_unlock(&lvds->suspend_lock);
-+}
-+
-+static struct drm_bridge_funcs rockchip_lvds_bridge_funcs = {
-+	.mode_set = rockchip_lvds_bridge_mode_set,
-+	.enable = rockchip_lvds_bridge_enable,
-+	.disable = rockchip_lvds_bridge_disable,
-+	.pre_enable = rockchip_lvds_bridge_pre_enable,
-+	.post_disable = rockchip_lvds_bridge_post_disable,
-+};
-+
- static struct rockchip_lvds_soc_data rk3288_lvds_data = {
- 	.grf_soc_con6 = 0x025c,
- 	.grf_soc_con7 = 0x0260,
-@@ -430,6 +545,35 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
- 
- 	lvds->drm_dev = drm_dev;
- 
-+	if (!lvds->panel) {
-+		struct drm_bridge *bridge = &lvds->bridge;
-+
-+		if (!lvds->ext_encoder->of_node)
-+			return -ENODEV;
-+
-+		ret = component_bind_all(dev, drm_dev);
-+		if (ret < 0)
-+			return ret;
-+
-+		/**
-+		 * Override any possible crtcs set by the encoder itself,
-+		 * as they are connected to the lvds instead.
-+		 */
-+		encoder = of_drm_find_encoder(lvds->ext_encoder->of_node);
-+		encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
-+								dev->of_node);
-+
-+		encoder->bridge = bridge;
-+		bridge->encoder = encoder;
-+		ret = drm_bridge_attach(drm_dev, bridge);
-+		if (ret < 0) {
-+			component_unbind_all(dev, drm_dev);
-+			return ret;
-+		}
-+
-+		return 0;
-+	}
-+
- 	encoder = &lvds->encoder;
- 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm_dev,
- 							     dev->of_node);
-@@ -482,6 +626,7 @@ static void rockchip_lvds_unbind(struct device *dev, struct device *master,
- 				void *data)
- {
- 	struct rockchip_lvds *lvds = dev_get_drvdata(dev);
-+	struct drm_device *drm_dev = data;
- 
- 	if (lvds->panel) {
- 		rockchip_lvds_encoder_dpms(&lvds->encoder, DRM_MODE_DPMS_OFF);
-@@ -490,6 +635,8 @@ static void rockchip_lvds_unbind(struct device *dev, struct device *master,
- 
- 		drm_connector_cleanup(&lvds->connector);
- 		drm_encoder_cleanup(&lvds->encoder);
-+	} else {
-+		component_unbind_all(dev, drm_dev);
- 	}
- }
- static const struct component_ops rockchip_lvds_component_ops = {
-@@ -497,6 +644,26 @@ static const struct component_ops rockchip_lvds_component_ops = {
- 	.unbind = rockchip_lvds_unbind,
- };
- 
-+static int compare_of(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+static int rockchip_lvds_master_bind(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static void rockchip_lvds_master_unbind(struct device *dev)
-+{
-+	/* do nothing */
-+}
-+
-+static const struct component_master_ops rockchip_lvds_master_ops = {
-+	.bind = rockchip_lvds_master_bind,
-+	.unbind = rockchip_lvds_master_unbind,
-+};
-+
- static int rockchip_lvds_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -596,18 +763,58 @@ static int rockchip_lvds_probe(struct platform_device *pdev)
- 
- 	if (!output_node) {
- 		dev_err(&pdev->dev, "no output defined\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto err_unprepare_pclk;
- 	}
- 
- 	lvds->panel = of_drm_find_panel(output_node);
--	of_node_put(output_node);
- 	if (!lvds->panel) {
--		dev_err(&pdev->dev, "panel not found\n");
--		return -EPROBE_DEFER;
-+		struct drm_encoder *encoder;
-+		struct component_match *match = NULL;
-+
-+		/* Try to find an encoder in the output node */
-+		encoder = of_drm_find_encoder(output_node);
-+		if (!encoder) {
-+			dev_err(&pdev->dev, "neither panel nor encoder found\n");
-+			of_node_put(output_node);
-+			ret = -EPROBE_DEFER;
-+			goto err_unprepare_pclk;
-+		}
-+
-+		lvds->ext_encoder = encoder;
-+
-+		component_match_add(dev, &match, compare_of, output_node);
-+		of_node_put(output_node);
-+
-+		lvds->bridge.funcs = &rockchip_lvds_bridge_funcs;
-+		lvds->bridge.of_node = dev->of_node;
-+		ret = drm_bridge_add(&lvds->bridge);
-+		if (ret) {
-+			dev_err(&pdev->dev, "failed to add bridge %d\n", ret);
-+			goto err_unprepare_pclk;
-+		}
-+
-+		ret = component_master_add_with_match(dev,
-+						      &rockchip_lvds_master_ops,
-+						      match);
-+		if (ret < 0)
-+			goto err_bridge_remove;
-+	} else {
-+		of_node_put(output_node);
- 	}
- 
--	return component_add(&pdev->dev, &rockchip_lvds_component_ops);
-+	ret = component_add(&pdev->dev, &rockchip_lvds_component_ops);
-+	if (ret < 0)
-+		goto err_master_remove;
-+
-+	return 0;
- 
-+err_master_remove:
-+	if (!lvds->panel)
-+		component_master_del(&pdev->dev, &rockchip_lvds_master_ops);
-+err_bridge_remove:
-+	if (!lvds->panel)
-+		drm_bridge_remove(&lvds->bridge);
- err_unprepare_pclk:
- 	clk_unprepare(lvds->pclk);
- 	return ret;
-@@ -618,6 +825,10 @@ static int rockchip_lvds_remove(struct platform_device *pdev)
- 	struct rockchip_lvds *lvds = dev_get_drvdata(&pdev->dev);
- 
- 	component_del(&pdev->dev, &rockchip_lvds_component_ops);
-+	if (!lvds->panel) {
-+		component_master_del(&pdev->dev, &rockchip_lvds_master_ops);
-+		drm_bridge_remove(&lvds->bridge);
-+	}
- 
- 	clk_unprepare(lvds->pclk);
- 
++				lvds_out_panel: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
 -- 
 2.1.4
