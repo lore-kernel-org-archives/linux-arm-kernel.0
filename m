@@ -1,57 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 1 Apr 2015 12:29:03 -0700
-Subject: [PATCHv6 00/34] ARM: OMAP2+: PRCM+SCM cleanup against 4.0-rc1
-In-Reply-To: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-References: <1427829267-32077-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20150401192902.GS10805@atomide.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 1 Apr 2015 14:37:15 -0500
+Subject: [PATCH v3 0/4] remoteproc: Introduce wkup_m3_rproc driver
+Message-ID: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [150331 12:15]:
-> Hi,
-> 
-> Decided to post a new version because of the number of minor changes
-> compared to v5, just to avoid any misunderstandings:
-> 
-> - dropped patch #1 ("clk: ti: fix ti_clk_get_reg_addr..."), this has been merged
->   through clock tree now
-> - fixed scm_conf area size issues on am33xx/am43xx
-> - fixed scm area size issue on am43xx
-> - fixed size issues on omap3_pmx_core (was 8 bytes short)
-> - added warnings on omap2_clk_readl/writel in case legacy access is attempted
-> - fixed omap3 legacy boot
-> - fixed boot time warning on omap4+ where scm_conf does not contain clocks node
->   yet (these may be added to DT later if support is required)
-> - fixed some randconfig warnings
-> 
-> Testing done:
->  1: am335x-evm      : boot
->  2: am335x-evmsk    : boot
->  3: am3517-evm      : boot
->  4: am43x-epos-evm  : boot
->  5: am437x-gp-evm   : boot
->  6: omap3-beagle-xm : boot
->  7: omap3-beagle    : boot, cpuidle (ret/off), suspend (ret/off), legacy boot
->  8: am335x-boneblack: boot
->  9: am335x-bone     : boot
-> 10: dra7xx-evm      : boot
-> 11: omap3-n900      : boot
-> 12: omap5-uevm      : boot
-> 13: omap4-panda-es  : boot, cpuidle (ret), suspend (ret)
-> 14: omap4-panda     : boot
-> 15: omap2430-sdp    : boot
-> 16: omap3430-sdp    : boot
-> 17: omap4-sdp-es23plus: boot
-> 
-> New branch also pushed:
-> tree: https://github.com/t-kristo/linux-pm.git
-> branch: 4.0-rc1-prcm-cleanup-v6
+Hi,
+This patch series is version three of the series to add a
+wkup_m3_rproc driver for TI AM335x SoCs. This family of SoCs
+contains an ARM Cortex M3 coprocessor that is responsible for
+low-level power tasks that cannot be handled by the main ARM
+Cortex A8 so firmware running from the CM3 can be used instead.
+This driver handles loading of the firmware and reset of the CM3
+once it is booted.
 
-OK great, this version seems to work for me. I'll merge this into
-omap-for-v4.1/prcm-cleanup and will send a pull request probably
-on Thursday or Friday to arm-soc. Note that it's getting late for
-v4.1 (except for fixes), so no guarantees this will still get in.
+The previous version of this series can be found here [1].
+I have pushed a branch based on v4.0-rc5 containing the entire
+am335x suspend series here for a higher level view of the entire
+series of patch sets here [2]. This series depends on "remoteproc:
+add IOMMU hardware capability flag" which is currently queued
+here [3].
+
+Based on comments on the DT node included in the "ARM: OMAP2+:
+wkup_m3_rproc support patches" series (v3 of that will immediately
+follow this series) the DT node moved under a different parent
+node so some changes to the driver were necessary to calculate proper
+device addresses for firmware loading.
+
+This series also now includes a patch to introduce an
+rproc_get_by_phandle API to the remoteproc core so that users of
+this wkup_m3_rproc driver are able to get a handle to the rproc
+and boot it as the rproc must be booted directly by the user.
+An example user, wkup_m3_ipc, can be seen in previously mentioned
+branch at [2].
+
+v2 -> v3:
+-Modify wkup_m3_rproc driver to properly handle device address
+ based on new DT location in l4_wkup node.
+-In binding doc, change ti,am3352-wkup-m3 from am3353-wkup_m3 to match
+ other am3352 compats
+-General cleanup of address representation in wkup_m3_rproc driver
+-Includes rproc_get_by_phandle patch now
+
+The driver expects to load firmware am335x-pm-firmware.elf from
+/lib/firmware which is found here [4].
 
 Regards,
+Dave
 
-Tony
+[1] http://www.spinics.net/lists/linux-omap/msg116364.html
+[2] https://github.com/dgerlach/linux-pm/tree/pm-v4.0-rc5-am335x-suspend
+[3] https://git.kernel.org/cgit/linux/kernel/git/ohad/remoteproc.git/commit/?h=for-next&id=315491e5d6ee66838a18a8ca0c14e6ffb376e48c
+[4] https://git.ti.com/ti-cm3-pm-firmware/amx3-cm3/commits/next-upstream
+
+Dave Gerlach (3):
+  remoteproc: introduce rproc_get_by_phandle API
+  Documentation: dt: add bindings for TI Wakeup M3 processor
+  remoteproc/wkup_m3: add a remoteproc driver for TI Wakeup M3
+
+Suman Anna (1):
+  remoteproc: add a rproc ops for performing address translation
+
+ .../bindings/remoteproc/wkup_m3_rproc.txt          |  52 +++++
+ Documentation/remoteproc.txt                       |   6 +
+ drivers/remoteproc/Kconfig                         |  13 ++
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/remoteproc_core.c               | 114 +++++++++-
+ drivers/remoteproc/wkup_m3_rproc.c                 | 249 +++++++++++++++++++++
+ include/linux/platform_data/wkup_m3.h              |  30 +++
+ include/linux/remoteproc.h                         |   4 +
+ 8 files changed, 463 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+ create mode 100644 drivers/remoteproc/wkup_m3_rproc.c
+ create mode 100644 include/linux/platform_data/wkup_m3.h
+
+-- 
+2.3.0
