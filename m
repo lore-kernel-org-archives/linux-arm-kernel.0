@@ -1,79 +1,63 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  1 Apr 2015 23:20:42 +0200
-Subject: [PATCH 5/6] ARM: dts: Add DT for Embedded Artist LPC4357 Developers
- Kit
-In-Reply-To: <1427923243-26296-1-git-send-email-manabian@gmail.com>
-References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
-Message-ID: <1427923243-26296-6-git-send-email-manabian@gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 01 Apr 2015 23:46:10 +0200
+Subject: Build regression in next-20150331
+In-Reply-To: <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
+References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+ <2720045.6sPXjyyvfF@vostro.rjw.lan>
+ <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
+Message-ID: <2863807.lxHPvZ2AsE@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds basic support for Embedded Artist' LPC4357 Developer's Kit. Board
-features a LPC4357 Soc, 32 MB SDRAM, 128 MB NAND Flash, 16 MB SPI
-Flash, USB and Ethernet.
+On Tuesday, March 31, 2015 08:37:32 PM Tyler Baker wrote:
+> Hi Rafael,
+> 
+> On 31 March 2015 at 16:27, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Wednesday, April 01, 2015 01:03:52 AM Rafael J. Wysocki wrote:
+> >> On Tuesday, March 31, 2015 11:39:37 AM Tyler Baker wrote:
+> >> > Hi Thomas, Rafael,
+> >> >
+> >> > I was notified this morning by the kernelci.org system that a new
+> >> > build error has been detected in next-20150331[0][1][2]. It seems that
+> >> > "clockevents: Remove CONFIG_GENERIC_CLOCKEVENTS_BUILD"
+> >> > c9439b1d6eb4ada5c2faf3970ac0d2bc4bd20e14 is the culprit.
 
-More information can be found on:
-http://www.embeddedartists.com/products/kits/lpc4357_kit.php
+[cut]
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/Makefile           |  2 ++
- arch/arm/boot/dts/lpc4357-ea4357.dts | 34 ++++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 arch/arm/boot/dts/lpc4357-ea4357.dts
+> >
+> > Please try the one below instead.
+> >
+> > Rafael
+> >
+> >
+> > ---
+> >  kernel/time/tick-internal.h |    2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > Index: linux-pm/kernel/time/tick-internal.h
+> > ===================================================================
+> > --- linux-pm.orig/kernel/time/tick-internal.h
+> > +++ linux-pm/kernel/time/tick-internal.h
+> > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
+> >  /* Set the periodic handler in non broadcast mode */
+> >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
+> >  {
+> > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+> >         dev->event_handler = tick_handle_periodic;
+> > +#endif
+> >  }
+> >  #endif /* !BROADCAST */
+> 
+> Thanks for the quick response. I've applied this patch on top of
+> next-20150331 and I can confirm this fixes the build error reported in
+> this thread. The test results can be found here[0].
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a1c776b8dcec..cae9917a4198 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -195,6 +195,8 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ts219-6282.dtb \
- 	kirkwood-ts419-6281.dtb \
- 	kirkwood-ts419-6282.dtb
-+dtb-$(CONFIG_ARCH_LPC18XX) += \
-+	lpc4357-ea4357.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += \
- 	ea3250.dtb phy3250.dtb
- dtb-$(CONFIG_MACH_MESON6) += \
-diff --git a/arch/arm/boot/dts/lpc4357-ea4357.dts b/arch/arm/boot/dts/lpc4357-ea4357.dts
-new file mode 100644
-index 000000000000..39340e355b0a
---- /dev/null
-+++ b/arch/arm/boot/dts/lpc4357-ea4357.dts
-@@ -0,0 +1,34 @@
-+/*
-+ * Embedded Artist LPC4357 Developer's Kit
-+ *
-+ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * This code is released using a dual license strategy: BSD/GPL
-+ * You can choose the licence that better fits your requirements.
-+ *
-+ * Released under the terms of 3-clause BSD License
-+ * Released under the terms of GNU General Public License Version 2.0
-+ *
-+ */
-+/dts-v1/;
-+
-+#include "lpc18xx.dtsi"
-+#include "lpc4357.dtsi"
-+
-+/ {
-+	model = "Embedded Artist LPC4357 Developer's Kit";
-+	compatible = "ea,lpc4357-developers-kit", "nxp,lpc4357";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x28000000 0x2000000>; /* 32 MB */
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
--- 
-1.8.0
+OK, thanks for verifying.
+
+Peter, do you think the above is acceptable or do I need to do anything more
+sophisticated to fix this?  [The alternative would be probably to prepare an
+empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
+move the definition of struct clock_event_device from under that Kconfig
+option.]
+
+Rafael
