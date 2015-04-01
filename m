@@ -1,81 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Apr 2015 09:58:32 +0100
-Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
- get rid of the bounce page"
-In-Reply-To: <7hbnj99epe.fsf@deeprootsystems.com>
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
- <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
-Message-ID: <20150401085832.GA1552@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 1 Apr 2015 11:02:47 +0200
+Subject: [PATCH 0/5] Add standby support for the recent mvebu SoCs
+In-Reply-To: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKew5FFsA+ZphXO1hfYcy5hi_SzEBBhyk5QtQ5zn-SAenQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Gregory,
 
-On Tue, Mar 31, 2015 at 07:58:21PM +0100, Kevin Hilman wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> > On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
-> >> On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
-> >> > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
-> >> > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
-> >> > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
-> >> > >> > I think we now have a new error: (seen with omap2plus_defconfig)
-> >> > >> > on next-20150324 :
-> >> > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
-> >> > >> > referenced in expression
-> >> > >> > make: *** [vmlinux] Error 1
-> >> > >>
-> >> > >> Thanks, I am seeing that too.
-> >> > >>
-> >> > >> My armchair suggestion is that the following should be reverted.
-> >> > >>
-> >> > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> >> > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
-> >> > >
-> >> > > Can you try again with the latest -next please? We've merged an additional
-> >> > > patch aimed at sorting this out. Reverting isn't really an option, as
-> >> > > there's an awful lot of code that depends on the bounce page removal.
-> >> > 
-> >> > Here are the kernelci.org -next results[1], if you click the build
-> >> > status you can dig down into the build failures. next-20150326 has now
-> >> > hit a compiler bug, Arnd mentioned he was looking into this issue.
-> >> 
-> >> I have confirmed that next-20150326 does not compile without
-> >> the following reverted:
-> >> 
-> >> 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
-> >> e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
-> >> 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
-> >
-> > Thanks for testing this and sorry for the continued breakage. Which
-> > toolchain did you say you were using? Ard has some more patches trying to
-> > fix this, but none of our toolchains seem to tickle the issue.
-> 
-> I've also tested on the default ARM toolchains available with ubuntu[1]
-> 
-> Are there any updates on this issue?
+When I run standby on A385 I get following error:
+root at localhost:~# echo standby > /sys/power/state
+[  122.889266] PM: System core suspend callback
+mvebu_mbus_suspend+0x0/0xf4 failed.
 
-It's been fixed since the end of last week!
+Did you see this issue in your setup?
 
-(see ARM: kvm: round HYP section to page size instead of log2 upper bound)
+Best regards,
+Marcin
 
-This was confirmed by both my testing and also Simon Horman, who reported
-the initial breakage.
-
-> It ha broken most of the ARM defconfigs in linux-next[2], and since it's
-> been broken for a week now, it is masking other types of issues that we
-> can normally find via automated boot testing.
-
-If you're referring to failures such as:
-
-  http://storage.kernelci.org/next/next-20150331/arm-axm55xx_defconfig/build.log
-
-Then that's not coming from the arm64 tree, and is a completely separate
-issue from the one originally reported in this thread.
-
-Will
+2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Hi,
+>
+> Until now only one Armada XP based board supported suspend to
+> ram. This suspend to ram mode was unusual because it involved shutting
+> down the SoC and relied on a PIC to wake up the system.
+>
+> However, most of the recent mvebu SoCs can support the standby
+> mode. Unlike for the suspend to ram, nothing special have to be done
+> for these SoCs. In this mode the SoCs go in idle mode (but they remain
+> powered up) and the devices enter in suspend mode. The support itself
+> was added in the patch 2.
+>
+> In order to wake-up the interrupt controller driver have been
+> updated. As in standby mode the interrupt controller is not shutdown,
+> any interrupt can be a wake-up source. So the MPIC (patch 4) and the
+> GIC (patch 3) now used the flags IRQCHIP_SKIP_SET_WAKE and
+> IRQCHIP_MASK_ON_SUSPEND.
+>
+> A wake up source is supposed to work in suspend _and_ in standby mode
+> but for the mvebu SoCs, no interrupt can wake up the system. The last
+> patch warns the user about it.
+>
+> The first patch is a clean-up found while working on this series
+>
+> All the patch are independents either for building or for running.
+>
+> Thanks,
+>
+> Gregory
+>
+>
+> Gregory CLEMENT (5):
+>   ARM: mvebu: Use __init for the PM initialization functions
+>   ARM: mvebu: Add standby support
+>   ARM: mvebu: Allow using the GIC for wakeup in standby mode
+>   irqchip: armada-370-xp: Allow using wakeup source
+>   ARM: mvebu: Warn about the wake-ups sources not taken into account in
+>     suspend
+>
+>  arch/arm/mach-mvebu/board-v7.c      |  7 +++++
+>  arch/arm/mach-mvebu/common.h        |  5 ++--
+>  arch/arm/mach-mvebu/pm-board.c      | 15 ++++++----
+>  arch/arm/mach-mvebu/pm.c            | 57 ++++++++++++++++++++++++++++++++-----
+>  drivers/irqchip/irq-armada-370-xp.c |  1 +
+>  5 files changed, 70 insertions(+), 15 deletions(-)
+>
+> --
+> 2.1.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
