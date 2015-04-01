@@ -1,35 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Apr 2015 08:58:24 +0100
-Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
-In-Reply-To: <551B5213.8070902@rock-chips.com>
-References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
- <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk>
- <551A5B2F.50203@rock-chips.com>
- <20150331091329.GP24899@n2100.arm.linux.org.uk>
- <551B5213.8070902@rock-chips.com>
-Message-ID: <20150401075824.GX24899@n2100.arm.linux.org.uk>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 1 Apr 2015 13:31:15 +0530
+Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type constants
+ in dt-bindings/phy/phy.h
+In-Reply-To: <20150401071501.GS9447@x1>
+References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
+ <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
+ <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
+ <551ABD99.2000503@ti.com> <551AC37E.70503@st.com> <20150401071501.GS9447@x1>
+Message-ID: <551BA5CB.6030903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 10:04:03AM +0800, Yakir wrote:
-> Hi Russell,
-> 
-> ? 2015/3/31 17:13, Russell King - ARM Linux ??:
-> >As for the channel number, this is intentionally left to the driver -
-> >most cases I've found either the driver isn't interested, or where
-> >they are interested (the only case I know of is my dw_hdmi ahb audio
-> >driver), it's more appropriate to generate a baseline channel status,
-> >and let the driver iterate over the channels adding the appropriate
-> >channel number in.
-> Okay, agree with you to keep baseline channel status, but seems dw_hdmi
-> i2s audio are interested in channle number (to fill in schnl resigeters).
+Hi,
 
-Correct - but it's pointless having it in this helper as I explained.
-Please read my dw_hdmi-ahb-audio code to see why.
+On Wednesday 01 April 2015 12:45 PM, Lee Jones wrote:
+> On Tue, 31 Mar 2015, Maxime Coquelin wrote:
+>
+>> Hi Kishon,
+>> On 03/31/2015 05:30 PM, Kishon Vijay Abraham I wrote:
+>>> Maxime,
+>>>
+>>> On Tuesday 31 March 2015 01:10 PM, Lee Jones wrote:
+>>>> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+>>>>
+>>>>> Hi Patrice, Maxime,
+>>>>>
+>>>>> On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
+>>>>>> Now there are generic phy type constants declared in phy.h,
+>>>>>> migrate over to
+>>>>>> using them rather than defining our own. This change has
+>>>>>> been done as one
+>>>>>> atomic commit to be bisectable.
+>>>>>>
+>>>>>> Note: The values of the defines are the same, so there is no
+>>>>>> ABI breakage
+>>>>>> with this patch.
+>>>>>>
+>>>>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>>>>> Acked-by: Rob Herring <robh@kernel.org>
+>>>>>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>>>>
+>>>>> Are you okay for this patch to go via PHY tree? It modifies
+>>>>> arch/arm/boot/dts
+>>>>> /stih416.dtsi.
+>>>>
+>>>> These files need to be changed simultaneously in order to prevent
+>>>> breakage during bisection and the like.  I think the best bet moving
+>>>> forward is to pull this into its own branch, tag it and send Maxime a
+>>>> pull-request to the immutable branch.  It's the best way to minimise
+>>>> merge conflicts during the v4.1 merge window.
+>>>
+>>> okay. I still need an Ack from Maxime.
+>>
+>> You have my Ack.
+>>
+>> I haven't sent a pull request for STi DT files for v4.1 now, and it
+>> is too late to send one.
+>> So creating an immutable tag is not even needed in my opinion, you
+>> can just take the DT patch.
+>
+> Kishon,
+>
+> I saw that you took the MAINTAINERS patch, but not this one.  If it's
+> because you are still unsure about it, I agree with Maxime, you can
+> just take this patch without fear of conflict.
 
-It would be wasteful to memset the structure back to zero, only to
-re-fill it with exactly the same data except for the channel number.
+I've took this already
+https://git.kernel.org/cgit/linux/kernel/git/kishon/linux-phy.git/commit/?h=next&id=76fa6deabab05688a1653c2f66224be4a3c08d6a
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+-Kishon
