@@ -1,54 +1,71 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 1 Apr 2015 14:47:07 -0500
-Subject: [PATCH v3 0/3] ARM: OMAP2+: wkup_m3_rproc support patches
-Message-ID: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
+Date: Wed, 1 Apr 2015 14:47:08 -0500
+Subject: [PATCH v3 1/3] ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset
+ management
+In-Reply-To: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
+References: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1427917630-43961-2-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the mach-omap2 code and DT nodes for v3 of the
-wkup_m3_rproc driver submitted here [1]. pdata-quirks patch requires
-the pdata added with patch 4 of the aforementioned series. Based on
-previous discussion here [2], the wkup_m3 DT node has been moved as a
-child of the l4_wkup as is done for l4_wkup components in Tero Kristo's
-series "PRCM+SCM cleanup against 4.0-rc1" found here [3]. Because of that,
-this series applies cleanly on top of that series in order to leverage the
-l4_wkup parent node introduced there.
+Use pdata-quirks to provide platform data required for reset
+management during boot and shutdown of the wkup_m3 processor
+on both the AM33xx and AM43xx SoCs. The WkupM3 remote processor
+is used to implement and achieve low-power functionality on
+the AM33xx & AM43xx SoCs.
 
-In addition to the move of the wkup_m3 node for am33xx, a new patch
-has been added to introduce the wkup_m3 node in the same fashion for
-am43xx as both SoCs use the same configuration. With this change
-support was also added to pdata-quirks for passing reset handlers to
-the driver for the am43xx binding as was already done for am33xx.
-
-I have pushed a branch containing all patches for am335x suspend
-here for a big picture view of how all patches fit together with
-these wkup_m3_rproc series [4].
-
-v2->v3:
--Change ti,am3353-wkup-m3 compat to ti,am3352-wkup-m3 to reflect
- binding documentation change
--Add ti,am4372-wkup-m3 node to am4372 SoC dt file
--Add am4372 support to pdata-quirks for reset handlers
-
-Regards,
-Dave
-
-[1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg115869.html
-[2] http://www.spinics.net/lists/linux-omap/msg116366.html
-[3] http://www.spinics.net/lists/arm-kernel/msg409842.html
-[4] https://github.com/dgerlach/linux-pm/tree/pm-v4.0-rc5-am335x-suspend
-
-Dave Gerlach (1):
-  ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset management
-
-Suman Anna (2):
-  ARM: dts: AM33xx: Update and move wkup_m3 node to l4 node
-  ARM: dts: AM4372: Add the wkupm3 rproc node
-
- arch/arm/boot/dts/am33xx.dtsi      | 17 +++++++++--------
- arch/arm/boot/dts/am4372.dtsi      |  9 +++++++++
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
  arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++++++++
- 3 files changed, 33 insertions(+), 8 deletions(-)
+ 1 file changed, 15 insertions(+)
 
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index e642b07..7b4a4c1 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -18,6 +18,7 @@
+ 
+ #include <linux/platform_data/pinctrl-single.h>
+ #include <linux/platform_data/iommu-omap.h>
++#include <linux/platform_data/wkup_m3.h>
+ 
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -314,6 +315,14 @@ static struct iommu_platform_data omap4_iommu_pdata = {
+ };
+ #endif
+ 
++#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
++static struct wkup_m3_platform_data wkup_m3_data = {
++	.reset_name = "wkup_m3",
++	.assert_reset = omap_device_assert_hardreset,
++	.deassert_reset = omap_device_deassert_hardreset,
++};
++#endif
++
+ #ifdef CONFIG_SOC_AM33XX
+ static void __init am335x_evmsk_legacy_init(void)
+ {
+@@ -383,6 +392,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+ 		       &am35xx_emac_pdata),
+ #endif
++#ifdef CONFIG_SOC_AM33XX
++	OF_DEV_AUXDATA("ti,am3352-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
++		       &wkup_m3_data),
++#endif
+ #ifdef CONFIG_ARCH_OMAP4
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
+@@ -396,6 +409,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #endif
+ #ifdef CONFIG_SOC_AM43XX
+ 	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
++		       &wkup_m3_data),
+ #endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
 -- 
 2.3.0
