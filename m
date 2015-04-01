@@ -1,71 +1,62 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 1 Apr 2015 14:47:08 -0500
-Subject: [PATCH v3 1/3] ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset
- management
+Date: Wed, 1 Apr 2015 14:47:09 -0500
+Subject: [PATCH v3 2/3] ARM: dts: AM33xx: Update and move wkup_m3 node to l4
+ node
 In-Reply-To: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
 References: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1427917630-43961-2-git-send-email-d-gerlach@ti.com>
+Message-ID: <1427917630-43961-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pdata-quirks to provide platform data required for reset
-management during boot and shutdown of the wkup_m3 processor
-on both the AM33xx and AM43xx SoCs. The WkupM3 remote processor
-is used to implement and achieve low-power functionality on
-the AM33xx & AM43xx SoCs.
+From: Suman Anna <s-anna@ti.com>
+
+The WakeupM3 remote processor device node has been moved to
+be a child node of the newly created l4_wkup node, to reflect
+its presence properly within the SoC. The node was added
+previously before any driver support, it is now updated as
+per the wkup_m3_rproc bindings added alongside the driver
+support.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index e642b07..7b4a4c1 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -18,6 +18,7 @@
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 21fcc44..4c1b4a8 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -103,6 +103,15 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 0x44c00000 0x280000>;
  
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
-+#include <linux/platform_data/wkup_m3.h>
- 
- #include "common.h"
- #include "common-board-devices.h"
-@@ -314,6 +315,14 @@ static struct iommu_platform_data omap4_iommu_pdata = {
- };
- #endif
- 
-+#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
-+static struct wkup_m3_platform_data wkup_m3_data = {
-+	.reset_name = "wkup_m3",
-+	.assert_reset = omap_device_assert_hardreset,
-+	.deassert_reset = omap_device_deassert_hardreset,
-+};
-+#endif
++			wkup_m3: wkup_m3 at 100000 {
++				compatible = "ti,am3352-wkup-m3";
++				reg = <0x100000 0x4000>,
++				      <0x180000	0x2000>;
++				reg-names = "umem", "dmem";
++				ti,hwmods = "wkup_m3";
++				ti,pm-firmware = "am335x-pm-firmware.elf";
++			};
 +
- #ifdef CONFIG_SOC_AM33XX
- static void __init am335x_evmsk_legacy_init(void)
- {
-@@ -383,6 +392,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
- 		       &am35xx_emac_pdata),
- #endif
-+#ifdef CONFIG_SOC_AM33XX
-+	OF_DEV_AUXDATA("ti,am3352-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
-+		       &wkup_m3_data),
-+#endif
- #ifdef CONFIG_ARCH_OMAP4
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
- 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
-@@ -396,6 +409,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- #endif
- #ifdef CONFIG_SOC_AM43XX
- 	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
-+	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
-+		       &wkup_m3_data),
- #endif
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+ 			prcm: prcm at 200000 {
+ 				compatible = "ti,am3-prcm";
+ 				reg = <0x200000 0x4000>;
+@@ -762,14 +771,6 @@
+ 			reg = <0x40300000 0x10000>; /* 64k */
+ 		};
+ 
+-		wkup_m3: wkup_m3 at 44d00000 {
+-			compatible = "ti,am3353-wkup-m3";
+-			reg = <0x44d00000 0x4000	/* M3 UMEM */
+-			       0x44d80000 0x2000>;	/* M3 DMEM */
+-			ti,hwmods = "wkup_m3";
+-			ti,no-reset-on-init;
+-		};
+-
+ 		elm: elm at 48080000 {
+ 			compatible = "ti,am3352-elm";
+ 			reg = <0x48080000 0x2000>;
 -- 
 2.3.0
