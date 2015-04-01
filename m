@@ -1,88 +1,47 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 1 Apr 2015 11:48:42 -0600
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <551C2768.6060209@wwwdotorg.org>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
- <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
- <55137098.4030903@wwwdotorg.org>
- <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
- <5514569E.2030406@wwwdotorg.org> <551C2768.6060209@wwwdotorg.org>
-Message-ID: <551C2F7A.7040107@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Apr 2015 18:50:40 +0100
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <1427907064.5567.256.camel@redhat.com>
+References: <20150327171946.GL1562@arm.com>
+ <1427894051.22236.6.camel@infradead.org>
+ <20150401133908.GI1552@arm.com>
+ <1427896377.22236.8.camel@infradead.org>
+ <1427907064.5567.256.camel@redhat.com>
+Message-ID: <20150401175040.GQ1552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2015 11:14 AM, Stephen Warren wrote:
-> On 03/26/2015 12:57 PM, Stephen Warren wrote:
->> On 03/26/2015 12:35 PM, Paul Walmsley wrote:
->>> On Wed, 25 Mar 2015, Stephen Warren wrote:
->>>
->>>> On 03/25/2015 04:00 PM, Paul Walmsley wrote:
->>>>> On Wed, 25 Mar 2015, Tyler Baker wrote:
->>>>>> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
->>>>>>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
->>>>>>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
->>>>>>> multi_v7_defconfig boot.
-> ...
->>>>>> Can you try to shift your kernel load address around a bit? From
->>>>>> experience with the boards from kernelci.org we find that as the 
->>>>>> multi
->>>>>> v7 kernel size increases they can clobber memory when they get
->>>>>> decompressed.
->>>>>
->>>>> Thanks, that was it:
->>>>>
->>>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt 
->>>>>
-> ...
->>>> Interesting. Do the values in U-Boot's default environment work
->>>> correctly
->>>
->>> No idea, I haven't tried.  (The load addresses I used are observable in
->>> the boot logs above.)
->>
->> Sure. I was hoping you'd try it out since you already had the setup to
->> repro the issue.
->>
->> It'd be good if your test-bed used the built-in U-Boot variables too, so
->> we're testing them.
->
-> I've reproduced the original problem, and then validated that using 
-> the addresses from U-Boot's default environment (at least with a ToT 
-> U-Boot that I just built) does indeed solve it.
->
-> I'd like to re-iterate that the test bed should be using the values 
-> from U-Boot's environment rather than making up its own. That way:
->
-> * The value the test bed uses for the kernel load address likely 
-> overlaps where the kernel decompressor writes to for even slightly 
-> large kernels. This means the decompressor must move itself before 
-> decompressing. IIUC, there's zero guarantee that moving the 
-> decompressor won't overwrite the DTB, since IIUC the decompressor uses 
-> zero knowledge of the DTB location. In other words, if the compressed 
-> kernel is loaded somewhere that's likely to require it to move itself, 
-> there's a real risk of the exact same problem cropping up again in the 
-> future if the kernel happens to overwrite the DTB during relocation.
->
-> * The values are part of every Tegra U-Boot port (and hopefully for 
-> other SoCs too given any distro using boot.scr with 
-> config_distro_bootcmd.h will expect the variables to exist), so for 
-> future (Tegra) chips you won't have to adjust the test bed if RAM 
-> layout changes.
->
-> * Those values get testing, so we'll find out if the ever don't work. 
-> We get more test coverage.
+Hi Alex,
 
-Sounds reasonable, I'll try to get to this at some point soon.
+On Wed, Apr 01, 2015 at 05:51:04PM +0100, Alex Williamson wrote:
+> On Wed, 2015-04-01 at 15:52 +0200, David Woodhouse wrote:
+> > On Wed, 2015-04-01 at 14:39 +0100, Will Deacon wrote:
+> > > In fact, that would also allow us to nuke the whole TLB on VFIO unmap of
+> > > large ranges. We currently iterate over the range page-by-page, which takes
+> > > ages (minutes) in simulation.
+> > 
+> > Which is one of the big reasons we lie about page sizes in VT-d.
+> 
+> I think (hope) we've solved a significant portion of the unmap problem
+> with the chunking patches that are now in v4.0.  We should now be
+> attempting to find the largest contiguous range to unmap instead of
+> doing the page-by-page unmap that was mostly hoping the IOMMU actually
+> used a super page.  I'm not sure how lying about page sizes had any
+> effect on this though.  In order for vfio to get any smarter about it
+> we'd need a "commit" callback and to be able to use the freelist to
+> track pages to unpin after commit.  Thanks,
 
-BTW, it might be worth changing U-boot CONFIG_LOADADDR to point to the 
-value you define for kernel_addr_r.  That would reinforce to folks who 
-aren't using the U-boot scripts that they should use that address for 
-loading their kernel.
+Just so I understand this correctly, is that "commit" callback to ensure
+that the domain_destroy has actually taken effect on the IOMMU (e.g. by
+invalidating the TLBs and waiting for that to take effect)?
 
+The io-pgtable API has a tlb_sync callback, but actually I made
+tlb_flush_all (which is called when destroying the page tables) always
+synchronous so that you wouldn't need to unmap anything explicitly in
+that case.
 
-- Paul
+Unfortunately, 4.0 doesn't seem to have improved wrt VFIO unmap for me.
+Is there something extra I need to add to the ARM SMMU driver?
 
-
-- Paul
+Will
