@@ -1,57 +1,57 @@
-From: dahi@linux.vnet.ibm.com (David Hildenbrand)
-Date: Wed, 1 Apr 2015 17:38:36 +0200
-Subject: [PATCH v2 01/10] KVM: add commentary for kvm_debug_exit_arch
- struct
-In-Reply-To: <1427814488-28467-2-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-2-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150401173836.09f7fde1@thinkpad-w530>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 1 Apr 2015 17:38:54 +0200
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150331144956.GA24094@arm.com>
+References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
+ <20150331144956.GA24094@arm.com>
+Message-ID: <20150401153854.GG4441@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Bring into line with the commentary for the other structures and their
-> KVM_EXIT_* cases.
+Hi Will,
 
-s/commentary/comments/ in the subject and description. Unless you want to add a
-lengthy discussion :)
+On Tue, Mar 31, 2015 at 03:49:56PM +0100, Will Deacon wrote:
+> But isn't this restriction already the case in practice? For example, if
+> I have a domain with some mapping already configured, then that mapping
+> will be using some fixed set of page sizes. Attaching a device behind
+> another IOMMU that doesn't support that page size would effectively require
+> the domain page tables to be freed and re-allocated from scratch.
 
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> ---
-> 
-> v2
->   - add comments for other exit types
-> 
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 8055706..5eedf84 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -226,6 +226,7 @@ struct kvm_run {
->  			__u32 count;
->  			__u64 data_offset; /* relative to kvm_run start */
->  		} io;
-> +		/* KVM_EXIT_DEBUG */
->  		struct {
->  			struct kvm_debug_exit_arch arch;
->  		} debug;
-> @@ -274,6 +275,7 @@ struct kvm_run {
->  			__u32 data;
->  			__u8  is_write;
->  		} dcr;
-> +		/* KVM_EXIT_INTERNAL_ERROR */
->  		struct {
->  			__u32 suberror;
->  			/* Available with KVM_CAP_INTERNAL_ERROR_DATA: */
-> @@ -284,6 +286,7 @@ struct kvm_run {
->  		struct {
->  			__u64 gprs[32];
->  		} osi;
-> +		/* KVM_EXIT_PAPR_HCALL */
->  		struct {
->  			__u64 nr;
->  			__u64 ret;
+The problem is that this restriction depends on the IOMMU driver in use.
+>From the beginning of the IOMMU-API the backend drivers have supported
+sharing a domain by multiple devices. In fact, the domain is just an
+abstraction for an address space that can be attached to devices just
+like cpu page-tables are assigned to threads of a process.
 
-Looks good to me.
+We can discuss whether this fundamental concept of the IOMMU-API needs
+to be changed (moving into the direction this patch-set proposes). I
+could imaging removing the domain concept entirely and just have
+map/unmap functions like this:
 
-David
+	iommu_map(struct device *dev, dma_addr_t iova,
+		  phys_addr_t phys, size_t size)
+	iommu_unmap(struct device *dev, dma_addr_t iova,
+		    phys_addr_t phys, size_t size)
+
+This would require some changes for the users of the IOMMU-API, but it
+shouldn't be too hard.
+
+Or we keep the desired semantics as they are now and do everything
+needed for that in the IOMMU drivers. For the arm-smmu this would mean
+exposing a common set of supported pgsizes between IOMMUs, or to build
+multiple page-tables to match the different IOMMU capabilities.
+
+I am open for disussions for either way, but I like the current
+semantics a bit more, as it allows us to share page-tables between
+devices and we can move all of the nasty code in VFIO that already
+creates multiple domains to get different page-tables into the
+IOMMU core or the drivers (were it belongs).
+
+What I definitly don't want is a mixture of both concepts depending on
+the IOMMU driver in use. We should settle on one way and force the
+drivers to behave accordingly. We don't need a common API when every
+driver behaves differently.
+
+
+	Joerg
