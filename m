@@ -1,102 +1,369 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed,  1 Apr 2015 12:09:36 +0200
-Subject: [PATCH RFC v2 02/12] drm/connector: add functionality to register
- connectors to a global list
+Date: Wed,  1 Apr 2015 12:09:38 +0200
+Subject: [PATCH RFC v2 04/12] drm/components: add generic vga encoder driver
 In-Reply-To: <1427882986-19110-1-git-send-email-heiko@sntech.de>
 References: <1427882986-19110-1-git-send-email-heiko@sntech.de>
-Message-ID: <1427882986-19110-3-git-send-email-heiko@sntech.de>
+Message-ID: <1427882986-19110-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows standalone connectors to be registered and found again
-through their devicetree node when going through their connection graph.
+This adds a driver for generic vga encoders like the Analog Devices adv7123
+and similar ics. These chips do not have any special configuration options
+except a powersafe gpio.
 
-Setting the of_node property is of course still optional, as it is not
-necessary in most cases to lookup connectors that are part of a bigger
-component.
+An exception is added for the rcar-du driver which also implements support
+for the adv7123 internally but is not yet converted to the component framework.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/drm_crtc.c | 41 +++++++++++++++++++++++++++++++++++++++++
- include/drm/drm_crtc.h     |  7 +++++++
- 2 files changed, 48 insertions(+)
+ drivers/gpu/drm/components/Kconfig       |   5 +
+ drivers/gpu/drm/components/Makefile      |   2 +
+ drivers/gpu/drm/components/vga-encoder.c | 315 +++++++++++++++++++++++++++++++
+ 3 files changed, 322 insertions(+)
+ create mode 100644 drivers/gpu/drm/components/vga-encoder.c
 
-diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-index b63e69d..8b49ea7 100644
---- a/drivers/gpu/drm/drm_crtc.c
-+++ b/drivers/gpu/drm/drm_crtc.c
-@@ -852,6 +852,47 @@ static void drm_connector_get_cmdline_mode(struct drm_connector *connector)
- 		      mode->interlace ?  " interlaced" : "");
- }
+diff --git a/drivers/gpu/drm/components/Kconfig b/drivers/gpu/drm/components/Kconfig
+index 9d5d462..647cea6 100644
+--- a/drivers/gpu/drm/components/Kconfig
++++ b/drivers/gpu/drm/components/Kconfig
+@@ -1,4 +1,9 @@
+ menu "Standalone components for use with the component framework"
+      depends on DRM && DRM_KMS_HELPER
  
-+static DEFINE_MUTEX(connector_lock);
-+static LIST_HEAD(connector_list);
++config DRM_COMPONENTS_VGA_ENCODER
++	tristate "Generic vga encoder"
++	help
++	  Support for generic vga encoder chips without any special controls.
 +
-+int drm_connector_add(struct drm_connector *connector)
+ endmenu
+diff --git a/drivers/gpu/drm/components/Makefile b/drivers/gpu/drm/components/Makefile
+index be16eca..719b1c9 100644
+--- a/drivers/gpu/drm/components/Makefile
++++ b/drivers/gpu/drm/components/Makefile
+@@ -1 +1,3 @@
+ ccflags-y := -Iinclude/drm
++
++obj-$(CONFIG_DRM_COMPONENTS_VGA_ENCODER) += vga-encoder.o
+diff --git a/drivers/gpu/drm/components/vga-encoder.c b/drivers/gpu/drm/components/vga-encoder.c
+new file mode 100644
+index 0000000..f559b5e
+--- /dev/null
++++ b/drivers/gpu/drm/components/vga-encoder.c
+@@ -0,0 +1,315 @@
++/*
++ * Simple vga encoder driver
++ *
++ * Copyright (C) 2014 Heiko Stuebner <heiko@sntech.de>
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/component.h>
++#include <linux/gpio.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/regulator/consumer.h>
++#include <linux/of_graph.h>
++#include <drm/drm_of.h>
++#include <drm/drmP.h>
++#include <drm/drm_crtc.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_edid.h>
++
++#define encoder_to_vga_encoder(x) container_of(x, struct vga_encoder, encoder)
++
++struct vga_encoder {
++	struct drm_encoder encoder;
++	struct device *dev;
++	struct regulator *vaa_reg;
++	struct gpio_desc *psave_gpio;
++
++	struct mutex enable_lock;
++	bool enabled;
++};
++
++static void vga_encoder_destroy(struct drm_encoder *encoder)
 +{
-+	mutex_lock(&connector_lock);
-+	list_add_tail(&connector->list, &connector_list);
-+	mutex_unlock(&connector_lock);
++	drm_encoder_cleanup(encoder);
++}
++
++static const struct drm_encoder_funcs vga_encoder_funcs = {
++	.destroy = vga_encoder_destroy,
++};
++
++static void vga_encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct vga_encoder *vga = encoder_to_vga_encoder(encoder);
++
++	mutex_lock(&vga->enable_lock);
++
++	switch (mode) {
++	case DRM_MODE_DPMS_ON:
++		if (vga->enabled)
++			goto out;
++
++		if (!IS_ERR(vga->vaa_reg))
++			regulator_enable(vga->vaa_reg);
++
++		if (vga->psave_gpio)
++			gpiod_set_value(vga->psave_gpio, 1);
++
++		vga->enabled = true;
++		break;
++	case DRM_MODE_DPMS_STANDBY:
++	case DRM_MODE_DPMS_SUSPEND:
++	case DRM_MODE_DPMS_OFF:
++		if (!vga->enabled)
++			goto out;
++
++		if (vga->psave_gpio)
++			gpiod_set_value(vga->psave_gpio, 0);
++
++		if (!IS_ERR(vga->vaa_reg))
++			regulator_enable(vga->vaa_reg);
++
++		vga->enabled = false;
++		break;
++	default:
++		break;
++	}
++
++out:
++	mutex_unlock(&vga->enable_lock);
++}
++
++static bool vga_encoder_mode_fixup(struct drm_encoder *encoder,
++				  const struct drm_display_mode *mode,
++				  struct drm_display_mode *adjusted_mode)
++{
++	return true;
++}
++
++static void vga_encoder_prepare(struct drm_encoder *encoder)
++{
++}
++
++static void vga_encoder_mode_set(struct drm_encoder *encoder,
++					struct drm_display_mode *mode,
++					struct drm_display_mode *adjusted_mode)
++{
++}
++
++static void vga_encoder_commit(struct drm_encoder *encoder)
++{
++	vga_encoder_dpms(encoder, DRM_MODE_DPMS_ON);
++}
++
++static void vga_encoder_disable(struct drm_encoder *encoder)
++{
++	vga_encoder_dpms(encoder, DRM_MODE_DPMS_OFF);
++}
++
++static const struct drm_encoder_helper_funcs vga_encoder_helper_funcs = {
++	.dpms = vga_encoder_dpms,
++	.mode_fixup = vga_encoder_mode_fixup,
++	.prepare = vga_encoder_prepare,
++	.mode_set = vga_encoder_mode_set,
++	.commit = vga_encoder_commit,
++	.disable = vga_encoder_disable,
++};
++
++/*
++ * Component helper functions
++ */
++
++static int vga_encoder_bind(struct device *dev, struct device *master,
++				 void *data)
++{
++	struct vga_encoder *vga = dev_get_drvdata(dev);
++	struct device_node *np = vga->encoder.of_node;
++	struct drm_device *drm_dev = data;
++
++	vga->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm_dev, np);
++
++	drm_encoder_helper_add(&vga->encoder, &vga_encoder_helper_funcs);
++	drm_encoder_init(drm_dev, &vga->encoder, &vga_encoder_funcs,
++			 DRM_MODE_ENCODER_DAC);
++
++	return component_bind_all(dev, drm_dev);
++}
++
++static void vga_encoder_unbind(struct device *dev, struct device *master,
++				    void *data)
++{
++	struct vga_encoder *vga = dev_get_drvdata(dev);
++	struct drm_device *drm_dev = data;
++
++	component_unbind_all(dev, drm_dev);
++	vga->encoder.funcs->destroy(&vga->encoder);
++}
++
++static const struct component_ops vga_encoder_ops = {
++	.bind = vga_encoder_bind,
++	.unbind = vga_encoder_unbind,
++};
++
++static int compare_of(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
++
++static int vga_encoder_master_bind(struct device *dev)
++{
++	return 0;
++}
++
++static void vga_encoder_master_unbind(struct device *dev)
++{
++	/* do nothing */
++}
++
++static const struct component_master_ops vga_encoder_master_ops = {
++	.bind = vga_encoder_master_bind,
++	.unbind = vga_encoder_master_unbind,
++};
++
++static int vga_encoder_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *port, *connector_node;
++	struct device *dev = &pdev->dev;
++	struct component_match *match = NULL;
++	struct vga_encoder *vga;
++	int ret;
++
++	if (!np)
++		return -ENODEV;
++
++	vga = devm_kzalloc(dev, sizeof(*vga), GFP_KERNEL);
++	if (!vga)
++		return -ENOMEM;
++
++	vga->dev = dev;
++	dev_set_drvdata(dev, vga);
++	mutex_init(&vga->enable_lock);
++
++	vga->psave_gpio = devm_gpiod_get_optional(dev, "psave",
++						   GPIOD_OUT_LOW);
++	if (IS_ERR(vga->psave_gpio)) {
++		ret = PTR_ERR(vga->psave_gpio);
++		dev_err(dev, "failed to request GPIO: %d\n", ret);
++		return ret;
++	}
++
++	vga->enabled = false;
++	vga->vaa_reg = devm_regulator_get_optional(dev, "vaa");
++	vga->encoder.of_node = np;
++
++	port = of_graph_get_port_by_id(dev->of_node, 1);
++	if (port) {
++		struct device_node *endpoint;
++
++		endpoint = of_get_child_by_name(port, "endpoint");
++		if (endpoint) {
++			connector_node = of_graph_get_remote_port_parent(endpoint);
++			of_node_put(endpoint);
++		}
++
++		of_node_put(port);
++	}
++
++	if (!of_drm_find_connector(connector_node))
++		return -EPROBE_DEFER;
++
++	component_match_add(dev, &match, compare_of, connector_node);
++
++	ret = drm_encoder_add(&vga->encoder);
++	if (ret < 0)
++		return ret;
++
++	ret = component_master_add_with_match(dev, &vga_encoder_master_ops, match);
++	if (ret < 0)
++		goto err_encoder_remove;
++
++	ret = component_add(dev, &vga_encoder_ops);
++	if (ret < 0)
++		goto err_master_remove;
++
++	return 0;
++
++err_master_remove:
++	component_master_del(&pdev->dev, &vga_encoder_master_ops);
++err_encoder_remove:
++	drm_encoder_remove(&vga->encoder);
++
++	return ret;
++}
++
++static int vga_encoder_remove(struct platform_device *pdev)
++{
++	struct vga_encoder *vga = dev_get_drvdata(&pdev->dev);
++
++	component_del(&pdev->dev, &vga_encoder_ops);
++	component_master_del(&pdev->dev, &vga_encoder_master_ops);
++	drm_encoder_remove(&vga->encoder);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(drm_connector_add);
 +
-+void drm_connector_remove(struct drm_connector *connector)
++static const struct of_device_id vga_encoder_ids[] = {
++	{ .compatible = "adi,adv7123", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, vga_encoder_ids);
++
++static struct platform_driver vga_encoder_driver = {
++	.probe  = vga_encoder_probe,
++	.remove = vga_encoder_remove,
++	.driver = {
++		.name = "vga-encoder",
++		.of_match_table = vga_encoder_ids,
++	},
++};
++
++static const struct of_device_id rcar_du_of_table[] = {
++	{ .compatible = "renesas,du-r8a7779" },
++	{ .compatible = "renesas,du-r8a7790" },
++	{ .compatible = "renesas,du-r8a7791" },
++	{ }
++};
++
++static int __init vga_encoder_init(void)
 +{
-+	mutex_lock(&connector_lock);
-+	list_del_init(&connector->list);
-+	mutex_unlock(&connector_lock);
-+}
-+EXPORT_SYMBOL(drm_connector_remove);
++	struct device_node *np;
 +
-+#ifdef CONFIG_OF
-+struct drm_connector *of_drm_find_connector(struct device_node *np)
-+{
-+	struct drm_connector *connector;
-+
-+	mutex_lock(&connector_lock);
-+
-+	list_for_each_entry(connector, &connector_list, list) {
-+		if (connector->of_node == np) {
-+			mutex_unlock(&connector_lock);
-+			return connector;
-+		}
++	/*
++	 * Play nice with rcar-du that is having its own implementation
++	 * of the adv7123 binding implementation and is not yet
++	 * converted to using components.
++	 */
++	np = of_find_matching_node(NULL, rcar_du_of_table);
++	if (np) {
++		of_node_put(np);
++		return 0;
 +	}
 +
-+	mutex_unlock(&connector_lock);
-+	return NULL;
++	return platform_driver_register(&vga_encoder_driver);
 +}
-+EXPORT_SYMBOL(of_drm_find_connector);
-+#endif
 +
- /**
-  * drm_connector_init - Init a preallocated connector
-  * @dev: DRM device
-diff --git a/include/drm/drm_crtc.h b/include/drm/drm_crtc.h
-index 76994ba..37b230b 100644
---- a/include/drm/drm_crtc.h
-+++ b/include/drm/drm_crtc.h
-@@ -671,6 +671,10 @@ struct drm_encoder {
-  */
- struct drm_connector {
- 	struct drm_device *dev;
-+#ifdef CONFIG_OF
-+	struct device_node *of_node;
-+#endif
-+	struct list_head list;
- 	struct device *kdev;
- 	struct device_attribute *attr;
- 	struct list_head head;
-@@ -1213,6 +1217,9 @@ static inline uint32_t drm_crtc_mask(struct drm_crtc *crtc)
- 
- extern void drm_connector_ida_init(void);
- extern void drm_connector_ida_destroy(void);
-+extern int drm_connector_add(struct drm_connector *connector);
-+extern void drm_connector_remove(struct drm_connector *connector);
-+extern struct drm_connector *of_drm_find_connector(struct device_node *np);
- extern int drm_connector_init(struct drm_device *dev,
- 			      struct drm_connector *connector,
- 			      const struct drm_connector_funcs *funcs,
++static void __exit vga_encoder_exit(void)
++{
++	platform_driver_unregister(&vga_encoder_driver);
++}
++
++module_init(vga_encoder_init);
++module_exit(vga_encoder_exit);
++
++MODULE_AUTHOR("Heiko Stuebner <heiko@sntech.de>");
++MODULE_DESCRIPTION("Simple vga converter");
++MODULE_LICENSE("GPL");
 -- 
 2.1.4
