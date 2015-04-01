@@ -1,84 +1,96 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 31 Mar 2015 18:42:18 -0700
-Subject: [PATCH 3/4] clk: Provide always-on clock support
-In-Reply-To: <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
- <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
- <20150302083652.GE31325@x1>
- <CABb+yY07woiiG8e2kff_AsiFCHNP+TKYyNm_o6=f5WmFsLi8gQ@mail.gmail.com>
- <20150302101859.GB32347@x1>
- <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
-Message-ID: <20150401014218.25195.61119@quantum>
+From: tyler.baker@linaro.org (Tyler Baker)
+Date: Tue, 31 Mar 2015 20:37:32 -0700
+Subject: Build regression in next-20150331
+In-Reply-To: <2720045.6sPXjyyvfF@vostro.rjw.lan>
+References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+ <1489627.zlEOcOu4fx@vostro.rjw.lan>
+ <2720045.6sPXjyyvfF@vostro.rjw.lan>
+Message-ID: <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jassi Brar (2015-03-02 02:28:44)
-> On 2 March 2015 at 15:48, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Mon, 02 Mar 2015, Jassi Brar wrote:
-> >
-> >> On Mon, Mar 2, 2015 at 2:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > On Sat, 28 Feb 2015, Jassi Brar wrote:
-> >> >
-> >> >> On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
-> >> >> > Lots of platforms contain clocks which if turned off would prove fatal.
-> >> >> > The only way to recover from these catastrophic failures is to restart
-> >> >> > the board(s).  Now, when a clock is registered with the framework it is
-> >> >> > compared against a list of provided always-on clock names which must be
-> >> >> > kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
-> >> >> > flag, which will prevent the common clk framework from attempting to
-> >> >> > gate it during the clk_disable_unused() procedure.
-> >> >> >
-> >> >> If a clock is critical on a certain board, it could be got+enabled
-> >> >> during early boot so there is always a user.
-> >> >
-> >> > I tried this.  There was push-back from the DT maintainers.
-> >> >
-> >> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324417.html
-> >> >
-> >> Thanks, I wasn't aware of the history.
-> >>
-> >> >> To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
-> >> >> flag could be made to initialize the clock with one phantom user
-> >> >> already. Or just reuse the CLK_IGNORE_UNUSED?
-> >> >
-> >> > How is that different to what this set is doing?
-> >> >
-> >> The phantom user - that's there but none can see it.
-> >>
-> >> How about?
-> >>
-> >> +       of_property_for_each_string(np, "clock-always-on", prop, clkname) {
-> >> +               clk = __clk_lookup(clkname);
-> >> +               if (!clk)
-> >> +                       continue;
-> >> +
-> >> +               clk->core->enable_count = 1;
-> >> +               clk->core->prepare_count = 1;
-> >> +       }
-> >
-> > This is only fractionally different from the current implementation.
-> >
-> > I believe the current way it slightly nicer, as we don't have to fake
-> > the user count.
-> >
-> Well... the user is indeed there, isn't it? It's just not known to
-> Linux. So 'fake' isn't most applicable here.
-> Otherwise you might have to stub out some existing and future
-> functions for CLK_IGNORE_UNUSED. And how do we explain to userspace
-> which would see power drawn but no user of the clock?
+Hi Rafael,
 
-Jassi,
+On 31 March 2015 at 16:27, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Wednesday, April 01, 2015 01:03:52 AM Rafael J. Wysocki wrote:
+>> On Tuesday, March 31, 2015 11:39:37 AM Tyler Baker wrote:
+>> > Hi Thomas, Rafael,
+>> >
+>> > I was notified this morning by the kernelci.org system that a new
+>> > build error has been detected in next-20150331[0][1][2]. It seems that
+>> > "clockevents: Remove CONFIG_GENERIC_CLOCKEVENTS_BUILD"
+>> > c9439b1d6eb4ada5c2faf3970ac0d2bc4bd20e14 is the culprit.
+>> >
+>> > Initially, I reported these failures to John Stultz and his response is below.
+>> >
+>> > *snip*
+>> >
+>> > I suspect we either need to enable GENERIC_CLOCKEVENTS on those three
+>> > hardware types, or if that's not possible, rework the definitions.
+>> >
+>> > Or something like (copy-paste whitespace corruption below.. only for
+>> > reference, don't apply):
+>> >
+>> > diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
+>> > index 2a1563a..6da40c0 100644
+>> > --- a/kernel/time/tick-internal.h
+>> > +++ b/kernel/time/tick-internal.h
+>> > @@ -107,12 +107,13 @@ static inline void tick_resume_broadcast(void) { }
+>> >  static inline bool tick_resume_check_broadcast(void) { return false; }
+>> >  static inline void tick_broadcast_init(void) { }
+>> >  static inline int tick_broadcast_update_freq(struct
+>> > clock_event_device *dev, u32 freq) { return -ENODEV; }
+>> > -
+>> > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+>> >  /* Set the periodic handler in non broadcast mode */
+>> >  static inline void tick_set_periodic_handler(struct
+>> > clock_event_device *dev, int broadcast)
+>> >  {
+>> >         dev->event_handler = tick_handle_periodic;
+>> >  }
+>> > +#endif
+>> >  #endif /* !BROADCAST */
+>> >
+>> > *snip*
+>> >
+>> > Any chance either of you can reproduce this issue on your end?
+>>
+>> Can you please tell me if the appended patch helps?
+>
+> Scratch that, wrong patch.
+>
+> Please try the one below instead.
+>
+> Rafael
+>
+>
+> ---
+>  kernel/time/tick-internal.h |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> Index: linux-pm/kernel/time/tick-internal.h
+> ===================================================================
+> --- linux-pm.orig/kernel/time/tick-internal.h
+> +++ linux-pm/kernel/time/tick-internal.h
+> @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
+>  /* Set the periodic handler in non broadcast mode */
+>  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
+>  {
+> +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+>         dev->event_handler = tick_handle_periodic;
+> +#endif
+>  }
+>  #endif /* !BROADCAST */
 
-This is broken. What if the parent of this clock has
-{enable,prepare}_count of zero? The way we propagate these refcounts up
-the tree would fall over.
+Thanks for the quick response. I've applied this patch on top of
+next-20150331 and I can confirm this fixes the build error reported in
+this thread. The test results can be found here[0].
 
-Regards,
-Mike
+>
+>
 
-> 
-> Anways, I am OK either way.
-> 
-> Cheers!
-> Jassi
+Cheers,
+
+Tyler
+
+[0] http://kernelci.org/build/tbaker/kernel/v4.0-rc6-7993-gb448f49+gcc-linaro-4.9-2015.02/
