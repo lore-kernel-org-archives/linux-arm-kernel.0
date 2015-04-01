@@ -1,93 +1,80 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 1 Apr 2015 17:10:58 +0530
-Subject: [PATCH 4/8] layerscape/ftm: Add compatible string for FTM0 be used as
- alarm timer.
-In-Reply-To: <1427888463-29549-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1427888463-29549-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1427888463-29549-5-git-send-email-bhupesh.sharma@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 1 Apr 2015 12:42:43 +0100
+Subject: [PATCH v2 1/6] phy: miphy365x: Use the generic phy type
+ constants in dt-bindings/phy/phy.h
+In-Reply-To: <551BA5CB.6030903@ti.com>
+References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
+ <1427728632-10846-2-git-send-email-peter.griffin@linaro.org>
+ <551A2D4D.1010601@ti.com> <20150331074027.GH9447@x1>
+ <551ABD99.2000503@ti.com> <551AC37E.70503@st.com>
+ <20150401071501.GS9447@x1> <551BA5CB.6030903@ti.com>
+Message-ID: <20150401114243.GV9447@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Wed, 01 Apr 2015, Kishon Vijay Abraham I wrote:
 
-Only FTM0 can be used as an alarm timer, so add a "fsl,ftm-alarm"
-compatible string to describe FTM0 alarm mode.
+> Hi,
+> 
+> On Wednesday 01 April 2015 12:45 PM, Lee Jones wrote:
+> >On Tue, 31 Mar 2015, Maxime Coquelin wrote:
+> >
+> >>Hi Kishon,
+> >>On 03/31/2015 05:30 PM, Kishon Vijay Abraham I wrote:
+> >>>Maxime,
+> >>>
+> >>>On Tuesday 31 March 2015 01:10 PM, Lee Jones wrote:
+> >>>>On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
+> >>>>
+> >>>>>Hi Patrice, Maxime,
+> >>>>>
+> >>>>>On Monday 30 March 2015 08:47 PM, Peter Griffin wrote:
+> >>>>>>Now there are generic phy type constants declared in phy.h,
+> >>>>>>migrate over to
+> >>>>>>using them rather than defining our own. This change has
+> >>>>>>been done as one
+> >>>>>>atomic commit to be bisectable.
+> >>>>>>
+> >>>>>>Note: The values of the defines are the same, so there is no
+> >>>>>>ABI breakage
+> >>>>>>with this patch.
+> >>>>>>
+> >>>>>>Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> >>>>>>Acked-by: Rob Herring <robh@kernel.org>
+> >>>>>>Acked-by: Lee Jones <lee.jones@linaro.org>
+> >>>>>
+> >>>>>Are you okay for this patch to go via PHY tree? It modifies
+> >>>>>arch/arm/boot/dts
+> >>>>>/stih416.dtsi.
+> >>>>
+> >>>>These files need to be changed simultaneously in order to prevent
+> >>>>breakage during bisection and the like.  I think the best bet moving
+> >>>>forward is to pull this into its own branch, tag it and send Maxime a
+> >>>>pull-request to the immutable branch.  It's the best way to minimise
+> >>>>merge conflicts during the v4.1 merge window.
+> >>>
+> >>>okay. I still need an Ack from Maxime.
+> >>
+> >>You have my Ack.
+> >>
+> >>I haven't sent a pull request for STi DT files for v4.1 now, and it
+> >>is too late to send one.
+> >>So creating an immutable tag is not even needed in my opinion, you
+> >>can just take the DT patch.
+> >
+> >Kishon,
+> >
+> >I saw that you took the MAINTAINERS patch, but not this one.  If it's
+> >because you are still unsure about it, I agree with Maxime, you can
+> >just take this patch without fear of conflict.
+> 
+> I've took this already
+> https://git.kernel.org/cgit/linux/kernel/git/kishon/linux-phy.git/commit/?h=next&id=76fa6deabab05688a1653c2f66224be4a3c08d6a
 
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
-Change-Id: Ie9a6c1c01a362ee6f0b6c995f9a104a3afff9165
-Reviewed-on: http://git.am.freescale.net:8181/30167
-Tested-by: Review Code-CDREVIEW <CDREVIEW@freescale.com>
-Reviewed-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Tested-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
----
- .../devicetree/bindings/timer/fsl,ftm-timer.txt    |   46 ++++++++++++++------
- 1 file changed, 32 insertions(+), 14 deletions(-)
+I missed that.  Thanks for pointing it out.
 
-diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-index aa8c402..a372ed7 100644
---- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
-@@ -2,12 +2,18 @@ Freescale FlexTimer Module (FTM) Timer
- 
- Required properties:
- 
--- compatible : should be "fsl,ftm-timer"
-+- compatible : should be "fsl,ftm-timer" & "fsl,ftm-alarm".
-+  (a) "fsl,ftm-timer", for FlexTimer compatible as normal timer.
-+  (b) "fsl,ftm-alarm", for FlexTimer compatible when FTM0 as an ALARM timer.
-+
- - reg : Specifies base physical address and size of the register sets for the
-   clock event device and clock source device.
-+
- - interrupts : Should be the clock event device interrupt.
-+
- - clocks : The clocks provided by the SoC to drive the timer, must contain an
-   entry for each entry in clock-names.
-+
- - clock-names : Must include the following entries:
-   o "ftm-evt"
-   o "ftm-src"
-@@ -16,16 +22,28 @@ Required properties:
- - big-endian: One boolean property, the big endian mode will be in use if it is
-   present, or the little endian mode will be in use for all the device registers.
- 
--Example:
--ftm: ftm at 400b8000 {
--	compatible = "fsl,ftm-timer";
--	reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
--	interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
--	clock-names = "ftm-evt", "ftm-src",
--		"ftm-evt-counter-en", "ftm-src-counter-en";
--	clocks = <&clks VF610_CLK_FTM2>,
--		<&clks VF610_CLK_FTM3>,
--		<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
--		<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
--	big-endian;
--};
-+Example 1: In this example, The FlexTimer module (FTM) is a two-to-eight,
-+	   channel timer that supports input capture, output compare, and
-+	   the generation of PWM signals to control electric motor and power
-+	   management applications.
-+
-+	ftm: ftm at 400b8000 {
-+		compatible = "fsl,ftm-timer";
-+		reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
-+		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
-+		clock-names = "ftm-evt", "ftm-src",
-+			"ftm-evt-counter-en", "ftm-src-counter-en";
-+		clocks = <&clks VF610_CLK_FTM2>,
-+			<&clks VF610_CLK_FTM3>,
-+			<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
-+			<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
-+		big-endian;
-+	};
-+
-+Example 2: In this example, FTM0 only be used as an alarm timer.
-+
-+	ftm0: ftm0 at 2800000 {
-+		compatible = "fsl,ftm-alarm";
-+		reg = <0x0 0x2800000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+	};
 -- 
-1.7.9.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
