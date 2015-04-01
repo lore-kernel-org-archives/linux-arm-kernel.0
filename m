@@ -1,57 +1,155 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Wed, 1 Apr 2015 17:38:54 +0200
-Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
- iommu_ops
-In-Reply-To: <20150331144956.GA24094@arm.com>
-References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
- <20150331144956.GA24094@arm.com>
-Message-ID: <20150401153854.GG4441@8bytes.org>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Wed, 01 Apr 2015 16:45:56 +0100
+Subject: [PATCH] ARM: fix broken hibernation
+Message-ID: <E1YdKq4-00049v-Bj@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Normally, when a CPU wants to clear a cache line to zero in the external
+L2 cache, it would generate bus cycles to write each word as it would do
+with any other data access.
 
-On Tue, Mar 31, 2015 at 03:49:56PM +0100, Will Deacon wrote:
-> But isn't this restriction already the case in practice? For example, if
-> I have a domain with some mapping already configured, then that mapping
-> will be using some fixed set of page sizes. Attaching a device behind
-> another IOMMU that doesn't support that page size would effectively require
-> the domain page tables to be freed and re-allocated from scratch.
+However, a Cortex A9 connected to a L2C-310 has a specific feature where
+the CPU can detect this operation, and signal that it wants to zero an
+entire cache line.  This feature, known as Full Line of Zeros (FLZ),
+involves a non-standard AXI signalling mechanism which only the L2C-310
+can properly interpret.
 
-The problem is that this restriction depends on the IOMMU driver in use.
->From the beginning of the IOMMU-API the backend drivers have supported
-sharing a domain by multiple devices. In fact, the domain is just an
-abstraction for an address space that can be attached to devices just
-like cpu page-tables are assigned to threads of a process.
+There are separate enable bits in both the L2C-310 and the Cortex A9 -
+the L2C-310 needs to be enabled and have the FLZ enable bit set in the
+auxiliary control register before the Cortex A9 has this feature
+enabled.
 
-We can discuss whether this fundamental concept of the IOMMU-API needs
-to be changed (moving into the direction this patch-set proposes). I
-could imaging removing the domain concept entirely and just have
-map/unmap functions like this:
+Unfortunately, the suspend code was not respecting this - it's not
+obvious from the code:
 
-	iommu_map(struct device *dev, dma_addr_t iova,
-		  phys_addr_t phys, size_t size)
-	iommu_unmap(struct device *dev, dma_addr_t iova,
-		    phys_addr_t phys, size_t size)
+swsusp_arch_suspend()
+ cpu_suspend() /* saves the Cortex A9 auxiliary control register */
+  arch_save_image()
+  soft_restart() /* turns off FLZ in Cortex A9, and disables L2C */
+   cpu_resume() /* restores the Cortex A9 registers, inc auxcr */
 
-This would require some changes for the users of the IOMMU-API, but it
-shouldn't be too hard.
+At this point, we end up with the L2C disabled, but the Cortex A9 with
+FLZ enabled - which means any memset() or zeroing of a full cache line
+will fail to take effect.
 
-Or we keep the desired semantics as they are now and do everything
-needed for that in the IOMMU drivers. For the arm-smmu this would mean
-exposing a common set of supported pgsizes between IOMMUs, or to build
-multiple page-tables to match the different IOMMU capabilities.
+A similar issue exists in the resume path, but it's slightly more
+complex:
 
-I am open for disussions for either way, but I like the current
-semantics a bit more, as it allows us to share page-tables between
-devices and we can move all of the nasty code in VFIO that already
-creates multiple domains to get different page-tables into the
-IOMMU core or the drivers (were it belongs).
+swsusp_arch_suspend()
+ cpu_suspend() /* saves the Cortex A9 auxiliary control register */
+  arch_save_image() /* image with A9 auxcr saved */
+...
+swsusp_arch_resume()
+ call_with_stack()
+  arch_restore_image() /* restores image with A9 auxcr saved above */
+  soft_restart() /* turns off FLZ in Cortex A9, and disables L2C */
+   cpu_resume() /* restores the Cortex A9 registers, inc auxcr */
 
-What I definitly don't want is a mixture of both concepts depending on
-the IOMMU driver in use. We should settle on one way and force the
-drivers to behave accordingly. We don't need a common API when every
-driver behaves differently.
+Again, here we end up with the L2C disabled, but Cortex A9 FLZ enabled.
 
+There's no need to turn off the L2C in either of these two paths; there
+are benefits from not doing so - for example, the page copies will be
+faster with the L2C enabled.
 
-	Joerg
+Hence, fix this by providing a variant of soft_restart() which can be
+used without turning the L2 cache controller off, and use it in both
+of these paths to keep the L2C enabled across the respective resume
+transitions.
+
+Fixes: 8ef418c7178f ("ARM: l2c: trial at enabling some Cortex-A9 optimisations")
+Reported-by: xobs <-- please give me your preferred email for this!
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/hibernate.c |  5 +++--
+ arch/arm/kernel/process.c   | 10 ++++++++--
+ arch/arm/kernel/reboot.h    |  6 ++++++
+ 3 files changed, 17 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/kernel/reboot.h
+
+diff --git a/arch/arm/kernel/hibernate.c b/arch/arm/kernel/hibernate.c
+index c4cc50e58c13..cfb354ff2a60 100644
+--- a/arch/arm/kernel/hibernate.c
++++ b/arch/arm/kernel/hibernate.c
+@@ -22,6 +22,7 @@
+ #include <asm/suspend.h>
+ #include <asm/memory.h>
+ #include <asm/sections.h>
++#include "reboot.h"
+ 
+ int pfn_is_nosave(unsigned long pfn)
+ {
+@@ -61,7 +62,7 @@ static int notrace arch_save_image(unsigned long unused)
+ 
+ 	ret = swsusp_save();
+ 	if (ret == 0)
+-		soft_restart(virt_to_phys(cpu_resume));
++		_soft_restart(virt_to_phys(cpu_resume), false);
+ 	return ret;
+ }
+ 
+@@ -86,7 +87,7 @@ static void notrace arch_restore_image(void *unused)
+ 	for (pbe = restore_pblist; pbe; pbe = pbe->next)
+ 		copy_page(pbe->orig_address, pbe->address);
+ 
+-	soft_restart(virt_to_phys(cpu_resume));
++	_soft_restart(virt_to_phys(cpu_resume), false);
+ }
+ 
+ static u64 resume_stack[PAGE_SIZE/2/sizeof(u64)] __nosavedata;
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index c50fe212fd89..d14d38b860f8 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -42,6 +42,7 @@
+ #include <asm/mach/time.h>
+ #include <asm/tls.h>
+ #include <asm/vdso.h>
++#include "reboot.h"
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+@@ -96,7 +97,7 @@ static void __soft_restart(void *addr)
+ 	BUG();
+ }
+ 
+-void soft_restart(unsigned long addr)
++void _soft_restart(unsigned long addr, bool disable_l2)
+ {
+ 	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+ 
+@@ -105,7 +106,7 @@ void soft_restart(unsigned long addr)
+ 	local_fiq_disable();
+ 
+ 	/* Disable the L2 if we're the last man standing. */
+-	if (num_online_cpus() == 1)
++	if (disable_l2)
+ 		outer_disable();
+ 
+ 	/* Change to the new stack and continue with the reset. */
+@@ -115,6 +116,11 @@ void soft_restart(unsigned long addr)
+ 	BUG();
+ }
+ 
++void soft_restart(unsigned long addr)
++{
++	_soft_restart(addr, num_online_cpus() == 1);
++}
++
+ /*
+  * Function pointers to optional machine specific functions
+  */
+diff --git a/arch/arm/kernel/reboot.h b/arch/arm/kernel/reboot.h
+new file mode 100644
+index 000000000000..c87f05816d6b
+--- /dev/null
++++ b/arch/arm/kernel/reboot.h
+@@ -0,0 +1,6 @@
++#ifndef REBOOT_H
++#define REBOOT_H
++
++extern void _soft_restart(unsigned long addr, bool disable_l2);
++
++#endif
+-- 
+1.8.3.1
