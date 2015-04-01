@@ -1,79 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed,  1 Apr 2015 14:30:47 +0200
-Subject: [PATCH v2] ARM: kexec: Relax SMP validation to improve DT
- compatibility
-Message-ID: <1427891447-30695-1-git-send-email-geert+renesas@glider.be>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 1 Apr 2015 20:43:25 +0800
+Subject: [PATCHv3] arm: crypto: Add optimized SHA-256/224
+In-Reply-To: <20150330083727.GA22406@google.com>
+References: <20150316154835.GA31336@google.com>
+ <20150323135009.GB820@google.com>
+ <20150330083727.GA22406@google.com>
+Message-ID: <20150401124325.GA26623@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trying to kexec into a new kernel on a platform where multiple CPU
-cores are present, but no SMP bringup code is available yet, the
-kexec_load system call fails with:
+On Mon, Mar 30, 2015 at 09:37:27AM +0100, Sami Tolvanen wrote:
+> Add Andy Polyakov's optimized assembly and NEON implementations for
+> SHA-256/224.
+> 
+> The sha256-armv4.pl script for generating the assembly code is from
+> OpenSSL commit 51f8d095562f36cdaa6893597b5c609e943b0565.
+> 
+> Compared to sha256-generic these implementations have the following
+> tcrypt speed improvements on Motorola Nexus 6 (Snapdragon 805):
 
-    kexec_load failed: Invalid argument
+I cannot merge this because none of your emails are making it
+to the mailing list so nobody except those on the cc list can
+see the patch.
 
-The SMP test added to machine_kexec_prepare() in commit 2103f6cba61a8b8b
-("ARM: 7807/1: kexec: validate CPU hotplug support") wants to prohibit
-kexec on SMP platforms where it cannot disable secondary CPUs.
-However, this test is too strict: if the secondary CPUs couldn't be
-enabled in the first place, there's no need to disable them later at
-kexec time.  Hence skip the test in the absence of SMP bringup code.
+Please refer to section 7 in Documentation/SubmittingPatches.
 
-This allows to add all CPU cores to the DTS from the beginning, without
-having to implement SMP bringup first, improving DT compatibility.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Warren <swarren@nvidia.com>
----
-v2:
-  - Add Acked-by.
----
- arch/arm/include/asm/smp_plat.h | 1 +
- arch/arm/kernel/machine_kexec.c | 3 ++-
- arch/arm/kernel/smp.c           | 5 +++++
- 3 files changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index 0ad7d490ee6f2657..993e5224d8f7eeeb 100644
---- a/arch/arm/include/asm/smp_plat.h
-+++ b/arch/arm/include/asm/smp_plat.h
-@@ -104,6 +104,7 @@ static inline u32 mpidr_hash_size(void)
- 	return 1 << mpidr_hash.bits;
- }
- 
-+extern int platform_can_secondary_boot(void);
- extern int platform_can_cpu_hotplug(void);
- 
- #endif
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index de2b085ad7535da7..8bf3b7c098881b95 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -46,7 +46,8 @@ int machine_kexec_prepare(struct kimage *image)
- 	 * and implements CPU hotplug for the current HW. If not, we won't be
- 	 * able to kexec reliably, so fail the prepare operation.
- 	 */
--	if (num_possible_cpus() > 1 && !platform_can_cpu_hotplug())
-+	if (num_possible_cpus() > 1 && platform_can_secondary_boot() &&
-+	    !platform_can_cpu_hotplug())
- 		return -EINVAL;
- 
- 	/*
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 86ef244c5a24b4fa..cca5b87581855244 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -145,6 +145,11 @@ void __init smp_init_cpus(void)
- 		smp_ops.smp_init_cpus();
- }
- 
-+int platform_can_secondary_boot(void)
-+{
-+	return !!smp_ops.smp_boot_secondary;
-+}
-+
- int platform_can_cpu_hotplug(void)
- {
- #ifdef CONFIG_HOTPLUG_CPU
+Thanks,
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
