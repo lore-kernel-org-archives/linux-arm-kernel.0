@@ -1,107 +1,92 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 01 Apr 2015 12:55:33 -0600
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <551C2F7A.7040107@nvidia.com>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
- <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
- <55137098.4030903@wwwdotorg.org>
- <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
- <5514569E.2030406@wwwdotorg.org> <551C2768.6060209@wwwdotorg.org>
- <551C2F7A.7040107@nvidia.com>
-Message-ID: <551C3F25.40105@wwwdotorg.org>
+From: mturquette@linaro.org (Michael Turquette)
+Date: Wed, 01 Apr 2015 12:02:36 -0700
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <CAJKOXPftzX4KT=RNVnuD3UKOLXKkKr0b9i9_HDE47=8z9AyzUQ@mail.gmail.com>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk> <7hiodg98z7.fsf@deeprootsystems.com>
+ <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
+ <7h1tk47awc.fsf@deeprootsystems.com>
+ <CAJKOXPftzX4KT=RNVnuD3UKOLXKkKr0b9i9_HDE47=8z9AyzUQ@mail.gmail.com>
+Message-ID: <20150401190236.14369.26750@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Dropping people likely not interested in Tegra U-Boot from explicit Cc)
+Quoting Krzysztof Kozlowski (2015-04-01 02:16:08)
+> 2015-04-01 6:03 GMT+02:00 Kevin Hilman <khilman@kernel.org>:
+> > Abhilash Kesavan <kesavan.abhilash@gmail.com> writes:
+> >
+> >> On Wed, Apr 1, 2015 at 2:32 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> >>> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+> >>>
+> >>> [...]
+> >>>
+> >>>> Unfortunately I don't fully understand why this clock needs to be
+> >>>> enabled. It would be good if someone at Samsung can explain in more
+> >>>> detail what the real problem really is.
+> >>>
+> >>> +1
+> >>>
+> >>> Maybe Abhilash can shed some light here?
+> >>>
+> >>> We really should know *why* this is needed because having the fix in the
+> >>> clock driver just doesn't seem right.  It seems like the DMA driver
+> >>> should be managing this clock.
+> >>
+> >> I think my last mail might not have reached you (was accidentally sent
+> >> as html).
+> >
+> > Yeah, I saw it a bit later in Javier's reply.  Thanks for doing the
+> > research and reporting back.
+> >
+> >> We are gating the aclk266_g2d clock without checking the
+> >> CG_STATUS0 register bits as specified in the UM. It looks like we need
+> >> to keep several clocks alive or gate them only after checking the
+> >> CG_STATUSx register bits.
+> >
+> > I dont' know much about this clock hardware, but to me it sounds like a
+> > clock driver bug.  The suspend fix Javier is proposing would fix it, but
+> > to me it sounds like the clock driver needs to actually start checking
+> > these CG_STATUSx bits before gating clocks.
+> >
+> > Otherwise, we might fix this current bug but a similar one will come and
+> > bite us another day.
+> 
+> Actually it looks kind a similar to issue with adma/mau_epll clocks:
+> https://lkml.org/lkml/2014/12/5/291
+> 
+> In that case runtime PM for pl330 caused adma clock to be gated. This
+> lead to gating its parent clock - mau_epll. The clock hierarchy is
+> strange for maudio domain. Basically mau_epll is needed to access
+> maudio clocks however these clocks are not children of mau_epll.
 
-On 04/01/2015 11:48 AM, Paul Walmsley wrote:
-> On 04/01/2015 11:14 AM, Stephen Warren wrote:
->> On 03/26/2015 12:57 PM, Stephen Warren wrote:
->>> On 03/26/2015 12:35 PM, Paul Walmsley wrote:
->>>> On Wed, 25 Mar 2015, Stephen Warren wrote:
->>>>
->>>>> On 03/25/2015 04:00 PM, Paul Walmsley wrote:
->>>>>> On Wed, 25 Mar 2015, Tyler Baker wrote:
->>>>>>> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
->>>>>>>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
->>>>>>>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
->>>>>>>> multi_v7_defconfig boot.
->> ...
->>>>>>> Can you try to shift your kernel load address around a bit? From
->>>>>>> experience with the boards from kernelci.org we find that as the
->>>>>>> multi
->>>>>>> v7 kernel size increases they can clobber memory when they get
->>>>>>> decompressed.
->>>>>>
->>>>>> Thanks, that was it:
->>>>>>
->>>>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt
->>>>>>
->> ...
->>>>> Interesting. Do the values in U-Boot's default environment work
->>>>> correctly
->>>>
->>>> No idea, I haven't tried.  (The load addresses I used are observable in
->>>> the boot logs above.)
->>>
->>> Sure. I was hoping you'd try it out since you already had the setup to
->>> repro the issue.
->>>
->>> It'd be good if your test-bed used the built-in U-Boot variables too, so
->>> we're testing them.
->>
->> I've reproduced the original problem, and then validated that using
->> the addresses from U-Boot's default environment (at least with a ToT
->> U-Boot that I just built) does indeed solve it.
->>
->> I'd like to re-iterate that the test bed should be using the values
->> from U-Boot's environment rather than making up its own. That way:
->>
->> * The value the test bed uses for the kernel load address likely
->> overlaps where the kernel decompressor writes to for even slightly
->> large kernels. This means the decompressor must move itself before
->> decompressing. IIUC, there's zero guarantee that moving the
->> decompressor won't overwrite the DTB, since IIUC the decompressor uses
->> zero knowledge of the DTB location. In other words, if the compressed
->> kernel is loaded somewhere that's likely to require it to move itself,
->> there's a real risk of the exact same problem cropping up again in the
->> future if the kernel happens to overwrite the DTB during relocation.
->>
->> * The values are part of every Tegra U-Boot port (and hopefully for
->> other SoCs too given any distro using boot.scr with
->> config_distro_bootcmd.h will expect the variables to exist), so for
->> future (Tegra) chips you won't have to adjust the test bed if RAM
->> layout changes.
->>
->> * Those values get testing, so we'll find out if the ever don't work.
->> We get more test coverage.
->
-> Sounds reasonable, I'll try to get to this at some point soon.
->
-> BTW, it might be worth changing U-boot CONFIG_LOADADDR to point to the
-> value you define for kernel_addr_r.  That would reinforce to folks who
-> aren't using the U-boot scripts that they should use that address for
-> loading their kernel.
+This sounds like an interface clock. It must be enabled for you touch
+registers across a bus/interconnect.
 
-Hmm. Our values for CONFIG_LOADADDR and CONFIG_SYS_LOADADDR in U-Boot 
-seem to be a mess.
+For this type of clock is perfectly correct for the driver to enable it
+in addition to any functional clocks (e.g. maudio clocks).
 
-Essentially they are used for the same semantic purpose, it's just that 
-different U-Boot features use one or the other. I propose we make them 
-the same value. There are certainly many other boards that do (and many 
-that don't, strangely).
+There are many instances where a driver must enable an interface clock
+(iclk) and a functional clock (fclk) and this isn't an issue of the
+driver knowing the clock topology, but instead knowing it's operational
+requirements.
 
-I'm not sure that pointing those at the same location as kernel_addr_r 
-is best. I'd expect modern scripts to explicitly use one of the 
-type-specific (kernel, DT, script, initrd, ...) variables and never rely 
-on simple $loadaddr. How about we point these variables somewhere that 
-doesn't overlap with any of the memory regions "reserved"/intended for a 
-specific purpose?
+Just to make life more confusing, it might also be appropriate for the
+clock driver to manage turning on the interface clocks if this is
+required to touching the functional clocks. In general the register
+address space is used to determine which IP "owns" such behavior.
 
-In other words, I'd suggest 0x90200000 as the value for Tegra30+; that's 
-consistent with the default values of $scriptaddr and $pxefile_addr_r, 
-i.e. 1MB beyond the latter, and well out of the way from anything else.
+Regards,
+Mike
 
-Does all that sound reasonable? If so, I'll send a patch for U-Boot.
+> 
+> I think we should not enable the mdma0 but instead we should find the
+> proper parent which needs to be enabled.
+> 
+> Anyway it is kind of annoying (or funny if one has sense of black
+> humour) that two issues are exposed by runtime PM for pl330 driver.
+> 
+> Best regards,
+> Krzysztof
