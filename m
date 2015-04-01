@@ -1,41 +1,65 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 1 Apr 2015 11:27:57 +0530
-Subject: [PATCH v2 6/6] MAINTAINERS: Add phy-miphy28lp.c to ARCH/STI
- architecture
-In-Reply-To: <20150331174011.GA16741@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1427728632-10846-1-git-send-email-peter.griffin@linaro.org>
- <1427728632-10846-7-git-send-email-peter.griffin@linaro.org>
- <551AC831.2000108@ti.com>
- <20150331174011.GA16741@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <551B88E5.1090501@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  1 Apr 2015 14:03:17 +0800
+Subject: [PATCH v6 0/6] mfd: axp20x: add AXP221 PMIC support
+Message-ID: <1427868203-7486-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Lee,
 
-On Tuesday 31 March 2015 11:10 PM, Peter Griffin wrote:
-> Hi Kishon,
->
-> On Tue, 31 Mar 2015, Kishon Vijay Abraham I wrote:
-> <snip>
->
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index 1de6afa..fa1bb4f 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -1469,6 +1469,7 @@ F:	drivers/clocksource/arm_global_timer.c
->>>   F:	drivers/i2c/busses/i2c-st.c
->>>   F:	drivers/media/rc/st_rc.c
->>>   F:	drivers/mmc/host/sdhci-st.c
->>> +F:	drivers/phy/phy-miphy28lp.c
->>
->> add for miphy365x.c as well?
->
-> Yes we should also be adding miphy365x.c as well.
->
-> Would you like me to send a seperate patch for that?
+This is v6 of the AXP221 series. This version is based on mfd-for-next
+(ba867bc60a44). The DTS patches are merged through Maxime's tree, so
+I dropped them.
 
-you can send an update to this patch. Haven't merged this one yet.
+I think it'd be easier if you take all the patches through your tree.
+Otherwise, patch 4 depends on patch 1, and you'd need to setup a
+common branch with Mark.
 
-Thanks
-Kishon
+Changes since v5:
+
+    - Rebased onto mfd-for-next (ba867bc60a44)
+
+    - Dropped dts patches
+
+    - Removed double line spacing
+
+Changes since v4:
+
+  - Rebased onto v4.0-rc1 and axp20x bindings v10
+
+  - Dropped regulator set registration patches
+
+  - Group regmap ranges/tables by AXP variant
+
+  - Fix AXP221 interrupt numbers to match datasheet
+
+  - Handle AXP variants when setting DC-DC regulator work mode
+
+  - Add "switch" type regulator DC1SW, which is a secondary output
+    of DCDC1 with a separate on/off switch.
+
+  - Add AXP221 to DT bindings
+
+
+Regards
+ChenYu
+
+
+Boris BREZILLON (3):
+  mfd: axp20x: add AXP22x PMIC support
+  regulator: axp20x: prepare support for multiple AXP chip families
+  regulator: axp20x: add support for AXP22X regulators
+
+Chen-Yu Tsai (3):
+  mfd: axp20x: update DT bindings with AXP22x compatibles
+  mfd: axp20x: Add AXP22x regulator information to DT bindings
+  mfd: axp20x: Enable AXP22X regulators
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  32 ++-
+ drivers/mfd/axp20x.c                             | 100 ++++++++++
+ drivers/regulator/axp20x-regulator.c             | 239 ++++++++++++++++++-----
+ include/linux/mfd/axp20x.h                       |  86 ++++++++
+ 4 files changed, 405 insertions(+), 52 deletions(-)
+
+-- 
+2.1.4
