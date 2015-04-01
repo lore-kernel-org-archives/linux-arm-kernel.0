@@ -1,59 +1,41 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 01 Apr 2015 16:39:33 +0200
-Subject: Reading twd_base at run-time
-In-Reply-To: <551BEF44.8020808@arm.com>
-References: <55158261.9010108@free.fr> <551586E6.3020200@arm.com>
- <5515BEA5.6040307@free.fr> <20150327205301.GD4019@n2100.arm.linux.org.uk>
- <551BDF69.4020205@free.fr> <551BE476.2060102@arm.com>
- <551BEC33.1090702@free.fr> <551BEF44.8020808@arm.com>
-Message-ID: <551C0325.7090500@free.fr>
+From: dwmw2@infradead.org (David Woodhouse)
+Date: Wed, 01 Apr 2015 16:46:10 +0200
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150401143904.GL1552@arm.com>
+References: <20150327171946.GL1562@arm.com>
+ <1427894051.22236.6.camel@infradead.org> <20150401133908.GI1552@arm.com>
+ <1427896377.22236.8.camel@infradead.org> <20150401140512.GJ1552@arm.com>
+ <1427898490.22236.10.camel@infradead.org> <20150401143904.GL1552@arm.com>
+Message-ID: <1427899570.22236.14.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2015 15:14, Marc Zyngier wrote:
-> On 01/04/15 14:01, Mason wrote:
->> On 01/04/2015 14:28, Marc Zyngier wrote:
->>
->>> It is worth mentioning that PERIPH_BASE is *not* an architected
->>> register, so an implementation is perfectly allowed not to implement it.
->>> Even on Cortex A9, a UP implementation will report PERIPH_BASE as zero.
->>> It is still likely to have a TWD though.
->>
->> It is interesting that you would mention TWD and UP implementations,
->> because "config HAVE_ARM_TWD" depends on SMP, as I mentioned in a
->> separate thread ("Dropping "depends on SMP" for HAVE_ARM_TWD").
->>
->> Would it make sense to drop the dependency?
->>
->> I have a single-core Cortex A9 MPcore system where I want to use
->> the local timers. If it's too much trouble changing the build
->> options, I suppose I can just run an SMP kernel?
->
-> There used to be a time where the TWD was completely tied to the SMP
-> code, but I think we now deal with per-cpu timers in a way similar to
-> the global timers (more or less...).
->
-> Worth trying, and see what breaks. On the other hand, SMP on UP should
-> give you the same result.
+On Wed, 2015-04-01 at 15:39 +0100, Will Deacon wrote:
+> 
+> However, once we have that, we run into the same problem that we've got
+> with the current pgsize_bitmap. Namely, that it needs to be a per-domain
+> property to avoid it changing dynamically following an initial map request
+> or a probe of a new IOMMU device.
 
-And now that you mention SMP_ON_UP and TI, I remembered just where
-I got the crazy idea to get PERIPH_BASE from CP15 ;-)
+That's not so much of a problem, surely? When adding devices to a new
+domain without any mappings, the minimum page size of the domain is the
+largest of all the IOMMUs participating in that domain.
 
-commit bc41b8724 ("Update SMP_ON_UP code to detect A9MPCore with
-1 CPU devices")
+And if you try to add new devices after you've already started making
+mappings, we refuse the addition if it would raise the minimum page size
+higher than the page sizes you're already using.
 
-arch/arm/kernel/head.S | 21 ++++++++++++++++++++-
+In VT-d we already have very similar logic for superpage and snooping
+support.
 
-	@ If a future SoC *does* use 0x0 as the PERIPH_BASE, then the
-	@ below address check will need to be #ifdef'd or equivalent
-	@ for the Aegis platform.
-	mrc	p15, 4, r0, c15, c0	@ get SCU base address
-	teq	r0, #0x0		@ '0' on actual UP A9 hardware
-	beq	__fixup_smp_on_up	@ So its an A9 UP
+-- 
+dwmw2
 
-
-Isn't this as problematic here as doing it later in the boot.
-
-Is the DT data already available in head.S?
-
-Regards.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 5745 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150401/a29d5818/attachment-0001.bin>
