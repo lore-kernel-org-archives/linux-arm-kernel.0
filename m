@@ -1,152 +1,71 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 01 Apr 2015 14:06:38 +0900
-Subject: [RFC v2 0/5] arm64: kvm: reset hyp context for kexec
-In-Reply-To: <20150331083159.7c3f78d4@arm.com>
-References: <1427358326-3708-1-git-send-email-takahiro.akashi@linaro.org>	<20150327153131.GK12400@redacted.bos.redhat.com>	<55157920.3050003@arm.com>	<20150327174044.GL12400@redacted.bos.redhat.com>	<5518A969.3090707@linaro.org>	<20150330081613.60ff7dc0@arm.com>	<55190F45.1070803@linaro.org>	<551A38FC.1040801@linaro.org>
- <20150331083159.7c3f78d4@arm.com>
-Message-ID: <551B7CDE.4020803@linaro.org>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 1 Apr 2015 13:29:46 +0800
+Subject: [PATCH v6 0/3] ARM: mediatek: Add driver for Mediatek I2C controller 
+Message-ID: <1427866189-19262-1-git-send-email-eddie.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc
+This series is for Mediatek SoCs I2C controller common bus driver.
 
-On 03/31/2015 04:31 PM, Marc Zyngier wrote:
-> On Tue, 31 Mar 2015 07:04:44 +0100
-> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->
-> Hi Takahiro,
->
->> Marc,
->>
->> On 03/30/2015 05:54 PM, AKASHI Takahiro wrote:
->>> On 03/30/2015 04:16 PM, Marc Zyngier wrote:
->>>> On Mon, 30 Mar 2015 02:39:53 +0100
->>>> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->>>>
->>>>> On 03/28/2015 02:40 AM, Kyle McMartin wrote:
->>>>>> On Fri, Mar 27, 2015 at 03:37:04PM +0000, Marc Zyngier wrote:
->>>>>>>> [  236.260863] Kernel panic - not syncing: HYP panic:
->>>>>>>> [  236.260863] PS:600003c9 PC:000003ffffff0830 ESR:0000000096000006
->>>>>>>
->>>>>>> It would be interesting if you could find out what you have at offset
->>>>>>> 0x830 of hyp-init.o (the stack trace is for EL1, and is not going to
->>>>>>> help much).
->>>>>>>
->>>>>>
->>>>>> Given the alignment, i'm going to assume i'm looking at the right thing:
->>>>>>
->>>>>> 0000000000000820 <__kvm_hyp_reset>:
->>>>>>         820:       d51c2000        msr     ttbr0_el2, x0
->>>>>>         824:       d5033fdf        isb
->>>>>>         828:       d50c871f        tlbi    alle2
->>>>>>         82c:       d5033f9f        dsb     sy
->>>>>>         830:       10000060        adr     x0, 83c <__kvm_hyp_reset+0x1c>
->>>>>>         834:       b3403c01        bfxil   x1, x0, #0, #16
->>>>>>         838:       d61f0020        br      x1
->>>>>>         83c:       d53c1000        mrs     x0, sctlr_el2
->>>>>>
->>>>>> but it seems fairly implausible to be trapping on ADR x0, 1f...
->>>>>
->>>>>
->>>>> I've never seen this panic on fast model...
->>>>>
->>>>> ESR shows that
->>>>>      - Exception class: Data abort taken without a change in Exception level
->>>>>      - Data fault status code: Translation fault at EL2
->>>>>
->>>>> and FAR seems not to be a proper address.
->>>>
->>>> ... which is consistent with what we're seeing here (data fault on
->>>> something that doesn't generate a load/store). I'm pretty sure the
->>>> page tables are screwed.
->>>>
->>>> Have you tested it with 64k pages?
->>>
->>> Hmm... It seems that I was able to reproduce the problem if 64k pages enabled.
->>
->> The entry address in trampoline code calc'ed by kvm_virt_to_trampoline(__kvm_hyp_reset)
->> seems to be wrong due to improper page-alignment in hyp-init.S.
->> The following patch fixed this problem, at least, in my environment(fast model).
->> (I don't know why it's PAGE_SHIFT - 1, not PAGE_SHIFT.)
->>
->>   >diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
->>   >index d212990..45b8d98 100644
->>   >--- a/arch/arm64/kvm/hyp-init.S
->>   >+++ b/arch/arm64/kvm/hyp-init.S
->>   >@@ -24,7 +24,7 @@
->>   >        .text
->>   >        .pushsection    .hyp.idmap.text, "ax"
->>   >
->>   >-       .align  11
->>   >+       .align  (PAGE_SHIFT - 1)
->
-> I'm afraid this is wrong. This alignment is for the vectors (which have
-> to be aligned on a 2kB boundary, hence the ".align 11"), not for the
-> code. Aligning it on a 32kB boundary doesn't make any sense, and just
-> hides the bug.
->
-> I bet that without this hack, the hyp-init code is spread across two
-> 64kB pages, and the kernel generates a bounce page for this code. By
-> changing the alignment, you just end up having the code to fit in a
-> single page, and no bounce page gets generated.
+Earlier MTK SoC (for example, MT6589, MT8135) I2C HW has some limitationes.
+New generation SoC like MT8173 fix these limitations.
 
-There seem to be two scenarios that make things go wrong:
-1) As you mentioned above, trampoline code is spread across page boundary
-    even though the whole size is less than a page.
-2) The whole trampoline code fits into a single page, but the physical start address
-    of this region (that is, __hyp_idmap_text_start) is not page-aligned.
-    In this case, pa of __kvm_hyp_reset should also be offset.
+1. Only support one i2c_msg number. One exception is WRRD (write then read)
+mode. WRRD can have two i2c_msg numbers.
 
-Given any combinations of #1 and #2, __kvm_virt_to_trampoline() would get a bit complicated.
+2. Mediatek I2C controller support WRRD(write then read) mode, in WRRD
+mode the Repeat Start will be issued between 2 messages.
+In this driver if 2 messages is first write then read, the driver will
+combine 2 messages using Write-Read mode so the RS will be issued between
+the 2 messages.
 
-> If I'm right above the above, it means that you're computing something
-> against the wrong base. Can you please verify this scenario?
->
-> Now, the good news is that Ard is removing the bounce page from the KVM
-> code (for unrelated reasons), and this may just be the saving grace.
+3. The max transfer data length is 255 in one message. In WRRD mode, the
+max data length of second msg is 31.
 
-Ard's patch will fix #1, but not #2. So I modified __kvm_virt_to_trampoline
-as followed and it seems to work well both on 4k-page kernel and 64k-page kernel
-(in addition to Ard's patch).
+MT8135 and MT6589 can control I2C pins on PMIC(MT6397) by setting the i2c
+registers in MT8135 side. In this case, driver should set OFFSET_PATH_DIR
+bit first, the operation on other registers are still the same.
+For now MT6589/MT8135 support this, MT6577/MT6595/MT8127 do not support.
+For example, If want to use I2C4/5/6 pins on MT8135 just need to enable
+the pinmux, else if want to use I2C pins on PMIC(MT6397) need to add
+"mediatek,have-pmic" property in the .dts file of each platform.
 
-But please note that Ard's patch already makes __hyp_idmap_text_start 4kb-aligned.
-So why not PAGE_SIZE-aligned as my previous patch does?
+This driver is based on 4.0-rc1.
 
- >diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
- >index c191432..facfd6d 100644
- >--- a/arch/arm64/include/asm/kvm_mmu.h
- >+++ b/arch/arm64/include/asm/kvm_mmu.h
- >@@ -308,7 +308,9 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
- >
- > extern char __hyp_idmap_text_start[];
- > #define kvm_virt_to_trampoline(x)      \
- >-                       (TRAMPOLINE_VA + ((x) - __hyp_idmap_text_start))
- >+               (TRAMPOLINE_VA          \
- >+               + ((unsigned long)(x)   \
- >+                 - ((unsigned long)__hyp_idmap_text_start & PAGE_MASK)))
- >
- > #endif /* __ASSEMBLY__ */
- > #endif /* __ARM64_KVM_MMU_H__ */
+Change in v6:
+Add mtk_i2c_compatible struct to set driver capability, and pass by
+of_device_id. Change to use completion API instead of waitqueue. Remove
+unnecessary spinlock. Fix get default speed error bug. Fix Sascha's
+review comment.
 
->>   >
->>   > ENTRY(__kvm_hyp_init)
->>   >        ventry  __invalid               // Synchronous EL2t
->>
->>
->> After applying this patch, I got another problem with kexec-tools on 64k page kernel,
->> but I've already modified kexec-tools.
->
-> The idea that userspace behavior is dependent on the kernel page size
-> is deeply worrying...
+Change in v5:
+Apply new i2c_adapter_quirks patch [2]. Change to use dam_map_single to map
+dma buffer. Add spinlock to fix race condition. Check of_property_read_u32
+return value. Remove I2C_FUNC_10BIT_ADDR capability due to driver not implement.
+Add MT8173 I2C driver.
 
-The logic is not directly related to a page size.
-Kexec-tools try to allocate several small chunks of memory in a fixed-size region of last part
-of main memory. Due to increased page size, the total size of chunks were overflowed.
+Change in v4:
+Modify to support i2c_adapter_quirks base on Wolfram's patch [1].
+Remove check transfer size and WRRD combine code. Instead, fill quirk
+property and let i2c_check_for_quirks to do the filter.
 
-Thanks,
--Takahiro AKASHI
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/314804.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/325744.html
 
-> Thanks,
->
-> 	M.
->
+Eddie Huang (1):
+  I2C: mediatek: Add driver for MediaTek MT8173 I2C controller
+
+Xudong Chen (2):
+  dt-bindings: Add I2C bindings for mt65xx/mt81xx.
+  I2C: mediatek: Add driver for MediaTek I2C controller
+
+ .../devicetree/bindings/i2c/i2c-mt6577.txt         |  41 ++
+ drivers/i2c/busses/Kconfig                         |   9 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-mt65xx.c                    | 748 +++++++++++++++++++++
+ 4 files changed, 799 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+ create mode 100644 drivers/i2c/busses/i2c-mt65xx.c
+
+--
+1.8.1.1.dirty
