@@ -1,133 +1,99 @@
 From: arun.ramamurthy@broadcom.com (Arun Ramamurthy)
-Date: Wed, 1 Apr 2015 13:49:09 -0700
-Subject: [PATCH v1 3/3] usb: ohci-platform: Use devm_of_phy_get_by_index
-In-Reply-To: <1427921349-18173-1-git-send-email-arun.ramamurthy@broadcom.com>
-References: <1427921349-18173-1-git-send-email-arun.ramamurthy@broadcom.com>
-Message-ID: <1427921349-18173-4-git-send-email-arun.ramamurthy@broadcom.com>
+Date: Wed, 1 Apr 2015 13:50:56 -0700
+Subject: [PATCH v2 2/3] Phy: DT binding documentation for Broadcom Cygnus USB
+ PHY driver
+In-Reply-To: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
+References: <1427921457-18235-1-git-send-email-arun.ramamurthy@broadcom.com>
+Message-ID: <1427921457-18235-3-git-send-email-arun.ramamurthy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Getting phys by index instead of phy names so that we do
-not have to create a naming scheme when multiple phys are present
+Broadcom's Cygnus chip has a USB 2.0 host controller connected to
+three separate phys. One of the phs (port 2) is also connectd to
+a usb 2.0 device controller
 
 Signed-off-by: Arun Ramamurthy <arun.ramamurthy@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/usb/host/ohci-platform.c | 70 ++++++++++++++--------------------------
- 1 file changed, 25 insertions(+), 45 deletions(-)
+ .../bindings/phy/brcm,cygnus-usb-phy.txt           | 69 ++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index 185ceee..0f8edf6 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -57,15 +57,13 @@ static int ohci_platform_power_on(struct platform_device *dev)
- 	}
- 
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			ret = phy_init(priv->phys[phy_num]);
--			if (ret)
--				goto err_exit_phy;
--			ret = phy_power_on(priv->phys[phy_num]);
--			if (ret) {
--				phy_exit(priv->phys[phy_num]);
--				goto err_exit_phy;
--			}
-+		ret = phy_init(priv->phys[phy_num]);
-+		if (ret)
-+			goto err_exit_phy;
-+		ret = phy_power_on(priv->phys[phy_num]);
-+		if (ret) {
-+			phy_exit(priv->phys[phy_num]);
-+			goto err_exit_phy;
- 		}
- 	}
- 
-@@ -73,10 +71,8 @@ static int ohci_platform_power_on(struct platform_device *dev)
- 
- err_exit_phy:
- 	while (--phy_num >= 0) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
- err_disable_clks:
- 	while (--clk >= 0)
-@@ -92,10 +88,8 @@ static void ohci_platform_power_off(struct platform_device *dev)
- 	int clk, phy_num;
- 
- 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--		if (priv->phys[phy_num]) {
--			phy_power_off(priv->phys[phy_num]);
--			phy_exit(priv->phys[phy_num]);
--		}
-+		phy_power_off(priv->phys[phy_num]);
-+		phy_exit(priv->phys[phy_num]);
- 	}
- 
- 	for (clk = OHCI_MAX_CLKS - 1; clk >= 0; clk--)
-@@ -123,7 +117,6 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	const char *phy_name;
- 	int err, irq, phy_num, clk = 0;
- 
- 	if (usb_disabled())
-@@ -174,36 +167,23 @@ static int ohci_platform_probe(struct platform_device *dev)
- 
- 		priv->num_phys = of_count_phandle_with_args(dev->dev.of_node,
- 				"phys", "#phy-cells");
--		priv->num_phys = priv->num_phys > 0 ? priv->num_phys : 1;
- 
--		priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
--				sizeof(struct phy *), GFP_KERNEL);
--		if (!priv->phys)
--			return -ENOMEM;
-+		if (priv->num_phys > 0) {
-+			priv->phys = devm_kcalloc(&dev->dev, priv->num_phys,
-+					    sizeof(struct phy *), GFP_KERNEL);
-+			if (!priv->phys)
-+				return -ENOMEM;
-+		} else
-+			priv->num_phys = 0;
- 
- 		for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
--				err = of_property_read_string_index(
--						dev->dev.of_node,
--						"phy-names", phy_num,
--						&phy_name);
--
--				if (err < 0) {
--					if (priv->num_phys > 1) {
--						dev_err(&dev->dev, "phy-names not provided");
--						goto err_put_hcd;
--					} else
--						phy_name = "usb";
--				}
--
--				priv->phys[phy_num] = devm_phy_get(&dev->dev,
--						phy_name);
--				if (IS_ERR(priv->phys[phy_num])) {
--					err = PTR_ERR(priv->phys[phy_num]);
--					if ((priv->num_phys > 1) ||
--					    (err == -EPROBE_DEFER))
--						goto err_put_hcd;
--					priv->phys[phy_num] = NULL;
--				}
-+			priv->phys[phy_num] = devm_of_phy_get_by_index(&dev->dev
-+						, dev->dev.of_node
-+						, phy_num);
-+			if (IS_ERR(priv->phys[phy_num])) {
-+				err = PTR_ERR(priv->phys[phy_num]);
-+				goto err_put_hcd;
-+			}
- 		}
- 
- 		for (clk = 0; clk < OHCI_MAX_CLKS; clk++) {
+diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+new file mode 100644
+index 0000000..d1a9a65
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+@@ -0,0 +1,69 @@
++BROADCOM CYGNUS USB PHY
++
++Required Properties:
++	- compatible:  brcm,cygnus-usb-phy
++	- reg : usbphy_regs - Base address of phy registers
++			usb2h_idm_regs - Base address of host idm registers
++			usb2d_idm_regs - Base address of device idm registers
++	- phy-cells - must be 1 for each port declared. This is because the node
++		      that uses the phy must provide one integers, 0 for device
++		      and 1 for host
++
++NOTE: port 0 and port 1 are host only and port 2 can be configured for host or
++device.
++
++Example of phy :
++	usbphy0: usbphy at 0x0301c000 {
++		compatible = "brcm,cygnus-usb-phy";
++		reg = <0x0301c000 0x2000>,
++		      <0x18115000 0x1000>,
++		      <0x18111000 0x1000>;
++		status = "okay";
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++		usbphy0_0: usbphy0 at 0 {
++			#phy-cells = <1>;
++			reg = <0>;
++			status = "okay";
++			phy-supply = <&vbus_p0>;
++		};
++
++		usbphy0_1: usbphy0 at 1 {
++			#phy-cells = <1>;
++			reg = <1>;
++			status = "okay";
++		};
++
++		usbphy0_2: usbphy0 at 2 {
++			#phy-cells = <1>;
++			reg = <2>;
++			status = "okay";
++			phy-supply = <&vbus_p2>;
++		};
++	};
++
++Example of node using the phy:
++
++	/* This nodes declares all three ports as host */
++
++	ehci0: usb at 0x18048000 {
++		compatible = "generic-ehci";
++		reg = <0x18048000 0x100>;
++		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++		phys = <&usbphy0_0 1 &usbphy0_1 1 &usbphy0_2 1>;
++		status = "okay";
++	};
++
++	/*
++	 * This node declares port 2 phy
++	 * and configures it for device
++	 */
++
++	usbd_udc_dwc1: usbd_udc_dwc at 0x1804c000 {
++		compatible = "iproc-udc";
++		reg = <0x1804c000 0x2000>;
++		interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
++		phys = <&usbphy0_2 0>;
++		phy-names = "usb";
++	};
 -- 
 2.3.4
