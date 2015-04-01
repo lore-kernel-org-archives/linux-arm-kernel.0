@@ -1,42 +1,42 @@
-From: vianney.leclement@essensium.com (Vianney le =?iso-8859-1?q?Cl=E9ment?=)
-Date: Wed, 1 Apr 2015 15:25:36 +0200
-Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <CAOMZO5DM66sUX-YojCyY5BC3Pdk4p4bkEqQ+W3tyDeNEL6nU5w@mail.gmail.com>
-References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
- <CAOMZO5DM66sUX-YojCyY5BC3Pdk4p4bkEqQ+W3tyDeNEL6nU5w@mail.gmail.com>
-Message-ID: <1427894736.2449.2@mail.essensium.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Apr 2015 14:39:09 +0100
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <1427894051.22236.6.camel@infradead.org>
+References: <20150327171946.GL1562@arm.com>
+ <1427894051.22236.6.camel@infradead.org>
+Message-ID: <20150401133908.GI1552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 1, 2015 at 1:39 , Fabio Estevam <festevam@gmail.com> wrote:
-> On Wed, Apr 1, 2015 at 5:10 AM, Vianney le Cl?ment de Saint-Marcq
-> <vianney.leclement@essensium.com> wrote:
->>  Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 
->> Dual
->>  based development board.
->> 
->>  The e-MMC chip is disabled because initialization fails (error 
->> -110).
->>  A possible cause is described in [2].
->> 
->>  [1] http://www.embest-tech.com/shop/star/marsboard.html
->>  [2] https://community.freescale.com/message/442168#442168
->> 
->>  Signed-off-by: Vianney le Cl?ment de Saint-Marcq 
->> <vianney.leclement@essensium.com>
+On Wed, Apr 01, 2015 at 02:14:11PM +0100, David Woodhouse wrote:
+> On Fri, 2015-03-27 at 17:19 +0000, Will Deacon wrote:
+> > 
+> > Please can you pull the following IOMMU changes for 4.1? They move the
+> > per-iommu_ops pgsize_bitmap field into the iommu_domain, which allows
+> > IOMMUs such as the ARM SMMU to support different page sizes within a
+> > given SoC.
 > 
-> Couldn't this be combined with the existing
-> arch/arm/boot/dts/imx6dl-riotboard.dts?
+> Can't we kill it entirely? It's always been horrid. Just let the IOMMU
+> driver fill the page tables as it sees according to the virtual/physical
+> size and alignment of the range it's asked to map.
+> 
+> We already lie about the supported page sizes in the Intel VT-d driver
+> and claim to support everything, just to make the caller "Just Ask" as
+> it should.
+> 
+> We might have to fix the loop that KVM uses to unmap pages, and
+> potentially the bizarre unmap() API which returns the page size that it
+> unmapped, but we should do that anyway :)
 
-While both boards do indeed share a lot of the schematics, the 
-marsboard has some differences, e.g., in pin configuration, that 
-requires a separate dts.  We could split common parts out in a new 
-dtsi, but I am not sure it is worth the hassle.
+We'd also need to update any page-table code that relies on being called
+one page at a time (i.e. the new io-pgtable stuff we merged for 4.0) so
+that we iterate over the requested range. That shouldn't be too difficult
+(i.e. just inline the iommu_map logic into each driver), but it would
+need some testing.
 
-Regards,
-Vianney
+In fact, that would also allow us to nuke the whole TLB on VFIO unmap of
+large ranges. We currently iterate over the range page-by-page, which takes
+ages (minutes) in simulation.
 
-Vianney le Cl?ment de Saint-Marcq
-Embedded Software Developper ? +32 485 84 55 05
-Essensium, Mind division ? www.mind.be
-GPG: 727B CFE9 355F 1B02 0820 EE1C 9042 3E07 A804 0316
+Will
