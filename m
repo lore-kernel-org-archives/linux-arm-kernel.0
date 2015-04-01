@@ -1,37 +1,67 @@
-From: ysato@users.sourceforge.jp (Yoshinori Sato)
-Date: Sun,  1 Mar 2015 16:43:35 +0900
-Subject: [PATCH] clkdev: clk_add_alias don't put origin clock
-Message-ID: <1425195815-14895-1-git-send-email-ysato@users.sourceforge.jp>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 1 Apr 2015 08:10:58 +0100
+Subject: [PATCH v6 5/6] mfd: axp20x: Add AXP22x regulator information to
+ DT bindings
+In-Reply-To: <1427868203-7486-6-git-send-email-wens@csie.org>
+References: <1427868203-7486-1-git-send-email-wens@csie.org>
+ <1427868203-7486-6-git-send-email-wens@csie.org>
+Message-ID: <20150401071058.GQ9447@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refer to 'r' later.
-So don't put in clk_add_alias.
+On Wed, 01 Apr 2015, Chen-Yu Tsai wrote:
 
-Signed-off-by: Yoshinori Sato <ysato@users.sourceforge.jp>
----
- drivers/clk/clkdev.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> Add the list of regulators for AXP22x to the DT bindings.
+> This includes the names and supply names.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 25 ++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
 
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 043fd36..fddb999 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -318,7 +318,6 @@ int clk_add_alias(const char *alias, const char *alias_dev_name, char *id,
- 		return PTR_ERR(r);
- 
- 	l = clkdev_alloc(r, alias, alias_dev_name);
--	clk_put(r);
- 	if (!l)
- 		return -ENODEV;
- 	clkdev_add(l);
-@@ -334,6 +333,7 @@ void clkdev_drop(struct clk_lookup *cl)
- 	mutex_lock(&clocks_mutex);
- 	list_del(&cl->node);
- 	mutex_unlock(&clocks_mutex);
-+	clk_put(cl->clk);
- 	kfree(cl);
- }
- EXPORT_SYMBOL(clkdev_drop);
+Looks fine.
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> index 3914a3f91ff6..753f14f46e85 100644
+> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+> @@ -49,6 +49,31 @@ LDO3		: LDO		: ldo3in-supply
+>  LDO4		: LDO		: ldo24in-supply	: shared supply
+>  LDO5		: LDO		: ldo5in-supply
+>  
+> +AXP221 regulators, type, and corresponding input supply names:
+> +
+> +Regulator	  Type		  Supply Name		  Notes
+> +---------	  ----		  -----------		  -----
+> +DCDC1		: DC-DC buck	: vin1-supply
+> +DCDC2		: DC-DC buck	: vin2-supply
+> +DCDC3		: DC-DC	buck	: vin3-supply
+> +DCDC4		: DC-DC	buck	: vin4-supply
+> +DCDC5		: DC-DC	buck	: vin5-supply
+> +DC1SW		: On/Off Switch	: dcdc1-supply		: DCDC1 secondary output
+> +DC5LDO		: LDO		: dcdc5-supply		: input from DCDC5
+> +ALDO1		: LDO		: aldoin-supply		: shared supply
+> +ALDO2		: LDO		: aldoin-supply		: shared supply
+> +ALDO3		: LDO		: aldoin-supply		: shared supply
+> +DLDO1		: LDO		: dldoin-supply		: shared supply
+> +DLDO2		: LDO		: dldoin-supply		: shared supply
+> +DLDO3		: LDO		: dldoin-supply		: shared supply
+> +DLDO4		: LDO		: dldoin-supply		: shared supply
+> +ELDO1		: LDO		: eldoin-supply		: shared supply
+> +ELDO2		: LDO		: eldoin-supply		: shared supply
+> +ELDO3		: LDO		: eldoin-supply		: shared supply
+> +LDO_IO0		: LDO		: ips-supply		: GPIO 0
+> +LDO_IO1		: LDO		: ips-supply		: GPIO 1
+> +RTC_LDO		: LDO		: ips-supply		: always on
+> +
+>  Example:
+>  
+>  axp209: pmic at 34 {
+
 -- 
-2.1.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
