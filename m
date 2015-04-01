@@ -1,42 +1,52 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 01 Apr 2015 10:51:04 -0600
-Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
- iommu_ops
-In-Reply-To: <1427896377.22236.8.camel@infradead.org>
-References: <20150327171946.GL1562@arm.com>
- <1427894051.22236.6.camel@infradead.org> <20150401133908.GI1552@arm.com>
- <1427896377.22236.8.camel@infradead.org>
-Message-ID: <1427907064.5567.256.camel@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Apr 2015 18:00:33 +0100
+Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
+ generation of APM X-Gene SoC
+In-Reply-To: <20150401163956.GE24899@n2100.arm.linux.org.uk>
+References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
+ <1427899682-10912-2-git-send-email-stripathi@apm.com>
+ <20150401161336.GS9974@htj.duckdns.org>
+ <20150401163116.GT9974@htj.duckdns.org>
+ <20150401163956.GE24899@n2100.arm.linux.org.uk>
+Message-ID: <20150401170032.GC28616@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-04-01 at 15:52 +0200, David Woodhouse wrote:
-> On Wed, 2015-04-01 at 14:39 +0100, Will Deacon wrote:
-> > We'd also need to update any page-table code that relies on being called
-> > one page at a time (i.e. the new io-pgtable stuff we merged for 4.0) so
-> > that we iterate over the requested range.
+On Wed, Apr 01, 2015 at 05:39:56PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 01, 2015 at 12:31:16PM -0400, Tejun Heo wrote:
+> > On Wed, Apr 01, 2015 at 12:13:36PM -0400, Tejun Heo wrote:
+> > > > Signed-off-by : Suman Tripathi <stripathi@apm.com>
+> > > 
+> > > Applied to libata/for-4.1 w/ minor edit.
+> > 
+> > Reverted due to build failure from missing asm/cputype.h.
 > 
-> Ick. I hadn't noticed we'd entrenched that mistake even harder. It
-> certainly *wasn't* that hard to fix it...
+> I'm guessing this is some kind of ARM driver, which is why
+> linux-arm-kernel has been Cc'd - though I haven't seen the original
+> patch.
 > 
-> >  That shouldn't be too difficult (i.e. just inline the iommu_map logic
-> > into each driver), but it would need some testing.
+> ARM has asm/cputype.h, and has had for a long time, so "missing
+> asm/cputype.h" doesn't make sense as a reason to revert it.  Maybe
+> it's trying to be built on x86 when it should be restricted to
+> only ARM?
 > 
-> Good.
-> 
-> > In fact, that would also allow us to nuke the whole TLB on VFIO unmap of
-> > large ranges. We currently iterate over the range page-by-page, which takes
-> > ages (minutes) in simulation.
-> 
-> Which is one of the big reasons we lie about page sizes in VT-d.
+> Dunno without seeing the original patch.
 
-I think (hope) we've solved a significant portion of the unmap problem
-with the chunking patches that are now in v4.0.  We should now be
-attempting to find the largest contiguous range to unmap instead of
-doing the page-by-page unmap that was mostly hoping the IOMMU actually
-used a super page.  I'm not sure how lying about page sizes had any
-effect on this though.  In order for vfio to get any smarter about it
-we'd need a "commit" callback and to be able to use the freelist to
-track pages to unpin after commit.  Thanks,
+First search result leads here:
 
-Alex
+https://www.mail-archive.com/devicetree at vger.kernel.org/msg67774.html
+
+The driver in general should not be ARM specific, though it runs on an
+ARMv8 platform. But looking at the patch it has some errata workarounds
+triggered based on the CPU id (MIDR). That looks dodgy as it doesn't
+even check the full ID, only the variant part.
+
+But if they don't have any other way of identifying the hardware
+version (ideally some SoC or device identification), the driver should
+at least be made dependent on ARM64. Looking at the Kconfig entries,
+PHY_XGENE depends on (ARM64 || COMPILE_TEST). The COMPILE_TEST part
+should be dropped (I would still prefer a different way to handle this
+than checking MIDR but I'm not familiar with the hardware).
+
+-- 
+Catalin
