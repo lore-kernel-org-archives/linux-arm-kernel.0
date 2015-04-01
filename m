@@ -1,60 +1,75 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 01 Apr 2015 11:50:31 +0100
-Subject: [RESEND] Altera socfpga big endian work
-In-Reply-To: <551ADDA0.5010500@opensource.altera.com>
-References: <1427282872-10563-1-git-send-email-ben.dooks@codethink.co.uk>
- <551AAB9D.1000809@opensource.altera.com> <551ABE7D.4090908@codethink.co.uk>
- <551ADDA0.5010500@opensource.altera.com>
-Message-ID: <551BCD77.6060906@codethink.co.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Apr 2015 11:55:19 +0100
+Subject: [PATCH] arm64: fix midr range for Cortex-A57 erratum 832075
+In-Reply-To: <20150401092229.GC1552@arm.com>
+References: <1427833848-12188-1-git-send-email-byan@nvidia.com>
+ <alpine.DEB.2.02.1503312113340.24011@utopia.booyaka.com>
+ <20150401092229.GC1552@arm.com>
+Message-ID: <20150401105519.GC11403@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/15 18:47, Dinh Nguyen wrote:
+On Wed, Apr 01, 2015 at 10:22:29AM +0100, Will Deacon wrote:
+> On Tue, Mar 31, 2015 at 10:17:21PM +0100, Paul Walmsley wrote:
+> > On Tue, 31 Mar 2015, Bo Yan wrote:
+> > 
+> > > Register MIDR_EL1 is masked to get variant and revision fields, then
+> > > compared against midr_range_min and midr_range_max when checking
+> > > whether CPU is affected by any particular erratum. However, variant
+> > > and revision fields in MIDR_EL1 are separated by 16 bits, so the min
+> > > and max of midr range should be constructed accordingly, otherwise
+> > > the patch will not be applied when variant field is non-0.
+> > > 
+> > > Signed-off-by: Bo Yan <byan@nvidia.com>
+> > > ---
+> > >  arch/arm64/kernel/cpu_errata.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > > index fa62637e63a8..7838f1578019 100644
+> > > --- a/arch/arm64/kernel/cpu_errata.c
+> > > +++ b/arch/arm64/kernel/cpu_errata.c
+> > > @@ -88,7 +88,7 @@ struct arm64_cpu_capabilities arm64_errata[] = {
+> > >  	/* Cortex-A57 r0p0 - r1p2 */
+> > >  		.desc = "ARM erratum 832075",
+> > >  		.capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+> > > -		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
+> > > +		MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x100002),
+> > >  	},
+> > >  #endif
+> > >  	{
+> > > -- 
+> > > 2.1.4
+> > 
+> > Reviewed-by: Paul Walmsley <paul@pwsan.com>
+> > 
+> > Reviewed against DDI0488G section 4.3.1 "Main ID Register, EL1".  Looks 
+> > like a cut-and-paste error from the A53 workarounds.
 > 
+> Thanks guys, I agree that this is a bug. I'll apply this, but using an
+> explicit shift to set the variant (tweaked version below).
 > 
-> On 3/31/15 10:34 AM, Ben Dooks wrote:
->> On 31/03/15 15:13, Dinh Nguyen wrote:
->>> Hi Ben,
->>>
->>> On 3/25/15 6:27 AM, Ben Dooks wrote:
->>>> This series enables the core of the socfpga systen to run in big endian
->>>> mode. It inclusdes support for debug uart, secondary core boot and has
->>>> support for timers and initial conversion patches for the mmc.
->>>>
->>>> The two drivers that are known to not work are the Ethernet and the
->>>> dwc2 usb. I do not have data for either, so I currently do not know
->>>> if it possible to change the hardware's endian fetch mode.
->>>>
->>>> The dwc2 driver on my cyclone5 socfpga board with v4.0-rc5 does not
->>>> work in little endian mode, which makes testing converting the driver
->>>> difficult. The supplied 3.10 kernel does work so it is not down to the
->>>> hardware. It detects the presence of a new device and then fails to
->>>> enumerate it (no other errors shown)
->>>>
->>>> This is up on git.baserock.org/delta/linux.git in the branch
->>>> baserock/bjdooks/socfpga-v5
->>>>
->>>> Sorry, this is a resend due to incorrect linux-arm-kernel mailing list
->>>> address.
->>>>
->>>
->>> I think I can take patches 1-3 through my tree, but the mmc patches
->>> [4-7] will need to linux-mmc tree.
->>
->> Thanks. I did CC 4-7 to the relevant maintainers.
->>
->> Any idea if dwc2 is going to be fixed before 4.1?
->>
->>
+> Will
 > 
-> I'll have to double check again, but I thought dwc2 on the socfpga has
-> been work fine for quite some time now. What are the errors that you are
-> seeing?
+> --->8
+> 
+> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> index a66f4fa4d541..c998345a052f 100644
+> --- a/arch/arm64/kernel/cpu_errata.c
+> +++ b/arch/arm64/kernel/cpu_errata.c
+> @@ -70,7 +70,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+>         /* Cortex-A57 r0p0 - r1p2 */
+>                 .desc = "ARM erratum 832075",
+>                 .capability = ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE,
+> -               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, 0x12),
+> +               MIDR_RANGE(MIDR_CORTEX_A57, 0x00, (1 << MIDR_VARIANT_SHIFT) | 2,
+>         },
 
-With 4.0-rc5 it failed to enumerate a USB memory stick attached to
-the board. It looked like VCC was supplied. We know the adapter is
-working as it comes up under the default boot supplied on the board.
+That works, though it's going to make this really painful to read.
+Perhaps we should update MIDR_RANGE to take separate variant and
+revision parameters?
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Then we could have MIDR_RANGE(MIDR_CORTEX_A57, 0x0, 0x0, 0x1, 0x2) for
+Cortex-A57 r0p0 to r1p2.
+
+Mark.
