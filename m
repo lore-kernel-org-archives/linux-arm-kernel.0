@@ -1,7 +1,7 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 02 Apr 2015 03:16:38 +0900
-Subject: [GIT PULL 3/5] Samsung DT updates for v4.1
-Message-ID: <551C3606.9070103@kernel.org>
+Date: Thu, 02 Apr 2015 03:16:55 +0900
+Subject: [GIT PULL 4/5] Samsung arm64 DT updates for v4.1
+Message-ID: <551C3617.5040306@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,96 +12,49 @@ The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-dt
+tags/samsung-dt-64
 
-for you to fetch changes up to f27b907595fc586bce62b8a3dc421e89bb927250:
+for you to fetch changes up to 423c716151e254e42650ad78b30c2cd782c6f654:
 
-  ARM: dts: Fixed typo interrupt-cells for exynos5420 and exynos5250
-(2015-03-27 01:55:28 +0900)
-
-----------------------------------------------------------------
-Samsung DT updates for v4.1
-
-- for exynos3250
-  : add assigned clock parents for CMU nodes
-
-- for exynos4412-odroid
-  : add eMMC reset line
-
-- for exynos5250
-  : fixed typo for interrupt-cells
-
-- for exynos5250-snow
-  : define stdout-path property
-  : represent bridge and panel connection
-  : enable wifi power-on and add cap-sdio-irq to wifi mmc node
-
-- for exynos5250-spring
-  : define stdout-path property
-
-- for exynos5420
-  : fixed typo for interrupt-cells
-  : add async-bridge clocks for gsc and disp1 PDs
-
-- for exynos5420 boards
-  : Mux XMMCnDATA[0] pad correctly
-
-- for exynos5420-odroidxu3
-  : add eMMC reset line
-
-- for Peach boards
-  : add HS400 support and define stdout-path property
-  : add mclk entry and add WiFi module support
-  : represent bridge and panel connection
+  arm64: dts: Add thermal-zones dt node for exynos5433 (2015-03-27
+02:13:43 +0900)
 
 ----------------------------------------------------------------
-Ajay Kumar (2):
-      ARM: dts: represent bridge and panel connection for exynos5250-snow
-      ARM: dts: represent bridge and panel connection for
-exynos5420-peach-pit
+Samsung arm64 DT updates for v4.1
 
-Anand Moon (1):
-      ARM: dts: Fixed typo interrupt-cells for exynos5420 and exynos5250
+- add new SoC for arm64 based exynos5433 SoC
+  : exynos5433 - Octa cores for big.LITTLE architecture
+  (Quad Cortex-A57 big and Quad Cortex-A53 LITTLE cores)
 
-Andrzej Hajda (3):
-      dt-bindings: add asynchronous bridge clock for exynos
-      ARM: dts: add async-bridge clocks to disp1 power domain for exynos5420
-      ARM: dts: add async-bridge clocks to gsc power domain for exynos5420
+  : added thermal-zones, TMU sensor and I2S dt nodes
+  : added ADMA, RTC, ADC, PMU, SPI/PDMA and MSHC dt nodes
+  : added pinctrl, HS-I2C, Serial and basic system dt nodes
 
-Beata Michalska (1):
-      ARM: dts: Add assigned clock parents to CMU node for exynos3250
+----------------------------------------------------------------
+Chanwoo Choi (6):
+      arm64: dts: Add dts files for 64-bit Exynos5433 SoC
+      arm64: dts: Add SPI/PDMA dt node for exynos5433
+      arm64: dts: Add PMU dt node for exynos5433
+      arm64: dts: Add RTC and ADC dt node for exynos5433
+      arm64: dts: Add TMU sensor dt node for exynos5433
+      arm64: dts: Add thermal-zones dt node for exynos5433
 
-Javier Martinez Canillas (7):
-      ARM: dts: Enable wifi power-on for exynos5250-snow
-      ARM: dts: Add cap-sdio-irq to wifi mmc node for exynos5250-snow
-      ARM: dts: Mux XMMCnDATA[0] pad correctly for Exynos5420 boards
-      ARM: dts: Add WiFi module support for Peach boards
-      ARM: dts: Define stdout-path property for Peach boards
-      ARM: dts: Define stdout-path property for exynos5250-snow
-      ARM: dts: Define stdout-path property for exynos5250-spring
+Inha Song (2):
+      arm64: dts: Add ADMA dt node for exynos5433
+      arm64: dts: Add I2S dt node for exynos5433
 
-Marek Szyprowski (2):
-      ARM: dts: add eMMC reset line for exynos4412-odroid-common
-      ARM: dts: add eMMC reset line for exynos5422-odroidxu3
+Jaehoon Chung (1):
+      arm64: dts: Add MSHC dt node for exynos5433
 
-Seungwon Jeon (1):
-      ARM: dts: Add HS400 support for exynos5420 and exynos5800
-
-Tushar Behera (1):
-      ARM: dts: Add mclk entry for Peach boards
-
- .../bindings/arm/exynos/power_domain.txt           |  3 +
- arch/arm/boot/dts/exynos3250.dtsi                  |  4 +
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi    | 14 +++
- arch/arm/boot/dts/exynos5250-snow.dts              | 57 ++++++++++++-
- arch/arm/boot/dts/exynos5250-spring.dts            |  1 +
- arch/arm/boot/dts/exynos5250.dtsi                  |  2 +-
- arch/arm/boot/dts/exynos5420-arndale-octa.dts      |  4 +-
- arch/arm/boot/dts/exynos5420-peach-pit.dts         | 99
-+++++++++++++++++++++-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi          |  7 ++
- arch/arm/boot/dts/exynos5420-smdk5420.dts          |  7 +-
- arch/arm/boot/dts/exynos5420.dtsi                  | 10 ++-
- arch/arm/boot/dts/exynos5422-odroidxu3.dts         | 21 ++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts          | 71 +++++++++++++++-
- 13 files changed, 280 insertions(+), 20 deletions(-)
+ .../devicetree/bindings/arm/samsung/pmu.txt        |   1 +
+ arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi | 698 +++++++++++++++
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |  22 +
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     | 231 +++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 931
++++++++++++++++++++++
+ 5 files changed, 1883 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+ create mode 100644
+arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
