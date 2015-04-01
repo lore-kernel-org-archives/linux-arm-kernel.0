@@ -1,51 +1,84 @@
 From: mturquette@linaro.org (Michael Turquette)
-Date: Tue, 31 Mar 2015 18:36:48 -0700
-Subject: [PATCH] MAINTAINERS: clk: discuss on the
- linux-clk@vger.kernel.org list
-In-Reply-To: <20150327071759.GA18059@codeaurora.org>
-References: <alpine.DEB.2.02.1503251828240.13341@utopia.booyaka.com>
- <20150327071759.GA18059@codeaurora.org>
-Message-ID: <20150401013648.25195.25687@quantum>
+Date: Tue, 31 Mar 2015 18:42:18 -0700
+Subject: [PATCH 3/4] clk: Provide always-on clock support
+In-Reply-To: <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <1425071674-16995-4-git-send-email-lee.jones@linaro.org>
+ <CAJe_Zhf=GBb8AfnTLaGxGcZkVSm9TtdnTsmpH_MBmbMT8ViMDg@mail.gmail.com>
+ <20150302083652.GE31325@x1>
+ <CABb+yY07woiiG8e2kff_AsiFCHNP+TKYyNm_o6=f5WmFsLi8gQ@mail.gmail.com>
+ <20150302101859.GB32347@x1>
+ <CAJe_Zhc-94afeWegEeOoL3X13y35MDJvqME1x7XMy3vVVXYedg@mail.gmail.com>
+Message-ID: <20150401014218.25195.61119@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2015-03-27 00:17:59)
-> On 03/25, Paul Walmsley wrote:
-> > 
-> > Most Linux clock framework discussions take place on the
-> > linux-kernel at vger.kernel.org or linux-arm-kernel at lists.infradead.org
-> > mailing lists.  The volume of unrelated messages on these lists makes
-> > it difficult for non-maintainers to follow along with discussions.
-> > Switch the discussion list for clock framework discussions to
-> > linux-clk at vger.kernel.org.  Also, add linux-clk at vger.kernel.org as a
-> > mailing list for clock API discussions.
-> > 
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > Cc: Viresh Kumar <viresh.linux@gmail.com>
-> > Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
-> > Cc: Prashant Gaikwad <pgaikwad@nvidia.com>
-> > Cc: Tero Kristo <t-kristo@ti.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > ---
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> Mike or I will pick this up for 4.1
+Quoting Jassi Brar (2015-03-02 02:28:44)
+> On 2 March 2015 at 15:48, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Mon, 02 Mar 2015, Jassi Brar wrote:
+> >
+> >> On Mon, Mar 2, 2015 at 2:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >> > On Sat, 28 Feb 2015, Jassi Brar wrote:
+> >> >
+> >> >> On 28 February 2015 at 02:44, Lee Jones <lee.jones@linaro.org> wrote:
+> >> >> > Lots of platforms contain clocks which if turned off would prove fatal.
+> >> >> > The only way to recover from these catastrophic failures is to restart
+> >> >> > the board(s).  Now, when a clock is registered with the framework it is
+> >> >> > compared against a list of provided always-on clock names which must be
+> >> >> > kept ungated.  If it matches, we enable the existing CLK_IGNORE_UNUSED
+> >> >> > flag, which will prevent the common clk framework from attempting to
+> >> >> > gate it during the clk_disable_unused() procedure.
+> >> >> >
+> >> >> If a clock is critical on a certain board, it could be got+enabled
+> >> >> during early boot so there is always a user.
+> >> >
+> >> > I tried this.  There was push-back from the DT maintainers.
+> >> >
+> >> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/324417.html
+> >> >
+> >> Thanks, I wasn't aware of the history.
+> >>
+> >> >> To be able to do that from DT, maybe add a new, say, CLK_ALWAYS_ON
+> >> >> flag could be made to initialize the clock with one phantom user
+> >> >> already. Or just reuse the CLK_IGNORE_UNUSED?
+> >> >
+> >> > How is that different to what this set is doing?
+> >> >
+> >> The phantom user - that's there but none can see it.
+> >>
+> >> How about?
+> >>
+> >> +       of_property_for_each_string(np, "clock-always-on", prop, clkname) {
+> >> +               clk = __clk_lookup(clkname);
+> >> +               if (!clk)
+> >> +                       continue;
+> >> +
+> >> +               clk->core->enable_count = 1;
+> >> +               clk->core->prepare_count = 1;
+> >> +       }
+> >
+> > This is only fractionally different from the current implementation.
+> >
+> > I believe the current way it slightly nicer, as we don't have to fake
+> > the user count.
+> >
+> Well... the user is indeed there, isn't it? It's just not known to
+> Linux. So 'fake' isn't most applicable here.
+> Otherwise you might have to stub out some existing and future
+> functions for CLK_IGNORE_UNUSED. And how do we explain to userspace
+> which would see power drawn but no user of the clock?
 
-Paul,
+Jassi,
 
-Thanks for requesting the new mailing list and for the patch. Applied to
-clk-next.
+This is broken. What if the parent of this clock has
+{enable,prepare}_count of zero? The way we propagate these refcounts up
+the tree would fall over.
 
 Regards,
 Mike
 
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> Anways, I am OK either way.
+> 
+> Cheers!
+> Jassi
