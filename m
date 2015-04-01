@@ -1,121 +1,74 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 1 Apr 2015 14:37:17 -0500
-Subject: [PATCH v3 2/4] remoteproc: add a rproc ops for performing address
- translation
-In-Reply-To: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
-References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1427917039-43206-3-git-send-email-d-gerlach@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 1 Apr 2015 12:40:07 -0700
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
+ ICE in gcc 4.7.3
+In-Reply-To: <551BBEC5.7070801@arm.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+Message-ID: <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Anna <s-anna@ti.com>
+On Wed, 01 Apr 2015 10:47:49 +0100 Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-The rproc_da_to_va API is currently used to perform any device to
-kernel address translations to meet the different needs of the remoteproc
-core/drivers (eg: loading). The functionality is achieved within the
-remoteproc core, and is limited only for carveouts allocated within the
-core.
+> > -static int unmap_and_move(new_page_t get_new_page, free_page_t put_new_page,
+> > -			unsigned long private, struct page *page, int force,
+> > -			enum migrate_mode mode)
+> > +static noinline int unmap_and_move(new_page_t get_new_page,
+> > +				   free_page_t put_new_page,
+> > +				   unsigned long private, struct page *page,
+> > +				   int force, enum migrate_mode mode)
+> >  {
+> >  	int rc = 0;
+> >  	int *result = NULL;
+> > 
+> 
+> Ouch. That's really ugly. And on 32bit ARM, we end-up spilling half of
+> the parameters on the stack, which is not going to help performance
+> either (not that this would be useful on 32bit ARM anyway...).
+> 
+> Any chance you could make this dependent on some compiler detection
+> mechanism?
 
-A new rproc ops, da_to_va, is added to provide flexibility to platform
-implementations to perform the address translation themselves when the
-above conditions cannot be met by the implementations. The rproc_da_to_va()
-API is extended to invoke this ops if present, and fallback to regular
-processing if the platform implementation cannot provide the translation.
-This will allow any remoteproc implementations to translate addresses for
-dedicated memories like internal memories.
+With my arm compiler (gcc-4.4.4) the patch makes no difference -
+unmap_and_move() isn't being inlined anyway.
 
-While at this, also update the rproc_da_to_va() documentation since it
-is an exported function.
+How does this look?
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- drivers/remoteproc/remoteproc_core.c | 31 +++++++++++++++++++++++++------
- include/linux/remoteproc.h           |  2 ++
- 2 files changed, 27 insertions(+), 6 deletions(-)
+Kevin, could you please retest?  I might have fat-fingered something...
 
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 5a6c192..f1efe62 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -159,28 +159,46 @@ static void rproc_disable_iommu(struct rproc *rproc)
- 	return;
+--- a/mm/migrate.c~mm-migrate-mark-unmap_and_move-noinline-to-avoid-ice-in-gcc-473-fix
++++ a/mm/migrate.c
+@@ -901,10 +901,20 @@ out:
  }
  
--/*
-+/**
-+ * rproc_da_to_va() - lookup the kernel virtual address for a remoteproc address
-+ * @rproc: handle of a remote processor
-+ * @da: remoteproc device address to translate
-+ * @len: length of the memory region @da is pointing to
-+ *
-  * Some remote processors will ask us to allocate them physically contiguous
-  * memory regions (which we call "carveouts"), and map them to specific
-- * device addresses (which are hardcoded in the firmware).
-+ * device addresses (which are hardcoded in the firmware). They may also have
-+ * dedicated memory regions internal to the processors, and use them either
-+ * exclusively or alongside carveouts.
-  *
-  * They may then ask us to copy objects into specific device addresses (e.g.
-  * code/data sections) or expose us certain symbols in other device address
-  * (e.g. their trace buffer).
-  *
-- * This function is an internal helper with which we can go over the allocated
-- * carveouts and translate specific device address to kernel virtual addresses
-- * so we can access the referenced memory.
-+ * This function is a helper function with which we can go over the allocated
-+ * carveouts and translate specific device addresses to kernel virtual addresses
-+ * so we can access the referenced memory. This function also allows to perform
-+ * translations on the internal remoteproc memory regions through a platform
-+ * implementation specific da_to_va ops, if present.
-+ *
-+ * The function returns a valid kernel address on success or NULL on failure.
-  *
-  * Note: phys_to_virt(iommu_iova_to_phys(rproc->domain, da)) will work too,
-  * but only on kernel direct mapped RAM memory. Instead, we're just using
-- * here the output of the DMA API, which should be more correct.
-+ * here the output of the DMA API for the carveouts, which should be more
-+ * correct.
-  */
- void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- {
- 	struct rproc_mem_entry *carveout;
- 	void *ptr = NULL;
- 
-+	if (rproc->ops->da_to_va) {
-+		ptr = rproc->ops->da_to_va(rproc, da, len);
-+		if (ptr)
-+			goto out;
-+	}
+ /*
++ * gcc-4.7.3 on arm gets an ICE when inlining unmap_and_move().  Work around
++ * it.
++ */
++#if GCC_VERSION == 40703 && defined(CONFIG_ARM)
++#define ICE_noinline noinline
++#else
++#define ICE_noinline
++#endif
 +
- 	list_for_each_entry(carveout, &rproc->carveouts, node) {
- 		int offset = da - carveout->da;
- 
-@@ -197,6 +215,7 @@ void *rproc_da_to_va(struct rproc *rproc, u64 da, int len)
- 		break;
- 	}
- 
-+out:
- 	return ptr;
- }
- EXPORT_SYMBOL(rproc_da_to_va);
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 0c7d403..81b224d 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -331,11 +331,13 @@ struct rproc;
-  * @start:	power on the device and boot it
-  * @stop:	power off the device
-  * @kick:	kick a virtqueue (virtqueue id given as a parameter)
-+ * @da_to_va:	optional platform hook to perform address translations
++/*
+  * Obtain the lock on page, remove all ptes and migrate the page
+  * to the newly allocated page in newpage.
   */
- struct rproc_ops {
- 	int (*start)(struct rproc *rproc);
- 	int (*stop)(struct rproc *rproc);
- 	void (*kick)(struct rproc *rproc, int vqid);
-+	void * (*da_to_va)(struct rproc *rproc, u64 da, int len);
- };
- 
- /**
--- 
-2.3.0
+-static noinline int unmap_and_move(new_page_t get_new_page,
++static ICE_noinline int unmap_and_move(new_page_t get_new_page,
+ 				   free_page_t put_new_page,
+ 				   unsigned long private, struct page *page,
+ 				   int force, enum migrate_mode mode)
+_
