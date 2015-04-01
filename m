@@ -1,355 +1,186 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 1 Apr 2015 14:37:19 -0500
-Subject: [PATCH v3 4/4] remoteproc/wkup_m3: add a remoteproc driver for TI
- Wakeup M3
+Date: Wed, 1 Apr 2015 14:37:16 -0500
+Subject: [PATCH v3 1/4] remoteproc: introduce rproc_get_by_phandle API
 In-Reply-To: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
 References: <1427917039-43206-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1427917039-43206-5-git-send-email-d-gerlach@ti.com>
+Message-ID: <1427917039-43206-2-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a remoteproc driver to load the firmware and boot a small
-Wakeup M3 processor present on TI AM33xx and AM43xx SoCs. This
-Wakeup M3 remote processor is an integrated Cortex M3 that allows
-the SoC to enter the lowest possible power state by taking control
-from the MPU after it has gone into its own low power state and
-shutting off any additional peripherals.
+Allow users of remoteproc the ability to get a handle to an rproc by
+passing a phandle supplied in the user's device tree node. This is
+useful in situations that require manual booting of the rproc.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+This patch uses the code removed by commit 40e575b1d0b3 ("remoteproc:
+remove the get_by_name/put API") for the ref counting a rproc klist
+code but has rproc_get_by_name replaced with an rproc_get_by_phandle API.
+
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/remoteproc/Kconfig            |  13 ++
- drivers/remoteproc/Makefile           |   1 +
- drivers/remoteproc/wkup_m3_rproc.c    | 249 ++++++++++++++++++++++++++++++++++
- include/linux/platform_data/wkup_m3.h |  30 ++++
- 4 files changed, 293 insertions(+)
- create mode 100644 drivers/remoteproc/wkup_m3_rproc.c
- create mode 100644 include/linux/platform_data/wkup_m3.h
+ Documentation/remoteproc.txt         |  6 +++
+ drivers/remoteproc/remoteproc_core.c | 83 ++++++++++++++++++++++++++++++++++++
+ include/linux/remoteproc.h           |  2 +
+ 3 files changed, 91 insertions(+)
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index 5e343ba..28c711f 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -41,6 +41,19 @@ config STE_MODEM_RPROC
- 	  This can be either built-in or a loadable module.
- 	  If unsure say N.
+diff --git a/Documentation/remoteproc.txt b/Documentation/remoteproc.txt
+index e6469fd..ef0219f 100644
+--- a/Documentation/remoteproc.txt
++++ b/Documentation/remoteproc.txt
+@@ -51,6 +51,12 @@ cost.
+         rproc_shutdown() returns, and users can still use it with a subsequent
+         rproc_boot(), if needed.
  
-+config WKUP_M3_RPROC
-+	tristate "AMx3xx Wakeup M3 remoteproc support"
-+	depends on SOC_AM33XX || SOC_AM43XX
-+	select REMOTEPROC
-+	help
-+	  Say y here to support Wakeup M3 remote processor on TI AM33xx
-+	  and AM43xx family of SoCs.
++  struct rproc *rproc_get_by_phandle(phandle phandle)
++    - Find an rproc handle using a device tree phandle. Returns the rproc
++      handle on success, and NULL on failure. This function increments
++      the remote processor's refcount, so always use rproc_put() to
++      decrement it back once rproc isn't needed anymore.
 +
-+	  Required for Suspend-to-RAM on AM33xx and AM43xx SoCs. Also needed
-+	  for deep CPUIdle states on AM33xx SoCs. Allows for loading of the
-+	  firmware onto these remote processors.
-+	  If unsure say N.
+ 3. Typical usage
+ 
+ #include <linux/remoteproc.h>
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index 3cd85a63..5a6c192 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -36,6 +36,7 @@
+ #include <linux/remoteproc.h>
+ #include <linux/iommu.h>
+ #include <linux/idr.h>
++#include <linux/klist.h>
+ #include <linux/elf.h>
+ #include <linux/crc32.h>
+ #include <linux/virtio_ids.h>
+@@ -44,6 +45,17 @@
+ 
+ #include "remoteproc_internal.h"
+ 
++static void klist_rproc_get(struct klist_node *n);
++static void klist_rproc_put(struct klist_node *n);
 +
- config DA8XX_REMOTEPROC
- 	tristate "DA8xx/OMAP-L13x remoteproc support"
- 	depends on ARCH_DAVINCI_DA8XX
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index ac2ff75..81b04d1 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -9,4 +9,5 @@ remoteproc-y				+= remoteproc_virtio.o
- remoteproc-y				+= remoteproc_elf_loader.o
- obj-$(CONFIG_OMAP_REMOTEPROC)		+= omap_remoteproc.o
- obj-$(CONFIG_STE_MODEM_RPROC)	 	+= ste_modem_rproc.o
-+obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
- obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
-diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
-new file mode 100644
-index 0000000..134ffa7
---- /dev/null
-+++ b/drivers/remoteproc/wkup_m3_rproc.c
-@@ -0,0 +1,249 @@
 +/*
-+ * TI AMx3 Wakeup M3 Remote Processor driver
++ * klist of the available remote processors.
 + *
-+ * Copyright (C) 2014-2015 Texas Instruments, Inc.
-+ *
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ * Suman Anna <s-anna@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * We need this in order to support rproc lookups (needed by the
++ * rproc_get_by_phandle()).
 + */
++static DEFINE_KLIST(rprocs, klist_rproc_get, klist_rproc_put);
 +
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/remoteproc.h>
-+
-+#include <linux/platform_data/wkup_m3.h>
-+
-+#include "remoteproc_internal.h"
-+
-+#define WKUPM3_MEM_MAX	2
-+
-+/**
-+ * struct wkup_m3_mem - WkupM3 internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @bus_addr: Bus address used to access the memory region
-+ * @dev_addr: Device address from Wakeup M3 view
-+ * @size: Size of the memory region
-+ */
-+struct wkup_m3_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t bus_addr;
-+	u32 dev_addr;
-+	size_t size;
-+};
-+
-+/**
-+ * struct wkup_m3_rproc - WkupM3 remote processor state
-+ * @rproc: rproc handle
-+ * @pdev: pointer to platform device
-+ * @mem: WkupM3 memory information
-+ */
-+struct wkup_m3_rproc {
-+	struct rproc *rproc;
-+	struct platform_device *pdev;
-+	struct wkup_m3_mem mem[WKUPM3_MEM_MAX];
-+};
-+
-+static int wkup_m3_rproc_start(struct rproc *rproc)
+ typedef int (*rproc_handle_resources_t)(struct rproc *rproc,
+ 				struct resource_table *table, int len);
+ typedef int (*rproc_handle_resource_t)(struct rproc *rproc,
+@@ -1162,6 +1174,71 @@ out:
+ }
+ EXPORT_SYMBOL(rproc_shutdown);
+ 
++/* will be called when an rproc is added to the rprocs klist */
++static void klist_rproc_get(struct klist_node *n)
 +{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	struct platform_device *pdev = wkupm3->pdev;
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev_get_platdata(dev);
++	struct rproc *rproc = container_of(n, struct rproc, node);
 +
-+	if (pdata->deassert_reset(pdev, pdata->reset_name)) {
-+		dev_err(dev, "Unable to reset wkup_m3!\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
++	get_device(&rproc->dev);
 +}
 +
-+static int wkup_m3_rproc_stop(struct rproc *rproc)
++/* will be called when an rproc is removed from the rprocs klist */
++static void klist_rproc_put(struct klist_node *n)
 +{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	struct platform_device *pdev = wkupm3->pdev;
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev_get_platdata(dev);
++	struct rproc *rproc = container_of(n, struct rproc, node);
 +
-+	if (pdata->assert_reset(pdev, pdata->reset_name)) {
-+		dev_err(dev, "Unable to assert reset of wkup_m3!\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
++	put_device(&rproc->dev);
 +}
 +
-+static void *wkup_m3_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
++static struct rproc *next_rproc(struct klist_iter *i)
 +{
-+	struct wkup_m3_rproc *wkupm3 = rproc->priv;
-+	void *va = NULL;
-+	int i;
-+	u32 offset;
++	struct klist_node *n;
 +
-+	if (len <= 0)
++	n = klist_next(i);
++	if (!n)
 +		return NULL;
 +
-+	for (i = 0; i < WKUPM3_MEM_MAX; i++) {
-+		if (da >= wkupm3->mem[i].dev_addr && da + len <=
-+		    wkupm3->mem[i].dev_addr +  wkupm3->mem[i].size) {
-+			offset = da -  wkupm3->mem[i].dev_addr;
-+			va = (__force void *)(wkupm3->mem[i].cpu_addr + offset);
++	return container_of(n, struct rproc, node);
++}
++
++/**
++ * rproc_get_by_phandle() - find a remote processor by phandle
++ * @phandle: phandle to the rproc
++ *
++ * Finds an rproc handle using the remote processor's phandle, and then
++ * return a handle to the rproc.
++ *
++ * Returns the rproc handle on success, and NULL on failure.
++ *
++ * This function increments the remote processor's refcount, so always
++ * use rproc_put() to decrement it back once rproc isn't needed anymore.
++ *
++ */
++struct rproc *rproc_get_by_phandle(phandle phandle)
++{
++	struct rproc *rproc;
++	struct klist_iter i;
++	struct device_node *np;
++
++	np = of_find_node_by_phandle(phandle);
++	if (!np)
++		return NULL;
++
++	/* find the remote processor, and upref its refcount */
++	klist_iter_init(&rprocs, &i);
++	while ((rproc = next_rproc(&i)) != NULL)
++		if (rproc->dev.parent && rproc->dev.parent->of_node == np) {
++			get_device(&rproc->dev);
 +			break;
 +		}
-+	}
++	klist_iter_exit(&i);
 +
-+	return va;
++	of_node_put(np);
++
++	return rproc;
 +}
++EXPORT_SYMBOL(rproc_get_by_phandle);
 +
-+static struct rproc_ops wkup_m3_rproc_ops = {
-+	.start		= wkup_m3_rproc_start,
-+	.stop		= wkup_m3_rproc_stop,
-+	.da_to_va	= wkup_m3_rproc_da_to_va,
-+};
+ /**
+  * rproc_add() - register a remote processor
+  * @rproc: the remote processor handle to register
+@@ -1191,6 +1268,9 @@ int rproc_add(struct rproc *rproc)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	/* expose to rproc_get_by_phandle users */
++	klist_add_tail(&rproc->node, &rprocs);
 +
-+static const struct of_device_id wkup_m3_rproc_of_match[] = {
-+	{ .compatible = "ti,am3352-wkup-m3", },
-+	{ .compatible = "ti,am4372-wkup-m3", },
-+	{},
-+};
+ 	dev_info(dev, "%s is available\n", rproc->name);
+ 
+ 	dev_info(dev, "Note: remoteproc is still under development and considered experimental.\n");
+@@ -1380,6 +1460,9 @@ int rproc_del(struct rproc *rproc)
+ 	/* Free the copy of the resource table */
+ 	kfree(rproc->cached_table);
+ 
++	/* the rproc is downref'ed as soon as it's removed from the klist */
++	klist_del(&rproc->node);
 +
-+static int wkup_m3_rproc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct wkup_m3_platform_data *pdata = dev->platform_data;
-+	const char *mem_names[WKUPM3_MEM_MAX] = { "umem", "dmem" };
-+	struct wkup_m3_rproc *wkupm3;
-+	const char *fw_name;
-+	struct rproc *rproc;
-+	struct resource *res;
-+	const __be32 *addrp;
-+	u32 l4_offset = 0;
-+	u64 size;
-+	int ret;
-+	int i;
-+
-+	if (!(pdata && pdata->deassert_reset && pdata->assert_reset &&
-+	      pdata->reset_name)) {
-+		dev_err(dev, "Platform data missing!\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = of_property_read_string(dev->of_node, "ti,pm-firmware",
-+				      &fw_name);
-+	if (ret) {
-+		dev_err(dev, "No firmware filename given\n");
-+		return -ENODEV;
-+	}
-+
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "pm_runtime_get_sync() failed\n");
-+		goto err;
-+	}
-+
-+	rproc = rproc_alloc(dev, "wkup_m3", &wkup_m3_rproc_ops,
-+			    fw_name, sizeof(*wkupm3));
-+	if (!rproc) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	wkupm3 = rproc->priv;
-+	wkupm3->rproc = rproc;
-+	wkupm3->pdev = pdev;
-+
-+	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   mem_names[i]);
-+		wkupm3->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(wkupm3->mem[i].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed for resource %d\n",
-+				i);
-+			ret = PTR_ERR(wkupm3->mem[i].cpu_addr);
-+			goto err;
-+		}
-+		wkupm3->mem[i].bus_addr = res->start;
-+		wkupm3->mem[i].size = resource_size(res);
-+		addrp = of_get_address(dev->of_node, i, &size, NULL);
-+		if (!strcmp(mem_names[i], "umem"))
-+			l4_offset = be32_to_cpu(*addrp);
-+		wkupm3->mem[i].dev_addr = be32_to_cpu(*addrp) - l4_offset;
-+	}
-+
-+	dev_set_drvdata(dev, rproc);
-+
-+	ret = rproc_add(rproc);
-+	if (ret) {
-+		dev_err(dev, "rproc_add failed\n");
-+		goto err_put_rproc;
-+	}
-+
-+	return 0;
-+
-+err_put_rproc:
-+	rproc_put(rproc);
-+err:
-+	pm_runtime_put_noidle(dev);
-+	pm_runtime_disable(dev);
-+	return ret;
-+}
-+
-+static int wkup_m3_rproc_remove(struct platform_device *pdev)
-+{
-+	struct rproc *rproc = platform_get_drvdata(pdev);
-+
-+	rproc_del(rproc);
-+	rproc_put(rproc);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM
-+static int wkup_m3_rpm_suspend(struct device *dev)
-+{
-+	return -EBUSY;
-+}
-+
-+static int wkup_m3_rpm_resume(struct device *dev)
-+{
-+	return 0;
-+}
-+#endif
-+
-+static const struct dev_pm_ops wkup_m3_rproc_pm_ops = {
-+	SET_RUNTIME_PM_OPS(wkup_m3_rpm_suspend, wkup_m3_rpm_resume, NULL)
-+};
-+
-+static struct platform_driver wkup_m3_rproc_driver = {
-+	.probe = wkup_m3_rproc_probe,
-+	.remove = wkup_m3_rproc_remove,
-+	.driver = {
-+		.name = "wkup_m3_rproc",
-+		.of_match_table = wkup_m3_rproc_of_match,
-+		.pm = &wkup_m3_rproc_pm_ops,
-+	},
-+};
-+
-+module_platform_driver(wkup_m3_rproc_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("TI Wakeup M3 remote processor control driver");
-+MODULE_AUTHOR("Dave Gerlach <d-gerlach@ti.com>");
-diff --git a/include/linux/platform_data/wkup_m3.h b/include/linux/platform_data/wkup_m3.h
-new file mode 100644
-index 0000000..3f1d77e
---- /dev/null
-+++ b/include/linux/platform_data/wkup_m3.h
-@@ -0,0 +1,30 @@
-+/*
-+ * TI Wakeup M3 remote processor platform data
-+ *
-+ * Copyright (C) 2014-2015 Texas Instruments, Inc.
-+ *
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_PLATFORM_DATA_WKUP_M3_H
-+#define _LINUX_PLATFORM_DATA_WKUP_M3_H
-+
-+struct platform_device;
-+
-+struct wkup_m3_platform_data {
-+	const char *reset_name;
-+
-+	int (*assert_reset)(struct platform_device *pdev, const char *name);
-+	int (*deassert_reset)(struct platform_device *pdev, const char *name);
-+};
-+
-+#endif /* _LINUX_PLATFORM_DATA_WKUP_M3_H */
+ 	device_del(&rproc->dev);
+ 
+ 	return 0;
+diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+index 9e7e745..0c7d403 100644
+--- a/include/linux/remoteproc.h
++++ b/include/linux/remoteproc.h
+@@ -41,6 +41,7 @@
+ #include <linux/virtio.h>
+ #include <linux/completion.h>
+ #include <linux/idr.h>
++#include <linux/of.h>
+ 
+ /**
+  * struct resource_table - firmware resource table header
+@@ -479,6 +480,7 @@ struct rproc_vdev {
+ 	u32 rsc_offset;
+ };
+ 
++struct rproc *rproc_get_by_phandle(phandle phandle);
+ struct rproc *rproc_alloc(struct device *dev, const char *name,
+ 				const struct rproc_ops *ops,
+ 				const char *firmware, int len);
 -- 
 2.3.0
