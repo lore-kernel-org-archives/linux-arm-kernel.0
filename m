@@ -1,18 +1,28 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 1 Apr 2015 12:14:06 +0100
-Subject: [PATCH REPOST v4 1/2] Revert "serial/amba-pl011: Leave the TX
- IRQ alone when the UART is not open"
-In-Reply-To: <1427886509-8553-1-git-send-email-Dave.Martin@arm.com>
-References: <1427886509-8553-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150401111406.GB3602@e103592.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 1 Apr 2015 08:39:12 -0300
+Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
+In-Reply-To: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
+References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
+Message-ID: <CAOMZO5DM66sUX-YojCyY5BC3Pdk4p4bkEqQ+W3tyDeNEL6nU5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 12:08:29PM +0100, Dave Martin wrote:
-> This reverts commit f2ee6dfa0e8597eea8b98d240b0033994e20d215.
+On Wed, Apr 1, 2015 at 5:10 AM, Vianney le Cl?ment de Saint-Marcq
+<vianney.leclement@essensium.com> wrote:
+> Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 Dual
+> based development board.
+>
+> The e-MMC chip is disabled because initialization fails (error -110).
+> A possible cause is described in [2].
+>
+> [1] http://www.embest-tech.com/shop/star/marsboard.html
+> [2] https://community.freescale.com/message/442168#442168
+>
+> Signed-off-by: Vianney le Cl?ment de Saint-Marcq <vianney.leclement@essensium.com>
 
-[ <1427886509-8553-1-git-send-email-Dave.Martin@arm.com> is a
-misthreaded duplicate mail, please ignore. ]
+Couldn't this be combined with the existing
+arch/arm/boot/dts/imx6dl-riotboard.dts?
 
-Oops
----Dave
+Regards,
+
+Fabio Estevam
