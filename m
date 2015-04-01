@@ -1,144 +1,144 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 01 Apr 2015 16:06:47 +0200
-Subject: Cache line size definition in arch/arm/mm/Kconfig
-In-Reply-To: <20150401115013.GA24899@n2100.arm.linux.org.uk>
-References: <5512C7A4.3000302@free.fr> <5515423E.4020802@free.fr>
- <20150327120601.GB4019@n2100.arm.linux.org.uk> <55155EE9.6020600@free.fr>
- <551BD9BF.8090808@free.fr> <20150401115013.GA24899@n2100.arm.linux.org.uk>
-Message-ID: <551BFB77.50403@free.fr>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 1 Apr 2015 08:27:08 -0600
+Subject: [PATCH 4/5] coresight-stm: adding driver for CoreSight STM
+ component
+In-Reply-To: <87384lcio3.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1425078294-13059-1-git-send-email-mathieu.poirier@linaro.org>
+ <1425078294-13059-5-git-send-email-mathieu.poirier@linaro.org>
+ <87bnjad1jb.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkzK_LX4OQJOUtcr0EksRUKPueNOXrw2C+qTJWov0sQPFA@mail.gmail.com>
+ <87384lcio3.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkz5Ar9aY6_4foWBcj2AXr2ttOJEPS_rC9Z2t1L-ht-Pvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2015 13:50, Russell King - ARM Linux wrote:
-> On Wed, Apr 01, 2015 at 01:42:55PM +0200, Mason wrote:
->> Example patch for illustration purposes (only compile-tested)
->>
->> (There is probably a much more elegant way to get 32-byte aligned
->> memory allocations.)
->>
->> diff --git a/drivers/clocksource/mmio.c b/drivers/clocksource/mmio.c
->> index c0e2512..77b91c5 100644
->> --- a/drivers/clocksource/mmio.c
->> +++ b/drivers/clocksource/mmio.c
->> @@ -10,34 +10,24 @@
->>   #include <linux/init.h>
->>   #include <linux/slab.h>
->> -struct clocksource_mmio {
->> -       void __iomem *reg;
->> -       struct clocksource clksrc;
+Adding Al Grant to the conversation - his knowledge on HW tracing for
+the ARM architecture is definitely an asset for this kind of planning.
+Please add him to future patchset as well.
+
+On 31 March 2015 at 09:04, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
 >
-> Just swap the order of these.
+>> On 30 March 2015 at 08:04, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>>> As it looks from the above snippet, you're using a stream of DATA
+>>> packets for user's payload. I also noticed that you use an ioctl to
+>>> trigger timestamps.
+>>
+>> Right, the ioctl() conveys user space intentions on that channel.
+>> Options are kept and applied on every packet for as long as the
+>> channel is open.
+>
+> So this means that, for example, if you enable timestamps on a channel,
+> then every single data packet on that channel will be timestamped, which
+> is a lot of timestamps.
 
-(Assuming arm32 && ARM_L1_CACHE_SHIFT = 6)
+That is how the original coresight-stm driver was implemented.  My
+initial goal was to upstream something that could be used as a
+conversation starter or a foundation to start building on.  I had
+planned to look into the protocol specification itself in later steps.
+But addressing the issue now is just as worthy.
 
-Because struct clocksource has attribute ____cacheline_aligned,
-sizeof(struct clocksource) = 128
+>Normally, you would only be interested in the
+> timestamp on the first data packet in the message (or frame or however
+> we decide to call it). This is one of the reasons why I'm suggesting a
+> common framing scheme or a "protocol".
+>
+>>> Now, in the STP protocol there are, for example, marked data packets
+>>> that can be used to mark beginning of a higher-level message,
+>>> timestamped data packets that can be used to mean the same thing and
+>>> FLAG packets to mark message boundaries.
+>>
+>> Same on my side, I simply haven't included them yet.  I'll do so in my
+>> next iteration.
+>>
+>>>
+>>> In my Intel TH code, I'm using D*TS packet for the beginning of a
+>>> message (or "frame") and FLAG packet for the the end of a message.
 
-Thus the layout for
-struct { void __iomem *reg; struct clocksource clksrc; }
-would be
-reg(4) pad1(60) clksrc(80) pad2(48)
+By the way, are you following the OST specification of this is a
+scheme you came up with?
 
-and the layout for
-struct { struct clocksource clksrc; void __iomem *reg; }
-would be
-clksrc(80) pad2(48) reg(4) pad1(60)
+>>>
+>>> So my question is, is there any specific STP framing pattern that you
+>>> use with Coresight STM or should we perhaps figure out a generic framing
+>>> pattern and make it part of the stm class as well?
+>>
+>> Now specific pattern... Sending a packet consists of MARK, DATA, FLAG.
+>
+> Is this pattern mandated by a decoder that you use or is there any other
+> reason why it's exactly that?
 
-If kmalloc returns  32-byte aligned pointer (which seems to be
-the case) then clksrc is correctly aligned in both cases.
+The driver was following the OST specification, or something close to
+that.  I don't have access to the standard itself and as such not in a
+position to assert how accurate the implementation.  That is one of
+the reason I left it out of my patchset.
 
-The reason for stuffing reg inside struct clocksource would be
-to avoid the 64-byte overhead from the padding. Also (but this
-only a matter of taste) it seems the code is marginally clearer
-without the "container_of" gymnastics.
+>
+>>>
+>>> For example, we can replace stm's .write callback with something like
+>>>
+>>>     int (*packet)(struct stm_data *data,
+>>>                   unsigned int type,    /* data, flag, trig etc */
+>>>                   unsigned int options, /* timestamped, marked */
+>>>                   u64 payload);
+>>>
+>>> and let the stm core do the "framing", which, then, will be common and
+>>> consistent across different architectures/stm implementations.
+>>
+>> I think the framing should be left to individual drivers.  It's only a
+>> matter of time before we get a weird device that doesn't play well
+>> with others, forcing to carry the ugliness in the STM core rather than
+>> the driver.
+>
+> Not necessarily. If a device doesn't support one type of packet or the
+> other, it will be up to them to work around that in the above .packet
+> callback.
+>
+> As for the devices that don't play well, there's a question of how much
+> one can violate the spec and still call oneself compliant.
 
-Regards.
+I understand your point of view.  On my side I'm trying to avoid
+painting ourselves in the corner.
 
+>
+>> And isn't carrying "options" redundant?  Using "container_of" on the
+>> "data" field one can get back to the driver specific structure, which
+>> is definitely a better place to keep that information.  I think the
+>> general structure looks good right now, we simply need to find a way
+>> to get rid of the ioctls.
+>
+> No, what I mean by options here is a property of each individual packet,
+> not the whole channel. For example, if I want the underlying driver to
+> send a marked data packet, I do
+>
+>      stm_data->packet(stm_data, STP_PACKET_D8, STP_OPTION_MARKED, payload);
+>
+> or if I want to send a timestamped flag, I do
+>
+>      stm_data->packet(stm_data, STP_PACKET_FLAG, STP_OPTION_TS, 0);
 
-diff --git a/drivers/clocksource/mmio.c b/drivers/clocksource/mmio.c
-index c0e2512..d6583ed 100644
---- a/drivers/clocksource/mmio.c
-+++ b/drivers/clocksource/mmio.c
-@@ -10,34 +10,24 @@
-  #include <linux/init.h>
-  #include <linux/slab.h>
-  
--struct clocksource_mmio {
--       void __iomem *reg;
--       struct clocksource clksrc;
--};
--
--static inline struct clocksource_mmio *to_mmio_clksrc(struct clocksource *c)
--{
--       return container_of(c, struct clocksource_mmio, clksrc);
--}
--
-  cycle_t clocksource_mmio_readl_up(struct clocksource *c)
-  {
--       return readl_relaxed(to_mmio_clksrc(c)->reg);
-+       return readl_relaxed(c->reg);
-  }
-  
-  cycle_t clocksource_mmio_readl_down(struct clocksource *c)
-  {
--       return ~readl_relaxed(to_mmio_clksrc(c)->reg);
-+       return ~readl_relaxed(c->reg);
-  }
-  
-  cycle_t clocksource_mmio_readw_up(struct clocksource *c)
-  {
--       return readw_relaxed(to_mmio_clksrc(c)->reg);
-+       return readw_relaxed(c->reg);
-  }
-  
-  cycle_t clocksource_mmio_readw_down(struct clocksource *c)
-  {
--       return ~(unsigned)readw_relaxed(to_mmio_clksrc(c)->reg);
-+       return ~(unsigned)readw_relaxed(c->reg);
-  }
-  
-  /**
-@@ -53,21 +43,21 @@ int __init clocksource_mmio_init(void __iomem *base, const char *name,
-         unsigned long hz, int rating, unsigned bits,
-         cycle_t (*read)(struct clocksource *))
-  {
--       struct clocksource_mmio *cs;
-+       struct clocksource *cs;
-  
-         if (bits > 32 || bits < 16)
-                 return -EINVAL;
-  
--       cs = kzalloc(sizeof(struct clocksource_mmio), GFP_KERNEL);
-+       cs = kzalloc(sizeof *cs, GFP_KERNEL);
-         if (!cs)
-                 return -ENOMEM;
-  
-         cs->reg = base;
--       cs->clksrc.name = name;
--       cs->clksrc.rating = rating;
--       cs->clksrc.read = read;
--       cs->clksrc.mask = CLOCKSOURCE_MASK(bits);
--       cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+       cs->name = name;
-+       cs->rating = rating;
-+       cs->read = read;
-+       cs->mask = CLOCKSOURCE_MASK(bits);
-+       cs->flags = CLOCK_SOURCE_IS_CONTINUOUS;
-  
--       return clocksource_register_hz(&cs->clksrc, hz);
-+       return clocksource_register_hz(cs, hz);
-  }
-diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
-index 879065d..9fdb5cf 100644
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -189,6 +189,9 @@ struct clocksource {
-         unsigned long flags;
-         void (*suspend)(struct clocksource *cs);
-         void (*resume)(struct clocksource *cs);
-+#ifdef CONFIG_CLKSRC_MMIO
-+       void __iomem *reg;
-+#endif
-  
-         /* private: */
-  #ifdef CONFIG_CLOCKSOURCE_WATCHDOG
+Ah!  It's getting clearer now.
+
+>
+> Like I said above, there seems little to be gained from enabling
+> timestamps for all packets in one channel.
+>
+>> Regarding the same "options", how did you plan on getting those from user space?
+>
+> Ideally, if we have a framing convension, we don't need to get it from
+> userspace at all, all userspace should care about is writing data to the
+> character device and we wrap it up and feed it to the underlying driver.
+
+What do you have in mind for "framing convention"?  As mentioned above
+codeAurora was using the OST specification but Al Grant tell me it
+isn't supported anymore.
+
+Thanks for the open dialogue,
+Mathieu
+
+>
+> Regards,
+> --
+> Alex
