@@ -1,86 +1,81 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 01 Apr 2015 10:45:54 +0200
-Subject: [PATCH 3/5] ARM: mvebu: Allow using the GIC for wakeup in standby
- mode
-In-Reply-To: <CAPv3WKdc=DQ9-dm3rm_mbG_sgeWbCZBJ7eML48hFXHQaJm1Pmw@mail.gmail.com>
-References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>	<1427724278-12379-4-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKdc=DQ9-dm3rm_mbG_sgeWbCZBJ7eML48hFXHQaJm1Pmw@mail.gmail.com>
-Message-ID: <551BB042.3070904@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Apr 2015 09:58:32 +0100
+Subject: Possible regression in next-20150323 due to "ARM, arm64: kvm:
+ get rid of the bounce page"
+In-Reply-To: <7hbnj99epe.fsf@deeprootsystems.com>
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+Message-ID: <20150401085832.GA1552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
+Hi Kevin,
 
-On 01/04/2015 10:34, Marcin Wojtas wrote:
-> Hi Gregory,
+On Tue, Mar 31, 2015 at 07:58:21PM +0100, Kevin Hilman wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> > On Fri, Mar 27, 2015 at 12:25:54AM +0000, Simon Horman wrote:
+> >> On Thu, Mar 26, 2015 at 08:29:21AM -0700, Tyler Baker wrote:
+> >> > On 26 March 2015 at 06:36, Will Deacon <will.deacon@arm.com> wrote:
+> >> > > On Thu, Mar 26, 2015 at 12:39:39AM +0000, Simon Horman wrote:
+> >> > >> On Tue, Mar 24, 2015 at 11:13:58AM -0500, Nishanth Menon wrote:
+> >> > >> > I think we now have a new error: (seen with omap2plus_defconfig)
+> >> > >> > on next-20150324 :
+> >> > >> > ./arch/arm/kernel/vmlinux.lds:677: undefined symbol `__hyp_idmap_size'
+> >> > >> > referenced in expression
+> >> > >> > make: *** [vmlinux] Error 1
+> >> > >>
+> >> > >> Thanks, I am seeing that too.
+> >> > >>
+> >> > >> My armchair suggestion is that the following should be reverted.
+> >> > >>
+> >> > >> e60a1fec44a2f ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> >> > >> 06f75a1f62000 ("ARM, arm64: kvm: get rid of the bounce page")
+> >> > >
+> >> > > Can you try again with the latest -next please? We've merged an additional
+> >> > > patch aimed at sorting this out. Reverting isn't really an option, as
+> >> > > there's an awful lot of code that depends on the bounce page removal.
+> >> > 
+> >> > Here are the kernelci.org -next results[1], if you click the build
+> >> > status you can dig down into the build failures. next-20150326 has now
+> >> > hit a compiler bug, Arnd mentioned he was looking into this issue.
+> >> 
+> >> I have confirmed that next-20150326 does not compile without
+> >> the following reverted:
+> >> 
+> >> 12eb3e833961 ("ARM: kvm: assert on HYP section boundaries not actual code size")
+> >> e60a1fec44a2 ("ARM: kvm: implement replacement for ld's LOG2CEIL()")
+> >> 06f75a1f6200 ("ARM, arm64: kvm: get rid of the bounce page")
+> >
+> > Thanks for testing this and sorry for the continued breakage. Which
+> > toolchain did you say you were using? Ard has some more patches trying to
+> > fix this, but none of our toolchains seem to tickle the issue.
 > 
-> 2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> On the Armada 375/38x/39x SoCs, in standby mode the SoC stay powered
->> and it is possible to wake-up from any interrupt sources. This patch
->> adds flag to the GIC irqchip driver to let linux know this.
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  arch/arm/mach-mvebu/board-v7.c | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
->> index 89a139ed7d5b..61774279a66d 100644
->> --- a/arch/arm/mach-mvebu/board-v7.c
->> +++ b/arch/arm/mach-mvebu/board-v7.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/of_address.h>
->>  #include <linux/of_fdt.h>
->>  #include <linux/of_platform.h>
->> +#include <linux/irq.h>
->>  #include <linux/io.h>
->>  #include <linux/clocksource.h>
->>  #include <linux/dma-mapping.h>
->> @@ -26,6 +27,7 @@
->>  #include <linux/signal.h>
->>  #include <linux/slab.h>
->>  #include <linux/irqchip.h>
->> +#include <linux/irqchip/arm-gic.h>
->>  #include <asm/hardware/cache-l2x0.h>
->>  #include <asm/mach/arch.h>
->>  #include <asm/mach/map.h>
->> @@ -129,6 +131,11 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
->>
->>  static void __init mvebu_init_irq(void)
->>  {
->> +       if (of_machine_is_compatible("marvell,armada375") ||
->> +           of_machine_is_compatible("marvell,armada380") ||
->> +           of_machine_is_compatible("marvell,armada390"))
->> +               gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
->> +                                     IRQCHIP_MASK_ON_SUSPEND);
+> I've also tested on the default ARM toolchains available with ubuntu[1]
 > 
-> I'm afraid you the patchset may be incomplete:
-> arch/arm/mach-mvebu/board-v7.c:137:3: error: implicit declaration of
-> function 'gic_set_irqchip_flags'
-> [-Werror=implicit-function-declaration]
+> Are there any updates on this issue?
 
-Actually I forgot to speak about the dependency.
+It's been fixed since the end of last week!
 
-This patch depends on the commit "irqchip: gic: Add an entry point to set up irqchip flags"
-which is already in the irqchip branch and will be part of 4.1.
+(see ARM: kvm: round HYP section to page size instead of log2 upper bound)
 
-So in case it would be ok to merge it in 4.1 (but I doubt it it will be the case), then
-this patch should be taken by the irqchip subsystem to resolve this dependency. I checked
-that it should not conflict with the mvebu patches.
+This was confirmed by both my testing and also Simon Horman, who reported
+the initial breakage.
 
-Thanks,
+> It ha broken most of the ARM defconfigs in linux-next[2], and since it's
+> been broken for a week now, it is masking other types of issues that we
+> can normally find via automated boot testing.
 
-Gregory
+If you're referring to failures such as:
 
+  http://storage.kernelci.org/next/next-20150331/arm-axm55xx_defconfig/build.log
 
-> 
-> Best regards,
-> Marcin
-> 
+Then that's not coming from the arm64 tree, and is a completely separate
+issue from the one originally reported in this thread.
 
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
