@@ -1,129 +1,91 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 1 Apr 2015 13:17:48 -0600
-Subject: "ARM: multi_v7_defconfig: Enable shmobile platforms" breaks
- Tegra20 multi_v7_defconfig boot
-In-Reply-To: <551C3F25.40105@wwwdotorg.org>
-References: <alpine.DEB.2.02.1503251740130.13341@utopia.booyaka.com>
- <CANMBJr7ibVCxQRUG47OT0meNntMjEoVqL7kiEK9DtCfp5NXPgg@mail.gmail.com>
- <alpine.DEB.2.02.1503252157240.7173@utopia.booyaka.com>
- <55137098.4030903@wwwdotorg.org>
- <alpine.DEB.2.02.1503261826210.18294@utopia.booyaka.com>
- <5514569E.2030406@wwwdotorg.org> <551C2768.6060209@wwwdotorg.org>
- <551C2F7A.7040107@nvidia.com> <551C3F25.40105@wwwdotorg.org>
-Message-ID: <551C445C.7040107@nvidia.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 01 Apr 2015 12:27:04 -0700
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
+ in gcc 4.7.3
+In-Reply-To: <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg> (Geert
+ Uytterhoeven's message of "Wed, 1 Apr 2015 11:37:13 +0200 (CEST)")
+References: <20150324004537.GA24816@verge.net.au>
+ <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
+ <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
+ <20150326133631.GB2805@arm.com>
+ <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au> <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+Message-ID: <7hh9sz6453.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/2015 12:55 PM, Stephen Warren wrote:
-> (Dropping people likely not interested in Tegra U-Boot from explicit Cc)
->
-> On 04/01/2015 11:48 AM, Paul Walmsley wrote:
->> On 04/01/2015 11:14 AM, Stephen Warren wrote:
->>> On 03/26/2015 12:57 PM, Stephen Warren wrote:
->>>> On 03/26/2015 12:35 PM, Paul Walmsley wrote:
->>>>> On Wed, 25 Mar 2015, Stephen Warren wrote:
->>>>>
->>>>>> On 03/25/2015 04:00 PM, Paul Walmsley wrote:
->>>>>>> On Wed, 25 Mar 2015, Tyler Baker wrote:
->>>>>>>> On 25 March 2015 at 11:03, Paul Walmsley <paul@pwsan.com> wrote:
->>>>>>>>> Looks like commit 4a3a6f86693922b29cf829c63f652b057f14619e ("ARM:
->>>>>>>>> multi_v7_defconfig: Enable shmobile platforms") breaks Tegra20
->>>>>>>>> multi_v7_defconfig boot.
->>> ...
->>>>>>>> Can you try to shift your kernel load address around a bit? From
->>>>>>>> experience with the boards from kernelci.org we find that as the
->>>>>>>> multi
->>>>>>>> v7 kernel size increases they can clobber memory when they get
->>>>>>>> decompressed.
->>>>>>>
->>>>>>> Thanks, that was it:
->>>>>>>
->>>>>>> http://nvt.pwsan.com/pub/pwalmsley-tester/testlogs/test_20150325144058_6af714b069dc278d5d8e1b7afc13568f71d9aba8/20150325144058/boot/tegra20-trimslice/tegra20-trimslice/multi_v7_defconfig_log.txt 
->>>>>>>
->>>>>>>
->>> ...
->>>>>> Interesting. Do the values in U-Boot's default environment work
->>>>>> correctly
->>>>>
->>>>> No idea, I haven't tried.  (The load addresses I used are 
->>>>> observable in
->>>>> the boot logs above.)
->>>>
->>>> Sure. I was hoping you'd try it out since you already had the setup to
->>>> repro the issue.
->>>>
->>>> It'd be good if your test-bed used the built-in U-Boot variables 
->>>> too, so
->>>> we're testing them.
->>>
->>> I've reproduced the original problem, and then validated that using
->>> the addresses from U-Boot's default environment (at least with a ToT
->>> U-Boot that I just built) does indeed solve it.
->>>
->>> I'd like to re-iterate that the test bed should be using the values
->>> from U-Boot's environment rather than making up its own. That way:
->>>
->>> * The value the test bed uses for the kernel load address likely
->>> overlaps where the kernel decompressor writes to for even slightly
->>> large kernels. This means the decompressor must move itself before
->>> decompressing. IIUC, there's zero guarantee that moving the
->>> decompressor won't overwrite the DTB, since IIUC the decompressor uses
->>> zero knowledge of the DTB location. In other words, if the compressed
->>> kernel is loaded somewhere that's likely to require it to move itself,
->>> there's a real risk of the exact same problem cropping up again in the
->>> future if the kernel happens to overwrite the DTB during relocation.
->>>
->>> * The values are part of every Tegra U-Boot port (and hopefully for
->>> other SoCs too given any distro using boot.scr with
->>> config_distro_bootcmd.h will expect the variables to exist), so for
->>> future (Tegra) chips you won't have to adjust the test bed if RAM
->>> layout changes.
->>>
->>> * Those values get testing, so we'll find out if the ever don't work.
->>> We get more test coverage.
->>
->> Sounds reasonable, I'll try to get to this at some point soon.
->>
->> BTW, it might be worth changing U-boot CONFIG_LOADADDR to point to the
->> value you define for kernel_addr_r.  That would reinforce to folks who
->> aren't using the U-boot scripts that they should use that address for
->> loading their kernel.
->
-> Hmm. Our values for CONFIG_LOADADDR and CONFIG_SYS_LOADADDR in U-Boot 
-> seem to be a mess.
->
-> Essentially they are used for the same semantic purpose, it's just 
-> that different U-Boot features use one or the other. I propose we make 
-> them the same value. There are certainly many other boards that do 
-> (and many that don't, strangely).
+Geert Uytterhoeven <geert@linux-m68k.org> writes:
 
-That sounds fine to me.  I got totally confused trying to figure out the 
-difference between CONFIG_LOADADDR and CONFIG_SYS_LOAD_ADDR.
+[...]
 
+>> build bisect points to commit 21f992084aeb[3], but that doesn't revert
+>> cleanly so I haven't got any further than that yet.
 >
-> I'm not sure that pointing those at the same location as kernel_addr_r 
-> is best. I'd expect modern scripts to explicitly use one of the 
-> type-specific (kernel, DT, script, initrd, ...) variables and never 
-> rely on simple $loadaddr. How about we point these variables somewhere 
-> that doesn't overlap with any of the memory regions 
-> "reserved"/intended for a specific purpose?
+> I installed gcc-arm-linux-gnueabi (4:4.7.2-1 from Ubuntu 14.04 LTS) and could
+> reproduce the ICE. I came up with the workaround below.
+
+Awesome, thanks!
+
+> Does this work for you?
+
+Yes, that patch works well and fixes the regression. Build results for
+all the defconfigs here:
+
+   http://kernelci.org/build/khilman/kernel/v4.0-rc6-8294-g2ef3958cc27e/
+
+and the remaining issues arent' realted to this ICE.
+
+> From 7ebe83316eaf1952e55a76754ce7a5832e461b8c Mon Sep 17 00:00:00 2001
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
+> Date: Wed, 1 Apr 2015 11:22:51 +0200
+> Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE in
+>  gcc 4.7.3
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
 >
-> In other words, I'd suggest 0x90200000 as the value for Tegra30+; 
-> that's consistent with the default values of $scriptaddr and 
-> $pxefile_addr_r, i.e. 1MB beyond the latter, and well out of the way 
-> from anything else.
+> With gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-12ubuntu1) :
 >
-> Does all that sound reasonable? If so, I'll send a patch for U-Boot.
+>     mm/migrate.c: In function ?migrate_pages?:
+>     mm/migrate.c:1148:1: internal compiler error: in push_minipool_fix, at config/arm/arm.c:13500
+>     Please submit a full bug report,
+>     with preprocessed source if appropriate.
+>     See <file:///usr/share/doc/gcc-4.7/README.Bugs> for instructions.
+>     Preprocessed source stored into /tmp/ccPoM1tr.out file, please attach this to your bugreport.
+>     make[1]: *** [mm/migrate.o] Error 1
+>     make: *** [mm/migrate.o] Error 2
+>
+> Mark unmap_and_move() (which is used in a single place only) "noinline"
+> to work around this compiler bug.
+>
+> Reported-by: Kevin Hilman <khilman@kernel.org>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I always used to treat CONFIG_LOADADDR as the "recommended" load address 
-for the kernel, as did my colleagues.  But that was years ago in the 
-days of uImages and things have changed a lot since then.  So to be 
-perfectly honest, I don't know what the right path forward is.  I'd hate 
-to add more work to your plate, but maybe we should ask on the U-boot 
-mailing lists to see what folks there would recommend?  If you're busy 
-I'd be happy to send the initial query, just let me know.
+Tested-by: Kevin Hilman <khilman@linaro.org>
 
-Otherwise, I think you probably know U-boot better than I, so ultimately 
-I'm fine with your discretion.
-
-- Paul
+> ---
+>  mm/migrate.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/mm/migrate.c b/mm/migrate.c
+> index 114602a68111d809..98f8574456c2010c 100644
+> --- a/mm/migrate.c
+> +++ b/mm/migrate.c
+> @@ -904,9 +904,10 @@ out:
+>   * Obtain the lock on page, remove all ptes and migrate the page
+>   * to the newly allocated page in newpage.
+>   */
+> -static int unmap_and_move(new_page_t get_new_page, free_page_t put_new_page,
+> -			unsigned long private, struct page *page, int force,
+> -			enum migrate_mode mode)
+> +static noinline int unmap_and_move(new_page_t get_new_page,
+> +				   free_page_t put_new_page,
+> +				   unsigned long private, struct page *page,
+> +				   int force, enum migrate_mode mode)
+>  {
+>  	int rc = 0;
+>  	int *result = NULL;
