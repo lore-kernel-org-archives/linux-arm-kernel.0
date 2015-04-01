@@ -1,455 +1,104 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 01 Apr 2015 10:15:56 +0200
-Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
-References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
-Message-ID: <1427876156.24886.1.camel@pengutronix.de>
+From: hns@goldelico.com (Dr. H. Nikolaus Schaller)
+Date: Wed, 1 Apr 2015 10:18:05 +0200
+Subject: [PATCH v4 3/6] Documentation: DT: Document twl4030-madc-battery
+ bindings
+In-Reply-To: <20150331072643.GB30788@amd>
+References: <1426022847-30912-1-git-send-email-marek@goldelico.com>
+ <1426022847-30912-4-git-send-email-marek@goldelico.com>
+ <20150311152414.GX5264@atomide.com>
+ <844740CD-C95B-4411-A2C8-4906F58DBEE8@goldelico.com>
+ <20150311164442.GA5264@atomide.com> <20150331072643.GB30788@amd>
+Message-ID: <BC5A7447-CAD7-4CCE-8F08-8CEFBB5C6905@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 01.04.2015, 10:10 +0200 schrieb Vianney le Cl?ment de
-Saint-Marcq:
-> Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 Dual
-> based development board.
-> 
-> The e-MMC chip is disabled because initialization fails (error -110).
-> A possible cause is described in [2].
+Hi Pavel,
 
-So if the problem is that there are only 4 connected data lines one the
-board, couldn't you simply add the property bus-width = <4>; to the emmc
-node?
+Am 31.03.2015 um 09:26 schrieb Pavel Machek <pavel@ucw.cz>:
+
+> Hi!
+> 
+>>>>> +		io-channels = <&twl_madc 1>,
+>>>>> +	                      <&twl_madc 10>,
+>>>>> +			      <&twl_madc 12>;
+>>>>> +		io-channel-names = "temp",
+>>>>> +		                   "ichg",
+>>>>> +		                   "vbat";
+>>>>> +	};
+>>>> 
+>>>> Rather than just making platform_data into device tree properties..
+>>>> 
+>>>> Can't you hide the these custom properties behind the compatible flag?
+>>>> 
+>>>> You can initialize that data in the driver based on the compatible
+>>>> flag and the match data.
+>>>> 
+>>>> This makes sense if you can group things to similar configurations.
+>>> 
+>>> Maybe I have not completely understood your proposal.
+>>> 
+>>> Do you mean to go back to have big parameter tables for each device/battery
+>>> combination in the driver code and the compatible flag (e.g. compatible = ?board17?)
+>>> chooses the right data set for the charging map and channels?
+>> 
+>> If you can somehow group them, then yes. Not for every board if there
+>> are many of them naturally.
+>> 
+>>> I thought this is what the DT was introduced for - to have the same driver 
+>>> code but adapt to different boards depending on hardware variations.
+>> 
+>> Yeah but you also need to consider the issues related to introducing
+>> new device tree properties. The device tree properties introduced
+>> should be generic where possible.
+>> 
+>>> And batteries have very different characteristics and vary between devices?
+>> 
+>> Right. Maybe that has been already agreed on to use capacity-uah for
+>> batteries in general? In that case I have not problem with that as
+>> it's a generic property :)
+>> 
+>>> The charging maps are depending on the battery type connected to the twl4030
+>>> and which madc channel is which value is also a little hardware dependent
+>>> (although the twl4030 doesn?t give much choice).
+>> 
+>> Just to consider alternatives before introducing driver specific
+>> property for the maps.. Maybe here you could have few different type
+>> of maps and select something safe by default? Of course it could be this
+>> is higly board specific, I think some devices may be able to run below
+>> 3.3V for example..
+> 
+> As I explained in some other mail, those tables should not be
+> neccessary at all. They can be computed from li-ion characteristics
+> and internal resistance, and assumed current during charge and
+> discharge.
+
+I already explained that we do not know the charging and discharging
+current well enough for such a calculation.
+
+And I explained that the ?internal resistance? is a system (battery + cables +
+connectors + other circuits) parameter that is not easy to derive or measure
+and type into the .dts source code.
+
+At least I have no idea how I should find it out for my boards. While I can
+easily determine the curves (and we already have them for the platform_data
+driver).
+
+Please propose your own code doing that so that we can test if it is
+better.
 
 > 
-> [1] http://www.embest-tech.com/shop/star/marsboard.html
-> [2] https://community.freescale.com/message/442168#442168
-> 
-> Signed-off-by: Vianney le Cl?ment de Saint-Marcq <vianney.leclement@essensium.com>
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/imx6q-marsboard.dts | 401 ++++++++++++++++++++++++++++++++++
->  2 files changed, 402 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 91bd5bd..06fa33e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -249,6 +249,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
->  	imx6q-gw54xx.dtb \
->  	imx6q-gw552x.dtb \
->  	imx6q-hummingboard.dtb \
-> +	imx6q-marsboard.dtb \
->  	imx6q-nitrogen6x.dtb \
->  	imx6q-phytec-pbab01.dtb \
->  	imx6q-rex-pro.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
-> new file mode 100644
-> index 0000000..30265c6
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-marsboard.dts
-> @@ -0,0 +1,401 @@
-> +/*
-> + * Copyright 2015 Vianney le Cl?ment de Saint-Marcq, Essensium NV
-> + *  Based on imx6dl-riotboard.dts Copyright Iain Paton.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "MarS Board i.MX6 Dual Board";
-> +	compatible = "embest,imx6q-marsboard", "fsl,imx6q";
-> +
-> +	memory {
-> +		reg = <0x10000000 0x40000000>;
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_2p5v: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "2P5V";
-> +			regulator-min-microvolt = <2500000>;
-> +			regulator-max-microvolt = <2500000>;
-> +		};
-> +
-> +		reg_3p3v: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +
-> +		reg_usb_otg_vbus: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name = "usb_otg_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 22 0>;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_led>;
-> +
-> +		led0: user1 {
-> +			label = "user1";
-> +			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-> +			default-state = "on";
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		led1: user2 {
-> +			label = "user2";
-> +			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
-> +			default-state = "off";
-> +		};
-> +	};
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux>;
-> +	status = "okay";
-> +};
-> +
-> +&ecspi1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> +	cs-gpios = <&gpio2 30 0>;
-> +	fsl,spi-num-chipselects = <1>;
-> +	status = "okay";
-> +
-> +	flash: m25p80 at 0 {
-> +		compatible = "st,sst25vf016b";
-> +		reg = <0>;
-> +		spi-max-frequency = <20000000>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		bootloader at 0 {
-> +			reg = <0x00000000 0x00100000>;
-> +			read-only;
-> +		};
-> +
-> +		kernel at 100000 {
-> +			reg = <0x00100000 0x00100000>;
-> +		};
-> +	};
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-mode = "rgmii";
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm1>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm2>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm3>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm4>;
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart4>;
-> +	status = "okay";
-> +};
-> +
-> +&uart5 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart5>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	dr_mode = "host";
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	disable-over-current;
-> +	dr_mode = "otg";
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	cd-gpios = <&gpio1 4 0>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	non-removable;
-> +	/* Disabled because eMMC initialization fails */
-> +	/*status = "okay";*/
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +
-> +	imx6-marsboard {
-> +		pinctrl_audmux: audmuxgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_ecspi1: ecspi1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x000b1		/* CS0 */
-> +			>;
-> +		};
-> +
-> +		pinctrl_ecspi2: ecspi2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK		0x100b1
-> +				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI		0x100b1
-> +				MX6QDL_PAD_EIM_OE__ECSPI2_MISO		0x100b1
-> +				MX6QDL_PAD_EIM_LBA__GPIO2_IO27		0x000b1		/* CS0 */
-> +				MX6QDL_PAD_EIM_A17__GPIO2_IO21		0x000b1		/* IRQ */
-> +			>;
-> +		};
-> +
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1		/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0		/* AR8035 pin strapping: IO voltage: pull up */
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0		/* AR8035 pin strapping: PHYADDR#0: pull down */
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0		/* AR8035 pin strapping: PHYADDR#1: pull down */
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0		/* AR8035 pin strapping: MODE#1: pull up */
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0		/* AR8035 pin strapping: MODE#3: pull up */
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0		/* AR8035 pin strapping: MODE#0: pull down */
-> +				MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0		/* RGMII_nRST */
-> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0		/* AR8035 interrupt */
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
-> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c3: i2c3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
-> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_led: ledgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* user led0 */
-> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* user led1 */
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm1: pwm1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_9__PWM1_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm2: pwm2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT2__PWM2_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm3: pwm3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm4: pwm4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD4_DAT2__PWM4_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D19__UART1_CTS_B		0x1b0b1
-> +				MX6QDL_PAD_EIM_D20__UART1_RTS_B		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart3: uart3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_EB3__UART3_RTS_B		0x1b0b1
-> +				MX6QDL_PAD_EIM_D23__UART3_CTS_B		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart4: uart4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart5: uart5grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbotg: usbotggrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
-> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* MX6QDL_PAD_EIM_D22__USB_OTG_PWR */
-> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* SD2 CD */
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3: usdhc3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17059
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17059
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17059
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17059
-> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08		0x1b0b0	/* SD3 RST (eMMC) */
-> +			>;
-> +		};
-> +	};
-> +};
+> Running below 3.3V.. not really. At that point, the battery is really
+> _empty_, and voltage is going down really really fast.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+It is the diffference between 2% and 0% where a fuel indication might
+be most important?
+
+> 
+> Plus, you are damaging the battery at that point.
+
+The power controller will shut down - but the driver should report
+reasonable (but IMHO not necessarily perfect) values until the last
+moment.
+
+BR,
+Nikolaus
