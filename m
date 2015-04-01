@@ -1,106 +1,46 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed,  1 Apr 2015 12:09:46 +0200
-Subject: [PATCH RFC v2 12/12] ARM: dts: rockchip: add vga encoder and enable
- lvds on rk3288-firefly
-In-Reply-To: <1427882986-19110-1-git-send-email-heiko@sntech.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Apr 2015 12:40:37 +0200
+Subject: [PATCH RFC v2 04/12] drm/components: add generic vga encoder
+ driver
+In-Reply-To: <20150401102751.GZ24899@n2100.arm.linux.org.uk>
 References: <1427882986-19110-1-git-send-email-heiko@sntech.de>
-Message-ID: <1427882986-19110-13-git-send-email-heiko@sntech.de>
+ <1427882986-19110-5-git-send-email-heiko@sntech.de>
+ <20150401102751.GZ24899@n2100.arm.linux.org.uk>
+Message-ID: <10579338.tTk9pSqjzX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the sda7123 simple vga encoder, connect it to the vop outputs
-and enable the lvds controller with the correct settings.
+Hi Russell,
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-firefly.dtsi | 68 +++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+Am Mittwoch, 1. April 2015, 11:27:51 schrieb Russell King - ARM Linux:
+> On Wed, Apr 01, 2015 at 12:09:38PM +0200, Heiko Stuebner wrote:
+> > This adds a driver for generic vga encoders like the Analog Devices
+> > adv7123
+> > and similar ics. These chips do not have any special configuration options
+> > except a powersafe gpio.
+> > 
+> > An exception is added for the rcar-du driver which also implements support
+> > for the adv7123 internally but is not yet converted to the component
+> > framework.
+> Why is this implemented as a master?  It's not the top level card device,
+> it shouldn't be a master.  It should be a component.
+> 
+> I wonder if this is why you need your previous patches.  Componentised
+> DRM works fine without needing to build lists of connectors and encoders.
 
-diff --git a/arch/arm/boot/dts/rk3288-firefly.dtsi b/arch/arm/boot/dts/rk3288-firefly.dtsi
-index b54dd78..2cce2a9 100644
---- a/arch/arm/boot/dts/rk3288-firefly.dtsi
-+++ b/arch/arm/boot/dts/rk3288-firefly.dtsi
-@@ -159,6 +159,51 @@
- 		regulator-always-on;
- 		vin-supply = <&vcc_5v>;
- 	};
-+
-+	sda7123: vga-encoder {
-+		compatible = "adi,adv7123";
-+		psave-gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				sda7123_in: endpoint at 0 {
-+					remote-endpoint = <&lvds_out>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				sda7123_out: endpoint at 0 {
-+					remote-endpoint = <&vga_connector_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga: vga-connector {
-+		compatible = "vga-connector";
-+		label = "vga";
-+
-+		ddc-i2c-bus = <&i2c4>;
-+
-+		port {
-+			vga_connector_in: endpoint {
-+				remote-endpoint = <&sda7123_out>;
-+			};
-+		};
-+	};
- };
- 
- &cpu0 {
-@@ -347,6 +392,29 @@
- 	status = "okay";
- };
- 
-+&lvds {
-+	avdd1v0-supply = <&vdd10_lcd>;
-+	avdd1v8-supply = <&vcc18_lcd>;
-+	avdd3v3-supply = <&vcca_33>;
-+	rockchip,data-mapping = "jeida";
-+	rockchip,data-width = <24>;
-+	rockchip,output = "rgb";
-+	status = "okay";
-+
-+	ports {
-+		port at 1 {
-+			reg = <1>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			lvds_out: endpoint at 0 {
-+				remote-endpoint = <&sda7123_in>;
-+			};
-+		};
-+	};
-+};
-+
- &pinctrl {
- 	pcfg_output_high: pcfg-output-high {
- 		output-high;
--- 
-2.1.4
+It is a component to the upper drm driver (rockchip or whatever) but a master 
+to the vga connector below, simply because the drm driver above (the lvds 
+controller in this case) does not know and also probably shouldn't care what 
+the structure below is.
+
+So in this case the lvds knows there is either a panel or an encoder 
+connected, but does not need to handle if this downstream component is some 
+one-piece i2c component like a tv encoder or contains another component down 
+below, like the vga-connector in this case.
+
+
+Of course I may very well have overlooked some simpler method to achieve this, 
+but got inspired to this by the similar way done in sti/sti_tvout.c
+
+
+Heiko
