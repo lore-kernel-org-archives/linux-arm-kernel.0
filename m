@@ -1,158 +1,191 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed,  1 Apr 2015 23:20:43 +0200
-Subject: [PATCH 6/6] ARM: lpc18xx: add kernel config
+Date: Wed,  1 Apr 2015 23:20:41 +0200
+Subject: [PATCH 4/6] ARM: dts: Add base DT for NXP LPC18xx and LPC4357
 In-Reply-To: <1427923243-26296-1-git-send-email-manabian@gmail.com>
 References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
-Message-ID: <1427923243-26296-7-git-send-email-manabian@gmail.com>
+Message-ID: <1427923243-26296-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+NXP LPC18xx/43xx SoCs are very similar devices and should be able to
+share a common base (lpc18xx.dtsi). Diffences between the devices are
+put in a dtsi which is specific to that device.
+
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/configs/lpc18xx_defconfig | 135 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 135 insertions(+)
- create mode 100644 arch/arm/configs/lpc18xx_defconfig
+ arch/arm/boot/dts/lpc18xx.dtsi | 117 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/lpc4357.dtsi |  39 ++++++++++++++
+ 2 files changed, 156 insertions(+)
+ create mode 100644 arch/arm/boot/dts/lpc18xx.dtsi
+ create mode 100644 arch/arm/boot/dts/lpc4357.dtsi
 
-diff --git a/arch/arm/configs/lpc18xx_defconfig b/arch/arm/configs/lpc18xx_defconfig
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
 new file mode 100644
-index 000000000000..0d03853fe462
+index 000000000000..161e98b442e0
 --- /dev/null
-+++ b/arch/arm/configs/lpc18xx_defconfig
-@@ -0,0 +1,135 @@
-+CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_XZ is not set
-+# CONFIG_RD_LZO is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+# CONFIG_UID16 is not set
-+# CONFIG_BASE_FULL is not set
-+# CONFIG_FUTEX is not set
-+# CONFIG_EPOLL is not set
-+# CONFIG_SIGNALFD is not set
-+# CONFIG_EVENTFD is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_VM_EVENT_COUNTERS is not set
-+# CONFIG_SLUB_DEBUG is not set
-+# CONFIG_LBDAF is not set
-+# CONFIG_BLK_DEV_BSG is not set
-+# CONFIG_IOSCHED_DEADLINE is not set
-+# CONFIG_IOSCHED_CFQ is not set
-+# CONFIG_MMU is not set
-+CONFIG_ARCH_LPC18XX=y
-+CONFIG_SET_MEM_PARAM=y
-+CONFIG_DRAM_BASE=0x28000000
-+CONFIG_DRAM_SIZE=0x02000000
-+CONFIG_FLASH_MEM_BASE=0x1b000000
-+CONFIG_FLASH_SIZE=0x00080000
-+CONFIG_PREEMPT=y
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_BINFMT_FLAT=y
-+CONFIG_BINFMT_ZFLAT=y
-+CONFIG_BINFMT_SHARED_FLAT=y
-+# CONFIG_COREDUMP is not set
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_INET_LRO is not set
-+# CONFIG_INET_DIAG is not set
-+# CONFIG_IPV6 is not set
-+# CONFIG_WIRELESS is not set
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_FW_LOADER is not set
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_SRAM=y
-+CONFIG_EEPROM_AT24=y
-+CONFIG_NETDEVICES=y
-+# CONFIG_NET_VENDOR_ARC is not set
-+# CONFIG_NET_CADENCE is not set
-+# CONFIG_NET_VENDOR_BROADCOM is not set
-+# CONFIG_NET_VENDOR_CIRRUS is not set
-+# CONFIG_NET_VENDOR_FARADAY is not set
-+# CONFIG_NET_VENDOR_HISILICON is not set
-+# CONFIG_NET_VENDOR_INTEL is not set
-+# CONFIG_NET_VENDOR_MARVELL is not set
-+# CONFIG_NET_VENDOR_MICREL is not set
-+# CONFIG_NET_VENDOR_MICROCHIP is not set
-+# CONFIG_NET_VENDOR_NATSEMI is not set
-+# CONFIG_NET_VENDOR_SAMSUNG is not set
-+# CONFIG_NET_VENDOR_SEEQ is not set
-+# CONFIG_NET_VENDOR_SMSC is not set
-+CONFIG_STMMAC_ETH=y
-+# CONFIG_NET_VENDOR_VIA is not set
-+# CONFIG_NET_VENDOR_WIZNET is not set
-+CONFIG_SMSC_PHY=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+# CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_GPIO_POLLED=y
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_UNIX98_PTYS is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_NONSTANDARD=y
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_SPI=y
-+CONFIG_SPI_PL022=y
-+CONFIG_GPIO_SYSFS=y
-+CONFIG_SENSORS_LM75=y
-+CONFIG_WATCHDOG=y
-+CONFIG_WATCHDOG_CORE=y
-+CONFIG_MFD_SYSCON=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_MMC=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_PCA9532=y
-+CONFIG_LEDS_PCA9532_GPIO=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_DMADEVICES=y
-+CONFIG_AMBA_PL08X=y
-+CONFIG_EXT2_FS=y
-+# CONFIG_FILE_LOCKING is not set
-+# CONFIG_DNOTIFY is not set
-+# CONFIG_INOTIFY_USER is not set
-+# CONFIG_NETWORK_FILESYSTEMS is not set
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DEBUG_INFO=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_DEBUG_FS=y
-+CONFIG_MAGIC_SYSRQ=y
-+# CONFIG_SCHED_DEBUG is not set
-+# CONFIG_DEBUG_BUGVERBOSE is not set
-+# CONFIG_RCU_CPU_STALL_INFO is not set
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_8250=y
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_CRC_ITU_T=y
-+CONFIG_CRC7=y
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -0,0 +1,117 @@
++/*
++ * Common base for NXP LPC18xx and LPC43xx devices.
++ *
++ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++
++#include "armv7-m.dtsi"
++
++/ {
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-m3";
++			device_type = "cpu";
++			reg = <0x0>;
++		};
++	};
++
++	clocks {
++		xtal: xtal {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <12000000>;
++		};
++
++		/* Temporary hardcode PLL1 until clk drivers are merged */
++		pll1: pll1 {
++			compatible = "fixed-factor-clock";
++			clocks = <&xtal>;
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <12>;
++		};
++	};
++
++	soc {
++		uart0: serial at 40081000 {
++			compatible = "ns16550a";
++			reg = <0x40081000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <24>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		uart1: serial at 40082000 {
++			compatible = "ns16550a";
++			reg = <0x40082000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <25>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		timer0: timer at 40084000 {
++			compatible = "nxp,lpc3250-timer";
++			reg = <0x40084000 0x1000>;
++			interrupts = <12>;
++			clocks = <&pll1>;
++		};
++
++		timer1: timer at 40085000 {
++			compatible = "nxp,lpc3250-timer";
++			reg = <0x40085000 0x1000>;
++			interrupts = <13>;
++			clocks = <&pll1>;
++		};
++
++		uart2: serial at 400c1000 {
++			compatible = "ns16550a";
++			reg = <0x400c1000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <26>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		uart3: serial at 400c2000 {
++			compatible = "ns16550a";
++			reg = <0x400c2000 0x1000>;
++			reg-shift = <2>;
++			interrupts = <27>;
++			clocks = <&pll1>;
++			status = "disabled";
++		};
++
++		timer2: timer at 400c3000 {
++			compatible = "nxp,lpc3250-timer";
++			reg = <0x400c3000 0x1000>;
++			interrupts = <14>;
++			clocks = <&pll1>;
++		};
++
++		timer3: timer at 400c4000 {
++			compatible = "nxp,lpc3250-timer";
++			reg = <0x400c4000 0x1000>;
++			interrupts = <15>;
++			clocks = <&pll1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/lpc4357.dtsi b/arch/arm/boot/dts/lpc4357.dtsi
+new file mode 100644
+index 000000000000..9a3ec7663419
+--- /dev/null
++++ b/arch/arm/boot/dts/lpc4357.dtsi
+@@ -0,0 +1,39 @@
++/*
++ * NXP LPC4357 SoC
++ *
++ * Copyright 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++
++/ {
++	compatible = "nxp,lpc4357";
++
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-m4";
++		};
++	};
++
++	soc {
++		sram0: sram at 10000000 {
++			compatible = "mmio-sram";
++			reg = <0x10000000 0x8000>; /* 32 KiB local SRAM */
++		};
++
++		sram1: sram at 10080000 {
++			compatible = "mmio-sram";
++			reg = <0x10080000 0xa000>; /* 32 + 8 KiB local SRAM */
++		};
++
++		sram2: sram at 20000000 {
++			compatible = "mmio-sram";
++			reg = <0x20000000 0x10000>; /* 4 x 16 KiB AHB SRAM */
++		};
++	};
++};
 -- 
 1.8.0
