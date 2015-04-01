@@ -1,71 +1,93 @@
 From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 1 Apr 2015 17:10:57 +0530
-Subject: [PATCH 3/8] doc/bindings: Update clk-qoriq bindings for FSL's
- chassis-3.0 SoCs
+Date: Wed, 1 Apr 2015 17:10:58 +0530
+Subject: [PATCH 4/8] layerscape/ftm: Add compatible string for FTM0 be used as
+ alarm timer.
 In-Reply-To: <1427888463-29549-1-git-send-email-bhupesh.sharma@freescale.com>
 References: <1427888463-29549-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1427888463-29549-4-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <1427888463-29549-5-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the 'clk-qoriq' device-tree bindings for
-chassis-3.0 compliant SoCs from FSL, for e.g. LS2085A
+From: Wang Dongsheng <dongsheng.wang@freescale.com>
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Only FTM0 can be used as an alarm timer, so add a "fsl,ftm-alarm"
+compatible string to describe FTM0 alarm mode.
+
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+Change-Id: Ie9a6c1c01a362ee6f0b6c995f9a104a3afff9165
+Reviewed-on: http://git.am.freescale.net:8181/30167
+Tested-by: Review Code-CDREVIEW <CDREVIEW@freescale.com>
+Reviewed-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Tested-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
 ---
- .../devicetree/bindings/clock/qoriq-clock.txt      |   14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/timer/fsl,ftm-timer.txt    |   46 ++++++++++++++------
+ 1 file changed, 32 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-index df4a259..60d758e 100644
---- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-@@ -14,6 +14,7 @@ Chassis Version		Example Chips
- ---------------		-------------
- 1.0			p4080, p5020, p5040
- 2.0			t4240, b4860, t1040
-+3.0			ls2085a
+diff --git a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+index aa8c402..a372ed7 100644
+--- a/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
++++ b/Documentation/devicetree/bindings/timer/fsl,ftm-timer.txt
+@@ -2,12 +2,18 @@ Freescale FlexTimer Module (FTM) Timer
  
- 1. Clock Block Binding
+ Required properties:
  
-@@ -30,9 +31,11 @@ Required properties:
- 	* "fsl,b4420-clockgen"
- 	* "fsl,b4860-clockgen"
- 	* "fsl,ls1021a-clockgen"
-+	* "fsl,ls2085a-clockgen"
- 	Chassis clock strings include:
- 	* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
- 	* "fsl,qoriq-clockgen-2.0": for chassis 2.0 clocks
-+	* "fsl,qoriq-clockgen-3.0": for chassis 3.0 clocks
- - reg: Describes the address of the device's resources within the
- 	address space defined by its parent bus, and resource zero
- 	represents the clock register set
-@@ -57,18 +60,23 @@ Required properties:
- - compatible : Should include one of the following:
- 	* "fsl,qoriq-core-pll-1.0" for core PLL clocks (v1.0)
- 	* "fsl,qoriq-core-pll-2.0" for core PLL clocks (v2.0)
-+	* "fsl,qoriq-core-pll-3.0" for core PLL clocks (v3.0)
- 	* "fsl,qoriq-core-mux-1.0" for core mux clocks (v1.0)
- 	* "fsl,qoriq-core-mux-2.0" for core mux clocks (v2.0)
-+	* "fsl,qoriq-core-mux-3.0" for core mux clocks (v3.0)
- 	* "fsl,qoriq-sysclk-1.0": for input system clock (v1.0).
- 		It takes parent's clock-frequency as its clock.
- 	* "fsl,qoriq-sysclk-2.0": for input system clock (v2.0).
- 		It takes parent's clock-frequency as its clock.
-+	* "fsl,qoriq-sysclk-3.0": for input system clock (v3.0).
-+		It takes parent's clock-frequency as its clock.
- 	* "fsl,qoriq-platform-pll-1.0" for the platform PLL clock (v1.0)
- 	* "fsl,qoriq-platform-pll-2.0" for the platform PLL clock (v2.0)
-+	* "fsl,qoriq-platform-pll-3.0" for the platform PLL clock (v3.0)
- - #clock-cells: From common clock binding. The number of cells in a
--	clock-specifier. Should be <0> for "fsl,qoriq-sysclk-[1,2].0"
--	clocks, or <1> for "fsl,qoriq-core-pll-[1,2].0" clocks.
--	For "fsl,qoriq-core-pll-[1,2].0" clocks, the single
-+	clock-specifier. Should be <0> for "fsl,qoriq-sysclk-[1,2,3].0"
-+	clocks, or <1> for "fsl,qoriq-core-pll-[1,2,3].0" clocks.
-+	For "fsl,qoriq-core-pll-[1,2,3].0" clocks, the single
- 	clock-specifier cell may take the following values:
- 	* 0 - equal to the PLL frequency
- 	* 1 - equal to the PLL frequency divided by 2
+-- compatible : should be "fsl,ftm-timer"
++- compatible : should be "fsl,ftm-timer" & "fsl,ftm-alarm".
++  (a) "fsl,ftm-timer", for FlexTimer compatible as normal timer.
++  (b) "fsl,ftm-alarm", for FlexTimer compatible when FTM0 as an ALARM timer.
++
+ - reg : Specifies base physical address and size of the register sets for the
+   clock event device and clock source device.
++
+ - interrupts : Should be the clock event device interrupt.
++
+ - clocks : The clocks provided by the SoC to drive the timer, must contain an
+   entry for each entry in clock-names.
++
+ - clock-names : Must include the following entries:
+   o "ftm-evt"
+   o "ftm-src"
+@@ -16,16 +22,28 @@ Required properties:
+ - big-endian: One boolean property, the big endian mode will be in use if it is
+   present, or the little endian mode will be in use for all the device registers.
+ 
+-Example:
+-ftm: ftm at 400b8000 {
+-	compatible = "fsl,ftm-timer";
+-	reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
+-	interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
+-	clock-names = "ftm-evt", "ftm-src",
+-		"ftm-evt-counter-en", "ftm-src-counter-en";
+-	clocks = <&clks VF610_CLK_FTM2>,
+-		<&clks VF610_CLK_FTM3>,
+-		<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
+-		<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
+-	big-endian;
+-};
++Example 1: In this example, The FlexTimer module (FTM) is a two-to-eight,
++	   channel timer that supports input capture, output compare, and
++	   the generation of PWM signals to control electric motor and power
++	   management applications.
++
++	ftm: ftm at 400b8000 {
++		compatible = "fsl,ftm-timer";
++		reg = <0x400b8000 0x1000 0x400b9000 0x1000>;
++		interrupts = <0 44 IRQ_TYPE_LEVEL_HIGH>;
++		clock-names = "ftm-evt", "ftm-src",
++			"ftm-evt-counter-en", "ftm-src-counter-en";
++		clocks = <&clks VF610_CLK_FTM2>,
++			<&clks VF610_CLK_FTM3>,
++			<&clks VF610_CLK_FTM2_EXT_FIX_EN>,
++			<&clks VF610_CLK_FTM3_EXT_FIX_EN>;
++		big-endian;
++	};
++
++Example 2: In this example, FTM0 only be used as an alarm timer.
++
++	ftm0: ftm0 at 2800000 {
++		compatible = "fsl,ftm-alarm";
++		reg = <0x0 0x2800000 0x0 0x10000>;
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
++	};
 -- 
 1.7.9.5
