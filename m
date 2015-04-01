@@ -1,49 +1,41 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 1 Apr 2015 10:11:17 +0800
-Subject: [PATCH v5 2/3] I2C: mediatek: Add driver for MediaTek I2C
- controller
-In-Reply-To: <20150331175234.GK9742@pengutronix.de>
-References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
- <1426917922-61356-3-git-send-email-eddie.huang@mediatek.com>
- <20150323084237.GG9742@pengutronix.de>
- <1427703252.26464.14.camel@mtksdaap41>
- <20150330172309.GB9742@pengutronix.de>
- <1427785715.3500.16.camel@mtksdaap41> <1427802658.32196.8.camel@mtksdaap41>
- <20150331175234.GK9742@pengutronix.de>
-Message-ID: <1427854277.21285.15.camel@mtksdaap41>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 1 Apr 2015 08:49:14 +0530
+Subject: [RFC PATCH v3 2/2] clk: exynos5420: Make sure MDMA0 clock is
+ enabled during suspend
+In-Reply-To: <7hiodg98z7.fsf@deeprootsystems.com>
+References: <1427730803-28635-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1427730803-28635-3-git-send-email-javier.martinez@collabora.co.uk>
+ <CA+Ln22FBpuzR06qCsVc7SXtLX2mhf901vDE5D-mT1+ijZ2G3sg@mail.gmail.com>
+ <551976F1.1000605@collabora.co.uk>
+ <7hiodg98z7.fsf@deeprootsystems.com>
+Message-ID: <CAM4voanzd-iiyTbGvZpTz4nmULJu9_VUFz3EibLB5L295K4P-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Kevin,
 
-On Tue, 2015-03-31 at 19:52 +0200, Sascha Hauer wrote:
-> On Tue, Mar 31, 2015 at 07:50:58PM +0800, Eddie Huang wrote:
-> > Hi Sascha,
-> > 
-> > On Tue, 2015-03-31 at 15:08 +0800, Eddie Huang wrote:
-> > > Hi Sascha,
-> > > 
-> > > > > > speed <= 400000 here to make this more obvious?
-> > > > > There are two cases, not only speed<=400000, but I2C_MASTER_WRRD. I tend
-> > > > > to keep it.
-> > > >
-> > > > Still it looks strange. You only ever write this default value to the
-> > > > register. Putting this register write under an if() seems bogus since
-> > > > the same value will be in the register the next time this code is
-> > > > executed. It looks like you should move this register write to some
-> > > > initialization function.
-> > > OK, move to mtk_i2c_init_hw function
-> > > 
-> > Sorry for my negligence. Write-then-read (I2C_MASTER_WRRD) decides
-> > according to each I2C transfer, so I still need to judge whether set
-> > I2C_CONTROL_RS and DELAY_LEN here. Other control setting can move to
-> > init function.
-> 
-> You need to decide whether you have to set the I2C_CONTROL_RS bit, but
-> you don't need to write the same value to the DELAY_LEN register each
-> time. It won't change under your hood.
-> 
-Yes, you are right. DELAY_LEN should only be set one time in init
-function. Thanks your correction.
+On Wed, Apr 1, 2015 at 2:32 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Javier Martinez Canillas <javier.martinez@collabora.co.uk> writes:
+>
+> [...]
+>
+>> Unfortunately I don't fully understand why this clock needs to be
+>> enabled. It would be good if someone at Samsung can explain in more
+>> detail what the real problem really is.
+>
+> +1
+>
+> Maybe Abhilash can shed some light here?
+>
+> We really should know *why* this is needed because having the fix in the
+> clock driver just doesn't seem right.  It seems like the DMA driver
+> should be managing this clock.
 
-Eddie
+I think my last mail might not have reached you (was accidentally sent
+as html). We are gating the aclk266_g2d clock without checking the
+CG_STATUS0 register bits as specified in the UM. It looks like we need
+to keep several clocks alive or gate them only after checking the
+CG_STATUSx register bits.
+
+Regards,
+Abhilash
