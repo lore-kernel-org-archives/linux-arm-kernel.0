@@ -1,38 +1,86 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 1 Apr 2015 10:36:58 +0200
-Subject: [PATCH v4 10/15] serial: stm32-usart: Add STM32 USART Driver
-In-Reply-To: <CAHp75VeUzKUEo7NCaXUYKBPpG7JYCykB+76Wu5tBKj750Bi+Qg@mail.gmail.com>
-References: <1427819096-31109-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1427819096-31109-11-git-send-email-mcoquelin.stm32@gmail.com>
- <CAHp75VeUzKUEo7NCaXUYKBPpG7JYCykB+76Wu5tBKj750Bi+Qg@mail.gmail.com>
-Message-ID: <CALszF6AKw-F1RVc5m2As7upp7ZuS7GpcJSoqixms3Dd4SNU9EQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 01 Apr 2015 10:45:54 +0200
+Subject: [PATCH 3/5] ARM: mvebu: Allow using the GIC for wakeup in standby
+ mode
+In-Reply-To: <CAPv3WKdc=DQ9-dm3rm_mbG_sgeWbCZBJ7eML48hFXHQaJm1Pmw@mail.gmail.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>	<1427724278-12379-4-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKdc=DQ9-dm3rm_mbG_sgeWbCZBJ7eML48hFXHQaJm1Pmw@mail.gmail.com>
+Message-ID: <551BB042.3070904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Andy,
+Hi Marcin,
 
-2015-03-31 18:45 GMT+02:00 Andy Shevchenko <andy.shevchenko@gmail.com>:
-> On Tue, Mar 31, 2015 at 7:24 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->> This drivers adds support to the STM32 USART controller, which is a
->> standard serial driver.
+On 01/04/2015 10:34, Marcin Wojtas wrote:
+> Hi Gregory,
+> 
+> 2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+>> On the Armada 375/38x/39x SoCs, in standby mode the SoC stay powered
+>> and it is possible to wake-up from any interrupt sources. This patch
+>> adds flag to the GIC irqchip driver to let linux know this.
 >>
->> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
->
-> Few minor comments below.
-
-All your comments are valid, I will send a v5 shortly fixing this.
-
-Thanks for the review,
-Maxime
-
->
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 >> ---
->>  drivers/tty/serial/Kconfig       |  17 +
->>  drivers/tty/serial/Makefile      |   1 +
->>  drivers/tty/serial/stm32-usart.c | 743 +++++++++++++++++++++++++++++++++++++++
->>  include/uapi/linux/serial_core.h |   3 +
->>  4 files changed, 764 insertions(+)
->>  create mode 100644 drivers/tty/serial/stm32-usart.c
+>>  arch/arm/mach-mvebu/board-v7.c | 7 +++++++
+>>  1 file changed, 7 insertions(+)
 >>
+>> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+>> index 89a139ed7d5b..61774279a66d 100644
+>> --- a/arch/arm/mach-mvebu/board-v7.c
+>> +++ b/arch/arm/mach-mvebu/board-v7.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_fdt.h>
+>>  #include <linux/of_platform.h>
+>> +#include <linux/irq.h>
+>>  #include <linux/io.h>
+>>  #include <linux/clocksource.h>
+>>  #include <linux/dma-mapping.h>
+>> @@ -26,6 +27,7 @@
+>>  #include <linux/signal.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/irqchip.h>
+>> +#include <linux/irqchip/arm-gic.h>
+>>  #include <asm/hardware/cache-l2x0.h>
+>>  #include <asm/mach/arch.h>
+>>  #include <asm/mach/map.h>
+>> @@ -129,6 +131,11 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
+>>
+>>  static void __init mvebu_init_irq(void)
+>>  {
+>> +       if (of_machine_is_compatible("marvell,armada375") ||
+>> +           of_machine_is_compatible("marvell,armada380") ||
+>> +           of_machine_is_compatible("marvell,armada390"))
+>> +               gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+>> +                                     IRQCHIP_MASK_ON_SUSPEND);
+> 
+> I'm afraid you the patchset may be incomplete:
+> arch/arm/mach-mvebu/board-v7.c:137:3: error: implicit declaration of
+> function 'gic_set_irqchip_flags'
+> [-Werror=implicit-function-declaration]
+
+Actually I forgot to speak about the dependency.
+
+This patch depends on the commit "irqchip: gic: Add an entry point to set up irqchip flags"
+which is already in the irqchip branch and will be part of 4.1.
+
+So in case it would be ok to merge it in 4.1 (but I doubt it it will be the case), then
+this patch should be taken by the irqchip subsystem to resolve this dependency. I checked
+that it should not conflict with the mvebu patches.
+
+Thanks,
+
+Gregory
+
+
+> 
+> Best regards,
+> Marcin
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
