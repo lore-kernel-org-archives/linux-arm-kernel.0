@@ -1,32 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Apr 2015 12:56:03 +0100
-Subject: [PATCH RFC 07/11] drm/edid: add function to help find SADs
-In-Reply-To: <87wq1wrrxn.fsf@intel.com>
-References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
- <E1YcfY0-0002vI-0F@rmk-PC.arm.linux.org.uk>
- <87wq1wrrxn.fsf@intel.com>
-Message-ID: <20150401115602.GB24899@n2100.arm.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed,  1 Apr 2015 09:03:45 -0300
+Subject: [PATCH] ARM: dts: hummingboard: Remove unneeded 'fsl,mode' property
+Message-ID: <1427889825-4349-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 02:47:32PM +0300, Jani Nikula wrote:
-> On Mon, 30 Mar 2015, Russell King <rmk+kernel@arm.linux.org.uk> wrote:
-> > Add a function to find the start of the SADs in the ELD.  This
-> > complements the helper to retrieve the SAD count.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> 
-> I guess version 31 is specific enough to warrant a #define of its own,
-> but meh.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-What about version 2?  We don't have any version definitions in
-drm_edid.h at all.  It would be nice to see some...
+imx6qdl-hummingboard boards use sgtl5000 codec and the machine file 
+(imx-sgtl5000) already sets SSI in slave mode and codec in master mode, so there
+is no need for having the 'fsl,mode' property.
 
-It would also be nice to see some of this stuff not being DRM specific,
-because EDID parsing isn't something limited to DRM - and let's face it,
-one of the biggest consumers of graphics on Linux is Android, which I'm
-told is pretty much wedded to the fbdev API.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index 151a3db..1f42c93 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -263,7 +263,6 @@
+ };
+ 
+ &ssi1 {
+-	fsl,mode = "i2s-slave";
+ 	status = "okay";
+ };
+ 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
