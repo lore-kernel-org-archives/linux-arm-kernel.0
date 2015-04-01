@@ -1,86 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 Apr 2015 13:28:23 +0100
-Subject: [PATCH v5 3/4] clk: Provide always-on clock support
-In-Reply-To: <1427891304-20160-1-git-send-email-lee.jones@linaro.org>
-References: <1427891304-20160-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1427891304-20160-4-git-send-email-lee.jones@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 01 Apr 2015 13:28:38 +0100
+Subject: Reading twd_base at run-time
+In-Reply-To: <551BDF69.4020205@free.fr>
+References: <55158261.9010108@free.fr> <551586E6.3020200@arm.com>
+ <5515BEA5.6040307@free.fr> <20150327205301.GD4019@n2100.arm.linux.org.uk>
+ <551BDF69.4020205@free.fr>
+Message-ID: <551BE476.2060102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover from these catastrophic failures is to restart
-the board(s).  Now, when a clock provider is registered with the
-framework it is possible for a list of always-on clocks to be supplied
-which must be kept ungated.  Each clock mentioned in the newly
-introduced 'clock-always-on' will be clk_prepare_enable()d where the
-normal references will be taken.  This will prevent the common clk
-framework from attempting to gate them during the clk_disable_unused()
-and disable_clock() procedures.
+On 01/04/15 13:07, Mason wrote:
+> On 27/03/2015 21:53, Russell King - ARM Linux wrote:
+> 
+>> That's one scenario.  Here's the scenario Mark is describing - one which
+>> has real-world examples:
+>>
+>> Hardware engineer picks address A for rev A and sets CP15 to address A.
+>> Everything works.  Hardware engineer then picks address B for rev B, but
+>> forgets to update CP15.  It breaks.
+> 
+> The hardware engineer told me that whatever arbitrary value is chosen
+> for PERIPH_BASE is automatically exported through CP15 (which is how
+> I thought this worked). So there is no "forgetting to update CP15"
+> (for this platform, at least).
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/clk/clk-conf.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+Go tell that to the TI guys who created this awesome derivative of the
+OMAP4, which reports PERIPH_BASE as 0, despite the peripherals being
+mapped somewhere else. What you describe is what happens when someone
+properly reconfigures their RTL by running the whole integration thing,
+which HW guys are eager to skip. What they often do is to cut and paste
+an existing design, and see how many screws are left after doing so.
 
-diff --git a/drivers/clk/clk-conf.c b/drivers/clk/clk-conf.c
-index aad4796..22b8fdd 100644
---- a/drivers/clk/clk-conf.c
-+++ b/drivers/clk/clk-conf.c
-@@ -116,6 +116,43 @@ static int __set_clk_rates(struct device_node *node, bool clk_supplier)
- 	return 0;
- }
- 
-+static int __set_clk_always_on(struct device_node *node, bool clk_supplier)
-+{
-+	struct of_phandle_args clkspec;
-+	struct clk *clk;
-+	struct property	*prop;
-+	const __be32 *cur;
-+	uint32_t index;
-+	int ret;
-+
-+	if (!clk_supplier)
-+		return 0;
-+
-+	of_property_for_each_u32(node, "clock-always-on", prop, cur, index) {
-+		clkspec.np = node;
-+		clkspec.args_count = 1;
-+		clkspec.args[0] = index;
-+
-+		clk = of_clk_get_by_clkspec(&clkspec);
-+		if (IS_ERR(clk)) {
-+			pr_err("clk: couldn't get clock %d for %s\n",
-+				index, node->full_name);
-+			return PTR_ERR(clk);
-+		}
-+
-+		ret = clk_prepare_enable(clk);
-+		if (ret) {
-+			pr_err("Failed to enable clock %d for %s: %d\n",
-+			       index, node->full_name, ret);
-+			return ret;
-+		}
-+
-+		pr_debug("Set clock %s as always-on\n", __clk_get_name(clk));
-+	}
-+
-+	return 0;
-+}
-+
- /**
-  * of_clk_set_defaults() - parse and set assigned clocks configuration
-  * @node: device node to apply clock settings for
-@@ -139,6 +176,10 @@ int of_clk_set_defaults(struct device_node *node, bool clk_supplier)
- 	if (rc < 0)
- 		return rc;
- 
--	return __set_clk_rates(node, clk_supplier);
-+	rc = __set_clk_rates(node, clk_supplier);
-+	if (rc < 0)
-+		return rc;
-+
-+	return __set_clk_always_on(node, clk_supplier);
- }
- EXPORT_SYMBOL_GPL(of_clk_set_defaults);
+The cupboard in front of me is full of system presenting similar issues.
+As much as I love HW engineers, it is a well known fact that they will
+lie to you most of the time! ;-)
+
+It is worth mentioning that PERIPH_BASE is *not* an architected
+register, so an implementation is perfectly allowed not to implement it.
+Even on Cortex A9, a UP implementation will report PERIPH_BASE as zero.
+It is still likely to have a TWD though.
+
+>> If it's in DT, it can be fixed.  It should be there anyway as part of
+>> the hardware description.  DT is a description of the hardware.
+> 
+> I thought DT was supposed to describe hardware that /cannot/ be probed
+> or discovered at run-time?
+
+Indeed. And when probing is so unreliable, it is not worth using it.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
