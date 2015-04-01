@@ -1,86 +1,89 @@
-From: dahi@linux.vnet.ibm.com (David Hildenbrand)
-Date: Wed, 1 Apr 2015 17:55:29 +0200
-Subject: [PATCH v2 04/10] KVM: arm: guest debug, add stub
- KVM_SET_GUEST_DEBUG ioctl
-In-Reply-To: <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-5-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150401175529.642f64af@thinkpad-w530>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 01 Apr 2015 21:26:39 +0530
+Subject: [PATCH 0/5] arm64: add kdump support
+In-Reply-To: <1427358533-3754-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1427358533-3754-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <551C1537.2030009@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-> ioctl. Currently any operation flag will return EINVAL. Actual
+Hi Akashi,
 
-Well it won't return -EINVAL if you push in KVM_GUESTDBG_ENABLE or 0.
+On Thursday 26 March 2015 01:58 PM, AKASHI Takahiro wrote:
+> This patch set enables kdump (crash dump kernel) support on arm64 on top of
+> Geoff's kexec patchset.
+>
+> In this version, there are some arm64-specific usage/constraints:
+> 1) "mem=" boot parameter must be specified on crash dump kernel
+> 2) Kvm will not be enabled on crash dump kernel even if configured
+> See commit messages and Documentation/kdump/kdump.txt for details.
+>
+> The only concern I have is whether or not we can use the exact same kernel
+> as both system kernel and crash dump kernel. The current arm64 kernel is
+> not relocatable in the exact sense but I have no problems in using the same
+> binary for testing kdump.
+>
+> I tested the code with
+> 	- ATF v1.1 + EDK2(UEFI) v3.0-rc0
+> 	- kernel v4.0-rc4 + Geoff' kexec v8
+> on Base fast model, using my yet-to-be-submitted kexec-tools [1].
+> You may want to start a kernel with the following boot parameter:
+> 	crashkernel=64M at 2240M
+> and try
+> 	$ kexec -p --load <vmlinux> --append ...
+> 	$ echo c > /proc/sysrq-trigger
+>
 
-"Any unsupported flag will return -EINVAL. For now, only KVM_GUESTDBG_ENABLE is
-supported, although it won't have any effects."
+I tried to use your kdump patches for kernel and kexec-tools. I am not 
+able to load the crash kernel properly.
 
-> functionality will be added with further patches.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
-> 
-> ---
-> v2
->   - simplified form of the ioctl (stuff will go into setup_debug)
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index b112efc..06c5064 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2604,7 +2604,7 @@ handled.
->  4.87 KVM_SET_GUEST_DEBUG
-> 
->  Capability: KVM_CAP_SET_GUEST_DEBUG
-> -Architectures: x86, s390, ppc
-> +Architectures: x86, s390, ppc, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_guest_debug (in)
->  Returns: 0 on success; -1 on error
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 5560f74..445933d 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -183,6 +183,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PSCI:
->  	case KVM_CAP_ARM_PSCI_0_2:
->  	case KVM_CAP_READONLY_MEM:
-> +	case KVM_CAP_SET_GUEST_DEBUG:
->  		r = 1;
->  		break;
->  	case KVM_CAP_COALESCED_MMIO:
-> @@ -303,10 +304,21 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->  	kvm_arm_set_running_vcpu(NULL);
->  }
-> 
-> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE)
 
-That makes me rather think that it is another flag.
+I passed crashkernel=64M at 259G (My 8GB RAM starts at 256G) to primary kernel.
 
-We(s390x) use VALID_GUESTDBG_FLAGS, what about that or KVM_GUESTDBG_VALID_MASK?
+Used following to load the crash kernel
+kexec -p  --load vmlinux  --append="$( cat /proc/cmdline ) maxcpus=1 
+mem=64M reset_devices"
 
-> +
->  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->  					struct kvm_guest_debug *dbg)
->  {
-> -	return -EINVAL;
-> +	if (dbg->control & KVM_GUESTDBG_ENABLE) {
-> +		if (dbg->control & ~KVM_GUESTDBG_VALID)
-> +			return -EINVAL;
+I see:
 
-I'd move that check directly to the start of the function and bail out on any
-unsupported flag.
+kexec_load failed: Cannot assign requested address
+entry       = 0x40c40005d0 flags = 0xb70001
 
-> +
-> +		vcpu->guest_debug = dbg->control;
-> +	} else {
-> +		/* If not enabled clear all flags */
-> +		vcpu->guest_debug = 0;
-> +	}
-> +	return 0;
->  }
-> 
-> 
+What I noticed that arm64_load_other_segments does not calculate correct 
+load address for purgatory or if I pass initrd then for that too within 
+crash kernel allocated memory.
 
-David
+Shouldn't we have a function similar to locate_dtb_in_crashmem for 
+putgatory as well as initrd? I can try to fix this allocation, but I was 
+just wondering if I understood correctly or I am missing something.
+
+~Pratyush
+
+
+> To examine vmcore (/proc/vmcore), you may use
+> 	- gdb v7.7 or later
+> 	- crash + a small patch (to recognize v4.0 kernel)
+>
+> [1] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git
+>
+>
+> AKASHI Takahiro (5):
+>    arm64: kdump: reserve memory for crash dump kernel
+>    arm64: kdump: implement machine_crash_shutdown()
+>    arm64: kdump: do not go into EL2 before starting a crash dump kernel
+>    arm64: add kdump support
+>    arm64: enable kdump in the arm64 defconfig
+>
+>   Documentation/kdump/kdump.txt     |   31 ++++++++++++++-
+>   arch/arm64/Kconfig                |   12 ++++++
+>   arch/arm64/configs/defconfig      |    1 +
+>   arch/arm64/include/asm/kexec.h    |   34 +++++++++++++++-
+>   arch/arm64/kernel/Makefile        |    1 +
+>   arch/arm64/kernel/crash_dump.c    |   71 +++++++++++++++++++++++++++++++++
+>   arch/arm64/kernel/machine_kexec.c |   55 +++++++++++++++++++++++++-
+>   arch/arm64/kernel/process.c       |    7 +++-
+>   arch/arm64/kernel/setup.c         |   78 +++++++++++++++++++++++++++++++++++++
+>   arch/arm64/kernel/smp.c           |   10 ++++-
+>   10 files changed, 294 insertions(+), 6 deletions(-)
+>   create mode 100644 arch/arm64/kernel/crash_dump.c
+>
