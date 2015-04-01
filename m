@@ -1,30 +1,36 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Wed, 1 Apr 2015 17:17:38 +0530
-Subject: [RESEND PATCH 8/8] dts/Makefile: Add build support for LS2085a QDS &
- RDB board DTS
-In-Reply-To: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1427888858-29636-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1427888858-29636-9-git-send-email-bhupesh.sharma@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Apr 2015 12:50:13 +0100
+Subject: Cache line size definition in arch/arm/mm/Kconfig
+In-Reply-To: <551BD9BF.8090808@free.fr>
+References: <5512C7A4.3000302@free.fr> <5515423E.4020802@free.fr>
+ <20150327120601.GB4019@n2100.arm.linux.org.uk>
+ <55155EE9.6020600@free.fr> <551BD9BF.8090808@free.fr>
+Message-ID: <20150401115013.GA24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds build support for LS2085a QDS & RDB board DTS files
-in the arm64 DTS Makefile.
+On Wed, Apr 01, 2015 at 01:42:55PM +0200, Mason wrote:
+> Example patch for illustration purposes (only compile-tested)
+> 
+> (There is probably a much more elegant way to get 32-byte aligned
+> memory allocations.)
+> 
+> Regards.
+> 
+> 
+> diff --git a/drivers/clocksource/mmio.c b/drivers/clocksource/mmio.c
+> index c0e2512..77b91c5 100644
+> --- a/drivers/clocksource/mmio.c
+> +++ b/drivers/clocksource/mmio.c
+> @@ -10,34 +10,24 @@
+>  #include <linux/init.h>
+>  #include <linux/slab.h>
+> -struct clocksource_mmio {
+> -       void __iomem *reg;
+> -       struct clocksource clksrc;
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
----
- arch/arm64/boot/dts/freescale/Makefile |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Just swap the order of these.
 
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index 4f2de3e7..a4fb84b 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,4 +1,4 @@
--dtb-$(CONFIG_ARCH_FSL_LS2085A) += fsl-ls2085a-simu.dtb
-+dtb-$(CONFIG_ARCH_FSL_LS2085A) += fsl-ls2085a-qds.dtb fsl-ls2085a-rdb.dtb fsl-ls2085a-simu.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
 -- 
-1.7.9.5
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
