@@ -1,77 +1,32 @@
-From: dahi@linux.vnet.ibm.com (David Hildenbrand)
-Date: Wed, 1 Apr 2015 17:46:46 +0200
-Subject: [PATCH v2 03/10] KVM: arm: guest debug, define API headers
-In-Reply-To: <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-4-git-send-email-alex.bennee@linaro.org>
-Message-ID: <20150401174646.74f695bd@thinkpad-w530>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 1 Apr 2015 17:53:51 +0200
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150401115340.GG1552@arm.com>
+References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
+ <20150331144956.GA24094@arm.com>
+ <1427817050.5567.148.camel@redhat.com>
+ <20150401115340.GG1552@arm.com>
+Message-ID: <20150401155351.GH4441@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This commit defines the API headers for guest debugging. There are two
-> architecture specific debug structures:
-> 
->   - kvm_guest_debug_arch, allows us to pass in HW debug registers
->   - kvm_debug_exit_arch, signals the exact debug exit and pc
-> 
-> The type of debugging being used is control by the architecture specific
+Hi Will,
 
-s/control/controlled/
+On Wed, Apr 01, 2015 at 12:53:40PM +0100, Will Deacon wrote:
+> Joerg: are you still against merging this? If so, what do you need to
+> see in order to change your mind? This is certainly something that we
+> need on ARM-based systems and, tbh, the direction that the IOMMU core is
+> going seems to be towards a N:1 domain:IOMMU mapping anyway (c.f. your
+> series to embed struct iommu_domain in a driver-private data structure).
 
-> control bits of the kvm_guest_debug->control flags in the ioctl
-> structure.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> ---
-> v2
->    - expose hsr and pc directly to user-space
-> 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 3ef77a4..6ee70a0 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -100,10 +100,24 @@ struct kvm_sregs {
->  struct kvm_fpu {
->  };
-> 
-> +/*
-> + * See ARM ARM D7.3: Debug Registers
+What I want is consistent behavior between drivers. Until now I tried to
+push for the domain concept, which allows to attach arbitrary devices to
+a domain. This patch-set makes it impossible to achieve this goal,
+that's why I am resistant against it.
 
-Maybe drop one ARM
+We can discuss moving into another direction with the IOMMU-API, and
+re-evaluate then if this patch-set is still required.
 
-> + *
-> + * The control registers are architecturally defined as 32 bits but are
-> + * stored as 64 bit values along side the value registers and aligned
-> + * with the rest 64 bit registers in the normal CPU context.
-> + */
-> +#define KVM_ARM_NDBG_REGS 16
->  struct kvm_guest_debug_arch {
-> +	__u64 dbg_bcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_bvr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wcr[KVM_ARM_NDBG_REGS];
-> +	__u64 dbg_wvr[KVM_ARM_NDBG_REGS];
->  };
-> 
->  struct kvm_debug_exit_arch {
-> +	__u64 pc;
-> +	__u32 hsr;
->  };
-> 
->  struct kvm_sync_regs {
-> @@ -207,4 +221,11 @@ struct kvm_arch_memory_slot {
-> 
->  #endif
-> 
-> +/*
-> + * Architecture related debug defines - upper 16 bits of
-> + * kvm_guest_debug->control
-> + */
-> +#define KVM_GUESTDBG_USE_SW_BP	        __KVM_GUESTDBG_USE_SW_BP
-> +#define KVM_GUESTDBG_USE_HW_BP		__KVM_GUESTDBG_USE_HW_BP
-> +
->  #endif /* __ARM_KVM_H__ */
 
-Looks good to me!
-
-David
+	Joerg
