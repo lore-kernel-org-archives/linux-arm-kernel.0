@@ -1,58 +1,63 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 01 Apr 2015 11:12:10 -0700
-Subject: Possible regression in next-20150323 due to "ARM,
- arm64: kvm: get rid of the bounce page"
-In-Reply-To: <20150401085832.GA1552@arm.com> (Will Deacon's message of "Wed, 1
- Apr 2015 09:58:32 +0100")
-References: <20150324004537.GA24816@verge.net.au>
- <CAKv+Gu-0jPk=KQ4gY32ELc+BVbe=1QdcrwQ+Pb=RkdwO9K3Vkw@mail.gmail.com>
- <20150324161358.GA694@kahuna> <20150326003939.GA25368@verge.net.au>
- <20150326133631.GB2805@arm.com>
- <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au> <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com> <20150401085832.GA1552@arm.com>
-Message-ID: <7hmw2r67lx.fsf@deeprootsystems.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Thu, 02 Apr 2015 03:15:54 +0900
+Subject: [GIT PULL 1/5] Samsung non-critical-fixes for v4.1
+Message-ID: <551C35DA.6070003@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 
-Will Deacon <will.deacon@arm.com> writes:
+  Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 
-[...]
+are available in the git repository at:
 
->> >
->> > Thanks for testing this and sorry for the continued breakage. Which
->> > toolchain did you say you were using? Ard has some more patches trying to
->> > fix this, but none of our toolchains seem to tickle the issue.
->> 
->> I've also tested on the default ARM toolchains available with ubuntu[1]
->> 
->> Are there any updates on this issue?
->
-> It's been fixed since the end of last week!
->
-> (see ARM: kvm: round HYP section to page size instead of log2 upper bound)
->
-> This was confirmed by both my testing and also Simon Horman, who reported
-> the initial breakage.
->
->> It ha broken most of the ARM defconfigs in linux-next[2], and since it's
->> been broken for a week now, it is masking other types of issues that we
->> can normally find via automated boot testing.
->
-> If you're referring to failures such as:
->
->   http://storage.kernelci.org/next/next-20150331/arm-axm55xx_defconfig/build.log
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-fixes-v4.1
 
-Yes, that's the one I'm trying to track down.
+for you to fetch changes up to a11176e65b8727158bc355ca0cb00bf70cd69e48:
 
-> Then that's not coming from the arm64 tree, and is a completely separate
-> issue from the one originally reported in this thread.
+  ARM: S3C24XX: avoid a Kconfig warning (2015-02-27 05:50:25 +0900)
 
-Ugh, womehow I got wires crossed and thought they were related problems.
-Looks like Geert now has a proposed fix for the issue I'm tracking.
+----------------------------------------------------------------
+Samsung non-critical fixes for v4.1
 
-Sorry for the noise,
+- mostly trivial build fixes with random configurations
+  from Arnd Bergmann
 
-Kevin
+  for s3c24xx:
+  avoid a Kconfig warning and fix header file inclusions,
+  and fix building without PM_SLEEP and use SAMSUNG_WAKEMASK
+
+  for s3c64xx:
+  fix __initdata section mismatch and add I2C dependencies,
+  and fix building with PM_SLEEP
+
+----------------------------------------------------------------
+Arnd Bergmann (7):
+      ARM: S3C64XX: add I2C dependencies where needed
+      ARM: S3C64XX: fix building without CONFIG_PM_SLEEP
+      ARM: S3C64XX: fix __initdata section mismatch
+      ARM: S3C24XX: use SAMSUNG_WAKEMASK for s3c2416
+      ARM: S3C24XX: fix building without PM_SLEEP
+      ARM: S3C24XX: fix header file inclusions
+      ARM: S3C24XX: avoid a Kconfig warning
+
+ arch/arm/mach-s3c24xx/Kconfig                | 19 ++++++++++---------
+ arch/arm/mach-s3c24xx/Makefile               |  3 ++-
+ arch/arm/mach-s3c24xx/include/mach/pm-core.h | 24 ++++++++++++++++++++++--
+ arch/arm/mach-s3c24xx/pm-s3c2416.c           |  3 ++-
+ arch/arm/mach-s3c24xx/pm.c                   |  6 ++++--
+ arch/arm/mach-s3c24xx/s3c2410.c              |  2 +-
+ arch/arm/mach-s3c24xx/s3c2412.c              |  2 +-
+ arch/arm/mach-s3c24xx/s3c2416.c              |  2 +-
+ arch/arm/mach-s3c24xx/s3c2440.c              |  4 ++--
+ arch/arm/mach-s3c24xx/s3c2442.c              |  4 ++--
+ arch/arm/mach-s3c24xx/s3c244x.c              |  7 ++-----
+ arch/arm/mach-s3c64xx/Kconfig                |  4 +++-
+ arch/arm/mach-s3c64xx/Makefile               |  3 ++-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c        |  2 +-
+ arch/arm/mach-s3c64xx/pm.c                   |  2 ++
+ arch/arm/plat-samsung/include/plat/pm.h      | 14 +++++++++++---
+ arch/arm/plat-samsung/pm-debug.c             |  1 +
+ arch/arm/plat-samsung/pm.c                   | 20 --------------------
+ 18 files changed, 69 insertions(+), 53 deletions(-)
