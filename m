@@ -1,324 +1,138 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Apr 2015 13:28:44 +0100
-Subject: [PATCH 2/2] arm64: add KASan support
-In-Reply-To: <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
-References: <1427208544-8232-1-git-send-email-a.ryabinin@samsung.com>
- <1427208544-8232-3-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150401122843.GA28616@e104818-lin.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 01 Apr 2015 14:20:38 +0200
+Subject: [RFC v5 06/13] VFIO: platform: add
+ vfio_external_{mask|is_active|set_automasked}
+In-Reply-To: <1427822405.5567.163.camel@redhat.com>
+References: <1426776951-24901-1-git-send-email-eric.auger@linaro.org>	
+ <1426776951-24901-7-git-send-email-eric.auger@linaro.org>
+ <1427822405.5567.163.camel@redhat.com>
+Message-ID: <551BE296.2080509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+On 03/31/2015 07:20 PM, Alex Williamson wrote:
+> On Thu, 2015-03-19 at 15:55 +0100, Eric Auger wrote:
+>> Introduces 3 new external functions aimed at doining some actions
+>> on VFIO platform devices:
+>> - mask a VFIO IRQ
+>> - get the active status of a VFIO IRQ (active at interrupt
+>>   controller level or masked by the level-sensitive automasking).
+>> - change the automasked property and the VFIO handler
+>>
+>> Note there is no way to discriminate between user-space
+>> masking and automasked handler masking. As a consequence, is_active
+>> will return true in case the IRQ was masked by the user-space.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> V4: creation
+>> ---
+>>  drivers/vfio/platform/vfio_platform_irq.c | 43 +++++++++++++++++++++++++++++++
+>>  include/linux/vfio.h                      | 14 ++++++++++
+>>  2 files changed, 57 insertions(+)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_irq.c b/drivers/vfio/platform/vfio_platform_irq.c
+>> index 8eb65c1..49994cb 100644
+>> --- a/drivers/vfio/platform/vfio_platform_irq.c
+>> +++ b/drivers/vfio/platform/vfio_platform_irq.c
+>> @@ -231,6 +231,49 @@ static int vfio_set_trigger(struct vfio_platform_device *vdev, int index,
+>>  	return 0;
+>>  }
+>>  
+>> +void vfio_external_mask(struct vfio_platform_device *vdev, int index)
+>> +{
+>> +	vfio_platform_mask(&vdev->irqs[index]);
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_mask);
+>> +
+>> +bool vfio_external_is_active(struct vfio_platform_device *vdev, int index)
+>> +{
+>> +	unsigned long flags;
+>> +	struct vfio_platform_irq *irq = &vdev->irqs[index];
+>> +	bool active, masked, outstanding;
+>> +	int ret;
+>> +
+>> +	spin_lock_irqsave(&irq->lock, flags);
+>> +
+>> +	ret = irq_get_irqchip_state(irq->hwirq, IRQCHIP_STATE_ACTIVE, &active);
+>> +	BUG_ON(ret);
+>> +	masked = irq->masked;
+>> +	outstanding = active || masked;
+>> +
+>> +	spin_unlock_irqrestore(&irq->lock, flags);
+>> +	return outstanding;
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_is_active);
+>> +
+>> +void vfio_external_set_automasked(struct vfio_platform_device *vdev,
+>> +				  int index, bool automasked)
+>> +{
+>> +	unsigned long flags;
+>> +	struct vfio_platform_irq *irq = &vdev->irqs[index];
+>> +
+>> +	spin_lock_irqsave(&irq->lock, flags);
+>> +	if (automasked) {
+>> +		irq->flags |= VFIO_IRQ_INFO_AUTOMASKED;
+>> +		irq->handler = vfio_automasked_irq_handler;
+>> +	} else {
+>> +		irq->flags &= ~VFIO_IRQ_INFO_AUTOMASKED;
+>> +		irq->handler = vfio_irq_handler;
+>> +	}
+>> +	spin_unlock_irqrestore(&irq->lock, flags);
+>> +}
+>> +EXPORT_SYMBOL_GPL(vfio_external_set_automasked);
+>> +
+> 
+> 
+> This is where the abstraction breaks down.  These are
+> vfio_external_foo() interfaces, yet they assume a specific type of
+> device, a vfio platform device.  Either the name should reflect that or
+> they should be hosted in vfio-core with a callout to the device specific
+> implementations.  Can we make kvm-vfio deal only in struct vfio_device
+> and struct device?
 
-On Tue, Mar 24, 2015 at 05:49:04PM +0300, Andrey Ryabinin wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4085df1..10bbd71 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -41,6 +41,7 @@ config ARM64
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
->  	select HAVE_ARCH_JUMP_LABEL
-> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
-> @@ -116,6 +117,12 @@ config GENERIC_CSUM
->  config GENERIC_CALIBRATE_DELAY
->  	def_bool y
->  
-> +config KASAN_SHADOW_OFFSET
-> +	hex
-> +	default 0xdfff200000000000 if ARM64_VA_BITS_48
-> +	default 0xdffffc8000000000 if ARM64_VA_BITS_42
-> +	default 0xdfffff9000000000 if ARM64_VA_BITS_39
+Hi Alex,
 
-Can we compute these at build time in some C header? Or they need to be
-passed to gcc when compiling the kernel so that it generates the right
-instrumentation?
+I will follow your guidelines and intend to extend vfio_platform_ops to
+store those new callbacks. Indeed kvm-vfio should be able to be
+vfio_platform_device independent.
 
-I'm not familiar with KASan but is the offset address supposed to be
-accessible? The addresses encoded above would always generate a fault
-(level 0 / address size fault).
+Thank you for the review.
 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index bd5db28..f5ce010 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -40,7 +40,7 @@
->   *	fixed mappings and modules
->   */
->  #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
-> -#define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
-> +#define VMALLOC_START		((UL(0xffffffffffffffff) << VA_BITS) + (UL(1) << (VA_BITS - 3)))
+Best Regards
 
-I assume that's where you want to make room for KASan? Some comments and
-macros would be useful for why this is needed and how it is calculated.
-It also needs to be disabled when KASan is not enabled.
-
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 51c9811..1a99e95 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -482,6 +482,9 @@ __mmap_switched:
->  	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
->  	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
->  	mov	x29, #0
-> +#ifdef CONFIG_KASAN
-> +	b kasan_early_init
-> +#endif
-
-Nitpick: tab between b and kasan_early_init.
-
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> new file mode 100644
-> index 0000000..df537da
-> --- /dev/null
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -0,0 +1,211 @@
-> +#include <linux/kasan.h>
-> +#include <linux/kernel.h>
-> +#include <linux/memblock.h>
-> +#include <linux/start_kernel.h>
-> +
-> +#include <asm/page.h>
-> +#include <asm/pgtable.h>
-> +#include <asm/tlbflush.h>
-> +
-> +static char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
-
-Can we not use the system's zero_page or it's not initialised yet?
-
-> +static pgd_t tmp_page_table[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
-> +
-> +#if CONFIG_PGTABLE_LEVELS > 3
-> +static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-> +#endif
-> +#if CONFIG_PGTABLE_LEVELS > 2
-> +static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-> +#endif
-> +static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
-> +
-> +static void __init init_kasan_page_tables(void)
-> +{
-> +	int i;
-> +
-> +#if CONFIG_PGTABLE_LEVELS > 3
-> +	for (i = 0; i < PTRS_PER_PUD; i++)
-> +		set_pud(&kasan_zero_pud[i], __pud(__pa(kasan_zero_pmd)
-> +							| PAGE_KERNEL));
-> +#endif
-> +#if CONFIG_PGTABLE_LEVELS > 2
-> +	for (i = 0; i < PTRS_PER_PMD; i++)
-> +		set_pmd(&kasan_zero_pmd[i], __pmd(__pa(kasan_zero_pte)
-> +							| PAGE_KERNEL));
-> +#endif
-
-These don't look right. You are setting page attributes on table
-entries. You should use the standard pmd_populate etc. macros here, see
-early_fixmap_init() as an example.
-
-> +	for (i = 0; i < PTRS_PER_PTE; i++)
-> +		set_pte(&kasan_zero_pte[i], __pte(__pa(kasan_zero_page)
-> +							| PAGE_KERNEL));
-
-PAGE_KERNEL is pgprot_t, so you mix the types here. Just do something
-like:
-
-	set_pte(..., pfn_pte(zero_pfn, PAGE_KERNEL_RO));
-
-(shouldn't it be read-only?)
-
-> +void __init kasan_map_early_shadow(pgd_t *pgdp)
-> +{
-> +	int i;
-> +	unsigned long start = KASAN_SHADOW_START;
-> +	unsigned long end = KASAN_SHADOW_END;
-> +	pgd_t pgd;
-> +
-> +#if CONFIG_PGTABLE_LEVELS > 3
-> +	pgd = __pgd(__pa(kasan_zero_pud) | PAGE_KERNEL);
-> +#elif CONFIG_PGTABLE_LEVELS > 2
-> +	pgd = __pgd(__pa(kasan_zero_pmd) | PAGE_KERNEL);
-> +#else
-> +	pgd = __pgd(__pa(kasan_zero_pte) | PAGE_KERNEL);
-> +#endif
-> +
-> +	for (i = pgd_index(start); start < end; i++) {
-> +		set_pgd(&pgdp[i], pgd);
-> +		start += PGDIR_SIZE;
-> +	}
-> +}
-
-Same problem as above with PAGE_KERNEL. You should just use
-pgd_populate().
-
-> +
-> +void __init kasan_early_init(void)
-> +{
-> +	init_kasan_page_tables();
-> +	kasan_map_early_shadow(swapper_pg_dir);
-> +	kasan_map_early_shadow(idmap_pg_dir);
-> +	flush_tlb_all();
-> +	start_kernel();
-> +}
-
-Why do you need to map the kasan page tables into the idmap?
-
-> +
-> +static void __init clear_pgds(unsigned long start,
-> +			unsigned long end)
-> +{
-> +	for (; start && start < end; start += PGDIR_SIZE)
-> +		set_pgd(pgd_offset_k(start), __pgd(0));
-> +}
-
-We have dedicated pgd_clear() macro.
-
-> +
-> +static int __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
-> +				unsigned long end)
-> +{
-> +	pte_t *pte = pte_offset_kernel(pmd, addr);
-> +
-> +	while (addr + PAGE_SIZE <= end) {
-> +		set_pte(pte, __pte(__pa(kasan_zero_page)
-> +					| PAGE_KERNEL_RO));
-
-See above for a pfn_pte() usage.
-
-> +		addr += PAGE_SIZE;
-> +		pte = pte_offset_kernel(pmd, addr);
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int __init zero_pmd_populate(pud_t *pud, unsigned long addr,
-> +				unsigned long end)
-> +{
-> +	int ret = 0;
-> +	pmd_t *pmd = pmd_offset(pud, addr);
-> +
-> +	while (IS_ALIGNED(addr, PMD_SIZE) && addr + PMD_SIZE <= end) {
-> +		set_pmd(pmd, __pmd(__pa(kasan_zero_pte)
-> +					| PAGE_KERNEL_RO));
-> +		addr += PMD_SIZE;
-> +		pmd++;
-> +	}
-> +
-> +	if (addr < end) {
-> +		if (pmd_none(*pmd)) {
-> +			void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
-> +			if (!p)
-> +				return -ENOMEM;
-> +			set_pmd(pmd, __pmd(__pa(p) | PAGE_KERNEL));
-> +		}
-> +		ret = zero_pte_populate(pmd, addr, end);
-> +	}
-> +	return ret;
-> +}
-> +
-> +static int __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
-> +				unsigned long end)
-> +{
-> +	int ret = 0;
-> +	pud_t *pud = pud_offset(pgd, addr);
-> +
-> +#if CONFIG_PGTABLE_LEVELS > 2
-> +	while (IS_ALIGNED(addr, PUD_SIZE) && addr + PUD_SIZE <= end) {
-> +		set_pud(pud, __pud(__pa(kasan_zero_pmd)
-> +					| PAGE_KERNEL_RO));
-> +		addr += PUD_SIZE;
-> +		pud++;
-> +	}
-> +#endif
-> +
-> +	if (addr < end) {
-> +		if (pud_none(*pud)) {
-> +			void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
-> +			if (!p)
-> +				return -ENOMEM;
-> +			set_pud(pud, __pud(__pa(p) | PAGE_KERNEL));
-> +		}
-> +		ret = zero_pmd_populate(pud, addr, end);
-> +	}
-> +	return ret;
-> +}
-> +
-> +static int __init zero_pgd_populate(unsigned long addr, unsigned long end)
-> +{
-> +	int ret = 0;
-> +	pgd_t *pgd = pgd_offset_k(addr);
-> +
-> +#if CONFIG_PGTABLE_LEVELS > 3
-> +	 while (IS_ALIGNED(addr, PGDIR_SIZE) && addr + PGDIR_SIZE <= end) {
-> +		set_pgd(pgd, __pgd(__pa(kasan_zero_pud)
-> +					| PAGE_KERNEL_RO));
-> +		addr += PGDIR_SIZE;
-> +		pgd++;
-> +	}
-> +#endif
-
-All these PAGE_KERNEL_RO on table entries are wrong. Please use the
-standard pgd/pud/pmd_populate macros.
-
-As for the while loops above, we have a standard way to avoid the
-#ifdef's by using pgd_addr_end() etc. See __create_mapping() as an
-example, there are a few others throughout the kernel.
-
-> +
-> +	 if (addr < end) {
-> +		 if (pgd_none(*pgd)) {
-> +			 void *p = vmemmap_alloc_block(PAGE_SIZE, NUMA_NO_NODE);
-> +			 if (!p)
-> +				 return -ENOMEM;
-> +			 set_pgd(pgd, __pgd(__pa(p) | PAGE_KERNEL));
-
-I'm just commenting here but it applies to the previous functions. You
-may be able to use functions like vmmemap_pgd_populate() which look very
-similar (and they also use pgd_populate instead of the set_pgd).
-
-> +static void cpu_set_ttbr1(unsigned long ttbr1)
-> +{
-> +	asm(
-> +	"	msr	ttbr1_el1, %0\n"
-> +	"	isb"
-> +	:
-> +	: "r" (ttbr1));
-> +}
-> +
-> +void __init kasan_init(void)
-> +{
-> +	struct memblock_region *reg;
-> +
-> +	memcpy(tmp_page_table, swapper_pg_dir, sizeof(tmp_page_table));
-> +	cpu_set_ttbr1(__pa(tmp_page_table));
-
-Why is this needed? The code lacks comments in several places but here I
-couldn't figure out what the point is.
-
-> +
-> +	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
-> +
-> +	populate_zero_shadow(KASAN_SHADOW_START,
-> +			(unsigned long)kasan_mem_to_shadow((void *)MODULES_VADDR));
-> +
-> +	for_each_memblock(memory, reg) {
-> +		void *start = (void *)__phys_to_virt(reg->base);
-> +		void *end = (void *)__phys_to_virt(reg->base + reg->size);
-> +
-> +		if (start >= end)
-> +			break;
-> +
-> +		vmemmap_populate((unsigned long)kasan_mem_to_shadow(start),
-> +				(unsigned long)kasan_mem_to_shadow(end),
-> +				pfn_to_nid(virt_to_pfn(start)));
-> +	}
-> +
-> +	memset(kasan_zero_page, 0, PAGE_SIZE);
-> +	cpu_set_ttbr1(__pa(swapper_pg_dir));
-> +	init_task.kasan_depth = 0;
-> +}
-
--- 
-Catalin
+Eric
+> 
+>>  static int vfio_platform_set_irq_trigger(struct vfio_platform_device *vdev,
+>>  					 unsigned index, unsigned start,
+>>  					 unsigned count, uint32_t flags,
+>> diff --git a/include/linux/vfio.h b/include/linux/vfio.h
+>> index b18c38f..7aa6330 100644
+>> --- a/include/linux/vfio.h
+>> +++ b/include/linux/vfio.h
+>> @@ -105,6 +105,20 @@ extern struct vfio_device *vfio_device_get_external_user(struct file *filep);
+>>  extern void vfio_device_put_external_user(struct vfio_device *vdev);
+>>  extern struct device *vfio_external_base_device(struct vfio_device *vdev);
+>>  
+>> +struct vfio_platform_device;
+>> +extern void vfio_external_mask(struct vfio_platform_device *vdev, int index);
+>> +/*
+>> + * returns whether the VFIO IRQ is active:
+>> + * true if not yet deactivated at interrupt controller level or if
+>> + * automasked (level sensitive IRQ). Unfortunately there is no way to
+>> + * discriminate between handler auto-masking and user-space masking
+>> + */
+>> +extern bool vfio_external_is_active(struct vfio_platform_device *vdev,
+>> +				    int index);
+>> +
+>> +extern void vfio_external_set_automasked(struct vfio_platform_device *vdev,
+>> +					 int index, bool automasked);
+>> +
+>>  struct pci_dev;
+>>  #ifdef CONFIG_EEH
+>>  extern void vfio_spapr_pci_eeh_open(struct pci_dev *pdev);
+> 
+> 
+> 
