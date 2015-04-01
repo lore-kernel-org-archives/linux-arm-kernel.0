@@ -1,52 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Apr 2015 18:00:33 +0100
-Subject: [PATCH v1] ata: ahci_xgene: Add AHCI Support for second
- generation of APM X-Gene SoC
-In-Reply-To: <20150401163956.GE24899@n2100.arm.linux.org.uk>
-References: <1427899682-10912-1-git-send-email-stripathi@apm.com>
- <1427899682-10912-2-git-send-email-stripathi@apm.com>
- <20150401161336.GS9974@htj.duckdns.org>
- <20150401163116.GT9974@htj.duckdns.org>
- <20150401163956.GE24899@n2100.arm.linux.org.uk>
-Message-ID: <20150401170032.GC28616@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Apr 2015 18:03:30 +0100
+Subject: [GIT PULL] iommu: Kill off pgsize_bitmap field from struct
+ iommu_ops
+In-Reply-To: <20150401153854.GG4441@8bytes.org>
+References: <20150327171946.GL1562@arm.com> <20150331142440.GD22683@8bytes.org>
+ <20150331144956.GA24094@arm.com> <20150401153854.GG4441@8bytes.org>
+Message-ID: <20150401170330.GO1552@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 05:39:56PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Apr 01, 2015 at 12:31:16PM -0400, Tejun Heo wrote:
-> > On Wed, Apr 01, 2015 at 12:13:36PM -0400, Tejun Heo wrote:
-> > > > Signed-off-by : Suman Tripathi <stripathi@apm.com>
-> > > 
-> > > Applied to libata/for-4.1 w/ minor edit.
-> > 
-> > Reverted due to build failure from missing asm/cputype.h.
+On Wed, Apr 01, 2015 at 04:38:54PM +0100, Joerg Roedel wrote:
+> Hi Will,
+
+Hi Joerg,
+
+> On Tue, Mar 31, 2015 at 03:49:56PM +0100, Will Deacon wrote:
+> > But isn't this restriction already the case in practice? For example, if
+> > I have a domain with some mapping already configured, then that mapping
+> > will be using some fixed set of page sizes. Attaching a device behind
+> > another IOMMU that doesn't support that page size would effectively require
+> > the domain page tables to be freed and re-allocated from scratch.
 > 
-> I'm guessing this is some kind of ARM driver, which is why
-> linux-arm-kernel has been Cc'd - though I haven't seen the original
-> patch.
+> The problem is that this restriction depends on the IOMMU driver in use.
+> From the beginning of the IOMMU-API the backend drivers have supported
+> sharing a domain by multiple devices. In fact, the domain is just an
+> abstraction for an address space that can be attached to devices just
+> like cpu page-tables are assigned to threads of a process.
+
+I think the domain is a useful abstraction; I just don't think it works
+too well when you attach devices upstream of different IOMMUs to the same
+domain. If all the devices attached to a domain share an IOMMU, everything
+works nicely.
+
+> We can discuss whether this fundamental concept of the IOMMU-API needs
+> to be changed (moving into the direction this patch-set proposes). I
+> could imaging removing the domain concept entirely and just have
+> map/unmap functions like this:
 > 
-> ARM has asm/cputype.h, and has had for a long time, so "missing
-> asm/cputype.h" doesn't make sense as a reason to revert it.  Maybe
-> it's trying to be built on x86 when it should be restricted to
-> only ARM?
+> 	iommu_map(struct device *dev, dma_addr_t iova,
+> 		  phys_addr_t phys, size_t size)
+> 	iommu_unmap(struct device *dev, dma_addr_t iova,
+> 		    phys_addr_t phys, size_t size)
 > 
-> Dunno without seeing the original patch.
+> This would require some changes for the users of the IOMMU-API, but it
+> shouldn't be too hard.
+> 
+> Or we keep the desired semantics as they are now and do everything
+> needed for that in the IOMMU drivers. For the arm-smmu this would mean
+> exposing a common set of supported pgsizes between IOMMUs, or to build
+> multiple page-tables to match the different IOMMU capabilities.
+> 
+> I am open for disussions for either way, but I like the current
+> semantics a bit more, as it allows us to share page-tables between
+> devices and we can move all of the nasty code in VFIO that already
+> creates multiple domains to get different page-tables into the
+> IOMMU core or the drivers (were it belongs).
 
-First search result leads here:
+I agree that sharing page tables is desirable and I certainly wouldn't
+suggest removing the domain abstraction.
 
-https://www.mail-archive.com/devicetree at vger.kernel.org/msg67774.html
+> What I definitly don't want is a mixture of both concepts depending on
+> the IOMMU driver in use. We should settle on one way and force the
+> drivers to behave accordingly. We don't need a common API when every
+> driver behaves differently.
 
-The driver in general should not be ARM specific, though it runs on an
-ARMv8 platform. But looking at the patch it has some errata workarounds
-triggered based on the CPU id (MIDR). That looks dodgy as it doesn't
-even check the full ID, only the variant part.
+Agreed. How would you feel about restricting domains to be per-IOMMU
+instance? VFIO already copes with this, so I think we'd just need
+something to keep legacy KVM device passthrough working on x86. Maybe we
+could add a new domain type using your new series (DOMAIN_X86_KVM_LEGACY
+or something) and avoid the cross-IOMMU domain checks for that.
 
-But if they don't have any other way of identifying the hardware
-version (ideally some SoC or device identification), the driver should
-at least be made dependent on ARM64. Looking at the Kconfig entries,
-PHY_XGENE depends on (ARM64 || COMPILE_TEST). The COMPILE_TEST part
-should be dropped (I would still prefer a different way to handle this
-than checking MIDR but I'm not familiar with the hardware).
-
--- 
-Catalin
+Will
