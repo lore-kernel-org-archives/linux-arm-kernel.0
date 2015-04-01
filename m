@@ -1,38 +1,60 @@
-From: vianney.leclement@essensium.com (Vianney le =?iso-8859-1?q?Cl=E9ment?=)
-Date: Wed, 1 Apr 2015 10:32:06 +0200
-Subject: [PATCH] ARM: dts: imx6: Add Embest MarS Board
-In-Reply-To: <1427876156.24886.1.camel@pengutronix.de>
-References: <1427875809-10444-1-git-send-email-vianney.leclement@essensium.com>
- <1427876156.24886.1.camel@pengutronix.de>
-Message-ID: <1427877126.2449.0@mail.essensium.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 1 Apr 2015 10:34:24 +0200
+Subject: [PATCH 3/5] ARM: mvebu: Allow using the GIC for wakeup in standby
+ mode
+In-Reply-To: <1427724278-12379-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+ <1427724278-12379-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKdc=DQ9-dm3rm_mbG_sgeWbCZBJ7eML48hFXHQaJm1Pmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 1, 2015 at 10:15 , Lucas Stach <l.stach@pengutronix.de> 
-wrote:
-> Am Mittwoch, den 01.04.2015, 10:10 +0200 schrieb Vianney le Cl?ment 
-> de
-> Saint-Marcq:
->>  Add device tree for the Embest/Element 14 MarS Board [1], an i.MX6 
->> Dual
->>  based development board.
->> 
->>  The e-MMC chip is disabled because initialization fails (error 
->> -110).
->>  A possible cause is described in [2].
-> 
-> So if the problem is that there are only 4 connected data lines one 
-> the
-> board, couldn't you simply add the property bus-width = <4>; to the 
-> emmc
-> node?
+Hi Gregory,
 
-It is already the case (imx6qdl.dtsi, line 929), but to no avail.  That 
-is why I wrote "possible" cause as I did not find any evidence of the 
-described behaviour in my (admittedly limited) investigations.
+2015-03-30 16:04 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> On the Armada 375/38x/39x SoCs, in standby mode the SoC stay powered
+> and it is possible to wake-up from any interrupt sources. This patch
+> adds flag to the GIC irqchip driver to let linux know this.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/mach-mvebu/board-v7.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+> index 89a139ed7d5b..61774279a66d 100644
+> --- a/arch/arm/mach-mvebu/board-v7.c
+> +++ b/arch/arm/mach-mvebu/board-v7.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_fdt.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/irq.h>
+>  #include <linux/io.h>
+>  #include <linux/clocksource.h>
+>  #include <linux/dma-mapping.h>
+> @@ -26,6 +27,7 @@
+>  #include <linux/signal.h>
+>  #include <linux/slab.h>
+>  #include <linux/irqchip.h>
+> +#include <linux/irqchip/arm-gic.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -129,6 +131,11 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
+>
+>  static void __init mvebu_init_irq(void)
+>  {
+> +       if (of_machine_is_compatible("marvell,armada375") ||
+> +           of_machine_is_compatible("marvell,armada380") ||
+> +           of_machine_is_compatible("marvell,armada390"))
+> +               gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+> +                                     IRQCHIP_MASK_ON_SUSPEND);
 
+I'm afraid you the patchset may be incomplete:
+arch/arm/mach-mvebu/board-v7.c:137:3: error: implicit declaration of
+function 'gic_set_irqchip_flags'
+[-Werror=implicit-function-declaration]
 
-Vianney le Cl?ment de Saint-Marcq
-Embedded Software Developper ? +32 485 84 55 05
-Essensium, Mind division ? www.mind.be
-GPG: 727B CFE9 355F 1B02 0820 EE1C 9042 3E07 A804 0316
+Best regards,
+Marcin
