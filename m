@@ -1,41 +1,49 @@
-From: ykk@rock-chips.com (Yakir)
-Date: Wed, 01 Apr 2015 10:04:03 +0800
-Subject: [PATCH RFC 09/11] sound/core: add IEC958 channel status helper
-In-Reply-To: <20150331091329.GP24899@n2100.arm.linux.org.uk>
-References: <20150330193911.GM24899@n2100.arm.linux.org.uk>
- <E1YcfYA-0002vc-Al@rmk-PC.arm.linux.org.uk> <551A5B2F.50203@rock-chips.com>
- <20150331091329.GP24899@n2100.arm.linux.org.uk>
-Message-ID: <551B5213.8070902@rock-chips.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 1 Apr 2015 10:11:17 +0800
+Subject: [PATCH v5 2/3] I2C: mediatek: Add driver for MediaTek I2C
+ controller
+In-Reply-To: <20150331175234.GK9742@pengutronix.de>
+References: <1426917922-61356-1-git-send-email-eddie.huang@mediatek.com>
+ <1426917922-61356-3-git-send-email-eddie.huang@mediatek.com>
+ <20150323084237.GG9742@pengutronix.de>
+ <1427703252.26464.14.camel@mtksdaap41>
+ <20150330172309.GB9742@pengutronix.de>
+ <1427785715.3500.16.camel@mtksdaap41> <1427802658.32196.8.camel@mtksdaap41>
+ <20150331175234.GK9742@pengutronix.de>
+Message-ID: <1427854277.21285.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Sascha,
 
-? 2015/3/31 17:13, Russell King - ARM Linux ??:
-> On Tue, Mar 31, 2015 at 04:30:39AM -0400, Yang Kuankuan wrote:
->>> +	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
->>> +	cs[1] = IEC958_AES1_CON_GENERAL;
->>> +	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
->>> +	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | fs;
->>> +
->> Pretty good, also suitable to rockchip platform, but why not add the
->> "IEC958_AES2_CON_CHANNEL_MASK" & "IEC958_AES2_CON_WORDLEN" ?
->>
->> Seems sample frequency & channle number & word length are the basic
->> message :)
-> I was debating about the word length, and that's something I'll add
-> later to it - but only if length shows that we have the 5th byte
-> available in the buffer.  Most users seem to only use the first four
-> bytes.
->
-> As for the channel number, this is intentionally left to the driver -
-> most cases I've found either the driver isn't interested, or where
-> they are interested (the only case I know of is my dw_hdmi ahb audio
-> driver), it's more appropriate to generate a baseline channel status,
-> and let the driver iterate over the channels adding the appropriate
-> channel number in.
-Okay, agree with you to keep baseline channel status, but seems dw_hdmi
-i2s audio are interested in channle number (to fill in schnl resigeters).
+On Tue, 2015-03-31 at 19:52 +0200, Sascha Hauer wrote:
+> On Tue, Mar 31, 2015 at 07:50:58PM +0800, Eddie Huang wrote:
+> > Hi Sascha,
+> > 
+> > On Tue, 2015-03-31 at 15:08 +0800, Eddie Huang wrote:
+> > > Hi Sascha,
+> > > 
+> > > > > > speed <= 400000 here to make this more obvious?
+> > > > > There are two cases, not only speed<=400000, but I2C_MASTER_WRRD. I tend
+> > > > > to keep it.
+> > > >
+> > > > Still it looks strange. You only ever write this default value to the
+> > > > register. Putting this register write under an if() seems bogus since
+> > > > the same value will be in the register the next time this code is
+> > > > executed. It looks like you should move this register write to some
+> > > > initialization function.
+> > > OK, move to mtk_i2c_init_hw function
+> > > 
+> > Sorry for my negligence. Write-then-read (I2C_MASTER_WRRD) decides
+> > according to each I2C transfer, so I still need to judge whether set
+> > I2C_CONTROL_RS and DELAY_LEN here. Other control setting can move to
+> > init function.
+> 
+> You need to decide whether you have to set the I2C_CONTROL_RS bit, but
+> you don't need to write the same value to the DELAY_LEN register each
+> time. It won't change under your hood.
+> 
+Yes, you are right. DELAY_LEN should only be set one time in init
+function. Thanks your correction.
 
-Best regards.
-Yakir Yang
+Eddie
