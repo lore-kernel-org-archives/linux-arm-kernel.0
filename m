@@ -1,119 +1,37 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 2 Apr 2015 22:30:44 +0200
-Subject: [PATCHv3] media: i2c/adp1653: devicetree support for adp1653
-In-Reply-To: <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
-References: <20150402143846.GA11687@amd>
- <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
-Message-ID: <20150402203043.GB29963@amd>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu,  2 Apr 2015 22:31:43 +0200
+Subject: [PATCH 1/6] clk: add table_size member to struct clk_mux
+In-Reply-To: <1428006708-13690-1-git-send-email-manabian@gmail.com>
+References: <1428006708-13690-1-git-send-email-manabian@gmail.com>
+Message-ID: <1428006708-13690-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Adding this field makes it a lot easier to loop through and register
+predefined tables containing struct clk_mux elements.
 
-> Hi Pawel,
-> 
-> My apologies for the very late reply.
-> 
-> On Thu, Apr 02, 2015 at 04:38:46PM +0200, Pavel Machek wrote:
-> > 
-> > 
-> > We are moving to device tree support on OMAP3, but that currently
-> > breaks ADP1653 driver. This adds device tree support, plus required
-> > documentation.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > ---
-> > 
-> > I'm not sure if it is device tree or media framework, either everyone
-> > waits for someone else, or noone really cares.
-> 
-> Neither. Some people are unfortuantely very busy with many other things as
-> well. :-P
+Also reorder members to prevent unnecessary padding in struct.
 
-Well.. Being busy is ok. Nitpicking is also ok. But both at the same
-time... is not good. 
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ include/linux/clk-provider.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> > Andrew, can you just merge it?
-> > 
-> > Please apply,
-> 
-> Please wait just a while.
-> 
-> I think we can merge this eventually through the linux-media tree, but
-> please first see the comments below.
-> 
-
-> > +Required properties of the flash LED child node:
-> > +
-> > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
-> > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
-> 
-> The documentation says that the maximum value is used if these values are
-> not specified. I think I'd make these optional.
-
-I'd rather not: when you make a typo in dts, it would supply maximum
-available current, potentially damaging the LED. You will not be able
-to tell brightness difference with naked eye...
-
-> >  __adp1653_set_power(struct adp1653_flash *flash, int on)
-> >  {
-> > -	int ret;
-> > +	int ret = 0;
-> > +
-> > +	if (flash->platform_data->power) {
-> > +		ret = flash->platform_data->power(&flash->subdev, on);
-> 
-> The power() callback should be dropped. It's controlling a GPIO. But that
-> can be done later on. The alternative is a patch before this one.
-
-I'd prefer to do it later; we want to keep functionality on N900
-without DTS, too.
-
-> >  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
-> >  	if (flash == NULL)
-> >  		return -ENOMEM;
-> >  
-> >  	flash->platform_data = client->dev.platform_data;
-> > +	if (!flash->platform_data) {
-> 
-> I'd check whether dev->of_node is non-NULL instead.
-
-Ok.
-
-> > @@ -438,10 +510,10 @@ static int adp1653_probe(struct i2c_client *client,
-> >  		goto free_and_quit;
-> >  
-> >  	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
-> > -
-> 
-> I rather liked the newline here. Please don't remove it. :-)
-
-Ok.
-
-> > @@ -464,7 +536,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
-> >  
-> > -static struct dev_pm_ops adp1653_pm_ops = {
-> > +static const struct dev_pm_ops adp1653_pm_ops = {
-> >  	.suspend	= adp1653_suspend,
-> >  	.resume		= adp1653_resume,
-> >  };
-> >  
-> > 
-> 
-> A corresponding change to the N900 dts would be very nice.
-
-Corresponding change to the dts will come in separate patch. Or do you
-have n900 for testing?
-
-> I think you're missing change to adp1653_i2c_driver.driver.of_match_table.
-
-It actually worked for me, which means device tree somehow does it
-magic.
-
-								Pavel
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 5591ea71a8d1..d5ee7ec7443c 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -411,9 +411,10 @@ struct clk_mux {
+ 	void __iomem	*reg;
+ 	u32		*table;
+ 	u32		mask;
++	spinlock_t	*lock;
+ 	u8		shift;
+ 	u8		flags;
+-	spinlock_t	*lock;
++	u8		table_size;
+ };
+ 
+ #define CLK_MUX_INDEX_ONE		BIT(0)
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.0
