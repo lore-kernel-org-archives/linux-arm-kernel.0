@@ -1,141 +1,66 @@
-From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
-Date: Thu, 02 Apr 2015 18:35:01 +0300
-Subject: [PATCH v2] ARM: tegra: Correct which USB controller has the UTMI
- pad registers
-In-Reply-To: <551D5E21.4040305@kapsi.fi>
-References: <551D57E0.7050102@kapsi.fi>
- <1427986842-21409-1-git-send-email-tomeu.vizoso@collabora.com>
- <551D5E21.4040305@kapsi.fi>
-Message-ID: <551D61A5.2010102@kapsi.fi>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 02 Apr 2015 17:35:39 +0200
+Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on Armada
+ 370 DB
+In-Reply-To: <20150402161626.182e267d@free-electrons.com>
+References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>	<2321040.CmsL1gluUd@wuerfel>	<20150402153650.2cc9c3d7@free-electrons.com>	<2515980.d69ggAvHPo@wuerfel>
+ <20150402161626.182e267d@free-electrons.com>
+Message-ID: <551D61CB.6000008@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/02/2015 06:20 PM, Mikko Perttunen wrote:
-> Reviewed-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+Hi Arnd,
 
-Scratch that;
+On 02/04/2015 16:16, Thomas Petazzoni wrote:
+> Arnd,
+> 
+> On Thu, 02 Apr 2015 16:09:03 +0200, Arnd Bergmann wrote:
+> 
+>> This device has 1GB, doing an incompatible change to an existing machine
+>> is completely moronic. How hard can it be to special-case this board
+>> in u-boot?
+> 
+> The device has a DIMM slot for RAM. 1 GB in the DT is just an example,
+> and it gets updated through ATAGS, or directly by the bootloader with
+> the real amount of RAM that you have, which can go up to 4 GB.
+> 
+>>> Also, the proposed change is exactly the same we've done on several
+>>> Marvell evaluation boards in the past:
+>>>
+>>>   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-gp.dts?id=91ed32200e6ea1df19df01355c5c7747f9014102
+>>>   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-db.dts?id=82066bdb5a759ec00c18f9667853c4fe8840e83d
+>>
+>> I'm aware of those, I just wish they would learn from their mistakes.
+> 
+> There was no mistake at all. You have no idea what the history of this
+> problem is, and you're giving lessons.
+> 
+> As Andrew Lunn said, on *all* Marvell EBU platforms the internal
+> registers have always been remapped at 0xf1000000. Look at Kirkwood,
+> Orion, Dove.
+> 
+> Marvell wanted to do exactly the same for Armada 370 and XP, which is
+> perfectly sane: keep the same behavior.
+> 
+> Except that the very early steppings of Armada 370 and Armada XP had a
+> bug, which prevented from changing the internal register base address,
+> so they had no other choice but to keep it at 0xd0000000. And then,
+> once those early steppings were replaced by real production steppings,
+> the bug was fixed, and they migrated to 0xf1000000, and the situation
+> was back to normal.
 
-as Tuomas noted on IRC, the reset numbers here are still wrong.
-phy1 should have 22 and phy2 58.
+As Andrew and Jason seem also agree with this patch, I would like to apply
+on it on the mvebu tree. However there is no point to do it if at the end
+you won't take it. Given the new information given by Thomas, do you agree
+with this patch?
 
->
-> On 04/02/2015 06:00 PM, Tomeu Vizoso wrote:
->> It should be the first controller, not the second.
->>
->> This broke USB after 6261b06 ("regulator: Defer lookup of supply to
->> regulator_get"), because it changed the order in which the controllers
->> were probed.
->>
->> The fix for this issue was suggested by Mikko Perttunen.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Cc: Mikko Perttunen <mikko.perttunen@kapsi.fi>
->> ---
->>
->> I think that the line numbers should be enough in this case, as I
->> expect this to be merged soon, but just in case I'm sending the same
->> patch with plenty of context.
->>
->> Regards,
->>
->> Tomeu
->>
->> ---
->>   arch/arm/boot/dts/tegra124.dtsi | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/tegra124.dtsi
->> b/arch/arm/boot/dts/tegra124.dtsi
->> index cf01c81..cb786a9 100644
->> --- a/arch/arm/boot/dts/tegra124.dtsi
->> +++ b/arch/arm/boot/dts/tegra124.dtsi
->> @@ -821,77 +821,77 @@
->>           compatible = "nvidia,tegra124-usb-phy",
->> "nvidia,tegra30-usb-phy";
->>           reg = <0x0 0x7d000000 0x0 0x4000>,
->>                 <0x0 0x7d000000 0x0 0x4000>;
->>           phy_type = "utmi";
->>           clocks = <&tegra_car TEGRA124_CLK_USBD>,
->>                <&tegra_car TEGRA124_CLK_PLL_U>,
->>                <&tegra_car TEGRA124_CLK_USBD>;
->>           clock-names = "reg", "pll_u", "utmi-pads";
->>           resets = <&tegra_car 59>, <&tegra_car 22>;
->>           reset-names = "usb", "utmi-pads";
->>           nvidia,hssync-start-delay = <0>;
->>           nvidia,idle-wait-delay = <17>;
->>           nvidia,elastic-limit = <16>;
->>           nvidia,term-range-adj = <6>;
->>           nvidia,xcvr-setup = <9>;
->>           nvidia,xcvr-lsfslew = <0>;
->>           nvidia,xcvr-lsrslew = <3>;
->>           nvidia,hssquelch-level = <2>;
->>           nvidia,hsdiscon-level = <5>;
->>           nvidia,xcvr-hsslew = <12>;
->> +        nvidia,has-utmi-pad-registers;
->>           status = "disabled";
->>       };
->>
->>       usb at 0,7d004000 {
->>           compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci",
->> "usb-ehci";
->>           reg = <0x0 0x7d004000 0x0 0x4000>;
->>           interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
->>           phy_type = "utmi";
->>           clocks = <&tegra_car TEGRA124_CLK_USB2>;
->>           resets = <&tegra_car 58>;
->>           reset-names = "usb";
->>           nvidia,phy = <&phy2>;
->>           status = "disabled";
->>       };
->>
->>       phy2: usb-phy at 0,7d004000 {
->>           compatible = "nvidia,tegra124-usb-phy",
->> "nvidia,tegra30-usb-phy";
->>           reg = <0x0 0x7d004000 0x0 0x4000>,
->>                 <0x0 0x7d000000 0x0 0x4000>;
->>           phy_type = "utmi";
->>           clocks = <&tegra_car TEGRA124_CLK_USB2>,
->>                <&tegra_car TEGRA124_CLK_PLL_U>,
->>                <&tegra_car TEGRA124_CLK_USBD>;
->>           clock-names = "reg", "pll_u", "utmi-pads";
->>           resets = <&tegra_car 22>, <&tegra_car 22>;
->>           reset-names = "usb", "utmi-pads";
->>           nvidia,hssync-start-delay = <0>;
->>           nvidia,idle-wait-delay = <17>;
->>           nvidia,elastic-limit = <16>;
->>           nvidia,term-range-adj = <6>;
->>           nvidia,xcvr-setup = <9>;
->>           nvidia,xcvr-lsfslew = <0>;
->>           nvidia,xcvr-lsrslew = <3>;
->>           nvidia,hssquelch-level = <2>;
->>           nvidia,hsdiscon-level = <5>;
->>           nvidia,xcvr-hsslew = <12>;
->> -        nvidia,has-utmi-pad-registers;
->>           status = "disabled";
->>       };
->>
->>       usb at 0,7d008000 {
->>           compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci",
->> "usb-ehci";
->>           reg = <0x0 0x7d008000 0x0 0x4000>;
->>           interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
->>           phy_type = "utmi";
->>           clocks = <&tegra_car TEGRA124_CLK_USB3>;
->>           resets = <&tegra_car 59>;
->>           reset-names = "usb";
->>           nvidia,phy = <&phy3>;
->>           status = "disabled";
->>       };
->>
->>       phy3: usb-phy at 0,7d008000 {
->>           compatible = "nvidia,tegra124-usb-phy",
->> "nvidia,tegra30-usb-phy";
->>           reg = <0x0 0x7d008000 0x0 0x4000>,
->>                 <0x0 0x7d000000 0x0 0x4000>;
->>           phy_type = "utmi";
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+
+Gregory
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
