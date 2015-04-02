@@ -1,163 +1,439 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  2 Apr 2015 22:31:45 +0200
-Subject: [PATCH 3/6] doc: dt: add documentation for lpc1850-cgu clk driver
+Date: Thu,  2 Apr 2015 22:31:46 +0200
+Subject: [PATCH 4/6] clk: add lpc18xx ccu clk driver
 In-Reply-To: <1428006708-13690-1-git-send-email-manabian@gmail.com>
 References: <1428006708-13690-1-git-send-email-manabian@gmail.com>
-Message-ID: <1428006708-13690-4-git-send-email-manabian@gmail.com>
+Message-ID: <1428006708-13690-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding documentation for lpc1850-cgu driver.
+Add driver for NXP LPC18xx/43xx Clock Control Unit (CCU). The CCU
+provides fine grained gating of most clocks present in the SoC.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- .../devicetree/bindings/clock/lpc1850-cgu.txt      | 138 +++++++++++++++++++++
- 1 file changed, 138 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+ drivers/clk/Makefile                    |   1 +
+ drivers/clk/clk-lpc18xx-ccu.c           | 318 ++++++++++++++++++++++++++++++++
+ include/dt-bindings/clock/lpc18xx-ccu.h |  74 ++++++++
+ 3 files changed, 393 insertions(+)
+ create mode 100644 drivers/clk/clk-lpc18xx-ccu.c
+ create mode 100644 include/dt-bindings/clock/lpc18xx-ccu.h
 
-diff --git a/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 222a4e39bb81..0c7526df1c84 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -25,6 +25,7 @@ obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
+ obj-$(CONFIG_ARCH_EFM32)		+= clk-efm32gg.o
+ obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
+ obj-$(CONFIG_ARCH_LPC18XX)		+= clk-lpc18xx-cgu.o
++obj-$(CONFIG_ARCH_LPC18XX)		+= clk-lpc18xx-ccu.o
+ obj-$(CONFIG_MACH_LOONGSON1)		+= clk-ls1x.o
+ obj-$(CONFIG_COMMON_CLK_MAX_GEN)	+= clk-max-gen.o
+ obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
+diff --git a/drivers/clk/clk-lpc18xx-ccu.c b/drivers/clk/clk-lpc18xx-ccu.c
 new file mode 100644
-index 000000000000..0b278ca6aee7
+index 000000000000..01130f31611c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/lpc1850-cgu.txt
-@@ -0,0 +1,138 @@
-+* NXP LPC1850 Clock Generation Unit (CGU)
++++ b/drivers/clk/clk-lpc18xx-ccu.c
+@@ -0,0 +1,318 @@
++/*
++ * Clk driver for NXP LPC18xx/LPC43xx Clock Control Unit (CCU)
++ *
++ * Copyright (C) 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+The CGU generates multiple independent clocks for the core and the
-+peripheral blocks of the LPC18xx. Each independent clock is called
-+a base clock and itself is one of the inputs to the two Clock
-+Control Units (CCUs) which control the branch clocks to the
-+individual peripherals.
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/string.h>
 +
-+The CGU selects the inputs to the clock generators from multiple
-+clock sources, controls the clock generation, and routes the outputs
-+of the clock generators through the clock source bus to the output
-+stages. Each output stage provides an independent clock source and
-+corresponds to one of the base clocks for the LPC18xx.
++#include <dt-bindings/clock/lpc18xx-cgu.h>
++#include <dt-bindings/clock/lpc18xx-ccu.h>
 +
-+ - Above text taken from NXP LPC1850 User Manual.
++/* Bit defines for CCU branch configuration register */
++#define LPC18XX_CCU_RUN		BIT(0)
++#define LPC18XX_CCU_AUTO	BIT(1)
++#define LPC18XX_CCU_DIV		BIT(5)
++#define LPC18XX_CCU_DIVSTAT	BIT(27)
 +
++/* CCU branch feature bits */
++#define CCU_BRANCH_IS_BUS	BIT(0)
++#define CCU_BRANCH_HAVE_DIV2	BIT(1)
 +
-+This binding uses the common clock binding:
-+    Documentation/devicetree/bindings/clock/clock-bindings.txt
++#define to_clk_gate(_hw) container_of(_hw, struct clk_gate, hw)
 +
-+Required properties:
-+- compatible:
-+	Should be "nxp,lpc1850-cgu"
-+- reg:
-+	Shall define the base and range of the address space
-+	containing clock control registers
-+- #clock-cells:
-+	Shall have value <1>.  The permitted clock-specifier values
-+	are the base clock numbers defined below.
-+- clocks:
-+	Shall contain a list of phandles for the external input
-+	sources to the CGU. The list shall be in the following
-+	order: xtal, 32khz, enet_rx_clk, enet_tx_clk, gp_clkin.
-+- clock-indices:
-+	Shall be an ordered list of numbers defining the base clock
-+	number provided by the CGU.
-+- clock-output-names:
-+	Shall be an ordered list of strings defining the names of
-+	the clocks provided by the CGU.
-+
-+Which base clocks that are available on the CGU depends on the
-+specific LPC part. Base cloks are numbered from 0 to 27.
-+
-+Number:		Name:			Description:
-+ 0		BASE_SAFE_CLK		Base safe clock (always on) for WWDT
-+ 1		BASE_USB0_CLK		Base clock for USB0
-+ 2		BASE_PERIPH_CLK		Base clock for Cortex-M0SUB subsystem,
-+					SPI, and SGPIO
-+ 3		BASE_USB1_CLK		Base clock for USB1
-+ 4		BASE_CPU_CLK		System base clock for ARM Cortex-M core
-+					and APB peripheral blocks #0 and #2
-+ 5		BASE_SPIFI_CLK		Base clock for SPIFI
-+ 6		BASE_SPI_CLK		Base clock for SPI
-+ 7		BASE_PHY_RX_CLK		Base clock for Ethernet PHY Receive clock
-+ 8		BASE_PHY_TX_CLK		Base clock for Ethernet PHY Transmit clock
-+ 9		BASE_APB1_CLK		Base clock for APB peripheral block # 1
-+10		BASE_APB3_CLK		Base clock for APB peripheral block # 3
-+11		BASE_LCD_CLK		Base clock for LCD
-+12		BASE_ADCHS_CLK		Base clock for ADCHS
-+13		BASE_SDIO_CLK		Base clock for SD/MMC
-+14		BASE_SSP0_CLK		Base clock for SSP0
-+15		BASE_SSP1_CLK		Base clock for SSP1
-+16		BASE_UART0_CLK		Base clock for UART0
-+17		BASE_UART1_CLK		Base clock for UART1
-+18		BASE_UART2_CLK		Base clock for UART2
-+19		BASE_UART3_CLK		Base clock for UART3
-+20		BASE_OUT_CLK		Base clock for CLKOUT pin
-+24-21		-			Reserved
-+25		BASE_AUDIO_CLK		Base clock for audio system (I2S)
-+26 		BASE_CGU_OUT0_CLK	Base clock for CGU_OUT0 clock output
-+27 		BASE_CGU_OUT1_CLK	Base clock for CGU_OUT1 clock output
-+
-+BASE_PERIPH_CLK and BASE_SPI_CLK is only available on LPC43xx.
-+BASE_ADCHS_CLK is only available on LPC4370.
-+
-+
-+Example board file:
-+
-+/ {
-+	clocks {
-+		xtal: xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <12000000>;
-+		};
-+
-+		xtal32: xtal32 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+		};
-+
-+		enet_rx_clk: enet_rx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_rx_clk";
-+		};
-+
-+		enet_tx_clk: enet_tx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_tx_clk";
-+		};
-+
-+		gp_clkin: gp_clkin {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "gp_clkin";
-+		};
-+	};
-+
-+	soc {
-+		cgu: cgu at 40050000 {
-+			compatible = "nxp,lpc1850-cgu";
-+			reg = <0x40050000 0x1000>;
-+			#clock-cells = <1>;
-+			clocks = <&xtal>, <&creg_clk 1>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
-+			clock-indices =  <0>,  <1>,  <2>,  <3>,  <4>,  <5>,  <6>,  <7>,
-+					 <8>,  <9>, <10>, <11>, <12>, <13>, <14>, <15>,
-+					<16>, <17>, <18>, <19>, <20>, <25>, <26>, <27>;
-+			clock-output-names = "base_safe_clk",    "base_usb0_clk",
-+					     "base_periph_clk",  "base_usb1_clk",
-+					     "base_cpu_clk",     "base_spifi_clk",
-+					     "base_spi_clk",     "base_phy_rx_clk",
-+					     "base_phy_tx_clk",  "base_apb1_clk",
-+					     "base_apb3_clk",    "base_lcd_clk",
-+					     "base_adchs_clk",   "base_sdio_clk",
-+					     "base_ssp0_clk",    "base_ssp1_clk",
-+					     "base_uart0_clk",   "base_uart1_clk",
-+					     "base_uart2_clk",   "base_uart3_clk",
-+					     "base_out_clk",     "base_audio_clk",
-+					     "base_cgu_out0_clk","base_cgu_out1_clk";
-+		};
-+	};
++struct lpc18xx_branch_clk_data {
++	int *base_ids;
++	int num_base_ids;
 +};
++
++struct lpc18xx_clk_branch {
++	int base_id;
++	const char *name;
++	u16 offset;
++	u16 flags;
++	struct clk *clk;
++	struct clk_gate gate;
++};
++
++static struct lpc18xx_clk_branch clk_branches[] = {
++	{BASE_APB3_CLK, "apb3_bus",		CLK_APB3_BUS,		CCU_BRANCH_IS_BUS},
++	{BASE_APB3_CLK, "apb3_i2c1",		CLK_APB3_I2C1,		0},
++	{BASE_APB3_CLK, "apb3_dac",		CLK_APB3_DAC,		0},
++	{BASE_APB3_CLK, "apb3_adc0",		CLK_APB3_ADC0,		0},
++	{BASE_APB3_CLK, "apb3_adc1",		CLK_APB3_ADC1,		0},
++	{BASE_APB3_CLK, "apb3_can0",		CLK_APB3_CAN0,		0},
++
++	{BASE_APB1_CLK, "apb1_bus",		CLK_APB1_BUS,		CCU_BRANCH_IS_BUS},
++	{BASE_APB1_CLK, "apb1_motorcon_pwm",	CLK_APB1_MOTOCON_PWM,	0},
++	{BASE_APB1_CLK, "apb1_i2c0",		CLK_APB1_I2C0,		0},
++	{BASE_APB1_CLK, "apb1_i2s",		CLK_APB1_I2S,		0},
++	{BASE_APB1_CLK, "apb1_can1",		CLK_APB1_CAN1,		0},
++
++	{BASE_SPIFI_CLK, "spifi",		CLK_SPIFI,		0},
++
++	{BASE_CPU_CLK, "cpu_bus",		CLK_CPU_BUS,		CCU_BRANCH_IS_BUS},
++	{BASE_CPU_CLK, "cpu_spifi",		CLK_CPU_SPIFI,		0},
++	{BASE_CPU_CLK, "cpu_gpio",		CLK_CPU_GPIO,		0},
++	{BASE_CPU_CLK, "cpu_lcd",		CLK_CPU_LCD,		0},
++	{BASE_CPU_CLK, "cpu_ethernet",		CLK_CPU_ETHERNET,	0},
++	{BASE_CPU_CLK, "cpu_usb0",		CLK_CPU_USB0,		0},
++	{BASE_CPU_CLK, "cpu_emc",		CLK_CPU_EMC,		0},
++	{BASE_CPU_CLK, "cpu_sdio",		CLK_CPU_SDIO,		0},
++	{BASE_CPU_CLK, "cpu_dma",		CLK_CPU_DMA,		0},
++	{BASE_CPU_CLK, "cpu_core",		CLK_CPU_CORE,		0},
++	{BASE_CPU_CLK, "cpu_sct",		CLK_CPU_SCT,		0},
++	{BASE_CPU_CLK, "cpu_usb1",		CLK_CPU_USB1,		0},
++	{BASE_CPU_CLK, "cpu_emcdiv",		CLK_CPU_EMCDIV,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_flasha",		CLK_CPU_FLASHA,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_flashb",		CLK_CPU_FLASHB,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_m0app",		CLK_CPU_M0APP,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_adchs",		CLK_CPU_ADCHS,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_eeprom",		CLK_CPU_EEPROM,		CCU_BRANCH_HAVE_DIV2},
++	{BASE_CPU_CLK, "cpu_wwdt",		CLK_CPU_WWDT,		0},
++	{BASE_CPU_CLK, "cpu_uart0",		CLK_CPU_UART0,		0},
++	{BASE_CPU_CLK, "cpu_uart1",		CLK_CPU_UART1,		0},
++	{BASE_CPU_CLK, "cpu_ssp0",		CLK_CPU_SSP0,		0},
++	{BASE_CPU_CLK, "cpu_timer0",		CLK_CPU_TIMER0,		0},
++	{BASE_CPU_CLK, "cpu_timer1",		CLK_CPU_TIMER1,		0},
++	{BASE_CPU_CLK, "cpu_scu",		CLK_CPU_SCU,		0},
++	{BASE_CPU_CLK, "cpu_creg",		CLK_CPU_CREG,		0},
++	{BASE_CPU_CLK, "cpu_ritimer",		CLK_CPU_RITIMER,	0},
++	{BASE_CPU_CLK, "cpu_uart2",		CLK_CPU_UART2,		0},
++	{BASE_CPU_CLK, "cpu_uart3",		CLK_CPU_UART3,		0},
++	{BASE_CPU_CLK, "cpu_timer2",		CLK_CPU_TIMER2,		0},
++	{BASE_CPU_CLK, "cpu_timer3",		CLK_CPU_TIMER3,		0},
++	{BASE_CPU_CLK, "cpu_ssp1",		CLK_CPU_SSP1,		0},
++	{BASE_CPU_CLK, "cpu_qei",		CLK_CPU_QEI,		0},
++
++	{BASE_PERIPH_CLK, "periph_bus",		CLK_PERIPH_BUS,		CCU_BRANCH_IS_BUS},
++	{BASE_PERIPH_CLK, "periph_core",	CLK_PERIPH_CORE,	0},
++	{BASE_PERIPH_CLK, "periph_sgpio",	CLK_PERIPH_SGPIO,	0},
++
++	{BASE_USB0_CLK,  "usb0",		CLK_USB0,		0},
++	{BASE_USB1_CLK,  "usb1",		CLK_USB1,		0},
++	{BASE_SPI_CLK,   "spi",			CLK_SPI,		0},
++	{BASE_ADCHS_CLK, "adchs",		CLK_ADCHS,		0},
++
++	{BASE_AUDIO_CLK, "audio",		CLK_AUDIO,		0},
++	{BASE_UART3_CLK, "apb2_uart3",		CLK_APB2_UART3,		0},
++	{BASE_UART2_CLK, "apb2_uart2",		CLK_APB2_UART2,		0},
++	{BASE_UART1_CLK, "apb0_uart1",		CLK_APB0_UART1,		0},
++	{BASE_UART0_CLK, "apb0_uart0",		CLK_APB0_UART0,		0},
++	{BASE_SSP1_CLK,  "apb2_ssp1",		CLK_APB2_SSP1,		0},
++	{BASE_SSP0_CLK,  "apb0_ssp0",		CLK_APB0_SSP0,		0},
++	{BASE_SDIO_CLK,  "sdio",		CLK_SDIO,		0},
++};
++
++static int of_clk_get_parent_arg(struct device_node *np, int index)
++{
++	struct of_phandle_args clkspec;
++	int rc;
++
++	if (index < 0)
++		return -EINVAL;
++
++	rc = of_parse_phandle_with_args(np, "clocks", "#clock-cells", index,
++					&clkspec);
++	if (rc)
++		return -EINVAL;
++
++	return clkspec.args_count ? clkspec.args[0] : -EINVAL;
++}
++
++static struct clk *lpc18xx_ccu_branch_clk_get(struct of_phandle_args *clkspec,
++					      void *data)
++{
++	struct lpc18xx_branch_clk_data *clk_data = data;
++	unsigned int offset = clkspec->args[0];
++	int i, j;
++
++	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
++		if (clk_branches[i].offset != offset)
++			continue;
++
++		for (j = 0; j < clk_data->num_base_ids; j++) {
++			if (clk_data->base_ids[j] == clk_branches[i].base_id)
++				return clk_branches[i].clk;
++		}
++	}
++
++	pr_err("%s: invalid clock offset %d\n", __func__, offset);
++
++	return ERR_PTR(-EINVAL);
++}
++
++static int lpc18xx_ccu_gate_endisable(struct clk_hw *hw, bool enable)
++{
++	struct clk_gate *gate = to_clk_gate(hw);
++	u32 val;
++
++	/*
++	 * Divider field is write only, so divider stat field must
++	 * be read so divider field can be set accordingly.
++	 */
++	val = clk_readl(gate->reg);
++	if (val & LPC18XX_CCU_DIVSTAT)
++		val |= LPC18XX_CCU_DIV;
++
++	if (enable) {
++		val |= LPC18XX_CCU_RUN;
++	} else {
++		/*
++		 * To safely disable a branch clock a squence of two separate
++		 * writes must be used. First write should set the AUTO bit
++		 * and the next write should clear the RUN bit.
++		 */
++		val |= LPC18XX_CCU_AUTO;
++		clk_writel(val, gate->reg);
++
++		val &= ~LPC18XX_CCU_RUN;
++	}
++
++	clk_writel(val, gate->reg);
++
++	return 0;
++}
++
++static int lpc18xx_ccu_gate_enable(struct clk_hw *hw)
++{
++	return lpc18xx_ccu_gate_endisable(hw, true);
++}
++
++static void lpc18xx_ccu_gate_disable(struct clk_hw *hw)
++{
++	lpc18xx_ccu_gate_endisable(hw, false);
++}
++
++static int lpc18xx_ccu_gate_is_enabled(struct clk_hw *hw)
++{
++	struct clk_gate *gate = to_clk_gate(hw);
++
++	return clk_readl(gate->reg) & LPC18XX_CCU_RUN;
++}
++
++static const struct clk_ops lpc18xx_ccu_gate_ops = {
++	.enable		= lpc18xx_ccu_gate_enable,
++	.disable	= lpc18xx_ccu_gate_disable,
++	.is_enabled	= lpc18xx_ccu_gate_is_enabled,
++};
++
++static void lpc18xx_ccu_register_branch_gate_div(struct lpc18xx_clk_branch *branch,
++						 void __iomem *base,
++						 const char *parent)
++{
++	const struct clk_ops *div_ops = NULL;
++	struct clk_divider *div = NULL;
++	struct clk_hw *div_hw = NULL;
++
++	if (branch->flags & CCU_BRANCH_HAVE_DIV2) {
++		div = kzalloc(sizeof(*div), GFP_KERNEL);
++		if (!div)
++			return;
++
++		div->reg = branch->offset + base;
++		div->flags = CLK_DIVIDER_READ_ONLY;
++		div->shift = 27;
++		div->width = 1;
++
++		div_hw = &div->hw;
++		div_ops = &clk_divider_ops;
++	}
++
++	branch->gate.reg = branch->offset + base;
++	branch->gate.bit_idx = 0;
++
++	branch->clk = clk_register_composite(NULL, branch->name, &parent, 1,
++					     NULL, NULL,
++					     div_hw, div_ops,
++					     &branch->gate.hw, &lpc18xx_ccu_gate_ops, 0);
++	if (IS_ERR(branch->clk)) {
++		kfree(div);
++		pr_warn("%s: failed to register %s\n", __func__, branch->name);
++		return;
++	}
++
++	/* Grab essential branch clocks for CPU and SDRAM */
++	switch (branch->offset) {
++	case CLK_CPU_EMC:
++	case CLK_CPU_CORE:
++	case CLK_CPU_CREG:
++	case CLK_CPU_EMCDIV:
++		clk_prepare_enable(branch->clk);
++	}
++}
++
++static void lpc18xx_ccu_register_branch_clks(void __iomem *base, int base_clk_id,
++					     const char *parent)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(clk_branches); i++) {
++		if (clk_branches[i].base_id != base_clk_id)
++			continue;
++
++		lpc18xx_ccu_register_branch_gate_div(&clk_branches[i], base,
++						     parent);
++
++		if (clk_branches[i].flags & CCU_BRANCH_IS_BUS)
++			parent = clk_branches[i].name;
++	}
++}
++
++static void __init lpc18xx_ccu_init(struct device_node *np)
++{
++	struct lpc18xx_branch_clk_data *clk_data;
++	int num_base_ids, *base_ids;
++	void __iomem *base;
++	const char *parent;
++	int base_clk_id;
++	int i;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_warn("%s: failed to map address range\n", __func__);
++		return;
++	}
++
++	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	num_base_ids = of_clk_get_parent_count(np);
++
++	base_ids = kcalloc(num_base_ids, sizeof(int), GFP_KERNEL);
++	if (!base_ids) {
++		kfree(clk_data);
++		return;
++	}
++
++	clk_data->base_ids = base_ids;
++	clk_data->num_base_ids = num_base_ids;
++
++	for (i = 0; i < num_base_ids; i++) {
++		parent = of_clk_get_parent_name(np, i);
++
++		base_clk_id = of_clk_get_parent_arg(np, i);
++		if (base_clk_id < 0 && base_clk_id >= BASE_CLK_MAX) {
++			pr_warn("%s: invalid base clk at idx %d\n", __func__, i);
++			base_ids[i] = -EINVAL;
++			continue;
++		}
++
++		clk_data->base_ids[i] = base_clk_id;
++		lpc18xx_ccu_register_branch_clks(base, base_clk_id, parent);
++	}
++
++	of_clk_add_provider(np, lpc18xx_ccu_branch_clk_get, clk_data);
++}
++CLK_OF_DECLARE(lpc18xx_ccu, "nxp,lpc1850-ccu", lpc18xx_ccu_init);
+diff --git a/include/dt-bindings/clock/lpc18xx-ccu.h b/include/dt-bindings/clock/lpc18xx-ccu.h
+new file mode 100644
+index 000000000000..bbfe00b6ab7d
+--- /dev/null
++++ b/include/dt-bindings/clock/lpc18xx-ccu.h
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (c) 2015 Joachim Eastwood <manabian@gmail.com>
++ *
++ * This code is released using a dual license strategy: BSD/GPL
++ * You can choose the licence that better fits your requirements.
++ *
++ * Released under the terms of 3-clause BSD License
++ * Released under the terms of GNU General Public License Version 2.0
++ *
++ */
++
++/* Clock Control Unit 1 (CCU1) clock offsets */
++#define CLK_APB3_BUS		0x100
++#define CLK_APB3_I2C1		0x108
++#define CLK_APB3_DAC		0x110
++#define CLK_APB3_ADC0		0x118
++#define CLK_APB3_ADC1		0x120
++#define CLK_APB3_CAN0		0x128
++#define CLK_APB1_BUS		0x200
++#define CLK_APB1_MOTOCON_PWM	0x208
++#define CLK_APB1_I2C0		0x210
++#define CLK_APB1_I2S		0x218
++#define CLK_APB1_CAN1		0x220
++#define CLK_SPIFI		0x300
++#define CLK_CPU_BUS		0x400
++#define CLK_CPU_SPIFI		0x408
++#define CLK_CPU_GPIO		0x410
++#define CLK_CPU_LCD		0x418
++#define CLK_CPU_ETHERNET	0x420
++#define CLK_CPU_USB0		0x428
++#define CLK_CPU_EMC		0x430
++#define CLK_CPU_SDIO		0x438
++#define CLK_CPU_DMA		0x440
++#define CLK_CPU_CORE		0x448
++#define CLK_CPU_SCT		0x468
++#define CLK_CPU_USB1		0x470
++#define CLK_CPU_EMCDIV		0x478
++#define CLK_CPU_FLASHA		0x480
++#define CLK_CPU_FLASHB		0x488
++#define CLK_CPU_M0APP		0x490
++#define CLK_CPU_ADCHS		0x498
++#define CLK_CPU_EEPROM		0x4a0
++#define CLK_CPU_WWDT		0x500
++#define CLK_CPU_UART0		0x508
++#define CLK_CPU_UART1		0x510
++#define CLK_CPU_SSP0		0x518
++#define CLK_CPU_TIMER0		0x520
++#define CLK_CPU_TIMER1		0x528
++#define CLK_CPU_SCU		0x530
++#define CLK_CPU_CREG		0x538
++#define CLK_CPU_RITIMER		0x600
++#define CLK_CPU_UART2		0x608
++#define CLK_CPU_UART3		0x610
++#define CLK_CPU_TIMER2		0x618
++#define CLK_CPU_TIMER3		0x620
++#define CLK_CPU_SSP1		0x628
++#define CLK_CPU_QEI		0x630
++#define CLK_PERIPH_BUS		0x700
++#define CLK_PERIPH_CORE		0x710
++#define CLK_PERIPH_SGPIO	0x718
++#define CLK_USB0		0x800
++#define CLK_USB1		0x900
++#define CLK_SPI			0xA00
++#define CLK_ADCHS		0xB00
++
++/* Clock Control Unit 2 (CCU2) clock offsets */
++#define CLK_AUDIO		0x100
++#define CLK_APB2_UART3		0x200
++#define CLK_APB2_UART2		0x300
++#define CLK_APB0_UART1		0x400
++#define CLK_APB0_UART0		0x500
++#define CLK_APB2_SSP1		0x600
++#define CLK_APB0_SSP0		0x700
++#define CLK_SDIO		0x800
 -- 
 1.8.0
