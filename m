@@ -1,49 +1,41 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 2 Apr 2015 12:49:10 -0400 (EDT)
-Subject: [GIT PULL] MCPM maintenance for v4.1
-In-Reply-To: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
-References: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
-Message-ID: <alpine.LFD.2.11.1504021245570.25806@knanqh.ubzr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Apr 2015 17:55:47 +0100
+Subject: [PATCH 1/3] mfd: ucb1x00: add irq field to the platform data
+In-Reply-To: <CALT56yM-JSN=8KR3EUFAa+k4ZZkqXY9zgwzT2PhRn23dMUc3rQ@mail.gmail.com>
+References: <1427989307-1805-1-git-send-email-dbaryshkov@gmail.com>
+ <20150402160252.GO24899@n2100.arm.linux.org.uk>
+ <CALT56yM-JSN=8KR3EUFAa+k4ZZkqXY9zgwzT2PhRn23dMUc3rQ@mail.gmail.com>
+Message-ID: <20150402165547.GV24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 02, 2015 at 07:27:24PM +0300, Dmitry Eremin-Solenikov wrote:
+> Because using static configuration would allow me to drop a nice piece
+> of code. Because it would allow later to use dts to describe ucb1x00
+> configuration. Because I will no longer have to think whether ucb1x00I h
+> driver barfing on IRQ is a problem of a chip, of an IRQ or just me having
+> touched wrong GPIO line at wrong time with a scope probe. Yes, I didn't
+> put all these causes to the commit description. Do you really want it?
 
-Ping.
+What I want is a decent commit description, one which isn't airy fairy
+and looks like it's just mindless churn.  That's all.
 
-On Wed, 25 Mar 2015, Nicolas Pitre wrote:
+It's what every other kernel developer wants to know.  This is precisely
+what the ARM ecosystem has been soo bad at for decades.
 
-> Please consider pulling the following:
-> 
-> http://git.linaro.org/people/nicolas.pitre/linux.git mcpm_for_armsoc
-> 
-> This series greatly simplifies things by moving all the locking handling 
-> to the core code, leaving machine specific backend only with simple and 
-> straight forward operations performed under lock protection. It will no 
-> longer be necessary for backend authors to know about all the MCPM 
-> subtleties for their code to be "right".
-> 
-> To avoid a flag day, the new scheme is introduced in parallel to the 
-> existing backend interface. This series may be merged at the same time 
-> as new backends still using the previous interface. That old interface 
-> should be removed in a subsequent merge cycle after everything is 
-> converted over.
-> 
-> The diffstat also shows a clear benefit.  Despite the addition of new 
-> documentation and the previous interface still in place, the number of 
-> lines actually goes down.
-> 
-> Tested on Versatile Express TC2 and Exynos 5800 (Chromebook2).
-> 
->  arch/arm/common/mcpm_entry.c       | 202 +++++++++++++++++----
->  arch/arm/include/asm/mcpm.h        |  65 ++++++-
->  arch/arm/mach-exynos/mcpm-exynos.c | 247 ++++++--------------------
->  arch/arm/mach-vexpress/dcscb.c     | 197 +++++++--------------
->  arch/arm/mach-vexpress/tc2_pm.c    | 291 +++++++++----------------------
->  5 files changed, 436 insertions(+), 566 deletions(-)
-> 
-> Thanks
-> 
-> 
-> Nicolas
-> 
-> 
+It matters.  It's one of the things what pisses Linus off.  What Linus
+sees from ARM people is lots and lots of apparently pointless churn
+which he doesn't understand - and part of that problem is that ARM
+people do _not_ justify in their commit messages why a change is
+necessary.
+
+So please, improve the commit messages and justify the commits.
+
+It really doesn't help that all that was posted was three patches and
+no covering message which could either explain what the three patches
+were trying to achieve.  Like most people do.  (And some people take
+that to an extreme, posting a cover message for just one patch.)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
