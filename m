@@ -1,5 +1,5 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Apr 2015 15:48:24 +0100
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 2 Apr 2015 14:48:37 +0000
 Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on
  Armada 370 DB
 In-Reply-To: <20150402161626.182e267d@free-electrons.com>
@@ -8,35 +8,39 @@ References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.co
  <20150402153650.2cc9c3d7@free-electrons.com>
  <2515980.d69ggAvHPo@wuerfel>
  <20150402161626.182e267d@free-electrons.com>
-Message-ID: <20150402144823.GJ24899@n2100.arm.linux.org.uk>
+Message-ID: <20150402144837.GF24598@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thomas,
+
 On Thu, Apr 02, 2015 at 04:16:26PM +0200, Thomas Petazzoni wrote:
-> All customers have evaluation boards with a production stepping of the
-> silicon, and for all of them the current kernel is *not* working.
-> 
-> The patch I'm proposing is what makes the kernel work for them.
-> 
+> Except that the very early steppings of Armada 370 and Armada XP had a
+> bug, which prevented from changing the internal register base address,
+> so they had no other choice but to keep it at 0xd0000000. And then,
+> once those early steppings were replaced by real production steppings,
+> the bug was fixed, and they migrated to 0xf1000000, and the situation
+> was back to normal.
+
+fwiw, I agree with the change, and I appreciate this background info.
+It's comforting to hear that it was a hardware bug, not just a "well, we
+forgot to remap in u-boot, oh well."
+
 > Arnd, please don't get in the way of platform maintainers for such very
 > platform-specific issues for which you don't have the background about
 > what happened and why we're doing this change. It's the responsibility
 > of the platform maintainers to decide how and when they want to keep or
 > break the compatibility.
 
-Wrong.  It's Arnd's responsibility to make sure that platform maintainers
-don't do stupid things like change the DT in incompatible ways which
-break lots of people's setups.
+Inhale, exhale, zen. :-)  Arnd is doing exactly what he's supposed to be
+doing.  He spotted something that doesn't appear to match the big
+picture of what we're trying to do with DT.  He questioned it.  It's our
+job to give him a clear, technical argument for why we're making the
+change.  To put it bluntly: him, Olof, and others are our sanity check.
 
-However, it is _your_ responsibility as the platform maintainer to place
-sufficient information into the commit message that explains why the
-change is necessary, and justifies the change.  Much of what you've said
-in these follow-on emails should have been in the original message to
-explain what the situation is, and why the change is appropriate.
+If we can't provide a sound technical reasoning for the change(s), then
+they shouldn't accept a branch containing them.
 
-I'm willing to bet that if the commit description had explained it
-properly, Arnd would have applied it by now.
+thx,
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Jason.
