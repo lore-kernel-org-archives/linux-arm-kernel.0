@@ -1,44 +1,66 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  2 Apr 2015 16:31:59 +0200
-Subject: [PATCH] ARM: tegra: Correct which USB controller has the UTMI pad
- registers
-Message-ID: <1427985119-15307-1-git-send-email-tomeu.vizoso@collabora.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Apr 2015 15:33:35 +0100
+Subject: [GIT PULL] arm-cci PMU updates for 4.1
+In-Reply-To: <20150327172500.GO1562@arm.com>
+References: <20150327172500.GO1562@arm.com>
+Message-ID: <20150402143332.GE9719@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It should be the first controller, not the second.
+On Fri, Mar 27, 2015 at 05:25:00PM +0000, Will Deacon wrote:
+> Hi Olof, Arnd,
+> 
+> Please can you pull the following ARM CCI PMU updates for 4.1? Suzuki
+> has reworked parts of the existing driver so that it can be used on CPUs
+> booting in non-secure mode (i.e. ARM64 systems) and also make it easier
+> to port over to new IP, such as CCI-500.
+> 
+> It's coming via me as $ARM_PERF_GUY, but Nico has Acked the core driver
+> (non-PMU) changes. Note that these have been in next for a bit, but I
+> can drop the branch once you've pulled.
 
-This broke USB after 6261b06 ("regulator: Defer lookup of supply to
-regulator_get"), because it changed the order in which the controllers
-were probed.
+Gentle ping as I'm off all next week and won't be able to chase this up...
 
-The fix for this issue was suggested by Mikko Perttunen.
+Will
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Mikko Perttunen <mikko.perttunen@kapsi.fi>
----
- arch/arm/boot/dts/tegra124.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index cf01c81..cb786a9 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -838,6 +838,7 @@
- 		nvidia,hssquelch-level = <2>;
- 		nvidia,hsdiscon-level = <5>;
- 		nvidia,xcvr-hsslew = <12>;
-+		nvidia,has-utmi-pad-registers;
- 		status = "disabled";
- 	};
- 
-@@ -874,7 +875,6 @@
- 		nvidia,hssquelch-level = <2>;
- 		nvidia,hsdiscon-level = <5>;
- 		nvidia,xcvr-hsslew = <12>;
--		nvidia,has-utmi-pad-registers;
- 		status = "disabled";
- 	};
- 
--- 
-2.3.4
+> --->8
+> 
+> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
+> 
+>   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-4.1
+> 
+> for you to fetch changes up to 874c571414d5617f4042298986b6a826816ee885:
+> 
+>   arm-cci: Fix CCI PMU event validation (2015-03-27 13:45:02 +0000)
+> 
+> ----------------------------------------------------------------
+> CCI-400 PMU updates
+> 
+> This series reworks some of the CCI-400 PMU code so that it can be used
+> on both ARM and ARM64-based systems, without the need to boot in secure
+> mode on the latter. This paves the way for CCI-500 support in future.
+> 
+> ----------------------------------------------------------------
+> Suzuki K. Poulose (6):
+>       drivers: cci: reject groups spanning multiple HW PMUs
+>       arm-cci: Rearrange code for splitting PMU vs driver code
+>       arm-cci: Abstract the CCI400 PMU specific definitions
+>       arm-cci: Get rid of secure transactions for PMU driver
+>       arm-cci: Split the code for PMU vs driver support
+>       arm-cci: Fix CCI PMU event validation
+> 
+>  Documentation/devicetree/bindings/arm/cci.txt |   7 +-
+>  arch/arm/include/asm/arm-cci.h                |  42 +++
+>  arch/arm/mach-exynos/Kconfig                  |   2 +-
+>  arch/arm/mach-vexpress/Kconfig                |   4 +-
+>  arch/arm64/include/asm/arm-cci.h              |  27 ++
+>  drivers/bus/Kconfig                           |  28 +-
+>  drivers/bus/arm-cci.c                         | 517 +++++++++++++++-----------
+>  include/linux/arm-cci.h                       |   9 +-
+>  8 files changed, 399 insertions(+), 237 deletions(-)
+>  create mode 100644 arch/arm/include/asm/arm-cci.h
+>  create mode 100644 arch/arm64/include/asm/arm-cci.h
