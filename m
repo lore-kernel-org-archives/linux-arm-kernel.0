@@ -1,65 +1,139 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 03 Apr 2015 08:39:13 +0900
-Subject: [PATCH v7 1/9] arm64: dts: exynos: Add dts files for 64-bit
- Exynos5433 SoC
-In-Reply-To: <20150402173558.GB30669@leverpostej>
-References: <1426637856-3730-1-git-send-email-cw00.choi@samsung.com>
- <1426637856-3730-2-git-send-email-cw00.choi@samsung.com>
- <20150330160940.GA13731@leverpostej> <5519E2B6.2030905@samsung.com>
- <20150402173558.GB30669@leverpostej>
-Message-ID: <551DD321.6030707@samsung.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 3 Apr 2015 02:48:23 +0300
+Subject: [PATCHv3] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150402203043.GB29963@amd>
+References: <20150402143846.GA11687@amd>
+ <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
+ <20150402203043.GB29963@amd>
+Message-ID: <20150402234823.GI20756@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2015 02:35 AM, Mark Rutland wrote:
-> On Tue, Mar 31, 2015 at 12:56:38AM +0100, Chanwoo Choi wrote:
->> Hi Mark,
->>
->> On 03/31/2015 01:09 AM, Mark Rutland wrote:
->>> Hi,
->>>
->>> On Wed, Mar 18, 2015 at 12:17:28AM +0000, Chanwoo Choi wrote:
->>>> This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
->>>> Octal core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
->>>> PSCI (Power State Coordination Interface) v0.1.
->>>>
->>>> This patch includes following dt node to support Exynos5433 SoC:
->>>> 1. Octa core for big.LITTLE architecture
->>>> - Cortex-A53 LITTLE Quad-core
->>>> - Cortex-A57 big Quad-core
->>>> - Support PSCI v0.1
->>>
->>> Is CPU0 hotplug still broken, or has the FW been fixed?
->>
->> CPU0 hotplug is still not working.
->>
->>>
->>> I'm very worried about adding a DT that's known broken, especially when
->>> we have no idea as to if/when the FW will be fixed judging from prior
->>> replies.
->>
->> As I replied, I can not fix the FW because I don't have any code of FW.
-> 
-> Surely you are able to contact those who do?
-> 
->> I don't have any solution to fix it on Linux kernel level.
->>
->> So, If you agree, I can add the comment of CPU0 hotplug issue on DT file.
-> 
-> I disagree. I do not want to add a DT that is known to be broken;
-> especially when we have no idea how to fix it. It creates long-term
-> maintenance pain for everyone, and marginal gain for few. A comment does
-> nothing to aid the end-user.
-> 
-> So NAK to the PSCI node and PSCI enable method in this dts until we
-> either have a working firmware, or a reasonable mechanism to handle the
-> deficiency.
+Hi Pawel,
 
-There is only CPU0 hotplug issue. Excpet CPU{1-7} are well working.
-To fix this issue, we must need the help of firmware developer.
-But, We never get the any help. Also, as I mentioned on previous mail,
-all Exynos SoCs can not turn off the CPU0. I've never seen Exynos SoC
-that CP0 hotplug is possible.
+On Thu, Apr 02, 2015 at 10:30:44PM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > Hi Pawel,
+> > 
+> > My apologies for the very late reply.
+> > 
+> > On Thu, Apr 02, 2015 at 04:38:46PM +0200, Pavel Machek wrote:
+> > > 
+> > > 
+> > > We are moving to device tree support on OMAP3, but that currently
+> > > breaks ADP1653 driver. This adds device tree support, plus required
+> > > documentation.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > ---
+> > > 
+> > > I'm not sure if it is device tree or media framework, either everyone
+> > > waits for someone else, or noone really cares.
+> > 
+> > Neither. Some people are unfortuantely very busy with many other things as
+> > well. :-P
+> 
+> Well.. Being busy is ok. Nitpicking is also ok. But both at the same
+> time... is not good. 
 
-Thanks,
-Chanwoo Choi
+Good. Then we should be fine. :-)
+
+> 
+> > > Andrew, can you just merge it?
+> > > 
+> > > Please apply,
+> > 
+> > Please wait just a while.
+> > 
+> > I think we can merge this eventually through the linux-media tree, but
+> > please first see the comments below.
+> > 
+> 
+> > > +Required properties of the flash LED child node:
+> > > +
+> > > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
+> > 
+> > The documentation says that the maximum value is used if these values are
+> > not specified. I think I'd make these optional.
+> 
+> I'd rather not: when you make a typo in dts, it would supply maximum
+> available current, potentially damaging the LED. You will not be able
+> to tell brightness difference with naked eye...
+
+Fine for me.
+
+> > >  __adp1653_set_power(struct adp1653_flash *flash, int on)
+> > >  {
+> > > -	int ret;
+> > > +	int ret = 0;
+> > > +
+> > > +	if (flash->platform_data->power) {
+> > > +		ret = flash->platform_data->power(&flash->subdev, on);
+> > 
+> > The power() callback should be dropped. It's controlling a GPIO. But that
+> > can be done later on. The alternative is a patch before this one.
+> 
+> I'd prefer to do it later; we want to keep functionality on N900
+> without DTS, too.
+
+Fine as well.
+
+> > >  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+> > >  	if (flash == NULL)
+> > >  		return -ENOMEM;
+> > >  
+> > >  	flash->platform_data = client->dev.platform_data;
+> > > +	if (!flash->platform_data) {
+> > 
+> > I'd check whether dev->of_node is non-NULL instead.
+> 
+> Ok.
+> 
+> > > @@ -438,10 +510,10 @@ static int adp1653_probe(struct i2c_client *client,
+> > >  		goto free_and_quit;
+> > >  
+> > >  	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
+> > > -
+> > 
+> > I rather liked the newline here. Please don't remove it. :-)
+> 
+> Ok.
+> 
+> > > @@ -464,7 +536,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
+> > >  };
+> > >  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+> > >  
+> > > -static struct dev_pm_ops adp1653_pm_ops = {
+> > > +static const struct dev_pm_ops adp1653_pm_ops = {
+> > >  	.suspend	= adp1653_suspend,
+> > >  	.resume		= adp1653_resume,
+> > >  };
+> > >  
+> > > 
+> > 
+> > A corresponding change to the N900 dts would be very nice.
+> 
+> Corresponding change to the dts will come in separate patch. Or do you
+> have n900 for testing?
+
+Yes, it should be a separate patch, I agree.
+
+I do have one but I can't say when I'd have time to test it. I'm fine with
+you having tested it though.
+
+> > I think you're missing change to adp1653_i2c_driver.driver.of_match_table.
+> 
+> It actually worked for me, which means device tree somehow does it
+> magic.
+
+By magic? :-) It probably just ends up comparing the device and the driver
+names. How about adding the of_match_table?
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
