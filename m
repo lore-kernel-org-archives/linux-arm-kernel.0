@@ -1,53 +1,46 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 2 Apr 2015 14:12:33 +0800
-Subject: [PATCH] mtd: atmel_nand: add a definition for the oob reserved bytes
-Message-ID: <1427955153-8851-1-git-send-email-josh.wu@atmel.com>
+Date: Thu, 2 Apr 2015 14:13:47 +0800
+Subject: [PATCH] mtd: atmel_nand: don't map the ROM table if no pmecc table
+ offset in DT
+Message-ID: <1427955227-8927-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's better to use a macro instead of just a number.
+if atmel,pmecc-lookup-table-offset is not found in DT node, we don't
+need to map the ROM table as we will build a runtime gf table anyway.
 
+Reported-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
 
- drivers/mtd/nand/atmel_nand.c     | 5 +++--
- drivers/mtd/nand/atmel_nand_ecc.h | 3 +++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/mtd/nand/atmel_nand.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index feaac90..0361c19 100644
+index 0361c19..46010bd 100644
 --- a/drivers/mtd/nand/atmel_nand.c
 +++ b/drivers/mtd/nand/atmel_nand.c
-@@ -485,7 +485,7 @@ static void pmecc_config_ecc_layout(struct nand_ecclayout *layout,
- 	for (i = 0; i < ecc_len; i++)
- 		layout->eccpos[i] = oobsize - ecc_len + i;
+@@ -1204,14 +1204,14 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		goto err;
+ 	}
  
--	layout->oobfree[0].offset = 2;
-+	layout->oobfree[0].offset = PMECC_OOB_RESERVED_BYTES;
- 	layout->oobfree[0].length =
- 		oobsize - ecc_len - layout->oobfree[0].offset;
- }
-@@ -1254,7 +1254,8 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		nand_chip->ecc.steps = mtd->writesize / sector_size;
- 		nand_chip->ecc.total = nand_chip->ecc.bytes *
- 			nand_chip->ecc.steps;
--		if (nand_chip->ecc.total > mtd->oobsize - 2) {
-+		if (nand_chip->ecc.total >
-+				mtd->oobsize - PMECC_OOB_RESERVED_BYTES) {
- 			dev_err(host->dev, "No room for ECC bytes\n");
- 			err_no = -EINVAL;
- 			goto err;
-diff --git a/drivers/mtd/nand/atmel_nand_ecc.h b/drivers/mtd/nand/atmel_nand_ecc.h
-index d4035e3..668e735 100644
---- a/drivers/mtd/nand/atmel_nand_ecc.h
-+++ b/drivers/mtd/nand/atmel_nand_ecc.h
-@@ -152,4 +152,7 @@
- /* Time out value for reading PMECC status register */
- #define PMECC_MAX_TIMEOUT_MS			100
+-	regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+-	host->pmecc_rom_base = devm_ioremap_resource(&pdev->dev, regs_rom);
+-	if (IS_ERR(host->pmecc_rom_base)) {
+-		if (!host->has_no_lookup_table)
+-			/* Don't display the information again */
++	if (!host->has_no_lookup_table) {
++		regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
++		host->pmecc_rom_base = devm_ioremap_resource(&pdev->dev,
++								regs_rom);
++		if (IS_ERR(host->pmecc_rom_base)) {
+ 			dev_err(host->dev, "Can not get I/O resource for ROM, will build a lookup table in runtime!\n");
+-
+-		host->has_no_lookup_table = true;
++			host->has_no_lookup_table = true;
++		}
+ 	}
  
-+/* Reserved bytes in oob area */
-+#define PMECC_OOB_RESERVED_BYTES		2
-+
- #endif
+ 	if (host->has_no_lookup_table) {
 -- 
 1.9.1
