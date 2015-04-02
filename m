@@ -1,38 +1,54 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 2 Apr 2015 15:35:27 +0200
-Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on
- Armada 370 DB
-In-Reply-To: <2321040.CmsL1gluUd@wuerfel>
-References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <2321040.CmsL1gluUd@wuerfel>
-Message-ID: <20150402133527.GD10092@lunn.ch>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 2 Apr 2015 15:50:05 +0200
+Subject: next-20150402 build: 3 failures 18 warnings (next-20150402)
+In-Reply-To: <20150402112231.GQ6023@sirena.org.uk>
+References: <E1YdaYh-0000LL-D5@debutante> <20150402112231.GQ6023@sirena.org.uk>
+Message-ID: <20150402135003.GA27011@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 03:28:09PM +0200, Arnd Bergmann wrote:
-> On Thursday 02 April 2015 11:16:24 Thomas Petazzoni wrote:
-> > The Armada 370 DB boards are now being used with a more recent version
-> > of U-Boot, which has Device Tree support, and remaps internal
-> > registers at 0xf1000000 like most of the other Marvell EBU platforms.
-> > 
-> > Consequently, this commit updates the Device Tree describing this
-> > platform to use this new internal register address, so that the
-> > mainline kernel can easily be used on such boards that use a modern
-> > bootloader. A comment is also added to warn users who could have
-> > boards with an older bootloader version.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On Thu, Apr 02, 2015 at 12:22:31PM +0100, Mark Brown wrote:
+> * PGP Signed by an unknown key
 > 
-> I think it would be better to add a new .dts file that includes the
-> former, and give it a new name, such as armada-370-db-broken-uboot.dts.
+> On Thu, Apr 02, 2015 at 09:33:03AM +0100, Build bot for Mark Brown wrote:
 > 
-> We should not stop supporting the older versions, and it would be better
-> to revert the bootloader change in their u-boot before it spreads too far.
+> > Failed defconfigs:
+> > 	arm64-allmodconfig
+> 
+> For the past few days -next has been failing to build an arm64
+> allmodconfig due to:
+> 
+> | drivers/built-in.o: In function `tegra124_132_clock_init_post':
+> | :(.init.text+0x285d8): undefined reference to `tegra_emc_init'
+> 
+> This is triggered by d035fdfa27ac124bc8 (arm64: Add Tegra132 support)
+> which enables ARCH_TEGRA and ARCH_TEGRA_132_SOC for arm64 which in turn
+> causes clk-tegra124 to be built on arm64.  That driver relies on
+> TEGRA124_EMC but that depends on ARCH_TEGRA_124_SOC which is 32 bit
+> only.
 
-Hi Arnd
+It's actually triggered by a newer patch (f8fd257fabf0 "clk: tegra: Add
+EMC clock driver") which adds this new dependency.
 
-Changing to 0xf100000 is the revert. Kirkwood and Dove are at
-0xf100000 and the regression was introduced with early Armada XP
-boards and spread to 370.
+> We either need the EMC driver for Tegra132, a stub or some ifdefs.
 
-       Andrew
+Tegra132 uses the same memory controller as Tegra124, so clk-emc should
+work on both. I likely overlooked this when applying the patches. I also
+have a local patch for this that I haven't pushed yet. Will do it right
+away.
+
+> It also looks like there's an issue if the memory controller driver is
+> not enabled (which looks to be something that can be controlled by the
+> user) but I've not checked properly.
+
+I'll do some testing to see if I can break it by permutating some of the
+Kconfig symbol combinations.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150402/4fd6b394/attachment.sig>
