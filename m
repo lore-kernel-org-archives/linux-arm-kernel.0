@@ -1,76 +1,80 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 03 Apr 2015 00:09:07 +0200
-Subject: Build regression in next-20150331
-In-Reply-To: <20150402082917.GS23123@twins.programming.kicks-ass.net>
-References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
- <2863807.lxHPvZ2AsE@vostro.rjw.lan>
- <20150402082917.GS23123@twins.programming.kicks-ass.net>
-Message-ID: <1674706.RfQn8UcQXL@vostro.rjw.lan>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 2 Apr 2015 15:53:01 -0600
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
+ ICE in gcc 4.7.3
+In-Reply-To: <CAMAWPa_P5JFQsrL96KPnt0gu=P4O40cGbWkM1j6b6HGy4edErQ@mail.gmail.com>
+References: <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+ <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
+ <7hwq1v4iq4.fsf@deeprootsystems.com>
+ <20150402191230.GA24219@linaro.org>
+ <CAMAWPa_P5JFQsrL96KPnt0gu=P4O40cGbWkM1j6b6HGy4edErQ@mail.gmail.com>
+Message-ID: <20150402215301.GA24500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 02, 2015 10:29:17 AM Peter Zijlstra wrote:
-> On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
-> 
-> > > > ---
-> > > >  kernel/time/tick-internal.h |    2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > >
-> > > > Index: linux-pm/kernel/time/tick-internal.h
-> > > > ===================================================================
-> > > > --- linux-pm.orig/kernel/time/tick-internal.h
-> > > > +++ linux-pm/kernel/time/tick-internal.h
-> > > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
-> > > >  /* Set the periodic handler in non broadcast mode */
-> > > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
-> > > >  {
-> > > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
-> > > >         dev->event_handler = tick_handle_periodic;
-> > > > +#endif
-> > > >  }
-> > > >  #endif /* !BROADCAST */
-> 
-> > Peter, do you think the above is acceptable or do I need to do anything more
-> > sophisticated to fix this?  [The alternative would be probably to prepare an
-> > empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
-> > move the definition of struct clock_event_device from under that Kconfig
-> > option.]
-> 
-> 
-> Does not something like the below make more sense? The entire broadcast
-> thing doesn't make sense if we don't have generic_clockevents.
-> 
-> Should we wrap more in generic_clockevents there?
+On Thu, Apr 02 2015 at 15:12 -0600, Kevin Hilman wrote:
+>On Thu, Apr 2, 2015 at 12:12 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> On Wed, Apr 01 2015 at 15:57 -0600, Kevin Hilman wrote:
+>>>
+>>> Andrew Morton <akpm@linux-foundation.org> writes:
+>>>
+>>>> On Wed, 01 Apr 2015 10:47:49 +0100 Marc Zyngier <marc.zyngier@arm.com>
+>>>> wrote:
+>>>>
+>>>>> > -static int unmap_and_move(new_page_t get_new_page, free_page_t
+>>>>> > put_new_page,
+>>>>> > -                     unsigned long private, struct page *page, int
+>>>>> > force,
+>>>>> > -                     enum migrate_mode mode)
+>>>>> > +static noinline int unmap_and_move(new_page_t get_new_page,
+>>>>> > +                                free_page_t put_new_page,
+>>>>> > +                                unsigned long private, struct page
+>>>>> > *page,
+>>>>> > +                                int force, enum migrate_mode mode)
+>>>>> >  {
+>>>>> >       int rc = 0;
+>>>>> >       int *result = NULL;
+>>>>> >
+>>>>>
+>>>>> Ouch. That's really ugly. And on 32bit ARM, we end-up spilling half of
+>>>>> the parameters on the stack, which is not going to help performance
+>>>>> either (not that this would be useful on 32bit ARM anyway...).
+>>>>>
+>>>>> Any chance you could make this dependent on some compiler detection
+>>>>> mechanism?
+>>>>
+>>>>
+>>>> With my arm compiler (gcc-4.4.4) the patch makes no difference -
+>>>> unmap_and_move() isn't being inlined anyway.
+>>>>
+>>>> How does this look?
+>>>>
+>>>> Kevin, could you please retest?  I might have fat-fingered something...
+>>>
+>>>
+>>> Your patch on top of Geert's still compiles fine for me with gcc-4.7.3.
+>>> However, I'm not sure how specific we can be on the versions.
+>>>
+>>> /me goes to test a few more compilers...   OK...
+>>>
+>>> ICE: 4.7.1, 4.7.3, 4.8.3
+>>> OK: 4.6.3, 4.9.2, 4.9.3
+>>>
+>>> The diff below[2] on top of yours compiles fine here and at least covers
+>>> the compilers I *know* to trigger the ICE.
+>>
+>>
+>> I see ICE on arm-linux-gnueabi-gcc (Ubuntu/Linaro 4.7.4-2ubuntu1) 4.7.4
+>>
+>
+>Thanks for checking.  I'm assuming my patch fixes it for your since
+>that should catch any 4.7.x compiler.
 
-Well, it does make sense, but does it work?
-
-Tyler, can you please test the Peter's patch too?
-
-> ---
->  kernel/time/tick-internal.h |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-> index 2a1563a..5569e65 100644
-> --- a/kernel/time/tick-internal.h
-> +++ b/kernel/time/tick-internal.h
-> @@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
->  #endif /* !TICK_ONESHOT */
->  
->  /* Broadcasting support */
-> +#ifdef CONFIG_GENERIC_CLOCKEVENTS
->  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
->  extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
->  extern void tick_install_broadcast_device(struct clock_event_device *dev);
-> @@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
->  	dev->event_handler = tick_handle_periodic;
->  }
->  #endif /* !BROADCAST */
-> +#endif /* GENERIC */
->  
->  /* Functions related to oneshot broadcasting */
->  #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Yes, thank you. This fixes it on 4.7.4
+>
+>Kevin
