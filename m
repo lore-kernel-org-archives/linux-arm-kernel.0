@@ -1,25 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Apr 2015 17:53:20 -0700
-Subject: [GIT PULL 1/2] ARM: rockchip: soc code changes for 4.1
-In-Reply-To: <9711811.dP5TtE1nVp@phil>
-References: <2684132.lK2CyBin0M@diego>
- <9711811.dP5TtE1nVp@phil>
-Message-ID: <20150402005320.GJ8137@localhost>
+Date: Wed, 1 Apr 2015 17:54:49 -0700
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
+ v4.1
+In-Reply-To: <cover.1426731062.git.horms+renesas@verge.net.au>
+References: <cover.1426731062.git.horms+renesas@verge.net.au>
+Message-ID: <20150402005449.GK8137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 26, 2015 at 06:41:44PM +0100, Heiko Stuebner wrote:
-> Am Mittwoch, 18. M?rz 2015, 17:41:15 schrieb Heiko St?bner:
-> > Hi Arnd, Olof,
-> > 
-> > some soc code changes for 4.1 . I hope the tag explains it, so please pull
+On Thu, Mar 19, 2015 at 11:15:21AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> as heard in Arnd's talk on ELC yesterday, I'm supposed to ping after one week 
-> of inactivity, so any news on these two pulls? :-)
+> Please consider these third round of Renesas ARM based SoC DT updates for v4.1.
+> 
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-dt2-for-v4.1,
+> which you have already pulled.
+> 
+> 
+> The following changes since commit 90ca409a1e6b9b72d1b6ae716cd7a63335fd0e87:
+> 
+>   ARM: shmobile: ape6evm dts: Configure the custom switch as wake-up source (2015-03-07 10:07:30 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.1
+> 
+> for you to fetch changes up to 63573339e7698503bfeaef3bb0c444ffc98e45a0:
+> 
+>   ARM: shmobile: r8a7791: sound enables Audio DMAC entry on DTSI (2015-03-11 09:40:30 +0900)
 
-Merged both now. :)
-
-Thanks,
+Merged, thanks.
 
 
 -Olof
