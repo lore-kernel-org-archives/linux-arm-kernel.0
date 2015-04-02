@@ -1,123 +1,167 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:21:56 +0100
-Subject: [PATCH RFC v2 08/13] drm: bridge/dw_hdmi: introduce interfaces to
- enable and disable audio
+Date: Thu, 02 Apr 2015 10:22:11 +0100
+Subject: [PATCH RFC v2 11/13] sound/core: add IEC958 channel status helper
 In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbK0-00085E-Cd@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YdbKF-00085U-O4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iMX6 devices suffer from an errata (ERR005174) where the audio FIFO can
-be emptied while it is partially full, resulting in misalignment of the
-audio samples.
-
-To prevent this, the errata workaround recommends writing N as zero
-until the audio FIFO has been loaded by DMA.  Writing N=0 prevents the
-HDMI bridge from reading from the audio FIFO, effectively disabling
-audio.
-
-This means we need to provide the audio driver with a pair of functions
-to enable/disable audio.  These are dw_hdmi_audio_enable() and
-dw_hdmi_audio_disable().
-
-A spinlock is introduced to ensure that setting the CTS/N values can't
-race, ensuring that the audio driver calling the enable/disable
-functions (which are called in an atomic context) can't race with a
-modeset.
+Add a helper to create the IEC958 channel status from an ALSA
+snd_pcm_runtime structure, taking account of the sample rate and
+sample size.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++++++++++++++++-
- include/drm/bridge/dw_hdmi.h     |  2 ++
- 2 files changed, 35 insertions(+), 1 deletion(-)
+ include/sound/pcm_iec958.h |  9 +++++
+ sound/core/Kconfig         |  3 ++
+ sound/core/Makefile        |  1 +
+ sound/core/pcm_iec958.c    | 95 ++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 108 insertions(+)
+ create mode 100644 include/sound/pcm_iec958.h
+ create mode 100644 sound/core/pcm_iec958.c
 
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 0369fab5c695..adda3a988f36 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -18,6 +18,7 @@
- #include <linux/hdmi.h>
- #include <linux/mutex.h>
- #include <linux/of_device.h>
-+#include <linux/spinlock.h>
+diff --git a/include/sound/pcm_iec958.h b/include/sound/pcm_iec958.h
+new file mode 100644
+index 000000000000..0eed397aca8e
+--- /dev/null
++++ b/include/sound/pcm_iec958.h
+@@ -0,0 +1,9 @@
++#ifndef __SOUND_PCM_IEC958_H
++#define __SOUND_PCM_IEC958_H
++
++#include <linux/types.h>
++
++int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
++	size_t len);
++
++#endif
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index b534c8a6046b..1507469425ec 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -9,6 +9,9 @@ config SND_PCM
+ config SND_PCM_ELD
+ 	bool
  
- #include <drm/drm_of.h>
- #include <drm/drmP.h>
-@@ -124,8 +125,12 @@ struct dw_hdmi {
- 	struct i2c_adapter *ddc;
- 	void __iomem *regs;
++config SND_PCM_IEC958
++	bool
++
+ config SND_DMAENGINE_PCM
+ 	tristate
  
-+	spinlock_t audio_lock;
- 	struct mutex audio_mutex;
- 	unsigned int sample_rate;
-+	unsigned int audio_cts;
-+	unsigned int audio_n;
-+	bool audio_enable;
- 	int ratio;
+diff --git a/sound/core/Makefile b/sound/core/Makefile
+index 591b49157b4d..2b925fcc95ea 100644
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -14,6 +14,7 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+ 		pcm_memory.o memalloc.o
+ snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
+ snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
++snd-pcm-$(CONFIG_SND_PCM_IEC958) += pcm_iec958.o
  
- 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
-@@ -347,7 +352,11 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
- 	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
- 		__func__, sample_rate, ratio, pixel_clk, n, cts);
- 
--	hdmi_set_cts_n(hdmi, cts, n);
-+	spin_lock_irq(&hdmi->audio_lock);
-+	hdmi->audio_n = n;
-+	hdmi->audio_cts = cts;
-+	hdmi_set_cts_n(hdmi, cts, hdmi->audio_enable ? n : 0);
-+	spin_unlock_irq(&hdmi->audio_lock);
- }
- 
- static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
-@@ -376,6 +385,28 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
- }
- EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
- 
-+void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
+ # for trace-points
+ CFLAGS_pcm_lib.o := -I$(src)
+diff --git a/sound/core/pcm_iec958.c b/sound/core/pcm_iec958.c
+new file mode 100644
+index 000000000000..36b2d7aca1bd
+--- /dev/null
++++ b/sound/core/pcm_iec958.c
+@@ -0,0 +1,95 @@
++/*
++ *  PCM DRM helpers
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License version 2 as
++ *   published by the Free Software Foundation.
++ */
++#include <linux/export.h>
++#include <linux/types.h>
++#include <sound/asoundef.h>
++#include <sound/pcm.h>
++#include <sound/pcm_iec958.h>
++
++/**
++ * snd_pcm_create_iec958_consumer - create consumer format IEC958 channel status
++ * @runtime: pcm runtime structure with ->rate filled in
++ * @cs: channel status buffer, at least four bytes
++ * @len: length of channel status buffer
++ *
++ * Create the consumer format channel status data in @cs of maximum size
++ * @len corresponding to the parameters of the PCM runtime @runtime.
++ *
++ * Drivers may wish to tweak the contents of the buffer after creation.
++ *
++ * Returns: length of buffer, or negative error code if something failed.
++ */
++int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
++	size_t len)
 +{
-+	unsigned long flags;
++	unsigned int fs, ws;
 +
-+	spin_lock_irqsave(&hdmi->audio_lock, flags);
-+	hdmi->audio_enable = true;
-+	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
-+	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
++	if (len < 4)
++		return -EINVAL;
++
++	switch (runtime->rate) {
++	case 32000:
++		fs = IEC958_AES3_CON_FS_32000;
++		break;
++	case 44100:
++		fs = IEC958_AES3_CON_FS_44100;
++		break;
++	case 48000:
++		fs = IEC958_AES3_CON_FS_48000;
++		break;
++	case 88200:
++		fs = IEC958_AES3_CON_FS_88200;
++		break;
++	case 96000:
++		fs = IEC958_AES3_CON_FS_96000;
++		break;
++	case 176400:
++		fs = IEC958_AES3_CON_FS_176400;
++		break;
++	case 192000:
++		fs = IEC958_AES3_CON_FS_192000;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	if (len > 4) {
++		switch (snd_pcm_format_width(runtime->format)) {
++		case 16:
++			ws = IEC958_AES4_CON_WORDLEN_20_16;
++			break;
++		case 18:
++			ws = IEC958_AES4_CON_WORDLEN_22_18;
++			break;
++		case 20:
++			ws = IEC958_AES4_CON_WORDLEN_20_16 |
++			     IEC958_AES4_CON_MAX_WORDLEN_24;
++			break;
++		case 24:
++			ws = IEC958_AES4_CON_WORDLEN_24_20 |
++			     IEC958_AES4_CON_MAX_WORDLEN_24;
++			break;
++
++		default:
++			return -EINVAL;
++		}
++	}
++
++	memset(cs, 0, len);
++
++	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
++	cs[1] = IEC958_AES1_CON_GENERAL;
++	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
++	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | fs;
++
++	if (len > 4)
++		cs[4] = ws;
++
++	return len;
 +}
-+EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
-+
-+void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&hdmi->audio_lock, flags);
-+	hdmi->audio_enable = false;
-+	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
-+	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
-+}
-+EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
-+
- /*
-  * this submodule is responsible for the video data synchronization.
-  * for example, for RGB 4:4:4 input, the data map is defined as
-@@ -1578,6 +1609,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 	hdmi->encoder = encoder;
- 
- 	mutex_init(&hdmi->audio_mutex);
-+	spin_lock_init(&hdmi->audio_lock);
- 
- 	of_property_read_u32(np, "reg-io-width", &val);
- 
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index 763af51e1d60..bae79f3c4d28 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -63,5 +63,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		 const struct dw_hdmi_plat_data *plat_data);
- 
- void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
-+void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
-+void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
- 
- #endif /* __IMX_HDMI_H__ */
++EXPORT_SYMBOL(snd_pcm_create_iec958_consumer);
 -- 
 1.8.3.1
