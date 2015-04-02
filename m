@@ -1,65 +1,29 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 02 Apr 2015 11:31:29 +0200
-Subject: __timer_udelay(1) may return immediately
-Message-ID: <551D0C71.8050707@free.fr>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 02 Apr 2015 10:37:47 +0100
+Subject: [GIT PULL] Support for Fujitsu MB86S7X SoCs
+In-Reply-To: <CAJe_ZheO1iNKj80798gT8RLcYoYo3xky3urw=ke4x-3wKdtZ9w@mail.gmail.com>
+References: <CAKR0VNJdCEEoM8mqFrc-teQ-q=DopGisos16+uKt=ky2mRjF8g@mail.gmail.com>
+ <CAJe_ZheO1iNKj80798gT8RLcYoYo3xky3urw=ke4x-3wKdtZ9w@mail.gmail.com>
+Message-ID: <551D0DEB.1060609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
 
-I'm using timer-based delays from arch/arm/lib/delay.c
+On 31/03/15 04:02, Jassi Brar wrote:
+> On 18 March 2015 at 11:14, Vincent Yang <vincent.cw.yang@gmail.com> wrote:
+>> Hi Arnd and Olof,
+>>
+>> Please consider pulling in these patches for series of Fujitsu SoC
+>> based around variations of 2xCA7+2xCA15 big.LITTLE architecture.
+>>
+>> The MHU driver is already queued in Mailbox tree.
+>>
 
-Consider the following configuration:
-HZ=100
-timer->freq = 1000000
+I see this in next but would like to fix the binding before it gets
+merged in v4.1. I have provided feedback on that patch. Mainly the
+compatible, clocks and the interrupt names have to fixed in the binding.
+Code changes can be done later, but bindings no. I prefer an ACK from DT
+guys if possible.
 
-Thus
-UDELAY_MULT = 107374
-ticks_per_jiffy = 10000
-
-Thus __timer_udelay(1) =>
-__timer_const_udelay(107374) =>
-__timer_delay(0) => calls get_cycles() twice then returns prematurely
-
-The issue comes from a tiny rounding error as
-107374 * ticks_per_jiffy >> UDELAY_SHIFT = 0,9999983
-which is rounded down to 0.
-
-The root of the issue is that mathematically,
-UDELAY_MULT = 2199023 * HZ / 2048 = 107374,169921875
-which is rounded down to 107374.
-
-It seems to me that a simple solution would be to round
-UDELAY_MULT up instead of down.
-
-Thus UDELAY_MULT = 107375
-107375 * ticks_per_jiffy >> UDELAY_SHIFT = 1,0000076
-
-We might end up sleeping one cycle more than necessary, but I don't
-think spinning a bit longer would be a problem?
-
-Patch provided for illustration purposes.
-
-What do you think?
-
-Regards.
-
-
-diff --git a/arch/arm/include/asm/delay.h b/arch/arm/include/asm/delay.h
-index dff714d..873a43e 100644
---- a/arch/arm/include/asm/delay.h
-+++ b/arch/arm/include/asm/delay.h
-@@ -10,7 +10,7 @@
-  #include <asm/param.h> /* HZ */
-  
-  #define MAX_UDELAY_MS  2
--#define UDELAY_MULT    ((UL(2199023) * HZ) >> 11)
-+#define UDELAY_MULT    (((UL(2199023) * HZ) >> 11) + 1)
-  #define UDELAY_SHIFT   30
-  
-  #ifndef __ASSEMBLY__
-
-
--- 
-(Note to self: tangentially relevant discussion)
-http://thread.gmane.org/gmane.linux.kernel/1858260
+Regards,
+Sudeep
