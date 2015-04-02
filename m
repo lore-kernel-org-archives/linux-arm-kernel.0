@@ -1,43 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Apr 2015 13:03:07 +0200
-Subject: [PATCH 1/2] ARM: dts: Use define for s3c-rtc clock id
-Message-ID: <1427972588-6573-1-git-send-email-k.kozlowski@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 2 Apr 2015 12:22:31 +0100
+Subject: next-20150402 build: 3 failures 18 warnings (next-20150402)
+In-Reply-To: <E1YdaYh-0000LL-D5@debutante>
+References: <E1YdaYh-0000LL-D5@debutante>
+Message-ID: <20150402112231.GQ6023@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a define instead of raw number as a ID for "rtc_src" clock.
+On Thu, Apr 02, 2015 at 09:33:03AM +0100, Build bot for Mark Brown wrote:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Failed defconfigs:
+> 	arm64-allmodconfig
 
----
+For the past few days -next has been failing to build an arm64
+allmodconfig due to:
 
-Patch depends on new file "dt-bindings/clock/samsung,s2mps11.h" from:
-1. ARM: dts: Add bindings for 32kHz clocks from s2mps11
-   http://www.spinics.net/lists/linux-samsung-soc/msg43345.html
----
- arch/arm/boot/dts/exynos3250-monk.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+| drivers/built-in.o: In function `tegra124_132_clock_init_post':
+| :(.init.text+0x285d8): undefined reference to `tegra_emc_init'
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index 1d483c1c8b48..a5863acc5fff 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -16,6 +16,7 @@
- #include "exynos3250.dtsi"
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/clock/samsung,s2mps11.h>
- 
- / {
- 	model = "Samsung Monk board";
-@@ -432,7 +433,7 @@
- };
- 
- &rtc {
--	clocks = <&cmu CLK_RTC>, <&s2mps14_osc 0>;
-+	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
- 	clock-names = "rtc", "rtc_src";
- 	status = "okay";
- };
--- 
-1.9.1
+This is triggered by d035fdfa27ac124bc8 (arm64: Add Tegra132 support)
+which enables ARCH_TEGRA and ARCH_TEGRA_132_SOC for arm64 which in turn
+causes clk-tegra124 to be built on arm64.  That driver relies on
+TEGRA124_EMC but that depends on ARCH_TEGRA_124_SOC which is 32 bit
+only.
+
+We either need the EMC driver for Tegra132, a stub or some ifdefs.
+
+It also looks like there's an issue if the memory controller driver is
+not enabled (which looks to be something that can be controlled by the
+user) but I've not checked properly.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150402/51438d1a/attachment.sig>
