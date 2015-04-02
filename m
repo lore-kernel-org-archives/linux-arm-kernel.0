@@ -1,47 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Apr 2015 17:59:23 -0700
-Subject: [GIT PULL] at91: multiplatform for 4.1 #1
-In-Reply-To: <1426785269-6484-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1426785269-6484-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150402005923.GN8137@localhost>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 2 Apr 2015 10:33:59 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+In-Reply-To: <551AB78B.4000506@cogentembedded.com>
+References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+ <8163383.0UU0Q5gsLE@wasted.cogentembedded.com>
+ <20150331002113.GB16289@verge.net.au>
+ <551AB78B.4000506@cogentembedded.com>
+Message-ID: <20150402013359.GB25445@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 06:14:29PM +0100, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
+On Tue, Mar 31, 2015 at 06:04:43PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> This is the real switch to multi-platform for AT91: after all the preparation
-> work that has been done, here we are! And there's also an additional cleanup on
-> top of that...
-> I stacked this material on top of my previous "at91-cleanup3" tag that I had sent
-> you earlier this week. As all my cleanup material is also on top of the fixes
-> tags (that you already have), these patches are also adapted to match this
-> state and avoid conflicts.
-> So, you can have this tag in your "multiplatform" branch separated, like I did,
-> or simply stacked on top or the AT91 cleanup material.
+> On 03/31/2015 03:21 AM, Simon Horman wrote:
 > 
-> Thanks, best regards,
+> >>Define the generic R8A7790 part of the EtherAVB device node.
 > 
-> The following changes since commit 88c5544ab2240cf2a2dc87b5af9cd7990d06d028:
+> >Please repost once this binding (and associated driver) has been accepted.
 > 
->   Merge tag 'at91-cleanup3' into at91-4.1-multiplatform (2015-03-16 18:09:48 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-multiplatform
-> 
-> for you to fetch changes up to 1164f672d71ac103d85207b0453f3127c0efefb3:
-> 
->   ARM: at91: drop AT91_TIMER_HZ (2015-03-19 16:37:45 +0100)
-> 
-> ----------------------------------------------------------------
-> This is the multi-platform support for AT91:
-> - reworked arch/arm/mach-at91/Kconfig and arch/arm/Kconfig to switch to
->   multi-platform
-> - updated at91_dt_defconfig
-> - continue the cleanup of unneeded files and code chunks
+>    OK, but will you merge patch #1?
 
-Nice! Merged.
+I would prefer to wait until we can exercise it with a driver.
 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>  arch/arm/boot/dts/r8a7790.dtsi |   10 ++++++++++
+> >>  1 file changed, 10 insertions(+)
+> >>
+> >>Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
+> >>===================================================================
+> >>--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
+> >>+++ renesas/arch/arm/boot/dts/r8a7790.dtsi
+> >>@@ -626,6 +626,16 @@
+> >>  		status = "disabled";
+> >>  	};
+> >>
+> >>+	avb: ethernet at e6800000 {
+> >>+		compatible = "renesas,ravb-r8a7790";
+> 
+>    I went the usual way here but I suspect that SoC part of the prop should
+> be "-rcar-gen2" as we now have this IP core (as well as most of the others,
+> except PFC) described in a common manual for the R-Car generation 2 SoCs.
+> What do you think?
 
--Olof
+I like -r8a7790.
