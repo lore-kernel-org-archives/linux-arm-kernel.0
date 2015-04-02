@@ -1,59 +1,65 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Thu,  2 Apr 2015 11:43:18 +0200
-Subject: [PATCH v2 1/1] pinctrl: at91: Add set_multiple GPIO chip feature
-Message-ID: <1427967798-6962-1-git-send-email-alexanders83@web.de>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Thu, 2 Apr 2015 11:45:14 +0200
+Subject: [STLinux Kernel] [PATCH 0/4] clk: Provide support for always-on
+ clocks
+In-Reply-To: <20150402081210.GB3567@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+ <20150402081210.GB3567@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <CAG374jDc6HsJhL4HqTgvnMU3AG9pXNYXyxr6gjZQkTODR-BHyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the callback for set_multiple.
-As this controller has a separate set and clear register, we can't write
-directly to PIO_ODSR as this would required a cached variable and would
-race with at91_gpio_set.
-So build masks for the PIO_SODR and PIO_CODR registers and write them
-together.
+Hi Peter, Lee,
 
-Signed-off-by: Alexander Stein <alexanders83@web.de>
----
-Changes in v2:
-* Greatly simplyfied the implementation: Generate the set- and clear-mask
-  directly from 'mask' and 'bits'
+With these series as they are, we need  'clk_ignore_unused'  on
+sthi407-b2120.dts and stih418-b2199.dts.
 
-I skipped the 'Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>'
-due to the new implementation.
+We have to modificate stih407-clock.dtsi and stih418-clock.dtsi in same way.
 
- drivers/pinctrl/pinctrl-at91.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+BR
+Gabriel
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index a4814066ea08..3a7b008a9a4e 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1330,6 +1330,18 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
- 	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
- }
- 
-+static void at91_gpio_set_multiple(struct gpio_chip *chip,
-+				      unsigned long *mask, unsigned long *bits)
-+{
-+	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-+	void __iomem *pio = at91_gpio->regbase;
-+	uint32_t set_mask = *mask & *bits;
-+	uint32_t clear_mask = *mask & ~(*bits);
-+
-+	writel_relaxed(set_mask, pio + PIO_SODR);
-+	writel_relaxed(clear_mask, pio + PIO_CODR);
-+}
-+
- static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
- 				int val)
- {
-@@ -1689,6 +1701,7 @@ static struct gpio_chip at91_gpio_template = {
- 	.get			= at91_gpio_get,
- 	.direction_output	= at91_gpio_direction_output,
- 	.set			= at91_gpio_set,
-+	.set_multiple		= at91_gpio_set_multiple,
- 	.dbg_show		= at91_gpio_dbg_show,
- 	.can_sleep		= false,
- 	.ngpio			= MAX_NB_GPIO_PER_BANK,
--- 
-2.3.4
+On 2 April 2015 at 10:12, Peter Griffin <peter.griffin@linaro.org> wrote:
+> Hi Lee,
+>
+> On Fri, 27 Feb 2015, Lee Jones wrote:
+>
+>> Some hardware contains bunches of clocks which must never be
+>> turned off.  If drivers a) fail to obtain a reference to any
+>> of these or b) give up a previously obtained reference
+>> during suspend, the common clk framework will attempt to
+>> disable them and a platform can fail irrecoverably as a
+>> result.  Usually the only way to recover from these failures
+>> is to reboot.
+>>
+>> To avoid either of these two scenarios from catastrophically
+>> disabling an otherwise perfectly healthy running system,
+>> clocks can be identified as always-on using this property
+>> from inside a clocksource's node.  The CLK_IGNORE_UNUSED
+>> flag will be applied to each clock instance named in this
+>> property, thus preventing them from being shut down by the
+>> framework.
+>
+> Great stuff.
+>
+> One minor comment is that assuming this works on stih407 and stih410
+> to the extent that the platform can now boot without clk_ignore_unused
+> kenel parameter then you should have an additional patch to remove
+> clk_ignore_unused from the default bootargs in stih407-b2120.dts and
+> stih410-b2120.dts files.
+>
+> Maxime - Is it possible for you to test this series on stih418-b2199 as
+> a well? As it could most likely also be removed from stih418-b2199.dts file
+> to, but neither Lee or myself have the hardware to test.
+>
+> Apart from that, for the series: -
+>  Acked-by: Peter Griffin <peter.griffin@linaro.org>
+>
+> regards,
+>
+> Peter.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
