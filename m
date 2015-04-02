@@ -1,46 +1,52 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 2 Apr 2015 14:13:47 +0800
-Subject: [PATCH] mtd: atmel_nand: don't map the ROM table if no pmecc table
- offset in DT
-Message-ID: <1427955227-8927-1-git-send-email-josh.wu@atmel.com>
+Date: Thu, 2 Apr 2015 14:17:56 +0800
+Subject: [PATCH] ARM: at91: sama5/dts: reduce the NFC command register map
+Message-ID: <1427955477-9176-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if atmel,pmecc-lookup-table-offset is not found in DT node, we don't
-need to map the ROM table as we will build a runtime gf table anyway.
+commit 111573ccd89b ("mtd: atmel_nand: check NFC busy flag by HSMC_SR
+instead of NFC cmd regs")
+check NFC busy by nfc SR instead of NFC cmd regs. So we don't need to
+map NFC cmd registers to include NFCBUSY bit.
+That means we only need map 0x08000000 instead of 0x10000000 for NFC
+cmd regs.
 
-Reported-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This patch reduce the NFC cmd regs map for sama5d3 & sama5d4.
+
 Signed-off-by: Josh Wu <josh.wu@atmel.com>
 ---
+This patch is based on linux-next git repo.
 
- drivers/mtd/nand/atmel_nand.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/sama5d3.dtsi | 2 +-
+ arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 0361c19..46010bd 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -1204,14 +1204,14 @@ static int atmel_pmecc_nand_init_params(struct platform_device *pdev,
- 		goto err;
- 	}
- 
--	regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
--	host->pmecc_rom_base = devm_ioremap_resource(&pdev->dev, regs_rom);
--	if (IS_ERR(host->pmecc_rom_base)) {
--		if (!host->has_no_lookup_table)
--			/* Don't display the information again */
-+	if (!host->has_no_lookup_table) {
-+		regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
-+		host->pmecc_rom_base = devm_ioremap_resource(&pdev->dev,
-+								regs_rom);
-+		if (IS_ERR(host->pmecc_rom_base)) {
- 			dev_err(host->dev, "Can not get I/O resource for ROM, will build a lookup table in runtime!\n");
--
--		host->has_no_lookup_table = true;
-+			host->has_no_lookup_table = true;
-+		}
- 	}
- 
- 	if (host->has_no_lookup_table) {
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 261311b..5b2c235 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -1445,7 +1445,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				reg = <
+-					0x70000000 0x10000000	/* NFC Command Registers */
++					0x70000000 0x08000000	/* NFC Command Registers */
+ 					0xffffc000 0x00000070	/* NFC HSMC regs */
+ 					0x00200000 0x00100000	/* NFC SRAM banks */
+ 					>;
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index d986b41..87705ad 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -294,7 +294,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				reg = <
+-					0x90000000 0x10000000	/* NFC Command Registers */
++					0x90000000 0x08000000	/* NFC Command Registers */
+ 					0xfc05c000 0x00000070	/* NFC HSMC regs */
+ 					0x00100000 0x00100000	/* NFC SRAM banks */
+                                          >;
 -- 
 1.9.1
