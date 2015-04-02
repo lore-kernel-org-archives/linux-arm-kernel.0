@@ -1,81 +1,123 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:21:46 +0100
-Subject: [PATCH RFC v2 06/13] drm: bridge/dw_hdmi: remove
- mhsyncpolarity/mvsyncpolarity/minterlaced
+Date: Thu, 02 Apr 2015 10:21:56 +0100
+Subject: [PATCH RFC v2 08/13] drm: bridge/dw_hdmi: introduce interfaces to
+ enable and disable audio
 In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbJq-000856-1r@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YdbK0-00085E-Cd@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the struct hdmi_vmode mhsyncpolarity/mvsyncpolarity/minterlaced
-members, which are only used within a single function.  We can directly
-reference the appropriate mode->flags instead.
+iMX6 devices suffer from an errata (ERR005174) where the audio FIFO can
+be emptied while it is partially full, resulting in misalignment of the
+audio samples.
+
+To prevent this, the errata workaround recommends writing N as zero
+until the audio FIFO has been loaded by DMA.  Writing N=0 prevents the
+HDMI bridge from reading from the audio FIFO, effectively disabling
+audio.
+
+This means we need to provide the audio driver with a pair of functions
+to enable/disable audio.  These are dw_hdmi_audio_enable() and
+dw_hdmi_audio_disable().
+
+A spinlock is introduced to ensure that setting the CTS/N values can't
+race, ensuring that the audio driver calling the enable/disable
+functions (which are called in an atomic context) can't race with a
+modeset.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 22 ++++++++--------------
- 1 file changed, 8 insertions(+), 14 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 34 +++++++++++++++++++++++++++++++++-
+ include/drm/bridge/dw_hdmi.h     |  2 ++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index a8bd3fbf4300..75728ba552d0 100644
+index 0369fab5c695..adda3a988f36 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -82,9 +82,6 @@ static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
+@@ -18,6 +18,7 @@
+ #include <linux/hdmi.h>
+ #include <linux/mutex.h>
+ #include <linux/of_device.h>
++#include <linux/spinlock.h>
  
- struct hdmi_vmode {
- 	bool mdvi;
--	bool mhsyncpolarity;
--	bool mvsyncpolarity;
--	bool minterlaced;
- 	bool mdataenablepolarity;
+ #include <drm/drm_of.h>
+ #include <drm/drmP.h>
+@@ -124,8 +125,12 @@ struct dw_hdmi {
+ 	struct i2c_adapter *ddc;
+ 	void __iomem *regs;
  
- 	unsigned int mpixelclock;
-@@ -1024,9 +1021,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	struct hdmi_vmode *vmode = &hdmi->hdmi_data.video_mode;
- 	int hblank, vblank, h_de_hs, v_de_vs, hsync_len, vsync_len;
++	spinlock_t audio_lock;
+ 	struct mutex audio_mutex;
+ 	unsigned int sample_rate;
++	unsigned int audio_cts;
++	unsigned int audio_n;
++	bool audio_enable;
+ 	int ratio;
  
--	vmode->mhsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PHSYNC);
--	vmode->mvsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PVSYNC);
--	vmode->minterlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
- 	vmode->mpixelclock = mode->clock * 1000;
+ 	void (*write)(struct dw_hdmi *hdmi, u8 val, int offset);
+@@ -347,7 +352,11 @@ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+ 	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
+ 		__func__, sample_rate, ratio, pixel_clk, n, cts);
  
- 	dev_dbg(hdmi->dev, "final pixclk = %d\n", vmode->mpixelclock);
-@@ -1036,13 +1030,13 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 		HDMI_FC_INVIDCONF_HDCP_KEEPOUT_ACTIVE :
- 		HDMI_FC_INVIDCONF_HDCP_KEEPOUT_INACTIVE);
+-	hdmi_set_cts_n(hdmi, cts, n);
++	spin_lock_irq(&hdmi->audio_lock);
++	hdmi->audio_n = n;
++	hdmi->audio_cts = cts;
++	hdmi_set_cts_n(hdmi, cts, hdmi->audio_enable ? n : 0);
++	spin_unlock_irq(&hdmi->audio_lock);
+ }
  
--	inv_val |= (vmode->mvsyncpolarity ?
-+	inv_val |= mode->flags & DRM_MODE_FLAG_PVSYNC ?
- 		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_HIGH :
--		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_LOW);
-+		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_LOW;
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+@@ -376,6 +385,28 @@ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
+ }
+ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
  
--	inv_val |= (vmode->mhsyncpolarity ?
-+	inv_val |= mode->flags & DRM_MODE_FLAG_PHSYNC ?
- 		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_HIGH :
--		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_LOW);
-+		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_LOW;
++void dw_hdmi_audio_enable(struct dw_hdmi *hdmi)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&hdmi->audio_lock, flags);
++	hdmi->audio_enable = true;
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, hdmi->audio_n);
++	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_audio_enable);
++
++void dw_hdmi_audio_disable(struct dw_hdmi *hdmi)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&hdmi->audio_lock, flags);
++	hdmi->audio_enable = false;
++	hdmi_set_cts_n(hdmi, hdmi->audio_cts, 0);
++	spin_unlock_irqrestore(&hdmi->audio_lock, flags);
++}
++EXPORT_SYMBOL_GPL(dw_hdmi_audio_disable);
++
+ /*
+  * this submodule is responsible for the video data synchronization.
+  * for example, for RGB 4:4:4 input, the data map is defined as
+@@ -1578,6 +1609,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 	hdmi->encoder = encoder;
  
- 	inv_val |= (vmode->mdataenablepolarity ?
- 		HDMI_FC_INVIDCONF_DE_IN_POLARITY_ACTIVE_HIGH :
-@@ -1051,13 +1045,13 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- 	if (hdmi->vic == 39)
- 		inv_val |= HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_HIGH;
- 	else
--		inv_val |= (vmode->minterlaced ?
-+		inv_val |= mode->flags & DRM_MODE_FLAG_INTERLACE ?
- 			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_HIGH :
--			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_LOW);
-+			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_LOW;
+ 	mutex_init(&hdmi->audio_mutex);
++	spin_lock_init(&hdmi->audio_lock);
  
--	inv_val |= (vmode->minterlaced ?
-+	inv_val |= mode->flags & DRM_MODE_FLAG_INTERLACE ?
- 		HDMI_FC_INVIDCONF_IN_I_P_INTERLACED :
--		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE);
-+		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE;
+ 	of_property_read_u32(np, "reg-io-width", &val);
  
- 	inv_val |= (vmode->mdvi ?
- 		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE :
+diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
+index 763af51e1d60..bae79f3c4d28 100644
+--- a/include/drm/bridge/dw_hdmi.h
++++ b/include/drm/bridge/dw_hdmi.h
+@@ -63,5 +63,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
+ 		 const struct dw_hdmi_plat_data *plat_data);
+ 
+ void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
++void dw_hdmi_audio_enable(struct dw_hdmi *hdmi);
++void dw_hdmi_audio_disable(struct dw_hdmi *hdmi);
+ 
+ #endif /* __IMX_HDMI_H__ */
 -- 
 1.8.3.1
