@@ -1,53 +1,119 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 2 Apr 2015 22:29:09 +0200
-Subject: [PATCH] i2c: cadence: Handling Slave monitor mode
-In-Reply-To: <CAFcVECKaLBvOVvTca87-oTue5nF_pek_0msFZDD8y4yuCHW2EA@mail.gmail.com>
-References: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
- <20150327153713.GC27238@katana>
- <CAFcVECKaLBvOVvTca87-oTue5nF_pek_0msFZDD8y4yuCHW2EA@mail.gmail.com>
-Message-ID: <20150402202909.GA3501@katana>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 2 Apr 2015 22:30:44 +0200
+Subject: [PATCHv3] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
+References: <20150402143846.GA11687@amd>
+ <20150402161453.GH20756@valkosipuli.retiisi.org.uk>
+Message-ID: <20150402203043.GB29963@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-> >> In slave monitor mode, the I2C interface is set up as a master and
-> >> continues to attempt a transfer to a particular slave until the
-> >> slave device responds with an ACK.
-> >>
-> >> Added this feature for zero length transfers enable the controller
-> >> for slave monitor interrupt and get the status. Disable the slave
-> >> monitor mode feature upon successful handling.
-> >>
-> >> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> >> Acked-by: Harini Katakam <harinik@xilinx.com>
-> >
-> > I am not sure this is going to work.
-> >
-> > How often is this access tried when there is no device? It should be
-> > tried only once.
+> Hi Pawel,
 > 
-> Once slave monitor is enabled in the host controller, it retries till there's an
-> ACK or slave monitor is disabled. The SW wont be involved and need not
+> My apologies for the very late reply.
+> 
+> On Thu, Apr 02, 2015 at 04:38:46PM +0200, Pavel Machek wrote:
+> > 
+> > 
+> > We are moving to device tree support on OMAP3, but that currently
+> > breaks ADP1653 driver. This adds device tree support, plus required
+> > documentation.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > ---
+> > 
+> > I'm not sure if it is device tree or media framework, either everyone
+> > waits for someone else, or noone really cares.
+> 
+> Neither. Some people are unfortuantely very busy with many other things as
+> well. :-P
 
-So, it is kind of flooding the bus until the timeout? That is not a
-single zero byte message.
+Well.. Being busy is ok. Nitpicking is also ok. But both at the same
+time... is not good. 
 
-> be interrupted in this gap. The way this feature works in the controller though,
-> I'm afraid there's no way to distinguish between no slave/ busy slave.
-> The out is the software timeout in that case.
-> Please suggest how to use this feature better.
+> > Andrew, can you just merge it?
+> > 
+> > Please apply,
+> 
+> Please wait just a while.
+> 
+> I think we can merge this eventually through the linux-media tree, but
+> please first see the comments below.
+> 
 
-I suggest to not use the feature and accept that this device cannot do
-zero byte length messages.
+> > +Required properties of the flash LED child node:
+> > +
+> > +- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
+> > +- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
+> 
+> The documentation says that the maximum value is used if these values are
+> not specified. I think I'd make these optional.
 
-Thanks,
+I'd rather not: when you make a typo in dts, it would supply maximum
+available current, potentially damaging the LED. You will not be able
+to tell brightness difference with naked eye...
 
-   Wolfram
+> >  __adp1653_set_power(struct adp1653_flash *flash, int on)
+> >  {
+> > -	int ret;
+> > +	int ret = 0;
+> > +
+> > +	if (flash->platform_data->power) {
+> > +		ret = flash->platform_data->power(&flash->subdev, on);
+> 
+> The power() callback should be dropped. It's controlling a GPIO. But that
+> can be done later on. The alternative is a patch before this one.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150402/4c8d5c1f/attachment.sig>
+I'd prefer to do it later; we want to keep functionality on N900
+without DTS, too.
+
+> >  	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+> >  	if (flash == NULL)
+> >  		return -ENOMEM;
+> >  
+> >  	flash->platform_data = client->dev.platform_data;
+> > +	if (!flash->platform_data) {
+> 
+> I'd check whether dev->of_node is non-NULL instead.
+
+Ok.
+
+> > @@ -438,10 +510,10 @@ static int adp1653_probe(struct i2c_client *client,
+> >  		goto free_and_quit;
+> >  
+> >  	flash->subdev.entity.type = MEDIA_ENT_T_V4L2_SUBDEV_FLASH;
+> > -
+> 
+> I rather liked the newline here. Please don't remove it. :-)
+
+Ok.
+
+> > @@ -464,7 +536,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
+> >  };
+> >  MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+> >  
+> > -static struct dev_pm_ops adp1653_pm_ops = {
+> > +static const struct dev_pm_ops adp1653_pm_ops = {
+> >  	.suspend	= adp1653_suspend,
+> >  	.resume		= adp1653_resume,
+> >  };
+> >  
+> > 
+> 
+> A corresponding change to the N900 dts would be very nice.
+
+Corresponding change to the dts will come in separate patch. Or do you
+have n900 for testing?
+
+> I think you're missing change to adp1653_i2c_driver.driver.of_match_table.
+
+It actually worked for me, which means device tree somehow does it
+magic.
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
