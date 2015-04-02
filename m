@@ -1,38 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Apr 2015 12:22:31 +0100
-Subject: next-20150402 build: 3 failures 18 warnings (next-20150402)
-In-Reply-To: <E1YdaYh-0000LL-D5@debutante>
-References: <E1YdaYh-0000LL-D5@debutante>
-Message-ID: <20150402112231.GQ6023@sirena.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 02 Apr 2015 14:31:19 +0300
+Subject: [PATCH 2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
+In-Reply-To: <20150402013359.GB25445@verge.net.au>
+References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
+ <8163383.0UU0Q5gsLE@wasted.cogentembedded.com>
+ <20150331002113.GB16289@verge.net.au> <551AB78B.4000506@cogentembedded.com>
+ <20150402013359.GB25445@verge.net.au>
+Message-ID: <551D2887.3020808@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 09:33:03AM +0100, Build bot for Mark Brown wrote:
+Hello.
 
-> Failed defconfigs:
-> 	arm64-allmodconfig
+On 4/2/2015 4:33 AM, Simon Horman wrote:
 
-For the past few days -next has been failing to build an arm64
-allmodconfig due to:
+>> On 03/31/2015 03:21 AM, Simon Horman wrote:
 
-| drivers/built-in.o: In function `tegra124_132_clock_init_post':
-| :(.init.text+0x285d8): undefined reference to `tegra_emc_init'
+>>>> Define the generic R8A7790 part of the EtherAVB device node.
 
-This is triggered by d035fdfa27ac124bc8 (arm64: Add Tegra132 support)
-which enables ARCH_TEGRA and ARCH_TEGRA_132_SOC for arm64 which in turn
-causes clk-tegra124 to be built on arm64.  That driver relies on
-TEGRA124_EMC but that depends on ARCH_TEGRA_124_SOC which is 32 bit
-only.
+>>> Please repost once this binding (and associated driver) has been accepted.
 
-We either need the EMC driver for Tegra132, a stub or some ifdefs.
+>>     OK, but will you merge patch #1?
 
-It also looks like there's an issue if the memory controller driver is
-not enabled (which looks to be something that can be controlled by the
-user) but I've not checked properly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150402/51438d1a/attachment.sig>
+> I would prefer to wait until we can exercise it with a driver.
+
+    Then you'll have to wait long as the Lager board doesn't have support for 
+Ethernet AVB. We've only tested it with the daughter boards.
+
+WBR, Sergei
