@@ -1,34 +1,49 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 2 Apr 2015 18:48:43 +0200
-Subject: [PATCH 1/6] ARM: lpc18xx: add basic support for NXP LPC18xx/43xx
- SoCs
-In-Reply-To: <2687696.KedyLfyrHp@wuerfel>
-References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
- <1427923243-26296-2-git-send-email-manabian@gmail.com>
- <2687696.KedyLfyrHp@wuerfel>
-Message-ID: <CAGhQ9VxK1ytLCNWY+6dKwWUkU_BuEV8vrhVfBDgfnovffLbfpg@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 2 Apr 2015 12:49:10 -0400 (EDT)
+Subject: [GIT PULL] MCPM maintenance for v4.1
+In-Reply-To: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
+References: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.11.1504021245570.25806@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2015 at 16:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 01 April 2015 23:20:38 Joachim Eastwood wrote:
->> +static const char *const lpc18xx_43xx_compat[] __initconst = {
->> +       "ea,lpc4357-developers-kit",
->> +       NULL
->>
->
-> I don't see 'ea' in Documentation/devicetree/bindings/vendor-prefixes.txt,
-> can you add a patch for that?
 
-Sure. I'll add it to the next version.
+Ping.
 
-> It's probably better to make the string we match against the most
-> generic one here, so we don't have to update the list for every
-> new dts file that gets added.
+On Wed, 25 Mar 2015, Nicolas Pitre wrote:
 
-Okey.
-
-Could I just use a SoC string here (like "nxp.lpc1850")?
-
-regards,
-Joachim Eastwood
+> Please consider pulling the following:
+> 
+> http://git.linaro.org/people/nicolas.pitre/linux.git mcpm_for_armsoc
+> 
+> This series greatly simplifies things by moving all the locking handling 
+> to the core code, leaving machine specific backend only with simple and 
+> straight forward operations performed under lock protection. It will no 
+> longer be necessary for backend authors to know about all the MCPM 
+> subtleties for their code to be "right".
+> 
+> To avoid a flag day, the new scheme is introduced in parallel to the 
+> existing backend interface. This series may be merged at the same time 
+> as new backends still using the previous interface. That old interface 
+> should be removed in a subsequent merge cycle after everything is 
+> converted over.
+> 
+> The diffstat also shows a clear benefit.  Despite the addition of new 
+> documentation and the previous interface still in place, the number of 
+> lines actually goes down.
+> 
+> Tested on Versatile Express TC2 and Exynos 5800 (Chromebook2).
+> 
+>  arch/arm/common/mcpm_entry.c       | 202 +++++++++++++++++----
+>  arch/arm/include/asm/mcpm.h        |  65 ++++++-
+>  arch/arm/mach-exynos/mcpm-exynos.c | 247 ++++++--------------------
+>  arch/arm/mach-vexpress/dcscb.c     | 197 +++++++--------------
+>  arch/arm/mach-vexpress/tc2_pm.c    | 291 +++++++++----------------------
+>  5 files changed, 436 insertions(+), 566 deletions(-)
+> 
+> Thanks
+> 
+> 
+> Nicolas
+> 
+> 
