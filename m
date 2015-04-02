@@ -1,54 +1,52 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Apr 2015 11:16:24 +0200
-Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on Armada
- 370 DB
-Message-ID: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 02 Apr 2015 10:21:20 +0100
+Subject: [PATCH RFC v2 01/13] drm: imx/dw_hdmi: move phy comments
+In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+Message-ID: <E1YdbJQ-00084m-GC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 DB boards are now being used with a more recent version
-of U-Boot, which has Device Tree support, and remaps internal
-registers at 0xf1000000 like most of the other Marvell EBU platforms.
+The phy comments in dw_hdmi.c applied to the iMX6 version.  Move these
+comments to the iMX6 dw_hdmi-imx data along side the data.
 
-Consequently, this commit updates the Device Tree describing this
-platform to use this new internal register address, so that the
-mainline kernel can easily be used on such boards that use a modern
-bootloader. A comment is also added to warn users who could have
-boards with an older bootloader version.
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/armada-370-db.dts | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c  | 3 ---
+ drivers/gpu/drm/imx/dw_hdmi-imx.c | 5 +++++
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index e993c46..dede3e7 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -45,6 +45,15 @@
-  *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-  */
+diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
+index 49cafb61d290..3494391e4199 100644
+--- a/drivers/gpu/drm/bridge/dw_hdmi.c
++++ b/drivers/gpu/drm/bridge/dw_hdmi.c
+@@ -834,11 +834,8 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
+ 		    phy_config[i].mpixelclock)
+ 			break;
  
- /dts-v1/;
-@@ -64,7 +73,7 @@
- 	};
+-	/* RESISTANCE TERM 133Ohm Cfg */
+ 	hdmi_phy_i2c_write(hdmi, phy_config[i].term, 0x19);  /* TXTERM */
+-	/* PREEMP Cgf 0.00 */
+ 	hdmi_phy_i2c_write(hdmi, phy_config[i].sym_ctr, 0x09); /* CKSYMTXCTRL */
+-	/* TX/CK LVL 10 */
+ 	hdmi_phy_i2c_write(hdmi, phy_config[i].vlev_ctr, 0x0E); /* VLEVCTRL */
  
- 	soc {
--		ranges = <MBUS_ID(0xf0, 0x01) 0 0xd0000000 0x100000
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
- 			  MBUS_ID(0x01, 0xe0) 0 0xfff00000 0x100000>;
+ 	/* REMOVE CLK TERM */
+diff --git a/drivers/gpu/drm/imx/dw_hdmi-imx.c b/drivers/gpu/drm/imx/dw_hdmi-imx.c
+index 1032c07773e3..2b2368f50c39 100644
+--- a/drivers/gpu/drm/imx/dw_hdmi-imx.c
++++ b/drivers/gpu/drm/imx/dw_hdmi-imx.c
+@@ -73,6 +73,11 @@ static const struct dw_hdmi_curr_ctrl imx_cur_ctr[] = {
+ 	}
+ };
  
- 		internal-regs {
++/*
++ * Resistance term 133Ohm Cfg
++ * PREEMP config 0.00
++ * TX/CK level 10
++ */
+ static const struct dw_hdmi_phy_config imx_phy_config[] = {
+ 	/*pixelclk   symbol   term   vlev */
+ 	{ 148500000, 0x800d, 0x0005, 0x01ad},
 -- 
-2.1.0
+1.8.3.1
