@@ -1,82 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 Apr 2015 11:05:11 +0100
-Subject: [PATCH 07/27] KVM: arm/arm64: remove coarse grain dist locking at
- kvm_vgic_sync_hwstate
+Date: Thu,  2 Apr 2015 11:05:10 +0100
+Subject: [PATCH 06/27] KVM: arm/arm64: implement kvm_arch_intc_initialized
 In-Reply-To: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
 References: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1427969131-8445-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1427969131-8445-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@linaro.org>
 
-To prepare for irqfd addition, coarse grain locking is removed at
-kvm_vgic_sync_hwstate level and finer grain locking is introduced in
-vgic_process_maintenance only.
+On arm/arm64 the VGIC is dynamically instantiated and it is useful
+to expose its state, especially for irqfd setup.
+
+This patch defines __KVM_HAVE_ARCH_INTC_INITIALIZED and
+implements kvm_arch_intc_initialized.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 2 ++
+ arch/arm/kvm/arm.c                | 5 +++++
+ arch/arm64/include/asm/kvm_host.h | 2 ++
+ 3 files changed, 9 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 86cec79..897c849 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1081,6 +1081,7 @@ epilog:
- static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- {
- 	u32 status = vgic_get_interrupt_status(vcpu);
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	bool level_pending = false;
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 41008cd..902a7d1 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -27,6 +27,8 @@
+ #include <asm/fpstate.h>
+ #include <kvm/arm_arch_timer.h>
  
- 	kvm_debug("STATUS = %08x\n", status);
-@@ -1098,6 +1099,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 			struct vgic_lr vlr = vgic_get_lr(vcpu, lr);
- 			WARN_ON(vgic_irq_is_edge(vcpu, vlr.irq));
- 
-+			spin_lock(&dist->lock);
- 			vgic_irq_clear_queued(vcpu, vlr.irq);
- 			WARN_ON(vlr.state & LR_STATE_MASK);
- 			vlr.state = 0;
-@@ -1125,6 +1127,8 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 				vgic_cpu_irq_clear(vcpu, vlr.irq);
- 			}
- 
-+			spin_unlock(&dist->lock);
++#define __KVM_HAVE_ARCH_INTC_INITIALIZED
 +
- 			/*
- 			 * Despite being EOIed, the LR may not have
- 			 * been marked as empty.
-@@ -1139,10 +1143,7 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
- 	return level_pending;
+ #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+ #else
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 37b46c5..5e893eb 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -448,6 +448,11 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	return 0;
  }
  
--/*
-- * Sync back the VGIC state after a guest run. The distributor lock is
-- * needed so we don't get preempted in the middle of the state processing.
-- */
-+/* Sync back the VGIC state after a guest run */
- static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
++bool kvm_arch_intc_initialized(struct kvm *kvm)
++{
++	return vgic_initialized(kvm);
++}
++
+ static void vcpu_pause(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-@@ -1189,14 +1190,10 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 8ac3c70..967fb1c 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -28,6 +28,8 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmio.h>
  
- void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
--
- 	if (!irqchip_in_kernel(vcpu->kvm))
- 		return;
- 
--	spin_lock(&dist->lock);
- 	__kvm_vgic_sync_hwstate(vcpu);
--	spin_unlock(&dist->lock);
- }
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
++#define __KVM_HAVE_ARCH_INTC_INITIALIZED
++
+ #if defined(CONFIG_KVM_ARM_MAX_VCPUS)
+ #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+ #else
 -- 
 2.1.4
