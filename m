@@ -1,126 +1,81 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:21:25 +0100
-Subject: [PATCH RFC v2 02/13] drm: bridge/dw_hdmi: clean up phy configuration
+Date: Thu, 02 Apr 2015 10:21:30 +0100
+Subject: [PATCH RFC v2 03/13] drm: bridge/dw_hdmi: clean up
+ hdmi_set_clk_regenerator()
 In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbJV-00084q-KO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YdbJa-00084u-O2@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy configuration is dependent on the SoC, and we look up values for
-some of the registers in SoC specific data.  However, we had partially
-programmed the phy before we had successfully looked up the clock rate.
-Also, we were only checking that we had a valid configuration for the
-currctrl register.
-
-Move all these lookups to the start of this function instead, so we can
-check that all lookups were successful before beginning to program the
-phy.
+Clean up hdmi_set_clk_regenerator() by allowing it to take the audio
+sample rate and ratio directly, rather than hiding it inside the
+function.  Raise the unsupported pixel clock/sample rate message from
+debug to error level as this results in audio not working correctly.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 68 +++++++++++++++++++++-------------------
- 1 file changed, 35 insertions(+), 33 deletions(-)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 32 +++++++++++++++-----------------
+ 1 file changed, 15 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 3494391e4199..23ea8c5c85b6 100644
+index 23ea8c5c85b6..75099b80ca7e 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -753,12 +753,12 @@ static void dw_hdmi_phy_sel_interface_control(struct dw_hdmi *hdmi, u8 enable)
- static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
- 			      unsigned char res, int cscon)
- {
--	unsigned res_idx, i;
-+	unsigned res_idx;
- 	u8 val, msec;
--	const struct dw_hdmi_plat_data *plat_data = hdmi->plat_data;
--	const struct dw_hdmi_mpll_config *mpll_config = plat_data->mpll_cfg;
--	const struct dw_hdmi_curr_ctrl *curr_ctrl = plat_data->cur_ctr;
--	const struct dw_hdmi_phy_config *phy_config = plat_data->phy_config;
-+	const struct dw_hdmi_plat_data *pdata = hdmi->plat_data;
-+	const struct dw_hdmi_mpll_config *mpll_config = pdata->mpll_cfg;
-+	const struct dw_hdmi_curr_ctrl *curr_ctrl = pdata->cur_ctr;
-+	const struct dw_hdmi_phy_config *phy_config = pdata->phy_config;
+@@ -335,39 +335,37 @@ static unsigned int hdmi_compute_cts(unsigned int freq, unsigned long pixel_clk,
+ }
  
- 	if (prep)
- 		return -EINVAL;
-@@ -778,6 +778,30 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
- 		return -EINVAL;
+ static void hdmi_set_clk_regenerator(struct dw_hdmi *hdmi,
+-				     unsigned long pixel_clk)
++	unsigned long pixel_clk, unsigned int sample_rate, unsigned int ratio)
+ {
+-	unsigned int clk_n, clk_cts;
++	unsigned int n, cts;
+ 
+-	clk_n = hdmi_compute_n(hdmi->sample_rate, pixel_clk,
+-			       hdmi->ratio);
+-	clk_cts = hdmi_compute_cts(hdmi->sample_rate, pixel_clk,
+-				   hdmi->ratio);
+-
+-	if (!clk_cts) {
+-		dev_dbg(hdmi->dev, "%s: pixel clock not supported: %lu\n",
+-			__func__, pixel_clk);
+-		return;
++	n = hdmi_compute_n(sample_rate, pixel_clk, ratio);
++	cts = hdmi_compute_cts(sample_rate, pixel_clk, ratio);
++	if (!cts) {
++		dev_err(hdmi->dev,
++			"%s: pixel clock/sample rate not supported: %luMHz / %ukHz\n",
++			__func__, pixel_clk, sample_rate);
  	}
  
-+	/* PLL/MPLL Cfg - always match on final entry */
-+	for (; mpll_config->mpixelclock != ~0UL; mpll_config++)
-+		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-+		    mpll_config->mpixelclock)
-+			break;
-+
-+	for (; curr_ctrl->mpixelclock != ~0UL; curr_ctrl++)
-+		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-+		    curr_ctrl->mpixelclock)
-+			break;
-+
-+	for (; phy_config->mpixelclock != ~0UL; phy_config++)
-+		if (hdmi->hdmi_data.video_mode.mpixelclock <=
-+		    phy_config->mpixelclock)
-+			break;
-+
-+	if (mpll_config->mpixelclock == ~0UL ||
-+	    curr_ctrl->mpixelclock == ~0UL ||
-+	    phy_config->mpixelclock == ~0UL) {
-+		dev_err(hdmi->dev, "Pixel clock %d - unsupported by HDMI\n",
-+			hdmi->hdmi_data.video_mode.mpixelclock);
-+		return -EINVAL;
-+	}
-+
- 	/* Enable csc path */
- 	if (cscon)
- 		val = HDMI_MC_FLOWCTRL_FEED_THROUGH_OFF_CSC_IN_PATH;
-@@ -803,40 +827,18 @@ static int hdmi_phy_configure(struct dw_hdmi *hdmi, unsigned char prep,
- 		    HDMI_PHY_I2CM_SLAVE_ADDR);
- 	hdmi_phy_test_clear(hdmi, 0);
+-	dev_dbg(hdmi->dev, "%s: samplerate=%d  ratio=%d  pixelclk=%lu  N=%d cts=%d\n",
+-		__func__, hdmi->sample_rate, hdmi->ratio,
+-		pixel_clk, clk_n, clk_cts);
++	dev_dbg(hdmi->dev, "%s: samplerate=%ukHz ratio=%d pixelclk=%luMHz N=%d cts=%d\n",
++		__func__, sample_rate, ratio, pixel_clk, n, cts);
  
--	/* PLL/MPLL Cfg - always match on final entry */
--	for (i = 0; mpll_config[i].mpixelclock != (~0UL); i++)
--		if (hdmi->hdmi_data.video_mode.mpixelclock <=
--		    mpll_config[i].mpixelclock)
--			break;
--
--	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].cpce, 0x06);
--	hdmi_phy_i2c_write(hdmi, mpll_config[i].res[res_idx].gmp, 0x15);
--
--	for (i = 0; curr_ctrl[i].mpixelclock != (~0UL); i++)
--		if (hdmi->hdmi_data.video_mode.mpixelclock <=
--		    curr_ctrl[i].mpixelclock)
--			break;
--
--	if (curr_ctrl[i].mpixelclock == (~0UL)) {
--		dev_err(hdmi->dev, "Pixel clock %d - unsupported by HDMI\n",
--			hdmi->hdmi_data.video_mode.mpixelclock);
--		return -EINVAL;
--	}
-+	hdmi_phy_i2c_write(hdmi, mpll_config->res[res_idx].cpce, 0x06);
-+	hdmi_phy_i2c_write(hdmi, mpll_config->res[res_idx].gmp, 0x15);
+-	hdmi_set_cts_n(hdmi, clk_cts, clk_n);
++	hdmi_set_cts_n(hdmi, cts, n);
+ }
  
- 	/* CURRCTRL */
--	hdmi_phy_i2c_write(hdmi, curr_ctrl[i].curr[res_idx], 0x10);
-+	hdmi_phy_i2c_write(hdmi, curr_ctrl->curr[res_idx], 0x10);
+ static void hdmi_init_clk_regenerator(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+-	hdmi_set_clk_regenerator(hdmi, 74250000);
++	hdmi_set_clk_regenerator(hdmi, 74250000, hdmi->sample_rate,
++				 hdmi->ratio);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
  
- 	hdmi_phy_i2c_write(hdmi, 0x0000, 0x13);  /* PLLPHBYCTRL */
- 	hdmi_phy_i2c_write(hdmi, 0x0006, 0x17);
+ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
+ {
+ 	mutex_lock(&hdmi->audio_mutex);
+-	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock);
++	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
++				 hdmi->sample_rate, hdmi->ratio);
+ 	mutex_unlock(&hdmi->audio_mutex);
+ }
  
--	for (i = 0; phy_config[i].mpixelclock != (~0UL); i++)
--		if (hdmi->hdmi_data.video_mode.mpixelclock <=
--		    phy_config[i].mpixelclock)
--			break;
--
--	hdmi_phy_i2c_write(hdmi, phy_config[i].term, 0x19);  /* TXTERM */
--	hdmi_phy_i2c_write(hdmi, phy_config[i].sym_ctr, 0x09); /* CKSYMTXCTRL */
--	hdmi_phy_i2c_write(hdmi, phy_config[i].vlev_ctr, 0x0E); /* VLEVCTRL */
-+	hdmi_phy_i2c_write(hdmi, phy_config->term, 0x19);  /* TXTERM */
-+	hdmi_phy_i2c_write(hdmi, phy_config->sym_ctr, 0x09); /* CKSYMTXCTRL */
-+	hdmi_phy_i2c_write(hdmi, phy_config->vlev_ctr, 0x0E); /* VLEVCTRL */
- 
- 	/* REMOVE CLK TERM */
- 	hdmi_phy_i2c_write(hdmi, 0x8000, 0x05);  /* CKCALCTRL */
 -- 
 1.8.3.1
