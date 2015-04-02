@@ -1,108 +1,120 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  2 Apr 2015 17:11:11 +0200
-Subject: [PATCH] gpio: mvebu: Fix mask/unmask managment per irq chip type
-Message-ID: <1427987471-20419-1-git-send-email-gregory.clement@free-electrons.com>
+From: mikko.perttunen@kapsi.fi (Mikko Perttunen)
+Date: Thu, 02 Apr 2015 18:20:01 +0300
+Subject: [PATCH v2] ARM: tegra: Correct which USB controller has the UTMI
+ pad registers
+In-Reply-To: <1427986842-21409-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <551D57E0.7050102@kapsi.fi>
+ <1427986842-21409-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <551D5E21.4040305@kapsi.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Level IRQ handlers and edge IRQ handler are managed by tow different
-sets of registers. But currently the driver uses the same mask for the
-both registers. It lead to issues with the following scenario:
+Reviewed-by: Mikko Perttunen <mikko.perttunen@kapsi.fi>
 
-First, an IRQ is requested on a GPIO to be triggered on front. After,
-this an other IRQ is requested for a GPIO of the same bank but
-triggered on level. Then the first one will be also setup to be
-triggered on level. It leads to an interrupt storm.
-
-The different kind of handler are already associated with two
-different irq chip type. With this patch the driver uses a private
-mask for each one which solves this issue.
-
-It has been tested on an Armada XP based board and on an Armada 375
-board. For the both boards, with this patch is applied, there is no
-such interrupt storm when running the previous scenario.
-
-This bug was already fixed but in a different way in the legacy
-version of this driver by Evgeniy Dushistov:
-9ece8839b1277fb9128ff6833411614ab6c88d68 "ARM: orion: Fix for certain
-sequence of request_irq can cause irq storm". The fact the new version
-of the gpio drive could be affected had been discussed there:
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/344670/focus=364012
-
-Reported-by: Evgeniy A. Dushistov <dushistov@mail.ru>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: <stable@vger.kernel.org> # v3.7 +
----
- drivers/gpio/gpio-mvebu.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index d0bc123c7975..1a54205860f5 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -320,11 +320,13 @@ static void mvebu_gpio_edge_irq_mask(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mvebu_gpio_chip *mvchip = gc->private;
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
- 	u32 mask = 1 << (d->irq - gc->irq_base);
- 
- 	irq_gc_lock(gc);
--	gc->mask_cache &= ~mask;
--	writel_relaxed(gc->mask_cache, mvebu_gpioreg_edge_mask(mvchip));
-+	ct->mask_cache_priv &= ~mask;
-+
-+	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_edge_mask(mvchip));
- 	irq_gc_unlock(gc);
- }
- 
-@@ -332,11 +334,13 @@ static void mvebu_gpio_edge_irq_unmask(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mvebu_gpio_chip *mvchip = gc->private;
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+
- 	u32 mask = 1 << (d->irq - gc->irq_base);
- 
- 	irq_gc_lock(gc);
--	gc->mask_cache |= mask;
--	writel_relaxed(gc->mask_cache, mvebu_gpioreg_edge_mask(mvchip));
-+	ct->mask_cache_priv |= mask;
-+	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_edge_mask(mvchip));
- 	irq_gc_unlock(gc);
- }
- 
-@@ -344,11 +348,13 @@ static void mvebu_gpio_level_irq_mask(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mvebu_gpio_chip *mvchip = gc->private;
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+
- 	u32 mask = 1 << (d->irq - gc->irq_base);
- 
- 	irq_gc_lock(gc);
--	gc->mask_cache &= ~mask;
--	writel_relaxed(gc->mask_cache, mvebu_gpioreg_level_mask(mvchip));
-+	ct->mask_cache_priv &= ~mask;
-+	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_level_mask(mvchip));
- 	irq_gc_unlock(gc);
- }
- 
-@@ -356,11 +362,13 @@ static void mvebu_gpio_level_irq_unmask(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct mvebu_gpio_chip *mvchip = gc->private;
-+	struct irq_chip_type *ct = irq_data_get_chip_type(d);
-+
- 	u32 mask = 1 << (d->irq - gc->irq_base);
- 
- 	irq_gc_lock(gc);
--	gc->mask_cache |= mask;
--	writel_relaxed(gc->mask_cache, mvebu_gpioreg_level_mask(mvchip));
-+	ct->mask_cache_priv |= mask;
-+	writel_relaxed(ct->mask_cache_priv, mvebu_gpioreg_level_mask(mvchip));
- 	irq_gc_unlock(gc);
- }
- 
--- 
-2.1.0
+On 04/02/2015 06:00 PM, Tomeu Vizoso wrote:
+> It should be the first controller, not the second.
+>
+> This broke USB after 6261b06 ("regulator: Defer lookup of supply to
+> regulator_get"), because it changed the order in which the controllers
+> were probed.
+>
+> The fix for this issue was suggested by Mikko Perttunen.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Cc: Mikko Perttunen <mikko.perttunen@kapsi.fi>
+> ---
+>
+> I think that the line numbers should be enough in this case, as I expect this to be merged soon, but just in case I'm sending the same patch with plenty of context.
+>
+> Regards,
+>
+> Tomeu
+>
+> ---
+>   arch/arm/boot/dts/tegra124.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+> index cf01c81..cb786a9 100644
+> --- a/arch/arm/boot/dts/tegra124.dtsi
+> +++ b/arch/arm/boot/dts/tegra124.dtsi
+> @@ -821,77 +821,77 @@
+>   		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
+>   		reg = <0x0 0x7d000000 0x0 0x4000>,
+>   		      <0x0 0x7d000000 0x0 0x4000>;
+>   		phy_type = "utmi";
+>   		clocks = <&tegra_car TEGRA124_CLK_USBD>,
+>   			 <&tegra_car TEGRA124_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA124_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+>   		resets = <&tegra_car 59>, <&tegra_car 22>;
+>   		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+>   		nvidia,term-range-adj = <6>;
+>   		nvidia,xcvr-setup = <9>;
+>   		nvidia,xcvr-lsfslew = <0>;
+>   		nvidia,xcvr-lsrslew = <3>;
+>   		nvidia,hssquelch-level = <2>;
+>   		nvidia,hsdiscon-level = <5>;
+>   		nvidia,xcvr-hsslew = <12>;
+> +		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
+>
+>   	usb at 0,7d004000 {
+>   		compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci", "usb-ehci";
+>   		reg = <0x0 0x7d004000 0x0 0x4000>;
+>   		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+>   		phy_type = "utmi";
+>   		clocks = <&tegra_car TEGRA124_CLK_USB2>;
+>   		resets = <&tegra_car 58>;
+>   		reset-names = "usb";
+>   		nvidia,phy = <&phy2>;
+>   		status = "disabled";
+>   	};
+>
+>   	phy2: usb-phy at 0,7d004000 {
+>   		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
+>   		reg = <0x0 0x7d004000 0x0 0x4000>,
+>   		      <0x0 0x7d000000 0x0 0x4000>;
+>   		phy_type = "utmi";
+>   		clocks = <&tegra_car TEGRA124_CLK_USB2>,
+>   			 <&tegra_car TEGRA124_CLK_PLL_U>,
+>   			 <&tegra_car TEGRA124_CLK_USBD>;
+>   		clock-names = "reg", "pll_u", "utmi-pads";
+>   		resets = <&tegra_car 22>, <&tegra_car 22>;
+>   		reset-names = "usb", "utmi-pads";
+>   		nvidia,hssync-start-delay = <0>;
+>   		nvidia,idle-wait-delay = <17>;
+>   		nvidia,elastic-limit = <16>;
+>   		nvidia,term-range-adj = <6>;
+>   		nvidia,xcvr-setup = <9>;
+>   		nvidia,xcvr-lsfslew = <0>;
+>   		nvidia,xcvr-lsrslew = <3>;
+>   		nvidia,hssquelch-level = <2>;
+>   		nvidia,hsdiscon-level = <5>;
+>   		nvidia,xcvr-hsslew = <12>;
+> -		nvidia,has-utmi-pad-registers;
+>   		status = "disabled";
+>   	};
+>
+>   	usb at 0,7d008000 {
+>   		compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci", "usb-ehci";
+>   		reg = <0x0 0x7d008000 0x0 0x4000>;
+>   		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+>   		phy_type = "utmi";
+>   		clocks = <&tegra_car TEGRA124_CLK_USB3>;
+>   		resets = <&tegra_car 59>;
+>   		reset-names = "usb";
+>   		nvidia,phy = <&phy3>;
+>   		status = "disabled";
+>   	};
+>
+>   	phy3: usb-phy at 0,7d008000 {
+>   		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
+>   		reg = <0x0 0x7d008000 0x0 0x4000>,
+>   		      <0x0 0x7d000000 0x0 0x4000>;
+>   		phy_type = "utmi";
+>
