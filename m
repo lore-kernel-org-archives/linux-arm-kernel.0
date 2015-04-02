@@ -1,62 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Apr 2015 09:17:56 +0200
-Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid ICE
- in gcc 4.7.3
-In-Reply-To: <20150401215950.GC4027@n2100.arm.linux.org.uk>
-References: <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
- <20150327002554.GA5527@verge.net.au>
- <20150327100612.GB1562@arm.com>
- <7hbnj99epe.fsf@deeprootsystems.com>
- <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
- <7h8uec95t2.fsf@deeprootsystems.com>
- <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
- <551BBEC5.7070801@arm.com>
- <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
- <7hwq1v4iq4.fsf@deeprootsystems.com>
- <20150401215950.GC4027@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdX95QxqUk7XNnZLWWqZT+0HeL9HzcEkuhevGAp7h6XcQQ@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 02 Apr 2015 16:47:21 +0900
+Subject: [PATCH] KVM: arm64: add gic-400 compatible
+In-Reply-To: <20140908222144.4967.80301.stgit@joelaarch64.amd.com>
+References: <20140908222144.4967.80301.stgit@joelaarch64.amd.com>
+Message-ID: <551CF409.1090707@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Ping.
+This patch was acked but has never been merged?
 
-On Wed, Apr 1, 2015 at 11:59 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Apr 01, 2015 at 02:54:59PM -0700, Kevin Hilman wrote:
->> Your patch on top of Geert's still compiles fine for me with gcc-4.7.3.
->> However, I'm not sure how specific we can be on the versions.
->>
->> /me goes to test a few more compilers...   OK...
->>
->> ICE: 4.7.1, 4.7.3, 4.8.3
->> OK: 4.6.3, 4.9.2, 4.9.3
->>
->> The diff below[2] on top of yours compiles fine here and at least covers
->> the compilers I *know* to trigger the ICE.
+-Takahiro AKASHI
+
+On 09/09/2014 07:21 AM, Joel Schopp wrote:
+> Add a one liner to identify the gic-400.  It's gicv2 with optional MSI extensions.
 >
-> Interesting.  I'm using stock gcc 4.7.4 here, though I'm not building
-> -next (only mainline + my tree + arm-soc) and it hasn't shown a problem
-> yet.
-
-Mainline doesn't fail.
-
-> I think we need to ask the question: is the bug in stock GCC or Linaro
-> GCC?  If it's not in stock GCC, then it's a GCC vendor problem :)
-
-Can you please try -next (e.g. next-20150320)?
-
-make bockw_defconfig
-make mm/migrate.o
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Joel Schopp <joel.schopp@amd.com>
+> ---
+>   virt/kvm/arm/vgic.c |    1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+> index 73eba79..e81444e 100644
+> --- a/virt/kvm/arm/vgic.c
+> +++ b/virt/kvm/arm/vgic.c
+> @@ -1550,6 +1550,7 @@ static struct notifier_block vgic_cpu_nb = {
+>
+>   static const struct of_device_id vgic_ids[] = {
+>   	{ .compatible = "arm,cortex-a15-gic", .data = vgic_v2_probe, },
+> +	{ .compatible = "arm,gic-400", .data = vgic_v2_probe, },
+>   	{ .compatible = "arm,gic-v3", .data = vgic_v3_probe, },
+>   	{},
+>   };
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
