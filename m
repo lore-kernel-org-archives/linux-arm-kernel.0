@@ -1,38 +1,18 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Thu, 2 Apr 2015 10:37:11 +0200
-Subject: [GIT PULL] qcom SoC changes for v4.1
-In-Reply-To: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
-References: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
-Message-ID: <CAP71WjzKSRRSVLcwpZTaQOYp2uziP7=J=E=3bHAzCjui-ZqbYQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 2 Apr 2015 14:05:16 +0530
+Subject: [PATCH v8 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
+In-Reply-To: <1426686456-15536-1-git-send-email-rsahu@apm.com>
+References: <1426686456-15536-1-git-send-email-rsahu@apm.com>
+Message-ID: <20150402083516.GZ7192@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy, Kumar,
+On Wed, Mar 18, 2015 at 07:17:33PM +0530, Rameshwar Prasad Sahu wrote:
+> This patch set implements the APM X-Gene SoC DMA driver support to offload
+> the DMA operations such as memory copy(memcpy), scatter gather memory copy,
+> raid5 xor and raid6 p+q.
+Applied, now
 
-On Mon, Mar 16, 2015 at 10:03 PM, Kumar Gala <galak@codeaurora.org> wrote:
-> Andy Gross (1):
->       soc: qcom: gsbi: Add support for ADM CRCI muxing
-
-this commit seems to break the boot on IFC6410, it was initially
-reported on kernelci.org, see report and bootlog [1].
-
-running git bisect led me to:
-
-e5fdad68d47ed344832b7ca4e18b2e9708d8141e is the first bad commit
-commit e5fdad68d47ed344832b7ca4e18b2e9708d8141e
-Author: Andy Gross <agross@codeaurora.org>
-Date:   Mon Feb 9 16:01:06 2015 -0600
-
-    soc: qcom: gsbi: Add support for ADM CRCI muxing
-
-    This patch adds automatic configuration for the ADM CRCI muxing required to
-    support DMA operations for GSBI clients.  The GSBI mode and
-instance determine
-    the correct TCSR ADM CRCI MUX value that must be programmed so that the DMA
-    works properly.
-
-    Signed-off-by: Andy Gross <agross@codeaurora.org>
-    Signed-off-by: Kumar Gala <galak@codeaurora.org>
-
-
-[1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.0-rc4-354-ga0690e6586df/
+Thanks
+-- 
+~Vinod
