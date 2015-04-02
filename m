@@ -1,57 +1,78 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Apr 2015 10:06:19 +0200
-Subject: [PATCH 2/2] ARM: dts: Use last parent for clocks during power domain
+Date: Thu, 02 Apr 2015 10:06:18 +0200
+Subject: [PATCH 1/2] ARM: EXYNOS: Get current parent clock for power domain
  on/off
-In-Reply-To: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
-References: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1427961979-29477-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace fixed parent with last parent (obtained with clk_get_parent())
-of clocks for devices in mfc and disp power domains. This should improve
-behavior if such clocks were reparented by the drivers and new parents
-are different than those specified in DTS.
+Using a fixed (by DTS) parent for clocks when turning on the power domain
+may introduce issues in other drivers. For example when such driver
+changes the parent during runtime and expects that he is the only place
+of such change.
+
+Do not rely entirely on DTS providing the fixed parent for such clocks.
+Instead if "pclkN" clock name is missing, grab a current parent of clock
+with clk_get_parent().
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 8 +++++---
+ arch/arm/mach-exynos/pm_domains.c                             | 9 ++++++---
+ 2 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index c7a44ee0ce06..b9b99305991b 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -264,9 +264,8 @@
- 	mfc_pd: power-domain at 10044060 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044060 0x20>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK333>,
--			<&clock CLK_MOUT_USER_ACLK333>;
--		clock-names = "oscclk", "pclk0", "clk0";
-+		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
-+		clock-names = "oscclk", "clk0";
- 		#power-domain-cells = <0>;
- 	};
+diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+index 5da38c5ed476..0fc1312f6fd5 100644
+--- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
++++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
+@@ -19,9 +19,11 @@ Optional Properties:
+ 	domains.
+ - clock-names: The following clocks can be specified:
+ 	- oscclk: Oscillator clock.
+-	- pclkN, clkN: Pairs of parent of input clock and input clock to the
+-		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
+-		are supported currently.
++	- pclkN, clkN: Input clocks (clkN) to the devices in this power domain.
++		Optionally with parrents (pclkN). If such parent is provided
++		it will be used for reparenting the given clock when domain
++		is turned on. Otherwise the parent before power down will be
++		used. Maximum of 4 pairs (N = 0 to 3) are supported currently.
+ 	- asbN: Clocks required by asynchronous bridges (ASB) present in
+ 		the power domain. These clock should be enabled during power
+ 		domain on/off operations.
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index cbe56b35aea0..c55bcf52a6ad 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -37,6 +37,7 @@ struct exynos_pm_domain {
+ 	struct clk *oscclk;
+ 	struct clk *clk[MAX_CLK_PER_DOMAIN];
+ 	struct clk *pclk[MAX_CLK_PER_DOMAIN];
++	unsigned int pclk_dynamic:MAX_CLK_PER_DOMAIN;
+ 	struct clk *asb_clk[MAX_CLK_PER_DOMAIN];
+ };
  
-@@ -280,16 +279,12 @@
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x100440C0 0x20>;
- 		#power-domain-cells = <0>;
--		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_SW_ACLK200>,
-+		clocks = <&clock CLK_FIN_PLL>,
- 			 <&clock CLK_MOUT_USER_ACLK200_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK300>,
- 			 <&clock CLK_MOUT_USER_ACLK300_DISP1>,
--			 <&clock CLK_MOUT_SW_ACLK400>,
- 			 <&clock CLK_MOUT_USER_ACLK400_DISP1>,
- 			 <&clock CLK_FIMD1>, <&clock CLK_MIXER>;
--		clock-names = "oscclk", "pclk0", "clk0",
--			      "pclk1", "clk1", "pclk2", "clk2",
--			      "asb0", "asb1";
-+		clock-names = "oscclk", "clk0", "clk1", "clk2", "asb0", "asb1";
- 	};
+@@ -62,6 +63,9 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
+ 		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
+ 			if (IS_ERR(pd->clk[i]))
+ 				break;
++			/* If parent was not set in DT, save current parent */
++			if (pd->pclk_dynamic & (1 << i))
++				pd->pclk[i] = clk_get_parent(pd->clk[i]);
+ 			if (clk_set_parent(pd->clk[i], pd->oscclk))
+ 				pr_err("%s: error setting oscclk as parent to clock %d\n",
+ 						pd->name, i);
+@@ -164,9 +168,8 @@ static __init int exynos4_pm_init_power_domain(void)
+ 			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
+ 			pd->pclk[i] = clk_get(dev, clk_name);
+ 			if (IS_ERR(pd->pclk[i])) {
+-				clk_put(pd->clk[i]);
+-				pd->clk[i] = ERR_PTR(-EINVAL);
+-				break;
++				pd->pclk_dynamic |= (1 << i);
++				pd->pclk[i] = clk_get_parent(pd->clk[i]);
+ 			}
+ 		}
  
- 	pinctrl_0: pinctrl at 13400000 {
 -- 
 1.9.1
