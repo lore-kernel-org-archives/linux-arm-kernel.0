@@ -1,22 +1,20 @@
-From: tyler.baker@linaro.org (Tyler Baker)
-Date: Thu, 2 Apr 2015 10:19:41 -0700
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 02 Apr 2015 11:23:57 -0600
 Subject: [PATCH 0/6] selftests: improve cross compilation support
 In-Reply-To: <551D49C8.3040900@osg.samsung.com>
 References: <1427930420-4762-1-git-send-email-tyler.baker@linaro.org>
  <551D49C8.3040900@osg.samsung.com>
-Message-ID: <CANMBJr4388KONsn4K_y2-1S0LtYURTFSc3AQakZk8Fhp-PCrBQ@mail.gmail.com>
+Message-ID: <551D7B2D.3020703@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shuah,
-
-On 2 April 2015 at 06:53, Shuah Khan <shuahkh@osg.samsung.com> wrote:
+On 04/02/2015 07:53 AM, Shuah Khan wrote:
 > On 04/01/2015 05:20 PM, Tyler Baker wrote:
 >> This patch set improves cross building functionality by resovling hard coded
->> assumptions about the compiler used. With this patch set, all but mqueue,
->> and kdbus cross build successfully as they must link against a native
->> libraries. The hope is tha the above issues can be resolved in future patch
->> sets. I have tested this series by building selftests for x86_64, arm and
+>> assumptions about the compiler used. With this patch set, all but mqueue, 
+>> and kdbus cross build successfully as they must link against a native 
+>> libraries. The hope is tha the above issues can be resolved in future patch 
+>> sets. I have tested this series by building selftests for x86_64, arm and 
 >> arm64 targets.
 >>
 >> This motivation behind this series is to enable the kernelci.org service to
@@ -41,28 +39,36 @@ On 2 April 2015 at 06:53, Shuah Khan <shuahkh@osg.samsung.com> wrote:
 >>  tools/testing/selftests/mqueue/Makefile | 6 ++++--
 >>  5 files changed, 15 insertions(+), 14 deletions(-)
 >>
->
->
+> 
+> 
 > Tyler,
->
+> 
 > Thanks for getting this work done. It is a bit late for
 > 4.1 and I plan to get these into 4.2.
+> 
 
-Thank you for your consideration, apologies for sending this series
-late in the merge window. Having these patches included in 4.2 sounds
-fine to me.
+After taking a second look at the patches, I want to get
+these into 4.1. It will be nice to enable cross compile
+as well in this release.
 
->
-> thanks,
-> -- Shuah
->
-> --
-> Shuah Khan
-> Sr. Linux Kernel Developer
-> Open Source Innovation Group
-> Samsung Research America (Silicon Valley)
-> shuahkh at osg.samsung.com | (970) 217-8978
+The one patch I won't be able to take it through kselftest
+tree is kdbus for logistical reasons. kdbus is going through
+Greg's tree - one of his many trees :)
 
-Cheers,
+Greg!
 
-Tyler
+Will you be able to include this kdbus patch in this series
+in your pull request for kdbus. I will reply to the kdbus
+patch in this series and cc you on that. If this doesn't
+work, could you suggest an alternative.
+
+thanks,
+-- Shuah
+
+
+-- 
+Shuah Khan
+Sr. Linux Kernel Developer
+Open Source Innovation Group
+Samsung Research America (Silicon Valley)
+shuahkh at osg.samsung.com | (970) 217-8978
