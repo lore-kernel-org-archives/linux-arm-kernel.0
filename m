@@ -1,405 +1,91 @@
-From: clabbe.montjoie@gmail.com (Corentin LABBE)
-Date: Thu, 02 Apr 2015 21:11:50 +0200
-Subject: [PATCH v6 4/4] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <20150326193115.5e30a9af@bbrezillon>
-References: <1426532482-28830-1-git-send-email-clabbe.montjoie@gmail.com>	<1426532482-28830-5-git-send-email-clabbe.montjoie@gmail.com>
- <20150326193115.5e30a9af@bbrezillon>
-Message-ID: <551D9476.7090206@gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 2 Apr 2015 13:12:30 -0600
+Subject: [PATCH] mm/migrate: Mark unmap_and_move() "noinline" to avoid
+ ICE in gcc 4.7.3
+In-Reply-To: <7hwq1v4iq4.fsf@deeprootsystems.com>
+References: <CANMBJr68dsbYvvHUzy6U4m4fEM6nq8dVHBH4kLQ=0c4QNOhLPQ@mail.gmail.com>
+ <20150327002554.GA5527@verge.net.au>
+ <20150327100612.GB1562@arm.com>
+ <7hbnj99epe.fsf@deeprootsystems.com>
+ <CAKv+Gu_ZHZFm-1eXn+r7fkEHOxqSmj+Q+Mmy7k6LK531vSfAjQ@mail.gmail.com>
+ <7h8uec95t2.fsf@deeprootsystems.com>
+ <alpine.DEB.2.10.1504011130030.14762@ayla.of.borg>
+ <551BBEC5.7070801@arm.com>
+ <20150401124007.20c440cc43a482f698f461b8@linux-foundation.org>
+ <7hwq1v4iq4.fsf@deeprootsystems.com>
+Message-ID: <20150402191230.GA24219@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 26/03/2015 19:31, Boris Brezillon a ?crit :
-> Hi Corentin,
-> 
-> Here is a quick review, there surely are a lot of other things I didn't
-> spot.
-> 
-> On Mon, 16 Mar 2015 20:01:22 +0100
-> LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
-> 
->> Add support for the Security System included in Allwinner SoC A20.
->> The Security System is a hardware cryptographic accelerator that support:
->> - MD5 and SHA1 hash algorithms
->> - AES block cipher in CBC mode with 128/196/256bits keys.
->> - DES and 3DES block cipher in CBC mode
+On Wed, Apr 01 2015 at 15:57 -0600, Kevin Hilman wrote:
+>Andrew Morton <akpm@linux-foundation.org> writes:
+>
+>> On Wed, 01 Apr 2015 10:47:49 +0100 Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>
->> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
->> ---
-> 
-> [...]
-> 
->> +static int sunxi_ss_cipher(struct ablkcipher_request *areq, u32 mode)
->> +{
->> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
->> +	struct sunxi_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
->> +	const char *cipher_type;
->> +	struct sunxi_ss_ctx *ss = op->ss;
->> +
->> +	if (areq->nbytes == 0)
->> +		return 0;
->> +
->> +	if (areq->info == NULL) {
->> +		dev_err(ss->dev, "ERROR: Empty IV\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (areq->src == NULL || areq->dst == NULL) {
->> +		dev_err(ss->dev, "ERROR: Some SGs are NULL\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	cipher_type = crypto_tfm_alg_name(crypto_ablkcipher_tfm(tfm));
->> +
->> +	if (strcmp("cbc(aes)", cipher_type) == 0) {
->> +		mode |= SS_OP_AES | SS_CBC | SS_ENABLED | op->keymode;
->> +		return sunxi_ss_aes_poll(areq, mode);
->> +	}
->> +
->> +	if (strcmp("cbc(des)", cipher_type) == 0) {
->> +		mode |= SS_OP_DES | SS_CBC | SS_ENABLED | op->keymode;
->> +		return sunxi_ss_des_poll(areq, mode);
->> +	}
->> +
->> +	if (strcmp("cbc(des3_ede)", cipher_type) == 0) {
->> +		mode |= SS_OP_3DES | SS_CBC | SS_ENABLED | op->keymode;
->> +		return sunxi_ss_des_poll(areq, mode);
->> +	}
-> 
-> Hm, I'm not sure doing these string comparisons in the crypto operation
-> path is a good idea.
-> Moreover, you're doing 3 string comparisons, even though only one can
-> be valid at a time (using 'else if' would have been a bit better).
-> 
-> Anyway, IMHO this function should be split into 3 functions, and
-> referenced by your alg template definitions.
-> Something like:
-> 
-> int sunxi_ss_xxx_encrypt(struct ablkcipher_request *areq)
-> {
-> 	/* put your cipher specific intialization here */
-> 
-> 	return sunxi_ss_xxx_poll(areq, SS_ENCRYPTION);
+>>> > -static int unmap_and_move(new_page_t get_new_page, free_page_t put_new_page,
+>>> > -			unsigned long private, struct page *page, int force,
+>>> > -			enum migrate_mode mode)
+>>> > +static noinline int unmap_and_move(new_page_t get_new_page,
+>>> > +				   free_page_t put_new_page,
+>>> > +				   unsigned long private, struct page *page,
+>>> > +				   int force, enum migrate_mode mode)
+>>> >  {
+>>> >  	int rc = 0;
+>>> >  	int *result = NULL;
+>>> >
+>>>
+>>> Ouch. That's really ugly. And on 32bit ARM, we end-up spilling half of
+>>> the parameters on the stack, which is not going to help performance
+>>> either (not that this would be useful on 32bit ARM anyway...).
+>>>
+>>> Any chance you could make this dependent on some compiler detection
+>>> mechanism?
+>>
+>> With my arm compiler (gcc-4.4.4) the patch makes no difference -
+>> unmap_and_move() isn't being inlined anyway.
+>>
+>> How does this look?
+>>
+>> Kevin, could you please retest?  I might have fat-fingered something...
+>
+>Your patch on top of Geert's still compiles fine for me with gcc-4.7.3.
+>However, I'm not sure how specific we can be on the versions.
+>
+>/me goes to test a few more compilers...   OK...
+>
+>ICE: 4.7.1, 4.7.3, 4.8.3
+>OK: 4.6.3, 4.9.2, 4.9.3
+>
+>The diff below[2] on top of yours compiles fine here and at least covers
+>the compilers I *know* to trigger the ICE.
+
+I see ICE on 
+arm-linux-gnueabi-gcc (Ubuntu/Linaro 4.7.4-2ubuntu1) 4.7.4
+
+>
+>Kevin
+>
+>
+>[1]
+>diff --git a/mm/migrate.c b/mm/migrate.c
+>index 25fd7f6291de..6e15ae3248e0 100644
+>--- a/mm/migrate.c
+>+++ b/mm/migrate.c
+>@@ -901,10 +901,10 @@ out:
 > }
-> 
-> int sunxi_ss_xxx_decrypt(struct ablkcipher_request *areq)
-> {
-> 	/* put your cipher specific intialization here */
-> 
-> 	return sunxi_ss_xxx_poll(areq, SS_DECRYPTION);
-> }
-> 
-
-You are right, I have added more block mode, and that was added too much strcmp.
-So splitting in simplier functions is good.
-
-> 
->> +
->> +int sunxi_ss_cipher_init(struct crypto_tfm *tfm)
->> +{
->> +	const char *name = crypto_tfm_alg_name(tfm);
->> +	struct sunxi_tfm_ctx *op = crypto_tfm_ctx(tfm);
->> +	struct crypto_alg *alg = tfm->__crt_alg;
->> +	struct sunxi_ss_alg_template *algt;
->> +	struct sunxi_ss_ctx *ss;
->> +
->> +	memset(op, 0, sizeof(struct sunxi_tfm_ctx));
->> +
->> +	algt = container_of(alg, struct sunxi_ss_alg_template, alg.crypto);
->> +	ss = algt->ss;
->> +	op->ss = algt->ss;
->> +
->> +	/* fallback is needed only for DES/3DES */
->> +	if (strcmp("cbc(des)", name) == 0 ||
->> +			strcmp("cbc(des3_ede)", name) == 0) {
->> +		op->fallback = crypto_alloc_ablkcipher(name, 0,
->> +				CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK);
->> +		if (IS_ERR(op->fallback)) {
->> +			dev_err(ss->dev, "ERROR: allocating fallback algo %s\n",
->> +					name);
->> +			return PTR_ERR(op->fallback);
->> +		}
->> +	}
-> 
-> Ditto: just create a specific init function for the des case:
-> 
-> int sunxi_ss_cbc_des_init(struct crypto_tfm *tfm)
-> {
-> 	sunxi_ss_cipher_init(tfm);
-> 
-> 	op->fallback = crypto_alloc_ablkcipher(name, 0,
-> 				CRYPTO_ALG_ASYNC |
-> 				CRYPTO_ALG_NEED_FALLBACK);
-> 	if (IS_ERR(op->fallback)) {
-> 		dev_err(ss->dev, "ERROR: allocating fallback algo %s\n",
-> 			name);
-> 		return PTR_ERR(op->fallback);
-> 	}
-> 
-> 	return 0;
-> }
-> 
-
-Ok
-
-> 
-> [..]
-> 
->> +/*
->> + * Optimized function for the case where we have only one SG,
->> + * so we can use kmap_atomic
->> + */
->> +static int sunxi_ss_aes_poll_atomic(struct ablkcipher_request *areq)
->> +{
->> +	u32 spaces;
->> +	struct scatterlist *in_sg = areq->src;
->> +	struct scatterlist *out_sg = areq->dst;
->> +	void *src_addr;
->> +	void *dst_addr;
->> +	unsigned int ileft = areq->nbytes;
->> +	unsigned int oleft = areq->nbytes;
->> +	unsigned int todo;
->> +	u32 *src32;
->> +	u32 *dst32;
->> +	u32 rx_cnt = 32;
->> +	u32 tx_cnt = 0;
->> +	int i;
->> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
->> +	struct sunxi_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
->> +	struct sunxi_ss_ctx *ss = op->ss;
->> +
->> +	src_addr = kmap_atomic(sg_page(in_sg)) + in_sg->offset;
->> +	if (src_addr == NULL) {
->> +		dev_err(ss->dev, "kmap_atomic error for src SG\n");
->> +		return -EINVAL;
->> +	}
->> +
->> +	dst_addr = kmap_atomic(sg_page(out_sg)) + out_sg->offset;
->> +	if (dst_addr == NULL) {
->> +		dev_err(ss->dev, "kmap_atomic error for dst SG\n");
->> +		kunmap_atomic(src_addr);
->> +		return -EINVAL;
->> +	}
->> +
->> +	src32 = (u32 *)src_addr;
->> +	dst32 = (u32 *)dst_addr;
->> +	ileft = areq->nbytes / 4;
->> +	oleft = areq->nbytes / 4;
->> +	i = 0;
->> +	do {
->> +		if (ileft > 0 && rx_cnt > 0) {
->> +			todo = min(rx_cnt, ileft);
->> +			ileft -= todo;
->> +			writesl(ss->base + SS_RXFIFO, src32, todo);
->> +			src32 += todo;
->> +		}
->> +		if (tx_cnt > 0) {
->> +			todo = min(tx_cnt, oleft);
->> +			oleft -= todo;
->> +			readsl(ss->base + SS_TXFIFO, dst32, todo);
->> +			dst32 += todo;
->> +		}
->> +		spaces = readl(ss->base + SS_FCSR);
->> +		rx_cnt = SS_RXFIFO_SPACES(spaces);
->> +		tx_cnt = SS_TXFIFO_SPACES(spaces);
->> +	} while (oleft > 0);
->> +	kunmap_atomic(dst_addr);
->> +	kunmap_atomic(src_addr);
->> +	return 0;
->> +}
->> +
->> +int sunxi_ss_aes_poll(struct ablkcipher_request *areq, u32 mode)
->> +{
->> +	u32 spaces;
->> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
->> +	struct sunxi_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
->> +	struct sunxi_ss_ctx *ss = op->ss;
->> +	unsigned int ivsize = crypto_ablkcipher_ivsize(tfm);
->> +	/* when activating SS, the default FIFO space is 32 */
->> +	u32 rx_cnt = 32;
->> +	u32 tx_cnt = 0;
->> +	u32 v;
->> +	int i, err = 0;
->> +	struct scatterlist *in_sg = areq->src;
->> +	struct scatterlist *out_sg = areq->dst;
->> +	void *src_addr;
->> +	void *dst_addr;
->> +	unsigned int ileft = areq->nbytes;
->> +	unsigned int oleft = areq->nbytes;
->> +	unsigned int sgileft = areq->src->length;
->> +	unsigned int sgoleft = areq->dst->length;
->> +	unsigned int todo;
->> +	u32 *src32;
->> +	u32 *dst32;
->> +	unsigned long flags;
->> +
->> +	spin_lock_irqsave(&ss->slock, flags);
->> +
->> +	for (i = 0; i < op->keylen; i += 4)
->> +		writel(*(op->key + i/4), ss->base + SS_KEY0 + i);
->> +
->> +	if (areq->info != NULL) {
->> +		for (i = 0; i < 4 && i < ivsize / 4; i++) {
->> +			v = *(u32 *)(areq->info + i * 4);
->> +			writel(v, ss->base + SS_IV0 + i * 4);
->> +		}
->> +	}
->> +	writel(mode, ss->base + SS_CTL);
->> +
->> +	/* If we have only one SG, we can use kmap_atomic */
->> +	if (sg_next(in_sg) == NULL && sg_next(out_sg) == NULL) {
->> +		err = sunxi_ss_aes_poll_atomic(areq);
->> +		goto release_ss;
->> +	}
->> +
->> +	/*
->> +	 * If we have more than one SG, we cannot use kmap_atomic since
->> +	 * we hold the mapping too long
->> +	 */
->> +	src_addr = kmap(sg_page(in_sg)) + in_sg->offset;
->> +	if (src_addr == NULL) {
->> +		dev_err(ss->dev, "KMAP error for src SG\n");
->> +		err = -EINVAL;
->> +		goto release_ss;
->> +	}
->> +	dst_addr = kmap(sg_page(out_sg)) + out_sg->offset;
->> +	if (dst_addr == NULL) {
->> +		kunmap(sg_page(in_sg));
->> +		dev_err(ss->dev, "KMAP error for dst SG\n");
->> +		err = -EINVAL;
->> +		goto release_ss;
->> +	}
->> +	src32 = (u32 *)src_addr;
->> +	dst32 = (u32 *)dst_addr;
->> +	ileft = areq->nbytes / 4;
->> +	oleft = areq->nbytes / 4;
->> +	sgileft = in_sg->length / 4;
->> +	sgoleft = out_sg->length / 4;
->> +	do {
->> +		spaces = readl_relaxed(ss->base + SS_FCSR);
->> +		rx_cnt = SS_RXFIFO_SPACES(spaces);
->> +		tx_cnt = SS_TXFIFO_SPACES(spaces);
->> +		todo = min3(rx_cnt, ileft, sgileft);
->> +		if (todo > 0) {
->> +			ileft -= todo;
->> +			sgileft -= todo;
->> +			writesl(ss->base + SS_RXFIFO, src32, todo);
->> +			src32 += todo;
->> +		}
->> +		if (in_sg != NULL && sgileft == 0 && ileft > 0) {
->> +			kunmap(sg_page(in_sg));
->> +			in_sg = sg_next(in_sg);
->> +			while (in_sg != NULL && in_sg->length == 0)
->> +				in_sg = sg_next(in_sg);
->> +			if (in_sg != NULL && ileft > 0) {
->> +				src_addr = kmap(sg_page(in_sg)) + in_sg->offset;
->> +				if (src_addr == NULL) {
->> +					dev_err(ss->dev, "ERROR: KMAP for src SG\n");
->> +					err = -EINVAL;
->> +					goto release_ss;
->> +				}
->> +				src32 = src_addr;
->> +				sgileft = in_sg->length / 4;
->> +			}
->> +		}
->> +		/* do not test oleft since when oleft == 0 we have finished */
->> +		todo = min3(tx_cnt, oleft, sgoleft);
->> +		if (todo > 0) {
->> +			oleft -= todo;
->> +			sgoleft -= todo;
->> +			readsl(ss->base + SS_TXFIFO, dst32, todo);
->> +			dst32 += todo;
->> +		}
->> +		if (out_sg != NULL && sgoleft == 0 && oleft >= 0) {
->> +			kunmap(sg_page(out_sg));
->> +			out_sg = sg_next(out_sg);
->> +			while (out_sg != NULL && out_sg->length == 0)
->> +				out_sg = sg_next(out_sg);
->> +			if (out_sg != NULL && oleft > 0) {
->> +				dst_addr = kmap(sg_page(out_sg)) +
->> +					out_sg->offset;
->> +				if (dst_addr == NULL) {
->> +					dev_err(ss->dev, "KMAP error\n");
->> +					err = -EINVAL;
->> +					goto release_ss;
->> +				}
->> +				dst32 = dst_addr;
->> +				sgoleft = out_sg->length / 4;
->> +			}
->> +		}
->> +	} while (oleft > 0);
->> +
->> +release_ss:
->> +	writel_relaxed(0, ss->base + SS_CTL);
->> +	spin_unlock_irqrestore(&ss->slock, flags);
->> +	return err;
->> +}
-> 
-> Do you really need to have both an "optimized" and "non-optimized"
-> function ?
-> 
-> BTW, you should take a look at the sg_copy_buffer function [1], which
-> is doing pretty much what you're doing here.
-> If you don't want to directly use sg_copy_buffer, you should at least
-> use the sg_miter_xxx function to iterate over you're sg list (it's
-> taking care of calling kmap or kmap_atomic depending on the
-> SG_MITER_ATOMIC flag).
-> 
-
-I have dropped sg_copy_buffer that I used for DES/3DES some times ago for handling SG with length not multiple of 4.
-And using sg_miter is not usefull.
-It could be usefull for DES/3DEs for non 4 bytes multiple SG, but I use a fallback for that case.
-
->> +
->> +/* Pure CPU driven way of doing DES/3DES with SS */
->> +int sunxi_ss_des_poll(struct ablkcipher_request *areq, u32 mode)
->> +{
->> +	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(areq);
->> +	struct sunxi_tfm_ctx *op = crypto_ablkcipher_ctx(tfm);
->> +	struct sunxi_ss_ctx *ss = op->ss;
->> +	int i, err = 0;
->> +	int no_chunk = 1;
->> +	struct scatterlist *in_sg = areq->src;
->> +	struct scatterlist *out_sg = areq->dst;
->> +	u8 kkey[256 / 8];
->> +
->> +	/*
->> +	 * if we have only SGs with size multiple of 4,
->> +	 * we can use the SS AES function
->> +	 */
->> +	while (in_sg != NULL && no_chunk == 1) {
->> +		if ((in_sg->length % 4) != 0)
->> +			no_chunk = 0;
->> +		in_sg = sg_next(in_sg);
->> +	}
->> +	while (out_sg != NULL && no_chunk == 1) {
->> +		if ((out_sg->length % 4) != 0)
->> +			no_chunk = 0;
->> +		out_sg = sg_next(out_sg);
->> +	}
->> +
->> +	if (no_chunk == 1)
->> +		return sunxi_ss_aes_poll(areq, mode);
->> +
-> 
-> Given your explanations, I'm not sure the names sunxi_ss_aes_poll and
-> sunxi_ss_des_poll are appropriate.
-> 
-> What about sunxi_ss_aligned_cipher_op_poll and sunxi_ss_cipher_op_poll.
-
-The difference is not about aligned or not since according to my understanding, the data will always be aligned following cra_alignmask.
-
-Thanks for your review
-
-> 
-> That's all I got for now.
-> I haven't reviewed the hash part yet, but I guess some of my comments
-> apply to this code too.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> 
-> [1]http://lxr.free-electrons.com/source/lib/scatterlist.c#L621
-> 
+>
+> /*
+>- * gcc-4.7.3 on arm gets an ICE when inlining unmap_and_move().  Work around
+>+ * gcc 4.7 and 4.8 on arm gets an ICE when inlining unmap_and_move().  Work around
+>  * it.
+>  */
+>-#if GCC_VERSION == 40703 && defined(CONFIG_ARM)
+>+#if (GCC_VERSION >= 40700 && GCC_VERSION < 40900) && defined(CONFIG_ARM)
+> #define ICE_noinline noinline
+> #else
+> #define ICE_noinline
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
