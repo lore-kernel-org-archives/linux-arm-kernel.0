@@ -1,194 +1,225 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu,  2 Apr 2015 22:31:48 +0200
-Subject: [PATCH 6/6] ARM: dts: lpc18xx: add clock nodes for cgu and ccu
-In-Reply-To: <1428006708-13690-1-git-send-email-manabian@gmail.com>
-References: <1428006708-13690-1-git-send-email-manabian@gmail.com>
-Message-ID: <1428006708-13690-7-git-send-email-manabian@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 2 Apr 2015 22:34:17 +0200
+Subject: [PATCHv4] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150402143846.GA11687@amd>
+References: <20150402143846.GA11687@amd>
+Message-ID: <20150402203417.GA6336@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/lpc18xx.dtsi | 96 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 82 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index 161e98b442e0..8e9f51c88fad 100644
---- a/arch/arm/boot/dts/lpc18xx.dtsi
-+++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -13,6 +13,9 @@
+
+We are moving to device tree support on OMAP3, but that currently
+breaks ADP1653 driver. This adds device tree support, plus required
+documentation.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
  
- #include "armv7-m.dtsi"
- 
-+#include "dt-bindings/clock/lpc18xx-cgu.h"
-+#include "dt-bindings/clock/lpc18xx-ccu.h"
+---
+
+Fixed feedback by Sakari.
+
+Please apply,
+ 							Pavel
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+new file mode 100644
+index 0000000..0fc28a9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+@@ -0,0 +1,37 @@
++* Analog Devices ADP1653 flash LED driver
 +
- / {
- 	aliases {
- 		serial0 = &uart0;
-@@ -29,6 +32,7 @@
- 			compatible = "arm,cortex-m3";
- 			device_type = "cpu";
- 			reg = <0x0>;
-+			clocks = <&ccu1 CLK_CPU_CORE>;
- 		};
- 	};
- 
-@@ -39,23 +43,84 @@
- 			clock-frequency = <12000000>;
- 		};
- 
--		/* Temporary hardcode PLL1 until clk drivers are merged */
--		pll1: pll1 {
--			compatible = "fixed-factor-clock";
--			clocks = <&xtal>;
-+		xtal32: xtal32 {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
++Required Properties:
++
++  - compatible: Must contain be "adi,adp1653"
++
++  - reg: I2C slave address
++
++  - gpios: References to the GPIO that controls the power for the chip.
++
++There are two led outputs available - flash and indicator. One led is
++represented by one child node, nodes need to be named "flash" and "indicator".
++
++Required properties of the LED child node:
++- max-microamp : see Documentation/devicetree/bindings/leds/common.txt
++
++Required properties of the flash LED child node:
++
++- flash-max-microamp : see Documentation/devicetree/bindings/leds/common.txt
++- flash-timeout-us : see Documentation/devicetree/bindings/leds/common.txt
++
++Example:
++
++	adp1653: led-controller at 30 {
++		compatible = "adi,adp1653";
++		reg = <0x30>;
++		gpios = <&gpio3 24 GPIO_ACTIVE_HIGH>; /* 88 */
++
++		flash {
++			flash-timeout-us = <500000>;
++			flash-max-microamp = <320000>;
++			max-microamp = <50000>;
 +		};
-+
-+		enet_rx_clk: enet_rx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_rx_clk";
++		indicator {
++			max-microamp = <17500>;
 +		};
++	};
+diff --git a/drivers/media/i2c/adp1653.c b/drivers/media/i2c/adp1653.c
+index 873fe19..6d57b16 100644
+--- a/drivers/media/i2c/adp1653.c
++++ b/drivers/media/i2c/adp1653.c
+@@ -8,6 +8,7 @@
+  * Contributors:
+  *	Sakari Ailus <sakari.ailus@iki.fi>
+  *	Tuukka Toivonen <tuukkat76@gmail.com>
++ *	Pavel Machek <pavel@ucw.cz>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -34,6 +35,8 @@
+ #include <linux/module.h>
+ #include <linux/i2c.h>
+ #include <linux/slab.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
+ #include <media/adp1653.h>
+ #include <media/v4l2-device.h>
+ 
+@@ -306,9 +309,17 @@ adp1653_init_device(struct adp1653_flash *flash)
+ static int
+ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ {
+-	int ret;
++	int ret = 0;
 +
-+		enet_tx_clk: enet_tx_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+			clock-output-names = "enet_tx_clk";
-+		};
++	if (flash->platform_data->power) {
++		ret = flash->platform_data->power(&flash->subdev, on);
++	} else {
++		gpio_set_value(flash->platform_data->power_gpio, on);
++		if (on)
++			/* Some delay is apparently required. */
++			udelay(20);
++	}
+ 
+-	ret = flash->platform_data->power(&flash->subdev, on);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -316,8 +327,13 @@ __adp1653_set_power(struct adp1653_flash *flash, int on)
+ 		return 0;
+ 
+ 	ret = adp1653_init_device(flash);
+-	if (ret < 0)
++	if (ret >= 0)
++		return ret;
 +
-+		gp_clkin: gp_clkin {
-+			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-div = <1>;
--			clock-mult = <12>;
-+			clock-frequency = <0>;
-+			clock-output-names = "gp_clkin";
- 		};
- 	};
++	if (flash->platform_data->power)
+ 		flash->platform_data->power(&flash->subdev, 0);
++	else
++		gpio_set_value(flash->platform_data->power_gpio, 0);
  
- 	soc {
-+		cgu: cgu at 40050000 {
-+			compatible = "nxp,lpc1850-cgu";
-+			reg = <0x40050000 0x1000>;
-+			#clock-cells = <1>;
-+			clocks = <&xtal>, <&xtal32>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
-+			clock-indices =  <0>,  <1>,  <2>,  <3>,  <4>,  <5>,  <6>,  <7>,
-+					 <8>,  <9>, <10>, <11>, <12>, <13>, <14>, <15>,
-+					<16>, <17>, <18>, <19>, <20>, <25>, <26>, <27>;
-+			clock-output-names = "base_safe_clk",    "base_usb0_clk",
-+					     "base_periph_clk",  "base_usb1_clk",
-+					     "base_cpu_clk",     "base_spifi_clk",
-+					     "base_spi_clk",     "base_phy_rx_clk",
-+					     "base_phy_tx_clk",  "base_apb1_clk",
-+					     "base_apb3_clk",    "base_lcd_clk",
-+					     "base_adchs_clk",   "base_sdio_clk",
-+					     "base_ssp0_clk",    "base_ssp1_clk",
-+					     "base_uart0_clk",   "base_uart1_clk",
-+					     "base_uart2_clk",   "base_uart3_clk",
-+					     "base_out_clk",     "base_audio_clk",
-+					     "base_cgu_out0_clk","base_cgu_out1_clk";
-+		};
+ 	return ret;
+ }
+@@ -407,21 +423,76 @@ static int adp1653_resume(struct device *dev)
+ 
+ #endif /* CONFIG_PM */
+ 
++static int adp1653_of_init(struct i2c_client *client,
++			   struct adp1653_flash *flash,
++			   struct device_node *node)
++{
++	u32 val;
++	struct adp1653_platform_data *pd;
++	enum of_gpio_flags flags;
++	struct device_node *child;
 +
-+		ccu1: ccu at 40051000 {
-+			compatible = "nxp,lpc1850-ccu";
-+			reg = <0x40051000 0x1000>;
-+			#clock-cells = <1>;
-+			clocks = <&cgu BASE_APB3_CLK>,   <&cgu BASE_APB1_CLK>,
-+				 <&cgu BASE_SPIFI_CLK>,  <&cgu BASE_CPU_CLK>,
-+				 <&cgu BASE_PERIPH_CLK>, <&cgu BASE_USB0_CLK>,
-+				 <&cgu BASE_USB1_CLK>,   <&cgu BASE_SPI_CLK>;
-+		};
++	if (!node)
++		return -EINVAL;
 +
-+		ccu2: ccu at 40052000 {
-+			compatible = "nxp,lpc1850-ccu";
-+			reg = <0x40052000 0x1000>;
-+			#clock-cells = <1>;
-+			clocks = <&cgu BASE_AUDIO_CLK>, <&cgu BASE_UART3_CLK>,
-+				 <&cgu BASE_UART2_CLK>, <&cgu BASE_UART1_CLK>,
-+				 <&cgu BASE_UART0_CLK>, <&cgu BASE_SSP1_CLK>,
-+				 <&cgu BASE_SSP0_CLK>,  <&cgu BASE_SDIO_CLK>;
-+		};
++	pd = devm_kzalloc(&client->dev, sizeof(*pd), GFP_KERNEL);
++	if (!pd)
++		return -ENOMEM;
++	flash->platform_data = pd;
 +
- 		uart0: serial at 40081000 {
- 			compatible = "ns16550a";
- 			reg = <0x40081000 0x1000>;
- 			reg-shift = <2>;
- 			interrupts = <24>;
--			clocks = <&pll1>;
-+			clocks = <&ccu2 CLK_APB0_UART0>, <&ccu1 CLK_CPU_UART0>;
-+			clock-names = "uart", "reg";
- 			status = "disabled";
- 		};
++	child = of_get_child_by_name(node, "flash");
++	if (!child)
++		return -EINVAL;
++	if (of_property_read_u32(child, "flash-timeout-microsec", &val))
++		return -EINVAL;
++
++	pd->max_flash_timeout = val;
++	if (of_property_read_u32(child, "flash-max-microamp", &val))
++		return -EINVAL;
++	pd->max_flash_intensity = val/1000;
++
++	if (of_property_read_u32(child, "max-microamp", &val))
++		return -EINVAL;
++	pd->max_torch_intensity = val/1000;
++
++	child = of_get_child_by_name(node, "indicator");
++	if (!child)
++		return -EINVAL;
++	if (of_property_read_u32(child, "max-microamp", &val))
++		return -EINVAL;
++	pd->max_indicator_intensity = val;
++
++	if (!of_find_property(node, "gpios", NULL)) {
++		dev_err(&client->dev, "No gpio node\n");
++		return -EINVAL;
++	}
++
++	pd->power_gpio = of_get_gpio_flags(node, 0, &flags);
++	if (pd->power_gpio < 0) {
++		dev_err(&client->dev, "Error getting GPIO\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++
+ static int adp1653_probe(struct i2c_client *client,
+ 			 const struct i2c_device_id *devid)
+ {
+ 	struct adp1653_flash *flash;
+ 	int ret;
  
-@@ -64,7 +129,8 @@
- 			reg = <0x40082000 0x1000>;
- 			reg-shift = <2>;
- 			interrupts = <25>;
--			clocks = <&pll1>;
-+			clocks = <&ccu2 CLK_APB0_UART1>, <&ccu1 CLK_CPU_UART1>;
-+			clock-names = "uart", "reg";
- 			status = "disabled";
- 		};
+-	/* we couldn't work without platform data */
+-	if (client->dev.platform_data == NULL)
+-		return -ENODEV;
+-
+ 	flash = devm_kzalloc(&client->dev, sizeof(*flash), GFP_KERNEL);
+ 	if (flash == NULL)
+ 		return -ENOMEM;
  
-@@ -72,14 +138,14 @@
- 			compatible = "nxp,lpc3250-timer";
- 			reg = <0x40084000 0x1000>;
- 			interrupts = <12>;
--			clocks = <&pll1>;
-+			clocks = <&ccu1 CLK_CPU_TIMER0>;
- 		};
+ 	flash->platform_data = client->dev.platform_data;
++	if (client->dev.of_node) {
++		ret = adp1653_of_init(client, flash, client->dev.of_node);
++		if (ret)
++			return ret;
++	}
  
- 		timer1: timer at 40085000 {
- 			compatible = "nxp,lpc3250-timer";
- 			reg = <0x40085000 0x1000>;
- 			interrupts = <13>;
--			clocks = <&pll1>;
-+			clocks = <&ccu1 CLK_CPU_TIMER1>;
- 		};
+ 	mutex_init(&flash->power_lock);
  
- 		uart2: serial at 400c1000 {
-@@ -87,7 +153,8 @@
- 			reg = <0x400c1000 0x1000>;
- 			reg-shift = <2>;
- 			interrupts = <26>;
--			clocks = <&pll1>;
-+			clocks = <&ccu2 CLK_APB2_UART2>, <&ccu1 CLK_CPU_UART2>;
-+			clock-names = "uart", "reg";
- 			status = "disabled";
- 		};
+@@ -442,6 +513,7 @@ static int adp1653_probe(struct i2c_client *client,
+ 	return 0;
  
-@@ -96,7 +163,8 @@
- 			reg = <0x400c2000 0x1000>;
- 			reg-shift = <2>;
- 			interrupts = <27>;
--			clocks = <&pll1>;
-+			clocks = <&ccu2 CLK_APB2_UART3>, <&ccu1 CLK_CPU_UART3>;
-+			clock-names = "uart", "reg";
- 			status = "disabled";
- 		};
- 
-@@ -104,14 +172,14 @@
- 			compatible = "nxp,lpc3250-timer";
- 			reg = <0x400c3000 0x1000>;
- 			interrupts = <14>;
--			clocks = <&pll1>;
-+			clocks = <&ccu1 CLK_CPU_TIMER2>;
- 		};
- 
- 		timer3: timer at 400c4000 {
- 			compatible = "nxp,lpc3250-timer";
- 			reg = <0x400c4000 0x1000>;
- 			interrupts = <15>;
--			clocks = <&pll1>;
-+			clocks = <&ccu1 CLK_CPU_TIMER3>;
- 		};
- 	};
+ free_and_quit:
++	dev_err(&client->dev, "adp1653: failed to register device\n");
+ 	v4l2_ctrl_handler_free(&flash->ctrls);
+ 	return ret;
+ }
+@@ -464,7 +536,7 @@ static const struct i2c_device_id adp1653_id_table[] = {
  };
+ MODULE_DEVICE_TABLE(i2c, adp1653_id_table);
+ 
+-static struct dev_pm_ops adp1653_pm_ops = {
++static const struct dev_pm_ops adp1653_pm_ops = {
+ 	.suspend	= adp1653_suspend,
+ 	.resume		= adp1653_resume,
+ };
+
 -- 
-1.8.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
