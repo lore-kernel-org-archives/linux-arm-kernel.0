@@ -1,78 +1,48 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Apr 2015 10:06:18 +0200
-Subject: [PATCH 1/2] ARM: EXYNOS: Get current parent clock for power domain
- on/off
-Message-ID: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 2 Apr 2015 09:12:10 +0100
+Subject: [STLinux Kernel] [PATCH 0/4] clk: Provide support for always-on
+ clocks
+In-Reply-To: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150402081210.GB3567@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using a fixed (by DTS) parent for clocks when turning on the power domain
-may introduce issues in other drivers. For example when such driver
-changes the parent during runtime and expects that he is the only place
-of such change.
+Hi Lee,
 
-Do not rely entirely on DTS providing the fixed parent for such clocks.
-Instead if "pclkN" clock name is missing, grab a current parent of clock
-with clk_get_parent().
+On Fri, 27 Feb 2015, Lee Jones wrote:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 8 +++++---
- arch/arm/mach-exynos/pm_domains.c                             | 9 ++++++---
- 2 files changed, 11 insertions(+), 6 deletions(-)
+> Some hardware contains bunches of clocks which must never be
+> turned off.  If drivers a) fail to obtain a reference to any
+> of these or b) give up a previously obtained reference
+> during suspend, the common clk framework will attempt to
+> disable them and a platform can fail irrecoverably as a
+> result.  Usually the only way to recover from these failures
+> is to reboot.
+> 
+> To avoid either of these two scenarios from catastrophically
+> disabling an otherwise perfectly healthy running system,
+> clocks can be identified as always-on using this property
+> from inside a clocksource's node.  The CLK_IGNORE_UNUSED
+> flag will be applied to each clock instance named in this
+> property, thus preventing them from being shut down by the
+> framework.
 
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-index 5da38c5ed476..0fc1312f6fd5 100644
---- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-@@ -19,9 +19,11 @@ Optional Properties:
- 	domains.
- - clock-names: The following clocks can be specified:
- 	- oscclk: Oscillator clock.
--	- pclkN, clkN: Pairs of parent of input clock and input clock to the
--		devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
--		are supported currently.
-+	- pclkN, clkN: Input clocks (clkN) to the devices in this power domain.
-+		Optionally with parrents (pclkN). If such parent is provided
-+		it will be used for reparenting the given clock when domain
-+		is turned on. Otherwise the parent before power down will be
-+		used. Maximum of 4 pairs (N = 0 to 3) are supported currently.
- 	- asbN: Clocks required by asynchronous bridges (ASB) present in
- 		the power domain. These clock should be enabled during power
- 		domain on/off operations.
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index cbe56b35aea0..c55bcf52a6ad 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -37,6 +37,7 @@ struct exynos_pm_domain {
- 	struct clk *oscclk;
- 	struct clk *clk[MAX_CLK_PER_DOMAIN];
- 	struct clk *pclk[MAX_CLK_PER_DOMAIN];
-+	unsigned int pclk_dynamic:MAX_CLK_PER_DOMAIN;
- 	struct clk *asb_clk[MAX_CLK_PER_DOMAIN];
- };
- 
-@@ -62,6 +63,9 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 		for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
- 			if (IS_ERR(pd->clk[i]))
- 				break;
-+			/* If parent was not set in DT, save current parent */
-+			if (pd->pclk_dynamic & (1 << i))
-+				pd->pclk[i] = clk_get_parent(pd->clk[i]);
- 			if (clk_set_parent(pd->clk[i], pd->oscclk))
- 				pr_err("%s: error setting oscclk as parent to clock %d\n",
- 						pd->name, i);
-@@ -164,9 +168,8 @@ static __init int exynos4_pm_init_power_domain(void)
- 			snprintf(clk_name, sizeof(clk_name), "pclk%d", i);
- 			pd->pclk[i] = clk_get(dev, clk_name);
- 			if (IS_ERR(pd->pclk[i])) {
--				clk_put(pd->clk[i]);
--				pd->clk[i] = ERR_PTR(-EINVAL);
--				break;
-+				pd->pclk_dynamic |= (1 << i);
-+				pd->pclk[i] = clk_get_parent(pd->clk[i]);
- 			}
- 		}
- 
--- 
-1.9.1
+Great stuff.
+
+One minor comment is that assuming this works on stih407 and stih410
+to the extent that the platform can now boot without clk_ignore_unused
+kenel parameter then you should have an additional patch to remove
+clk_ignore_unused from the default bootargs in stih407-b2120.dts and
+stih410-b2120.dts files.
+
+Maxime - Is it possible for you to test this series on stih418-b2199 as
+a well? As it could most likely also be removed from stih418-b2199.dts file
+to, but neither Lee or myself have the hardware to test.
+
+Apart from that, for the series: -
+ Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+regards,
+
+Peter.
