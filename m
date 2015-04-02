@@ -1,48 +1,162 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 2 Apr 2015 10:33:59 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8a7790: add EtherAVB DT support
-In-Reply-To: <551AB78B.4000506@cogentembedded.com>
-References: <1625400.M0MxPQybIy@wasted.cogentembedded.com>
- <8163383.0UU0Q5gsLE@wasted.cogentembedded.com>
- <20150331002113.GB16289@verge.net.au>
- <551AB78B.4000506@cogentembedded.com>
-Message-ID: <20150402013359.GB25445@verge.net.au>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 1 Apr 2015 19:28:22 -0700
+Subject: [PATCH 4/5] phy: add Broadcom SATA3 PHY driver for Broadcom STB
+ SoCs
+In-Reply-To: <551A3844.6060806@ti.com>
+References: <1426728222-8197-1-git-send-email-computersforpeace@gmail.com>
+ <1426728222-8197-4-git-send-email-computersforpeace@gmail.com>
+ <55132FD0.2000103@ti.com> <20150328002844.GA32500@ld-irv-0074>
+ <551A3844.6060806@ti.com>
+Message-ID: <20150402022822.GE32500@ld-irv-0074>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 06:04:43PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 03/31/2015 03:21 AM, Simon Horman wrote:
-> 
-> >>Define the generic R8A7790 part of the EtherAVB device node.
-> 
-> >Please repost once this binding (and associated driver) has been accepted.
-> 
->    OK, but will you merge patch #1?
-
-I would prefer to wait until we can exercise it with a driver.
-
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Tue, Mar 31, 2015 at 11:31:40AM +0530, Kishon Vijay Abraham I wrote:
+> On Saturday 28 March 2015 05:58 AM, Brian Norris wrote:
+> >On Thu, Mar 26, 2015 at 03:29:44AM +0530, Kishon Vijay Abraham I wrote:
+> >>On Thursday 19 March 2015 06:53 AM, Brian Norris wrote:
+> >>>+static struct phy *brcm_sata_phy_xlate(struct device *dev,
+> >>>+				       struct of_phandle_args *args)
+> >>>+{
+> >>>+	struct brcm_sata_phy *priv = dev_get_drvdata(dev);
+> >>>+	int i = args->args[0];
+> >>>+
+> >>>+	if (i >= MAX_PORTS || !priv->phys[i].phy) {
+> >>>+		dev_err(dev, "invalid phy: %d\n", i);
+> >>>+		return ERR_PTR(-ENODEV);
+> >>>+	}
+> >>>+
+> >>>+	return priv->phys[i].phy;
+> >>>+}
 > >>
-> >>---
-> >>  arch/arm/boot/dts/r8a7790.dtsi |   10 ++++++++++
-> >>  1 file changed, 10 insertions(+)
-> >>
-> >>Index: renesas/arch/arm/boot/dts/r8a7790.dtsi
-> >>===================================================================
-> >>--- renesas.orig/arch/arm/boot/dts/r8a7790.dtsi
-> >>+++ renesas/arch/arm/boot/dts/r8a7790.dtsi
-> >>@@ -626,6 +626,16 @@
-> >>  		status = "disabled";
-> >>  	};
-> >>
-> >>+	avb: ethernet at e6800000 {
-> >>+		compatible = "renesas,ravb-r8a7790";
+> >>this xlate is not required at all if the controller device tree node has
+> >>phandle to the phy node (sub node) instead of the phy provider device tree
+> >>node.
+> >
+> >That doesn't match any convention I see in existing SATA phy bindings,
+> >nor do I see how the existing of_phy_simple_xlate() would support this,
+> >unless I instantiate a device for each port's PHY. If I adjust the
+> >device tree as you suggest, and use of_phy_simple_xlate() instead of
+> >this, of_phy_get() can't find the PHY provider, because the provider is
+> >registered to the parent, not the subnode.
 > 
->    I went the usual way here but I suspect that SoC part of the prop should
-> be "-rcar-gen2" as we now have this IP core (as well as most of the others,
-> except PFC) described in a common manual for the R-Car generation 2 SoCs.
-> What do you think?
+> The phy core should still be able to get the PHY provider.
+> See this in of_phy_provider_lookup
+>                 for_each_child_of_node(phy_provider->dev->of_node, child)
+>                         if (child == node)
+>                                 return phy_provider;
 
-I like -r8a7790.
+That just searches for children of the node. It doesn't walk parent
+nodes.
+
+> Can you post your device tree node here?
+
+You mean patch 5?
+
+https://lkml.org/lkml/2015/3/18/937
+
+> >
+> >Can you elaborate on your suggestion?
+> >
+> >>>+
+> >>>+static const struct of_device_id brcmstb_sata_phy_of_match[] = {
+> >>>+	{ .compatible	= "brcm,bcm7445-sata-phy" },
+> >>>+	{},
+> >>>+};
+> >>>+MODULE_DEVICE_TABLE(of, brcmstb_sata_phy_of_match);
+> >>>+
+> >>>+static int brcmstb_sata_phy_probe(struct platform_device *pdev)
+> >>>+{
+> >>>+	struct device *dev = &pdev->dev;
+> >>>+	struct device_node *dn = dev->of_node, *child;
+> >>>+	struct brcm_sata_phy *priv;
+> >>>+	struct resource *res;
+> >>>+	struct phy_provider *provider;
+> >>>+	int count = 0;
+> >>>+
+> >>>+	if (of_get_child_count(dn) == 0)
+> >>>+		return -ENODEV;
+> >>>+
+> >>>+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> >>>+	if (!priv)
+> >>>+		return -ENOMEM;
+> >>>+	dev_set_drvdata(dev, priv);
+> >>>+	priv->dev = dev;
+> >>>+
+> >>>+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "port-ctrl");
+> >>>+	if (!res) {
+> >>>+		dev_err(dev, "couldn't get port-ctrl resource\n");
+> >>>+		return -EINVAL;
+> >>>+	}
+> >>>+	/*
+> >>>+	 * Don't request region, since it may be within a region owned by the
+> >>>+	 * SATA driver
+> >>
+> >>It should be in the SATA driver then. Why is it here?
+> >
+> >Did you read the discussion branching here?
+> >
+> >http://article.gmane.org/gmane.linux.drivers.devicetree/114637
+> >
+> >I've seen the exact opposite suggestion already (move it to the PHY
+> >driver), and I'm not sure either suggestion is correct. The same
+> >register block has registers for both the PHY and the SATA controller.
+> 
+> IMHO the register space shouldn't be defined based on the programming sequence
+> but by where the register is actually present in the IP. From that thread it
+> doesn't look like it is present in the PHY IP.
+
+If you say so. But it has plenty of PHY controls packed into those
+registers, so are you just recommending handling those bits from the
+SATA driver?
+
+...
+
+> >>lets not make the boot noisy. Make it dev_vdbg if it is required.
+> >
+> >I think it's important to have at least some of the three informational
+> >prints that you're suggesting turn into dbg. It's pretty important to
+> >see that we're powering on one or more PHY ports, for both
+> >power/correctness concerns (trying to power on a port that is
+> >OTP-disabled, for instance) and debugging concerns (the suggestions you
+> >made about the device tree yielded a dead SATA, and it was obvious,
+> >because the "powering on" prints were missing).
+> 
+> All these are debugging info. Hence it's better to keep in dev_vdbg or dev_dbg.
+> >
+> >I'd kinda like to see the previous power on/off prints above stay as
+> >dev_info(), though the "registered" print might be superfluous, as the
+> >registration info should show up in sysfs.
+> >
+> >Related: I don't see any API for monitoring the PHY status from user
+> >space. e.g., there's nothing useful in /sys/class/phy/*/.
+> 
+> Do you really need to monitor the PHY status? We should be careful about
+> exposing anything to the user space since it will become an ABI and we can
+> never modify it.
+
+Not really, but the debugging info (which you want me to remove by
+default, and which is unretrievable after system boot) is the next
+easiest solution. It doesn't provide an ABI, exactly, but it keeps the
+info readily available.
+
+> >>>+
+> >>>+	return 0;
+> >>>+}
+> >>>+
+> >>>+static int brcmstb_sata_phy_remove(struct platform_device *pdev)
+> >>>+{
+> >>>+	return 0;
+> >>>+}
+> >>
+> >>Remove this function if it doesn't have anything to do.
+> >
+> >I was confused; I thought that that the driver model would not allow a
+> >device to be detached if there was no remove function. Will remove now.
+> 
+> okay. I'll cross check that again.
+
+I haven't done an exhaustive search, but it looks like
+__device_release_driver() handles a missing .remove just fine.
+
+Brian
