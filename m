@@ -1,36 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Apr 2015 17:54:49 -0700
-Subject: [GIT PULL] Third Round of Renesas ARM Based SoC DT Updates for
- v4.1
-In-Reply-To: <cover.1426731062.git.horms+renesas@verge.net.au>
-References: <cover.1426731062.git.horms+renesas@verge.net.au>
-Message-ID: <20150402005449.GK8137@localhost>
+Date: Wed, 1 Apr 2015 17:56:00 -0700
+Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from
+ ARM defconfigs
+In-Reply-To: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
+References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
+ <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20150402005600.GL8137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 11:15:21AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Mar 19, 2015 at 05:30:09AM +0000, Kuninori Morimoto wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> Please consider these third round of Renesas ARM based SoC DT updates for v4.1.
+> Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
+> Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
+> And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
+> But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
+> not a general purpose DMAC (2nd DMAC is for Device to Device inside
+> sound system). Additionally, current DMAEngine can't support Device to
+> Device, and we don't have correct DT bindings for it at this point.
+> So the easiest solution for it is that move it from DMAEngine to rsnd
+> driver.
+> Audio DMAC peri peri DMAEngine is no longer needed.
+> Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-dt2-for-v4.1,
-> which you have already pulled.
-> 
-> 
-> The following changes since commit 90ca409a1e6b9b72d1b6ae716cd7a63335fd0e87:
-> 
->   ARM: shmobile: ape6evm dts: Configure the custom switch as wake-up source (2015-03-07 10:07:30 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt3-for-v4.1
-> 
-> for you to fetch changes up to 63573339e7698503bfeaef3bb0c444ffc98e45a0:
-> 
->   ARM: shmobile: r8a7791: sound enables Audio DMAC entry on DTSI (2015-03-11 09:40:30 +0900)
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Merged, thanks.
+Applied, thanks.
 
 
 -Olof
