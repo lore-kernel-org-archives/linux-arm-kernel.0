@@ -1,49 +1,42 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 2 Apr 2015 10:18:52 +0200
-Subject: [PATCH] pinctrl: dt: at91: new binding
-In-Reply-To: <CAOesGMgsyEwuF95FFe81Li8nXO0MhHF0ZHPVV91MEH-JGO43tA@mail.gmail.com>
-References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdbNLE+VjhvSgsU4oqAc03ieCNyiLkUzbjEiu_LFof-Unw@mail.gmail.com>
- <CAOesGMgsyEwuF95FFe81Li8nXO0MhHF0ZHPVV91MEH-JGO43tA@mail.gmail.com>
-Message-ID: <20150402081852.GA26864@ns203013.ovh.net>
+Date: Thu, 2 Apr 2015 10:19:41 +0200
+Subject: [PATCH 2/2] pinctrl: at91: Add missing include
+In-Reply-To: <1426878721-2618-2-git-send-email-alexanders83@web.de>
+References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+ <1426878721-2618-2-git-send-email-alexanders83@web.de>
+Message-ID: <20150402081941.GB26864@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:55 Sun 29 Mar     , Olof Johansson wrote:
-> On Tue, Mar 17, 2015 at 5:07 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Thu, Feb 26, 2015 at 10:34 AM, Jean-Christophe PLAGNIOL-VILLARD
-> > <plagnioj@jcrosoft.com> wrote:
-> >
-> >> +For each peripheral/bank we will descibe in a u32 if a pin can be
-> >> +configured in it by putting 1 to the pin bit (1 << pin)
-> >
-> > This seems to be describing driver intrinsics in the device tree, like
-> > how the hardware is routed on the inside and what it can do.
-> >
-> > IMO that is driver territory, the driver should know these limitations
-> > and protest if you try to do something illegal.
-> >
-> > Anyway as the AT91 maintainers seem to disagree I will allow some
-> > more time for discussion before merging the patch.
-> >
-> > I can't really have one AT91 maintainer NACKing another, it doesn't
-> > matter that this is a separate driver, in my book the MAINTAINERS
-> > entry for AT91 as a whole overrides that so can you please find an
-> > agreement on how to handle this or I will stall the patch until
-> > you're in agreement.
+On 20:12 Fri 20 Mar     , Alexander Stein wrote:
+> This fixes the sparse warning:
+> drivers/pinctrl/pinctrl-at91.c:1556:6: warning: symbol
+>  'at91_pinctrl_gpio_suspend' was not declared. Should it be static?
+> drivers/pinctrl/pinctrl-at91.c:1580:6: warning: symbol
+>  'at91_pinctrl_gpio_resume' was not declared. Should it be static?
 > 
-> Nicolas has been the de-facto maintainer of AT91 for quite a while
-> now, even though more of them are listed on the maintainers entry. It
-> would be inappropriate to merge something that he disagreed with on
-> that platform.
-I'm still following it
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+>  drivers/pinctrl/pinctrl-at91.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> > ARM SoC maintainers input would be welcomed.
-> 
-> It seems appropriate to ask the at91 folks to come back with a
-> solution that everybody is OK with, and until then hold off merging
-> this.
-when the nack is motivated not just I don't like it
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index a882523..02f6477 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -25,6 +25,8 @@
+>  /* Since we request GPIOs from ourself */
+>  #include <linux/pinctrl/consumer.h>
+>  
+> +#include <mach/hardware.h>
+NACK this will break multi arch support
 
 Best Regards,
 J.
+> +
+>  #include "pinctrl-at91.h"
+>  #include "core.h"
+>  
+> -- 
+> 2.3.3
+> 
