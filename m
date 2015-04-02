@@ -1,30 +1,44 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 2 Apr 2015 18:36:50 +0200
-Subject: [PATCH 4/6] ARM: dts: Add base DT for NXP LPC18xx and LPC4357
-In-Reply-To: <3163497.OVbqFkjUY9@wuerfel>
-References: <1427923243-26296-1-git-send-email-manabian@gmail.com>
- <1427923243-26296-5-git-send-email-manabian@gmail.com>
- <3163497.OVbqFkjUY9@wuerfel>
-Message-ID: <CAGhQ9VxF2Ki6pLDZTQ1LstqxcwWQDT=X2B81PCV1aexnnU1Jow@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 2 Apr 2015 11:40:14 -0500
+Subject: [PATCH v8 0/4] hwspinlock core & omap dt support
+In-Reply-To: <5509F4E7.6070607@ti.com>
+References: <1425520876-37826-1-git-send-email-s-anna@ti.com>
+ <CAK=WgbY1Gbc+b1YtHafUyph6P60fees1ND_K5OE=9MXuqszbOg@mail.gmail.com>
+ <5509F4E7.6070607@ti.com>
+Message-ID: <551D70EE.307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2015 at 16:25, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 01 April 2015 23:20:41 Joachim Eastwood wrote:
->> +/ {
->> +       aliases {
->> +               serial0 = &uart0;
->> +               serial1 = &uart1;
->> +               serial2 = &uart2;
->> +               serial3 = &uart3;
->> +       };
->
-> Better move these to the board specific file.
+Mark,
 
-Okay.
+On 03/18/2015 04:57 PM, Suman Anna wrote:
+> Hi Mark,
+> 
+> On 03/12/2015 04:24 AM, Ohad Ben-Cohen wrote:
+>> Hi Suman,
+>>
+>> On Thu, Mar 5, 2015 at 4:01 AM, Suman Anna <s-anna@ti.com> wrote:
+>>> This is the latest version of the hwspinlock dt support series,
+>>> rebased onto v4.0-rc1 and addressing the long discussion on the
+>>> bindings in v7 [1]. I really hope that this series can make it
+>>> into 4.1.
+>>
+>> From a quick glance this looks great, thanks!
+>>
+>>> Mark,
+>>> Can you please provide your Acked-by for the binding documents
+>>> so that Ohad can pick up the patches for the next merge window?
+>>
+>> That would be perfect. Once we'll have it I could move forward with
+>> this towards 4.1.
+> 
+> Gentle reminder. Can you please provide your ack on the bindings in this
+> series (Patches 1 & 3) for Ohad to queue up the series for 4.1.
+> 
 
-Looking at arch/arm/boot/dts/ it seems to be very common to have
-aliases setup in SoC dtsi files, though.
+Ping again, if you can provide your ack on these bindings and the qcom
+hwmutex bindings, then Ohad can pick up both the series for 4.1. Both
+series are blocked on getting the binding acks.
 
-regards,
-Joachim Eastwood
+regards
+Suman
