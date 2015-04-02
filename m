@@ -1,71 +1,49 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Thu, 2 Apr 2015 21:47:44 +0200
-Subject: [GIT PULL] qcom SoC changes for v4.1
-In-Reply-To: <551D9BF6.2070502@codeaurora.org>
-References: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
- <CAP71WjzKSRRSVLcwpZTaQOYp2uziP7=J=E=3bHAzCjui-ZqbYQ@mail.gmail.com>
- <42F2C5A0-5231-4D4B-95EE-7BC173A14768@codeaurora.org>
- <551D9BF6.2070502@codeaurora.org>
-Message-ID: <CAP71WjxbvUZ6p_+=pCNWN5huBcChKy0h8GD+tMM0YeCrZGonMw@mail.gmail.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Fri, 3 Apr 2015 01:39:52 +0530
+Subject: [PATCH] i2c: cadence: Handling Slave monitor mode
+In-Reply-To: <20150327153713.GC27238@katana>
+References: <BL2FFO11FD05378650E02EA6549B4DF50E8030@BL2FFO11FD053.protection.gbl>
+ <20150327153713.GC27238@katana>
+Message-ID: <CAFcVECKaLBvOVvTca87-oTue5nF_pek_0msFZDD8y4yuCHW2EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 2, 2015 at 9:43 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> What about this patch squashed on top? Just guessing but I suspect we
-> don't care about cell-index if we're not doing the tcsr stuff. Also, I
-> imagine we could get rid of cell-index entirely if we matched against
-> the address of the gsbi instead.
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->
-> ----8<-----
->
-> diff --git a/drivers/soc/qcom/qcom_gsbi.c b/drivers/soc/qcom/qcom_gsbi.c
-> index 09c669e70d63..ac7d71b6527d 100644
-> --- a/drivers/soc/qcom/qcom_gsbi.c
-> +++ b/drivers/soc/qcom/qcom_gsbi.c
-> @@ -139,7 +139,7 @@ static int gsbi_probe(struct platform_device *pdev)
->         void __iomem *base;
->         struct gsbi_info *gsbi;
->         int i;
-> -       u32 mask, gsbi_num;
-> +       u32 mask, gsbi_num = 0;
->         const struct crci_config *config = NULL;
->
->         gsbi = devm_kzalloc(&pdev->dev, sizeof(*gsbi), GFP_KERNEL);
-> @@ -166,16 +166,19 @@ static int gsbi_probe(struct platform_device *pdev)
->
->                         of_node_put(tcsr_node);
->                 }
-> -       }
->
-> -       if (of_property_read_u32(node, "cell-index", &gsbi_num)) {
-> -               dev_err(&pdev->dev, "missing cell-index\n");
-> -               return -EINVAL;
-> -       }
-> +               if (config) {
-> +                       if (of_property_read_u32(node, "cell-index", &gsbi_num)) {
-> +                               dev_err(&pdev->dev, "missing cell-index\n");
-> +                               return -EINVAL;
-> +                       }
-> +
-> +                       if (gsbi_num < 1 || gsbi_num > MAX_GSBI) {
-> +                               dev_err(&pdev->dev, "invalid cell-index\n");
-> +                               return -EINVAL;
-> +                       }
-> +               }
->
-> -       if (gsbi_num < 1 || gsbi_num > MAX_GSBI) {
-> -               dev_err(&pdev->dev, "invalid cell-index\n");
-> -               return -EINVAL;
->         }
->
->         if (of_property_read_u32(node, "qcom,mode", &gsbi->mode)) {
+Hi Wolfram,
 
+On Fri, Mar 27, 2015 at 9:07 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> On Tue, Mar 17, 2015 at 09:48:15PM +0530, Nava kishore Manne wrote:
+>> In slave monitor mode, the I2C interface is set up as a master and
+>> continues to attempt a transfer to a particular slave until the
+>> slave device responds with an ACK.
+>>
+>> Added this feature for zero length transfers enable the controller
+>> for slave monitor interrupt and get the status. Disable the slave
+>> monitor mode feature upon successful handling.
+>>
+>> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+>> Acked-by: Harini Katakam <harinik@xilinx.com>
+>
+> I am not sure this is going to work.
+>
+> How often is this access tried when there is no device? It should be
+> tried only once.
 
-I think it would work, i cannot test right now, i can do it tomorrow
-if you need it, but that's pretty much how i tested earlier today (i
-had commented out the 2 statements you are putting moving here in the
-new if statement.
+Once slave monitor is enabled in the host controller, it retries till there's an
+ACK or slave monitor is disabled. The SW wont be involved and need not
+be interrupted in this gap. The way this feature works in the controller though,
+I'm afraid there's no way to distinguish between no slave/ busy slave.
+The out is the software timeout in that case.
+Please suggest how to use this feature better.
 
-I did also test with the associated DT patches, and it worked as well.
+>
+> Those 0byte messages can be read or write, so transferring one bit, one
+> could say. I assume this one can only read? (which is not a show-stopper
+> but the cases should be handled)
+>
+
+Yes, only read is used.
+
+Thanks for the review.
+
+Regards,
+Harini
