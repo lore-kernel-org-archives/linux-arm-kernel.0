@@ -1,99 +1,44 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:22:22 +0100
-Subject: [PATCH RFC v2 13/13] drm: bridge/dw_hdmi-ahb-audio: parse ELD from
- HDMI driver
-In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbKQ-00085c-4Z@rmk-PC.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Apr 2015 11:22:59 +0200
+Subject: [PATCH] ARM: dts: sun7i: Add Goodix GT911 nodes for Wexler TAB7200
+In-Reply-To: <20150331221420.3b65d2540c7dbe1d12611e12@gmail.com>
+References: <1427789897-4085-1-git-send-email-mamlinav@gmail.com>
+ <20150331144338.GG23664@lukather>
+ <20150331221420.3b65d2540c7dbe1d12611e12@gmail.com>
+Message-ID: <20150402092259.GK23664@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse the ELD (EDID like data) stored from the HDMI driver to restrict
-the sample rates and channels which are available to ALSA.  This causes
-the ALSA device to reflect the capabilities of the overall audio path,
-not just what is supported at the HDMI source interface level.
+On Tue, Mar 31, 2015 at 10:14:20PM +0300, Aleksei Mamlin wrote:
+> On Tue, 31 Mar 2015 07:43:38 -0700
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Hi,
+> > 
+> > On Tue, Mar 31, 2015 at 11:18:17AM +0300, Aleksei Mamlin wrote:
+> > > This patch adds nodes for the Goodix GT911 touchscreen controller found
+> > > on the Wexler TAB7200 tablet. Controller uses one of following I2C
+> > > addresses: 0x5d or 0x14, so just add two nodes.
+> > 
+> > In which case are these different addresses encountered? Different
+> > revisions of the same board?
+>
+> According to the datasheet it is a feature of the controller. 
+> The address(0x5d or 0x14) can be configured using a reset sequence,
+> which has not yet been implemented in the driver.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/gpu/drm/bridge/Kconfig             | 1 +
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 6 ++++++
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h | 1 +
- drivers/gpu/drm/bridge/dw_hdmi.c           | 3 +++
- 4 files changed, 11 insertions(+)
+Which address is set up by the bootloader then?
 
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index 557962a67fc5..9fff41e76940 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -7,6 +7,7 @@ config DRM_DW_HDMI_AHB_AUDIO
- 	tristate "Synopsis Designware AHB Audio interface"
- 	depends on DRM_DW_HDMI && SND
- 	select SND_PCM
-+	select SND_PCM_ELD
- 	select SND_PCM_IEC958
- 	help
- 	  Support the AHB Audio interface which is part of the Synopsis
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-index e98c291268f4..2bb68bda3cb0 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c
-@@ -12,11 +12,13 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <drm/bridge/dw_hdmi.h>
-+#include <drm/drm_edid.h>
- 
- #include <sound/asoundef.h>
- #include <sound/core.h>
- #include <sound/initval.h>
- #include <sound/pcm.h>
-+#include <sound/pcm_drm_eld.h>
- #include <sound/pcm_iec958.h>
- 
- #include "dw_hdmi-ahb-audio.h"
-@@ -284,6 +286,10 @@ static int dw_hdmi_open(struct snd_pcm_substream *substream)
- 
- 	runtime->hw = dw_hdmi_hw;
- 
-+	ret = snd_pcm_hw_constraint_eld(runtime, dw->data.eld);
-+	if (ret < 0)
-+		return ret;
-+
- 	ret = snd_pcm_limit_hw_rates(runtime);
- 	if (ret < 0)
- 		return ret;
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-index 1e840118d90a..91f631beecc7 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-+++ b/drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h
-@@ -8,6 +8,7 @@ struct dw_hdmi_audio_data {
- 	void __iomem *base;
- 	int irq;
- 	struct dw_hdmi *hdmi;
-+	u8 *eld;
- };
- 
- #endif
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 1cb427935ed2..dc0aed18019d 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -1446,6 +1446,8 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 
- 		drm_mode_connector_update_edid_property(connector, edid);
- 		ret = drm_add_edid_modes(connector, edid);
-+		/* Store the ELD */
-+		drm_edid_to_eld(connector, edid);
- 		kfree(edid);
- 	} else {
- 		dev_dbg(hdmi->dev, "failed to get edid\n");
-@@ -1725,6 +1727,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		audio.base = hdmi->regs;
- 		audio.irq = irq;
- 		audio.hdmi = hdmi;
-+		audio.eld = hdmi->connector.eld;
- 
- 		pdevinfo.name = "dw-hdmi-ahb-audio";
- 		pdevinfo.data = &audio;
+Maxime
+
 -- 
-1.8.3.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150402/4c8233b4/attachment.sig>
