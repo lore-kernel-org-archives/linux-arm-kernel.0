@@ -1,74 +1,130 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 Apr 2015 11:58:03 +0100
-Subject: [STLinux Kernel] [PATCH 0/4] clk: Provide support for always-on
- clocks
-In-Reply-To: <CAG374jDc6HsJhL4HqTgvnMU3AG9pXNYXyxr6gjZQkTODR-BHyQ@mail.gmail.com>
-References: <1425071674-16995-1-git-send-email-lee.jones@linaro.org>
- <20150402081210.GB3567@griffinp-ThinkPad-X1-Carbon-2nd>
- <CAG374jDc6HsJhL4HqTgvnMU3AG9pXNYXyxr6gjZQkTODR-BHyQ@mail.gmail.com>
-Message-ID: <20150402105803.GD9447@x1>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Apr 2015 13:03:08 +0200
+Subject: [PATCH 2/2] ARM: dts: Enable S3C RTC on Trats2,
+ Odroid-U3 and Arndale Octa
+In-Reply-To: <1427972588-6573-1-git-send-email-k.kozlowski@samsung.com>
+References: <1427972588-6573-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1427972588-6573-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> With these series as they are, we need  'clk_ignore_unused'  on
-> sthi407-b2120.dts and stih418-b2199.dts.
-> 
-> We have to modificate stih407-clock.dtsi and stih418-clock.dtsi in same way.
+Extend the S3C RTC node with rtc_src clock so it could be operational.
+The rtc_src clock is provided by MAX77686 (Trats2 and Odroid-U3) or
+S2MPS11 (Arndale Octa).
 
-Just to clarify this point for all interested parties; this patch-set
-is not the completed article.  It's purpose is to add the core
-functionality and the documentation _only_.  The STiH410 support is
-only provided in this set as an example of how the bindings are to be
-used.  Other platforms are to be enabled subsequently as part of a
-different submission.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> On 2 April 2015 at 10:12, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > Hi Lee,
-> >
-> > On Fri, 27 Feb 2015, Lee Jones wrote:
-> >
-> >> Some hardware contains bunches of clocks which must never be
-> >> turned off.  If drivers a) fail to obtain a reference to any
-> >> of these or b) give up a previously obtained reference
-> >> during suspend, the common clk framework will attempt to
-> >> disable them and a platform can fail irrecoverably as a
-> >> result.  Usually the only way to recover from these failures
-> >> is to reboot.
-> >>
-> >> To avoid either of these two scenarios from catastrophically
-> >> disabling an otherwise perfectly healthy running system,
-> >> clocks can be identified as always-on using this property
-> >> from inside a clocksource's node.  The CLK_IGNORE_UNUSED
-> >> flag will be applied to each clock instance named in this
-> >> property, thus preventing them from being shut down by the
-> >> framework.
-> >
-> > Great stuff.
-> >
-> > One minor comment is that assuming this works on stih407 and stih410
-> > to the extent that the platform can now boot without clk_ignore_unused
-> > kenel parameter then you should have an additional patch to remove
-> > clk_ignore_unused from the default bootargs in stih407-b2120.dts and
-> > stih410-b2120.dts files.
-> >
-> > Maxime - Is it possible for you to test this series on stih418-b2199 as
-> > a well? As it could most likely also be removed from stih418-b2199.dts file
-> > to, but neither Lee or myself have the hardware to test.
-> >
-> > Apart from that, for the series: -
-> >  Acked-by: Peter Griffin <peter.griffin@linaro.org>
-> >
-> > regards,
-> >
-> > Peter.
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+---
 
+Patch depends on new file "dt-bindings/clock/samsung,s2mps11.h"
+from:
+1. ARM: dts: Add bindings for 32kHz clocks from s2mps11
+   http://www.spinics.net/lists/linux-samsung-soc/msg43345.html
+---
+ arch/arm/boot/dts/exynos4.dtsi                |  2 +-
+ arch/arm/boot/dts/exynos4412-odroidu3.dts     |  7 +++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts       |  9 ++++++++-
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 11 +++++++----
+ 4 files changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 8ea2e374acaf..95efdf805f20 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -266,7 +266,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	rtc at 10070000 {
++	rtc: rtc at 10070000 {
+ 		compatible = "samsung,s3c6410-rtc";
+ 		reg = <0x10070000 0x100>;
+ 		interrupt-parent = <&pmu_system_controller>;
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 44684e57ead1..2bf7447d02ef 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -13,6 +13,7 @@
+ 
+ /dts-v1/;
+ #include "exynos4412-odroid-common.dtsi"
++#include <dt-bindings/clock/maxim,max77686.h>
+ 
+ / {
+ 	model = "Hardkernel ODROID-U3 board based on Exynos4412";
+@@ -61,3 +62,9 @@
+ 		"Speakers", "SPKL",
+ 		"Speakers", "SPKR";
+ };
++
++&rtc {
++	status = "okay";
++	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
++	clock-names = "rtc", "rtc_src";
++};
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 173ffa479ad3..c032cde11d5c 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -16,6 +16,7 @@
+ #include "exynos4412.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/clock/maxim,max77686.h>
+ 
+ / {
+ 	model = "Samsung Trats 2 based on Exynos4412";
+@@ -214,7 +215,7 @@
+ 		pinctrl-names = "default";
+ 		status = "okay";
+ 
+-		max77686_pmic at 09 {
++		max77686: max77686_pmic at 09 {
+ 			compatible = "maxim,max77686";
+ 			interrupt-parent = <&gpx0>;
+ 			interrupts = <7 0>;
+@@ -1304,3 +1305,9 @@
+ 		PIN_SLP(gpv4-0, INPUT, DOWN);
+ 	};
+ };
++
++&rtc {
++	status = "okay";
++	clocks = <&clock CLK_RTC>, <&max77686 MAX77686_CLK_AP>;
++	clock-names = "rtc", "rtc_src";
++};
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index b82b6fa15f48..d78fcd997ce6 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -13,6 +13,7 @@
+ #include "exynos5420.dtsi"
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/input/input.h>
++#include <dt-bindings/clock/samsung,s2mps11.h>
+ 
+ / {
+ 	model = "Insignal Arndale Octa evaluation board based on EXYNOS5420";
+@@ -38,10 +39,6 @@
+ 		};
+ 	};
+ 
+-	rtc at 101E0000 {
+-		status = "okay";
+-	};
+-
+ 	codec at 11000000 {
+ 		samsung,mfc-r = <0x43000000 0x800000>;
+ 		samsung,mfc-l = <0x51000000 0x800000>;
+@@ -376,3 +373,9 @@
+ &cci {
+ 	status = "disabled";
+ };
++
++&rtc {
++	status = "okay";
++	clocks = <&clock CLK_RTC>, <&s2mps11_osc S2MPS11_CLK_AP>;
++	clock-names = "rtc", "rtc_src";
++};
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
