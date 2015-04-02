@@ -1,68 +1,89 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 2 Apr 2015 10:29:17 +0200
-Subject: Build regression in next-20150331
-In-Reply-To: <2863807.lxHPvZ2AsE@vostro.rjw.lan>
-References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
- <2720045.6sPXjyyvfF@vostro.rjw.lan>
- <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
- <2863807.lxHPvZ2AsE@vostro.rjw.lan>
-Message-ID: <20150402082917.GS23123@twins.programming.kicks-ass.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 2 Apr 2015 10:30:18 +0200
+Subject: [PATCH 1/2] pinctrl: at91: Add set_multiple GPIO chip feature
+In-Reply-To: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
+Message-ID: <20150402083018.GC26864@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
+On 20:12 Fri 20 Mar     , Alexander Stein wrote:
+> This adds the callback for set_multiple.
+> As this controller has a separate set and clear register, we can't write
+> directly to PIO_ODSR as this would required a cached variable and would
+> race with at91_gpio_set.
+> So build masks for the PIO_SODR and PIO_CODR registers and write them
+> together.
+> 
+> Signed-off-by: Alexander Stein <alexanders83@web.de>
+> ---
+> This was tested by using an own test driver which uses
+> gpiod_set_array_cansleep to set multiple GPIOs at once.
+> 
+>  drivers/pinctrl/pinctrl-at91.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index f4cd0b9..a882523 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -1330,6 +1330,33 @@ static void at91_gpio_set(struct gpio_chip *chip, unsigned offset,
+>  	writel_relaxed(mask, pio + (val ? PIO_SODR : PIO_CODR));
+>  }
+>  
+> +static void at91_gpio_set_multiple(struct gpio_chip *chip,
+> +				      unsigned long *mask, unsigned long *bits)
+> +{
+> +	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
+> +	void __iomem *pio = at91_gpio->regbase;
+> +	unsigned long set_mask;
+> +	unsigned long clear_mask;
+> +	size_t i;
+> +
+> +	set_mask = 0;
+> +	clear_mask = 0;
+> +
+> +	for (i = 0; i < chip->ngpio; i++) {
+> +		if (*mask == 0)
+so why do you loop?
+> +			break;
+> +		if (__test_and_clear_bit(i, mask)) {
+> +			if (test_bit(i, bits))
+> +				set_mask |= BIT(i);
+> +			else
+> +				clear_mask |= BIT(i);
+> +		}
+> +	}
 
-> > > ---
-> > >  kernel/time/tick-internal.h |    2 ++
-> > >  1 file changed, 2 insertions(+)
-> > >
-> > > Index: linux-pm/kernel/time/tick-internal.h
-> > > ===================================================================
-> > > --- linux-pm.orig/kernel/time/tick-internal.h
-> > > +++ linux-pm/kernel/time/tick-internal.h
-> > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
-> > >  /* Set the periodic handler in non broadcast mode */
-> > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
-> > >  {
-> > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
-> > >         dev->event_handler = tick_handle_periodic;
-> > > +#endif
-> > >  }
-> > >  #endif /* !BROADCAST */
+just use mask to invert the mask for the CODR
 
-> Peter, do you think the above is acceptable or do I need to do anything more
-> sophisticated to fix this?  [The alternative would be probably to prepare an
-> empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
-> move the definition of struct clock_event_device from under that Kconfig
-> option.]
+#define BITS_MASK(bits)	(((bits) == 32) ? ~0U : (BIT(bits) - 1))
 
+	uint32_t set_mask = *mask & BITS_MASK(chip->ngpio);;
+	uint32_t clear_mask = ~set_mask;
 
-Does not something like the below make more sense? The entire broadcast
-thing doesn't make sense if we don't have generic_clockevents.
+	writel_relaxed(set_mask, pio + PIO_SODR);
+	writel_relaxed(clear_mask, pio + PIO_CODR);
 
-Should we wrap more in generic_clockevents there?
+Best Regards,
+J.
 
----
- kernel/time/tick-internal.h |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
-index 2a1563a..5569e65 100644
---- a/kernel/time/tick-internal.h
-+++ b/kernel/time/tick-internal.h
-@@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
- #endif /* !TICK_ONESHOT */
- 
- /* Broadcasting support */
-+#ifdef CONFIG_GENERIC_CLOCKEVENTS
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
- extern void tick_install_broadcast_device(struct clock_event_device *dev);
-@@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
- 	dev->event_handler = tick_handle_periodic;
- }
- #endif /* !BROADCAST */
-+#endif /* GENERIC */
- 
- /* Functions related to oneshot broadcasting */
- #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
+> +
+> +	writel_relaxed(set_mask, pio + PIO_SODR);
+> +	writel_relaxed(clear_mask, pio + PIO_CODR);
+> +}
+> +
+>  static int at91_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+>  				int val)
+>  {
+> @@ -1692,6 +1719,7 @@ static struct gpio_chip at91_gpio_template = {
+>  	.get			= at91_gpio_get,
+>  	.direction_output	= at91_gpio_direction_output,
+>  	.set			= at91_gpio_set,
+> +	.set_multiple		= at91_gpio_set_multiple,
+>  	.dbg_show		= at91_gpio_dbg_show,
+>  	.can_sleep		= false,
+>  	.ngpio			= MAX_NB_GPIO_PER_BANK,
+> -- 
+> 2.3.3
+> 
