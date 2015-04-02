@@ -1,75 +1,78 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 02 Apr 2015 17:34:32 +0900
-Subject: [PATCH 1/6] arm64: dts: exynos: Add EHCI and OHCI dt node for
- Exynos5433
+Date: Thu, 02 Apr 2015 17:34:33 +0900
+Subject: [PATCH 2/6] arm64: dts: exynos: Add USB Device dt node for Exynos5433
 In-Reply-To: <1427963677-32661-1-git-send-email-cw00.choi@samsung.com>
 References: <1427963677-32661-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1427963677-32661-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1427963677-32661-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jaewon Kim <jaewon02.kim@samsung.com>
 
-This patch adds EHCI and OHCI device tree node
-to usb USB2.0 Host and HSCI(High Speed Inter-Chip) function.
+This patch adds USB DRD(Dual Role Device) and PHY
+device tree node to use USB Device.
 
 Cc: Kukjin Kim <kgene@kernel.org>
 Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Inki Dae <inki.dae@samsung.com>
 ---
- arch/arm64/boot/dts/exynos/exynos5433.dtsi | 43 ++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 47 ++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-index faea1c6..8a1875d 100644
+index 8a1875d..b460f5f 100644
 --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
 +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
-@@ -916,6 +916,49 @@
- 			io-channel-ranges;
+@@ -959,6 +959,53 @@
+ 			#phy-cells = <1>;
  			status = "disabled";
  		};
 +
-+		ehci: usb at 15510000 {
-+			compatible = "samsung,exynos4210-ehci";
-+			reg = <0x15510000 0x1000>;
-+			interrupts = <0 230 0>;
-+			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>;
-+			clock-names = "usbhost";
++		usbdrd30: usb at 15400000 {
++			compatible = "samsung,exynos5250-dwusb3";
++			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>,
++				<&cmu_fsys CLK_SCLK_USBDRD30>;
++			clock-names = "usbdrd30", "usbdrd30_susp_clk";
++			assigned-clocks =
++				<&cmu_fsys CLK_MOUT_SCLK_USBDRD30_USER>,
++				<&cmu_top CLK_MOUT_SCLK_USBDRD30>,
++				<&cmu_top CLK_DIV_SCLK_USBDRD30>;
++			assigned-clock-parents =
++				<&cmu_top CLK_SCLK_USBDRD30_FSYS>,
++				<&cmu_top CLK_MOUT_BUS_PLL_USER>;
++			assigned-clock-rates = <0>, <0>, <66700000>;
 +			#address-cells = <1>;
-+			#size-cells = <0>;
++			#size-cells = <1>;
++			ranges;
 +			status = "disabled";
 +
-+			port at 0 {
-+				reg = <0>;
-+				phys = <&usb2_phy 0>;
-+				status = "disabled";
++			dwc3 {
++				compatible = "snps,dwc3";
++				reg = <0x15400000 0x10000>;
++				interrupts = <0 231 0>;
++				phys = <&usbdrd30_phy 0>, <&usbdrd30_phy 1>;
++				phy-names = "usb2-phy", "usb3-phy";
 +			};
-+			port at 1 {
-+				reg = <1>;
-+				phys = <&usb2_phy 1>;
-+				status = "disabled";
-+			};
++
 +		};
 +
-+		ohci: usb at 15520000 {
-+			compatible = "samsung,exynos4210-ohci";
-+			reg = <0x15520000 0x1000>;
-+			interrupts = <0 230 0>;
-+			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>;
-+			clock-names = "usbhost";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		usb2_phy: usb2phy at 15530000 {
-+			compatible = "samsung,exynos5433-usb2-phy";
-+			reg = <0x15530000 0x100>;
-+			samsung,pmureg-phandle = <&pmu_system_controller>;
-+			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>, <&xxti>;
-+			clock-names = "phy", "ref";
++		usbdrd30_phy: phy at 15500000 {
++			compatible = "samsung,exynos5433-usbdrd-phy";
++			reg = <0x15500000 0x100>;
++			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>, <&xxti>,
++				<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PHYCLOCK>,
++				<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PIPE_PCLK>,
++				<&cmu_fsys CLK_SCLK_USBDRD30>;
++			clock-names = "phy", "ref", "phy_utmi", "phy_pipe", "itp";
++			assigned-clocks =
++				<&cmu_fsys CLK_MOUT_PHYCLK_USBDRD30_UDRD30_PIPE_PCLK_USER>,
++				<&cmu_fsys CLK_MOUT_PHYCLK_USBDRD30_UDRD30_PHYCLOCK_USER>;
++			assigned-clock-parents =
++				<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PIPE_PCLK_PHY>,
++				<&cmu_fsys CLK_PHYCLK_USBDRD30_UDRD30_PHYCLOCK_PHY>;
 +			#phy-cells = <1>;
++			samsung,pmu-syscon = <&pmu_system_controller>;
 +			status = "disabled";
 +		};
  	};
