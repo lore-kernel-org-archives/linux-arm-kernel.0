@@ -1,44 +1,170 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Apr 2015 16:41:42 +0100
-Subject: [PATCH] dmaengine: sa11x0: report slave capabilities to upper
- layers
-In-Reply-To: <1427989171-1702-1-git-send-email-dbaryshkov@gmail.com>
-References: <1427989171-1702-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <20150402154142.GL24899@n2100.arm.linux.org.uk>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 02 Apr 2015 16:49:32 +0100
+Subject: [PATCH v6] arm: perf: Directly handle SMP platforms with one SPI
+In-Reply-To: <20150331162040.GE24583@arm.com>
+References: <1416581603-30557-1-git-send-email-daniel.thompson@linaro.org>
+ <1425475545-4323-1-git-send-email-daniel.thompson@linaro.org>
+ <20150331162040.GE24583@arm.com>
+Message-ID: <551D650C.8010409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 02, 2015 at 06:39:31PM +0300, Dmitry Eremin-Solenikov wrote:
-> Fix the following warning by initializing necessary fields in the dma_device
-> structure.
-> 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at drivers/dma/dmaengine.c:863 dma_async_device_register+0x2b4/0x4f0()
-> this driver doesn't support generic slave capabilities reporting
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper Not tainted 4.0.0-rc5+ #10
-> Hardware name: Sharp-Collie
-> [<c0105cd8>] (unwind_backtrace) from [<c0103ef8>] (show_stack+0x10/0x14)
-> [<c0103ef8>] (show_stack) from [<c010e9b8>] (warn_slowpath_common+0x74/0xac)
-> [<c010e9b8>] (warn_slowpath_common) from [<c010ea20>] (warn_slowpath_fmt+0x30/0x40)
-> [<c010ea20>] (warn_slowpath_fmt) from [<c02956fc>] (dma_async_device_register+0x2b4/0x4f0)
-> [<c02956fc>] (dma_async_device_register) from [<c0296a9c>] (sa11x0_dma_probe+0x21c/0x358)
-> [<c0296a9c>] (sa11x0_dma_probe) from [<c02c52c0>] (platform_drv_probe+0x30/0x94)
-> [<c02c52c0>] (platform_drv_probe) from [<c02c39bc>] (driver_probe_device+0x84/0x234)
-> [<c02c39bc>] (driver_probe_device) from [<c02c3c4c>] (__driver_attach+0x98/0x9c)
-> [<c02c3c4c>] (__driver_attach) from [<c02c1f9c>] (bus_for_each_dev+0x74/0xa4)
-> [<c02c1f9c>] (bus_for_each_dev) from [<c02c3230>] (bus_add_driver+0x13c/0x1e8)
-> [<c02c3230>] (bus_add_driver) from [<c02c4260>] (driver_register+0x78/0xf8)
-> [<c02c4260>] (driver_register) from [<c0100624>] (do_one_initcall+0x84/0x1f4)
-> [<c0100624>] (do_one_initcall) from [<c0700e1c>] (kernel_init_freeable+0xf8/0x1b4)
-> [<c0700e1c>] (kernel_init_freeable) from [<c040a920>] (kernel_init+0x8/0xf0)
-> [<c040a920>] (kernel_init) from [<c01013a8>] (ret_from_fork+0x14/0x2c)
-> ---[ end trace e188b8fe0e782e75 ]---
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+On 31/03/15 17:20, Will Deacon wrote:
+> Hi Daniel,
+>
+> On Wed, Mar 04, 2015 at 01:25:45PM +0000, Daniel Thompson wrote:
+>> Some ARM platforms mux the PMU interrupt of every core into a single
+>> SPI. On such platforms if the PMU of any core except 0 raises an interrupt
+>> then it cannot be serviced and eventually, if you are lucky, the spurious
+>> irq detection might forcefully disable the interrupt.
+>>
+>> On these SoCs it is not possible to determine which core raised the
+>> interrupt so workaround this issue by queuing irqwork on the other
+>> cores whenever the primary interrupt handler is unable to service the
+>> interrupt.
+>>
+>> The u8500 platform has an alternative workaround that dynamically alters
+>> the affinity of the PMU interrupt. This workaround logic is no longer
+>> required so the original code is removed as is the hook it relied upon.
+>>
+>> Tested on imx6q (which has fours cores/PMUs all muxed to a single SPI)
+>> using a simple soak, combined perf and CPU hotplug soak and using
+>> perf fuzzer's fast_repro.sh.
+>
+> [...]
+>
+>> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+>> index b1596bd59129..dfef7904b790 100644
+>> --- a/arch/arm/include/asm/pmu.h
+>> +++ b/arch/arm/include/asm/pmu.h
+>> @@ -87,6 +87,14 @@ struct pmu_hw_events {
+>>           * already have to allocate this struct per cpu.
+>>           */
+>>          struct arm_pmu          *percpu_pmu;
+>> +
+>> +#ifdef CONFIG_SMP
+>> +       /*
+>> +        * This is used to schedule workaround logic on platforms where all
+>> +        * the PMUs are attached to a single SPI.
+>> +        */
+>> +       struct irq_work work;
+>> +#endif
+>>   };
+>>
+>>   struct arm_pmu {
+>> @@ -117,6 +125,10 @@ struct arm_pmu {
+>>          struct platform_device  *plat_device;
+>>          struct pmu_hw_events    __percpu *hw_events;
+>>          struct notifier_block   hotplug_nb;
+>> +#ifdef CONFIG_SMP
+>> +       int                     muxed_spi_workaround_irq;
+>> +       atomic_t                remaining_irq_work;
+>> +#endif
+>>   };
+>>
+>>   #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+>> diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+>> index 557e128e4df0..e3fc1a0ce969 100644
+>> --- a/arch/arm/kernel/perf_event.c
+>> +++ b/arch/arm/kernel/perf_event.c
+>> @@ -305,8 +305,6 @@ validate_group(struct perf_event *event)
+>>   static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+>>   {
+>>          struct arm_pmu *armpmu;
+>> -       struct platform_device *plat_device;
+>> -       struct arm_pmu_platdata *plat;
+>>          int ret;
+>>          u64 start_clock, finish_clock;
+>>
+>> @@ -317,14 +315,9 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+>>           * dereference.
+>>           */
+>>          armpmu = *(void **)dev;
+>> -       plat_device = armpmu->plat_device;
+>> -       plat = dev_get_platdata(&plat_device->dev);
+>>
+>>          start_clock = sched_clock();
+>> -       if (plat && plat->handle_irq)
+>> -               ret = plat->handle_irq(irq, armpmu, armpmu->handle_irq);
+>> -       else
+>> -               ret = armpmu->handle_irq(irq, armpmu);
+>> +       ret = armpmu->handle_irq(irq, armpmu);
+>>          finish_clock = sched_clock();
+>>
+>>          perf_sample_event_took(finish_clock - start_clock);
+>> diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+>> index 61b53c46edfa..d5bbd79abd4c 100644
+>> --- a/arch/arm/kernel/perf_event_cpu.c
+>> +++ b/arch/arm/kernel/perf_event_cpu.c
+>> @@ -59,6 +59,116 @@ int perf_num_counters(void)
+>>   }
+>>   EXPORT_SYMBOL_GPL(perf_num_counters);
+>>
+>> +#ifdef CONFIG_SMP
+>> +
+>> +static cpumask_t down_prepare_cpu_mask;
+>> +static DEFINE_SPINLOCK(down_prepare_cpu_lock);
+>> +
+>> +/*
+>> + * Workaround logic that is distributed to all cores if the PMU has only
+>> + * a single IRQ and the CPU receiving that IRQ cannot handle it. Its
+>> + * job is to try to service the interrupt on the current CPU. It will
+>> + * also enable the IRQ again if all the other CPUs have already tried to
+>> + * service it.
+>> + */
+>> +static void cpu_pmu_do_percpu_work(struct irq_work *w)
+>> +{
+>> +       struct pmu_hw_events *hw_events =
+>> +           container_of(w, struct pmu_hw_events, work);
+>> +       struct arm_pmu *cpu_pmu = hw_events->percpu_pmu;
+>> +
+>> +       /* Ignore the return code, we can do nothing useful with it */
+>> +       (void) cpu_pmu->handle_irq(0, cpu_pmu);
+>> +
+>> +       if (atomic_dec_and_test(&cpu_pmu->remaining_irq_work))
+>> +               enable_irq(cpu_pmu->muxed_spi_workaround_irq);
+>> +}
+>> +
+>> +/*
+>> + * Workaround for systems where all PMU interrupts are targeting a
+>> + * single SPI.
+>> + *
+>> + * The workaround will disable the interrupt and distribute irqwork to all
+>> + * the other processors in the system. Hopefully one of them will clear the
+>> + * interrupt...
+>> + *
+>> + * The workaround is only deployed when all PMU interrupts are aimed
+>> + * at a single core. As a result the workaround is never re-entered
+>> + * making it safe for us to use static data to maintain state.
+>> + */
+>> +static void cpu_pmu_deploy_muxed_spi_workaround(struct arm_pmu *cpu_pmu)
+>> +{
+>> +       static cpumask_t irqwork_mask;
+>> +       int cpu;
+>> +
+>> +       disable_irq_nosync(cpu_pmu->muxed_spi_workaround_irq);
+>> +       spin_lock(&down_prepare_cpu_lock);
+>> +
+>> +       /*
+>> +        * Combining cpu_online_mask and down_prepare_cpu_mask gives
+>> +        * us the CPUs that are currently online and cannot die until
+>> +        * we release down_prepare_cpu_lock.
+>> +        */
+>> +       cpumask_andnot(&irqwork_mask, cpu_online_mask, &down_prepare_cpu_mask);
+>> +       cpumask_clear_cpu(smp_processor_id(), &irqwork_mask);
+>> +       atomic_add(cpumask_weight(&irqwork_mask), &cpu_pmu->remaining_irq_work);
+>
+> AFAICT, this is a hack to avoid get_online_cpus (which can sleep) from irq
+> context? Is there no way we can do try_get_online_cpus, and just return
+> IRQ_NONE if that fails? At some point, the hotplug operation will complete
+> and we'll be able to service the pending interrupt. I think that would allow
+> us to kill the down_prepare_cpu_lock.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+It certainly doesn't look easy but I will take a closer look...
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+ From the perf side its reasonably easy. I don't think we can return 
+IRQ_NONE (we might own the h.p. lock on the CPU handling the interrupt) 
+so we have to disable the interrupt. However we could probably arrange 
+to re-enable it from the hotplug notifications when this is needed.
+
+Unfortunately I'm not sure the cpu_hotplug side is so easy.
