@@ -1,167 +1,69 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 02 Apr 2015 15:06:09 +0100
-Subject: [PATCH v2 06/10] KVM: arm64: guest debug,
- add SW break point support
-In-Reply-To: <20150402145203.01c3654b@thinkpad-w530>
-References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
- <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
- <20150402145203.01c3654b@thinkpad-w530>
-Message-ID: <87fv8iy69a.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Apr 2015 16:09:03 +0200
+Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on
+ Armada 370 DB
+In-Reply-To: <20150402153650.2cc9c3d7@free-electrons.com>
+References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2321040.CmsL1gluUd@wuerfel> <20150402153650.2cc9c3d7@free-electrons.com>
+Message-ID: <2515980.d69ggAvHPo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 02 April 2015 15:36:50 Thomas Petazzoni wrote:
+> 
+> On Thu, 02 Apr 2015 15:28:09 +0200, Arnd Bergmann wrote:
+> 
+> > I think it would be better to add a new .dts file that includes the
+> > former, and give it a new name, such as armada-370-db-broken-uboot.dts.
+> > 
+> > We should not stop supporting the older versions, and it would be better
+> > to revert the bootloader change in their u-boot before it spreads too far.
+> 
+> Sorry, but I don't follow you.
+> 
+> What was wrong was the initial choice in U-Boot made to keep internal
+> registers at 0xd0000000. Having the registers at 0xf1000000 is what
+> should have been done from the beginning: it is the right thing to do,
+> and there is absolutely no reason to do a revert a go back to
+> 0xd0000000.
+> 
+> Actually, having internal registers at 0xd0000000 is a very bad choice,
+> as it means that more space in the 0 -> 4 GB physical space is devoted
+> to I/O, which overlaps with RAM when you have 4+ GB of RAM. One of the
+> reason with moving the registers at 0xf1000000 is to be able to use as
+> much RAM as possible.
 
-David Hildenbrand <dahi@linux.vnet.ibm.com> writes:
+This device has 1GB, doing an incompatible change to an existing machine
+is completely moronic. How hard can it be to special-case this board
+in u-boot?
 
->> This adds support for SW breakpoints inserted by userspace.
->> 
->> We do this by trapping all BKPT exceptions in the
->> hypervisor (MDCR_EL2_TDE). The kvm_debug_exit_arch carries the address
->> of the exception. If user-space doesn't know of the breakpoint then we
->> have a guest inserted breakpoint and the hypervisor needs to start again
->> and deliver the exception to guest.
->> 
->> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
->> 
->> ---
->> v2
->>   - update to use new exit struct
->>   - tweak for C setup
->>   - do our setup in debug_setup/clear code
->>   - fixed up comments
->> 
->> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
->> index 06c5064..17d4f9c 100644
->> --- a/Documentation/virtual/kvm/api.txt
->> +++ b/Documentation/virtual/kvm/api.txt
->> @@ -2626,7 +2626,7 @@ when running. Common control bits are:
->>  The top 16 bits of the control field are architecture specific control
->>  flags which can include the following:
->> 
->> -  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
->> +  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
->>    - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
->>    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
->>    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 7ea8b0e..d3bc8dc 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -304,7 +304,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  	kvm_arm_set_running_vcpu(NULL);
->>  }
->> 
->> -#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE)
->> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE|KVM_GUESTDBG_USE_SW_BP)
->> 
->>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
->>  					struct kvm_guest_debug *dbg)
->> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
->> index 8a29d0b..cff0475 100644
->> --- a/arch/arm64/kvm/debug.c
->> +++ b/arch/arm64/kvm/debug.c
->> @@ -45,11 +45,18 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
->>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
->>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
->> 
->> +	/* Trap debug register access? */
+> Also, the proposed change is exactly the same we've done on several
+> Marvell evaluation boards in the past:
+> 
+>   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-gp.dts?id=91ed32200e6ea1df19df01355c5c7747f9014102
+>   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-db.dts?id=82066bdb5a759ec00c18f9667853c4fe8840e83d
+
+I'm aware of those, I just wish they would learn from their mistakes.
+
+> Those boards are evaluation boards from Marvell, only available to
+> selected customers, who are supposed to know what they are doing. And
+> all of those customers are getting boards with a new version of the
+> bootloader that remaps registers at 0xf1000000.
 >
-> This should probably go to the earlier patch.
+> So the patch I'm proposing is simply fixing the kernel so that it works
+> for the customers who have access to this Armada 370 DB board.
+> 
+> If you want a file named armada-370-db-broken-uboot.dts, then it should
+> be the one using the 0xd0000000 register address. We can do that if you
+> like it, but this .dts file will just be useless clutter as nobody will
+> ever use it.
 
-Agreed.
+Find a different name then, but don't change the value in the existing
+file. It's been around for too long now. The other ones were changed
+shortly after being introduced, but anybody who is using
+armada-370-db.dts today obviously has the old boot loader and cannot
+update the bootloader without breaking their kernels, but they should
+at least be able to update their kernels without changing the
+scripts.
 
->
->>  	if (!vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
->>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
->>  	else
->>  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
->> 
->> +	/* Trap breakpoints? */
->> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
->> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
->> +	else
->> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
->
-> Again, a candidate for clear_debug?
-
-I don't follow. Changes to mdcr_el2 will only get applied as we jump in
-through the hyp.S code. We need to ensure the guest can use SW BKPTs if
-we are not.
-
->
->> +
->>  }
->> 
->>  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
->> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
->> index 524fa25..ed1bbb4 100644
->> --- a/arch/arm64/kvm/handle_exit.c
->> +++ b/arch/arm64/kvm/handle_exit.c
->> @@ -82,6 +82,37 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  	return 1;
->>  }
->> 
->> +/**
->> + * kvm_handle_debug_exception - handle a debug exception instruction
->
-> "kvm_handle_guest_debug"
-
-Sure.
-
->
->> + *
->> + * @vcpu:	the vcpu pointer
->> + * @run:	access to the kvm_run structure for results
->> + *
->> + * We route all debug exceptions through the same handler as we
->> + * just need to report the PC and the HSR values to userspace.
->> + * Userspace may decide to re-inject the exception and deliver it to
->> + * the guest if it wasn't for the host to deal with.
->> + */
->> +static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->> +{
->> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
->> +
->> +	run->exit_reason = KVM_EXIT_DEBUG;
->> +	run->debug.arch.hsr = hsr;
->> +
->> +	switch (hsr >> ESR_ELx_EC_SHIFT) {
->> +	case ESR_ELx_EC_BKPT32:
->> +	case ESR_ELx_EC_BRK64:
->> +		run->debug.arch.pc = *vcpu_pc(vcpu);
->> +		break;
->> +	default:
->> +		kvm_err("%s: un-handled case hsr: %#08x\n",
->> +			__func__, (unsigned int) hsr);
->
-> Don't you want to fail hard in this case? This might result in many messages.
-> returning 0 feels wrong.
-
-You mean a BUG_ON()? Although it would be a cock up on the hosts part to
-have an un-handled exception enabled allowing the guest to trigger a
-host panic seems excessive.
-
->
->> +		break;
->> +	}
->> +	return 0;
->> +}
->> +
->>  static exit_handle_fn arm_exit_handlers[] = {
->>  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
->>  	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
->> @@ -96,6 +127,8 @@ static exit_handle_fn arm_exit_handlers[] = {
->>  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
->>  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
->>  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
->> +	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
->> +	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
->>  };
->> 
->>  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->
->
-> David
-
--- 
-Alex Benn?e
+	Arnd
