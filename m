@@ -1,40 +1,45 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Apr 2015 17:55:47 +0100
+Date: Thu, 2 Apr 2015 18:08:35 +0100
 Subject: [PATCH 1/3] mfd: ucb1x00: add irq field to the platform data
 In-Reply-To: <CALT56yM-JSN=8KR3EUFAa+k4ZZkqXY9zgwzT2PhRn23dMUc3rQ@mail.gmail.com>
 References: <1427989307-1805-1-git-send-email-dbaryshkov@gmail.com>
  <20150402160252.GO24899@n2100.arm.linux.org.uk>
  <CALT56yM-JSN=8KR3EUFAa+k4ZZkqXY9zgwzT2PhRn23dMUc3rQ@mail.gmail.com>
-Message-ID: <20150402165547.GV24899@n2100.arm.linux.org.uk>
+Message-ID: <20150402170835.GW24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Apr 02, 2015 at 07:27:24PM +0300, Dmitry Eremin-Solenikov wrote:
-> Because using static configuration would allow me to drop a nice piece
-> of code. Because it would allow later to use dts to describe ucb1x00
-> configuration. Because I will no longer have to think whether ucb1x00I h
-> driver barfing on IRQ is a problem of a chip, of an IRQ or just me having
-> touched wrong GPIO line at wrong time with a scope probe. Yes, I didn't
-> put all these causes to the commit description. Do you really want it?
+> Not only "because we can", but "because we should". In my humble
+> opinion.
+> 
+> It looks like the whole story of me touching sa1100 is like fighting with
+> 'it was done so for ages' windmills. Yes, I have different opinions sometimes.
 
-What I want is a decent commit description, one which isn't airy fairy
-and looks like it's just mindless churn.  That's all.
+Right, and what you're forgetting is that others may have different
+opinions.  Like me - and as I'm the sa1100 and ucb1x00 maintainer,
+if you have a different opinion, you need to convince me that your
+solution is the right thing to do.
 
-It's what every other kernel developer wants to know.  This is precisely
-what the ARM ecosystem has been soo bad at for decades.
+Had I thought that passing an IRQ through platform data would be a
+good thing, then I would've done it from the outset.
 
-It matters.  It's one of the things what pisses Linus off.  What Linus
-sees from ARM people is lots and lots of apparently pointless churn
-which he doesn't understand - and part of that problem is that ARM
-people do _not_ justify in their commit messages why a change is
-necessary.
+On principle, I don't like the idea of passing driver resources
+through platform data, I find it abhorrent.  However, there isn't
+really any good solution here other than platform data or
+auto-detecting it, and auto-detecting it is, in my opinion, the
+lesser of the evils.
 
-So please, improve the commit messages and justify the commits.
+> I would like for sa1100 to converge to other platforms. PXA, especially.
+> Why? Because I like several small devices sitting on my table. PXA
+> is now slowly moving towards dts, cleaner drivers and cleaner interfaces.
 
-It really doesn't help that all that was posted was three patches and
-no covering message which could either explain what the three patches
-were trying to achieve.  Like most people do.  (And some people take
-that to an extreme, posting a cover message for just one patch.)
+Right, so when the UCB1x00 gets a node in DT, the driver can parse
+the interrupt from DT, without needing it in platform data - and
+if it finds that it's in DT, then there's no need to auto-probe it.
+
+I don't see the point of adding it to platform data only to later
+have to change it /again/ when SA11x0 moves to DT.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
