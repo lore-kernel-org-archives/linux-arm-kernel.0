@@ -1,63 +1,81 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:21:51 +0100
-Subject: [PATCH RFC v2 07/13] drm: bridge/dw_hdmi: introduce interface to
- setting sample rate
+Date: Thu, 02 Apr 2015 10:21:46 +0100
+Subject: [PATCH RFC v2 06/13] drm: bridge/dw_hdmi: remove
+ mhsyncpolarity/mvsyncpolarity/minterlaced
 In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbJv-00085A-82@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YdbJq-000856-1r@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce dw_hdmi_set_sample_rate(), which allows us to configure the
-audio sample rate, setting the CTS/N values appropriately.
+Remove the struct hdmi_vmode mhsyncpolarity/mvsyncpolarity/minterlaced
+members, which are only used within a single function.  We can directly
+reference the appropriate mode->flags instead.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/bridge/dw_hdmi.c | 10 ++++++++++
- include/drm/bridge/dw_hdmi.h     |  5 +++++
- 2 files changed, 15 insertions(+)
+ drivers/gpu/drm/bridge/dw_hdmi.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 75728ba552d0..0369fab5c695 100644
+index a8bd3fbf4300..75728ba552d0 100644
 --- a/drivers/gpu/drm/bridge/dw_hdmi.c
 +++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -366,6 +366,16 @@ static void hdmi_clk_regenerator_update_pixel_clock(struct dw_hdmi *hdmi)
- 	mutex_unlock(&hdmi->audio_mutex);
- }
+@@ -82,9 +82,6 @@ static const u16 csc_coeff_rgb_in_eitu709[3][4] = {
  
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate)
-+{
-+	mutex_lock(&hdmi->audio_mutex);
-+	hdmi->sample_rate = rate;
-+	hdmi_set_clk_regenerator(hdmi, hdmi->hdmi_data.video_mode.mpixelclock,
-+				 hdmi->sample_rate, hdmi->ratio);
-+	mutex_unlock(&hdmi->audio_mutex);
-+}
-+EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
-+
- /*
-  * this submodule is responsible for the video data synchronization.
-  * for example, for RGB 4:4:4 input, the data map is defined as
-diff --git a/include/drm/bridge/dw_hdmi.h b/include/drm/bridge/dw_hdmi.h
-index de13bfc35634..763af51e1d60 100644
---- a/include/drm/bridge/dw_hdmi.h
-+++ b/include/drm/bridge/dw_hdmi.h
-@@ -12,6 +12,8 @@
+ struct hdmi_vmode {
+ 	bool mdvi;
+-	bool mhsyncpolarity;
+-	bool mvsyncpolarity;
+-	bool minterlaced;
+ 	bool mdataenablepolarity;
  
- #include <drm/drmP.h>
+ 	unsigned int mpixelclock;
+@@ -1024,9 +1021,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 	struct hdmi_vmode *vmode = &hdmi->hdmi_data.video_mode;
+ 	int hblank, vblank, h_de_hs, v_de_vs, hsync_len, vsync_len;
  
-+struct dw_hdmi;
-+
- enum {
- 	DW_HDMI_RES_8,
- 	DW_HDMI_RES_10,
-@@ -59,4 +61,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 		 void *data, struct drm_encoder *encoder,
- 		 struct resource *iores, int irq,
- 		 const struct dw_hdmi_plat_data *plat_data);
-+
-+void dw_hdmi_set_sample_rate(struct dw_hdmi *hdmi, unsigned int rate);
-+
- #endif /* __IMX_HDMI_H__ */
+-	vmode->mhsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PHSYNC);
+-	vmode->mvsyncpolarity = !!(mode->flags & DRM_MODE_FLAG_PVSYNC);
+-	vmode->minterlaced = !!(mode->flags & DRM_MODE_FLAG_INTERLACE);
+ 	vmode->mpixelclock = mode->clock * 1000;
+ 
+ 	dev_dbg(hdmi->dev, "final pixclk = %d\n", vmode->mpixelclock);
+@@ -1036,13 +1030,13 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 		HDMI_FC_INVIDCONF_HDCP_KEEPOUT_ACTIVE :
+ 		HDMI_FC_INVIDCONF_HDCP_KEEPOUT_INACTIVE);
+ 
+-	inv_val |= (vmode->mvsyncpolarity ?
++	inv_val |= mode->flags & DRM_MODE_FLAG_PVSYNC ?
+ 		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_HIGH :
+-		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_LOW);
++		HDMI_FC_INVIDCONF_VSYNC_IN_POLARITY_ACTIVE_LOW;
+ 
+-	inv_val |= (vmode->mhsyncpolarity ?
++	inv_val |= mode->flags & DRM_MODE_FLAG_PHSYNC ?
+ 		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_HIGH :
+-		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_LOW);
++		HDMI_FC_INVIDCONF_HSYNC_IN_POLARITY_ACTIVE_LOW;
+ 
+ 	inv_val |= (vmode->mdataenablepolarity ?
+ 		HDMI_FC_INVIDCONF_DE_IN_POLARITY_ACTIVE_HIGH :
+@@ -1051,13 +1045,13 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+ 	if (hdmi->vic == 39)
+ 		inv_val |= HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_HIGH;
+ 	else
+-		inv_val |= (vmode->minterlaced ?
++		inv_val |= mode->flags & DRM_MODE_FLAG_INTERLACE ?
+ 			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_HIGH :
+-			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_LOW);
++			HDMI_FC_INVIDCONF_R_V_BLANK_IN_OSC_ACTIVE_LOW;
+ 
+-	inv_val |= (vmode->minterlaced ?
++	inv_val |= mode->flags & DRM_MODE_FLAG_INTERLACE ?
+ 		HDMI_FC_INVIDCONF_IN_I_P_INTERLACED :
+-		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE);
++		HDMI_FC_INVIDCONF_IN_I_P_PROGRESSIVE;
+ 
+ 	inv_val |= (vmode->mdvi ?
+ 		HDMI_FC_INVIDCONF_DVI_MODEZ_DVI_MODE :
 -- 
 1.8.3.1
