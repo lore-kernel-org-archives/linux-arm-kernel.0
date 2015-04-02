@@ -1,117 +1,56 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu,  2 Apr 2015 17:00:42 +0200
-Subject: [PATCH v2] ARM: tegra: Correct which USB controller has the UTMI pad
- registers
-In-Reply-To: <551D57E0.7050102@kapsi.fi>
-References: <551D57E0.7050102@kapsi.fi>
-Message-ID: <1427986842-21409-1-git-send-email-tomeu.vizoso@collabora.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 2 Apr 2015 17:02:53 +0200
+Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on
+ Armada 370 DB
+In-Reply-To: <20150402144823.GJ24899@n2100.arm.linux.org.uk>
+References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2321040.CmsL1gluUd@wuerfel>
+ <20150402153650.2cc9c3d7@free-electrons.com>
+ <2515980.d69ggAvHPo@wuerfel>
+ <20150402161626.182e267d@free-electrons.com>
+ <20150402144823.GJ24899@n2100.arm.linux.org.uk>
+Message-ID: <20150402170253.70e951bd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It should be the first controller, not the second.
+Dear Russell King - ARM Linux,
 
-This broke USB after 6261b06 ("regulator: Defer lookup of supply to
-regulator_get"), because it changed the order in which the controllers
-were probed.
+On Thu, 2 Apr 2015 15:48:24 +0100, Russell King - ARM Linux wrote:
 
-The fix for this issue was suggested by Mikko Perttunen.
+> Wrong.  It's Arnd's responsibility to make sure that platform maintainers
+> don't do stupid things like change the DT in incompatible ways which
+> break lots of people's setups.
+> 
+> However, it is _your_ responsibility as the platform maintainer to place
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Mikko Perttunen <mikko.perttunen@kapsi.fi>
----
+I am _not_ a platform maintainer. But thanks for supposing so :-)
 
-I think that the line numbers should be enough in this case, as I expect this to be merged soon, but just in case I'm sending the same patch with plenty of context.
+> sufficient information into the commit message that explains why the
+> change is necessary, and justifies the change.  Much of what you've said
+> in these follow-on emails should have been in the original message to
+> explain what the situation is, and why the change is appropriate.
+> 
+> I'm willing to bet that if the commit description had explained it
+> properly, Arnd would have applied it by now.
 
-Regards,
+Agreed that the commit message could have been better. Though the
+commit message is sufficiently clear for the platform maintainers to
+understand, since they have all the background about the platform
+needed to understand it. I don't think all commit messages in the
+kernel are meant to be understood by developers having no knowledge of
+the area touched by the patch.
 
-Tomeu
+My commit log has way enough details for the platform maintainers
+Andrew Lunn, Jason Cooper, Gregory Clement and Sebastian Hesselbarth to
+make up their mind about the patch.
 
----
- arch/arm/boot/dts/tegra124.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+See the reaction from both Andrew and Jason: they understood the patch
+and basically agree with it.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index cf01c81..cb786a9 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -821,77 +821,77 @@
- 		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
- 		reg = <0x0 0x7d000000 0x0 0x4000>,
- 		      <0x0 0x7d000000 0x0 0x4000>;
- 		phy_type = "utmi";
- 		clocks = <&tegra_car TEGRA124_CLK_USBD>,
- 			 <&tegra_car TEGRA124_CLK_PLL_U>,
- 			 <&tegra_car TEGRA124_CLK_USBD>;
- 		clock-names = "reg", "pll_u", "utmi-pads";
- 		resets = <&tegra_car 59>, <&tegra_car 22>;
- 		reset-names = "usb", "utmi-pads";
- 		nvidia,hssync-start-delay = <0>;
- 		nvidia,idle-wait-delay = <17>;
- 		nvidia,elastic-limit = <16>;
- 		nvidia,term-range-adj = <6>;
- 		nvidia,xcvr-setup = <9>;
- 		nvidia,xcvr-lsfslew = <0>;
- 		nvidia,xcvr-lsrslew = <3>;
- 		nvidia,hssquelch-level = <2>;
- 		nvidia,hsdiscon-level = <5>;
- 		nvidia,xcvr-hsslew = <12>;
-+		nvidia,has-utmi-pad-registers;
- 		status = "disabled";
- 	};
- 
- 	usb at 0,7d004000 {
- 		compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci", "usb-ehci";
- 		reg = <0x0 0x7d004000 0x0 0x4000>;
- 		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
- 		phy_type = "utmi";
- 		clocks = <&tegra_car TEGRA124_CLK_USB2>;
- 		resets = <&tegra_car 58>;
- 		reset-names = "usb";
- 		nvidia,phy = <&phy2>;
- 		status = "disabled";
- 	};
- 
- 	phy2: usb-phy at 0,7d004000 {
- 		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
- 		reg = <0x0 0x7d004000 0x0 0x4000>,
- 		      <0x0 0x7d000000 0x0 0x4000>;
- 		phy_type = "utmi";
- 		clocks = <&tegra_car TEGRA124_CLK_USB2>,
- 			 <&tegra_car TEGRA124_CLK_PLL_U>,
- 			 <&tegra_car TEGRA124_CLK_USBD>;
- 		clock-names = "reg", "pll_u", "utmi-pads";
- 		resets = <&tegra_car 22>, <&tegra_car 22>;
- 		reset-names = "usb", "utmi-pads";
- 		nvidia,hssync-start-delay = <0>;
- 		nvidia,idle-wait-delay = <17>;
- 		nvidia,elastic-limit = <16>;
- 		nvidia,term-range-adj = <6>;
- 		nvidia,xcvr-setup = <9>;
- 		nvidia,xcvr-lsfslew = <0>;
- 		nvidia,xcvr-lsrslew = <3>;
- 		nvidia,hssquelch-level = <2>;
- 		nvidia,hsdiscon-level = <5>;
- 		nvidia,xcvr-hsslew = <12>;
--		nvidia,has-utmi-pad-registers;
- 		status = "disabled";
- 	};
- 
- 	usb at 0,7d008000 {
- 		compatible = "nvidia,tegra124-ehci", "nvidia,tegra30-ehci", "usb-ehci";
- 		reg = <0x0 0x7d008000 0x0 0x4000>;
- 		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
- 		phy_type = "utmi";
- 		clocks = <&tegra_car TEGRA124_CLK_USB3>;
- 		resets = <&tegra_car 59>;
- 		reset-names = "usb";
- 		nvidia,phy = <&phy3>;
- 		status = "disabled";
- 	};
- 
- 	phy3: usb-phy at 0,7d008000 {
- 		compatible = "nvidia,tegra124-usb-phy", "nvidia,tegra30-usb-phy";
- 		reg = <0x0 0x7d008000 0x0 0x4000>,
- 		      <0x0 0x7d000000 0x0 0x4000>;
- 		phy_type = "utmi";
+Best regards,
+
+Thomas
 -- 
-2.3.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
