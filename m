@@ -1,42 +1,68 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 2 Apr 2015 10:19:41 +0200
-Subject: [PATCH 2/2] pinctrl: at91: Add missing include
-In-Reply-To: <1426878721-2618-2-git-send-email-alexanders83@web.de>
-References: <1426878721-2618-1-git-send-email-alexanders83@web.de>
- <1426878721-2618-2-git-send-email-alexanders83@web.de>
-Message-ID: <20150402081941.GB26864@ns203013.ovh.net>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 2 Apr 2015 10:29:17 +0200
+Subject: Build regression in next-20150331
+In-Reply-To: <2863807.lxHPvZ2AsE@vostro.rjw.lan>
+References: <CANMBJr68RVNgVpkDohyOeH=wd=UgKBCFeuveqiUyNcQ_7vendQ@mail.gmail.com>
+ <2720045.6sPXjyyvfF@vostro.rjw.lan>
+ <CANMBJr76ap0qL+yxrwe5ECWRgFRgbtdKNBGoSd8SOzrhzDjTrg@mail.gmail.com>
+ <2863807.lxHPvZ2AsE@vostro.rjw.lan>
+Message-ID: <20150402082917.GS23123@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:12 Fri 20 Mar     , Alexander Stein wrote:
-> This fixes the sparse warning:
-> drivers/pinctrl/pinctrl-at91.c:1556:6: warning: symbol
->  'at91_pinctrl_gpio_suspend' was not declared. Should it be static?
-> drivers/pinctrl/pinctrl-at91.c:1580:6: warning: symbol
->  'at91_pinctrl_gpio_resume' was not declared. Should it be static?
-> 
-> Signed-off-by: Alexander Stein <alexanders83@web.de>
-> ---
->  drivers/pinctrl/pinctrl-at91.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index a882523..02f6477 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -25,6 +25,8 @@
->  /* Since we request GPIOs from ourself */
->  #include <linux/pinctrl/consumer.h>
->  
-> +#include <mach/hardware.h>
-NACK this will break multi arch support
+On Wed, Apr 01, 2015 at 11:46:10PM +0200, Rafael J. Wysocki wrote:
 
-Best Regards,
-J.
-> +
->  #include "pinctrl-at91.h"
->  #include "core.h"
->  
-> -- 
-> 2.3.3
-> 
+> > > ---
+> > >  kernel/time/tick-internal.h |    2 ++
+> > >  1 file changed, 2 insertions(+)
+> > >
+> > > Index: linux-pm/kernel/time/tick-internal.h
+> > > ===================================================================
+> > > --- linux-pm.orig/kernel/time/tick-internal.h
+> > > +++ linux-pm/kernel/time/tick-internal.h
+> > > @@ -110,7 +110,9 @@ static inline int tick_broadcast_update_
+> > >  /* Set the periodic handler in non broadcast mode */
+> > >  static inline void tick_set_periodic_handler(struct clock_event_device *dev, int broadcast)
+> > >  {
+> > > +#ifdef CONFIG_GENERIC_CLOCKEVENTS
+> > >         dev->event_handler = tick_handle_periodic;
+> > > +#endif
+> > >  }
+> > >  #endif /* !BROADCAST */
+
+> Peter, do you think the above is acceptable or do I need to do anything more
+> sophisticated to fix this?  [The alternative would be probably to prepare an
+> empty definition of tick_handle_periodic() for CONFIG_GENERIC_CLOCKEVENTS and
+> move the definition of struct clock_event_device from under that Kconfig
+> option.]
+
+
+Does not something like the below make more sense? The entire broadcast
+thing doesn't make sense if we don't have generic_clockevents.
+
+Should we wrap more in generic_clockevents there?
+
+---
+ kernel/time/tick-internal.h |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/kernel/time/tick-internal.h b/kernel/time/tick-internal.h
+index 2a1563a..5569e65 100644
+--- a/kernel/time/tick-internal.h
++++ b/kernel/time/tick-internal.h
+@@ -81,6 +81,7 @@ static inline int tick_check_oneshot_change(int allow_nohz) { return 0; }
+ #endif /* !TICK_ONESHOT */
+ 
+ /* Broadcasting support */
++#ifdef CONFIG_GENERIC_CLOCKEVENTS
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ extern int tick_device_uses_broadcast(struct clock_event_device *dev, int cpu);
+ extern void tick_install_broadcast_device(struct clock_event_device *dev);
+@@ -114,6 +115,7 @@ static inline void tick_set_periodic_handler(struct clock_event_device *dev, int
+ 	dev->event_handler = tick_handle_periodic;
+ }
+ #endif /* !BROADCAST */
++#endif /* GENERIC */
+ 
+ /* Functions related to oneshot broadcasting */
+ #if defined(CONFIG_GENERIC_CLOCKEVENTS_BROADCAST) && defined(CONFIG_TICK_ONESHOT)
