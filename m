@@ -1,26 +1,71 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Thu, 2 Apr 2015 15:56:37 +0530
-Subject: [PATCH v8 0/3] dmaengine: APM X-Gene SoC DMA engine driver support
-In-Reply-To: <20150402083516.GZ7192@intel.com>
-References: <1426686456-15536-1-git-send-email-rsahu@apm.com>
- <20150402083516.GZ7192@intel.com>
-Message-ID: <CAFd313yTU9VO3nTO_+DFCYXMER_L7XtnJV8_S1ioepkPaVFZMw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  2 Apr 2015 11:05:17 +0100
+Subject: [PATCH 13/27] arm/arm64: KVM: add a common vgic_queue_irq_to_lr fn
+In-Reply-To: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
+References: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1427969131-8445-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 2, 2015 at 2:05 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Wed, Mar 18, 2015 at 07:17:33PM +0530, Rameshwar Prasad Sahu wrote:
->> This patch set implements the APM X-Gene SoC DMA driver support to offload
->> the DMA operations such as memory copy(memcpy), scatter gather memory copy,
->> raid5 xor and raid6 p+q.
-> Applied, now
+From: Alex Benn?e <alex.bennee@linaro.org>
 
-Thank you very much Vinod.
+This helps re-factor away some of the repetitive code and makes the code
+flow more nicely.
 
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-~Ram
+ virt/kvm/arm/vgic.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
->
-> Thanks
-> --
-> ~Vinod
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index c000e97..697ce17 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -950,6 +950,20 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu)
+ 	}
+ }
+ 
++static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
++				 int lr_nr, struct vgic_lr vlr)
++{
++	if (vgic_dist_irq_is_pending(vcpu, irq)) {
++		vlr.state |= LR_STATE_PENDING;
++		kvm_debug("Set pending: 0x%x\n", vlr.state);
++	}
++
++	if (!vgic_irq_is_edge(vcpu, irq))
++		vlr.state |= LR_EOI_INT;
++
++	vgic_set_lr(vcpu, lr_nr, vlr);
++}
++
+ /*
+  * Queue an interrupt to a CPU virtual interface. Return true on success,
+  * or false if it wasn't possible to queue it.
+@@ -977,8 +991,7 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 		if (vlr.source == sgi_source_id) {
+ 			kvm_debug("LR%d piggyback for IRQ%d\n", lr, vlr.irq);
+ 			BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
+-			vlr.state |= LR_STATE_PENDING;
+-			vgic_set_lr(vcpu, lr, vlr);
++			vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
+ 			return true;
+ 		}
+ 	}
+@@ -995,11 +1008,8 @@ bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
+ 
+ 	vlr.irq = irq;
+ 	vlr.source = sgi_source_id;
+-	vlr.state = LR_STATE_PENDING;
+-	if (!vgic_irq_is_edge(vcpu, irq))
+-		vlr.state |= LR_EOI_INT;
+-
+-	vgic_set_lr(vcpu, lr, vlr);
++	vlr.state = 0;
++	vgic_queue_irq_to_lr(vcpu, irq, lr, vlr);
+ 
+ 	return true;
+ }
+-- 
+2.1.4
