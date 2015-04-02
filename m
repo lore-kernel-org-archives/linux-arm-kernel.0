@@ -1,35 +1,25 @@
-From: roy.qing.li@gmail.com (Li RongQing)
-Date: Thu, 2 Apr 2015 08:52:38 +0800
-Subject: [PATCH] audit.h: remove the macro AUDIT_ARCH_ARMEB definition
-In-Reply-To: <CAJFZqHzxXyuzi7Z9WawYKfFnTMfYfsRL0Qnt276p_t-AV9GB2A@mail.gmail.com>
-References: <1426827329-27976-1-git-send-email-roy.qing.li@gmail.com>
- <CAHC9VhR5VcaCtLG9hdVS2gZRWxVmdnpbK+fJwm6wCA8qyLebUQ@mail.gmail.com>
- <CAJFZqHxdPEhX+9z-FYUMvTF_6LVgK=gOetq0zT4UTZSgUGRqCQ@mail.gmail.com>
- <CAJFZqHxfq0DSjKn-uqhT+pAeJ9u8ym2Mr=wsqvPyX7sCicPGZA@mail.gmail.com>
- <CAHC9VhTbxf_u2FXkcdqofkhywbgrrjjUo_W7yqWXFm=wSJBOAQ@mail.gmail.com>
- <CAJFZqHzxXyuzi7Z9WawYKfFnTMfYfsRL0Qnt276p_t-AV9GB2A@mail.gmail.com>
-Message-ID: <CAJFZqHxos3WUS4O9By0MLh-0GOTyk+BRvDJczwW=xjt393u=sQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 1 Apr 2015 17:53:20 -0700
+Subject: [GIT PULL 1/2] ARM: rockchip: soc code changes for 4.1
+In-Reply-To: <9711811.dP5TtE1nVp@phil>
+References: <2684132.lK2CyBin0M@diego>
+ <9711811.dP5TtE1nVp@phil>
+Message-ID: <20150402005320.GJ8137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 8:01 AM, Li RongQing <roy.qing.li@gmail.com> wrote:
-> On Wed, Mar 25, 2015 at 5:16 AM, Paul Moore <paul@paul-moore.com> wrote:
->> [NOTE: Adding the linux-arm folks to this thread just in case they are
->> interested.]
->>
->> I'm not an ARM expert, but the kernel #define for AUDIT_ARCH_ARMEB
->> (below) seems reasonable to me based on the other audit machine
->> definitions.  There is clearly a mismatch between the kernel and the
->> audit userspace, but I wonder if the issue should be addressed in the
->> userspace tools.  Further, you mention kernel 3.14, what happens with
->> kernel 3.19 and the most recent audit userspace tools?
->>
->>   > grep "AUDIT_ARCH_ARMEB" include/uapi/linux/audit.h
->>   #define AUDIT_ARCH_ARMEB        (EM_ARM)
->
->
+On Thu, Mar 26, 2015 at 06:41:44PM +0100, Heiko Stuebner wrote:
+> Am Mittwoch, 18. M?rz 2015, 17:41:15 schrieb Heiko St?bner:
+> > Hi Arnd, Olof,
+> > 
+> > some soc code changes for 4.1 . I hope the tag explains it, so please pull
+> 
+> as heard in Arnd's talk on ELC yesterday, I'm supposed to ping after one week 
+> of inactivity, so any news on these two pulls? :-)
+
+Merged both now. :)
+
+Thanks,
 
 
-ping...
-
--Roy
+-Olof
