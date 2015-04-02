@@ -1,33 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Apr 2015 17:56:00 -0700
-Subject: [PATCH 1/1] ARM: configs: remove all CONFIG_RCAR_AUDMAC_PP from
- ARM defconfigs
-In-Reply-To: <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
-References: <871tkleesi.wl%kuninori.morimoto.gx@renesas.com>
- <87zj79d06x.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20150402005600.GL8137@localhost>
+Date: Wed, 1 Apr 2015 17:57:00 -0700
+Subject: [GIT PULL] DaVinci McASP changes for v4.1
+In-Reply-To: <550A802B.7050201@ti.com>
+References: <550A802B.7050201@ti.com>
+Message-ID: <20150402005700.GM8137@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 19, 2015 at 05:30:09AM +0000, Kuninori Morimoto wrote:
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Mar 19, 2015 at 01:22:11PM +0530, Sekhar Nori wrote:
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 > 
-> Renesas R-Car sound (= rsnd) needs 2 DMAC which are called as
-> Audio DMAC (= 1st DMAC) and Audio DMAC peri peri (2nd DMAC).
-> And rsnd had assumed that 1st / 2nd DMACs are implemented as DMAEngine.
-> But, in result of DMA ML discussion, 2nd DMAC was concluded that it is
-> not a general purpose DMAC (2nd DMAC is for Device to Device inside
-> sound system). Additionally, current DMAEngine can't support Device to
-> Device, and we don't have correct DT bindings for it at this point.
-> So the easiest solution for it is that move it from DMAEngine to rsnd
-> driver.
-> Audio DMAC peri peri DMAEngine is no longer needed.
-> Remove all CONFIG_RCAR_AUDMAC_PP from ARM defconfigs
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 > 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.1/mcasp
+> 
+> for you to fetch changes up to 6cfdf55b7746a3b1bc324a9e64abe2f055368e6f:
+> 
+>   ARM: davinci: dm646x: Add interrupt resource for McASPs (2015-03-18 17:19:50 +0530)
 
-Applied, thanks.
+Merged, thanks.
 
 
 -Olof
