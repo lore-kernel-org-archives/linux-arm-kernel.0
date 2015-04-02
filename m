@@ -1,25 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 2 Apr 2015 10:13:18 +0200
-Subject: [PATCH] ASoC: atmel-pcm-dma: increase buffer_bytes_max
-In-Reply-To: <20150401203342.GH6023@sirena.org.uk>
-References: <1427744437-14610-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20150401203342.GH6023@sirena.org.uk>
-Message-ID: <20150402081318.GF20669@piout.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 2 Apr 2015 10:18:52 +0200
+Subject: [PATCH] pinctrl: dt: at91: new binding
+In-Reply-To: <CAOesGMgsyEwuF95FFe81Li8nXO0MhHF0ZHPVV91MEH-JGO43tA@mail.gmail.com>
+References: <1424943294-8805-1-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdbNLE+VjhvSgsU4oqAc03ieCNyiLkUzbjEiu_LFof-Unw@mail.gmail.com>
+ <CAOesGMgsyEwuF95FFe81Li8nXO0MhHF0ZHPVV91MEH-JGO43tA@mail.gmail.com>
+Message-ID: <20150402081852.GA26864@ns203013.ovh.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/2015 at 21:33:42 +0100, Mark Brown wrote :
-> On Mon, Mar 30, 2015 at 09:40:37PM +0200, Alexandre Belloni wrote:
-> > atmel-pcm-dma is not limited to a buffer size of 64kB like atmel-pcm-pdc.
-> > Increase buffer_bytes_max to 512kB to allow for higher bit rates (i.e. 32bps at
-> > 192kHz) to work correctly. By default, keep the prealloc at 64kB.
+On 13:55 Sun 29 Mar     , Olof Johansson wrote:
+> On Tue, Mar 17, 2015 at 5:07 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Thu, Feb 26, 2015 at 10:34 AM, Jean-Christophe PLAGNIOL-VILLARD
+> > <plagnioj@jcrosoft.com> wrote:
+> >
+> >> +For each peripheral/bank we will descibe in a u32 if a pin can be
+> >> +configured in it by putting 1 to the pin bit (1 << pin)
+> >
+> > This seems to be describing driver intrinsics in the device tree, like
+> > how the hardware is routed on the inside and what it can do.
+> >
+> > IMO that is driver territory, the driver should know these limitations
+> > and protest if you try to do something illegal.
+> >
+> > Anyway as the AT91 maintainers seem to disagree I will allow some
+> > more time for discussion before merging the patch.
+> >
+> > I can't really have one AT91 maintainer NACKing another, it doesn't
+> > matter that this is a separate driver, in my book the MAINTAINERS
+> > entry for AT91 as a whole overrides that so can you please find an
+> > agreement on how to handle this or I will stall the patch until
+> > you're in agreement.
 > 
-> Applied, but please look into Lars' suggestion - we should be able to
-> just figure everything out from the DMA controller.
+> Nicolas has been the de-facto maintainer of AT91 for quite a while
+> now, even though more of them are listed on the maintainers entry. It
+> would be inappropriate to merge something that he disagreed with on
+> that platform.
+I'm still following it
+> 
+> > ARM SoC maintainers input would be welcomed.
+> 
+> It seems appropriate to ask the at91 folks to come back with a
+> solution that everybody is OK with, and until then hold off merging
+> this.
+when the nack is motivated not just I don't like it
 
-This is definitively on the TODO list.
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best Regards,
+J.
