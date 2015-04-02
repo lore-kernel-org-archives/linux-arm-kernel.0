@@ -1,76 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Apr 2015 20:46:58 +0200
-Subject: [PATCH v5 4/4] clk: dt: Introduce binding for always-on clock
- support
-In-Reply-To: <1427891304-20160-5-git-send-email-lee.jones@linaro.org>
-References: <1427891304-20160-1-git-send-email-lee.jones@linaro.org>
- <1427891304-20160-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAMuHMdXbWTuQAP9hg1qVCgaodkD3Wjin9UX=7uT=F0yodqEm+g@mail.gmail.com>
+From: lhikichi@broadcom.com (Lori Hikichi)
+Date: Thu, 2 Apr 2015 11:47:07 -0700
+Subject: [PATCH 1/2] ASoC: cygnus-audio: adding device tree bindings
+In-Reply-To: <20150331055806.GB2869@sirena.org.uk>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <1427771784-29950-2-git-send-email-sbranden@broadcom.com>
+ <20150331055806.GB2869@sirena.org.uk>
+Message-ID: <551D8EAB.3070803@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 1, 2015 at 2:28 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/clock/clock-bindings.txt   | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+
+
+On 15-03-30 10:58 PM, Mark Brown wrote:
+> On Mon, Mar 30, 2015 at 08:16:23PM -0700, Scott Branden wrote:
 >
-> diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> index 06fc6d5..94cdda2 100644
-> --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> @@ -44,6 +44,37 @@ For example:
->    clocks by index. The names should reflect the clock output signal
->    names for the device.
+>> +SSP Subnode properties:
+>> +- dai-name: The name of the DAI registered with ASOC
 >
-> +clock-always-on:    Some hardware contains bunches of clocks which must never be
-> +                   turned off.  If drivers a) fail to obtain a reference to any
-> +                   of these or b) give up a previously obtained reference
-> +                   during suspend, the common clk framework will attempt to
-> +                   disable them and a platform can fail irrecoverably as a
-> +                   result.  Usually the only way to recover from these failures
-> +                   is to reboot.
-> +
-> +                   To avoid either of these two scenarios from catastrophically
-> +                   disabling an otherwise perfectly healthy running system,
-> +                   clocks can be identified as always-on using this property
-> +                   from inside a clocksource's node.
-> +
-> +                   This property is not to be abused.  It is only to be used to
-> +                   protect platforms from being crippled by gated clocks, not
-> +                   as a convenience function to avoid using the framework
-> +                   correctly inside device drivers.
+> ASoC.
+>
+Okay.
 
-Please document what are the expected value(s) for this property.
-I assume these are clock indices into the array of hardware clocks?
+> Why is this in the DT - it sounds like this is just an internal
+> implementation detail for Linux, not a property of the hardware.
+>
+Will move into the driver code.
 
-Do they take into account sparse hardware clocks, cfr. the "clock-indices"
-property below (I didn't check)?
+>> +- mode: Controls if this port should be configured as I2S or TDM mode.
+>> +	Valid values are: "tdm" or "i2s"
+>> +- tdm-bits-per-frame:  only if mode is "tdm" then this property must set.
+>> +	Valid values are (128/256/512)
+>
+> We'd normally leave these up to the machine driver to set as they're
+> link wide things for system integration.  The bits per frame in
+> particular looks like something that's not going to be fixed by the
+> hardware and could be varied at runtime.
+>
+I was using the device tree to set some board specific properties of our 
+audio serial port driver. The idea was that these properties would only 
+need to be one value for a specific board.  Therefore, we could set them 
+in the device tree and then not have to set them in the
+machine file. I thought it would help keep the machine file
+a little more basic.  Moving these to the machine file is reasonable and 
+will allow for a more dynamic usage of our driver.  I will move them to 
+machine file.
 
-> +For example:
-> +
-> +    oscillator {
-> +        #clock-cells = <1>;
-> +        clock-output-names = "ckil", "ckih";
-> +        clock-always-on = <0>, <1>;
-> +    };
-> +
-> +- this node defines a device with two clock outputs, just as in the
-> +  example above.  The only difference being that 'ckil' and 'ckih'
-> +  are now identified as an always-on clocks, so the framework will
-> +  know to never attempt to gate them.
-> +
->  clock-indices:    If the identifying number for the clocks in the node
->                    is not linear from zero, then this allows the mapping of
->                    identifiers into the clock-output-names array.
+>> +- port-status: Controls if port is enabled or not
+>> +	Valid values "enabled" or "disabled"
+>
+> This sounds like it's replicating the DT standard status property?
+>
+Okay. Will replace with "status"
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> +- channel-group: Control grouping of serial port
+>> +	Valid values are "2_0", "3_1", or "5_1"
+>
+> What does this mean?  It looks like it's setting the number of channels
+> which again seems like a runtime thing.
+>
+It is a configuration where we can link together two or three of the 
+ports to allow for synchronized starts and stop. I will look into 
+another method of configuring this operational mode.
