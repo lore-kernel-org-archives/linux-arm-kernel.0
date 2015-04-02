@@ -1,104 +1,133 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 Apr 2015 11:05:25 +0100
-Subject: [PATCH 21/27] KVM: arm/arm64: simplify vgic_find_range() and callers
+Date: Thu,  2 Apr 2015 11:05:16 +0100
+Subject: [PATCH 12/27] arm/arm64: KVM: export VCPU power state via MP_STATE
+ ioctl
 In-Reply-To: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
 References: <1427969131-8445-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1427969131-8445-22-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1427969131-8445-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Alex Benn?e <alex.bennee@linaro.org>
 
-The vgic_find_range() function in vgic.c takes a struct kvm_exit_mmio
-argument, but actually only used the length field in there. Since we
-need to get rid of that structure in that part of the code anyway,
-let's rework the function (and it's callers) to pass the length
-argument to the function directly.
+To cleanly restore an SMP VM we need to ensure that the current pause
+state of each vcpu is correctly recorded. Things could get confused if
+the CPU starts running after migration restore completes when it was
+paused before it state was captured.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+We use the existing KVM_GET/SET_MP_STATE ioctl to do this. The arm/arm64
+interface is a lot simpler as the only valid states are
+KVM_MP_STATE_RUNNABLE and KVM_MP_STATE_STOPPED.
+
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic-v2-emul.c |  2 +-
- virt/kvm/arm/vgic.c         | 22 ++++++++--------------
- virt/kvm/arm/vgic.h         |  3 +--
- 3 files changed, 10 insertions(+), 17 deletions(-)
+ Documentation/virtual/kvm/api.txt | 16 ++++++++++++----
+ arch/arm/kvm/arm.c                | 21 +++++++++++++++++++--
+ 2 files changed, 31 insertions(+), 6 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-index ddb3135..1dd183e 100644
---- a/virt/kvm/arm/vgic-v2-emul.c
-+++ b/virt/kvm/arm/vgic-v2-emul.c
-@@ -715,7 +715,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 	default:
- 		BUG();
- 	}
--	r = vgic_find_range(ranges, &mmio, offset);
-+	r = vgic_find_range(ranges, 4, offset);
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index b265d8e..71d10d7 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -997,7 +997,7 @@ for vm-wide capabilities.
+ 4.38 KVM_GET_MP_STATE
  
- 	if (unlikely(!r || !r->handle_mmio)) {
- 		ret = -ENXIO;
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 21a3550..8802ad7 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -713,16 +713,13 @@ void vgic_unqueue_irqs(struct kvm_vcpu *vcpu)
+ Capability: KVM_CAP_MP_STATE
+-Architectures: x86, s390
++Architectures: x86, s390, arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_mp_state (out)
+ Returns: 0 on success; -1 on error
+@@ -1011,7 +1011,7 @@ uniprocessor guests).
  
- const
- struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
--				      struct kvm_exit_mmio *mmio,
--				      phys_addr_t offset)
-+				      int len, gpa_t offset)
+ Possible values are:
+ 
+- - KVM_MP_STATE_RUNNABLE:        the vcpu is currently running [x86]
++ - KVM_MP_STATE_RUNNABLE:        the vcpu is currently running [x86,arm/arm64]
+  - KVM_MP_STATE_UNINITIALIZED:   the vcpu is an application processor (AP)
+                                  which has not yet received an INIT signal [x86]
+  - KVM_MP_STATE_INIT_RECEIVED:   the vcpu has received an INIT signal, and is
+@@ -1020,7 +1020,7 @@ Possible values are:
+                                  is waiting for an interrupt [x86]
+  - KVM_MP_STATE_SIPI_RECEIVED:   the vcpu has just received a SIPI (vector
+                                  accessible via KVM_GET_VCPU_EVENTS) [x86]
+- - KVM_MP_STATE_STOPPED:         the vcpu is stopped [s390]
++ - KVM_MP_STATE_STOPPED:         the vcpu is stopped [s390,arm/arm64]
+  - KVM_MP_STATE_CHECK_STOP:      the vcpu is in a special error state [s390]
+  - KVM_MP_STATE_OPERATING:       the vcpu is operating (running or halted)
+                                  [s390]
+@@ -1031,11 +1031,15 @@ On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+ in-kernel irqchip, the multiprocessing state must be maintained by userspace on
+ these architectures.
+ 
++For arm/arm64:
++
++The only states that are valid are KVM_MP_STATE_STOPPED and
++KVM_MP_STATE_RUNNABLE which reflect if the vcpu is paused or not.
+ 
+ 4.39 KVM_SET_MP_STATE
+ 
+ Capability: KVM_CAP_MP_STATE
+-Architectures: x86, s390
++Architectures: x86, s390, arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_mp_state (in)
+ Returns: 0 on success; -1 on error
+@@ -1047,6 +1051,10 @@ On x86, this ioctl is only useful after KVM_CREATE_IRQCHIP. Without an
+ in-kernel irqchip, the multiprocessing state must be maintained by userspace on
+ these architectures.
+ 
++For arm/arm64:
++
++The only states that are valid are KVM_MP_STATE_STOPPED and
++KVM_MP_STATE_RUNNABLE which reflect if the vcpu should be paused or not.
+ 
+ 4.40 KVM_SET_IDENTITY_MAP_ADDR
+ 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index cc96619..9a5f057 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -180,6 +180,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PSCI:
+ 	case KVM_CAP_ARM_PSCI_0_2:
+ 	case KVM_CAP_READONLY_MEM:
++	case KVM_CAP_MP_STATE:
+ 		r = 1;
+ 		break;
+ 	case KVM_CAP_COALESCED_MMIO:
+@@ -310,13 +311,29 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
  {
--	const struct vgic_io_range *r = ranges;
--
--	while (r->len) {
--		if (offset >= r->base &&
--		    (offset + mmio->len) <= (r->base + r->len))
--			return r;
--		r++;
-+	while (ranges->len) {
-+		if (offset >= ranges->base &&
-+		    (offset + len) <= (ranges->base + ranges->len))
-+			return ranges;
-+		ranges++;
- 	}
+-	return -EINVAL;
++	if (vcpu->arch.pause)
++		mp_state->mp_state = KVM_MP_STATE_STOPPED;
++	else
++		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
++
++	return 0;
+ }
  
- 	return NULL;
-@@ -813,7 +810,7 @@ bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	unsigned long offset;
- 
- 	offset = mmio->phys_addr - mmio_base;
--	range = vgic_find_range(ranges, mmio, offset);
-+	range = vgic_find_range(ranges, mmio->len, offset);
- 	if (unlikely(!range || !range->handle_mmio)) {
- 		pr_warn("Unhandled access %d %08llx %d\n",
- 			mmio->is_write, mmio->phys_addr, mmio->len);
-@@ -1986,10 +1983,7 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
- 
- int vgic_has_attr_regs(const struct vgic_io_range *ranges, phys_addr_t offset)
+ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
  {
--	struct kvm_exit_mmio dev_attr_mmio;
--
--	dev_attr_mmio.len = 4;
--	if (vgic_find_range(ranges, &dev_attr_mmio, offset))
-+	if (vgic_find_range(ranges, 4, offset))
- 		return 0;
- 	else
- 		return -ENXIO;
-diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
-index 6fccb96..01aa622 100644
---- a/virt/kvm/arm/vgic.h
-+++ b/virt/kvm/arm/vgic.h
-@@ -90,8 +90,7 @@ static inline bool is_in_range(phys_addr_t addr, unsigned long len,
+-	return -EINVAL;
++	switch (mp_state->mp_state) {
++	case KVM_MP_STATE_RUNNABLE:
++		vcpu->arch.pause = false;
++		break;
++	case KVM_MP_STATE_STOPPED:
++		vcpu->arch.pause = true;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
+ }
  
- const
- struct vgic_io_range *vgic_find_range(const struct vgic_io_range *ranges,
--				      struct kvm_exit_mmio *mmio,
--				      phys_addr_t offset);
-+				      int len, gpa_t offset);
- 
- bool vgic_handle_mmio_range(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 			    struct kvm_exit_mmio *mmio,
+ /**
 -- 
 2.1.4
