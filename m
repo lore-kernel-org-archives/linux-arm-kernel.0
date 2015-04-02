@@ -1,79 +1,144 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 2 Apr 2015 14:44:29 +0200
-Subject: [PATCH 1/2] ARM: EXYNOS: Get current parent clock for power
- domain on/off
-In-Reply-To: <551D362B.90901@collabora.co.uk>
-References: <1427961979-29477-1-git-send-email-k.kozlowski@samsung.com>
- <551D362B.90901@collabora.co.uk>
-Message-ID: <CAJKOXPc1dfHAaUQd+3HDhNwQW8xYDeoYFgN6QMkmQPEnLGtG-A@mail.gmail.com>
+From: dahi@linux.vnet.ibm.com (David Hildenbrand)
+Date: Thu, 2 Apr 2015 14:52:03 +0200
+Subject: [PATCH v2 06/10] KVM: arm64: guest debug, add SW break point
+ support
+In-Reply-To: <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+References: <1427814488-28467-1-git-send-email-alex.bennee@linaro.org>
+ <1427814488-28467-7-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150402145203.01c3654b@thinkpad-w530>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-02 14:29 GMT+02:00 Javier Martinez Canillas
-<javier.martinez@collabora.co.uk>:
-> Hello Krzysztof,
->
-> On 04/02/2015 10:06 AM, Krzysztof Kozlowski wrote:
->> Using a fixed (by DTS) parent for clocks when turning on the power domain
->> may introduce issues in other drivers. For example when such driver
->> changes the parent during runtime and expects that he is the only place
->> of such change.
->>
->> Do not rely entirely on DTS providing the fixed parent for such clocks.
->> Instead if "pclkN" clock name is missing, grab a current parent of clock
->> with clk_get_parent().
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 8 +++++---
->>  arch/arm/mach-exynos/pm_domains.c                             | 9 ++++++---
->>  2 files changed, 11 insertions(+), 6 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> index 5da38c5ed476..0fc1312f6fd5 100644
->> --- a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> +++ b/Documentation/devicetree/bindings/arm/exynos/power_domain.txt
->> @@ -19,9 +19,11 @@ Optional Properties:
->>       domains.
->>  - clock-names: The following clocks can be specified:
->>       - oscclk: Oscillator clock.
->> -     - pclkN, clkN: Pairs of parent of input clock and input clock to the
->> -             devices in this power domain. Maximum of 4 pairs (N = 0 to 3)
->> -             are supported currently.
->> +     - pclkN, clkN: Input clocks (clkN) to the devices in this power domain.
->> +             Optionally with parrents (pclkN). If such parent is provided
->> +             it will be used for reparenting the given clock when domain
->> +             is turned on. Otherwise the parent before power down will be
->> +             used. Maximum of 4 pairs (N = 0 to 3) are supported currently.
->>       - asbN: Clocks required by asynchronous bridges (ASB) present in
->>               the power domain. These clock should be enabled during power
->>               domain on/off operations.
->> diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
->> index cbe56b35aea0..c55bcf52a6ad 100644
->> --- a/arch/arm/mach-exynos/pm_domains.c
->> +++ b/arch/arm/mach-exynos/pm_domains.c
->> @@ -37,6 +37,7 @@ struct exynos_pm_domain {
->>       struct clk *oscclk;
->>       struct clk *clk[MAX_CLK_PER_DOMAIN];
->>       struct clk *pclk[MAX_CLK_PER_DOMAIN];
->> +     unsigned int pclk_dynamic:MAX_CLK_PER_DOMAIN;
->>       struct clk *asb_clk[MAX_CLK_PER_DOMAIN];
->>  };
->>
->> @@ -62,6 +63,9 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
->>               for (i = 0; i < MAX_CLK_PER_DOMAIN; i++) {
->>                       if (IS_ERR(pd->clk[i]))
->>                               break;
->> +                     /* If parent was not set in DT, save current parent */
->> +                     if (pd->pclk_dynamic & (1 << i))
->
-> Small nit: I personally think that using the BIT(i) macro for shifting bits
-> is more readable but I guess is a matter of personal taste.
+> This adds support for SW breakpoints inserted by userspace.
+> 
+> We do this by trapping all BKPT exceptions in the
+> hypervisor (MDCR_EL2_TDE). The kvm_debug_exit_arch carries the address
+> of the exception. If user-space doesn't know of the breakpoint then we
+> have a guest inserted breakpoint and the hypervisor needs to start again
+> and deliver the exception to guest.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> 
+> ---
+> v2
+>   - update to use new exit struct
+>   - tweak for C setup
+>   - do our setup in debug_setup/clear code
+>   - fixed up comments
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 06c5064..17d4f9c 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2626,7 +2626,7 @@ when running. Common control bits are:
+>  The top 16 bits of the control field are architecture specific control
+>  flags which can include the following:
+> 
+> -  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86]
+> +  - KVM_GUESTDBG_USE_SW_BP:     using software breakpoints [x86, arm64]
+>    - KVM_GUESTDBG_USE_HW_BP:     using hardware breakpoints [x86, s390]
+>    - KVM_GUESTDBG_INJECT_DB:     inject DB type exception [x86]
+>    - KVM_GUESTDBG_INJECT_BP:     inject BP type exception [x86]
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 7ea8b0e..d3bc8dc 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -304,7 +304,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	kvm_arm_set_running_vcpu(NULL);
+>  }
+> 
+> -#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE)
+> +#define KVM_GUESTDBG_VALID (KVM_GUESTDBG_ENABLE|KVM_GUESTDBG_USE_SW_BP)
+> 
+>  int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+>  					struct kvm_guest_debug *dbg)
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index 8a29d0b..cff0475 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -45,11 +45,18 @@ void kvm_arch_setup_debug(struct kvm_vcpu *vcpu)
+>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM | MDCR_EL2_TPMCR);
+>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TDRA | MDCR_EL2_TDOSA);
+> 
+> +	/* Trap debug register access? */
 
-Right, it seems I always forget about BIT macro.
-I'll respin with BIT() and your review/tested tags.
+This should probably go to the earlier patch.
 
-Thanks for feedback and testing!
+>  	if (!vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+>  	else
+>  		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDA;
+> 
+> +	/* Trap breakpoints? */
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP)
+> +		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDE;
+> +	else
+> +		vcpu->arch.mdcr_el2 &= ~MDCR_EL2_TDE;
 
-Best regards,
-Krzysztof
+Again, a candidate for clear_debug?
+
+> +
+>  }
+> 
+>  void kvm_arch_clear_debug(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 524fa25..ed1bbb4 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -82,6 +82,37 @@ static int kvm_handle_wfx(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	return 1;
+>  }
+> 
+> +/**
+> + * kvm_handle_debug_exception - handle a debug exception instruction
+
+"kvm_handle_guest_debug"
+
+> + *
+> + * @vcpu:	the vcpu pointer
+> + * @run:	access to the kvm_run structure for results
+> + *
+> + * We route all debug exceptions through the same handler as we
+> + * just need to report the PC and the HSR values to userspace.
+> + * Userspace may decide to re-inject the exception and deliver it to
+> + * the guest if it wasn't for the host to deal with.
+> + */
+> +static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+> +
+> +	run->exit_reason = KVM_EXIT_DEBUG;
+> +	run->debug.arch.hsr = hsr;
+> +
+> +	switch (hsr >> ESR_ELx_EC_SHIFT) {
+> +	case ESR_ELx_EC_BKPT32:
+> +	case ESR_ELx_EC_BRK64:
+> +		run->debug.arch.pc = *vcpu_pc(vcpu);
+> +		break;
+> +	default:
+> +		kvm_err("%s: un-handled case hsr: %#08x\n",
+> +			__func__, (unsigned int) hsr);
+
+Don't you want to fail hard in this case? This might result in many messages.
+returning 0 feels wrong.
+
+> +		break;
+> +	}
+> +	return 0;
+> +}
+> +
+>  static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
+>  	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
+> @@ -96,6 +127,8 @@ static exit_handle_fn arm_exit_handlers[] = {
+>  	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
+>  	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
+>  	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
+> +	[ESR_ELx_EC_BKPT32]	= kvm_handle_guest_debug,
+> +	[ESR_ELx_EC_BRK64]	= kvm_handle_guest_debug,
+>  };
+> 
+>  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+
+
+David
