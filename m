@@ -1,167 +1,49 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:22:11 +0100
-Subject: [PATCH RFC v2 11/13] sound/core: add IEC958 channel status helper
+Date: Thu, 02 Apr 2015 10:22:01 +0100
+Subject: [PATCH RFC v2 09/13] drm/edid: add function to help find SADs
 In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbKF-00085U-O4@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1YdbK5-00085I-HB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to create the IEC958 channel status from an ALSA
-snd_pcm_runtime structure, taking account of the sample rate and
-sample size.
+Add a function to find the start of the SADs in the ELD.  This
+complements the helper to retrieve the SAD count.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- include/sound/pcm_iec958.h |  9 +++++
- sound/core/Kconfig         |  3 ++
- sound/core/Makefile        |  1 +
- sound/core/pcm_iec958.c    | 95 ++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 108 insertions(+)
- create mode 100644 include/sound/pcm_iec958.h
- create mode 100644 sound/core/pcm_iec958.c
+ include/drm/drm_edid.h | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/include/sound/pcm_iec958.h b/include/sound/pcm_iec958.h
-new file mode 100644
-index 000000000000..0eed397aca8e
---- /dev/null
-+++ b/include/sound/pcm_iec958.h
-@@ -0,0 +1,9 @@
-+#ifndef __SOUND_PCM_IEC958_H
-+#define __SOUND_PCM_IEC958_H
-+
-+#include <linux/types.h>
-+
-+int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
-+	size_t len);
-+
-+#endif
-diff --git a/sound/core/Kconfig b/sound/core/Kconfig
-index b534c8a6046b..1507469425ec 100644
---- a/sound/core/Kconfig
-+++ b/sound/core/Kconfig
-@@ -9,6 +9,9 @@ config SND_PCM
- config SND_PCM_ELD
- 	bool
+diff --git a/include/drm/drm_edid.h b/include/drm/drm_edid.h
+index 87d85e81d3a7..c44ad513e0f7 100644
+--- a/include/drm/drm_edid.h
++++ b/include/drm/drm_edid.h
+@@ -346,6 +346,25 @@ static inline int drm_eld_mnl(const uint8_t *eld)
+ }
  
-+config SND_PCM_IEC958
-+	bool
-+
- config SND_DMAENGINE_PCM
- 	tristate
- 
-diff --git a/sound/core/Makefile b/sound/core/Makefile
-index 591b49157b4d..2b925fcc95ea 100644
---- a/sound/core/Makefile
-+++ b/sound/core/Makefile
-@@ -14,6 +14,7 @@ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
- 		pcm_memory.o memalloc.o
- snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
- snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
-+snd-pcm-$(CONFIG_SND_PCM_IEC958) += pcm_iec958.o
- 
- # for trace-points
- CFLAGS_pcm_lib.o := -I$(src)
-diff --git a/sound/core/pcm_iec958.c b/sound/core/pcm_iec958.c
-new file mode 100644
-index 000000000000..36b2d7aca1bd
---- /dev/null
-+++ b/sound/core/pcm_iec958.c
-@@ -0,0 +1,95 @@
-+/*
-+ *  PCM DRM helpers
-+ *
-+ *   This program is free software; you can redistribute it and/or modify
-+ *   it under the terms of the GNU General Public License version 2 as
-+ *   published by the Free Software Foundation.
+ /**
++ * drm_eld_sad - Get ELD SAD structures.
++ * @eld: pointer to an eld memory structure with sad_count set
 + */
-+#include <linux/export.h>
-+#include <linux/types.h>
-+#include <sound/asoundef.h>
-+#include <sound/pcm.h>
-+#include <sound/pcm_iec958.h>
++static inline const uint8_t *drm_eld_sad(const uint8_t *eld)
++{
++	unsigned int ver, mnl;
++
++	ver = (eld[DRM_ELD_VER] & DRM_ELD_VER_MASK) >> DRM_ELD_VER_SHIFT;
++	if (ver != 2 && ver != 31)
++		return NULL;
++
++	mnl = drm_eld_mnl(eld);
++	if (mnl > 16)
++		return NULL;
++
++	return eld + DRM_ELD_CEA_SAD(mnl, 0);
++}
 +
 +/**
-+ * snd_pcm_create_iec958_consumer - create consumer format IEC958 channel status
-+ * @runtime: pcm runtime structure with ->rate filled in
-+ * @cs: channel status buffer, at least four bytes
-+ * @len: length of channel status buffer
-+ *
-+ * Create the consumer format channel status data in @cs of maximum size
-+ * @len corresponding to the parameters of the PCM runtime @runtime.
-+ *
-+ * Drivers may wish to tweak the contents of the buffer after creation.
-+ *
-+ * Returns: length of buffer, or negative error code if something failed.
-+ */
-+int snd_pcm_create_iec958_consumer(struct snd_pcm_runtime *runtime, u8 *cs,
-+	size_t len)
-+{
-+	unsigned int fs, ws;
-+
-+	if (len < 4)
-+		return -EINVAL;
-+
-+	switch (runtime->rate) {
-+	case 32000:
-+		fs = IEC958_AES3_CON_FS_32000;
-+		break;
-+	case 44100:
-+		fs = IEC958_AES3_CON_FS_44100;
-+		break;
-+	case 48000:
-+		fs = IEC958_AES3_CON_FS_48000;
-+		break;
-+	case 88200:
-+		fs = IEC958_AES3_CON_FS_88200;
-+		break;
-+	case 96000:
-+		fs = IEC958_AES3_CON_FS_96000;
-+		break;
-+	case 176400:
-+		fs = IEC958_AES3_CON_FS_176400;
-+		break;
-+	case 192000:
-+		fs = IEC958_AES3_CON_FS_192000;
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (len > 4) {
-+		switch (snd_pcm_format_width(runtime->format)) {
-+		case 16:
-+			ws = IEC958_AES4_CON_WORDLEN_20_16;
-+			break;
-+		case 18:
-+			ws = IEC958_AES4_CON_WORDLEN_22_18;
-+			break;
-+		case 20:
-+			ws = IEC958_AES4_CON_WORDLEN_20_16 |
-+			     IEC958_AES4_CON_MAX_WORDLEN_24;
-+			break;
-+		case 24:
-+			ws = IEC958_AES4_CON_WORDLEN_24_20 |
-+			     IEC958_AES4_CON_MAX_WORDLEN_24;
-+			break;
-+
-+		default:
-+			return -EINVAL;
-+		}
-+	}
-+
-+	memset(cs, 0, len);
-+
-+	cs[0] = IEC958_AES0_CON_NOT_COPYRIGHT | IEC958_AES0_CON_EMPHASIS_NONE;
-+	cs[1] = IEC958_AES1_CON_GENERAL;
-+	cs[2] = IEC958_AES2_CON_SOURCE_UNSPEC | IEC958_AES2_CON_CHANNEL_UNSPEC;
-+	cs[3] = IEC958_AES3_CON_CLOCK_1000PPM | fs;
-+
-+	if (len > 4)
-+		cs[4] = ws;
-+
-+	return len;
-+}
-+EXPORT_SYMBOL(snd_pcm_create_iec958_consumer);
+  * drm_eld_sad_count - Get ELD SAD count.
+  * @eld: pointer to an eld memory structure with sad_count set
+  */
 -- 
 1.8.3.1
