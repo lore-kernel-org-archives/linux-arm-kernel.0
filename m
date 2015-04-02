@@ -1,95 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Apr 2015 15:13:36 +0100
-Subject: Versatile Express randomly fails to boot - Versatile Express to
- be removed from nightly testing
-In-Reply-To: <551AD902.9090401@arm.com>
-References: <20150316195255.GM8656@n2100.arm.linux.org.uk>
- <550818A6.9020205@arm.com>
- <20150317153657.GY8656@n2100.arm.linux.org.uk>
- <55084D99.7050004@arm.com>
- <20150317161748.GZ8656@n2100.arm.linux.org.uk>
- <20150330140333.GJ24899@n2100.arm.linux.org.uk>
- <55196228.5050805@arm.com>
- <20150330150552.GK24899@n2100.arm.linux.org.uk>
- <55196E31.80803@arm.com> <551AD902.9090401@arm.com>
-Message-ID: <20150402141336.GI24899@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 2 Apr 2015 16:16:26 +0200
+Subject: [PATCH] ARM: mvebu: use 0xf1000000 as internal registers on
+ Armada 370 DB
+In-Reply-To: <2515980.d69ggAvHPo@wuerfel>
+References: <1427966184-8288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <2321040.CmsL1gluUd@wuerfel>
+ <20150402153650.2cc9c3d7@free-electrons.com>
+ <2515980.d69ggAvHPo@wuerfel>
+Message-ID: <20150402161626.182e267d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 31, 2015 at 06:27:30PM +0100, Sudeep Holla wrote:
-> Not sure on that as v3.18 with DT seems to be working fine and passed
-> overnight reboot testing.
+Arnd,
 
-Okay, that suggests there's something post v3.18 which is causing this,
-rather than it being a DT vs non-DT thing.
+On Thu, 02 Apr 2015 16:09:03 +0200, Arnd Bergmann wrote:
 
-An extra data point which I've just found (by enabling attempts to do
-hibernation on various test platforms) is that the Versatile Express
-appears to be incapable of taking a CPU offline.
+> This device has 1GB, doing an incompatible change to an existing machine
+> is completely moronic. How hard can it be to special-case this board
+> in u-boot?
 
-This crashes the entire system with sometimes random results.  Sometimes
-it'll appear that a spinlock has been left owned by CPU#1 which is
-offline.  Sometimes it'll silently hang.  Sometimes it'll start slowly
-dumping kernel messages from the start of the kernel's ring buffer (!),
-eg:
+The device has a DIMM slot for RAM. 1 GB in the DT is just an example,
+and it gets updated through ATAGS, or directly by the bootloader with
+the real amount of RAM that you have, which can go up to 4 GB.
 
-PM: freeze of devices complete after 29.342 msecs
-PM: late freeze of devices complete after 6.398 msecs
-PM: noirq freeze of devices complete after 5.493 msecs
-Disabling non-boot CPUs ...
-__cpu_disable(1)
-__cpu_die(1)
-handle_IPI(0)
-Booting Linux on physical CPU 0x0
+> > Also, the proposed change is exactly the same we've done on several
+> > Marvell evaluation boards in the past:
+> > 
+> >   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-gp.dts?id=91ed32200e6ea1df19df01355c5c7747f9014102
+> >   http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/boot/dts/armada-xp-db.dts?id=82066bdb5a759ec00c18f9667853c4fe8840e83d
+> 
+> I'm aware of those, I just wish they would learn from their mistakes.
 
-So far, it's not managed to take a CPU successfully offline and know that
-it has.  If I disable the calls to cpu_enter_lowpower() and
-cpu_leave_lowpower(), then it appears to work.
+There was no mistake at all. You have no idea what the history of this
+problem is, and you're giving lessons.
 
-This leads me to wonder whether flush_cache_louis() works... which led me
-in turn to ARM_ERRATA_643719, which is disabled in my builds.  However,
-the CA9 tile has a r0p1 CA9, which allegedly suffers from this errata.
+As Andrew Lunn said, on *all* Marvell EBU platforms the internal
+registers have always been remapped at 0xf1000000. Look at Kirkwood,
+Orion, Dove.
 
-The really interesting thing is that I've never had that errata enabled
-for Versatile Express - even going back to 3.14 times (I have a working
-3.14 config file which clearly shows that it was disabled.)  So, I'm
-wondering if we've relaxed the cache flushing in such a way that we now
-expose the ineffectual flush_cache_louis() bug.
+Marvell wanted to do exactly the same for Armada 370 and XP, which is
+perfectly sane: keep the same behavior.
 
-There aren't that many flush_cache_louis() calls in the kernel.  We do
-have this:
+Except that the very early steppings of Armada 370 and Armada XP had a
+bug, which prevented from changing the internal register base address,
+so they had no other choice but to keep it at 0xd0000000. And then,
+once those early steppings were replaced by real production steppings,
+the bug was fixed, and they migrated to 0xf1000000, and the situation
+was back to normal.
 
-commit bca7a5a04933700a8bde4ea5798119607a8b0436
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Thu Apr 18 18:15:44 2013 +0100
+> Find a different name then, but don't change the value in the existing
+> file. It's been around for too long now. The other ones were changed
+> shortly after being introduced, but anybody who is using
 
-    ARM: cpu hotplug: remove majority of cache flushing from platforms
+Not at all. The others were also changed long after the board was
+introduced in the kernel. Not as long as for the Armada 370 DB, because
+I only recently put my hand on an eval board which has a production
+stepping of the SoC.
 
-in conjuction with:
+> armada-370-db.dts today obviously has the old boot loader and cannot
+> update the bootloader without breaking their kernels, but they should
+> at least be able to update their kernels without changing the
+> scripts.
 
-commit 51acdfd1fa38a2bf1003255be9f105c19fbc0176
-Author: Russell King <rmk+kernel@arm.linux.org.uk>
-Date:   Thu Apr 18 18:05:29 2013 +0100
+All customers have evaluation boards with a production stepping of the
+silicon, and for all of them the current kernel is *not* working.
 
-    ARM: smp: flush L1 cache in cpu_die()
+The patch I'm proposing is what makes the kernel work for them.
 
-which changed the flush_cache_all() to a flush_cache_louis() in the
-hot unplug path.  We also have this:
+Arnd, please don't get in the way of platform maintainers for such very
+platform-specific issues for which you don't have the background about
+what happened and why we're doing this change. It's the responsibility
+of the platform maintainers to decide how and when they want to keep or
+break the compatibility.
 
-commit e40678559fdf3f56ce9a349365fbf39e1f63ecc0
-Author: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date:   Thu Nov 8 19:46:07 2012 +0100
+Best regards,
 
-    ARM: 7573/1: idmap: use flush_cache_louis() and flush TLBs only when necessary
-
-which added the flush_cache_louis() for the idmap tables, but prior to
-that, I don't see how we were ensuring that the page tables were visible.
-
-I haven't tested going back to a tag latency of 1 1 1 yet.  Can you
-confirm whether you have this errata enabled for your tests?
-
-Thanks.
-
+Thomas
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
