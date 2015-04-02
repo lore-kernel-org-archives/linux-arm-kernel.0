@@ -1,38 +1,54 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu,  2 Apr 2015 17:34:13 +0200
-Subject: [PATCH 4/4] clk: rockchip: enable CLK_DEFER_ORPHAN for all branches
+Date: Thu,  2 Apr 2015 17:34:12 +0200
+Subject: [PATCH 3/4] clk: add CLK_DEFER_ORPHAN flag to prevent orphans from
+ being used
 In-Reply-To: <1427988853-9549-1-git-send-email-heiko@sntech.de>
 References: <1427988853-9549-1-git-send-email-heiko@sntech.de>
-Message-ID: <1427988853-9549-5-git-send-email-heiko@sntech.de>
+Message-ID: <1427988853-9549-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Rockchip drivers should handle deferentials correctly and on all boards
-we have the situation that some clock sources are generated off-soc by an
-external i2c component (like the xin32k feeding for example the sclk_tsadc
-on rk3288). So some clocks are always orphans until the i2c drivers are
-probed.
-So add the new CLK_DEFER_ORPHAN flag for all our clock branches to generate
-correct deferals for this timespan.
+The usage of clocks derived from an orphan can produce issues when trying
+to set rates etc. So ideally a clk_get to such a clock should defer till
+the clock hierarchy is complete.
+But as some arches probably rely on such clocks we can't disable them all.
+Therefore add a new clk flag where arches can enable this behaviour for
+their clocks.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/clk/rockchip/clk.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clk/clk.c            | 6 ++++++
+ include/linux/clk-provider.h | 1 +
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
-index 20e05bb..5bb5fa6 100644
---- a/drivers/clk/rockchip/clk.c
-+++ b/drivers/clk/rockchip/clk.c
-@@ -220,6 +220,9 @@ void __init rockchip_clk_register_branches(
- 	for (idx = 0; idx < nr_clk; idx++, list++) {
- 		flags = list->flags;
- 
-+		/* defer clk_get on orphan clocks */
-+		flags |= CLK_DEFER_ORPHAN;
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 476f491..8511c62 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -3041,6 +3041,12 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 		if (provider->node == clkspec->np)
+ 			clk = provider->get(clkspec, provider->data);
+ 		if (!IS_ERR(clk)) {
++			if ((__clk_get_flags(clk) & CLK_DEFER_ORPHAN)
++						&& clk_is_orphan(clk)) {
++				clk = ERR_PTR(-EPROBE_DEFER);
++				break;
++			}
 +
- 		/* catch simple muxes */
- 		switch (list->branch_type) {
- 		case branch_mux:
+ 			clk = __clk_create_clk(__clk_get_hw(clk), dev_id,
+ 					       con_id);
+ 
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 28abf1b..ef8d669 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -31,6 +31,7 @@
+ #define CLK_GET_RATE_NOCACHE	BIT(6) /* do not use the cached clk rate */
+ #define CLK_SET_RATE_NO_REPARENT BIT(7) /* don't re-parent on rate change */
+ #define CLK_GET_ACCURACY_NOCACHE BIT(8) /* do not use the cached clk accuracy */
++#define CLK_DEFER_ORPHAN	BIT(9) /* defer clk_get calls for orphans */
+ 
+ struct clk_hw;
+ struct clk_core;
 -- 
 2.1.4
