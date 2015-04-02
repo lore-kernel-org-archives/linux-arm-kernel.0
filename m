@@ -1,72 +1,43 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu,  2 Apr 2015 17:34:11 +0200
-Subject: [PATCH 2/4] clk: add clk_is_orphan() to check if a clocks inherits
- from an orphan clock
-In-Reply-To: <1427988853-9549-1-git-send-email-heiko@sntech.de>
-References: <1427988853-9549-1-git-send-email-heiko@sntech.de>
-Message-ID: <1427988853-9549-3-git-send-email-heiko@sntech.de>
+Date: Thu,  2 Apr 2015 17:34:09 +0200
+Subject: [PATCH 0/4] clk: improve handling of orphan clocks
+Message-ID: <1427988853-9549-1-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are cases where it is helpful to know if the full clock path can be
-trusted or if there is a parent clock missing somewhere in the parent-path.
+This resurrects a patch from Doug Anderson from november that fixes the
+enable counts when previous orphan-clocks get reparented to a newly
+probed parent clock.
 
-We keep it confined to the ccf area for now, if later users outside the ccf
-surface it can be made more publically available.
+In the ensuing discussion Russell rightfully pointed out that orphan
+clocks should probably not be used at all, as things like dividers
+won't be able to set meaningful / safe values at all. But Doug's reply
+also rightfully mentioned the fact that we most likely cannot change
+the behaviour for all orphans as maybe some arches depend on the
+current behaviour and it's not really possible to find all possible
+affected clocks.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/clk.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+So this series is two-part. Patch1 is the fix from Doug fixing the
+actual enable mismatch when an enabled orphan gets reparented to
+a real parent and patches 2-4 try to provide a way to let the clock
+core defer clk_gets on orphan clocks.
+If at some point the majority of clock drivers make use of deferrals
+this could then become the default behaviour.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 512323f..476f491 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2271,6 +2271,44 @@ bool clk_is_match(const struct clk *p, const struct clk *q)
- EXPORT_SYMBOL_GPL(clk_is_match);
- 
- /**
-+ * __clk_is_orphan - check if a clock or its parent is an orphan
-+ *
-+ * Walks up the clock parents until it reaches a root-clock or
-+ * a clock contained in the orphan list. Returns true if there is
-+ * an orphan in the parent-path otherwise false.
-+ */
-+static bool __clk_is_orphan(struct clk_core *clk)
-+{
-+	struct clk_core *orphan;
-+
-+	if (clk->flags & CLK_IS_ROOT)
-+		return false;
-+
-+	hlist_for_each_entry(orphan, &clk_orphan_list, child_node) {
-+		if (clk == orphan)
-+			return true;
-+	}
-+
-+	if (clk->num_parents)
-+		return __clk_is_orphan(clk->parent);
-+
-+	return false;
-+}
-+
-+static bool clk_is_orphan(struct clk *clk)
-+{
-+	bool ret;
-+
-+	if (!clk)
-+		return false;
-+
-+	clk_prepare_lock();
-+	ret = __clk_is_orphan(clk->core);
-+	clk_prepare_unlock();
-+	return ret;
-+}
-+
-+/**
-  * __clk_init - initialize the data structures in a struct clk
-  * @dev:	device initializing this clk, placeholder for now
-  * @clk:	clk being initialized
+
+Doug Anderson (1):
+  clk: Propagate prepare and enable when reparenting orphans
+
+Heiko Stuebner (3):
+  clk: add clk_is_orphan() to check if a clocks inherits from an orphan
+    clock
+  clk: add CLK_DEFER_ORPHAN flag to prevent orphans from being used
+  clk: rockchip: enable CLK_DEFER_ORPHAN for all branches
+
+ drivers/clk/clk.c            | 69 ++++++++++++++++++++++++++++++++++++++++++--
+ drivers/clk/rockchip/clk.c   |  3 ++
+ include/linux/clk-provider.h |  1 +
+ 3 files changed, 71 insertions(+), 2 deletions(-)
+
 -- 
 2.1.4
