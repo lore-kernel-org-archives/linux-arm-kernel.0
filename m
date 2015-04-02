@@ -1,92 +1,89 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu,  2 Apr 2015 14:40:16 +0900
-Subject: [v3 5/5] arm: kvm: add stub implementation for kvm_cpu_reset()
-In-Reply-To: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1427953216-11737-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1427953216-11737-6-git-send-email-takahiro.akashi@linaro.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 02 Apr 2015 11:31:14 +0530
+Subject: [PATCH 0/5] arm64: add kdump support
+In-Reply-To: <551CD58E.60807@linaro.org>
+References: <1427358533-3754-1-git-send-email-takahiro.akashi@linaro.org>
+ <551C1537.2030009@redhat.com> <551C7EF5.9030806@linaro.org>
+ <551CCC67.1040607@redhat.com> <551CD58E.60807@linaro.org>
+Message-ID: <551CDB2A.5060604@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm/include/asm/kvm_asm.h  |    1 +
- arch/arm/include/asm/kvm_host.h |   12 ++++++++++++
- arch/arm/include/asm/kvm_mmu.h  |    5 +++++
- arch/arm/kvm/init.S             |    6 ++++++
- 4 files changed, 24 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 25410b2..462babf 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -85,6 +85,7 @@ struct kvm_vcpu;
- 
- extern char __kvm_hyp_init[];
- extern char __kvm_hyp_init_end[];
-+extern char __kvm_hyp_reset[];
- 
- extern char __kvm_hyp_exit[];
- extern char __kvm_hyp_exit_end[];
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ca97764..6d38134 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -220,6 +220,18 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
- }
- 
-+static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
-+					phys_addr_t phys_idmap_start,
-+					unsigned long stub_vector_ptr,
-+					unsigned long reset_func)
-+{
-+	/*
-+	 * TODO
-+	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start, stub_vector_ptr,
-+	 *		  reset_func);
-+	 */
-+}
-+
- static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- {
- 	return 0;
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index bf0fe99..dc9543b 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -66,6 +66,7 @@ void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- phys_addr_t kvm_mmu_get_httbr(void);
- phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
-+phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
- void kvm_clear_hyp_idmap(void);
- 
-@@ -270,6 +271,10 @@ static inline void __kvm_flush_dcache_pud(pud_t pud)
- void kvm_set_way_flush(struct kvm_vcpu *vcpu);
- void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
- 
-+extern char __hyp_idmap_text_start[];
-+#define kvm_virt_to_trampoline(x)       \
-+			(TRAMPOLINE_VA + ((x) - __hyp_idmap_text_start))
-+
- #endif	/* !__ASSEMBLY__ */
- 
- #endif /* __ARM_KVM_MMU_H__ */
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 3988e72..9178c9a 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -156,4 +156,10 @@ target:	@ We're now in the trampoline code, switch page tables
- 	.globl __kvm_hyp_init_end
- __kvm_hyp_init_end:
- 
-+	.globl __kvm_hyp_reset
-+__kvm_hyp_reset:
-+	@ TODO
-+
-+	eret
-+
- 	.popsection
--- 
-1.7.9.5
+
+On Thursday 02 April 2015 11:07 AM, AKASHI Takahiro wrote:
+> Pratyush,
+>
+> On 04/02/2015 01:58 PM, Pratyush Anand wrote:
+>>
+>>
+>> On Thursday 02 April 2015 04:57 AM, AKASHI Takahiro wrote:
+>>> Please try my latest kexec-tools in my linaro repo (branch name is
+>>> kdump/v0.11)
+>>> and let me know the result.
+>>
+>> Thanks a lot.. Just fetched your repo and found v.0.11.
+>>
+>> With this crash kernel loaded successfully, if I do not use initrd.
+>>
+>> With following I still see Overlapping memory segments
+>>
+>> kexec -p  /home/panand/work/kernel/bsa2_kdump/vmlinux
+>> --initrd=/boot/initramfs-3.19.0.bz1198945+.img --append="$( cat
+>> /proc/cmdline ) maxcpus=1 mem=64M reset_devices"
+>
+> How big is your initrd?
+> If it is good small, please tell me segments info, or messages from
+> add_segment_phys_virt()
+> for all the segments.
+>
+
+add_segment_phys_virt: 000000000dcd0b90 - 000000000dcd0f90 (00000400) -> 
+00000040c3ff0000 - 00000040c4000000 (00010000)
+add_segment_phys_virt: 000003ff88c10010 - 000003ff8984a010 (00c3a000) -> 
+00000040c0080000 - 00000040c1310000 (01290000)
+add_segment_phys_virt: 000000000dcd53c0 - 000000000dcd96b8 (000042f8) -> 
+00000040c0000000 - 00000040c0010000 (00010000)
+add_segment_phys_virt: 000003ff87360010 - 000003ff88bfcc2f (0189cc1f) -> 
+00000040c0010000 - 00000040c18b0000 (018a0000)
+Overlapping memory segments at 0x40c18b0000
+sort_segments failed
+
+Why do we try to fit dtb just after crash_reserved_mem.start. Should n't 
+it should start after crash_reserved_mem.start + arm64_mem.text_offset + 
+arm64_mem.image_size
+
+
+I tried following and it works perfectly:
+
+diff --git a/kexec/arch/arm64/crashdump-arm64.c 
+b/kexec/arch/arm64/crashdump-arm64.c
+index 41266f294589..75f4e4d269ca 100644
+--- a/kexec/arch/arm64/crashdump-arm64.c
++++ b/kexec/arch/arm64/crashdump-arm64.c
+@@ -312,5 +312,6 @@ void set_crash_entry(struct mem_ehdr *ehdr, struct 
+kexec_info *info)
+  off_t locate_dtb_in_crashmem(struct kexec_info *info, off_t dtb_size)
+  {
+         return locate_hole(info, dtb_size, 128UL * 1024,
+-               crash_reserved_mem.start, crash_reserved_mem.end, 1);
++               crash_reserved_mem.start + arm64_mem.text_offset +
++               arm64_mem.image_size, crash_reserved_mem.end, 1);
+  }
+
+With this changes new allocations are:
+add_segment_phys_virt: 0000000010350b90 - 0000000010350f90 (00000400) -> 
+00000040c3ff0000 - 00000040c4000000 (00010000)
+add_segment_phys_virt: 000003ff7ad70010 - 000003ff7b9aa010 (00c3a000) -> 
+00000040c0080000 - 00000040c1310000 (01290000)
+add_segment_phys_virt: 00000000103553c0 - 00000000103596b8 (000042f8) -> 
+00000040c1360000 - 00000040c1370000 (00010000)
+add_segment_phys_virt: 000003ff794c0010 - 000003ff7ad5cc2f (0189cc1f) -> 
+00000040c1370000 - 00000040c2c10000 (018a0000)
+add_segment_phys_virt: 00000000103596c0 - 0000000010360190 (00006ad0) -> 
+00000040c2c10000 - 00000040c2c20000 (00010000)
+
+
+Crash kernel loaded upon panic.
+
+~Pratyush
