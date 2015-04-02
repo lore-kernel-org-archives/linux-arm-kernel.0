@@ -1,40 +1,79 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 02 Apr 2015 17:34:31 +0900
-Subject: [PATCH 0/6] arm64: dts: exynos: Add USB/PWM/UART3/reboot dt node for
- Exynos5433 SoC
-Message-ID: <1427963677-32661-1-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 02 Apr 2015 17:34:32 +0900
+Subject: [PATCH 1/6] arm64: dts: exynos: Add EHCI and OHCI dt node for
+ Exynos5433
+In-Reply-To: <1427963677-32661-1-git-send-email-cw00.choi@samsung.com>
+References: <1427963677-32661-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1427963677-32661-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set add the following devicetree to support USB/PWM/UART3/reboot.
-- USB 3.0 DRD (Dual Role Device) and host
-- PWM (Pulse Width Modulation)
-- UART3
-- System reboot
+From: Jaewon Kim <jaewon02.kim@samsung.com>
 
-Depend on:
+This patch adds EHCI and OHCI device tree node
+to usb USB2.0 Host and HSCI(High Speed Inter-Chip) function.
 
-This patch-set have the dependnecy on following patch[1] to support USB 3.0
-Host and DRD (Dual Role Device) for Exynos5433 SoC. This patch[1] was merged
-by Kishon Vijay Abraham I (GENERIC PHY FRAMEWORK maintainer).
-[1] https://lkml.org/lkml/2015/3/25/984
-    : [PATCH RESEND] phy: exynos5-usbdrd: Add to support for Exynos5433 SoC
+Cc: Kukjin Kim <kgene@kernel.org>
+Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Inki Dae <inki.dae@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 43 ++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-Beomho Seo (1):
-  arm64: dts: exynos: Add UART3 dt node for Exynos5433 SoC
-
-Jaewon Kim (4):
-  arm64: dts: exynos: Add EHCI and OHCI dt node for Exynos5433
-  arm64: dts: exynos: Add USB Device dt node for Exynos5433
-  arm64: dts: exynos: Add USB3.0 Host dt node for Exynos5433
-  arm64: dts: exynos: Add PWM dt node and pinctrl for Exynos5433 SoC
-
-Joonyoung Shim (1):
-  arm64: dts: exynos: add reboot node for exynos5433
-
- arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  35 +++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 167 +++++++++++++++++++++
- 2 files changed, 202 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index faea1c6..8a1875d 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -916,6 +916,49 @@
+ 			io-channel-ranges;
+ 			status = "disabled";
+ 		};
++
++		ehci: usb at 15510000 {
++			compatible = "samsung,exynos4210-ehci";
++			reg = <0x15510000 0x1000>;
++			interrupts = <0 230 0>;
++			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>;
++			clock-names = "usbhost";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			port at 0 {
++				reg = <0>;
++				phys = <&usb2_phy 0>;
++				status = "disabled";
++			};
++			port at 1 {
++				reg = <1>;
++				phys = <&usb2_phy 1>;
++				status = "disabled";
++			};
++		};
++
++		ohci: usb at 15520000 {
++			compatible = "samsung,exynos4210-ohci";
++			reg = <0x15520000 0x1000>;
++			interrupts = <0 230 0>;
++			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>;
++			clock-names = "usbhost";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		usb2_phy: usb2phy at 15530000 {
++			compatible = "samsung,exynos5433-usb2-phy";
++			reg = <0x15530000 0x100>;
++			samsung,pmureg-phandle = <&pmu_system_controller>;
++			clocks = <&cmu_fsys CLK_ACLK_USBHOST20>, <&xxti>;
++			clock-names = "phy", "ref";
++			#phy-cells = <1>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	timer {
 -- 
 1.8.5.5
