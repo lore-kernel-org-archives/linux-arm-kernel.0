@@ -1,41 +1,89 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 02 Apr 2015 09:23:23 -0700
-Subject: String literals in __init functions
-In-Reply-To: <alpine.DEB.2.10.1504021558350.27469@digraph.polyomino.org.uk>
-References: <5512F6C6.1020304@free.fr> <1427306517.2717.0.camel@perches.com>
- <5513FE2F.3040306@free.fr> <1427386390.15849.13.camel@perches.com>
- <CA+rthh9Fb2q+O_wicc6eNcbo6SzwOVZed=tnThJLF-xuoQ-+Cw@mail.gmail.com>
- <1427392393.15849.16.camel@perches.com>
- <CA+rthh8irf+tTSbomivu=bgN-L1k99TQ-q6UYgmMRC1PNOG7qw@mail.gmail.com>
- <20150326144058.56ef6916b00ad38030296089@linux-foundation.org>
- <1427407120.15849.34.camel@perches.com>
- <alpine.DEB.2.10.1504021558350.27469@digraph.polyomino.org.uk>
-Message-ID: <1427991803.23434.27.camel@perches.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Thu, 2 Apr 2015 19:27:24 +0300
+Subject: [PATCH 1/3] mfd: ucb1x00: add irq field to the platform data
+In-Reply-To: <20150402160252.GO24899@n2100.arm.linux.org.uk>
+References: <1427989307-1805-1-git-send-email-dbaryshkov@gmail.com>
+ <20150402160252.GO24899@n2100.arm.linux.org.uk>
+Message-ID: <CALT56yM-JSN=8KR3EUFAa+k4ZZkqXY9zgwzT2PhRn23dMUc3rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-04-02 at 16:00 +0000, Joseph Myers wrote:
-> On Thu, 26 Mar 2015, Joe Perches wrote:
-> > > I'd have thought that a function-wide
-> > > 	__attribute__((__string_section__(foo))
-> > > wouldn't be a ton of work to implement.
-> > 
-> > Maybe not.
-> > 
-> > Could some future version of gcc move string constants
-> > in a function to a specific section marked in a manner
-> > similar to what Andrew described above?
-> 
-> Putting string constants in a special section is an old project idea at 
-> <http://gcc.gnu.org/projects/optimize.html#putting_constants_in_special_sections>.  
+Hello,
 
-That's news to me.  Thanks for the link.
+2015-04-02 19:02 GMT+03:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> Just like has already been pointed out on the list once today, we need
+> much better commit descriptions than this.
+>
+> The code has been perfectly happy to auto-detect the IRQ for over ten
+> years.  Why do we suddenly need to change it now?  What's the
+> justification for this change.
 
-> I still think support for that would make sense.
+Because using static configuration would allow me to drop a nice piece
+of code. Because it would allow later to use dts to describe ucb1x00
+configuration. Because I will no longer have to think whether ucb1x00I h
+driver barfing on IRQ is a problem of a chip, of an IRQ or just me having
+touched wrong GPIO line at wrong time with a scope probe. Yes, I didn't
+put all these causes to the commit description. Do you really want it?
 
-That's good to know.
+>
+> Or is this just a case of "because we can" and you happen to have a
+> different opinion on how stuff should be done from how it's been
+> successfully done for the last ten years?
 
-Do you know of a mechanism in place to prioritize
-development for these optimization projects or is
-this a placeholder for unscheduled or unresourced
-TODOs?
+Not only "because we can", but "because we should". In my humble
+opinion.
+
+It looks like the whole story of me touching sa1100 is like fighting with
+'it was done so for ages' windmills. Yes, I have different opinions sometimes.
+I would like for sa1100 to converge to other platforms. PXA, especially.
+Why? Because I like several small devices sitting on my table. PXA
+is now slowly moving towards dts, cleaner drivers and cleaner interfaces.
+We should have done this ages ago. Nobody had time and interest.
+SA-11x0 had even older drivers. Older implementations. Older ideas.
+Yes, I have a different opinion at this place. I'd like for sa1100 to live
+in a contemporary world. I'd like to have my devices work with the rest
+of Linux subsystems. Should I just fork sa1100 subarch, make it work
+with devices I have at hand and submit it as a 'new' subarch?
+Or we can have an evolution-like process that will make sa1100 live
+in style with the rest of the Linux kernel.
+
+>
+> On Thu, Apr 02, 2015 at 06:41:45PM +0300, Dmitry Eremin-Solenikov wrote:
+>> To allow boards to specify the irq that is used by UCB1x00 chip, add irq
+>> field to the platform data structure.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>  include/linux/mfd/ucb1x00.h | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/include/linux/mfd/ucb1x00.h b/include/linux/mfd/ucb1x00.h
+>> index e1345ff..9a2dacb 100644
+>> --- a/include/linux/mfd/ucb1x00.h
+>> +++ b/include/linux/mfd/ucb1x00.h
+>> @@ -118,6 +118,7 @@ struct ucb1x00_plat_data {
+>>       unsigned                irq_base;
+>>       int                     gpio_base;
+>>       unsigned                can_wakeup;
+>> +     int                     irq;
+>>  };
+>>
+>>  struct ucb1x00 {
+>> --
+>> 2.1.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> --
+> FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+> according to speedtest.net.
+
+
+
+-- 
+With best wishes
+Dmitry
