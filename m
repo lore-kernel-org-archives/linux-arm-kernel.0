@@ -1,72 +1,161 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Apr 2015 10:20:50 +0100
-Subject: [RFC v2 0/13] dw_hdmi cleanups, audio preparation, helpers and ahb
- audio support
-Message-ID: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 02 Apr 2015 10:22:06 +0100
+Subject: [PATCH RFC v2 10/13] sound/core: add DRM ELD helper
+In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
+Message-ID: <E1YdbKA-00085Q-LL@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm sending this series for comments, and to allow people to update
-their code bases (for those who are using my AHB audio driver on
-iMX6).  This is really several series, and I'm not expecting this
-to be ready for the upcoming merge window.  That said, if anyone
-wants to say that they're happy with some of the initial six patches,
-I'm happy to queue those for David, if he's willing to take them.
+Add a helper for the EDID like data structure, which is typically passed
+from a HDMI adapter to its associated audio driver.  This informs the
+audio driver of the capabilities of the attached HDMI sink.
 
-This series applies on top of my previous series, with the three
-patches from the rockchip guys applied, iow:
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ include/sound/pcm_drm_eld.h |  6 +++
+ sound/core/Kconfig          |  3 ++
+ sound/core/Makefile         |  1 +
+ sound/core/pcm_drm_eld.c    | 92 +++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 102 insertions(+)
+ create mode 100644 include/sound/pcm_drm_eld.h
+ create mode 100644 sound/core/pcm_drm_eld.c
 
- drm: rockchip/dw_hdmi-rockchip: improve for HDMI electrical test
- drm: bridge/dw_hdmi: separate VLEVCTRL settting into platform driver
- drm: bridge/dw_hdmi: fixed codec style
- drm: bridge/dw_hdmi: adjust n/cts setting order
- drm: bridge/dw_hdmi: protect n/cts setting with a mutex
- drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
-
-The first four patches are a few cleanups to the dw_hdmi driver.
-
-The next two patches introduce new interfaces to the dw_hdmi driver
-to support AHB audio, including the errata found on iMX6 which
-requires N to be programmed to zero when the audio FIFO is not full.
-I'm expecting some discussion with these last two as we try to work
-out how to deal with the two variants of audio support for this part
-(AHB audio vs I2S audio).
-
-The following three add various helpers to the DRM and ALSA subsystems
-for audio support which is non-specific to the AHB audio driver.  For
-DRM, this is a helper macro to obtain the pointer into the short audio
-descriptors.  For ALSA, it's a set of helpers to restrict an audio PCM
-device's capabilities according to the ELD, and to generate the IEC958
-channel status data.  If these helpers are acceptable, we can convert
-a number of drivers to them.
-
-The ELD helper isn't quite finished, but should be sufficient for
-initial testing.
-
-The last two patches add support for the dw_hdmi audio.  This is an
-ALSA driver rather than an ASoC driver as it's a pretty simple affair.
-I couldn't find a suitable location in the sound/ subtree to place it,
-so I've placed it next to the bridge - yes, we probably need to find
-it a better home in the sound/ subtree, but it currently makes
-use of dw_hdmi.h in the directory it lives.
-
- drivers/gpu/drm/bridge/Kconfig             |  11 +
- drivers/gpu/drm/bridge/Makefile            |   1 +
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 566 +++++++++++++++++++++++++++++
- drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h |  14 +
- drivers/gpu/drm/bridge/dw_hdmi.c           | 321 +++++++++-------
- drivers/gpu/drm/bridge/dw_hdmi.h           |   3 +
- drivers/gpu/drm/imx/dw_hdmi-imx.c          |   5 +
- include/drm/bridge/dw_hdmi.h               |   7 +
- include/drm/drm_edid.h                     |  19 +
- include/sound/pcm_drm_eld.h                |   6 +
- include/sound/pcm_iec958.h                 |   9 +
- sound/core/Kconfig                         |   6 +
- sound/core/Makefile                        |   2 +
- sound/core/pcm_drm_eld.c                   |  92 +++++
- sound/core/pcm_iec958.c                    |  95 +++++
- 15 files changed, 1029 insertions(+), 128 deletions(-)
-
+diff --git a/include/sound/pcm_drm_eld.h b/include/sound/pcm_drm_eld.h
+new file mode 100644
+index 000000000000..93357b25d2e2
+--- /dev/null
++++ b/include/sound/pcm_drm_eld.h
+@@ -0,0 +1,6 @@
++#ifndef __SOUND_PCM_DRM_ELD_H
++#define __SOUND_PCM_DRM_ELD_H
++
++int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld);
++
++#endif
+diff --git a/sound/core/Kconfig b/sound/core/Kconfig
+index 313f22e9d929..b534c8a6046b 100644
+--- a/sound/core/Kconfig
++++ b/sound/core/Kconfig
+@@ -6,6 +6,9 @@ config SND_PCM
+ 	tristate
+ 	select SND_TIMER
+ 
++config SND_PCM_ELD
++	bool
++
+ config SND_DMAENGINE_PCM
+ 	tristate
+ 
+diff --git a/sound/core/Makefile b/sound/core/Makefile
+index 4daf2f58261c..591b49157b4d 100644
+--- a/sound/core/Makefile
++++ b/sound/core/Makefile
+@@ -13,6 +13,7 @@ snd-$(CONFIG_SND_JACK)	  += jack.o
+ snd-pcm-y := pcm.o pcm_native.o pcm_lib.o pcm_timer.o pcm_misc.o \
+ 		pcm_memory.o memalloc.o
+ snd-pcm-$(CONFIG_SND_DMA_SGBUF) += sgbuf.o
++snd-pcm-$(CONFIG_SND_PCM_ELD) += pcm_drm_eld.o
+ 
+ # for trace-points
+ CFLAGS_pcm_lib.o := -I$(src)
+diff --git a/sound/core/pcm_drm_eld.c b/sound/core/pcm_drm_eld.c
+new file mode 100644
+index 000000000000..47d9b60435fe
+--- /dev/null
++++ b/sound/core/pcm_drm_eld.c
+@@ -0,0 +1,92 @@
++/*
++ *  PCM DRM helpers
++ *
++ *   This program is free software; you can redistribute it and/or modify
++ *   it under the terms of the GNU General Public License version 2 as
++ *   published by the Free Software Foundation.
++ */
++#include <linux/export.h>
++#include <drm/drm_edid.h>
++#include <sound/pcm.h>
++#include <sound/pcm_drm_eld.h>
++
++static const unsigned int eld_rates[] = {
++	32000,
++	44100,
++	48000,
++	88200,
++	96000,
++	176400,
++	192000,
++};
++
++static int eld_limit_rates(struct snd_pcm_hw_params *params,
++			   struct snd_pcm_hw_rule *rule)
++{
++	struct snd_interval *r = hw_param_interval(params, rule->var);
++	struct snd_interval *c;
++	unsigned int rate_mask = 7, i;
++	const u8 *sad, *eld = rule->private;
++
++	sad = drm_eld_sad(eld);
++	if (sad) {
++		c = hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
++
++		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
++			unsigned channels = 1 + (sad[0] & 7);
++
++			/*
++			 * Exclude SADs which do not include the
++			 * requested number of channels.
++			 */
++			if (c->min <= channels)
++				rate_mask |= sad[1];
++		}
++printk("%s: r %d-%d c %d-%d m %x\n", __func__, r->min, r->max, c->min, c->max, rate_mask);
++	}
++
++	return snd_interval_list(r, ARRAY_SIZE(eld_rates), eld_rates,
++				 rate_mask);
++}
++
++static int eld_limit_channels(struct snd_pcm_hw_params *params,
++			      struct snd_pcm_hw_rule *rule)
++{
++	struct snd_interval *var = hw_param_interval(params, rule->var);
++	struct snd_interval t = { .min = 1, .max = 2, .integer = 1, };
++	unsigned int i;
++	const u8 *sad, *eld = rule->private;
++
++	sad = drm_eld_sad(eld);
++	if (sad) {
++		for (i = drm_eld_sad_count(eld); i > 0; i--, sad += 3) {
++			switch (sad[0] & 0x78) {
++			case 0x08:
++				t.max = max(t.max, (sad[0] & 7) + 1u);
++				break;
++			}
++		}
++	}
++
++	return snd_interval_refine(var, &t);
++}
++
++int snd_pcm_hw_constraint_eld(struct snd_pcm_runtime *runtime, void *eld)
++{
++	int ret;
++
++	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
++				  eld_limit_rates, eld,
++				  SNDRV_PCM_HW_PARAM_RATE,
++				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
++	if (ret < 0)
++		return ret;
++
++	ret = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
++				  eld_limit_channels, eld,
++				  SNDRV_PCM_HW_PARAM_CHANNELS,
++				  SNDRV_PCM_HW_PARAM_RATE, -1);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(snd_pcm_hw_constraint_eld);
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.8.3.1
