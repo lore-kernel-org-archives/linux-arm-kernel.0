@@ -1,49 +1,72 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 02 Apr 2015 10:22:01 +0100
-Subject: [PATCH RFC v2 09/13] drm/edid: add function to help find SADs
-In-Reply-To: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-References: <20150402092050.GH24899@n2100.arm.linux.org.uk>
-Message-ID: <E1YdbK5-00085I-HB@rmk-PC.arm.linux.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Apr 2015 10:20:50 +0100
+Subject: [RFC v2 0/13] dw_hdmi cleanups, audio preparation, helpers and ahb
+ audio support
+Message-ID: <20150402092050.GH24899@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to find the start of the SADs in the ELD.  This
-complements the helper to retrieve the SAD count.
+I'm sending this series for comments, and to allow people to update
+their code bases (for those who are using my AHB audio driver on
+iMX6).  This is really several series, and I'm not expecting this
+to be ready for the upcoming merge window.  That said, if anyone
+wants to say that they're happy with some of the initial six patches,
+I'm happy to queue those for David, if he's willing to take them.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- include/drm/drm_edid.h | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+This series applies on top of my previous series, with the three
+patches from the rockchip guys applied, iow:
 
-diff --git a/include/drm/drm_edid.h b/include/drm/drm_edid.h
-index 87d85e81d3a7..c44ad513e0f7 100644
---- a/include/drm/drm_edid.h
-+++ b/include/drm/drm_edid.h
-@@ -346,6 +346,25 @@ static inline int drm_eld_mnl(const uint8_t *eld)
- }
- 
- /**
-+ * drm_eld_sad - Get ELD SAD structures.
-+ * @eld: pointer to an eld memory structure with sad_count set
-+ */
-+static inline const uint8_t *drm_eld_sad(const uint8_t *eld)
-+{
-+	unsigned int ver, mnl;
-+
-+	ver = (eld[DRM_ELD_VER] & DRM_ELD_VER_MASK) >> DRM_ELD_VER_SHIFT;
-+	if (ver != 2 && ver != 31)
-+		return NULL;
-+
-+	mnl = drm_eld_mnl(eld);
-+	if (mnl > 16)
-+		return NULL;
-+
-+	return eld + DRM_ELD_CEA_SAD(mnl, 0);
-+}
-+
-+/**
-  * drm_eld_sad_count - Get ELD SAD count.
-  * @eld: pointer to an eld memory structure with sad_count set
-  */
+ drm: rockchip/dw_hdmi-rockchip: improve for HDMI electrical test
+ drm: bridge/dw_hdmi: separate VLEVCTRL settting into platform driver
+ drm: bridge/dw_hdmi: fixed codec style
+ drm: bridge/dw_hdmi: adjust n/cts setting order
+ drm: bridge/dw_hdmi: protect n/cts setting with a mutex
+ drm: bridge/dw_hdmi: combine hdmi_set_clock_regenerator_n() and hdmi_regenerate_cts()
+
+The first four patches are a few cleanups to the dw_hdmi driver.
+
+The next two patches introduce new interfaces to the dw_hdmi driver
+to support AHB audio, including the errata found on iMX6 which
+requires N to be programmed to zero when the audio FIFO is not full.
+I'm expecting some discussion with these last two as we try to work
+out how to deal with the two variants of audio support for this part
+(AHB audio vs I2S audio).
+
+The following three add various helpers to the DRM and ALSA subsystems
+for audio support which is non-specific to the AHB audio driver.  For
+DRM, this is a helper macro to obtain the pointer into the short audio
+descriptors.  For ALSA, it's a set of helpers to restrict an audio PCM
+device's capabilities according to the ELD, and to generate the IEC958
+channel status data.  If these helpers are acceptable, we can convert
+a number of drivers to them.
+
+The ELD helper isn't quite finished, but should be sufficient for
+initial testing.
+
+The last two patches add support for the dw_hdmi audio.  This is an
+ALSA driver rather than an ASoC driver as it's a pretty simple affair.
+I couldn't find a suitable location in the sound/ subtree to place it,
+so I've placed it next to the bridge - yes, we probably need to find
+it a better home in the sound/ subtree, but it currently makes
+use of dw_hdmi.h in the directory it lives.
+
+ drivers/gpu/drm/bridge/Kconfig             |  11 +
+ drivers/gpu/drm/bridge/Makefile            |   1 +
+ drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.c | 566 +++++++++++++++++++++++++++++
+ drivers/gpu/drm/bridge/dw_hdmi-ahb-audio.h |  14 +
+ drivers/gpu/drm/bridge/dw_hdmi.c           | 321 +++++++++-------
+ drivers/gpu/drm/bridge/dw_hdmi.h           |   3 +
+ drivers/gpu/drm/imx/dw_hdmi-imx.c          |   5 +
+ include/drm/bridge/dw_hdmi.h               |   7 +
+ include/drm/drm_edid.h                     |  19 +
+ include/sound/pcm_drm_eld.h                |   6 +
+ include/sound/pcm_iec958.h                 |   9 +
+ sound/core/Kconfig                         |   6 +
+ sound/core/Makefile                        |   2 +
+ sound/core/pcm_drm_eld.c                   |  92 +++++
+ sound/core/pcm_iec958.c                    |  95 +++++
+ 15 files changed, 1029 insertions(+), 128 deletions(-)
+
 -- 
-1.8.3.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
