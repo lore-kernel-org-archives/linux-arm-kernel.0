@@ -1,46 +1,40 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Apr 2015 18:04:08 +0100
+Date: Fri, 3 Apr 2015 18:07:57 +0100
 Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
  complex dependencies
-In-Reply-To: <20150403125727.GT10964@mwanda>
+In-Reply-To: <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
 References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
  <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
  <20150403125727.GT10964@mwanda>
-Message-ID: <20150403170407.GA13898@n2100.arm.linux.org.uk>
+ <CAMuHMdVhX-MrFxeW5j98NLaQQtJ+DToxkz2Z1+SRSs7YF27RDw@mail.gmail.com>
+Message-ID: <20150403170757.GB13898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 03:57:27PM +0300, Dan Carpenter wrote:
-> On Fri, Apr 03, 2015 at 02:42:02PM +0200, Geert Uytterhoeven wrote:
-> > +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
-> > +{
-> > +	struct clk *clk;
-> > +	int error;
-> > +
-> > +	pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
-> > +		 bsc->con_id, bsc->dev_id);
-> > +	clk = clk_get(NULL, bsc->clk);
-> > +	if (IS_ERR(clk)) {
-> > +		error = PTR_ERR(clk);
-> > +		pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
-> > +		return error;
-> > +	}
-> > +
-> > +	error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
-> > +	if (error)
-> > +		pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
-> > +		return error;
+On Fri, Apr 03, 2015 at 03:27:40PM +0200, Geert Uytterhoeven wrote:
+> On Fri, Apr 3, 2015 at 2:57 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> >> +     error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
+> >> +     if (error)
+> >> +             pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
+> >> +             return error;
+> >
+> > Missing curly braces.  Also it's weird that don't we need a clk_put()
+> > on the error patch as well as the success path?
 > 
-> Missing curly braces.  Also it's weird that don't we need a clk_put()
-> on the error patch as well as the success path?
+> Thanks!
+> 
+> So it worked only by accident: with the new per-user struct clk instances
+> clk_put() must not be called if clk_register_clkdev() succeeded.
 
-What's also concerning is that this is an abuse of this.
+Yes, that's because the per-user struct clk messed quite a lot of things
+up - the patches were /not/ well tested before they went in.
 
-clk_register_clkdev() is supposed to be used with clocks created with
-the CCF functions, it's not for creating aliases.
+That's no excuse to work around the breakage they caused though.
 
-We have clk_add_alias() which does *everything* that this function does,
-only in a less buggy way.
+That said, I never did post the work I did earlier this month to fix the
+problems in clkdev which those patches caused... so, I guess it's time
+to post them and rush them in for the 4.1 merge window...  (frankly, the
+per-user struct clk patches should've been reverted.)
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
