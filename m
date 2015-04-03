@@ -1,35 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:58:01 -0700
-Subject: [GIT PULL 2/4] ARM: imx: soc changes for 4.1
-In-Reply-To: <CAAQ0ZWT+-s9V6GtYAQKoF0Qk8XZctSnSemkvqR6twD0Nxo+KTw@mail.gmail.com>
-References: <CAAQ0ZWT+-s9V6GtYAQKoF0Qk8XZctSnSemkvqR6twD0Nxo+KTw@mail.gmail.com>
-Message-ID: <20150403205801.GK23023@localhost>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 3 Apr 2015 23:04:39 +0200
+Subject: [PATCHv5] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
+ <20150403083353.GA21070@amd>
+ <20150403113216.GK20756@valkosipuli.retiisi.org.uk>
+Message-ID: <20150403210439.GC13009@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 30, 2015 at 10:02:26PM +0800, Shawn Guo wrote:
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
-> tags/imx-soc-4.1
-> 
-> for you to fetch changes up to ae4aee959f7959427e99edb3927c9512986cbdc5:
-> 
->   ARM: imx: depend MXC debug board on 3DS machines (2015-03-13 21:55:29 +0800)
-> 
-> ----------------------------------------------------------------
-> The i.MX SoC changes for 4.1:
->  - An error handling improvement on imx-weim bus driver
->  - A number of imx6q clock tree update around MIPI support
->  - Add support for i.MX6 GPU/VPU power domain
->  - Enable SMP_ON_UP build for Vybrid
->  - Let MXC_DEBUG_BOARD depend on 3-stack (3DS) boards
+Hi!
 
-Merged, thanks.
+> > +	pd->max_flash_intensity = val/1000;
+> > +
+> > +	if (of_property_read_u32(child, "max-microamp", &val))
+> > +		return -EINVAL;
+> > +	pd->max_torch_intensity = val/1000;
+> 
+> I think you need to do of_node_put(child) here and after you're done with
+> indicator below.
 
+...and in most of the error paths. Ok. Will submit the updated patch
+when the documentation one is accepted.
 
--Olof
+Best regards,
+
+								Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
