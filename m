@@ -1,22 +1,48 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 3 Apr 2015 16:28:59 +0200
-Subject: [PATCH 2/6] selftest/kdbus: enable cross compilation
-In-Reply-To: <1427930420-4762-3-git-send-email-tyler.baker@linaro.org>
-References: <1427930420-4762-1-git-send-email-tyler.baker@linaro.org>
- <1427930420-4762-3-git-send-email-tyler.baker@linaro.org>
-Message-ID: <20150403142859.GA4579@kroah.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 3 Apr 2015 14:29:22 +0000
+Subject: [PATCH 4/5] irqchip: armada-370-xp: Allow using wakeup source
+In-Reply-To: <551E3EA3.8010409@free-electrons.com>
+References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
+ <1427724278-12379-5-git-send-email-gregory.clement@free-electrons.com>
+ <20150402232316.GJ24598@io.lakedaemon.net>
+ <551E3EA3.8010409@free-electrons.com>
+Message-ID: <20150403142922.GL24598@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 01, 2015 at 04:20:16PM -0700, Tyler Baker wrote:
-> Use the CC variable instead of hard coding gcc and include lib.mk.
+On Fri, Apr 03, 2015 at 09:17:55AM +0200, Gregory CLEMENT wrote:
+> Hi Jason,
 > 
-> Signed-off-by: Tyler Baker <tyler.baker@linaro.org>
-> Acked-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  tools/testing/selftests/kdbus/Makefile | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> On 03/04/2015 01:23, Jason Cooper wrote:
+> > On Mon, Mar 30, 2015 at 04:04:37PM +0200, Gregory CLEMENT wrote:
+> >> On the Armada 370/XP SoCs, in standby mode the SoC stay powered and it
+> >> is possible to wake-up from any interrupt sources. This patch adds
+> >> flag to the MPIC irqchip driver to let linux know this.
+> >>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  drivers/irqchip/irq-armada-370-xp.c | 1 +
+> >>  1 file changed, 1 insertion(+)
+> > 
+> > Applied to irqchip/mvebu
+> 
+> Thanks!
+> 
+> Do you agree to take also the patch 3?
 
-Applied to my kdbus branch, thanks.
+hmmm...
 
-greg k-h
+> It modifies a file in mach-mvebu (board-v7.c) but it depends on a patch
+> located in irqchip: "irqchip: gic: Add an entry point to set up irqchip flags"
+
+Yeah, I saw that.  Do you forsee any merge conflicts with mvebu?  The reason I
+ask is that it looks like I'm going to be sending directly to Linus this
+cycle.  I'd really prefer to hold off a cycle on that patch.  I'm not
+100% certain my second PR (stacked domain/DT break) is going to get
+accepted.  Which is what this patch depends on.
+
+thoughts?
+
+thx,
+
+Jason.
