@@ -1,57 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 3 Apr 2015 10:43:40 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: add phy address for macb1
-In-Reply-To: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1427792170-13162-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <551E52BC.3040702@atmel.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 3 Apr 2015 10:49:12 +0200
+Subject: [PATCHv4] media: i2c/adp1653: devicetree support for adp1653
+In-Reply-To: <20150403082129.GA10671@amd>
+References: <20150402143846.GA11687@amd> <20150402203417.GA6336@amd>
+ <CABxcv=nfg_D9HvXUd4PBFJ5a1XST=PCDEZCjkTtbu_u7cc1+ug@mail.gmail.com>
+ <20150403082129.GA10671@amd>
+Message-ID: <CABxcv=mVdw7QkUWSqa1=VRJD+mHCU3dP09SBxVERs1NWUBeWiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 31/03/2015 10:56, Nicolas Ferre a ?crit :
-> After 57a38effa598 (net: phy: micrel: disable broadcast for KSZ8081/KSZ8091)
-> the macb1 interface refuses to work properly because it tries
-> to cling to address 0 which isn't able to communicate in broadcast with
-> the mac anymore. The micrel phy on the board is actually configured
-> to show up at address 1.
-> Adding the phy node and its real address fixes the issue.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Johan Hovold <johan@kernel.org>
-> Cc: <stable@vger.kernel.org> #3.19
-> ---
+Hello Pavel,
 
-Arnd, Olof, Kevin,
+On Fri, Apr 3, 2015 at 10:21 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> > Fixed feedback by Sakari.
+>> >
+>> > Please apply,
+>>
+>> There is no need to ask for patches to be applied IMHO. It is expected
+>> that people post patches wanting them to be applied unless there is an
+>> RFC prefix in the subject or say explicitly that the patch is for
+>> testing and should not be picked.
+>
+> See history of this patch.
+>
+>> > diff --git a/Documentation/devicetree/bindings/media/i2c/adp1653.txt b/Documentation/devicetree/bindings/media/i2c/adp1653.txt
+>>
+>> When adding DT bindings, the Documentation portion should be in a
+>> separate patch and should come in the series before the patch
+>> implementing the binding. That makes the change easier to review,
+>> please take a look to points 1 and 3 in
+>> Documentation/devicetree/bindings/submitting-patches.txt.
+>
+> Because actual patch at the end of email is too much eye clutter for
+> the poor device tree people, I can prepare nice series... producing
+> more work for me and more noise on the lists? No, thanks.
+>
 
-It seems late but, is it possible to queue this patch as a 4.0 fixes?
+I wonder then what's the point of having written rules if people are
+not going to follow...
 
-Without it, the 10/100 Ethernet on sama5d3 doesn't work if it's not used
-by u-boot previously.
+>> > +Required Properties:
+>> > +
+>> > +  - compatible: Must contain be "adi,adp1653"
+>> > +
+>> > +  - reg: I2C slave address
+>> > +
+>> > +  - gpios: References to the GPIO that controls the power for the chip.
+>>
+>> The convention nowadays is to not use unnamed DT properties for GPIOs
+>> but instead use a prefix that explains what those GPIOs are used for.
+>> So something like "power-gpios" or "power-gpio" (if there is only one
+>> GPIO) will be more suitable. Please take a look to
+>> Documentation/gpio/board.txt for more details.
+>
+> Ok. Actually, reading docs below, "power-gpio" will not work, and it
+> needs to be "power-gpios", right?
+>
 
-Bye,
+No, the documentation is not updated. People used <function>-gpio so
+at the end it was added as another supported suffix, see commit:
+dd34c37aa3e8 ("gpio: of: Allow -gpio suffix for property names").
 
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index fec1fca2ad66..6c4bc53cbf4e 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -167,7 +167,13 @@
->  
->  			macb1: ethernet at f802c000 {
->  				phy-mode = "rmii";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
->  				status = "okay";
-> +
-> +				ethernet-phy at 1 {
-> +					reg = <0x1>;
-> +				};
->  			};
->  
->  			dbgu: serial at ffffee00 {
-> 
+But I guess it doesn't matter if -gpio or -gpios is used.
 
+>> > +       if (!of_find_property(node, "gpios", NULL)) {
+>> > +               dev_err(&client->dev, "No gpio node\n");
+>> > +               return -EINVAL;
+>> > +       }
+>> > +
+>> > +       pd->power_gpio = of_get_gpio_flags(node, 0, &flags);
+>>
+>> The old integer-based GPIO interface is deprecated and we want to get
+>> rid of it so please use the descriptor-based for new code. For example
+>> you want to use gpiod_get() instead of of_get_gpio_flags().
+>> Documentation/gpio/gpio.txt describes the new interface.
+>
+> Ok.
+>                                                                         Pavel
+> --
 
--- 
-Nicolas Ferre
+Best regards,
+Javier
