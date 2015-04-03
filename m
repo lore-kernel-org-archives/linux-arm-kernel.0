@@ -1,42 +1,63 @@
-From: b52261@freescale.com (Jianwei Wang)
-Date: Fri, 3 Apr 2015 17:35:58 +0800
-Subject: [PATCH v4 3/4] arm/dts/ls1021a: Add DCU dts node
-In-Reply-To: <1428053759-3129-1-git-send-email-b52261@freescale.com>
-References: <1428053759-3129-1-git-send-email-b52261@freescale.com>
-Message-ID: <1428053759-3129-4-git-send-email-b52261@freescale.com>
+From: wangyijing@huawei.com (Yijing Wang)
+Date: Fri, 3 Apr 2015 17:25:57 +0800
+Subject: [PATCH v9 23/30] PCI/mvebu: Use pci_common_init_dev() to simplify code
+In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-25-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DCU node, DCU is a display controller of Freescale
-named 2D-ACE.
+Mvebu_pcie_scan_bus() is not necessary, we could use
+pci_common_init_dev() instead of pci_common_init(),
+and pass the device pointer as the parent. Then
+pci_scan_root_bus() will be called to scan the pci busses.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <b52261@freescale.com>
+Signed-off-by: Yijing Wang <wangyijing@huawei.com>
+CC: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+CC: Jason Cooper <jason@lakedaemon.net>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/pci/host/pci-mvebu.c |   18 +-----------------
+ 1 files changed, 1 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..6d6e3e2 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -383,6 +383,16 @@
- 				 <&platform_clk 1>;
- 		};
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 0cfc494..d5a2b70 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -750,21 +750,6 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+ 	return 1;
+ }
  
-+		dcu: dcu at 2ce0000 {
-+			compatible = "fsl,ls1021a-dcu";
-+			reg = <0x0 0x2ce0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 0>;
-+			clock-names = "dcu";
-+			big-endian;
-+			status = "disabled";
-+		};
-+
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
+-static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct mvebu_pcie *pcie = sys_to_pcie(sys);
+-	struct pci_bus *bus;
+-
+-	bus = pci_create_root_bus(&pcie->pdev->dev, -1, sys->busnr,
+-				  &mvebu_pcie_ops, sys, &sys->resources);
+-	if (!bus)
+-		return NULL;
+-
+-	pci_scan_child_bus(bus);
+-
+-	return bus;
+-}
+-
+ static resource_size_t mvebu_pcie_align_resource(struct pci_dev *dev,
+ 						 const struct resource *res,
+ 						 resource_size_t start,
+@@ -808,12 +793,11 @@ static void mvebu_pcie_enable(struct mvebu_pcie *pcie)
+ 	hw.nr_controllers = 1;
+ 	hw.private_data   = (void **)&pcie;
+ 	hw.setup          = mvebu_pcie_setup;
+-	hw.scan           = mvebu_pcie_scan_bus;
+ 	hw.map_irq        = of_irq_parse_and_map_pci;
+ 	hw.ops            = &mvebu_pcie_ops;
+ 	hw.align_resource = mvebu_pcie_align_resource;
+ 
+-	pci_common_init(&hw);
++	pci_common_init_dev(&pcie->pdev->dev, &hw);
+ }
+ 
+ /*
 -- 
-2.1.0.27.g96db324
+1.7.1
