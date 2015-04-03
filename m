@@ -1,23 +1,44 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 3 Apr 2015 19:03:04 +0000 (UTC)
-Subject: [PATCHv2 03/10] ARM: DRA7: hwmod: set DSS submodule parent hwmods
-In-Reply-To: <1427208910-17678-4-git-send-email-tomi.valkeinen@ti.com>
-References: <1427208910-17678-1-git-send-email-tomi.valkeinen@ti.com>
- <1427208910-17678-4-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.02.1504031902470.19540@utopia.booyaka.com>
+From: galak@codeaurora.org (Kumar Gala)
+Date: Fri, 3 Apr 2015 14:13:02 -0500
+Subject: [PATCH] arm64: dts: Add Qualcomm APQ8016 SBC evaluation board dts
+In-Reply-To: <20150403181636.GO23023@localhost>
+References: <1427151065-29867-1-git-send-email-galak@codeaurora.org>
+ <20150403181217.GM23023@localhost> <20150403181401.GN23023@localhost>
+ <20150403181636.GO23023@localhost>
+Message-ID: <CD6F0F6A-91BE-4843-AA65-FC617641B584@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Mar 2015, Tomi Valkeinen wrote:
 
-> Set DSS core hwmod as the parent for all the DSS submodules.
+On Apr 3, 2015, at 1:18 PM, Olof Johansson <olof@lixom.net> wrote:
+
+> On Fri, Apr 03, 2015 at 11:14:01AM -0700, Olof Johansson wrote:
+>> On Fri, Apr 03, 2015 at 11:12:17AM -0700, Olof Johansson wrote:
+>>> On Mon, Mar 23, 2015 at 05:51:05PM -0500, Kumar Gala wrote:
+>>>> Add initial device tree support for Qualcomm APQ8016 SBC Evaluation board.
+>>>> This board is also referred to as the DragonBoard 410c.
+>>>> 
+>>>> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+>>> 
+>>> Hi,
+>>> 
+>>> Patch applied but see comment below.
+>> 
+>> You both sent us the patch and a pull request with this patch in
+>> it. Please only send patches to arm at kernel.org that you intend for us
+>> to apply.
 > 
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Uh, need more coffee, please ignore. I got confused since your patch didn't
+> apply cleanly due to the dts/qcom directory creation.
+> 
+> 
+> -Olof
 
-Thanks, queued.  Will send a pull request for this to Tony today, but it  
-may not make it for v4.1.  
+Ok, but this should be part of the 'qcom-dt-for-4.1? so hopefully you will end up pulling all of that in as well
 
-Note that I cannot boot test this since I do not have a DRA7xx board.
+- k
 
-
-- Paul
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
