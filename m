@@ -1,87 +1,77 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:52 +0800
-Subject: [PATCH v9 18/30] ia64/PCI: Refine pci_acpi_scan_root() with generic
- pci_host_bridge
+Date: Fri, 3 Apr 2015 17:25:55 +0800
+Subject: [PATCH v9 21/30] sparc/PCI: Use pci_scan_host_bridge() for simplicity
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-20-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-23-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
+Now we could use pci_scan_host_bridge() to scan
+pci buses, provide sparc specific pci_host_bridge_ops.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
-CC: Tony Luck <tony.luck@intel.com>
-CC: Fenghua Yu <fenghua.yu@intel.com>
-CC: linux-ia64 at vger.kernel.org
+CC: "David S. Miller" <davem@davemloft.net>
+CC: sparclinux at vger.kernel.org
 ---
- arch/ia64/pci/pci.c |   34 +++++++++++++++++++---------------
- 1 files changed, 19 insertions(+), 15 deletions(-)
+ arch/sparc/kernel/pci.c |   28 ++++++++++++++++++++++------
+ 1 files changed, 22 insertions(+), 6 deletions(-)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index c642bc8..95dc43b 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -420,6 +420,19 @@ probe_pci_root_info(struct pci_root_info *info, struct acpi_device *device,
- 	return 0;
+diff --git a/arch/sparc/kernel/pci.c b/arch/sparc/kernel/pci.c
+index e40e456..fa95a1d 100644
+--- a/arch/sparc/kernel/pci.c
++++ b/arch/sparc/kernel/pci.c
+@@ -650,12 +650,27 @@ static void pci_claim_bus_resources(struct pci_bus *bus)
+ 		pci_claim_bus_resources(child_bus);
  }
  
-+static int pci_host_bridge_prepare(struct pci_host_bridge *bridge)
++static int pci_host_of_scan_bus(
++		struct pci_host_bridge *host)
 +{
-+	struct pci_controller *controller = bridge->bus->sysdata;
++	struct pci_pbm_info *pbm = dev_get_drvdata(&host->dev);
++	struct device_node *node = pbm->op->dev.of_node;
 +
-+	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
-+	return 0;
++	pci_of_scan_bus(pbm, node, host->bus);
++	return pci_bus_child_max_busnr(host->bus);
 +}
 +
 +static struct pci_host_bridge_ops pci_host_ops = {
-+	.pci_ops = &pci_root_ops,
-+	.prepare = pci_host_bridge_prepare,
++	.scan_bus = pci_host_of_scan_bus,
 +};
 +
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 				 struct device *parent)
  {
- 	struct acpi_device *device = root->device;
-@@ -428,7 +441,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	struct pci_controller *controller;
- 	struct pci_root_info *info = NULL;
- 	int busnum = root->secondary.start;
--	struct pci_bus *pbus;
+ 	LIST_HEAD(resources);
+ 	struct device_node *node = pbm->op->dev.of_node;
+ 	struct pci_bus *bus;
 +	struct pci_host_bridge *host;
- 	int ret;
  
- 	controller = alloc_pci_controller(domain);
-@@ -465,26 +478,17 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	 * should handle the case here, but it appears that IA64 hasn't
- 	 * such quirk. So we just ignore the case now.
- 	 */
--	pbus = pci_create_root_bus(NULL, domain, bus, &pci_root_ops,
--			controller, &info->resources);
--	if (!pbus) {
-+	host = pci_scan_host_bridge(NULL, domain, bus, controller,
-+			&info->resources, &pci_host_ops);
+ 	printk("PCI: Scanning PBM %s\n", node->full_name);
+ 
+@@ -667,16 +682,17 @@ struct pci_bus *pci_scan_one_pbm(struct pci_pbm_info *pbm,
+ 	pbm->busn.end	= pbm->pci_last_busno;
+ 	pbm->busn.flags	= IORESOURCE_BUS;
+ 	pci_add_resource(&resources, &pbm->busn);
+-	bus = pci_create_root_bus(parent, pbm->index, pbm->pci_first_busno,
+-			pbm->pci_ops, pbm, &resources);
+-	if (!bus) {
+-		printk(KERN_ERR "Failed to create bus for %s\n",
+-		       node->full_name);
++	pci_host_ops.pci_ops = pbm->pci_ops;
++	host = pci_scan_host_bridge(parent, pbm->index, pbm->pci_first_busno,
++			pbm, &resources, &pci_host_ops);
 +	if (!host) {
- 		pci_free_resource_list(&info->resources);
- 		__release_pci_root_info(info);
++		pr_err("Failed to create host bridge pci%04x:%02x for %s\n",
++		       pbm->index, pbm->pci_first_busno, node->full_name);
+ 		pci_free_resource_list(&resources);
  		return NULL;
  	}
  
--	pci_set_host_bridge_release(to_pci_host_bridge(pbus->bridge),
-+	pci_set_host_bridge_release(host,
- 			release_pci_root_info, info);
--	pci_scan_child_bus(pbus);
--	return pbus;
--}
--
--int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
--{
--	struct pci_controller *controller = bridge->bus->sysdata;
--
--	ACPI_COMPANION_SET(&bridge->dev, controller->companion);
--	return 0;
-+	return host->bus;
- }
+-	pci_of_scan_bus(pbm, node, bus);
++	bus = host->bus;
+ 	pci_bus_register_of_sysfs(bus);
  
- void pcibios_fixup_device_resources(struct pci_dev *dev)
+ 	pci_claim_bus_resources(bus);
 -- 
 1.7.1
