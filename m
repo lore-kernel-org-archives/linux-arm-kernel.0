@@ -1,24 +1,36 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Apr 2015 00:46:33 +0300
-Subject: [PATCH v1.1 07/14] media: omap3isp: remove unused clkdev
-In-Reply-To: <1428097502-19593-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1428097502-19593-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <20150403214633.GQ20756@valkosipuli.retiisi.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 14:47:36 -0700
+Subject: [GIT PULL] ARM: mediatek: arm64 changes for 4.1
+In-Reply-To: <CABuKBeKb99suZ=QycVvyy18N+Ooz=+rBM8mStxqyoaT=gtN0zQ@mail.gmail.com>
+References: <CABuKBeKb99suZ=QycVvyy18N+Ooz=+rBM8mStxqyoaT=gtN0zQ@mail.gmail.com>
+Message-ID: <20150403214736.GM23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 04, 2015 at 12:45:02AM +0300, Laurent Pinchart wrote:
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Mar 30, 2015 at 04:54:54PM +0200, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
-> No merged platform supplies xclks via platform data.  As we want to
-> slightly change the clkdev interface, rather than fixing this unused
-> code, remove it instead.
+> please pull the following changes.
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Thanks,
+> Matthias
+> 
+> ---
+> 
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> 
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.0-next-arm64
+> 
+> for you to fetch changes up to 359f9365d3f8d0d62683344807c986ec7d711b59:
+> 
+>   arm64: dts: mt8173: Add pinctrl/GPIO/EINT node for mt8173.
+> (2015-03-10 11:20:30 +0100)
 
-Acked-by: Sakari Ailus <sakari.ailus@iki.fi>
+Thanks, merged.
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+
+-Olof
