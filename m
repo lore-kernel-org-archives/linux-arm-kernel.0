@@ -1,180 +1,354 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri,  3 Apr 2015 19:01:17 +0200
-Subject: [PATCH v5 11/15] ARM: Add STM32 family machine
+Date: Fri,  3 Apr 2015 19:01:19 +0200
+Subject: [PATCH v5 13/15] ARM: dts: Introduce STM32F429 MCU
 In-Reply-To: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1428080481-18591-12-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1428080481-18591-14-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STMicrolectronics's STM32 series is a family of Cortex-M
-microcontrollers. It is used in various applications, and
-proposes a wide range of peripherals.
+The STMicrolectornics's STM32F419 MCU has the following main features:
+ - Cortex-M4 core running up to @180MHz
+ - 2MB internal flash, 256KBytes internal RAM
+ - FMC controller to connect SDRAM, NOR and NAND memories
+ - SD/MMC/SDIO support
+ - Ethernet controller
+ - USB OTFG FS & HS controllers
+ - I2C, SPI, CAN busses support
+ - Several 16 & 32 bits general purpose timers
+ - Serial Audio interface
+ - LCD controller
 
 Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- Documentation/arm/stm32/overview.txt           | 32 ++++++++++++++++++++++++++
- Documentation/arm/stm32/stm32f429-overview.txt | 22 ++++++++++++++++++
- arch/arm/Kconfig                               | 18 +++++++++++++++
- arch/arm/Makefile                              |  1 +
- arch/arm/mach-stm32/Makefile                   |  1 +
- arch/arm/mach-stm32/Makefile.boot              |  3 +++
- arch/arm/mach-stm32/board-dt.c                 | 19 +++++++++++++++
- 7 files changed, 96 insertions(+)
- create mode 100644 Documentation/arm/stm32/overview.txt
- create mode 100644 Documentation/arm/stm32/stm32f429-overview.txt
- create mode 100644 arch/arm/mach-stm32/Makefile
- create mode 100644 arch/arm/mach-stm32/Makefile.boot
- create mode 100644 arch/arm/mach-stm32/board-dt.c
+ arch/arm/boot/dts/Makefile            |   1 +
+ arch/arm/boot/dts/stm32f429-disco.dts |  71 +++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi      | 226 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 298 insertions(+)
+ create mode 100644 arch/arm/boot/dts/stm32f429-disco.dts
+ create mode 100644 arch/arm/boot/dts/stm32f429.dtsi
 
-diff --git a/Documentation/arm/stm32/overview.txt b/Documentation/arm/stm32/overview.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index a1c776b..e5dbd03 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -509,6 +509,7 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih416-b2020.dtb \
+ 	stih416-b2020e.dtb \
+ 	stih418-b2199.dtb
++dtb-$(CONFIG_ARCH_STM32)+= stm32f429-disco.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
 new file mode 100644
-index 0000000..09aed55
+index 0000000..6b9aa59
 --- /dev/null
-+++ b/Documentation/arm/stm32/overview.txt
-@@ -0,0 +1,32 @@
-+			STM32 ARM Linux Overview
-+			========================
-+
-+Introduction
-+------------
-+
-+  The STMicroelectronics family of Cortex-M based MCUs are supported by the
-+  'STM32' platform of ARM Linux. Currently only the STM32F429 is supported.
-+
-+
-+Configuration
-+-------------
-+
-+  A generic configuration is provided for STM32 family, and can be used as the
-+  default by
-+	make stm32_defconfig
-+
-+Layout
-+------
-+
-+  All the files for multiple machine families are located in the platform code
-+  contained in arch/arm/mach-stm32
-+
-+  There is a generic board board-dt.c in the mach folder which support
-+  Flattened Device Tree, which means, it works with any compatible board with
-+  Device Trees.
-+
-+
-+Document Author
-+---------------
-+
-+  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-diff --git a/Documentation/arm/stm32/stm32f429-overview.txt b/Documentation/arm/stm32/stm32f429-overview.txt
-new file mode 100644
-index 0000000..5206822
---- /dev/null
-+++ b/Documentation/arm/stm32/stm32f429-overview.txt
-@@ -0,0 +1,22 @@
-+			STM32F429 Overview
-+			==================
-+
-+  Introduction
-+  ------------
-+	The STM32F429 is a Cortex-M4 MCU aimed at various applications.
-+	It features:
-+	- ARM Cortex-M4 up to 180MHz with FPU
-+	- 2MB internal Flash Memory
-+	- External memory support through FMC controller (PSRAM, SDRAM, NOR, NAND)
-+	- I2C, SPI, SAI, CAN, USB OTG, Ethernet controllers
-+	- LCD controller & Camera interface
-+	- Cryptographic processor
-+
-+  Resources
-+  ---------
-+	Datasheet and reference manual are publicly available on ST website:
-+	- http://www.st.com/web/en/catalog/mmc/FM141/SC1169/SS1577/LN1806?ecmp=stm32f429-439_pron_pr-ces2014_nov2013
-+
-+  Document Author
-+  ---------------
-+	Maxime Coquelin <mcoquelin.stm32@gmail.com>
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9f1f09a..5b1157d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -776,6 +776,24 @@ config ARCH_OMAP1
- 	help
- 	  Support for older TI OMAP1 (omap7xx, omap15xx or omap16xx)
- 
-+config ARCH_STM32
-+	bool "STMicrolectronics STM32"
-+	depends on !MMU
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select ARM_NVIC
-+	select ARMV7M_SYSTICK
-+	select AUTO_ZRELADDR
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select CPU_V7M
-+	select GENERIC_CLOCKEVENTS
-+	select NO_IOPORT_MAP
-+	select RESET_CONTROLLER
-+	select SPARSE_IRQ
-+	select USE_OF
-+	help
-+	  Support for STMicroelectronics STM32 processors.
-+
- endchoice
- 
- menu "Multiple platform selection"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 7f99cd6..982c104 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -196,6 +196,7 @@ machine-$(CONFIG_ARCH_SHMOBILE) 	+= shmobile
- machine-$(CONFIG_ARCH_SIRF)		+= prima2
- machine-$(CONFIG_ARCH_SOCFPGA)		+= socfpga
- machine-$(CONFIG_ARCH_STI)		+= sti
-+machine-$(CONFIG_ARCH_STM32)		+= stm32
- machine-$(CONFIG_ARCH_SUNXI)		+= sunxi
- machine-$(CONFIG_ARCH_TEGRA)		+= tegra
- machine-$(CONFIG_ARCH_U300)		+= u300
-diff --git a/arch/arm/mach-stm32/Makefile b/arch/arm/mach-stm32/Makefile
-new file mode 100644
-index 0000000..bd0b7b5
---- /dev/null
-+++ b/arch/arm/mach-stm32/Makefile
-@@ -0,0 +1 @@
-+obj-y += board-dt.o
-diff --git a/arch/arm/mach-stm32/Makefile.boot b/arch/arm/mach-stm32/Makefile.boot
-new file mode 100644
-index 0000000..eacfc3f
---- /dev/null
-+++ b/arch/arm/mach-stm32/Makefile.boot
-@@ -0,0 +1,3 @@
-+# Empty file waiting for deletion once Makefile.boot isn't needed any more.
-+# Patch waits for application at
-+# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
-diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-new file mode 100644
-index 0000000..f2ad772
---- /dev/null
-+++ b/arch/arm/mach-stm32/board-dt.c
-@@ -0,0 +1,19 @@
++++ b/arch/arm/boot/dts/stm32f429-disco.dts
+@@ -0,0 +1,71 @@
 +/*
-+ * Copyright (C) Maxime Coquelin 2015
-+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ * License terms:  GNU General Public License (GPL), version 2
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/kernel.h>
-+#include <asm/v7m.h>
-+#include <asm/mach/arch.h>
++/dts-v1/;
++#include "stm32f429.dtsi"
 +
-+static const char *const stm32_compat[] __initconst = {
-+	"st,stm32f429",
-+	NULL
++/ {
++	model = "STMicroelectronics STM32F429i-DISCO board";
++	compatible = "st,stm32f429i-disco", "st,stm32f429";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/ram rdinit=/linuxrc";
++		linux,stdout-path = &usart1;
++	};
++
++	memory {
++		reg = <0x90000000 0x800000>;
++	};
++
++	aliases {
++		serial0 = &usart1;
++	};
 +};
 +
-+DT_MACHINE_START(STM32DT, "STM32 (Device Tree Support)")
-+	.dt_compat = stm32_compat,
-+	.restart = armv7m_restart,
-+MACHINE_END
++&usart1 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+new file mode 100644
+index 0000000..39ffdb8
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -0,0 +1,226 @@
++/*
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "armv7-m.dtsi"
++
++/ {
++	clocks {
++		clk_sysclk: clk-sysclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_hclk: clk-hclk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_pclk1: clk-pclk1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <45000000>;
++		};
++
++		clk_pclk2: clk-pclk2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr1: clk-pmtr1 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <90000000>;
++		};
++
++		clk_pmtr2: clk-pmtr2 {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <180000000>;
++		};
++
++		clk_systick: clk-systick {
++			compatible = "fixed-factor-clock";
++			clocks = <&clk_hclk>;
++			#clock-cells = <0>;
++			clock-div = <8>;
++			clock-mult = <1>;
++		};
++	};
++
++	soc {
++		timer2: timer at 40000000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000000 0x400>;
++			interrupts = <28>;
++			resets = <&rcc 256>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer3: timer at 40000400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000400 0x400>;
++			interrupts = <29>;
++			resets = <&rcc 257>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer4: timer at 40000800 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000800 0x400>;
++			interrupts = <30>;
++			resets = <&rcc 258>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer5: timer at 40000c00 {
++			compatible = "st,stm32-timer";
++			reg = <0x40000c00 0x400>;
++			interrupts = <50>;
++			resets = <&rcc 259>;
++			clocks = <&clk_pmtr1>;
++		};
++
++		timer6: timer at 40001000 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001000 0x400>;
++			interrupts = <54>;
++			resets = <&rcc 260>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		timer7: timer at 40001400 {
++			compatible = "st,stm32-timer";
++			reg = <0x40001400 0x400>;
++			interrupts = <55>;
++			resets = <&rcc 261>;
++			clocks = <&clk_pmtr1>;
++			status = "disabled";
++		};
++
++		usart2: serial at 40004400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004400 0x400>;
++			interrupts = <38>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart3: serial at 40004800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40004800 0x400>;
++			interrupts = <39>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart4: serial at 40004c00 {
++			compatible = "st,stm32-uart";
++			reg = <0x40004c00 0x400>;
++			interrupts = <52>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart5: serial at 40005000 {
++			compatible = "st,stm32-uart";
++			reg = <0x40005000 0x400>;
++			interrupts = <53>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart7: serial at 40007800 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007800 0x400>;
++			interrupts = <82>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart8: serial at 40007c00 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40007c00 0x400>;
++			interrupts = <83>;
++			clocks = <&clk_pclk1>;
++			status = "disabled";
++		};
++
++		usart1: serial at 40011000 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011000 0x400>;
++			interrupts = <37>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++
++		usart6: serial at 40011400 {
++			compatible = "st,stm32-usart", "st,stm32-uart";
++			reg = <0x40011400 0x400>;
++			interrupts = <71>;
++			clocks = <&clk_pclk2>;
++			status = "disabled";
++		};
++
++		rcc: rcc at 40023810 {
++			#reset-cells = <1>;
++			compatible = "st,stm32-rcc";
++			reg = <0x40023800 0x400>;
++		};
++	};
++};
++
++&systick {
++	clocks = <&clk_systick>;
++	status = "okay";
++};
 -- 
 1.9.1
