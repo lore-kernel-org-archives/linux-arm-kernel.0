@@ -1,166 +1,49 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Fri,  3 Apr 2015 19:01:12 +0200
-Subject: [PATCH v5 06/15] drivers: reset: Add STM32 reset driver
+Date: Fri,  3 Apr 2015 19:01:13 +0200
+Subject: [PATCH v5 07/15] dt-bindings: Document the STM32 timer bindings
 In-Reply-To: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1428080481-18591-7-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <1428080481-18591-8-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STM32 MCUs family IPs can be reset by accessing some registers
-from the RCC block.
-
-The list of available reset lines is documented in the DT bindings.
+This adds documentation of device tree bindings for the
+STM32 timer.
 
 Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 ---
- drivers/reset/Makefile      |   1 +
- drivers/reset/reset-stm32.c | 124 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 125 insertions(+)
- create mode 100644 drivers/reset/reset-stm32.c
+ .../devicetree/bindings/timer/st,stm32-timer.txt   | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
 
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 157d421..aed12d1 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_RESET_CONTROLLER) += core.o
- obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
- obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
-+obj-$(CONFIG_ARCH_STM32) += reset-stm32.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
-diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+diff --git a/Documentation/devicetree/bindings/timer/st,stm32-timer.txt b/Documentation/devicetree/bindings/timer/st,stm32-timer.txt
 new file mode 100644
-index 0000000..2c41858
+index 0000000..d3fdeb0
 --- /dev/null
-+++ b/drivers/reset/reset-stm32.c
-@@ -0,0 +1,124 @@
-+/*
-+ * Copyright (C) Maxime Coquelin 2015
-+ * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ *
-+ * Heavily based on sunxi driver from Maxime Ripard.
-+ */
++++ b/Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+@@ -0,0 +1,22 @@
++. STMicroelectronics STM32 timer
 +
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+#include <linux/types.h>
++The STM32 MCUs family has several general-purpose 16 and 32 bits timers.
 +
-+struct stm32_reset_data {
-+	spinlock_t			lock;
-+	void __iomem			*membase;
-+	struct reset_controller_dev	rcdev;
++Required properties:
++- compatible : Should be st,stm32-timer"
++- reg : Address and length of the register set
++- clocks : Reference on the timer input clock
++- interrupts : Reference to the timer interrupt
++
++Optional properties:
++- resets: Reference to a reset controller asserting the timer
++
++Example:
++
++timer5: timer at 40000c00 {
++	compatible = "st,stm32-timer";
++	reg = <0x40000c00 0x400>;
++	interrupts = <50>;
++	resets = <&rrc 259>;
++	clocks = <&clk_pmtr1>;
 +};
-+
-+static int stm32_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct stm32_reset_data *data = container_of(rcdev,
-+						     struct stm32_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl_relaxed(data->membase + (bank * 4));
-+	writel_relaxed(reg | BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct stm32_reset_data *data = container_of(rcdev,
-+						     struct stm32_reset_data,
-+						     rcdev);
-+	int bank = id / BITS_PER_LONG;
-+	int offset = id % BITS_PER_LONG;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&data->lock, flags);
-+
-+	reg = readl_relaxed(data->membase + (bank * 4));
-+	writel_relaxed(reg & ~BIT(offset), data->membase + (bank * 4));
-+
-+	spin_unlock_irqrestore(&data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static struct reset_control_ops stm32_reset_ops = {
-+	.assert		= stm32_reset_assert,
-+	.deassert	= stm32_reset_deassert,
-+};
-+
-+static const struct of_device_id stm32_reset_dt_ids[] = {
-+	 { .compatible = "st,stm32-rcc", },
-+	 { /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, sstm32_reset_dt_ids);
-+
-+static int stm32_reset_probe(struct platform_device *pdev)
-+{
-+	struct stm32_reset_data *data;
-+	struct resource *res;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->membase = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->membase))
-+		return PTR_ERR(data->membase);
-+
-+	spin_lock_init(&data->lock);
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = resource_size(res) * 8;
-+	data->rcdev.ops = &stm32_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+
-+	return reset_controller_register(&data->rcdev);
-+}
-+
-+static int stm32_reset_remove(struct platform_device *pdev)
-+{
-+	struct stm32_reset_data *data = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&data->rcdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver stm32_reset_driver = {
-+	.probe	= stm32_reset_probe,
-+	.remove	= stm32_reset_remove,
-+	.driver = {
-+		.name		= "stm32-rcc-reset",
-+		.of_match_table	= stm32_reset_dt_ids,
-+	},
-+};
-+module_platform_driver(stm32_reset_driver);
-+
-+MODULE_AUTHOR("Maxime Coquelin <maxime.coquelin@gmail.com>");
-+MODULE_DESCRIPTION("STM32 MCUs Reset Controller Driver");
-+MODULE_LICENSE("GPL");
 -- 
 1.9.1
