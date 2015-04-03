@@ -1,33 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:07:09 -0700
-Subject: [GIT PULL] Allwinner defconfig changes for 4.1
-In-Reply-To: <20150325212501.GA18485@lukather>
-References: <20150325212501.GA18485@lukather>
-Message-ID: <20150403200709.GV23023@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Apr 2015 21:09:31 +0100
+Subject: [PATCH v4 07/11] ARM: allow MULTIPLATFORM with !MMU
+In-Reply-To: <1428090292-21693-8-git-send-email-stefan@agner.ch>
+References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
+ <1428090292-21693-8-git-send-email-stefan@agner.ch>
+Message-ID: <20150403200931.GD13898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 02:25:01PM -0700, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On Fri, Apr 03, 2015 at 09:44:48PM +0200, Stefan Agner wrote:
+> In order to support SoC with heterogenous CPU architectures (such
+> as Freescale Vybrid/i.MXSX) it is preferable to use the same
+> architecture (ARCH_MXC in this case) for the MMU enabled and !MMU
+> CPU. Hence allow to select MULTIPLATFORM even without MMU.
 > 
-> Here are the Allwinner defconfig related changes for the 4.1 merge window.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/Kconfig | 21 ++++++++++-----------
+>  1 file changed, 10 insertions(+), 11 deletions(-)
 > 
-> Thanks!
-> Maxime
-> 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
-> 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
-> 
-> are available in the git repository at:
-> 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-4.1
-> 
-> for you to fetch changes up to a198d27cb4d34de1fde22989c5fa536a951f6303:
-> 
->   ARM: sunxi_defconfig: increase the number of maximum number of CPUs to 8 (2015-02-23 09:30:29 +0100)
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9f1f09a..636cb3f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -230,7 +230,7 @@ config VECTORS_BASE
+>  	  in size.
+>  
+>  config ARM_PATCH_PHYS_VIRT
+> -	bool "Patch physical to virtual translations at runtime" if EMBEDDED
+> +	bool "Patch physical to virtual translations at runtime" if EMBEDDED || (ARCH_MULTIPLATFORM && MMU)
+>  	default y
 
-Merged, thanks.
+This makes no sense.  Multiplatform MMU _requires_ this feature, so why
+offer it to the user when multiplatform is enabled _and_ MMU is enabled?
 
+Patch 7817/1 in the patch system tried doing something like you're trying
+to do here - I wonder whether you've reviewed the mailing list for
+previous discussions.
 
--Olof
+Given that it's Easter, I'm not going to re-state what I said last time
+this came up, but instead leave you to do some research.  For example,
+reading message id <20130819232411.GX23006@n2100.arm.linux.org.uk>...
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
