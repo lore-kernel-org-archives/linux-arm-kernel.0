@@ -1,23 +1,28 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 3 Apr 2015 22:32:31 +0300
-Subject: [PATCH 3/3] ARM: pxa: declare battery device on poodle
-In-Reply-To: <87wq1trown.fsf@free.fr>
-References: <1427711971-8164-1-git-send-email-dbaryshkov@gmail.com>
- <1427711971-8164-3-git-send-email-dbaryshkov@gmail.com>
- <87wq1trown.fsf@free.fr>
-Message-ID: <CALT56yPGUGZ6+bp4fit_9PoXkycv7coVN-x=A6BGKXtgHeB-1g@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Fri, 3 Apr 2015 12:33:12 -0700
+Subject: [PATCH 0/2] Cygnus Audio Driver
+In-Reply-To: <20150331064338.GE2869@sirena.org.uk>
+References: <1427771784-29950-1-git-send-email-sbranden@broadcom.com>
+ <20150331064338.GE2869@sirena.org.uk>
+Message-ID: <551EEAF8.7050108@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-04-03 22:29 GMT+03:00 Robert Jarzmik <robert.jarzmik@free.fr>:
-> Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> writes:
+Hi Mark,
+
+
+On 15-03-30 11:43 PM, Mark Brown wrote:
+> On Mon, Mar 30, 2015 at 08:16:22PM -0700, Scott Branden wrote:
 >
->> Declare a battery platform device for SL-5600 (poodle) platform.
-> Why ? Is there a driver for it ? I didn't found any in driver/power.
+>> The audio PLL is embedded in the audio block and only used
+>> by the audio block. The audio PLL registers are also in the middle of
+>> the audio register map.
+>
+> When you say it's only used by the audio block do you mean to say that
+> the audio block exposes no clock signals other than the bit and frame
+> clocks?
+>
+The audio block exposes the MCLK in addition to the bit and frame clock.
 
-Due to my error it was submitted separately from these patches.
-http://thread.gmane.org/gmane.linux.power-management.general/58546
-
--- 
-With best wishes
-Dmitry
+Regards,
+  Scott
