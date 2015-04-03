@@ -1,60 +1,60 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 3 Apr 2015 12:09:16 -0500
-Subject: [PATCH v5 03/15] dt-bindings: Document the ARM System timer
- bindings
-In-Reply-To: <1428080481-18591-4-git-send-email-mcoquelin.stm32@gmail.com>
+Date: Fri, 3 Apr 2015 12:10:39 -0500
+Subject: [PATCH v5 07/15] dt-bindings: Document the STM32 timer bindings
+In-Reply-To: <1428080481-18591-8-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1428080481-18591-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1428080481-18591-4-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CAL_JsqJUG4gh7nqVukfFU-kkF=QBbsinF6e+Bh35WDLRbj84qg@mail.gmail.com>
+ <1428080481-18591-8-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CAL_JsqJjnsYpPeyrxhPvPZ-iO-Gf_vc3NgUQcmqTawAmcDjBgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Apr 3, 2015 at 12:01 PM, Maxime Coquelin
 <mcoquelin.stm32@gmail.com> wrote:
 > This adds documentation of device tree bindings for the
-> ARM System timer.
+> STM32 timer.
 >
 > Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
 > Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
+One minor thing below, otherwise:
+
 Acked-by: Rob Herring <robh@kernel.org>
 
 > ---
->  .../devicetree/bindings/arm/armv7m_systick.txt     | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/armv7m_systick.txt
+>  .../devicetree/bindings/timer/st,stm32-timer.txt   | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/st,stm32-timer.txt
 >
-> diff --git a/Documentation/devicetree/bindings/arm/armv7m_systick.txt b/Documentation/devicetree/bindings/arm/armv7m_systick.txt
+> diff --git a/Documentation/devicetree/bindings/timer/st,stm32-timer.txt b/Documentation/devicetree/bindings/timer/st,stm32-timer.txt
 > new file mode 100644
-> index 0000000..7cf4a24
+> index 0000000..d3fdeb0
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/armv7m_systick.txt
-> @@ -0,0 +1,26 @@
-> +* ARMv7M System Timer
+> +++ b/Documentation/devicetree/bindings/timer/st,stm32-timer.txt
+> @@ -0,0 +1,22 @@
+> +. STMicroelectronics STM32 timer
 > +
-> +ARMv7-M includes a system timer, known as SysTick. Current driver only
-> +implements the clocksource feature.
+> +The STM32 MCUs family has several general-purpose 16 and 32 bits timers.
 > +
 > +Required properties:
-> +- compatible     : Should be "arm,armv7m-systick"
-> +- reg            : The address range of the timer
+> +- compatible : Should be st,stm32-timer"
+
+Missing quote
+
+> +- reg : Address and length of the register set
+> +- clocks : Reference on the timer input clock
+> +- interrupts : Reference to the timer interrupt
 > +
-> +Required clocking property, have to be one of:
-> +- clocks         : The input clock of the timer
-> +- clock-frequency : The rate in HZ in input of the ARM SysTick
+> +Optional properties:
+> +- resets: Reference to a reset controller asserting the timer
 > +
-> +Examples:
+> +Example:
 > +
-> +systick: timer at e000e010 {
-> +       compatible = "arm,armv7m-systick";
-> +       reg = <0xe000e010 0x10>;
-> +       clocks = <&clk_systick>;
-> +};
-> +
-> +systick: timer at e000e010 {
-> +       compatible = "arm,armv7m-systick";
-> +       reg = <0xe000e010 0x10>;
-> +       clock-frequency = <90000000>;
+> +timer5: timer at 40000c00 {
+> +       compatible = "st,stm32-timer";
+> +       reg = <0x40000c00 0x400>;
+> +       interrupts = <50>;
+> +       resets = <&rrc 259>;
+> +       clocks = <&clk_pmtr1>;
 > +};
 > --
 > 1.9.1
