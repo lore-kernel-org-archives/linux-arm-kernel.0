@@ -1,42 +1,35 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 3 Apr 2015 15:57:27 +0300
-Subject: [PATCH/RFC 5/6] staging: board: Add support for devices with
- complex dependencies
-In-Reply-To: <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri,  3 Apr 2015 14:41:59 +0200
+Subject: [PATCH/RFC 2/6] staging: board: Initialize staging board code earlier
+In-Reply-To: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
 References: <1428064923-24950-1-git-send-email-geert+renesas@glider.be>
- <1428064923-24950-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <20150403125727.GT10964@mwanda>
+Message-ID: <1428064923-24950-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 02:42:02PM +0200, Geert Uytterhoeven wrote:
-> +int __init board_staging_register_clock(const struct board_staging_clk *bsc)
-> +{
-> +	struct clk *clk;
-> +	int error;
-> +
-> +	pr_debug("Registering clock %s for con_id %s dev_id %s\n", bsc->clk,
-> +		 bsc->con_id, bsc->dev_id);
-> +	clk = clk_get(NULL, bsc->clk);
-> +	if (IS_ERR(clk)) {
-> +		error = PTR_ERR(clk);
-> +		pr_err("Failed to get clock %s (%d)\n", bsc->clk, error);
-> +		return error;
-> +	}
-> +
-> +	error = clk_register_clkdev(clk, bsc->con_id, bsc->dev_id);
-> +	if (error)
-> +		pr_err("Failed to register clock %s (%d)\n", bsc->clk, error);
-> +		return error;
+Currently the staging board code is initialized from a late_initcall().
+However, unused PM domains are also disabled from a late_initcall(),
+which happens before due to link order.
 
-Missing curly braces.  Also it's weird that don't we need a clk_put()
-on the error patch as well as the success path?
+Change the initialization of staging board code from using
+late_initcall() to device_initcall() to fix this.
 
-> +
-> +	clk_put(clk);
-> +	return 0;
-> +}
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/staging/board/board.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-regards,
-dan carpenter
+diff --git a/drivers/staging/board/board.h b/drivers/staging/board/board.h
+index 2390ed6c31a42f2f..e9c914985d4acb36 100644
+--- a/drivers/staging/board/board.h
++++ b/drivers/staging/board/board.h
+@@ -15,6 +15,6 @@ static int __init runtime_board_check(void)	\
+ 	return 0;				\
+ }						\
+ 						\
+-late_initcall(runtime_board_check)
++device_initcall(runtime_board_check)
+ 
+ #endif /* __BOARD_H__ */
+-- 
+1.9.1
