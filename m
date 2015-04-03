@@ -1,79 +1,115 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  3 Apr 2015 21:44:43 +0200
-Subject: [PATCH v4 02/11] irqchip: nvic: support hierarchy irq domain
-In-Reply-To: <1428090292-21693-1-git-send-email-stefan@agner.ch>
-References: <1428090292-21693-1-git-send-email-stefan@agner.ch>
-Message-ID: <1428090292-21693-3-git-send-email-stefan@agner.ch>
+Date: Fri,  3 Apr 2015 21:44:41 +0200
+Subject: [PATCH v4 00/11] ARM: vf610m4: Add Vybrid Cortex-M4 support
+Message-ID: <1428090292-21693-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for hierarchy irq domains. This is required to stack
-the MSCM interrupt router and the NVIC controller found in Vybrid
-SoC.
+The fourth version has one small fix in the MSCM IR driver and
+one dependency fix.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- drivers/irqchip/Kconfig    |  1 +
- drivers/irqchip/irq-nvic.c | 28 +++++++++++++++++++++++++++-
- 2 files changed, 28 insertions(+), 1 deletion(-)
+Like version 3 of the patchset, it does not contain the interrupt
+router driver anymore (MSCM IR). The driver has been merged
+inbetween:
+https://lkml.org/lkml/2015/3/8/6
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index cc79d2a..ab8de26 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -30,6 +30,7 @@ config ARM_GIC_V3_ITS
- config ARM_NVIC
- 	bool
- 	select IRQ_DOMAIN
-+	select IRQ_DOMAIN_HIERARCHY
- 	select GENERIC_IRQ_CHIP
- 
- config ARM_VIC
-diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
-index 4ff0805..5fac910 100644
---- a/drivers/irqchip/irq-nvic.c
-+++ b/drivers/irqchip/irq-nvic.c
-@@ -49,6 +49,31 @@ nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
- 	handle_IRQ(irq, regs);
- }
- 
-+static int nvic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-+				unsigned int nr_irqs, void *arg)
-+{
-+	int i, ret;
-+	irq_hw_number_t hwirq;
-+	unsigned int type = IRQ_TYPE_NONE;
-+	struct of_phandle_args *irq_data = arg;
-+
-+	ret = irq_domain_xlate_onecell(domain, irq_data->np, irq_data->args,
-+				   irq_data->args_count, &hwirq, &type);
-+	if (ret)
-+		return ret;
-+
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_map_generic_chip(domain, virq + i, hwirq + i);
-+
-+	return 0;
-+}
-+
-+static const struct irq_domain_ops nvic_irq_domain_ops = {
-+	.xlate = irq_domain_xlate_onecell,
-+	.alloc = nvic_irq_domain_alloc,
-+	.free = irq_domain_free_irqs_top,
-+};
-+
- static int __init nvic_of_init(struct device_node *node,
- 			       struct device_node *parent)
- {
-@@ -70,7 +95,8 @@ static int __init nvic_of_init(struct device_node *node,
- 		irqs = NVIC_MAX_IRQ;
- 
- 	nvic_irq_domain =
--		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
-+		irq_domain_add_linear(node, irqs, &nvic_irq_domain_ops, NULL);
-+
- 	if (!nvic_irq_domain) {
- 		pr_warn("Failed to allocate irq domain\n");
- 		return -ENOMEM;
+This patchset extends the NVIC driver to support irq domain
+hierarchy and the MSCM IR driver to support NVIC as a parent irq
+controller.
+
+I'm happy with the outcome of the MSCM driver, the irq domain
+hierarchy support has proven to work with GIC and NVIC as
+intendet.
+
+Since v2, this patchset also doesn't add any ARCH or SOC anymore.
+Instead, it allows to select ARCH_MULTIPLATFORM in the !MMU case
+and add ARCH_MULTI_V7M as a new CPU choice. This change is based
+on patches found in Arnd's git tree, however, it tries to allow
+MULTIPLATFORM with !MMU in a way which should not allow to make
+other selections than before (except ARCH_MULTI_V7M of course).
+This makes ARCH_MXC and SOC_VF610 available for the !MMU CPU V7M.
+With a small change, SOC_VF610 is now selectable when the CPU
+ARCH_MULTI_V7M is selected, and hence allows to build a kernel
+for the Cortex-M4 CPU too.
+
+The patchset has proven to be working on the Cortex-M4 of the
+Vybrid SoC using a Colibri VF61 module.
+
+Changes since v3:
+- Added dependency IRQ_DOMAIN_HIERARCHY for ARM_NVIC
+- Fix MSCM IR disable function check
+- Remove "ARM: imx: depend MXC debug board on 3DS machines",
+  the patch has been merged
+
+Changes since v2:
+- Update MSCM patches to merged version of MSCM interrupt router
+- Use the GPLv2/X11 dual license in the new device tree files
+- Drop SD controller in device tree (initramfs works now and is
+  probably more appropriate for most cases)
+- Disable GPIO nodes since the A5 is using them
+- Drop CONFIG_ prefixes in Kconfig changes for MXC_DEBUG_BOARD
+- Drop vector table resizing in favor of Maxime Coquelin's patch
+  (https://lkml.org/lkml/2015/2/20/399)
+- Remove !MMU dependency for ARCH_EFM32 since its part of
+  ARCH_MULTI_V7M
+- Rebased on v4.0-rc1
+
+Changes since v1:
+- Remove MSCM driver
+- Support irq domain hierarchy with NVIC irq controller
+- Extend MSCM interrupt router with NVIC as parent in the irq
+  domain hierarchy 
+- Rebased on v3.19-rc1 with MSCM driver
+- NVIC: Register only the amount of IRQ's which vectors are
+  available for
+
+Changes since RFC:
+- Unified addruart calls for MMU/!MMU
+- Add MSCM support along with routable IRQ support in NVIC
+- Rebased on Shawns for-next tree which made some changes
+  obsolete (mainly the Vybrid SoC device tree files in for-next
+  are already prepared for Cortex-M4 support)
+- Removed SRC_GPR3 hack, this is now part of a mini boot-loader:
+  https://github.com/falstaff84/vf610m4bootldr
+
+Arnd Bergmann (1):
+  ARM: efm32: move into multiplatform
+
+Stefan Agner (10):
+  genirq: generic chip: support hierarchy domain
+  irqchip: nvic: support hierarchy irq domain
+  irqchip: vf610-mscm: support NVIC parent
+  ARM: ARMv7M: define size of vector table for Vybrid
+  clocksource: add dependencies for Vybrid pit clocksource
+  ARM: unify MMU/!MMU addruart calls
+  ARM: allow MULTIPLATFORM with !MMU
+  ARM: vf610: enable Cortex-M4 on Vybrid SoC
+  ARM: dts: add support for Vybrid running on Cortex-M4
+  ARM: vf610m4: add defconfig for Linux on Vybrids Cortex-M4
+
+ Documentation/devicetree/bindings/arm/fsl.txt |  3 +
+ arch/arm/Kconfig                              | 54 +++++++--------
+ arch/arm/boot/dts/Makefile                    |  1 +
+ arch/arm/boot/dts/vf610m4-colibri.dts         | 98 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/vf610m4.dtsi                | 50 ++++++++++++++
+ arch/arm/configs/efm32_defconfig              |  2 +
+ arch/arm/configs/vf610m4_defconfig            | 43 ++++++++++++
+ arch/arm/include/debug/efm32.S                |  2 +-
+ arch/arm/kernel/debug.S                       |  2 +-
+ arch/arm/mach-imx/Kconfig                     | 36 ++++++----
+ arch/arm/mach-imx/Makefile.boot               |  0
+ arch/arm/mach-imx/mach-vf610.c                |  1 +
+ arch/arm/mm/Kconfig                           |  1 +
+ drivers/clocksource/Kconfig                   |  2 +
+ drivers/irqchip/Kconfig                       |  1 +
+ drivers/irqchip/irq-nvic.c                    | 28 +++++++-
+ drivers/irqchip/irq-vf610-mscm-ir.c           | 32 +++++++--
+ kernel/irq/generic-chip.c                     |  5 +-
+ 18 files changed, 306 insertions(+), 55 deletions(-)
+ create mode 100644 arch/arm/boot/dts/vf610m4-colibri.dts
+ create mode 100644 arch/arm/boot/dts/vf610m4.dtsi
+ create mode 100644 arch/arm/configs/vf610m4_defconfig
+ create mode 100644 arch/arm/mach-imx/Makefile.boot
+
 -- 
 2.3.5
