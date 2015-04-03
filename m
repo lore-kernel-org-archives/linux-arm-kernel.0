@@ -1,16 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 10:52:52 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC PM Updates for v4.1
-In-Reply-To: <cover.1426812951.git.horms+renesas@verge.net.au>
-References: <cover.1426812951.git.horms+renesas@verge.net.au>
-Message-ID: <20150403175252.GF23023@localhost>
+Date: Fri, 3 Apr 2015 10:53:34 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.1
+In-Reply-To: <cover.1426813316.git.horms+renesas@verge.net.au>
+References: <cover.1426813316.git.horms+renesas@verge.net.au>
+Message-ID: <20150403175334.GG23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 20, 2015 at 10:07:15AM +0900, Simon Horman wrote:
+On Fri, Mar 20, 2015 at 10:07:28AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM based SoC PM updates for v4.1.
+> Please consider these Renesas ARM based SoC defconfig updates for v4.1.
+> 
+> 
+> I have been holding off on this for a while as the patches to
+> enable multiplatform builds for the bockw and ape6evm boards only
+> really make sense with the following two pull requests applied.
+> Please consider those pull requests first.
+> 
+> * Renesas ARM Based SoC r8a73a4 CCF and Multiplatform Updates for v4.1
+> * Renesas ARM Based SoC sh73a0 Multiplatform Updates for v4.1
 > 
 > 
 > The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
@@ -19,13 +28,13 @@ On Fri, Mar 20, 2015 at 10:07:15AM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pm-for-v4.1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.1
 > 
-> for you to fetch changes up to a8caad66904a7923c05fc4a137110085533ef00c:
+> for you to fetch changes up to bb3ab878a29a3879669bb922bebce87b9a9af755:
 > 
->   ARM: shmobile: Consolidate the pm code for R-Car Gen2 (2015-03-17 08:05:13 +0900)
+>   ARM: shmobile: Enable bockw board in multiplatform defconfig (2015-03-05 09:20:26 +0900)
 
-Merged into next/cleanup. Thanks.
+Merged, thanks.
 
 
 -Olof
