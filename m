@@ -1,78 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 11:01:32 -0700
-Subject: [GIT PULL] OMAP-GPMC driver updates for v4.1
-In-Reply-To: <550FEBC6.3000902@ti.com>
-References: <550FEBC6.3000902@ti.com>
-Message-ID: <20150403180132.GJ23023@localhost>
+Date: Fri, 3 Apr 2015 11:05:56 -0700
+Subject: [GIT PULL] at91: cleanup for 4.1 #4
+In-Reply-To: <1427108651-566-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1427108651-566-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150403180556.GK23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 23, 2015 at 12:32:38PM +0200, Roger Quadros wrote:
-> Hi Arnd, Hi Olof,
+On Mon, Mar 23, 2015 at 12:04:11PM +0100, Nicolas Ferre wrote:
+> Arnd, Olof, Kevin,
 > 
-> Based on Tony's request I will be sending you pull requests for OMAP-GPMC driver
-> hence forth. I've sent this earlier on the 9th of March but had missed to copy Olof.
-
-It was actually in my queue but I hadn't gotten to it yet. A few comments
-below.
-
-> Please pull in these OMAP-GPMC driver fixes for v4.1.
-> Patches have been tested for GPMC-NAND on dra7-evm and omap3-beagle.
+> Another cleanup pull-request for fixing some issues and stacking more PM
+> cleanup.
+> It is based on the previous "at91-cleanup3" tag sent last week (not inclueded
+> yet).
 > 
-> Thanks.
+> Thanks, best regards,
 > 
-> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
+> The following changes since commit 8590ca655a19f9e124b52bfbf28f14eb16a05bec:
 > 
->   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
+>   ARM: at91: remove useless include (2015-03-16 17:03:08 +0100)
 > 
 > are available in the git repository at:
 > 
->   git at github.com:rogerq/linux.git tags/gpmc-omap-for-v4.1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-cleanup4
 > 
-> for you to fetch changes up to 4b613e9b4bbe94545a588a100e09006d827a7ebe:
+> for you to fetch changes up to dd905bbb09383f9f62d7a6296f11788d8c283c86:
 > 
->   ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters (2015-03-06 12:55:32 +0200)
-
-Merged into next/drivers
-
-> ----------------------------------------------------------------
-> OMAP-GPMC driver fixes for v4.1
-> 
-> * Fixed WAITMONITORINGTIME programming to be based on
-> GPMC_CLK instead of GPMC_FCLK. The GPMC clock divider
-> programming is fixed for both synchronous and asynchronous
-> modes.
-> * Allow GPMC's children of default bus type to be populated in
-> the device tree.
-> * Improved DEBUG output data and format.
-> * Prevent writing 1 into reserved bits of GPMC_CONFIG7.
+>   ARM: at91/pm: move AT91_MEMCTRL_* to pm.h (2015-03-23 11:16:00 +0100)
 > 
 > ----------------------------------------------------------------
-> Robert ABEL (8):
->       ARM OMAP2+ GPMC: don't undef DEBUG
->       ARM OMAP2+ GPMC: add bus children
->       ARM OMAP2+ GPMC: fix debug output alignment
->       ARM OMAP2+ GPMC: change get_gpmc_timing_reg output for DTS
->       ARM OMAP2+ GPMC: always program GPMCFCLKDIVIDER
->       ARM OMAP2+ GPMC: calculate GPMCFCLKDIVIDER based on WAITMONITORINGTIME
->       ARM OMAP2+ GPMC: fix WAITMONITORINGTIME divider bug
->       ARM OMAP2+ GPMC: fix programming/showing reserved timing parameters
-
-We prefix patches to arch/arm/* with ARM: <platform>:. For these, memory: gpmc:
-seems to be a better prefix going forward.
-
-> Semen Protsenko (2):
->       ARM: OMAP2+: gpmc: Fix writing in gpmc_cs_set_memconf
->       ARM: OMAP2+: gpmc: make gpmc_cs_get_name() static
+> Fourth batch of cleanup for 4.1:
+> - 2 issues revealed by the kbuild test robot fixed
+> - move of some functions and macros into relevant files to be able to
+>   streamline the at91 specific header afterwards
 > 
->  arch/arm/mach-omap2/gpmc-nand.c    |  18 +++++----
->  arch/arm/mach-omap2/gpmc-onenand.c |   4 +-
->  arch/arm/mach-omap2/usb-tusb6010.c |   4 +-
->  drivers/memory/omap-gpmc.c         | 358 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---------------------------------
->  include/linux/omap-gpmc.h          |   3 +-
+> ----------------------------------------------------------------
+> Alexandre Belloni (4):
+>       ARM: at91: fix pm_suspend.S compilation when ARMv6 is selected
+>       clocksource: atmel-st: select MFD_SYSCON
+>       ARM: at91/pm: move the standby functions to pm.c
+>       ARM: at91/pm: move AT91_MEMCTRL_* to pm.h
 
-Tip: If you have a 80-column terminal, or redirect the request-pull to
-a file, you dont' get these super long diffstat lines. :)
+Having a linear cleanup branch doesn't work all that well when you mix in
+driver changes like you did in the last version. I.e. I chose to merge that
+branch in as a driver branch, but now you're stacking new cleanuips on top.
+
+If the pm changes are independent of the clocksource one (which they seem to
+be), then it's better to do base them on the cleanup2 branch instead of
+cleanup3.
+
+Would you mind respinning that way? We should still be able to take them
+for 4.1.
 
 
 -Olof
