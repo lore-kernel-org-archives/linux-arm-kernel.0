@@ -1,65 +1,84 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 3 Apr 2015 16:04:29 +0000
-Subject: [PATCH 4/5] irqchip: armada-370-xp: Allow using wakeup source
-In-Reply-To: <551EB403.9030607@free-electrons.com>
-References: <1427724278-12379-1-git-send-email-gregory.clement@free-electrons.com>
- <1427724278-12379-5-git-send-email-gregory.clement@free-electrons.com>
- <20150402232316.GJ24598@io.lakedaemon.net>
- <551E3EA3.8010409@free-electrons.com>
- <20150403142922.GL24598@io.lakedaemon.net>
- <551EB403.9030607@free-electrons.com>
-Message-ID: <20150403160429.GA7873@io.lakedaemon.net>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 03 Apr 2015 09:20:51 -0700
+Subject: arm64 efi_power_off crash
+Message-ID: <1428078051.1118.4.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 05:38:43PM +0200, Gregory CLEMENT wrote:
-> On 03/04/2015 16:29, Jason Cooper wrote:
-> > On Fri, Apr 03, 2015 at 09:17:55AM +0200, Gregory CLEMENT wrote:
-> >> Hi Jason,
-> >>
-> >> On 03/04/2015 01:23, Jason Cooper wrote:
-> >>> On Mon, Mar 30, 2015 at 04:04:37PM +0200, Gregory CLEMENT wrote:
-> >>>> On the Armada 370/XP SoCs, in standby mode the SoC stay powered and it
-> >>>> is possible to wake-up from any interrupt sources. This patch adds
-> >>>> flag to the MPIC irqchip driver to let linux know this.
-> >>>>
-> >>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >>>> ---
-> >>>>  drivers/irqchip/irq-armada-370-xp.c | 1 +
-> >>>>  1 file changed, 1 insertion(+)
-> >>>
-> >>> Applied to irqchip/mvebu
-> >>
-> >> Thanks!
-> >>
-> >> Do you agree to take also the patch 3?
-> > 
-> > hmmm...
-> > 
-> >> It modifies a file in mach-mvebu (board-v7.c) but it depends on a patch
-> >> located in irqchip: "irqchip: gic: Add an entry point to set up irqchip flags"
-> > 
-> > Yeah, I saw that.  Do you forsee any merge conflicts with mvebu?  The reason I
-> 
-> There is only two patches which modify the same file, but they don't touch the
-> same chunk. So the only impact would be the line numbers which could not be
-> different. In order to be sure I've just tried to apply first this patch and then
-> these 2 other ones: there was no problem at all.
-> 
-> > ask is that it looks like I'm going to be sending directly to Linus this
-> > cycle.  I'd really prefer to hold off a cycle on that patch.  I'm not
-> > 100% certain my second PR (stacked domain/DT break) is going to get
-> > accepted.  Which is what this patch depends on.
-> > 
-> > thoughts?
-> 
-> This patch can wait if needed as this patch alone is not enough to to be able
-> to use standby and I am not sure at all that I the other part of the series will
-> be merged in 4.1.
+Hi,
 
-Ok, let's hold off then.  btw - I just ran through Thomas' slides on DT
-ABI/fantasy.  Very good work.  I hope to see the video some day.  :-)
+Got this with v4.0-rc6 and arm64 defconfig on the foundation
+model and Linaro's 15.01 firmware when I do a 'poweroff'.
+Didn't look into it.
 
-thx,
+-Geoff
 
-Jason.
+reboot: Power down
+Unable to handle kernel paging request at virtual address 1c0100a8
+pgd = ffffffc079705000
+[1c0100a8] *pgd=00000000f965e003, *pud=00000000f965e003, *pmd=0000000000000000
+Internal error: Oops: 96000005 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 1050 Comm: halt Tainted: G        W       4.0.0-rc6 #1
+Hardware name: ARM Arm Versatile Express/Arm Versatile Express, BIOS 09:51:17 Jan 27 2015
+task: ffffffc87a076e00 ti: ffffffc0796a4000 task.ti: ffffffc0796a4000
+PC is at 0x400f2674
+LR is at 0x400f265c
+pc : [<00000000400f2674>] lr : [<00000000400f265c>] pstate: 600001c5
+sp : ffffffc0796a7c80
+x29: ffffffc0796a7d10 x28: ffffffc0796a4000 
+x27: ffffffc00056b000 x26: 000000000000008e 
+x25: 000000000000011a x24: 0000000000000000 
+x23: 0000000000000000 x22: 0000000000000000 
+x21: 0000000000000008 x20: ffffffc0796a7cfc 
+x19: 000000001c0100a8 x18: 0000000000000000 
+x17: 0000007f9bd72b10 x16: ffffffc0000cdf94 
+x15: 000000000000021e x14: 0000007f9bcb52b8 
+x13: 000000000000021e x12: 0000000000412000 
+x11: ffffffc0007a6000 x10: ffffffc0007ea000 
+x9 : 0000000000000000 x8 : 0000000000000000 
+x7 : ffffffc0007965d8 x6 : ffffffc000391b50 
+x5 : ffffffc0796a7cfc x4 : 0000000000000000 
+x3 : 0000000000000000 x2 : 0000000000000000 
+x1 : 00000000fffffffe x0 : 000000001c0100a8 
+
+Process halt (pid: 1050, stack limit = 0xffffffc0796a4028)
+Stack: (0xffffffc0796a7c80 to 0xffffffc0796a8000)
+7c80: 40000000 00000000 400f24e4 00000000 796a7d40 ffffffc0 fffffffe 00000000
+7ca0: 00809c50 ffffffc0 000001c0 00000000 00000002 00000000 00000002 00000000
+7cc0: fee1dead ffffffff 00000015 00000000 400f2634 00000000 000cdef8 ffffffc0
+7ce0: 400f2480 00000000 0032562c ffffffc0 796a7d00 ffffffc0 000935b4 00000000
+7d00: 00473614 ffffffc0 004735f0 ffffffc0 796a7d60 ffffffc0 00473538 ffffffc0
+7d20: 00000000 00000000 4321fedc 00000000 007a3d88 ffffffc0 00090350 ffffffc0
+7d40: 796a7d70 ffffffc0 00000000 00000000 00000000 00000000 00000000 00000000
+7d60: 796a7d70 ffffffc0 00086a2c ffffffc0 796a7d80 ffffffc0 000cdf04 ffffffc0
+7d80: 796a7d90 ffffffc0 000ce0e8 ffffffc0 d21faf10 0000007f 00085c30 ffffffc0
+7da0: 00000000 00000000 d21fb0d8 0000007f ffffffff ffffffff 9bd72b2c 0000007f
+7dc0: 00000000 00000000 00000015 00000000 796a7df0 ffffffc0 000befbc ffffffc0
+7de0: 00000000 00000000 000befa4 00000000 d21faf10 0000007f 00085c30 ffffffc0
+7e00: 00000000 00000000 d21fb0d8 0000007f ffffffff ffffffff 9bce4db8 0000007f
+7e20: 80000000 00000000 00000015 00000000 0000011a 00000000 001945fc ffffffc0
+7e40: 796a7e60 ffffffc0 00194584 ffffffc0 00000014 00000000 00000000 ffffffc0
+7e60: 0000041a 00000000 00194634 ffffffc0 00000000 00000000 d21fb0d8 0000007f
+7e80: ffffffff ffffffff 9bd6cf20 0000007f 796a7eb0 ffffffc0 00089604 ffffffc0
+7ea0: 00000008 00000000 00024800 ffff0000 d21faf10 0000007f 00085b4c ffffffc0
+7ec0: 00000000 00000000 00085c30 ffffffc0 fee1dead ffffffff 28121969 00000000
+7ee0: 4321fedc 00000000 00000002 00000000 00000000 00000000 00000005 00000000
+7f00: d21faf00 0000007f 9be1f000 0000007f 0000008e 00000000 00000000 00000000
+7f20: 00000000 00000000 9be24cb0 0000007f 00412000 00000000 0000021e 00000000
+7f40: 9bcb52b8 0000007f 0000021e 00000000 00412dd0 00000000 9bd72b10 0000007f
+7f60: 00000000 00000000 00000000 00000000 d21fb0d8 0000007f 00000005 00000000
+7f80: 004026b4 00000000 00000000 00000000 00412000 00000000 00000001 00000000
+7fa0: 00000000 00000000 00000001 00000000 00000000 00000000 d21faf10 0000007f
+7fc0: 00401714 00000000 d21faf10 0000007f 9bd72b2c 0000007f 00000000 00000000
+7fe0: fee1dead ffffffff 0000008e 00000000 00000000 00000000 00000000 00000000
+Call trace:
+[<00000000400f2674>] 0x400f2674
+[<ffffffc000473534>] efi_power_off+0x20/0x2c
+[<ffffffc000086a28>] machine_power_off+0x1c/0x28
+[<ffffffc0000cdf00>] kernel_power_off+0x60/0x6c
+[<ffffffc0000ce0e4>] SyS_reboot+0x150/0x214
+Code: aa1303e0 a9407bf3 910083ff 14000003 (b9400000) 
+---[ end trace f890eacf6ac54c75 ]---
+note: halt[1050] exited with preempt_count 3
+/etc/rc0.d/S90halt: line 27:  1050 Segmentation fault      halt -d -f -p $hddown
