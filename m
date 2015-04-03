@@ -1,44 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 13:40:16 -0700
-Subject: [GIT PULL] arm-cci PMU updates for 4.1
-In-Reply-To: <20150327172500.GO1562@arm.com>
-References: <20150327172500.GO1562@arm.com>
-Message-ID: <20150403204016.GB23023@localhost>
+Date: Fri, 3 Apr 2015 13:41:00 -0700
+Subject: [GIT PULL 1/2] omap non-urgent fixes for v4.1
+In-Reply-To: <5516d200.e267440a.7bab.fffff2bdSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <5516d200.e267440a.7bab.fffff2bdSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20150403204100.GC23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 27, 2015 at 05:25:00PM +0000, Will Deacon wrote:
-> Hi Olof, Arnd,
+On Sat, Mar 28, 2015 at 09:02:29AM -0700, Tony Lindgren wrote:
+> The following changes since commit c517d838eb7d07bbe9507871fab3931deccff539:
 > 
-> Please can you pull the following ARM CCI PMU updates for 4.1? Suzuki
-> has reworked parts of the existing driver so that it can be used on CPUs
-> booting in non-secure mode (i.e. ARM64 systems) and also make it easier
-> to port over to new IP, such as CCI-500.
-> 
-> It's coming via me as $ARM_PERF_GUY, but Nico has Acked the core driver
-> (non-PMU) changes. Note that these have been in next for a bit, but I
-> can drop the branch once you've pulled.
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> The following changes since commit 06e5801b8cb3fc057d88cb4dc03c0b64b2744cda:
-> 
->   Linux 4.0-rc4 (2015-03-15 17:38:20 -0700)
+>   Linux 4.0-rc1 (2015-02-22 18:21:14 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git tags/arm-perf-4.1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.1/fixes-0
 > 
-> for you to fetch changes up to 874c571414d5617f4042298986b6a826816ee885:
+> for you to fetch changes up to 209431eff8afb928d72200c79153165c7d860ca0:
 > 
->   arm-cci: Fix CCI PMU event validation (2015-03-27 13:45:02 +0000)
+>   ARM: DRA7: Enable Cortex A15 errata 798181 (2015-03-27 14:38:03 -0700)
+> 
 
-Merged now. The Kconfig merge was a bit messy since someone decided to sort the
-file, and Stephen will see that too (cc:d here).
+Merged, thanks.
 
 
 -Olof
