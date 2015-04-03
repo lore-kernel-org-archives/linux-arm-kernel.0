@@ -1,32 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 11:34:56 -0700
-Subject: [PATCH 1/5] MFD/OF: document MFD devices and handle simple-mfd
-In-Reply-To: <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
-References: <1425375148-4369-1-git-send-email-linus.walleij@linaro.org>
- <1425375148-4369-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CAOesGMhz6WPweQFXfPhTO6Pz5L4Z1Si6YGiCRCiFD9B5qB9tVw@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 3 Apr 2015 11:40:09 -0700
+Subject: [GIT PULL] qcom SoC changes for v4.1
+In-Reply-To: <20150403162246.GA426@qualcomm.com>
+References: <alpine.DEB.2.02.1503161601450.30317@galak-ubuntu.qualcomm.com>
+ <CAP71WjzKSRRSVLcwpZTaQOYp2uziP7=J=E=3bHAzCjui-ZqbYQ@mail.gmail.com>
+ <42F2C5A0-5231-4D4B-95EE-7BC173A14768@codeaurora.org>
+ <551D9BF6.2070502@codeaurora.org>
+ <20150403162246.GA426@qualcomm.com>
+Message-ID: <20150403184009.GA18274@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/03, Andy Gross wrote:
+> On Thu, Apr 02, 2015 at 12:43:50PM -0700, Stephen Boyd wrote:
+> > On 04/02/15 12:25, Kumar Gala wrote:
+> > >> [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.0-rc4-354-ga0690e6586df/
+> > > I think we need to associated DT updates.
+> > >
+> > >
+> > 
+> > What about this patch squashed on top? Just guessing but I suspect we
+> > don't care about cell-index if we're not doing the tcsr stuff. Also, I
+> > imagine we could get rid of cell-index entirely if we matched against
+> > the address of the gsbi instead.
+> 
+> Except that the GSBI5 base address changes from chip to chip.
+> 
+> 
 
-I understand this is bikeshedding to some extent, but I'd also like to
-avoid needless variation in binding formats:
+Yep, for the cell-index removal part I was thinking we would make
+another table per SoC like we already have for the TCSR part. The
+table would map the physical address to the GSBI number.
 
-On Tue, Mar 3, 2015 at 1:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> +
-> +foo at 1000 {
-> +               compatible = "syscon", "simple-mfd";
-> +               reg = <0x010000 0x1000>;
-> +
-> +               led at 08.0 {
-
-This doesn't seem to be a typo, you're using a period in the unit
-address. I've never seen that done before, usually commas are used
-instead.
-
-Was there a reason for going with period?
-
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
