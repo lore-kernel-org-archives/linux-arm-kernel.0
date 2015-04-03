@@ -1,28 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 12:51:42 -0700
-Subject: [PATCH v2] coresight: adding basic support for Spreadtrum SC9836
-In-Reply-To: <1427287931-9363-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1427287931-9363-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <20150403195142.GR23023@localhost>
+Date: Fri, 3 Apr 2015 12:53:56 -0700
+Subject: [GIT PULL] MCPM maintenance for v4.1
+In-Reply-To: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
+References: <alpine.LFD.2.11.1503251216310.27567@knanqh.ubzr>
+Message-ID: <20150403195356.GS23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 25, 2015 at 08:52:11PM +0800, Chunyan Zhang wrote:
-> Support only for ETF, FUNNEL, STM are included currently.
-> Support for ETM, TPIU and the replicator linked to it are not included in
-> this version patch.
+On Wed, Mar 25, 2015 at 12:46:47PM -0400, Nicolas Pitre wrote:
+> Please consider pulling the following:
 > 
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
-> Change for v2:
->  - Corrected the TMC whose space is wrongly used as ETB in v1.
->  - Removed "coresight-default-sink" from the DT.
-> ---
+> http://git.linaro.org/people/nicolas.pitre/linux.git mcpm_for_armsoc
+> 
+> This series greatly simplifies things by moving all the locking handling 
+> to the core code, leaving machine specific backend only with simple and 
+> straight forward operations performed under lock protection. It will no 
+> longer be necessary for backend authors to know about all the MCPM 
+> subtleties for their code to be "right".
+> 
+> To avoid a flag day, the new scheme is introduced in parallel to the 
+> existing backend interface. This series may be merged at the same time 
+> as new backends still using the previous interface. That old interface 
+> should be removed in a subsequent merge cycle after everything is 
+> converted over.
+> 
+> The diffstat also shows a clear benefit.  Despite the addition of new 
+> documentation and the previous interface still in place, the number of 
+> lines actually goes down.
+> 
+> Tested on Versatile Express TC2 and Exynos 5800 (Chromebook2).
 
-Appled but with subject:
+Hi,
 
-arm64: dts: sprd: adding coresight entries to Spreadtrum SC9836                 
+This was based on a newer -rc than any other arm-soc contents (-rc4). I ended
+up cherry-picking the patches over instead.
+
+So, contents picked up but I didn't do it by merging the branch.
 
 
+Thanks,
 
 -Olof
