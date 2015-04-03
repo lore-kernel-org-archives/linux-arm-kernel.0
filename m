@@ -1,97 +1,69 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 03 Apr 2015 18:43:47 +0200
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
+Date: Fri, 03 Apr 2015 18:43:48 +0200
+Subject: [PATCH 5/6] ARM: Exynos: switch to using generic cpufreq driver for
+ Exynos4210
 In-Reply-To: <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
 References: <'@samsung.com>
  <1428079429-4252-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1428079429-4252-5-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1428079429-4252-6-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thomas Abraham <thomas.ab@samsung.com>
 
-For Exynos4210 platforms, add CPU operating points and CPU
-regulator supply properties for migrating from Exynos specific
-cpufreq driver to using generic cpufreq driver.
+The new CPU clock type allows the use of generic CPUfreq driver.
+Switch Exynos4210 to using generic cpufreq driver.
 
 Changes by Bartlomiej:
-- removed Exynos5250 and Exynos5420 support for now
+- removed non-Exynos4210 support for now
 
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Doug Anderson <dianders@chromium.org>
-Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-Cc: Andreas Faerber <afaerber@suse.de>
-Cc: Sachin Kamat <sachin.kamat@linaro.org>
-Cc: Andreas Farber <afaerber@suse.de>
 Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/boot/dts/exynos4210-origen.dts         |    4 ++++
- arch/arm/boot/dts/exynos4210-trats.dts          |    4 ++++
- arch/arm/boot/dts/exynos4210-universal_c210.dts |    4 ++++
- arch/arm/boot/dts/exynos4210.dtsi               |   12 ++++++++++++
- 4 files changed, 24 insertions(+)
+ arch/arm/mach-exynos/exynos.c |   21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index b811461..5b0941f 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -335,3 +335,7 @@
- 		};
- 	};
- };
-+
-+&cpu0 {
-+	cpu0-supply = <&buck1_reg>;
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index bcde0dd..4e13de5 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -197,6 +197,25 @@ static void __init exynos_init_irq(void)
+ 	exynos_map_pmu();
+ }
+ 
++static const struct of_device_id exynos_cpufreq_matches[] = {
++	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
++	{ /* sentinel */ }
 +};
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 32c5fd8..9b5bdd0 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -483,3 +483,7 @@
- 		};
- 	};
- };
 +
-+&cpu0 {
-+	cpu0-supply = <&varm_breg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index d4f2b11..5bf74da 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -567,3 +567,7 @@
- &mdma1 {
- 	reg = <0x12840000 0x1000>;
- };
++static void __init exynos_cpufreq_init(void)
++{
++	struct device_node *root = of_find_node_by_path("/");
++	const struct of_device_id *match;
 +
-+&cpu0 {
-+	cpu0-supply = <&vdd_arm_reg>;
-+};
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index be89f83..df075e64 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -40,6 +40,18 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0x900>;
-+			clocks = <&clock CLK_ARM_CLK>;
-+			clock-names = "cpu";
-+			clock-latency = <160000>;
++	match = of_match_node(exynos_cpufreq_matches, root);
++	if (!match) {
++		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
++		return;
++	}
 +
-+			operating-points = <
-+				1200000 1250000
-+				1000000 1150000
-+				800000	1075000
-+				500000	975000
-+				400000	975000
-+				200000	950000
-+			>;
- 			cooling-min-level = <4>;
- 			cooling-max-level = <2>;
- 			#cooling-cells = <2>; /* min followed by max */
++	platform_device_register_simple(match->data, -1, NULL, 0);
++}
++
+ static void __init exynos_dt_machine_init(void)
+ {
+ 	/*
+@@ -218,7 +237,7 @@ static void __init exynos_dt_machine_init(void)
+ 	    of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
+ 
+-	platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
++	exynos_cpufreq_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
 -- 
 1.7.9.5
