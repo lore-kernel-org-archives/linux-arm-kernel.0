@@ -1,32 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Apr 2015 11:18:49 -0700
-Subject: [PATCH] arm64: dts: Add Qualcomm APQ8016 SBC evaluation board dts
-In-Reply-To: <20150403181401.GN23023@localhost>
-References: <1427151065-29867-1-git-send-email-galak@codeaurora.org>
- <20150403181217.GM23023@localhost>
- <20150403181401.GN23023@localhost>
-Message-ID: <20150403181636.GO23023@localhost>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 3 Apr 2015 20:21:38 +0200
+Subject: [PATCH V2 1/3] i2c: busses: add SLIMpro I2C device driver on APM
+ X-Gene platform
+In-Reply-To: <CAL85gmD9qsjBdY2Qyv05AjutU_uad7aaRjxORk8om8WeRQM1Eg@mail.gmail.com>
+References: <1424288043-2995-1-git-send-email-fkan@apm.com>
+ <20150323183153.GA1128@katana>
+ <CAL85gmD9qsjBdY2Qyv05AjutU_uad7aaRjxORk8om8WeRQM1Eg@mail.gmail.com>
+Message-ID: <20150403182138.GB1298@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 03, 2015 at 11:14:01AM -0700, Olof Johansson wrote:
-> On Fri, Apr 03, 2015 at 11:12:17AM -0700, Olof Johansson wrote:
-> > On Mon, Mar 23, 2015 at 05:51:05PM -0500, Kumar Gala wrote:
-> > > Add initial device tree support for Qualcomm APQ8016 SBC Evaluation board.
-> > > This board is also referred to as the DragonBoard 410c.
-> > > 
-> > > Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> > 
-> > Hi,
-> > 
-> > Patch applied but see comment below.
+> >> +     paddr = dma_map_single(ctx->dev, ctx->dma_buffer, readlen,
+> >> +                            DMA_FROM_DEVICE);
+> >
+> > The device should be the device of the dma channel.
 > 
-> You both sent us the patch and a pull request with this patch in
-> it. Please only send patches to arm at kernel.org that you intend for us
-> to apply.
+> The device is not visible on linux, DMA is done by the helper processor.
+> Perhaps you cah give me some idea how to do this. Thanks
 
-Uh, need more coffee, please ignore. I got confused since your patch didn't
-apply cleanly due to the dts/qcom directory creation.
+Well, that is a question for the DMA maintainers. But we can fix this
+later, I guess.
 
-
--Olof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150403/d60dce7e/attachment.sig>
