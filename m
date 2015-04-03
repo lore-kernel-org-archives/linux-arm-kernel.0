@@ -1,29 +1,26 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 3 Apr 2015 22:42:46 +0200
-Subject: ARM errata 430973 on multi platform kernels (was: OMAP3-N900:
- Add microphone bias voltages)
-In-Reply-To: <20150403163553.GA16247@earth>
-References: <1425236828-28349-1-git-send-email-jarkko.nikula@bitmer.com>
- <55197A12.1050009@bitmer.com> <20150330164237.GJ10805@atomide.com>
- <55198BA4.5010207@bitmer.com> <20150330175051.GK10805@atomide.com>
- <20150331123233.GA15103@earth> <20150401194734.GT10805@atomide.com>
- <20150403163553.GA16247@earth>
-Message-ID: <20150403204246.GB13009@amd>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Apr 2015 13:49:57 -0700
+Subject: [RESEND PATCH] arm64: dts: add interrupt-affinity property to
+ pmu node for juno
+In-Reply-To: <1427709570-15891-1-git-send-email-will.deacon@arm.com>
+References: <1427709570-15891-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150403204957.GD23023@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, Mar 30, 2015 at 10:59:30AM +0100, Will Deacon wrote:
+> Make the Juno .dts robust against potential reordering of the CPU nodes
+> by adding an explicit interrupt-affinity property to the PMU node. While
+> we're at it, fix the PMU interrupts numbers too.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> 
+> Resending, as requested. Please apply for 4.1.
 
-> Maybe an option would be to provide two cpu_v7_switch_mm
-> implementations (one with the errata and one without). Then
-> the system can start with the simple implementation. Once
-> the boot as progressed far enough to know, that the hardware
-> is affected by the errata, it could switch to the implementation
-> with the flushing.
+Thanks, applied.
 
-Actually... we should start with the slow&safe option, and then switch
-to faster implementation if workaround is not needed.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+-Olof
