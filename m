@@ -1,43 +1,89 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 3 Apr 2015 17:25:42 +0800
-Subject: [PATCH v9 08/30] PCI: Update pci_host_bridge bus resource
+Date: Fri, 3 Apr 2015 17:25:39 +0800
+Subject: [PATCH v9 05/30] PCI: Introduce pci_host_assign_domain_nr() to assign
+ domain
 In-Reply-To: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
 References: <1428053164-28277-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1428053164-28277-10-git-send-email-wangyijing@huawei.com>
+Message-ID: <1428053164-28277-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yijing Wang <wangyijing0307@gmail.com>
-
-Sometimes, the bus resource start number is not equal to
-root bus number. For example, in pci_scan_bus(), we always
-add the default bus resource which start bus number is 0,
-but the root bus number callers given may != 0, so
-we need to update pci_host_bridge bus resource, because we
-would check whether host bridge bus resoruce is confict
-in later patch.
+Introduce pci_host_assign_domain_nr() to assign domain
+number for pci_host_bridge. In the later patch, we would
+assign domain in pci_create_host_bridge, clean up the
+pci_bus_assign_domain_nr() and move this function into
+drivers/pci/host-bridge.c.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/host-bridge.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
+ drivers/pci/pci.c |   21 ++++++++++++++++-----
+ drivers/pci/pci.h |    4 ++++
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/host-bridge.c b/drivers/pci/host-bridge.c
-index ecc1a7c..1a9834b 100644
---- a/drivers/pci/host-bridge.c
-+++ b/drivers/pci/host-bridge.c
-@@ -26,8 +26,11 @@ static void pci_host_update_busn_res(
- 	struct resource_entry *window;
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 81f06e8..6677fac 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4501,10 +4501,10 @@ int pci_get_new_domain_nr(void)
+ }
  
- 	resource_list_for_each_entry(window, resources)
--		if (window->res->flags & IORESOURCE_BUS)
-+		if (window->res->flags & IORESOURCE_BUS) {
-+			if (bus > window->res->start)
-+				window->res->start = bus;
- 			return;
-+		}
+ #ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++static int pci_assign_domain_nr(struct device *dev)
+ {
+ 	static int use_dt_domains = -1;
+-	int domain = of_get_pci_domain_nr(parent->of_node);
++	int domain = of_get_pci_domain_nr(dev->of_node);
  
- 	pr_info(
- 	 "No busn resource found for pci%04x:%02x, will use [bus %02x-ff]\n",
+ 	/*
+ 	 * Check DT domain and use_dt_domains values.
+@@ -4538,13 +4538,24 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 		use_dt_domains = 0;
+ 		domain = pci_get_new_domain_nr();
+ 	} else {
+-		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
+-			parent->of_node->full_name);
++		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
++			dev->of_node->full_name);
+ 		domain = -1;
+ 	}
+ 
+-	bus->domain_nr = domain;
++	return domain;
++}
++
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++{
++	bus->domain_nr = pci_assign_domain_nr(parent);
+ }
++
++void pci_host_assign_domain_nr(struct pci_host_bridge *host)
++{
++	host->domain = pci_assign_domain_nr(host->dev.parent);
++}
++
+ #endif
+ #endif
+ 
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index ba1bcce..1d3d2d1 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -323,11 +323,15 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
+ 
+ #ifdef CONFIG_PCI_DOMAINS_GENERIC
+ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
++void pci_host_assign_domain_nr(struct pci_host_bridge *host);
+ #else
+ static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+ 					struct device *parent)
+ {
+ }
++static inline void pci_host_assign_domain_nr(struct pci_host_bridge *host)
++{
++}
+ #endif
+ 
+ #endif /* DRIVERS_PCI_H */
 -- 
 1.7.1
